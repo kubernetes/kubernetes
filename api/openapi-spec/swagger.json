@@ -13130,6 +13130,27 @@
       "description": "Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and AsInt64() accessors.\n\nThe serialization format is:\n\n``` <quantity>        ::= <signedNumber><suffix>\n\n\t(Note that <suffix> may be empty, from the \"\" case in <decimalSI>.)\n\n<digit>           ::= 0 | 1 | ... | 9 <digits>          ::= <digit> | <digit><digits> <number>          ::= <digits> | <digits>.<digits> | <digits>. | .<digits> <sign>            ::= \"+\" | \"-\" <signedNumber>    ::= <number> | <sign><number> <suffix>          ::= <binarySI> | <decimalExponent> | <decimalSI> <binarySI>        ::= Ki | Mi | Gi | Ti | Pi | Ei\n\n\t(International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)\n\n<decimalSI>       ::= m | \"\" | k | M | G | T | P | E\n\n\t(Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)\n\n<decimalExponent> ::= \"e\" <signedNumber> | \"E\" <signedNumber> ```\n\nNo matter which of the three exponent forms is used, no quantity may represent a number greater than 2^63-1 in magnitude, nor may it have more than 3 decimal places. Numbers larger or more precise will be capped or rounded up. (E.g.: 0.1m will rounded up to 1m.) This may be extended in the future if we require larger or smaller quantities.\n\nWhen a Quantity is parsed from a string, it will remember the type of suffix it had, and will use the same type again when it is serialized.\n\nBefore serializing, Quantity will be put in \"canonical form\". This means that Exponent/suffix will be adjusted up or down (with a corresponding increase or decrease in Mantissa) such that:\n\n- No precision is lost - No fractional digits will be emitted - The exponent (or suffix) is as large as possible.\n\nThe sign will be omitted unless the number is negative.\n\nExamples:\n\n- 1.5 will be serialized as \"1500m\" - 1.5Gi will be serialized as \"1536Mi\"\n\nNote that the quantity will NEVER be internally represented by a floating point number. That is the whole point of this exercise.\n\nNon-canonical values will still parse as long as they are well formed, but will be re-emitted in their canonical form. (So always use canonical form, or don't diff.)\n\nThis format is intended to make it difficult to use these numbers without writing some sort of special handling code in the hopes that that will cause implementors to also use a fixed point implementation.",
       "type": "string"
     },
+    "io.k8s.apimachinery.pkg.apis.meta.v1.APIDiscoveryKind": {
+      "description": "APIDiscoveryKind provides the group version kind information for a resource.",
+      "properties": {
+        "group": {
+          "description": "Group is the group of the serialization.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind is the kind of the serialiation",
+          "type": "string"
+        },
+        "version": {
+          "description": "Version is the version of the serialization",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "type": "object"
+    },
     "io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup": {
       "description": "APIGroup contains the name, the supported versions, and the preferred version of a group.",
       "properties": {
@@ -13176,6 +13197,115 @@
           "version": "v1"
         }
       ]
+    },
+    "io.k8s.apimachinery.pkg.apis.meta.v1.APIGroupDiscovery": {
+      "description": "APIGroupDiscovery holds information about which resources are being served for all version of the API Group.",
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
+          "description": "Standard object's metadata. The only field completed will be Name.  For instance, resourceVersion will be empty. Name is the name of the API group whose discovery information is presented here. Name is allowed to be \"\" to represent the legacy, ungroupified resources. This is included to make the standard deserialization easier. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+        },
+        "status": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroupDiscoveryStatus",
+          "description": "Most recently observed status of the APIGroupDiscovery. This data may not be up to date. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
+        },
+        "versions": {
+          "description": "Versions are the versions supported in this group.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIVersionDiscovery"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "version"
+          ],
+          "x-kubernetes-list-type": "map"
+        }
+      },
+      "type": "object",
+      "x-kubernetes-group-version-kind": [
+        {
+          "group": "",
+          "kind": "APIGroupDiscovery",
+          "version": "v1"
+        }
+      ]
+    },
+    "io.k8s.apimachinery.pkg.apis.meta.v1.APIGroupDiscoveryList": {
+      "description": "APIGroupDiscoveryList is a resource containing a list of APIGroupDiscoveries. The shape is chosen to be very similar to \"normal\" api endpoints and work well with our type system This is what is returned from the /discovery/v2 endpoint.",
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+          "type": "string"
+        },
+        "groups": {
+          "description": "Groups is the list of groups for discovery.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroupDiscovery"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta",
+          "description": "ResourceVersion will not be set, because this does not have a replayable ordering among multiple apiservers. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+        }
+      },
+      "required": [
+        "groups"
+      ],
+      "type": "object",
+      "x-kubernetes-group-version-kind": [
+        {
+          "group": "",
+          "kind": "APIGroupDiscoveryList",
+          "version": "v1"
+        }
+      ]
+    },
+    "io.k8s.apimachinery.pkg.apis.meta.v1.APIGroupDiscoveryStatus": {
+      "description": "APIGroupDiscoveryStatus contains the observations of an APIGroupDiscovery",
+      "properties": {
+        "conditions": {
+          "description": "Represents the observations of a APIGroupDiscovery's current state. Known .status.conditions.type are: \"Stale\"",
+          "items": {
+            "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map",
+          "x-kubernetes-patch-merge-key": "type",
+          "x-kubernetes-patch-strategy": "merge"
+        },
+        "staleVersions": {
+          "description": "StaleVersions represent the observations of a APIGroupDiscovery's current state.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "set"
+        }
+      },
+      "required": [
+        "staleVersions"
+      ],
+      "type": "object"
     },
     "io.k8s.apimachinery.pkg.apis.meta.v1.APIGroupList": {
       "description": "APIGroupList is a list of APIGroup, to allow clients to discover the API at /apis.",
@@ -13270,6 +13400,69 @@
       ],
       "type": "object"
     },
+    "io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceDiscovery": {
+      "description": "APIResourceDiscovery provides information about an API resource for discovery.",
+      "properties": {
+        "categories": {
+          "description": "Categories is a list of the grouped resources this resource belongs to (e.g. 'all')",
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "set"
+        },
+        "resource": {
+          "description": "Resource is the plural name of the resource.  This is used in the URL path and is the unique identifier for this resource across all versions. resources with non-\"\" groups are located at /apis/<APIGroupDiscovery.objectMeta.name>/<APIVersionDiscovery.version>/<APIResourceDiscovery.Resource> resource with \"\" groups are located at /api/v1/<APIResourceDiscovery.Resource>",
+          "type": "string"
+        },
+        "returnType": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIDiscoveryKind",
+          "description": "ReturnType describes the type of serialization that will be returned from this endpoint."
+        },
+        "scope": {
+          "description": "Scope indicates the scope of a resource, either Cluster or Namespace",
+          "type": "string"
+        },
+        "shortNames": {
+          "description": "ShortNames is a list of suggested short names of the resource.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "set"
+        },
+        "singularName": {
+          "description": "SingularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely. The singularName is more correct for reporting status on a single item and both singular and plural are allowed from the kubectl CLI interface.",
+          "type": "string"
+        },
+        "subresources": {
+          "description": "Subresources is a list of subresources provided by this resource. Subresources are located at /apis/<APIGroupDiscovery.objectMeta.name>/<APIVersionDiscovery.version>/<APIResourceDiscovery.Resource>/name-of-instance/<APIResourceDiscovery.subresources[i].subresource>",
+          "items": {
+            "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APISubresourceDiscovery"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "subresource"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "verbs": {
+          "description": "Verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, other)",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "resource",
+        "returnType",
+        "scope",
+        "singularName",
+        "verbs"
+      ],
+      "type": "object"
+    },
     "io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList": {
       "description": "APIResourceList is a list of APIResource, it is used to expose the name of the resources supported in a specific group and version, and if the resource is namespaced.",
       "properties": {
@@ -13305,6 +13498,63 @@
           "version": "v1"
         }
       ]
+    },
+    "io.k8s.apimachinery.pkg.apis.meta.v1.APISubresourceDiscovery": {
+      "description": "APISubresourceDiscovery provides information about an API subresource for discovery.",
+      "properties": {
+        "acceptedTypes": {
+          "description": "AcceptedTypes describes the kinds that this endpoint accepts.  It is possible for a subresource to accept multiple kinds. It is also possible for an endpoint to accept no standard types.  Those will have a zero length list.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIDiscoveryKind"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "set"
+        },
+        "returnType": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIDiscoveryKind",
+          "description": "ReturnType describes the type of serialization that will be returned from this endpoint. Some subresources do not return normal resources, these will have nil return types."
+        },
+        "subresource": {
+          "description": "Subresource is the name of the subresource.  This is used in the URL path and is the unique identifier for this resource across all versions.",
+          "type": "string"
+        },
+        "verbs": {
+          "description": "Verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, other)",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "subresource",
+        "verbs"
+      ],
+      "type": "object"
+    },
+    "io.k8s.apimachinery.pkg.apis.meta.v1.APIVersionDiscovery": {
+      "description": "APIVersionDiscovery holds a list of APIResourceDiscovery types that are served for a particular version within an API Group.",
+      "properties": {
+        "resources": {
+          "description": "Resources is a list of APIResourceDiscovery objects for the corresponding group version.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceDiscovery"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "resource"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "version": {
+          "description": "Version is the name of the version within a group version.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "type": "object"
     },
     "io.k8s.apimachinery.pkg.apis.meta.v1.APIVersions": {
       "description": "APIVersions lists the versions that are available, to allow clients to discover the API at /api, which is the root path of the legacy v1 API.",
@@ -13687,106 +13937,6 @@
           "version": "v1beta1"
         }
       ]
-    },
-    "io.k8s.apimachinery.pkg.apis.meta.v1.DiscoveryAPIGroup": {
-      "description": "APIGroup contains the name, the supported versions, and the preferred version of a group.",
-      "properties": {
-        "apiVersion": {
-          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-          "type": "string"
-        },
-        "kind": {
-          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-          "type": "string"
-        },
-        "name": {
-          "description": "name is the name of the group.",
-          "type": "string"
-        },
-        "versions": {
-          "description": "versions are the versions supported in this group. This will be sorted in descending order based on the preferred version",
-          "items": {
-            "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DiscoveryGroupVersion"
-          },
-          "type": "array",
-          "x-kubernetes-list-map-keys": [
-            "version"
-          ],
-          "x-kubernetes-list-type": "map"
-        }
-      },
-      "required": [
-        "name",
-        "versions"
-      ],
-      "type": "object",
-      "x-kubernetes-group-version-kind": [
-        {
-          "group": "",
-          "kind": "DiscoveryAPIGroup",
-          "version": "v1"
-        }
-      ]
-    },
-    "io.k8s.apimachinery.pkg.apis.meta.v1.DiscoveryAPIGroupList": {
-      "description": "Discovery API Types DiscoveryAPIGroupList is a list of APIGroup, to allow clients to discover the API at /discovery/v2.",
-      "properties": {
-        "apiVersion": {
-          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-          "type": "string"
-        },
-        "groups": {
-          "description": "groups is a list of APIGroup.",
-          "items": {
-            "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DiscoveryAPIGroup"
-          },
-          "type": "array",
-          "x-kubernetes-list-map-keys": [
-            "name"
-          ],
-          "x-kubernetes-list-type": "map"
-        },
-        "kind": {
-          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-          "type": "string"
-        }
-      },
-      "required": [
-        "groups"
-      ],
-      "type": "object",
-      "x-kubernetes-group-version-kind": [
-        {
-          "group": "",
-          "kind": "DiscoveryAPIGroupList",
-          "version": "v1"
-        }
-      ]
-    },
-    "io.k8s.apimachinery.pkg.apis.meta.v1.DiscoveryGroupVersion": {
-      "description": "GroupVersion contains the \"group/version\" and \"version\" string of a version. It is made a struct to keep extensibility.",
-      "properties": {
-        "resources": {
-          "description": "resources contains the name of the resources and if they are namespaced.",
-          "items": {
-            "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource"
-          },
-          "type": "array",
-          "x-kubernetes-list-map-keys": [
-            "name"
-          ],
-          "x-kubernetes-list-type": "map"
-        },
-        "version": {
-          "description": "version specifies the version in the form of \"version\". This is to save the clients the trouble of splitting the GroupVersion.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "version",
-        "resources"
-      ],
-      "type": "object"
     },
     "io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1": {
       "description": "FieldsV1 stores a set of fields in a data structure like a Trie, in JSON format.\n\nEach key is either a '.' representing the field itself, and will always map to an empty set, or a string representing a sub-field or item. The string will follow one of these four formats: 'f:<name>', where <name> is the name of a field in a struct, or key in a map 'v:<value>', where <value> is the exact json formatted value of a list item 'i:<index>', where <index> is position of a item in a list 'k:<keys>', where <keys> is a map of  a list item's key fields to their unique values If a key maps to an empty Fields value, the field that key represents is part of the set.\n\nThe exact format is defined in sigs.k8s.io/structured-merge-diff",
@@ -77036,7 +77186,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DiscoveryAPIGroupList"
+              "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroupDiscoveryList"
             }
           },
           "401": {

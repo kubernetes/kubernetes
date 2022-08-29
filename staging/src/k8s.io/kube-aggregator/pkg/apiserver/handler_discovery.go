@@ -31,9 +31,9 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/v2"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	scheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 // Given a list of APIServices and proxyHandlers for contacting them,
@@ -139,7 +139,7 @@ type apiServiceInfo struct {
 
 	// Currently cached discovery document for this service
 	// a nil discovery document indicates this service needs to be re-fetched
-	discovery *metav1.DiscoveryAPIGroupList
+	discovery *metav1.APIGroupDiscoveryList
 
 	// ETag hash of the cached discoveryDocument
 	etag string
@@ -230,7 +230,7 @@ func (dm *discoveryManager) refreshDocument(localOnly bool) error {
 	// Download update discovery documents in parallel
 	type resultItem struct {
 		service   serviceKey
-		discovery *metav1.DiscoveryAPIGroupList
+		discovery *metav1.APIGroupDiscoveryList
 		etag      string
 		error     error
 	}
@@ -258,7 +258,8 @@ func (dm *discoveryManager) refreshDocument(localOnly bool) error {
 				klog.Errorf("failed to create http.Request for /discovery/v2: %v", err)
 				continue
 			}
-			req.Header.Add("Accept", runtime.ContentTypeProtobuf)
+			// req.Header.Add("Accept", runtime.ContentTypeProtobuf)
+			req.Header.Add("Accept", runtime.ContentTypeJSON)
 
 			if len(updateInfo.etag) != 0 {
 				req.Header.Add("If-None-Match", updateInfo.etag)
@@ -278,8 +279,8 @@ func (dm *discoveryManager) refreshDocument(localOnly bool) error {
 					error:     errors.New("not found"),
 				}
 			case http.StatusOK:
-				parsed := &metav1.DiscoveryAPIGroupList{}
-				if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), writer.data, parsed); err != nil {
+				parsed := &metav1.APIGroupDiscoveryList{}
+				if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), writer.data, parsed); err != nil {
 					results <- resultItem{
 						service: key,
 						error:   err,
@@ -345,7 +346,7 @@ func (dm *discoveryManager) refreshDocument(localOnly bool) error {
 
 	// After merging all the data back together, give it to the endpoint handler
 	// to respond to HTTP requests
-	var allGroups []metav1.DiscoveryAPIGroup
+	var allGroups []metav1.APIGroupDiscovery
 	for _, info := range dm.services {
 		if info.discovery != nil {
 			allGroups = append(allGroups, info.discovery.Groups...)

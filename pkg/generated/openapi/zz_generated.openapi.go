@@ -882,10 +882,17 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.WebhookClientConfig":               schema_pkg_apis_apiextensions_v1beta1_WebhookClientConfig(ref),
 		"k8s.io/apimachinery/pkg/api/resource.Quantity":                                                   schema_apimachinery_pkg_api_resource_Quantity(ref),
 		"k8s.io/apimachinery/pkg/api/resource.int64Amount":                                                schema_apimachinery_pkg_api_resource_int64Amount(ref),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.APIDiscoveryKind":                                           schema_pkg_apis_meta_v1_APIDiscoveryKind(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroup":                                                   schema_pkg_apis_meta_v1_APIGroup(ref),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroupDiscovery":                                          schema_pkg_apis_meta_v1_APIGroupDiscovery(ref),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroupDiscoveryList":                                      schema_pkg_apis_meta_v1_APIGroupDiscoveryList(ref),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroupDiscoveryStatus":                                    schema_pkg_apis_meta_v1_APIGroupDiscoveryStatus(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroupList":                                               schema_pkg_apis_meta_v1_APIGroupList(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.APIResource":                                                schema_pkg_apis_meta_v1_APIResource(ref),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.APIResourceDiscovery":                                       schema_pkg_apis_meta_v1_APIResourceDiscovery(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.APIResourceList":                                            schema_pkg_apis_meta_v1_APIResourceList(ref),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.APISubresourceDiscovery":                                    schema_pkg_apis_meta_v1_APISubresourceDiscovery(ref),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.APIVersionDiscovery":                                        schema_pkg_apis_meta_v1_APIVersionDiscovery(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.APIVersions":                                                schema_pkg_apis_meta_v1_APIVersions(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.ApplyOptions":                                               schema_pkg_apis_meta_v1_ApplyOptions(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.Condition":                                                  schema_pkg_apis_meta_v1_Condition(ref),
@@ -44150,6 +44157,42 @@ func schema_apimachinery_pkg_api_resource_int64Amount(ref common.ReferenceCallba
 	}
 }
 
+func schema_pkg_apis_meta_v1_APIDiscoveryKind(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "APIDiscoveryKind provides the group version kind information for a resource.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"group": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Group is the group of the serialization.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"version": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Version is the version of the serialization",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is the kind of the serialiation",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"kind"},
+			},
+		},
+	}
+}
+
 func schema_pkg_apis_meta_v1_APIGroup(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -44220,6 +44263,190 @@ func schema_pkg_apis_meta_v1_APIGroup(ref common.ReferenceCallback) common.OpenA
 		},
 		Dependencies: []string{
 			"k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersionForDiscovery", "k8s.io/apimachinery/pkg/apis/meta/v1.ServerAddressByClientCIDR"},
+	}
+}
+
+func schema_pkg_apis_meta_v1_APIGroupDiscovery(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "APIGroupDiscovery holds information about which resources are being served for all version of the API Group.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata. The only field completed will be Name.  For instance, resourceVersion will be empty. Name is the name of the API group whose discovery information is presented here. Name is allowed to be \"\" to represent the legacy, ungroupified resources. This is included to make the standard deserialization easier. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"versions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"version",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Versions are the versions supported in this group.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.APIVersionDiscovery"),
+									},
+								},
+							},
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Most recently observed status of the APIGroupDiscovery. This data may not be up to date. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.APIGroupDiscoveryStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroupDiscoveryStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.APIVersionDiscovery", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_pkg_apis_meta_v1_APIGroupDiscoveryList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "APIGroupDiscoveryList is a resource containing a list of APIGroupDiscoveries. The shape is chosen to be very similar to \"normal\" api endpoints and work well with our type system This is what is returned from the /discovery/v2 endpoint.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ResourceVersion will not be set, because this does not have a replayable ordering among multiple apiservers. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"groups": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Groups is the list of groups for discovery.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.APIGroupDiscovery"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"groups"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroupDiscovery", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
+func schema_pkg_apis_meta_v1_APIGroupDiscoveryStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "APIGroupDiscoveryStatus contains the observations of an APIGroupDiscovery",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"staleVersions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "StaleVersions represent the observations of a APIGroupDiscovery's current state.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"type",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "type",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Represents the observations of a APIGroupDiscovery's current state. Known .status.conditions.type are: \"Stale\"",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.Condition"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"staleVersions"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Condition"},
 	}
 }
 
@@ -44379,6 +44606,130 @@ func schema_pkg_apis_meta_v1_APIResource(ref common.ReferenceCallback) common.Op
 	}
 }
 
+func schema_pkg_apis_meta_v1_APIResourceDiscovery(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "APIResourceDiscovery provides information about an API resource for discovery.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"resource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Resource is the plural name of the resource.  This is used in the URL path and is the unique identifier for this resource across all versions. resources with non-\"\" groups are located at /apis/<APIGroupDiscovery.objectMeta.name>/<APIVersionDiscovery.version>/<APIResourceDiscovery.Resource> resource with \"\" groups are located at /api/v1/<APIResourceDiscovery.Resource>",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"returnType": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ReturnType describes the type of serialization that will be returned from this endpoint.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.APIDiscoveryKind"),
+						},
+					},
+					"scope": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Scope indicates the scope of a resource, either Cluster or Namespace",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"singularName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SingularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely. The singularName is more correct for reporting status on a single item and both singular and plural are allowed from the kubectl CLI interface.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"verbs": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, other)",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"shortNames": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "ShortNames is a list of suggested short names of the resource.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"categories": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Categories is a list of the grouped resources this resource belongs to (e.g. 'all')",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"subresources": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"subresource",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Subresources is a list of subresources provided by this resource. Subresources are located at /apis/<APIGroupDiscovery.objectMeta.name>/<APIVersionDiscovery.version>/<APIResourceDiscovery.Resource>/name-of-instance/<APIResourceDiscovery.subresources[i].subresource>",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.APISubresourceDiscovery"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"resource", "returnType", "scope", "singularName", "verbs"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.APIDiscoveryKind", "k8s.io/apimachinery/pkg/apis/meta/v1.APISubresourceDiscovery"},
+	}
+}
+
 func schema_pkg_apis_meta_v1_APIResourceList(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -44428,6 +44779,116 @@ func schema_pkg_apis_meta_v1_APIResourceList(ref common.ReferenceCallback) commo
 		},
 		Dependencies: []string{
 			"k8s.io/apimachinery/pkg/apis/meta/v1.APIResource"},
+	}
+}
+
+func schema_pkg_apis_meta_v1_APISubresourceDiscovery(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "APISubresourceDiscovery provides information about an API subresource for discovery.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"subresource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Subresource is the name of the subresource.  This is used in the URL path and is the unique identifier for this resource across all versions.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"returnType": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ReturnType describes the type of serialization that will be returned from this endpoint. Some subresources do not return normal resources, these will have nil return types.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.APIDiscoveryKind"),
+						},
+					},
+					"acceptedTypes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "AcceptedTypes describes the kinds that this endpoint accepts.  It is possible for a subresource to accept multiple kinds. It is also possible for an endpoint to accept no standard types.  Those will have a zero length list.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.APIDiscoveryKind"),
+									},
+								},
+							},
+						},
+					},
+					"verbs": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, other)",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"subresource", "verbs"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.APIDiscoveryKind"},
+	}
+}
+
+func schema_pkg_apis_meta_v1_APIVersionDiscovery(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "APIVersionDiscovery holds a list of APIResourceDiscovery types that are served for a particular version within an API Group.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"version": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Version is the name of the version within a group version.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"resources": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"resource",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Resources is a list of APIResourceDiscovery objects for the corresponding group version.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.APIResourceDiscovery"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"version"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.APIResourceDiscovery"},
 	}
 }
 

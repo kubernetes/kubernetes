@@ -54,38 +54,46 @@ func init() {
 	serializer = runtime.NewSimpleNegotiatedSerializer(info)
 }
 
-func fuzzAPIGroups(atLeastNumGroups, maxNumGroups int, seed int64) metav1.DiscoveryAPIGroupList {
+func fuzzAPIGroups(atLeastNumGroups, maxNumGroups int, seed int64) metav1.APIGroupDiscoveryList {
 	fuzzer := fuzz.NewWithSeed(seed)
 	fuzzer.NumElements(atLeastNumGroups, maxNumGroups)
 	fuzzer.NilChance(0)
-	fuzzer.Funcs(func(o *metav1.DiscoveryAPIGroup, c fuzz.Continue) {
+	fuzzer.Funcs(func(o *metav1.APIGroupDiscovery, c fuzz.Continue) {
 		c.FuzzNoCustom(o)
 
 		// The ResourceManager will just not serve the grouop if its versions
 		// list is empty
-		atLeastOne := metav1.DiscoveryGroupVersion{}
+		atLeastOne := metav1.APIVersionDiscovery{}
 		c.Fuzz(&atLeastOne)
 		o.Versions = append(o.Versions, atLeastOne)
 
 		o.TypeMeta = metav1.TypeMeta{
-			Kind:       "DiscoveryAPIGroup",
+			Kind:       "APIGroupDiscovery",
 			APIVersion: "v1",
+		}
+		var name string
+		c.Fuzz(&name)
+		o.ObjectMeta = metav1.ObjectMeta{
+			Name: name,
+		}
+		o.Status = metav1.APIGroupDiscoveryStatus{
+			// TODO: We may need to change how conditions work with discovery
 		}
 	})
 
-	var apis []metav1.DiscoveryAPIGroup
+	var apis []metav1.APIGroupDiscovery
 	fuzzer.Fuzz(&apis)
 
-	return metav1.DiscoveryAPIGroupList{
+	return metav1.APIGroupDiscoveryList{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "DiscoveryAPIGroupList",
+			Kind:       "APIGroupDiscoveryList",
 			APIVersion: "v1",
 		},
 		Groups: apis,
 	}
 }
 
-func fetchPath(handler http.Handler, path string, etag string) (*http.Response, []byte, *metav1.DiscoveryAPIGroupList) {
+func fetchPath(handler http.Handler, path string, etag string) (*http.Response, []byte, *metav1.APIGroupDiscoveryList) {
 	// Expect json-formatted apis group list
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", discoveryPath, nil)
@@ -105,9 +113,9 @@ func fetchPath(handler http.Handler, path string, etag string) (*http.Response, 
 	handler.ServeHTTP(w, req)
 
 	bytes := w.Body.Bytes()
-	var decoded *metav1.DiscoveryAPIGroupList
+	var decoded *metav1.APIGroupDiscoveryList
 	if len(bytes) > 0 {
-		decoded = &metav1.DiscoveryAPIGroupList{}
+		decoded = &metav1.APIGroupDiscoveryList{}
 		runtime.DecodeInto(codecs.UniversalDecoder(), bytes, decoded)
 	}
 
@@ -325,7 +333,7 @@ func TestUpdateService(t *testing.T) {
 
 	assert.Equal(t, initialDocument, &apis, "should have returned expected document")
 
-	apis.Groups[0].Versions[0].APIResources[0].Name = "changed a resource name!"
+	apis.Groups[0].Versions[0].Resources[0].Resource = "changed a resource name!"
 
 	for _, group := range apis.Groups {
 		for _, version := range group.Versions {

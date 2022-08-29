@@ -27,6 +27,18 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "k8s.io/apimachinery/pkg/apis/meta/v1";
 
+// APIDiscoveryKind provides the group version kind information for a resource.
+message APIDiscoveryKind {
+  // Group is the group of the serialization.
+  optional string group = 1;
+
+  // Version is the version of the serialization
+  optional string version = 2;
+
+  // Kind is the kind of the serialiation
+  optional string kind = 3;
+}
+
 // APIGroup contains the name, the supported versions, and the preferred version
 // of a group.
 message APIGroup {
@@ -50,6 +62,59 @@ message APIGroup {
   // Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP.
   // +optional
   repeated ServerAddressByClientCIDR serverAddressByClientCIDRs = 4;
+}
+
+// APIGroupDiscovery holds information about which resources are being served for all version of the API Group.
+message APIGroupDiscovery {
+  // Standard object's metadata.
+  // The only field completed will be Name.  For instance, resourceVersion will be empty.
+  // Name is the name of the API group whose discovery information is presented here.
+  // Name is allowed to be "" to represent the legacy, ungroupified resources.
+  // This is included to make the standard deserialization easier.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
+  optional ObjectMeta metadata = 1;
+
+  // Versions are the versions supported in this group.
+  // +listType=map
+  // +listMapKey=version
+  repeated APIVersionDiscovery versions = 2;
+
+  // Most recently observed status of the APIGroupDiscovery.
+  // This data may not be up to date.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+  // +optional
+  optional APIGroupDiscoveryStatus status = 3;
+}
+
+// APIGroupDiscoveryList is a resource containing a list of APIGroupDiscoveries.
+// The shape is chosen to be very similar to "normal" api endpoints and work well with our type system
+// This is what is returned from the /discovery/v2 endpoint.
+message APIGroupDiscoveryList {
+  // ResourceVersion will not be set, because this does not have a replayable ordering among multiple apiservers.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
+  optional ListMeta metadata = 1;
+
+  // Groups is the list of groups for discovery.
+  // +listType=map
+  // +listMapKey=name
+  repeated APIGroupDiscovery groups = 2;
+}
+
+// APIGroupDiscoveryStatus contains the observations of an APIGroupDiscovery
+message APIGroupDiscoveryStatus {
+  // StaleVersions represent the observations of a APIGroupDiscovery's current state.
+  // +listType=set
+  repeated string staleVersions = 1;
+
+  // Represents the observations of a APIGroupDiscovery's current state.
+  // Known .status.conditions.type are: "Stale"
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
+  repeated Condition conditions = 2;
 }
 
 // APIGroupList is a list of APIGroup, to allow clients to discover the API at
@@ -104,6 +169,43 @@ message APIResource {
   optional string storageVersionHash = 10;
 }
 
+// APIResourceDiscovery provides information about an API resource for discovery.
+message APIResourceDiscovery {
+  // Resource is the plural name of the resource.  This is used in the URL path and is the unique identifier
+  // for this resource across all versions.
+  // resources with non-"" groups are located at /apis/<APIGroupDiscovery.objectMeta.name>/<APIVersionDiscovery.version>/<APIResourceDiscovery.Resource>
+  // resource with "" groups are located at /api/v1/<APIResourceDiscovery.Resource>
+  optional string resource = 1;
+
+  // ReturnType describes the type of serialization that will be returned from this endpoint.
+  optional APIDiscoveryKind returnType = 2;
+
+  // Scope indicates the scope of a resource, either Cluster or Namespace
+  optional string scope = 3;
+
+  // SingularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely.
+  // The singularName is more correct for reporting status on a single item and both singular and plural are allowed
+  // from the kubectl CLI interface.
+  optional string singularName = 4;
+
+  // Verbs is a list of supported kube verbs (this includes get, list, watch, create,
+  // update, patch, delete, deletecollection, other)
+  optional Verbs verbs = 5;
+
+  // ShortNames is a list of suggested short names of the resource.
+  // +listType=set
+  repeated string shortNames = 6;
+
+  // Categories is a list of the grouped resources this resource belongs to (e.g. 'all')
+  // +listType=set
+  repeated string categories = 7;
+
+  // Subresources is a list of subresources provided by this resource. Subresources are located at /apis/<APIGroupDiscovery.objectMeta.name>/<APIVersionDiscovery.version>/<APIResourceDiscovery.Resource>/name-of-instance/<APIResourceDiscovery.subresources[i].subresource>
+  // +listType=map
+  // +listMapKey=subresource
+  repeated APISubresourceDiscovery subresources = 8;
+}
+
 // APIResourceList is a list of APIResource, it is used to expose the name of the
 // resources supported in a specific group and version, and if the resource
 // is namespaced.
@@ -113,6 +215,37 @@ message APIResourceList {
 
   // resources contains the name of the resources and if they are namespaced.
   repeated APIResource resources = 2;
+}
+
+// APISubresourceDiscovery provides information about an API subresource for discovery.
+message APISubresourceDiscovery {
+  // Subresource is the name of the subresource.  This is used in the URL path and is the unique identifier
+  // for this resource across all versions.
+  optional string subresource = 1;
+
+  // ReturnType describes the type of serialization that will be returned from this endpoint.
+  // Some subresources do not return normal resources, these will have nil return types.
+  optional APIDiscoveryKind returnType = 2;
+
+  // AcceptedTypes describes the kinds that this endpoint accepts.  It is possible for a subresource to accept multiple kinds.
+  // It is also possible for an endpoint to accept no standard types.  Those will have a zero length list.
+  // +listType=set
+  repeated APIDiscoveryKind acceptedTypes = 3;
+
+  // Verbs is a list of supported kube verbs (this includes get, list, watch, create,
+  // update, patch, delete, other)
+  optional Verbs verbs = 4;
+}
+
+// APIVersionDiscovery holds a list of APIResourceDiscovery types that are served for a particular version within an API Group.
+message APIVersionDiscovery {
+  // Version is the name of the version within a group version.
+  optional string version = 1;
+
+  // Resources is a list of APIResourceDiscovery objects for the corresponding group version.
+  // +listType=map
+  // +listMapKey=resource
+  repeated APIResourceDiscovery resources = 2;
 }
 
 // APIVersions lists the versions that are available, to allow clients to

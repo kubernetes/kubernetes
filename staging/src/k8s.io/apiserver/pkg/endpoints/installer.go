@@ -68,6 +68,83 @@ type action struct {
 	AllNamespaces bool // true iff the action is namespaced but works on aggregate result for all namespaces
 }
 
+type discoveryAPIResourceBuilder struct {
+	discoveryAPIResourceList []*discoveryAPIResourceBuilderConfig
+}
+
+func (b *discoveryAPIResourceBuilder) ToDiscoveryAPIResource() []metav1.APIResource {
+	var apiResourceList []metav1.APIResource
+	for _, r := range b.discoveryAPIResourceList {
+		apiResourceList = append(apiResourceList, metav1.APIResource{
+			Name:               r.path,
+			Namespaced:         r.namespaceScoped,
+			Group:              r.group,
+			Version:            r.version,
+			Kind:               r.resourceKind,
+			Verbs:              r.verbs,
+			ShortNames:         r.shortnames,
+			Categories:         r.categories,
+			StorageVersionHash: r.storageVersionHash,
+		})
+	}
+	return apiResourceList
+}
+
+func (b *discoveryAPIResourceBuilder) ToDiscoveryAPIResourceForAggregatedDiscovery() []metav1.APIResourceDiscovery {
+	var apiResourceList []metav1.APIResourceDiscovery
+
+	for _, r := range b.discoveryAPIResourceList {
+		var scope metav1.ResourceScope
+		if r.namespaceScoped {
+			scope = metav1.ScopeNamespace
+		} else {
+			scope = metav1.ScopeCluster
+		}
+		if len(r.subresource) > 0 {
+			parent := &apiResourceList[len(apiResourceList)-1]
+			// TODO: Because the list is sorted, the parent resource is the last resource that was added. Maybe a check could be added to verify this case
+			parent.Subresources = append(parent.Subresources, metav1.APISubresourceDiscovery{
+				Subresource: r.subresource,
+				ReturnType: &metav1.APIDiscoveryKind{
+					Group:   r.group,
+					Version: r.version,
+					Kind:    r.resourceKind,
+				},
+				Verbs: r.verbs,
+			})
+		} else {
+			apiResourceList = append(apiResourceList, metav1.APIResourceDiscovery{
+				Resource: r.path,
+				Scope:    scope,
+				ReturnType: metav1.APIDiscoveryKind{
+					Group:   r.group,
+					Version: r.version,
+					Kind:    r.resourceKind,
+				},
+				Verbs:      r.verbs,
+				ShortNames: r.shortnames,
+				Categories: r.categories,
+			})
+		}
+	}
+	return apiResourceList
+}
+
+type discoveryAPIResourceBuilderConfig struct {
+	path               string
+	resource           string
+	subresource        string
+	resourceKind       string
+	storageVersionHash string
+	namespaceScoped    bool
+	verbs              []string
+	shortnames         []string
+	categories         []string
+	group              string
+	version            string
+	kind               string
+}
+
 // An interface to see if one storage supports override its default verb for monitoring
 type StorageMetricsOverride interface {
 	// OverrideMetricsVerb gives a storage object an opportunity to override the verb reported to the metrics endpoint
@@ -95,8 +172,7 @@ var toDiscoveryKubeVerb = map[string]string{
 }
 
 // Install handlers for API resources.
-func (a *APIInstaller) Install() ([]metav1.APIResource, []*storageversion.ResourceInfo, *restful.WebService, []error) {
-	var apiResources []metav1.APIResource
+func (a *APIInstaller) Install() ([]metav1.APIResource, []metav1.APIResourceDiscovery, []*storageversion.ResourceInfo, *restful.WebService, []error) {
 	var resourceInfos []*storageversion.ResourceInfo
 	var errors []error
 	ws := a.newWebService()
@@ -109,19 +185,22 @@ func (a *APIInstaller) Install() ([]metav1.APIResource, []*storageversion.Resour
 		i++
 	}
 	sort.Strings(paths)
+	builder := &discoveryAPIResourceBuilder{}
 	for _, path := range paths {
-		apiResource, resourceInfo, err := a.registerResourceHandlers(path, a.group.Storage[path], ws)
+		partialResource, resourceInfo, err := a.registerResourceHandlers(path, a.group.Storage[path], ws)
 		if err != nil {
 			errors = append(errors, fmt.Errorf("error in registering resource: %s, %v", path, err))
 		}
-		if apiResource != nil {
-			apiResources = append(apiResources, *apiResource)
+		if partialResource != nil {
+			builder.discoveryAPIResourceList = append(builder.discoveryAPIResourceList, partialResource)
 		}
 		if resourceInfo != nil {
 			resourceInfos = append(resourceInfos, resourceInfo)
 		}
 	}
-	return apiResources, resourceInfos, ws, errors
+	apiResources := builder.ToDiscoveryAPIResource()
+	apiResourcesAggregatedDiscovery := builder.ToDiscoveryAPIResourceForAggregatedDiscovery()
+	return apiResources, apiResourcesAggregatedDiscovery, resourceInfos, ws, errors
 }
 
 // newWebService creates a new restful webservice with the api installer's prefix and version.
@@ -187,7 +266,7 @@ func GetResourceKind(groupVersion schema.GroupVersion, storage rest.Storage, typ
 	return fqKindToRegister, nil
 }
 
-func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService) (*metav1.APIResource, *storageversion.ResourceInfo, error) {
+func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService) (*discoveryAPIResourceBuilderConfig, *storageversion.ResourceInfo, error) {
 	admit := a.group.Admit
 
 	optionsExternalVersion := a.group.GroupVersion
@@ -395,7 +474,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		return nil, nil, fmt.Errorf("%q must implement TableConvertor", resource)
 	}
 
-	var apiResource metav1.APIResource
+	var storageVersionHash string
 	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionHash) &&
 		isStorageVersionProvider &&
 		storageVersionProvider.StorageVersion() != nil {
@@ -404,7 +483,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if err != nil {
 			return nil, nil, err
 		}
-		apiResource.StorageVersionHash = discovery.StorageVersionHash(gvk.Group, gvk.Version, gvk.Kind)
+		storageVersionHash = discovery.StorageVersionHash(gvk.Group, gvk.Version, gvk.Kind)
 	}
 
 	// Get the list of actions for the given scope.
@@ -423,9 +502,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			resourcePath = itemPath
 			resourceParams = nameParams
 		}
-		apiResource.Name = path
-		apiResource.Namespaced = false
-		apiResource.Kind = resourceKind
 		namer := handlers.ContextBasedNaming{
 			Namer:         a.group.Namer,
 			ClusterScoped: true,
@@ -470,9 +546,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			resourcePath = itemPath
 			resourceParams = nameParams
 		}
-		apiResource.Name = path
-		apiResource.Namespaced = true
-		apiResource.Kind = resourceKind
 		namer := handlers.ContextBasedNaming{
 			Namer:         a.group.Namer,
 			ClusterScoped: false,
@@ -524,7 +597,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		resourceInfo = &storageversion.ResourceInfo{
 			GroupResource: schema.GroupResource{
 				Group:    a.group.GroupVersion.Group,
-				Resource: apiResource.Name,
+				Resource: path,
 			},
 			EncodingVersion: encodingGVK.GroupVersion().String(),
 			// We record EquivalentResourceMapper first instead of calculate
@@ -624,7 +697,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		requestScope := "cluster"
 		var namespaced string
 		var operationSuffix string
-		if apiResource.Namespaced {
+		if namespaceScoped {
 			requestScope = "namespace"
 			namespaced = "Namespaced"
 		}
@@ -983,30 +1056,39 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 		// Note: update GetAuthorizerAttributes() when adding a custom handler.
 	}
+	// Record the existence of the GVR and the corresponding GVK
 
-	apiResource.Verbs = make([]string, 0, len(kubeVerbs))
+	verbs := make([]string, 0, len(kubeVerbs))
 	for kubeVerb := range kubeVerbs {
-		apiResource.Verbs = append(apiResource.Verbs, kubeVerb)
+		verbs = append(verbs, kubeVerb)
 	}
-	sort.Strings(apiResource.Verbs)
+	sort.Strings(verbs)
 
+	partialResource := &discoveryAPIResourceBuilderConfig{
+		path:               path,
+		resourceKind:       resourceKind,
+		storageVersionHash: storageVersionHash,
+		namespaceScoped:    namespaceScoped,
+		verbs:              verbs,
+		subresource:        subresource,
+		resource:           resource,
+	}
 	if shortNamesProvider, ok := storage.(rest.ShortNamesProvider); ok {
-		apiResource.ShortNames = shortNamesProvider.ShortNames()
+		partialResource.shortnames = shortNamesProvider.ShortNames()
 	}
 	if categoriesProvider, ok := storage.(rest.CategoriesProvider); ok {
-		apiResource.Categories = categoriesProvider.Categories()
+		partialResource.categories = categoriesProvider.Categories()
 	}
 	if gvkProvider, ok := storage.(rest.GroupVersionKindProvider); ok {
 		gvk := gvkProvider.GroupVersionKind(a.group.GroupVersion)
-		apiResource.Group = gvk.Group
-		apiResource.Version = gvk.Version
-		apiResource.Kind = gvk.Kind
+		partialResource.group = gvk.Group
+		partialResource.version = gvk.Version
+		partialResource.resourceKind = gvk.Kind
 	}
 
-	// Record the existence of the GVR and the corresponding GVK
 	a.group.EquivalentResourceRegistry.RegisterKindFor(reqScope.Resource, reqScope.Subresource, fqKindToRegister)
 
-	return &apiResource, resourceInfo, nil
+	return partialResource, resourceInfo, nil
 }
 
 // indirectArbitraryPointer returns *ptrToObject for an arbitrary pointer

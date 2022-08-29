@@ -680,7 +680,8 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 
 		apiGroupVersion.MaxRequestBodyBytes = s.maxRequestBodyBytes
 
-		apiResources, r, err := apiGroupVersion.InstallREST(s.Handler.GoRestfulContainer)
+		discoveryAPIResources, r, err := apiGroupVersion.InstallREST(s.Handler.GoRestfulContainer)
+
 		if err != nil {
 			return fmt.Errorf("unable to setup API %v: %v", apiGroupInfo, err)
 		}
@@ -688,9 +689,9 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 
 		s.DiscoveryResourceManager.AddGroupVersion(
 			apiGroupInfo.PrioritizedVersions[0].Group,
-			metav1.DiscoveryGroupVersion{
-				Version:      groupVersion.Version,
-				APIResources: apiResources,
+			metav1.APIVersionDiscovery{
+				Version:   groupVersion.Version,
+				Resources: discoveryAPIResources,
 			},
 		)
 	}

@@ -33,9 +33,9 @@ const DiscoveryEndpointRoot = "/discovery"
 // api resources indexed by their group version.
 type ResourceManager interface {
 	// Adds knowledge of the given groupversion to the discovery document
-	// If it was already being tracked, updates the stored DiscoveryGroupVersion
+	// If it was already being tracked, updates the stored APIVersionDiscovery
 	// Thread-safe
-	AddGroupVersion(groupName string, value metav1.DiscoveryGroupVersion)
+	AddGroupVersion(groupName string, value metav1.APIVersionDiscovery)
 
 	// Removes all group versions for a given group
 	// Thread-safe
@@ -49,7 +49,7 @@ type ResourceManager interface {
 	// Resets the manager's known list of group-versions and replaces them
 	// with the given groups
 	// Thread-Safe
-	SetGroups([]metav1.DiscoveryAPIGroup)
+	SetGroups([]metav1.APIGroupDiscovery)
 
 	// Returns a restful webservice which responds to discovery requests
 	// Thread-safe
@@ -60,11 +60,11 @@ type ResourceManager interface {
 
 type noopResourceManager struct{}
 
-func (noopResourceManager) AddGroupVersion(groupName string, value metav1.DiscoveryGroupVersion) {}
-func (noopResourceManager) RemoveGroup(groupName string)                                         {}
-func (noopResourceManager) RemoveGroupVersion(gv metav1.GroupVersion)                            {}
-func (noopResourceManager) SetGroups([]metav1.DiscoveryAPIGroup)                                 {}
-func (noopResourceManager) WebService() *restful.WebService                                      { return nil }
+func (noopResourceManager) AddGroupVersion(groupName string, value metav1.APIVersionDiscovery) {}
+func (noopResourceManager) RemoveGroup(groupName string)                                       {}
+func (noopResourceManager) RemoveGroupVersion(gv metav1.GroupVersion)                          {}
+func (noopResourceManager) SetGroups([]metav1.APIGroupDiscovery)                               {}
+func (noopResourceManager) WebService() *restful.WebService                                    { return nil }
 func (noopResourceManager) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	resp.WriteHeader(http.StatusNotImplemented)
 }
@@ -81,7 +81,7 @@ type resourceDiscoveryManager struct {
 
 	// Writes protected by the lock. List if all apigroups & resources indexed
 	// by the resource manager
-	apiGroups     map[string]*metav1.DiscoveryAPIGroup
+	apiGroups     map[string]*metav1.APIGroupDiscovery
 	apiGroupNames []string // apiGroupNames preserves insertion order
 
 	serializer runtime.NegotiatedSerializer
@@ -90,7 +90,7 @@ type resourceDiscoveryManager struct {
 
 type cachedGroupList struct {
 	// Most up to date version of all discovery api groups
-	cachedResponse *metav1.DiscoveryAPIGroupList
+	cachedResponse *metav1.APIGroupDiscoveryList
 	// Hash of the cachedResponse used for cache-busting
 	cachedResponseETag string
 }
@@ -100,7 +100,7 @@ func NewResourceManager(serializer runtime.NegotiatedSerializer) ResourceManager
 	return result
 }
 
-func (rdm *resourceDiscoveryManager) SetGroups(groups []metav1.DiscoveryAPIGroup) {
+func (rdm *resourceDiscoveryManager) SetGroups(groups []metav1.APIGroupDiscovery) {
 	rdm.lock.Lock()
 	defer rdm.lock.Unlock()
 
@@ -115,7 +115,7 @@ func (rdm *resourceDiscoveryManager) SetGroups(groups []metav1.DiscoveryAPIGroup
 	}
 }
 
-func (rdm *resourceDiscoveryManager) AddGroups(groups ...metav1.DiscoveryAPIGroup) {
+func (rdm *resourceDiscoveryManager) AddGroups(groups ...metav1.APIGroupDiscovery) {
 	rdm.lock.Lock()
 	defer rdm.lock.Unlock()
 
@@ -126,18 +126,18 @@ func (rdm *resourceDiscoveryManager) AddGroups(groups ...metav1.DiscoveryAPIGrou
 	}
 }
 
-func (rdm *resourceDiscoveryManager) AddGroupVersion(groupName string, value metav1.DiscoveryGroupVersion) {
+func (rdm *resourceDiscoveryManager) AddGroupVersion(groupName string, value metav1.APIVersionDiscovery) {
 	rdm.lock.Lock()
 	defer rdm.lock.Unlock()
 
 	rdm.addGroupVersionLocked(groupName, value)
 }
 
-func (rdm *resourceDiscoveryManager) addGroupVersionLocked(groupName string, value metav1.DiscoveryGroupVersion) {
+func (rdm *resourceDiscoveryManager) addGroupVersionLocked(groupName string, value metav1.APIVersionDiscovery) {
 	klog.Infof("Adding GroupVersion %s %s to ResourceManager", groupName, value.Version)
 
 	if rdm.apiGroups == nil {
-		rdm.apiGroups = make(map[string]*metav1.DiscoveryAPIGroup)
+		rdm.apiGroups = make(map[string]*metav1.APIGroupDiscovery)
 	}
 
 	if existing, groupExists := rdm.apiGroups[groupName]; groupExists {
@@ -158,13 +158,15 @@ func (rdm *resourceDiscoveryManager) addGroupVersionLocked(groupName string, val
 		}
 
 	} else {
-		rdm.apiGroups[groupName] = &metav1.DiscoveryAPIGroup{
+		rdm.apiGroups[groupName] = &metav1.APIGroupDiscovery{
 			TypeMeta: metav1.TypeMeta{
-				Kind:       "DiscoveryAPIGroup",
+				Kind:       "APIGroupDiscovery",
 				APIVersion: "v1",
 			},
-			Name:     groupName,
-			Versions: []metav1.DiscoveryGroupVersion{value},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: groupName,
+			},
+			Versions: []metav1.APIVersionDiscovery{value},
 		}
 		rdm.apiGroupNames = append(rdm.apiGroupNames, groupName)
 	}
@@ -232,7 +234,7 @@ func (rdm *resourceDiscoveryManager) WebService() *restful.WebService {
 		Operation("getDiscoveryResources").
 		Produces(mediaTypes...).
 		Consumes(mediaTypes...).
-		Writes(metav1.DiscoveryAPIGroupList{}))
+		Writes(metav1.APIGroupDiscoveryList{}))
 	return ws
 }
 
@@ -257,15 +259,15 @@ func (rdm *resourceDiscoveryManager) ServeHTTP(resp http.ResponseWriter, req *ht
 		response, etag = rdm.cachedResponse, rdm.cachedResponseETag
 		if response == nil {
 			// Re-order the apiGroups by their insertion order
-			orderedGroups := []metav1.DiscoveryAPIGroup{}
+			orderedGroups := []metav1.APIGroupDiscovery{}
 			for _, groupName := range rdm.apiGroupNames {
 				orderedGroups = append(orderedGroups, *rdm.apiGroups[groupName])
 			}
 
 			var err error
-			response = &metav1.DiscoveryAPIGroupList{
+			response = &metav1.APIGroupDiscoveryList{
 				TypeMeta: metav1.TypeMeta{
-					Kind:       "DiscoveryAPIGroupList",
+					Kind:       "APIGroupDiscoveryList",
 					APIVersion: "v1",
 				},
 				Groups: orderedGroups,

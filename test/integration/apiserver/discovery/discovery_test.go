@@ -136,14 +136,16 @@ func TestAggregatedAPIServiceDiscovery(t *testing.T) {
 	defer cleanup()
 
 	resourceManager := discoveryendpoint.NewResourceManager(serialize)
-	group := metav1.DiscoveryAPIGroup{
-		Name: "stable.example.com",
-		Versions: []metav1.DiscoveryGroupVersion{
+	group := metav1.APIGroupDiscovery{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "stable.example.com",
+		},
+		Versions: []metav1.APIVersionDiscovery{
 			{
 				Version: "v1",
-				APIResources: []metav1.APIResource{
+				Resources: []metav1.APIResourceDiscovery{
 					{
-						Name:       "jobs",
+						Resource:   "jobs",
 						Verbs:      []string{"create", "list", "watch", "delete"},
 						ShortNames: []string{"jz"},
 						Categories: []string{"all"},
@@ -152,7 +154,7 @@ func TestAggregatedAPIServiceDiscovery(t *testing.T) {
 			},
 		},
 	}
-	resourceManager.SetGroups([]metav1.DiscoveryAPIGroup{group})
+	resourceManager.SetGroups([]metav1.APIGroupDiscovery{group})
 	service := NewFakeService("test-server", client, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, discoveryendpoint.DiscoveryEndpointRoot) {
 			resourceManager.ServeHTTP(w, r)
@@ -188,7 +190,7 @@ func TestAggregatedAPIServiceDiscovery(t *testing.T) {
 				return false, err
 			}
 
-			groupList, ok := response.(*metav1.DiscoveryAPIGroupList)
+			groupList, ok := response.(*metav1.APIGroupDiscoveryList)
 			if !ok {
 				return false, errors.New("unknown response type")
 			}

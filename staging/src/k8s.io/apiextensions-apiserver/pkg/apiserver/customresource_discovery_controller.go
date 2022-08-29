@@ -86,6 +86,7 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 
 	apiVersionsForDiscovery := []metav1.GroupVersionForDiscovery{}
 	apiResourcesForDiscovery := []metav1.APIResource{}
+	var apiResourceDiscovery metav1.APIResourceDiscovery
 	versionsForDiscoveryMap := map[metav1.GroupVersion]bool{}
 
 	crds, err := c.crdLister.List(labels.Everything())
@@ -150,11 +151,40 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 			StorageVersionHash: storageVersionHash,
 		})
 
+		var scope metav1.ResourceScope
+		if crd.Spec.Scope == apiextensionsv1.NamespaceScoped {
+			scope = metav1.ScopeNamespace
+		} else {
+			scope = metav1.ScopeCluster
+		}
+		apiResourceDiscovery = metav1.APIResourceDiscovery{
+			Resource:     crd.Status.AcceptedNames.Plural,
+			SingularName: crd.Status.AcceptedNames.Singular,
+			Scope:        scope,
+			ReturnType: metav1.APIDiscoveryKind{
+				Group:   version.Group,
+				Version: version.Version,
+				Kind:    crd.Status.AcceptedNames.Kind,
+			},
+			Verbs:      verbs,
+			ShortNames: crd.Status.AcceptedNames.ShortNames,
+			Categories: crd.Status.AcceptedNames.Categories,
+		}
+
 		subresources, err := apiextensionshelpers.GetSubresourcesForVersion(crd, version.Version)
 		if err != nil {
 			return err
 		}
 		if subresources != nil && subresources.Status != nil {
+			apiResourceDiscovery.Subresources = append(apiResourceDiscovery.Subresources, metav1.APISubresourceDiscovery{
+				Subresource: "status",
+				ReturnType: &metav1.APIDiscoveryKind{
+					Group:   version.Group,
+					Version: version.Version,
+					Kind:    crd.Status.AcceptedNames.Kind,
+				},
+				Verbs: metav1.Verbs([]string{"get", "patch", "update"}),
+			})
 			apiResourcesForDiscovery = append(apiResourcesForDiscovery, metav1.APIResource{
 				Name:       crd.Status.AcceptedNames.Plural + "/status",
 				Namespaced: crd.Spec.Scope == apiextensionsv1.NamespaceScoped,
@@ -164,6 +194,15 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 		}
 
 		if subresources != nil && subresources.Scale != nil {
+			apiResourceDiscovery.Subresources = append(apiResourceDiscovery.Subresources, metav1.APISubresourceDiscovery{
+				Subresource: "scale",
+				ReturnType: &metav1.APIDiscoveryKind{
+					Group:   autoscaling.GroupName,
+					Version: "v1",
+					Kind:    "Scale",
+				},
+				Verbs: metav1.Verbs([]string{"get", "patch", "update"}),
+			})
 			apiResourcesForDiscovery = append(apiResourcesForDiscovery, metav1.APIResource{
 				Group:      autoscaling.GroupName,
 				Version:    "v1",
@@ -207,9 +246,9 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 		return apiResourcesForDiscovery
 	})))
 
-	c.resourceManager.AddGroupVersion(version.Group, metav1.DiscoveryGroupVersion{
-		Version:      version.Version,
-		APIResources: apiResourcesForDiscovery,
+	c.resourceManager.AddGroupVersion(version.Group, metav1.APIVersionDiscovery{
+		Version:   version.Version,
+		Resources: []metav1.APIResourceDiscovery{apiResourceDiscovery},
 	})
 	return nil
 }

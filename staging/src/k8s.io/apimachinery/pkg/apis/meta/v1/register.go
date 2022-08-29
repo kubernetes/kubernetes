@@ -80,6 +80,8 @@ func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		&APIResourceList{},
 		&DiscoveryAPIGroupList{},
 		&DiscoveryAPIGroup{},
+		&APIGroupDiscoveryList{},
+		&APIGroupDiscovery{},
 	)
 
 	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
