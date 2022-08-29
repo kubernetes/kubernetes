@@ -169,7 +169,7 @@ func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan
 		}
 	}()
 
-	return func() error {
+	check := func() error {
 		// Given that client is closed on shutdown we hold the lock for
 		// the entire period of healthcheck call to ensure that client will
 		// not be closed during healthcheck.
@@ -188,7 +188,9 @@ func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan
 			return nil
 		}
 		return fmt.Errorf("error getting data from etcd: %w", err)
-	}, nil
+	}
+
+	return newCachedETCDCheck(check, 5*time.Second, stopCh), nil
 }
 
 var newETCD3Client = func(c storagebackend.TransportConfig) (*clientv3.Client, error) {
