@@ -21,11 +21,12 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/server/healthz"
 	serveroptions "k8s.io/apiserver/pkg/server/options"
-	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	"k8s.io/apiserver/pkg/server/resourceconfig"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -58,7 +59,6 @@ func DefaultWatchCacheSizes() map[schema.GroupResource]int {
 
 // NewStorageFactoryConfig returns a new StorageFactoryConfig set up with necessary resource overrides.
 func NewStorageFactoryConfig() *StorageFactoryConfig {
-
 	resources := []schema.GroupVersionResource{
 		// If a resource has to be stored in a version that is not the
 		// latest, then it can be listed here. Usually this is the case
@@ -83,14 +83,14 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 
 // StorageFactoryConfig is a configuration for creating storage factory.
 type StorageFactoryConfig struct {
-	StorageConfig                    storagebackend.Config
-	APIResourceConfig                *serverstorage.ResourceConfig
-	DefaultResourceEncoding          *serverstorage.DefaultResourceEncodingConfig
-	DefaultStorageMediaType          string
-	Serializer                       runtime.StorageSerializer
-	ResourceEncodingOverrides        []schema.GroupVersionResource
-	EtcdServersOverrides             []string
-	EncryptionProviderConfigFilepath string
+	StorageConfig             storagebackend.Config
+	APIResourceConfig         *serverstorage.ResourceConfig
+	DefaultResourceEncoding   *serverstorage.DefaultResourceEncodingConfig
+	DefaultStorageMediaType   string
+	Serializer                runtime.StorageSerializer
+	ResourceEncodingOverrides []schema.GroupVersionResource
+	EtcdServersOverrides      []string
+	LoadEncryptionConfig      func() (map[schema.GroupResource]value.Transformer, []healthz.HealthChecker, error)
 }
 
 // Complete completes the StorageFactoryConfig with provided etcdOptions returning completedStorageFactoryConfig.
@@ -98,7 +98,7 @@ func (c *StorageFactoryConfig) Complete(etcdOptions *serveroptions.EtcdOptions) 
 	c.StorageConfig = etcdOptions.StorageConfig
 	c.DefaultStorageMediaType = etcdOptions.DefaultStorageMediaType
 	c.EtcdServersOverrides = etcdOptions.EtcdServersOverrides
-	c.EncryptionProviderConfigFilepath = etcdOptions.EncryptionProviderConfigFilepath
+	c.LoadEncryptionConfig = etcdOptions.LoadEncryptionConfig
 	return &completedStorageFactoryConfig{c}, nil
 }
 
@@ -141,14 +141,14 @@ func (c *completedStorageFactoryConfig) New(stopCh <-chan struct{}) (*serverstor
 		servers := strings.Split(tokens[1], ";")
 		storageFactory.SetEtcdLocation(groupResource, servers)
 	}
-	if len(c.EncryptionProviderConfigFilepath) != 0 {
-		transformerOverrides, err := encryptionconfig.GetTransformerOverrides(c.EncryptionProviderConfigFilepath, stopCh)
-		if err != nil {
-			return nil, err
-		}
-		for groupResource, transformer := range transformerOverrides {
-			storageFactory.SetTransformer(groupResource, transformer)
-		}
+
+	transformerOverrides, _, err := c.LoadEncryptionConfig(stopCh)
+	if err != nil {
+		return nil, err
 	}
+	for groupResource, transformer := range transformerOverrides {
+		storageFactory.SetTransformer(groupResource, transformer)
+	}
+
 	return storageFactory, nil
 }

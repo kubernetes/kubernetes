@@ -198,7 +198,7 @@ func (t *prefixTransformers) TransformFromStorage(ctx context.Context, data []by
 func (t *prefixTransformers) TransformToStorage(ctx context.Context, data []byte, dataCtx Context) ([]byte, error) {
 	start := time.Now()
 	transformer := t.transformers[0]
-	prefixedData := make([]byte, len(transformer.Prefix), len(data)+len(transformer.Prefix))
+	prefixedData := make([]byte, len(transformer.Prefix), len(data)+len(transformer.Prefix)) // TODO make more efficient for KMS
 	copy(prefixedData, transformer.Prefix)
 	result, err := transformer.Transformer.TransformToStorage(ctx, data, dataCtx)
 	RecordTransformation("to_storage", string(transformer.Prefix), start, err)

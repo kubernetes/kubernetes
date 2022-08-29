@@ -110,7 +110,11 @@ func TestEnvelopeCaching(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
 			envelopeService := newTestEnvelopeService()
-			envelopeTransformer, err := NewEnvelopeTransformer(envelopeService, tt.cacheSize, aestransformer.NewGCMTransformer)
+			envelopeTransformer, err := NewEnvelopeTransformer(envelopeService,
+				func(ctx context.Context) (string, error) {
+					return "", nil
+				},
+				tt.cacheSize, aestransformer.NewGCMTransformer)
 			if err != nil {
 				t.Fatalf("failed to initialize envelope transformer: %v", err)
 			}
@@ -145,7 +149,11 @@ func TestEnvelopeCaching(t *testing.T) {
 
 // Makes Envelope transformer hit cache limit, throws error if it misbehaves.
 func TestEnvelopeCacheLimit(t *testing.T) {
-	envelopeTransformer, err := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, aestransformer.NewGCMTransformer)
+	envelopeTransformer, err := NewEnvelopeTransformer(newTestEnvelopeService(),
+		func(ctx context.Context) (string, error) {
+			return "", nil
+		},
+		testEnvelopeCacheSize, aestransformer.NewGCMTransformer)
 	if err != nil {
 		t.Fatalf("failed to initialize envelope transformer: %v", err)
 	}
