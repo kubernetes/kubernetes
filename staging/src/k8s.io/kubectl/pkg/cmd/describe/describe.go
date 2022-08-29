@@ -36,7 +36,7 @@ import (
 )
 
 var (
-	describeLong = templates.LongDesc(i18n.T(`
+	describeLong = templates.LongDesc(`
 		Show details of a specific resource or group of resources.
 
 		Print a detailed description of the selected resources, including related resources such
@@ -46,9 +46,9 @@ var (
 		    $ kubectl describe TYPE NAME_PREFIX
 
 		will first check for an exact match on TYPE and NAME_PREFIX. If no such resource
-		exists, it will output details for every resource that has a name prefixed with NAME_PREFIX.`))
+		exists, it will output details for every resource that has a name prefixed with NAME_PREFIX.`)
 
-	describeExample = templates.Examples(i18n.T(`
+	describeExample = templates.Examples(`
 		# Describe a node
 		kubectl describe nodes kubernetes-node-emt8.c.myproject.internal
 
@@ -66,7 +66,7 @@ var (
 
 		# Describe all pods managed by the 'frontend' replication controller 
 		# (rc-created pods get the name of the rc as a prefix in the pod name)
-		kubectl describe pods frontend`))
+		kubectl describe pods frontend`)
 )
 
 type DescribeOptions struct {
@@ -104,7 +104,7 @@ func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericclioptions.
 	cmd := &cobra.Command{
 		Use:                   "describe (-f FILENAME | TYPE [NAME_PREFIX | -l label] | TYPE/NAME)",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Show details of a specific resource or group of resources"),
+		Short:                 "Show details of a specific resource or group of resources",
 		Long:                  describeLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
 		Example:               describeExample,
 		ValidArgsFunction:     completion.ResourceTypeAndNameCompletionFunc(f),

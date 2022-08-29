@@ -51,7 +51,7 @@ import (
 )
 
 var (
-	waitLong = templates.LongDesc(i18n.T(`
+	waitLong = templates.LongDesc(`
 		Experimental: Wait for a specific condition on one or many resources.
 
 		The command takes multiple resources and waits until the specified condition
@@ -61,9 +61,9 @@ var (
 		by providing the "delete" keyword as the value to the --for flag.
 
 		A successful message will be printed to stdout indicating when the specified
-        condition has been met. You can use -o option to change to output destination.`))
+        condition has been met. You can use -o option to change to output destination.`)
 
-	waitExample = templates.Examples(i18n.T(`
+	waitExample = templates.Examples(`
 		# Wait for the pod "busybox1" to contain the status condition of type "Ready"
 		kubectl wait --for=condition=Ready pod/busybox1
 
@@ -75,7 +75,7 @@ var (
 
 		# Wait for the pod "busybox1" to be deleted, with a timeout of 60s, after having issued the "delete" command
 		kubectl delete pod/busybox1
-		kubectl wait --for=delete pod/busybox1 --timeout=60s`))
+		kubectl wait --for=delete pod/busybox1 --timeout=60s`)
 )
 
 // errNoMatchingResources is returned when there is no resources matching a query.
@@ -120,7 +120,7 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 
 	cmd := &cobra.Command{
 		Use:     "wait ([-f FILENAME] | resource.group/resource.name | resource.group [(-l label | --all)]) [--for=delete|--for condition=available|--for=jsonpath='{}'=value]",
-		Short:   i18n.T("Experimental: Wait for a specific condition on one or many resources"),
+		Short:   "Experimental: Wait for a specific condition on one or many resources",
 		Long:    waitLong,
 		Example: waitExample,
 

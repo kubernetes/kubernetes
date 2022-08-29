@@ -37,10 +37,10 @@ import (
 )
 
 var (
-	pcLong = templates.LongDesc(i18n.T(`
-		Create a priority class with the specified name, value, globalDefault and description.`))
+	pcLong = templates.LongDesc(`
+		Create a priority class with the specified name, value, globalDefault and description.`)
 
-	pcExample = templates.Examples(i18n.T(`
+	pcExample = templates.Examples(`
 		# Create a priority class named high-priority
 		kubectl create priorityclass high-priority --value=1000 --description="high priority"
 
@@ -48,7 +48,7 @@ var (
 		kubectl create priorityclass default-priority --value=1000 --global-default=true --description="default priority"
 
 		# Create a priority class named high-priority that cannot preempt pods with lower priority
-		kubectl create priorityclass high-priority --value=1000 --description="high priority" --preemption-policy="Never"`))
+		kubectl create priorityclass high-priority --value=1000 --description="high priority" --preemption-policy="Never"`)
 )
 
 // PriorityClassOptions holds the options for 'create priorityclass' sub command
@@ -90,7 +90,7 @@ func NewCmdCreatePriorityClass(f cmdutil.Factory, ioStreams genericclioptions.IO
 		Use:                   "priorityclass NAME --value=VALUE --global-default=BOOL [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"pc"},
-		Short:                 i18n.T("Create a priority class with the specified name"),
+		Short:                 "Create a priority class with the specified name",
 		Long:                  pcLong,
 		Example:               pcExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -104,10 +104,10 @@ func NewCmdCreatePriorityClass(f cmdutil.Factory, ioStreams genericclioptions.IO
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().Int32Var(&o.Value, "value", o.Value, i18n.T("the value of this priority class."))
-	cmd.Flags().BoolVar(&o.GlobalDefault, "global-default", o.GlobalDefault, i18n.T("global-default specifies whether this PriorityClass should be considered as the default priority."))
-	cmd.Flags().StringVar(&o.Description, "description", o.Description, i18n.T("description is an arbitrary string that usually provides guidelines on when this priority class should be used."))
-	cmd.Flags().StringVar(&o.PreemptionPolicy, "preemption-policy", o.PreemptionPolicy, i18n.T("preemption-policy is the policy for preempting pods with lower priority."))
+	cmd.Flags().Int32Var(&o.Value, "value", o.Value, "the value of this priority class.")
+	cmd.Flags().BoolVar(&o.GlobalDefault, "global-default", o.GlobalDefault, "global-default specifies whether this PriorityClass should be considered as the default priority.")
+	cmd.Flags().StringVar(&o.Description, "description", o.Description, "description is an arbitrary string that usually provides guidelines on when this priority class should be used.")
+	cmd.Flags().StringVar(&o.PreemptionPolicy, "preemption-policy", o.PreemptionPolicy, "preemption-policy is the policy for preempting pods with lower priority.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 	return cmd
 }

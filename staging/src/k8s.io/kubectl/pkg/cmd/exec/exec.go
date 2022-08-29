@@ -45,7 +45,7 @@ import (
 )
 
 var (
-	execExample = templates.Examples(i18n.T(`
+	execExample = templates.Examples(`
 		# Get output from running the 'date' command from pod mypod, using the first container by default
 		kubectl exec mypod -- date
 
@@ -68,7 +68,7 @@ var (
 
 		# Get output from running 'date' command from the first pod of the service myservice, using the first container by default
 		kubectl exec svc/myservice -- date
-		`))
+		`)
 )
 
 const (
@@ -86,8 +86,8 @@ func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd := &cobra.Command{
 		Use:                   "exec (POD | TYPE/NAME) [-c CONTAINER] [flags] -- COMMAND [args...]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Execute a command in a container"),
-		Long:                  i18n.T("Execute a command in a container."),
+		Short:                 "Execute a command in a container",
+		Long:                  "Execute a command in a container.",
 		Example:               execExample,
 		ValidArgsFunction:     completion.PodResourceNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {

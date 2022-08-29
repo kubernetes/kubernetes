@@ -55,12 +55,12 @@ type PauseOptions struct {
 }
 
 var (
-	pauseLong = templates.LongDesc(i18n.T(`
+	pauseLong = templates.LongDesc(`
 		Mark the provided resource as paused.
 
 		Paused resources will not be reconciled by a controller.
 		Use "kubectl rollout resume" to resume a paused resource.
-		Currently only deployments support being paused.`))
+		Currently only deployments support being paused.`)
 
 	pauseExample = templates.Examples(`
 		# Mark the nginx deployment as paused
@@ -81,7 +81,7 @@ func NewCmdRolloutPause(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	cmd := &cobra.Command{
 		Use:                   "pause RESOURCE",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Mark the provided resource as paused"),
+		Short:                 "Mark the provided resource as paused",
 		Long:                  pauseLong,
 		Example:               pauseExample,
 		ValidArgsFunction:     completion.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),

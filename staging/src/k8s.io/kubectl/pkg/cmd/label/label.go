@@ -90,15 +90,15 @@ type LabelOptions struct {
 }
 
 var (
-	labelLong = templates.LongDesc(i18n.T(`
+	labelLong = templates.LongDesc(`
 		Update the labels on a resource.
 
 		* A label key and value must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters each.
 		* Optionally, the key can begin with a DNS subdomain prefix and a single '/', like example.com/my-app.
 		* If --overwrite is true, then existing labels can be overwritten, otherwise attempting to overwrite a label will result in an error.
-		* If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.`))
+		* If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.`)
 
-	labelExample = templates.Examples(i18n.T(`
+	labelExample = templates.Examples(`
 		# Update pod 'foo' with the label 'unhealthy' and the value 'true'
 		kubectl label pods foo unhealthy=true
 
@@ -116,7 +116,7 @@ var (
 
 		# Update pod 'foo' by removing a label named 'bar' if it exists
 		# Does not require the --overwrite flag
-		kubectl label pods foo bar-`))
+		kubectl label pods foo bar-`)
 )
 
 func NewLabelOptions(ioStreams genericclioptions.IOStreams) *LabelOptions {
@@ -136,7 +136,7 @@ func NewCmdLabel(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd := &cobra.Command{
 		Use:                   "label [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Update the labels on a resource"),
+		Short:                 "Update the labels on a resource",
 		Long:                  fmt.Sprintf(labelLong, validation.LabelValueMaxLength),
 		Example:               labelExample,
 		ValidArgsFunction:     completion.ResourceTypeAndNameCompletionFunc(f),
@@ -156,7 +156,7 @@ func NewCmdLabel(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd.Flags().StringVar(&o.fieldSelector, "field-selector", o.fieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
 	cmd.Flags().BoolVar(&o.all, "all", o.all, "Select all resources, in the namespace of the specified resource types")
 	cmd.Flags().BoolVarP(&o.allNamespaces, "all-namespaces", "A", o.allNamespaces, "If true, check the specified action in all namespaces.")
-	cmd.Flags().StringVar(&o.resourceVersion, "resource-version", o.resourceVersion, i18n.T("If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
+	cmd.Flags().StringVar(&o.resourceVersion, "resource-version", o.resourceVersion, "If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
 	usage := "identifying the resource to update the labels"
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)

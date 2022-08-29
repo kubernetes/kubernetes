@@ -53,8 +53,8 @@ type UndoOptions struct {
 }
 
 var (
-	undoLong = templates.LongDesc(i18n.T(`
-		Roll back to a previous rollout.`))
+	undoLong = templates.LongDesc(`
+		Roll back to a previous rollout.`)
 
 	undoExample = templates.Examples(`
 		# Roll back to the previous deployment
@@ -85,7 +85,7 @@ func NewCmdRolloutUndo(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 	cmd := &cobra.Command{
 		Use:                   "undo (TYPE NAME | TYPE/NAME) [flags]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Undo a previous rollout"),
+		Short:                 "Undo a previous rollout",
 		Long:                  undoLong,
 		Example:               undoExample,
 		ValidArgsFunction:     completion.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),

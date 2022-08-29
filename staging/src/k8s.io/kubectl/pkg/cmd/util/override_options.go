@@ -47,7 +47,7 @@ type OverrideOptions struct {
 }
 
 func (o *OverrideOptions) AddOverrideFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&o.Overrides, "overrides", "", i18n.T("An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field."))
+	cmd.Flags().StringVar(&o.Overrides, "overrides", "", "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.")
 	cmd.Flags().StringVar((*string)(&o.OverrideType), "override-type", string(DefaultOverrideType), fmt.Sprintf("The method used to override the generated object: %s, %s, or %s.", OverrideTypeJSON, OverrideTypeMerge, OverrideTypeStrategic))
 }
 

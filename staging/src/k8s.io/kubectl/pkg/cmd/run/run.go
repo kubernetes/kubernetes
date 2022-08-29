@@ -56,9 +56,9 @@ import (
 )
 
 var (
-	runLong = templates.LongDesc(i18n.T(`Create and run a particular image in a pod.`))
+	runLong = templates.LongDesc(`Create and run a particular image in a pod.`)
 
-	runExample = templates.Examples(i18n.T(`
+	runExample = templates.Examples(`
 		# Start a nginx pod
 		kubectl run nginx --image=nginx
 
@@ -84,7 +84,7 @@ var (
 		kubectl run nginx --image=nginx -- <arg1> <arg2> ... <argN>
 
 		# Start the nginx pod using a different command and custom arguments
-		kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>`))
+		kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>`)
 )
 
 const (
@@ -149,7 +149,7 @@ func NewCmdRun(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 	cmd := &cobra.Command{
 		Use:                   "run NAME --image=image [--env=\"key=value\"] [--port=port] [--dry-run=server|client] [--overrides=inline-json] [--command] -- [COMMAND] [args...]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Run a particular image on the cluster"),
+		Short:                 "Run a particular image on the cluster",
 		Long:                  runLong,
 		Example:               runExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -169,23 +169,23 @@ func NewCmdRun(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 
 func addRunFlags(cmd *cobra.Command, opt *RunOptions) {
 	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().StringArray("annotations", []string{}, i18n.T("Annotations to apply to the pod."))
-	cmd.Flags().StringVar(&opt.Image, "image", opt.Image, i18n.T("The image for the container to run."))
+	cmd.Flags().StringArray("annotations", []string{}, "Annotations to apply to the pod.")
+	cmd.Flags().StringVar(&opt.Image, "image", opt.Image, "The image for the container to run.")
 	cmd.MarkFlagRequired("image")
-	cmd.Flags().String("image-pull-policy", "", i18n.T("The image pull policy for the container.  If left empty, this value will not be specified by the client and defaulted by the server."))
+	cmd.Flags().String("image-pull-policy", "", "The image pull policy for the container.  If left empty, this value will not be specified by the client and defaulted by the server.")
 	cmd.Flags().Bool("rm", false, "If true, delete the pod after it exits.  Only valid when attaching to the container, e.g. with '--attach' or with '-i/--stdin'.")
 	cmd.Flags().StringArray("env", []string{}, "Environment variables to set in the container.")
-	cmd.Flags().StringVar(&opt.Port, "port", opt.Port, i18n.T("The port that this container exposes."))
+	cmd.Flags().StringVar(&opt.Port, "port", opt.Port, "The port that this container exposes.")
 	cmd.Flags().StringP("labels", "l", "", "Comma separated labels to apply to the pod. Will override previous values.")
 	cmd.Flags().BoolVarP(&opt.Interactive, "stdin", "i", opt.Interactive, "Keep stdin open on the container in the pod, even if nothing is attached.")
 	cmd.Flags().BoolVarP(&opt.TTY, "tty", "t", opt.TTY, "Allocate a TTY for the container in the pod.")
 	cmd.Flags().BoolVar(&opt.Attach, "attach", opt.Attach, "If true, wait for the Pod to start running, and then attach to the Pod as if 'kubectl attach ...' were called.  Default false, unless '-i/--stdin' is set, in which case the default is true. With '--restart=Never' the exit code of the container process is returned.")
 	cmd.Flags().BoolVar(&opt.LeaveStdinOpen, "leave-stdin-open", opt.LeaveStdinOpen, "If the pod is started in interactive mode or with stdin, leave stdin open after the first attach completes. By default, stdin will be closed after the first attach completes.")
-	cmd.Flags().String("restart", "Always", i18n.T("The restart policy for this Pod.  Legal values [Always, OnFailure, Never]."))
+	cmd.Flags().String("restart", "Always", "The restart policy for this Pod.  Legal values [Always, OnFailure, Never].")
 	cmd.Flags().Bool("command", false, "If true and extra arguments are present, use them as the 'command' field in the container, rather than the 'args' field which is the default.")
 	cmd.Flags().BoolVar(&opt.Expose, "expose", opt.Expose, "If true, create a ClusterIP service associated with the pod.  Requires `--port`.")
 	cmd.Flags().BoolVarP(&opt.Quiet, "quiet", "q", opt.Quiet, "If true, suppress prompt messages.")
-	cmd.Flags().BoolVar(&opt.Privileged, "privileged", opt.Privileged, i18n.T("If true, run the container in privileged mode."))
+	cmd.Flags().BoolVar(&opt.Privileged, "privileged", opt.Privileged, "If true, run the container in privileged mode.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &opt.fieldManager, "kubectl-run")
 	opt.AddOverrideFlags(cmd)
 }

@@ -43,7 +43,7 @@ import (
 )
 
 var (
-	deleteLong = templates.LongDesc(i18n.T(`
+	deleteLong = templates.LongDesc(`
 		Delete resources by file names, stdin, resources and names, or by resources and label selector.
 
 		JSON and YAML formats are accepted. Only one type of argument may be specified: file names,
@@ -74,9 +74,9 @@ var (
 
 		After a CustomResourceDefinition is deleted, invalidation of discovery cache may take up
 		to 6 hours. If you don't want to wait, you might want to run "kubectl api-resources" to refresh
-		the discovery cache.`))
+		the discovery cache.`)
 
-	deleteExample = templates.Examples(i18n.T(`
+	deleteExample = templates.Examples(`
 		# Delete a pod using the type and name specified in pod.json
 		kubectl delete -f ./pod.json
 
@@ -102,7 +102,7 @@ var (
 		kubectl delete pod foo --force
 
 		# Delete all pods
-		kubectl delete pods --all`))
+		kubectl delete pods --all`)
 )
 
 type DeleteOptions struct {
@@ -143,7 +143,7 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd := &cobra.Command{
 		Use:                   "delete ([-f FILENAME] | [-k DIRECTORY] | TYPE [(NAME | -l label | --all)])",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Delete resources by file names, stdin, resources and names, or by resources and label selector"),
+		Short:                 "Delete resources by file names, stdin, resources and names, or by resources and label selector",
 		Long:                  deleteLong,
 		Example:               deleteExample,
 		ValidArgsFunction:     completion.ResourceTypeAndNameCompletionFunc(f),

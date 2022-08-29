@@ -38,12 +38,12 @@ import (
 )
 
 var (
-	clusterRoleBindingLong = templates.LongDesc(i18n.T(`
-		Create a cluster role binding for a particular cluster role.`))
+	clusterRoleBindingLong = templates.LongDesc(`
+		Create a cluster role binding for a particular cluster role.`)
 
-	clusterRoleBindingExample = templates.Examples(i18n.T(`
+	clusterRoleBindingExample = templates.Examples(`
 		  # Create a cluster role binding for user1, user2, and group1 using the cluster-admin cluster role
-		  kubectl create clusterrolebinding cluster-admin --clusterrole=cluster-admin --user=user1 --user=user2 --group=group1`))
+		  kubectl create clusterrolebinding cluster-admin --clusterrole=cluster-admin --user=user1 --user=user2 --group=group1`)
 )
 
 // ClusterRoleBindingOptions is returned by NewCmdCreateClusterRoleBinding
@@ -85,7 +85,7 @@ func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, ioStreams genericclioptio
 	cmd := &cobra.Command{
 		Use:                   "clusterrolebinding NAME --clusterrole=NAME [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Create a cluster role binding for a particular cluster role"),
+		Short:                 "Create a cluster role binding for a particular cluster role",
 		Long:                  clusterRoleBindingLong,
 		Example:               clusterRoleBindingExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -99,7 +99,7 @@ func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, ioStreams genericclioptio
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().StringVar(&o.ClusterRole, "clusterrole", "", i18n.T("ClusterRole this ClusterRoleBinding should reference"))
+	cmd.Flags().StringVar(&o.ClusterRole, "clusterrole", "", "ClusterRole this ClusterRoleBinding should reference")
 	cmd.MarkFlagRequired("clusterrole")
 	cmd.Flags().StringArrayVar(&o.Users, "user", o.Users, "Usernames to bind to the clusterrole. The flag can be repeated to add multiple users.")
 	cmd.Flags().StringArrayVar(&o.Groups, "group", o.Groups, "Groups to bind to the clusterrole. The flag can be repeated to add multiple groups.")

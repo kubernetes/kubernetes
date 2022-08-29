@@ -46,9 +46,9 @@ type Version struct {
 }
 
 var (
-	versionExample = templates.Examples(i18n.T(`
+	versionExample = templates.Examples(`
 		# Print the client and server versions for the current context
-		kubectl version`))
+		kubectl version`)
 )
 
 // Options is a struct to support version command
@@ -77,8 +77,8 @@ func NewCmdVersion(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 	o := NewOptions(ioStreams)
 	cmd := &cobra.Command{
 		Use:     "version",
-		Short:   i18n.T("Print the client and server version information"),
-		Long:    i18n.T("Print the client and server version information for the current context."),
+		Short:   "Print the client and server version information",
+		Long:    "Print the client and server version information for the current context.",
 		Example: versionExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))

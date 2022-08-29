@@ -87,7 +87,7 @@ type GetOptions struct {
 }
 
 var (
-	getLong = templates.LongDesc(i18n.T(`
+	getLong = templates.LongDesc(`
 		Display one or many resources.
 
 		Prints a table of the most important information about the specified resources.
@@ -96,9 +96,9 @@ var (
 		namespace unless you pass --all-namespaces.
 
 		By specifying the output as 'template' and providing a Go template as the value
-		of the --template flag, you can filter the attributes of the fetched resources.`))
+		of the --template flag, you can filter the attributes of the fetched resources.`)
 
-	getExample = templates.Examples(i18n.T(`
+	getExample = templates.Examples(`
 		# List all pods in ps output format
 		kubectl get pods
 
@@ -133,7 +133,7 @@ var (
 		kubectl get rc/web service/frontend pods/web-pod-13je7
 
 		# List status subresource for a single pod.
-		kubectl get pod web-pod-13je7 --subresource status`))
+		kubectl get pod web-pod-13je7 --subresource status`)
 )
 
 const (
@@ -163,7 +163,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 	cmd := &cobra.Command{
 		Use:                   fmt.Sprintf("get [(-o|--output=)%s] (TYPE[.VERSION][.GROUP] [NAME | -l label] | TYPE[.VERSION][.GROUP]/NAME ...) [flags]", strings.Join(o.PrintFlags.AllowedFormats(), "|")),
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Display one or many resources"),
+		Short:                 "Display one or many resources",
 		Long:                  getLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
 		Example:               getExample,
 		// ValidArgsFunction is set when this function is called so that we have access to the util package

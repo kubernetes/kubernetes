@@ -32,7 +32,7 @@ import (
 )
 
 var (
-	explainLong = templates.LongDesc(i18n.T(`
+	explainLong = templates.LongDesc(`
 		List the fields for supported resources.
 
 		This command describes the fields associated with each supported API resource.
@@ -41,14 +41,14 @@ var (
 			<type>.<fieldName>[.<fieldName>]
 
 		Add the --recursive flag to display all of the fields at once without descriptions.
-		Information about each field is retrieved from the server in OpenAPI format.`))
+		Information about each field is retrieved from the server in OpenAPI format.`)
 
-	explainExamples = templates.Examples(i18n.T(`
+	explainExamples = templates.Examples(`
 		# Get the documentation of the resource and its fields
 		kubectl explain pods
 
 		# Get the documentation of a specific field of a resource
-		kubectl explain pods.spec.containers`))
+		kubectl explain pods.spec.containers`)
 )
 
 type ExplainOptions struct {
@@ -78,7 +78,7 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericclioptions.I
 	cmd := &cobra.Command{
 		Use:                   "explain RESOURCE",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Get documentation for a resource"),
+		Short:                 "Get documentation for a resource",
 		Long:                  explainLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
 		Example:               explainExamples,
 		Run: func(cmd *cobra.Command, args []string) {

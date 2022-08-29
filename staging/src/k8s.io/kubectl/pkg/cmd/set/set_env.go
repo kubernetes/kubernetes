@@ -48,7 +48,7 @@ var (
 	envResources       = `
   	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), statefulset (sts), cronjob (cj), replicaset (rs)`
 
-	envLong = templates.LongDesc(i18n.T(`
+	envLong = templates.LongDesc(`
 		Update environment variables on a pod template.
 
 		List environment variable definitions in one or more pods, pod templates.
@@ -61,7 +61,7 @@ var (
 		syntax.
 
 		Possible resources include (case insensitive):
-		`) + envResources)
+		` + envResources)
 
 	envExample = templates.Examples(`
           # Update deployment 'registry' with a new environment variable
@@ -153,7 +153,7 @@ func NewCmdEnv(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 	cmd := &cobra.Command{
 		Use:                   "env RESOURCE/NAME KEY_1=VAL_1 ... KEY_N=VAL_N",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Update environment variables on a pod template"),
+		Short:                 "Update environment variables on a pod template",
 		Long:                  envLong,
 		Example:               envExample,
 		Run: func(cmd *cobra.Command, args []string) {

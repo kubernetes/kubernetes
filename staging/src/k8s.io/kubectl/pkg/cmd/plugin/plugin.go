@@ -34,27 +34,27 @@ import (
 )
 
 var (
-	pluginLong = templates.LongDesc(i18n.T(`
+	pluginLong = templates.LongDesc(`
 		Provides utilities for interacting with plugins.
 
 		Plugins provide extended functionality that is not part of the major command-line distribution.
 		Please refer to the documentation and examples for more information about how write your own plugins.
 
 		The easiest way to discover and install plugins is via the kubernetes sub-project krew.
-		To install krew, visit [krew.sigs.k8s.io](https://krew.sigs.k8s.io/docs/user-guide/setup/install/)`))
+		To install krew, visit [krew.sigs.k8s.io](https://krew.sigs.k8s.io/docs/user-guide/setup/install/)`)
 
-	pluginExample = templates.Examples(i18n.T(`
+	pluginExample = templates.Examples(`
 		# List all available plugins
-		kubectl plugin list`))
+		kubectl plugin list`)
 
-	pluginListLong = templates.LongDesc(i18n.T(`
+	pluginListLong = templates.LongDesc(`
 		List all available plugin files on a user's PATH.
 
 		Available plugin files are those that are:
 		- executable
 		- anywhere on the user's PATH
 		- begin with "kubectl-"
-`))
+`)
 
 	ValidPluginFilenamePrefixes = []string{"kubectl"}
 )
@@ -63,7 +63,7 @@ func NewCmdPlugin(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "plugin [flags]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Provides utilities for interacting with plugins"),
+		Short:                 "Provides utilities for interacting with plugins",
 		Long:                  pluginLong,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.DefaultSubCommandRun(streams.ErrOut)(cmd, args)
@@ -91,7 +91,7 @@ func NewCmdPluginList(streams genericclioptions.IOStreams) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "list",
-		Short:   i18n.T("List all visible plugin executables on a user's PATH"),
+		Short:   "List all visible plugin executables on a user's PATH",
 		Example: pluginExample,
 		Long:    pluginListLong,
 		Run: func(cmd *cobra.Command, args []string) {

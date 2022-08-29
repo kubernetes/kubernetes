@@ -73,14 +73,14 @@ type ImageResolverFunc func(in string) (string, error)
 var ImageResolver = resolveImageFunc
 
 var (
-	imageResources = i18n.T(`
-  	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), statefulset (sts), cronjob (cj), replicaset (rs)`)
+	imageResources = `
+  	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), statefulset (sts), cronjob (cj), replicaset (rs)`
 
-	imageLong = templates.LongDesc(i18n.T(`
+	imageLong = templates.LongDesc(`
 		Update existing container image(s) of resources.
 
 		Possible resources include (case insensitive):
-		`) + imageResources)
+		` + imageResources)
 
 	imageExample = templates.Examples(`
 		# Set a deployment's nginx container image to 'nginx:1.9.1', and its busybox container image to 'busybox'
@@ -115,7 +115,7 @@ func NewCmdImage(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	cmd := &cobra.Command{
 		Use:                   "image (-f FILENAME | TYPE NAME) CONTAINER_NAME_1=CONTAINER_IMAGE_1 ... CONTAINER_NAME_N=CONTAINER_IMAGE_N",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Update the image of a pod template"),
+		Short:                 "Update the image of a pod template",
 		Long:                  imageLong,
 		Example:               imageExample,
 		Run: func(cmd *cobra.Command, args []string) {

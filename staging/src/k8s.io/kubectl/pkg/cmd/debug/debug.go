@@ -56,7 +56,7 @@ import (
 )
 
 var (
-	debugLong = templates.LongDesc(i18n.T(`
+	debugLong = templates.LongDesc(`
 		Debug cluster resources using interactive debugging containers.
 
 		'debug' provides automation for common debugging tasks for cluster objects identified by
@@ -71,9 +71,9 @@ var (
 		            debugging utilities without restarting the pod.
 		* Node: Create a new pod that runs in the node's host namespaces and can access
 		        the node's filesystem.
-`))
+`)
 
-	debugExample = templates.Examples(i18n.T(`
+	debugExample = templates.Examples(`
 		# Create an interactive debugging session in pod mypod and immediately attach to it.
 		# (requires the EphemeralContainers feature to be enabled in the cluster)
 		kubectl debug mypod -it --image=busybox
@@ -97,7 +97,7 @@ var (
 		# Create an interactive debugging session on a node and immediately attach to it.
 		# The container will run in the host namespaces and the host's filesystem will be mounted at /host
 		kubectl debug node/mynode -it --image=busybox
-`))
+`)
 )
 
 var nameSuffixFunc = utilrand.String
@@ -152,7 +152,7 @@ func NewCmdDebug(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	cmd := &cobra.Command{
 		Use:                   "debug (POD | TYPE[[.VERSION].GROUP]/NAME) [ -- COMMAND [args...] ]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Create debugging sessions for troubleshooting workloads and nodes"),
+		Short:                 "Create debugging sessions for troubleshooting workloads and nodes",
 		Long:                  debugLong,
 		Example:               debugExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -167,22 +167,22 @@ func NewCmdDebug(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 }
 
 func addDebugFlags(cmd *cobra.Command, opt *DebugOptions) {
-	cmd.Flags().BoolVar(&opt.ArgsOnly, "arguments-only", opt.ArgsOnly, i18n.T("If specified, everything after -- will be passed to the new container as Args instead of Command."))
-	cmd.Flags().BoolVar(&opt.Attach, "attach", opt.Attach, i18n.T("If true, wait for the container to start running, and then attach as if 'kubectl attach ...' were called.  Default false, unless '-i/--stdin' is set, in which case the default is true."))
-	cmd.Flags().StringVarP(&opt.Container, "container", "c", opt.Container, i18n.T("Container name to use for debug container."))
-	cmd.Flags().StringVar(&opt.CopyTo, "copy-to", opt.CopyTo, i18n.T("Create a copy of the target Pod with this name."))
-	cmd.Flags().BoolVar(&opt.Replace, "replace", opt.Replace, i18n.T("When used with '--copy-to', delete the original Pod."))
-	cmd.Flags().StringToString("env", nil, i18n.T("Environment variables to set in the container."))
-	cmd.Flags().StringVar(&opt.Image, "image", opt.Image, i18n.T("Container image to use for debug container."))
-	cmd.Flags().StringToStringVar(&opt.SetImages, "set-image", opt.SetImages, i18n.T("When used with '--copy-to', a list of name=image pairs for changing container images, similar to how 'kubectl set image' works."))
-	cmd.Flags().String("image-pull-policy", "", i18n.T("The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server."))
-	cmd.Flags().BoolVarP(&opt.Interactive, "stdin", "i", opt.Interactive, i18n.T("Keep stdin open on the container(s) in the pod, even if nothing is attached."))
-	cmd.Flags().BoolVarP(&opt.Quiet, "quiet", "q", opt.Quiet, i18n.T("If true, suppress informational messages."))
-	cmd.Flags().BoolVar(&opt.SameNode, "same-node", opt.SameNode, i18n.T("When used with '--copy-to', schedule the copy of target Pod on the same node."))
-	cmd.Flags().BoolVar(&opt.ShareProcesses, "share-processes", opt.ShareProcesses, i18n.T("When used with '--copy-to', enable process namespace sharing in the copy."))
-	cmd.Flags().StringVar(&opt.TargetContainer, "target", "", i18n.T("When using an ephemeral container, target processes in this container name."))
-	cmd.Flags().BoolVarP(&opt.TTY, "tty", "t", opt.TTY, i18n.T("Allocate a TTY for the debugging container."))
-	cmd.Flags().StringVar(&opt.Profile, "profile", ProfileLegacy, i18n.T("Debugging profile."))
+	cmd.Flags().BoolVar(&opt.ArgsOnly, "arguments-only", opt.ArgsOnly, "If specified, everything after -- will be passed to the new container as Args instead of Command.")
+	cmd.Flags().BoolVar(&opt.Attach, "attach", opt.Attach, "If true, wait for the container to start running, and then attach as if 'kubectl attach ...' were called.  Default false, unless '-i/--stdin' is set, in which case the default is true.")
+	cmd.Flags().StringVarP(&opt.Container, "container", "c", opt.Container, "Container name to use for debug container.")
+	cmd.Flags().StringVar(&opt.CopyTo, "copy-to", opt.CopyTo, "Create a copy of the target Pod with this name.")
+	cmd.Flags().BoolVar(&opt.Replace, "replace", opt.Replace, "When used with '--copy-to', delete the original Pod.")
+	cmd.Flags().StringToString("env", nil, "Environment variables to set in the container.")
+	cmd.Flags().StringVar(&opt.Image, "image", opt.Image, "Container image to use for debug container.")
+	cmd.Flags().StringToStringVar(&opt.SetImages, "set-image", opt.SetImages, "When used with '--copy-to', a list of name=image pairs for changing container images, similar to how 'kubectl set image' works.")
+	cmd.Flags().String("image-pull-policy", "", "The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server.")
+	cmd.Flags().BoolVarP(&opt.Interactive, "stdin", "i", opt.Interactive, "Keep stdin open on the container(s) in the pod, even if nothing is attached.")
+	cmd.Flags().BoolVarP(&opt.Quiet, "quiet", "q", opt.Quiet, "If true, suppress informational messages.")
+	cmd.Flags().BoolVar(&opt.SameNode, "same-node", opt.SameNode, "When used with '--copy-to', schedule the copy of target Pod on the same node.")
+	cmd.Flags().BoolVar(&opt.ShareProcesses, "share-processes", opt.ShareProcesses, "When used with '--copy-to', enable process namespace sharing in the copy.")
+	cmd.Flags().StringVar(&opt.TargetContainer, "target", "", "When using an ephemeral container, target processes in this container name.")
+	cmd.Flags().BoolVarP(&opt.TTY, "tty", "t", opt.TTY, "Allocate a TTY for the debugging container.")
+	cmd.Flags().StringVar(&opt.Profile, "profile", ProfileLegacy, "Debugging profile.")
 }
 
 // Complete finishes run-time initialization of debug.DebugOptions.

@@ -88,7 +88,7 @@ func TestGetRestartPolicy(t *testing.T) {
 	}
 	for _, test := range tests {
 		cmd := &cobra.Command{}
-		cmd.Flags().String("restart", "", i18n.T("dummy restart flag)"))
+		cmd.Flags().String("restart", "", "dummy restart flag)")
 		cmd.Flags().Lookup("restart").Value.Set(test.input)
 		policy, err := getRestartPolicy(cmd, test.interactive)
 		if test.expectErr && err == nil {

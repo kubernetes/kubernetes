@@ -44,7 +44,7 @@ const defaultBoilerPlate = `
 `
 
 var (
-	completionLong = templates.LongDesc(i18n.T(`
+	completionLong = templates.LongDesc(`
 		Output shell completion code for the specified shell (bash, zsh, fish, or powershell).
 		The shell code must be evaluated to provide interactive
 		completion of kubectl commands.  This can be done by sourcing it from
@@ -61,9 +61,9 @@ var (
         for windows:
         https://kubernetes.io/docs/tasks/tools/install-kubectl-windows/#enable-shell-autocompletion
 
-		Note for zsh users: [1] zsh completions are only supported in versions of zsh >= 5.2.`))
+		Note for zsh users: [1] zsh completions are only supported in versions of zsh >= 5.2.`)
 
-	completionExample = templates.Examples(i18n.T(`
+	completionExample = templates.Examples(`
 		# Installing bash completion on macOS using homebrew
 		## If running Bash 3.2 included with macOS
 		    brew install bash-completion
@@ -109,7 +109,7 @@ var (
 		        kubectl completion powershell | Out-String | Invoke-Expression
 		    }"
 		## Add completion code directly to the $PROFILE script
-		    kubectl completion powershell >> $PROFILE`))
+		    kubectl completion powershell >> $PROFILE`)
 )
 
 var (
@@ -131,7 +131,7 @@ func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "completion SHELL",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Output shell completion code for the specified shell (bash, zsh, fish, or powershell)"),
+		Short:                 "Output shell completion code for the specified shell (bash, zsh, fish, or powershell)",
 		Long:                  completionLong,
 		Example:               completionExample,
 		Run: func(cmd *cobra.Command, args []string) {

@@ -46,8 +46,8 @@ import (
 func NewCmdCreateSecret(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "secret",
-		Short: i18n.T("Create a secret using specified subcommand"),
-		Long:  i18n.T("Create a secret using specified subcommand."),
+		Short: "Create a secret using specified subcommand",
+		Long:  "Create a secret using specified subcommand.",
 		Run:   cmdutil.DefaultSubCommandRun(ioStreams.ErrOut),
 	}
 	cmd.AddCommand(NewCmdCreateSecretDockerRegistry(f, ioStreams))
@@ -58,7 +58,7 @@ func NewCmdCreateSecret(f cmdutil.Factory, ioStreams genericclioptions.IOStreams
 }
 
 var (
-	secretLong = templates.LongDesc(i18n.T(`
+	secretLong = templates.LongDesc(`
 		Create a secret based on a file, directory, or specified literal value.
 
 		A single secret may package one or more key/value pairs.
@@ -69,9 +69,9 @@ var (
 
 		When creating a secret based on a directory, each file whose basename is a valid key in the directory will be
 		packaged into the secret. Any directory entries except regular files are ignored (e.g. subdirectories,
-		symlinks, devices, pipes, etc).`))
+		symlinks, devices, pipes, etc).`)
 
-	secretExample = templates.Examples(i18n.T(`
+	secretExample = templates.Examples(`
 	  # Create a new secret named my-secret with keys for each file in folder bar
 	  kubectl create secret generic my-secret --from-file=path/to/bar
 
@@ -85,7 +85,7 @@ var (
 	  kubectl create secret generic my-secret --from-file=ssh-privatekey=path/to/id_rsa --from-literal=passphrase=topsecret
 
 	  # Create a new secret named my-secret from env files
-	  kubectl create secret generic my-secret --from-env-file=path/to/foo.env --from-env-file=path/to/bar.env`))
+	  kubectl create secret generic my-secret --from-env-file=path/to/foo.env --from-env-file=path/to/bar.env`)
 )
 
 // CreateSecretOptions holds the options for 'create secret' sub command
@@ -135,7 +135,7 @@ func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericclioptions.IO
 	cmd := &cobra.Command{
 		Use:                   "generic NAME [--type=string] [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Create a secret from a local file, directory, or literal value"),
+		Short:                 "Create a secret from a local file, directory, or literal value",
 		Long:                  secretLong,
 		Example:               secretExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -153,7 +153,7 @@ func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericclioptions.IO
 	cmd.Flags().StringSliceVar(&o.FileSources, "from-file", o.FileSources, "Key files can be specified using their file path, in which case a default name will be given to them, or optionally with a name and file path, in which case the given name will be used.  Specifying a directory will iterate each named file in the directory that is a valid secret key.")
 	cmd.Flags().StringArrayVar(&o.LiteralSources, "from-literal", o.LiteralSources, "Specify a key and literal value to insert in secret (i.e. mykey=somevalue)")
 	cmd.Flags().StringSliceVar(&o.EnvFileSources, "from-env-file", o.EnvFileSources, "Specify the path to a file to read lines of key=val pairs to create a secret.")
-	cmd.Flags().StringVar(&o.Type, "type", o.Type, i18n.T("The type of secret to create"))
+	cmd.Flags().StringVar(&o.Type, "type", o.Type, "The type of secret to create")
 	cmd.Flags().BoolVar(&o.AppendHash, "append-hash", o.AppendHash, "Append a hash of the secret to its name.")
 
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")

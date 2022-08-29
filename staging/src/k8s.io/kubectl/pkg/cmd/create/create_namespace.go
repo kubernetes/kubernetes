@@ -37,12 +37,12 @@ import (
 )
 
 var (
-	namespaceLong = templates.LongDesc(i18n.T(`
-		Create a namespace with the specified name.`))
+	namespaceLong = templates.LongDesc(`
+		Create a namespace with the specified name.`)
 
-	namespaceExample = templates.Examples(i18n.T(`
+	namespaceExample = templates.Examples(`
 	  # Create a new namespace named my-namespace
-	  kubectl create namespace my-namespace`))
+	  kubectl create namespace my-namespace`)
 )
 
 // NamespaceOptions is the options for 'create namespace' sub command
@@ -82,7 +82,7 @@ func NewCmdCreateNamespace(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 		Use:                   "namespace NAME [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"ns"},
-		Short:                 i18n.T("Create a namespace with the specified name"),
+		Short:                 "Create a namespace with the specified name",
 		Long:                  namespaceLong,
 		Example:               namespaceExample,
 		Run: func(cmd *cobra.Command, args []string) {

@@ -53,12 +53,12 @@ type DrainCmdOptions struct {
 }
 
 var (
-	cordonLong = templates.LongDesc(i18n.T(`
-		Mark node as unschedulable.`))
+	cordonLong = templates.LongDesc(`
+		Mark node as unschedulable.`)
 
-	cordonExample = templates.Examples(i18n.T(`
+	cordonExample = templates.Examples(`
 		# Mark node "foo" as unschedulable
-		kubectl cordon foo`))
+		kubectl cordon foo`)
 )
 
 func NewCmdCordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
@@ -67,7 +67,7 @@ func NewCmdCordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 	cmd := &cobra.Command{
 		Use:                   "cordon NODE",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Mark node as unschedulable"),
+		Short:                 "Mark node as unschedulable",
 		Long:                  cordonLong,
 		Example:               cordonExample,
 		ValidArgsFunction:     completion.ResourceNameCompletionFunc(f, "node"),
@@ -82,12 +82,12 @@ func NewCmdCordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 }
 
 var (
-	uncordonLong = templates.LongDesc(i18n.T(`
-		Mark node as schedulable.`))
+	uncordonLong = templates.LongDesc(`
+		Mark node as schedulable.`)
 
-	uncordonExample = templates.Examples(i18n.T(`
+	uncordonExample = templates.Examples(`
 		# Mark node "foo" as schedulable
-		kubectl uncordon foo`))
+		kubectl uncordon foo`)
 )
 
 func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
@@ -96,7 +96,7 @@ func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *c
 	cmd := &cobra.Command{
 		Use:                   "uncordon NODE",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Mark node as schedulable"),
+		Short:                 "Mark node as schedulable",
 		Long:                  uncordonLong,
 		Example:               uncordonExample,
 		ValidArgsFunction:     completion.ResourceNameCompletionFunc(f, "node"),
@@ -111,7 +111,7 @@ func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *c
 }
 
 var (
-	drainLong = templates.LongDesc(i18n.T(`
+	drainLong = templates.LongDesc(`
 		Drain node in preparation for maintenance.
 
 		The given node will be marked unschedulable to prevent new pods from arriving.
@@ -134,14 +134,14 @@ var (
 		When you are ready to put the node back into service, use kubectl uncordon, which
 		will make the node schedulable again.
 
-		![Workflow](https://kubernetes.io/images/docs/kubectl_drain.svg)`))
+		![Workflow](https://kubernetes.io/images/docs/kubectl_drain.svg)`)
 
-	drainExample = templates.Examples(i18n.T(`
+	drainExample = templates.Examples(`
 		# Drain node "foo", even if there are pods not managed by a replication controller, replica set, job, daemon set or stateful set on it
 		kubectl drain foo --force
 
 		# As above, but abort if there are pods not managed by a replication controller, replica set, job, daemon set or stateful set, and use a grace period of 15 minutes
-		kubectl drain foo --grace-period=900`))
+		kubectl drain foo --grace-period=900`)
 )
 
 func NewDrainCmdOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *DrainCmdOptions {
@@ -182,7 +182,7 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd := &cobra.Command{
 		Use:                   "drain NODE",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Drain node in preparation for maintenance"),
+		Short:                 "Drain node in preparation for maintenance",
 		Long:                  drainLong,
 		Example:               drainExample,
 		ValidArgsFunction:     completion.ResourceNameCompletionFunc(f, "node"),

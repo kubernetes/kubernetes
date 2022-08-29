@@ -38,7 +38,7 @@ import (
 )
 
 var (
-	secretForDockerRegistryLong = templates.LongDesc(i18n.T(`
+	secretForDockerRegistryLong = templates.LongDesc(`
 		Create a new secret for use with Docker registries.
 
 		Dockercfg secrets are used to authenticate against Docker registries.
@@ -51,14 +51,14 @@ var (
 
 		When creating applications, you may have a Docker registry that requires authentication.  In order for the
 		nodes to pull images on your behalf, they must have the credentials.  You can provide this information
-		by creating a dockercfg secret and attaching it to your service account.`))
+		by creating a dockercfg secret and attaching it to your service account.`)
 
-	secretForDockerRegistryExample = templates.Examples(i18n.T(`
+	secretForDockerRegistryExample = templates.Examples(`
 		  # If you don't already have a .dockercfg file, you can create a dockercfg secret directly by using:
 		  kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL
 
 		  # Create a new secret named my-secret from ~/.docker/config.json
-		  kubectl create secret docker-registry my-secret --from-file=.dockerconfigjson=path/to/.docker/config.json`))
+		  kubectl create secret docker-registry my-secret --from-file=.dockerconfigjson=path/to/.docker/config.json`)
 )
 
 // DockerConfigJSON represents a local docker auth config file
@@ -132,7 +132,7 @@ func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, ioStreams genericcliopt
 	cmd := &cobra.Command{
 		Use:                   "docker-registry NAME --docker-username=user --docker-password=password --docker-email=email [--docker-server=string] [--from-file=[key=]source] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Create a secret for use with a Docker registry"),
+		Short:                 "Create a secret for use with a Docker registry",
 		Long:                  secretForDockerRegistryLong,
 		Example:               secretForDockerRegistryExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -148,10 +148,10 @@ func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, ioStreams genericcliopt
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
 
-	cmd.Flags().StringVar(&o.Username, "docker-username", o.Username, i18n.T("Username for Docker registry authentication"))
-	cmd.Flags().StringVar(&o.Password, "docker-password", o.Password, i18n.T("Password for Docker registry authentication"))
-	cmd.Flags().StringVar(&o.Email, "docker-email", o.Email, i18n.T("Email for Docker registry"))
-	cmd.Flags().StringVar(&o.Server, "docker-server", o.Server, i18n.T("Server location for Docker registry"))
+	cmd.Flags().StringVar(&o.Username, "docker-username", o.Username, "Username for Docker registry authentication")
+	cmd.Flags().StringVar(&o.Password, "docker-password", o.Password, "Password for Docker registry authentication")
+	cmd.Flags().StringVar(&o.Email, "docker-email", o.Email, "Email for Docker registry")
+	cmd.Flags().StringVar(&o.Server, "docker-server", o.Server, "Server location for Docker registry")
 	cmd.Flags().BoolVar(&o.AppendHash, "append-hash", o.AppendHash, "Append a hash of the secret to its name.")
 	cmd.Flags().StringSliceVar(&o.FileSources, "from-file", o.FileSources, "Key files can be specified using their file path, in which case a default name will be given to them, or optionally with a name and file path, in which case the given name will be used.  Specifying a directory will iterate each named file in the directory that is a valid secret key.")
 

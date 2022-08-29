@@ -51,10 +51,10 @@ type ViewOptions struct {
 }
 
 var (
-	viewLong = templates.LongDesc(i18n.T(`
+	viewLong = templates.LongDesc(`
 		Display merged kubeconfig settings or a specified kubeconfig file.
 
-		You can use --output jsonpath={...} to extract specific values using a jsonpath expression.`))
+		You can use --output jsonpath={...} to extract specific values using a jsonpath expression.`)
 
 	viewExample = templates.Examples(`
 		# Show merged kubeconfig settings
@@ -78,7 +78,7 @@ func NewCmdConfigView(streams genericclioptions.IOStreams, ConfigAccess clientcm
 
 	cmd := &cobra.Command{
 		Use:     "view",
-		Short:   i18n.T("Display merged kubeconfig settings or a specified kubeconfig file"),
+		Short:   "Display merged kubeconfig settings or a specified kubeconfig file",
 		Long:    viewLong,
 		Example: viewExample,
 		Run: func(cmd *cobra.Command, args []string) {

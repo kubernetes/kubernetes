@@ -39,7 +39,7 @@ import (
 )
 
 var (
-	cpExample = templates.Examples(i18n.T(`
+	cpExample = templates.Examples(`
 		# !!!Important Note!!!
 		# Requires that the 'tar' binary is present in your container
 		# image.  If 'tar' is not present, 'kubectl cp' will fail.
@@ -63,7 +63,7 @@ var (
 		kubectl cp /tmp/foo <some-namespace>/<some-pod>:/tmp/bar
 
 		# Copy /tmp/foo from a remote pod to /tmp/bar locally
-		kubectl cp <some-namespace>/<some-pod>:/tmp/foo /tmp/bar`))
+		kubectl cp <some-namespace>/<some-pod>:/tmp/foo /tmp/bar`)
 )
 
 // CopyOptions have the data required to perform the copy operation
@@ -96,8 +96,8 @@ func NewCmdCp(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.C
 	cmd := &cobra.Command{
 		Use:                   "cp <file-spec-src> <file-spec-dest>",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Copy files and directories to and from containers"),
-		Long:                  i18n.T("Copy files and directories to and from containers."),
+		Short:                 "Copy files and directories to and from containers",
+		Long:                  "Copy files and directories to and from containers.",
 		Example:               cpExample,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			var comps []string

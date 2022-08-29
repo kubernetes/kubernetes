@@ -67,7 +67,7 @@ const (
 )
 
 var (
-	setCredentialsLong = fmt.Sprintf(templates.LongDesc(i18n.T(`
+	setCredentialsLong = fmt.Sprintf(templates.LongDesc(`
 		Set a user entry in kubeconfig.
 
 		Specifying a name that already exists will merge new fields on top of existing values.
@@ -81,7 +81,7 @@ var (
 		    Basic auth flags:
 			  --%v=basic_user --%v=basic_password
 
-		Bearer token and basic auth are mutually exclusive.`)), clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword)
+		Bearer token and basic auth are mutually exclusive.`), clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword)
 
 	setCredentialsExample = templates.Examples(`
 		# Set only the "client-key" field on the "cluster-admin"
@@ -155,7 +155,7 @@ func newCmdConfigSetCredentials(out io.Writer, options *setCredentialsOptions) *
 			flagExecEnv,
 		),
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Set a user entry in kubeconfig"),
+		Short:                 "Set a user entry in kubeconfig",
 		Long:                  setCredentialsLong,
 		Example:               setCredentialsExample,
 		Run: func(cmd *cobra.Command, args []string) {

@@ -65,15 +65,15 @@ type TopPodOptions struct {
 const metricsCreationDelay = 2 * time.Minute
 
 var (
-	topPodLong = templates.LongDesc(i18n.T(`
+	topPodLong = templates.LongDesc(`
 		Display resource (CPU/memory) usage of pods.
 
 		The 'top pod' command allows you to see the resource consumption of pods.
 
 		Due to the metrics pipeline delay, they may be unavailable for a few minutes
-		since pod creation.`))
+		since pod creation.`)
 
-	topPodExample = templates.Examples(i18n.T(`
+	topPodExample = templates.Examples(`
 		# Show metrics for all pods in the default namespace
 		kubectl top pod
 
@@ -84,7 +84,7 @@ var (
 		kubectl top pod POD_NAME --containers
 
 		# Show metrics for the pods defined by label name=myLabel
-		kubectl top pod -l name=myLabel`))
+		kubectl top pod -l name=myLabel`)
 )
 
 func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions.IOStreams) *cobra.Command {
@@ -98,7 +98,7 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions
 	cmd := &cobra.Command{
 		Use:                   "pod [NAME | -l label]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Display resource (CPU/memory) usage of pods"),
+		Short:                 "Display resource (CPU/memory) usage of pods",
 		Long:                  topPodLong,
 		Example:               topPodExample,
 		ValidArgsFunction:     completion.ResourceNameCompletionFunc(f, "pod"),

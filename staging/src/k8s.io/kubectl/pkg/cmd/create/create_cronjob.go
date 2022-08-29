@@ -37,8 +37,8 @@ import (
 )
 
 var (
-	cronjobLong = templates.LongDesc(i18n.T(`
-		Create a cron job with the specified name.`))
+	cronjobLong = templates.LongDesc(`
+		Create a cron job with the specified name.`)
 
 	cronjobExample = templates.Examples(`
 		# Create a cron job
@@ -88,7 +88,7 @@ func NewCmdCreateCronJob(f cmdutil.Factory, ioStreams genericclioptions.IOStream
 		Use:                   "cronjob NAME --image=image --schedule='0/5 * * * ?' -- [COMMAND] [args...]",
 		DisableFlagsInUseLine: false,
 		Aliases:               []string{"cj"},
-		Short:                 i18n.T("Create a cron job with the specified name"),
+		Short:                 "Create a cron job with the specified name",
 		Long:                  cronjobLong,
 		Example:               cronjobExample,
 		Run: func(cmd *cobra.Command, args []string) {

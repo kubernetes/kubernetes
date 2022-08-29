@@ -50,7 +50,7 @@ import (
 )
 
 var (
-	diffLong = templates.LongDesc(i18n.T(`
+	diffLong = templates.LongDesc(`
 		Diff configurations specified by file name or stdin between the current online
 		configuration, and the configuration as it would be if applied.
 
@@ -71,14 +71,14 @@ var (
 		 >1
 		Kubectl or diff failed with an error.
 
-		Note: KUBECTL_EXTERNAL_DIFF, if used, is expected to follow that convention.`))
+		Note: KUBECTL_EXTERNAL_DIFF, if used, is expected to follow that convention.`)
 
-	diffExample = templates.Examples(i18n.T(`
+	diffExample = templates.Examples(`
 		# Diff resources included in pod.json
 		kubectl diff -f pod.json
 
 		# Diff file read from stdin
-		cat service.yaml | kubectl diff -f -`))
+		cat service.yaml | kubectl diff -f -`)
 )
 
 // Number of times we try to diff before giving-up
@@ -133,7 +133,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd := &cobra.Command{
 		Use:                   "diff -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Diff the live version against a would-be applied version"),
+		Short:                 "Diff the live version against a would-be applied version",
 		Long:                  diffLong,
 		Example:               diffExample,
 		Run: func(cmd *cobra.Command, args []string) {

@@ -38,22 +38,22 @@ import (
 )
 
 var (
-	serviceaccountResources = i18n.T(`replicationcontroller (rc), deployment (deploy), daemonset (ds), job, replicaset (rs), statefulset`)
+	serviceaccountResources = `replicationcontroller (rc), deployment (deploy), daemonset (ds), job, replicaset (rs), statefulset`
 
-	serviceaccountLong = templates.LongDesc(i18n.T(`
+	serviceaccountLong = templates.LongDesc(`
 	Update the service account of pod template resources.
 
 	Possible resources (case insensitive) can be:
 
-	`) + serviceaccountResources)
+	` + serviceaccountResources)
 
-	serviceaccountExample = templates.Examples(i18n.T(`
+	serviceaccountExample = templates.Examples(`
 	# Set deployment nginx-deployment's service account to serviceaccount1
 	kubectl set serviceaccount deployment nginx-deployment serviceaccount1
 
 	# Print the result (in YAML format) of updated nginx deployment with the service account from local file, without hitting the API server
 	kubectl set sa -f nginx-deployment.yaml serviceaccount1 --local --dry-run=client -o yaml
-	`))
+	`)
 )
 
 // SetServiceAccountOptions encapsulates the data required to perform the operation.
@@ -99,7 +99,7 @@ func NewCmdServiceAccount(f cmdutil.Factory, streams genericclioptions.IOStreams
 		Use:                   "serviceaccount (-f FILENAME | TYPE NAME) SERVICE_ACCOUNT",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"sa"},
-		Short:                 i18n.T("Update the service account of a resource"),
+		Short:                 "Update the service account of a resource",
 		Long:                  serviceaccountLong,
 		Example:               serviceaccountExample,
 		Run: func(cmd *cobra.Command, args []string) {

@@ -37,10 +37,10 @@ import (
 )
 
 var (
-	jobLong = templates.LongDesc(i18n.T(`
-		Create a job with the specified name.`))
+	jobLong = templates.LongDesc(`
+		Create a job with the specified name.`)
 
-	jobExample = templates.Examples(i18n.T(`
+	jobExample = templates.Examples(`
 		# Create a job
 		kubectl create job my-job --image=busybox
 
@@ -48,7 +48,7 @@ var (
 		kubectl create job my-job --image=busybox -- date
 
 		# Create a job from a cron job named "a-cronjob"
-		kubectl create job test-job --from=cronjob/a-cronjob`))
+		kubectl create job test-job --from=cronjob/a-cronjob`)
 )
 
 // CreateJobOptions is the command line options for 'create job'
@@ -89,7 +89,7 @@ func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	cmd := &cobra.Command{
 		Use:                   "job NAME --image=image [--from=cronjob/name] -- [COMMAND] [args...]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Create a job with the specified name"),
+		Short:                 "Create a job with the specified name",
 		Long:                  jobLong,
 		Example:               jobExample,
 		Run: func(cmd *cobra.Command, args []string) {

@@ -39,10 +39,10 @@ import (
 )
 
 var (
-	deploymentLong = templates.LongDesc(i18n.T(`
-	Create a deployment with the specified name.`))
+	deploymentLong = templates.LongDesc(`
+	Create a deployment with the specified name.`)
 
-	deploymentExample = templates.Examples(i18n.T(`
+	deploymentExample = templates.Examples(`
 	# Create a deployment named my-dep that runs the busybox image
 	kubectl create deployment my-dep --image=busybox
 
@@ -53,7 +53,7 @@ var (
 	kubectl create deployment my-dep --image=nginx --replicas=3
 
 	# Create a deployment named my-dep that runs the busybox image and expose port 5701
-	kubectl create deployment my-dep --image=busybox --port=5701`))
+	kubectl create deployment my-dep --image=busybox --port=5701`)
 )
 
 // CreateDeploymentOptions is returned by NewCmdCreateDeployment
@@ -98,7 +98,7 @@ func NewCmdCreateDeployment(f cmdutil.Factory, ioStreams genericclioptions.IOStr
 		Use:                   "deployment NAME --image=image -- [COMMAND] [args...]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"deploy"},
-		Short:                 i18n.T("Create a deployment with the specified name"),
+		Short:                 "Create a deployment with the specified name",
 		Long:                  deploymentLong,
 		Example:               deploymentExample,
 		Run: func(cmd *cobra.Command, args []string) {

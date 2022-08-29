@@ -42,7 +42,7 @@ import (
 )
 
 var (
-	attachExample = templates.Examples(i18n.T(`
+	attachExample = templates.Examples(`
 		# Get output from running pod mypod; use the 'kubectl.kubernetes.io/default-container' annotation
 		# for selecting the container to be attached or the first container in the pod will be chosen
 		kubectl attach mypod
@@ -56,7 +56,7 @@ var (
 
 		# Get output from the first pod of a replica set named nginx
 		kubectl attach rs/nginx
-		`))
+		`)
 )
 
 const (
@@ -103,8 +103,8 @@ func NewCmdAttach(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd := &cobra.Command{
 		Use:                   "attach (POD | TYPE/NAME) -c CONTAINER",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Attach to a running container"),
-		Long:                  i18n.T("Attach to a process that is already running inside an existing container."),
+		Short:                 "Attach to a running container",
+		Long:                  "Attach to a process that is already running inside an existing container.",
 		Example:               attachExample,
 		ValidArgsFunction:     completion.PodResourceNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {

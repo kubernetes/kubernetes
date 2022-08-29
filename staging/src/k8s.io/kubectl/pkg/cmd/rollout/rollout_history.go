@@ -34,8 +34,8 @@ import (
 )
 
 var (
-	historyLong = templates.LongDesc(i18n.T(`
-		View previous rollout revisions and configurations.`))
+	historyLong = templates.LongDesc(`
+		View previous rollout revisions and configurations.`)
 
 	historyExample = templates.Examples(`
 		# View the rollout history of a deployment
@@ -82,7 +82,7 @@ func NewCmdRolloutHistory(f cmdutil.Factory, streams genericclioptions.IOStreams
 	cmd := &cobra.Command{
 		Use:                   "history (TYPE NAME | TYPE/NAME) [flags]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("View rollout history"),
+		Short:                 "View rollout history",
 		Long:                  historyLong,
 		Example:               historyExample,
 		ValidArgsFunction:     completion.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),

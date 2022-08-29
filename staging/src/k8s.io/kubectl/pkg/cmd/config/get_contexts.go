@@ -50,7 +50,7 @@ type GetContextsOptions struct {
 }
 
 var (
-	getContextsLong = templates.LongDesc(i18n.T(`Display one or many contexts from the kubeconfig file.`))
+	getContextsLong = templates.LongDesc(`Display one or many contexts from the kubeconfig file.`)
 
 	getContextsExample = templates.Examples(`
 		# List all the contexts in your kubeconfig file
@@ -72,7 +72,7 @@ func NewCmdConfigGetContexts(streams genericclioptions.IOStreams, configAccess c
 	cmd := &cobra.Command{
 		Use:                   "get-contexts [(-o|--output=)name)]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Describe one or many contexts"),
+		Short:                 "Describe one or many contexts",
 		Long:                  getContextsLong,
 		Example:               getContextsExample,
 		Run: func(cmd *cobra.Command, args []string) {

@@ -37,12 +37,12 @@ import (
 )
 
 var (
-	serviceAccountLong = templates.LongDesc(i18n.T(`
-		Create a service account with the specified name.`))
+	serviceAccountLong = templates.LongDesc(`
+		Create a service account with the specified name.`)
 
-	serviceAccountExample = templates.Examples(i18n.T(`
+	serviceAccountExample = templates.Examples(`
 	  # Create a new service account named my-service-account
-	  kubectl create serviceaccount my-service-account`))
+	  kubectl create serviceaccount my-service-account`)
 )
 
 // ServiceAccountOpts holds the options for 'create serviceaccount' sub command
@@ -83,7 +83,7 @@ func NewCmdCreateServiceAccount(f cmdutil.Factory, ioStreams genericclioptions.I
 		Use:                   "serviceaccount NAME [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"sa"},
-		Short:                 i18n.T("Create a service account with the specified name"),
+		Short:                 "Create a service account with the specified name",
 		Long:                  serviceAccountLong,
 		Example:               serviceAccountExample,
 		Run: func(cmd *cobra.Command, args []string) {

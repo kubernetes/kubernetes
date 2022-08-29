@@ -38,12 +38,12 @@ import (
 )
 
 var (
-	resourcesLong = templates.LongDesc(i18n.T(`
+	resourcesLong = templates.LongDesc(`
 		Specify compute resource requirements (CPU, memory) for any resource that defines a pod template.  If a pod is successfully scheduled, it is guaranteed the amount of resource requested, but may burst up to its specified limits.
 
 		For each compute resource, if a limit is specified and a request is omitted, the request will default to the limit.
 
-		Possible resources include (case insensitive): %s.`))
+		Possible resources include (case insensitive): %s.`)
 
 	resourcesExample = templates.Examples(`
 		# Set a deployments nginx container cpu limits to "200m" and memory to "512Mi"
@@ -113,7 +113,7 @@ func NewCmdResources(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	cmd := &cobra.Command{
 		Use:                   "resources (-f FILENAME | TYPE NAME)  ([--limits=LIMITS & --requests=REQUESTS]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Update resource requests/limits on objects with pod templates"),
+		Short:                 "Update resource requests/limits on objects with pod templates",
 		Long:                  fmt.Sprintf(resourcesLong, cmdutil.SuggestAPIResources("kubectl")),
 		Example:               resourcesExample,
 		Run: func(cmd *cobra.Command, args []string) {

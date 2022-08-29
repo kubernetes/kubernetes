@@ -58,10 +58,10 @@ var (
 	// and the TLS validation regex
 	ruleRegex = regexHostPathSvc + regexTLS
 
-	ingressLong = templates.LongDesc(i18n.T(`
-	Create an ingress with the specified name.`))
+	ingressLong = templates.LongDesc(`
+	Create an ingress with the specified name.`)
 
-	ingressExample = templates.Examples(i18n.T(`
+	ingressExample = templates.Examples(`
 		# Create a single ingress called 'simple' that directs requests to foo.com/bar to svc
 		# svc1:8080 with a tls secret "my-cert"
 		kubectl create ingress simple --rule="foo.com/bar=svc1:8080,tls=my-cert"
@@ -98,7 +98,7 @@ var (
 		   --default-backend=defaultsvc:http \
 		   --rule="foo.com/*=svc:8080,tls=secret1"
 
-		`))
+		`)
 )
 
 // CreateIngressOptions is returned by NewCmdCreateIngress
@@ -143,7 +143,7 @@ func NewCmdCreateIngress(f cmdutil.Factory, ioStreams genericclioptions.IOStream
 		Use:                   "ingress NAME --rule=host/path=service:port[,tls[=secret]] ",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"ing"},
-		Short:                 i18n.T("Create an ingress with the specified name"),
+		Short:                 "Create an ingress with the specified name",
 		Long:                  ingressLong,
 		Example:               ingressExample,
 		Run: func(cmd *cobra.Command, args []string) {

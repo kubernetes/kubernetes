@@ -77,12 +77,12 @@ type PatchOptions struct {
 }
 
 var (
-	patchLong = templates.LongDesc(i18n.T(`
+	patchLong = templates.LongDesc(`
 		Update fields of a resource using strategic merge patch, a JSON merge patch, or a JSON patch.
 
-		JSON and YAML formats are accepted.`))
+		JSON and YAML formats are accepted.`)
 
-	patchExample = templates.Examples(i18n.T(`
+	patchExample = templates.Examples(`
 		# Partially update a node using a strategic merge patch, specifying the patch as JSON
 		kubectl patch node k8s-node-1 -p '{"spec":{"unschedulable":true}}'
 
@@ -99,7 +99,7 @@ var (
 		kubectl patch pod valid-pod --type='json' -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"new image"}]'
 		
 		# Update a deployment's replicas through the scale subresource using a merge patch.
-		kubectl patch deployment nginx-deployment --subresource='scale' --type='merge' -p '{"spec":{"replicas":2}}'`))
+		kubectl patch deployment nginx-deployment --subresource='scale' --type='merge' -p '{"spec":{"replicas":2}}'`)
 )
 
 var supportedSubresources = []string{"status", "scale"}
@@ -119,7 +119,7 @@ func NewCmdPatch(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd := &cobra.Command{
 		Use:                   "patch (-f FILENAME | TYPE NAME) [-p PATCH|--patch-file FILE]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Update fields of a resource"),
+		Short:                 "Update fields of a resource",
 		Long:                  patchLong,
 		Example:               patchExample,
 		ValidArgsFunction:     completion.ResourceTypeAndNameCompletionFunc(f),

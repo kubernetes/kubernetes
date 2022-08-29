@@ -61,16 +61,16 @@ type PortForwardOptions struct {
 }
 
 var (
-	portforwardLong = templates.LongDesc(i18n.T(`
+	portforwardLong = templates.LongDesc(`
                 Forward one or more local ports to a pod.
 
                 Use resource type/name such as deployment/mydeployment to select a pod. Resource type defaults to 'pod' if omitted.
 
                 If there are multiple pods matching the criteria, a pod will be selected automatically. The
                 forwarding session ends when the selected pod terminates, and a rerun of the command is needed
-                to resume forwarding.`))
+                to resume forwarding.`)
 
-	portforwardExample = templates.Examples(i18n.T(`
+	portforwardExample = templates.Examples(`
 		# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod
 		kubectl port-forward pod/mypod 5000 6000
 
@@ -90,7 +90,7 @@ var (
 		kubectl port-forward --address localhost,10.19.21.23 pod/mypod 8888:5000
 
 		# Listen on a random port locally, forwarding to 5000 in the pod
-		kubectl port-forward pod/mypod :5000`))
+		kubectl port-forward pod/mypod :5000`)
 )
 
 const (
@@ -107,7 +107,7 @@ func NewCmdPortForward(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 	cmd := &cobra.Command{
 		Use:                   "port-forward TYPE/NAME [options] [LOCAL_PORT:]REMOTE_PORT [...[LOCAL_PORT_N:]REMOTE_PORT_N]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Forward one or more local ports to a pod"),
+		Short:                 "Forward one or more local ports to a pod",
 		Long:                  portforwardLong,
 		Example:               portforwardExample,
 		ValidArgsFunction:     completion.PodResourceNameCompletionFunc(f),

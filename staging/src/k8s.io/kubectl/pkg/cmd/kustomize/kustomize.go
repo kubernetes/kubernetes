@@ -32,9 +32,9 @@ func NewCmdKustomize(streams genericclioptions.IOStreams) *cobra.Command {
 		filesys.MakeFsOnDisk(),
 		&build.Help{
 			Use:     h.Use,
-			Short:   i18n.T(h.Short),
-			Long:    templates.LongDesc(i18n.T(h.Long)),
-			Example: templates.Examples(i18n.T(h.Example)),
+			Short:   h.Short,
+			Long:    templates.LongDesc(h.Long),
+			Example: templates.Examples(h.Example),
 		},
 		streams.Out)
 }

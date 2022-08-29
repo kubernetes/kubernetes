@@ -44,7 +44,7 @@ import (
 )
 
 var (
-	statusLong = templates.LongDesc(i18n.T(`
+	statusLong = templates.LongDesc(`
 		Show the status of the rollout.
 
 		By default 'rollout status' will watch the status of the latest rollout
@@ -52,7 +52,7 @@ var (
 		you can use --watch=false. Note that if a new rollout starts in-between, then
 		'rollout status' will continue watching the latest revision. If you want to
 		pin to a specific revision and abort if it is rolled over by another revision,
-		use --revision=N where N is the revision you need to watch for.`))
+		use --revision=N where N is the revision you need to watch for.`)
 
 	statusExample = templates.Examples(`
 		# Watch the rollout status of a deployment
@@ -100,7 +100,7 @@ func NewCmdRolloutStatus(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	cmd := &cobra.Command{
 		Use:                   "status (TYPE NAME | TYPE/NAME) [flags]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Show the status of the rollout"),
+		Short:                 "Show the status of the rollout",
 		Long:                  statusLong,
 		Example:               statusExample,
 		ValidArgsFunction:     completion.SpecifiedResourceTypeAndNameNoRepeatCompletionFunc(f, validArgs),

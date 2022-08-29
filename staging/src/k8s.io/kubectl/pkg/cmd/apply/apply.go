@@ -132,16 +132,16 @@ type ApplyOptions struct {
 }
 
 var (
-	applyLong = templates.LongDesc(i18n.T(`
+	applyLong = templates.LongDesc(`
 		Apply a configuration to a resource by file name or stdin.
 		The resource name must be specified. This resource will be created if it doesn't exist yet.
 		To use 'apply', always create the resource initially with either 'apply' or 'create --save-config'.
 
 		JSON and YAML formats are accepted.
 
-		Alpha Disclaimer: the --prune functionality is not yet complete. Do not use unless you are aware of what the current state is. See https://issues.k8s.io/34274.`))
+		Alpha Disclaimer: the --prune functionality is not yet complete. Do not use unless you are aware of what the current state is. See https://issues.k8s.io/34274.`)
 
-	applyExample = templates.Examples(i18n.T(`
+	applyExample = templates.Examples(`
 		# Apply the configuration in pod.json to a pod
 		kubectl apply -f ./pod.json
 
@@ -159,7 +159,7 @@ var (
 		kubectl apply --prune -f manifest.yaml -l app=nginx
 
 		# Apply the configuration in manifest.yaml and delete all the other config maps that are not in the file
-		kubectl apply --prune -f manifest.yaml --all --prune-whitelist=core/v1/ConfigMap`))
+		kubectl apply --prune -f manifest.yaml --all --prune-whitelist=core/v1/ConfigMap`)
 
 	warningNoLastAppliedConfigAnnotation = "Warning: resource %[1]s is missing the %[2]s annotation which is required by %[3]s apply. %[3]s apply should only be used on resources created declaratively by either %[3]s create --save-config or %[3]s apply. The missing annotation will be patched automatically.\n"
 	warningChangesOnDeletingResource     = "Warning: Detected changes to resource %[1]s which is currently being deleted.\n"
@@ -187,7 +187,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	cmd := &cobra.Command{
 		Use:                   "apply (-f FILENAME | -k DIRECTORY)",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Apply a configuration to a resource by file name or stdin"),
+		Short:                 "Apply a configuration to a resource by file name or stdin",
 		Long:                  applyLong,
 		Example:               applyExample,
 		Run: func(cmd *cobra.Command, args []string) {

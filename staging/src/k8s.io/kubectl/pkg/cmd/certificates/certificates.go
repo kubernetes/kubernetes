@@ -46,8 +46,8 @@ func NewCmdCertificate(restClientGetter genericclioptions.RESTClientGetter, ioSt
 	cmd := &cobra.Command{
 		Use:                   "certificate SUBCOMMAND",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Modify certificate resources."),
-		Long:                  i18n.T("Modify certificate resources."),
+		Short:                 "Modify certificate resources.",
+		Long:                  "Modify certificate resources.",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
 		},
@@ -133,8 +133,8 @@ func NewCmdCertificateApprove(restClientGetter genericclioptions.RESTClientGette
 	cmd := &cobra.Command{
 		Use:                   "approve (-f FILENAME | NAME)",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Approve a certificate signing request"),
-		Long: templates.LongDesc(i18n.T(`
+		Short:                 "Approve a certificate signing request",
+		Long: templates.LongDesc(`
 		Approve a certificate signing request.
 
 		kubectl certificate approve allows a cluster admin to approve a certificate
@@ -145,11 +145,11 @@ func NewCmdCertificateApprove(restClientGetter genericclioptions.RESTClientGette
 		can potentially grant a requester access to cluster resources or to authenticate
 		as a requested identity. Before approving a CSR, ensure you understand what the
 		signed certificate can do.
-		`)),
-		Example: templates.Examples(i18n.T(`
+		`),
+		Example: templates.Examples(`
 			# Approve CSR 'csr-sqgzp'
 			kubectl certificate approve csr-sqgzp
-		`)),
+		`),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(restClientGetter, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -181,18 +181,18 @@ func NewCmdCertificateDeny(restClientGetter genericclioptions.RESTClientGetter, 
 	cmd := &cobra.Command{
 		Use:                   "deny (-f FILENAME | NAME)",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Deny a certificate signing request"),
-		Long: templates.LongDesc(i18n.T(`
+		Short:                 "Deny a certificate signing request",
+		Long: templates.LongDesc(`
 		Deny a certificate signing request.
 
 		kubectl certificate deny allows a cluster admin to deny a certificate
 		signing request (CSR). This action tells a certificate signing controller to
 		not to issue a certificate to the requestor.
-		`)),
-		Example: templates.Examples(i18n.T(`
+		`),
+		Example: templates.Examples(`
 			# Deny CSR 'csr-sqgzp'
 			kubectl certificate deny csr-sqgzp
-		`)),
+		`),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(restClientGetter, cmd, args))
 			cmdutil.CheckErr(o.Validate())

@@ -41,14 +41,14 @@ type setOptions struct {
 }
 
 var (
-	setLong = templates.LongDesc(i18n.T(`
+	setLong = templates.LongDesc(`
 	Set an individual value in a kubeconfig file.
 
 	PROPERTY_NAME is a dot delimited name where each token represents either an attribute name or a map key.  Map keys may not contain dots.
 
 	PROPERTY_VALUE is the new value you want to set. Binary fields such as 'certificate-authority-data' expect a base64 encoded string unless the --set-raw-bytes flag is used.
 
-	Specifying an attribute name that already exists will merge new fields on top of existing values.`))
+	Specifying an attribute name that already exists will merge new fields on top of existing values.`)
 
 	setExample = templates.Examples(`
 	# Set the server field on the my-cluster cluster to https://1.2.3.4
@@ -71,7 +71,7 @@ func NewCmdConfigSet(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.
 	cmd := &cobra.Command{
 		Use:                   "set PROPERTY_NAME PROPERTY_VALUE",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Set an individual value in a kubeconfig file"),
+		Short:                 "Set an individual value in a kubeconfig file",
 		Long:                  setLong,
 		Example:               setExample,
 		Run: func(cmd *cobra.Command, args []string) {

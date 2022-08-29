@@ -40,10 +40,10 @@ import (
 )
 
 var (
-	roleLong = templates.LongDesc(i18n.T(`
-		Create a role with single rule.`))
+	roleLong = templates.LongDesc(`
+		Create a role with single rule.`)
 
-	roleExample = templates.Examples(i18n.T(`
+	roleExample = templates.Examples(`
 		# Create a role named "pod-reader" that allows user to perform "get", "watch" and "list" on pods
 		kubectl create role pod-reader --verb=get --verb=list --verb=watch --resource=pods
 
@@ -54,7 +54,7 @@ var (
 		kubectl create role foo --verb=get,list,watch --resource=rs.apps
 
 		# Create a role named "foo" with SubResource specified
-		kubectl create role foo --verb=get,list,watch --resource=pods,pods/status`))
+		kubectl create role foo --verb=get,list,watch --resource=pods,pods/status`)
 
 	// Valid resource verb list for validation.
 	validResourceVerbs = []string{"*", "get", "delete", "list", "create", "update", "patch", "watch", "proxy", "deletecollection", "use", "bind", "escalate", "impersonate"}
@@ -169,7 +169,7 @@ func NewCmdCreateRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) 
 	cmd := &cobra.Command{
 		Use:                   "role NAME --verb=verb --resource=resource.group/subresource [--resource-name=resourcename] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Create a role with single rule"),
+		Short:                 "Create a role with single rule",
 		Long:                  roleLong,
 		Example:               roleExample,
 		Run: func(cmd *cobra.Command, args []string) {

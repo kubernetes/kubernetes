@@ -56,12 +56,12 @@ type ResumeOptions struct {
 }
 
 var (
-	resumeLong = templates.LongDesc(i18n.T(`
+	resumeLong = templates.LongDesc(`
 		Resume a paused resource.
 
 		Paused resources will not be reconciled by a controller. By resuming a
 		resource, we allow it to be reconciled again.
-		Currently only deployments support being resumed.`))
+		Currently only deployments support being resumed.`)
 
 	resumeExample = templates.Examples(`
 		# Resume an already paused deployment
@@ -85,7 +85,7 @@ func NewCmdRolloutResume(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	cmd := &cobra.Command{
 		Use:                   "resume RESOURCE",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Resume a paused resource"),
+		Short:                 "Resume a paused resource",
 		Long:                  resumeLong,
 		Example:               resumeExample,
 		ValidArgsFunction:     completion.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),

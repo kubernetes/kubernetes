@@ -31,9 +31,9 @@ import (
 )
 
 var (
-	apiversionsExample = templates.Examples(i18n.T(`
+	apiversionsExample = templates.Examples(`
 		# Print the supported API versions
-		kubectl api-versions`))
+		kubectl api-versions`)
 )
 
 // APIVersionsOptions have the data required for API versions
@@ -55,8 +55,8 @@ func NewCmdAPIVersions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 	o := NewAPIVersionsOptions(ioStreams)
 	cmd := &cobra.Command{
 		Use:                   "api-versions",
-		Short:                 i18n.T("Print the supported API versions on the server, in the form of \"group/version\""),
-		Long:                  i18n.T("Print the supported API versions on the server, in the form of \"group/version\"."),
+		Short:                 "Print the supported API versions on the server, in the form of \"group/version\"",
+		Long:                  "Print the supported API versions on the server, in the form of \"group/version\".",
 		Example:               apiversionsExample,
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, args []string) {

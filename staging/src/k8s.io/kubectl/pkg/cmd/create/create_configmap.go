@@ -43,7 +43,7 @@ import (
 )
 
 var (
-	configMapLong = templates.LongDesc(i18n.T(`
+	configMapLong = templates.LongDesc(`
 		Create a config map based on a file, directory, or specified literal value.
 
 		A single config map may package one or more key/value pairs.
@@ -53,9 +53,9 @@ var (
 
 		When creating a config map based on a directory, each file whose basename is a valid key in the directory will be
 		packaged into the config map.  Any directory entries except regular files are ignored (e.g. subdirectories,
-		symlinks, devices, pipes, etc).`))
+		symlinks, devices, pipes, etc).`)
 
-	configMapExample = templates.Examples(i18n.T(`
+	configMapExample = templates.Examples(`
 		  # Create a new config map named my-config based on folder bar
 		  kubectl create configmap my-config --from-file=path/to/bar
 
@@ -69,7 +69,7 @@ var (
 		  kubectl create configmap my-config --from-file=path/to/bar
 
 		  # Create a new config map named my-config from an env file
-		  kubectl create configmap my-config --from-env-file=path/to/foo.env --from-env-file=path/to/bar.env`))
+		  kubectl create configmap my-config --from-env-file=path/to/foo.env --from-env-file=path/to/bar.env`)
 )
 
 // ConfigMapOptions holds properties for create configmap sub-command
@@ -120,7 +120,7 @@ func NewCmdCreateConfigMap(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 		Use:                   "configmap NAME [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"cm"},
-		Short:                 i18n.T("Create a config map from a local file, directory or literal value"),
+		Short:                 "Create a config map from a local file, directory or literal value",
 		Long:                  configMapLong,
 		Example:               configMapExample,
 		Run: func(cmd *cobra.Command, args []string) {

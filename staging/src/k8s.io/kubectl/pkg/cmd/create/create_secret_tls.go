@@ -38,15 +38,15 @@ import (
 )
 
 var (
-	secretForTLSLong = templates.LongDesc(i18n.T(`
+	secretForTLSLong = templates.LongDesc(`
 		Create a TLS secret from the given public/private key pair.
 
 		The public/private key pair must exist beforehand. The public key certificate must be .PEM encoded and match
-		the given private key.`))
+		the given private key.`)
 
-	secretForTLSExample = templates.Examples(i18n.T(`
+	secretForTLSExample = templates.Examples(`
 	  # Create a new TLS secret named tls-secret with the given key pair
-	  kubectl create secret tls tls-secret --cert=path/to/tls.cert --key=path/to/tls.key`))
+	  kubectl create secret tls tls-secret --cert=path/to/tls.cert --key=path/to/tls.key`)
 )
 
 // CreateSecretTLSOptions holds the options for 'create secret tls' sub command
@@ -92,7 +92,7 @@ func NewCmdCreateSecretTLS(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	cmd := &cobra.Command{
 		Use:                   "tls NAME --cert=path/to/cert/file --key=path/to/key/file [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Create a TLS secret"),
+		Short:                 "Create a TLS secret",
 		Long:                  secretForTLSLong,
 		Example:               secretForTLSExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -108,8 +108,8 @@ func NewCmdCreateSecretTLS(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
 
-	cmd.Flags().StringVar(&o.Cert, "cert", o.Cert, i18n.T("Path to PEM encoded public key certificate."))
-	cmd.Flags().StringVar(&o.Key, "key", o.Key, i18n.T("Path to private key associated with given certificate."))
+	cmd.Flags().StringVar(&o.Cert, "cert", o.Cert, "Path to PEM encoded public key certificate.")
+	cmd.Flags().StringVar(&o.Key, "key", o.Key, "Path to private key associated with given certificate.")
 	cmd.Flags().BoolVar(&o.AppendHash, "append-hash", o.AppendHash, "Append a hash of the secret to its name.")
 
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")

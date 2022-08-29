@@ -71,7 +71,7 @@ func NewCmdClusterInfoDump(restClientGetter genericclioptions.RESTClientGetter, 
 
 	cmd := &cobra.Command{
 		Use:     "dump",
-		Short:   i18n.T("Dump relevant information for debugging and diagnosis"),
+		Short:   "Dump relevant information for debugging and diagnosis",
 		Long:    dumpLong,
 		Example: dumpExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -82,7 +82,7 @@ func NewCmdClusterInfoDump(restClientGetter genericclioptions.RESTClientGetter, 
 
 	o.PrintFlags.AddFlags(cmd)
 
-	cmd.Flags().StringVar(&o.OutputDir, "output-directory", o.OutputDir, i18n.T("Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory"))
+	cmd.Flags().StringVar(&o.OutputDir, "output-directory", o.OutputDir, "Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory")
 	cmd.Flags().StringSliceVar(&o.Namespaces, "namespaces", o.Namespaces, "A comma separated list of namespaces to dump.")
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If true, dump all namespaces.  If true, --namespaces is ignored.")
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodLogsTimeout)
@@ -90,16 +90,16 @@ func NewCmdClusterInfoDump(restClientGetter genericclioptions.RESTClientGetter, 
 }
 
 var (
-	dumpLong = templates.LongDesc(i18n.T(`
+	dumpLong = templates.LongDesc(`
     Dump cluster information out suitable for debugging and diagnosing cluster problems.  By default, dumps everything to
     stdout. You can optionally specify a directory with --output-directory.  If you specify a directory, Kubernetes will
     build a set of files in that directory.  By default, only dumps things in the current namespace and 'kube-system' namespace, but you can
     switch to a different namespace with the --namespaces flag, or specify --all-namespaces to dump all namespaces.
 
     The command also dumps the logs of all of the pods in the cluster; these logs are dumped into different directories
-    based on namespace and pod name.`))
+    based on namespace and pod name.`)
 
-	dumpExample = templates.Examples(i18n.T(`
+	dumpExample = templates.Examples(`
     # Dump current cluster state to stdout
     kubectl cluster-info dump
 
@@ -110,7 +110,7 @@ var (
     kubectl cluster-info dump --all-namespaces
 
     # Dump a set of namespaces to /path/to/cluster-state
-    kubectl cluster-info dump --namespaces default,kube-system --output-directory=/path/to/cluster-state`))
+    kubectl cluster-info dump --namespaces default,kube-system --output-directory=/path/to/cluster-state`)
 )
 
 func setupOutputWriter(dir string, defaultWriter io.Writer, filename string, fileExtension string) io.Writer {

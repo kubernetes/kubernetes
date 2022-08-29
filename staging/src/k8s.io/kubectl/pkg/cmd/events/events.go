@@ -47,14 +47,14 @@ import (
 )
 
 var (
-	eventsLong = templates.LongDesc(i18n.T(`
+	eventsLong = templates.LongDesc(`
 		Experimental: Display events
 
 		Prints a table of the most important information about events.
 		You can request events for a namespace, for all namespace, or
-		filtered to only those pertaining to a specified resource.`))
+		filtered to only those pertaining to a specified resource.`)
 
-	eventsExample = templates.Examples(i18n.T(`
+	eventsExample = templates.Examples(`
 	# List recent events in the default namespace.
 	kubectl alpha events
 
@@ -68,7 +68,7 @@ var (
 	kubectl alpha events -oyaml
 
 	# List recent only events in given event types
-	kubectl alpha events --types=Warning,Normal`))
+	kubectl alpha events --types=Warning,Normal`)
 )
 
 // EventsFlags directly reflect the information that CLI is gathering via flags.  They will be converted to Options, which
@@ -122,7 +122,7 @@ func NewCmdEvents(restClientGetter genericclioptions.RESTClientGetter, streams g
 	cmd := &cobra.Command{
 		Use:                   fmt.Sprintf("events [(-o|--output=)%s] [--for TYPE/NAME] [--watch] [--event=Normal,Warning]", strings.Join(flags.PrintFlags.AllowedFormats(), "|")),
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Experimental: List events"),
+		Short:                 "Experimental: List events",
 		Long:                  eventsLong,
 		Example:               eventsExample,
 		Run: func(cmd *cobra.Command, args []string) {

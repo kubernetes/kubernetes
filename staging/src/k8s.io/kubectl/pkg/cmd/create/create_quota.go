@@ -38,15 +38,15 @@ import (
 )
 
 var (
-	quotaLong = templates.LongDesc(i18n.T(`
-		Create a resource quota with the specified name, hard limits, and optional scopes.`))
+	quotaLong = templates.LongDesc(`
+		Create a resource quota with the specified name, hard limits, and optional scopes.`)
 
-	quotaExample = templates.Examples(i18n.T(`
+	quotaExample = templates.Examples(`
 		# Create a new resource quota named my-quota
 		kubectl create quota my-quota --hard=cpu=1,memory=1G,pods=2,services=3,replicationcontrollers=2,resourcequotas=1,secrets=5,persistentvolumeclaims=10
 
 		# Create a new resource quota named best-effort
-		kubectl create quota best-effort --hard=pods=100 --scopes=BestEffort`))
+		kubectl create quota best-effort --hard=pods=100 --scopes=BestEffort`)
 )
 
 // QuotaOpts holds the command-line options for 'create quota' sub command
@@ -89,7 +89,7 @@ func NewCmdCreateQuota(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 		Use:                   "quota NAME [--hard=key1=value1,key2=value2] [--scopes=Scope1,Scope2] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"resourcequota"},
-		Short:                 i18n.T("Create a quota with the specified name"),
+		Short:                 "Create a quota with the specified name",
 		Long:                  quotaLong,
 		Example:               quotaExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -104,8 +104,8 @@ func NewCmdCreateQuota(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().StringVar(&o.Hard, "hard", o.Hard, i18n.T("A comma-delimited set of resource=quantity pairs that define a hard limit."))
-	cmd.Flags().StringVar(&o.Scopes, "scopes", o.Scopes, i18n.T("A comma-delimited set of quota scopes that must all match each object tracked by the quota."))
+	cmd.Flags().StringVar(&o.Hard, "hard", o.Hard, "A comma-delimited set of resource=quantity pairs that define a hard limit.")
+	cmd.Flags().StringVar(&o.Scopes, "scopes", o.Scopes, "A comma-delimited set of quota scopes that must all match each object tracked by the quota.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 	return cmd
 }

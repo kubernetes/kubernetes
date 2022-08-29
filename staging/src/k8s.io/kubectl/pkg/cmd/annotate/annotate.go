@@ -80,7 +80,7 @@ type AnnotateOptions struct {
 }
 
 var (
-	annotateLong = templates.LongDesc(i18n.T(`
+	annotateLong = templates.LongDesc(`
 		Update the annotations on one or more resources.
 
 		All Kubernetes objects support the ability to store additional data with the object as
@@ -90,9 +90,9 @@ var (
 
 		Attempting to set an annotation that already exists will fail unless --overwrite is set.
 		If --resource-version is specified and does not match the current resource version on
-		the server the command will fail.`))
+		the server the command will fail.`)
 
-	annotateExample = templates.Examples(i18n.T(`
+	annotateExample = templates.Examples(`
     # Update pod 'foo' with the annotation 'description' and the value 'my frontend'
     # If the same annotation is set multiple times, only the last value will be applied
     kubectl annotate pods foo description='my frontend'
@@ -111,7 +111,7 @@ var (
 
     # Update pod 'foo' by removing an annotation named 'description' if it exists
     # Does not require the --overwrite flag
-    kubectl annotate pods foo description-`))
+    kubectl annotate pods foo description-`)
 )
 
 // NewAnnotateOptions creates the options for annotate
@@ -132,7 +132,7 @@ func NewCmdAnnotate(parent string, f cmdutil.Factory, ioStreams genericclioption
 	cmd := &cobra.Command{
 		Use:                   "annotate [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Update the annotations on a resource"),
+		Short:                 "Update the annotations on a resource",
 		Long:                  annotateLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
 		Example:               annotateExample,
 		ValidArgsFunction:     completion.ResourceTypeAndNameCompletionFunc(f),
@@ -153,7 +153,7 @@ func NewCmdAnnotate(parent string, f cmdutil.Factory, ioStreams genericclioption
 	cmd.Flags().StringVar(&o.fieldSelector, "field-selector", o.fieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
 	cmd.Flags().BoolVar(&o.all, "all", o.all, "Select all resources, in the namespace of the specified resource types.")
 	cmd.Flags().BoolVarP(&o.allNamespaces, "all-namespaces", "A", o.allNamespaces, "If true, check the specified action in all namespaces.")
-	cmd.Flags().StringVar(&o.resourceVersion, "resource-version", o.resourceVersion, i18n.T("If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
+	cmd.Flags().StringVar(&o.resourceVersion, "resource-version", o.resourceVersion, "If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
 	usage := "identifying the resource to update the annotation"
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)

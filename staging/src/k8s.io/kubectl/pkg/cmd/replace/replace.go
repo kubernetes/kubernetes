@@ -46,15 +46,15 @@ import (
 )
 
 var (
-	replaceLong = templates.LongDesc(i18n.T(`
+	replaceLong = templates.LongDesc(`
 		Replace a resource by file name or stdin.
 
 		JSON and YAML formats are accepted. If replacing an existing resource, the
 		complete resource spec must be provided. This can be obtained by
 
-		    $ kubectl get TYPE NAME -o yaml`))
+		    $ kubectl get TYPE NAME -o yaml`)
 
-	replaceExample = templates.Examples(i18n.T(`
+	replaceExample = templates.Examples(`
 		# Replace a pod using the data in pod.json
 		kubectl replace -f ./pod.json
 
@@ -65,7 +65,7 @@ var (
 		kubectl get pod mypod -o yaml | sed 's/\(image: myimage\):.*$/\1:v4/' | kubectl replace -f -
 
 		# Force replace, delete and then re-create the resource
-		kubectl replace --force -f ./pod.json`))
+		kubectl replace --force -f ./pod.json`)
 )
 
 var supportedSubresources = []string{"status", "scale"}
@@ -118,7 +118,7 @@ func NewCmdReplace(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd := &cobra.Command{
 		Use:                   "replace -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Replace a resource by file name or stdin"),
+		Short:                 "Replace a resource by file name or stdin",
 		Long:                  replaceLong,
 		Example:               replaceExample,
 		Run: func(cmd *cobra.Command, args []string) {

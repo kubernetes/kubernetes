@@ -47,11 +47,11 @@ const (
 )
 
 var (
-	logsLong = templates.LongDesc(i18n.T(`
+	logsLong = templates.LongDesc(`
 		Print the logs for a container in a pod or specified resource. 
-		If the pod has only one container, the container name is optional.`))
+		If the pod has only one container, the container name is optional.`)
 
-	logsExample = templates.Examples(i18n.T(`
+	logsExample = templates.Examples(`
 		# Return snapshot logs from pod nginx with only one container
 		kubectl logs nginx
 
@@ -83,7 +83,7 @@ var (
 		kubectl logs job/hello
 
 		# Return snapshot logs from container nginx-1 of a deployment named nginx
-		kubectl logs deployment/nginx -c nginx-1`))
+		kubectl logs deployment/nginx -c nginx-1`)
 
 	selectorTail    int64 = 10
 	logsUsageErrStr       = fmt.Sprintf("expected '%s'.\nPOD or TYPE/NAME is a required argument for the logs command", logsUsageStr)
@@ -150,7 +150,7 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd := &cobra.Command{
 		Use:                   logsUsageStr,
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Print the logs for a container in a pod"),
+		Short:                 "Print the logs for a container in a pod",
 		Long:                  logsLong,
 		Example:               logsExample,
 		ValidArgsFunction:     completion.PodResourceNameAndContainerCompletionFunc(f),
@@ -172,7 +172,7 @@ func (o *LogsOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&o.Previous, "previous", "p", o.Previous, "If true, print the logs for the previous instance of the container in a pod if it exists.")
 	cmd.Flags().Int64Var(&o.Tail, "tail", o.Tail, "Lines of recent log file to display. Defaults to -1 with no selector, showing all log lines otherwise 10, if a selector is provided.")
 	cmd.Flags().BoolVar(&o.IgnoreLogErrors, "ignore-errors", o.IgnoreLogErrors, "If watching / following pod logs, allow for any errors that occur to be non-fatal")
-	cmd.Flags().StringVar(&o.SinceTime, "since-time", o.SinceTime, i18n.T("Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used."))
+	cmd.Flags().StringVar(&o.SinceTime, "since-time", o.SinceTime, "Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used.")
 	cmd.Flags().DurationVar(&o.SinceSeconds, "since", o.SinceSeconds, "Only return logs newer than a relative duration like 5s, 2m, or 3h. Defaults to all logs. Only one of since-time / since may be used.")
 	cmd.Flags().StringVarP(&o.Container, "container", "c", o.Container, "Print the logs of this container")
 	cmd.Flags().BoolVar(&o.InsecureSkipTLSVerifyBackend, "insecure-skip-tls-verify-backend", o.InsecureSkipTLSVerifyBackend,

@@ -26,17 +26,17 @@ import (
 )
 
 var (
-	optionsExample = templates.Examples(i18n.T(`
+	optionsExample = templates.Examples(`
 		# Print flags inherited by all commands
-		kubectl options`))
+		kubectl options`)
 )
 
 // NewCmdOptions implements the options command
 func NewCmdOptions(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "options",
-		Short:   i18n.T("Print the list of flags inherited by all commands"),
-		Long:    i18n.T("Print the list of flags inherited by all commands"),
+		Short:   "Print the list of flags inherited by all commands",
+		Long:    "Print the list of flags inherited by all commands",
 		Example: optionsExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Usage()

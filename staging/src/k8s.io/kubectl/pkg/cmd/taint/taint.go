@@ -68,7 +68,7 @@ type TaintOptions struct {
 }
 
 var (
-	taintLong = templates.LongDesc(i18n.T(`
+	taintLong = templates.LongDesc(`
 		Update the taints on one or more nodes.
 
 		* A taint consists of a key, value, and effect. As an argument here, it is expressed as key=value:effect.
@@ -76,9 +76,9 @@ var (
 		* Optionally, the key can begin with a DNS subdomain prefix and a single '/', like example.com/my-app.
 		* The value is optional. If given, it must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[2]d characters.
 		* The effect must be NoSchedule, PreferNoSchedule or NoExecute.
-		* Currently taint can only apply to node.`))
+		* Currently taint can only apply to node.`)
 
-	taintExample = templates.Examples(i18n.T(`
+	taintExample = templates.Examples(`
 		# Update node 'foo' with a taint with key 'dedicated' and value 'special-user' and effect 'NoSchedule'
 		# If a taint with that key and effect already exists, its value is replaced as specified
 		kubectl taint nodes foo dedicated=special-user:NoSchedule
@@ -93,7 +93,7 @@ var (
 		kubectl taint node -l myLabel=X  dedicated=foo:PreferNoSchedule
 
 		# Add to node 'foo' a taint with key 'bar' and no value
-		kubectl taint nodes foo bar:NoSchedule`))
+		kubectl taint nodes foo bar:NoSchedule`)
 )
 
 func NewCmdTaint(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -107,7 +107,7 @@ func NewCmdTaint(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	cmd := &cobra.Command{
 		Use:                   "taint NODE NAME KEY_1=VAL_1:TAINT_EFFECT_1 ... KEY_N=VAL_N:TAINT_EFFECT_N",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Update the taints on one or more nodes"),
+		Short:                 "Update the taints on one or more nodes",
 		Long:                  fmt.Sprintf(taintLong, validation.DNS1123SubdomainMaxLength, validation.LabelValueMaxLength),
 		Example:               taintExample,
 		ValidArgsFunction:     completion.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),

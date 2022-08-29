@@ -27,8 +27,8 @@ import (
 )
 
 var (
-	rolloutLong = templates.LongDesc(i18n.T(`
-		Manage the rollout of one or many resources.`) + rolloutValidResources)
+	rolloutLong = templates.LongDesc(`
+		Manage the rollout of one or many resources.` + rolloutValidResources)
 
 	rolloutExample = templates.Examples(`
 		# Rollback to the previous deployment
@@ -57,7 +57,7 @@ func NewCmdRollout(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd := &cobra.Command{
 		Use:                   "rollout SUBCOMMAND",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Manage the rollout of a resource"),
+		Short:                 "Manage the rollout of a resource",
 		Long:                  rolloutLong,
 		Example:               rolloutExample,
 		Run:                   cmdutil.DefaultSubCommandRun(streams.Out),

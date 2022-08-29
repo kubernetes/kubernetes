@@ -37,16 +37,16 @@ import (
 )
 
 var (
-	scaleLong = templates.LongDesc(i18n.T(`
+	scaleLong = templates.LongDesc(`
 		Set a new size for a deployment, replica set, replication controller, or stateful set.
 
 		Scale also allows users to specify one or more preconditions for the scale action.
 
 		If --current-replicas or --resource-version is specified, it is validated before the
 		scale is attempted, and it is guaranteed that the precondition holds true when the
-		scale is sent to the server.`))
+		scale is sent to the server.`)
 
-	scaleExample = templates.Examples(i18n.T(`
+	scaleExample = templates.Examples(`
 		# Scale a replica set named 'foo' to 3
 		kubectl scale --replicas=3 rs/foo
 
@@ -60,7 +60,7 @@ var (
 		kubectl scale --replicas=5 rc/foo rc/bar rc/baz
 
 		# Scale stateful set named 'web' to 3
-		kubectl scale --replicas=3 statefulset/web`))
+		kubectl scale --replicas=3 statefulset/web`)
 )
 
 type ScaleOptions struct {
@@ -111,7 +111,7 @@ func NewCmdScale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd := &cobra.Command{
 		Use:                   "scale [--resource-version=version] [--current-replicas=count] --replicas=COUNT (-f FILENAME | TYPE NAME)",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Set a new size for a deployment, replica set, or replication controller"),
+		Short:                 "Set a new size for a deployment, replica set, or replication controller",
 		Long:                  scaleLong,
 		Example:               scaleExample,
 		ValidArgsFunction:     completion.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
@@ -126,7 +126,7 @@ func NewCmdScale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	o.PrintFlags.AddFlags(cmd)
 
 	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources in the namespace of the specified resource types")
-	cmd.Flags().StringVar(&o.ResourceVersion, "resource-version", o.ResourceVersion, i18n.T("Precondition for resource version. Requires that the current resource version match this value in order to scale."))
+	cmd.Flags().StringVar(&o.ResourceVersion, "resource-version", o.ResourceVersion, "Precondition for resource version. Requires that the current resource version match this value in order to scale.")
 	cmd.Flags().IntVar(&o.CurrentReplicas, "current-replicas", o.CurrentReplicas, "Precondition for current size. Requires that the current size of the resource match this value in order to scale. -1 (default) for no condition.")
 	cmd.Flags().IntVar(&o.Replicas, "replicas", o.Replicas, "The new desired number of replicas. Required.")
 	cmd.MarkFlagRequired("replicas")

@@ -28,7 +28,7 @@ import (
 )
 
 var (
-	editLong = templates.LongDesc(i18n.T(`
+	editLong = templates.LongDesc(`
 		Edit a resource from the default editor.
 
 		The edit command allows you to directly edit any API resource you can retrieve via the
@@ -50,9 +50,9 @@ var (
 		that contains your unapplied changes. The most common error when updating a resource
 		is another editor changing the resource on the server. When this occurs, you will have
 		to apply your changes to the newer version of the resource, or update your temporary
-		saved copy to include the latest resource version.`))
+		saved copy to include the latest resource version.`)
 
-	editExample = templates.Examples(i18n.T(`
+	editExample = templates.Examples(`
 		# Edit the service named 'registry'
 		kubectl edit svc/registry
 
@@ -66,7 +66,7 @@ var (
 		kubectl edit deployment/mydeployment -o yaml --save-config
 
 		# Edit the deployment/mydeployment's status subresource
-		kubectl edit deployment mydeployment --subresource='status'`))
+		kubectl edit deployment mydeployment --subresource='status'`)
 )
 
 // NewCmdEdit creates the `edit` command
@@ -75,7 +75,7 @@ func NewCmdEdit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra
 	cmd := &cobra.Command{
 		Use:                   "edit (RESOURCE/NAME | -f FILENAME)",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Edit a resource on the server"),
+		Short:                 "Edit a resource on the server",
 		Long:                  editLong,
 		Example:               editExample,
 		ValidArgsFunction:     completion.ResourceTypeAndNameCompletionFunc(f),

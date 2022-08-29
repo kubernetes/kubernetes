@@ -55,17 +55,17 @@ type TopNodeOptions struct {
 }
 
 var (
-	topNodeLong = templates.LongDesc(i18n.T(`
+	topNodeLong = templates.LongDesc(`
 		Display resource (CPU/memory) usage of nodes.
 
-		The top-node command allows you to see the resource consumption of nodes.`))
+		The top-node command allows you to see the resource consumption of nodes.`)
 
-	topNodeExample = templates.Examples(i18n.T(`
+	topNodeExample = templates.Examples(`
 		  # Show metrics for all nodes
 		  kubectl top node
 
 		  # Show metrics for a given node
-		  kubectl top node NODE_NAME`))
+		  kubectl top node NODE_NAME`)
 )
 
 func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptions.IOStreams) *cobra.Command {
@@ -79,7 +79,7 @@ func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptio
 	cmd := &cobra.Command{
 		Use:                   "node [NAME | -l label]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Display resource (CPU/memory) usage of nodes"),
+		Short:                 "Display resource (CPU/memory) usage of nodes",
 		Long:                  topNodeLong,
 		Example:               topNodeExample,
 		ValidArgsFunction:     completion.ResourceNameCompletionFunc(f, "node"),

@@ -55,10 +55,10 @@ type RestartOptions struct {
 }
 
 var (
-	restartLong = templates.LongDesc(i18n.T(`
+	restartLong = templates.LongDesc(`
 		Restart a resource.
 
-	        Resource rollout will be restarted.`))
+	        Resource rollout will be restarted.`)
 
 	restartExample = templates.Examples(`
 		# Restart a deployment
@@ -88,7 +88,7 @@ func NewCmdRolloutRestart(f cmdutil.Factory, streams genericclioptions.IOStreams
 	cmd := &cobra.Command{
 		Use:                   "restart RESOURCE",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Restart a resource"),
+		Short:                 "Restart a resource",
 		Long:                  restartLong,
 		Example:               restartExample,
 		ValidArgsFunction:     completion.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),

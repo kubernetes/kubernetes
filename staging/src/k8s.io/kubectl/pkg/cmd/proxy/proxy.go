@@ -67,13 +67,13 @@ const (
 )
 
 var (
-	proxyLong = templates.LongDesc(i18n.T(`
+	proxyLong = templates.LongDesc(`
 		Creates a proxy server or application-level gateway between localhost and
 		the Kubernetes API server. It also allows serving static content over specified
 		HTTP path. All incoming data enters through one port and gets forwarded to
-		the remote Kubernetes API server port, except for the path matching the static content path.`))
+		the remote Kubernetes API server port, except for the path matching the static content path.`)
 
-	proxyExample = templates.Examples(i18n.T(`
+	proxyExample = templates.Examples(`
 		# To proxy all of the Kubernetes API and nothing else
 		kubectl proxy --api-prefix=/
 
@@ -94,7 +94,7 @@ var (
 
 		# Run a proxy to the Kubernetes API server, changing the API prefix to k8s-api
 		# This makes e.g. the pods API available at localhost:8001/k8s-api/v1/pods/
-		kubectl proxy --api-prefix=/k8s-api`))
+		kubectl proxy --api-prefix=/k8s-api`)
 )
 
 // NewProxyOptions creates the options for proxy
@@ -119,7 +119,7 @@ func NewCmdProxy(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd := &cobra.Command{
 		Use:                   "proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Run a proxy to the Kubernetes API server"),
+		Short:                 "Run a proxy to the Kubernetes API server",
 		Long:                  proxyLong,
 		Example:               proxyExample,
 		Run: func(cmd *cobra.Command, args []string) {

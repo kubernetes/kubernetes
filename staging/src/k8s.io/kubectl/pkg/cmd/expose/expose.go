@@ -47,9 +47,9 @@ import (
 )
 
 var (
-	exposeResources = i18n.T(`pod (po), service (svc), replicationcontroller (rc), deployment (deploy), replicaset (rs)`)
+	exposeResources = `pod (po), service (svc), replicationcontroller (rc), deployment (deploy), replicaset (rs)`
 
-	exposeLong = templates.LongDesc(i18n.T(`
+	exposeLong = templates.LongDesc(`
 		Expose a resource as a new Kubernetes service.
 
 		Looks up a deployment, service, replica set, replication controller or pod by name and uses the selector
@@ -61,9 +61,9 @@ var (
 
 		Possible resources include (case insensitive):
 
-		`) + exposeResources)
+		` + exposeResources)
 
-	exposeExample = templates.Examples(i18n.T(`
+	exposeExample = templates.Examples(`
 		# Create a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000
 		kubectl expose rc nginx --port=80 --target-port=8000
 
@@ -83,7 +83,7 @@ var (
 		kubectl expose rs nginx --port=80 --target-port=8000
 
 		# Create a service for an nginx deployment, which serves on port 80 and connects to the containers on port 8000
-		kubectl expose deployment nginx --port=80 --target-port=8000`))
+		kubectl expose deployment nginx --port=80 --target-port=8000`)
 )
 
 // ExposeServiceOptions holds the options for kubectl expose command
@@ -160,7 +160,7 @@ func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	cmd := &cobra.Command{
 		Use:                   "expose (-f FILENAME | TYPE NAME) [--port=port] [--protocol=TCP|UDP|SCTP] [--target-port=number-or-name] [--name=name] [--external-ip=external-ip-of-service] [--type=type]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Take a replication controller, service, deployment or pod and expose it as a new Kubernetes service"),
+		Short:                 "Take a replication controller, service, deployment or pod and expose it as a new Kubernetes service",
 		Long:                  exposeLong,
 		Example:               exposeExample,
 		ValidArgsFunction:     completion.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
@@ -173,17 +173,17 @@ func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	o.RecordFlags.AddFlags(cmd)
 	o.PrintFlags.AddFlags(cmd)
 
-	cmd.Flags().StringVar(&o.Protocol, "protocol", o.Protocol, i18n.T("The network protocol for the service to be created. Default is 'TCP'."))
-	cmd.Flags().StringVar(&o.Port, "port", o.Port, i18n.T("The port that the service should serve on. Copied from the resource being exposed, if unspecified"))
-	cmd.Flags().StringVar(&o.Type, "type", o.Type, i18n.T("Type for this service: ClusterIP, NodePort, LoadBalancer, or ExternalName. Default is 'ClusterIP'."))
-	cmd.Flags().StringVar(&o.LoadBalancerIP, "load-balancer-ip", o.LoadBalancerIP, i18n.T("IP to assign to the LoadBalancer. If empty, an ephemeral IP will be created and used (cloud-provider specific)."))
-	cmd.Flags().StringVar(&o.Selector, "selector", o.Selector, i18n.T("A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.)"))
+	cmd.Flags().StringVar(&o.Protocol, "protocol", o.Protocol, "The network protocol for the service to be created. Default is 'TCP'.")
+	cmd.Flags().StringVar(&o.Port, "port", o.Port, "The port that the service should serve on. Copied from the resource being exposed, if unspecified")
+	cmd.Flags().StringVar(&o.Type, "type", o.Type, "Type for this service: ClusterIP, NodePort, LoadBalancer, or ExternalName. Default is 'ClusterIP'.")
+	cmd.Flags().StringVar(&o.LoadBalancerIP, "load-balancer-ip", o.LoadBalancerIP, "IP to assign to the LoadBalancer. If empty, an ephemeral IP will be created and used (cloud-provider specific).")
+	cmd.Flags().StringVar(&o.Selector, "selector", o.Selector, "A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.)")
 	cmd.Flags().StringVarP(&o.Labels, "labels", "l", o.Labels, "Labels to apply to the service created by this call.")
-	cmd.Flags().StringVar(&o.TargetPort, "target-port", o.TargetPort, i18n.T("Name or number for the port on the container that the service should direct traffic to. Optional."))
-	cmd.Flags().StringVar(&o.ExternalIP, "external-ip", o.ExternalIP, i18n.T("Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP."))
-	cmd.Flags().StringVar(&o.Name, "name", o.Name, i18n.T("The name for the newly created object."))
-	cmd.Flags().StringVar(&o.SessionAffinity, "session-affinity", o.SessionAffinity, i18n.T("If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'"))
-	cmd.Flags().StringVar(&o.ClusterIP, "cluster-ip", o.ClusterIP, i18n.T("ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service."))
+	cmd.Flags().StringVar(&o.TargetPort, "target-port", o.TargetPort, "Name or number for the port on the container that the service should direct traffic to. Optional.")
+	cmd.Flags().StringVar(&o.ExternalIP, "external-ip", o.ExternalIP, "Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP.")
+	cmd.Flags().StringVar(&o.Name, "name", o.Name, "The name for the newly created object.")
+	cmd.Flags().StringVar(&o.SessionAffinity, "session-affinity", o.SessionAffinity, "If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'")
+	cmd.Flags().StringVar(&o.ClusterIP, "cluster-ip", o.ClusterIP, "ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-expose")
 	o.AddOverrideFlags(cmd)
 

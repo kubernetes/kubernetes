@@ -29,7 +29,6 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/validation"
 	scheme "k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -37,7 +36,7 @@ import (
 )
 
 var (
-	convertLong = templates.LongDesc(i18n.T(`
+	convertLong = templates.LongDesc(`
 		Convert config files between different API versions. Both YAML
 		and JSON formats are accepted.
 
@@ -46,9 +45,9 @@ var (
 		not supported, convert to latest version.
 
 		The default output will be printed to stdout in YAML format. One can use -o option
-		to change to output destination.`))
+		to change to output destination.`)
 
-	convertExample = templates.Examples(i18n.T(`
+	convertExample = templates.Examples(`
 		# Convert 'pod.yaml' to latest version and print to stdout.
 		kubectl convert -f pod.yaml
 
@@ -57,7 +56,7 @@ var (
 		kubectl convert -f pod.yaml --local -o json
 
 		# Convert all files under current directory to latest version and create them all.
-		kubectl convert -f . | kubectl create -f -`))
+		kubectl convert -f . | kubectl create -f -`)
 )
 
 // ConvertOptions have the data required to perform the convert operation
@@ -92,7 +91,7 @@ func NewCmdConvert(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 	cmd := &cobra.Command{
 		Use:                   "convert -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Convert config files between different API versions"),
+		Short:                 "Convert config files between different API versions",
 		Long:                  convertLong,
 		Example:               convertExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -102,7 +101,7 @@ func NewCmdConvert(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 	}
 
 	cmd.Flags().BoolVar(&o.local, "local", o.local, "If true, convert will NOT try to contact api-server but run locally.")
-	cmd.Flags().StringVar(&o.OutputVersion, "output-version", o.OutputVersion, i18n.T("Output the formatted object with the given group version (for ex: 'extensions/v1beta1')."))
+	cmd.Flags().StringVar(&o.OutputVersion, "output-version", o.OutputVersion, "Output the formatted object with the given group version (for ex: 'extensions/v1beta1').")
 	o.PrintFlags.AddFlags(cmd)
 
 	cmdutil.AddValidateFlags(cmd)

@@ -91,8 +91,8 @@ func NewCmdAPIResources(f cmdutil.Factory, ioStreams genericclioptions.IOStreams
 
 	cmd := &cobra.Command{
 		Use:     "api-resources",
-		Short:   i18n.T("Print the supported API resources on the server"),
-		Long:    i18n.T("Print the supported API resources on the server."),
+		Short:   "Print the supported API resources on the server",
+		Long:    "Print the supported API resources on the server.",
 		Example: apiresourcesExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(cmd, args))

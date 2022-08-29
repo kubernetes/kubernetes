@@ -64,13 +64,13 @@ type SetSelectorOptions struct {
 }
 
 var (
-	selectorLong = templates.LongDesc(i18n.T(`
+	selectorLong = templates.LongDesc(`
 		Set the selector on a resource. Note that the new selector will overwrite the old selector if the resource had one prior to the invocation
 		of 'set selector'.
 
 		A selector must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters.
 		If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.
-        Note: currently selectors can only be set on Service objects.`))
+        Note: currently selectors can only be set on Service objects.`)
 	selectorExample = templates.Examples(`
         # Set the labels and selector before creating a deployment/service pair
         kubectl create service clusterip my-svc --clusterip="None" -o yaml --dry-run=client | kubectl set selector --local -f - 'environment=qa' -o yaml | kubectl create -f -
@@ -101,7 +101,7 @@ func NewCmdSelector(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	cmd := &cobra.Command{
 		Use:                   "selector (-f FILENAME | TYPE NAME) EXPRESSIONS [--resource-version=version]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Set the selector on a resource"),
+		Short:                 "Set the selector on a resource",
 		Long:                  fmt.Sprintf(selectorLong, validation.LabelValueMaxLength),
 		Example:               selectorExample,
 		Run: func(cmd *cobra.Command, args []string) {

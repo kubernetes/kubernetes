@@ -67,12 +67,12 @@ type PatchBuffer struct {
 }
 
 var (
-	applySetLastAppliedLong = templates.LongDesc(i18n.T(`
+	applySetLastAppliedLong = templates.LongDesc(`
 		Set the latest last-applied-configuration annotations by setting it to match the contents of a file.
 		This results in the last-applied-configuration being updated as though 'kubectl apply -f <file>' was run,
-		without updating any other parts of the object.`))
+		without updating any other parts of the object.`)
 
-	applySetLastAppliedExample = templates.Examples(i18n.T(`
+	applySetLastAppliedExample = templates.Examples(`
 		# Set the last-applied-configuration of a resource to match the contents of a file
 		kubectl apply set-last-applied -f deploy.yaml
 
@@ -81,7 +81,7 @@ var (
 
 		# Set the last-applied-configuration of a resource to match the contents of a file; will create the annotation if it does not already exist
 		kubectl apply set-last-applied -f deploy.yaml --create-annotation=true
-		`))
+		`)
 )
 
 // NewSetLastAppliedOptions takes option arguments from a CLI stream and returns it at SetLastAppliedOptions type.
@@ -98,7 +98,7 @@ func NewCmdApplySetLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IO
 	cmd := &cobra.Command{
 		Use:                   "set-last-applied -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Set the last-applied-configuration annotation on a live object to match the contents of a file"),
+		Short:                 "Set the last-applied-configuration annotation on a live object to match the contents of a file",
 		Long:                  applySetLastAppliedLong,
 		Example:               applySetLastAppliedExample,
 		Run: func(cmd *cobra.Command, args []string) {
