@@ -38,7 +38,7 @@ const (
 	// owner: @jefftree @alexzielenski
 	// alpha: v1.26
 	//
-	// Enables a single HTTP endpoint /discovery/v2 which supports native HTTP
+	// Enables an single HTTP endpoint /discovery/<version> which supports native HTTP
 	// caching with ETags containing all APIResources known to the apiserver.
 	AggregatedDiscoveryEndpoint featuregate.Feature = "AggregatedDiscoveryEndpoint"
 
