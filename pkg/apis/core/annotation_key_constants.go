@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This file should be consistent with pkg/api/v1/annotation_key_constants.go.
+// This file should be consistent with staging/src/k8s.io/api/core/v1/annotation_key_constants.go.
 
 package core
 
