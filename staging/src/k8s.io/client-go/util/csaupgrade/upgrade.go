@@ -1,12 +1,12 @@
 package csaupgrade
 
 import (
+	"bytes"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -14,9 +14,13 @@ const csaAnnotationName = "kubectl.kubernetes.io/last-applied-configuration"
 
 var csaAnnotationFieldSet = fieldpath.NewSet(fieldpath.MakePathOrDie("metadata", "annotations", csaAnnotationName))
 
-// Upgrades the Manager information for fields managed with CSA
+// Upgrades the Manager information for fields managed with client-side-apply (CSA)
 // Prepares fields owned by `csaManager` for 'Update' operations for use now
 // with the given `ssaManager` for `Apply` operations.
+//
+// This transformation should be performed on an object if it has been previously
+// managed using client-side-apply to prepare it for future use with 
+// server-side-apply.
 //
 // Caveats:
 //  1. This operation is not reversible. Information about which fields the client
@@ -27,9 +31,11 @@ var csaAnnotationFieldSet = fieldpath.NewSet(fieldpath.MakePathOrDie("metadata",
 //  4. Care must be taken to not overwrite the managed fields on the server if they
 //     have changed before sending a patch.
 //
-// csaManager - Name of FieldManager formerly used for `Update` operations
-// ssaManager - Name of FieldManager formerly used for `Apply` operations
-// subResource - Name of subresource used for api calls or empty string for main resource
+// obj - Target of the operation which has been managed with CSA in the past
+// csaManagerName - Name of FieldManager formerly used for `Update` operations
+// ssaManagerName - Name of FieldManager formerly used for `Apply` operations
+// Returns: a copy of the `obj` paramter with its managed fields modified so that
+// it may be used with server-side apply in the future.
 func UpgradeManagedFields(
 	obj runtime.Object,
 	csaManagerName string,
@@ -65,7 +71,7 @@ func UpgradeManagedFields(
 					entry.APIVersion == ssaManager.APIVersion
 			})
 
-		ssaFieldSet, err := fieldmanager.FieldsToSet(*ssaManager.FieldsV1)
+		ssaFieldSet, err := fieldsToSet(*ssaManager.FieldsV1)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert fields to set: %w", err)
 		}
@@ -76,7 +82,7 @@ func UpgradeManagedFields(
 		if csaManagerExists {
 			csaManager := managedFields[csaManagerIndex]
 
-			csaFieldSet, err := fieldmanager.FieldsToSet(*csaManager.FieldsV1)
+			csaFieldSet, err := fieldsToSet(*csaManager.FieldsV1)
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert fields to set: %w", err)
 			}
@@ -88,7 +94,7 @@ func UpgradeManagedFields(
 		// last applied annotation
 		combinedFieldSet = combinedFieldSet.Difference(csaAnnotationFieldSet)
 
-		combinedFieldSetEncoded, err := fieldmanager.SetToFields(*combinedFieldSet)
+		combinedFieldSetEncoded, err := setToFields(*combinedFieldSet)
 		if err != nil {
 			return nil, fmt.Errorf("failed to encode field set: %w", err)
 		}
@@ -115,7 +121,7 @@ func UpgradeManagedFields(
 		}
 
 		csaManager := managedFields[csaManagerIndex]
-		csaFieldSet, err := fieldmanager.FieldsToSet(*csaManager.FieldsV1)
+		csaFieldSet, err := fieldsToSet(*csaManager.FieldsV1)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert fields to set: %w", err)
 		}
@@ -123,7 +129,7 @@ func UpgradeManagedFields(
 		// Remove last applied configuration from owned fields, if necessary
 		csaFieldSet = *csaFieldSet.Difference(csaAnnotationFieldSet)
 
-		csaFieldSetEncoded, err := fieldmanager.SetToFields(csaFieldSet)
+		csaFieldSetEncoded, err := setToFields(csaFieldSet)
 		if err != nil {
 			return nil, fmt.Errorf("failed to encode field set: %w", err)
 		}
@@ -186,4 +192,17 @@ func filter[T any](
 	}
 
 	return result
+}
+
+// Included from fieldmanager.internal to avoid dependency cycle
+// FieldsToSet creates a set paths from an input trie of fields
+func fieldsToSet(f metav1.FieldsV1) (s fieldpath.Set, err error) {
+	err = s.FromJSON(bytes.NewReader(f.Raw))
+	return s, err
+}
+
+// SetToFields creates a trie of fields from an input set of paths
+func setToFields(s fieldpath.Set) (f metav1.FieldsV1, err error) {
+	f.Raw, err = s.ToJSON()
+	return f, err
 }
