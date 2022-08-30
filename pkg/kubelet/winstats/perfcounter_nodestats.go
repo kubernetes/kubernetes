@@ -216,15 +216,15 @@ func (p *perfCounterNodeStatsClient) collectMetricsData(cpuCounter, memWorkingSe
 		return
 	}
 
-	memCommittedBytesValue, err := memCommittedBytesCounter.getData()
-	if err != nil {
-		klog.ErrorS(err, "Unable to get memCommittedBytes perf counter data")
-		return
-	}
-
 	networkAdapterStats, err := networkAdapterCounter.getData()
 	if err != nil {
 		klog.ErrorS(err, "Unable to get network adapter perf counter data")
+		return
+	}
+
+	total, free, err := getFreePhysicalMemoryBytes()
+	if err != nil {
+		klog.ErrorS(err, "Unable to read free available memory")
 		return
 	}
 
@@ -234,9 +234,10 @@ func (p *perfCounterNodeStatsClient) collectMetricsData(cpuCounter, memWorkingSe
 		cpuUsageCoreNanoSeconds:   p.convertCPUValue(cpuCores, cpuValue),
 		cpuUsageNanoCores:         p.getCPUUsageNanoCores(),
 		memoryPrivWorkingSetBytes: memWorkingSetValue,
-		memoryCommittedBytes:      memCommittedBytesValue,
-		interfaceStats:            networkAdapterStats,
-		timeStamp:                 time.Now(),
+		// hack committed memory so that memoryCommittedBytes + memoryPrivWorkingSetBytes = total - free (used physical memory)
+		memoryCommittedBytes: total - free - memWorkingSetValue,
+		interfaceStats:       networkAdapterStats,
+		timeStamp:            time.Now(),
 	}
 }
 
@@ -287,6 +288,18 @@ func getPhysicallyInstalledSystemMemoryBytes() (uint64, error) {
 	}
 
 	return statex.TotalPhys, nil
+}
+
+func getFreePhysicalMemoryBytes() (uint64, uint64, error) {
+	var statex MemoryStatusEx
+	statex.Length = uint32(unsafe.Sizeof(statex))
+	ret, _, _ := procGlobalMemoryStatusEx.Call(uintptr(unsafe.Pointer(&statex)))
+
+	if ret == 0 {
+		return 0, 0, errors.New("unable to read free physical memory")
+	}
+
+	return statex.TotalPhys, statex.AvailPhys, nil
 }
 
 func getBootID() (string, error) {
