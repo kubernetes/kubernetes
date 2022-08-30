@@ -162,7 +162,7 @@ if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
   echo "Kubelet Config File: ${kubelet_config_file}"
 
   # Invoke the runner
-  go run test/e2e_node/runner/remote/run_remote.go  --logtostderr --vmodule=*=4 --ssh-env="gce" \
+  go run test/e2e_node/runner/remote/run_remote.go  --vmodule=*=4 --ssh-env="gce" \
     --zone="${zone}" --project="${project}" --gubernator="${gubernator}" \
     --hosts="${hosts}" --images="${images}" --cleanup="${cleanup}" \
     --results-dir="${artifacts}" --ginkgo-flags="${ginkgoflags}" --runtime-config="${runtime_config}" \
@@ -189,7 +189,7 @@ elif [ "${remote}" = true ] && [ "${remote_mode}" = ssh ] ; then
   test_args='--kubelet-flags="--cluster-domain='${KUBE_DNS_DOMAIN:-cluster.local}'" '${test_args}
 
   # Invoke the runner
-  go run test/e2e_node/runner/remote/run_remote.go  --mode="ssh" --logtostderr --vmodule=*=4 \
+  go run test/e2e_node/runner/remote/run_remote.go  --mode="ssh" --vmodule=*=4 \
     --hosts="${hosts}" --results-dir="${artifacts}" --ginkgo-flags="${ginkgoflags}" \
     --test_args="${test_args}" --system-spec-name="${system_spec_name}" \
     --runtime-config="${runtime_config}" \
@@ -222,7 +222,7 @@ else
   go run test/e2e_node/runner/local/run_local.go \
     --system-spec-name="${system_spec_name}" --extra-envs="${extra_envs}" \
     --ginkgo-flags="${ginkgoflags}" \
-    --test-flags="--alsologtostderr --v 4 --report-dir=${artifacts} --node-name $(hostname) ${test_args}" \
+    --test-flags="--v 4 --report-dir=${artifacts} --node-name $(hostname) ${test_args}" \
     --runtime-config="${runtime_config}" \
     --kubelet-config-file="${kubelet_config_file}" \
     --build-dependencies=true 2>&1 | tee -i "${artifacts}/build-log.txt"
