@@ -43,6 +43,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
@@ -990,5 +991,80 @@ func TestUnschedulableNodeDaemonDoesLaunchPod(t *testing.T) {
 
 		validateDaemonSetPodsAndMarkReady(podClient, podInformer, 2, t)
 		validateDaemonSetStatus(dsClient, ds.Name, 2, t)
+	})
+}
+
+func TestUpdateStatusDespitePodCreationFailure(t *testing.T) {
+	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
+		limitedPodNumber := 2
+		// use framework.StartTestServer to inject admission control
+		// e.g. to emulate the resource quota behavior
+		c, config, closeFn := framework.StartTestServer(t, framework.TestServerSetup{
+			ModifyServerConfig: func(config *controlplane.Config) {
+				config.GenericConfig.AdmissionControl = &fakePodFailAdmission{
+					limitedPodNumber: limitedPodNumber,
+				}
+			},
+		})
+		defer closeFn()
+
+		resyncPeriod := 12 * time.Hour
+		informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "daemonset-informers")), resyncPeriod)
+		dc, err := daemon.NewDaemonSetsController(
+			informers.Apps().V1().DaemonSets(),
+			informers.Apps().V1().ControllerRevisions(),
+			informers.Core().V1().Pods(),
+			informers.Core().V1().Nodes(),
+			clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "daemonset-controller")),
+			flowcontrol.NewBackOff(5*time.Second, 15*time.Minute),
+		)
+		if err != nil {
+			t.Fatalf("error creating DaemonSets controller: %v", err)
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
+			Interface: c.EventsV1(),
+		})
+
+		sched, err := scheduler.New(
+			c,
+			informers,
+			nil,
+			profile.NewRecorderFactory(eventBroadcaster),
+			ctx.Done(),
+		)
+		if err != nil {
+			t.Fatalf("Couldn't create scheduler: %v", err)
+		}
+
+		eventBroadcaster.StartRecordingToSink(ctx.Done())
+		defer eventBroadcaster.Shutdown()
+		go sched.Run(ctx)
+
+		ns := framework.CreateNamespaceOrDie(c, "update-status-despite-pod-failure", t)
+		defer framework.DeleteNamespaceOrDie(c, ns, t)
+
+		dsClient := c.AppsV1().DaemonSets(ns.Name)
+		podClient := c.CoreV1().Pods(ns.Name)
+		nodeClient := c.CoreV1().Nodes()
+		podInformer := informers.Core().V1().Pods().Informer()
+		informers.Start(ctx.Done())
+		go dc.Run(ctx, 2)
+
+		ds := newDaemonSet("foo", ns.Name)
+		ds.Spec.UpdateStrategy = *strategy
+		_, err = dsClient.Create(context.TODO(), ds, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create DaemonSet: %v", err)
+		}
+		defer cleanupDaemonSets(t, c, ds)
+
+		addNodes(nodeClient, 0, 5, nil, t)
+
+		validateDaemonSetPodsAndMarkReady(podClient, podInformer, limitedPodNumber, t)
+		validateDaemonSetStatus(dsClient, ds.Name, int32(limitedPodNumber), t)
 	})
 }
