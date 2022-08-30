@@ -45,26 +45,31 @@ func (assertion *Assertion) Error() types.Assertion {
 
 func (assertion *Assertion) Should(matcher types.GomegaMatcher, optionalDescription ...interface{}) bool {
 	assertion.g.THelper()
+	vetOptionalDescription("Assertion", optionalDescription...)
 	return assertion.vet(assertion, optionalDescription...) && assertion.match(matcher, true, optionalDescription...)
 }
 
 func (assertion *Assertion) ShouldNot(matcher types.GomegaMatcher, optionalDescription ...interface{}) bool {
 	assertion.g.THelper()
+	vetOptionalDescription("Assertion", optionalDescription...)
 	return assertion.vet(assertion, optionalDescription...) && assertion.match(matcher, false, optionalDescription...)
 }
 
 func (assertion *Assertion) To(matcher types.GomegaMatcher, optionalDescription ...interface{}) bool {
 	assertion.g.THelper()
+	vetOptionalDescription("Assertion", optionalDescription...)
 	return assertion.vet(assertion, optionalDescription...) && assertion.match(matcher, true, optionalDescription...)
 }
 
 func (assertion *Assertion) ToNot(matcher types.GomegaMatcher, optionalDescription ...interface{}) bool {
 	assertion.g.THelper()
+	vetOptionalDescription("Assertion", optionalDescription...)
 	return assertion.vet(assertion, optionalDescription...) && assertion.match(matcher, false, optionalDescription...)
 }
 
 func (assertion *Assertion) NotTo(matcher types.GomegaMatcher, optionalDescription ...interface{}) bool {
 	assertion.g.THelper()
+	vetOptionalDescription("Assertion", optionalDescription...)
 	return assertion.vet(assertion, optionalDescription...) && assertion.match(matcher, false, optionalDescription...)
 }
 

@@ -116,7 +116,10 @@ func (opts formatOptions) FormatDiff(v *valueNode, ptrs *pointerReferences) (out
 	}
 
 	// For leaf nodes, format the value based on the reflect.Values alone.
-	if v.MaxDepth == 0 {
+	// As a special case, treat equal []byte as a leaf nodes.
+	isBytes := v.Type.Kind() == reflect.Slice && v.Type.Elem() == reflect.TypeOf(byte(0))
+	isEqualBytes := isBytes && v.NumDiff+v.NumIgnored+v.NumTransformed == 0
+	if v.MaxDepth == 0 || isEqualBytes {
 		switch opts.DiffMode {
 		case diffUnknown, diffIdentical:
 			// Format Equal.

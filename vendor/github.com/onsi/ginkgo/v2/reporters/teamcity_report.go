@@ -17,12 +17,12 @@ import (
 )
 
 func tcEscape(s string) string {
-	s = strings.Replace(s, "|", "||", -1)
-	s = strings.Replace(s, "'", "|'", -1)
-	s = strings.Replace(s, "\n", "|n", -1)
-	s = strings.Replace(s, "\r", "|r", -1)
-	s = strings.Replace(s, "[", "|[", -1)
-	s = strings.Replace(s, "]", "|]", -1)
+	s = strings.ReplaceAll(s, "|", "||")
+	s = strings.ReplaceAll(s, "'", "|'")
+	s = strings.ReplaceAll(s, "\n", "|n")
+	s = strings.ReplaceAll(s, "\r", "|r")
+	s = strings.ReplaceAll(s, "[", "|[")
+	s = strings.ReplaceAll(s, "]", "|]")
 	return s
 }
 

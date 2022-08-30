@@ -80,3 +80,9 @@ Labels are the type for spec Label decorators.  Use Label(...) to construct Labe
 You can learn more here: https://onsi.github.io/ginkgo/#spec-labels
 */
 type Labels = internal.Labels
+
+/*
+SuppressProgressReporting is a decorator that allows you to disable progress reporting of a particular node.  This is useful if `ginkgo -v -progress` is generating too much noise; particularly
+if you have a `ReportAfterEach` node that is running for every skipped spec and is generating lots of progress reports.
+*/
+const SuppressProgressReporting = internal.SuppressProgressReporting
