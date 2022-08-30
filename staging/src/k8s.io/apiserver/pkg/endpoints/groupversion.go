@@ -105,7 +105,7 @@ type APIGroupVersion struct {
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
 // in a slash.
-func (g *APIGroupVersion) InstallREST(container *restful.Container) ([]*storageversion.ResourceInfo, error) {
+func (g *APIGroupVersion) InstallREST(container *restful.Container) ([]metav1.APIResourceDiscovery, []*storageversion.ResourceInfo, error) {
 	prefix := path.Join(g.Root, g.GroupVersion.Group, g.GroupVersion.Version)
 	installer := &APIInstaller{
 		group:             g,
@@ -114,10 +114,15 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) ([]*storagev
 	}
 
 	apiResources, resourceInfos, ws, registrationErrors := installer.Install()
-	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, staticLister{apiResources})
+
+	// Generate legacy and v2 discovery information from the resource data
+	// which was gleaned from the installed REST APIS
+	legacyDiscoveryResources, discoveryV2Resources := ConvertResourceInfoToDiscovery(apiResources)
+
+	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, staticLister{legacyDiscoveryResources})
 	versionDiscoveryHandler.AddToWebService(ws)
 	container.Add(ws)
-	return removeNonPersistedResources(resourceInfos), utilerrors.NewAggregate(registrationErrors)
+	return discoveryV2Resources, removeNonPersistedResources(resourceInfos), utilerrors.NewAggregate(registrationErrors)
 }
 
 func removeNonPersistedResources(infos []*storageversion.ResourceInfo) []*storageversion.ResourceInfo {

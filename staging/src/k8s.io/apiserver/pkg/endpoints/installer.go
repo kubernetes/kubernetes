@@ -68,6 +68,72 @@ type action struct {
 	AllNamespaces bool // true iff the action is namespaced but works on aggregate result for all namespaces
 }
 
+func ConvertResourceInfoToDiscovery(resources []*apiResourceInfo) ([]metav1.APIResource, []metav1.APIResourceDiscovery) {
+	var legacyResources []metav1.APIResource
+	for _, r := range resources {
+		// apiResourceInfo.APIResource maps 1:1 with the legacy resource types
+		legacyResources = append(legacyResources, r.APIResource)
+	}
+
+	var apiResourceList []metav1.APIResourceDiscovery
+	rootResources := map[schema.GroupVersionResource]*metav1.APIResourceDiscovery{}
+
+	// Loop through all top-level resources
+	for _, r := range resources {
+		if len(r.Subresource) > 0 {
+			// Skip subresources for now so we can get the list of resources
+			continue
+		}
+
+		var scope metav1.ResourceScope
+		if r.Namespaced {
+			scope = metav1.ScopeNamespace
+		} else {
+			scope = metav1.ScopeCluster
+		}
+
+		
+		apiResourceList = append(apiResourceList, metav1.APIResourceDiscovery{
+			Resource: r.Name,
+			Scope:    scope,
+			ReturnType: metav1.APIDiscoveryKind{
+				Group:   r.Group,
+				Version: r.Version,
+				Kind:    r.Kind,
+			},
+			Verbs:      r.Verbs,
+			ShortNames: r.ShortNames,
+			Categories: r.Categories,
+		})
+		rootResources[r.Resource] = &apiResourceList[len(apiResourceList) - 1]
+	}
+
+	// Loop through all subrouces
+	for _, r := range resources {
+		if len(r.Subresource) == 0 {
+			// Skip root resources
+			continue
+		}
+
+		parent, exists := rootResources[r.Resource]
+		if !exists {
+			// Had a subresource but not its parent???
+			continue
+		}
+
+		parent.Subresources = append(parent.Subresources, metav1.APISubresourceDiscovery{
+			Subresource: r.Subresource,
+			ReturnType: &metav1.APIDiscoveryKind{
+				Group:   r.Group,
+				Version: r.Version,
+				Kind:    r.Kind,
+			},
+			Verbs: r.Verbs,
+		})
+	}
+	return legacyResources, apiResourceList
+}
+
 // An interface to see if one storage supports override its default verb for monitoring
 type StorageMetricsOverride interface {
 	// OverrideMetricsVerb gives a storage object an opportunity to override the verb reported to the metrics endpoint
@@ -94,9 +160,16 @@ var toDiscoveryKubeVerb = map[string]string{
 	"WATCHLIST":        "watch",
 }
 
+type apiResourceInfo struct {
+	metav1.APIResource
+
+	Subresource string
+	Resource    schema.GroupVersionResource
+}
+
 // Install handlers for API resources.
-func (a *APIInstaller) Install() ([]metav1.APIResource, []*storageversion.ResourceInfo, *restful.WebService, []error) {
-	var apiResources []metav1.APIResource
+func (a *APIInstaller) Install() ([]*apiResourceInfo, []*storageversion.ResourceInfo, *restful.WebService, []error) {
+	var apiResources []*apiResourceInfo
 	var resourceInfos []*storageversion.ResourceInfo
 	var errors []error
 	ws := a.newWebService()
@@ -115,7 +188,7 @@ func (a *APIInstaller) Install() ([]metav1.APIResource, []*storageversion.Resour
 			errors = append(errors, fmt.Errorf("error in registering resource: %s, %v", path, err))
 		}
 		if apiResource != nil {
-			apiResources = append(apiResources, *apiResource)
+			apiResources = append(apiResources, apiResource)
 		}
 		if resourceInfo != nil {
 			resourceInfos = append(resourceInfos, resourceInfo)
@@ -187,7 +260,7 @@ func GetResourceKind(groupVersion schema.GroupVersion, storage rest.Storage, typ
 	return fqKindToRegister, nil
 }
 
-func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService) (*metav1.APIResource, *storageversion.ResourceInfo, error) {
+func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService) (*apiResourceInfo, *storageversion.ResourceInfo, error) {
 	admit := a.group.Admit
 
 	optionsExternalVersion := a.group.GroupVersion
@@ -1006,7 +1079,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	// Record the existence of the GVR and the corresponding GVK
 	a.group.EquivalentResourceRegistry.RegisterKindFor(reqScope.Resource, reqScope.Subresource, fqKindToRegister)
 
-	return &apiResource, resourceInfo, nil
+	return &apiResourceInfo{
+		APIResource: apiResource,
+		Resource:    reqScope.Resource,
+		Subresource: reqScope.Subresource,
+	}, resourceInfo, nil
 }
 
 // indirectArbitraryPointer returns *ptrToObject for an arbitrary pointer

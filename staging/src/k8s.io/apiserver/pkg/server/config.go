@@ -48,6 +48,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
+	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/v2"
 	"k8s.io/apiserver/pkg/endpoints/filterlatency"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
@@ -120,6 +121,11 @@ type Config struct {
 	EnableIndex     bool
 	EnableProfiling bool
 	EnableDiscovery bool
+
+	// Toggles whether /discovery/<version> endpoint with ALL resources known to
+	// apiserver is added to the http handler
+	EnableAggregatedDiscoveryEndpoint bool
+
 	// Requires generic profiling enabled
 	EnableContentionProfiling bool
 	EnableMetrics             bool
@@ -373,6 +379,11 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		APIServerID:           id,
 		StorageVersionManager: storageversion.NewDefaultManager(),
 		TracerProvider:        oteltrace.NewNoopTracerProvider(),
+
+		// Default is to advertise /discovery endpoint if the feature is enabled
+		// Some apiservers may not want this behavior, such as aggregator
+		// apiserver, which has its own discovery implementation.
+		EnableAggregatedDiscoveryEndpoint: true,
 	}
 }
 
@@ -662,6 +673,12 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		muxAndDiscoveryCompleteSignals: map[string]<-chan struct{}{},
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
+		s.DiscoveryResourceManager = discoveryendpoint.NewResourceManager(c.Serializer)
+	} else {
+		s.DiscoveryResourceManager = discoveryendpoint.NewNoopResourceManager()
+	}
+
 	for {
 		if c.JSONPatchMaxCopyBytes <= 0 {
 			break
@@ -894,6 +911,11 @@ func installAPI(s *GenericAPIServer, c *Config) {
 	if c.EnableDiscovery {
 		s.Handler.GoRestfulContainer.Add(s.DiscoveryGroupManager.WebService())
 	}
+
+	if discoveryService := s.DiscoveryResourceManager.WebService(); discoveryService != nil {
+		s.Handler.GoRestfulContainer.Add(discoveryService)
+	}
+
 	if c.FlowControl != nil && utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) {
 		c.FlowControl.Install(s.Handler.NonGoRestfulMux)
 	}
