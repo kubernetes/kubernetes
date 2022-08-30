@@ -533,7 +533,7 @@ func (c *AvailableConditionController) addAPIService(obj interface{}) {
 	if castObj.Spec.Service != nil {
 		c.rebuildAPIServiceCache()
 	}
-	c.queue.Add(castObj.Name)
+	c.checkIfNotInBackoff(castObj.Name)
 }
 
 func (c *AvailableConditionController) updateAPIService(oldObj, newObj interface{}) {
@@ -543,7 +543,16 @@ func (c *AvailableConditionController) updateAPIService(oldObj, newObj interface
 	if !reflect.DeepEqual(castObj.Spec.Service, oldCastObj.Spec.Service) {
 		c.rebuildAPIServiceCache()
 	}
-	c.queue.Add(oldCastObj.Name)
+	c.checkIfNotInBackoff(oldCastObj.Name)
+}
+
+func (c *AvailableConditionController) checkIfNotInBackoff(apiservice string) {
+	if c.queue.NumRequeues(apiservice) > 0 {
+		klog.V(4).Infof("Skipping check of %s due to it being rate-limited", apiservice)
+		return
+	}
+	klog.V(4).Infof("Scheduling check of %s", apiservice)
+	c.queue.Add(apiservice)
 }
 
 func (c *AvailableConditionController) deleteAPIService(obj interface{}) {
