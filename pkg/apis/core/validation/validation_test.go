@@ -34,6 +34,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -19649,6 +19650,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 	fieldPathWhenUnsatisfiable := subFldPath0.Child("whenUnsatisfiable")
 	fieldPathTopologyKeyAndWhenUnsatisfiable := subFldPath0.Child("{topologyKey, whenUnsatisfiable}")
 	fieldPathMatchLabelKeys := subFldPath0.Child("matchLabelKeys")
+	fieldPathLabelSelector := subFldPath0.Child("labelSelector")
 	nodeAffinityField := subFldPath0.Child("nodeAffinityPolicy")
 	nodeTaintsField := subFldPath0.Child("nodeTaintsPolicy")
 	unknown := core.NodeInclusionPolicy("Unknown")
@@ -19659,6 +19661,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 		name            string
 		constraints     []core.TopologySpreadConstraint
 		wantFieldErrors field.ErrorList
+		cmpOptions      cmp.Option
 	}{
 		{
 			name: "all required fields ok",
@@ -19860,14 +19863,114 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			},
 			wantFieldErrors: []*field.Error{field.Invalid(fieldPathMatchLabelKeys.Index(0), "foo", "exists in both matchLabelKeys and labelSelector")},
 		},
+		{
+			name: "invalid label key in LabelSelector",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.DoNotSchedule,
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"?foo": "bar",
+						},
+					},
+				},
+			},
+			cmpOptions:      cmpopts.IgnoreFields(field.Error{}, "Detail"), // skip to compare the details since it's too verbose.
+			wantFieldErrors: []*field.Error{field.Invalid(fieldPathLabelSelector.Child("matchLabels"), "?foo", "name part must consist of alphanumeric characters")},
+		},
+		{
+			name: "invalid label value in LabelSelector",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.DoNotSchedule,
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"foo": strings.Repeat("a", 70),
+						},
+					},
+				},
+			},
+			wantFieldErrors: []*field.Error{field.Invalid(fieldPathLabelSelector.Child("matchLabels"), strings.Repeat("a", 70), "must be no more than 63 characters")},
+		},
+		{
+			name: "invalid operator in MatchExpressions",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.DoNotSchedule,
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: "bugus",
+								Values:   []string{"value"},
+							},
+						},
+					},
+				},
+			},
+			wantFieldErrors: []*field.Error{field.NotSupported(fieldPathLabelSelector.Child("matchExpressions").Index(0).Child("operator"), selection.Operator("bugus"), []string{"in", "notin", "=", "==", "!=", "gt", "lt", "exists", "!"})},
+		},
+		{
+			name: "invalid key in MatchExpressions",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.DoNotSchedule,
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "",
+								Operator: metav1.LabelSelectorOpExists,
+							},
+						},
+					},
+				},
+			},
+			cmpOptions:      cmpopts.IgnoreFields(field.Error{}, "Detail"),
+			wantFieldErrors: []*field.Error{field.Invalid(fieldPathLabelSelector.Child("matchExpressions").Index(0).Child("key"), "", "name part must be non-empty")},
+		},
+		{
+			name: "invalid value in MatchExpressions",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.DoNotSchedule,
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string(nil),
+							},
+						},
+					},
+				},
+			},
+			wantFieldErrors: []*field.Error{field.Invalid(fieldPathLabelSelector.Child("matchExpressions").Index(0).Child("values"), []string(nil), "for 'in', 'notin' operators, values set can't be empty")},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			errs := validateTopologySpreadConstraints(tc.constraints, fieldPath)
-			if diff := cmp.Diff(tc.wantFieldErrors, errs); diff != "" {
+			if diff := cmp.Diff(tc.wantFieldErrors, errs, tc.cmpOptions); diff != "" {
 				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
 			}
+			if errs != nil && tc.cmpOptions != nil {
+				actualError := errs.ToAggregate().Error()
+				if !strings.Contains(actualError, tc.wantFieldErrors.ToAggregate().Error()) {
+					t.Errorf("expected error to contain %q, got %q", tc.wantFieldErrors.ToAggregate().Error(), actualError)
+				}
+			}
+
 		})
 	}
 }

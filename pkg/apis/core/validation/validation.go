@@ -37,6 +37,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -6594,9 +6596,38 @@ func validateTopologySpreadConstraints(constraints []core.TopologySpreadConstrai
 		if err := validateNodeInclusionPolicy(subFldPath.Child("nodeTaintsPolicy"), constraint.NodeTaintsPolicy); err != nil {
 			allErrs = append(allErrs, err)
 		}
+		allErrs = append(allErrs, validateLabelSelctor(subFldPath.Child("labelSelector"), constraint.LabelSelector)...)
 		allErrs = append(allErrs, validateMatchLabelKeys(subFldPath.Child("matchLabelKeys"), constraint.MatchLabelKeys, constraint.LabelSelector)...)
 	}
 
+	return allErrs
+}
+
+func validateLabelSelctor(fldPath *field.Path, labelSelector *metav1.LabelSelector) field.ErrorList {
+	if labelSelector == nil {
+		return nil
+	}
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(labelSelector.MatchLabels, fldPath.Child("matchLabels"))...)
+	for i, expr := range labelSelector.MatchExpressions {
+		var op selection.Operator
+		switch expr.Operator {
+		case metav1.LabelSelectorOpIn:
+			op = selection.In
+		case metav1.LabelSelectorOpNotIn:
+			op = selection.NotIn
+		case metav1.LabelSelectorOpExists:
+			op = selection.Exists
+		case metav1.LabelSelectorOpDoesNotExist:
+			op = selection.DoesNotExist
+		default:
+			op = selection.Operator(expr.Operator)
+		}
+		_, err := labels.NewRequirement(expr.Key, op, append([]string(nil), expr.Values...), field.WithPath(fldPath.Child("matchExpressions").Index(i)))
+		if err != nil {
+			allErrs = append(allErrs, field.FromAggregate(err.(utilerrors.Aggregate))...)
+		}
+	}
 	return allErrs
 }
 

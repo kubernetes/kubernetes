@@ -305,7 +305,7 @@ func (list ErrorList) ToAggregate() utilerrors.Aggregate {
 	return utilerrors.NewAggregate(errs)
 }
 
-func fromAggregate(agg utilerrors.Aggregate) ErrorList {
+func FromAggregate(agg utilerrors.Aggregate) ErrorList {
 	errs := agg.Errors()
 	list := make(ErrorList, len(errs))
 	for i := range errs {
@@ -321,5 +321,5 @@ func (list ErrorList) Filter(fns ...utilerrors.Matcher) ErrorList {
 		return nil
 	}
 	// FilterOut takes an Aggregate and returns an Aggregate
-	return fromAggregate(err.(utilerrors.Aggregate))
+	return FromAggregate(err.(utilerrors.Aggregate))
 }
