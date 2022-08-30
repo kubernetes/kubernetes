@@ -602,7 +602,12 @@ func (jm *ControllerV2) syncCronJob(
 	case errors.IsAlreadyExists(err):
 		// If the job is created by other actor, assume  it has updated the cronjob status accordingly
 		klog.InfoS("Job already exists", "cronjob", klog.KRef(cronJob.GetNamespace(), cronJob.GetName()), "job", klog.KRef(jobReq.GetNamespace(), jobReq.GetName()))
-		return cronJob, nil, updateStatus, err
+		// When the job created by other actor and the status of cronjob has not been
+		// updated normally, so here need get all jobs again. 
+		jobResp ,err = jm.jobControl.GetJob(cronJob.GetNamespace(),jobReq.GetName())
+		if err != nil {
+			return cronJob, nil, updateStatus, err
+		}
 	case err != nil:
 		// default error handling
 		jm.recorder.Eventf(cronJob, corev1.EventTypeWarning, "FailedCreate", "Error creating job: %v", err)
