@@ -19,6 +19,7 @@ package statefulset
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -344,6 +345,7 @@ func scaleSTS(t *testing.T, c clientset.Interface, sts *appsv1.StatefulSet, repl
 var _ admission.ValidationInterface = &fakePodFailAdmission{}
 
 type fakePodFailAdmission struct {
+	lock             sync.Mutex
 	limitedPodNumber int
 	succeedPodsCount int
 }
@@ -356,6 +358,9 @@ func (f *fakePodFailAdmission) Validate(ctx context.Context, attr admission.Attr
 	if attr.GetKind().GroupKind() != api.Kind("Pod") {
 		return nil
 	}
+
+	f.lock.Lock()
+	defer f.lock.Unlock()
 
 	if f.succeedPodsCount >= f.limitedPodNumber {
 		return fmt.Errorf("fakePodFailAdmission error")
