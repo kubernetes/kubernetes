@@ -19,7 +19,7 @@ var csaAnnotationFieldSet = fieldpath.NewSet(fieldpath.MakePathOrDie("metadata",
 // with the given `ssaManager` for `Apply` operations.
 //
 // This transformation should be performed on an object if it has been previously
-// managed using client-side-apply to prepare it for future use with 
+// managed using client-side-apply to prepare it for future use with
 // server-side-apply.
 //
 // Caveats:
@@ -59,47 +59,10 @@ func UpgradeManagedFields(
 		})
 
 	if ssaManagerExists {
-		ssaManager := managedFields[ssaManagerIndex]
-
-		// find Update manager of same APIVersion, union ssa fields with it.
-		// discard all other Update managers of the same name
-		csaManagerIndex, csaManagerExists := findFirstIndex(managedFields,
-			func(entry metav1.ManagedFieldsEntry) bool {
-				return entry.Manager == csaManagerName &&
-					entry.Operation == metav1.ManagedFieldsOperationUpdate &&
-					entry.Subresource == "" &&
-					entry.APIVersion == ssaManager.APIVersion
-			})
-
-		ssaFieldSet, err := fieldsToSet(*ssaManager.FieldsV1)
+		err = unionManagerIntoIndex(managedFields, ssaManagerIndex, csaManagerName)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert fields to set: %w", err)
+			return nil, err
 		}
-
-		combinedFieldSet := &ssaFieldSet
-
-		// Union the csa manager with the existing SSA manager
-		if csaManagerExists {
-			csaManager := managedFields[csaManagerIndex]
-
-			csaFieldSet, err := fieldsToSet(*csaManager.FieldsV1)
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert fields to set: %w", err)
-			}
-
-			combinedFieldSet = combinedFieldSet.Union(&csaFieldSet)
-		}
-
-		// Ensure that the resultant fieldset does not include the
-		// last applied annotation
-		combinedFieldSet = combinedFieldSet.Difference(csaAnnotationFieldSet)
-
-		combinedFieldSetEncoded, err := setToFields(*combinedFieldSet)
-		if err != nil {
-			return nil, fmt.Errorf("failed to encode field set: %w", err)
-		}
-
-		managedFields[ssaManagerIndex].FieldsV1 = &combinedFieldSetEncoded
 
 	} else {
 		// SSA manager does not exist. Find the most recent matching CSA manager,
@@ -120,24 +83,14 @@ func UpgradeManagedFields(
 			return obj, nil
 		}
 
-		csaManager := managedFields[csaManagerIndex]
-		csaFieldSet, err := fieldsToSet(*csaManager.FieldsV1)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert fields to set: %w", err)
-		}
-
-		// Remove last applied configuration from owned fields, if necessary
-		csaFieldSet = *csaFieldSet.Difference(csaAnnotationFieldSet)
-
-		csaFieldSetEncoded, err := setToFields(csaFieldSet)
-		if err != nil {
-			return nil, fmt.Errorf("failed to encode field set: %w", err)
-		}
-
-		// Convert the entry to apply operation
-		managedFields[csaManagerIndex].FieldsV1 = &csaFieldSetEncoded
+		// Convert CSA manager into SSA manager
 		managedFields[csaManagerIndex].Operation = metav1.ManagedFieldsOperationApply
 		managedFields[csaManagerIndex].Manager = ssaManagerName
+
+		err = unionManagerIntoIndex(managedFields, csaManagerIndex, csaManagerName)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Create version of managed fields which has no CSA managers with the given name
@@ -160,6 +113,56 @@ func UpgradeManagedFields(
 	copiedAccessor.SetAnnotations(annotations)
 
 	return copied, nil
+}
+
+// Locates an Update manager entry named `csaManagerName` with the same APIVersion
+// as the manager at the targetIndex. Unions both manager's fields together
+// into the manager specified by `targetIndex`. No other managers are modified.
+func unionManagerIntoIndex(entries []metav1.ManagedFieldsEntry, targetIndex int, csaManagerName string) error {
+	ssaManager := entries[targetIndex]
+
+	// find Update manager of same APIVersion, union ssa fields with it.
+	// discard all other Update managers of the same name
+	csaManagerIndex, csaManagerExists := findFirstIndex(entries,
+		func(entry metav1.ManagedFieldsEntry) bool {
+			return entry.Manager == csaManagerName &&
+				entry.Operation == metav1.ManagedFieldsOperationUpdate &&
+				entry.Subresource == "" &&
+				entry.APIVersion == ssaManager.APIVersion
+		})
+
+	targetFieldSet, err := fieldsToSet(*ssaManager.FieldsV1)
+	if err != nil {
+		return fmt.Errorf("failed to convert fields to set: %w", err)
+	}
+
+	combinedFieldSet := &targetFieldSet
+
+	// Union the csa manager with the existing SSA manager. Do nothing if
+	// there was no good candidate found
+	if csaManagerExists {
+		csaManager := entries[csaManagerIndex]
+
+		csaFieldSet, err := fieldsToSet(*csaManager.FieldsV1)
+		if err != nil {
+			return fmt.Errorf("failed to convert fields to set: %w", err)
+		}
+
+		combinedFieldSet = combinedFieldSet.Union(&csaFieldSet)
+	}
+
+	// Ensure that the resultant fieldset does not include the
+	// last applied annotation
+	combinedFieldSet = combinedFieldSet.Difference(csaAnnotationFieldSet)
+
+	// Encode the fields back to the serialized format
+	combinedFieldSetEncoded, err := setToFields(*combinedFieldSet)
+	if err != nil {
+		return fmt.Errorf("failed to encode field set: %w", err)
+	}
+
+	entries[targetIndex].FieldsV1 = &combinedFieldSetEncoded
+	return nil
 }
 
 func findFirstIndex[T any](
