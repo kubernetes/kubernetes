@@ -141,7 +141,7 @@ func TestE2E(t *testing.T) {
 
 var _ = ginkgo.ReportAfterEach(func(report ginkgo.SpecReport) {
 	progressReporter.ProcessSpecReport(report)
-})
+}, ginkgo.SuppressProgressReporting)
 
 var _ = ginkgo.ReportAfterSuite("Kubernetes e2e suite report", func(report ginkgo.Report) {
 	var err error
