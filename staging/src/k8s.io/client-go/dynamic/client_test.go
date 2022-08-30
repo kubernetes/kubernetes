@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -670,5 +671,109 @@ func TestPatch(t *testing.T) {
 		if !reflect.DeepEqual(got, tc.want) {
 			t.Errorf("Patch(%q) want: %v\ngot: %v", tc.name, tc.want, got)
 		}
+	}
+}
+
+func TestInvalidSegments(t *testing.T) {
+	name := "bad/name"
+	namespace := "bad/namespace"
+	resource := schema.GroupVersionResource{Group: "gtest", Version: "vtest", Resource: "rtest"}
+	obj := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "vtest",
+			"kind":       "vkind",
+			"metadata": map[string]interface{}{
+				"name": name,
+			},
+		},
+	}
+	cl, err := NewForConfig(&restclient.Config{
+		Host: "127.0.0.1",
+	})
+	if err != nil {
+		t.Fatalf("Failed to create config: %v", err)
+	}
+
+	_, err = cl.Resource(resource).Namespace(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+	if err == nil || !strings.Contains(err.Error(), "invalid namespace") {
+		t.Fatalf("Expected `invalid namespace` error, got: %v", err)
+	}
+
+	_, err = cl.Resource(resource).Update(context.TODO(), obj, metav1.UpdateOptions{})
+	if err == nil || !strings.Contains(err.Error(), "invalid resource name") {
+		t.Fatalf("Expected `invalid resource name` error, got: %v", err)
+	}
+	_, err = cl.Resource(resource).Namespace(namespace).Update(context.TODO(), obj, metav1.UpdateOptions{})
+	if err == nil || !strings.Contains(err.Error(), "invalid namespace") {
+		t.Fatalf("Expected `invalid namespace` error, got: %v", err)
+	}
+
+	_, err = cl.Resource(resource).UpdateStatus(context.TODO(), obj, metav1.UpdateOptions{})
+	if err == nil || !strings.Contains(err.Error(), "invalid resource name") {
+		t.Fatalf("Expected `invalid resource name` error, got: %v", err)
+	}
+	_, err = cl.Resource(resource).Namespace(namespace).UpdateStatus(context.TODO(), obj, metav1.UpdateOptions{})
+	if err == nil || !strings.Contains(err.Error(), "invalid namespace") {
+		t.Fatalf("Expected `invalid namespace` error, got: %v", err)
+	}
+
+	err = cl.Resource(resource).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	if err == nil || !strings.Contains(err.Error(), "invalid resource name") {
+		t.Fatalf("Expected `invalid resource name` error, got: %v", err)
+	}
+	err = cl.Resource(resource).Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	if err == nil || !strings.Contains(err.Error(), "invalid namespace") {
+		t.Fatalf("Expected `invalid namespace` error, got: %v", err)
+	}
+
+	err = cl.Resource(resource).Namespace(namespace).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+	if err == nil || !strings.Contains(err.Error(), "invalid namespace") {
+		t.Fatalf("Expected `invalid namespace` error, got: %v", err)
+	}
+
+	_, err = cl.Resource(resource).Get(context.TODO(), name, metav1.GetOptions{})
+	if err == nil || !strings.Contains(err.Error(), "invalid resource name") {
+		t.Fatalf("Expected `invalid resource name` error, got: %v", err)
+	}
+	_, err = cl.Resource(resource).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err == nil || !strings.Contains(err.Error(), "invalid namespace") {
+		t.Fatalf("Expected `invalid namespace` error, got: %v", err)
+	}
+
+	_, err = cl.Resource(resource).Namespace(namespace).List(context.TODO(), metav1.ListOptions{})
+	if err == nil || !strings.Contains(err.Error(), "invalid namespace") {
+		t.Fatalf("Expected `invalid namespace` error, got: %v", err)
+	}
+
+	_, err = cl.Resource(resource).Namespace(namespace).Watch(context.TODO(), metav1.ListOptions{})
+	if err == nil || !strings.Contains(err.Error(), "invalid namespace") {
+		t.Fatalf("Expected `invalid namespace` error, got: %v", err)
+	}
+
+	_, err = cl.Resource(resource).Patch(context.TODO(), name, types.StrategicMergePatchType, []byte("{}"), metav1.PatchOptions{})
+	if err == nil || !strings.Contains(err.Error(), "invalid resource name") {
+		t.Fatalf("Expected `invalid resource name` error, got: %v", err)
+	}
+	_, err = cl.Resource(resource).Namespace(namespace).Patch(context.TODO(), name, types.StrategicMergePatchType, []byte("{}"), metav1.PatchOptions{})
+	if err == nil || !strings.Contains(err.Error(), "invalid namespace") {
+		t.Fatalf("Expected `invalid namespace` error, got: %v", err)
+	}
+
+	_, err = cl.Resource(resource).Apply(context.TODO(), name, obj, metav1.ApplyOptions{})
+	if err == nil || !strings.Contains(err.Error(), "invalid resource name") {
+		t.Fatalf("Expected `invalid resource name` error, got: %v", err)
+	}
+	_, err = cl.Resource(resource).Namespace(namespace).Apply(context.TODO(), name, obj, metav1.ApplyOptions{})
+	if err == nil || !strings.Contains(err.Error(), "invalid namespace") {
+		t.Fatalf("Expected `invalid namespace` error, got: %v", err)
+	}
+
+	_, err = cl.Resource(resource).ApplyStatus(context.TODO(), name, obj, metav1.ApplyOptions{})
+	if err == nil || !strings.Contains(err.Error(), "invalid resource name") {
+		t.Fatalf("Expected `invalid resource name` error, got: %v", err)
+	}
+	_, err = cl.Resource(resource).Namespace(namespace).ApplyStatus(context.TODO(), name, obj, metav1.ApplyOptions{})
+	if err == nil || !strings.Contains(err.Error(), "invalid namespace") {
+		t.Fatalf("Expected `invalid namespace` error, got: %v", err)
 	}
 }
