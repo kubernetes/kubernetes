@@ -667,7 +667,8 @@ func TestSharedInformerHandlerAbuse(t *testing.T) {
 					reg, err := informer.AddEventHandlerWithResyncPeriod(funcs, 1*time.Second)
 					if err != nil {
 						if strings.Contains(err.Error(), "stopped already") {
-							continue
+							// test is over
+							return
 						}
 						t.Errorf("failed to add handler: %v", err)
 						return
@@ -683,7 +684,8 @@ func TestSharedInformerHandlerAbuse(t *testing.T) {
 					err := informer.RemoveEventHandler(handles[idx])
 					if err != nil {
 						if strings.Contains(err.Error(), "stopped already") {
-							continue
+							// test is over
+							return
 						}
 						t.Errorf("failed to remove handler: %v", err)
 						return
