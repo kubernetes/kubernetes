@@ -277,7 +277,10 @@ func TestApplyResetFields(t *testing.T) {
 						Resource(mapping.Resource).
 						Namespace(namespace).
 						Apply(context.TODO(), name, obj2, metav1.ApplyOptions{FieldManager: "fieldmanager2"})
-					expectConflict(t, objRet, err, dynamicClient, mapping.Resource, namespace, name, "spec")
+					err = expectConflict(objRet, err, dynamicClient, mapping.Resource, namespace, name)
+					if err != nil {
+						t.Fatalf("Did not get expected conflict in spec of %s %s/%s: %v", mapping.Resource, namespace, name, err)
+					}
 
 					// reapply first object to the status endpoint
 					// that should fail with a conflict
@@ -285,7 +288,10 @@ func TestApplyResetFields(t *testing.T) {
 						Resource(mapping.Resource).
 						Namespace(namespace).
 						ApplyStatus(context.TODO(), name, &obj1, metav1.ApplyOptions{FieldManager: "fieldmanager1"})
-					expectConflict(t, objRet, err, dynamicClient, mapping.Resource, namespace, name, "status")
+					err = expectConflict(objRet, err, dynamicClient, mapping.Resource, namespace, name)
+					if err != nil {
+						t.Fatalf("Did not get expected conflict in status of %s %s/%s: %v", mapping.Resource, namespace, name, err)
+					}
 				}
 
 				// cleanup
@@ -298,30 +304,29 @@ func TestApplyResetFields(t *testing.T) {
 	}
 }
 
-func expectConflict(t *testing.T, objRet *unstructured.Unstructured, err error, dynamicClient dynamic.Interface, resource schema.GroupVersionResource, namespace, name, where string) {
+func expectConflict(objRet *unstructured.Unstructured, err error, dynamicClient dynamic.Interface, resource schema.GroupVersionResource, namespace, name string) error {
 	if err != nil && strings.Contains(err.Error(), "conflict") {
-		return
+		return nil
 	}
 	which := "returned"
-	var gotten string
-	var err2 error
+	// something unexpected is going on here, let's not assume that objRet==nil if any only if err!=nil
 	if objRet == nil {
 		which = "subsequently fetched"
+		var err2 error
 		objRet, err2 = dynamicClient.
 			Resource(resource).
 			Namespace(namespace).
 			Get(context.TODO(), name, metav1.GetOptions{})
 		if err2 != nil {
-			gotten = fmt.Sprintf("<failed to Get object: %v>", err2)
+			return fmt.Errorf("instead got error %w, and failed to Get object: %v", err, err2)
 		}
 	}
-	if gotten == "" {
-		marshBytes, marshErr := json.Marshal(objRet)
-		if marshErr == nil {
-			gotten = string(marshBytes)
-		} else {
-			gotten = fmt.Sprintf("<failed to json.Marshall(%#+v): %v>", objRet, marshErr)
-		}
+	marshBytes, marshErr := json.Marshal(objRet)
+	var gotten string
+	if marshErr == nil {
+		gotten = string(marshBytes)
+	} else {
+		gotten = fmt.Sprintf("<failed to json.Marshall(%#+v): %v>", objRet, marshErr)
 	}
-	t.Fatalf("expected conflict in %s, but instead got error %v; %s object is %s", where, err, which, gotten)
+	return fmt.Errorf("instead got error %w; %s object is %s", err, which, gotten)
 }
