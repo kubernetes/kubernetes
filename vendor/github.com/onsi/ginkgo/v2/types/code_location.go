@@ -65,7 +65,7 @@ func NewCodeLocationWithStackTrace(skip int) CodeLocation {
 func PruneStack(fullStackTrace string, skip int) string {
 	stack := strings.Split(fullStackTrace, "\n")
 	// Ensure that the even entries are the method names and the
-	// the odd entries the source code information.
+	// odd entries the source code information.
 	if len(stack) > 0 && strings.HasPrefix(stack[0], "goroutine ") {
 		// Ignore "goroutine 29 [running]:" line.
 		stack = stack[1:]

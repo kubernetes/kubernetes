@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/onsi/ginkgo/v2/formatter"
@@ -35,18 +36,20 @@ type Suite struct {
 	interruptHandler  interrupt_handler.InterruptHandlerInterface
 	config            types.SuiteConfig
 
-	skipAll           bool
-	report            types.Report
-	currentSpecReport types.SpecReport
-	currentNode       Node
+	skipAll                         bool
+	report                          types.Report
+	currentSpecReport               types.SpecReport
+	currentSpecReportUserAccessLock *sync.Mutex
+	currentNode                     Node
 
 	client parallel_support.Client
 }
 
 func NewSuite() *Suite {
 	return &Suite{
-		tree:  &TreeNode{},
-		phase: PhaseBuildTopLevel,
+		tree:                            &TreeNode{},
+		phase:                           PhaseBuildTopLevel,
+		currentSpecReportUserAccessLock: &sync.Mutex{},
 	}
 }
 
@@ -212,14 +215,20 @@ func (suite *Suite) pushCleanupNode(node Node) error {
   Spec Running methods - used during PhaseRun
 */
 func (suite *Suite) CurrentSpecReport() types.SpecReport {
+	suite.currentSpecReportUserAccessLock.Lock()
+	defer suite.currentSpecReportUserAccessLock.Unlock()
 	report := suite.currentSpecReport
 	if suite.writer != nil {
 		report.CapturedGinkgoWriterOutput = string(suite.writer.Bytes())
 	}
+	report.ReportEntries = make([]ReportEntry, len(report.ReportEntries))
+	copy(report.ReportEntries, suite.currentSpecReport.ReportEntries)
 	return report
 }
 
 func (suite *Suite) AddReportEntry(entry ReportEntry) error {
+	suite.currentSpecReportUserAccessLock.Lock()
+	defer suite.currentSpecReportUserAccessLock.Unlock()
 	if suite.phase != PhaseRun {
 		return types.GinkgoErrors.AddReportEntryNotDuringRunPhase(entry.Location)
 	}
@@ -560,7 +569,7 @@ func (suite *Suite) runNode(node Node, interruptChannel chan interface{}, text s
 		suite.currentNode = Node{}
 	}()
 
-	if suite.config.EmitSpecProgress {
+	if suite.config.EmitSpecProgress && !node.MarkedSuppressProgressReporting {
 		if text == "" {
 			text = "TOP-LEVEL"
 		}

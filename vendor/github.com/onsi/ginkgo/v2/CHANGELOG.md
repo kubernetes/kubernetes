@@ -1,3 +1,31 @@
+## 2.1.6
+
+### Fixes
+- Add `SuppressProgressReporting` decorator to turn off --progress announcements for a given node [dfef62a]
+- chore: remove duplicate word in comments [7373214]
+
+## 2.1.5
+
+### Fixes
+- drop -mod=mod instructions; fixes #1026 [6ad7138]
+- Ensure `CurrentSpecReport` and `AddReportEntry` are thread-safe [817c09b]
+- remove stale importmap gcflags flag test [3cd8b93]
+- Always emit spec summary [5cf23e2] - even when only one spec has failed
+- Fix ReportAfterSuite usage in docs [b1864ad]
+- fixed typo (#997) [219cc00]
+- TrimRight is not designed to trim Suffix [71ebb74]
+- refactor: replace strings.Replace with strings.ReplaceAll (#978) [143d208]
+- fix syntax in examples (#975) [b69554f]
+
+### Maintenance
+- Bump github.com/onsi/gomega from 1.20.0 to 1.20.1 (#1027) [e5dfce4]
+- Bump tzinfo from 1.2.9 to 1.2.10 in /docs (#1006) [7ae91c4]
+- Bump github.com/onsi/gomega from 1.19.0 to 1.20.0 (#1005) [e87a85a]
+- test: add new Go 1.19 to test matrix (#1014) [bbefe12]
+- Bump golang.org/x/tools from 0.1.11 to 0.1.12 (#1012) [9327906]
+- Bump golang.org/x/tools from 0.1.10 to 0.1.11 (#993) [f44af96]
+- Bump nokogiri from 1.13.3 to 1.13.6 in /docs (#981) [ef336aa]
+
 ## 2.1.4
 
 ### Fixes
