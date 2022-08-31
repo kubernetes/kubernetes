@@ -42,20 +42,13 @@ func makePV(name, storageClassName, resourceVersion string) *persistentVolume {
 }
 
 type pvAssumeCache struct {
-	AssumeCache
+	AssumeCache[*persistentVolume]
 }
 
 func (c pvAssumeCache) ListPVs(storageClassName string) []*persistentVolume {
-	objs := c.List(&persistentVolume{
+	return c.List(&persistentVolume{
 		storageClassName: storageClassName,
 	})
-	var pvs []*persistentVolume
-	for _, obj := range objs {
-		if pv, ok := obj.(*persistentVolume); ok {
-			pvs = append(pvs, pv)
-		}
-	}
-	return pvs
 }
 
 func pvStorageClassIndexFunc(obj interface{}) ([]string, error) {
@@ -66,7 +59,7 @@ func pvStorageClassIndexFunc(obj interface{}) ([]string, error) {
 }
 
 func newPVAssumeCache(informer AssumeCacheInformer) pvAssumeCache {
-	return pvAssumeCache{NewAssumeCache(informer, "persistentVolume", "storageclass", pvStorageClassIndexFunc)}
+	return pvAssumeCache{NewAssumeCache[*persistentVolume](informer, "persistentVolume", "storageclass", pvStorageClassIndexFunc)}
 }
 
 // fakeAssumeCacheInformer makes it possible to add/update/delete objects directly.
@@ -175,7 +168,7 @@ func TestAssumePV(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		cache := newPVAssumeCache(nil)
-		internalCache, ok := cache.AssumeCache.(*assumeCache)
+		internalCache, ok := cache.AssumeCache.(*assumeCache[*persistentVolume])
 		if !ok {
 			t.Fatalf("Failed to get internal cache")
 		}
@@ -209,7 +202,7 @@ func TestAssumePV(t *testing.T) {
 
 func TestRestorePV(t *testing.T) {
 	cache := newPVAssumeCache(nil)
-	internalCache, ok := cache.AssumeCache.(*assumeCache)
+	internalCache, ok := cache.AssumeCache.(*assumeCache[*persistentVolume])
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
 	}
@@ -249,7 +242,7 @@ func TestRestorePV(t *testing.T) {
 
 func TestBasicPVCache(t *testing.T) {
 	cache := newPVAssumeCache(nil)
-	internalCache, ok := cache.AssumeCache.(*assumeCache)
+	internalCache, ok := cache.AssumeCache.(*assumeCache[*persistentVolume])
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
 	}
@@ -293,7 +286,7 @@ func TestBasicPVCache(t *testing.T) {
 
 func TestPVCacheWithStorageClasses(t *testing.T) {
 	cache := newPVAssumeCache(nil)
-	internalCache, ok := cache.AssumeCache.(*assumeCache)
+	internalCache, ok := cache.AssumeCache.(*assumeCache[*persistentVolume])
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
 	}
@@ -339,7 +332,7 @@ func TestPVCacheWithStorageClasses(t *testing.T) {
 
 func TestAssumeUpdatePVCache(t *testing.T) {
 	cache := newPVAssumeCache(nil)
-	internalCache, ok := cache.AssumeCache.(*assumeCache)
+	internalCache, ok := cache.AssumeCache.(*assumeCache[*persistentVolume])
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
 	}
