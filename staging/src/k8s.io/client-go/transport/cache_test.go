@@ -24,6 +24,18 @@ import (
 	"testing"
 )
 
+type fakeDialer struct{}
+
+func (f fakeDialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	return nil, nil
+}
+
+type fakeCert struct{}
+
+func (f fakeCert) GetCertificate() (*tls.Certificate, error) {
+	return nil, nil
+}
+
 func TestTLSConfigKey(t *testing.T) {
 	// Make sure config fields that don't affect the tls config don't affect the cache key
 	identicalConfigurations := map[string]*Config{
@@ -68,6 +80,8 @@ func TestTLSConfigKey(t *testing.T) {
 		"no tls":   {},
 		"dialer":   {Dial: dialer.DialContext},
 		"dialer2":  {Dial: func(ctx context.Context, network, address string) (net.Conn, error) { return nil, nil }},
+		"dialer3":  {Dial: dialer.DialContext, Dialer: &dialer},
+		"dialer4":  {Dial: dialer.DialContext, Dialer: &fakeDialer{}},
 		"insecure": {TLS: TLSConfig{Insecure: true}},
 		"cadata 1": {TLS: TLSConfig{CAData: []byte{1}}},
 		"cadata 2": {TLS: TLSConfig{CAData: []byte{2}}},
@@ -126,6 +140,13 @@ func TestTLSConfigKey(t *testing.T) {
 			TLS: TLSConfig{
 				KeyData: []byte{1},
 				GetCert: func() (*tls.Certificate, error) { return nil, nil },
+			},
+		},
+		"getCert3": {
+			TLS: TLSConfig{
+				KeyData: []byte{1},
+				GetCert: getCert,
+				Cert:    &fakeCert{},
 			},
 		},
 		"getCert1, key 2": {

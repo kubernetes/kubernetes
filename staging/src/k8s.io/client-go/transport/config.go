@@ -68,14 +68,36 @@ type Config struct {
 	WrapTransport WrapperFunc
 
 	// Dial specifies the dial function for creating unencrypted TCP connections.
+	// Deprecated: Use Dialer instead, which allows the transport to be cached.
+	// If both are set, Dialer takes priority.
 	Dial func(ctx context.Context, network, address string) (net.Conn, error)
+
+	// Dialer implements the dial function for creating unencrypted TCP connections.
+	Dialer Dialer
 
 	// Proxy is the proxy func to be used for all requests made by this
 	// transport. If Proxy is nil, http.ProxyFromEnvironment is used. If Proxy
 	// returns a nil *URL, no proxy is used.
 	//
 	// socks5 proxying does not currently support spdy streaming endpoints.
+	// Deprecated: Use Proxier instead, which allows the transport to be cached.
+	// If both are set, Proxier takes priority.
 	Proxy func(*http.Request) (*url.URL, error)
+
+	// Proxy is the proxy func to be used for all requests made by this
+	// transport. If Proxy is nil, http.ProxyFromEnvironment is used. If Proxy
+	// returns a nil *URL, no proxy is used.
+	//
+	// socks5 proxying does not currently support spdy streaming endpoints.
+	Proxier Proxier
+}
+
+type Dialer interface {
+	DialContext(ctx context.Context, network, address string) (net.Conn, error)
+}
+
+type Proxier interface {
+	Proxy(*http.Request) (*url.URL, error)
 }
 
 // ImpersonationConfig has all the available impersonation options
@@ -112,7 +134,7 @@ func (c *Config) HasCertAuth() bool {
 
 // HasCertCallback returns whether the configuration has certificate callback or not.
 func (c *Config) HasCertCallback() bool {
-	return c.TLS.GetCert != nil
+	return c.TLS.GetCert != nil || c.TLS.Cert != nil
 }
 
 // Wrap adds a transport middleware function that will give the caller
@@ -143,5 +165,14 @@ type TLSConfig struct {
 	// To use only http/1.1, set to ["http/1.1"].
 	NextProtos []string
 
+	// Deprecated: Use Cert instead, which allows the transport to be cached.
+	// If both are set, Dialer takes priority.
 	GetCert func() (*tls.Certificate, error) // Callback that returns a TLS client certificate. CertData, CertFile, KeyData and KeyFile supercede this field.
+
+	// Cert implements GetCertificate() that returns a TLS client certificate.
+	Cert Certificate
+}
+
+type Certificate interface {
+	GetCertificate() (*tls.Certificate, error)
 }

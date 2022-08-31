@@ -17,9 +17,11 @@ limitations under the License.
 package transport
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -55,6 +57,9 @@ type tlsCacheKey struct {
 	serverName         string
 	nextProtos         string
 	disableCompression bool
+	dialer             Dialer
+	cert               Certificate
+	proxier            Proxier
 }
 
 func (t tlsCacheKey) String() string {
@@ -62,7 +67,7 @@ func (t tlsCacheKey) String() string {
 	if len(t.keyData) > 0 {
 		keyText = "<redacted>"
 	}
-	return fmt.Sprintf("insecure:%v, caData:%#v, certData:%#v, keyData:%s, serverName:%s, disableCompression:%t", t.insecure, t.caData, t.certData, keyText, t.serverName, t.disableCompression)
+	return fmt.Sprintf("insecure:%v, caData:%#v, certData:%#v, keyData:%s, serverName:%s, disableCompression:%t dialer:%#v cert:%#v proxier:%#v", t.insecure, t.caData, t.certData, keyText, t.serverName, t.disableCompression, t.dialer, t.cert, t.proxier)
 }
 
 func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
@@ -92,9 +97,13 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		return http.DefaultTransport, nil
 	}
 
-	dial := config.Dial
-	if dial == nil {
-		dial = (&net.Dialer{
+	var dialFunc func(ctx context.Context, network, address string) (net.Conn, error)
+	if config.Dialer != nil {
+		dialFunc = config.Dialer.DialContext
+	} else if config.Dial != nil {
+		dialFunc = config.Dial
+	} else {
+		dialFunc = (&net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
 		}).DialContext
@@ -103,23 +112,27 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 	// If we use are reloading files, we need to handle certificate rotation properly
 	// TODO(jackkleeman): We can also add rotation here when config.HasCertCallback() is true
 	if config.TLS.ReloadTLSFiles {
-		dynamicCertDialer := certRotatingDialer(tlsConfig.GetClientCertificate, dial)
+		dynamicCertDialer := certRotatingDialer(tlsConfig.GetClientCertificate, dialFunc)
 		tlsConfig.GetClientCertificate = dynamicCertDialer.GetClientCertificate
-		dial = dynamicCertDialer.connDialer.DialContext
+		dialFunc = dynamicCertDialer.connDialer.DialContext
 		go dynamicCertDialer.Run(DialerStopCh)
 	}
 
-	proxy := http.ProxyFromEnvironment
-	if config.Proxy != nil {
-		proxy = config.Proxy
+	var proxyFunc func(*http.Request) (*url.URL, error)
+	if config.Proxier != nil {
+		proxyFunc = config.Proxier.Proxy
+	} else if config.Proxy != nil {
+		proxyFunc = config.Proxy
+	} else {
+		proxyFunc = http.ProxyFromEnvironment
 	}
 
 	transport := utilnet.SetTransportDefaults(&http.Transport{
-		Proxy:               proxy,
+		Proxy:               proxyFunc,
 		TLSHandshakeTimeout: 10 * time.Second,
 		TLSClientConfig:     tlsConfig,
 		MaxIdleConnsPerHost: idleConnsPerHost,
-		DialContext:         dial,
+		DialContext:         dialFunc,
 		DisableCompression:  config.DisableCompression,
 	})
 
@@ -138,7 +151,7 @@ func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 		return tlsCacheKey{}, false, err
 	}
 
-	if c.TLS.GetCert != nil || c.Dial != nil || c.Proxy != nil {
+	if (c.TLS.GetCert != nil && c.TLS.Cert == nil) || (c.Dial != nil && c.Dialer == nil) || (c.Proxy != nil && c.Proxier == nil) {
 		// cannot determine equality for functions
 		return tlsCacheKey{}, false, nil
 	}
@@ -149,6 +162,9 @@ func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 		serverName:         c.TLS.ServerName,
 		nextProtos:         strings.Join(c.TLS.NextProtos, ","),
 		disableCompression: c.DisableCompression,
+		dialer:             c.Dialer,
+		cert:               c.TLS.Cert,
+		proxier:            c.Proxier,
 	}
 
 	if c.TLS.ReloadTLSFiles {
