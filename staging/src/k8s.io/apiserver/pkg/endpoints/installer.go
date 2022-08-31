@@ -65,7 +65,7 @@ type action struct {
 	Path          string               // The path of the action
 	Params        []*restful.Parameter // List of parameters associated with the action.
 	Namer         handlers.ScopeNamer
-	AllNamespaces bool // true iff the action is namespaced but works on aggregate result for all namespaces
+	AllNamespaces bool // true if the action is namespaced but works on aggregate result for all namespaces
 }
 
 // An interface to see if one storage supports override its default verb for monitoring
