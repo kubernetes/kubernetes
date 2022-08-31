@@ -22,11 +22,8 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -181,8 +178,6 @@ func TestAllocateTiny(t *testing.T) {
 }
 
 func TestAllocateReserved(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceIPStaticSubrange, true)()
-
 	_, cidr, err := netutils.ParseCIDRSloppy("192.168.1.0/25")
 	if err != nil {
 		t.Fatal(err)
@@ -425,8 +420,6 @@ func TestNewFromSnapshot(t *testing.T) {
 
 func TestClusterIPMetrics(t *testing.T) {
 	clearMetrics()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceIPStaticSubrange, true)()
-
 	// create IPv4 allocator
 	cidrIPv4 := "10.0.0.0/24"
 	_, clusterCIDRv4, _ := netutils.ParseCIDRSloppy(cidrIPv4)
@@ -539,8 +532,6 @@ func TestClusterIPMetrics(t *testing.T) {
 
 func TestClusterIPAllocatedMetrics(t *testing.T) {
 	clearMetrics()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceIPStaticSubrange, true)()
-
 	// create IPv4 allocator
 	cidrIPv4 := "10.0.0.0/25"
 	_, clusterCIDRv4, _ := netutils.ParseCIDRSloppy(cidrIPv4)
