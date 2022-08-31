@@ -28,13 +28,12 @@ import (
 const (
 	// SchedulerSubsystem - subsystem name used by scheduler
 	SchedulerSubsystem = "scheduler"
-	// Below are possible values for the operation label. Each represents a substep of e2e scheduling:
+	// Below are possible values for the work label.
 
-	// PrioritizingExtender - prioritizing extender operation label value
+	// PrioritizingExtender - prioritizing extender work label value
 	PrioritizingExtender = "prioritizing_extender"
-	// Binding - binding operation label value
+	// Binding - binding work label value
 	Binding = "binding"
-	// E2eScheduling - e2e scheduling operation label value
 )
 
 // All the histogram based metrics have 1ms as size for the smallest bucket.
