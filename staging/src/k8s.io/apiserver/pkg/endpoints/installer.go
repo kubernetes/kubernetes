@@ -613,6 +613,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create field manager: %v", err)
 		}
+
+		reqScope.AvoidNoopTransformer = a.group.AvoidNoopTransformer
 	}
 	for _, action := range actions {
 		producedObject := storageMeta.ProducesObject(action.Verb)

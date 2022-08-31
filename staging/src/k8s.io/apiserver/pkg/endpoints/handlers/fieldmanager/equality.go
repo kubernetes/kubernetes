@@ -50,9 +50,12 @@ var (
 	avoidNoopTimestampUpdatesEnabled = determineAvoidNoopTimestampUpdatesEnabled()
 )
 
-var avoidTimestampEqualities = func() conversion.Equalities {
-	var eqs = equality.Semantic.Copy()
+type AvoidNoopTransformer struct {
+	equalities conversion.Equalities
+}
 
+func NewAvoidNoopTransformer(toAdd ...interface{}) (*AvoidNoopTransformer, error) {
+	var eqs = equality.Semantic.Copy()
 	err := eqs.AddFunc(
 		func(a, b metav1.ManagedFieldsEntry) bool {
 			// Two objects' managed fields are equivalent if, ignoring timestamp,
@@ -64,16 +67,22 @@ var avoidTimestampEqualities = func() conversion.Equalities {
 	)
 
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to instantiate semantic equalities: %w", err)
 	}
 
-	return eqs
-}()
+	err = eqs.AddFuncs(toAdd...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate semantic equalities: %w", err)
+	}
+
+	return &AvoidNoopTransformer{
+		equalities: eqs,
+	}, nil
+}
 
 // IgnoreManagedFieldsTimestampsTransformer reverts timestamp updates
 // if the non-managed parts of the object are equivalent
-func IgnoreManagedFieldsTimestampsTransformer(
-	_ context.Context,
+func (a AvoidNoopTransformer) Transform(_ context.Context,
 	newObj runtime.Object,
 	oldObj runtime.Object,
 ) (res runtime.Object, err error) {
@@ -154,11 +163,11 @@ func IgnoreManagedFieldsTimestampsTransformer(
 	// This condition ensures the managed fields are always compared first. If
 	//	this check fails, the if statement will short circuit. If the check
 	// 	succeeds the slow path is taken which compares entire objects.
-	if !avoidTimestampEqualities.DeepEqualWithNilDifferentFromEmpty(oldManagedFields, newManagedFields) {
+	if !a.equalities.DeepEqualWithNilDifferentFromEmpty(oldManagedFields, newManagedFields) {
 		return newObj, nil
 	}
 
-	if avoidTimestampEqualities.DeepEqualWithNilDifferentFromEmpty(newObj, oldObj) {
+	if a.equalities.DeepEqualWithNilDifferentFromEmpty(newObj, oldObj) {
 		// Remove any changed timestamps, so that timestamp is not the only
 		// change seen by etcd.
 		//

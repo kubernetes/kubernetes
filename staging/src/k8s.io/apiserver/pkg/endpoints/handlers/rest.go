@@ -90,8 +90,9 @@ type RequestScope struct {
 
 	EquivalentResourceMapper runtime.EquivalentResourceMapper
 
-	TableConvertor rest.TableConvertor
-	FieldManager   *fieldmanager.FieldManager
+	TableConvertor       rest.TableConvertor
+	FieldManager         *fieldmanager.FieldManager
+	AvoidNoopTransformer *fieldmanager.AvoidNoopTransformer
 
 	Resource schema.GroupVersionResource
 	Kind     schema.GroupVersionKind
