@@ -300,17 +300,22 @@ func (a *Authenticator) UpdateTransportConfig(c *transport.Config) error {
 	if c.HasCertCallback() {
 		return errors.New("can't add TLS certificate callback: transport.Config.TLS.GetCert already set")
 	}
-	c.TLS.GetCert = a.cert
+
+	// Authenticator implements the transport.Certificate interface
+	// it allows to cache the transport connections
+	c.TLS.Cert = a
 
 	var d *connrotation.Dialer
-	if c.Dial != nil {
+	if c.Dialer != nil {
 		// if c has a custom dialer, we have to wrap it
+		d = connrotation.NewDialerWithTracker(c.Dialer.DialContext, a.connTracker)
+	} else if c.Dial != nil {
 		d = connrotation.NewDialerWithTracker(c.Dial, a.connTracker)
 	} else {
 		d = a.defaultDialer
 	}
 
-	c.Dial = d.DialContext
+	c.Dialer = d
 
 	return nil
 }
@@ -360,7 +365,7 @@ func (a *Authenticator) credsExpired() bool {
 	return a.now().After(a.exp)
 }
 
-func (a *Authenticator) cert() (*tls.Certificate, error) {
+func (a *Authenticator) GetCertificate() (*tls.Certificate, error) {
 	creds, err := a.getCreds()
 	if err != nil {
 		return nil, err
