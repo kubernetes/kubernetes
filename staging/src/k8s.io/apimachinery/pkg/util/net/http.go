@@ -209,6 +209,21 @@ type RoundTripperWrapper interface {
 	WrappedRoundTripper() http.RoundTripper
 }
 
+func TransportFor(transport http.RoundTripper) (*http.Transport, error) {
+	if transport == nil {
+		return nil, nil
+	}
+
+	switch transport := transport.(type) {
+	case *http.Transport:
+		return transport, nil
+	case RoundTripperWrapper:
+		return TransportFor(transport.WrappedRoundTripper())
+	default:
+		return nil, fmt.Errorf("unknown transport type: %T", transport)
+	}
+}
+
 type DialFunc func(ctx context.Context, net, addr string) (net.Conn, error)
 
 func DialerFor(transport http.RoundTripper) (DialFunc, error) {

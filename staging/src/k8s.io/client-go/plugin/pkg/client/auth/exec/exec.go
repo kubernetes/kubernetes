@@ -280,6 +280,49 @@ type credentials struct {
 	cert  *tls.Certificate `datapolicy:"secret-key"`
 }
 
+func (a *Authenticator) UpdateTransport(transport http.RoundTripper) (http.RoundTripper, error) {
+	tlsConfig, err := utilnet.TLSClientConfig(transport)
+	if err != nil {
+		return transport, err
+	}
+	tlsConfig.GetClientCertificate = func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
+		cert, err := a.cert()
+		if err != nil {
+			return nil, err
+		}
+		// GetCert may return empty value, meaning no cert.
+		if cert != nil {
+			return cert, nil
+		}
+
+		// Both c.TLS.CertData/KeyData were unset and GetCert didn't return
+		// anything. Return an empty tls.Certificate, no client cert will
+		// be sent to the server.
+		return &tls.Certificate{}, nil
+	}
+	dialer, err := utilnet.DialerFor(transport)
+	if err != nil {
+		return transport, err
+	}
+
+	var d *connrotation.Dialer
+	if dialer != nil {
+		// if c has a custom dialer, we have to wrap it
+		d = connrotation.NewDialerWithTracker(connrotation.DialFunc(dialer), a.connTracker)
+	} else {
+		d = a.defaultDialer
+	}
+
+	tr, err := utilnet.TransportFor(transport)
+	if err != nil {
+		return transport, err
+	}
+	tr.DialContext = d.DialContext
+
+	rt := &roundTripper{a, transport}
+	return rt, nil
+}
+
 // UpdateTransportConfig updates the transport.Config to use credentials
 // returned by the plugin.
 func (a *Authenticator) UpdateTransportConfig(c *transport.Config) error {

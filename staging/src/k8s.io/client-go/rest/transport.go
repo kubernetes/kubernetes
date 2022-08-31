@@ -65,7 +65,31 @@ func TransportFor(config *Config) (http.RoundTripper, error) {
 	if err != nil {
 		return nil, err
 	}
-	return transport.New(cfg)
+	tr, err := transport.New(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	if config.ExecProvider != nil {
+		var cluster *clientauthentication.Cluster
+		if config.ExecProvider.ProvideClusterInfo {
+			var err error
+			cluster, err = ConfigToExecCluster(config)
+			if err != nil {
+				return nil, err
+			}
+		}
+		provider, err := exec.GetAuthenticator(config.ExecProvider, cluster)
+		if err != nil {
+			return nil, err
+		}
+		tr, err = provider.UpdateTransport(tr)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return tr, nil
+
 }
 
 // HTTPWrappersForConfig wraps a round tripper with any relevant layered behavior from the
@@ -116,23 +140,6 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 		return nil, errors.New("execProvider and authProvider cannot be used in combination")
 	}
 
-	if c.ExecProvider != nil {
-		var cluster *clientauthentication.Cluster
-		if c.ExecProvider.ProvideClusterInfo {
-			var err error
-			cluster, err = ConfigToExecCluster(c)
-			if err != nil {
-				return nil, err
-			}
-		}
-		provider, err := exec.GetAuthenticator(c.ExecProvider, cluster)
-		if err != nil {
-			return nil, err
-		}
-		if err := provider.UpdateTransportConfig(conf); err != nil {
-			return nil, err
-		}
-	}
 	if c.AuthProvider != nil {
 		provider, err := GetAuthProvider(c.Host, c.AuthProvider, c.AuthConfigPersister)
 		if err != nil {

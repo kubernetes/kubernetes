@@ -17,6 +17,7 @@ limitations under the License.
 package client
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -26,6 +27,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -40,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -51,6 +54,9 @@ import (
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/connrotation"
+	"k8s.io/component-base/logs"
+	"k8s.io/kubectl/pkg/cmd/apply"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -430,6 +436,166 @@ func v1beta1TestsFromV1Tests(v1Tests []execPluginClientTestData) []execPluginCli
 		v1beta1Tests = append(v1beta1Tests, v1beta1Test)
 	}
 	return v1beta1Tests
+}
+
+type fakeDialerWithCounter struct {
+	mu      sync.Mutex
+	counter int
+}
+
+func (d *fakeDialerWithCounter) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	d.mu.Lock()
+	d.counter++
+	fmt.Println("dialing ...", network, address)
+	d.mu.Unlock()
+	return (&net.Dialer{}).DialContext(ctx, network, address)
+}
+
+func (d *fakeDialerWithCounter) calls() int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.counter
+}
+
+// Test that validate that only one transport is created when using kubectl apply
+func TestApplyMultipleItems(t *testing.T) {
+
+	tests := []struct {
+		name       string
+		execPlugin bool
+	}{
+		/*
+			{
+				name:       "without exec plugin",
+				execPlugin: false,
+			},*/
+		{
+			name:       "with exec plugin",
+			execPlugin: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result, clientAuthorizedToken, _, _ := startTestServer(t)
+			actualMetrics := captureMetrics(t)
+
+			cwd, err := os.Getwd()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			kconfig := `
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: "` + result.ClientConfig.Host + `"
+    insecure-skip-tls-verify: true
+  name: test
+contexts:
+- context:
+    cluster: test
+    user: test
+  name: test
+current-context: test
+users:
+- name: test
+`
+			if test.execPlugin {
+				kconfig = kconfig + `
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1
+      env:
+      - name: EXEC_PLUGIN_OUTPUT
+        value: '{"kind": "ExecCredential", "apiVersion": "client.authentication.k8s.io/v1", "status": {"token": "` + clientAuthorizedToken + `"}}'
+      args: ["--random-arg-to-avoid-authenticator-cache-hits","` + rand.String(10) + `"]
+      command: "` + filepath.Join(cwd, "testdata", "exec-plugin.sh") + `"
+      interactiveMode: IfAvailable
+`
+			}
+
+			kubeconfig, err := os.CreateTemp("", "kubeconfig")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			kubeconfig.WriteString(kconfig)
+			kubeconfig.Close()
+
+			originalArgs := os.Args
+			originalKubeconfig, wasSet := os.LookupEnv("KUBECONFIG")
+			t.Cleanup(func() {
+				os.Args = originalArgs
+				if wasSet {
+					os.Setenv("KUBECONFIG", originalKubeconfig)
+				}
+				os.Remove(kubeconfig.Name())
+			})
+
+			defer cmdutil.DefaultBehaviorOnFatal()
+			cmdutil.BehaviorOnFatal(func(msg string, code int) {
+				t.Error(msg, code)
+			})
+
+			clientGetter := genericclioptions.NewConfigFlags(true)
+			/*
+				dialer := &fakeDialerWithCounter{}
+				clientGetter.WithWrapConfigFn(func(c *rest.Config) *rest.Config {
+					c.Dial = dialer.DialContext
+					return c
+				})*/
+			f := cmdutil.NewFactory(clientGetter)
+			stdin := &bytes.Buffer{}
+			stdout := &bytes.Buffer{}
+			stderr := &bytes.Buffer{}
+			iostreams := genericclioptions.IOStreams{In: stdin, Out: stdout, ErrOut: stderr}
+			cmd := apply.NewCmdApply("kubectl", f, iostreams)
+			clientGetter.AddFlags(cmd.Flags())
+			os.Args = []string{"apply", "--kubeconfig", kubeconfig.Name(), "--filename", "testdata/exec-plugin-apply.yaml"}
+			if !test.execPlugin {
+				os.Args = append(os.Args, "--token", clientAuthorizedToken)
+			}
+			fmt.Println("before apply")
+			logs.GlogSetter("9")
+			// grep for HTTP Statistics:
+			// DNSLookup 0 ms Dial means a new connection is created
+			// HTTP Statistics: GetConnection means a existing connection has been reused
+			if err := cmd.Execute(); err != nil {
+				t.Fatal(err)
+			}
+			logs.GlogSetter("2")
+			fmt.Println("after apply")
+
+			// t.Log(stdout.String())
+			// t.Log(stderr.String())
+
+			if test.execPlugin && len(actualMetrics.calls) != 1 {
+				t.Errorf("expected 1 call, got %d", len(actualMetrics.calls))
+			}
+			/*
+				// one per object + discovery
+				if dialer.calls() != 1 {
+					t.Errorf("expected 1 call, got %d", dialer.calls())
+				}
+
+				dialer2 := &fakeDialerWithCounter{}
+				c := rest.CopyConfig(result.ClientConfig)
+				// c.Dial = dialer2.DialContext
+				client := clientset.NewForConfigOrDie(c)
+				if _, err := client.CoreV1().ConfigMaps("default").Get(context.TODO(), "exec-test1", metav1.GetOptions{}); err != nil {
+					t.Error(err)
+				}
+				if _, err := client.CoreV1().ConfigMaps("default").Get(context.TODO(), "exec-test10", metav1.GetOptions{}); err != nil {
+					t.Error(err)
+				}
+				if dialer2.calls() != 1 {
+					t.Errorf("expected 1 call, got %d", dialer2.calls())
+				}
+			*/
+		})
+	}
 }
 
 func TestExecPluginViaClient(t *testing.T) {
