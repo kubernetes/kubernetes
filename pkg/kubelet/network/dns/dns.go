@@ -25,7 +25,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -268,9 +268,8 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 			searches = []string{}
 			for _, s := range fields[1:] {
 				if s != "." {
-					s = strings.TrimSuffix(s, ".")
+					searches = append(searches, strings.TrimSuffix(s, "."))
 				}
-				searches = append(searches, s)
 			}
 		}
 		if fields[0] == "options" {
