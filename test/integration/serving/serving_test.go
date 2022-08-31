@@ -51,7 +51,7 @@ func (kubeControllerManagerTester) StartTestServer(t kubectrlmgrtesting.Logger, 
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	return gotResult.Options.SecureServing, gotResult.Config.SecureServing, gotResult.Config.InsecureServing, gotResult.TearDownFn, err
+	return gotResult.Options.SecureServing, gotResult.Config.SecureServing, nil, gotResult.TearDownFn, err
 }
 
 type cloudControllerManagerTester struct{}
