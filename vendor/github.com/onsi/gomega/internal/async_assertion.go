@@ -40,7 +40,7 @@ func NewAsyncAssertion(asyncType AsyncAssertionType, actualInput interface{}, g 
 	}
 
 	switch actualType := reflect.TypeOf(actualInput); {
-	case actualType.Kind() != reflect.Func:
+	case actualInput == nil || actualType.Kind() != reflect.Func:
 		out.actualValue = actualInput
 	case actualType.NumIn() == 0 && actualType.NumOut() > 0:
 		out.actualIsFunc = true
@@ -104,11 +104,13 @@ func (assertion *AsyncAssertion) WithPolling(interval time.Duration) types.Async
 
 func (assertion *AsyncAssertion) Should(matcher types.GomegaMatcher, optionalDescription ...interface{}) bool {
 	assertion.g.THelper()
+	vetOptionalDescription("Asynchronous assertion", optionalDescription...)
 	return assertion.match(matcher, true, optionalDescription...)
 }
 
 func (assertion *AsyncAssertion) ShouldNot(matcher types.GomegaMatcher, optionalDescription ...interface{}) bool {
 	assertion.g.THelper()
+	vetOptionalDescription("Asynchronous assertion", optionalDescription...)
 	return assertion.match(matcher, false, optionalDescription...)
 }
 

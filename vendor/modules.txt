@@ -588,7 +588,7 @@ github.com/mvdan/xurls
 # github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f => github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 ## explicit
 github.com/mxk/go-flowrate/flowrate
-# github.com/onsi/ginkgo/v2 v2.1.4 => github.com/onsi/ginkgo/v2 v2.1.4
+# github.com/onsi/ginkgo/v2 v2.1.6 => github.com/onsi/ginkgo/v2 v2.1.6
 ## explicit; go 1.18
 github.com/onsi/ginkgo/v2
 github.com/onsi/ginkgo/v2/config
@@ -610,7 +610,7 @@ github.com/onsi/ginkgo/v2/internal/parallel_support
 github.com/onsi/ginkgo/v2/internal/testingtproxy
 github.com/onsi/ginkgo/v2/reporters
 github.com/onsi/ginkgo/v2/types
-# github.com/onsi/gomega v1.19.0 => github.com/onsi/gomega v1.19.0
+# github.com/onsi/gomega v1.20.1 => github.com/onsi/gomega v1.20.1
 ## explicit; go 1.18
 github.com/onsi/gomega
 github.com/onsi/gomega/format
@@ -2716,8 +2716,8 @@ sigs.k8s.io/yaml
 # github.com/mxk/go-flowrate => github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 # github.com/niemeyer/pretty => github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e
 # github.com/olekukonko/tablewriter => github.com/olekukonko/tablewriter v0.0.4
-# github.com/onsi/ginkgo/v2 => github.com/onsi/ginkgo/v2 v2.1.4
-# github.com/onsi/gomega => github.com/onsi/gomega v1.19.0
+# github.com/onsi/ginkgo/v2 => github.com/onsi/ginkgo/v2 v2.1.6
+# github.com/onsi/gomega => github.com/onsi/gomega v1.20.1
 # github.com/opencontainers/go-digest => github.com/opencontainers/go-digest v1.0.0
 # github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.2
 # github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.3
