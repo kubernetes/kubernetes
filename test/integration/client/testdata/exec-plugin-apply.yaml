@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: exec-test1
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: exec-test2
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: exec-test3
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: exec-test4
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: exec-test5
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: exec-test6
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: exec-test7
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: exec-test8
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: exec-test9
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: exec-test10
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: exec-test11
