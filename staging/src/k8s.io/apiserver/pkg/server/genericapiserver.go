@@ -247,6 +247,8 @@ type GenericAPIServer struct {
 	// If enabled, after ShutdownDelayDuration elapses, any incoming request is
 	// rejected with a 429 status code and a 'Retry-After' response.
 	ShutdownSendRetryAfter bool
+
+	noopTransformer *fieldmanager.AvoidNoopTransformer
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -672,6 +674,7 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 				return err
 			}
 			apiGroupVersion.TypeConverter = typeConverter
+			apiGroupVersion.AvoidNoopTransformer = s.noopTransformer
 		}
 
 		apiGroupVersion.MaxRequestBodyBytes = s.maxRequestBodyBytes
