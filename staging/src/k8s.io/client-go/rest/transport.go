@@ -108,8 +108,10 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 			Groups:   c.Impersonate.Groups,
 			Extra:    c.Impersonate.Extra,
 		},
-		Dial:  c.Dial,
-		Proxy: c.Proxy,
+		Dial:    c.Dial,
+		Dialer:  c.Dialer,
+		Proxy:   c.Proxy,
+		Proxier: c.Proxier,
 	}
 
 	if c.ExecProvider != nil && c.AuthProvider != nil {

@@ -250,8 +250,18 @@ func TestConfigToExecClusterRoundtrip(t *testing.T) {
 		func(r *func(ctx context.Context, network, addr string) (net.Conn, error), f fuzz.Continue) {
 			*r = fakeDialFunc
 		},
+		func(r *Dialer, f fuzz.Continue) {
+			dialer := &fakeDialer{}
+			f.Fuzz(dialer)
+			*r = dialer
+		},
 		func(r *func(*http.Request) (*url.URL, error), f fuzz.Continue) {
 			*r = fakeProxyFunc
+		},
+		func(r *Proxier, f fuzz.Continue) {
+			proxier := &fakeProxier{}
+			f.Fuzz(proxier)
+			*r = proxier
 		},
 		func(r *runtime.Object, f fuzz.Continue) {
 			unknown := &runtime.Unknown{}
@@ -291,6 +301,8 @@ func TestConfigToExecClusterRoundtrip(t *testing.T) {
 		expected.WarningHandler = nil
 		expected.Timeout = 0
 		expected.Dial = nil
+		expected.Dialer = nil
+		expected.Proxier = nil
 
 		// Manually set URLs so we don't get an error when parsing these during the roundtrip.
 		if expected.Host != "" {

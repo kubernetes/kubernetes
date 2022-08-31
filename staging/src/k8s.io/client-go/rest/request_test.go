@@ -3759,6 +3759,110 @@ func TestHTTP1DoNotReuseRequestAfterTimeout(t *testing.T) {
 	}
 }
 
+type fakeDialerWithCounter struct {
+	mu      sync.Mutex
+	counter int
+}
+
+func (d *fakeDialerWithCounter) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.counter++
+	return (&net.Dialer{}).DialContext(ctx, network, address)
+}
+
+func (d *fakeDialerWithCounter) calls() int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.counter
+}
+
+func TestDifferentDialers(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	dialer1 := &fakeDialerWithCounter{}
+	dialer2 := &fakeDialerWithCounter{}
+
+	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Hello, %s", r.Proto)
+	}))
+	ts.EnableHTTP2 = true
+	ts.StartTLS()
+	defer ts.Close()
+
+	config := &Config{
+		Host: ts.URL,
+		TLSClientConfig: TLSClientConfig{
+			Insecure: true,
+		},
+		// These fields are required to create a REST client.
+		ContentConfig: ContentConfig{
+			GroupVersion:         &schema.GroupVersion{},
+			NegotiatedSerializer: &serializer.CodecFactory{},
+		},
+	}
+	config1 := CopyConfig(config)
+	config1.Dialer = dialer1
+
+	c1, err := RESTClientFor(config1)
+	if err != nil {
+		t.Fatalf("failed to create REST client: %v", err)
+	}
+	data, err := c1.Verb("GET").
+		Prefix("foo").
+		DoRaw(ctx)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if string(data) != "Hello, HTTP/2.0" {
+		t.Fatalf("unexpected response: %s", data)
+	}
+
+	config2 := CopyConfig(config)
+	config2.Dialer = dialer2
+	c2, err := RESTClientFor(config2)
+	if err != nil {
+		t.Fatalf("failed to create REST client: %v", err)
+	}
+
+	data, err = c2.Verb("GET").
+		Prefix("foo").
+		DoRaw(ctx)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if string(data) != "Hello, HTTP/2.0" {
+		t.Fatalf("unexpected response: %s", data)
+	}
+
+	dialer3 := dialer2
+	config3 := CopyConfig(config)
+	config2.Dialer = dialer3
+	c3, err := RESTClientFor(config3)
+	if err != nil {
+		t.Fatalf("failed to create REST client: %v", err)
+	}
+
+	data, err = c3.Verb("GET").
+		Prefix("foo").
+		DoRaw(ctx)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if string(data) != "Hello, HTTP/2.0" {
+		t.Fatalf("unexpected response: %s", data)
+	}
+
+	// HTTP2 reuses the connection, so only 1 Dial per each Dialer
+	if dialer1.calls() != 1 || dialer2.calls() != 1 {
+		t.Errorf("unexpacted dials: Dialer1 got %d expected 1 times Dialer2 got %d  expected 1 times", dialer1.calls(), dialer2.calls())
+	}
+
+}
 func TestTransportConcurrency(t *testing.T) {
 	const numReqs = 10
 	var tests = []struct {

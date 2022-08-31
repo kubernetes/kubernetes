@@ -131,18 +131,40 @@ type Config struct {
 	Timeout time.Duration
 
 	// Dial specifies the dial function for creating unencrypted TCP connections.
+	// Deprecated: Use Dialer instead, which allows the transport to be cached.
+	// If both are set, Dialer takes priority.
 	Dial func(ctx context.Context, network, address string) (net.Conn, error)
+
+	// Dialer implements the dial function for creating unencrypted TCP connections.
+	Dialer Dialer
 
 	// Proxy is the proxy func to be used for all requests made by this
 	// transport. If Proxy is nil, http.ProxyFromEnvironment is used. If Proxy
 	// returns a nil *URL, no proxy is used.
 	//
 	// socks5 proxying does not currently support spdy streaming endpoints.
+	// Deprecated: Use Proxier instead, which allows the transport to be cached.
+	// If both are set, Proxier takes priority.
 	Proxy func(*http.Request) (*url.URL, error)
+
+	// Proxy is the proxy func to be used for all requests made by this
+	// transport. If Proxy is nil, http.ProxyFromEnvironment is used. If Proxy
+	// returns a nil *URL, no proxy is used.
+	//
+	// socks5 proxying does not currently support spdy streaming endpoints.
+	Proxier Proxier
 
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
 	// Version string
+}
+
+type Dialer interface {
+	DialContext(ctx context.Context, network, address string) (net.Conn, error)
+}
+
+type Proxier interface {
+	Proxy(*http.Request) (*url.URL, error)
 }
 
 var _ fmt.Stringer = new(Config)
@@ -618,7 +640,9 @@ func AnonymousClientConfig(config *Config) *Config {
 		Burst:              config.Burst,
 		Timeout:            config.Timeout,
 		Dial:               config.Dial,
+		Dialer:             config.Dialer,
 		Proxy:              config.Proxy,
+		Proxier:            config.Proxier,
 	}
 }
 
@@ -662,7 +686,9 @@ func CopyConfig(config *Config) *Config {
 		WarningHandler:     config.WarningHandler,
 		Timeout:            config.Timeout,
 		Dial:               config.Dial,
+		Dialer:             config.Dialer,
 		Proxy:              config.Proxy,
+		Proxier:            config.Proxier,
 	}
 	if config.ExecProvider != nil && config.ExecProvider.Config != nil {
 		c.ExecProvider.Config = config.ExecProvider.Config.DeepCopyObject()
