@@ -68,6 +68,9 @@ type proxyHandler struct {
 	// egressSelector selects the proper egress dialer to communicate with the custom apiserver
 	// overwrites proxyTransport dialer if not nil
 	egressSelector *egressselector.EgressSelector
+
+	// reject to forward redirect response
+	rejectForwardingRedirects bool
 }
 
 type proxyHandlingInfo struct {
@@ -172,6 +175,9 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	handler := proxy.NewUpgradeAwareHandler(location, proxyRoundTripper, true, upgrade, &responder{w: w})
+	if r.rejectForwardingRedirects {
+		handler.RejectForwardingRedirects = true
+	}
 	utilflowcontrol.RequestDelegated(req.Context())
 	handler.ServeHTTP(w, newReq)
 }
