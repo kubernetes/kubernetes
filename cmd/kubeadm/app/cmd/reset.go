@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"path"
 
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
@@ -65,6 +66,7 @@ type resetOptions struct {
 	ignorePreflightErrors []string
 	kubeconfigPath        string
 	dryRun                bool
+	cleanupTmpDir         bool
 }
 
 // resetData defines all the runtime information used when running the kubeadm reset workflow;
@@ -79,6 +81,7 @@ type resetData struct {
 	outputWriter          io.Writer
 	cfg                   *kubeadmapi.InitConfiguration
 	dryRun                bool
+	cleanupTmpDir         bool
 }
 
 // newResetOptions returns a struct ready for being used for creating cmd join flags.
@@ -87,6 +90,7 @@ func newResetOptions() *resetOptions {
 		certificatesDir: kubeadmapiv1.DefaultCertificatesDir,
 		forceReset:      false,
 		kubeconfigPath:  kubeadmconstants.GetAdminKubeConfigPath(),
+		cleanupTmpDir:   false,
 	}
 }
 
@@ -136,6 +140,7 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 		outputWriter:          out,
 		cfg:                   cfg,
 		dryRun:                options.dryRun,
+		cleanupTmpDir:         options.cleanupTmpDir,
 	}, nil
 }
 
@@ -159,6 +164,10 @@ func AddResetFlags(flagSet *flag.FlagSet, resetOptions *resetOptions) {
 	flagSet.BoolVar(
 		&resetOptions.dryRun, options.DryRun, resetOptions.dryRun,
 		"Don't apply any changes; just output what would be done.",
+	)
+	flagSet.BoolVar(
+		&resetOptions.cleanupTmpDir, options.CleanupTmpDir, resetOptions.cleanupTmpDir,
+		fmt.Sprintf("Cleanup the %q directory", path.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.TempDirForKubeadm)),
 	)
 
 	options.AddKubeConfigFlag(flagSet, &resetOptions.kubeconfigPath)
@@ -215,9 +224,14 @@ func (r *resetData) Cfg() *kubeadmapi.InitConfiguration {
 	return r.cfg
 }
 
-// DryRun returns the DryRun flag.
+// DryRun returns the dryRun flag.
 func (r *resetData) DryRun() bool {
 	return r.dryRun
+}
+
+// CleanupTmpDir returns the cleanupTmpDir flag.
+func (r *resetData) CleanupTmpDir() bool {
+	return r.cleanupTmpDir
 }
 
 // CertificatesDir returns the CertificatesDir.
