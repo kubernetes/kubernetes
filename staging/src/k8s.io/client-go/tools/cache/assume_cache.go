@@ -39,13 +39,17 @@ type AssumeCacheInformer interface {
 // AssumeCache is a cache on top of the informer that allows for updating
 // objects outside of informer events and also restoring the informer
 // cache's version of the object.  Objects are assumed to be
-// Kubernetes API objects that implement meta.Interface
+// Kubernetes API objects that implement meta.Interface.
+//
+// Methods with log output support contextual logging by taking an explicit
+// logger parameter. The log level at which info messages get emitted
+// is 4 or higher.
 type AssumeCache[T any] interface {
 	// Assume updates the object in-memory only
-	Assume(obj T) error
+	Assume(logger klog.Logger, obj T) error
 
 	// Restore the informer cache's version of the object
-	Restore(objName string)
+	Restore(logger klog.Logger, objName string)
 
 	// Get the object by name. apierrors.IsNotFound will return true
 	// for the error if no such object exists.
@@ -99,6 +103,8 @@ func (e *errObjectName) Error() string {
 // Restore() sets the latest object pointer back to the informer object.
 // Get/List() always returns the latest object pointer.
 type assumeCache[T any] struct {
+	logger klog.Logger
+
 	// Synchronizes updates to store
 	rwMutex sync.RWMutex
 
@@ -142,8 +148,10 @@ func (c *assumeCache[T]) objInfoIndexFunc(obj interface{}) ([]string, error) {
 }
 
 // NewAssumeCache creates an assume cache for general objects.
-func NewAssumeCache[T any](informer AssumeCacheInformer, description, indexName string, indexFunc IndexFunc) AssumeCache[T] {
+// The logger is used for callbacks from the informer.
+func NewAssumeCache[T any](logger klog.Logger, informer AssumeCacheInformer, description, indexName string, indexFunc IndexFunc) AssumeCache[T] {
 	c := &assumeCache[T]{
+		logger:      logger,
 		description: description,
 		indexFunc:   indexFunc,
 		indexName:   indexName,
@@ -174,7 +182,7 @@ func (c *assumeCache[T]) add(obj interface{}) {
 
 	name, err := MetaNamespaceKeyFunc(obj)
 	if err != nil {
-		klog.ErrorS(&errObjectName{err}, "Add failed")
+		c.logger.Error(&errObjectName{err}, "Add failed")
 		return
 	}
 
@@ -184,29 +192,29 @@ func (c *assumeCache[T]) add(obj interface{}) {
 	if objInfo := c.getObjInfoNoError(name); objInfo != nil {
 		newVersion, err := c.getObjVersion(name, obj)
 		if err != nil {
-			klog.ErrorS(err, "Add failed: couldn't get object version")
+			c.logger.Error(err, "Add failed: couldn't get object version")
 			return
 		}
 
 		storedVersion, err := c.getObjVersion(name, objInfo.latestObj)
 		if err != nil {
-			klog.ErrorS(err, "Add failed: couldn't get stored object version")
+			c.logger.Error(err, "Add failed: couldn't get stored object version")
 			return
 		}
 
 		// Only update object if version is newer.
 		// This is so we don't override assumed objects due to informer resync.
 		if newVersion <= storedVersion {
-			klog.V(10).InfoS("Skip adding object to assume cache because version is not newer than storedVersion", "description", c.description, "cacheKey", name, "newVersion", newVersion, "storedVersion", storedVersion)
+			c.logger.V(10).Info("Skip adding object to assume cache because version is not newer than storedVersion", "description", c.description, "cacheKey", name, "newVersion", newVersion, "storedVersion", storedVersion)
 			return
 		}
 	}
 
 	objInfo := &objInfo{name: name, latestObj: obj, apiObj: obj}
 	if err = c.store.Update(objInfo); err != nil {
-		klog.InfoS("Error occurred while updating stored object", "err", err)
+		c.logger.Info("Error occurred while updating stored object", "err", err)
 	} else {
-		klog.V(10).InfoS("Adding object to assume cache", "description", c.description, "cacheKey", name, "assumeCache", obj)
+		c.logger.V(10).Info("Adding object to assume cache", "description", c.description, "cacheKey", name, "assumeCache", obj)
 	}
 }
 
@@ -221,7 +229,7 @@ func (c *assumeCache[T]) delete(obj interface{}) {
 
 	name, err := DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
-		klog.ErrorS(&errObjectName{err}, "Failed to delete")
+		c.logger.Error(&errObjectName{err}, "Delete failed")
 		return
 	}
 
@@ -231,7 +239,7 @@ func (c *assumeCache[T]) delete(obj interface{}) {
 	objInfo := &objInfo{name: name}
 	err = c.store.Delete(objInfo)
 	if err != nil {
-		klog.ErrorS(err, "Failed to delete", "description", c.description, "cacheKey", name)
+		c.logger.Error(err, "Failed to delete", "description", c.description, "cacheKey", name)
 	}
 }
 
@@ -304,19 +312,19 @@ func (c *assumeCache[T]) List(indexObj T) []T {
 	allObjs := []T{}
 	objs, err := c.store.Index(c.indexName, &objInfo{latestObj: indexObj})
 	if err != nil {
-		klog.ErrorS(err, "List index error")
+		c.logger.Error(err, "List index error")
 		return nil
 	}
 
 	for _, obj := range objs {
 		objInfo, err := Typecast[*objInfo](obj)
 		if err != nil {
-			klog.ErrorS(err, "List error")
+			c.logger.Error(err, "List error")
 			continue
 		}
 		t, err := Typecast[T](objInfo.latestObj)
 		if err != nil {
-			klog.ErrorS(err, "List error")
+			c.logger.Error(err, "List error")
 			continue
 		}
 		allObjs = append(allObjs, t)
@@ -324,7 +332,7 @@ func (c *assumeCache[T]) List(indexObj T) []T {
 	return allObjs
 }
 
-func (c *assumeCache[T]) Assume(obj T) error {
+func (c *assumeCache[T]) Assume(logger klog.Logger, obj T) error {
 	name, err := MetaNamespaceKeyFunc(obj)
 	if err != nil {
 		return &errObjectName{err}
@@ -354,20 +362,20 @@ func (c *assumeCache[T]) Assume(obj T) error {
 
 	// Only update the cached object
 	objInfo.latestObj = obj
-	klog.V(4).InfoS("Assumed object", "description", c.description, "cacheKey", name, "version", newVersion)
+	logger.V(4).Info("Assumed object", "description", c.description, "cacheKey", name, "version", newVersion)
 	return nil
 }
 
-func (c *assumeCache[T]) Restore(objName string) {
+func (c *assumeCache[T]) Restore(logger klog.Logger, objName string) {
 	c.rwMutex.Lock()
 	defer c.rwMutex.Unlock()
 
 	objInfo, err := c.getObjInfo(objName)
 	if err != nil {
 		// This could be expected if object got deleted
-		klog.V(5).InfoS("Restore object", "description", c.description, "cacheKey", objName, "err", err)
+		logger.V(5).Info("Restore object", "description", c.description, "cacheKey", objName, "err", err)
 	} else {
 		objInfo.latestObj = objInfo.apiObj
-		klog.V(4).InfoS("Restored object", "description", c.description, "cacheKey", objName)
+		logger.V(4).Info("Restored object", "description", c.description, "cacheKey", objName)
 	}
 }
