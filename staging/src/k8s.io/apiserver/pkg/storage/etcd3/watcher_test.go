@@ -269,7 +269,7 @@ func TestWatchContextCancel(t *testing.T) {
 func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 	origCtx, store, _ := testSetup(t)
 	ctx, cancel := context.WithCancel(origCtx)
-	w := store.watcher.createWatchChan(ctx, "/abc", 0, false, &genericapirequest.Cluster{}, false, storage.Everything)
+	w := store.watcher.createWatchChan(ctx, "/abc", 0, false, genericapirequest.Shard(""), &genericapirequest.Cluster{}, false, storage.Everything)
 	// make resutlChan and errChan blocking to ensure ordering.
 	w.resultChan = make(chan watch.Event)
 	w.errChan = make(chan error)

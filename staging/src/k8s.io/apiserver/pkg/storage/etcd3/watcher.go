@@ -97,6 +97,7 @@ type watchChan struct {
 
 	// kcp
 	cluster    *genericapirequest.Cluster
+	shard      genericapirequest.Shard
 	crdRequest bool
 }
 
@@ -133,8 +134,9 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive bo
 	if err != nil {
 		return nil, err
 	}
+	shard := genericapirequest.ShardFrom(ctx)
 
-	wc := w.createWatchChan(ctx, key, rev, recursive, cluster, progressNotify, pred)
+	wc := w.createWatchChan(ctx, key, rev, recursive, shard, cluster, progressNotify, pred)
 	go wc.run()
 
 	// For etcd watch we don't have an easy way to answer whether the watch
@@ -147,7 +149,7 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive bo
 	return wc, nil
 }
 
-func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive bool, cluster *genericapirequest.Cluster, progressNotify bool, pred storage.SelectionPredicate) *watchChan {
+func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive bool, shard genericapirequest.Shard, cluster *genericapirequest.Cluster, progressNotify bool, pred storage.SelectionPredicate) *watchChan {
 	wc := &watchChan{
 		watcher:           w,
 		key:               key,
@@ -161,6 +163,7 @@ func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, re
 
 		// kcp
 		cluster:    cluster,
+		shard:      shard,
 		crdRequest: kcp.CustomResourceIndicatorFrom(ctx),
 	}
 	if pred.Empty() {
@@ -455,7 +458,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 		}
 
 		// kcp: apply clusterName to the decoded object, as the name is not persisted in storage.
-		clusterName := adjustClusterNameIfWildcard(wc.cluster, wc.crdRequest, wc.key, e.key)
+		clusterName := adjustClusterNameIfWildcard(wc.shard, wc.cluster, wc.crdRequest, wc.key, e.key)
 		setClusterNameOnDecodedObject(curObj, clusterName)
 	}
 	// We need to decode prevValue, only if this is deletion event or
@@ -476,7 +479,7 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 		}
 
 		// kcp: apply clusterName to the decoded object, as the name is not persisted in storage.
-		clusterName := adjustClusterNameIfWildcard(wc.cluster, wc.crdRequest, wc.key, e.key)
+		clusterName := adjustClusterNameIfWildcard(wc.shard, wc.cluster, wc.crdRequest, wc.key, e.key)
 		setClusterNameOnDecodedObject(oldObj, clusterName)
 	}
 	return curObj, oldObj, nil

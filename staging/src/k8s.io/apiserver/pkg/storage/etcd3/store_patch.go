@@ -33,6 +33,12 @@ var (
 	// Example: root:org:ws/some-name
 	wildcardClusterNameRegex = regexp.MustCompile(`^([^/]+)\/.+`)
 
+	// matches shard/cluster/remainder, capturing shard and cluster.
+	//
+	// Example: amber/root:org:ws/some-namespace/some-name
+	// Example: amber/root:org:ws/some-name
+	wildcardShardClusterNameRegex = regexp.MustCompile(`^([^\/]+)\/([^\/]+)\/.+`)
+
 	// matches identity-or-customresources/cluster/remainder, capturing cluster
 	//
 	// Example: customresources/root:org:ws/some-namespace/some-name
@@ -45,26 +51,31 @@ var (
 // adjustClusterNameIfWildcard determines the logical cluster name. If this is not a wildcard list/watch request,
 // the cluster name is returned unmodified. Otherwise, the cluster name is extracted from the key based on whether
 // it is a CR partial metadata request (prefix/identity/clusterName/remainder) or not (prefix/clusterName/remainder).
-func adjustClusterNameIfWildcard(cluster *genericapirequest.Cluster, crdRequest bool, keyPrefix, key string) logicalcluster.Name {
+func adjustClusterNameIfWildcard(shard genericapirequest.Shard, cluster *genericapirequest.Cluster, crdRequest bool, keyPrefix, key string) logicalcluster.Name {
 	if cluster.Name != logicalcluster.Wildcard {
 		return cluster.Name
 	}
 
 	keyWithoutPrefix := strings.TrimPrefix(key, keyPrefix)
 
-	var regex *regexp.Regexp
-
-	if cluster.PartialMetadataRequest && crdRequest {
-		regex = crdWildcardPartialMetadataClusterNameRegex
-	} else {
-		regex = wildcardClusterNameRegex
+	if !shard.Wildcard() {
+		var regex *regexp.Regexp
+		if cluster.PartialMetadataRequest && crdRequest {
+			regex = crdWildcardPartialMetadataClusterNameRegex
+		} else {
+			regex = wildcardClusterNameRegex
+		}
+		matches := regex.FindStringSubmatch(keyWithoutPrefix)
+		if len(matches) >= 2 {
+			return logicalcluster.New(matches[1])
+		}
+		return logicalcluster.Name{}
 	}
 
-	matches := regex.FindStringSubmatch(keyWithoutPrefix)
-	if len(matches) >= 2 {
-		return logicalcluster.New(matches[1])
+	matches := wildcardShardClusterNameRegex.FindStringSubmatch(keyWithoutPrefix)
+	if len(matches) >= 3 {
+		return logicalcluster.New(matches[2])
 	}
-
 	return logicalcluster.Name{}
 }
 

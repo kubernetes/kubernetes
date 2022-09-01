@@ -710,7 +710,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	if err != nil {
 		return storage.NewInternalErrorf("unable to get cluster for list key %q: %v", keyPrefix, err)
 	}
-
+	shard := genericapirequest.ShardFrom(ctx)
 	crdIndicator := kcp.CustomResourceIndicatorFrom(ctx)
 	// end kcp
 
@@ -769,7 +769,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			}
 
 			// kcp
-			clusterName := adjustClusterNameIfWildcard(cluster, crdIndicator, keyPrefix, string(kv.Key))
+			clusterName := adjustClusterNameIfWildcard(shard, cluster, crdIndicator, keyPrefix, string(kv.Key))
 
 			if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc, clusterName); err != nil {
 				return err
