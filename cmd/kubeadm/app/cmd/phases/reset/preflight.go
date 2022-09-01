@@ -53,7 +53,9 @@ func runPreflight(c workflow.RunData) error {
 
 	if !r.ForceReset() && !r.DryRun() {
 		klog.Warning("[reset] WARNING: Changes made to this host by 'kubeadm init' or 'kubeadm join' will be reverted.")
-		return util.InteractivelyConfirmAction("reset", "Are you sure you want to proceed?", r.InputReader())
+		if err := util.InteractivelyConfirmAction("reset", "Are you sure you want to proceed?", r.InputReader()); err != nil {
+			return err
+		}
 	}
 
 	fmt.Println("[preflight] Running pre-flight checks")
