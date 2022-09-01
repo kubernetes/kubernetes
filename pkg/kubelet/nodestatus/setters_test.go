@@ -69,6 +69,7 @@ func TestNodeAddress(t *testing.T) {
 		cloudProviderType   cloudProviderType
 		nodeAddresses       []v1.NodeAddress
 		expectedAddresses   []v1.NodeAddress
+		existingAnnotations map[string]string
 		expectedAnnotations map[string]string
 		shouldError         bool
 	}{
@@ -452,13 +453,72 @@ func TestNodeAddress(t *testing.T) {
 			expectedAnnotations: map[string]string{},
 			shouldError:         false,
 		},
+		{
+			name:              "Stale nodeIP annotation is removed when not using cloud provider",
+			nodeIP:            netutils.ParseIPSloppy("10.1.1.1"),
+			cloudProviderType: cloudProviderNone,
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			existingAnnotations: map[string]string{
+				"alpha.kubernetes.io/provided-node-ip": "10.1.1.3",
+			},
+			expectedAnnotations: map[string]string{},
+			shouldError:         false,
+		},
+		{
+			name:              "Stale nodeIP annotation is removed when using cloud provider but no --node-ip",
+			nodeIP:            nil,
+			cloudProviderType: cloudProviderLegacy,
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			existingAnnotations: map[string]string{
+				"alpha.kubernetes.io/provided-node-ip": "10.1.1.1",
+			},
+			expectedAnnotations: map[string]string{},
+			shouldError:         false,
+		},
+		{
+			name:              "Incorrect nodeIP annotation is fixed",
+			nodeIP:            netutils.ParseIPSloppy("10.1.1.1"),
+			cloudProviderType: cloudProviderExternal,
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			existingAnnotations: map[string]string{
+				"alpha.kubernetes.io/provided-node-ip": "10.1.1.3",
+			},
+			expectedAnnotations: map[string]string{
+				"alpha.kubernetes.io/provided-node-ip": "10.1.1.1",
+			},
+			shouldError: false,
+		},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			// testCase setup
 			existingNode := &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Annotations: make(map[string]string)},
-				Spec:       v1.NodeSpec{},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        testKubeletHostname,
+					Annotations: testCase.existingAnnotations,
+				},
+				Spec: v1.NodeSpec{},
 				Status: v1.NodeStatus{
 					Addresses: []v1.NodeAddress{},
 				},
