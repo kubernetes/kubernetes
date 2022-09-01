@@ -434,7 +434,7 @@ func (config *NetworkingTestConfig) GetHTTPCodeFromTestContainer(path, targetIP 
 // in a test container running with host networking.
 //   - minTries is the minimum number of curl/nc attempts required before declaring
 //     success. If 0, then we return as soon as all endpoints succeed.
-//   - There is no logical change to test results if faillures happen AFTER endpoints have succeeded,
+//   - There is no logical change to test results if failures happen AFTER endpoints have succeeded,
 //     hence over-padding minTries will NOT reverse a successful result and is thus not very useful yet
 //     (See the TODO about checking probability, which isnt implemented yet).
 //   - maxTries is the maximum number of curl/echo attempts before an error is returned.  The
