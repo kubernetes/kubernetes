@@ -76,7 +76,8 @@ type ServerRunOptions struct {
 	ProxyClientCertFile string
 	ProxyClientKeyFile  string
 
-	EnableAggregatorRouting bool
+	EnableAggregatorRouting             bool
+	AggregatorRejectForwardingRedirects bool
 
 	MasterCount            int
 	EndpointReconcilerType string
@@ -132,7 +133,8 @@ func NewServerRunOptions() *ServerRunOptions {
 			},
 			HTTPTimeout: time.Duration(5) * time.Second,
 		},
-		ServiceNodePortRange: kubeoptions.DefaultServiceNodePortRange,
+		ServiceNodePortRange:                kubeoptions.DefaultServiceNodePortRange,
+		AggregatorRejectForwardingRedirects: true,
 	}
 
 	// Overwrite the default for storage data format.
@@ -243,6 +245,9 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 
 	fs.BoolVar(&s.EnableAggregatorRouting, "enable-aggregator-routing", s.EnableAggregatorRouting,
 		"Turns on aggregator routing requests to endpoints IP rather than cluster IP.")
+
+	fs.BoolVar(&s.AggregatorRejectForwardingRedirects, "aggregator-reject-forwarding-redirect", s.AggregatorRejectForwardingRedirects,
+		"Aggregator reject forwarding redirect response back to client.")
 
 	fs.StringVar(&s.ServiceAccountSigningKeyFile, "service-account-signing-key-file", s.ServiceAccountSigningKeyFile, ""+
 		"Path to the file that contains the current private key of the service account token issuer. The issuer will sign issued ID tokens with this private key.")
