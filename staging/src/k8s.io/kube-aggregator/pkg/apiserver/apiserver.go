@@ -86,6 +86,8 @@ type ExtraConfig struct {
 
 	// Mechanism by which the Aggregator will resolve services. Required.
 	ServiceResolver ServiceResolver
+
+	RejectForwardingRedirects bool
 }
 
 // Config represents the configuration needed to create an APIAggregator.
@@ -155,6 +157,9 @@ type APIAggregator struct {
 	// egressSelector selects the proper egress dialer to communicate with the custom apiserver
 	// overwrites proxyTransport dialer if not nil
 	egressSelector *egressselector.EgressSelector
+
+	// rejectForwardingRedirects is whether to allow to forward redirect response
+	rejectForwardingRedirects bool
 }
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
@@ -212,6 +217,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		openAPIV3Config:            c.GenericConfig.OpenAPIV3Config,
 		egressSelector:             c.GenericConfig.EgressSelector,
 		proxyCurrentCertKeyContent: func() (bytes []byte, bytes2 []byte) { return nil, nil },
+		rejectForwardingRedirects:  c.ExtraConfig.RejectForwardingRedirects,
 	}
 
 	// used later  to filter the served resource by those that have expired.
@@ -442,6 +448,7 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 		proxyTransport:             s.proxyTransport,
 		serviceResolver:            s.serviceResolver,
 		egressSelector:             s.egressSelector,
+		rejectForwardingRedirects:  s.rejectForwardingRedirects,
 	}
 	proxyHandler.updateAPIService(apiService)
 	if s.openAPIAggregationController != nil {
