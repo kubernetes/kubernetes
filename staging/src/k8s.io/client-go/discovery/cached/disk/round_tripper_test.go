@@ -78,7 +78,7 @@ func TestCacheRoundTripper(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cache := newCacheRoundTripper(cacheDir, rt)
+	cache := NewCacheRoundTripper(cacheDir, rt)
 
 	// First call, caches the response
 	req := &http.Request{
@@ -139,7 +139,7 @@ func TestCacheRoundTripperPathPerm(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cache := newCacheRoundTripper(cacheDir, rt)
+	cache := NewCacheRoundTripper(cacheDir, rt)
 
 	// First call, caches the response
 	req := &http.Request{
