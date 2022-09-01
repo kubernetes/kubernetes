@@ -352,3 +352,103 @@ func TestSyncRolloutStatus(t *testing.T) {
 		})
 	}
 }
+
+func getRSConditions(typeConditionsReplicas []apps.ReplicaSetConditionType, statusConditionsReplicas []v1.ConditionStatus) []apps.ReplicaSetCondition {
+	var conditions []apps.ReplicaSetCondition
+	for i := 0; i < len(typeConditionsReplicas); i++ {
+		Condition := apps.ReplicaSetCondition{
+			Type:   typeConditionsReplicas[i],
+			Status: statusConditionsReplicas[i],
+		}
+		conditions = append(conditions, Condition)
+	}
+	return conditions
+}
+
+func newRSWithCondition(name string, specReplicas int, typeConditionsReplicas []apps.ReplicaSetConditionType, statusConditionsReplicas []v1.ConditionStatus) *apps.ReplicaSet {
+	rs := rs(name, specReplicas, nil, metav1.Time{})
+	rs.Status.Conditions = getRSConditions(typeConditionsReplicas, statusConditionsReplicas)
+	return rs
+}
+
+func TestGetReplicaFailures(t *testing.T) {
+	typeConditionsReplicasAll := []apps.ReplicaSetConditionType{
+		apps.ReplicaSetReplicaFailure,
+		apps.ReplicaSetReplicaFailure,
+		apps.ReplicaSetReplicaFailure,
+	}
+	statusConditionsReplicasAll := []v1.ConditionStatus{
+		v1.ConditionTrue,
+		v1.ConditionFalse,
+		v1.ConditionUnknown,
+	}
+
+	typeConditionsReplicasOne := []apps.ReplicaSetConditionType{
+		apps.ReplicaSetReplicaFailure,
+	}
+	statusConditionsReplicasOne := []v1.ConditionStatus{
+		v1.ConditionTrue,
+	}
+
+	typeConditionsReplicasTwo := []apps.ReplicaSetConditionType{
+		apps.ReplicaSetReplicaFailure,
+		apps.ReplicaSetReplicaFailure,
+	}
+	statusConditionsReplicasTwo := []v1.ConditionStatus{
+		v1.ConditionTrue,
+		v1.ConditionFalse,
+	}
+	typeConditionsReplicasZero := []apps.ReplicaSetConditionType{}
+	statusConditionsReplicasZero := []v1.ConditionStatus{}
+
+	tests := []struct {
+		name              string
+		allRSs            []*apps.ReplicaSet
+		newRS             *apps.ReplicaSet
+		wantConditionsLen int
+	}{
+		{
+			name:              "Failures for the new replica include one status of Replicas' conditions ",
+			allRSs:            []*apps.ReplicaSet{newRSWithCondition("bar", 0, typeConditionsReplicasAll, statusConditionsReplicasAll)},
+			newRS:             newRSWithCondition("foo", 3, typeConditionsReplicasOne, statusConditionsReplicasOne),
+			wantConditionsLen: 1,
+		},
+		{
+			name:              "Failures for the new replica include Two status of Replicas' conditions ",
+			allRSs:            []*apps.ReplicaSet{newRSWithCondition("bar", 0, typeConditionsReplicasAll, statusConditionsReplicasAll)},
+			newRS:             newRSWithCondition("foo", 3, typeConditionsReplicasTwo, statusConditionsReplicasTwo),
+			wantConditionsLen: 2,
+		},
+		{
+			name:              "Failures for the new replica include all three status of Replicas' conditions ",
+			allRSs:            []*apps.ReplicaSet{newRSWithCondition("bar", 0, typeConditionsReplicasZero, statusConditionsReplicasZero)},
+			newRS:             newRSWithCondition("foo", 3, typeConditionsReplicasAll, statusConditionsReplicasAll),
+			wantConditionsLen: 3,
+		},
+		{
+			name:              "Failures for the old replica include all three status of Replicas' conditions. The new replica is not failures of Replicas' conditions.",
+			allRSs:            []*apps.ReplicaSet{newRSWithCondition("bar", 0, typeConditionsReplicasAll, statusConditionsReplicasAll)},
+			newRS:             newRSWithCondition("foo", 3, typeConditionsReplicasZero, statusConditionsReplicasZero),
+			wantConditionsLen: 3,
+		},
+		{
+			name:              "The old replica and new replica do not have failures status of Replicas' conditions",
+			allRSs:            []*apps.ReplicaSet{newRSWithCondition("bar", 0, typeConditionsReplicasZero, statusConditionsReplicasZero)},
+			newRS:             newRSWithCondition("foo", 3, typeConditionsReplicasZero, statusConditionsReplicasZero),
+			wantConditionsLen: 0,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fake := fake.Clientset{}
+			dc := &DeploymentController{
+				client: &fake,
+			}
+			conditions := dc.getReplicaFailures(test.allRSs, test.newRS)
+			if len(conditions) != test.wantConditionsLen {
+				t.Errorf("The expected conditions are %d,\n but the actual conditions are error.\n The actual conditions are %v", test.wantConditionsLen, conditions)
+			}
+		})
+	}
+}
