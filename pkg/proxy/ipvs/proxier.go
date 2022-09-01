@@ -84,6 +84,10 @@ const (
 	// kubeLoadBalancerChain is the kubernetes chain for loadbalancer type service
 	kubeLoadBalancerChain utiliptables.Chain = "KUBE-LOAD-BALANCER"
 
+	// kubeIPVSFilterChain filters external access to main netns
+	// https://github.com/kubernetes/kubernetes/issues/72236
+	kubeIPVSFilterChain utiliptables.Chain = "KUBE-IPVS-FILTER"
+
 	// defaultScheduler is the default ipvs scheduler algorithm - round robin.
 	defaultScheduler = "rr"
 
@@ -112,6 +116,7 @@ var iptablesJumpChain = []struct {
 	{utiliptables.TableFilter, utiliptables.ChainInput, kubeNodePortChain, "kubernetes health check rules"},
 	{utiliptables.TableFilter, utiliptables.ChainInput, kubeProxyFirewallChain, "kube-proxy firewall rules"},
 	{utiliptables.TableFilter, utiliptables.ChainForward, kubeProxyFirewallChain, "kube-proxy firewall rules"},
+	{utiliptables.TableFilter, utiliptables.ChainInput, kubeIPVSFilterChain, "kubernetes ipvs access filter"},
 }
 
 var iptablesChains = []struct {
@@ -127,6 +132,7 @@ var iptablesChains = []struct {
 	{utiliptables.TableFilter, kubeNodePortChain},
 	{utiliptables.TableFilter, kubeProxyFirewallChain},
 	{utiliptables.TableFilter, kubeSourceRangesFirewallChain},
+	{utiliptables.TableFilter, kubeIPVSFilterChain},
 }
 
 var iptablesCleanupChains = []struct {
@@ -141,6 +147,7 @@ var iptablesCleanupChains = []struct {
 	{utiliptables.TableFilter, kubeNodePortChain},
 	{utiliptables.TableFilter, kubeProxyFirewallChain},
 	{utiliptables.TableFilter, kubeSourceRangesFirewallChain},
+	{utiliptables.TableFilter, kubeIPVSFilterChain},
 }
 
 // ipsetInfo is all ipset we needed in ipvs proxier
@@ -165,6 +172,7 @@ var ipsetInfo = []struct {
 	{kubeNodePortSetSCTP, utilipset.HashIPPort, kubeNodePortSetSCTPComment},
 	{kubeNodePortLocalSetSCTP, utilipset.HashIPPort, kubeNodePortLocalSetSCTPComment},
 	{kubeHealthCheckNodePortSet, utilipset.BitmapPort, kubeHealthCheckNodePortSetComment},
+	{kubeIPVSSet, utilipset.HashIP, kubeIPVSSetComment},
 }
 
 // ipsetWithIptablesChain is the ipsets list with iptables source chain and the chain jump to
@@ -1549,6 +1557,9 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 
+	// Set the KUBE-IPVS-IPS set to the "activeBindAddrs"
+	proxier.ipsetList[kubeIPVSSet].activeEntries = sets.StringKeySet(activeBindAddrs)
+
 	// sync ipset entries
 	for _, set := range proxier.ipsetList {
 		set.syncIPSetEntries()
@@ -1791,6 +1802,22 @@ func (proxier *Proxier) writeIptablesRules() {
 		"-m", "set", "--match-set", proxier.ipsetList[kubeHealthCheckNodePortSet].Name, "dst",
 		"-j", "ACCEPT",
 	)
+
+	// Add rules to the filter/KUBE-IPVS-FILTER chain to prevent access to ports on the host through VIP addresses.
+	// https://github.com/kubernetes/kubernetes/issues/72236
+	proxier.filterRules.Write(
+		"-A", string(kubeIPVSFilterChain),
+		"-m", "set", "--match-set", proxier.ipsetList[kubeLoadBalancerSet].Name, "dst,dst", "-j", "ACCEPT")
+	proxier.filterRules.Write(
+		"-A", string(kubeIPVSFilterChain),
+		"-m", "set", "--match-set", proxier.ipsetList[kubeClusterIPSet].Name, "dst,dst", "-j", "ACCEPT")
+	proxier.filterRules.Write(
+		"-A", string(kubeIPVSFilterChain),
+		"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPSet].Name, "dst,dst", "-j", "ACCEPT")
+	proxier.filterRules.Write(
+		"-A", string(kubeIPVSFilterChain),
+		"-m", "conntrack", "--ctstate", "NEW",
+		"-m", "set", "--match-set", proxier.ipsetList[kubeIPVSSet].Name, "dst", "-j", "REJECT")
 
 	// Install the kubernetes-specific postrouting rules. We use a whole chain for
 	// this so that it is easier to flush and change, for example if the mark
