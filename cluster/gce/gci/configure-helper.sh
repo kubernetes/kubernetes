@@ -3442,6 +3442,10 @@ function main() {
   fi
   log-end 'SetupKubePodLogReadersGroupDir'
 
+  # Note prepare-mounter-rootfs must be called before the kubelet starts, as
+  # kubelet startup updates its nameserver.
+  log-wrap 'PrepareMounterRootfs' prepare-mounter-rootfs
+
   log-wrap 'StartKubelet' start-kubelet
 
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
@@ -3470,7 +3474,6 @@ function main() {
     fi
   fi
   log-wrap 'ResetMotd' reset-motd
-  log-wrap 'PrepareMounterRootfs' prepare-mounter-rootfs
 
   # Wait for all background jobs to finish.
   wait
