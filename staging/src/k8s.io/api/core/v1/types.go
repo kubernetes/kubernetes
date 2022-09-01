@@ -2665,6 +2665,10 @@ const (
 	// PodReasonUnschedulable reason in PodScheduled PodCondition means that the scheduler
 	// can't schedule the pod right now, for example due to insufficient resources in the cluster.
 	PodReasonUnschedulable = "Unschedulable"
+
+	// PodReasonSchedulerError reason in PodScheduled PodCondition means that some internal error happens
+	// during scheduling, for example due to nodeAffinity parsing errors.
+	PodReasonSchedulerError = "SchedulerError"
 )
 
 // PodCondition contains details for the current condition of this pod.
