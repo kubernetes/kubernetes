@@ -1253,6 +1253,7 @@ func InitVSphereDriver() storageframework.TestDriver {
 				storageframework.CapExec:        true,
 				storageframework.CapMultiPODs:   true,
 				storageframework.CapTopology:    true,
+				storageframework.CapBlock:       true,
 			},
 		},
 	}
