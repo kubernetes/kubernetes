@@ -348,6 +348,60 @@ func TestCheckInvalidErr(t *testing.T) {
 			"The request is invalid",
 			DefaultErrorExitCode,
 		},
+		// invalid error that that includes a message but no details
+		{
+			&errors.StatusError{metav1.Status{
+				Status: metav1.StatusFailure,
+				Code:   http.StatusUnprocessableEntity,
+				Reason: metav1.StatusReasonInvalid,
+				// Details is nil.
+				Message: "Some message",
+			}},
+			"The request is invalid: Some message",
+			DefaultErrorExitCode,
+		},
+		// webhook response that sets code=422 with no reason
+		{
+			&errors.StatusError{metav1.Status{
+				Status:  "Failure",
+				Message: `admission webhook "my.webhook" denied the request without explanation`,
+				Code:    422,
+			}},
+			`Error from server: admission webhook "my.webhook" denied the request without explanation`,
+			DefaultErrorExitCode,
+		},
+		// webhook response that sets code=422 with no reason and non-nil details
+		{
+			&errors.StatusError{metav1.Status{
+				Status:  "Failure",
+				Message: `admission webhook "my.webhook" denied the request without explanation`,
+				Code:    422,
+				Details: &metav1.StatusDetails{},
+			}},
+			`Error from server: admission webhook "my.webhook" denied the request without explanation`,
+			DefaultErrorExitCode,
+		},
+		// source-wrapped webhook response that sets code=422 with no reason
+		{
+			AddSourceToErr("creating", "configmap.yaml", &errors.StatusError{metav1.Status{
+				Status:  "Failure",
+				Message: `admission webhook "my.webhook" denied the request without explanation`,
+				Code:    422,
+			}}),
+			`Error from server: error when creating "configmap.yaml": admission webhook "my.webhook" denied the request without explanation`,
+			DefaultErrorExitCode,
+		},
+		// webhook response that sets reason=Invalid and code=422 and a message
+		{
+			&errors.StatusError{metav1.Status{
+				Status:  "Failure",
+				Reason:  "Invalid",
+				Message: `admission webhook "my.webhook" denied the request without explanation`,
+				Code:    422,
+			}},
+			`The request is invalid: admission webhook "my.webhook" denied the request without explanation`,
+			DefaultErrorExitCode,
+		},
 	})
 }
 
