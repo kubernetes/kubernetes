@@ -341,7 +341,7 @@ func TestRoundTrip(t *testing.T) {
 
 // TestUnknownFields checks for the collection of unknown
 // field errors from the various possible locations of
-// unknown fields (e.g. fields on struct, inlined sturct, slice, etc)
+// unknown fields (e.g. fields on struct, inlined struct, slice, etc)
 func TestUnknownFields(t *testing.T) {
 	// simples checks that basic unknown fields are found
 	// in fields, subfields and slices.
