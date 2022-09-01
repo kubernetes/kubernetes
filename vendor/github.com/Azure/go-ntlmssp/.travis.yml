@@ -1,0 +1,17 @@
+sudo: false
+
+language: go
+
+before_script:
+  - go get -u golang.org/x/lint/golint
+
+go:
+  - 1.10.x
+  - master
+
+script:
+  - test -z "$(gofmt -s -l . | tee /dev/stderr)"
+  - test -z "$(golint ./... |  tee /dev/stderr)"
+  - go vet ./...
+  - go build -v ./...
+  - go test -v ./...
