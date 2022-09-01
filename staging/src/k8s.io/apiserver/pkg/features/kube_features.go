@@ -208,7 +208,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.Beta},
 
-	DryRun: {Default: true, PreRelease: featuregate.GA},
+	DryRun: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 

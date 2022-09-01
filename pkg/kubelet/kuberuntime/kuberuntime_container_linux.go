@@ -70,7 +70,11 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 	}
 
 	// set linux container resources
-	lc.Resources = m.calculateLinuxResources(container.Resources.Requests.Cpu(), container.Resources.Limits.Cpu(), container.Resources.Limits.Memory())
+	var cpuRequest *resource.Quantity
+	if _, cpuRequestExists := container.Resources.Requests[v1.ResourceCPU]; cpuRequestExists {
+		cpuRequest = container.Resources.Requests.Cpu()
+	}
+	lc.Resources = m.calculateLinuxResources(cpuRequest, container.Resources.Limits.Cpu(), container.Resources.Limits.Memory())
 
 	lc.Resources.OomScoreAdj = int64(qos.GetContainerOOMScoreAdjust(pod, container,
 		int64(m.machineInfo.MemoryCapacity)))
@@ -145,7 +149,7 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 	// If request is not specified, but limit is, we want request to default to limit.
 	// API server does this for new containers, but we repeat this logic in Kubelet
 	// for containers running on existing Kubernetes clusters.
-	if cpuRequest.IsZero() && !cpuLimit.IsZero() {
+	if cpuRequest == nil && cpuLimit != nil {
 		cpuShares = int64(cm.MilliCPUToShares(cpuLimit.MilliValue()))
 	} else {
 		// if cpuRequest.Amount is nil, then MilliCPUToShares will return the minimal number

@@ -21,7 +21,6 @@ import (
 	"os"
 	"reflect"
 	"runtime"
-	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -258,30 +257,6 @@ func TestFsUserFrom(t *testing.T) {
 				t.Errorf("FsUserFrom(%v) = %d, want %d", test.pod, *fsUser, *test.wantFsUser)
 			}
 		})
-	}
-}
-
-func TestGenerateVolumeName(t *testing.T) {
-
-	// Normal operation, no truncate
-	v1 := GenerateVolumeName("kubernetes", "pv-cinder-abcde", 255)
-	if v1 != "kubernetes-dynamic-pv-cinder-abcde" {
-		t.Errorf("Expected kubernetes-dynamic-pv-cinder-abcde, got %s", v1)
-	}
-
-	// Truncate trailing "6789-dynamic"
-	prefix := strings.Repeat("0123456789", 9) // 90 characters prefix + 8 chars. of "-dynamic"
-	v2 := GenerateVolumeName(prefix, "pv-cinder-abcde", 100)
-	expect := prefix[:84] + "-pv-cinder-abcde"
-	if v2 != expect {
-		t.Errorf("Expected %s, got %s", expect, v2)
-	}
-
-	// Truncate really long cluster name
-	prefix = strings.Repeat("0123456789", 1000) // 10000 characters prefix
-	v3 := GenerateVolumeName(prefix, "pv-cinder-abcde", 100)
-	if v3 != expect {
-		t.Errorf("Expected %s, got %s", expect, v3)
 	}
 }
 

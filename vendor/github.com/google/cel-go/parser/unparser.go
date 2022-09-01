@@ -81,7 +81,7 @@ func (un *unparser) visit(expr *exprpb.Expr) error {
 	if visited || err != nil {
 		return err
 	}
-	switch expr.ExprKind.(type) {
+	switch expr.GetExprKind().(type) {
 	case *exprpb.Expr_CallExpr:
 		return un.visitCall(expr)
 	case *exprpb.Expr_ConstExpr:
@@ -249,7 +249,7 @@ func (un *unparser) visitCallUnary(expr *exprpb.Expr) error {
 
 func (un *unparser) visitConst(expr *exprpb.Expr) error {
 	c := expr.GetConstExpr()
-	switch c.ConstantKind.(type) {
+	switch c.GetConstantKind().(type) {
 	case *exprpb.Constant_BoolValue:
 		un.str.WriteString(strconv.FormatBool(c.GetBoolValue()))
 	case *exprpb.Constant_BytesValue:

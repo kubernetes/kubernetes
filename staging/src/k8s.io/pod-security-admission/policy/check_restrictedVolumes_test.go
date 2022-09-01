@@ -53,7 +53,6 @@ func TestRestrictedVolumes(t *testing.T) {
 					{Name: "b7", VolumeSource: corev1.VolumeSource{Glusterfs: &corev1.GlusterfsVolumeSource{}}},
 					{Name: "b8", VolumeSource: corev1.VolumeSource{RBD: &corev1.RBDVolumeSource{}}},
 					{Name: "b9", VolumeSource: corev1.VolumeSource{FlexVolume: &corev1.FlexVolumeSource{}}},
-					{Name: "b10", VolumeSource: corev1.VolumeSource{Cinder: &corev1.CinderVolumeSource{}}},
 					{Name: "b11", VolumeSource: corev1.VolumeSource{CephFS: &corev1.CephFSVolumeSource{}}},
 					{Name: "b12", VolumeSource: corev1.VolumeSource{Flocker: &corev1.FlockerVolumeSource{}}},
 					{Name: "b13", VolumeSource: corev1.VolumeSource{FC: &corev1.FCVolumeSource{}}},
@@ -72,9 +71,9 @@ func TestRestrictedVolumes(t *testing.T) {
 			}},
 			expectReason: `restricted volume types`,
 			expectDetail: `volumes ` +
-				`"b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9", "b10", "b11", "b12", "b13", "b14", "b15", "b16", "b17", "b18", "b19", "b20", "b21", "c1"` +
+				`"b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9", "b11", "b12", "b13", "b14", "b15", "b16", "b17", "b18", "b19", "b20", "b21", "c1"` +
 				` use restricted volume types ` +
-				`"awsElasticBlockStore", "azureDisk", "azureFile", "cephfs", "cinder", "fc", "flexVolume", "flocker", "gcePersistentDisk", "gitRepo", "glusterfs", ` +
+				`"awsElasticBlockStore", "azureDisk", "azureFile", "cephfs", "fc", "flexVolume", "flocker", "gcePersistentDisk", "gitRepo", "glusterfs", ` +
 				`"hostPath", "iscsi", "nfs", "photonPersistentDisk", "portworxVolume", "quobyte", "rbd", "scaleIO", "storageos", "unknown", "vsphereVolume"`,
 		},
 	}

@@ -68,8 +68,6 @@ func (pm PluginManager) IsMigrationCompleteForPlugin(pluginName string) bool {
 		return pm.featureGate.Enabled(features.InTreePluginAzureFileUnregister)
 	case csilibplugins.AzureDiskInTreePluginName:
 		return pm.featureGate.Enabled(features.InTreePluginAzureDiskUnregister)
-	case csilibplugins.CinderInTreePluginName:
-		return pm.featureGate.Enabled(features.InTreePluginOpenStackUnregister)
 	case csilibplugins.VSphereInTreePluginName:
 		return pm.featureGate.Enabled(features.InTreePluginvSphereUnregister)
 	case csilibplugins.PortworxVolumePluginName:
@@ -96,8 +94,6 @@ func (pm PluginManager) IsMigrationEnabledForPlugin(pluginName string) bool {
 		return pm.featureGate.Enabled(features.CSIMigrationAzureFile)
 	case csilibplugins.AzureDiskInTreePluginName:
 		return pm.featureGate.Enabled(features.CSIMigrationAzureDisk)
-	case csilibplugins.CinderInTreePluginName:
-		return true
 	case csilibplugins.VSphereInTreePluginName:
 		return pm.featureGate.Enabled(features.CSIMigrationvSphere)
 	case csilibplugins.PortworxVolumePluginName:

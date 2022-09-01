@@ -528,7 +528,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
 		keepTerminatedPodVolumes:                keepTerminatedPodVolumes,
 		nodeStatusMaxImages:                     nodeStatusMaxImages,
-		lastContainerStartedTime:                newTimeCache(),
 	}
 
 	if klet.cloud != nil {
@@ -1026,9 +1025,6 @@ type Kubelet struct {
 
 	// lastStatusReportTime is the time when node status was last reported.
 	lastStatusReportTime time.Time
-
-	// lastContainerStartedTime is the time of the last ContainerStarted event observed per pod
-	lastContainerStartedTime *timeCache
 
 	// syncNodeStatusMux is a lock on updating the node status, because this path is not thread-safe.
 	// This lock is used by Kubelet.syncNodeStatus function and shouldn't be used anywhere else.
@@ -2122,12 +2118,6 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 		kl.sourcesReady.AddSource(u.Source)
 
 	case e := <-plegCh:
-		if e.Type == pleg.ContainerStarted {
-			// record the most recent time we observed a container start for this pod.
-			// this lets us selectively invalidate the runtimeCache when processing a delete for this pod
-			// to make sure we don't miss handling graceful termination for containers we reported as having started.
-			kl.lastContainerStartedTime.Add(e.ID, time.Now())
-		}
 		if isSyncPodWorthy(e) {
 			// PLEG event for a pod; sync it.
 			if pod, ok := kl.podManager.GetPodByUID(e.ID); ok {

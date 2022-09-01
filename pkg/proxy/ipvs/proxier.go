@@ -223,6 +223,13 @@ type Proxier struct {
 	serviceMap   proxy.ServiceMap
 	endpointsMap proxy.EndpointsMap
 	nodeLabels   map[string]string
+	// initialSync is a bool indicating if the proxier is syncing for the first time.
+	// It is set to true when a new proxier is initialized and then set to false on all
+	// future syncs.
+	// This lets us run specific logic that's required only during proxy startup.
+	// For eg: it enables us to update weights of existing destinations only on startup
+	// saving us the cost of querying and updating real servers during every sync.
+	initialSync bool
 	// endpointSlicesSynced, and servicesSynced are set to true when
 	// corresponding objects are synced after startup. This is used to avoid updating
 	// ipvs rules with some partial data after kube-proxy restart.
@@ -468,6 +475,7 @@ func NewProxier(ipt utiliptables.Interface,
 		serviceChanges:        proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, recorder, nil),
 		endpointsMap:          make(proxy.EndpointsMap),
 		endpointsChanges:      proxy.NewEndpointChangeTracker(hostname, nil, ipFamily, recorder, nil),
+		initialSync:           true,
 		syncPeriod:            syncPeriod,
 		minSyncPeriod:         minSyncPeriod,
 		excludeCIDRs:          parsedExcludeCIDRs,
@@ -706,25 +714,25 @@ func (handle *LinuxKernelHandler) GetKernelVersion() (string, error) {
 	return strings.TrimSpace(string(fileContent)), nil
 }
 
-// CanUseIPVSProxier returns true if we can use the ipvs Proxier.
+// CanUseIPVSProxier checks if we can use the ipvs Proxier.
 // This is determined by checking if all the required kernel modules can be loaded. It may
 // return an error if it fails to get the kernel modules information without error, in which
 // case it will also return false.
-func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner, scheduler string) (bool, error) {
+func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner, scheduler string) error {
 	mods, err := handle.GetModules()
 	if err != nil {
-		return false, fmt.Errorf("error getting installed ipvs required kernel modules: %v", err)
+		return fmt.Errorf("error getting installed ipvs required kernel modules: %v", err)
 	}
 	loadModules := sets.NewString()
 	loadModules.Insert(mods...)
 
 	kernelVersionStr, err := handle.GetKernelVersion()
 	if err != nil {
-		return false, fmt.Errorf("error determining kernel version to find required kernel modules for ipvs support: %v", err)
+		return fmt.Errorf("error determining kernel version to find required kernel modules for ipvs support: %v", err)
 	}
 	kernelVersion, err := version.ParseGeneric(kernelVersionStr)
 	if err != nil {
-		return false, fmt.Errorf("error parsing kernel version %q: %v", kernelVersionStr, err)
+		return fmt.Errorf("error parsing kernel version %q: %v", kernelVersionStr, err)
 	}
 	mods = utilipvs.GetRequiredIPVSModules(kernelVersion)
 	wantModules := sets.NewString()
@@ -751,18 +759,18 @@ func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner, scheduler 
 	}
 
 	if len(missingMods) != 0 {
-		return false, fmt.Errorf("IPVS proxier will not be used because the following required kernel modules are not loaded: %v", missingMods)
+		return fmt.Errorf("IPVS proxier will not be used because the following required kernel modules are not loaded: %v", missingMods)
 	}
 
 	// Check ipset version
 	versionString, err := ipsetver.GetVersion()
 	if err != nil {
-		return false, fmt.Errorf("error getting ipset version, error: %v", err)
+		return fmt.Errorf("error getting ipset version, error: %v", err)
 	}
 	if !checkMinVersion(versionString) {
-		return false, fmt.Errorf("ipset version: %s is less than min required version: %s", versionString, MinIPSetCheckVersion)
+		return fmt.Errorf("ipset version: %s is less than min required version: %s", versionString, MinIPSetCheckVersion)
 	}
-	return true, nil
+	return nil
 }
 
 // CleanupIptablesLeftovers removes all iptables rules and chains created by the Proxier
@@ -1009,6 +1017,12 @@ func (proxier *Proxier) syncProxyRules() {
 		klog.V(2).InfoS("Not syncing ipvs rules until Services and Endpoints have been received from master")
 		return
 	}
+
+	// its safe to set initialSync to false as it acts as a flag for startup actions
+	// and the mutex is held.
+	defer func() {
+		proxier.initialSync = false
+	}()
 
 	// Keep track of how long syncs take.
 	start := time.Now()
@@ -2007,6 +2021,19 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 		}
 
 		if curEndpoints.Has(ep) {
+			// if we are syncing for the first time, loop through all current destinations and
+			// reset their weight.
+			if proxier.initialSync {
+				for _, dest := range curDests {
+					if dest.Weight != newDest.Weight {
+						err = proxier.ipvs.UpdateRealServer(appliedVirtualServer, newDest)
+						if err != nil {
+							klog.ErrorS(err, "Failed to update destination", "newDest", newDest)
+							continue
+						}
+					}
+				}
+			}
 			// check if newEndpoint is in gracefulDelete list, if true, delete this ep immediately
 			uniqueRS := GetUniqueRSName(vs, newDest)
 			if !proxier.gracefuldeleteManager.InTerminationList(uniqueRS) {
@@ -2025,6 +2052,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 			continue
 		}
 	}
+
 	// Delete old endpoints
 	for _, ep := range curEndpoints.Difference(newEndpoints).UnsortedList() {
 		// if curEndpoint is in gracefulDelete, skip

@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 	netutils "k8s.io/utils/net"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 // kube-proxy generates iptables rules to forward traffic from Services to Endpoints
@@ -371,8 +371,8 @@ func generateServiceEndpoints(nServices, nEndpoints int, epsFunc func(eps *disco
 		AddressType: discovery.AddressTypeIPv4,
 		Endpoints:   []discovery.Endpoint{},
 		Ports: []discovery.EndpointPort{{
-			Name:     utilpointer.StringPtr(fmt.Sprintf("%d", epPort)),
-			Port:     utilpointer.Int32(int32(epPort)),
+			Name:     pointer.String(fmt.Sprintf("%d", epPort)),
+			Port:     pointer.Int32(int32(epPort)),
 			Protocol: &tcpProtocol,
 		}},
 	}

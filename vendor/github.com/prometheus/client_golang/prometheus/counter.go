@@ -51,7 +51,7 @@ type Counter interface {
 // will lead to a valid (label-less) exemplar. But if Labels is nil, the current
 // exemplar is left in place. AddWithExemplar panics if the value is < 0, if any
 // of the provided labels are invalid, or if the provided labels contain more
-// than 64 runes in total.
+// than 128 runes in total.
 type ExemplarAdder interface {
 	AddWithExemplar(value float64, exemplar Labels)
 }

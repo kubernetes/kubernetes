@@ -140,13 +140,6 @@ const (
 	// Enables the GCE PD in-tree driver to GCE CSI Driver migration feature.
 	CSIMigrationGCE featuregate.Feature = "CSIMigrationGCE"
 
-	// owner: @adisky
-	// alpha: v1.14
-	// beta: v1.18
-	//
-	// Enables the OpenStack Cinder in-tree driver to OpenStack Cinder CSI Driver migration feature.
-	CSIMigrationOpenStack featuregate.Feature = "CSIMigrationOpenStack"
-
 	// owner: @trierra
 	// alpha: v1.23
 	//
@@ -410,12 +403,6 @@ const (
 	// Disables the GCE PD in-tree driver.
 	InTreePluginGCEUnregister featuregate.Feature = "InTreePluginGCEUnregister"
 
-	// owner: @adisky
-	// alpha: v1.21
-	//
-	// Disables the OpenStack Cinder in-tree driver.
-	InTreePluginOpenStackUnregister featuregate.Feature = "InTreePluginOpenStackUnregister"
-
 	// owner: @trierra
 	// alpha: v1.23
 	//
@@ -533,7 +520,6 @@ const (
 
 	// owner: @RobertKrawitz
 	// alpha: v1.15
-	// beta: v1.25
 	//
 	// Allow use of filesystems for ephemeral storage monitoring.
 	// Only applies if LocalStorageCapacityIsolation is set.
@@ -923,8 +909,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CSIMigrationGCE: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.25 (requires GCE PD CSI Driver)
 
-	CSIMigrationOpenStack: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
-
 	CSIMigrationPortworx: {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires Portworx CSI driver)
 
 	CSIMigrationRBD: {Default: false, PreRelease: featuregate.Alpha}, // Off by default (requires RBD CSI driver)
@@ -999,8 +983,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	InTreePluginGCEUnregister: {Default: false, PreRelease: featuregate.Alpha},
 
-	InTreePluginOpenStackUnregister: {Default: false, PreRelease: featuregate.Alpha},
-
 	InTreePluginPortworxUnregister: {Default: false, PreRelease: featuregate.Alpha},
 
 	InTreePluginRBDUnregister: {Default: false, PreRelease: featuregate.Alpha},
@@ -1033,7 +1015,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	LocalStorageCapacityIsolation: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
 
-	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: true, PreRelease: featuregate.Beta},
+	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 
 	LogarithmicScaleDown: {Default: true, PreRelease: featuregate.Beta},
 
@@ -1142,7 +1124,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.Beta},
 
-	genericfeatures.DryRun: {Default: true, PreRelease: featuregate.GA},
+	genericfeatures.DryRun: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	genericfeatures.OpenAPIEnums: {Default: true, PreRelease: featuregate.Beta},
 

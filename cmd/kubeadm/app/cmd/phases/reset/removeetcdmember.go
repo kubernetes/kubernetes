@@ -18,6 +18,7 @@ package phases
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/pkg/errors"
@@ -25,6 +26,8 @@ import (
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -57,14 +60,31 @@ func runRemoveETCDMemberPhase(c workflow.RunData) error {
 	etcdManifestPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "etcd.yaml")
 	etcdDataDir, err := getEtcdDataDir(etcdManifestPath, cfg)
 	if err == nil {
-		r.AddDirsToClean(etcdDataDir)
 		if cfg != nil {
 			if !r.DryRun() {
-				if err := etcdphase.RemoveStackedEtcdMemberFromCluster(r.Client(), cfg); err != nil {
+				err := etcdphase.RemoveStackedEtcdMemberFromCluster(r.Client(), cfg)
+				if err != nil {
 					klog.Warningf("[reset] Failed to remove etcd member: %v, please manually remove this etcd member using etcdctl", err)
+				} else {
+					if err := CleanDir(etcdDataDir); err != nil {
+						klog.Warningf("[reset] Failed to delete contents of the etcd directory: %q, error: %v", etcdDataDir, err)
+					} else {
+						fmt.Printf("[reset] Deleted contents of the etcd data directory: %v\n", etcdDataDir)
+					}
 				}
 			} else {
 				fmt.Println("[reset] Would remove the etcd member on this node from the etcd cluster")
+				fmt.Printf("[reset] Would delete contents of the etcd data directory: %v\n", etcdDataDir)
+			}
+		}
+		// This could happen if the phase `cleanup-node` is run before the `remove-etcd-member`.
+		// Cleanup the data in the etcd data dir to avoid some stale files which might cause the failure to build cluster in the next time.
+		empty, _ := IsDirEmpty(etcdDataDir)
+		if !empty && !r.DryRun() {
+			if err := CleanDir(etcdDataDir); err != nil {
+				klog.Warningf("[reset] Failed to delete contents of the etcd directory: %q, error: %v", etcdDataDir, err)
+			} else {
+				fmt.Printf("[reset] Deleted contents of the etcd data directory: %v\n", etcdDataDir)
 			}
 		}
 	} else {
@@ -84,11 +104,17 @@ func getEtcdDataDir(manifestPath string, cfg *kubeadmapi.InitConfiguration) (str
 	}
 	klog.Warningln("[reset] No kubeadm config, using etcd pod spec to get data directory")
 
+	if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
+		// Fall back to use the default cluster config if etcd.yaml doesn't exist, this could happen that
+		// etcd.yaml is removed by other reset phases, e.g. cleanup-node.
+		cfg := &v1beta3.ClusterConfiguration{}
+		scheme.Scheme.Default(cfg)
+		return cfg.Etcd.Local.DataDir, nil
+	}
 	etcdPod, err := utilstaticpod.ReadStaticPodFromDisk(manifestPath)
 	if err != nil {
 		return "", err
 	}
-
 	for _, volumeMount := range etcdPod.Spec.Volumes {
 		if volumeMount.Name == etcdVolumeName {
 			dataDir = volumeMount.HostPath.Path

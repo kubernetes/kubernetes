@@ -5,7 +5,7 @@ module k8s.io/kube-scheduler
 go 1.19
 
 require (
-	github.com/google/go-cmp v0.5.6
+	github.com/google/go-cmp v0.5.8
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/component-base v0.0.0

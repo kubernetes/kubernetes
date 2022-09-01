@@ -1109,7 +1109,7 @@ func TestCodecsEncodePluginConfig(t *testing.T) {
 								Name: "InterPodAffinity",
 								Args: runtime.RawExtension{
 									Object: &v1beta2.InterPodAffinityArgs{
-										HardPodAffinityWeight: pointer.Int32Ptr(5),
+										HardPodAffinityWeight: pointer.Int32(5),
 									},
 								},
 							},
@@ -1117,7 +1117,7 @@ func TestCodecsEncodePluginConfig(t *testing.T) {
 								Name: "VolumeBinding",
 								Args: runtime.RawExtension{
 									Object: &v1beta2.VolumeBindingArgs{
-										BindTimeoutSeconds: pointer.Int64Ptr(300),
+										BindTimeoutSeconds: pointer.Int64(300),
 										Shape: []v1beta2.UtilizationShapePoint{
 											{
 												Utilization: 0,
@@ -1330,7 +1330,7 @@ profiles:
 								Name: "InterPodAffinity",
 								Args: runtime.RawExtension{
 									Object: &v1beta3.InterPodAffinityArgs{
-										HardPodAffinityWeight: pointer.Int32Ptr(5),
+										HardPodAffinityWeight: pointer.Int32(5),
 									},
 								},
 							},
@@ -1338,7 +1338,7 @@ profiles:
 								Name: "VolumeBinding",
 								Args: runtime.RawExtension{
 									Object: &v1beta2.VolumeBindingArgs{
-										BindTimeoutSeconds: pointer.Int64Ptr(300),
+										BindTimeoutSeconds: pointer.Int64(300),
 										Shape: []v1beta2.UtilizationShapePoint{
 											{
 												Utilization: 0,
@@ -1549,7 +1549,7 @@ profiles:
 								Name: "InterPodAffinity",
 								Args: runtime.RawExtension{
 									Object: &v1.InterPodAffinityArgs{
-										HardPodAffinityWeight: pointer.Int32Ptr(5),
+										HardPodAffinityWeight: pointer.Int32(5),
 									},
 								},
 							},
@@ -1557,7 +1557,7 @@ profiles:
 								Name: "VolumeBinding",
 								Args: runtime.RawExtension{
 									Object: &v1.VolumeBindingArgs{
-										BindTimeoutSeconds: pointer.Int64Ptr(300),
+										BindTimeoutSeconds: pointer.Int64(300),
 										Shape: []v1.UtilizationShapePoint{
 											{
 												Utilization: 0,

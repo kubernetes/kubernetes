@@ -2,6 +2,7 @@
 
 approvers:
   - sig-apps-approvers
+  - alculquicondor
 reviewers:
   - sig-apps-reviewers
 labels:

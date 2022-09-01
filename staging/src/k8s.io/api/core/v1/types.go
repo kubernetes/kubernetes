@@ -4079,7 +4079,7 @@ type ReplicationControllerSpec struct {
 // ReplicationControllerStatus represents the current status of a replication
 // controller.
 type ReplicationControllerStatus struct {
-	// Replicas is the most recently oberved number of replicas.
+	// Replicas is the most recently observed number of replicas.
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#what-is-a-replicationcontroller
 	Replicas int32 `json:"replicas" protobuf:"varint,1,opt,name=replicas"`
 

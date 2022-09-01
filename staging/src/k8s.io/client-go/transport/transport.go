@@ -22,8 +22,8 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -157,10 +157,7 @@ func loadTLSFiles(c *Config) error {
 	}
 
 	c.TLS.KeyData, err = dataFromSliceOrFile(c.TLS.KeyData, c.TLS.KeyFile)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // dataFromSliceOrFile returns data from the slice (if non-empty), or from the file,
@@ -170,7 +167,7 @@ func dataFromSliceOrFile(data []byte, file string) ([]byte, error) {
 		return data, nil
 	}
 	if len(file) > 0 {
-		fileData, err := ioutil.ReadFile(file)
+		fileData, err := os.ReadFile(file)
 		if err != nil {
 			return []byte{}, err
 		}

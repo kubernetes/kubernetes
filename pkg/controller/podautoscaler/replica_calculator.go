@@ -94,8 +94,8 @@ func (c *ReplicaCalculator) GetResourceReplicas(ctx context.Context, currentRepl
 		return 0, 0, 0, time.Time{}, err
 	}
 
-	rebalanceIgnored := len(unreadyPods) > 0 && usageRatio > 1.0
-	if !rebalanceIgnored && len(missingPods) == 0 {
+	scaleUpWithUnready := len(unreadyPods) > 0 && usageRatio > 1.0
+	if !scaleUpWithUnready && len(missingPods) == 0 {
 		if math.Abs(1.0-usageRatio) <= c.tolerance {
 			// return the current replicas if the change would be too small
 			return currentReplicas, utilization, rawUtilization, timestamp, nil
@@ -120,7 +120,7 @@ func (c *ReplicaCalculator) GetResourceReplicas(ctx context.Context, currentRepl
 		}
 	}
 
-	if rebalanceIgnored {
+	if scaleUpWithUnready {
 		// on a scale-up, treat unready pods as using 0% of the resource request
 		for podName := range unreadyPods {
 			metrics[podName] = metricsclient.PodMetric{Value: 0}
@@ -197,9 +197,9 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 
 	usageRatio, utilization := metricsclient.GetMetricUtilizationRatio(metrics, targetUtilization)
 
-	rebalanceIgnored := len(unreadyPods) > 0 && usageRatio > 1.0
+	scaleUpWithUnready := len(unreadyPods) > 0 && usageRatio > 1.0
 
-	if !rebalanceIgnored && len(missingPods) == 0 {
+	if !scaleUpWithUnready && len(missingPods) == 0 {
 		if math.Abs(1.0-usageRatio) <= c.tolerance {
 			// return the current replicas if the change would be too small
 			return currentReplicas, utilization, nil
@@ -224,7 +224,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 		}
 	}
 
-	if rebalanceIgnored {
+	if scaleUpWithUnready {
 		// on a scale-up, treat unready pods as using 0% of the resource request
 		for podName := range unreadyPods {
 			metrics[podName] = metricsclient.PodMetric{Value: 0}

@@ -248,7 +248,7 @@ func (ReplicaSetSpec) SwaggerDoc() map[string]string {
 
 var map_ReplicaSetStatus = map[string]string{
 	"":                     "ReplicaSetStatus represents the current status of a ReplicaSet.",
-	"replicas":             "Replicas is the most recently oberved number of replicas. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller",
+	"replicas":             "Replicas is the most recently observed number of replicas. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller",
 	"fullyLabeledReplicas": "The number of pods that have labels matching the labels of the pod template of the replicaset.",
 	"readyReplicas":        "readyReplicas is the number of pods targeted by this ReplicaSet controller with a Ready Condition.",
 	"availableReplicas":    "The number of available replicas (ready for at least minReadySeconds) for this replica set.",

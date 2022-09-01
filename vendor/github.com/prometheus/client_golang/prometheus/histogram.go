@@ -581,11 +581,11 @@ func (h *constHistogram) Desc() *Desc {
 
 func (h *constHistogram) Write(out *dto.Metric) error {
 	his := &dto.Histogram{}
+
 	buckets := make([]*dto.Bucket, 0, len(h.buckets))
 
 	his.SampleCount = proto.Uint64(h.count)
 	his.SampleSum = proto.Float64(h.sum)
-
 	for upperBound, count := range h.buckets {
 		buckets = append(buckets, &dto.Bucket{
 			CumulativeCount: proto.Uint64(count),

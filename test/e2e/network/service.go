@@ -33,6 +33,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -1173,6 +1174,44 @@ var _ = common.SIGDescribe("Services", func() {
 
 		ginkgo.By("verifying service " + svc3 + " is up")
 		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames3, svc3IP, servicePort))
+	})
+
+	ginkgo.It("should work after the service has been recreated", func() {
+		serviceName := "service-deletion"
+		ns := f.Namespace.Name
+		numPods, servicePort := 1, defaultServeHostnameServicePort
+
+		ginkgo.By("creating the service " + serviceName + " in namespace " + ns)
+		defer func() {
+			framework.ExpectNoError(StopServeHostnameService(f.ClientSet, ns, serviceName))
+		}()
+		podNames, svcIP, _ := StartServeHostnameService(cs, getServeHostnameService(serviceName), ns, numPods)
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames, svcIP, servicePort))
+
+		ginkgo.By("deleting the service " + serviceName + " in namespace " + ns)
+		err := cs.CoreV1().Services(ns).Delete(context.TODO(), serviceName, metav1.DeleteOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Waiting for the service " + serviceName + " in namespace " + ns + " to disappear")
+		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.RespondingTimeout, func() (bool, error) {
+			_, err := cs.CoreV1().Services(ns).Get(context.TODO(), serviceName, metav1.GetOptions{})
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					framework.Logf("Service %s/%s is gone.", ns, serviceName)
+					return true, nil
+				}
+				return false, err
+			}
+			framework.Logf("Service %s/%s still exists", ns, serviceName)
+			return false, nil
+		}); pollErr != nil {
+			framework.Failf("Failed to wait for service to disappear: %v", pollErr)
+		}
+
+		ginkgo.By("recreating the service " + serviceName + " in namespace " + ns)
+		svc, err := cs.CoreV1().Services(ns).Create(context.TODO(), getServeHostnameService(serviceName), metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames, svc.Spec.ClusterIP, servicePort))
 	})
 
 	ginkgo.It("should work after restarting kube-proxy [Disruptive]", func() {

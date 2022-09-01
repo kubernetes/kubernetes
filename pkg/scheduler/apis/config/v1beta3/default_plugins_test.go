@@ -240,8 +240,8 @@ func TestMergePlugins(t *testing.T) {
 			customPlugins: &v1beta3.Plugins{
 				Filter: v1beta3.PluginSet{
 					Enabled: []v1beta3.Plugin{
-						{Name: "Plugin1", Weight: pointer.Int32Ptr(2)},
-						{Name: "Plugin3", Weight: pointer.Int32Ptr(3)},
+						{Name: "Plugin1", Weight: pointer.Int32(2)},
+						{Name: "Plugin3", Weight: pointer.Int32(3)},
 					},
 				},
 			},
@@ -257,9 +257,9 @@ func TestMergePlugins(t *testing.T) {
 			expectedPlugins: &v1beta3.Plugins{
 				Filter: v1beta3.PluginSet{
 					Enabled: []v1beta3.Plugin{
-						{Name: "Plugin1", Weight: pointer.Int32Ptr(2)},
+						{Name: "Plugin1", Weight: pointer.Int32(2)},
 						{Name: "Plugin2"},
-						{Name: "Plugin3", Weight: pointer.Int32Ptr(3)},
+						{Name: "Plugin3", Weight: pointer.Int32(3)},
 					},
 				},
 			},
@@ -269,8 +269,8 @@ func TestMergePlugins(t *testing.T) {
 			customPlugins: &v1beta3.Plugins{
 				Filter: v1beta3.PluginSet{
 					Enabled: []v1beta3.Plugin{
-						{Name: "Plugin2", Weight: pointer.Int32Ptr(2)},
-						{Name: "Plugin1", Weight: pointer.Int32Ptr(1)},
+						{Name: "Plugin2", Weight: pointer.Int32(2)},
+						{Name: "Plugin1", Weight: pointer.Int32(1)},
 					},
 				},
 			},
@@ -286,8 +286,8 @@ func TestMergePlugins(t *testing.T) {
 			expectedPlugins: &v1beta3.Plugins{
 				Filter: v1beta3.PluginSet{
 					Enabled: []v1beta3.Plugin{
-						{Name: "Plugin1", Weight: pointer.Int32Ptr(1)},
-						{Name: "Plugin2", Weight: pointer.Int32Ptr(2)},
+						{Name: "Plugin1", Weight: pointer.Int32(1)},
+						{Name: "Plugin2", Weight: pointer.Int32(2)},
 						{Name: "Plugin3"},
 					},
 				},
@@ -299,9 +299,9 @@ func TestMergePlugins(t *testing.T) {
 				Filter: v1beta3.PluginSet{
 					Enabled: []v1beta3.Plugin{
 						{Name: "Plugin1"},
-						{Name: "Plugin2", Weight: pointer.Int32Ptr(2)},
+						{Name: "Plugin2", Weight: pointer.Int32(2)},
 						{Name: "Plugin3"},
-						{Name: "Plugin2", Weight: pointer.Int32Ptr(4)},
+						{Name: "Plugin2", Weight: pointer.Int32(4)},
 					},
 				},
 			},
@@ -318,9 +318,9 @@ func TestMergePlugins(t *testing.T) {
 				Filter: v1beta3.PluginSet{
 					Enabled: []v1beta3.Plugin{
 						{Name: "Plugin1"},
-						{Name: "Plugin2", Weight: pointer.Int32Ptr(4)},
+						{Name: "Plugin2", Weight: pointer.Int32(4)},
 						{Name: "Plugin3"},
-						{Name: "Plugin2", Weight: pointer.Int32Ptr(2)},
+						{Name: "Plugin2", Weight: pointer.Int32(2)},
 					},
 				},
 			},

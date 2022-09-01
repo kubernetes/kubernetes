@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,8 +47,6 @@ import (
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 
 	utilpointer "k8s.io/utils/pointer"
-
-	"github.com/stretchr/testify/assert"
 )
 
 const region = "us-central"
@@ -101,7 +100,6 @@ func newController() (*Controller, *fakecloud.Cloud, *fake.Clientset) {
 
 	controller := &Controller{
 		cloud:            cloud,
-		knownHosts:       []*v1.Node{},
 		kubeClient:       kubeClient,
 		clusterName:      "test-cluster",
 		cache:            &serviceCache{serviceMap: make(map[string]*cachedService)},
@@ -109,8 +107,8 @@ func newController() (*Controller, *fakecloud.Cloud, *fake.Clientset) {
 		eventRecorder:    recorder,
 		nodeLister:       newFakeNodeLister(nil),
 		nodeListerSynced: nodeInformer.Informer().HasSynced,
-		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "service"),
-		nodeSyncCh:       make(chan interface{}, 1),
+		serviceQueue:     workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "service"),
+		nodeQueue:        workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "node"),
 		lastSyncedNodes:  []*v1.Node{},
 	}
 
@@ -566,7 +564,6 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 			defer cancel()
 			controller, cloud, _ := newController()
 			controller.nodeLister = newFakeNodeLister(nil, nodes...)
-
 			if servicesToRetry := controller.updateLoadBalancerHosts(ctx, item.services, item.workers); len(servicesToRetry) != 0 {
 				t.Errorf("for case %q, unexpected servicesToRetry: %v", item.desc, servicesToRetry)
 			}
@@ -908,7 +905,7 @@ func TestProcessServiceCreateOrUpdate(t *testing.T) {
 				cachedServiceTest.state = svc
 				controller.cache.set(keyExpected, cachedServiceTest)
 
-				keyGot, quit := controller.queue.Get()
+				keyGot, quit := controller.serviceQueue.Get()
 				if quit {
 					t.Fatalf("get no queue element")
 				}
@@ -1513,28 +1510,6 @@ func TestServiceCache(t *testing.T) {
 		if err := tc.checkCacheFn(); err != nil {
 			t.Errorf("%v returned %v", tc.testName, err)
 		}
-	}
-}
-
-// Test a utility functions as it's not easy to unit test nodeSyncInternal directly
-func TestNodeSlicesEqualForLB(t *testing.T) {
-	numNodes := 10
-	nArray := make([]*v1.Node, numNodes)
-	mArray := make([]*v1.Node, numNodes)
-	for i := 0; i < numNodes; i++ {
-		nArray[i] = &v1.Node{}
-		nArray[i].Name = fmt.Sprintf("node%d", i)
-	}
-	for i := 0; i < numNodes; i++ {
-		mArray[i] = &v1.Node{}
-		mArray[i].Name = fmt.Sprintf("node%d", i+1)
-	}
-
-	if !nodeSlicesEqualForLB(nArray, nArray) {
-		t.Errorf("nodeSlicesEqualForLB() Expected=true Obtained=false")
-	}
-	if nodeSlicesEqualForLB(nArray, mArray) {
-		t.Errorf("nodeSlicesEqualForLB() Expected=false Obtained=true")
 	}
 }
 
@@ -3206,66 +3181,6 @@ func Test_shouldSyncUpdatedNode_compoundedPredicates(t *testing.T) {
 				t.Errorf("unexpected result from shouldSyncNode, expected: %v, actual: %v", testcase.shouldSync, shouldSync)
 			}
 		})
-	}
-}
-
-func TestTriggerNodeSync(t *testing.T) {
-	controller, _, _ := newController()
-
-	tryReadFromChannel(t, controller.nodeSyncCh, false)
-	controller.triggerNodeSync()
-	tryReadFromChannel(t, controller.nodeSyncCh, true)
-	tryReadFromChannel(t, controller.nodeSyncCh, false)
-	tryReadFromChannel(t, controller.nodeSyncCh, false)
-	tryReadFromChannel(t, controller.nodeSyncCh, false)
-	controller.triggerNodeSync()
-	controller.triggerNodeSync()
-	controller.triggerNodeSync()
-	tryReadFromChannel(t, controller.nodeSyncCh, true)
-	tryReadFromChannel(t, controller.nodeSyncCh, false)
-	tryReadFromChannel(t, controller.nodeSyncCh, false)
-	tryReadFromChannel(t, controller.nodeSyncCh, false)
-}
-
-func TestMarkAndUnmarkFullSync(t *testing.T) {
-	controller, _, _ := newController()
-	if controller.needFullSync != false {
-		t.Errorf("expect controller.needFullSync to be false, but got true")
-	}
-
-	ret := controller.needFullSyncAndUnmark()
-	if ret != false {
-		t.Errorf("expect ret == false, but got true")
-	}
-
-	ret = controller.needFullSyncAndUnmark()
-	if ret != false {
-		t.Errorf("expect ret == false, but got true")
-	}
-	controller.needFullSync = true
-	ret = controller.needFullSyncAndUnmark()
-	if ret != true {
-		t.Errorf("expect ret == true, but got false")
-	}
-	ret = controller.needFullSyncAndUnmark()
-	if ret != false {
-		t.Errorf("expect ret == false, but got true")
-	}
-}
-
-func tryReadFromChannel(t *testing.T, ch chan interface{}, expectValue bool) {
-	select {
-	case _, ok := <-ch:
-		if !ok {
-			t.Errorf("The channel is closed")
-		}
-		if !expectValue {
-			t.Errorf("Does not expect value from the channel, but got a value")
-		}
-	default:
-		if expectValue {
-			t.Errorf("Expect value from the channel, but got none")
-		}
 	}
 }
 

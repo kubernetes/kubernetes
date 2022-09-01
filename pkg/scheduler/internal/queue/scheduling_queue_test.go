@@ -745,13 +745,21 @@ func TestPriorityQueue_PendingPods(t *testing.T) {
 	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(highPriorityPodInfo.Pod), q.SchedulingCycle())
 
 	expectedSet := makeSet([]*v1.Pod{medPriorityPodInfo.Pod, unschedulablePodInfo.Pod, highPriorityPodInfo.Pod})
-	if !reflect.DeepEqual(expectedSet, makeSet(q.PendingPods())) {
+	gotPods, gotSummary := q.PendingPods()
+	if !reflect.DeepEqual(expectedSet, makeSet(gotPods)) {
 		t.Error("Unexpected list of pending Pods.")
+	}
+	if wantSummary := fmt.Sprintf(pendingPodsSummary, 1, 0, 2); wantSummary != gotSummary {
+		t.Errorf("Unexpected pending pods summary: want %v, but got %v.", wantSummary, gotSummary)
 	}
 	// Move all to active queue. We should still see the same set of pods.
 	q.MoveAllToActiveOrBackoffQueue(TestEvent, nil)
-	if !reflect.DeepEqual(expectedSet, makeSet(q.PendingPods())) {
-		t.Error("Unexpected list of pending Pods...")
+	gotPods, gotSummary = q.PendingPods()
+	if !reflect.DeepEqual(expectedSet, makeSet(gotPods)) {
+		t.Error("Unexpected list of pending Pods.")
+	}
+	if wantSummary := fmt.Sprintf(pendingPodsSummary, 1, 2, 0); wantSummary != gotSummary {
+		t.Errorf("Unexpected pending pods summary: want %v, but got %v.", wantSummary, gotSummary)
 	}
 }
 

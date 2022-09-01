@@ -19,7 +19,6 @@ package clientcmd
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -296,7 +295,7 @@ func TestValidateCleanClusterInfo(t *testing.T) {
 }
 
 func TestValidateCleanWithCAClusterInfo(t *testing.T) {
-	tempFile, _ := ioutil.TempFile("", "")
+	tempFile, _ := os.CreateTemp("", "")
 	defer os.Remove(tempFile.Name())
 
 	config := clientcmdapi.NewConfig()
@@ -339,7 +338,7 @@ func TestValidateCertFilesNotFoundAuthInfo(t *testing.T) {
 }
 
 func TestValidateCertDataOverridesFiles(t *testing.T) {
-	tempFile, _ := ioutil.TempFile("", "")
+	tempFile, _ := os.CreateTemp("", "")
 	defer os.Remove(tempFile.Name())
 
 	config := clientcmdapi.NewConfig()
@@ -359,7 +358,7 @@ func TestValidateCertDataOverridesFiles(t *testing.T) {
 }
 
 func TestValidateCleanCertFilesAuthInfo(t *testing.T) {
-	tempFile, _ := ioutil.TempFile("", "")
+	tempFile, _ := os.CreateTemp("", "")
 	defer os.Remove(tempFile.Name())
 
 	config := clientcmdapi.NewConfig()
