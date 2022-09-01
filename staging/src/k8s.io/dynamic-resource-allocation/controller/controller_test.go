@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
 )
@@ -378,6 +379,8 @@ func TestController(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+
 			initialObjects := []runtime.Object{}
 			for _, class := range test.classes {
 				initialObjects = append(initialObjects, class)
@@ -396,6 +399,10 @@ func TestController(t *testing.T) {
 			claimInformer := informerFactory.Resource().V1alpha1().ResourceClaims()
 			podInformer := informerFactory.Core().V1().Pods()
 			podSchedulingInformer := informerFactory.Resource().V1alpha1().PodSchedulings()
+			// Order is important: on function exit, we first must
+			// cancel, then wait (last-in-first-out).
+			defer informerFactory.Shutdown()
+			defer cancel()
 
 			for _, obj := range initialObjects {
 				switch obj.(type) {
@@ -416,6 +423,14 @@ func TestController(t *testing.T) {
 			driver.t = t
 
 			ctrl := New(ctx, driverName, driver, kubeClient, informerFactory)
+			informerFactory.Start(ctx.Done())
+			if !cache.WaitForCacheSync(ctx.Done(),
+				informerFactory.Resource().V1alpha1().ResourceClasses().Informer().HasSynced,
+				informerFactory.Resource().V1alpha1().ResourceClaims().Informer().HasSynced,
+				informerFactory.Resource().V1alpha1().PodSchedulings().Informer().HasSynced,
+			) {
+				t.Fatal("could not sync caches")
+			}
 			_, err := ctrl.(*controller).syncKey(ctx, test.key)
 			if err != nil && test.expectedError == "" {
 				t.Fatalf("unexpected error: %v", err)
