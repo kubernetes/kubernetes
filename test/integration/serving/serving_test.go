@@ -39,39 +39,39 @@ import (
 )
 
 type componentTester interface {
-	StartTestServer(t kubectrlmgrtesting.Logger, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, *server.DeprecatedInsecureServingInfo, func(), error)
+	StartTestServer(t kubectrlmgrtesting.Logger, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error)
 }
 
 type kubeControllerManagerTester struct{}
 
-func (kubeControllerManagerTester) StartTestServer(t kubectrlmgrtesting.Logger, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, *server.DeprecatedInsecureServingInfo, func(), error) {
+func (kubeControllerManagerTester) StartTestServer(t kubectrlmgrtesting.Logger, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error) {
 	// avoid starting any controller loops, we're just testing serving
 	customFlags = append([]string{"--controllers="}, customFlags...)
 	gotResult, err := kubectrlmgrtesting.StartTestServer(t, customFlags)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, err
 	}
-	return gotResult.Options.SecureServing, gotResult.Config.SecureServing, nil, gotResult.TearDownFn, err
+	return gotResult.Options.SecureServing, gotResult.Config.SecureServing, gotResult.TearDownFn, err
 }
 
 type cloudControllerManagerTester struct{}
 
-func (cloudControllerManagerTester) StartTestServer(t kubectrlmgrtesting.Logger, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, *server.DeprecatedInsecureServingInfo, func(), error) {
+func (cloudControllerManagerTester) StartTestServer(t kubectrlmgrtesting.Logger, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error) {
 	gotResult, err := cloudctrlmgrtesting.StartTestServer(t, customFlags)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, err
 	}
-	return gotResult.Options.SecureServing, gotResult.Config.SecureServing, gotResult.Config.InsecureServing, gotResult.TearDownFn, err
+	return gotResult.Options.SecureServing, gotResult.Config.SecureServing, gotResult.TearDownFn, err
 }
 
 type kubeSchedulerTester struct{}
 
-func (kubeSchedulerTester) StartTestServer(t kubectrlmgrtesting.Logger, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, *server.DeprecatedInsecureServingInfo, func(), error) {
+func (kubeSchedulerTester) StartTestServer(t kubectrlmgrtesting.Logger, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, func(), error) {
 	gotResult, err := kubeschedulertesting.StartTestServer(t, customFlags)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, err
 	}
-	return gotResult.Options.SecureServing, gotResult.Config.SecureServing, nil, gotResult.TearDownFn, err
+	return gotResult.Options.SecureServing, gotResult.Config.SecureServing, gotResult.TearDownFn, err
 }
 
 func TestComponentSecureServingAndAuth(t *testing.T) {
@@ -158,171 +158,18 @@ users:
 	brokenApiserverConfig.Close()
 
 	tests := []struct {
-		name             string
-		tester           componentTester
-		extraFlags       []string
-		insecureDisabled bool
+		name       string
+		tester     componentTester
+		extraFlags []string
 	}{
-		{"kube-controller-manager", kubeControllerManagerTester{}, nil, true},
-		{"cloud-controller-manager", cloudControllerManagerTester{}, []string{"--cloud-provider=fake"}, true},
-		{"kube-scheduler", kubeSchedulerTester{}, nil, true},
+		{"kube-controller-manager", kubeControllerManagerTester{}, nil},
+		{"cloud-controller-manager", cloudControllerManagerTester{}, []string{"--cloud-provider=fake"}},
+		{"kube-scheduler", kubeSchedulerTester{}, nil},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.insecureDisabled {
-				testComponentWithSecureServing(t, tt.tester, apiserverConfig.Name(), brokenApiserverConfig.Name(), token, tt.extraFlags)
-			} else {
-				testComponent(t, tt.tester, apiserverConfig.Name(), brokenApiserverConfig.Name(), token, tt.extraFlags)
-			}
-		})
-	}
-}
-
-func testComponent(t *testing.T, tester componentTester, kubeconfig, brokenKubeconfig, token string, extraFlags []string) {
-	tests := []struct {
-		name                             string
-		flags                            []string
-		path                             string
-		anonymous                        bool // to use the token or not
-		wantErr                          bool
-		wantSecureCode, wantInsecureCode *int
-	}{
-		{"no-flags", nil, "/healthz", false, true, nil, nil},
-		{"insecurely /healthz", []string{
-			"--secure-port=0",
-			"--port=10253",
-			"--kubeconfig", kubeconfig,
-			"--leader-elect=false",
-		}, "/healthz", true, false, nil, intPtr(http.StatusOK)},
-		{"insecurely /metrics", []string{
-			"--secure-port=0",
-			"--port=10253",
-			"--kubeconfig", kubeconfig,
-			"--leader-elect=false",
-		}, "/metrics", true, false, nil, intPtr(http.StatusOK)},
-		{"/healthz without authn/authz", []string{
-			"--port=0",
-			"--kubeconfig", kubeconfig,
-			"--leader-elect=false",
-		}, "/healthz", true, false, intPtr(http.StatusOK), nil},
-		{"/metrics without authn/authz", []string{
-			"--kubeconfig", kubeconfig,
-			"--leader-elect=false",
-			"--port=10253",
-		}, "/metrics", true, false, intPtr(http.StatusForbidden), intPtr(http.StatusOK)},
-		{"authorization skipped for /healthz with authn/authz", []string{
-			"--port=0",
-			"--authentication-kubeconfig", kubeconfig,
-			"--authorization-kubeconfig", kubeconfig,
-			"--kubeconfig", kubeconfig,
-			"--leader-elect=false",
-		}, "/healthz", false, false, intPtr(http.StatusOK), nil},
-		{"authorization skipped for /healthz with BROKEN authn/authz", []string{
-			"--port=0",
-			"--authentication-skip-lookup", // to survive inaccessible extensions-apiserver-authentication configmap
-			"--authentication-kubeconfig", brokenKubeconfig,
-			"--authorization-kubeconfig", brokenKubeconfig,
-			"--kubeconfig", kubeconfig,
-			"--leader-elect=false",
-		}, "/healthz", false, false, intPtr(http.StatusOK), nil},
-		{"not authorized /metrics", []string{
-			"--port=0",
-			"--authentication-kubeconfig", kubeconfig,
-			"--authorization-kubeconfig", kubeconfig,
-			"--kubeconfig", kubeconfig,
-			"--leader-elect=false",
-		}, "/metrics", false, false, intPtr(http.StatusForbidden), nil},
-		{"not authorized /metrics with BROKEN authn/authz", []string{
-			"--port=10253",
-			"--authentication-kubeconfig", kubeconfig,
-			"--authorization-kubeconfig", brokenKubeconfig,
-			"--kubeconfig", kubeconfig,
-			"--leader-elect=false",
-		}, "/metrics", false, false, intPtr(http.StatusInternalServerError), intPtr(http.StatusOK)},
-		{"always-allowed /metrics with BROKEN authn/authz", []string{
-			"--port=0",
-			"--authentication-skip-lookup", // to survive inaccessible extensions-apiserver-authentication configmap
-			"--authentication-kubeconfig", brokenKubeconfig,
-			"--authorization-kubeconfig", brokenKubeconfig,
-			"--authorization-always-allow-paths", "/healthz,/metrics",
-			"--kubeconfig", kubeconfig,
-			"--leader-elect=false",
-		}, "/metrics", false, false, intPtr(http.StatusOK), nil},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			secureOptions, secureInfo, insecureInfo, tearDownFn, err := tester.StartTestServer(t, append(append([]string{}, tt.flags...), extraFlags...))
-			if tearDownFn != nil {
-				defer tearDownFn()
-			}
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("StartTestServer() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if err != nil {
-				return
-			}
-
-			if want, got := tt.wantSecureCode != nil, secureInfo != nil; want != got {
-				t.Errorf("SecureServing enabled: expected=%v got=%v", want, got)
-			} else if want {
-				url := fmt.Sprintf("https://%s%s", secureInfo.Listener.Addr().String(), tt.path)
-				url = strings.Replace(url, "[::]", "127.0.0.1", -1) // switch to IPv4 because the self-signed cert does not support [::]
-
-				// read self-signed server cert disk
-				pool := x509.NewCertPool()
-				serverCertPath := path.Join(secureOptions.ServerCert.CertDirectory, secureOptions.ServerCert.PairName+".crt")
-				serverCert, err := os.ReadFile(serverCertPath)
-				if err != nil {
-					t.Fatalf("Failed to read component server cert %q: %v", serverCertPath, err)
-				}
-				pool.AppendCertsFromPEM(serverCert)
-				tr := &http.Transport{
-					TLSClientConfig: &tls.Config{
-						RootCAs: pool,
-					},
-				}
-
-				client := &http.Client{Transport: tr}
-				req, err := http.NewRequest("GET", url, nil)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if !tt.anonymous {
-					req.Header.Add("Authorization", fmt.Sprintf("Token %s", token))
-				}
-				r, err := client.Do(req)
-				if err != nil {
-					t.Fatalf("failed to GET %s from component: %v", tt.path, err)
-				}
-
-				body, err := io.ReadAll(r.Body)
-				if err != nil {
-					t.Fatalf("failed to read response body: %v", err)
-				}
-				defer r.Body.Close()
-				if got, expected := r.StatusCode, *tt.wantSecureCode; got != expected {
-					t.Fatalf("expected http %d at %s of component, got: %d %q", expected, tt.path, got, string(body))
-				}
-			}
-
-			if want, got := tt.wantInsecureCode != nil, insecureInfo != nil; want != got {
-				t.Errorf("InsecureServing enabled: expected=%v got=%v", want, got)
-			} else if want {
-				url := fmt.Sprintf("http://%s%s", insecureInfo.Listener.Addr().String(), tt.path)
-				r, err := http.Get(url)
-				if err != nil {
-					t.Fatalf("failed to GET %s from component: %v", tt.path, err)
-				}
-				body, err := io.ReadAll(r.Body)
-				if err != nil {
-					t.Fatalf("failed to read response body: %v", err)
-				}
-				defer r.Body.Close()
-				if got, expected := r.StatusCode, *tt.wantInsecureCode; got != expected {
-					t.Fatalf("expected http %d at %s of component, got: %d %q", expected, tt.path, got, string(body))
-				}
-			}
+			testComponentWithSecureServing(t, tt.tester, apiserverConfig.Name(), brokenApiserverConfig.Name(), token, tt.extraFlags)
 		})
 	}
 }
@@ -375,7 +222,7 @@ func testComponentWithSecureServing(t *testing.T, tester componentTester, kubeco
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			secureOptions, secureInfo, _, tearDownFn, err := tester.StartTestServer(t, append(append([]string{}, tt.flags...), extraFlags...))
+			secureOptions, secureInfo, tearDownFn, err := tester.StartTestServer(t, append(append([]string{}, tt.flags...), extraFlags...))
 			if tearDownFn != nil {
 				defer tearDownFn()
 			}
