@@ -374,6 +374,55 @@ func TestAssumeUpdatePVCache(t *testing.T) {
 	}
 }
 
+func TestAssumeEventHandler(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	informer := &fakeAssumeCacheInformer{}
+	cache := newPVAssumeCache(logger, informer)
+
+	pv := makePV("test-pv0", "", "1")
+	pvUpdate := makePV("test-pv0", "test-claim", "2")
+
+	counts := map[string]int{}
+	cache.AddEventHandler(
+		ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				counts["added"]++
+
+				if p, ok := obj.(*persistentVolume); !ok || p != pv {
+					t.Errorf("Expected %v, got %v", pv, obj)
+				}
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				counts["updated"]++
+
+				if p, ok := oldObj.(*persistentVolume); !ok || p != pv {
+					t.Errorf("Expected %v, got %v", pv, oldObj)
+				}
+				if p, ok := newObj.(*persistentVolume); !ok || p != pvUpdate {
+					t.Errorf("Expected %v, got %v", pv, newObj)
+				}
+
+			},
+			DeleteFunc: func(obj interface{}) {
+				counts["deleted"]++
+
+				if p, ok := obj.(*persistentVolume); !ok || p != pvUpdate {
+					t.Errorf("Expected %v, got %v", pv, obj)
+				}
+			},
+		},
+	)
+
+	informer.add(pv)
+	informer.update(pv, pvUpdate)
+	informer.delete(pvUpdate)
+	for name, count := range counts {
+		if count != 1 {
+			t.Errorf("Expected 1 %s event, got %d", name, count)
+		}
+	}
+}
+
 var result interface{}
 
 // BenchmarkAssumePVInformerInput simulates receiving a constant stream of

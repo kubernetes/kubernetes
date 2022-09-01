@@ -61,6 +61,14 @@ type AssumeCache[T any] interface {
 
 	// List all the objects in the cache
 	List(indexObj T) []T
+
+	// Event handlers get invoked when the AssumeCache is called by the
+	// underlying informer after the AssumeCache has updated its own state.
+	// This allows work queues to react to changes in the apiserver without
+	// racing with the AssumeCache updating its state.
+	//
+	// Assume and Restore do not invoke event handlers.
+	AddEventHandler(handler ResourceEventHandler)
 }
 
 // Typecast does a checked typecast into some target type.
@@ -105,7 +113,7 @@ func (e *errObjectName) Error() string {
 type assumeCache[T any] struct {
 	logger klog.Logger
 
-	// Synchronizes updates to store
+	// Synchronizes updates to store and eventHandlers
 	rwMutex sync.RWMutex
 
 	// describes the object stored
@@ -117,6 +125,8 @@ type assumeCache[T any] struct {
 	// Index function for object
 	indexFunc IndexFunc
 	indexName string
+
+	eventHandlers []ResourceEventHandler
 }
 
 type objInfo struct {
@@ -175,6 +185,13 @@ func NewAssumeCache[T any](logger klog.Logger, informer AssumeCacheInformer, des
 	return c
 }
 
+func (c *assumeCache[T]) AddEventHandler(handler ResourceEventHandler) {
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
+
+	c.eventHandlers = append(c.eventHandlers, handler)
+}
+
 func (c *assumeCache[T]) add(obj interface{}) {
 	if obj == nil {
 		return
@@ -187,6 +204,10 @@ func (c *assumeCache[T]) add(obj interface{}) {
 	}
 
 	c.rwMutex.Lock()
+	for _, handler := range c.eventHandlers {
+		// This will get called after unlocking the mutex.
+		defer handler.OnAdd(obj)
+	}
 	defer c.rwMutex.Unlock()
 
 	if objInfo := c.getObjInfoNoError(name); objInfo != nil {
@@ -219,7 +240,50 @@ func (c *assumeCache[T]) add(obj interface{}) {
 }
 
 func (c *assumeCache[T]) update(oldObj interface{}, newObj interface{}) {
-	c.add(newObj)
+	if newObj == nil {
+		return
+	}
+
+	name, err := MetaNamespaceKeyFunc(newObj)
+	if err != nil {
+		c.logger.Error(&errObjectName{err}, "Update failed")
+		return
+	}
+
+	c.rwMutex.Lock()
+	for _, handler := range c.eventHandlers {
+		// This will get called after unlocking the mutex.
+		defer handler.OnUpdate(oldObj, newObj)
+	}
+	defer c.rwMutex.Unlock()
+
+	if objInfo, _ := c.getObjInfo(name); objInfo != nil {
+		newVersion, err := c.getObjVersion(name, newObj)
+		if err != nil {
+			klog.ErrorS(err, "Add failed: couldn't get object version")
+			return
+		}
+
+		storedVersion, err := c.getObjVersion(name, objInfo.latestObj)
+		if err != nil {
+			klog.ErrorS(err, "Add failed: couldn't get stored object version")
+			return
+		}
+
+		// Only update object if version is newer.
+		// This is so we don't override assumed objects due to informer resync.
+		if newVersion <= storedVersion {
+			c.logger.V(10).Info("Skip adding object to assume cache because version is not newer than storedVersion", "description", c.description, "cacheKey", name, "newVersion", newVersion, "storedVersion", storedVersion)
+			return
+		}
+	}
+
+	objInfo := &objInfo{name: name, latestObj: newObj, apiObj: newObj}
+	if err = c.store.Update(objInfo); err != nil {
+		c.logger.Info("Error occurred while updating stored object", "err", err)
+	} else {
+		c.logger.V(10).Info("Adding object to assume cache", "description", c.description, "cacheKey", name, "assumeCache", newObj)
+	}
 }
 
 func (c *assumeCache[T]) delete(obj interface{}) {
@@ -234,6 +298,10 @@ func (c *assumeCache[T]) delete(obj interface{}) {
 	}
 
 	c.rwMutex.Lock()
+	for _, handler := range c.eventHandlers {
+		// This will get called after unlocking the mutex.
+		defer handler.OnDelete(obj)
+	}
 	defer c.rwMutex.Unlock()
 
 	objInfo := &objInfo{name: name}
