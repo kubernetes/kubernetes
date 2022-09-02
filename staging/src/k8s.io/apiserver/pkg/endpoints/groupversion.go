@@ -114,15 +114,10 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) ([]metav1.AP
 	}
 
 	apiResources, resourceInfos, ws, registrationErrors := installer.Install()
-
-	// Generate legacy and v2 discovery information from the resource data
-	// which was gleaned from the installed REST APIS
-	legacyDiscoveryResources, discoveryV2Resources := ConvertResourceInfoToDiscovery(apiResources)
-
-	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, staticLister{legacyDiscoveryResources})
+	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, staticLister{apiResources})
 	versionDiscoveryHandler.AddToWebService(ws)
 	container.Add(ws)
-	return discoveryV2Resources, removeNonPersistedResources(resourceInfos), utilerrors.NewAggregate(registrationErrors)
+	return ConvertGroupVersionIntoToDiscovery(apiResources), removeNonPersistedResources(resourceInfos), utilerrors.NewAggregate(registrationErrors)
 }
 
 func removeNonPersistedResources(infos []*storageversion.ResourceInfo) []*storageversion.ResourceInfo {

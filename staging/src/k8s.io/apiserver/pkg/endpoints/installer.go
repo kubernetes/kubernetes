@@ -68,19 +68,13 @@ type action struct {
 	AllNamespaces bool // true iff the action is namespaced but works on aggregate result for all namespaces
 }
 
-func ConvertResourceInfoToDiscovery(resources []*apiResourceInfo) ([]metav1.APIResource, []metav1.APIResourceDiscovery) {
-	var legacyResources []metav1.APIResource
-	for _, r := range resources {
-		// apiResourceInfo.APIResource maps 1:1 with the legacy resource types
-		legacyResources = append(legacyResources, r.APIResource)
-	}
-
+func ConvertGroupVersionIntoToDiscovery(list []metav1.APIResource) []metav1.APIResourceDiscovery {
 	var apiResourceList []metav1.APIResourceDiscovery
-	rootResources := map[schema.GroupVersionResource]*metav1.APIResourceDiscovery{}
+	parentResources := map[string]*metav1.APIResourceDiscovery{}
 
 	// Loop through all top-level resources
-	for _, r := range resources {
-		if len(r.Subresource) > 0 {
+	for _, r := range list {
+		if strings.Contains(r.Name, "/") {
 			// Skip subresources for now so we can get the list of resources
 			continue
 		}
@@ -92,7 +86,6 @@ func ConvertResourceInfoToDiscovery(resources []*apiResourceInfo) ([]metav1.APIR
 			scope = metav1.ScopeCluster
 		}
 
-		
 		apiResourceList = append(apiResourceList, metav1.APIResourceDiscovery{
 			Resource: r.Name,
 			Scope:    scope,
@@ -105,24 +98,27 @@ func ConvertResourceInfoToDiscovery(resources []*apiResourceInfo) ([]metav1.APIR
 			ShortNames: r.ShortNames,
 			Categories: r.Categories,
 		})
-		rootResources[r.Resource] = &apiResourceList[len(apiResourceList) - 1]
+		parentResources[r.Name] = &apiResourceList[len(apiResourceList)-1]
 	}
 
-	// Loop through all subrouces
-	for _, r := range resources {
-		if len(r.Subresource) == 0 {
-			// Skip root resources
+	// Loop through all subresources
+	for _, r := range list {
+		// Split resource name and subresource name
+		split := strings.SplitN(r.Name, "/", 2)
+
+		if len(split) != 2 {
+			// Skip parent resources
 			continue
 		}
 
-		parent, exists := rootResources[r.Resource]
+		parent, exists := parentResources[split[0]]
 		if !exists {
 			// Had a subresource but not its parent???
 			continue
 		}
 
 		parent.Subresources = append(parent.Subresources, metav1.APISubresourceDiscovery{
-			Subresource: r.Subresource,
+			Subresource: split[1],
 			ReturnType: &metav1.APIDiscoveryKind{
 				Group:   r.Group,
 				Version: r.Version,
@@ -131,7 +127,7 @@ func ConvertResourceInfoToDiscovery(resources []*apiResourceInfo) ([]metav1.APIR
 			Verbs: r.Verbs,
 		})
 	}
-	return legacyResources, apiResourceList
+	return apiResourceList
 }
 
 // An interface to see if one storage supports override its default verb for monitoring
@@ -160,16 +156,9 @@ var toDiscoveryKubeVerb = map[string]string{
 	"WATCHLIST":        "watch",
 }
 
-type apiResourceInfo struct {
-	metav1.APIResource
-
-	Subresource string
-	Resource    schema.GroupVersionResource
-}
-
 // Install handlers for API resources.
-func (a *APIInstaller) Install() ([]*apiResourceInfo, []*storageversion.ResourceInfo, *restful.WebService, []error) {
-	var apiResources []*apiResourceInfo
+func (a *APIInstaller) Install() ([]metav1.APIResource, []*storageversion.ResourceInfo, *restful.WebService, []error) {
+	var apiResources []metav1.APIResource
 	var resourceInfos []*storageversion.ResourceInfo
 	var errors []error
 	ws := a.newWebService()
@@ -188,7 +177,7 @@ func (a *APIInstaller) Install() ([]*apiResourceInfo, []*storageversion.Resource
 			errors = append(errors, fmt.Errorf("error in registering resource: %s, %v", path, err))
 		}
 		if apiResource != nil {
-			apiResources = append(apiResources, apiResource)
+			apiResources = append(apiResources, *apiResource)
 		}
 		if resourceInfo != nil {
 			resourceInfos = append(resourceInfos, resourceInfo)
@@ -260,7 +249,7 @@ func GetResourceKind(groupVersion schema.GroupVersion, storage rest.Storage, typ
 	return fqKindToRegister, nil
 }
 
-func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService) (*apiResourceInfo, *storageversion.ResourceInfo, error) {
+func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService) (*metav1.APIResource, *storageversion.ResourceInfo, error) {
 	admit := a.group.Admit
 
 	optionsExternalVersion := a.group.GroupVersion
@@ -1079,11 +1068,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	// Record the existence of the GVR and the corresponding GVK
 	a.group.EquivalentResourceRegistry.RegisterKindFor(reqScope.Resource, reqScope.Subresource, fqKindToRegister)
 
-	return &apiResourceInfo{
-		APIResource: apiResource,
-		Resource:    reqScope.Resource,
-		Subresource: reqScope.Subresource,
-	}, resourceInfo, nil
+	return &apiResource, resourceInfo, nil
 }
 
 // indirectArbitraryPointer returns *ptrToObject for an arbitrary pointer

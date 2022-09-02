@@ -101,24 +101,22 @@ func TestGetArticleForNoun(t *testing.T) {
 	}
 }
 
-func TestConvertResourceInfoToDiscovery(t *testing.T) {
+func TestConvertAPIResourceToDiscovery(t *testing.T) {
 	tests := []struct {
 		name                     string
-		resources                []*apiResourceInfo
-		wantAPIResource          []metav1.APIResource
+		resources                []metav1.APIResource
 		wantAPIResourceDiscovery []metav1.APIResourceDiscovery
 	}{
 		{
 			name: "Basic Test",
-			resources: []*apiResourceInfo{
+			resources: []metav1.APIResource{
 				{
-					APIResource: metav1.APIResource{
-						Name:       "pods",
-						Namespaced: true,
-						Kind:       "Pod",
-						ShortNames: []string{"po"},
-						Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
-					},
+
+					Name:       "pods",
+					Namespaced: true,
+					Kind:       "Pod",
+					ShortNames: []string{"po"},
+					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
 				},
 			},
 			wantAPIResourceDiscovery: []metav1.APIResourceDiscovery{
@@ -135,17 +133,15 @@ func TestConvertResourceInfoToDiscovery(t *testing.T) {
 		},
 		{
 			name: "Basic Group Version Test",
-			resources: []*apiResourceInfo{
+			resources: []metav1.APIResource{
 				{
-					APIResource: metav1.APIResource{
-						Name:       "cronjobs",
-						Namespaced: true,
-						Group: "batch",
-						Version: "v1",
-						Kind:       "CronJob",
-						ShortNames: []string{"cj"},
-						Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
-					},
+					Name:       "cronjobs",
+					Namespaced: true,
+					Group:      "batch",
+					Version:    "v1",
+					Kind:       "CronJob",
+					ShortNames: []string{"cj"},
+					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
 				},
 			},
 			wantAPIResourceDiscovery: []metav1.APIResourceDiscovery{
@@ -164,29 +160,24 @@ func TestConvertResourceInfoToDiscovery(t *testing.T) {
 		},
 		{
 			name: "Test with subresource",
-			resources: []*apiResourceInfo{
+			resources: []metav1.APIResource{
 				{
-					APIResource: metav1.APIResource{
-						Name:       "cronjobs",
-						Namespaced: true,
-						Kind:       "CronJob",
-						Group:      "batch",
-						Version:    "v1",
-						ShortNames: []string{"cj"},
-						Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
-					},
+					Name:       "cronjobs",
+					Namespaced: true,
+					Kind:       "CronJob",
+					Group:      "batch",
+					Version:    "v1",
+					ShortNames: []string{"cj"},
+					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
 				},
 				{
-					Subresource: "status",
-					APIResource: metav1.APIResource{
-						Name:       "cronjobs",
-						Namespaced: true,
-						Kind:       "CronJob",
-						Group:      "batch",
-						Version:    "v1",
-						ShortNames: []string{"cj"},
-						Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
-					},
+					Name:       "cronjobs/status",
+					Namespaced: true,
+					Kind:       "CronJob",
+					Group:      "batch",
+					Version:    "v1",
+					ShortNames: []string{"cj"},
+					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
 				},
 			},
 			wantAPIResourceDiscovery: []metav1.APIResourceDiscovery{
@@ -214,15 +205,13 @@ func TestConvertResourceInfoToDiscovery(t *testing.T) {
 		},
 		{
 			name: "Cluster Scope Test",
-			resources: []*apiResourceInfo{
+			resources: []metav1.APIResource{
 				{
-					APIResource: metav1.APIResource{
-						Name:       "nodes",
-						Namespaced: false,
-						Kind:       "Node",
-						ShortNames: []string{"no"},
-						Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
-					},
+					Name:       "nodes",
+					Namespaced: false,
+					Kind:       "Node",
+					ShortNames: []string{"no"},
+					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
 				},
 			},
 			wantAPIResourceDiscovery: []metav1.APIResourceDiscovery{
@@ -237,11 +226,10 @@ func TestConvertResourceInfoToDiscovery(t *testing.T) {
 				},
 			},
 		},
-
 	}
 
 	for _, tt := range tests {
-		_, discoveryAPIResources := ConvertResourceInfoToDiscovery(tt.resources)
+		discoveryAPIResources := ConvertGroupVersionIntoToDiscovery(tt.resources)
 		if !reflect.DeepEqual(discoveryAPIResources, tt.wantAPIResourceDiscovery) {
 			t.Errorf("Error: Test %s, Expected %v, got %v\n", tt.name, tt.wantAPIResourceDiscovery, discoveryAPIResources)
 		}
