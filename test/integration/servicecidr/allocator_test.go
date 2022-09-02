@@ -29,12 +29,15 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/logs"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func TestServiceCIDR(t *testing.T) {
+	logs.GlogSetter("5")
+
 	// set the feature gate to enable MultiCIDRRangeAllocator
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, true)()
 
@@ -78,16 +81,6 @@ func TestServiceCIDR(t *testing.T) {
 		},
 	}
 
-	service, err := client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("Error creating test service: %v", err)
-	}
-	service, err = client.CoreV1().Services(ns.Name).Get(context.TODO(), service.Name, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("error getting service: %v", err)
-	}
-	fmt.Println("----------- Service ", service)
-
 	svcList, err := client.NetworkingV1alpha1().ServiceCIDRs().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Error(err)
@@ -98,5 +91,21 @@ func TestServiceCIDR(t *testing.T) {
 		t.Error(err)
 	}
 	fmt.Println("----------- Service IP Addresses", ipList)
+
+	sList, err := client.CoreV1().Services("").List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println("----------- Service CIDRs", sList)
+
+	service, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating test service: %v", err)
+	}
+	service, err = client.CoreV1().Services(ns.Name).Get(context.TODO(), service.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("error getting service: %v", err)
+	}
+	fmt.Println("----------- Service ", service)
 
 }
