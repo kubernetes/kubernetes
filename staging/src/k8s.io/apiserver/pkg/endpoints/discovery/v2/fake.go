@@ -53,7 +53,7 @@ type recorderResourceManagerAction struct {
 }
 
 func (f *fakeResourceManager) Expect() ResourceManager {
-	return &f.recorderResourceManager
+	return &f.expect
 }
 
 func (f *fakeResourceManager) HasExpectedNumberActions() bool {
