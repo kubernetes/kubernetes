@@ -38,6 +38,10 @@ import (
 
 const runAsUserNameContainerName = "run-as-username-container"
 
+var (
+	trueVar = true
+)
+
 var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 	f := framework.NewDefaultFramework("windows-run-as-username")
 
