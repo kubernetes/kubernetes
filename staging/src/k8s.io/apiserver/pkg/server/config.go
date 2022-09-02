@@ -121,11 +121,6 @@ type Config struct {
 	EnableIndex     bool
 	EnableProfiling bool
 	EnableDiscovery bool
-
-	// Toggles whether /discovery/<version> endpoint with ALL resources known to
-	// apiserver is added to the http handler
-	EnableAggregatedDiscoveryEndpoint bool
-
 	// Requires generic profiling enabled
 	EnableContentionProfiling bool
 	EnableMetrics             bool
@@ -379,11 +374,6 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		APIServerID:           id,
 		StorageVersionManager: storageversion.NewDefaultManager(),
 		TracerProvider:        oteltrace.NewNoopTracerProvider(),
-
-		// Default is to advertise /discovery endpoint if the feature is enabled
-		// Some apiservers may not want this behavior, such as aggregator
-		// apiserver, which has its own discovery implementation.
-		EnableAggregatedDiscoveryEndpoint: true,
 	}
 }
 
