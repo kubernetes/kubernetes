@@ -173,7 +173,6 @@ func (cfg *Config) Complete() CompletedConfig {
 	// the kube aggregator wires its own discovery mechanism
 	// TODO eventually collapse this by extracting all of the discovery out
 	c.GenericConfig.EnableDiscovery = false
-	c.GenericConfig.EnableAggregatedDiscoveryEndpoint = false
 
 	version := version.Get()
 	c.GenericConfig.Version = &version
@@ -387,22 +386,18 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 		s.discoveryAggregationController = NewDiscoveryManager(
-			s.GenericAPIServer.Serializer,
+			s.GenericAPIServer.DiscoveryResourceManager,
 		)
 
 		// Inform discovery manager of all local api servers which contain
 		// crds/builtin types
-		s.discoveryAggregationController.AddLocalAPIService(
-			"kube-aggregator", s.GenericAPIServer.DiscoveryResourceManager)
-
 		i := 0
 		for delegate := s.GenericAPIServer.NextDelegate(); delegate != nil && delegate.NextDelegate() != nil; delegate = delegate.NextDelegate() {
-			s.discoveryAggregationController.AddLocalAPIService("delegate_"+strconv.Itoa(i), delegate.UnprotectedHandler())
+			s.discoveryAggregationController.AddLocalDelegate("delegate_"+strconv.Itoa(i), delegate)
 			i++
 		}
 
 		// Setup discovery endpoint
-		s.GenericAPIServer.Handler.GoRestfulContainer.Add(s.discoveryAggregationController.WebService())
 		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-discovery-controller", func(context genericapiserver.PostStartHookContext) error {
 			// Run discovery manager's worker to watch for new/removed/updated
 			// APIServices to the discovery document can be updated at runtime
@@ -464,7 +459,9 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 		}
 		// Forward calls to discovery manager to update discovery document
 		if s.discoveryAggregationController != nil {
-			s.discoveryAggregationController.AddAPIService(apiService, proxyHandler)
+			handlerCopy := *proxyHandler
+			handlerCopy.setServiceAvailable(true)
+			s.discoveryAggregationController.AddAPIService(apiService, &handlerCopy)
 		}
 		return nil
 	}

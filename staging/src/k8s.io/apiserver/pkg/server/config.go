@@ -673,7 +673,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		muxAndDiscoveryCompleteSignals: map[string]<-chan struct{}{},
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) && c.EnableAggregatedDiscoveryEndpoint {
 		s.DiscoveryResourceManager = discoveryendpoint.NewResourceManager(c.Serializer)
 	} else {
 		s.DiscoveryResourceManager = discoveryendpoint.NewNoopResourceManager()

@@ -164,6 +164,9 @@ func TestAggregatedAPIServiceDiscovery(t *testing.T) {
 	service := NewFakeService("test-server", client, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, discoveryendpoint.DiscoveryEndpointRoot) {
 			resourceManager.ServeHTTP(w, r)
+		} else if strings.HasPrefix(r.URL.Path, "/apis/stable.example.com") {
+			// Return invalid response so APIService can be marked as "available"
+			w.WriteHeader(http.StatusOK)
 		} else {
 			// reject openapi/v2, openapi/v3, apis/<group>/<version>
 			w.WriteHeader(http.StatusNotFound)
