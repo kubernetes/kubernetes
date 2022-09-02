@@ -39,3 +39,4 @@ func (t *testData) DryRun() bool                       { return false }
 func (t *testData) Client() clientset.Interface        { return nil }
 func (t *testData) CertificatesDir() string            { return "" }
 func (t *testData) CRISocketPath() string              { return "" }
+func (t *testData) CleanupTmpDir() bool                { return false }

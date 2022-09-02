@@ -36,4 +36,5 @@ type resetData interface {
 	Client() clientset.Interface
 	CertificatesDir() string
 	CRISocketPath() string
+	CleanupTmpDir() bool
 }
