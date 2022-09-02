@@ -106,9 +106,10 @@ func (c *ReplicaCalculator) GetResourceReplicas(ctx context.Context, currentRepl
 	if len(missingPods) > 0 {
 		if usageRatio < 1.0 {
 			// on a scale-down, treat missing pods as using 100% (all) of the resource request
-			maxTargetUtilization := int64(max(100, int32(targetUtilization)))
+			// or the utilization target for targets higher than 100%
+			fallbackUtilization := int64(max(100, targetUtilization))
 			for podName := range missingPods {
-				metrics[podName] = metricsclient.PodMetric{Value: requests[podName] * maxTargetUtilization / 100}
+				metrics[podName] = metricsclient.PodMetric{Value: requests[podName] * fallbackUtilization / 100}
 			}
 		} else if usageRatio > 1.0 {
 			// on a scale-up, treat missing pods as using 0% of the resource request
@@ -209,7 +210,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 
 	if len(missingPods) > 0 {
 		if usageRatio < 1.0 {
-			// on a scale-down, treat missing pods as using 100% (all) of the resource request
+			// on a scale-down, treat missing pods as using exactly the target amount
 			for podName := range missingPods {
 				metrics[podName] = metricsclient.PodMetric{Value: targetUtilization}
 			}
