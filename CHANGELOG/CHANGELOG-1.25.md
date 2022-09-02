@@ -23,6 +23,8 @@
     - [Promoted Server Side Unknown Field Validation to Beta](#promoted-server-side-unknown-field-validation-to-beta)
     - [Kube-proxy images are now based in distroless](#kube-proxy-images-are-now-based-in-distroless)
     - [Introduced KMS v2](#introduced-kms-v2)
+  - [Known Issues](#known-issues)
+    - [LocalStorageCapacityIsolationFSQuotaMonitoring ConfigMap rendering failure](#LocalStorageCapacityIsolationFSQuotaMonitoring-ConfigMap-rendering-failure)
   - [Urgent Upgrade Notes](#urgent-upgrade-notes)
     - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade)
   - [Changes by Kind](#changes-by-kind)
@@ -279,6 +281,11 @@ Introduce KMS v2alpha1 API to add performance, rotation, and observability impro
 ### Kube-proxy images are now based on distroless images
 
 In previous releases, kube-proxy container images were built using Debian as the base image. Starting with this release, the images are now built using [distroless](https://github.com/GoogleContainerTools/distroless). This change reduced image size by almost 50% and decreased the number of installed packages and files to only those strictly required for kube-proxy to do its job.
+
+## Known Issues
+
+### LocalStorageCapacityIsolationFSQuotaMonitoring ConfigMap rendering failure
+ConfigMap rendering [issue](https://github.com/kubernetes/kubernetes/issues/112081) was found in the 1.25.0 release. When ConfigMaps get updated within the API, they do not get rendered to the resulting pod's filesystem by the Kubelet. The feature has been [reverted to alpha](https://github.com/kubernetes/kubernetes/pull/112078) in the 1.25.1 release.
 
 ## Urgent Upgrade Notes
 
