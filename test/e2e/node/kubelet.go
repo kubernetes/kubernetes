@@ -17,13 +17,18 @@ limitations under the License.
 package node
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -42,8 +47,6 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -461,7 +464,7 @@ var _ = SIGDescribe("kubelet", func() {
 	})
 
 	//Test kubectl alpha node-logs <node-name> commands
-	ginkgo.Describe("kubectl node-logs <node-name> [Feature:add node log viewer]", func() {
+	ginkgo.Describe("kubectl node-logs <node-name> [Feature:NodeLogViewer]", func() {
 		var (
 			numNodes  int
 			nodeNames sets.String
@@ -479,62 +482,271 @@ var _ = SIGDescribe("kubelet", func() {
 
 		/*
 			Test if kubectl node-logs <node-name>
-			returns something or not!
+			returns an error or not!
 		*/
 
-		ginkgo.It("should return the logs ", func() {
+		ginkgo.It("should return the error of running without --query option", func() {
 			ginkgo.By("Starting the command")
 			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
 
 			for nodeName := range nodeNames {
 				cmd := tk.KubectlCmd("alpha", "node-logs", nodeName)
-				runKubectlCommand(cmd, "")
+				_, _, err := framework.StartCmdAndStreamOutput(cmd)
+				if err != nil {
+					framework.Failf("Failed to start kubectl command! Error: %v", err)
+				}
+				err = cmd.Wait()
+				if err == nil {
+					framework.Failf("Command failed: %v. It was expected an error!", cmd)
+				}
 			}
 		})
 
 		/*
-			Test if kubectl node-logs <node-name> --service kubelet
-			returns something or not!
+			Test if kubectl node-logs <node-name> --query kubelet
+			returns the kubelet logs or not!
 		*/
 
-		ginkgo.It("should return the logs for the requested service", func() {
+		ginkgo.It("should return the logs for the requested query", func() {
 			ginkgo.By("Starting the command")
 			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
 
 			for nodeName := range nodeNames {
-				cmd := tk.KubectlCmd("alpha", "node-logs", nodeName, "--service", "kubelet")
-				runKubectlCommand(cmd, "--service")
+				cmd := tk.KubectlCmd("alpha", "node-logs", nodeName, "--query", "kubelet")
+				result := runKubectlCommand(cmd, "--query")
+				assertContains("kubelet", result)
 			}
 		})
 
 		/*
-			Test if kubectl node-logs <node-name> --path pods
-			returns something or not!
+			Test if kubectl node-logs --role master --query kubelet --tail 4 -o short
+			returns 4 lines from the kubelet logs or not!
 		*/
 
-		ginkgo.It("should return the logs for the provided path", func() {
+		ginkgo.It("should return the first 4 lines of logs for the requested query of the specific role", func() {
+			ginkgo.By("Starting the command")
+			n := "4"
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+			cmd := tk.KubectlCmd("alpha", "node-logs", "--role", "master", "--query", "kubelet", "--tail", n, "-o", "short")
+			result := runKubectlCommand(cmd, "--role --query --tail")
+			logs := journalctlCommand("-u", "kubelet", "-n", n)
+			if result != logs {
+				framework.Failf("Failed to receive the correct kubelet logs or the correct amount of lines of logs")
+			}
+		})
+
+		/*
+			Test if kubectl node-logs --role worker --query kubelet --raw
+			returns the kubelet logs or not!
+		*/
+
+		ginkgo.It("should return the logs in the raw form for the requested query of the specific role in raw form", func() {
 			ginkgo.By("Starting the command")
 			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+			cmd := tk.KubectlCmd("alpha", "node-logs", "--role", "master", "--query", "kubelet", "--raw")
+			result := runKubectlCommand(cmd, "--role --query --raw")
+			assertContains("kubelet", result)
+		})
 
-			for nodeName := range nodeNames {
-				cmd := tk.KubectlCmd("alpha", "node-logs", nodeName, "--path", "pods")
-				runKubectlCommand(cmd, "--path")
+		/*
+			Test if kubectl node-logs --role master --query kubelet --pattern kubelet -o short
+			returns the kubelet logs or not!
+		*/
+
+		ginkgo.It("should return the logs for the requested query of the master node and filtered by kubelet", func() {
+			ginkgo.By("Starting the command")
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+			cmd := tk.KubectlCmd("alpha", "node-logs", "--role", "master", "--query", "kubelet", "--pattern", "kubelet", "-o", "short")
+			result := runKubectlCommand(cmd, "--role --query --pattern")
+			logs := journalctlCommand("-u", "kubelet", "-b", "0", "-g", "kubelet")
+			if result != logs {
+				framework.Failf("Failed to receive the correct kubelet logs for the specific pattern")
 			}
+		})
+
+		/*
+			Test if kubectl node-logs --role master --query kubelet --tail 1 --output json
+			returns the kubelet logs in json format or not!
+		*/
+
+		ginkgo.It("should return the logs for the requested query of the specific node in json format", func() {
+			ginkgo.By("Starting the command")
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+			cmd := tk.KubectlCmd("alpha", "node-logs", "--role", "master", "--query", "kubelet", "--tail", "1", "--output", "json")
+			result := runKubectlCommand(cmd, "--role --query --tail --output")
+			framework.ExpectEqual(len(strings.Split(strings.TrimRight(result, "\n"), "\n")), 1)
+			assertContains("kubelet", result)
+			if r := checkJSON(result); r != nil {
+				framework.Failf("Receive invalid json: %v", r)
+			}
+		})
+
+		/*
+			Test if kubectl node-logs <node-name> --Q kubelet --since-time '4 hours ago' -o short
+			returns the kubelet logs or not!
+		*/
+
+		ginkgo.It("should return the logs for the requested query of the specific node from 4 hours ago", func() {
+			ginkgo.By("Starting the command")
+			start := time.Now()
+			const RFC3339 = "2006-01-02T15:04:05Z07:00"
+			count := 4
+			start = start.Add(time.Duration(-count) * time.Hour)
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+			cmd := tk.KubectlCmd("alpha", "node-logs", "--role", "master", "--query", "kubelet", "--since-time", start.Format(RFC3339), "-o", "short")
+			result := runKubectlCommand(cmd, "--role --query --since-time")
+			logs := journalctlCommand("-u", "kubelet", "-S", "4 hours ago", "")
+			if result != logs {
+				framework.Failf("Failed to receive the correct kubelet logs since the specific time")
+			}
+		})
+
+		/*
+			Test if kubectl node-logs <node-name> --Q kubelet --boot -1 -o short
+			returns the kubelet logs or not!
+		*/
+
+		ginkgo.It("should return the logs for the requested query of the master node from the previous boot", func() {
+			ginkgo.By("Starting the command")
+			n := "-1"
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+			cmd := tk.KubectlCmd("alpha", "node-logs", "--role", "master", "--query", "kubelet", "--boot", n, "-o", "short")
+			result := runKubectlCommand(cmd, "--role --query --boot")
+			logs := journalctlCommand("-u", "kubelet", "-b", n)
+			if result != logs {
+				framework.Failf("Failed to receive the correct kubelet logs for the %s boot", n)
+			}
+		})
+
+		/*
+			Test if kubectl node-logs --role master --query kubelet --boot 2
+			returns an error or not!
+		*/
+
+		ginkgo.It("should return the error of running with boot option value over 0", func() {
+			ginkgo.By("Starting the command")
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+			cmd := tk.KubectlCmd("alpha", "node-logs", "--role", "master", "--query", "kubelet", "--boot", "2")
+			_, _, err := framework.StartCmdAndStreamOutput(cmd)
+			if err != nil {
+				framework.Failf("Failed to start kubectl command: %v", err)
+			}
+			err = cmd.Wait()
+			if err == nil {
+				framework.Failf("Command failed: %v. It was expected an error!", cmd)
+			}
+		})
+
+		/*
+			Test if kubectl node-logs -l kuberentes.io/os=linux --Q kubelet
+			returns the kubelet logs or not!
+		*/
+
+		ginkgo.It("should return the logs for the requested query using the selector kubernetes.io/os=linux [LinuxOnly]", func() {
+			ginkgo.By("Starting the command")
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+			cmd := tk.KubectlCmd("alpha", "node-logs", "-l", "kubernetes.io/os=linux", "--query", "kubelet")
+			result := runKubectlCommand(cmd, "--role -l --query")
+			assertContains("kubelet", result)
+		})
+
+		/*
+			Test if kubectl node-logs --role master --Q kubelet --until-time current date and time
+			returns the kubelet logs or not!
+		*/
+
+		ginkgo.It("should return the logs for the requested query until the current date and time", func() {
+			ginkgo.By("Starting the command")
+			const RFC3339 = "2006-01-02T15:04:05Z07:00"
+			start := time.Now()
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+			cmd := tk.KubectlCmd("alpha", "node-logs", "--role", "master", "--query", "kubelet", "-o", "short", "--until-time", start.Format(RFC3339))
+			result := runKubectlCommand(cmd, "--role --query --until-time")
+			logs := journalctlCommand("-u", "kubelet", "-U", "now")
+			if result != logs {
+				framework.Failf("Failed to receive the correct kubelet logs")
+			}
+		})
+
+		/*
+			Test if kubectl node-logs --role master --query kubelet -o short
+			returns the true kubelet logs!
+		*/
+
+		ginkgo.It("should return the correct logs for the requested query", func() {
+			ginkgo.By("Starting the command")
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+			cmd := tk.KubectlCmd("alpha", "node-logs", "--role", "master", "--query", "kubelet", "-o", "short")
+			result := runKubectlCommand(cmd, "--query -o")
+			logs := journalctlCommand("-u", "kubelet", "-b", "0")
+			if result != logs {
+				framework.Failf("Failed to receive the correct kubelet logs")
+			}
+		})
+
+		/*
+			Test if kubectl node-logs works for other timezones
+			except UTC!
+		*/
+
+		ginkgo.It("should return the correct logs for the requested query in the correct timezone format", func() {
+			ginkgo.By("Starting the command")
+			tzone := os.Getenv("TZ")
+			os.Setenv("TZ", "Africa/Cairo")
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
+			cmd := tk.KubectlCmd("alpha", "node-logs", "--role", "master", "--query", "kubelet", "-o", "short")
+			result := runKubectlCommand(cmd, "--query -o")
+			logs := journalctlCommand("-u", "kubelet", "-b", "0")
+			if result != logs {
+				framework.Failf("Failed to receive the correct kubelet logs for the specific timezone")
+			}
+			os.Setenv("TZ", tzone)
 		})
 	})
 })
 
-func runKubectlCommand(cmd *exec.Cmd, arg string) {
+func runKubectlCommand(cmd *exec.Cmd, arg string) (result string) {
 	stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
+	var buf bytes.Buffer
 	if err != nil {
-		framework.Failf("Failed to start kubectl command: %v", err)
+		framework.Failf("Failed to start kubectl command! Stderr: %v, error: %v", stderr, err)
 	}
 	defer stdout.Close()
 	defer stderr.Close()
 	defer framework.TryKill(cmd)
-	buf := make([]byte, 128)
-	if _, err = stdout.Read(buf); err != nil {
-		framework.Failf("Expected output from kubectl alpha node-logs %s: %v", arg, err)
+
+	b_read, err := io.Copy(&buf, stdout)
+	if err != nil {
+		framework.Failf("Expected output from kubectl alpha node-logs %s: %v\n Stderr: %v", arg, err, stderr)
 	}
-	framework.Logf("output: %s", buf)
+	out := ""
+	if b_read >= 0 {
+		out = buf.String()
+	}
+
+	framework.Logf("Kubectl output: %s", out)
+	return out
+}
+
+func assertContains(expectedString string, result string) {
+	if strings.Contains(result, expectedString) {
+		return
+	}
+	framework.Failf("Failed to find \"%s\"", expectedString)
+	return
+}
+
+func checkJSON(s string) error {
+	var js interface{}
+	return json.Unmarshal([]byte(s), &js)
+}
+
+func journalctlCommand(arg ...string) string {
+	command := exec.Command("journalctl", arg...)
+	out, err := command.Output()
+	if err != nil {
+		framework.Failf("Error at running journalctl command")
+	}
+	framework.Logf("Journalctl output: %s", out)
+	return string(out)
 }
