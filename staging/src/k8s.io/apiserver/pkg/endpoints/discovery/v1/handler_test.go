@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v2_test
+package v1_test
 
 import (
 	"encoding/json"
@@ -33,7 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/v2"
+	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/v1"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 )
 

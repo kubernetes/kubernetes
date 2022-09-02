@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v2
+package v1
 
 import (
 	"net/http"
@@ -227,7 +227,7 @@ func (rdm *resourceDiscoveryManager) WebService() *restful.WebService {
 	ws.Path(DiscoveryEndpointRoot)
 	ws.Doc("get available API groupversions and resources")
 
-	ws.Route(ws.GET("/v2").To(func(req *restful.Request, resp *restful.Response) {
+	ws.Route(ws.GET("/v1").To(func(req *restful.Request, resp *restful.Response) {
 		rdm.ServeHTTP(resp.ResponseWriter, req.Request)
 	}).
 		Doc("get available API groupversions and their resources").
