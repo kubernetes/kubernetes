@@ -71,22 +71,20 @@ func (c *ReplicaCalculator) GetResourceReplicas(ctx context.Context, currentRepl
 	if err != nil {
 		return 0, 0, 0, time.Time{}, fmt.Errorf("unable to get pods while calculating replica count: %v", err)
 	}
-
-	itemsLen := len(podList)
-	if itemsLen == 0 {
+	if len(podList) == 0 {
 		return 0, 0, 0, time.Time{}, fmt.Errorf("no pods returned by selector while calculating replica count")
 	}
 
 	readyPodCount, unreadyPods, missingPods, ignoredPods := groupPods(podList, metrics, resource, c.cpuInitializationPeriod, c.delayOfInitialReadinessStatus)
 	removeMetricsForPods(metrics, ignoredPods)
 	removeMetricsForPods(metrics, unreadyPods)
+	if len(metrics) == 0 {
+		return 0, 0, 0, time.Time{}, fmt.Errorf("did not receive metrics for any ready pods")
+	}
+
 	requests, err := calculatePodRequests(podList, container, resource)
 	if err != nil {
 		return 0, 0, 0, time.Time{}, err
-	}
-
-	if len(metrics) == 0 {
-		return 0, 0, 0, time.Time{}, fmt.Errorf("did not receive metrics for any ready pods")
 	}
 
 	usageRatio, utilization, rawUtilization, err := metricsclient.GetResourceUtilizationRatio(metrics, requests, targetUtilization)
