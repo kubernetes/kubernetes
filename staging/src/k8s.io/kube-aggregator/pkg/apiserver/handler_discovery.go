@@ -58,9 +58,11 @@ type DiscoveryAggregationController interface {
 
 	// Spwans a worker which waits for added/updated apiservices and updates
 	// the unified discovery document by contacting the aggregated api services
-	//
-	// Blocks until local apiservices are populated or returns an error
-	Run(stopCh <-chan struct{}) error
+	Run(stopCh <-chan struct{})
+
+	// Returns true if all GVs of local APIServices have been added as an
+	// APIService and synced to the discovery document
+	LocalServicesSynced() bool
 }
 
 type discoveryManager struct {
@@ -69,7 +71,7 @@ type discoveryManager struct {
 
 	// Map from APIService's name (or a unique string for local servers)
 	// to information about contacting that API Service
-	apiServices map[string]apiServiceInfo
+	apiServices map[string]groupVersionInfo
 
 	// Map of local delegate names to a handler which can contact their API
 	// surface
@@ -134,6 +136,8 @@ type cachedResult struct {
 	// ETag hash of the cached discoveryDocument
 	etag string
 
+	// Guaranteed to be a time less than the time the server responded with the
+	// discovery data.
 	lastUpdated time.Time
 
 	// results are stale if server was attempted to be contacted and it failed
@@ -143,11 +147,25 @@ type cachedResult struct {
 }
 
 // Information about a specific APIService/GroupVersion
-type apiServiceInfo struct {
-	// Date this APIService was marked dirty. Used for request deduplication
+type groupVersionInfo struct {
+	// Date this APIService was marked dirty.
+	// Guaranteed to be a time greater than the most recent time the APIService
+	// was known to be modified.
+	//
+	// Used for request deduplication to ensure the data used to reconcile each
+	// apiservice was retrieved after the time of the APIService change:
+	// real_apiservice_change_time < groupVersionInfo.lastMarkedDirty < cachedResult.lastUpdated < real_document_fresh_time
+	//
+	// This ensures that if the apiservice was changed after the last cached entry
+	// was stored, the discovery document will always be re-fetched.
 	lastMarkedDirty time.Time
 
-	// ServiceReference for this APIService
+	// This is true if the GV has been visited by the reconciler at least once
+	// so that its GV is included in the discovery document
+	reconciledOnce bool
+
+	// ServiceReference of this GroupVersion. This identifies the Service which
+	// describes how to contact the server responsible for this GroupVersion.
 	service serviceKey
 
 	// Method for contacting the service
@@ -161,17 +179,134 @@ func NewDiscoveryManager(
 ) DiscoveryAggregationController {
 	return &discoveryManager{
 		mergedDiscoveryHandler: target,
-		apiServices:            make(map[string]apiServiceInfo),
+		apiServices:            make(map[string]groupVersionInfo),
 		cachedResults:          make(map[serviceKey]cachedResult),
 		localDelegates:         make(map[string]genericapiserver.DelegationTarget),
 		dirtyAPIServiceQueue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "discovery-manager"),
 	}
 }
 
+// Returns discovery data for the given apiservice.
+// Caches the result.
+// Returns the cached result if it is retrieved after the apiservice was last
+// marked dirty
+func (dm *discoveryManager) fetchFreshDiscoveryForService(gv metav1.GroupVersion, info groupVersionInfo) (cachedResult, error) {
+	// Lookup last cached result for this apiservice's service.
+	dm.resultsLock.RLock()
+	cached, exists := dm.cachedResults[info.service]
+	dm.resultsLock.RUnlock()
+
+	// If entry exists and was updated after the given time, just stop now
+	if exists && !cached.stale && cached.lastUpdated.After(info.lastMarkedDirty) {
+		return cached, nil
+	}
+
+	// If we have a handler to contact the server for this APIService, and
+	// the cache entry is too old to use, refresh the cache entry now.
+	handler := http.TimeoutHandler(info.handler, 5*time.Second, "request timed out")
+	req, err := http.NewRequest("GET", "/discovery/v2", nil)
+	if err != nil {
+		// NewRequest should not fail, but if it does for some reason,
+		// log it and continue
+		return cached, fmt.Errorf("failed to create http.Request: %v", err)
+	}
+
+	// Apply aggregator user to request
+	req = req.WithContext(
+		request.WithUser(
+			req.Context(), &user.DefaultInfo{Name: "system:kube-aggregator"}))
+
+	// req.Header.Add("Accept", runtime.ContentTypeProtobuf)
+	req.Header.Add("Accept", runtime.ContentTypeJSON)
+
+	if exists && len(cached.etag) > 0 {
+		req.Header.Add("If-None-Match", cached.etag)
+	}
+
+	// Important that the time recorded in the data's "lastUpdated" is conservatively
+	// from BEFORE the request is dispatched so that lastUpdated can be used to
+	// de-duplicate requests.
+	now := time.Now()
+	writer := newInMemoryResponseWriter()
+	handler.ServeHTTP(writer, req)
+
+	switch writer.respCode {
+	case http.StatusNotModified:
+		dm.resultsLock.Lock()
+		defer dm.resultsLock.Unlock()
+
+		// Keep old entry, update timestamp
+		cached = cachedResult{
+			discovery:   cached.discovery,
+			etag:        cached.etag,
+			lastUpdated: now,
+		}
+		dm.cachedResults[info.service] = cached
+
+		return cached, nil
+	case http.StatusNotFound:
+		// Discovery Document is not being served at all.
+		// Fall back to legacy discovery information
+		return errors.New("not found")
+
+	case http.StatusOK:
+
+		parsed := &metav1.APIGroupDiscoveryList{}
+		if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), writer.data, parsed); err != nil {
+			return cached, err
+		}
+
+		klog.Infof("DiscoveryManager: Successfully downloaded discovery for %s", info.service.String())
+
+		// Convert discovery info into a map for convenient lookup later
+		discoMap := map[metav1.GroupVersion]metav1.APIVersionDiscovery{}
+		for _, g := range parsed.Groups {
+			for _, v := range g.Versions {
+				discoMap[metav1.GroupVersion{Group: g.Name, Version: v.Version}] = v
+			}
+		}
+
+		dm.resultsLock.Lock()
+		defer dm.resultsLock.Unlock()
+
+		// Save cached result
+		cached = cachedResult{
+			discovery:   discoMap,
+			etag:        writer.Header().Get("Etag"),
+			lastUpdated: now,
+		}
+		dm.cachedResults[info.service] = cached
+		return cached, nil
+
+	default:
+		dm.resultsLock.Lock()
+		defer dm.resultsLock.Unlock()
+
+		// Unhandled response. Mark information as stale.
+		// Try again later.
+		//!TODO: After a few tries, just wipe it out?
+		// 	or after certain time?
+		if !cached.stale {
+			cached = cachedResult{
+				discovery:   cached.discovery,
+				etag:        cached.etag,
+				lastUpdated: now,
+				stale:       true,
+			}
+			dm.cachedResults[info.service] = cached
+		}
+
+		klog.Infof("DiscoveryManager: Failed to download discovery for %v: %v %s",
+			info.service.String(), writer.respCode, writer.data)
+		return cached, fmt.Errorf("service %s returned non-success response code: %v",
+			info.service.String(), writer.respCode)
+	}
+}
+
 // Try to sync a single APIService.
 func (dm *discoveryManager) syncAPIService(apiServiceName string) error {
 	dm.servicesLock.RLock()
-	apiServiceInfo, exists := dm.apiServices[apiServiceName]
+	info, exists := dm.apiServices[apiServiceName]
 	dm.servicesLock.RUnlock()
 
 	gv := helper.APIServiceNameToGroupVersion(apiServiceName)
@@ -183,154 +318,53 @@ func (dm *discoveryManager) syncAPIService(apiServiceName string) error {
 		return nil
 	}
 
-	cacheKey := apiServiceInfo.service
-
 	// Lookup last cached result for this apiservice's service.
-	dm.resultsLock.RLock()
-	cached, exists := dm.cachedResults[cacheKey]
-	dm.resultsLock.RUnlock()
+	cached, err := dm.fetchFreshDiscoveryForService(mgv, info)
 
-	// De-deduplicate this request if the APIService was last marked dirty
-	// before the cache entry of its service was last updated, then assume the
-	// result would be the same (as a form of request de-duplication)
-	if exists && !cached.stale && cached.lastUpdated.After(apiServiceInfo.lastMarkedDirty) {
-		// Check cache entry for this groupversion and insert it into the
-		// document if present
-		if entry, exists := cached.discovery[mgv]; exists {
-			dm.mergedDiscoveryHandler.AddGroupVersion(gv.Group, entry)
-		} else {
-			// Use empty GV, since there is an APIService for it
-			dm.mergedDiscoveryHandler.AddGroupVersion(gv.Group, metav1.APIVersionDiscovery{
-				Version: gv.Version,
-			})
-		}
-		return nil
+	if !info.reconciledOnce {
+		dm.servicesLock.Lock()
+		info.reconciledOnce = true
+		dm.apiServices[apiServiceName] = info
+		dm.servicesLock.Unlock()
 	}
 
-	// If we have a handler to contact the server for this APIService, and
-	// the cache entry is too old to use, refresh the cache entry now.
-	handler := apiServiceInfo.handler
-	handler = http.TimeoutHandler(handler, 5*time.Second, "request timed out")
-
-	req, err := http.NewRequest("GET", "/discovery/v2", nil)
 	if err != nil {
-		// NewRequest should not fail, but if it does for some reason,
-		// log it and continue
-		return fmt.Errorf("failed to create http.Request: %v", err)
-
+		// There was an error fetching discovery for this APIService.
+		// Just use empty GV to mark that GV exists, but no resources.
+		//
+		// TODO: Maybe also stick in a status for the version the error?
+		dm.mergedDiscoveryHandler.AddGroupVersion(gv.Group, metav1.APIVersionDiscovery{
+			Version: gv.Version,
+		})
+		return err
 	}
 
-	// Apply aggregator user proxy header to request
-	// transport.SetAuthProxyHeaders(req, "system:kube-aggregator", []string{"system:masters"}, nil)
-	req = req.WithContext(request.WithUser(req.Context(), &user.DefaultInfo{Name: "system:kube-aggregator"}))
-
-	// req.Header.Add("Accept", runtime.ContentTypeProtobuf)
-	req.Header.Add("Accept", runtime.ContentTypeJSON)
-
-	if exists && len(cached.etag) > 0 {
-		req.Header.Add("If-None-Match", cached.etag)
+	// Check cache entry for this groupversion and insert it into the
+	// document if present
+	if entry, exists := cached.discovery[mgv]; exists {
+		//!TODO: mark with staleness of cache
+		dm.mergedDiscoveryHandler.AddGroupVersion(gv.Group, entry)
+	} else {
+		// Use empty GV, since there is an APIService for it
+		//!TODO: mark with staleness of cache
+		dm.mergedDiscoveryHandler.AddGroupVersion(gv.Group, metav1.APIVersionDiscovery{
+			Version: gv.Version,
+		})
 	}
 
-	writer := newInMemoryResponseWriter()
-	handler.ServeHTTP(writer, req)
-
-	dm.resultsLock.Lock()
-	defer dm.resultsLock.Unlock()
-
-	switch writer.respCode {
-	case http.StatusNotModified:
-		// Keep old entry, update timestamp
-		dm.cachedResults[cacheKey] = cachedResult{
-			discovery:   cached.discovery,
-			etag:        cached.etag,
-			lastUpdated: time.Now(),
-		}
-
-		if entry, exists := cached.discovery[mgv]; exists {
-			dm.mergedDiscoveryHandler.AddGroupVersion(gv.Group, entry)
-		} else {
-			// Use empty GV, since there is an APIService for it
-			dm.mergedDiscoveryHandler.AddGroupVersion(gv.Group, metav1.APIVersionDiscovery{
-				Version: gv.Version,
-			})
-		}
-
-		return nil
-	case http.StatusNotFound:
-		// Discovery Document is not being served at all.
-		// Fall back to legacy discovery information
-		return errors.New("not found")
-
-	case http.StatusOK:
-		parsed := &metav1.APIGroupDiscoveryList{}
-		if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), writer.data, parsed); err != nil {
-			return err
-		}
-
-		klog.Infof("DiscoveryManager: Successfully downloaded discovery for %s", cacheKey.String())
-
-		// Convert discovery info into a map for convenient lookup later
-		discoMap := map[metav1.GroupVersion]metav1.APIVersionDiscovery{}
-		for _, g := range parsed.Groups {
-			for _, v := range g.Versions {
-				discoMap[metav1.GroupVersion{Group: g.Name, Version: v.Version}] = v
-			}
-		}
-
-		if entry, exists := discoMap[mgv]; exists {
-			dm.mergedDiscoveryHandler.AddGroupVersion(gv.Group, entry)
-		} else {
-			// Use empty GV, since there is an APIService for it
-			dm.mergedDiscoveryHandler.AddGroupVersion(gv.Group, metav1.APIVersionDiscovery{
-				Version: gv.Version,
-			})
-		}
-
-		// Save cached result
-		dm.cachedResults[cacheKey] = cachedResult{
-			discovery:   discoMap,
-			etag:        writer.Header().Get("Etag"),
-			lastUpdated: time.Now(),
-		}
-		return nil
-
-	default:
-		// Unhandled response. Mark information as stale.
-		// Try again later.
-		//!TODO: After a few tries, just wipe it out?
-		// 	or after certain time?
-		if !cached.stale {
-			dm.cachedResults[cacheKey] = cachedResult{
-				discovery:   cached.discovery,
-				etag:        cached.etag,
-				lastUpdated: time.Now(),
-				stale:       true,
-			}
-		}
-
-		// Re-use old entry for this GV
-		if entry, exists := cached.discovery[mgv]; exists {
-			dm.mergedDiscoveryHandler.AddGroupVersion(gv.Group, entry)
-		} else {
-			// Use empty GV, since there is an APIService for it
-			dm.mergedDiscoveryHandler.AddGroupVersion(gv.Group, metav1.APIVersionDiscovery{
-				Version: gv.Version,
-			})
-		}
-
-		klog.Infof("DiscoveryManager: Failed to download discovery for %v: %v %s", cacheKey.String(), writer.respCode, writer.data)
-		return fmt.Errorf("service %s returned non-success response code: %v", cacheKey.String(), writer.respCode)
-	}
+	return nil
 }
 
 // Spwans a goroutune which waits for added/updated apiservices and updates
 // the discovery document accordingly
-func (dm *discoveryManager) Run(stopCh <-chan struct{}) error {
+func (dm *discoveryManager) Run(stopCh <-chan struct{}) {
 	klog.Info("Starting ResourceDiscoveryManager")
 
-	var result error
-
 	// Spawn workers
+	// These workers wait for APIServices to be marked dirty.
+	// Worker ensures the cached discovery document hosted by the ServiceReference of
+	// the APIService is at least as fresh as the APIService, then includes the
+	// APIService's groupversion into the merged document
 	for i := 0; i < 2; i++ {
 		go func() {
 			for {
@@ -350,13 +384,17 @@ func (dm *discoveryManager) Run(stopCh <-chan struct{}) error {
 	}
 
 	// Refresh external Services every minute
-	wait.PollImmediateUntil(1*time.Minute, func() (done bool, err error) {
+	wait.PollUntil(1*time.Minute, func() (done bool, err error) {
 		dm.servicesLock.Lock()
 		defer dm.servicesLock.Unlock()
 
 		now := time.Now()
+
+		// Mark all non-local APIServices as dirty
 		for key, info := range dm.apiServices {
-			//!TODO: filter for external apiservices only
+			if len(info.service.LocalName) > 0 {
+				continue
+			}
 			info.lastMarkedDirty = now
 			dm.apiServices[key] = info
 
@@ -366,7 +404,8 @@ func (dm *discoveryManager) Run(stopCh <-chan struct{}) error {
 		return true, nil
 	}, stopCh)
 
-	return result
+	// Shutdown the queue since stopCh was signalled
+	dm.dirtyAPIServiceQueue.ShutDown()
 }
 
 // Adds an APIService to be tracked by the discovery manager. If the APIService
@@ -392,7 +431,7 @@ func (dm *discoveryManager) AddAPIService(apiService *apiregistrationv1.APIServi
 			listedPaths := delegate.ListedPaths()
 			for _, path := range listedPaths {
 				if path == searchPath {
-					dm.apiServices[apiService.Name] = apiServiceInfo{
+					dm.apiServices[apiService.Name] = groupVersionInfo{
 						handler:         delegate.UnprotectedHandler(),
 						lastMarkedDirty: time.Now(),
 						service: serviceKey{
@@ -408,7 +447,7 @@ func (dm *discoveryManager) AddAPIService(apiService *apiregistrationv1.APIServi
 		klog.Infof("Failed to find local service for apiservice: %s", apiService.Name)
 	} else {
 		// Add or update APIService record and mark it as dirty
-		dm.apiServices[apiService.Name] = apiServiceInfo{
+		dm.apiServices[apiService.Name] = groupVersionInfo{
 			handler:         handler,
 			lastMarkedDirty: time.Now(),
 			service:         newServiceKey(*apiService.Spec.Service),
@@ -432,6 +471,42 @@ func (dm *discoveryManager) RemoveAPIService(apiServiceName string) {
 	delete(dm.apiServices, apiServiceName)
 
 	dm.dirtyAPIServiceQueue.Add(apiServiceName)
+}
+
+func (dm *discoveryManager) LocalServicesSynced() bool {
+	dm.servicesLock.RLock()
+	defer dm.servicesLock.RUnlock()
+
+	// Make sure each local delegate has been contacted, and that each GroupVersion
+	// in their discovery document has been added to the mergedResourceManager
+	for key, target := range dm.localDelegates {
+		cached, err := dm.fetchFreshDiscoveryForService(metav1.GroupVersion{},
+			groupVersionInfo{
+				lastMarkedDirty: time.Now(),
+				service:         serviceKey{LocalName: key},
+				handler:         target.UnprotectedHandler(),
+			})
+		if err != nil {
+			return false
+		}
+
+		// Make sure each APIService pointing to local delegate has been contacted
+		for gv := range cached.discovery {
+			info, exists := dm.apiServices[gv.Version+"."+gv.Group]
+			if !exists {
+				return false
+			} else if len(info.service.LocalName) == 0 {
+				// Skip external APIServices
+				continue
+			}
+
+			if !info.reconciledOnce {
+				return false
+			}
+		}
+	}
+	// If we reach this point all local services had reconciled at least once
+	return true
 }
 
 // !TODO: This was copied from staging/src/k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator/downloader.go

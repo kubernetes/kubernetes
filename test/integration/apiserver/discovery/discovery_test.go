@@ -191,7 +191,7 @@ func TestAggregatedAPIServiceDiscovery(t *testing.T) {
 	require.NoError(t, wait.PollWithContext(
 		ctx,
 		250*time.Millisecond,
-		5*time.Second,
+		1*time.Second,
 		func(ctx context.Context) (done bool, err error) {
 			result := client.
 				Discovery().

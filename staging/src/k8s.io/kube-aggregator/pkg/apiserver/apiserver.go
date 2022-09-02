@@ -18,6 +18,7 @@ package apiserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -35,6 +36,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/version"
+	"k8s.io/client-go/tools/cache"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
@@ -401,10 +403,17 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-discovery-controller", func(context genericapiserver.PostStartHookContext) error {
 			// Run discovery manager's worker to watch for new/removed/updated
 			// APIServices to the discovery document can be updated at runtime
-			//
-			// Run populates only the local APIServices and returns an error if
-			// there was any.
-			return s.discoveryAggregationController.Run(context.StopCh)
+			go s.discoveryAggregationController.Run(context.StopCh)
+
+			// Wait for local APIServices to sync
+			if !cache.WaitForNamedCacheSync(
+				"discovery-aggregation",
+				context.StopCh,
+				s.discoveryAggregationController.LocalServicesSynced,
+			) {
+				return errors.New("failed to sync local discovery information")
+			}
+			return nil
 		})
 	}
 
