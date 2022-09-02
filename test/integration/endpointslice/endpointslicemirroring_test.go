@@ -528,6 +528,153 @@ func TestEndpointSliceMirroringSelectorTransition(t *testing.T) {
 	}
 }
 
+func TestEndpointSliceMirroringDeleteWhenEndpoointSliceMirroringControllerRestart(t *testing.T) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client, err := clientset.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	resyncPeriod := 12 * time.Hour
+	informer := informers.NewSharedInformerFactory(client, resyncPeriod)
+
+	epsmController := endpointslicemirroring.NewController(
+		informer.Core().V1().Endpoints(),
+		informer.Discovery().V1().EndpointSlices(),
+		informer.Core().V1().Services(),
+		int32(100),
+		client,
+		1*time.Second)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	// Start informer and controllers
+	stopCh := make(chan struct{})
+	closedCh := make(chan struct{})
+	informer.Start(stopCh)
+	go func() {
+		epsmController.Run(1, stopCh)
+		closedCh <- struct{}{}
+	}()
+
+	// 1. create service, endpoint, wait controller to mirror.
+	ns := framework.CreateNamespaceOrDie(client, "test-endpointslice-mirroring", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-123",
+			Namespace: ns.Name,
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{{
+				Port: int32(80),
+			}},
+		},
+	}
+
+	customEndpoints := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "test-123",
+			Namespace:   ns.Name,
+			Labels:      map[string]string{},
+			Annotations: map[string]string{},
+		},
+		Subsets: []corev1.EndpointSubset{{
+			Ports: []corev1.EndpointPort{{
+				Port: 80,
+			}},
+			Addresses: []corev1.EndpointAddress{{
+				IP: "10.0.0.1",
+			}},
+		}},
+	}
+
+	_, err = client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating service: %v", err)
+	}
+
+	_, err = client.CoreV1().Endpoints(ns.Name).Create(ctx, customEndpoints, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating endpoints: %v", err)
+	}
+
+	// verify the expected number of mirrored slices exist
+	err = waitForMirroredSlices(t, client, ns.Name, service.Name, 1)
+	if err != nil {
+		t.Fatalf("Timed out waiting for initial mirrored slices to match expectations: %v", err)
+	}
+
+	//2. restart mirroring controller
+	close(stopCh)
+	<-closedCh
+
+	informer = informers.NewSharedInformerFactory(client, resyncPeriod)
+	epsmController = endpointslicemirroring.NewController(
+		informer.Core().V1().Endpoints(),
+		informer.Discovery().V1().EndpointSlices(),
+		informer.Core().V1().Services(),
+		int32(100),
+		client,
+		1*time.Second)
+	informer.Start(ctx.Done())
+	wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		if epsmController.Queue().Len() == 1 {
+			return true, nil
+		}
+		return false, nil
+	})
+	go epsmController.Run(1, ctx.Done())
+	wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		if epsmController.Queue().Len() == 0 {
+			return true, nil
+		}
+		return false, nil
+	})
+
+	// delete endpointslice
+	lSelector := discovery.LabelServiceName + "=" + service.Name
+	lSelector += "," + discovery.LabelManagedBy + "=endpointslicemirroring-controller.k8s.io"
+	esList, err := client.DiscoveryV1().EndpointSlices(ns.Name).List(context.TODO(), metav1.ListOptions{LabelSelector: lSelector})
+	if err != nil {
+		t.Fatalf("Error listing EndpointSlices: %v", err)
+	}
+	if len(esList.Items) == 0 {
+		t.Fatalf("expected endpoint(%s/%s) mirrored endpointslice not found", customEndpoints.Namespace, customEndpoints.Name)
+	}
+
+	err = client.DiscoveryV1().EndpointSlices(ns.Name).Delete(ctx, esList.Items[0].Name, metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatalf("Error deleting EndpointSlices(%s/%s): %v", ns.Name, esList.Items[0].Name, err)
+	}
+
+	oldUID := esList.Items[0].UID
+	// wait endpoint slice to be deleted
+	err = wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		esList, err := client.DiscoveryV1().EndpointSlices(ns.Name).List(context.TODO(), metav1.ListOptions{LabelSelector: lSelector})
+		if err != nil {
+			t.Logf("Error listing EndpointSlices: %v", err)
+			return false, err
+		}
+		if len(esList.Items) == 0 {
+			t.Logf("List endpoint(%s/%s) mirrored endpointslice not found", customEndpoints.Namespace, customEndpoints.Name)
+			return false, nil
+		}
+		if esList.Items[0].UID != oldUID {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("Timed out waiting for mirrored slices recreate to match expectations: %v", err)
+	}
+
+}
+
 func waitForMirroredSlices(t *testing.T, client *clientset.Clientset, nsName, svcName string, num int) error {
 	t.Helper()
 	return wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {

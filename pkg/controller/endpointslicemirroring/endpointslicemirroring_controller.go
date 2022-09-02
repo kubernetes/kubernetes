@@ -228,6 +228,12 @@ func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
 	<-stopCh
 }
 
+// Queue return Controller ratelimit queue
+// only for testing
+func (c *Controller) Queue() workqueue.RateLimitingInterface {
+	return c.queue
+}
+
 // worker runs a worker thread that just dequeues items, processes them, and
 // marks them done. You may run as many of these in parallel as you wish; the
 // workqueue guarantees that they will not end up processing the same service
