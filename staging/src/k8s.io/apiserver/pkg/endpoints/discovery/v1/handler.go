@@ -18,6 +18,7 @@ package v1
 
 import (
 	"net/http"
+	"sort"
 	"sync"
 
 	"github.com/emicklei/go-restful/v3"
@@ -81,8 +82,7 @@ type resourceDiscoveryManager struct {
 
 	// Writes protected by the lock. List if all apigroups & resources indexed
 	// by the resource manager
-	apiGroups     map[string]*metav1.APIGroupDiscovery
-	apiGroupNames []string // apiGroupNames preserves insertion order
+	apiGroups map[string]*metav1.APIGroupDiscovery
 
 	serializer runtime.NegotiatedSerializer
 	cachedGroupList
@@ -105,7 +105,6 @@ func (rdm *resourceDiscoveryManager) SetGroups(groups []metav1.APIGroupDiscovery
 	defer rdm.lock.Unlock()
 
 	rdm.apiGroups = nil
-	rdm.apiGroupNames = nil
 	rdm.cachedGroupList = cachedGroupList{}
 
 	for _, group := range groups {
@@ -168,7 +167,6 @@ func (rdm *resourceDiscoveryManager) addGroupVersionLocked(groupName string, val
 			},
 			Versions: []metav1.APIVersionDiscovery{value},
 		}
-		rdm.apiGroupNames = append(rdm.apiGroupNames, groupName)
 	}
 
 	// Reset response document so it is recreated lazily
@@ -193,12 +191,6 @@ func (rdm *resourceDiscoveryManager) RemoveGroupVersion(apiGroup metav1.GroupVer
 
 	if len(group.Versions) == 0 {
 		delete(rdm.apiGroups, group.Name)
-		for i := range rdm.apiGroupNames {
-			if rdm.apiGroupNames[i] == group.Name {
-				rdm.apiGroupNames = append(rdm.apiGroupNames[:i], rdm.apiGroupNames[i+1:]...)
-				break
-			}
-		}
 	}
 
 	// Reset response document so it is recreated lazily
@@ -210,12 +202,6 @@ func (rdm *resourceDiscoveryManager) RemoveGroup(groupName string) {
 	defer rdm.lock.Unlock()
 
 	delete(rdm.apiGroups, groupName)
-	for i := range rdm.apiGroupNames {
-		if rdm.apiGroupNames[i] == groupName {
-			rdm.apiGroupNames = append(rdm.apiGroupNames[:i], rdm.apiGroupNames[i+1:]...)
-			break
-		}
-	}
 
 	// Reset response document so it is recreated lazily
 	rdm.cachedGroupList = cachedGroupList{}
@@ -259,10 +245,15 @@ func (rdm *resourceDiscoveryManager) ServeHTTP(resp http.ResponseWriter, req *ht
 		response, etag = rdm.cachedResponse, rdm.cachedResponseETag
 		if response == nil {
 			// Re-order the apiGroups by their insertion order
-			orderedGroups := []metav1.APIGroupDiscovery{}
-			for _, groupName := range rdm.apiGroupNames {
-				orderedGroups = append(orderedGroups, *rdm.apiGroups[groupName])
+			groups := []metav1.APIGroupDiscovery{}
+			for _, v := range rdm.apiGroups {
+				groups = append(groups, *v)
 			}
+
+			// Sort groups by name to keep order consistent
+			sort.Slice(groups, func(i, j int) bool {
+				return groups[i].Name < groups[j].Name
+			})
 
 			var err error
 			response = &metav1.APIGroupDiscoveryList{
@@ -270,7 +261,7 @@ func (rdm *resourceDiscoveryManager) ServeHTTP(resp http.ResponseWriter, req *ht
 					Kind:       "APIGroupDiscoveryList",
 					APIVersion: "v1",
 				},
-				Groups: orderedGroups,
+				Groups: groups,
 			}
 			etag, err = CalculateETag(response)
 
