@@ -374,7 +374,9 @@ func createPodWithVolumeAndNodeSelector(client clientset.Interface, namespace st
 	for _, volumePath := range volumePaths {
 		isAttached, err := diskIsAttached(volumePath, nodeName)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(isAttached, true, "disk:"+volumePath+" is not attached with the node")
+		if !isAttached {
+			framework.Failf("Volume: %s is not attached to the node: %v", volumePath, nodeName)
+		}
 	}
 	return pod
 }

@@ -152,7 +152,9 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	gomega.Expect(e2epod.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(gomega.Succeed())
 
 	isAttached, err := diskIsAttached(pv.Spec.VsphereVolume.VolumePath, nodeName)
-	framework.ExpectEqual(isAttached, true)
+	if !isAttached {
+		framework.Failf("Volume: %s is not attached to the node: %v", pv.Spec.VsphereVolume.VolumePath, nodeName)
+	}
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Verify Disk Format")
@@ -198,7 +200,9 @@ func verifyDiskFormat(client clientset.Interface, nodeName string, pvVolumePath 
 		}
 	}
 
-	framework.ExpectEqual(diskFound, true, "Failed to find disk")
+	if !diskFound {
+		framework.Failf("Failed to find disk: %s", pvVolumePath)
+	}
 	isDiskFormatCorrect := false
 	if diskFormat == "eagerzeroedthick" {
 		if eagerlyScrub == true && thinProvisioned == false {

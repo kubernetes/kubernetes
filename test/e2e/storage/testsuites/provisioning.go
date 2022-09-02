@@ -701,7 +701,9 @@ func (t StorageClassTest) checkProvisioning(client clientset.Interface, claim *v
 				break
 			}
 		}
-		framework.ExpectEqual(found, true)
+		if !found {
+			framework.Failf("Actual access modes %v are not in claim's access mode", pv.Spec.AccessModes)
+		}
 	}
 
 	framework.ExpectEqual(pv.Spec.ClaimRef.Name, claim.ObjectMeta.Name)

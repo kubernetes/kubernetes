@@ -108,7 +108,9 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() 
 		ginkgo.By("Verify disk should be attached to the node")
 		isAttached, err := diskIsAttached(volumePath, node)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(isAttached, true, "disk is not attached with the node")
+		if !isAttached {
+			framework.Failf("Disk %s is not attached with the node", volumePath)
+		}
 	})
 
 	ginkgo.AfterEach(func() {

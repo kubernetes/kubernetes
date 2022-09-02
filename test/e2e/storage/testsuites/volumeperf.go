@@ -19,13 +19,14 @@ package testsuites
 import (
 	"context"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+
 	"github.com/onsi/ginkgo/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -219,7 +220,9 @@ func createPerformanceStats(stats *performanceStats, provisionCount int, pvcs []
 	var min, max, sum time.Duration
 	for _, pvc := range pvcs {
 		pvcMetric, ok := stats.perObjectInterval[pvc.Name]
-		framework.ExpectEqual(ok, true)
+		if !ok {
+			framework.Failf("PVC %s not found in perObjectInterval", pvc.Name)
+		}
 
 		elapsedTime := pvcMetric.elapsed
 		sum += elapsedTime
@@ -271,7 +274,9 @@ func newPVCWatch(f *framework.Framework, provisionCount int, pvcMetrics *perform
 		// Check if PVC entered the bound state
 		if oldPVC.Status.Phase != v1.ClaimBound && newPVC.Status.Phase == v1.ClaimBound {
 			newPVCInterval, ok := pvcMetrics.perObjectInterval[newPVC.Name]
-			framework.ExpectEqual(ok, true, "PVC %s should exist in interval map already", newPVC.Name)
+			if !ok {
+				framework.Failf("PVC %s should exist in interval map already", newPVC.Name)
+			}
 			count++
 			newPVCInterval.enterDesiredState = now
 			newPVCInterval.elapsed = now.Sub(newPVCInterval.create)
@@ -299,9 +304,13 @@ func newPVCWatch(f *framework.Framework, provisionCount int, pvcMetrics *perform
 		cache.ResourceEventHandlerFuncs{
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				oldPVC, ok := oldObj.(*v1.PersistentVolumeClaim)
-				framework.ExpectEqual(ok, true)
+				if !ok {
+					framework.Failf("Expected a PVC, got instead an old object of type %T", oldObj)
+				}
 				newPVC, ok := newObj.(*v1.PersistentVolumeClaim)
-				framework.ExpectEqual(ok, true)
+				if !ok {
+					framework.Failf("Expected a PVC, got instead a new object of type %T", newObj)
+				}
 
 				checkPVCBound(oldPVC, newPVC)
 			},
