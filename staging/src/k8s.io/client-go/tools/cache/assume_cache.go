@@ -24,7 +24,7 @@ import (
 	"k8s.io/klog/v2"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -37,14 +37,15 @@ type AssumeCacheInformer interface {
 }
 
 // AssumeCache is a cache on top of the informer that allows for updating
-// objects outside of informer events and also restoring the informer
-// cache's version of the object.  Objects are assumed to be
-// Kubernetes API objects that implement meta.Interface.
+// objects outside of informer events and also restoring the informer cache's
+// version of the object. Objects must be Kubernetes API objects that implement
+// metav1.Object and must have an increasing integer number as
+// ResourceVersion.
 //
 // Methods with log output support contextual logging by taking an explicit
 // logger parameter. The log level at which info messages get emitted
 // is 4 or higher.
-type AssumeCache[T any] interface {
+type AssumeCache[T metav1.Object] interface {
 	// Assume updates the object in-memory only
 	Assume(logger klog.Logger, obj T) error
 
@@ -110,7 +111,7 @@ func (e *errObjectName) Error() string {
 // Assume() only updates the latest object pointer.
 // Restore() sets the latest object pointer back to the informer object.
 // Get/List() always returns the latest object pointer.
-type assumeCache[T any] struct {
+type assumeCache[T metav1.Object] struct {
 	logger klog.Logger
 
 	// Synchronizes updates to store and eventHandlers
@@ -123,25 +124,25 @@ type assumeCache[T any] struct {
 	store Indexer
 
 	// Index function for object
-	indexFunc IndexFunc
+	indexFunc func(obj T) ([]string, error)
 	indexName string
 
 	eventHandlers []ResourceEventHandler
 }
 
-type objInfo struct {
+type objInfo[T any] struct {
 	// name of the object
 	name string
 
 	// Latest version of object could be cached-only or from informer
-	latestObj interface{}
+	latestObj T
 
 	// Latest object from informer
-	apiObj interface{}
+	apiObj T
 }
 
 func objInfoKeyFunc[T any](obj interface{}) (string, error) {
-	objInfo, err := Typecast[*objInfo](obj)
+	objInfo, err := Typecast[*objInfo[T]](obj)
 	if err != nil {
 		return "", err
 	}
@@ -149,7 +150,7 @@ func objInfoKeyFunc[T any](obj interface{}) (string, error) {
 }
 
 func (c *assumeCache[T]) objInfoIndexFunc(obj interface{}) ([]string, error) {
-	objInfo, err := Typecast[*objInfo](obj)
+	objInfo, err := Typecast[*objInfo[T]](obj)
 	if err != nil {
 		// []string{""} is from the original implementation of the assumeCache, but seems odd.
 		return []string{""}, err
@@ -159,7 +160,7 @@ func (c *assumeCache[T]) objInfoIndexFunc(obj interface{}) ([]string, error) {
 
 // NewAssumeCache creates an assume cache for general objects.
 // The logger is used for callbacks from the informer.
-func NewAssumeCache[T any](logger klog.Logger, informer AssumeCacheInformer, description, indexName string, indexFunc IndexFunc) AssumeCache[T] {
+func NewAssumeCache[T metav1.Object](logger klog.Logger, informer AssumeCacheInformer, description, indexName string, indexFunc func(obj T) ([]string, error)) AssumeCache[T] {
 	c := &assumeCache[T]{
 		logger:      logger,
 		description: description,
@@ -197,11 +198,13 @@ func (c *assumeCache[T]) add(obj interface{}) {
 		return
 	}
 
-	name, err := MetaNamespaceKeyFunc(obj)
+	objT, err := Typecast[T](obj)
 	if err != nil {
-		c.logger.Error(&errObjectName{err}, "Add failed")
+		c.logger.Error(err, "Add failed")
 		return
 	}
+
+	name := getObjName(objT)
 
 	c.rwMutex.Lock()
 	for _, handler := range c.eventHandlers {
@@ -211,7 +214,7 @@ func (c *assumeCache[T]) add(obj interface{}) {
 	defer c.rwMutex.Unlock()
 
 	if objInfo := c.getObjInfoNoError(name); objInfo != nil {
-		newVersion, err := c.getObjVersion(name, obj)
+		newVersion, err := c.getObjVersion(name, objT)
 		if err != nil {
 			c.logger.Error(err, "Add failed: couldn't get object version")
 			return
@@ -231,11 +234,11 @@ func (c *assumeCache[T]) add(obj interface{}) {
 		}
 	}
 
-	objInfo := &objInfo{name: name, latestObj: obj, apiObj: obj}
+	objInfo := &objInfo[T]{name: name, latestObj: objT, apiObj: objT}
 	if err = c.store.Update(objInfo); err != nil {
 		c.logger.Info("Error occurred while updating stored object", "err", err)
 	} else {
-		c.logger.V(10).Info("Adding object to assume cache", "description", c.description, "cacheKey", name, "assumeCache", obj)
+		c.logger.V(10).Info("Adding object to assume cache", "description", c.description, "cacheKey", name, "assumeCache", objT)
 	}
 }
 
@@ -244,11 +247,13 @@ func (c *assumeCache[T]) update(oldObj interface{}, newObj interface{}) {
 		return
 	}
 
-	name, err := MetaNamespaceKeyFunc(newObj)
+	objT, err := Typecast[T](newObj)
 	if err != nil {
-		c.logger.Error(&errObjectName{err}, "Update failed")
+		c.logger.Error(err, "Update failed")
 		return
 	}
+
+	name := getObjName(objT)
 
 	c.rwMutex.Lock()
 	for _, handler := range c.eventHandlers {
@@ -258,7 +263,7 @@ func (c *assumeCache[T]) update(oldObj interface{}, newObj interface{}) {
 	defer c.rwMutex.Unlock()
 
 	if objInfo, _ := c.getObjInfo(name); objInfo != nil {
-		newVersion, err := c.getObjVersion(name, newObj)
+		newVersion, err := c.getObjVersion(name, objT)
 		if err != nil {
 			klog.ErrorS(err, "Add failed: couldn't get object version")
 			return
@@ -278,11 +283,11 @@ func (c *assumeCache[T]) update(oldObj interface{}, newObj interface{}) {
 		}
 	}
 
-	objInfo := &objInfo{name: name, latestObj: newObj, apiObj: newObj}
+	objInfo := &objInfo[T]{name: name, latestObj: objT, apiObj: objT}
 	if err = c.store.Update(objInfo); err != nil {
 		c.logger.Info("Error occurred while updating stored object", "err", err)
 	} else {
-		c.logger.V(10).Info("Adding object to assume cache", "description", c.description, "cacheKey", name, "assumeCache", newObj)
+		c.logger.V(10).Info("Adding object to assume cache", "description", c.description, "cacheKey", name, "assumeCache", objT)
 	}
 }
 
@@ -291,11 +296,16 @@ func (c *assumeCache[T]) delete(obj interface{}) {
 		return
 	}
 
-	name, err := DeletionHandlingMetaNamespaceKeyFunc(obj)
+	if d, ok := obj.(DeletedFinalStateUnknown); ok {
+		obj = d.Obj
+	}
+	objT, err := Typecast[T](obj)
 	if err != nil {
-		c.logger.Error(&errObjectName{err}, "Delete failed")
+		c.logger.Error(err, "Delete failed")
 		return
 	}
+
+	name := getObjName(objT)
 
 	c.rwMutex.Lock()
 	for _, handler := range c.eventHandlers {
@@ -304,27 +314,32 @@ func (c *assumeCache[T]) delete(obj interface{}) {
 	}
 	defer c.rwMutex.Unlock()
 
-	objInfo := &objInfo{name: name}
+	objInfo := &objInfo[T]{name: name}
 	err = c.store.Delete(objInfo)
 	if err != nil {
 		c.logger.Error(err, "Failed to delete", "description", c.description, "cacheKey", name)
 	}
 }
 
-func (c *assumeCache[T]) getObjVersion(name string, obj interface{}) (int64, error) {
-	objAccessor, err := meta.Accessor(obj)
+func (c *assumeCache[T]) getObjVersion(name string, obj metav1.Object) (int64, error) {
+	resourceVersion := obj.GetResourceVersion()
+	objResourceVersion, err := strconv.ParseInt(resourceVersion, 10, 64)
 	if err != nil {
-		return -1, err
-	}
-
-	objResourceVersion, err := strconv.ParseInt(objAccessor.GetResourceVersion(), 10, 64)
-	if err != nil {
-		return -1, fmt.Errorf("error parsing ResourceVersion %q for %v %q: %s", objAccessor.GetResourceVersion(), c.description, name, err)
+		return -1, fmt.Errorf("error parsing ResourceVersion %q for %v %q: %s", resourceVersion, c.description, name, err)
 	}
 	return objResourceVersion, nil
 }
 
-func (c *assumeCache[T]) getObjInfo(name string) (*objInfo, error) {
+func getObjName(obj metav1.Object) string {
+	namespace := obj.GetNamespace()
+	name := obj.GetName()
+	if namespace != "" {
+		return namespace + "/" + name
+	}
+	return name
+}
+
+func (c *assumeCache[T]) getObjInfo(name string) (*objInfo[T], error) {
 	obj, ok, err := c.store.GetByKey(name)
 	if err != nil {
 		return nil, err
@@ -333,19 +348,21 @@ func (c *assumeCache[T]) getObjInfo(name string) (*objInfo, error) {
 		return nil, apierrors.NewNotFound(schema.GroupResource{Resource: c.description}, name)
 	}
 
-	return Typecast[*objInfo](obj)
+	return Typecast[*objInfo[T]](obj)
 }
 
 // getObjInfoNoError avoids allocating an error that add above would
 // just discard again.
-func (c *assumeCache[T]) getObjInfoNoError(name string) *objInfo {
+func (c *assumeCache[T]) getObjInfoNoError(name string) *objInfo[T] {
 	obj, ok, err := c.store.GetByKey(name)
 	if err != nil || !ok {
 		return nil
 	}
-	if info, err := Typecast[*objInfo](obj); err == nil {
+
+	if info, err := Typecast[*objInfo[T]](obj); err == nil {
 		return info
 	}
+
 	return nil
 }
 
@@ -358,7 +375,7 @@ func (c *assumeCache[T]) Get(objName string) (obj T, finalErr error) {
 		finalErr = err
 		return
 	}
-	return Typecast[T](objInfo.latestObj)
+	return objInfo.latestObj, nil
 }
 
 func (c *assumeCache[T]) GetAPIObj(objName string) (obj T, finalErr error) {
@@ -370,7 +387,7 @@ func (c *assumeCache[T]) GetAPIObj(objName string) (obj T, finalErr error) {
 		finalErr = err
 		return
 	}
-	return Typecast[T](objInfo.apiObj)
+	return objInfo.apiObj, nil
 }
 
 func (c *assumeCache[T]) List(indexObj T) []T {
@@ -378,24 +395,19 @@ func (c *assumeCache[T]) List(indexObj T) []T {
 	defer c.rwMutex.RUnlock()
 
 	allObjs := []T{}
-	objs, err := c.store.Index(c.indexName, &objInfo{latestObj: indexObj})
+	objs, err := c.store.Index(c.indexName, &objInfo[T]{latestObj: indexObj})
 	if err != nil {
 		c.logger.Error(err, "List index error")
 		return nil
 	}
 
 	for _, obj := range objs {
-		objInfo, err := Typecast[*objInfo](obj)
+		objInfo, err := Typecast[*objInfo[T]](obj)
 		if err != nil {
 			c.logger.Error(err, "List error")
 			continue
 		}
-		t, err := Typecast[T](objInfo.latestObj)
-		if err != nil {
-			c.logger.Error(err, "List error")
-			continue
-		}
-		allObjs = append(allObjs, t)
+		allObjs = append(allObjs, objInfo.latestObj)
 	}
 	return allObjs
 }

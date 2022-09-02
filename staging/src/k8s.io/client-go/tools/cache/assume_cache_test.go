@@ -56,11 +56,8 @@ func (c pvAssumeCache) ListPVs(storageClassName string) []*persistentVolume {
 	})
 }
 
-func pvStorageClassIndexFunc(obj interface{}) ([]string, error) {
-	if pv, ok := obj.(*persistentVolume); ok {
-		return []string{pv.storageClassName}, nil
-	}
-	return []string{""}, fmt.Errorf("object is not a persistentVolume: %v", obj)
+func pvStorageClassIndexFunc(pv *persistentVolume) ([]string, error) {
+	return []string{pv.storageClassName}, nil
 }
 
 func newPVAssumeCache(logger klog.Logger, informer AssumeCacheInformer) pvAssumeCache {
