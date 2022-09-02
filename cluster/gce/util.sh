@@ -2576,11 +2576,13 @@ function create-cloud-nat-router() {
 }
 
 function delete-all-firewall-rules() {
-  if fws=$(gcloud compute firewall-rules list --project "${NETWORK_PROJECT}" --filter="network=${NETWORK}" --format="value(name)"); then
-    echo "Deleting firewall rules remaining in network ${NETWORK}: ${fws}"
-    delete-firewall-rules "$fws"
+  local -a fws
+  kube::util::read-array fws < <(gcloud compute firewall-rules list --project "${NETWORK_PROJECT}" --filter="network=${NETWORK}" --format="value(name)")
+  if (( "${#fws[@]}" > 0 )); then
+    echo "Deleting firewall rules remaining in network ${NETWORK}: ${fws[*]}"
+    delete-firewall-rules "${fws[@]}"
   else
-    echo "Failed to list firewall rules from the network ${NETWORK}"
+    echo "No firewall rules in network ${NETWORK}"
   fi
 }
 
