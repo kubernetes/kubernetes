@@ -64,6 +64,10 @@ type DiscoveryAggregationController interface {
 	// Returns true if all GVs of local APIServices have been added as an
 	// APIService and synced to the discovery document
 	LocalServicesSynced() bool
+
+	// Returns true if all non-local APIServices that have been added
+	// are synced at least once to the discovery document
+	ExternalServicesSynced() bool
 }
 
 type discoveryManager struct {
@@ -161,9 +165,8 @@ type groupVersionInfo struct {
 	// was stored, the discovery document will always be re-fetched.
 	lastMarkedDirty time.Time
 
-	// This is true if the GV has been visited by the reconciler at least once
-	// so that its GV is included in the discovery document
-	reconciledOnce bool
+	// Last time sync funciton was run for this GV.
+	lastReconciled time.Time
 
 	// ServiceReference of this GroupVersion. This identifies the Service which
 	// describes how to contact the server responsible for this GroupVersion.
@@ -379,14 +382,13 @@ func (dm *discoveryManager) syncAPIService(apiServiceName string) error {
 	}
 
 	// Lookup last cached result for this apiservice's service.
+	now := time.Now()
 	cached, err := dm.fetchFreshDiscoveryForService(mgv, info)
 
-	if !info.reconciledOnce {
-		dm.servicesLock.Lock()
-		info.reconciledOnce = true
-		dm.apiServices[apiServiceName] = info
-		dm.servicesLock.Unlock()
-	}
+	dm.servicesLock.Lock()
+	info.lastReconciled = now
+	dm.apiServices[apiServiceName] = info
+	dm.servicesLock.Unlock()
 
 	if err != nil {
 		// There was an error fetching discovery for this APIService.
@@ -533,6 +535,19 @@ func (dm *discoveryManager) RemoveAPIService(apiServiceName string) {
 	dm.dirtyAPIServiceQueue.Add(apiServiceName)
 }
 
+func (dm *discoveryManager) ExternalServicesSynced() bool {
+	dm.servicesLock.RLock()
+	defer dm.servicesLock.RUnlock()
+
+	for _, info := range dm.apiServices {
+		if info.lastMarkedDirty.After(info.lastReconciled) {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (dm *discoveryManager) LocalServicesSynced() bool {
 	dm.servicesLock.RLock()
 	defer dm.servicesLock.RUnlock()
@@ -560,7 +575,7 @@ func (dm *discoveryManager) LocalServicesSynced() bool {
 				continue
 			}
 
-			if !info.reconciledOnce {
+			if info.lastMarkedDirty.After(info.lastReconciled) {
 				return false
 			}
 		}
