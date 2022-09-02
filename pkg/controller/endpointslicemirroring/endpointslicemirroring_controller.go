@@ -488,12 +488,15 @@ func (c *Controller) onEndpointSliceDelete(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("onEndpointSliceDelete() expected type discovery.EndpointSlice, got %T", obj))
 		return
 	}
-	if managedByController(endpointSlice) && c.endpointSliceTracker.Has(endpointSlice) {
-		// This returns false if we didn't expect the EndpointSlice to be
-		// deleted. If that is the case, we queue the Service for another sync.
-		if !c.endpointSliceTracker.HandleDeletion(endpointSlice) {
-			c.queueEndpointsForEndpointSlice(endpointSlice)
-		}
+	// if endpoint not managed by controller, just skip this EndpointSlice
+	if !managedByController(endpointSlice) {
+		return
+	}
+	// requeue the service for another sync, if
+	// 1. endpointSliceTracker don't has EndpointSlice.
+	// 2. tracker not expected this EndpointSlice to be deleted
+	if !c.endpointSliceTracker.Has(endpointSlice) || !c.endpointSliceTracker.HandleDeletion(endpointSlice) {
+		c.queueEndpointsForEndpointSlice(endpointSlice)
 	}
 }
 

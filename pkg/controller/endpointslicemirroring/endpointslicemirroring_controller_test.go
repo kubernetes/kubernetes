@@ -474,3 +474,95 @@ func generateAddresses(num int) []v1.EndpointAddress {
 	}
 	return addresses
 }
+
+func TestController_onEndpointSliceDelete(t *testing.T) {
+	testCases := []struct {
+		name                                 string
+		endpointSlice                        *discovery.EndpointSlice
+		expectedRequeue                      bool
+		needUpdateInEndpointSliceTracker     bool
+		needMarkDeleteInEndpointSliceTracker bool
+	}{
+		{
+			name:                                 "delete EndpointSlice not managed by controller",
+			expectedRequeue:                      false,
+			needUpdateInEndpointSliceTracker:     false,
+			needMarkDeleteInEndpointSliceTracker: false,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "example-1",
+					Namespace: "ns1",
+					Labels: map[string]string{
+						discovery.LabelServiceName: "svc1",
+					},
+				},
+			},
+		},
+		{
+			name:                                 "EndpointSlice doesn't exist in endpointSliceTracker",
+			expectedRequeue:                      true,
+			needUpdateInEndpointSliceTracker:     false,
+			needMarkDeleteInEndpointSliceTracker: false,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "example-1",
+					Namespace: "ns1",
+					Labels: map[string]string{
+						discovery.LabelServiceName: "svc1",
+						discovery.LabelManagedBy:   controllerName,
+					},
+					UID: "7c693a5d-aa3e-46f3-9a6d-54a83e5813cc",
+				},
+			},
+		},
+		{
+			name:                                 "EndpointSlice exist in endpointSliceTracker, but marked deleted",
+			expectedRequeue:                      false,
+			needUpdateInEndpointSliceTracker:     true,
+			needMarkDeleteInEndpointSliceTracker: true,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "example-1",
+					Namespace: "ns1",
+					Labels: map[string]string{
+						discovery.LabelServiceName: "svc1",
+						discovery.LabelManagedBy:   controllerName,
+					},
+					UID: "7c693a5d-aa3e-46f3-9a6d-54a83e5813cc",
+				},
+			},
+		},
+		{
+			name:                                 "EndpointSlice exist in endpointSliceTracker, not marked deleted",
+			expectedRequeue:                      true,
+			needUpdateInEndpointSliceTracker:     true,
+			needMarkDeleteInEndpointSliceTracker: false,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "example-1",
+					Namespace: "ns1",
+					Labels: map[string]string{
+						discovery.LabelServiceName: "svc1",
+						discovery.LabelManagedBy:   controllerName,
+					},
+					UID: "7c693a5d-aa3e-46f3-9a6d-54a83e5813cc",
+				},
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			_, c := newController(time.Duration(0))
+			if testCase.needUpdateInEndpointSliceTracker {
+				c.endpointSliceTracker.Update(testCase.endpointSlice)
+			}
+			if testCase.needMarkDeleteInEndpointSliceTracker {
+				c.endpointSliceTracker.ExpectDeletion(testCase.endpointSlice)
+			}
+			c.onEndpointSliceDelete(testCase.endpointSlice)
+			if (c.queue.Len() != 0) != testCase.expectedRequeue {
+				t.Errorf("Expected requeue %t to be returned, got %t", testCase.expectedRequeue, c.queue.Len() != 0)
+			}
+		})
+	}
+}
