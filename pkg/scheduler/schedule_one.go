@@ -398,11 +398,9 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 		if !s.IsUnschedulable() {
 			return nil, diagnosis, s.AsError()
 		}
-		// All nodes will have the same status. Some non trivial refactoring is
-		// needed to avoid this copy.
-		for _, n := range allNodes {
-			diagnosis.NodeToStatusMap[n.Node().Name] = s
-		}
+		// Record the messages from PreFilter in Diagnosis.PreFilterMsg.
+		diagnosis.PreFilterMsg = s.Message()
+		klog.V(5).InfoS("Status after running PreFilter plugins for pod", "pod", klog.KObj(pod), "status", s)
 		// Status satisfying IsUnschedulable() gets injected into diagnosis.UnschedulablePlugins.
 		if s.FailedPlugin() != "" {
 			diagnosis.UnschedulablePlugins.Insert(s.FailedPlugin())

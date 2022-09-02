@@ -213,7 +213,9 @@ type WeightedAffinityTerm struct {
 type Diagnosis struct {
 	NodeToStatusMap      NodeToStatusMap
 	UnschedulablePlugins sets.String
-	// PostFilterMsg records the messages returned from PostFilterPlugins.
+	// PreFilterMsg records the messages returned from PreFilter plugins.
+	PreFilterMsg string
+	// PostFilterMsg records the messages returned from PostFilter plugins.
 	PostFilterMsg string
 }
 
@@ -224,10 +226,15 @@ type FitError struct {
 	Diagnosis   Diagnosis
 }
 
-// NoNodeAvailableMsg is used to format message when no nodes available.
-const NoNodeAvailableMsg = "0/%v nodes are available"
+const (
+	// NoNodeAvailableMsg is used to format message when no nodes available.
+	NoNodeAvailableMsg = "0/%v nodes are available"
+	// SeparatorFormat is used to separate PreFilterMsg, FilterMsg and PostFilterMsg.
+	SeparatorFormat = " %v."
+)
 
-// Error returns detailed information of why the pod failed to fit on each node
+// Error returns detailed information of why the pod failed to fit on each node.
+// A message format is "0/X nodes are available: <PreFilterMsg>. <FilterMsg>. <PostFilterMsg>."
 func (f *FitError) Error() string {
 	reasons := make(map[string]int)
 	for _, status := range f.Diagnosis.NodeToStatusMap {
@@ -236,6 +243,12 @@ func (f *FitError) Error() string {
 		}
 	}
 
+	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+":", f.NumAllNodes)
+	// Add the messages from PreFilter plugins to reasonMsg.
+	preFilterMsg := f.Diagnosis.PreFilterMsg
+	if preFilterMsg != "" {
+		reasonMsg += fmt.Sprintf(SeparatorFormat, preFilterMsg)
+	}
 	sortReasonsHistogram := func() []string {
 		var reasonStrings []string
 		for k, v := range reasons {
@@ -244,10 +257,14 @@ func (f *FitError) Error() string {
 		sort.Strings(reasonStrings)
 		return reasonStrings
 	}
-	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+": %v.", f.NumAllNodes, strings.Join(sortReasonsHistogram(), ", "))
+	sortedFilterMsg := sortReasonsHistogram()
+	if len(sortedFilterMsg) != 0 {
+		reasonMsg += fmt.Sprintf(SeparatorFormat, strings.Join(sortedFilterMsg, ", "))
+	}
+	// Add the messages from PostFilter plugins to reasonMsg.
 	postFilterMsg := f.Diagnosis.PostFilterMsg
 	if postFilterMsg != "" {
-		reasonMsg += " " + postFilterMsg
+		reasonMsg += fmt.Sprintf(SeparatorFormat, postFilterMsg)
 	}
 	return reasonMsg
 }
