@@ -16,7 +16,7 @@ limitations under the License.
 
 // Package test contains a reusable unit test for logging output and behavior.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This package is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -44,7 +44,7 @@ import (
 // InitKlog must be called once in an init function of a test package to
 // configure klog for testing with Output.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This function is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -61,7 +61,7 @@ func InitKlog() {
 
 // OutputConfig contains optional settings for Output.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -103,7 +103,7 @@ type OutputConfig struct {
 // Loggers will be tested with direct calls to Info or
 // as backend for klog.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This function is EXPERIMENTAL and may be changed or removed in a
 // later release. The test cases and thus the expected output also may

@@ -25,7 +25,7 @@ import (
 // DefaultConfig is the global default logging configuration for a unit
 // test. It is used by NewTestContext and k8s.io/klogr/testing/init.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This variable is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -36,7 +36,7 @@ var DefaultConfig = NewConfig()
 // will receive all log output. Importing k8s.io/klogr/testing/init will add
 // command line flags that modify the configuration of that log output.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This function is EXPERIMENTAL and may be changed or removed in a
 // later release.

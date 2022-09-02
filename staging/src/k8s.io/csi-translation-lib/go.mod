@@ -8,7 +8,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
-	k8s.io/klog/v2 v2.70.1
+	k8s.io/klog/v2 v2.80.0
 )
 
 require (

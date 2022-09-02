@@ -18,7 +18,7 @@ limitations under the License.
 // the flag.CommandLine. This is done during initialization, so merely
 // importing it is enough.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This package is EXPERIMENTAL and may be changed or removed in a
 // later release.
