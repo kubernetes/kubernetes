@@ -65,8 +65,42 @@ func pvStorageClassIndexFunc(obj interface{}) ([]string, error) {
 	return []string{""}, fmt.Errorf("object is not a persistentVolume: %v", obj)
 }
 
-func newPVAssumeCache(informer SharedIndexInformer) pvAssumeCache {
+func newPVAssumeCache(informer AssumeCacheInformer) pvAssumeCache {
 	return pvAssumeCache{NewAssumeCache(informer, "persistentVolume", "storageclass", pvStorageClassIndexFunc)}
+}
+
+// fakeAssumeCacheInformer makes it possible to add/update/delete objects directly.
+type fakeAssumeCacheInformer struct {
+	eventHandlers []ResourceEventHandler
+}
+
+func (fi *fakeAssumeCacheInformer) AddEventHandler(handler ResourceEventHandler) (ResourceEventHandlerRegistration, error) {
+	fi.eventHandlers = append(fi.eventHandlers, handler)
+	return nil, nil
+}
+
+func (fi *fakeAssumeCacheInformer) add(obj interface{}) {
+	for _, handler := range fi.eventHandlers {
+		handler.OnAdd(obj)
+	}
+}
+
+func (fi *fakeAssumeCacheInformer) update(oldObj, newObj interface{}) {
+	for _, handler := range fi.eventHandlers {
+		handler.OnUpdate(oldObj, newObj)
+	}
+}
+
+func (fi *fakeAssumeCacheInformer) delete(obj interface{}) {
+	for _, handler := range fi.eventHandlers {
+		handler.OnDelete(obj)
+	}
+}
+
+func newTestPVAssumeCache() (pvAssumeCache, *fakeAssumeCacheInformer) {
+	internalCache := &fakeAssumeCacheInformer{}
+	cache := newPVAssumeCache(internalCache)
+	return cache, internalCache
 }
 
 func verifyListPVs(t *testing.T, cache pvAssumeCache, expectedPVs map[string]*persistentVolume, storageClassName string) {
@@ -333,5 +367,60 @@ func TestAssumeUpdatePVCache(t *testing.T) {
 	internalCache.add(pv)
 	if err := verifyPV(cache, pvName, &newPV); err != nil {
 		t.Fatalf("failed to get PV after old PV added: %v", err)
+	}
+}
+
+var result interface{}
+
+// BenchmarkAssumePVInformerInput simulates receiving a constant stream of
+// add/update/delete input from the informer.
+func BenchmarkAssumePVInformerInput(b *testing.B) {
+	_, internalCache := newTestPVAssumeCache()
+	pvName := "test-pv0"
+	pv := makePV(pvName, "", "1")
+	pvUpdate := makePV(pvName, "", "2")
+
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		internalCache.add(pv)
+		internalCache.update(pv, pvUpdate)
+		internalCache.delete(pvUpdate)
+	}
+}
+
+// BenchmarkAssumePVGet simulates retrieving the same assumed PV repeatedly.
+func BenchmarkAssumePVGet(b *testing.B) {
+	cache, internalCache := newTestPVAssumeCache()
+	pvName := "test-pv0"
+	pv := makePV(pvName, "", "1")
+	pvUpdate := makePV(pvName, "", "2")
+	internalCache.add(pv)
+	cache.Assume(pvUpdate)
+	var r interface{}
+	var err error
+
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		r, err = cache.Get(pvName)
+		if err != nil {
+			b.Fatalf("unexpected Get error: %v", err)
+		}
+	}
+	result = r
+}
+
+// BenchmarkAssumePVRestore simulates assuming and restoring a PV.
+func BenchmarkAssumePVRestore(b *testing.B) {
+	cache, internalCache := newTestPVAssumeCache()
+	pvName := "test-pv0"
+	pv := makePV(pvName, "", "1")
+	pvUpdate := makePV(pvName, "", "2")
+	internalCache.add(pv)
+	cache.Assume(pvUpdate)
+
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		cache.Assume(pvUpdate)
+		cache.Restore(pvName)
 	}
 }

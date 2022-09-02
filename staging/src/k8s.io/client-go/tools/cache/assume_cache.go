@@ -26,6 +26,14 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 )
 
+// AssumeCacheInformer is the subset of a SharedInformer required by NewAssumeCache.
+type AssumeCacheInformer interface {
+	// AddEventHandler adds an event handler to the shared informer using the shared informer's resync
+	// period. Events to a single handler are delivered sequentially, but there is no coordination
+	// between different handlers.
+	AddEventHandler(handler ResourceEventHandler) (ResourceEventHandlerRegistration, error)
+}
+
 // AssumeCache is a cache on top of the informer that allows for updating
 // objects outside of informer events and also restoring the informer
 // cache's version of the object.  Objects are assumed to be
@@ -126,7 +134,7 @@ func (c *assumeCache) objInfoIndexFunc(obj interface{}) ([]string, error) {
 }
 
 // NewAssumeCache creates an assume cache for general objects.
-func NewAssumeCache(informer SharedIndexInformer, description, indexName string, indexFunc IndexFunc) AssumeCache {
+func NewAssumeCache(informer AssumeCacheInformer, description, indexName string, indexFunc IndexFunc) AssumeCache {
 	c := &assumeCache{
 		description: description,
 		indexFunc:   indexFunc,
