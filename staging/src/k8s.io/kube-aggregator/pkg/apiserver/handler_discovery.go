@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/endpoints"
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/v2"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -247,7 +248,66 @@ func (dm *discoveryManager) fetchFreshDiscoveryForService(gv metav1.GroupVersion
 	case http.StatusNotFound:
 		// Discovery Document is not being served at all.
 		// Fall back to legacy discovery information
-		return errors.New("not found")
+		if len(gv.Version) == 0 {
+			return cached, errors.New("not found")
+		}
+
+		var path string
+		if len(gv.Group) == 0 {
+			path = "/api/" + gv.Version
+		} else {
+			path = "/apis/" + gv.Group + "/" + gv.Version
+		}
+
+		req, err := http.NewRequest("GET", path, nil)
+		if err != nil {
+			// NewRequest should not fail, but if it does for some reason,
+			// log it and continue
+			return cached, fmt.Errorf("failed to create http.Request: %v", err)
+		}
+
+		// Apply aggregator user to request
+		req = req.WithContext(
+			request.WithUser(
+				req.Context(), &user.DefaultInfo{Name: "system:kube-aggregator"}))
+
+		// req.Header.Add("Accept", runtime.ContentTypeProtobuf)
+		req.Header.Add("Accept", runtime.ContentTypeJSON)
+
+		if exists && len(cached.etag) > 0 {
+			req.Header.Add("If-None-Match", cached.etag)
+		}
+
+		writer := newInMemoryResponseWriter()
+		handler.ServeHTTP(writer, req)
+
+		if writer.respCode != http.StatusOK {
+			return cached, fmt.Errorf("failed to download discovery for %s: %v", path, writer.String())
+		}
+
+		parsed := &metav1.APIResourceList{}
+		if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), writer.data, parsed); err != nil {
+			return cached, err
+		}
+
+		// Create a discomap with single group-version
+		discoMap := map[metav1.GroupVersion]metav1.APIVersionDiscovery{
+			// Convert old-style APIGroupList to new information
+			gv: {
+				Version:   gv.Version,
+				Resources: endpoints.ConvertGroupVersionIntoToDiscovery(parsed.APIResources),
+			},
+		}
+
+		cached = cachedResult{
+			discovery:   discoMap,
+			lastUpdated: now,
+		}
+
+		// Don't bother saving result, there is no ETag support on this endpoint
+		dm.cachedResults[info.service] = cached
+
+		return cached, nil
 
 	case http.StatusOK:
 
