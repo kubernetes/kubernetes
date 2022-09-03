@@ -51,46 +51,39 @@ func UpgradeManagedFields(
 	managedFields = append(managedFields, accessor.GetManagedFields()...)
 
 	// Locate SSA manager
-	ssaManagerIndex, ssaManagerExists := findFirstIndex(managedFields,
+	replaceIndex, managerExists := findFirstIndex(managedFields,
 		func(entry metav1.ManagedFieldsEntry) bool {
 			return entry.Manager == ssaManagerName &&
 				entry.Operation == metav1.ManagedFieldsOperationApply &&
 				entry.Subresource == ""
 		})
 
-	if ssaManagerExists {
-		err = unionManagerIntoIndex(managedFields, ssaManagerIndex, csaManagerName)
-		if err != nil {
-			return nil, err
-		}
-
-	} else {
+	if !managerExists {
 		// SSA manager does not exist. Find the most recent matching CSA manager,
 		// convert it to an SSA manager.
 		//
 		// (find first index, since managed fields are sorted so that most recent is
 		//  first in the list)
-		csaManagerIndex, csaManagerExists := findFirstIndex(managedFields,
+		replaceIndex, managerExists = findFirstIndex(managedFields,
 			func(entry metav1.ManagedFieldsEntry) bool {
 				return entry.Manager == csaManagerName &&
 					entry.Operation == metav1.ManagedFieldsOperationUpdate &&
 					entry.Subresource == ""
 			})
 
-		if !csaManagerExists {
+		if !managerExists {
 			// There are no CSA managers that need to be converted. Nothing to do
 			// Return early
 			return obj, nil
 		}
 
 		// Convert CSA manager into SSA manager
-		managedFields[csaManagerIndex].Operation = metav1.ManagedFieldsOperationApply
-		managedFields[csaManagerIndex].Manager = ssaManagerName
-
-		err = unionManagerIntoIndex(managedFields, csaManagerIndex, csaManagerName)
-		if err != nil {
-			return nil, err
-		}
+		managedFields[replaceIndex].Operation = metav1.ManagedFieldsOperationApply
+		managedFields[replaceIndex].Manager = ssaManagerName
+	}
+	err = unionManagerIntoIndex(managedFields, replaceIndex, csaManagerName)
+	if err != nil {
+		return nil, err
 	}
 
 	// Create version of managed fields which has no CSA managers with the given name
