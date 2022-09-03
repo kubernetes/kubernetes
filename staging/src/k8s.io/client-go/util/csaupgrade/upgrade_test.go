@@ -441,8 +441,9 @@ metadata:
 				t.Fatal(err)
 			}
 
-			upgraded, err := csaupgrade.UpgradeManagedFields(
-				&initialObject,
+			upgraded := initialObject.DeepCopy()
+			err = csaupgrade.UpgradeManagedFields(
+				upgraded,
 				testCase.CSAManager,
 				testCase.SSAManager,
 			)

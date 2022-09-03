@@ -40,10 +40,10 @@ func UpgradeManagedFields(
 	obj runtime.Object,
 	csaManagerName string,
 	ssaManagerName string,
-) (runtime.Object, error) {
+) error {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return nil, fmt.Errorf("error accessing object metadata: %w", err)
+		return fmt.Errorf("error accessing object metadata: %w", err)
 	}
 
 	// Create managed fields clone since we modify the values
@@ -74,7 +74,7 @@ func UpgradeManagedFields(
 		if !managerExists {
 			// There are no CSA managers that need to be converted. Nothing to do
 			// Return early
-			return obj, nil
+			return nil
 		}
 
 		// Convert CSA manager into SSA manager
@@ -83,7 +83,7 @@ func UpgradeManagedFields(
 	}
 	err = unionManagerIntoIndex(managedFields, replaceIndex, csaManagerName)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Create version of managed fields which has no CSA managers with the given name
@@ -93,19 +93,15 @@ func UpgradeManagedFields(
 			entry.Subresource == "")
 	})
 
-	copied := obj.DeepCopyObject()
-	copiedAccessor, err := meta.Accessor(copied)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get meta accessor for copied object: %w", err)
-	}
-	copiedAccessor.SetManagedFields(filteredManagers)
-
-	// Wipe out CSA annotation if it exists
-	annotations := copiedAccessor.GetAnnotations()
+	// Wipe out last-applied-configuration annotation if it exists
+	annotations := accessor.GetAnnotations()
 	delete(annotations, csaAnnotationName)
-	copiedAccessor.SetAnnotations(annotations)
 
-	return copied, nil
+	// Commit changes to object
+	accessor.SetAnnotations(annotations)
+	accessor.SetManagedFields(filteredManagers)
+
+	return nil
 }
 
 // Locates an Update manager entry named `csaManagerName` with the same APIVersion
