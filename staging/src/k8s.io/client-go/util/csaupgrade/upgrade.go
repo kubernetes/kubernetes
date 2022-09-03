@@ -34,8 +34,6 @@ var csaAnnotationFieldSet = fieldpath.NewSet(fieldpath.MakePathOrDie("metadata",
 // obj - Target of the operation which has been managed with CSA in the past
 // csaManagerName - Name of FieldManager formerly used for `Update` operations
 // ssaManagerName - Name of FieldManager formerly used for `Apply` operations
-// Returns: a copy of the `obj` paramter with its managed fields modified so that
-// it may be used with server-side apply in the future.
 func UpgradeManagedFields(
 	obj runtime.Object,
 	csaManagerName string,
