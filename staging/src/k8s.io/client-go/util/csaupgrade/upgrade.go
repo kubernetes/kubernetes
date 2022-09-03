@@ -124,7 +124,7 @@ func unionManagerIntoIndex(entries []metav1.ManagedFieldsEntry, targetIndex int,
 				entry.APIVersion == ssaManager.APIVersion
 		})
 
-	targetFieldSet, err := fieldsToSet(*ssaManager.FieldsV1)
+	targetFieldSet, err := decodeManagedFieldsEntrySet(ssaManager)
 	if err != nil {
 		return fmt.Errorf("failed to convert fields to set: %w", err)
 	}
@@ -136,7 +136,7 @@ func unionManagerIntoIndex(entries []metav1.ManagedFieldsEntry, targetIndex int,
 	if csaManagerExists {
 		csaManager := entries[csaManagerIndex]
 
-		csaFieldSet, err := fieldsToSet(*csaManager.FieldsV1)
+		csaFieldSet, err := decodeManagedFieldsEntrySet(csaManager)
 		if err != nil {
 			return fmt.Errorf("failed to convert fields to set: %w", err)
 		}
@@ -149,12 +149,11 @@ func unionManagerIntoIndex(entries []metav1.ManagedFieldsEntry, targetIndex int,
 	combinedFieldSet = combinedFieldSet.Difference(csaAnnotationFieldSet)
 
 	// Encode the fields back to the serialized format
-	combinedFieldSetEncoded, err := setToFields(*combinedFieldSet)
+	err = encodeManagedFieldsEntrySet(&entries[targetIndex], *combinedFieldSet)
 	if err != nil {
 		return fmt.Errorf("failed to encode field set: %w", err)
 	}
 
-	entries[targetIndex].FieldsV1 = &combinedFieldSetEncoded
 	return nil
 }
 
@@ -192,13 +191,13 @@ func filter[T any](
 
 // Included from fieldmanager.internal to avoid dependency cycle
 // FieldsToSet creates a set paths from an input trie of fields
-func fieldsToSet(f metav1.FieldsV1) (s fieldpath.Set, err error) {
-	err = s.FromJSON(bytes.NewReader(f.Raw))
+func decodeManagedFieldsEntrySet(f metav1.ManagedFieldsEntry) (s fieldpath.Set, err error) {
+	err = s.FromJSON(bytes.NewReader(f.FieldsV1.Raw))
 	return s, err
 }
 
 // SetToFields creates a trie of fields from an input set of paths
-func setToFields(s fieldpath.Set) (f metav1.FieldsV1, err error) {
-	f.Raw, err = s.ToJSON()
-	return f, err
+func encodeManagedFieldsEntrySet(f *metav1.ManagedFieldsEntry, s fieldpath.Set) (err error) {
+	f.FieldsV1.Raw, err = s.ToJSON()
+	return err
 }
