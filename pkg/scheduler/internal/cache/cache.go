@@ -35,7 +35,7 @@ var (
 
 // New returns a Cache implementation.
 // It automatically starts a go routine that manages expiration of assumed pods.
-// "ttl" is how long the assumed pod will get expired.
+// "ttl" is how long the assumed pod will get expired, "0" means pod will never expire.
 // "stop" is the channel that would close the background goroutine.
 func New(ttl time.Duration, stop <-chan struct{}) Cache {
 	cache := newCache(ttl, cleanAssumedPeriod, stop)
