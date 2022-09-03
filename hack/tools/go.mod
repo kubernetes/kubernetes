@@ -11,7 +11,7 @@ require (
 	github.com/google/go-flow-levee v0.1.5
 	gotest.tools/gotestsum v1.6.4
 	honnef.co/go/tools v0.3.3
-	sigs.k8s.io/logtools v0.1.0
+	sigs.k8s.io/logtools v0.4.1
 	sigs.k8s.io/zeitgeist v0.2.0
 )
 
