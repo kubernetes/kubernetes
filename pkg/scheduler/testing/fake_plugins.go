@@ -22,7 +22,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -151,6 +151,34 @@ func (pl *FakePreFilterPlugin) PreFilterExtensions() framework.PreFilterExtensio
 func NewFakePreFilterPlugin(name string, result *framework.PreFilterResult, status *framework.Status) frameworkruntime.PluginFactory {
 	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &FakePreFilterPlugin{
+			Result: result,
+			Status: status,
+			name:   name,
+		}, nil
+	}
+}
+
+// FakePreScorePlugin is a test filter plugin.
+type FakePreScorePlugin struct {
+	Result *framework.PreFilterResult
+	Status *framework.Status
+	name   string
+}
+
+// Name returns name of the plugin.
+func (pl *FakePreScorePlugin) Name() string {
+	return pl.name
+}
+
+// PreFilter invoked at the PreFilter extension point.
+func (pl *FakePreScorePlugin) PreScore(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ []*v1.Node) *framework.Status {
+	return pl.Status
+}
+
+// NewFakePreScorePlugin initializes a fakePreFilterPlugin and returns it.
+func NewFakePreScorePlugin(name string, result *framework.PreFilterResult, status *framework.Status) frameworkruntime.PluginFactory {
+	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+		return &FakePreScorePlugin{
 			Result: result,
 			Status: status,
 			name:   name,

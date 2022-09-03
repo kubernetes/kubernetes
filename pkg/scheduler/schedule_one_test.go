@@ -154,16 +154,18 @@ func (pl *falseMapPlugin) ScoreExtensions() framework.ScoreExtensions {
 	return nil
 }
 
-type numericMapPlugin struct{}
+type numericMapPlugin struct {
+	pluginName string
+}
 
-func newNumericMapPlugin() frameworkruntime.PluginFactory {
+func newNumericMapPlugin(pluginName string) frameworkruntime.PluginFactory {
 	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
-		return &numericMapPlugin{}, nil
+		return &numericMapPlugin{pluginName: pluginName}, nil
 	}
 }
 
 func (pl *numericMapPlugin) Name() string {
-	return "NumericMap"
+	return pl.pluginName
 }
 
 func (pl *numericMapPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeName string) (int64, *framework.Status) {
@@ -1573,7 +1575,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
-				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
+				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin("NumericMap"), 1),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes:     []string{"3", "2", "1"},
@@ -1586,7 +1588,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterFilterPlugin("MatchFilter", st.NewMatchFilterPlugin),
-				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
+				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin("NumericMap"), 1),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes:     []string{"3", "2", "1"},
@@ -1599,7 +1601,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
-				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
+				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin("NumericMap"), 1),
 				st.RegisterScorePlugin("ReverseNumericMap", newReverseNumericMapPlugin(), 2),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
@@ -1614,7 +1616,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterFilterPlugin("FalseFilter", st.NewFalseFilterPlugin),
-				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
+				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin("NumericMap"), 1),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"3", "2", "1"},
@@ -1638,7 +1640,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterFilterPlugin("NoPodsFilter", NewNoPodsFilterPlugin),
 				st.RegisterFilterPlugin("MatchFilter", st.NewMatchFilterPlugin),
-				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
+				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin("NumericMap"), 1),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			pods: []*v1.Pod{
@@ -1799,7 +1801,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 					"FakeFilter",
 					st.NewFakeFilterPlugin(map[string]framework.Code{"3": framework.Unschedulable}),
 				),
-				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
+				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin("NumericMap"), 1),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes:     []string{"3"},
@@ -1824,7 +1826,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 					"FakeFilter",
 					st.NewFakeFilterPlugin(map[string]framework.Code{"3": framework.UnschedulableAndUnresolvable}),
 				),
-				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
+				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin("NumericMap"), 1),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes:     []string{"3"},
@@ -1849,7 +1851,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 					"FakeFilter",
 					st.NewFakeFilterPlugin(map[string]framework.Code{"1": framework.Unschedulable}),
 				),
-				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
+				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin("NumericMap"), 1),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes:     []string{"1", "2"},
@@ -2045,6 +2047,178 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			}
 			if test.wErr == nil && wantEvaluatedNodes != result.EvaluatedNodes {
 				t.Errorf("Expected EvaluatedNodes: %d, got: %d", wantEvaluatedNodes, result.EvaluatedNodes)
+			}
+		})
+	}
+}
+
+// BenchmarkSchedulePod takes benchmarks of the schedulePod function.
+// Note that this function's purpose is benchmark, not validate the behavior of the function,
+// and it doesn't check the response from the function carefully.
+// The behavior should be validated in the TestSchedulerSchedulePod test.
+func BenchmarkSchedulePod(b *testing.B) {
+	preFilterPlugins := make([]st.RegisterPluginFunc, 20)
+	for i := 0; i < 20; i++ {
+		pluginName := "FakePreFilter" + strconv.Itoa(i)
+		preFilterPlugins[i] = st.RegisterPreFilterPlugin(
+			pluginName,
+			st.NewFakePreFilterPlugin(pluginName, nil, nil),
+		)
+	}
+	filterPlugins := make([]st.RegisterPluginFunc, 20)
+	for i := 0; i < 20; i++ {
+		pluginName := "FakeFilter" + strconv.Itoa(i)
+		filterPlugins[i] = st.RegisterFilterPlugin(pluginName, st.NewTrueFilterPlugin)
+	}
+	preScorePlugins := make([]st.RegisterPluginFunc, 20)
+	for i := 0; i < 20; i++ {
+		pluginName := "FakePreScore" + strconv.Itoa(i)
+		preScorePlugins[i] = st.RegisterPreScorePlugin(pluginName, st.NewFakePreScorePlugin(pluginName, nil, nil))
+	}
+	scorePlugins := make([]st.RegisterPluginFunc, 20)
+	for i := 0; i < 20; i++ {
+		pluginName := "FakeScore" + strconv.Itoa(i)
+		scorePlugins[i] = st.RegisterScorePlugin(pluginName, newNumericMapPlugin(pluginName), 1)
+	}
+
+	extenders := make([]framework.Extender, 20)
+	for i := 0; i < 20; i++ {
+		extenderName := "FakeExtender" + strconv.Itoa(i)
+		extenders[i] = &st.FakeExtender{
+			ExtenderName: extenderName,
+			Predicates:   []st.FitPredicate{st.TruePredicateExtender},
+			Prioritizers: []st.PriorityConfig{{Function: st.Node1PrioritizerExtender, Weight: 10}},
+			Weight:       1,
+		}
+	}
+
+	allPlugins := append(append(append(preFilterPlugins, filterPlugins...), scorePlugins...), preScorePlugins...)
+
+	nodes := make([]string, 100)
+	for i := 0; i < 100; i++ {
+		nodes[i] = strconv.Itoa(i)
+	}
+	tests := []struct {
+		name            string
+		registerPlugins []st.RegisterPluginFunc
+		extenders       []framework.Extender
+		nodes           []string
+		pvcs            []v1.PersistentVolumeClaim
+		pod             *v1.Pod
+		pods            []*v1.Pod
+	}{
+		{
+			name: "Scheduler has some filter plugins, but has no other plugins.",
+			registerPlugins: append([]st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}, filterPlugins...),
+			nodes: nodes,
+			pod:   st.MakePod().Name("pod").Obj(),
+		},
+		{
+			name: "Scheduler has some score plugins, but has no other plugins.",
+			registerPlugins: append([]st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}, scorePlugins...),
+			nodes: nodes,
+			pod:   st.MakePod().Name("pod").Obj(),
+		},
+		{
+			name: "Scheduler has some pre filter plugins, but has no other plugins.",
+			registerPlugins: append([]st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}, preScorePlugins...),
+			nodes: nodes,
+			pod:   st.MakePod().Name("pod").Obj(),
+		},
+		{
+			name: "Scheduler has some pre score plugins, but has no other plugins.",
+			registerPlugins: append([]st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}, preScorePlugins...),
+			nodes: nodes,
+			pod:   st.MakePod().Name("pod").Obj(),
+		},
+		{
+			name: "Scheduler has some extenders, but has no plugins.",
+			registerPlugins: []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			extenders: extenders,
+			nodes:     nodes,
+			pod:       st.MakePod().Name("pod").Obj(),
+		},
+		{
+			name: "Scheduler has extenders and all kinds of plugins.",
+			registerPlugins: append([]st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}, allPlugins...),
+			extenders: extenders,
+			nodes:     nodes,
+			pod:       st.MakePod().Name("pod").Obj(),
+		},
+	}
+
+	for _, test := range tests {
+		b.Run(test.name, func(b *testing.B) {
+			cache := internalcache.New(time.Duration(0), wait.NeverStop)
+			for _, pod := range test.pods {
+				cache.AddPod(pod)
+			}
+			var nodes []*v1.Node
+			for _, name := range test.nodes {
+				node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{"hostname": name}}}
+				nodes = append(nodes, node)
+				cache.AddNode(node)
+			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			cs := clientsetfake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(cs, 0)
+			for _, pvc := range test.pvcs {
+				metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, volume.AnnBindCompleted, "true")
+				cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, &pvc, metav1.CreateOptions{})
+				if pvName := pvc.Spec.VolumeName; pvName != "" {
+					pv := v1.PersistentVolume{ObjectMeta: metav1.ObjectMeta{Name: pvName}}
+					cs.CoreV1().PersistentVolumes().Create(ctx, &pv, metav1.CreateOptions{})
+				}
+			}
+			snapshot := internalcache.NewSnapshot(test.pods, nodes)
+			fwk, err := st.NewFramework(
+				test.registerPlugins, "", ctx.Done(),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+			)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			scheduler := newScheduler(
+				cache,
+				test.extenders,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				snapshot,
+				schedulerapi.DefaultPercentageOfNodesToScore)
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
+
+			for i := 0; i < b.N; i++ {
+				_, err := scheduler.SchedulePod(ctx, fwk, framework.NewCycleState(), test.pod)
+				if err != nil {
+					b.Fatal(err)
+				}
 			}
 		})
 	}
