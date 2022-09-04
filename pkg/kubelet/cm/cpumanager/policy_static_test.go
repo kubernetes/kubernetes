@@ -754,6 +754,7 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 		stAssignments   state.ContainerCPUAssignments
 		stDefaultCPUSet cpuset.CPUSet
 		numRequested    int
+		reusableCPUs    cpuset.CPUSet
 		socketMask      bitmask.BitMask
 		expCSet         cpuset.CPUSet
 	}{
@@ -764,6 +765,7 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 			numRequested:    2,
 			socketMask:      nil,
+			reusableCPUs:    cpuset.NewCPUSet(),
 			expCSet:         cpuset.NewCPUSet(0, 6),
 		},
 		{
@@ -776,7 +778,8 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 				mask, _ := bitmask.NewBitMask(0)
 				return mask
 			}(),
-			expCSet: cpuset.NewCPUSet(0, 6),
+			reusableCPUs: cpuset.NewCPUSet(),
+			expCSet:      cpuset.NewCPUSet(0, 6),
 		},
 		{
 			description:     "Request 2 CPUs, BitMask on Socket 1",
@@ -788,7 +791,8 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 				mask, _ := bitmask.NewBitMask(1)
 				return mask
 			}(),
-			expCSet: cpuset.NewCPUSet(1, 7),
+			reusableCPUs: cpuset.NewCPUSet(),
+			expCSet:      cpuset.NewCPUSet(1, 7),
 		},
 		{
 			description:     "Request 8 CPUs, BitMask on Socket 0",
@@ -800,7 +804,8 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 				mask, _ := bitmask.NewBitMask(0)
 				return mask
 			}(),
-			expCSet: cpuset.NewCPUSet(0, 6, 2, 8, 4, 10, 1, 7),
+			reusableCPUs: cpuset.NewCPUSet(),
+			expCSet:      cpuset.NewCPUSet(0, 6, 2, 8, 4, 10, 1, 7),
 		},
 		{
 			description:     "Request 8 CPUs, BitMask on Socket 1",
@@ -812,7 +817,30 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 				mask, _ := bitmask.NewBitMask(1)
 				return mask
 			}(),
-			expCSet: cpuset.NewCPUSet(1, 7, 3, 9, 5, 11, 0, 6),
+			reusableCPUs: cpuset.NewCPUSet(),
+			expCSet:      cpuset.NewCPUSet(1, 7, 3, 9, 5, 11, 0, 6),
+		},
+
+		{
+			description:     "Reuse 2 CPUs",
+			topo:            topoDualSocketHT,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			numRequested:    2,
+			socketMask:      nil,
+			reusableCPUs:    cpuset.NewCPUSet(1, 7),
+			expCSet:         cpuset.NewCPUSet(1, 7),
+		},
+
+		{
+			description:     "Request 4 CPUs, reuse 2 CPUs",
+			topo:            topoDualSocketHT,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			numRequested:    4,
+			socketMask:      nil,
+			reusableCPUs:    cpuset.NewCPUSet(1, 7),
+			expCSet:         cpuset.NewCPUSet(1, 3, 7, 9),
 		},
 	}
 	for _, tc := range testCases {
@@ -828,7 +856,7 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 			continue
 		}
 
-		cset, err := policy.allocateCPUs(st, tc.numRequested, tc.socketMask, cpuset.NewCPUSet())
+		cset, err := policy.allocateCPUs(st, tc.numRequested, tc.socketMask, tc.reusableCPUs)
 		if err != nil {
 			t.Errorf("StaticPolicy allocateCPUs() error (%v). expected CPUSet %v not error %v",
 				tc.description, tc.expCSet, err)

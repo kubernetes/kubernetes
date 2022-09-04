@@ -326,14 +326,27 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 
 	allocatableCPUs := p.GetAllocatableCPUs(s).Union(reusableCPUs)
 
-	// If there are aligned CPUs in numaAffinity, attempt to take those first.
+	// re-use CPUs first: init-containers CPUs are reserved for the current pod
 	result := cpuset.NewCPUSet()
+	if reusableCPUs.Size() > 0 {
+		neededReusableCPUs := reusableCPUs.Size()
+		if numCPUs < neededReusableCPUs {
+			neededReusableCPUs = numCPUs
+		}
+		var err error
+		result, err = p.takeByTopology(reusableCPUs, neededReusableCPUs)
+		if err != nil {
+			return cpuset.NewCPUSet(), err
+		}
+	}
+
+	// If there are aligned CPUs in numaAffinity, attempt to take those next.
 	if numaAffinity != nil {
-		alignedCPUs := p.getAlignedCPUs(numaAffinity, allocatableCPUs)
+		alignedCPUs := p.getAlignedCPUs(numaAffinity, allocatableCPUs.Difference(result))
 
 		numAlignedToAlloc := alignedCPUs.Size()
-		if numCPUs < numAlignedToAlloc {
-			numAlignedToAlloc = numCPUs
+		if numCPUs-result.Size() < numAlignedToAlloc {
+			numAlignedToAlloc = numCPUs - result.Size()
 		}
 
 		alignedCPUs, err := p.takeByTopology(alignedCPUs, numAlignedToAlloc)
@@ -344,7 +357,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 		result = result.Union(alignedCPUs)
 	}
 
-	// Get any remaining CPUs from what's leftover after attempting to grab aligned ones.
+	// Get any remaining CPUs from what's leftover after attempting to grab init and aligned ones.
 	remainingCPUs, err := p.takeByTopology(allocatableCPUs.Difference(result), numCPUs-result.Size())
 	if err != nil {
 		return cpuset.NewCPUSet(), err
