@@ -240,7 +240,7 @@ var (
 func ConvertToRuntimeMaskedPaths(opt *v1.ProcMountType) []string {
 	if opt != nil && *opt == v1.UnmaskedProcMount {
 		// Unmasked proc mount should have no paths set as masked.
-		return []string{}
+		return nil
 	}
 
 	// Otherwise, add the default masked paths to the runtime security context.
@@ -252,7 +252,7 @@ func ConvertToRuntimeMaskedPaths(opt *v1.ProcMountType) []string {
 func ConvertToRuntimeReadonlyPaths(opt *v1.ProcMountType) []string {
 	if opt != nil && *opt == v1.UnmaskedProcMount {
 		// Unmasked proc mount should have no paths set as readonly.
-		return []string{}
+		return nil
 	}
 
 	// Otherwise, add the default readonly paths to the runtime security context.
