@@ -21,9 +21,9 @@ package oom
 
 import (
 	"os"
+	"testing"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -35,9 +35,10 @@ func sequenceToPidLister(pidListSequence [][]int) func(string) ([]int, error) {
 	var numCalls int
 	return func(cgroupName string) ([]int, error) {
 		numCalls++
-		if len(pidListSequence) == 0 {
-			return []int{}, nil
-		} else if numCalls > len(pidListSequence) {
+		switch {
+		case len(pidListSequence) == 0:
+			return nil, nil
+		case numCalls > len(pidListSequence):
 			return pidListSequence[len(pidListSequence)-1], nil
 		}
 		return pidListSequence[numCalls-1], nil

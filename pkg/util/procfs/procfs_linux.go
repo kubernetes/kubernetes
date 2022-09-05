@@ -98,11 +98,11 @@ func PKill(name string, sig syscall.Signal) error {
 // and return their pid(s).
 func PidOf(name string) ([]int, error) {
 	if len(name) == 0 {
-		return []int{}, fmt.Errorf("name should not be empty")
+		return nil, fmt.Errorf("name should not be empty")
 	}
 	re, err := regexp.Compile("(^|/)" + name + "$")
 	if err != nil {
-		return []int{}, err
+		return nil, err
 	}
 	return getPids(re), nil
 }
