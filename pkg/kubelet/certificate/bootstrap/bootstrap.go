@@ -55,39 +55,39 @@ const tmpPrivateKeyFile = "kubelet-client.key.tmp"
 // kubeconfigPath on disk is populated based on bootstrapPath but pointing to the location of the client cert
 // in certDir. This preserves the historical behavior of bootstrapping where on subsequent restarts the
 // most recent client cert is used to request new client certs instead of the initial token.
-func LoadClientConfig(kubeconfigPath, bootstrapPath, certDir string) (certConfig, userConfig *restclient.Config, err error) {
+func LoadClientConfig(kubeconfigPath, bootstrapPath, certDir string) (certConfig, userConfig *restclient.Config, bootstraping bool, err error) {
 	if len(bootstrapPath) == 0 {
 		clientConfig, err := loadRESTClientConfig(kubeconfigPath)
 		if err != nil {
-			return nil, nil, fmt.Errorf("unable to load kubeconfig: %v", err)
+			return nil, nil, false, fmt.Errorf("unable to load kubeconfig: %v", err)
 		}
 		klog.V(2).InfoS("No bootstrapping requested, will use kubeconfig")
-		return clientConfig, restclient.CopyConfig(clientConfig), nil
+		return clientConfig, restclient.CopyConfig(clientConfig), false, nil
 	}
 
 	store, err := certificate.NewFileStore("kubelet-client", certDir, certDir, "", "")
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to build bootstrap cert store")
+		return nil, nil, false, fmt.Errorf("unable to build bootstrap cert store")
 	}
 
 	ok, err := isClientConfigStillValid(kubeconfigPath)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 
 	// use the current client config
 	if ok {
 		clientConfig, err := loadRESTClientConfig(kubeconfigPath)
 		if err != nil {
-			return nil, nil, fmt.Errorf("unable to load kubeconfig: %v", err)
+			return nil, nil, false, fmt.Errorf("unable to load kubeconfig: %v", err)
 		}
 		klog.V(2).InfoS("Current kubeconfig file contents are still valid, no bootstrap necessary")
-		return clientConfig, restclient.CopyConfig(clientConfig), nil
+		return clientConfig, restclient.CopyConfig(clientConfig), false, nil
 	}
 
 	bootstrapClientConfig, err := loadRESTClientConfig(bootstrapPath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to load bootstrap kubeconfig: %v", err)
+		return nil, nil, true, fmt.Errorf("unable to load bootstrap kubeconfig: %v", err)
 	}
 
 	clientConfig := restclient.AnonymousClientConfig(bootstrapClientConfig)
@@ -95,10 +95,10 @@ func LoadClientConfig(kubeconfigPath, bootstrapPath, certDir string) (certConfig
 	clientConfig.KeyFile = pemPath
 	clientConfig.CertFile = pemPath
 	if err := writeKubeconfigFromBootstrapping(clientConfig, kubeconfigPath, pemPath); err != nil {
-		return nil, nil, err
+		return nil, nil, true, err
 	}
 	klog.V(2).InfoS("Use the bootstrap credentials to request a cert, and set kubeconfig to point to the certificate dir")
-	return bootstrapClientConfig, clientConfig, nil
+	return bootstrapClientConfig, clientConfig, true, nil
 }
 
 // LoadClientCert requests a client cert for kubelet if the kubeconfigPath file does not exist.

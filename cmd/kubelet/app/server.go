@@ -822,8 +822,8 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, tp 
 		// which provides a high powered kubeconfig on the master with cert/key data, we must
 		// bootstrap the cert manager with the contents of the initial client config.
 
-		klog.InfoS("Client rotation is on, will bootstrap in background")
-		certConfig, clientConfig, err := bootstrap.LoadClientConfig(s.KubeConfig, s.BootstrapKubeconfig, s.CertDirectory)
+		klog.InfoS("Client rotation is on")
+		certConfig, clientConfig, bootstraping, err := bootstrap.LoadClientConfig(s.KubeConfig, s.BootstrapKubeconfig, s.CertDirectory)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -836,6 +836,18 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, tp 
 		clientCertificateManager, err := buildClientCertificateManager(certConfig, clientConfig, s.CertDirectory, nodeName)
 		if err != nil {
 			return nil, nil, err
+		}
+
+		if bootstraping {
+			klog.InfoS("When bootstraping, waiting the client rotation for the first time")
+			rotated, err := clientCertificateManager.RotateCerts()
+			if err != nil {
+				klog.Warningf("When bootstraping, failed to rotate certs: %v", err)
+			} else if !rotated {
+				klog.Warning("Failed to rotate certs when bootstrap")
+			} else {
+				klog.InfoS("Succeeded to rotate certs when bootstrap")
+			}
 		}
 
 		legacyregistry.RawMustRegister(metrics.NewGaugeFunc(

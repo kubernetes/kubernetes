@@ -64,6 +64,9 @@ type Manager interface {
 	// be very conservative and only return true if recent communication has
 	// occurred with the server.
 	ServerHealthy() bool
+	// Returns true if it changed the cert, false otherwise. Error is only returned in
+	// exceptional cases.
+	RotateCerts() (bool, error)
 }
 
 // Config is the set of configuration parameters available for a new Manager.
@@ -429,10 +432,10 @@ func (m *manager) getClientset() (clientset.Interface, error) {
 	return m.clientsetFn(current)
 }
 
-// RotateCerts is exposed for testing only and is not a part of the public interface.
-// Returns true if it changed the cert, false otherwise. Error is only returned in
-// exceptional cases.
 func (m *manager) RotateCerts() (bool, error) {
+	if m.forceRotation {
+		m.forceRotation = false
+	}
 	return m.rotateCerts()
 }
 
