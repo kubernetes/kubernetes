@@ -863,7 +863,7 @@ function start_kubescheduler {
     SCHEDULER_LOG=${LOG_DIR}/kube-scheduler.log
 
     cat <<EOF > /tmp/kube-scheduler.yaml
-apiVersion: kubescheduler.config.k8s.io/v1beta2
+apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: ${CERT_DIR}/scheduler.kubeconfig

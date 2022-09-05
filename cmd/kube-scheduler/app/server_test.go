@@ -158,43 +158,6 @@ profiles:
 		t.Fatal(err)
 	}
 
-	// plugin config
-	pluginConfigFilev1beta2 := filepath.Join(tmpDir, "pluginv1beta2.yaml")
-	if err := os.WriteFile(pluginConfigFilev1beta2, []byte(fmt.Sprintf(`
-apiVersion: kubescheduler.config.k8s.io/v1beta2
-kind: KubeSchedulerConfiguration
-clientConnection:
-  kubeconfig: "%s"
-profiles:
-- plugins:
-    preFilter:
-      enabled:
-      - name: NodeResourcesFit
-      - name: NodePorts
-      disabled:
-      - name: "*"
-    filter:
-      enabled:
-      - name: NodeResourcesFit
-      - name: NodePorts
-      disabled:
-      - name: "*"
-    preScore:
-      enabled:
-      - name: InterPodAffinity
-      - name: TaintToleration
-      disabled:
-      - name: "*"
-    score:
-      enabled:
-      - name: InterPodAffinity
-      - name: TaintToleration
-      disabled:
-      - name: "*"
-`, configKubeconfig)), os.FileMode(0600)); err != nil {
-		t.Fatal(err)
-	}
-
 	// out-of-tree plugin config v1
 	outOfTreePluginConfigFilev1 := filepath.Join(tmpDir, "outOfTreePluginv1.yaml")
 	if err := os.WriteFile(outOfTreePluginConfigFilev1, []byte(fmt.Sprintf(`
@@ -218,25 +181,6 @@ profiles:
 	outOfTreePluginConfigFilev1beta3 := filepath.Join(tmpDir, "outOfTreePluginv1beta3.yaml")
 	if err := os.WriteFile(outOfTreePluginConfigFilev1beta3, []byte(fmt.Sprintf(`
 apiVersion: kubescheduler.config.k8s.io/v1beta3
-kind: KubeSchedulerConfiguration
-clientConnection:
-  kubeconfig: "%s"
-profiles:
-- plugins:
-    preFilter:
-      enabled:
-      - name: Foo
-    filter:
-      enabled:
-      - name: Foo
-`, configKubeconfig)), os.FileMode(0600)); err != nil {
-		t.Fatal(err)
-	}
-
-	// out-of-tree plugin config v1beta2
-	outOfTreePluginConfigFilev1beta2 := filepath.Join(tmpDir, "outOfTreePluginv1beta2.yaml")
-	if err := os.WriteFile(outOfTreePluginConfigFilev1beta2, []byte(fmt.Sprintf(`
-apiVersion: kubescheduler.config.k8s.io/v1beta2
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: "%s"
@@ -350,46 +294,6 @@ leaderElection:
 			},
 		},
 		{
-			name: "component configuration v1beta2",
-			flags: []string{
-				"--config", pluginConfigFilev1beta2,
-				"--kubeconfig", configKubeconfig,
-			},
-			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": {
-					Bind: config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultBinder"}}},
-					Filter: config.PluginSet{
-						Enabled: []config.Plugin{
-							{Name: "NodeResourcesFit"},
-							{Name: "NodePorts"},
-						},
-					},
-					PreFilter: config.PluginSet{
-						Enabled: []config.Plugin{
-							{Name: "NodeResourcesFit"},
-							{Name: "NodePorts"},
-						},
-					},
-					PostFilter: config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultPreemption"}}},
-					PreScore: config.PluginSet{
-						Enabled: []config.Plugin{
-							{Name: "InterPodAffinity"},
-							{Name: "TaintToleration"},
-						},
-					},
-					QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: "PrioritySort"}}},
-					Score: config.PluginSet{
-						Enabled: []config.Plugin{
-							{Name: "InterPodAffinity", Weight: 1},
-							{Name: "TaintToleration", Weight: 1},
-						},
-					},
-					Reserve: config.PluginSet{Enabled: []config.Plugin{{Name: "VolumeBinding"}}},
-					PreBind: config.PluginSet{Enabled: []config.Plugin{{Name: "VolumeBinding"}}},
-				},
-			},
-		},
-		{
 			name: "component configuration v1beta3",
 			flags: []string{
 				"--config", pluginConfigFilev1beta3,
@@ -466,31 +370,6 @@ leaderElection:
 					},
 					Reserve: config.PluginSet{Enabled: []config.Plugin{{Name: "VolumeBinding"}}},
 					PreBind: config.PluginSet{Enabled: []config.Plugin{{Name: "VolumeBinding"}}},
-				},
-			},
-		},
-		{
-			name: "out-of-tree component configuration v1beta2",
-			flags: []string{
-				"--config", outOfTreePluginConfigFilev1beta2,
-				"--kubeconfig", configKubeconfig,
-			},
-			registryOptions: []Option{WithPlugin("Foo", newFoo)},
-			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": {
-					Bind: defaults.PluginsV1beta2.Bind,
-					Filter: config.PluginSet{
-						Enabled: append(defaults.PluginsV1beta2.Filter.Enabled, config.Plugin{Name: "Foo"}),
-					},
-					PreFilter: config.PluginSet{
-						Enabled: append(defaults.PluginsV1beta2.PreFilter.Enabled, config.Plugin{Name: "Foo"}),
-					},
-					PostFilter: defaults.PluginsV1beta2.PostFilter,
-					PreScore:   defaults.PluginsV1beta2.PreScore,
-					QueueSort:  defaults.PluginsV1beta2.QueueSort,
-					Score:      defaults.PluginsV1beta2.Score,
-					Reserve:    defaults.PluginsV1beta2.Reserve,
-					PreBind:    defaults.PluginsV1beta2.PreBind,
 				},
 			},
 		},
