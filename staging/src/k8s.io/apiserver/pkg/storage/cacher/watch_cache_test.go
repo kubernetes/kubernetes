@@ -536,7 +536,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 	}
 
 	lw := &testLW{
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+		WatchFunc: func(_ metav1.ListOptions) (watch.Interface, error) {
 			fw := watch.NewFake()
 			go fw.Stop()
 			return fw, nil
