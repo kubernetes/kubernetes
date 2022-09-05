@@ -300,7 +300,7 @@ func (q *RateLimitedTimedQueue) SwapLimiter(newQPS float32) {
 		// - number of used tokens
 		// - number of available tokens
 		// - something else
-		if q.limiter.TryAccept() == false {
+		if !q.limiter.TryAccept() {
 			newLimiter.TryAccept()
 		}
 	}
