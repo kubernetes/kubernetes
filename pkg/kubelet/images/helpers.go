@@ -19,8 +19,11 @@ package images
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/flowcontrol"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -34,19 +37,60 @@ func throttleImagePulling(imageService kubecontainer.ImageService, qps float32, 
 		return imageService
 	}
 	return &throttledImageService{
-		ImageService: imageService,
-		limiter:      flowcontrol.NewTokenBucketRateLimiter(qps, burst),
+		ImageService:     imageService,
+		limiter:          flowcontrol.NewTokenBucketRateLimiter(qps, burst),
+		qps:              qps,
+		burst:            burst,
+		currentPullCount: 0,
+		lock:             sync.Mutex{},
 	}
 }
 
 type throttledImageService struct {
 	kubecontainer.ImageService
-	limiter flowcontrol.RateLimiter
+	limiter          flowcontrol.RateLimiter
+	qps              float32
+	burst            int
+	currentPullCount int
+	lock             sync.Mutex
 }
+
+var (
+	errPullBurstExceeded error = fmt.Errorf("pull burst exceeded more than 1 minute")
+	errPullQPSExceeded   error = fmt.Errorf("pull QPS exceeded")
+)
 
 func (ts throttledImageService) PullImage(ctx context.Context, image kubecontainer.ImageSpec, secrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	if ts.limiter.TryAccept() {
-		return ts.ImageService.PullImage(ctx, image, secrets, podSandboxConfig)
+		err := wait.PollImmediate(100*time.Microsecond, 5*time.Minute, func() (done bool, err error) {
+			if ts.AcceptOne() {
+				return true, nil
+			} else {
+				return false, errPullBurstExceeded
+			}
+		})
+		if err != nil {
+			return ts.ImageService.PullImage(ctx, image, secrets, podSandboxConfig)
+		}
 	}
-	return "", fmt.Errorf("pull QPS exceeded")
+
+	return "", errPullQPSExceeded
+}
+
+func (ts *throttledImageService) AcceptOne() bool {
+	ts.lock.Lock()
+	defer ts.lock.Unlock()
+	if ts.burst > ts.currentPullCount {
+		ts.currentPullCount++
+		return true
+	}
+	return false
+}
+
+func (ts *throttledImageService) ReleaseOne() {
+	ts.lock.Lock()
+	defer ts.lock.Unlock()
+	if ts.currentPullCount > 0 {
+		ts.currentPullCount--
+	}
 }

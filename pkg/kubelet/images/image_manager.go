@@ -143,7 +143,12 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, pod *v1.Pod, conta
 	startTime := time.Now()
 	pullChan := make(chan pullResult)
 	m.puller.pullImage(ctx, spec, pullSecrets, pullChan, podSandboxConfig)
+	throttledImageService, throttled := m.imageService.(*throttledImageService)
 	imagePullResult := <-pullChan
+
+	if throttled && imagePullResult.err != errPullQPSExceeded && imagePullResult.err != errPullBurstExceeded {
+		defer throttledImageService.ReleaseOne()
+	}
 	if imagePullResult.err != nil {
 		m.logIt(ref, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, imagePullResult.err), klog.Warning)
 		m.backOff.Next(backOffKey, m.backOff.Clock.Now())
