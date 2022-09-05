@@ -1464,6 +1464,24 @@ func TestReplicaCalcMissingMetricsUnreadyScaleDown(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestReplicaCalcMissingMetricsScaleDownTargetOver100(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  4,
+		expectedReplicas: 2,
+		podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue},
+		resource: &resourceInfo{
+			name:     v1.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("2.0"), resource.MustParse("2.0")},
+			levels:   makePodMetricLevels(200, 100, 100),
+
+			targetUtilization:   300,
+			expectedUtilization: 6,
+			expectedValue:       numContainersPerPod * 100,
+		},
+	}
+	tc.runTest(t)
+}
+
 func TestReplicaCalcDuringRollingUpdateWithMaxSurge(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  2,
