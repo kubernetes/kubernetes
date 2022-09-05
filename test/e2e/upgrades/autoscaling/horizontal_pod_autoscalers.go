@@ -53,7 +53,7 @@ func (t *HPAUpgradeTest) Setup(f *framework.Framework) {
 		f.ScalesGetter,
 		e2eautoscaling.Disable,
 		e2eautoscaling.Idle)
-	t.hpa = e2eautoscaling.CreateCPUHorizontalPodAutoscaler(
+	t.hpa = e2eautoscaling.CreateCPUResourceHorizontalPodAutoscaler(
 		t.rc,
 		20, /* targetCPUUtilizationPercent */
 		1,  /* minPods */

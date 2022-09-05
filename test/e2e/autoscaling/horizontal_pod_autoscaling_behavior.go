@@ -27,7 +27,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 )
 
-var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] [Feature:BHPA] Horizontal pod autoscaling (non-default behavior)", func() {
+var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (non-default behavior)", func() {
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
