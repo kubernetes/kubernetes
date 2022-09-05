@@ -240,9 +240,8 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState *framework
 
 	s := &preFilterState{}
 
-	s.podInfo = framework.NewPodInfo(pod)
-	if s.podInfo.ParseError != nil {
-		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("parsing pod: %+v", s.podInfo.ParseError))
+	if s.podInfo, err = framework.NewPodInfo(pod); err != nil {
+		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("parsing pod: %+v", err))
 	}
 
 	for i := range s.podInfo.RequiredAffinityTerms {
