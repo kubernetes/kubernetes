@@ -31,7 +31,6 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
-	"k8s.io/kubernetes/pkg/kubelet/leaky"
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	"k8s.io/kubernetes/pkg/volume"
@@ -58,23 +57,23 @@ func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {
 		// ContainerInfo with past creation time and no CPU/memory usage for
 		// simulating uncleaned cgroups of already terminated containers, which
 		// should not be shown in the results.
-		"/pod0-i-terminated-1":  getTerminatedContainerInfo(seedPastPod0Infra, pName0, namespace, leaky.PodInfraContainerName),
+		"/pod0-i-terminated-1":  getTerminatedContainerInfo(seedPastPod0Infra, pName0, namespace, podInfraContainerName),
 		"/pod0-c0-terminated-1": getTerminatedContainerInfo(seedPastPod0Container0, pName0, namespace, cName00),
 
 		// Same as above but uses the same creation time as the latest
 		// containers. They are terminated containers, so they should not be in
 		// the results.
-		"/pod0-i-terminated-2":  getTerminatedContainerInfo(seedPod0Infra, pName0, namespace, leaky.PodInfraContainerName),
+		"/pod0-i-terminated-2":  getTerminatedContainerInfo(seedPod0Infra, pName0, namespace, podInfraContainerName),
 		"/pod0-c0-terminated-2": getTerminatedContainerInfo(seedPod0Container0, pName0, namespace, cName00),
 
 		// The latest containers, which should be in the results.
-		"/pod0-i":  getTestContainerInfo(seedPod0Infra, pName0, namespace, leaky.PodInfraContainerName),
+		"/pod0-i":  getTestContainerInfo(seedPod0Infra, pName0, namespace, podInfraContainerName),
 		"/pod0-c0": getTestContainerInfo(seedPod0Container0, pName0, namespace, cName00),
 
-		"/pod1-i.slice":  getTestContainerInfo(seedPod0Infra, pName1, namespace, leaky.PodInfraContainerName),
+		"/pod1-i.slice":  getTestContainerInfo(seedPod0Infra, pName1, namespace, podInfraContainerName),
 		"/pod1-c1.slice": getTestContainerInfo(seedPod0Container0, pName1, namespace, cName11),
 
-		"/pod2-i-terminated-1": getTerminatedContainerInfo(seedPastPod0Infra, pName2, namespace, leaky.PodInfraContainerName),
+		"/pod2-i-terminated-1": getTerminatedContainerInfo(seedPastPod0Infra, pName2, namespace, podInfraContainerName),
 		// ContainerInfo with past creation time and no CPU/memory usage for
 		// simulating uncleaned cgroups of already terminated containers, which
 		// should not be shown in the results.
@@ -158,19 +157,19 @@ func TestCadvisorListPodStats(t *testing.T) {
 		"/kubelet":       getTestContainerInfo(seedKubelet, "", "", ""),
 		"/system":        getTestContainerInfo(seedMisc, "", "", ""),
 		// Pod0 - Namespace0
-		"/pod0-i":  getTestContainerInfo(seedPod0Infra, pName0, namespace0, leaky.PodInfraContainerName),
+		"/pod0-i":  getTestContainerInfo(seedPod0Infra, pName0, namespace0, podInfraContainerName),
 		"/pod0-c0": getTestContainerInfo(seedPod0Container0, pName0, namespace0, cName00),
 		"/pod0-c1": getTestContainerInfo(seedPod0Container1, pName0, namespace0, cName01),
 		// Pod1 - Namespace0
-		"/pod1-i":  getTestContainerInfo(seedPod1Infra, pName1, namespace0, leaky.PodInfraContainerName),
+		"/pod1-i":  getTestContainerInfo(seedPod1Infra, pName1, namespace0, podInfraContainerName),
 		"/pod1-c0": getTestContainerInfo(seedPod1Container, pName1, namespace0, cName10),
 		// Pod2 - Namespace2
-		"/pod2-i":                        getTestContainerInfo(seedPod2Infra, pName2, namespace2, leaky.PodInfraContainerName),
+		"/pod2-i":                        getTestContainerInfo(seedPod2Infra, pName2, namespace2, podInfraContainerName),
 		"/pod2-c0":                       getTestContainerInfo(seedPod2Container, pName2, namespace2, cName20),
-		"/kubepods/burstable/podUIDpod0": getTestContainerInfo(seedPod0Infra, pName0, namespace0, leaky.PodInfraContainerName),
-		"/kubepods/podUIDpod1":           getTestContainerInfo(seedPod1Infra, pName1, namespace0, leaky.PodInfraContainerName),
+		"/kubepods/burstable/podUIDpod0": getTestContainerInfo(seedPod0Infra, pName0, namespace0, podInfraContainerName),
+		"/kubepods/podUIDpod1":           getTestContainerInfo(seedPod1Infra, pName1, namespace0, podInfraContainerName),
 		// Pod3 - Namespace0
-		"/pod3-i":       getTestContainerInfo(seedPod3Infra, pName3, namespace0, leaky.PodInfraContainerName),
+		"/pod3-i":       getTestContainerInfo(seedPod3Infra, pName3, namespace0, podInfraContainerName),
 		"/pod3-c0-init": getTestContainerInfo(seedPod3Container0, pName3, namespace0, cName30),
 		"/pod3-c1":      getTestContainerInfo(seedPod3Container1, pName3, namespace0, cName31),
 	}
@@ -377,17 +376,17 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 		"/kubelet":       getTestContainerInfo(seedKubelet, "", "", ""),
 		"/system":        getTestContainerInfo(seedMisc, "", "", ""),
 		// Pod0 - Namespace0
-		"/pod0-i":  getTestContainerInfo(seedPod0Infra, pName0, namespace0, leaky.PodInfraContainerName),
+		"/pod0-i":  getTestContainerInfo(seedPod0Infra, pName0, namespace0, podInfraContainerName),
 		"/pod0-c0": getTestContainerInfo(seedPod0Container0, pName0, namespace0, cName00),
 		"/pod0-c1": getTestContainerInfo(seedPod0Container1, pName0, namespace0, cName01),
 		// Pod1 - Namespace0
-		"/pod1-i":  getTestContainerInfo(seedPod1Infra, pName1, namespace0, leaky.PodInfraContainerName),
+		"/pod1-i":  getTestContainerInfo(seedPod1Infra, pName1, namespace0, podInfraContainerName),
 		"/pod1-c0": getTestContainerInfo(seedPod1Container, pName1, namespace0, cName10),
 		// Pod2 - Namespace2
-		"/pod2-i":                        getTestContainerInfo(seedPod2Infra, pName2, namespace2, leaky.PodInfraContainerName),
+		"/pod2-i":                        getTestContainerInfo(seedPod2Infra, pName2, namespace2, podInfraContainerName),
 		"/pod2-c0":                       getTestContainerInfo(seedPod2Container, pName2, namespace2, cName20),
-		"/kubepods/burstable/podUIDpod0": getTestContainerInfo(seedPod0Infra, pName0, namespace0, leaky.PodInfraContainerName),
-		"/kubepods/podUIDpod1":           getTestContainerInfo(seedPod1Infra, pName1, namespace0, leaky.PodInfraContainerName),
+		"/kubepods/burstable/podUIDpod0": getTestContainerInfo(seedPod0Infra, pName0, namespace0, podInfraContainerName),
+		"/kubepods/podUIDpod1":           getTestContainerInfo(seedPod1Infra, pName1, namespace0, podInfraContainerName),
 	}
 
 	// memory limit overrides for each container (used to test available bytes if a memory limit is known)
@@ -566,7 +565,7 @@ func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
 		"/kubelet":       getTestContainerInfo(seedKubelet, "", "", ""),
 		"/system":        getTestContainerInfo(seedMisc, "", "", ""),
 		// Pod0 - Namespace0
-		"/pod0-i":  getTestContainerInfo(seedPod0Infra, pName0, namespace0, leaky.PodInfraContainerName),
+		"/pod0-i":  getTestContainerInfo(seedPod0Infra, pName0, namespace0, podInfraContainerName),
 		"/pod0-c0": getTestContainerInfo(seedPod0Container0, pName0, namespace0, cName00),
 		"/pod0-c1": getTestContainerInfo(seedPod0Container1, pName0, namespace0, cName01),
 	}
