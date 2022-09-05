@@ -48,7 +48,7 @@ import (
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
 // Note that the mark-control-plane phase is left out, not needed, and no token is created as that doesn't belong to the upgrade
 func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, patchesDir string, dryRun bool, out io.Writer) error {
-	errs := []error{}
+	var errs []error
 
 	// Upload currently used configuration to the cluster
 	// Note: This is done right in the beginning of cluster initialization; as we might want to make other phases
@@ -191,7 +191,7 @@ func GetKubeletDir(dryRun bool) (string, error) {
 
 // moveFiles moves files from one directory to another.
 func moveFiles(files map[string]string) error {
-	filesToRecover := map[string]string{}
+	filesToRecover := make(map[string]string, len(files))
 	for from, to := range files {
 		if err := os.Rename(from, to); err != nil {
 			return rollbackFiles(filesToRecover, err)

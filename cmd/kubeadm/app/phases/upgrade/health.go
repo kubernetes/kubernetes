@@ -226,7 +226,7 @@ func controlPlaneNodesReady(client clientset.Interface, _ *kubeadmapi.ClusterCon
 
 // staticPodManifestHealth makes sure the required static pods are presents
 func staticPodManifestHealth(_ clientset.Interface, _ *kubeadmapi.ClusterConfiguration) error {
-	nonExistentManifests := []string{}
+	var nonExistentManifests []string
 	for _, component := range constants.ControlPlaneComponents {
 		manifestFile := constants.GetStaticPodFilepath(component, constants.GetStaticPodDirectory())
 		if _, err := os.Stat(manifestFile); os.IsNotExist(err) {
@@ -241,7 +241,7 @@ func staticPodManifestHealth(_ clientset.Interface, _ *kubeadmapi.ClusterConfigu
 
 // getNotReadyNodes returns a string slice of nodes in the cluster that are NotReady
 func getNotReadyNodes(nodes []v1.Node) []string {
-	notReadyNodes := []string{}
+	var notReadyNodes []string
 	for _, node := range nodes {
 		for _, condition := range node.Status.Conditions {
 			if condition.Type == v1.NodeReady && condition.Status != v1.ConditionTrue {
