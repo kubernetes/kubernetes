@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
-
 	"github.com/stretchr/testify/assert"
 )
 
