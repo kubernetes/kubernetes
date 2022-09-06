@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -59,7 +60,19 @@ func (cfgCtlr *configController) dumpPriorityLevels(w http.ResponseWriter, r *ht
 	}
 	tabPrint(tabWriter, rowForHeaders(columnHeaders))
 	endLine(tabWriter)
-	for _, plState := range cfgCtlr.priorityLevelStates {
+	plNames := make([]string, len(cfgCtlr.priorityLevelStates))
+	i := 0
+	for plName := range cfgCtlr.priorityLevelStates {
+		plNames[i] = plName
+		i++
+	}
+	sort.Strings(plNames)
+	for i := range plNames {
+		plState, ok := cfgCtlr.priorityLevelStates[plNames[i]]
+		if !ok {
+			continue
+		}
+
 		if plState.queues == nil {
 			tabPrint(tabWriter, row(
 				plState.pl.Name, // 1
