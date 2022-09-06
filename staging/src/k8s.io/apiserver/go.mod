@@ -15,7 +15,6 @@ require (
 	github.com/google/btree v1.0.1
 	github.com/google/gnostic v0.5.7-v3refs
 	github.com/google/go-cmp v0.5.8
-	github.com/google/btree v1.0.1 // indirect
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.2
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
