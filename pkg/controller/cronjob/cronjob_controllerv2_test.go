@@ -462,15 +462,14 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
-		"prev ran but done, is time, create job failed, A": {
+		"prev ran but done, is time, create job failed and get job failed, A": {
 			concurrencyPolicy:          "Allow",
 			schedule:                   onTheHour,
 			deadline:                   noDead,
 			ranPreviously:              true,
 			jobCreationTime:            justAfterThePriorHour(),
 			now:                        *justAfterTheHour(),
-			jobCreateError:             errors.NewAlreadyExists(schema.GroupResource{Resource: "job", Group: "batch"}, ""),
-			expectErr:                  true,
+                        jobGetErr:                  errors.NewBadRequest("request is invalid"),
 			expectUpdateStatus:         true,
 			jobPresentInCJActiveStatus: true,
 		},
