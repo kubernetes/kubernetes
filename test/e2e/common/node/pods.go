@@ -63,7 +63,7 @@ import (
 const (
 	buildBackOffDuration = time.Minute
 	syncLoopFrequency    = 10 * time.Second
-	maxBackOffTolerance  = time.Duration(1.3 * float64(kubelet.MaxContainerBackOff))
+	maxBackOffTolerance  = time.Duration(1.4 * float64(kubelet.MaxContainerBackOff))
 	podRetryPeriod       = 1 * time.Second
 )
 
