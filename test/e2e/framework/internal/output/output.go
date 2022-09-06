@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-func TestGinkgoOutput(t *testing.T, expected SuiteResults) {
+func TestGinkgoOutput(t *testing.T, expected SuiteResults, runSpecsArgs ...interface{}) {
 	// Run the Ginkgo suite with spec results collected via ReportAfterEach
 	// in adddition to the default one. To see what the full
 	// Ginkgo output looks like, run this test with "go test -v".
@@ -39,7 +39,7 @@ func TestGinkgoOutput(t *testing.T, expected SuiteResults) {
 		report = append(report, spec)
 	})
 	fakeT := &testing.T{}
-	ginkgo.RunSpecs(fakeT, "Logging Suite")
+	ginkgo.RunSpecs(fakeT, "Logging Suite", runSpecsArgs...)
 
 	// Now check the output.
 	actual := normalizeReport(report)
@@ -103,9 +103,13 @@ var timePrefix = regexp.MustCompile(`(?m)^[[:alpha:]]{3} +[[:digit:]]{1,2} +[[:d
 // elapsedSuffix matches "Elapsed: 16.189µs"
 var elapsedSuffix = regexp.MustCompile(`Elapsed: [[:digit:]]+(\.[[:digit:]]+)?(µs|ns|ms|s|m)`)
 
+// timeSuffix matches "09/06/22 15:36:43.445" as printed by Ginkgo v2 for log output.
+var timeSuffix = regexp.MustCompile(`(?m)[[:space:]][[:digit:]]{2}/[[:digit:]]{2}/[[:digit:]]{2} [[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}\.[[:digit:]]{1,3}$`)
+
 func stripTimes(in string) string {
 	out := timePrefix.ReplaceAllString(in, "")
 	out = elapsedSuffix.ReplaceAllString(out, "Elapsed: <elapsed>")
+	out = timeSuffix.ReplaceAllString(out, "")
 	return out
 }
 
