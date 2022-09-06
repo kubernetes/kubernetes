@@ -216,7 +216,7 @@ const (
 
 // nodeEvictionMap stores evictionStatus data for each node.
 type nodeEvictionMap struct {
-	lock          sync.Mutex
+	lock          sync.RWMutex
 	nodeEvictions map[string]evictionStatus
 }
 
@@ -249,8 +249,8 @@ func (n *nodeEvictionMap) setStatus(nodeName string, status evictionStatus) bool
 }
 
 func (n *nodeEvictionMap) getStatus(nodeName string) (evictionStatus, bool) {
-	n.lock.Lock()
-	defer n.lock.Unlock()
+	n.lock.RLock()
+	defer n.lock.RUnlock()
 	if _, exists := n.nodeEvictions[nodeName]; !exists {
 		return unmarked, false
 	}
