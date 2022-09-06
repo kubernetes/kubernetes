@@ -212,6 +212,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		return nil, nil, err
 	}
 	defaultVersionedObject := indirectArbitraryPointer(versionedPtr)
+
+	resourceGroup := fqKindToRegister.Group
+	resourceVersion := fqKindToRegister.Version
 	kind := fqKindToRegister.Kind
 	isSubresource := len(subresource) > 0
 
@@ -426,6 +429,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		apiResource.Name = path
 		apiResource.Namespaced = false
 		apiResource.Kind = resourceKind
+		apiResource.Group = resourceGroup
+		apiResource.Version = resourceVersion
 		namer := handlers.ContextBasedNaming{
 			Namer:         a.group.Namer,
 			ClusterScoped: true,
@@ -473,6 +478,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		apiResource.Name = path
 		apiResource.Namespaced = true
 		apiResource.Kind = resourceKind
+		apiResource.Group = resourceGroup
+		apiResource.Version = resourceVersion
 		namer := handlers.ContextBasedNaming{
 			Namer:         a.group.Namer,
 			ClusterScoped: false,
