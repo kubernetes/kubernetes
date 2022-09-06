@@ -52,6 +52,7 @@ import (
 )
 
 func TestRunOnce(t *testing.T) {
+	t.Parallel()
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 

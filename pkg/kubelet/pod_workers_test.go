@@ -358,6 +358,7 @@ func drainAllWorkers(podWorkers *podWorkers) {
 }
 
 func TestUpdatePod(t *testing.T) {
+	t.Parallel()
 	podWorkers, processed := createPodWorkers()
 
 	numPods := 20
@@ -396,6 +397,7 @@ func TestUpdatePod(t *testing.T) {
 }
 
 func TestUpdatePodWithTerminatedPod(t *testing.T) {
+	t.Parallel()
 	podWorkers, _ := createPodWorkers()
 	terminatedPod := newPodWithPhase("0000-0000-0000", "done-pod", v1.PodSucceeded)
 	orphanedPod := &kubecontainer.Pod{ID: "0000-0000-0001", Name: "orphaned-pod"}
@@ -426,6 +428,7 @@ func TestUpdatePodWithTerminatedPod(t *testing.T) {
 }
 
 func TestUpdatePodForRuntimePod(t *testing.T) {
+	t.Parallel()
 	podWorkers, processed := createPodWorkers()
 
 	// ignores running pod of wrong sync type
@@ -457,6 +460,7 @@ func TestUpdatePodForRuntimePod(t *testing.T) {
 }
 
 func TestUpdatePodForTerminatedRuntimePod(t *testing.T) {
+	t.Parallel()
 	podWorkers, processed := createPodWorkers()
 
 	now := time.Now()
@@ -486,6 +490,7 @@ func TestUpdatePodForTerminatedRuntimePod(t *testing.T) {
 }
 
 func TestUpdatePodDoesNotForgetSyncPodKill(t *testing.T) {
+	t.Parallel()
 	podWorkers, processed := createPodWorkers()
 	numPods := 20
 	for i := 0; i < numPods; i++ {
@@ -566,6 +571,7 @@ func newTerminalPhaseSync(fn syncPodFnType) *terminalPhaseSync {
 }
 
 func TestTerminalPhaseTransition(t *testing.T) {
+	t.Parallel()
 	podWorkers, _ := createPodWorkers()
 	var channels WorkChannel
 	podWorkers.workerChannelFn = channels.Intercept
@@ -1074,6 +1080,7 @@ func (w *WorkChannel) Intercept(uid types.UID, ch chan podWork) (outCh <-chan po
 }
 
 func TestSyncKnownPods(t *testing.T) {
+	t.Parallel()
 	podWorkers, _ := createPodWorkers()
 
 	numPods := 20
@@ -1217,6 +1224,7 @@ func TestSyncKnownPods(t *testing.T) {
 }
 
 func Test_removeTerminatedWorker(t *testing.T) {
+	t.Parallel()
 	podUID := types.UID("pod-uid")
 
 	testCases := []struct {
@@ -1309,6 +1317,7 @@ func (kl *simpleFakeKubelet) syncTerminatedPod(ctx context.Context, pod *v1.Pod,
 // TestFakePodWorkers verifies that the fakePodWorkers behaves the same way as the real podWorkers
 // for their invocation of the syncPodFn.
 func TestFakePodWorkers(t *testing.T) {
+	t.Parallel()
 	fakeRecorder := &record.FakeRecorder{}
 	fakeRuntime := &containertest.FakeRuntime{}
 	fakeCache := containertest.NewFakeCache(fakeRuntime)
@@ -1376,6 +1385,7 @@ func TestFakePodWorkers(t *testing.T) {
 
 // TestKillPodNowFunc tests the blocking kill pod function works with pod workers as expected.
 func TestKillPodNowFunc(t *testing.T) {
+	t.Parallel()
 	fakeRecorder := &record.FakeRecorder{}
 	podWorkers, processed := createPodWorkers()
 	killPodFunc := killPodNow(podWorkers, fakeRecorder)
@@ -1406,6 +1416,7 @@ func TestKillPodNowFunc(t *testing.T) {
 }
 
 func Test_allowPodStart(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		desc                               string
 		pod                                *v1.Pod

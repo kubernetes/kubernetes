@@ -37,6 +37,7 @@ func (d *testProvider) Provide(image string) DockerConfig {
 }
 
 func TestCachingProvider(t *testing.T) {
+	t.Parallel()
 	provider := &testProvider{
 		Count: 0,
 	}

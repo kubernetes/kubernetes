@@ -25,6 +25,7 @@ import (
 )
 
 func TestPruneXML(t *testing.T) {
+	t.Parallel()
 	sourceXML := `<?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
 	<testsuite tests="3" failures="1" time="271.610000" name="k8s.io/kubernetes/test/integration/apiserver" timestamp="">

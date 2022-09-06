@@ -21,6 +21,7 @@ import (
 )
 
 func TestCleanupForInclude(t *testing.T) {
+	t.Parallel()
 
 	var tests = []struct {
 		markdown, expectedMarkdown string

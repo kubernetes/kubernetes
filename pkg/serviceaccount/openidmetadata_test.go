@@ -78,6 +78,7 @@ type Configuration struct {
 }
 
 func TestServeConfiguration(t *testing.T) {
+	t.Parallel()
 	s, jwksURI := setupServer(t, exampleIssuer, defaultKeys)
 	defer s.Close()
 
@@ -120,6 +121,7 @@ func TestServeConfiguration(t *testing.T) {
 }
 
 func TestServeKeys(t *testing.T) {
+	t.Parallel()
 	wantPubRSA := getPublicKey(rsaPublicKey).(*rsa.PublicKey)
 	wantPubECDSA := getPublicKey(ecdsaPublicKey).(*ecdsa.PublicKey)
 	var serveKeysTests = []struct {
@@ -217,6 +219,7 @@ func TestServeKeys(t *testing.T) {
 }
 
 func TestURLBoundaries(t *testing.T) {
+	t.Parallel()
 	s, _ := setupServer(t, exampleIssuer, defaultKeys)
 	defer s.Close()
 
@@ -249,6 +252,7 @@ func TestURLBoundaries(t *testing.T) {
 }
 
 func TestNewOpenIDMetadata(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name            string
 		issuerURL       string

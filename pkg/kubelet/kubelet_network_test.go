@@ -26,6 +26,7 @@ import (
 )
 
 func TestGetIPTablesMark(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		bit    int
 		expect string

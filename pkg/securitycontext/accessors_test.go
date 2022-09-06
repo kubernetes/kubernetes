@@ -25,6 +25,7 @@ import (
 )
 
 func TestPodSecurityContextAccessor(t *testing.T) {
+	t.Parallel()
 	fsGroup := int64(2)
 	runAsUser := int64(1)
 	runAsGroup := int64(1)
@@ -83,6 +84,7 @@ func TestPodSecurityContextAccessor(t *testing.T) {
 }
 
 func TestPodSecurityContextMutator(t *testing.T) {
+	t.Parallel()
 	testcases := map[string]struct {
 		newSC func() *api.PodSecurityContext
 	}{
@@ -255,6 +257,7 @@ func TestPodSecurityContextMutator(t *testing.T) {
 }
 
 func TestContainerSecurityContextAccessor(t *testing.T) {
+	t.Parallel()
 	privileged := true
 	runAsUser := int64(1)
 	runAsGroup := int64(1)
@@ -311,6 +314,7 @@ func TestContainerSecurityContextAccessor(t *testing.T) {
 }
 
 func TestContainerSecurityContextMutator(t *testing.T) {
+	t.Parallel()
 	testcases := map[string]struct {
 		newSC func() *api.SecurityContext
 	}{
@@ -465,6 +469,7 @@ func TestContainerSecurityContextMutator(t *testing.T) {
 }
 
 func TestEffectiveContainerSecurityContextAccessor(t *testing.T) {
+	t.Parallel()
 	privileged := true
 	runAsUser := int64(1)
 	runAsUserPod := int64(12)
@@ -602,6 +607,7 @@ func TestEffectiveContainerSecurityContextAccessor(t *testing.T) {
 }
 
 func TestEffectiveContainerSecurityContextMutator(t *testing.T) {
+	t.Parallel()
 	runAsNonRootPod := false
 	runAsUserPod := int64(12)
 

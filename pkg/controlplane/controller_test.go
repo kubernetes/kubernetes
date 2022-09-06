@@ -33,6 +33,7 @@ import (
 )
 
 func TestCreateOrUpdateMasterService(t *testing.T) {
+	t.Parallel()
 	singleStack := corev1.IPFamilyPolicySingleStack
 	ns := metav1.NamespaceDefault
 	om := func(name string) metav1.ObjectMeta {
@@ -440,6 +441,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 }
 
 func Test_completedConfig_NewBootstrapController(t *testing.T) {
+	t.Parallel()
 
 	_, ipv4cidr, err := netutils.ParseCIDRSloppy("192.168.0.0/24")
 	if err != nil {

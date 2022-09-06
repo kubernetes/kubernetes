@@ -24,6 +24,7 @@ import (
 )
 
 func TestURLsMatch(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		globURL       string
 		targetURL     string
@@ -121,6 +122,7 @@ func TestURLsMatch(t *testing.T) {
 }
 
 func TestDockerKeyringForGlob(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		globURL   string
 		targetURL string
@@ -229,6 +231,7 @@ func TestDockerKeyringForGlob(t *testing.T) {
 }
 
 func TestKeyringMiss(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		globURL   string
 		lookupURL string
@@ -286,6 +289,7 @@ func TestKeyringMiss(t *testing.T) {
 }
 
 func TestKeyringMissWithDockerHubCredentials(t *testing.T) {
+	t.Parallel()
 	url := defaultRegistryKey
 	email := "foo@bar.baz"
 	username := "foo"
@@ -312,6 +316,7 @@ func TestKeyringMissWithDockerHubCredentials(t *testing.T) {
 }
 
 func TestKeyringHitWithUnqualifiedDockerHub(t *testing.T) {
+	t.Parallel()
 	url := defaultRegistryKey
 	email := "foo@bar.baz"
 	username := "foo"
@@ -353,6 +358,7 @@ func TestKeyringHitWithUnqualifiedDockerHub(t *testing.T) {
 }
 
 func TestKeyringHitWithUnqualifiedLibraryDockerHub(t *testing.T) {
+	t.Parallel()
 	url := defaultRegistryKey
 	email := "foo@bar.baz"
 	username := "foo"
@@ -394,6 +400,7 @@ func TestKeyringHitWithUnqualifiedLibraryDockerHub(t *testing.T) {
 }
 
 func TestKeyringHitWithQualifiedDockerHub(t *testing.T) {
+	t.Parallel()
 	url := defaultRegistryKey
 	email := "foo@bar.baz"
 	username := "foo"
@@ -435,6 +442,7 @@ func TestKeyringHitWithQualifiedDockerHub(t *testing.T) {
 }
 
 func TestIsDefaultRegistryMatch(t *testing.T) {
+	t.Parallel()
 	samples := []map[bool]string{
 		{true: "foo/bar"},
 		{true: "docker.io/foo/bar"},
@@ -455,6 +463,7 @@ func TestIsDefaultRegistryMatch(t *testing.T) {
 }
 
 func TestProvidersDockerKeyring(t *testing.T) {
+	t.Parallel()
 	provider := &testProvider{
 		Count: 0,
 	}
@@ -482,6 +491,7 @@ func TestProvidersDockerKeyring(t *testing.T) {
 }
 
 func TestDockerKeyringLookup(t *testing.T) {
+	t.Parallel()
 	ada := AuthConfig{
 		Username: "ada",
 		Password: "smash", // Fake value for testing.
@@ -549,6 +559,7 @@ func TestDockerKeyringLookup(t *testing.T) {
 // by images that only match the hostname.
 // NOTE: the above covers the case of a more specific match trumping just hostname.
 func TestIssue3797(t *testing.T) {
+	t.Parallel()
 	rex := AuthConfig{
 		Username: "rex",
 		Password: "tiny arms", // Fake value for testing.

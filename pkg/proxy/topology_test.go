@@ -46,6 +46,7 @@ func checkExpectedEndpoints(expected sets.String, actual []Endpoint) error {
 }
 
 func TestCategorizeEndpoints(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name         string
 		hintsEnabled bool

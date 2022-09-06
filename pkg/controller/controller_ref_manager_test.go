@@ -60,6 +60,7 @@ func newPod(podName string, label map[string]string, owner metav1.Object) *v1.Po
 }
 
 func TestClaimPods(t *testing.T) {
+	t.Parallel()
 	controllerKind := schema.GroupVersionKind{}
 	type test struct {
 		name    string
@@ -262,6 +263,7 @@ func TestClaimPods(t *testing.T) {
 }
 
 func TestGeneratePatchBytesForDelete(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name         string
 		ownerUID     []types.UID

@@ -168,6 +168,7 @@ func newReplicaSet(name string, replicas int) *apps.ReplicaSet {
 }
 
 func TestControllerExpectations(t *testing.T) {
+	t.Parallel()
 	ttl := 30 * time.Second
 	e, fakeClock := NewFakeControllerExpectationsLookup(ttl)
 	// In practice we can't really have add and delete expectations since we only either create or
@@ -232,6 +233,7 @@ func TestControllerExpectations(t *testing.T) {
 }
 
 func TestUIDExpectations(t *testing.T) {
+	t.Parallel()
 	uidExp := NewUIDTrackingControllerExpectations(NewControllerExpectations())
 	rcList := []*v1.ReplicationController{
 		newReplicationController(2),
@@ -284,6 +286,7 @@ func TestUIDExpectations(t *testing.T) {
 }
 
 func TestCreatePods(t *testing.T) {
+	t.Parallel()
 	ns := metav1.NamespaceDefault
 	body := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "empty_pod"}})
 	fakeHandler := utiltesting.FakeHandler{
@@ -322,6 +325,7 @@ func TestCreatePods(t *testing.T) {
 }
 
 func TestCreatePodsWithGenerateName(t *testing.T) {
+	t.Parallel()
 	ns := metav1.NamespaceDefault
 	body := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "empty_pod"}})
 	fakeHandler := utiltesting.FakeHandler{
@@ -363,6 +367,7 @@ func TestCreatePodsWithGenerateName(t *testing.T) {
 }
 
 func TestDeletePodsAllowsMissing(t *testing.T) {
+	t.Parallel()
 	fakeClient := fake.NewSimpleClientset()
 	podControl := RealPodControl{
 		KubeClient: fakeClient,
@@ -376,6 +381,7 @@ func TestDeletePodsAllowsMissing(t *testing.T) {
 }
 
 func TestActivePodFiltering(t *testing.T) {
+	t.Parallel()
 	// This rc is not needed by the test, only the newPodList to give the pods labels/a namespace.
 	rc := newReplicationController(0)
 	podList := newPodList(nil, 5, v1.PodRunning, rc)
@@ -403,6 +409,7 @@ func TestActivePodFiltering(t *testing.T) {
 }
 
 func TestSortingActivePods(t *testing.T) {
+	t.Parallel()
 	numPods := 9
 	// This rc is not needed by the test, only the newPodList to give the pods labels/a namespace.
 	rc := newReplicationController(0)
@@ -478,6 +485,7 @@ func TestSortingActivePods(t *testing.T) {
 }
 
 func TestSortingActivePodsWithRanks(t *testing.T) {
+	t.Parallel()
 	now := metav1.Now()
 	then1Month := metav1.Time{Time: now.AddDate(0, -1, 0)}
 	then2Hours := metav1.Time{Time: now.Add(-2 * time.Hour)}
@@ -601,6 +609,7 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 }
 
 func TestActiveReplicaSetsFiltering(t *testing.T) {
+	t.Parallel()
 	var replicaSets []*apps.ReplicaSet
 	replicaSets = append(replicaSets, newReplicaSet("zero", 0))
 	replicaSets = append(replicaSets, nil)
@@ -624,6 +633,7 @@ func TestActiveReplicaSetsFiltering(t *testing.T) {
 }
 
 func TestComputeHash(t *testing.T) {
+	t.Parallel()
 	collisionCount := int32(1)
 	otherCollisionCount := int32(2)
 	maxCollisionCount := int32(math.MaxInt32)
@@ -656,6 +666,7 @@ func TestComputeHash(t *testing.T) {
 }
 
 func TestRemoveTaintOffNode(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name           string
 		nodeHandler    *testutil.FakeNodeHandler
@@ -830,6 +841,7 @@ func TestRemoveTaintOffNode(t *testing.T) {
 }
 
 func TestAddOrUpdateTaintOnNode(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name           string
 		nodeHandler    *testutil.FakeNodeHandler

@@ -24,6 +24,7 @@ import (
 )
 
 func TestKubeletDirs(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet

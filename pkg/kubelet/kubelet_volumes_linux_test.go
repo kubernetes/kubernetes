@@ -54,6 +54,7 @@ func validateDirNotExists(dir string) error {
 }
 
 func TestCleanupOrphanedPodDirs(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
@@ -201,6 +202,7 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 }
 
 func TestPodVolumesExistWithMount(t *testing.T) {
+	t.Parallel()
 	poduid := types.UID("poduid")
 	testCases := map[string]struct {
 		prepareFunc func(kubelet *Kubelet) error

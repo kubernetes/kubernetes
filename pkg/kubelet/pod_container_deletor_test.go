@@ -25,6 +25,7 @@ import (
 )
 
 func TestGetContainersToDeleteInPodWithFilter(t *testing.T) {
+	t.Parallel()
 	pod := kubecontainer.PodStatus{
 		ContainerStatuses: []*kubecontainer.Status{
 			{
@@ -87,6 +88,7 @@ func TestGetContainersToDeleteInPodWithFilter(t *testing.T) {
 }
 
 func TestGetContainersToDeleteInPod(t *testing.T) {
+	t.Parallel()
 	pod := kubecontainer.PodStatus{
 		ContainerStatuses: []*kubecontainer.Status{
 			{
@@ -149,6 +151,7 @@ func TestGetContainersToDeleteInPod(t *testing.T) {
 }
 
 func TestGetContainersToDeleteInPodWithNoMatch(t *testing.T) {
+	t.Parallel()
 	pod := kubecontainer.PodStatus{
 		ContainerStatuses: []*kubecontainer.Status{
 			{

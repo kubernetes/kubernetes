@@ -161,6 +161,7 @@ func (lcm *localCM) GetCapacity(localStorageCapacityIsolation bool) v1.ResourceL
 }
 
 func TestUpdateNewNodeStatus(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		desc                string
 		nodeStatusMaxImages int32
@@ -315,6 +316,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 }
 
 func TestUpdateExistingNodeStatus(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -572,6 +574,7 @@ func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 }
 
 func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -781,6 +784,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 }
 
 func TestUpdateNodeStatusError(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -792,6 +796,7 @@ func TestUpdateNodeStatusError(t *testing.T) {
 }
 
 func TestUpdateNodeStatusWithLease(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	clock := testKubelet.fakeClock
@@ -1030,6 +1035,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 }
 
 func TestUpdateNodeStatusAndVolumesInUseWithNodeLease(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		desc                  string
 		existingVolumes       []v1.UniqueVolumeName // volumes to initially populate volumeManager
@@ -1128,6 +1134,7 @@ func TestUpdateNodeStatusAndVolumesInUseWithNodeLease(t *testing.T) {
 }
 
 func TestRegisterWithApiServer(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -1186,6 +1193,7 @@ func TestRegisterWithApiServer(t *testing.T) {
 }
 
 func TestTryRegisterWithApiServer(t *testing.T) {
+	t.Parallel()
 	alreadyExists := &apierrors.StatusError{
 		ErrStatus: metav1.Status{Reason: metav1.StatusReasonAlreadyExists},
 	}
@@ -1345,6 +1353,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 }
 
 func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
+	t.Parallel()
 	const nodeStatusMaxImages = 5
 
 	// generate one more in inputImageList than we configure the Kubelet to report
@@ -1415,6 +1424,7 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 }
 
 func TestUpdateDefaultLabels(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	testKubelet.kubelet.kubeClient = nil // ensure only the heartbeat client is used
 
@@ -1720,6 +1730,7 @@ func TestUpdateDefaultLabels(t *testing.T) {
 }
 
 func TestUpdateDefaultResources(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name         string
 		initialNode  *v1.Node
@@ -1930,6 +1941,7 @@ func TestUpdateDefaultResources(t *testing.T) {
 }
 
 func TestReconcileHugePageResource(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	hugePageResourceName64Ki := v1.ResourceName("hugepages-64Ki")
 	hugePageResourceName2Mi := v1.ResourceName("hugepages-2Mi")
@@ -2222,6 +2234,7 @@ func TestReconcileHugePageResource(t *testing.T) {
 
 }
 func TestReconcileExtendedResource(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	testKubelet.kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	testKubelet.kubelet.containerManager = cm.NewStubContainerManagerWithExtendedResource(true /* shouldResetExtendedResourceCapacity*/)
@@ -2410,6 +2423,7 @@ func TestReconcileExtendedResource(t *testing.T) {
 }
 
 func TestValidateNodeIPParam(t *testing.T) {
+	t.Parallel()
 	type test struct {
 		nodeIP   string
 		success  bool
@@ -2501,6 +2515,7 @@ func TestValidateNodeIPParam(t *testing.T) {
 }
 
 func TestRegisterWithApiServerWithTaint(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -2547,6 +2562,7 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 }
 
 func TestNodeStatusHasChanged(t *testing.T) {
+	t.Parallel()
 	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
 	fakeFuture := metav1.Time{Time: fakeNow.Time.Add(time.Minute)}
 	readyCondition := v1.NodeCondition{
@@ -2703,6 +2719,7 @@ func TestNodeStatusHasChanged(t *testing.T) {
 }
 
 func TestUpdateNodeAddresses(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet

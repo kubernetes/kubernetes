@@ -24,6 +24,7 @@ import (
 )
 
 func TestReasonCache(t *testing.T) {
+	t.Parallel()
 	// Create test sync result
 	syncResult := kubecontainer.PodSyncResult{}
 	results := []*kubecontainer.SyncResult{

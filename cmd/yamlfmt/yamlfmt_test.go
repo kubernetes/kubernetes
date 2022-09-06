@@ -24,6 +24,7 @@ import (
 )
 
 func TestFetchYaml(t *testing.T) {
+	t.Parallel()
 	sourceYaml := ` # See the OWNERS docs at https://go.k8s.io/owners
 approvers:
 - dep-approvers

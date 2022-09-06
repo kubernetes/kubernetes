@@ -49,6 +49,7 @@ func ErrorPrintHandler(obj *TestPrintType, options GenerateOptions) ([]metav1bet
 }
 
 func TestCustomTypePrinting(t *testing.T) {
+	t.Parallel()
 	columns := []metav1beta1.TableColumnDefinition{{Name: "Data"}}
 	generator := NewTableGenerator()
 	err := generator.TableHandler(columns, PrintCustomType)
@@ -72,6 +73,7 @@ func TestCustomTypePrinting(t *testing.T) {
 }
 
 func TestPrintHandlerError(t *testing.T) {
+	t.Parallel()
 	columns := []metav1beta1.TableColumnDefinition{{Name: "Data"}}
 	generator := NewTableGenerator()
 	err := generator.TableHandler(columns, ErrorPrintHandler)

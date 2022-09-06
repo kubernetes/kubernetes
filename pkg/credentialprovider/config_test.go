@@ -27,6 +27,7 @@ import (
 )
 
 func TestReadDockerConfigFile(t *testing.T) {
+	t.Parallel()
 	configJSONFileName := "config.json"
 	var fileInfo *os.File
 
@@ -63,6 +64,7 @@ func TestReadDockerConfigFile(t *testing.T) {
 	}
 }
 func TestDockerConfigJsonJSONDecode(t *testing.T) {
+	t.Parallel()
 	// Fake values for testing.
 	input := []byte(`{"auths": {"http://foo.example.com":{"username": "foo", "password": "bar", "email": "foo@example.com"}, "http://bar.example.com":{"username": "bar", "password": "baz", "email": "bar@example.com"}}}`)
 
@@ -93,6 +95,7 @@ func TestDockerConfigJsonJSONDecode(t *testing.T) {
 }
 
 func TestDockerConfigJSONDecode(t *testing.T) {
+	t.Parallel()
 	// Fake values for testing.
 	input := []byte(`{"http://foo.example.com":{"username": "foo", "password": "bar", "email": "foo@example.com"}, "http://bar.example.com":{"username": "bar", "password": "baz", "email": "bar@example.com"}}`)
 
@@ -121,6 +124,7 @@ func TestDockerConfigJSONDecode(t *testing.T) {
 }
 
 func TestDockerConfigEntryJSONDecode(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		input  []byte
 		expect DockerConfigEntry
@@ -198,6 +202,7 @@ func TestDockerConfigEntryJSONDecode(t *testing.T) {
 }
 
 func TestDecodeDockerConfigFieldAuth(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		input    string
 		username string
@@ -282,6 +287,7 @@ func TestDecodeDockerConfigFieldAuth(t *testing.T) {
 }
 
 func TestDockerConfigEntryJSONCompatibleEncode(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		input  DockerConfigEntry
 		expect []byte
@@ -311,6 +317,7 @@ func TestDockerConfigEntryJSONCompatibleEncode(t *testing.T) {
 }
 
 func TestReadDockerConfigFileFromBytes(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		id               string
 		input            []byte
@@ -355,6 +362,7 @@ func TestReadDockerConfigFileFromBytes(t *testing.T) {
 }
 
 func TestReadDockerConfigJSONFileFromBytes(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		id               string
 		input            []byte

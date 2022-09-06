@@ -40,6 +40,7 @@ func init() {
 }
 
 func TestClaims(t *testing.T) {
+	t.Parallel()
 	sa := core.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "myns",
@@ -229,6 +230,7 @@ type claimTestCase struct {
 }
 
 func TestValidatePrivateClaims(t *testing.T) {
+	t.Parallel()
 	var (
 		nowUnix = int64(1514764800)
 

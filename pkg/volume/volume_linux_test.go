@@ -56,6 +56,7 @@ func (l *localFakeMounter) GetMetrics() (*Metrics, error) {
 }
 
 func TestSkipPermissionChange(t *testing.T) {
+	t.Parallel()
 	always := v1.FSGroupChangeAlways
 	onrootMismatch := v1.FSGroupChangeOnRootMismatch
 	tests := []struct {
@@ -176,6 +177,7 @@ func TestSkipPermissionChange(t *testing.T) {
 }
 
 func TestSetVolumeOwnershipMode(t *testing.T) {
+	t.Parallel()
 	always := v1.FSGroupChangeAlways
 	onrootMismatch := v1.FSGroupChangeOnRootMismatch
 	expectedMask := rwMask | os.ModeSetgid | execMask
@@ -341,6 +343,7 @@ func verifyDirectoryPermission(path string, readonly bool) bool {
 }
 
 func TestSetVolumeOwnershipOwner(t *testing.T) {
+	t.Parallel()
 	fsGroup := int64(3000)
 	currentUid := os.Geteuid()
 	if currentUid != 0 {

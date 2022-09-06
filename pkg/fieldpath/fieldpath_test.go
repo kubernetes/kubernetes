@@ -25,6 +25,7 @@ import (
 )
 
 func TestExtractFieldPathAsString(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name                    string
 		fieldPath               string
@@ -187,6 +188,7 @@ func TestExtractFieldPathAsString(t *testing.T) {
 }
 
 func TestSplitMaybeSubscriptedPath(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		fieldPath         string
 		expectedPath      string

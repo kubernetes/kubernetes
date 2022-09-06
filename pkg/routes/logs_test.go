@@ -23,6 +23,7 @@ import (
 )
 
 func TestPreCheckLogFileNameLength(t *testing.T) {
+	t.Parallel()
 	oversizeFileName := fmt.Sprintf("%0256s", "a")
 	normalFileName := fmt.Sprintf("%0255s", "a")
 

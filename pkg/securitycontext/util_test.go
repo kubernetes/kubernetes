@@ -25,6 +25,7 @@ import (
 )
 
 func TestAddNoNewPrivileges(t *testing.T) {
+	t.Parallel()
 	pfalse := false
 	ptrue := true
 
@@ -65,6 +66,7 @@ func TestAddNoNewPrivileges(t *testing.T) {
 }
 
 func TestConvertToRuntimeMaskedPaths(t *testing.T) {
+	t.Parallel()
 	dPM := v1.DefaultProcMount
 	uPM := v1.UnmaskedProcMount
 	tests := map[string]struct {
@@ -94,6 +96,7 @@ func TestConvertToRuntimeMaskedPaths(t *testing.T) {
 }
 
 func TestConvertToRuntimeReadonlyPaths(t *testing.T) {
+	t.Parallel()
 	dPM := v1.DefaultProcMount
 	uPM := v1.UnmaskedProcMount
 	tests := map[string]struct {
@@ -123,6 +126,7 @@ func TestConvertToRuntimeReadonlyPaths(t *testing.T) {
 }
 
 func TestDetermineEffectiveRunAsUser(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		desc          string
 		pod           *v1.Pod

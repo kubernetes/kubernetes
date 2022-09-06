@@ -34,6 +34,7 @@ import (
 )
 
 func TestMakeMounts(t *testing.T) {
+	t.Parallel()
 	bTrue := true
 	propagationHostToContainer := v1.MountPropagationHostToContainer
 	propagationBidirectional := v1.MountPropagationBidirectional
@@ -271,6 +272,7 @@ func TestMakeMounts(t *testing.T) {
 }
 
 func TestMakeBlockVolumes(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet

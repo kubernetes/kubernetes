@@ -48,6 +48,7 @@ import (
 )
 
 func TestNodeAllocatableChanged(t *testing.T) {
+	t.Parallel()
 	newQuantity := func(value int64) resource.Quantity {
 		return *resource.NewQuantity(value, resource.BinarySI)
 	}
@@ -82,6 +83,7 @@ func TestNodeAllocatableChanged(t *testing.T) {
 }
 
 func TestNodeLabelsChanged(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		Name      string
 		Changed   bool
@@ -114,6 +116,7 @@ func TestNodeLabelsChanged(t *testing.T) {
 }
 
 func TestNodeTaintsChanged(t *testing.T) {
+	t.Parallel()
 	for _, test := range []struct {
 		Name      string
 		Changed   bool
@@ -145,6 +148,7 @@ func TestNodeTaintsChanged(t *testing.T) {
 }
 
 func TestNodeConditionsChanged(t *testing.T) {
+	t.Parallel()
 	nodeConditionType := reflect.TypeOf(v1.NodeCondition{})
 	if nodeConditionType.NumField() != 6 {
 		t.Errorf("NodeCondition type has changed. The nodeConditionsChanged() function must be reevaluated.")
@@ -199,6 +203,7 @@ func TestNodeConditionsChanged(t *testing.T) {
 }
 
 func TestUpdatePodInCache(t *testing.T) {
+	t.Parallel()
 	ttl := 10 * time.Second
 	nodeName := "node"
 
@@ -251,6 +256,7 @@ func withPodName(pod *v1.Pod, name string) *v1.Pod {
 }
 
 func TestPreCheckForNode(t *testing.T) {
+	t.Parallel()
 	cpu4 := map[v1.ResourceName]string{v1.ResourceCPU: "4"}
 	cpu8 := map[v1.ResourceName]string{v1.ResourceCPU: "8"}
 	cpu16 := map[v1.ResourceName]string{v1.ResourceCPU: "16"}
@@ -356,6 +362,7 @@ func TestPreCheckForNode(t *testing.T) {
 
 // test for informers of resources we care about is registered
 func TestAddAllEventHandlers(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name                   string
 		gvkMap                 map[framework.GVK]framework.ActionType
@@ -461,6 +468,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 }
 
 func TestAdmissionCheck(t *testing.T) {
+	t.Parallel()
 	nodeaffinityError := AdmissionResult{Name: nodeaffinity.Name, Reason: nodeaffinity.ErrReasonPod}
 	nodenameError := AdmissionResult{Name: nodename.Name, Reason: nodename.ErrReason}
 	nodeportsError := AdmissionResult{Name: nodeports.Name, Reason: nodeports.ErrReason}

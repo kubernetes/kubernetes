@@ -28,6 +28,7 @@ import (
 )
 
 func TestPodResourceLimitsDefaulting(t *testing.T) {
+	t.Parallel()
 	tk := newTestKubelet(t, true)
 	defer tk.Cleanup()
 	tk.kubelet.nodeLister = &testNodeLister{

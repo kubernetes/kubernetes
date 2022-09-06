@@ -140,6 +140,7 @@ func (fakeLocalhost443Listener) Addr() net.Addr {
 // their various strategies properly wired up. This surfaced as a bug where strategies defined Export functions, but
 // they were never used outside of unit tests because the export strategies were not assigned inside the Store.
 func TestLegacyRestStorageStrategies(t *testing.T) {
+	t.Parallel()
 	_, etcdserver, apiserverCfg, _ := newInstance(t)
 	defer etcdserver.Terminate(t)
 
@@ -165,6 +166,7 @@ func TestLegacyRestStorageStrategies(t *testing.T) {
 }
 
 func TestCertificatesRestStorageStrategies(t *testing.T) {
+	t.Parallel()
 	_, etcdserver, apiserverCfg, _ := newInstance(t)
 	defer etcdserver.Terminate(t)
 
@@ -194,6 +196,7 @@ func newInstance(t *testing.T) (*Instance, *etcd3testing.EtcdTestServer, Config,
 
 // TestVersion tests /version
 func TestVersion(t *testing.T) {
+	t.Parallel()
 	s, etcdserver, _, _ := newInstance(t)
 	defer etcdserver.Terminate(t)
 
@@ -231,6 +234,7 @@ func decodeResponse(resp *http.Response, obj interface{}) error {
 // Because we need to be backwards compatible with release 1.1, at endpoints
 // that exist in release 1.1, the responses should have empty APIVersion.
 func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
+	t.Parallel()
 	apiserver, etcdserver, _, assert := newInstance(t)
 	defer etcdserver.Terminate(t)
 
@@ -288,6 +292,7 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 
 // This test doesn't cover the apiregistration and apiextensions group, as they are installed by other apiservers.
 func TestStorageVersionHashes(t *testing.T) {
+	t.Parallel()
 	apiserver, etcdserver, _, _ := newInstance(t)
 	defer etcdserver.Terminate(t)
 
@@ -335,6 +340,7 @@ func TestStorageVersionHashes(t *testing.T) {
 }
 
 func TestNoAlphaVersionsEnabledByDefault(t *testing.T) {
+	t.Parallel()
 	config := DefaultAPIResourceConfigSource()
 	for gv, enable := range config.GroupVersionConfigs {
 		if enable && strings.Contains(gv.Version, "alpha") {
@@ -344,6 +350,7 @@ func TestNoAlphaVersionsEnabledByDefault(t *testing.T) {
 }
 
 func TestNoBetaVersionsEnabledByDefault(t *testing.T) {
+	t.Parallel()
 	config := DefaultAPIResourceConfigSource()
 	for gv, enable := range config.GroupVersionConfigs {
 		if enable && strings.Contains(gv.Version, "beta") {
@@ -353,6 +360,7 @@ func TestNoBetaVersionsEnabledByDefault(t *testing.T) {
 }
 
 func TestNewBetaResourcesEnabledByDefault(t *testing.T) {
+	t.Parallel()
 	// legacyEnabledBetaResources is nearly a duplication from elsewhere.  This is intentional.  These types already have
 	// GA equivalents available and should therefore never have a beta enabled by default again.
 	legacyEnabledBetaResources := map[schema.GroupVersionResource]bool{

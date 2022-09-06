@@ -30,6 +30,7 @@ import (
 )
 
 func TestEndpointsMapFromESC(t *testing.T) {
+	t.Parallel()
 	testCases := map[string]struct {
 		endpointSlices []*discovery.EndpointSlice
 		hostname       string
@@ -218,6 +219,7 @@ func TestEndpointsMapFromESC(t *testing.T) {
 }
 
 func TestEndpointInfoByServicePort(t *testing.T) {
+	t.Parallel()
 	testCases := map[string]struct {
 		namespacedName types.NamespacedName
 		endpointSlices []*discovery.EndpointSlice
@@ -322,6 +324,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 }
 
 func TestEsInfoChanged(t *testing.T) {
+	t.Parallel()
 	p80 := int32(80)
 	p443 := int32(443)
 	tcpProto := v1.ProtocolTCP

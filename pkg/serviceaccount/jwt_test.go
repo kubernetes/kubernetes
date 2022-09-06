@@ -133,6 +133,7 @@ func getPublicKey(data string) interface{} {
 }
 
 func TestTokenGenerateAndValidate(t *testing.T) {
+	t.Parallel()
 	expectedUserName := "system:serviceaccount:test:my-service-account"
 	expectedUserUID := "12345"
 
