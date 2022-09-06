@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -37,6 +38,8 @@ type IntegrationTestNodePreparer struct {
 	countToStrategy []testutils.CountToStrategy
 	nodeNamePrefix  string
 	nodeSpec        *v1.Node
+	// PreparedNodes stores the nodes created by IntegrationTestNodePreparer.
+	preparedNodes sets.String
 }
 
 // NewIntegrationTestNodePreparer creates an IntegrationTestNodePreparer configured with defaults.
@@ -45,6 +48,7 @@ func NewIntegrationTestNodePreparer(client clientset.Interface, countToStrategy 
 		client:          client,
 		countToStrategy: countToStrategy,
 		nodeNamePrefix:  nodeNamePrefix,
+		preparedNodes:   sets.NewString(),
 	}
 }
 
@@ -54,6 +58,7 @@ func NewIntegrationTestNodePreparerWithNodeSpec(client clientset.Interface, coun
 		client:          client,
 		countToStrategy: countToStrategy,
 		nodeSpec:        nodeSpec,
+		preparedNodes:   sets.NewString(),
 	}
 }
 
@@ -89,8 +94,9 @@ func (p *IntegrationTestNodePreparer) PrepareNodes(nextNodeIndex int) error {
 	for i := 0; i < numNodes; i++ {
 		var err error
 		for retry := 0; retry < retries; retry++ {
-			_, err = p.client.CoreV1().Nodes().Create(context.TODO(), baseNode, metav1.CreateOptions{})
+			node, err := p.client.CoreV1().Nodes().Create(context.TODO(), baseNode, metav1.CreateOptions{})
 			if err == nil {
+				p.preparedNodes.Insert(node.Name)
 				break
 			}
 		}
@@ -115,17 +121,11 @@ func (p *IntegrationTestNodePreparer) PrepareNodes(nextNodeIndex int) error {
 	return nil
 }
 
-// CleanupNodes deletes existing test nodes.
+// CleanupNodes deletes managed test nodes.
 func (p *IntegrationTestNodePreparer) CleanupNodes() error {
-	// TODO(#93794): make CleanupNodes only clean up the nodes created by this
-	// IntegrationTestNodePreparer to make this more intuitive.
-	nodes, err := GetReadySchedulableNodes(p.client)
-	if err != nil {
-		klog.Fatalf("Error listing nodes: %v", err)
-	}
 	var errRet error
-	for i := range nodes.Items {
-		if err := p.client.CoreV1().Nodes().Delete(context.TODO(), nodes.Items[i].Name, metav1.DeleteOptions{}); err != nil {
+	for node := range p.preparedNodes {
+		if err := p.client.CoreV1().Nodes().Delete(context.TODO(), node, metav1.DeleteOptions{}); err != nil {
 			klog.Errorf("Error while deleting Node: %v", err)
 			errRet = err
 		}
