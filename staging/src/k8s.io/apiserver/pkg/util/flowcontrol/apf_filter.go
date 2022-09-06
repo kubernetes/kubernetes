@@ -181,6 +181,7 @@ func (cfgCtlr *configController) Handle(ctx context.Context, requestDigest Reque
 			metrics.ObserveWaitingDuration(ctx, pl.Name, fs.Name, strconv.FormatBool(req != nil), time.Since(startWaitingTime))
 		}
 		metrics.AddDispatch(ctx, pl.Name, fs.Name)
+		fqs.OnRequestDispatched(ctx, req)
 		executed = true
 		startExecutionTime := time.Now()
 		defer func() {

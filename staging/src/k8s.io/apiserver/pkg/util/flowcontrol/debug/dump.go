@@ -30,6 +30,10 @@ type QueueSetDump struct {
 	Executing    int
 	SeatsInUse   int
 	SeatsWaiting int
+	Dispatched   int
+	Rejected     int
+	Timedout     int
+	Cancelled    int
 }
 
 // QueueDump is an instant dump of one queue in a queue-set.
