@@ -3,6 +3,7 @@ package gomega
 import (
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/gomega/matchers"
 	"github.com/onsi/gomega/types"
 )
@@ -23,6 +24,15 @@ func Equal(expected interface{}) types.GomegaMatcher {
 func BeEquivalentTo(expected interface{}) types.GomegaMatcher {
 	return &matchers.BeEquivalentToMatcher{
 		Expected: expected,
+	}
+}
+
+//BeComparableTo uses gocmp.Equal to compare. You can pass cmp.Option as options.
+//It is an error for actual and expected to be nil.  Use BeNil() instead.
+func BeComparableTo(expected interface{}, opts ...cmp.Option) types.GomegaMatcher {
+	return &matchers.BeComparableToMatcher{
+		Expected: expected,
+		Options:  opts,
 	}
 }
 
@@ -391,6 +401,19 @@ func HaveField(field string, expected interface{}) types.GomegaMatcher {
 	return &matchers.HaveFieldMatcher{
 		Field:    field,
 		Expected: expected,
+	}
+}
+
+// HaveExistingField succeeds if actual is a struct and the specified field
+// exists.
+//
+// HaveExistingField can be combined with HaveField in order to cover use cases
+// with optional fields. HaveField alone would trigger an error in such situations.
+//
+//     Expect(MrHarmless).NotTo(And(HaveExistingField("Title"), HaveField("Title", "Supervillain")))
+func HaveExistingField(field string) types.GomegaMatcher {
+	return &matchers.HaveExistingFieldMatcher{
+		Field: field,
 	}
 }
 

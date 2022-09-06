@@ -293,7 +293,9 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(e2econfig *storagefra
 		framework.ExpectNoError(err, "patch items")
 
 		sc, ok = items[0].(*storagev1.StorageClass)
-		framework.ExpectEqual(ok, true, "storage class from %s", d.StorageClass.FromFile)
+		if !ok {
+			framework.Failf("storage class from %s", d.StorageClass.FromFile)
+		}
 	}
 
 	framework.ExpectNotEqual(sc, nil, "storage class is unexpectantly nil")

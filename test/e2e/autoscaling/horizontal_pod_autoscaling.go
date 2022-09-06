@@ -17,9 +17,11 @@ limitations under the License.
 package autoscaling
 
 import (
-	"k8s.io/pod-security-admission/api"
 	"time"
 
+	"k8s.io/pod-security-admission/api"
+
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
@@ -104,6 +106,22 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 			doNotScaleOnBusySidecar("rs", e2eautoscaling.KindReplicaSet, true, f)
 		})
 	})
+
+	ginkgo.Describe("CustomResourceDefinition", func() {
+		ginkgo.It("Should scale with a CRD targetRef", func() {
+			scaleTest := &HPAScaleTest{
+				initPods:                    1,
+				totalInitialCPUUsage:        150,
+				perPodCPURequest:            200,
+				targetCPUUtilizationPercent: 50,
+				minPods:                     1,
+				maxPods:                     2,
+				firstScale:                  2,
+				targetRef:                   e2eautoscaling.CustomCRDTargetRef(),
+			}
+			scaleTest.run("crd-light", e2eautoscaling.KindCRD, f)
+		})
+	})
 })
 
 // HPAScaleTest struct is used by the scale(...) function.
@@ -118,6 +136,7 @@ type HPAScaleTest struct {
 	firstScaleStasis            time.Duration
 	cpuBurst                    int
 	secondScale                 int32
+	targetRef                   autoscalingv2.CrossVersionObjectReference
 }
 
 // run is a method which runs an HPA lifecycle, from a starting state, to an expected
@@ -129,7 +148,8 @@ func (scaleTest *HPAScaleTest) run(name string, kind schema.GroupVersionKind, f 
 	const timeToWait = 15 * time.Minute
 	rc := e2eautoscaling.NewDynamicResourceConsumer(name, f.Namespace.Name, kind, scaleTest.initPods, scaleTest.totalInitialCPUUsage, 0, 0, scaleTest.perPodCPURequest, 200, f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle)
 	defer rc.CleanUp()
-	hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscaler(rc, scaleTest.targetCPUUtilizationPercent, scaleTest.minPods, scaleTest.maxPods)
+	var hpa *autoscalingv2.HorizontalPodAutoscaler
+	hpa = e2eautoscaling.CreateCPUHorizontalPodAutoscaler(rc, scaleTest.targetCPUUtilizationPercent, scaleTest.minPods, scaleTest.maxPods)
 	defer e2eautoscaling.DeleteHorizontalPodAutoscaler(rc, hpa.Name)
 
 	rc.WaitForReplicas(scaleTest.firstScale, timeToWait)

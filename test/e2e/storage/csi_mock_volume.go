@@ -684,7 +684,9 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				sc, pvc, pod := createPod(pvcReference)
 				gomega.Expect(pod).NotTo(gomega.BeNil(), "while creating pod for resizing")
 
-				framework.ExpectEqual(*sc.AllowVolumeExpansion, true, "failed creating sc with allowed expansion")
+				if !*sc.AllowVolumeExpansion {
+					framework.Fail("failed creating sc with allowed expansion")
+				}
 
 				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "Failed to start pod1: %v", err)
@@ -777,7 +779,9 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				sc, pvc, pod := createPod(pvcReference)
 				gomega.Expect(pod).NotTo(gomega.BeNil(), "while creating pod for resizing")
 
-				framework.ExpectEqual(*sc.AllowVolumeExpansion, true, "failed creating sc with allowed expansion")
+				if !*sc.AllowVolumeExpansion {
+					framework.Fail("failed creating sc with allowed expansion")
+				}
 
 				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "Failed to start pod1: %v", err)
@@ -1528,7 +1532,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				}
 
 				ginkgo.By(fmt.Sprintf("Get VolumeSnapshotContent bound to VolumeSnapshot %s", snapshot.GetName()))
-				snapshotContent := utils.GetSnapshotContentFromSnapshot(m.config.Framework.DynamicClient, snapshot)
+				snapshotContent := utils.GetSnapshotContentFromSnapshot(m.config.Framework.DynamicClient, snapshot, f.Timeouts.SnapshotCreate)
 				volumeSnapshotContentName := snapshotContent.GetName()
 
 				ginkgo.By(fmt.Sprintf("Verify VolumeSnapshotContent %s contains finalizer %s", snapshot.GetName(), volumeSnapshotContentFinalizer))
@@ -1860,7 +1864,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				_, snapshot := storageframework.CreateSnapshot(sDriver, m.config, storageframework.DynamicSnapshotDelete, pvc.Name, pvc.Namespace, f.Timeouts, parameters)
 				framework.ExpectNoError(err, "failed to create snapshot")
-				snapshotcontent := utils.GetSnapshotContentFromSnapshot(m.config.Framework.DynamicClient, snapshot)
+				snapshotcontent := utils.GetSnapshotContentFromSnapshot(m.config.Framework.DynamicClient, snapshot, f.Timeouts.SnapshotCreate)
 				if annotations, ok = snapshotcontent.Object["metadata"].(map[string]interface{})["annotations"]; !ok {
 					framework.Failf("Unable to get volume snapshot content annotations")
 				}

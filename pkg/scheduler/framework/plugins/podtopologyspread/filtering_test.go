@@ -645,7 +645,7 @@ func TestPreFilterState(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node-a").Label("node", "node-a").Label("foo", "").Obj(),
 				st.MakeNode().Name("node-b").Label("node", "node-b").Label("foo", "").Obj(),
-				st.MakeNode().Name("node-y").Label("node", "node-y").Label("bar", "").Obj(),
+				st.MakeNode().Name("node-c").Label("node", "node-c").Label("bar", "").Obj(),
 			},
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p-a").Node("node-a").Label("bar", "").Obj(),
@@ -683,7 +683,7 @@ func TestPreFilterState(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node-a").Label("node", "node-a").Label("foo", "").Obj(),
 				st.MakeNode().Name("node-b").Label("node", "node-b").Label("foo", "").Obj(),
-				st.MakeNode().Name("node-y").Label("node", "node-y").Label("bar", "").Obj(),
+				st.MakeNode().Name("node-c").Label("node", "node-c").Label("bar", "").Obj(),
 			},
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p-a").Node("node-a").Label("bar", "").Obj(),
@@ -760,7 +760,7 @@ func TestPreFilterState(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node-a").Label("node", "node-a").Label("foo", "").Obj(),
 				st.MakeNode().Name("node-b").Label("node", "node-b").Label("foo", "").Obj(),
-				st.MakeNode().Name("node-y").Label("node", "node-y").Label("bar", "").Obj(),
+				st.MakeNode().Name("node-c").Label("node", "node-c").Label("bar", "").Obj(),
 			},
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p-a").Node("node-a").Label("bar", "").Obj(),

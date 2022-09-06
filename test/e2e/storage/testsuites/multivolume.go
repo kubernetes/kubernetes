@@ -429,6 +429,10 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 			e2eskipper.Skipf("Driver %q does not support multiple concurrent pods - skipping", dInfo.Name)
 		}
 
+		if l.driver.GetDriverInfo().Name == "vsphere" && pattern == storageframework.BlockVolModeDynamicPV {
+			e2eskipper.Skipf("Driver %q does not support read only raw block volumes - skipping", dInfo.Name)
+		}
+
 		// Create volume
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
 		resource := storageframework.CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
@@ -746,7 +750,7 @@ func getCurrentTopologiesNumber(cs clientset.Interface, nodes *v1.NodeList, keys
 				break
 			}
 		}
-		if !found {
+		if !found && len(topo) > 0 {
 			framework.Logf("found topology %v", topo)
 			topos = append(topos, topo)
 			topoCount = append(topoCount, 1)

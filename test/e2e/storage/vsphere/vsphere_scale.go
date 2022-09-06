@@ -86,8 +86,12 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 		volumesPerPod = GetAndExpectIntEnvVar(VCPScaleVolumesPerPod)
 
 		numberOfInstances = GetAndExpectIntEnvVar(VCPScaleInstances)
-		framework.ExpectNotEqual(numberOfInstances > 5, true, "Maximum allowed instances are 5")
-		framework.ExpectNotEqual(numberOfInstances > volumeCount, true, "Number of instances should be less than the total volume count")
+		if numberOfInstances > 5 {
+			framework.Failf("Maximum 5 instances allowed, got instead: %v", numberOfInstances)
+		}
+		if numberOfInstances > volumeCount {
+			framework.Failf("Number of instances: %v cannot be greater than volume count: %v", numberOfInstances, volumeCount)
+		}
 
 		policyName = GetAndExpectStringEnvVar(SPBMPolicyName)
 		datastoreName = GetAndExpectStringEnvVar(StorageClassDatastoreName)

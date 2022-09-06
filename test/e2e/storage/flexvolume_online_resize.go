@@ -94,7 +94,9 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume volume expan
 			fmt.Printf("storage class creation error: %v\n", err)
 		}
 		framework.ExpectNoError(err, "Error creating resizable storage class: %v", err)
-		framework.ExpectEqual(*resizableSc.AllowVolumeExpansion, true)
+		if !*resizableSc.AllowVolumeExpansion {
+			framework.Failf("Class %s does not allow volume expansion", resizableSc.Name)
+		}
 
 		pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 			StorageClassName: &(resizableSc.Name),

@@ -588,7 +588,7 @@ github.com/mvdan/xurls
 # github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f => github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 ## explicit
 github.com/mxk/go-flowrate/flowrate
-# github.com/onsi/ginkgo/v2 v2.1.4 => github.com/onsi/ginkgo/v2 v2.1.4
+# github.com/onsi/ginkgo/v2 v2.1.6 => github.com/onsi/ginkgo/v2 v2.1.6
 ## explicit; go 1.18
 github.com/onsi/ginkgo/v2
 github.com/onsi/ginkgo/v2/config
@@ -610,7 +610,7 @@ github.com/onsi/ginkgo/v2/internal/parallel_support
 github.com/onsi/ginkgo/v2/internal/testingtproxy
 github.com/onsi/ginkgo/v2/reporters
 github.com/onsi/ginkgo/v2/types
-# github.com/onsi/gomega v1.19.0 => github.com/onsi/gomega v1.19.0
+# github.com/onsi/gomega v1.20.1 => github.com/onsi/gomega v1.20.1
 ## explicit; go 1.18
 github.com/onsi/gomega
 github.com/onsi/gomega/format
@@ -1565,6 +1565,7 @@ k8s.io/apiserver/pkg/endpoints/handlers
 k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager
 k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal
 k8s.io/apiserver/pkg/endpoints/handlers/finisher
+k8s.io/apiserver/pkg/endpoints/handlers/metrics
 k8s.io/apiserver/pkg/endpoints/handlers/negotiation
 k8s.io/apiserver/pkg/endpoints/handlers/responsewriters
 k8s.io/apiserver/pkg/endpoints/metrics
@@ -2101,7 +2102,7 @@ k8s.io/gengo/generator
 k8s.io/gengo/namer
 k8s.io/gengo/parser
 k8s.io/gengo/types
-# k8s.io/klog/v2 v2.70.1 => k8s.io/klog/v2 v2.70.1
+# k8s.io/klog/v2 v2.80.0 => k8s.io/klog/v2 v2.80.0
 ## explicit; go 1.13
 k8s.io/klog/v2
 k8s.io/klog/v2/internal/buffer
@@ -2715,8 +2716,8 @@ sigs.k8s.io/yaml
 # github.com/mxk/go-flowrate => github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 # github.com/niemeyer/pretty => github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e
 # github.com/olekukonko/tablewriter => github.com/olekukonko/tablewriter v0.0.4
-# github.com/onsi/ginkgo/v2 => github.com/onsi/ginkgo/v2 v2.1.4
-# github.com/onsi/gomega => github.com/onsi/gomega v1.19.0
+# github.com/onsi/ginkgo/v2 => github.com/onsi/ginkgo/v2 v2.1.6
+# github.com/onsi/gomega => github.com/onsi/gomega v1.20.1
 # github.com/opencontainers/go-digest => github.com/opencontainers/go-digest v1.0.0
 # github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.2
 # github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.3
@@ -2840,7 +2841,7 @@ sigs.k8s.io/yaml
 # k8s.io/cri-api => ./staging/src/k8s.io/cri-api
 # k8s.io/csi-translation-lib => ./staging/src/k8s.io/csi-translation-lib
 # k8s.io/gengo => k8s.io/gengo v0.0.0-20211129171323-c02415ce4185
-# k8s.io/klog/v2 => k8s.io/klog/v2 v2.70.1
+# k8s.io/klog/v2 => k8s.io/klog/v2 v2.80.0
 # k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 # k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
 # k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20220803162953-67bda5d908f1

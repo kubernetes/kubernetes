@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 
 	"github.com/pkg/errors"
@@ -47,6 +48,7 @@ func NewCleanupNodePhase() workflow.Phase {
 		InheritFlags: []string{
 			options.CertificatesDir,
 			options.NodeCRISocket,
+			options.CleanupTmpDir,
 		},
 	}
 }
@@ -103,7 +105,12 @@ func runCleanupNode(c workflow.RunData) error {
 	if certsDir != kubeadmapiv1.DefaultCertificatesDir {
 		klog.Warningf("[reset] WARNING: Cleaning a non-default certificates directory: %q\n", certsDir)
 	}
+
 	dirsToClean = append(dirsToClean, certsDir)
+	if r.CleanupTmpDir() {
+		tempDir := path.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.TempDirForKubeadm)
+		dirsToClean = append(dirsToClean, tempDir)
+	}
 	resetConfigDir(kubeadmconstants.KubernetesDir, dirsToClean, r.DryRun())
 
 	if r.Cfg() != nil && features.Enabled(r.Cfg().FeatureGates, features.RootlessControlPlane) {

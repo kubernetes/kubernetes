@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"reflect"
 	"strings"
@@ -45,9 +46,12 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/endpoints/handlers/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -104,6 +108,94 @@ func TestPatchAnonymousField(t *testing.T) {
 	}
 	if !apiequality.Semantic.DeepEqual(actual, expected) {
 		t.Errorf("expected %#v, got %#v", expected, actual)
+	}
+}
+
+func TestLimitedReadBody(t *testing.T) {
+	defer legacyregistry.Reset()
+	legacyregistry.Register(metrics.RequestBodySizes)
+
+	testcases := []struct {
+		desc            string
+		requestBody     io.Reader
+		limit           int64
+		expectedMetrics string
+		expectedErr     bool
+	}{
+		{
+			desc:            "aaaa with limit 1",
+			requestBody:     strings.NewReader("aaaa"),
+			limit:           1,
+			expectedMetrics: "",
+			expectedErr:     true,
+		},
+		{
+			desc:        "aaaa with limit 5",
+			requestBody: strings.NewReader("aaaa"),
+			limit:       5,
+			expectedMetrics: `
+        # HELP apiserver_request_body_sizes [ALPHA] Apiserver request body sizes broken out by size.
+        # TYPE apiserver_request_body_sizes histogram
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="50000"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="150000"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="250000"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="350000"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="450000"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="550000"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="650000"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="750000"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="850000"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="950000"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="1.05e+06"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="1.15e+06"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="1.25e+06"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="1.35e+06"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="1.45e+06"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="1.55e+06"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="1.65e+06"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="1.75e+06"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="1.85e+06"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="1.95e+06"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="2.05e+06"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="2.15e+06"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="2.25e+06"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="2.35e+06"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="2.45e+06"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="2.55e+06"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="2.65e+06"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="2.75e+06"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="2.85e+06"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="2.95e+06"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="3.05e+06"} 1
+        apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="+Inf"} 1
+        apiserver_request_body_sizes_sum{resource="resource.group",verb="create"} 4
+        apiserver_request_body_sizes_count{resource="resource.group",verb="create"} 1
+`,
+			expectedErr: false,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.desc, func(t *testing.T) {
+			// reset metrics
+			defer metrics.RequestBodySizes.Reset()
+			defer legacyregistry.Reset()
+
+			req, err := http.NewRequest("POST", "/", tc.requestBody)
+			if err != nil {
+				t.Errorf("err not expected: got %v", err)
+			}
+			_, err = limitedReadBodyWithRecordMetric(context.Background(), req, tc.limit, "resource.group", metrics.Create)
+			if tc.expectedErr {
+				if err == nil {
+					t.Errorf("err expected: got nil")
+				}
+				return
+			}
+			if err = testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tc.expectedMetrics), "apiserver_request_body_sizes"); err != nil {
+				t.Errorf("unexpected err: %v", err)
+			}
+		})
 	}
 }
 

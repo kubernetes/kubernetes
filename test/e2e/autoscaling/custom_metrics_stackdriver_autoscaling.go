@@ -18,6 +18,7 @@ package autoscaling
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"time"
 
@@ -29,7 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/featuregate"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/instrumentation/monitoring"
@@ -217,6 +221,25 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: Custom Me
 			hpa:             externalHPA(f.Namespace.ObjectMeta.Name, metricTargets)}
 		tc.Run()
 	})
+
+	ginkgo.It("should scale down to 0 with Custom Metric of type Object from Stackdriver [Feature:CustomMetricsAutoscaling]", func() {
+		defer withFeatureGate(features.HPAScaleToZero, true)()
+		initialReplicas := 2
+		// metric should cause scale down
+		metricValue := int64(100)
+		metricTarget := 2 * metricValue
+		tc := CustomMetricTestCase{
+			framework:       f,
+			kubeClient:      f.ClientSet,
+			initialReplicas: initialReplicas,
+			scaledReplicas:  0,
+			// Metric exported by deployment is ignored
+			deployment: monitoring.SimpleStackdriverExporterDeployment(dummyDeploymentName, f.Namespace.ObjectMeta.Name, int32(initialReplicas), 0 /* ignored */),
+			pod:        monitoring.StackdriverExporterPod(stackdriverExporterPod, f.Namespace.Name, stackdriverExporterPod, monitoring.CustomMetricName, metricValue),
+			hpa:        objectHPA(f.Namespace.ObjectMeta.Name, metricTarget)}
+		tc.Run()
+	})
+
 })
 
 // CustomMetricTestCase is a struct for test cases.
@@ -244,14 +267,13 @@ func (tc *CustomMetricTestCase) Run() {
 	// If this is your use case, create application default credentials:
 	// $ gcloud auth application-default login
 	// and uncomment following lines:
-	/*
-		ts, err := google.DefaultTokenSource(oauth2.NoContext)
-		framework.Logf("Couldn't get application default credentials, %v", err)
-		if err != nil {
-			framework.Failf("Error accessing application default credentials, %v", err)
-		}
-		client := oauth2.NewClient(oauth2.NoContext, ts)
-	*/
+
+	// ts, err := google.DefaultTokenSource(oauth2.NoContext)
+	// framework.Logf("Couldn't get application default credentials, %v", err)
+	// if err != nil {
+	// 	framework.Failf("Error accessing application default credentials, %v", err)
+	// }
+	// client = oauth2.NewClient(oauth2.NoContext, ts)
 
 	gcmService, err := gcm.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
@@ -470,5 +492,15 @@ func waitForReplicas(deploymentName, namespace string, cs clientset.Interface, t
 	})
 	if err != nil {
 		framework.Failf("Timeout waiting %v for %v replicas", timeout, desiredReplicas)
+	}
+}
+
+// Equivalent of featuregatetesting.SetFeatureGateDuringTest
+// which can't be used here because we're not in a Testing context.
+func withFeatureGate(feature featuregate.Feature, desired bool) func() {
+	current := utilfeature.DefaultFeatureGate.Enabled(feature)
+	utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%v", string(feature), desired))
+	return func() {
+		utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%v", string(feature), current))
 	}
 }
