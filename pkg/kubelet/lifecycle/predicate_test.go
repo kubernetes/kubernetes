@@ -290,7 +290,7 @@ func TestGeneralPredicates(t *testing.T) {
 				},
 				Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
 			},
-			reasons: []PredicateFailureReason{&PredicateFailureError{tainttoleration.Name, tainttoleration.ErrReasonNotMatch}},
+			reasons: []PredicateFailureReason{&PredicateFailureError{tainttoleration.Name, "node(s) had untolerated taint {bar: }"}},
 			name:    "NoExecute taint/toleration not match",
 		},
 		{
