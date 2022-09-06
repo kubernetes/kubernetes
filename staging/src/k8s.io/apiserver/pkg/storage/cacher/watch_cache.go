@@ -225,7 +225,7 @@ func newWatchCache(
 		endIndex:           0,
 		// store:               cache.NewIndexer(storeElementKey, storeElementIndexers(indexers)),
 		// TODO: figure out what the degree should be.
-		store:               newBtreeStore(storeElementKey, storeElementIndexers(indexers), 2),
+		store:               newBtreeStore(storeElementKey, storeElementIndexers(indexers), 6),
 		resourceVersion:     0,
 		listResourceVersion: 0,
 		eventHandler:        eventHandler,
