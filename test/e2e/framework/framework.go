@@ -98,11 +98,6 @@ type Framework struct {
 	// Flaky operation failures in an e2e test can be captured through this.
 	flakeReport *FlakeReport
 
-	// To make sure that this framework cleans up after itself, no matter what,
-	// we install a Cleanup action before each test and clear it after.  If we
-	// should abort, the AfterSuite hook should run all Cleanup actions.
-	cleanupHandle CleanupActionHandle
-
 	// configuration for framework's client
 	Options Options
 
@@ -177,48 +172,43 @@ func (f *Framework) BeforeEach() {
 	// Registered later and thus runs before deleting namespaces.
 	ginkgo.DeferCleanup(f.dumpNamespaceInfo)
 
-	// The fact that we need this feels like a bug in ginkgo.
-	// https://github.com/onsi/ginkgo/v2/issues/222
-	f.cleanupHandle = AddCleanupAction(f.AfterEach)
-	if f.ClientSet == nil {
-		ginkgo.By("Creating a kubernetes client")
-		config, err := LoadConfig()
-		ExpectNoError(err)
+	ginkgo.By("Creating a kubernetes client")
+	config, err := LoadConfig()
+	ExpectNoError(err)
 
-		config.QPS = f.Options.ClientQPS
-		config.Burst = f.Options.ClientBurst
-		if f.Options.GroupVersion != nil {
-			config.GroupVersion = f.Options.GroupVersion
-		}
-		if TestContext.KubeAPIContentType != "" {
-			config.ContentType = TestContext.KubeAPIContentType
-		}
-		f.clientConfig = rest.CopyConfig(config)
-		f.ClientSet, err = clientset.NewForConfig(config)
-		ExpectNoError(err)
-		f.DynamicClient, err = dynamic.NewForConfig(config)
-		ExpectNoError(err)
-
-		// create scales getter, set GroupVersion and NegotiatedSerializer to default values
-		// as they are required when creating a REST client.
-		if config.GroupVersion == nil {
-			config.GroupVersion = &schema.GroupVersion{}
-		}
-		if config.NegotiatedSerializer == nil {
-			config.NegotiatedSerializer = scheme.Codecs
-		}
-		restClient, err := rest.RESTClientFor(config)
-		ExpectNoError(err)
-		discoClient, err := discovery.NewDiscoveryClientForConfig(config)
-		ExpectNoError(err)
-		cachedDiscoClient := cacheddiscovery.NewMemCacheClient(discoClient)
-		restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscoClient)
-		restMapper.Reset()
-		resolver := scaleclient.NewDiscoveryScaleKindResolver(cachedDiscoClient)
-		f.ScalesGetter = scaleclient.New(restClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
-
-		TestContext.CloudConfig.Provider.FrameworkBeforeEach(f)
+	config.QPS = f.Options.ClientQPS
+	config.Burst = f.Options.ClientBurst
+	if f.Options.GroupVersion != nil {
+		config.GroupVersion = f.Options.GroupVersion
 	}
+	if TestContext.KubeAPIContentType != "" {
+		config.ContentType = TestContext.KubeAPIContentType
+	}
+	f.clientConfig = rest.CopyConfig(config)
+	f.ClientSet, err = clientset.NewForConfig(config)
+	ExpectNoError(err)
+	f.DynamicClient, err = dynamic.NewForConfig(config)
+	ExpectNoError(err)
+
+	// create scales getter, set GroupVersion and NegotiatedSerializer to default values
+	// as they are required when creating a REST client.
+	if config.GroupVersion == nil {
+		config.GroupVersion = &schema.GroupVersion{}
+	}
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = scheme.Codecs
+	}
+	restClient, err := rest.RESTClientFor(config)
+	ExpectNoError(err)
+	discoClient, err := discovery.NewDiscoveryClientForConfig(config)
+	ExpectNoError(err)
+	cachedDiscoClient := cacheddiscovery.NewMemCacheClient(discoClient)
+	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscoClient)
+	restMapper.Reset()
+	resolver := scaleclient.NewDiscoveryScaleKindResolver(cachedDiscoClient)
+	f.ScalesGetter = scaleclient.New(restClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
+
+	TestContext.CloudConfig.Provider.FrameworkBeforeEach(f)
 
 	if !f.SkipNamespaceCreation {
 		ginkgo.By(fmt.Sprintf("Building a namespace api object, basename %s", f.BaseName))
@@ -356,8 +346,6 @@ func printSummaries(summaries []TestDataSummary, testBaseName string) {
 
 // AfterEach deletes the namespace, after reading its events.
 func (f *Framework) AfterEach() {
-	RemoveCleanupAction(f.cleanupHandle)
-
 	// This should not happen. Given ClientSet is a public field a test must have updated it!
 	// Error out early before any API calls during cleanup.
 	if f.ClientSet == nil {

@@ -50,7 +50,6 @@ var _ = utils.SIGDescribe("Volume Placement [Feature:vsphere]", func() {
 		node1KeyValueLabel map[string]string
 		node2Name          string
 		node2KeyValueLabel map[string]string
-		isNodeLabeled      bool
 		nodeInfo           *NodeInfo
 		vsp                *VSphere
 	)
@@ -60,41 +59,29 @@ var _ = utils.SIGDescribe("Volume Placement [Feature:vsphere]", func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
-		if !isNodeLabeled {
-			node1Name, node1KeyValueLabel, node2Name, node2KeyValueLabel = testSetupVolumePlacement(c, ns)
-			isNodeLabeled = true
-			nodeInfo = TestContext.NodeMapper.GetNodeInfo(node1Name)
-			vsp = nodeInfo.VSphere
-		}
-		ginkgo.By("creating vmdk")
-		volumePath, err := vsp.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
-		framework.ExpectNoError(err)
-		volumePaths = append(volumePaths, volumePath)
-	})
-
-	ginkgo.AfterEach(func() {
-		for _, volumePath := range volumePaths {
-			vsp.DeleteVolume(volumePath, nodeInfo.DataCenterRef)
-		}
-		volumePaths = nil
-	})
-
-	/*
-		Steps
-		1. Remove labels assigned to node 1 and node 2
-		2. Delete VMDK volume
-	*/
-	framework.AddCleanupAction(func() {
-		// Cleanup actions will be called even when the tests are skipped and leaves namespace unset.
-		if len(ns) > 0 {
+		node1Name, node1KeyValueLabel, node2Name, node2KeyValueLabel = testSetupVolumePlacement(c, ns)
+		ginkgo.DeferCleanup(func() {
 			if len(node1KeyValueLabel) > 0 {
 				framework.RemoveLabelOffNode(c, node1Name, NodeLabelKey)
 			}
 			if len(node2KeyValueLabel) > 0 {
 				framework.RemoveLabelOffNode(c, node2Name, NodeLabelKey)
 			}
-		}
+		})
+		nodeInfo = TestContext.NodeMapper.GetNodeInfo(node1Name)
+		vsp = nodeInfo.VSphere
+		ginkgo.By("creating vmdk")
+		volumePath, err := vsp.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
+		framework.ExpectNoError(err)
+		volumePaths = append(volumePaths, volumePath)
+		ginkgo.DeferCleanup(func() {
+			for _, volumePath := range volumePaths {
+				vsp.DeleteVolume(volumePath, nodeInfo.DataCenterRef)
+			}
+			volumePaths = nil
+		})
 	})
+
 	/*
 		Steps
 

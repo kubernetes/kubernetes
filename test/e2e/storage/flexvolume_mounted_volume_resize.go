@@ -55,7 +55,6 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]
 		resizableSc       *storagev1.StorageClass
 		node              *v1.Node
 		nodeName          string
-		isNodeLabeled     bool
 		nodeKeyValueLabel map[string]string
 		nodeLabelValue    string
 		nodeKey           string
@@ -76,15 +75,11 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]
 		framework.ExpectNoError(err)
 		nodeName = node.Name
 
-		nodeKey = "mounted_flexvolume_expand"
-
-		if !isNodeLabeled {
-			nodeLabelValue = ns
-			nodeKeyValueLabel = make(map[string]string)
-			nodeKeyValueLabel[nodeKey] = nodeLabelValue
-			framework.AddOrUpdateLabelOnNode(c, nodeName, nodeKey, nodeLabelValue)
-			isNodeLabeled = true
-		}
+		nodeKey = "mounted_flexvolume_expand_" + ns
+		nodeLabelValue = ns
+		nodeKeyValueLabel = map[string]string{nodeKey: nodeLabelValue}
+		framework.AddOrUpdateLabelOnNode(c, nodeName, nodeKey, nodeLabelValue)
+		ginkgo.DeferCleanup(framework.RemoveLabelOffNode, c, nodeName, nodeKey)
 
 		test := testsuites.StorageClassTest{
 			Name:                 "flexvolume-resize",
@@ -109,24 +104,12 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume expand[Slow]
 		}, ns)
 		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Error creating pvc")
-	})
-
-	framework.AddCleanupAction(func() {
-		if len(nodeLabelValue) > 0 {
-			framework.RemoveLabelOffNode(c, nodeName, nodeKey)
-		}
-	})
-
-	ginkgo.AfterEach(func() {
-		framework.Logf("AfterEach: Cleaning up resources for mounted volume resize")
-
-		if c != nil {
+		ginkgo.DeferCleanup(func() {
+			framework.Logf("AfterEach: Cleaning up resources for mounted volume resize")
 			if errs := e2epv.PVPVCCleanup(c, ns, nil, pvc); len(errs) > 0 {
 				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 			}
-			pvc, nodeName, isNodeLabeled, nodeLabelValue = nil, "", false, ""
-			nodeKeyValueLabel = make(map[string]string)
-		}
+		})
 	})
 
 	ginkgo.It("Should verify mounted flex volumes can be resized", func() {
