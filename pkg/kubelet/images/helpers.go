@@ -42,7 +42,6 @@ func throttleImagePulling(imageService kubecontainer.ImageService, qps float32, 
 		qps:              qps,
 		burst:            burst,
 		currentPullCount: 0,
-		lock:             sync.Mutex{},
 	}
 }
 
@@ -60,7 +59,7 @@ var (
 	errPullQPSExceeded   error = fmt.Errorf("pull QPS exceeded")
 )
 
-func (ts throttledImageService) PullImage(ctx context.Context, image kubecontainer.ImageSpec, secrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (ts *throttledImageService) PullImage(ctx context.Context, image kubecontainer.ImageSpec, secrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	if ts.limiter.TryAccept() {
 		err := wait.PollImmediate(100*time.Microsecond, 5*time.Minute, func() (done bool, err error) {
 			if ts.AcceptOne() {

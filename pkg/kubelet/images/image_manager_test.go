@@ -139,9 +139,9 @@ func pullerTestCases() []pullerTestCase {
 			qps:        400.0,
 			burst:      600,
 			expected: []pullerExpects{
-				{[]string{"GetImageRef", "PullImage"}, nil},
-				{[]string{"GetImageRef", "PullImage"}, nil},
-				{[]string{"GetImageRef", "PullImage"}, nil},
+				{[]string{"GetImageRef"}, ErrImagePull},
+				{[]string{"GetImageRef"}, ErrImagePull},
+				{[]string{"GetImageRef"}, ErrImagePullBackOff},
 			}},
 		// image present, non-zero qps, try to pull when qps exceeded
 		{containerImage: "present_image",
