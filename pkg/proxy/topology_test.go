@@ -46,6 +46,7 @@ func checkExpectedEndpoints(expected sets.String, actual []Endpoint) error {
 }
 
 func TestCategorizeEndpoints(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name         string
 		hintsEnabled bool
@@ -474,7 +475,9 @@ func TestCategorizeEndpoints(t *testing.T) {
 	}}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareHints, tc.hintsEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProxyTerminatingEndpoints, tc.pteEnabled)()
 

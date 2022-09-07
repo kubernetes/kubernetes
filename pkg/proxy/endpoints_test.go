@@ -44,6 +44,7 @@ func (proxier *FakeProxier) deleteEndpoints(endpoints *v1.Endpoints) {
 }
 
 func TestGetLocalEndpointIPs(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		endpointsMap EndpointsMap
 		expected     map[types.NamespacedName]sets.String
@@ -182,6 +183,7 @@ func makeTestEndpoints(namespace, name string, eptFunc func(*v1.Endpoints)) *v1.
 
 // This is a coarse test, but it offers some modicum of confidence as the code is evolved.
 func TestEndpointsToEndpointsMap(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		desc         string
 		newEndpoints *v1.Endpoints
@@ -450,7 +452,9 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
+			t.Parallel()
 
 			epTracker := NewEndpointChangeTracker("test-hostname", nil, tc.ipFamily, nil, nil)
 
@@ -477,6 +481,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 }
 
 func TestUpdateEndpointsMap(t *testing.T) {
+	t.Parallel()
 	var nodeName = testHostname
 
 	emptyEndpoint := func(ept *v1.Endpoints) {
@@ -1315,7 +1320,10 @@ func TestUpdateEndpointsMap(t *testing.T) {
 	}
 
 	for tci, tc := range testCases {
+		tc := tc
+		tci := tci
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
 			fp.hostname = nodeName
 
@@ -1386,6 +1394,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 }
 
 func TestLastChangeTriggerTime(t *testing.T) {
+	t.Parallel()
 	startTime := time.Date(2018, 01, 01, 0, 0, 0, 0, time.UTC)
 	t_1 := startTime.Add(-time.Second)
 	t0 := startTime.Add(time.Second)
@@ -1516,6 +1525,7 @@ func TestLastChangeTriggerTime(t *testing.T) {
 }
 
 func TestEndpointSliceUpdate(t *testing.T) {
+	t.Parallel()
 	fqdnSlice := generateEndpointSlice("svc1", "ns1", 2, 5, 999, 999, []string{"host1"}, []*int32{pointer.Int32(80), pointer.Int32(443)})
 	fqdnSlice.AddressType = discovery.AddressTypeFQDN
 
@@ -1773,7 +1783,9 @@ func TestEndpointSliceUpdate(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
+		tc := tc
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			initializeCache(tc.endpointChangeTracker.endpointSliceCache, tc.startingSlices)
 
 			got := tc.endpointChangeTracker.EndpointSliceUpdate(tc.paramEndpointSlice, tc.paramRemoveSlice)
@@ -1799,6 +1811,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 }
 
 func TestCheckoutChanges(t *testing.T) {
+	t.Parallel()
 	svcPortName0 := ServicePortName{types.NamespacedName{Namespace: "ns1", Name: "svc1"}, "port-0", v1.ProtocolTCP}
 	svcPortName1 := ServicePortName{types.NamespacedName{Namespace: "ns1", Name: "svc1"}, "port-1", v1.ProtocolTCP}
 
@@ -1849,7 +1862,9 @@ func TestCheckoutChanges(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
+		tc := tc
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			for _, slice := range tc.appliedSlices {
 				tc.endpointChangeTracker.EndpointSliceUpdate(slice, false)
 			}

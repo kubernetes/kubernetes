@@ -30,6 +30,7 @@ import (
 )
 
 func TestEndpointsMapFromESC(t *testing.T) {
+	t.Parallel()
 	testCases := map[string]struct {
 		endpointSlices []*discovery.EndpointSlice
 		hostname       string
@@ -203,7 +204,9 @@ func TestEndpointsMapFromESC(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
+		tc := tc
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			esCache := NewEndpointSliceCache(tc.hostname, v1.IPv4Protocol, nil, nil)
 
 			cmc := newCacheMutationCheck(tc.endpointSlices)
@@ -218,6 +221,7 @@ func TestEndpointsMapFromESC(t *testing.T) {
 }
 
 func TestEndpointInfoByServicePort(t *testing.T) {
+	t.Parallel()
 	testCases := map[string]struct {
 		namespacedName types.NamespacedName
 		endpointSlices []*discovery.EndpointSlice
@@ -306,7 +310,9 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
+		tc := tc
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			esCache := NewEndpointSliceCache(tc.hostname, v1.IPv4Protocol, nil, nil)
 
 			for _, endpointSlice := range tc.endpointSlices {
@@ -322,6 +328,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 }
 
 func TestEsInfoChanged(t *testing.T) {
+	t.Parallel()
 	p80 := int32(80)
 	p443 := int32(443)
 	tcpProto := v1.ProtocolTCP
@@ -435,7 +442,9 @@ func TestEsInfoChanged(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
+		tc := tc
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			cmc := newCacheMutationCheck([]*discovery.EndpointSlice{tc.initialSlice})
 
 			if tc.initialSlice != nil {

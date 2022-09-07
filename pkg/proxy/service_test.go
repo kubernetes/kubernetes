@@ -86,6 +86,7 @@ func makeServicePortName(ns, name, port string, protocol v1.Protocol) ServicePor
 }
 
 func TestServiceToServiceMap(t *testing.T) {
+	t.Parallel()
 	testClusterIPv4 := "10.0.0.1"
 	testExternalIPv4 := "8.8.8.8"
 	testSourceRangeIPv4 := "0.0.0.0/1"
@@ -464,7 +465,9 @@ func TestServiceToServiceMap(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
+			t.Parallel()
 			svcTracker := NewServiceChangeTracker(nil, tc.ipFamily, nil, nil)
 			// outputs
 			newServices := svcTracker.serviceToServiceMap(tc.service)
@@ -549,6 +552,7 @@ func (fake *FakeProxier) deleteService(service *v1.Service) {
 }
 
 func TestServiceMapUpdateHeadless(t *testing.T) {
+	t.Parallel()
 	fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
 
 	makeServiceMap(fp,
@@ -580,6 +584,7 @@ func TestServiceMapUpdateHeadless(t *testing.T) {
 }
 
 func TestUpdateServiceTypeExternalName(t *testing.T) {
+	t.Parallel()
 	fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
 
 	makeServiceMap(fp,
@@ -605,6 +610,7 @@ func TestUpdateServiceTypeExternalName(t *testing.T) {
 }
 
 func TestBuildServiceMapAddRemove(t *testing.T) {
+	t.Parallel()
 	fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
 
 	services := []*v1.Service{
@@ -708,6 +714,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 }
 
 func TestBuildServiceMapServiceUpdate(t *testing.T) {
+	t.Parallel()
 	fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
 
 	servicev1 := makeTestService("ns1", "svc1", func(svc *v1.Service) {
