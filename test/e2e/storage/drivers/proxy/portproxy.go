@@ -42,6 +42,17 @@ import (
 // need more than one per sidecar and kubelet. Keeping this reasonably
 // small ensures that we don't establish connections through the apiserver
 // and the remote kernel which then aren't needed.
+//
+// The proxy code below establishes this many connections in advance,
+// without waiting for a client on the remote side. On the local side
+// a gRPC server will accept the same number of connections and then wait
+// for data from a future client.
+//
+// This approach has the advantage that a client on the remote side can
+// immediately start communicating, without the delay caused by establishing
+// the connection. That delay is large enough that clients like the
+// node-driver-registrar with a very small timeout for gRPC did indeed
+// time out unnecessarily.
 const maxConcurrentConnections = 10
 
 // This delay determines how quickly we notice when someone has
