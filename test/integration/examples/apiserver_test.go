@@ -22,11 +22,13 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -371,6 +373,120 @@ func waitForWardleRunning(ctx context.Context, t *testing.T, wardleToKASKubeConf
 	}
 
 	return directWardleClientConfig, nil
+}
+
+func TestAggregatedAPIServerRejectRedirectResponse(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	t.Cleanup(cancel)
+
+	backendServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		if strings.HasSuffix(r.URL.Path, "redirectTarget") {
+			t.Errorf("backend called unexpectedly")
+		}
+	}))
+	defer backendServer.Close()
+
+	redirectedURL := backendServer.URL
+	redirectServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "tryRedirect") {
+			http.Redirect(w, r, redirectedURL+"/redirectTarget", http.StatusMovedPermanently)
+		} else {
+			http.Redirect(w, r, redirectedURL, http.StatusMovedPermanently)
+		}
+	}))
+	defer redirectServer.Close()
+
+	// endpoints cannot have loopback IPs so we need to override the resolver itself
+	t.Cleanup(app.SetServiceResolverForTests(staticURLServiceResolver(fmt.Sprintf("https://%s", redirectServer.Listener.Addr().String()))))
+
+	// start the server after resolver is overwritten
+	redirectServer.StartTLS()
+
+	testServer := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: false}, nil, framework.SharedEtcd())
+	defer testServer.TearDownFn()
+	kubeClientConfig := rest.CopyConfig(testServer.ClientConfig)
+	// force json because everything speaks it
+	kubeClientConfig.ContentType = ""
+	kubeClientConfig.AcceptContentTypes = ""
+	kubeClient := client.NewForConfigOrDie(kubeClientConfig)
+	aggregatorClient := aggregatorclient.NewForConfigOrDie(kubeClientConfig)
+
+	// create the bare minimum resources required to be able to get the API service into an available state
+	_, err := kubeClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kube-redirect",
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = kubeClient.CoreV1().Services("kube-redirect").Create(ctx, &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "api",
+		},
+		Spec: corev1.ServiceSpec{
+			ExternalName: "needs-to-be-non-empty",
+			Type:         corev1.ServiceTypeExternalName,
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = aggregatorClient.ApiregistrationV1().APIServices().Create(ctx, &apiregistrationv1.APIService{
+		ObjectMeta: metav1.ObjectMeta{Name: "v1alpha1.reject.redirect.example.com"},
+		Spec: apiregistrationv1.APIServiceSpec{
+			Service: &apiregistrationv1.ServiceReference{
+				Namespace: "kube-redirect",
+				Name:      "api",
+			},
+			Group:                 "reject.redirect.example.com",
+			Version:               "v1alpha1",
+			GroupPriorityMinimum:  200,
+			VersionPriority:       200,
+			InsecureSkipTLSVerify: true,
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// wait for the API service to be available
+	err = wait.Poll(time.Second, wait.ForeverTestTimeout, func() (done bool, err error) {
+		apiService, err := aggregatorClient.ApiregistrationV1().APIServices().Get(ctx, "v1alpha1.reject.redirect.example.com", metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		var available bool
+		for _, condition := range apiService.Status.Conditions {
+			if condition.Type == apiregistrationv1.Available && condition.Status == apiregistrationv1.ConditionTrue {
+				available = true
+				break
+			}
+		}
+		if !available {
+			t.Log("api service is not available", apiService.Status.Conditions)
+			return false, nil
+		}
+		return available, nil
+	})
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+
+	// get raw response to check the original error and msg
+	expectedMsg := "the backend attempted to redirect this request, which is not permitted"
+	// add specific request path suffix to discriminate between request from client and generic pings from the aggregator
+	url := url.URL{
+		Path: "/apis/reject.redirect.example.com/v1alpha1/tryRedirect",
+	}
+	bytes, err := kubeClient.RESTClient().Get().AbsPath(url.String()).DoRaw(context.TODO())
+	if err == nil {
+		t.Errorf("expect server to reject redirect response, but forwarded")
+	} else if !strings.Contains(string(bytes), expectedMsg) {
+		t.Errorf("expect response contains %s, got %s", expectedMsg, string(bytes))
+	}
 }
 
 func writeKubeConfigForWardleServerToKASConnection(t *testing.T, kubeClientConfig *rest.Config) string {
