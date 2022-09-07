@@ -70,7 +70,7 @@ func TestGetDataFromInitConfig(t *testing.T) {
 		t.Fatalf("failed to get secret data. fatal error: %v", err)
 	}
 
-	re := regexp.MustCompile(`[-._a-zA-Z0-9]+`)
+	re := regexp.MustCompile(`[-.\w]+`)
 	for name, data := range secretData {
 		if !re.MatchString(name) {
 			t.Fatalf(dedent.Dedent("failed to validate secretData\n %s isn't a valid secret key"), name)

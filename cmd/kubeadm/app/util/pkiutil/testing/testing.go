@@ -48,7 +48,7 @@ func Reset() {
 }
 
 var (
-	testFunction = regexp.MustCompile(`.*\.Test[^./]+(.func[0-9]*)?$`)
+	testFunction = regexp.MustCompile(`.*\.Test[^./]+(.func\d*)?$`)
 
 	lock       = sync.Mutex{}
 	fixtureDir = ""
