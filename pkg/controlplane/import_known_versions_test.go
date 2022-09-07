@@ -29,6 +29,7 @@ import (
 )
 
 func TestGroupVersions(t *testing.T) {
+	t.Parallel()
 	// legacyUnsuffixedGroups contains the groups released prior to deciding that kubernetes API groups should be dns-suffixed
 	// new groups should be suffixed with ".k8s.io" (https://github.com/kubernetes/kubernetes/pull/31887#issuecomment-244462396)
 	legacyUnsuffixedGroups := sets.NewString(
@@ -79,6 +80,7 @@ var allowedNonstandardJSONNames = map[reflect.Type]string{
 }
 
 func TestTypeTags(t *testing.T) {
+	t.Parallel()
 	if err := apinamingtest.VerifyTagNaming(legacyscheme.Scheme, typesAllowedTags, allowedNonstandardJSONNames); err != nil {
 		t.Errorf("%v", err)
 	}
