@@ -56,6 +56,9 @@ func (priorityLevelConfigurationStrategy) GetResetFields() map[fieldpath.APIVers
 		"flowcontrol.apiserver.k8s.io/v1beta2": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
+		"flowcontrol.apiserver.k8s.io/v1beta3": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
 	}
 
 	return fields
@@ -133,6 +136,10 @@ func (priorityLevelConfigurationStatusStrategy) GetResetFields() map[fieldpath.A
 			fieldpath.MakePathOrDie("metadata"),
 		),
 		"flowcontrol.apiserver.k8s.io/v1beta2": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+			fieldpath.MakePathOrDie("metadata"),
+		),
+		"flowcontrol.apiserver.k8s.io/v1beta3": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("spec"),
 			fieldpath.MakePathOrDie("metadata"),
 		),
