@@ -127,6 +127,7 @@ func verifyPV(cache pvAssumeCache, name string, expectedPV *persistentVolume) er
 
 func TestAssumePV(t *testing.T) {
 	scenarios := map[string]struct {
+		cachedPV      *persistentVolume
 		oldPV         *persistentVolume
 		newPV         *persistentVolume
 		shouldSucceed bool
@@ -146,24 +147,21 @@ func TestAssumePV(t *testing.T) {
 			newPV:         makePV("pv1", "", "6"),
 			shouldSucceed: true,
 		},
+		"success-same-higher-version": {
+			cachedPV:      makePV("pv1", "", "6"),
+			oldPV:         makePV("pv1", "", "5"),
+			newPV:         makePV("pv1", "", "6"),
+			shouldSucceed: true,
+		},
 		"fail-old-not-found": {
 			oldPV:         makePV("pv2", "", "5"),
 			newPV:         makePV("pv1", "", "5"),
 			shouldSucceed: false,
 		},
-		"fail-new-lower-version": {
-			oldPV:         makePV("pv1", "", "5"),
+		"fail-different-version": {
+			oldPV:         makePV("pv1", "", "2"),
+			cachedPV:      makePV("pv1", "", "3"),
 			newPV:         makePV("pv1", "", "4"),
-			shouldSucceed: false,
-		},
-		"fail-new-bad-version": {
-			oldPV:         makePV("pv1", "", "5"),
-			newPV:         makePV("pv1", "", "a"),
-			shouldSucceed: false,
-		},
-		"fail-old-bad-version": {
-			oldPV:         makePV("pv1", "", "a"),
-			newPV:         makePV("pv1", "", "5"),
 			shouldSucceed: false,
 		},
 	}
@@ -177,14 +175,18 @@ func TestAssumePV(t *testing.T) {
 				t.Fatalf("Failed to get internal cache")
 			}
 
-			// Add oldPV to cache
-			internalCache.add(scenario.oldPV)
-			if err := verifyPV(cache, scenario.oldPV.Name, scenario.oldPV); err != nil {
+			// Add oldPV to cache or, if set, some other PV.
+			cachedPV := scenario.cachedPV
+			if cachedPV == nil {
+				cachedPV = scenario.oldPV
+			}
+			internalCache.add(cachedPV)
+			if err := verifyPV(cache, cachedPV.Name, cachedPV); err != nil {
 				t.Fatalf("Failed to GetPV() after initial update: %v", err)
 			}
 
 			// Assume newPV
-			err := cache.Assume(logger, scenario.newPV)
+			err := cache.Assume(logger, scenario.oldPV, scenario.newPV)
 			if scenario.shouldSucceed && err != nil {
 				t.Errorf("Assume() returned error %v", err)
 			}
@@ -195,7 +197,7 @@ func TestAssumePV(t *testing.T) {
 			// Check that GetPV returns correct PV
 			expectedPV := scenario.newPV
 			if !scenario.shouldSucceed {
-				expectedPV = scenario.oldPV
+				expectedPV = cachedPV
 			}
 			if err := verifyPV(cache, scenario.oldPV.Name, expectedPV); err != nil {
 				t.Errorf("Failed to GetPV() after initial update: %v", err)
@@ -231,7 +233,7 @@ func TestRestorePV(t *testing.T) {
 	}
 
 	// Assume newPV
-	if err := cache.Assume(logger, newPV); err != nil {
+	if err := cache.Assume(logger, oldPV, newPV); err != nil {
 		t.Fatalf("Assume() returned error %v", err)
 	}
 	if err := verifyPV(cache, oldPV.Name, newPV); err != nil {
@@ -357,16 +359,16 @@ func TestAssumeUpdatePVCache(t *testing.T) {
 	// Assume PV
 	newPV := *pv
 	newPV.claimRef = "test-claim"
-	if err := cache.Assume(logger, &newPV); err != nil {
+	if err := cache.Assume(logger, pv, &newPV); err != nil {
 		t.Fatalf("failed to assume PV: %v", err)
 	}
 	if err := verifyPV(cache, pvName, &newPV); err != nil {
 		t.Fatalf("failed to get PV after assume: %v", err)
 	}
 
-	// Add old PV
+	// Add old PV, overwrites the new one.
 	internalCache.add(pv)
-	if err := verifyPV(cache, pvName, &newPV); err != nil {
+	if err := verifyPV(cache, pvName, pv); err != nil {
 		t.Fatalf("failed to get PV after old PV added: %v", err)
 	}
 }
@@ -446,7 +448,7 @@ func BenchmarkAssumePVGet(b *testing.B) {
 	pv := makePV(pvName, "", "1")
 	pvUpdate := makePV(pvName, "", "2")
 	internalCache.add(pv)
-	cache.Assume(logger, pvUpdate)
+	cache.Assume(logger, pv, pvUpdate)
 	var r interface{}
 	var err error
 
@@ -468,11 +470,11 @@ func BenchmarkAssumePVRestore(b *testing.B) {
 	pv := makePV(pvName, "", "1")
 	pvUpdate := makePV(pvName, "", "2")
 	internalCache.add(pv)
-	cache.Assume(logger, pvUpdate)
+	cache.Assume(logger, pv, pvUpdate)
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		cache.Assume(logger, pvUpdate)
+		cache.Assume(logger, pv, pvUpdate)
 		cache.Restore(logger, pvName)
 	}
 }
