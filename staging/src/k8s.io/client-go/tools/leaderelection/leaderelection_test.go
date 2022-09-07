@@ -975,7 +975,7 @@ func testReleaseLease(t *testing.T, objectType string) {
 			wg.Wait()
 			wg.Add(1)
 
-			if test.expectSuccess != le.release() {
+			if test.expectSuccess != le.release(context.Background()) {
 				t.Errorf("unexpected result of release: [succeeded=%v]", !test.expectSuccess)
 			}
 
