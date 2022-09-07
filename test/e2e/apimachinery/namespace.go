@@ -356,7 +356,13 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 		framework.Logf("Status.Condition: %#v", statusUpdated.Status.Conditions[len(statusUpdated.Status.Conditions)-1])
 	})
 
-	ginkgo.It("should apply an update to a Namespace", func() {
+	/*
+		Release: v1.26
+		Testname: Namespace, apply update to a namespace
+		Description: When updating the namespace it MUST
+		succeed and the field MUST equal the new value.
+	*/
+	framework.ConformanceIt("should apply an update to a Namespace", func() {
 		var err error
 		var updatedNamespace *v1.Namespace
 		ns := f.Namespace.Name
