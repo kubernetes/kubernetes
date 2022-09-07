@@ -35,11 +35,11 @@ import (
 
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
 
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	testapiserver "k8s.io/kubernetes/test/utils/apiserver"
 )
 
 const (
@@ -424,44 +424,6 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.DurationVar(&nodeKiller.SimulatedDowntime, "node-killer-simulated-downtime", 10*time.Minute, "A delay between node death and recreation")
 }
 
-func createKubeConfig(clientCfg *restclient.Config) *clientcmdapi.Config {
-	clusterNick := "cluster"
-	userNick := "user"
-	contextNick := "context"
-
-	configCmd := clientcmdapi.NewConfig()
-
-	credentials := clientcmdapi.NewAuthInfo()
-	credentials.Token = clientCfg.BearerToken
-	credentials.TokenFile = clientCfg.BearerTokenFile
-	credentials.ClientCertificate = clientCfg.TLSClientConfig.CertFile
-	if len(credentials.ClientCertificate) == 0 {
-		credentials.ClientCertificateData = clientCfg.TLSClientConfig.CertData
-	}
-	credentials.ClientKey = clientCfg.TLSClientConfig.KeyFile
-	if len(credentials.ClientKey) == 0 {
-		credentials.ClientKeyData = clientCfg.TLSClientConfig.KeyData
-	}
-	configCmd.AuthInfos[userNick] = credentials
-
-	cluster := clientcmdapi.NewCluster()
-	cluster.Server = clientCfg.Host
-	cluster.CertificateAuthority = clientCfg.CAFile
-	if len(cluster.CertificateAuthority) == 0 {
-		cluster.CertificateAuthorityData = clientCfg.CAData
-	}
-	cluster.InsecureSkipTLSVerify = clientCfg.Insecure
-	configCmd.Clusters[clusterNick] = cluster
-
-	context := clientcmdapi.NewContext()
-	context.Cluster = clusterNick
-	context.AuthInfo = userNick
-	configCmd.Contexts[contextNick] = context
-	configCmd.CurrentContext = contextNick
-
-	return configCmd
-}
-
 // GenerateSecureToken returns a string of length tokenLen, consisting
 // of random bytes encoded as base64 for use as a Bearer Token during
 // communication with an APIServer
@@ -498,7 +460,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 		// Check if we can use the in-cluster config
 		if clusterConfig, err := restclient.InClusterConfig(); err == nil {
 			if tempFile, err := os.CreateTemp(os.TempDir(), "kubeconfig-"); err == nil {
-				kubeConfig := createKubeConfig(clusterConfig)
+				kubeConfig := testapiserver.CreateKubeConfig(clusterConfig)
 				clientcmd.WriteToFile(*kubeConfig, tempFile.Name())
 				t.KubeConfig = tempFile.Name()
 				klog.V(4).Infof("Using a temporary kubeconfig file from in-cluster config : %s", tempFile.Name())
