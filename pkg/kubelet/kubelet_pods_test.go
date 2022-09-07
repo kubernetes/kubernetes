@@ -60,6 +60,7 @@ import (
 )
 
 func TestNodeHostsFileContent(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		hostsFileName            string
 		hostAliases              []v1.HostAlias
@@ -173,7 +174,9 @@ fe00::2	ip6-allrouters
 	}
 
 	for _, testCase := range testCases {
+		testCase := testCase
 		t.Run(testCase.hostsFileName, func(t *testing.T) {
+			t.Parallel()
 			tmpdir, err := writeHostsFile(testCase.hostsFileName, testCase.rawHostsFileContent)
 			require.NoError(t, err, "could not create a temp hosts file")
 			defer os.RemoveAll(tmpdir)
@@ -196,6 +199,7 @@ func writeHostsFile(filename string, cfg string) (string, error) {
 }
 
 func TestManagedHostsFileContent(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		hostIPs         []string
 		hostName        string
@@ -299,6 +303,7 @@ fd00::6	podFoo.domainFoo	podFoo
 }
 
 func TestRunInContainerNoSuchPod(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -318,6 +323,7 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 }
 
 func TestRunInContainer(t *testing.T) {
+	t.Parallel()
 	for _, testError := range []error{nil, errors.New("bar")} {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 		defer testKubelet.Cleanup()
@@ -384,6 +390,7 @@ func buildService(name, namespace, clusterIP, protocol string, port int) *v1.Ser
 }
 
 func TestMakeEnvironmentVariables(t *testing.T) {
+	t.Parallel()
 	trueVal := true
 	services := []*v1.Service{
 		buildService("kubernetes", metav1.NamespaceDefault, "1.2.3.1", "TCP", 8081),
@@ -1673,7 +1680,9 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			fakeRecorder := record.NewFakeRecorder(1)
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			testKubelet.kubelet.recorder = fakeRecorder
@@ -1861,6 +1870,7 @@ func withID(status v1.ContainerStatus, id string) v1.ContainerStatus {
 }
 
 func TestPodPhaseWithRestartAlways(t *testing.T) {
+	t.Parallel()
 	desiredState := v1.PodSpec{
 		NodeName: "machine",
 		Containers: []v1.Container{
@@ -1961,6 +1971,7 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 }
 
 func TestPodPhaseWithRestartAlwaysInitContainers(t *testing.T) {
+	t.Parallel()
 	desiredState := v1.PodSpec{
 		NodeName: "machine",
 		InitContainers: []v1.Container{
@@ -2064,6 +2075,7 @@ func TestPodPhaseWithRestartAlwaysInitContainers(t *testing.T) {
 }
 
 func TestPodPhaseWithRestartNever(t *testing.T) {
+	t.Parallel()
 	desiredState := v1.PodSpec{
 		NodeName: "machine",
 		Containers: []v1.Container{
@@ -2164,6 +2176,7 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 }
 
 func TestPodPhaseWithRestartNeverInitContainers(t *testing.T) {
+	t.Parallel()
 	desiredState := v1.PodSpec{
 		NodeName: "machine",
 		InitContainers: []v1.Container{
@@ -2267,6 +2280,7 @@ func TestPodPhaseWithRestartNeverInitContainers(t *testing.T) {
 }
 
 func TestPodPhaseWithRestartOnFailure(t *testing.T) {
+	t.Parallel()
 	desiredState := v1.PodSpec{
 		NodeName: "machine",
 		Containers: []v1.Container{
@@ -2384,6 +2398,7 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 // }
 
 func TestConvertToAPIContainerStatuses(t *testing.T) {
+	t.Parallel()
 	desiredState := v1.PodSpec{
 		NodeName: "machine",
 		Containers: []v1.Container{
@@ -2455,7 +2470,9 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
@@ -2475,6 +2492,7 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 }
 
 func Test_generateAPIPodStatus(t *testing.T) {
+	t.Parallel()
 	desiredState := v1.PodSpec{
 		NodeName: "machine",
 		Containers: []v1.Container{
@@ -2913,6 +2931,7 @@ func findContainerStatusByName(status v1.PodStatus, name string) *v1.ContainerSt
 }
 
 func TestGetExec(t *testing.T) {
+	t.Parallel()
 	const (
 		podName                = "podFoo"
 		podNamespace           = "nsFoo"
@@ -2962,7 +2981,9 @@ func TestGetExec(t *testing.T) {
 	}}
 
 	for _, tc := range testcases {
+		tc := tc
 		t.Run(tc.description, func(t *testing.T) {
+			t.Parallel()
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kubelet := testKubelet.kubelet
@@ -2996,6 +3017,7 @@ func TestGetExec(t *testing.T) {
 }
 
 func TestGetPortForward(t *testing.T) {
+	t.Parallel()
 	const (
 		podName                = "podFoo"
 		podNamespace           = "nsFoo"
@@ -3049,6 +3071,7 @@ func TestGetPortForward(t *testing.T) {
 }
 
 func TestHasHostMountPVC(t *testing.T) {
+	t.Parallel()
 	type testcase struct {
 		pvError         error
 		pvcError        error
@@ -3142,13 +3165,17 @@ func TestHasHostMountPVC(t *testing.T) {
 	}
 
 	for k, v := range tests {
+		k := k
+		v := v
 		t.Run(k, func(t *testing.T) {
+			t.Parallel()
 			run(t, v)
 		})
 	}
 }
 
 func TestHasNonNamespacedCapability(t *testing.T) {
+	t.Parallel()
 	createPodWithCap := func(caps []v1.Capability) *v1.Pod {
 		pod := &v1.Pod{
 			Spec: v1.PodSpec{
@@ -3190,6 +3217,7 @@ func TestHasNonNamespacedCapability(t *testing.T) {
 }
 
 func TestHasHostVolume(t *testing.T) {
+	t.Parallel()
 	pod := &v1.Pod{
 		Spec: v1.PodSpec{
 			Volumes: []v1.Volume{
@@ -3215,6 +3243,7 @@ func TestHasHostVolume(t *testing.T) {
 }
 
 func TestHasHostNamespace(t *testing.T) {
+	t.Parallel()
 	tests := map[string]struct {
 		ps       v1.PodSpec
 		expected bool
@@ -3264,6 +3293,7 @@ func TestHasHostNamespace(t *testing.T) {
 }
 
 func TestTruncatePodHostname(t *testing.T) {
+	t.Parallel()
 	for c, test := range map[string]struct {
 		input  string
 		output string
@@ -3293,6 +3323,7 @@ func TestTruncatePodHostname(t *testing.T) {
 }
 
 func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
+	t.Parallel()
 	testcases := []struct {
 		name          string
 		nodeAddresses []v1.NodeAddress
@@ -3389,7 +3420,9 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
@@ -3425,6 +3458,7 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 }
 
 func TestNodeAddressUpdatesGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
+	t.Parallel()
 	testcases := []struct {
 		name           string
 		nodeIPs        []string
@@ -3493,7 +3527,9 @@ func TestNodeAddressUpdatesGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
@@ -3538,6 +3574,7 @@ func TestNodeAddressUpdatesGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 }
 
 func TestGenerateAPIPodStatusPodIPs(t *testing.T) {
+	t.Parallel()
 	testcases := []struct {
 		name      string
 		nodeIP    string
@@ -3642,7 +3679,9 @@ func TestGenerateAPIPodStatusPodIPs(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
@@ -3671,6 +3710,7 @@ func TestGenerateAPIPodStatusPodIPs(t *testing.T) {
 }
 
 func TestSortPodIPs(t *testing.T) {
+	t.Parallel()
 	testcases := []struct {
 		name        string
 		nodeIP      string
@@ -3746,7 +3786,9 @@ func TestSortPodIPs(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
@@ -3763,6 +3805,7 @@ func TestSortPodIPs(t *testing.T) {
 }
 
 func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
+	t.Parallel()
 	pod := podWithUIDNameNs("12345", "test-pod", "test-namespace")
 
 	testTimestamp := time.Unix(123456789, 987654321)

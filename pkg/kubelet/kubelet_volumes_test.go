@@ -32,6 +32,7 @@ import (
 )
 
 func TestListVolumesForPod(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
@@ -96,6 +97,7 @@ func TestListVolumesForPod(t *testing.T) {
 }
 
 func TestPodVolumesExist(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
@@ -210,6 +212,7 @@ func TestPodVolumesExist(t *testing.T) {
 }
 
 func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
@@ -269,6 +272,7 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 }
 
 func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
@@ -358,6 +362,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 }
 
 func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
@@ -442,6 +447,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 }
 
 func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}

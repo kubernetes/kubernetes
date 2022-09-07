@@ -34,6 +34,7 @@ import (
 )
 
 func TestMakeMounts(t *testing.T) {
+	t.Parallel()
 	bTrue := true
 	propagationHostToContainer := v1.MountPropagationHostToContainer
 	propagationBidirectional := v1.MountPropagationBidirectional
@@ -241,7 +242,10 @@ func TestMakeMounts(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
+		name := name
+		tc := tc
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			fhu := hostutil.NewFakeHostUtil(nil)
 			fsp := &subpath.FakeSubpath{}
 			pod := v1.Pod{
@@ -271,6 +275,7 @@ func TestMakeMounts(t *testing.T) {
 }
 
 func TestMakeBlockVolumes(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -379,7 +384,9 @@ func TestMakeBlockVolumes(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
+		tc := tc
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			pod := v1.Pod{
 				Spec: v1.PodSpec{
 					HostNetwork: true,

@@ -175,6 +175,7 @@ func TestUserNsManagerParseUserNsFile(t *testing.T) {
 }
 
 func TestUserNsManagerHostIDFromMapping(t *testing.T) {
+	t.Parallel()
 	// mapping []*runtimeapi.IDMapping, containerId *int64
 
 	cases := []struct {
@@ -283,7 +284,9 @@ func TestUserNsManagerHostIDFromMapping(t *testing.T) {
 	}
 
 	for _, tc := range cases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			var containerId *int64
 			if tc.containerId != -1 {
 				containerId = &tc.containerId

@@ -54,6 +54,7 @@ func validateDirNotExists(dir string) error {
 }
 
 func TestCleanupOrphanedPodDirs(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
@@ -171,7 +172,10 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
+		name := name
+		tc := tc
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kubelet := testKubelet.kubelet
@@ -201,6 +205,7 @@ func TestCleanupOrphanedPodDirs(t *testing.T) {
 }
 
 func TestPodVolumesExistWithMount(t *testing.T) {
+	t.Parallel()
 	poduid := types.UID("poduid")
 	testCases := map[string]struct {
 		prepareFunc func(kubelet *Kubelet) error
@@ -293,7 +298,10 @@ func TestPodVolumesExistWithMount(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
+		name := name
+		tc := tc
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kubelet := testKubelet.kubelet

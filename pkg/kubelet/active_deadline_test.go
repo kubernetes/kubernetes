@@ -44,6 +44,7 @@ func (m *mockPodStatusProvider) GetPodStatus(uid types.UID) (v1.PodStatus, bool)
 
 // TestActiveDeadlineHandler verifies the active deadline handler functions as expected.
 func TestActiveDeadlineHandler(t *testing.T) {
+	t.Parallel()
 	pods := newTestPods(4)
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	podStatusProvider := &mockPodStatusProvider{pods: pods}

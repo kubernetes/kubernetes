@@ -409,6 +409,7 @@ func newTestPods(count int) []*v1.Pod {
 }
 
 func TestSyncLoopAbort(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -429,6 +430,7 @@ func TestSyncLoopAbort(t *testing.T) {
 }
 
 func TestSyncPodsStartPod(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -446,6 +448,7 @@ func TestSyncPodsStartPod(t *testing.T) {
 }
 
 func TestHandlePodCleanupsPerQOS(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 
@@ -510,6 +513,7 @@ func TestHandlePodCleanupsPerQOS(t *testing.T) {
 }
 
 func TestDispatchWorkOfCompletedPod(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -589,6 +593,7 @@ func TestDispatchWorkOfCompletedPod(t *testing.T) {
 }
 
 func TestDispatchWorkOfActivePod(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -643,6 +648,7 @@ func TestDispatchWorkOfActivePod(t *testing.T) {
 }
 
 func TestHandlePodCleanups(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 
@@ -671,6 +677,7 @@ func TestHandlePodCleanups(t *testing.T) {
 }
 
 func TestHandlePodRemovesWhenSourcesAreReady(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
@@ -744,6 +751,7 @@ func checkPodStatus(t *testing.T, kl *Kubelet, pod *v1.Pod, phase v1.PodPhase) {
 
 // Tests that we handle port conflicts correctly by setting the failed status in status map.
 func TestHandlePortConflicts(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
@@ -794,6 +802,7 @@ func TestHandlePortConflicts(t *testing.T) {
 
 // Tests that we handle host name conflicts correctly by setting the failed status in status map.
 func TestHandleHostNameConflicts(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
@@ -837,6 +846,7 @@ func TestHandleHostNameConflicts(t *testing.T) {
 
 // Tests that we handle not matching labels selector correctly by setting the failed status in status map.
 func TestHandleNodeSelector(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
@@ -879,6 +889,7 @@ func TestHandleNodeSelector(t *testing.T) {
 
 // Tests that we handle not matching labels selector correctly by setting the failed status in status map.
 func TestHandleNodeSelectorBasedOnOS(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		nodeLabels  map[string]string
@@ -906,7 +917,9 @@ func TestHandleNodeSelectorBasedOnOS(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
@@ -944,6 +957,7 @@ func TestHandleNodeSelectorBasedOnOS(t *testing.T) {
 
 // Tests that we handle exceeded resources correctly by setting the failed status in status map.
 func TestHandleMemExceeded(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
@@ -999,6 +1013,7 @@ func TestHandleMemExceeded(t *testing.T) {
 // Tests that we handle result of interface UpdatePluginResources correctly
 // by setting corresponding status in status map.
 func TestHandlePluginResources(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
@@ -1132,6 +1147,7 @@ func TestHandlePluginResources(t *testing.T) {
 
 // TODO(filipg): This test should be removed once StatusSyncer can do garbage collection without external signal.
 func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 
@@ -1155,6 +1171,7 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 }
 
 func TestValidateContainerLogStatus(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -1304,6 +1321,7 @@ func TestValidateContainerLogStatus(t *testing.T) {
 }
 
 func TestCreateMirrorPod(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		updateType kubetypes.SyncPodType
@@ -1320,6 +1338,7 @@ func TestCreateMirrorPod(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 
@@ -1342,6 +1361,7 @@ func TestCreateMirrorPod(t *testing.T) {
 }
 
 func TestDeleteOutdatedMirrorPod(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 
@@ -1378,6 +1398,7 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 }
 
 func TestDeleteOrphanedMirrorPods(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 
@@ -1446,6 +1467,7 @@ func TestDeleteOrphanedMirrorPods(t *testing.T) {
 }
 
 func TestGetContainerInfoForMirrorPods(t *testing.T) {
+	t.Parallel()
 	// pods contain one static and one mirror pod with the same name but
 	// different UIDs.
 	pods := []*v1.Pod{
@@ -1510,6 +1532,7 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 }
 
 func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -1541,6 +1564,7 @@ func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
 }
 
 func TestFilterOutInactivePods(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -1590,6 +1614,7 @@ func TestFilterOutInactivePods(t *testing.T) {
 }
 
 func TestCheckpointContainer(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -1664,7 +1689,9 @@ func TestCheckpointContainer(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			options := &runtimeapi.CheckpointContainerRequest{}
 			if test.checkpointLocation != "" {
 				options.Location = test.checkpointLocation
@@ -1703,6 +1730,7 @@ func TestCheckpointContainer(t *testing.T) {
 }
 
 func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	fakeRuntime := testKubelet.fakeRuntime
@@ -1752,6 +1780,7 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 }
 
 func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	fakeRuntime := testKubelet.fakeRuntime
@@ -1817,6 +1846,7 @@ func podWithUIDNameNsSpec(uid types.UID, name, namespace string, spec v1.PodSpec
 }
 
 func TestDeletePodDirsForDeletedPods(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
@@ -1853,6 +1883,7 @@ func syncAndVerifyPodDir(t *testing.T, testKubelet *TestKubelet, pods []*v1.Pod,
 }
 
 func TestDoesNotDeletePodDirsForTerminatedPods(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
@@ -1870,6 +1901,7 @@ func TestDoesNotDeletePodDirsForTerminatedPods(t *testing.T) {
 }
 
 func TestDoesNotDeletePodDirsIfContainerIsRunning(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	runningPod := &kubecontainer.Pod{
@@ -1900,6 +1932,7 @@ func TestDoesNotDeletePodDirsIfContainerIsRunning(t *testing.T) {
 }
 
 func TestGetPodsToSync(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -1931,6 +1964,7 @@ func TestGetPodsToSync(t *testing.T) {
 }
 
 func TestGenerateAPIPodStatusWithSortedContainers(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -1984,6 +2018,7 @@ func verifyContainerStatuses(t *testing.T, statuses []v1.ContainerStatus, expect
 
 // Test generateAPIPodStatus with different reason cache and old api pod status.
 func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
+	t.Parallel()
 	// The following waiting reason and message  are generated in convertStatusToAPIStatus()
 	testTimestamp := time.Unix(123456789, 987654321)
 	testErrorReason := fmt.Errorf("test-error")
@@ -2204,6 +2239,7 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 
 // Test generateAPIPodStatus with different restart policies.
 func TestGenerateAPIPodStatusWithDifferentRestartPolicies(t *testing.T) {
+	t.Parallel()
 	testErrorReason := fmt.Errorf("test-error")
 	emptyContainerID := (&kubecontainer.ContainerID{}).String()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
@@ -2369,6 +2405,7 @@ func (a *testPodAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecyc
 
 // Test verifies that the kubelet invokes an admission handler during HandlePodAdditions.
 func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
@@ -2430,6 +2467,7 @@ func (a *testPodSyncLoopHandler) ShouldSync(pod *v1.Pod) bool {
 
 // TestGetPodsToSyncInvokesPodSyncLoopHandlers ensures that the get pods to sync routine invokes the handler.
 func TestGetPodsToSyncInvokesPodSyncLoopHandlers(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -2466,6 +2504,7 @@ func (a *testPodSyncHandler) ShouldEvict(pod *v1.Pod) lifecycle.ShouldEvictRespo
 
 // TestGenerateAPIPodStatusInvokesPodSyncHandlers invokes the handlers and reports the proper status
 func TestGenerateAPIPodStatusInvokesPodSyncHandlers(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -2484,6 +2523,7 @@ func TestGenerateAPIPodStatusInvokesPodSyncHandlers(t *testing.T) {
 }
 
 func TestSyncTerminatingPodKillPod(t *testing.T) {
+	t.Parallel()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
@@ -2510,6 +2550,7 @@ func TestSyncTerminatingPodKillPod(t *testing.T) {
 }
 
 func TestSyncLabels(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name             string
 		existingNode     *v1.Node
@@ -2538,7 +2579,9 @@ func TestSyncLabels(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			testKubelet := newTestKubelet(t, false)
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
