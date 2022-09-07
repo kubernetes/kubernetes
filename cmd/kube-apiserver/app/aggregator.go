@@ -278,6 +278,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "node.k8s.io", Version: "v1beta1"}:                   {group: 16300, version: 9},
 	{Group: "discovery.k8s.io", Version: "v1"}:                   {group: 16200, version: 15},
 	{Group: "discovery.k8s.io", Version: "v1beta1"}:              {group: 16200, version: 12},
+	{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta3"}:  {group: 16100, version: 18},
 	{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta2"}:  {group: 16100, version: 15},
 	{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta1"}:  {group: 16100, version: 12},
 	{Group: "flowcontrol.apiserver.k8s.io", Version: "v1alpha1"}: {group: 16100, version: 9},
