@@ -286,12 +286,12 @@ func (le *LeaderElector) renew(ctx context.Context) {
 
 	// if we hold the lease, give it up
 	if le.config.ReleaseOnCancel {
-		le.release()
+		le.release(ctx)
 	}
 }
 
 // release attempts to release the leader lease if we have acquired it.
-func (le *LeaderElector) release() bool {
+func (le *LeaderElector) release(ctx context.Context) bool {
 	if !le.IsLeader() {
 		return true
 	}
@@ -302,7 +302,7 @@ func (le *LeaderElector) release() bool {
 		RenewTime:            now,
 		AcquireTime:          now,
 	}
-	if err := le.config.Lock.Update(context.TODO(), leaderElectionRecord); err != nil {
+	if err := le.config.Lock.Update(ctx, leaderElectionRecord); err != nil {
 		klog.Errorf("Failed to release lock: %v", err)
 		return false
 	}
