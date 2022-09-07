@@ -152,7 +152,7 @@ func main() {
 			log.Fatalf("Error running 'go mod graph': %s", err)
 		}
 	} else if len(os.Args) == 3 {
-		modGraphFile := string(os.Args[2])
+		modGraphFile := os.Args[2]
 		modeGraphStr, err = readFile(modGraphFile)
 		// read file, such as `mod.graph`
 		if err != nil {
@@ -162,7 +162,7 @@ func main() {
 		log.Fatalf("Usage: %s dependencies.json {mod.graph}", os.Args[0])
 	}
 
-	dependenciesJSONPath := string(os.Args[1])
+	dependenciesJSONPath := os.Args[1]
 	dependencies, err := readFile(dependenciesJSONPath)
 	if err != nil {
 		log.Fatalf("Error reading dependencies file %s: %s", dependencies, err)
