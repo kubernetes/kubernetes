@@ -48,5 +48,9 @@ func main() {
 	// regardless of where we run.
 	os.Setenv("HOME", "/home/username")
 	kubectl := cmd.NewKubectlCommand(cmd.KubectlOptions{IOStreams: genericclioptions.IOStreams{In: bytes.NewReader(nil), Out: io.Discard, ErrOut: io.Discard}})
-	doc.GenMarkdownTree(kubectl, outDir)
+	err = doc.GenMarkdownTree(kubectl, outDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to get markdown tree: %v\n", err)
+		os.Exit(1)
+	}
 }
