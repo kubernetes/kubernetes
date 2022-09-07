@@ -52,6 +52,7 @@ func (r *mockRangeRegistry) CreateOrUpdate(alloc *api.RangeAllocation) error {
 }
 
 func TestRepair(t *testing.T) {
+	t.Parallel()
 	fakeClient := fake.NewSimpleClientset()
 	ipregistry := &mockRangeRegistry{
 		item: &api.RangeAllocation{Range: "192.168.1.0/24"},
@@ -77,6 +78,7 @@ func TestRepair(t *testing.T) {
 }
 
 func TestRepairLeak(t *testing.T) {
+	t.Parallel()
 	_, cidr, _ := netutils.ParseCIDRSloppy("192.168.1.0/24")
 	previous, err := ipallocator.NewInMemory(cidr)
 	if err != nil {
@@ -129,6 +131,7 @@ func TestRepairLeak(t *testing.T) {
 }
 
 func TestRepairWithExisting(t *testing.T) {
+	t.Parallel()
 	_, cidr, _ := netutils.ParseCIDRSloppy("192.168.1.0/24")
 	previous, err := ipallocator.NewInMemory(cidr)
 	if err != nil {
@@ -247,6 +250,7 @@ func makeIPNet(cidr string) *net.IPNet {
 	return net
 }
 func TestShouldWorkOnSecondary(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name             string
 		expectedFamilies []corev1.IPFamily
@@ -279,7 +283,9 @@ func TestShouldWorkOnSecondary(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
 			fakeClient := makeFakeClientSet()
 			primaryRegistry := makeRangeRegistry(t, tc.primaryNet.String())
@@ -323,6 +329,7 @@ func TestShouldWorkOnSecondary(t *testing.T) {
 }
 
 func TestRepairDualStack(t *testing.T) {
+	t.Parallel()
 	fakeClient := fake.NewSimpleClientset()
 	ipregistry := &mockRangeRegistry{
 		item: &api.RangeAllocation{Range: "192.168.1.0/24"},
@@ -361,6 +368,7 @@ func TestRepairDualStack(t *testing.T) {
 }
 
 func TestRepairLeakDualStack(t *testing.T) {
+	t.Parallel()
 	_, cidr, _ := netutils.ParseCIDRSloppy("192.168.1.0/24")
 	previous, err := ipallocator.NewInMemory(cidr)
 	if err != nil {
@@ -452,6 +460,7 @@ func TestRepairLeakDualStack(t *testing.T) {
 }
 
 func TestRepairWithExistingDualStack(t *testing.T) {
+	t.Parallel()
 	// because anything (other than allocator) depends
 	// on families assigned to service (not the value of IPFamilyPolicy)
 	// we can saftly create tests that has ipFamilyPolicy:nil

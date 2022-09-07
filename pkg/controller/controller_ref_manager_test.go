@@ -60,6 +60,7 @@ func newPod(podName string, label map[string]string, owner metav1.Object) *v1.Po
 }
 
 func TestClaimPods(t *testing.T) {
+	t.Parallel()
 	controllerKind := schema.GroupVersionKind{}
 	type test struct {
 		name    string
@@ -231,7 +232,9 @@ func TestClaimPods(t *testing.T) {
 		}(),
 	}
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			claimed, err := test.manager.ClaimPods(context.TODO(), test.pods)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
@@ -262,6 +265,7 @@ func TestClaimPods(t *testing.T) {
 }
 
 func TestGeneratePatchBytesForDelete(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name         string
 		ownerUID     []types.UID
@@ -306,7 +310,9 @@ func TestGeneratePatchBytesForDelete(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, _ := GenerateDeleteOwnerRefStrategicMergeBytes(tt.dependentUID, tt.ownerUID, tt.finalizers...)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("generatePatchBytesForDelete() got = %s, want %s", got, tt.want)

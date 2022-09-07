@@ -53,6 +53,7 @@ func (r *mockRangeRegistry) CreateOrUpdate(alloc *api.RangeAllocation) error {
 }
 
 func TestRepair(t *testing.T) {
+	t.Parallel()
 	fakeClient := fake.NewSimpleClientset()
 	registry := &mockRangeRegistry{
 		item: &api.RangeAllocation{Range: "100-200"},
@@ -78,6 +79,7 @@ func TestRepair(t *testing.T) {
 }
 
 func TestRepairLeak(t *testing.T) {
+	t.Parallel()
 	pr, _ := net.ParsePortRange("100-200")
 	previous, err := portallocator.NewInMemory(*pr)
 	if err != nil {
@@ -130,6 +132,7 @@ func TestRepairLeak(t *testing.T) {
 }
 
 func TestRepairWithExisting(t *testing.T) {
+	t.Parallel()
 	pr, _ := net.ParsePortRange("100-200")
 	previous, err := portallocator.NewInMemory(*pr)
 	if err != nil {
@@ -207,6 +210,7 @@ func TestRepairWithExisting(t *testing.T) {
 }
 
 func TestCollectServiceNodePorts(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		serviceSpec corev1.ServiceSpec
@@ -291,7 +295,9 @@ func TestCollectServiceNodePorts(t *testing.T) {
 		},
 	}
 	for _, tc := range tests {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			ports := collectServiceNodePorts(&corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "one"},
 				Spec:       tc.serviceSpec,
