@@ -25,7 +25,6 @@ import (
 	"io/fs"
 	"os"
 	"path"
-	"path/filepath"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -629,7 +628,6 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 	var volumeMounter volumepkg.Mounter
 	var deviceMounter volumepkg.DeviceMounter
 	// Path to the mount or block device to check
-	var checkPath string
 
 	if volume.volumeMode == v1.PersistentVolumeBlock {
 		var newMapperErr error
@@ -646,8 +644,6 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 				pod.UID,
 				newMapperErr)
 		}
-		mapDir, linkName := volumeMapper.GetPodDeviceMapPath()
-		checkPath = filepath.Join(mapDir, linkName)
 	} else {
 		var err error
 		volumeMounter, err = plugin.NewMounter(
@@ -663,7 +659,6 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 				pod.UID,
 				err)
 		}
-		checkPath = volumeMounter.GetPath()
 		if deviceMountablePlugin != nil {
 			deviceMounter, err = deviceMountablePlugin.NewDeviceMounter()
 			if err != nil {
@@ -675,16 +670,6 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 					err)
 			}
 		}
-	}
-
-	// Check existence of mount point for filesystem volume or symbolic link for block volume
-	isExist, checkErr := rc.operationExecutor.CheckVolumeExistenceOperation(volumeSpec, checkPath, volumeSpec.Name(), rc.mounter, uniqueVolumeName, volume.podName, pod.UID, attachablePlugin)
-	if checkErr != nil {
-		return nil, checkErr
-	}
-	// If mount or symlink doesn't exist, volume reconstruction should be failed
-	if !isExist {
-		return nil, fmt.Errorf("volume: %q is not mounted", uniqueVolumeName)
 	}
 
 	reconstructedVolume := &reconstructedVolume{
