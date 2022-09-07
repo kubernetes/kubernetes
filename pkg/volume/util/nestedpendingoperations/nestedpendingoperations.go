@@ -244,6 +244,7 @@ func (grm *nestedPendingOperations) isOperationExists(key operationKey) (bool, i
 		return false, -1
 	}
 
+	opIndex := -1
 	for previousOpIndex, previousOp := range grm.operations {
 		volumeNameMatch := previousOp.key.volumeName == key.volumeName
 
@@ -251,16 +252,28 @@ func (grm *nestedPendingOperations) isOperationExists(key operationKey) (bool, i
 			key.podName == EmptyUniquePodName ||
 			previousOp.key.podName == key.podName
 
+		podNameExactMatch := previousOp.key.podName == key.podName
+
 		nodeNameMatch := previousOp.key.nodeName == EmptyNodeName ||
 			key.nodeName == EmptyNodeName ||
 			previousOp.key.nodeName == key.nodeName
 
+		nodeNameExactMatch := previousOp.key.nodeName == key.nodeName
+
 		if volumeNameMatch && podNameMatch && nodeNameMatch {
-			return true, previousOpIndex
+			// nonExactMatch pending first
+			if previousOp.operationPending {
+				return true, previousOpIndex
+			}
+			// nonExactMatch with no pending, set opIndex to the first nonExactMatch
+			// exactMatch can override opIndex to expected
+			if opIndex == -1 || (podNameExactMatch && nodeNameExactMatch) {
+				opIndex = previousOpIndex
+			}
 		}
 	}
+	return opIndex != -1, opIndex
 
-	return false, -1
 }
 
 func (grm *nestedPendingOperations) getOperation(key operationKey) (uint, error) {
