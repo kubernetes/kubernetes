@@ -21,6 +21,7 @@ import (
 )
 
 func TestMetricsNilSupportsMetrics(t *testing.T) {
+	t.Parallel()
 	metrics := &MetricsNil{}
 	supported := metrics.SupportsMetrics()
 	if supported {
@@ -29,6 +30,7 @@ func TestMetricsNilSupportsMetrics(t *testing.T) {
 }
 
 func TestMetricsNilGetCapacity(t *testing.T) {
+	t.Parallel()
 	metrics := &MetricsNil{}
 	actual, err := metrics.GetMetrics()
 	expected := &Metrics{}

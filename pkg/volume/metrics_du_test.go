@@ -44,6 +44,7 @@ func getExpectedBlockSize(path string) int64 {
 // TestMetricsDuGetCapacity tests that MetricsDu can read disk usage
 // for path
 func TestMetricsDuGetCapacity(t *testing.T) {
+	t.Parallel()
 	tmpDir, err := utiltesting.MkTmpdir("metrics_du_test")
 	if err != nil {
 		t.Fatalf("Can't make a tmp dir: %v", err)
@@ -102,6 +103,7 @@ func TestMetricsDuGetCapacity(t *testing.T) {
 // TestMetricsDuRequireInit tests that if MetricsDu is not initialized with a path, GetMetrics
 // returns an error
 func TestMetricsDuRequirePath(t *testing.T) {
+	t.Parallel()
 	metrics := NewMetricsDu("")
 	actual, err := metrics.GetMetrics()
 	expected := &Metrics{}
@@ -116,6 +118,7 @@ func TestMetricsDuRequirePath(t *testing.T) {
 // TestMetricsDuRealDirectory tests that if MetricsDu is initialized to a non-existent path, GetMetrics
 // returns an error
 func TestMetricsDuRequireRealDirectory(t *testing.T) {
+	t.Parallel()
 	metrics := NewMetricsDu("/not/a/real/directory")
 	actual, err := metrics.GetMetrics()
 	expected := &Metrics{}

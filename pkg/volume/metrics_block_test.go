@@ -24,6 +24,7 @@ import (
 )
 
 func TestGetMetricsBlockInvalid(t *testing.T) {
+	t.Parallel()
 	metrics := NewMetricsBlock("")
 	actual, err := metrics.GetMetrics()
 	expected := &Metrics{}

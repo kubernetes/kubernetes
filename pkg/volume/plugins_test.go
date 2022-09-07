@@ -27,6 +27,7 @@ import (
 const testPluginName = "kubernetes.io/testPlugin"
 
 func TestSpecSourceConverters(t *testing.T) {
+	t.Parallel()
 	v := &v1.Volume{
 		Name:         "foo",
 		VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
@@ -108,6 +109,7 @@ func newTestPlugin() []VolumePlugin {
 }
 
 func TestVolumePluginMgrFunc(t *testing.T) {
+	t.Parallel()
 	vpm := VolumePluginMgr{}
 	var prober DynamicPluginProber = nil // TODO (#51147) inject mock
 	vpm.InitPlugins(newTestPlugin(), prober, nil)
@@ -133,6 +135,7 @@ func TestVolumePluginMgrFunc(t *testing.T) {
 }
 
 func Test_ValidatePodTemplate(t *testing.T) {
+	t.Parallel()
 	pod := &v1.Pod{
 		Spec: v1.PodSpec{
 			Volumes: []v1.Volume{

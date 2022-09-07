@@ -26,6 +26,7 @@ import (
 )
 
 func TestGetMetricsStatFS(t *testing.T) {
+	t.Parallel()
 	metrics := NewMetricsStatFS("")
 	actual, err := metrics.GetMetrics()
 	expected := &Metrics{}

@@ -56,6 +56,7 @@ func (l *localFakeMounter) GetMetrics() (*Metrics, error) {
 }
 
 func TestSkipPermissionChange(t *testing.T) {
+	t.Parallel()
 	always := v1.FSGroupChangeAlways
 	onrootMismatch := v1.FSGroupChangeOnRootMismatch
 	tests := []struct {
@@ -118,7 +119,9 @@ func TestSkipPermissionChange(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run(test.description, func(t *testing.T) {
+			t.Parallel()
 			tmpDir, err := utiltesting.MkTmpdir("volume_linux_test")
 			if err != nil {
 				t.Fatalf("error creating temp dir: %v", err)
@@ -176,6 +179,7 @@ func TestSkipPermissionChange(t *testing.T) {
 }
 
 func TestSetVolumeOwnershipMode(t *testing.T) {
+	t.Parallel()
 	always := v1.FSGroupChangeAlways
 	onrootMismatch := v1.FSGroupChangeOnRootMismatch
 	expectedMask := rwMask | os.ModeSetgid | execMask
@@ -279,7 +283,9 @@ func TestSetVolumeOwnershipMode(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run(test.description, func(t *testing.T) {
+			t.Parallel()
 			tmpDir, err := utiltesting.MkTmpdir("volume_linux_ownership")
 			if err != nil {
 				t.Fatalf("error creating temp dir: %v", err)
@@ -341,6 +347,7 @@ func verifyDirectoryPermission(path string, readonly bool) bool {
 }
 
 func TestSetVolumeOwnershipOwner(t *testing.T) {
+	t.Parallel()
 	fsGroup := int64(3000)
 	currentUid := os.Geteuid()
 	if currentUid != 0 {
@@ -424,7 +431,9 @@ func TestSetVolumeOwnershipOwner(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run(test.description, func(t *testing.T) {
+			t.Parallel()
 			tmpDir, err := utiltesting.MkTmpdir("volume_linux_ownership")
 			if err != nil {
 				t.Fatalf("error creating temp dir: %v", err)
