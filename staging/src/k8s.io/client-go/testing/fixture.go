@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
@@ -391,6 +392,20 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 		return err
 	}
 
+	// Only generate the name for objects that are Created
+	if !replaceExisting && len(newMeta.GetGenerateName()) > 0 && len(newMeta.GetName()) == 0 {
+		newMeta.SetName(generateName(newMeta.GetGenerateName()))
+	}
+
+	if len(newMeta.GetGenerateName()) > 0 && len(newMeta.GetName()) == 0 {
+		return errors.NewInternalError(fmt.Errorf("metadata.name was not generated"))
+	}
+
+	// Object name is required
+	if len(newMeta.GetName()) == 0 {
+		return errors.NewInternalError(fmt.Errorf("metadata.name is required"))
+	}
+
 	// Propagate namespace to the new object if hasn't already been set.
 	if len(newMeta.GetNamespace()) == 0 {
 		newMeta.SetNamespace(ns)
@@ -578,4 +593,22 @@ func resourceCovers(resource string, action Action) bool {
 	}
 
 	return false
+}
+
+// generateName is a generator that returns the name plus a random suffix of five alphanumerics
+// when a name is requested. The string is guaranteed to not exceed the length of a standard Kubernetes
+// name (63 characters)
+// forked from k8s.io/apiserver/pkg/storage/names/generate.go
+func generateName(base string) string {
+	const (
+		// TODO: make this flexible for non-core resources with alternate naming rules.
+		maxNameLength          = 63
+		randomLength           = 5
+		MaxGeneratedNameLength = maxNameLength - randomLength
+	)
+
+	if len(base) > MaxGeneratedNameLength {
+		base = base[:MaxGeneratedNameLength]
+	}
+	return fmt.Sprintf("%s%s", base, utilrand.String(randomLength))
 }

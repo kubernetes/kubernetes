@@ -24,11 +24,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
@@ -404,6 +403,142 @@ func Test_resourceCovers(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := resourceCovers(tt.args.resource, tt.args.action); got != tt.want {
 				t.Errorf("resourceCovers() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_Create(t *testing.T) {
+	testResource := schema.GroupVersionResource{Group: "", Version: "test_version", Resource: "test_kind"}
+	testObj := getArbitraryResource(testResource, "test_name", "test_namespace")
+
+	tests := []struct {
+		name    string
+		f       func(obj runtime.Object) runtime.Object
+		ns      string
+		wantErr bool
+	}{
+		{
+			name: "Name and GenerateName set",
+			ns:   "test_namespace",
+		},
+		{
+			name:    "Name and GenerateName set but wrong namespace",
+			ns:      "test_namespace_wrong",
+			wantErr: true,
+		},
+		{
+			name: "Name not set and GenerateName set",
+			f: func(obj runtime.Object) runtime.Object {
+				clone := obj.DeepCopyObject()
+				newMeta, err := meta.Accessor(clone)
+				if err != nil {
+					t.Error(err)
+				}
+				newMeta.SetName("")
+				return clone
+			},
+			ns: "test_namespace",
+		},
+		{
+			name: "Name not set and GenerateName no set",
+			f: func(obj runtime.Object) runtime.Object {
+				clone := obj.DeepCopyObject()
+				newMeta, err := meta.Accessor(clone)
+				if err != nil {
+					t.Error(err)
+				}
+				newMeta.SetName("")
+				newMeta.SetGenerateName("")
+				return clone
+			},
+			ns:      "test_namespace",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			codecs := serializer.NewCodecFactory(scheme)
+			o := NewObjectTracker(scheme, codecs.UniversalDecoder())
+			obj := runtime.Object(testObj)
+			if tt.f != nil {
+				obj = tt.f(testObj)
+			}
+			err := o.Create(testResource, obj, tt.ns)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("tracker.Create() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_Update(t *testing.T) {
+	ns := "test_namespace"
+	name := "test_name"
+	testResource := schema.GroupVersionResource{Group: "", Version: "test_version", Resource: "test_kind"}
+	testObj := getArbitraryResource(testResource, name, ns)
+
+	tests := []struct {
+		name    string
+		f       func(obj runtime.Object) runtime.Object
+		ns      string
+		wantErr bool
+	}{
+		{
+			name: "Name and GenerateName set",
+			ns:   ns,
+		},
+		{
+			name:    "Name and GenerateName set but wrong namespace",
+			ns:      "test_namespace_wrong",
+			wantErr: true,
+		},
+		{
+			name: "Name not set and GenerateName set",
+			f: func(obj runtime.Object) runtime.Object {
+				clone := obj.DeepCopyObject()
+				newMeta, err := meta.Accessor(clone)
+				if err != nil {
+					t.Error(err)
+				}
+				newMeta.SetName("")
+				return clone
+			},
+			ns:      ns,
+			wantErr: true,
+		},
+		{
+			name: "Name not set and GenerateName no set",
+			f: func(obj runtime.Object) runtime.Object {
+				clone := obj.DeepCopyObject()
+				newMeta, err := meta.Accessor(clone)
+				if err != nil {
+					t.Error(err)
+				}
+				newMeta.SetName("")
+				newMeta.SetGenerateName("")
+				return clone
+			},
+			ns:      ns,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			codecs := serializer.NewCodecFactory(scheme)
+			o := NewObjectTracker(scheme, codecs.UniversalDecoder())
+			err := o.Create(testResource, testObj, ns)
+			if err != nil {
+				t.Fatal(err)
+			}
+			obj := runtime.Object(testObj)
+			if tt.f != nil {
+				obj = tt.f(testObj)
+			}
+			if err := o.Update(testResource, obj, tt.ns); (err != nil) != tt.wantErr {
+				t.Errorf("tracker.Update() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
