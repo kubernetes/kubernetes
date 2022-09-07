@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/daemonset"
+	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -75,7 +75,7 @@ var _ = SIGDescribe("[Feature:GPUDevicePlugin] Device Plugin", func() {
 				MountPath: mountPath,
 			},
 		}
-		ds := daemonset.NewDaemonSet(dsName, image, labels, volumes, mounts, nil)
+		ds := e2edaemonset.NewDaemonSet(dsName, image, labels, volumes, mounts, nil)
 		ds.Spec.Template.Spec.PriorityClassName = "system-node-critical"
 		ds.Spec.Template.Spec.Tolerations = []v1.Toleration{
 			{
