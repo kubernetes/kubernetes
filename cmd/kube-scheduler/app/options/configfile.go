@@ -55,6 +55,9 @@ func loadConfig(data []byte) (*config.KubeSchedulerConfiguration, error) {
 		if cfgObj.TypeMeta.APIVersion == configv1beta2.SchemeGroupVersion.String() {
 			klog.InfoS("KubeSchedulerConfiguration v1beta2 is deprecated in v1.25, will be removed in v1.26")
 		}
+		if cfgObj.TypeMeta.APIVersion == configv1beta3.SchemeGroupVersion.String() {
+			klog.InfoS("KubeSchedulerConfiguration v1beta3 is deprecated in v1.26, will be removed in v1.29")
+		}
 		return cfgObj, nil
 	}
 	return nil, fmt.Errorf("couldn't decode as KubeSchedulerConfiguration, got %s: ", gvk)
