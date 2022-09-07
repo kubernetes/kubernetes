@@ -70,7 +70,7 @@ func main() {
 		log.Fatalf("Error reading dependencies file: %v", err)
 	}
 
-	packages := []goPackage{}
+	var packages []goPackage
 	decoder := json.NewDecoder(bytes.NewBuffer(b))
 	for {
 		pkg := goPackage{}
@@ -88,8 +88,8 @@ func main() {
 		if excludePattern != nil && excludePattern.MatchString(p.ImportPath) {
 			continue
 		}
-		importViolations := []string{}
-		allImports := []string{}
+		var importViolations []string
+		var allImports []string
 		allImports = append(allImports, p.Imports...)
 		allImports = append(allImports, p.TestImports...)
 		allImports = append(allImports, p.XTestImports...)
