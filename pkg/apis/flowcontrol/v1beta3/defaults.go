@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta2
+package v1beta3
 
 import (
-	"k8s.io/api/flowcontrol/v1beta2"
+	"k8s.io/api/flowcontrol/v1beta3"
 )
 
 // Default settings for flow-schema
@@ -34,20 +34,20 @@ const (
 )
 
 // SetDefaults_FlowSchema sets default values for flow schema
-func SetDefaults_FlowSchemaSpec(spec *v1beta2.FlowSchemaSpec) {
+func SetDefaults_FlowSchemaSpec(spec *v1beta3.FlowSchemaSpec) {
 	if spec.MatchingPrecedence == 0 {
 		spec.MatchingPrecedence = FlowSchemaDefaultMatchingPrecedence
 	}
 }
 
-func SetDefaults_LimitedPriorityLevelConfiguration(lplc *v1beta2.LimitedPriorityLevelConfiguration) {
+func SetDefaults_LimitedPriorityLevelConfiguration(lplc *v1beta3.LimitedPriorityLevelConfiguration) {
 	if lplc.AssuredConcurrencyShares == 0 {
 		lplc.AssuredConcurrencyShares = PriorityLevelConfigurationDefaultAssuredConcurrencyShares
 	}
 }
 
 // SetDefaults_FlowSchema sets default values for flow schema
-func SetDefaults_QueuingConfiguration(cfg *v1beta2.QueuingConfiguration) {
+func SetDefaults_QueuingConfiguration(cfg *v1beta3.QueuingConfiguration) {
 	if cfg.HandSize == 0 {
 		cfg.HandSize = PriorityLevelConfigurationDefaultHandSize
 	}

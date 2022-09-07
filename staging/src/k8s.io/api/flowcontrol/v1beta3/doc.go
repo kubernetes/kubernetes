@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,5 +21,5 @@ limitations under the License.
 
 // +groupName=flowcontrol.apiserver.k8s.io
 
-// Package v1beta2 holds api types of version v1alpha1 for group "flowcontrol.apiserver.k8s.io".
-package v1beta2 // import "k8s.io/api/flowcontrol/v1beta2"
+// Package v1beta3 holds api types of version v1beta3 for group "flowcontrol.apiserver.k8s.io".
+package v1beta3 // import "k8s.io/api/flowcontrol/v1beta3"
