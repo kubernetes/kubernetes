@@ -158,15 +158,15 @@ type NetworkPolicyPort struct {
 	EndPort *int32
 }
 
-// IPBlock describes a particular CIDR (Ex. "192.168.1.1/24","2001:db9::/64") that is allowed
+// IPBlock describes a particular CIDR (Ex. "192.168.1.0/24","2001:db8::/64") that is allowed
 // to the pods matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs
 // that should not be included within this rule.
 type IPBlock struct {
 	// CIDR is a string representing the IP Block
-	// Valid examples are "192.168.1.1/24" or "2001:db9::/64"
+	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
 	CIDR string
 	// Except is a slice of CIDRs that should not be included within an IP Block
-	// Valid examples are "192.168.1.1/24" or "2001:db9::/64"
+	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
 	// Except values will be rejected if they are outside the CIDR range
 	// +optional
 	Except []string
@@ -628,7 +628,7 @@ type ClusterCIDRSpec struct {
 	// +optional
 	IPv4 string
 
-	// IPv6 defines an IPv6 IP block in CIDR notation(e.g. "fd12:3456:789a:1::/64").
+	// IPv6 defines an IPv6 IP block in CIDR notation(e.g. "2001:db8::/64").
 	// At least one of IPv4 and IPv6 must be specified.
 	// This field is immutable.
 	// +optional
