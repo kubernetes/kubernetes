@@ -20,14 +20,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	admissionapi "k8s.io/pod-security-admission/api"
 	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/opencontainers/runc/libcontainer/apparmor"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,10 +39,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/opencontainers/runc/libcontainer/apparmor"
 )
 
 var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() {

@@ -23,14 +23,13 @@ import (
 	"strconv"
 	"strings"
 
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	netutils "k8s.io/utils/net"
-
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	netutils "k8s.io/utils/net"
 )
 
 // probeConnectivityArgs is set of arguments for a probeConnectivity
