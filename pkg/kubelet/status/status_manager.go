@@ -34,8 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -849,6 +851,12 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningCon
 	for _, c := range newPodStatus.Conditions {
 		if kubetypes.PodConditionByKubelet(c.Type) {
 			podConditions = append(podConditions, c)
+		} else {
+			if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+				if c.Type == v1.AlphaNoCompatGuaranteeDisruptionTarget {
+					podConditions = append(podConditions, c)
+				}
+			}
 		}
 	}
 	newPodStatus.Conditions = podConditions
