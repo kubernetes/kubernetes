@@ -611,12 +611,11 @@ func Test_Run_UpdateNodeStatusFailBeforeOneVolumeDetachNodeWithReadWriteOnce(t *
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
+		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
-	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	rc := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
 	reconciliationLoopFunc := rc.(*reconciler).reconciliationLoopFunc()
 	podName1 := "pod-uid1"
 	volumeName := v1.UniqueVolumeName("volume-name")
