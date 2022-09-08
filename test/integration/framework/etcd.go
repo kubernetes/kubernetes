@@ -198,7 +198,7 @@ func EtcdMain(tests func() int) {
 		// like k8s.io/klog/v2.(*loggingT).flushDaemon()
 		// TODO(#108483): Reduce this number once we address the
 		//   couple remaining issues.
-		if dg := runtime.NumGoroutine() - before; dg <= 15 {
+		if dg := runtime.NumGoroutine() - before; dg <= 9 {
 			return true, nil
 		}
 		// Allow goroutines to schedule and die off.

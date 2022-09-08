@@ -412,7 +412,7 @@ func buildGenericConfig(
 		lastErr = err
 		return
 	}
-	storageFactory, lastErr = completedStorageFactoryConfig.New()
+	storageFactory, lastErr = completedStorageFactoryConfig.New(genericConfig.DrainedNotify())
 	if lastErr != nil {
 		return
 	}
