@@ -544,7 +544,7 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 							if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 								expected = append(expected, "application/apply-patch+yaml")
 							}
-							assert.Equal(t, operation.Consumes, expected)
+							assert.Equal(t, expected, operation.Consumes)
 						} else {
 							assert.Equal(t, operation.Consumes, []string{"application/json", "application/yaml"})
 						}
