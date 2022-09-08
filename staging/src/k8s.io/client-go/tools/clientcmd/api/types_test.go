@@ -46,10 +46,12 @@ func Example_ofOptionsConfig() {
 		Server:                "https://alfa.org:8080",
 		InsecureSkipTLSVerify: true,
 		CertificateAuthority:  "path/to/my/cert-ca-filename",
+		DisableCompression:    true,
 	}
 	defaultConfig.Clusters["bravo"] = &Cluster{
 		Server:                "https://bravo.org:8080",
 		InsecureSkipTLSVerify: false,
+		DisableCompression:    false,
 	}
 	defaultConfig.AuthInfos["white-mage-via-cert"] = &AuthInfo{
 		ClientCertificate: "path/to/my/client-cert-filename",
@@ -94,6 +96,7 @@ func Example_ofOptionsConfig() {
 	//   alfa:
 	//     LocationOfOrigin: ""
 	//     certificate-authority: path/to/my/cert-ca-filename
+	//     disable-compression: true
 	//     insecure-skip-tls-verify: true
 	//     server: https://alfa.org:8080
 	//   bravo:

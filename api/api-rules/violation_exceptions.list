@@ -448,10 +448,12 @@ API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,
 API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,StrVal
 API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,Type
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1,Cluster,CertificateAuthorityData
+API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1,Cluster,DisableCompression
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1,Cluster,InsecureSkipTLSVerify
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1,Cluster,ProxyURL
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1,Cluster,TLSServerName
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1beta1,Cluster,CertificateAuthorityData
+API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1beta1,Cluster,DisableCompression
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1beta1,Cluster,InsecureSkipTLSVerify
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1beta1,Cluster,ProxyURL
 API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1beta1,Cluster,TLSServerName

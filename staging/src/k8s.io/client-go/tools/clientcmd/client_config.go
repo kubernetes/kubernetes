@@ -164,6 +164,8 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 		clientConfig.Proxy = http.ProxyURL(u)
 	}
 
+	clientConfig.DisableCompression = configClusterInfo.DisableCompression
+
 	if config.overrides != nil && len(config.overrides.Timeout) > 0 {
 		timeout, err := ParseTimeout(config.overrides.Timeout)
 		if err != nil {
