@@ -281,7 +281,7 @@ func (a *cpuAccumulator) freeCPUs() []int {
 
 // Sorts the provided list of NUMA nodes/sockets/cores/cpus referenced in 'ids'
 // by the number of available CPUs contained within them (smallest to largest).
-// The 'getCPU()' paramater defines the function that should be called to
+// The 'getCPU()' parameter defines the function that should be called to
 // retrieve the list of available CPUs for the type being referenced. If two
 // NUMA nodes/sockets/cores/cpus have the same number of available CPUs, they
 // are sorted in ascending order by their id.
