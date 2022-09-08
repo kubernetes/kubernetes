@@ -103,7 +103,7 @@ var _ = SIGDescribe("Node Performance Testing [Serial] [Slow]", func() {
 		delOpts := metav1.DeleteOptions{
 			GracePeriodSeconds: &gp,
 		}
-		f.PodClient().DeleteSync(pod.Name, delOpts, framework.DefaultPodDeletionTimeout)
+		e2epod.NewPodClient(f).DeleteSync(pod.Name, delOpts, e2epod.DefaultPodDeletionTimeout)
 
 		// We are going to give some more time for the CPU manager to do any clean
 		// up it needs to do now that the pod has been deleted. Otherwise we may
@@ -124,7 +124,7 @@ var _ = SIGDescribe("Node Performance Testing [Serial] [Slow]", func() {
 		// Make the pod for the workload.
 		pod = makeNodePerfPod(wl)
 		// Create the pod.
-		pod = f.PodClient().CreateSync(pod)
+		pod = e2epod.NewPodClient(f).CreateSync(pod)
 		// Wait for pod success.
 		// but avoid using WaitForSuccess because we want the container logs upon failure #109295
 		podErr := e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), wl.Timeout(),

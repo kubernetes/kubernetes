@@ -18,10 +18,12 @@ package node
 
 import (
 	"context"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2esecurity "k8s.io/kubernetes/test/e2e/framework/security"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/upgrades"
@@ -61,7 +63,7 @@ func (t *AppArmorUpgradeTest) Setup(f *framework.Framework) {
 
 	// Create the initial test pod.
 	ginkgo.By("Creating a long-running AppArmor enabled pod.")
-	t.pod = e2esecurity.CreateAppArmorTestPod(f.Namespace.Name, f.ClientSet, f.PodClient(), false, false)
+	t.pod = e2esecurity.CreateAppArmorTestPod(f.Namespace.Name, f.ClientSet, e2epod.NewPodClient(f), false, false)
 
 	// Verify initial state.
 	t.verifyNodesAppArmorEnabled(f)
@@ -88,7 +90,7 @@ func (t *AppArmorUpgradeTest) Teardown(f *framework.Framework) {
 
 func (t *AppArmorUpgradeTest) verifyPodStillUp(f *framework.Framework) {
 	ginkgo.By("Verifying an AppArmor profile is continuously enforced for a pod")
-	pod, err := f.PodClient().Get(context.TODO(), t.pod.Name, metav1.GetOptions{})
+	pod, err := e2epod.NewPodClient(f).Get(context.TODO(), t.pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Should be able to get pod")
 	framework.ExpectEqual(pod.Status.Phase, v1.PodRunning, "Pod should stay running")
 	gomega.Expect(pod.Status.ContainerStatuses[0].State.Running).NotTo(gomega.BeNil(), "Container should be running")
@@ -97,7 +99,7 @@ func (t *AppArmorUpgradeTest) verifyPodStillUp(f *framework.Framework) {
 
 func (t *AppArmorUpgradeTest) verifyNewPodSucceeds(f *framework.Framework) {
 	ginkgo.By("Verifying an AppArmor profile is enforced for a new pod")
-	e2esecurity.CreateAppArmorTestPod(f.Namespace.Name, f.ClientSet, f.PodClient(), false, true)
+	e2esecurity.CreateAppArmorTestPod(f.Namespace.Name, f.ClientSet, e2epod.NewPodClient(f), false, true)
 }
 
 func (t *AppArmorUpgradeTest) verifyNodesAppArmorEnabled(f *framework.Framework) {

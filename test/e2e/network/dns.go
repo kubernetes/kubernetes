@@ -432,7 +432,7 @@ var _ = common.SIGDescribe("DNS", func() {
 
 		runCommand := func(arg string) string {
 			cmd := []string{"/agnhost", arg}
-			stdout, stderr, err := f.ExecWithOptions(framework.ExecOptions{
+			stdout, stderr, err := e2epod.ExecWithOptions(f, e2epod.ExecOptions{
 				Command:       cmd,
 				Namespace:     f.Namespace.Name,
 				PodName:       testAgnhostPod.Name,
@@ -524,7 +524,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		ginkgo.By("Verifying customized DNS option is configured on pod...")
 		// TODO: Figure out a better way other than checking the actual resolv,conf file.
 		cmd := []string{"cat", "/etc/resolv.conf"}
-		stdout, stderr, err := f.ExecWithOptions(framework.ExecOptions{
+		stdout, stderr, err := e2epod.ExecWithOptions(f, e2epod.ExecOptions{
 			Command:       cmd,
 			Namespace:     f.Namespace.Name,
 			PodName:       testUtilsPod.Name,
@@ -544,7 +544,7 @@ var _ = common.SIGDescribe("DNS", func() {
 		// - DNS query is sent to the specified server.
 		cmd = []string{"dig", "+short", "+search", testDNSNameShort}
 		digFunc := func() (bool, error) {
-			stdout, stderr, err := f.ExecWithOptions(framework.ExecOptions{
+			stdout, stderr, err := e2epod.ExecWithOptions(f, e2epod.ExecOptions{
 				Command:       cmd,
 				Namespace:     f.Namespace.Name,
 				PodName:       testUtilsPod.Name,

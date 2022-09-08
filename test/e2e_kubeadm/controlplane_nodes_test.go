@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -57,7 +58,7 @@ var _ = Describe("control-plane node", func() {
 
 		// checks that the control-plane nodes have the expected taints
 		for _, cp := range controlPlanes.Items {
-			framework.ExpectNodeHasTaint(f.ClientSet, cp.GetName(), &corev1.Taint{Key: controlPlaneLabel, Effect: corev1.TaintEffectNoSchedule})
+			e2enode.ExpectNodeHasTaint(f.ClientSet, cp.GetName(), &corev1.Taint{Key: controlPlaneLabel, Effect: corev1.TaintEffectNoSchedule})
 		}
 	})
 })

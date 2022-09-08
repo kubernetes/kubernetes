@@ -89,7 +89,7 @@ func runPodFailingConditionsTest(f *framework.Framework, hasInitContainers, chec
 			},
 		}
 
-		p = f.PodClient().Create(p)
+		p = e2epod.NewPodClient(f).Create(p)
 
 		ginkgo.By("waiting until kubelet has started trying to set up the pod and started to fail")
 
@@ -101,7 +101,7 @@ func runPodFailingConditionsTest(f *framework.Framework, hasInitContainers, chec
 		}.AsSelector().String()
 		e2eevents.WaitTimeoutForEvent(f.ClientSet, f.Namespace.Name, eventSelector, "MountVolume.SetUp failed for volume", framework.PodEventTimeout)
 
-		p, err := f.PodClient().Get(context.TODO(), p.Name, metav1.GetOptions{})
+		p, err := e2epod.NewPodClient(f).Get(context.TODO(), p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("checking pod condition for a pod whose sandbox creation is blocked")
@@ -139,10 +139,10 @@ func runPodReadyConditionsTest(f *framework.Framework, hasInitContainers, checkP
 	return func() {
 		ginkgo.By("creating a pod that successfully comes up in a ready/running state")
 
-		p := f.PodClient().Create(webserverPodSpec("pod-"+string(uuid.NewUUID()), "web1", "init1", hasInitContainers))
+		p := e2epod.NewPodClient(f).Create(webserverPodSpec("pod-"+string(uuid.NewUUID()), "web1", "init1", hasInitContainers))
 		e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout)
 
-		p, err := f.PodClient().Get(context.TODO(), p.Name, metav1.GetOptions{})
+		p, err := e2epod.NewPodClient(f).Get(context.TODO(), p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		isReady, err := testutils.PodRunningReady(p)
 		framework.ExpectNoError(err)

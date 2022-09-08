@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2eperf "k8s.io/kubernetes/test/e2e/framework/perf"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -55,7 +56,7 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 		// The Cadvsior of Kubelet has a housekeeping interval of 10s, which is too long to
 		// show the resource usage spikes. But changing its interval increases the overhead
 		// of kubelet. Hence we use a Cadvisor pod.
-		f.PodClient().CreateSync(getCadvisorPod())
+		e2epod.NewPodClient(f).CreateSync(getCadvisorPod())
 		rc = NewResourceCollector(containerStatsPollingPeriod)
 	})
 
@@ -155,7 +156,7 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 	defer rc.Stop()
 
 	ginkgo.By("Creating a batch of Pods")
-	f.PodClient().CreateBatch(pods)
+	e2epod.NewPodClient(f).CreateBatch(pods)
 
 	// wait for a while to let the node be steady
 	time.Sleep(sleepAfterCreatePods)

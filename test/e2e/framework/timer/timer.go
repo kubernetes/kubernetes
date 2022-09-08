@@ -22,9 +22,10 @@ import (
 	"bytes"
 	"fmt"
 
+	"sync"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/perftype"
-	"sync"
 )
 
 var now = time.Now

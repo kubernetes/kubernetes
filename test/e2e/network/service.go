@@ -64,6 +64,8 @@ import (
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
+	e2eproviders "k8s.io/kubernetes/test/e2e/framework/providers"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -134,7 +136,7 @@ func affinityCheckFromPod(execPod *v1.Pod, serviceIP string, servicePort int) (t
 	curl := fmt.Sprintf(`curl -q -s --connect-timeout 2 http://%s/`, serviceIPPort)
 	cmd := fmt.Sprintf("for i in $(seq 0 %d); do echo; %s ; done", AffinityConfirmCount, curl)
 	getHosts := func() []string {
-		stdout, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+		stdout, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 		if err != nil {
 			framework.Logf("Failed to get response from %s. Retry until timeout", serviceIPPort)
 			return nil
@@ -343,7 +345,7 @@ func verifyServeHostnameServiceUp(c clientset.Interface, ns string, expectedPods
 			50*len(expectedPods), wgetCmd, serviceIPPort)
 		framework.Logf("Executing cmd %q in pod %v/%v", cmd, ns, podName)
 		// TODO: Use exec-over-http via the netexec pod instead of kubectl exec.
-		output, err := framework.RunHostCmd(ns, podName, cmd)
+		output, err := e2eoutput.RunHostCmd(ns, podName, cmd)
 		if err != nil {
 			framework.Logf("error while kubectl execing %q in pod %v/%v: %v\nOutput: %v", cmd, ns, podName, err, output)
 		}
@@ -406,7 +408,7 @@ func verifyServeHostnameServiceDown(c clientset.Interface, ns string, serviceIP 
 		"curl -g -s --connect-timeout 2 http://%s && echo service-down-failed", ipPort)
 
 	for start := time.Now(); time.Since(start) < e2eservice.KubeProxyLagTimeout; time.Sleep(5 * time.Second) {
-		output, err := framework.RunHostCmd(ns, hostExecPod.Name, command)
+		output, err := e2eoutput.RunHostCmd(ns, hostExecPod.Name, command)
 		if err != nil {
 			framework.Logf("error while kubectl execing %q in pod %v/%v: %v\nOutput: %v", command, ns, hostExecPod.Name, err, output)
 		}
@@ -1762,7 +1764,7 @@ var _ = common.SIGDescribe("Services", func() {
 		var stdout string
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
 			var err error
-			stdout, err = framework.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
+			stdout, err = e2eoutput.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
 			if err != nil {
 				framework.Logf("expected node port (%d) to not be in use, stdout: %v", nodePort, stdout)
 				return false, nil
@@ -1855,7 +1857,7 @@ var _ = common.SIGDescribe("Services", func() {
 		var stdout string
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
 			var err error
-			stdout, err = framework.RunHostCmd(f.Namespace.Name, execPodName, cmd)
+			stdout, err = e2eoutput.RunHostCmd(f.Namespace.Name, execPodName, cmd)
 			if err != nil {
 				framework.Logf("expected un-ready endpoint for Service %v, stdout: %v, err %v", t.Name, stdout, err)
 				return false, nil
@@ -1878,7 +1880,7 @@ var _ = common.SIGDescribe("Services", func() {
 		cmd = fmt.Sprintf("curl -q -s --connect-timeout 2 http://%s:%d/; test \"$?\" -ne \"0\"", svcName, port)
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
 			var err error
-			stdout, err = framework.RunHostCmd(f.Namespace.Name, execPodName, cmd)
+			stdout, err = e2eoutput.RunHostCmd(f.Namespace.Name, execPodName, cmd)
 			if err != nil {
 				framework.Logf("expected un-ready endpoint for Service %v, stdout: %v, err %v", t.Name, stdout, err)
 				return false, nil
@@ -1898,7 +1900,7 @@ var _ = common.SIGDescribe("Services", func() {
 		cmd = fmt.Sprintf("curl -q -s --connect-timeout 2 http://%s:%d/", svcName, port)
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
 			var err error
-			stdout, err = framework.RunHostCmd(f.Namespace.Name, execPodName, cmd)
+			stdout, err = e2eoutput.RunHostCmd(f.Namespace.Name, execPodName, cmd)
 			if err != nil {
 				framework.Logf("expected un-ready endpoint for Service %v, stdout: %v, err %v", t.Name, stdout, err)
 				return false, nil
@@ -2153,7 +2155,7 @@ var _ = common.SIGDescribe("Services", func() {
 		clusterIPAddress := net.JoinHostPort(svc.Spec.ClusterIP, strconv.Itoa(servicePort))
 		cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, clusterIPAddress)
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, func() (bool, error) {
-			_, err := framework.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
+			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
 			if err != nil {
 				return true, nil
 			}
@@ -2169,15 +2171,15 @@ var _ = common.SIGDescribe("Services", func() {
 		// connect 3 times every 5 seconds to the Service and expect a failure
 		for i := 0; i < 5; i++ {
 			cmd = fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, clusterIPAddress)
-			_, err := framework.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
+			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
 			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
 
 			cmd = fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, nodePortAddress0)
-			_, err = framework.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
+			_, err = e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
 			framework.ExpectError(err, "expected error when trying to connect to NodePort address")
 
 			cmd = fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, nodePortAddress1)
-			_, err = framework.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
+			_, err = e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
 			framework.ExpectError(err, "expected error when trying to connect to NodePort address")
 
 			time.Sleep(5 * time.Second)
@@ -2410,7 +2412,7 @@ var _ = common.SIGDescribe("Services", func() {
 		ginkgo.By(fmt.Sprintf("hitting service %v from pod %v on node %v", serviceAddress, podName, nodeName))
 		expectedErr := "REFUSED"
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, func() (bool, error) {
-			_, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+			_, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 
 			if err != nil {
 				if strings.Contains(err.Error(), expectedErr) {
@@ -2452,7 +2454,7 @@ var _ = common.SIGDescribe("Services", func() {
 		evictedPod.Spec.Containers[0].Resources = v1.ResourceRequirements{
 			Limits: v1.ResourceList{"ephemeral-storage": resource.MustParse("5Mi")},
 		}
-		f.PodClient().Create(evictedPod)
+		e2epod.NewPodClient(f).Create(evictedPod)
 		err = e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, evictedPod.Name, "Evicted", f.Namespace.Name)
 		if err != nil {
 			framework.Failf("error waiting for pod to be evicted: %v", err)
@@ -2501,7 +2503,7 @@ var _ = common.SIGDescribe("Services", func() {
 		ginkgo.By(fmt.Sprintf("hitting service %v from pod %v on node %v expected to be refused", serviceAddress, podName, nodeName))
 		expectedErr := "REFUSED"
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, func() (bool, error) {
-			_, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+			_, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 
 			if err != nil {
 				if strings.Contains(err.Error(), expectedErr) {
@@ -2590,7 +2592,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
-			_, err := framework.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
+			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
 			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
 		}
 	})
@@ -2670,7 +2672,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
-			_, err := framework.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
+			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
 			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
 		}
 	})
@@ -2753,7 +2755,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
-			_, err := framework.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
+			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
 			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
 		}
 
@@ -2782,7 +2784,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
-			_, err := framework.RunHostCmd(pausePod3.Namespace, pausePod3.Name, cmd)
+			_, err := e2eoutput.RunHostCmd(pausePod3.Namespace, pausePod3.Name, cmd)
 			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
 		}
 	})
@@ -2847,7 +2849,7 @@ var _ = common.SIGDescribe("Services", func() {
 		// validate that the health check node port from kube-proxy returns 200 when there are ready endpoints
 		err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
 			cmd := fmt.Sprintf(`curl -s -o /dev/null -w "%%{http_code}" --connect-timeout 5 http://%s/healthz`, healthCheckNodePortAddr)
-			out, err := framework.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
+			out, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
 			if err != nil {
 				return false, err
 			}
@@ -2868,7 +2870,7 @@ var _ = common.SIGDescribe("Services", func() {
 		// validate that the health check node port from kube-proxy returns 503 when there are no ready endpoints
 		err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
 			cmd := fmt.Sprintf(`curl -s -o /dev/null -w "%%{http_code}" --connect-timeout 5 http://%s/healthz`, healthCheckNodePortAddr)
-			out, err := framework.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
+			out, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
 			if err != nil {
 				return false, err
 			}
@@ -3050,7 +3052,7 @@ var _ = common.SIGDescribe("Services", func() {
 			execHostnameTest(*pausePod0, serviceAddress, webserverPod0.Name)
 
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
-			_, err := framework.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
+			_, err := e2eoutput.RunHostCmd(pausePod1.Namespace, pausePod1.Name, cmd)
 			framework.ExpectError(err, "expected error when trying to connect to cluster IP")
 
 			time.Sleep(5 * time.Second)
@@ -3226,7 +3228,7 @@ var _ = common.SIGDescribe("Services", func() {
 			// pausePod0 -> node0 and pausePod1 -> node1 both succeed because pod-to-same-node-NodePort
 			// connections are neither internal nor external and always get Cluster traffic policy.
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, nodePortAddress1)
-			_, err := framework.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
+			_, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
 			framework.ExpectError(err, "expected error when trying to connect to node port for pausePod0")
 
 			execHostnameTest(*pausePod0, nodePortAddress0, webserverPod0.Name)
@@ -3820,7 +3822,7 @@ func execAffinityTestForSessionAffinityTimeout(f *framework.Framework, cs client
 	hosts := sets.NewString()
 	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 2 http://%s/`, net.JoinHostPort(svcIP, strconv.Itoa(servicePort)))
 	for i := 0; i < 10; i++ {
-		hostname, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+		hostname, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 		if err == nil {
 			hosts.Insert(hostname)
 			if hosts.Len() > 1 {
@@ -3999,7 +4001,7 @@ func createPodOrFail(f *framework.Framework, ns, name string, labels map[string]
 	// Add a dummy environment variable to work around a docker issue.
 	// https://github.com/docker/docker/issues/14203
 	pod.Spec.Containers[0].Env = []v1.EnvVar{{Name: "FOO", Value: " "}}
-	f.PodClient().CreateSync(pod)
+	e2epod.NewPodClient(f).CreateSync(pod)
 }
 
 // launchHostExecPod launches a hostexec pod in the given namespace and waits
@@ -4018,7 +4020,7 @@ func launchHostExecPod(client clientset.Interface, ns, name string) *v1.Pod {
 func checkReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, namespace, pod, target string) {
 	cmd := fmt.Sprintf("wget -T 5 -qO- %q", target)
 	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		_, err := framework.RunHostCmd(namespace, pod, cmd)
+		_, err := e2eoutput.RunHostCmd(namespace, pod, cmd)
 		if expectToBeReachable && err != nil {
 			framework.Logf("Expect target to be reachable. But got err: %v. Retry until timeout", err)
 			return false, nil
@@ -4037,11 +4039,11 @@ func checkReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, n
 func proxyMode(f *framework.Framework) (string, error) {
 	pod := e2epod.NewAgnhostPod(f.Namespace.Name, "kube-proxy-mode-detector", nil, nil, nil)
 	pod.Spec.HostNetwork = true
-	f.PodClient().CreateSync(pod)
-	defer f.PodClient().DeleteSync(pod.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+	e2epod.NewPodClient(f).CreateSync(pod)
+	defer e2epod.NewPodClient(f).DeleteSync(pod.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
 
 	cmd := "curl -q -s --connect-timeout 1 http://localhost:10249/proxyMode"
-	stdout, err := framework.RunHostCmd(pod.Namespace, pod.Name, cmd)
+	stdout, err := e2eoutput.RunHostCmd(pod.Namespace, pod.Name, cmd)
 	if err != nil {
 		return "", err
 	}
@@ -4159,7 +4161,7 @@ func restartApiserver(namespace string, cs clientset.Interface) error {
 		if err != nil {
 			return err
 		}
-		return framework.MasterUpgradeGKE(namespace, v.GitVersion[1:]) // strip leading 'v'
+		return e2eproviders.MasterUpgradeGKE(namespace, v.GitVersion[1:]) // strip leading 'v'
 	}
 
 	return restartComponent(cs, kubeAPIServerLabelName, metav1.NamespaceSystem, map[string]string{clusterComponentKey: kubeAPIServerLabelName})
@@ -4266,7 +4268,7 @@ var _ = common.SIGDescribe("SCTP [LinuxOnly]", func() {
 		e2epod.SetNodeSelection(&podSpec.Spec, nodeSelection)
 
 		ginkgo.By(fmt.Sprintf("Launching the pod on node %v", node.Name))
-		f.PodClient().CreateSync(podSpec)
+		e2epod.NewPodClient(f).CreateSync(podSpec)
 		defer func() {
 			err := cs.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podName, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", podName, f.Namespace.Name)

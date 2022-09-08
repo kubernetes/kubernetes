@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -111,7 +112,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 			hostExec.IssueCommand(cleanCmd, node)
 		}()
 
-		podClient := f.PodClient()
+		podClient := e2epod.NewPodClient(f)
 		bidirectional := v1.MountPropagationBidirectional
 		master := podClient.CreateSync(preparePod("master", node, &bidirectional, hostDir))
 
@@ -128,18 +129,18 @@ var _ = SIGDescribe("Mount propagation", func() {
 		for _, podName := range podNames {
 			for _, dirName := range podNames {
 				cmd := fmt.Sprintf("test -d /mnt/test/%s", dirName)
-				f.ExecShellInPod(podName, cmd)
+				e2epod.ExecShellInPod(f, podName, cmd)
 			}
 		}
 
 		// Each pod mounts one tmpfs to /mnt/test/<podname> and puts a file there.
 		for _, podName := range podNames {
 			cmd := fmt.Sprintf("mount -t tmpfs e2e-mount-propagation-%[1]s /mnt/test/%[1]s; echo %[1]s > /mnt/test/%[1]s/file", podName)
-			f.ExecShellInPod(podName, cmd)
+			e2epod.ExecShellInPod(f, podName, cmd)
 
 			// unmount tmpfs when the test finishes
 			cmd = fmt.Sprintf("umount /mnt/test/%s", podName)
-			defer f.ExecShellInPod(podName, cmd)
+			defer e2epod.ExecShellInPod(f, podName, cmd)
 		}
 
 		// The host mounts one tmpfs to testdir/host and puts a file there so we
@@ -170,7 +171,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 		for podName, mounts := range expectedMounts {
 			for _, mountName := range dirNames {
 				cmd := fmt.Sprintf("cat /mnt/test/%s/file", mountName)
-				stdout, stderr, err := f.ExecShellInPodWithFullOutput(podName, cmd)
+				stdout, stderr, err := e2epod.ExecShellInPodWithFullOutput(f, podName, cmd)
 				framework.Logf("pod %s mount %s: stdout: %q, stderr: %q error: %v", podName, mountName, stdout, stderr, err)
 				msg := fmt.Sprintf("When checking pod %s and directory %s", podName, mountName)
 				shouldBeVisible := mounts.Has(mountName)

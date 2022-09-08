@@ -122,10 +122,10 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			},
 		}
 
-		f.PodClient().Create(pod)
+		e2epod.NewPodClient(f).Create(pod)
 
 		ginkgo.By("Waiting for pod to run")
-		f.PodClient().WaitForFinish(podName, 3*time.Minute)
+		e2epod.NewPodClient(f).WaitForFinish(podName, 3*time.Minute)
 
 		ginkgo.By("Then ensuring pod finished running successfully")
 		p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(
@@ -174,10 +174,10 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			},
 		}
 
-		f.PodClient().Create(pod)
+		e2epod.NewPodClient(f).Create(pod)
 
 		ginkgo.By("Waiting for pod to run")
-		f.PodClient().WaitForFinish(podName, 3*time.Minute)
+		e2epod.NewPodClient(f).WaitForFinish(podName, 3*time.Minute)
 
 		ginkgo.By("Then ensuring pod finished running successfully")
 		p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(
@@ -412,10 +412,10 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 					},
 				},
 			}
-			f.PodClient().Create(pod)
+			e2epod.NewPodClient(f).Create(pod)
 
 			ginkgo.By(fmt.Sprintf("Waiting for pod '%s' to run", podName))
-			f.PodClient().WaitForFinish(podName, 3*time.Minute)
+			e2epod.NewPodClient(f).WaitForFinish(podName, 3*time.Minute)
 
 			ginkgo.By("Then ensuring pod finished running successfully")
 			p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(
@@ -487,10 +487,10 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		podAndContainerName := "host-process-volume-mounts"
 		pod := makeTestPodWithVolumeMounts(podAndContainerName)
 
-		f.PodClient().Create(pod)
+		e2epod.NewPodClient(f).Create(pod)
 
 		ginkgo.By("Waiting for pod to run")
-		f.PodClient().WaitForFinish(podAndContainerName, 3*time.Minute)
+		e2epod.NewPodClient(f).WaitForFinish(podAndContainerName, 3*time.Minute)
 
 		logs, err := e2epod.GetPodLogs(f.ClientSet, ns.Name, podAndContainerName, podAndContainerName)
 		framework.ExpectNoError(err, "Error getting pod logs")
@@ -552,8 +552,8 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			},
 		}
 
-		f.PodClient().Create(pod)
-		f.PodClient().WaitForFinish(podName, 3*time.Minute)
+		e2epod.NewPodClient(f).Create(pod)
+		e2epod.NewPodClient(f).WaitForFinish(podName, 3*time.Minute)
 
 		ginkgo.By("Scheduling a pod with a HostProcess container that will fail")
 		podName = "host-process-metrics-pod-failing-container"
@@ -581,8 +581,8 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			},
 		}
 
-		f.PodClient().Create(pod)
-		f.PodClient().WaitForFinish(podName, 3*time.Minute)
+		e2epod.NewPodClient(f).Create(pod)
+		e2epod.NewPodClient(f).WaitForFinish(podName, 3*time.Minute)
 
 		ginkgo.By("Getting subsequent kubelet metrics values")
 

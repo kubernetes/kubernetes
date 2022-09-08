@@ -39,6 +39,7 @@ import (
 	"github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/godbus/dbus/v5"
 	v1 "k8s.io/api/core/v1"
@@ -99,9 +100,9 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 			}
 
 			ginkgo.By("Creating batch pods")
-			f.PodClient().CreateBatch(pods)
+			e2epod.NewPodClient(f).CreateBatch(pods)
 
-			list, err := f.PodClient().List(context.TODO(), metav1.ListOptions{
+			list, err := e2epod.NewPodClient(f).List(context.TODO(), metav1.ListOptions{
 				FieldSelector: nodeSelector,
 			})
 			framework.ExpectNoError(err)
@@ -149,7 +150,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 			ginkgo.By("Verifying that non-critical pods are shutdown")
 			// Not critical pod should be shutdown
 			gomega.Eventually(func() error {
-				list, err = f.PodClient().List(context.TODO(), metav1.ListOptions{
+				list, err = e2epod.NewPodClient(f).List(context.TODO(), metav1.ListOptions{
 					FieldSelector: nodeSelector,
 				})
 				if err != nil {
@@ -176,7 +177,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 			ginkgo.By("Verifying that all pods are shutdown")
 			// All pod should be shutdown
 			gomega.Eventually(func() error {
-				list, err = f.PodClient().List(context.TODO(), metav1.ListOptions{
+				list, err = e2epod.NewPodClient(f).List(context.TODO(), metav1.ListOptions{
 					FieldSelector: nodeSelector,
 				})
 				if err != nil {
@@ -368,9 +369,9 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 			}
 
 			ginkgo.By("Creating batch pods")
-			f.PodClient().CreateBatch(pods)
+			e2epod.NewPodClient(f).CreateBatch(pods)
 
-			list, err := f.PodClient().List(context.TODO(), metav1.ListOptions{
+			list, err := e2epod.NewPodClient(f).List(context.TODO(), metav1.ListOptions{
 				FieldSelector: nodeSelector,
 			})
 			framework.ExpectNoError(err)
@@ -391,7 +392,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 
 			for _, step := range downSteps {
 				gomega.Eventually(func() error {
-					list, err = f.PodClient().List(context.TODO(), metav1.ListOptions{
+					list, err = e2epod.NewPodClient(f).List(context.TODO(), metav1.ListOptions{
 						FieldSelector: nodeSelector,
 					})
 					if err != nil {

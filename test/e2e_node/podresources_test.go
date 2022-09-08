@@ -164,7 +164,7 @@ func newTestPodData() *testPodData {
 func (tpd *testPodData) createPodsForTest(f *framework.Framework, podReqs []podDesc) {
 	for _, podReq := range podReqs {
 		pod := makePodResourcesTestPod(podReq)
-		pod = f.PodClient().CreateSync(pod)
+		pod = e2epod.NewPodClient(f).CreateSync(pod)
 
 		framework.Logf("created pod %s", podReq.podName)
 		tpd.PodMap[podReq.podName] = pod

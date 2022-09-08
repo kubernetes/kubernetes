@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
@@ -117,7 +118,7 @@ var _ = common.SIGDescribe("CVE-2021-29923", func() {
 		ip := netutils.ParseIPSloppy(clusterIPZero)
 		cmd := fmt.Sprintf("echo hostName | nc -v -t -w 2 %s %v", ip.String(), servicePort)
 		err = wait.PollImmediate(1*time.Second, e2eservice.ServiceReachabilityShortPollTimeout, func() (bool, error) {
-			stdout, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+			stdout, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 			if err != nil {
 				framework.Logf("Service reachability failing with error: %v\nRetrying...", err)
 				return false, nil
@@ -136,7 +137,7 @@ var _ = common.SIGDescribe("CVE-2021-29923", func() {
 		// We have to check that the Service is not reachable in the address interpreted as decimal.
 		cmd = fmt.Sprintf("echo hostName | nc -v -t -w 2 %s %v", clusterIPOctal, servicePort)
 		err = wait.PollImmediate(1*time.Second, e2eservice.ServiceReachabilityShortPollTimeout, func() (bool, error) {
-			stdout, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+			stdout, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 			if err != nil {
 				framework.Logf("Service reachability failing with error: %v\nRetrying...", err)
 				return false, nil

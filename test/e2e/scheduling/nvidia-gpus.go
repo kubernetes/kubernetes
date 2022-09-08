@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
@@ -127,7 +128,7 @@ func getGPUsAvailable(f *framework.Framework) int64 {
 }
 
 // SetupNVIDIAGPUNode install Nvidia Drivers and wait for Nvidia GPUs to be available on nodes
-func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *framework.ContainerResourceGatherer {
+func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *e2edebug.ContainerResourceGatherer {
 	logOSImages(f)
 
 	var err error
@@ -161,10 +162,10 @@ func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *fra
 		pods.Items = append(pods.Items, devicepluginPods.Items...)
 	}
 
-	var rsgather *framework.ContainerResourceGatherer
+	var rsgather *e2edebug.ContainerResourceGatherer
 	if setupResourceGatherer {
 		framework.Logf("Starting ResourceUsageGather for the created DaemonSet pods.")
-		rsgather, err = framework.NewResourceUsageGatherer(f.ClientSet, framework.ResourceGathererOptions{InKubemark: false, Nodes: framework.AllNodes, ResourceDataGatheringPeriod: 2 * time.Second, ProbeDuration: 2 * time.Second, PrintVerboseLogs: true}, pods)
+		rsgather, err = e2edebug.NewResourceUsageGatherer(f.ClientSet, e2edebug.ResourceGathererOptions{InKubemark: false, Nodes: e2edebug.AllNodes, ResourceDataGatheringPeriod: 2 * time.Second, ProbeDuration: 2 * time.Second, PrintVerboseLogs: true}, pods)
 		framework.ExpectNoError(err, "creating ResourceUsageGather for the daemonset pods")
 		go rsgather.StartGatheringData()
 	}
@@ -195,17 +196,17 @@ func testNvidiaGPUs(f *framework.Framework) {
 	framework.Logf("Creating %d pods and have the pods run a CUDA app", gpuPodNum)
 	podList := []*v1.Pod{}
 	for i := int64(0); i < gpuPodNum; i++ {
-		podList = append(podList, f.PodClient().Create(makeCudaAdditionDevicePluginTestPod()))
+		podList = append(podList, e2epod.NewPodClient(f).Create(makeCudaAdditionDevicePluginTestPod()))
 	}
 	framework.Logf("Wait for all test pods to succeed")
 	// Wait for all pods to succeed
 	for _, pod := range podList {
-		f.PodClient().WaitForSuccess(pod.Name, 5*time.Minute)
+		e2epod.NewPodClient(f).WaitForSuccess(pod.Name, 5*time.Minute)
 		logContainers(f, pod)
 	}
 
 	framework.Logf("Stopping ResourceUsageGather")
-	constraints := make(map[string]framework.ResourceConstraint)
+	constraints := make(map[string]e2edebug.ResourceConstraint)
 	// For now, just gets summary. Can pass valid constraints in the future.
 	summary, err := rsgather.StopAndSummarize([]int{50, 90, 100}, constraints)
 	f.TestSummaries = append(f.TestSummaries, summary)
@@ -299,7 +300,7 @@ func VerifyJobNCompletions(f *framework.Framework, completions int32) {
 	successes := int32(0)
 	regex := regexp.MustCompile("PASSED")
 	for _, podName := range createdPodNames {
-		f.PodClient().WaitForFinish(podName, 5*time.Minute)
+		e2epod.NewPodClient(f).WaitForFinish(podName, 5*time.Minute)
 		logs, err := e2epod.GetPodLogs(f.ClientSet, ns, podName, "vector-addition")
 		framework.ExpectNoError(err, "Should be able to get logs for pod %v", podName)
 		if regex.MatchString(logs) {

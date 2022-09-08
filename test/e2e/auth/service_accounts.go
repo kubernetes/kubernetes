@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -316,7 +317,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			fmt.Sprintf("content of file \"%v\": %s", tokenVolumePath, `[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*`),
 		}
 
-		f.TestContainerOutputRegexp("service account token: ", pod, 0, output)
+		e2eoutput.TestContainerOutputRegexp(f, "service account token: ", pod, 0, output)
 	})
 
 	/*
@@ -424,7 +425,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				fmt.Sprintf("owner UID of \"%v\": %d", tokenVolumePath, tc.wantUID),
 				fmt.Sprintf("owner GID of \"%v\": %d", tokenVolumePath, tc.wantGID),
 			}
-			f.TestContainerOutputRegexp("service account token: ", pod, 0, output)
+			e2eoutput.TestContainerOutputRegexp(f, "service account token: ", pod, 0, output)
 		}
 	})
 

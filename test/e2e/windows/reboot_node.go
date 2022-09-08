@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -73,7 +74,7 @@ var _ = SIGDescribe("[Feature:Windows] [Excluded:WindowsDocker] [MinimumKubeletV
 		}
 		agnPod.Spec.Containers[0].Args = []string{"test-webserver"}
 		ginkgo.By("creating a windows pod and waiting for it to be running")
-		agnPod = f.PodClient().CreateSync(agnPod)
+		agnPod = e2epod.NewPodClient(f).CreateSync(agnPod)
 
 		// Create Linux pod to ping the windows pod
 		linuxBusyBoxImage := imageutils.GetE2EImage(imageutils.Nginx)
@@ -106,7 +107,7 @@ var _ = SIGDescribe("[Feature:Windows] [Excluded:WindowsDocker] [MinimumKubeletV
 			},
 		}
 		ginkgo.By("Waiting for the Linux pod to run")
-		nginxPod = f.PodClient().CreateSync(nginxPod)
+		nginxPod = e2epod.NewPodClient(f).CreateSync(nginxPod)
 
 		ginkgo.By("checking connectivity to 8.8.8.8 53 (google.com) from Linux")
 		assertConsistentConnectivity(f, nginxPod.ObjectMeta.Name, "linux", linuxCheck("8.8.8.8", 53))
@@ -155,10 +156,10 @@ var _ = SIGDescribe("[Feature:Windows] [Excluded:WindowsDocker] [MinimumKubeletV
 			},
 		}
 
-		f.PodClient().Create(pod)
+		e2epod.NewPodClient(f).Create(pod)
 
 		ginkgo.By("Waiting for pod to run")
-		f.PodClient().WaitForFinish(podName, 3*time.Minute)
+		e2epod.NewPodClient(f).WaitForFinish(podName, 3*time.Minute)
 
 		ginkgo.By("Then ensuring pod finished running successfully")
 		p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(
@@ -238,10 +239,10 @@ var _ = SIGDescribe("[Feature:Windows] [Excluded:WindowsDocker] [MinimumKubeletV
 			},
 		}
 
-		f.PodClient().Create(checkPod)
+		e2epod.NewPodClient(f).Create(checkPod)
 
 		ginkgo.By("Waiting for pod to run")
-		f.PodClient().WaitForFinish("check-reboot-pod", 3*time.Minute)
+		e2epod.NewPodClient(f).WaitForFinish("check-reboot-pod", 3*time.Minute)
 
 		ginkgo.By("Then ensuring pod finished running successfully")
 		p, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(

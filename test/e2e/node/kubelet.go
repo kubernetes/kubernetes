@@ -110,7 +110,7 @@ func waitTillNPodsRunningOnNodes(c clientset.Interface, nodeNames sets.String, p
 func restartNfsServer(serverPod *v1.Pod) {
 	const startcmd = "/usr/sbin/rpc.nfsd 1"
 	ns := fmt.Sprintf("--namespace=%v", serverPod.Namespace)
-	framework.RunKubectlOrDie(ns, "exec", ns, serverPod.Name, "--", "/bin/sh", "-c", startcmd)
+	e2ekubectl.RunKubectlOrDie(ns, "exec", ns, serverPod.Name, "--", "/bin/sh", "-c", startcmd)
 }
 
 // Stop the passed-in nfs-server by issuing a `/usr/sbin/rpc.nfsd 0` command in the
@@ -119,7 +119,7 @@ func restartNfsServer(serverPod *v1.Pod) {
 func stopNfsServer(serverPod *v1.Pod) {
 	const stopcmd = "/usr/sbin/rpc.nfsd 0"
 	ns := fmt.Sprintf("--namespace=%v", serverPod.Namespace)
-	framework.RunKubectlOrDie(ns, "exec", ns, serverPod.Name, "--", "/bin/sh", "-c", stopcmd)
+	e2ekubectl.RunKubectlOrDie(ns, "exec", ns, serverPod.Name, "--", "/bin/sh", "-c", stopcmd)
 }
 
 // Creates a pod that mounts an nfs volume that is served by the nfs-server pod. The container
@@ -310,7 +310,7 @@ var _ = SIGDescribe("kubelet", func() {
 			}
 			for nodeName := range nodeNames {
 				for k, v := range nodeLabels {
-					framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
+					e2enode.AddOrUpdateLabelOnNode(c, nodeName, k, v)
 				}
 			}
 
@@ -334,7 +334,7 @@ var _ = SIGDescribe("kubelet", func() {
 			// If we added labels to nodes in this test, remove them now.
 			for nodeName := range nodeNames {
 				for k := range nodeLabels {
-					framework.RemoveLabelOffNode(c, nodeName, k)
+					e2enode.RemoveLabelOffNode(c, nodeName, k)
 				}
 			}
 		})
