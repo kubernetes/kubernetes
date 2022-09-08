@@ -95,6 +95,8 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 				minPods:          1,
 				maxPods:          2,
 				firstScale:       2,
+				resourceType:     cpuResource,
+				metricTargetType: utilizationMetricType,
 			}
 			st.run("rc-light", e2eautoscaling.KindRC, f)
 		})
@@ -107,6 +109,8 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 				minPods:          1,
 				maxPods:          2,
 				firstScale:       1,
+				resourceType:     cpuResource,
+				metricTargetType: utilizationMetricType,
 			}
 			st.run("rc-light", e2eautoscaling.KindRC, f)
 		})
@@ -126,7 +130,7 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 
 	ginkgo.Describe("CustomResourceDefinition", func() {
 		ginkgo.It("Should scale with a CRD targetRef", func() {
-			st := &HPAScaleTest{
+			scaleTest := &HPAScaleTest{
 				initPods:         1,
 				initCPUTotal:     150,
 				perPodCPURequest: 200,
@@ -134,9 +138,10 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 				minPods:          1,
 				maxPods:          2,
 				firstScale:       2,
-				targetRef:        e2eautoscaling.CustomCRDTargetRef(),
+				resourceType:     cpuResource,
+				metricTargetType: utilizationMetricType,
 			}
-			st.run("crd-light", e2eautoscaling.KindCRD, f)
+			scaleTest.run("foo-crd", e2eautoscaling.KindCRD, f)
 		})
 	})
 })
@@ -179,7 +184,6 @@ type HPAScaleTest struct {
 	cpuBurst         int
 	memBurst         int
 	secondScale      int32
-	targetRef        autoscalingv2.CrossVersionObjectReference
 	resourceType     v1.ResourceName
 	metricTargetType autoscalingv2.MetricTargetType
 }
