@@ -108,7 +108,7 @@ func TestEventSeriesf(t *testing.T) {
 	nonIsomorphicEvent := expectedEvent.DeepCopy()
 	nonIsomorphicEvent.Action = "stopped"
 
-	expectedEvent.Series = &eventsv1.EventSeries{Count: 1}
+	expectedEvent.Series = &eventsv1.EventSeries{Count: 2}
 	table := []struct {
 		regarding    k8sruntime.Object
 		related      k8sruntime.Object
