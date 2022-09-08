@@ -49,6 +49,7 @@ import (
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
+	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
@@ -107,6 +108,7 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	flowcontrolv1alpha1.AddToScheme,
 	flowcontrolv1beta1.AddToScheme,
 	flowcontrolv1beta2.AddToScheme,
+	flowcontrolv1beta3.AddToScheme,
 	networkingv1.AddToScheme,
 	networkingv1alpha1.AddToScheme,
 	networkingv1beta1.AddToScheme,

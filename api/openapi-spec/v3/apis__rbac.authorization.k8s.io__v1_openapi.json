@@ -834,6 +834,11 @@
             "version": "v1beta2"
           },
           {
+            "group": "flowcontrol.apiserver.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta3"
+          },
+          {
             "group": "imagepolicy.k8s.io",
             "kind": "DeleteOptions",
             "version": "v1alpha1"
@@ -1537,6 +1542,11 @@
             "group": "flowcontrol.apiserver.k8s.io",
             "kind": "WatchEvent",
             "version": "v1beta2"
+          },
+          {
+            "group": "flowcontrol.apiserver.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta3"
           },
           {
             "group": "imagepolicy.k8s.io",
