@@ -384,6 +384,13 @@
     MUST cause pods created by that RC to be orphaned.
   release: v1.9
   file: test/e2e/apimachinery/garbage_collector.go
+- testname: Namespace, apply update to a namespace
+  codename: '[sig-api-machinery] Namespaces [Serial] should apply an update to a Namespace
+    [Conformance]'
+  description: When updating the namespace it MUST succeed and the field MUST equal
+    the new value.
+  release: v1.26
+  file: test/e2e/apimachinery/namespace.go
 - testname: Namespace, apply changes to a namespace status
   codename: '[sig-api-machinery] Namespaces [Serial] should apply changes to a namespace
     status [Conformance]'
