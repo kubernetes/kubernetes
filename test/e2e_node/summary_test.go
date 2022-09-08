@@ -28,6 +28,7 @@ import (
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -59,7 +60,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 			ginkgo.By("Creating test pods")
 			numRestarts := int32(1)
 			pods := getSummaryTestPods(f, numRestarts, pod0, pod1)
-			f.PodClient().CreateBatch(pods)
+			e2epod.NewPodClient(f).CreateBatch(pods)
 
 			ginkgo.By("restarting the containers to ensure container metrics are still being gathered after a container is restarted")
 			gomega.Eventually(func() error {

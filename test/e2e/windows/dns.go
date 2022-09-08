@@ -77,7 +77,7 @@ var _ = SIGDescribe("[Feature:Windows] DNS", func() {
 		// This isn't the best 'test' but it is a great diagnostic, see later test for the 'real' test.
 		ginkgo.By("Calling ipconfig to get debugging info for this pod's DNS and confirm that a dns server 1.1.1.1 can be injected, along with ")
 		cmd := []string{"ipconfig", "/all"}
-		stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
+		stdout, _, err := e2epod.ExecWithOptions(f, e2epod.ExecOptions{
 			Command:       cmd,
 			Namespace:     f.Namespace.Name,
 			PodName:       testPod.Name,
@@ -102,7 +102,7 @@ var _ = SIGDescribe("[Feature:Windows] DNS", func() {
 		// TODO @jayunit100 add ResolveHost to agn images
 
 		cmd = []string{"curl.exe", "-k", "https://kubernetezzzzzzzz:443"}
-		stdout, _, err = f.ExecWithOptions(framework.ExecOptions{
+		stdout, _, err = e2epod.ExecWithOptions(f, e2epod.ExecOptions{
 			Command:       cmd,
 			Namespace:     f.Namespace.Name,
 			PodName:       testPod.Name,
@@ -117,7 +117,7 @@ var _ = SIGDescribe("[Feature:Windows] DNS", func() {
 
 		ginkgo.By("Verifying that injected dns records for 'kubernetes' resolve to the valid ip address")
 		cmd = []string{"curl.exe", "-k", "https://kubernetes:443"}
-		stdout, _, err = f.ExecWithOptions(framework.ExecOptions{
+		stdout, _, err = e2epod.ExecWithOptions(f, e2epod.ExecOptions{
 			Command:       cmd,
 			Namespace:     f.Namespace.Name,
 			PodName:       testPod.Name,

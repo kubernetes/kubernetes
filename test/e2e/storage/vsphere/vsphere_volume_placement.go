@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -58,14 +59,14 @@ var _ = utils.SIGDescribe("Volume Placement [Feature:vsphere]", func() {
 		Bootstrap(f)
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 		node1Name, node1KeyValueLabel, node2Name, node2KeyValueLabel = testSetupVolumePlacement(c, ns)
 		ginkgo.DeferCleanup(func() {
 			if len(node1KeyValueLabel) > 0 {
-				framework.RemoveLabelOffNode(c, node1Name, NodeLabelKey)
+				e2enode.RemoveLabelOffNode(c, node1Name, NodeLabelKey)
 			}
 			if len(node2KeyValueLabel) > 0 {
-				framework.RemoveLabelOffNode(c, node2Name, NodeLabelKey)
+				e2enode.RemoveLabelOffNode(c, node2Name, NodeLabelKey)
 			}
 		})
 		nodeInfo = TestContext.NodeMapper.GetNodeInfo(node1Name)
@@ -307,10 +308,10 @@ var _ = utils.SIGDescribe("Volume Placement [Feature:vsphere]", func() {
 
 			// Create empty files on the mounted volumes on the pod to verify volume is writable
 			ginkgo.By("Creating empty file on volume mounted on pod-A")
-			framework.CreateEmptyFileOnPod(ns, podA.Name, podAFileName)
+			e2eoutput.CreateEmptyFileOnPod(ns, podA.Name, podAFileName)
 
 			ginkgo.By("Creating empty file volume mounted on pod-B")
-			framework.CreateEmptyFileOnPod(ns, podB.Name, podBFileName)
+			e2eoutput.CreateEmptyFileOnPod(ns, podB.Name, podBFileName)
 
 			// Verify newly and previously created files present on the volume mounted on the pod
 			ginkgo.By("Verify newly Created file and previously created files present on volume mounted on pod-A")
@@ -337,12 +338,12 @@ func testSetupVolumePlacement(client clientset.Interface, namespace string) (nod
 	node1LabelValue := "vsphere_e2e_" + string(uuid.NewUUID())
 	node1KeyValueLabel = make(map[string]string)
 	node1KeyValueLabel[NodeLabelKey] = node1LabelValue
-	framework.AddOrUpdateLabelOnNode(client, node1Name, NodeLabelKey, node1LabelValue)
+	e2enode.AddOrUpdateLabelOnNode(client, node1Name, NodeLabelKey, node1LabelValue)
 
 	node2LabelValue := "vsphere_e2e_" + string(uuid.NewUUID())
 	node2KeyValueLabel = make(map[string]string)
 	node2KeyValueLabel[NodeLabelKey] = node2LabelValue
-	framework.AddOrUpdateLabelOnNode(client, node2Name, NodeLabelKey, node2LabelValue)
+	e2enode.AddOrUpdateLabelOnNode(client, node2Name, NodeLabelKey, node2LabelValue)
 	return node1Name, node1KeyValueLabel, node2Name, node2KeyValueLabel
 }
 

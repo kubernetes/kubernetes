@@ -161,11 +161,11 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) v1.
 		w := &cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = fieldSelector
-				return f.PodClient().List(context.TODO(), options)
+				return e2epod.NewPodClient(f).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.FieldSelector = fieldSelector
-				return f.PodClient().Watch(context.TODO(), options)
+				return e2epod.NewPodClient(f).Watch(context.TODO(), options)
 			},
 		}
 		preconditionFunc := func(store cache.Store) (bool, error) {
@@ -202,7 +202,7 @@ func runAppArmorTest(f *framework.Framework, shouldRun bool, profile string) v1.
 		})
 		framework.ExpectNoError(err)
 	}
-	p, err := f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
+	p, err := e2epod.NewPodClient(f).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	return p.Status
 }
@@ -224,7 +224,7 @@ func createPodWithAppArmor(f *framework.Framework, profile string) *v1.Pod {
 			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
-	return f.PodClient().Create(pod)
+	return e2epod.NewPodClient(f).Create(pod)
 }
 
 func expectSoftRejection(status v1.PodStatus) {

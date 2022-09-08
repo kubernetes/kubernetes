@@ -25,6 +25,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubelogs "k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -70,7 +71,7 @@ var _ = SIGDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive]", func() 
 					},
 				},
 			}
-			pod = f.PodClient().CreateSync(pod)
+			pod = e2epod.NewPodClient(f).CreateSync(pod)
 			ginkgo.By("get container log path")
 			framework.ExpectEqual(len(pod.Status.ContainerStatuses), 1)
 			id := kubecontainer.ParseContainerID(pod.Status.ContainerStatuses[0].ContainerID).ID

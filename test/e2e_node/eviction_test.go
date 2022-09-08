@@ -37,6 +37,7 @@ import (
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -532,7 +533,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 			for _, spec := range testSpecs {
 				pods = append(pods, spec.pod)
 			}
-			f.PodClient().CreateBatch(pods)
+			e2epod.NewPodClient(f).CreateBatch(pods)
 		})
 
 		ginkgo.It("should eventually evict all of the correct pods", func() {
@@ -603,7 +604,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 			ginkgo.By("deleting pods")
 			for _, spec := range testSpecs {
 				ginkgo.By(fmt.Sprintf("deleting pod: %s", spec.pod.Name))
-				f.PodClient().DeleteSync(spec.pod.Name, metav1.DeleteOptions{}, 10*time.Minute)
+				e2epod.NewPodClient(f).DeleteSync(spec.pod.Name, metav1.DeleteOptions{}, 10*time.Minute)
 			}
 
 			// In case a test fails before verifying that NodeCondition no longer exist on the node,
@@ -631,7 +632,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 
 			ginkgo.By("making sure we can start a new pod after the test")
 			podName := "test-admit-pod"
-			f.PodClient().CreateSync(&v1.Pod{
+			e2epod.NewPodClient(f).CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
 				},

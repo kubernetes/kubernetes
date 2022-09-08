@@ -38,6 +38,7 @@ import (
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
@@ -628,7 +629,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		tcpIngressIP := e2eservice.GetIngressPoint(lbIngress)
 		if pollErr := wait.PollImmediate(pollInterval, createTimeout, func() (bool, error) {
 			cmd := fmt.Sprintf(`curl -m 5 'http://%v:%v/echo?msg=hello'`, tcpIngressIP, svcPort)
-			stdout, err := framework.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
+			stdout, err := e2eoutput.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
 			if err != nil {
 				framework.Logf("error curling; stdout: %v. err: %v", stdout, err)
 				return false, nil
@@ -1219,7 +1220,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 		loadBalancerPropagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(cs)
 		ginkgo.By(fmt.Sprintf("Hitting external lb %v from pod %v on node %v", ingressIP, pausePod.Name, pausePod.Spec.NodeName))
 		if pollErr := wait.PollImmediate(framework.Poll, loadBalancerPropagationTimeout, func() (bool, error) {
-			stdout, err := framework.RunHostCmd(pausePod.Namespace, pausePod.Name, cmd)
+			stdout, err := e2eoutput.RunHostCmd(pausePod.Namespace, pausePod.Name, cmd)
 			if err != nil {
 				framework.Logf("got err: %v, retry until timeout", err)
 				return false, nil

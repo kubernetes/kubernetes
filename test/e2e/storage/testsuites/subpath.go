@@ -35,8 +35,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
@@ -487,7 +489,7 @@ func TestBasicSubpathFile(f *framework.Framework, contents string, pod *v1.Pod, 
 
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
 	removeUnusedContainers(pod)
-	f.TestContainerOutput("atomic-volume-subpath", pod, 0, []string{contents})
+	e2eoutput.TestContainerOutput(f, "atomic-volume-subpath", pod, 0, []string{contents})
 
 	ginkgo.By(fmt.Sprintf("Deleting pod %s", pod.Name))
 	err := e2epod.DeletePodWithWait(f.ClientSet, pod)
@@ -670,7 +672,7 @@ func addMultipleWrites(container *v1.Container, file1 string, file2 string) {
 func testMultipleReads(f *framework.Framework, pod *v1.Pod, containerIndex int, file1 string, file2 string) {
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
 	removeUnusedContainers(pod)
-	f.TestContainerOutput("multi_subpath", pod, containerIndex, []string{
+	e2eoutput.TestContainerOutput(f, "multi_subpath", pod, containerIndex, []string{
 		"content of file \"" + file1 + "\": mount-tester new file",
 		"content of file \"" + file2 + "\": mount-tester new file",
 	})
@@ -689,7 +691,7 @@ func testReadFile(f *framework.Framework, file string, pod *v1.Pod, containerInd
 
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
 	removeUnusedContainers(pod)
-	f.TestContainerOutput("subpath", pod, containerIndex, []string{
+	e2eoutput.TestContainerOutput(f, "subpath", pod, containerIndex, []string{
 		"content of file \"" + file + "\": mount-tester new file",
 	})
 
@@ -1040,5 +1042,5 @@ func podContainerExec(pod *v1.Pod, containerIndex int, command string) (string, 
 		shell = "/bin/sh"
 		option = "-c"
 	}
-	return framework.RunKubectl(pod.Namespace, "exec", pod.Name, "--container", pod.Spec.Containers[containerIndex].Name, "--", shell, option, command)
+	return e2ekubectl.RunKubectl(pod.Namespace, "exec", pod.Name, "--container", pod.Spec.Containers[containerIndex].Name, "--", shell, option, command)
 }

@@ -21,6 +21,7 @@ import (
 	"io"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/csi-test/mock/service"
 )
 
@@ -87,7 +88,7 @@ func (p PodDirIO) RemoveAll(path string) error {
 }
 
 func (p PodDirIO) execute(command []string, stdin io.Reader) (string, string, error) {
-	return p.F.ExecWithOptions(framework.ExecOptions{
+	return e2epod.ExecWithOptions(p.F, e2epod.ExecOptions{
 		Command:       command,
 		Namespace:     p.Namespace,
 		PodName:       p.PodName,

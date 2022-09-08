@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -116,7 +117,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 				},
 			},
 		}
-		fr.PodClient().CreateSync(hostExecPod)
+		e2epod.NewPodClient(fr).CreateSync(hostExecPod)
 
 		// Create the client and server pods
 		clientPodSpec := &v1.Pod{
@@ -184,7 +185,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 			serverNodeInfo.name,
 			serverNodeInfo.nodeIP,
 			kubeProxyE2eImage))
-		fr.PodClient().CreateSync(serverPodSpec)
+		e2epod.NewPodClient(fr).CreateSync(serverPodSpec)
 
 		// The server should be listening before spawning the client pod
 		if readyErr := e2epod.WaitTimeoutForPodReadyInNamespace(fr.ClientSet, serverPodSpec.Name, fr.Namespace.Name, framework.PodStartTimeout); readyErr != nil {
@@ -196,7 +197,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 			clientNodeInfo.name,
 			clientNodeInfo.nodeIP,
 			kubeProxyE2eImage))
-		fr.PodClient().CreateSync(clientPodSpec)
+		e2epod.NewPodClient(fr).CreateSync(clientPodSpec)
 
 		ginkgo.By("Checking conntrack entries for the timeout")
 		// These must be synchronized from the default values set in
@@ -217,7 +218,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 			"| grep -m 1 'CLOSE_WAIT.*dport=%v' ",
 			ipFamily, ip, testDaemonTCPPort)
 		if err := wait.PollImmediate(2*time.Second, epsilonSeconds*time.Second, func() (bool, error) {
-			result, err := framework.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", cmd)
+			result, err := e2eoutput.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", cmd)
 			// retry if we can't obtain the conntrack entry
 			if err != nil {
 				framework.Logf("failed to obtain conntrack entry: %v %v", result, err)
@@ -239,7 +240,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 			return false, fmt.Errorf("wrong TCP CLOSE_WAIT timeout: %v expected: %v", timeoutSeconds, expectedTimeoutSeconds)
 		}); err != nil {
 			// Dump all conntrack entries for debugging
-			result, err2 := framework.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", "conntrack -L")
+			result, err2 := e2eoutput.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", "conntrack -L")
 			if err2 != nil {
 				framework.Logf("failed to obtain conntrack entry: %v %v", result, err2)
 			}

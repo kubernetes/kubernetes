@@ -126,7 +126,7 @@ func (t *dnsTestCommon) runDig(dnsName, target string) []string {
 	}
 	cmd = append(cmd, dnsName)
 
-	stdout, stderr, err := t.f.ExecWithOptions(framework.ExecOptions{
+	stdout, stderr, err := e2epod.ExecWithOptions(t.f, e2epod.ExecOptions{
 		Command:       cmd,
 		Namespace:     t.f.Namespace.Name,
 		PodName:       t.utilPod.Name,

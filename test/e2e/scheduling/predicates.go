@@ -95,7 +95,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		nodeList = &v1.NodeList{}
 		var err error
 
-		framework.AllNodesReady(cs, time.Minute)
+		e2enode.AllNodesReady(cs, time.Minute)
 
 		nodeList, err = e2enode.GetReadySchedulableNodes(cs)
 		if err != nil {
@@ -339,8 +339,8 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 				continue
 			}
 			// Apply node label to each node
-			framework.AddOrUpdateLabelOnNode(cs, node.Name, "node", node.Name)
-			framework.ExpectNodeHasLabel(cs, node.Name, "node", node.Name)
+			e2enode.AddOrUpdateLabelOnNode(cs, node.Name, "node", node.Name)
+			e2enode.ExpectNodeHasLabel(cs, node.Name, "node", node.Name)
 			// Find allocatable amount of CPU.
 			allocatable, found := node.Status.Allocatable[v1.ResourceCPU]
 			if !found {
@@ -354,7 +354,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		// Clean up added labels after this test.
 		defer func() {
 			for nodeName := range nodeToAllocatableMap {
-				framework.RemoveLabelOffNode(cs, nodeName, "node")
+				e2enode.RemoveLabelOffNode(cs, nodeName, "node")
 			}
 		}()
 
@@ -464,9 +464,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		ginkgo.By("Trying to apply a random label on the found node.")
 		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(uuid.NewUUID()))
 		v := "42"
-		framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
-		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(cs, nodeName, k)
+		e2enode.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
+		e2enode.ExpectNodeHasLabel(cs, nodeName, k, v)
+		defer e2enode.RemoveLabelOffNode(cs, nodeName, k)
 
 		ginkgo.By("Trying to relaunch the pod, now with labels.")
 		labelPodName := "with-labels"
@@ -537,9 +537,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		ginkgo.By("Trying to apply a random label on the found node.")
 		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(uuid.NewUUID()))
 		v := "42"
-		framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
-		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(cs, nodeName, k)
+		e2enode.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
+		e2enode.ExpectNodeHasLabel(cs, nodeName, k, v)
+		defer e2enode.RemoveLabelOffNode(cs, nodeName, k)
 
 		ginkgo.By("Trying to relaunch the pod, now with labels.")
 		labelPodName := "with-labels"
@@ -589,15 +589,15 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			Effect: v1.TaintEffectNoSchedule,
 		}
 		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
-		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
+		e2enode.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		ginkgo.By("Trying to apply a random label on the found node.")
 		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(uuid.NewUUID()))
 		labelValue := "testing-label-value"
-		framework.AddOrUpdateLabelOnNode(cs, nodeName, labelKey, labelValue)
-		framework.ExpectNodeHasLabel(cs, nodeName, labelKey, labelValue)
-		defer framework.RemoveLabelOffNode(cs, nodeName, labelKey)
+		e2enode.AddOrUpdateLabelOnNode(cs, nodeName, labelKey, labelValue)
+		e2enode.ExpectNodeHasLabel(cs, nodeName, labelKey, labelValue)
+		defer e2enode.RemoveLabelOffNode(cs, nodeName, labelKey)
 
 		ginkgo.By("Trying to relaunch the pod, now with tolerations.")
 		tolerationPodName := "with-tolerations"
@@ -632,15 +632,15 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			Effect: v1.TaintEffectNoSchedule,
 		}
 		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
-		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
+		e2enode.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		ginkgo.By("Trying to apply a random label on the found node.")
 		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(uuid.NewUUID()))
 		labelValue := "testing-label-value"
-		framework.AddOrUpdateLabelOnNode(cs, nodeName, labelKey, labelValue)
-		framework.ExpectNodeHasLabel(cs, nodeName, labelKey, labelValue)
-		defer framework.RemoveLabelOffNode(cs, nodeName, labelKey)
+		e2enode.AddOrUpdateLabelOnNode(cs, nodeName, labelKey, labelValue)
+		e2enode.ExpectNodeHasLabel(cs, nodeName, labelKey, labelValue)
+		defer e2enode.RemoveLabelOffNode(cs, nodeName, labelKey)
 
 		ginkgo.By("Trying to relaunch the pod, still no tolerations.")
 		podNameNoTolerations := "still-no-tolerations"
@@ -674,9 +674,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		nodeSelector := make(map[string]string)
 		nodeSelector[k] = v
 
-		framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
-		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(cs, nodeName, k)
+		e2enode.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
+		e2enode.ExpectNodeHasLabel(cs, nodeName, k, v)
+		defer e2enode.RemoveLabelOffNode(cs, nodeName, k)
 
 		port := int32(54321)
 		ginkgo.By(fmt.Sprintf("Trying to create a pod(pod1) with hostport %v and hostIP %s and expect scheduled", port, localhost))
@@ -707,9 +707,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		nodeSelector := make(map[string]string)
 		nodeSelector[k] = v
 
-		framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
-		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(cs, nodeName, k)
+		e2enode.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
+		e2enode.ExpectNodeHasLabel(cs, nodeName, k, v)
+		defer e2enode.RemoveLabelOffNode(cs, nodeName, k)
 
 		port := int32(54322)
 		ginkgo.By(fmt.Sprintf("Trying to create a pod(pod4) with hostport %v and hostIP 0.0.0.0(empty string here) and expect scheduled", port))
@@ -731,12 +731,12 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			nodeNames = Get2NodesThatCanRunPod(f)
 			ginkgo.By(fmt.Sprintf("Apply dedicated topologyKey %v for this test on the 2 nodes.", topologyKey))
 			for _, nodeName := range nodeNames {
-				framework.AddOrUpdateLabelOnNode(cs, nodeName, topologyKey, nodeName)
+				e2enode.AddOrUpdateLabelOnNode(cs, nodeName, topologyKey, nodeName)
 			}
 		})
 		ginkgo.AfterEach(func() {
 			for _, nodeName := range nodeNames {
-				framework.RemoveLabelOffNode(cs, nodeName, topologyKey)
+				e2enode.RemoveLabelOffNode(cs, nodeName, topologyKey)
 			}
 		})
 

@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
@@ -254,7 +255,7 @@ func testScriptInPod(
 	}
 	e2epod.SetNodeSelection(&pod.Spec, config.ClientNodeSelection)
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
-	f.TestContainerOutput("exec-volume-test", pod, 0, []string{fileName})
+	e2eoutput.TestContainerOutput(f, "exec-volume-test", pod, 0, []string{fileName})
 
 	ginkgo.By(fmt.Sprintf("Deleting pod %s", pod.Name))
 	err := e2epod.DeletePodWithWait(f.ClientSet, pod)

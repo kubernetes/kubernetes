@@ -89,7 +89,7 @@ func makePodToVerifyPids(baseName string, pidsLimit resource.Quantity) *v1.Pod {
 func runPodPidsLimitTests(f *framework.Framework) {
 	ginkgo.It("should set pids.max for Pod", func() {
 		ginkgo.By("by creating a G pod")
-		pod := f.PodClient().Create(&v1.Pod{
+		pod := e2epod.NewPodClient(f).Create(&v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod" + string(uuid.NewUUID()),
 				Namespace: f.Namespace.Name,
@@ -112,7 +112,7 @@ func runPodPidsLimitTests(f *framework.Framework) {
 		podUID := string(pod.UID)
 		ginkgo.By("checking if the expected pids settings were applied")
 		verifyPod := makePodToVerifyPids("pod"+podUID, resource.MustParse("1024"))
-		f.PodClient().Create(verifyPod)
+		e2epod.NewPodClient(f).Create(verifyPod)
 		err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, verifyPod.Name, f.Namespace.Name)
 		framework.ExpectNoError(err)
 	})
