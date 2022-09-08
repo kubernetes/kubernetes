@@ -62,19 +62,41 @@ func adjustClusterNameIfWildcard(shard genericapirequest.Shard, cluster *generic
 	}
 }
 
-// setClusterNameOnDecodedObject applies clusterName to obj. This is necessary because we don't store the cluster
-// name in the objects in storage. Instead, it is derived from the storage key, and then applied after retrieving
-// the object from storage.
-func setClusterNameOnDecodedObject(obj interface{}, clusterName logicalcluster.Name) {
-	var s clusterNameSetter
+// adjustShardNameIfWildcard determines a shard name. If this is not a shard-wildcard request,
+// the shard name is returned unmodified. Otherwise, the shard name is extracted from the storage key.
+func adjustShardNameIfWildcard(shard genericapirequest.Shard, keyPrefix, key string) genericapirequest.Shard {
+	if !shard.Empty() && !shard.Wildcard() {
+		return shard
+	}
+
+	if !shard.Wildcard() {
+		// no-op: we can only assign shard names
+		// to a request that explicitly asked for it
+		return ""
+	}
+
+	keyWithoutPrefix := strings.TrimPrefix(key, keyPrefix)
+	parts := strings.SplitN(keyWithoutPrefix, "/", 3)
+	if len(parts) < 3 {
+		klog.Warningf("unable to extract a shard name, invalid key=%s had %d parts, not %d", keyWithoutPrefix, len(parts), 3)
+		return ""
+	}
+	return genericapirequest.Shard(parts[0])
+}
+
+// annotateDecodedObjectWith applies clusterName and shardName to an object.
+// This is necessary because we don't store the cluster name and the shard name in the objects in storage.
+// Instead, they are derived from the storage key, and then applied after retrieving the object from storage.
+func annotateDecodedObjectWith(obj interface{}, clusterName logicalcluster.Name, shardName genericapirequest.Shard) {
+	var s nameSetter
 
 	switch t := obj.(type) {
 	case metav1.ObjectMetaAccessor:
 		s = t.GetObjectMeta()
-	case clusterNameSetter:
+	case nameSetter:
 		s = t
 	default:
-		klog.Warningf("Could not set ClusterName %s on object: %T", clusterName, obj)
+		klog.Warningf("Could not set ClusterName %s, ShardName %s on object: %T", clusterName, shardName, obj)
 		return
 	}
 
@@ -83,10 +105,13 @@ func setClusterNameOnDecodedObject(obj interface{}, clusterName logicalcluster.N
 		annotations = make(map[string]string)
 	}
 	annotations[logicalcluster.AnnotationKey] = clusterName.String()
+	if !shardName.Empty() {
+		annotations[genericapirequest.AnnotationKey] = shardName.String()
+	}
 	s.SetAnnotations(annotations)
 }
 
-type clusterNameSetter interface {
+type nameSetter interface {
 	GetAnnotations() map[string]string
 	SetAnnotations(a map[string]string)
 }

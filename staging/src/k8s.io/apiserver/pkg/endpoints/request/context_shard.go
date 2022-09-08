@@ -25,6 +25,9 @@ type shardKey int
 const (
 	// shardKey is the context key for the request.
 	shardContextKey shardKey = iota
+
+	// AnnotationKey is the name of the annotation key used to denote an object's shard name.
+	AnnotationKey = "kcp.dev/shard"
 )
 
 // Shard describes a shard

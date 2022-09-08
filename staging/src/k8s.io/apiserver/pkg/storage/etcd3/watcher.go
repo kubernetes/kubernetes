@@ -459,7 +459,8 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 
 		// kcp: apply clusterName to the decoded object, as the name is not persisted in storage.
 		clusterName := adjustClusterNameIfWildcard(wc.shard, wc.cluster, wc.crdRequest, wc.key, e.key)
-		setClusterNameOnDecodedObject(curObj, clusterName)
+		shardName := adjustShardNameIfWildcard(wc.shard, wc.key, e.key)
+		annotateDecodedObjectWith(curObj, clusterName, shardName)
 	}
 	// We need to decode prevValue, only if this is deletion event or
 	// the underlying filter doesn't accept all objects (otherwise we
@@ -480,7 +481,8 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 
 		// kcp: apply clusterName to the decoded object, as the name is not persisted in storage.
 		clusterName := adjustClusterNameIfWildcard(wc.shard, wc.cluster, wc.crdRequest, wc.key, e.key)
-		setClusterNameOnDecodedObject(oldObj, clusterName)
+		shardName := adjustShardNameIfWildcard(wc.shard, wc.key, e.key)
+		annotateDecodedObjectWith(oldObj, clusterName, shardName)
 	}
 	return curObj, oldObj, nil
 }
