@@ -84,6 +84,8 @@ import (
 	fakeflowcontrolv1beta1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1/fake"
 	flowcontrolv1beta2 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
 	fakeflowcontrolv1beta2 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2/fake"
+	flowcontrolv1beta3 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta3"
+	fakeflowcontrolv1beta3 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta3/fake"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	fakenetworkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1/fake"
 	networkingv1alpha1 "k8s.io/client-go/kubernetes/typed/networking/v1alpha1"
@@ -319,6 +321,11 @@ func (c *Clientset) FlowcontrolV1beta1() flowcontrolv1beta1.FlowcontrolV1beta1In
 // FlowcontrolV1beta2 retrieves the FlowcontrolV1beta2Client
 func (c *Clientset) FlowcontrolV1beta2() flowcontrolv1beta2.FlowcontrolV1beta2Interface {
 	return &fakeflowcontrolv1beta2.FakeFlowcontrolV1beta2{Fake: &c.Fake}
+}
+
+// FlowcontrolV1beta3 retrieves the FlowcontrolV1beta3Client
+func (c *Clientset) FlowcontrolV1beta3() flowcontrolv1beta3.FlowcontrolV1beta3Interface {
+	return &fakeflowcontrolv1beta3.FakeFlowcontrolV1beta3{Fake: &c.Fake}
 }
 
 // NetworkingV1 retrieves the NetworkingV1Client

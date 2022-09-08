@@ -44,6 +44,7 @@ import (
 	v1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
+	v1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	imagepolicyv1alpha1 "k8s.io/api/imagepolicy/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
@@ -89,6 +90,7 @@ import (
 	flowcontrolv1alpha1 "k8s.io/client-go/applyconfigurations/flowcontrol/v1alpha1"
 	applyconfigurationsflowcontrolv1beta1 "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta1"
 	applyconfigurationsflowcontrolv1beta2 "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta2"
+	flowcontrolv1beta3 "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta3"
 	applyconfigurationsimagepolicyv1alpha1 "k8s.io/client-go/applyconfigurations/imagepolicy/v1alpha1"
 	applyconfigurationsmetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	applyconfigurationsnetworkingv1 "k8s.io/client-go/applyconfigurations/networking/v1"
@@ -1121,6 +1123,48 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsflowcontrolv1beta2.SubjectApplyConfiguration{}
 	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("UserSubject"):
 		return &applyconfigurationsflowcontrolv1beta2.UserSubjectApplyConfiguration{}
+
+		// Group=flowcontrol.apiserver.k8s.io, Version=v1beta3
+	case v1beta3.SchemeGroupVersion.WithKind("FlowDistinguisherMethod"):
+		return &flowcontrolv1beta3.FlowDistinguisherMethodApplyConfiguration{}
+	case v1beta3.SchemeGroupVersion.WithKind("FlowSchema"):
+		return &flowcontrolv1beta3.FlowSchemaApplyConfiguration{}
+	case v1beta3.SchemeGroupVersion.WithKind("FlowSchemaCondition"):
+		return &flowcontrolv1beta3.FlowSchemaConditionApplyConfiguration{}
+	case v1beta3.SchemeGroupVersion.WithKind("FlowSchemaSpec"):
+		return &flowcontrolv1beta3.FlowSchemaSpecApplyConfiguration{}
+	case v1beta3.SchemeGroupVersion.WithKind("FlowSchemaStatus"):
+		return &flowcontrolv1beta3.FlowSchemaStatusApplyConfiguration{}
+	case v1beta3.SchemeGroupVersion.WithKind("GroupSubject"):
+		return &flowcontrolv1beta3.GroupSubjectApplyConfiguration{}
+	case v1beta3.SchemeGroupVersion.WithKind("LimitedPriorityLevelConfiguration"):
+		return &flowcontrolv1beta3.LimitedPriorityLevelConfigurationApplyConfiguration{}
+	case v1beta3.SchemeGroupVersion.WithKind("LimitResponse"):
+		return &flowcontrolv1beta3.LimitResponseApplyConfiguration{}
+	case v1beta3.SchemeGroupVersion.WithKind("NonResourcePolicyRule"):
+		return &flowcontrolv1beta3.NonResourcePolicyRuleApplyConfiguration{}
+	case v1beta3.SchemeGroupVersion.WithKind("PolicyRulesWithSubjects"):
+		return &flowcontrolv1beta3.PolicyRulesWithSubjectsApplyConfiguration{}
+	case v1beta3.SchemeGroupVersion.WithKind("PriorityLevelConfiguration"):
+		return &flowcontrolv1beta3.PriorityLevelConfigurationApplyConfiguration{}
+	case v1beta3.SchemeGroupVersion.WithKind("PriorityLevelConfigurationCondition"):
+		return &flowcontrolv1beta3.PriorityLevelConfigurationConditionApplyConfiguration{}
+	case v1beta3.SchemeGroupVersion.WithKind("PriorityLevelConfigurationReference"):
+		return &flowcontrolv1beta3.PriorityLevelConfigurationReferenceApplyConfiguration{}
+	case v1beta3.SchemeGroupVersion.WithKind("PriorityLevelConfigurationSpec"):
+		return &flowcontrolv1beta3.PriorityLevelConfigurationSpecApplyConfiguration{}
+	case v1beta3.SchemeGroupVersion.WithKind("PriorityLevelConfigurationStatus"):
+		return &flowcontrolv1beta3.PriorityLevelConfigurationStatusApplyConfiguration{}
+	case v1beta3.SchemeGroupVersion.WithKind("QueuingConfiguration"):
+		return &flowcontrolv1beta3.QueuingConfigurationApplyConfiguration{}
+	case v1beta3.SchemeGroupVersion.WithKind("ResourcePolicyRule"):
+		return &flowcontrolv1beta3.ResourcePolicyRuleApplyConfiguration{}
+	case v1beta3.SchemeGroupVersion.WithKind("ServiceAccountSubject"):
+		return &flowcontrolv1beta3.ServiceAccountSubjectApplyConfiguration{}
+	case v1beta3.SchemeGroupVersion.WithKind("Subject"):
+		return &flowcontrolv1beta3.SubjectApplyConfiguration{}
+	case v1beta3.SchemeGroupVersion.WithKind("UserSubject"):
+		return &flowcontrolv1beta3.UserSubjectApplyConfiguration{}
 
 		// Group=imagepolicy.k8s.io, Version=v1alpha1
 	case imagepolicyv1alpha1.SchemeGroupVersion.WithKind("ImageReview"):
