@@ -119,8 +119,13 @@ func validateV1EventSeries(event *core.Event) field.ErrorList {
 	allErrs := field.ErrorList{}
 	zeroTime := time.Time{}
 	if event.Series != nil {
-		if event.Series.Count < 2 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("series.count"), "", "should be at least 2"))
+		// Tolerate isomorphic events with a count of at least 1 to avoid rejecting
+		// Series patch from older clients that were built with an incorrect
+		// initialization of EventSeries. Instead of initializing the Count of the
+		// Series to 2, older clients were initialiazing it to 1.
+		// See https://github.com/kubernetes/kubernetes/pull/112334
+		if event.Series.Count < 1 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("series.count"), event.Series.Count, "should be at least 1"))
 		}
 		if event.Series.LastObservedTime.Time == zeroTime {
 			allErrs = append(allErrs, field.Required(field.NewPath("series.lastObservedTime"), ""))

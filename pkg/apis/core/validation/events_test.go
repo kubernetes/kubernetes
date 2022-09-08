@@ -709,7 +709,7 @@ zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz`,
 				},
 			},
 			valid: false,
-			msg:   "non-nil series with cound < 2",
+			msg:   "non-nil series with count < 1",
 		},
 		{
 			Event: &core.Event{
@@ -733,6 +733,30 @@ zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz`,
 			},
 			valid: false,
 			msg:   "non-nil series with empty lastObservedTime",
+		},
+		{
+			Event: &core.Event{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: metav1.NamespaceSystem,
+				},
+				InvolvedObject: core.ObjectReference{
+					APIVersion: "v1",
+					Kind:       "Node",
+				},
+				EventTime:           someTime,
+				ReportingController: "k8s.io/my-controller",
+				ReportingInstance:   "node-xyz",
+				Action:              "Do",
+				Reason:              "Because",
+				Type:                "Normal",
+				Series: &core.EventSeries{
+					Count:            1,
+					LastObservedTime: someTime,
+				},
+			},
+			valid: true,
+			msg:   "non-nil series with count of 1",
 		},
 	}
 
