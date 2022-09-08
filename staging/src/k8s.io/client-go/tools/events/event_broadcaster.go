@@ -181,7 +181,7 @@ func (e *eventBroadcasterImpl) recordToSink(event *eventsv1.Event, clock clock.C
 					return nil
 				}
 				isomorphicEvent.Series = &eventsv1.EventSeries{
-					Count:            1,
+					Count:            2,
 					LastObservedTime: metav1.MicroTime{Time: clock.Now()},
 				}
 				return isomorphicEvent
