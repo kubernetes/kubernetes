@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"reflect"
 	"sync"
 	"time"
 
@@ -37,6 +38,10 @@ func New(config *Config) (http.RoundTripper, error) {
 	// Set transport level security
 	if config.Transport != nil && (config.HasCA() || config.HasCertAuth() || config.HasCertCallback() || config.TLS.Insecure) {
 		return nil, fmt.Errorf("using a custom transport with TLS certificate options or the insecure flag is not allowed")
+	}
+
+	if !isValidHolders(config) {
+		return nil, fmt.Errorf("misconfigured holder for dialer or cert callback")
 	}
 
 	var (
@@ -54,6 +59,26 @@ func New(config *Config) (http.RoundTripper, error) {
 	}
 
 	return HTTPWrappersForConfig(config, rt)
+}
+
+func isValidHolders(config *Config) bool {
+	if config.TLS.GetCertHolder != nil {
+		if config.TLS.GetCertHolder.GetCert == nil ||
+			config.TLS.GetCert == nil ||
+			reflect.ValueOf(config.TLS.GetCertHolder.GetCert).Pointer() != reflect.ValueOf(config.TLS.GetCert).Pointer() {
+			return false
+		}
+	}
+
+	if config.DialHolder != nil {
+		if config.DialHolder.Dial == nil ||
+			config.Dial == nil ||
+			reflect.ValueOf(config.DialHolder.Dial).Pointer() != reflect.ValueOf(config.Dial).Pointer() {
+			return false
+		}
+	}
+
+	return true
 }
 
 // TLSConfigFor returns a tls.Config that will provide the transport level security defined
