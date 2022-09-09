@@ -537,6 +537,7 @@ func InClusterConfig() (*Config, error) {
 		TLSClientConfig: tlsClientConfig,
 		BearerToken:     string(token),
 		BearerTokenFile: tokenFile,
+		DisableCompression: true,
 	}, nil
 }
 
