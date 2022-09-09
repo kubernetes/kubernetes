@@ -54,6 +54,9 @@ const (
 
 	testProfileName = "test-profile"
 	nodeName        = "testNode"
+
+	injectReason       = "injected status"
+	injectFilterReason = "injected filter status"
 )
 
 // TestScoreWithNormalizePlugin implements ScoreWithNormalizePlugin interface.
@@ -121,7 +124,7 @@ func (pl *TestScorePlugin) Name() string {
 }
 
 func (pl *TestScorePlugin) PreScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
-	return framework.NewStatus(framework.Code(pl.inj.PreScoreStatus), "injected status")
+	return framework.NewStatus(framework.Code(pl.inj.PreScoreStatus), injectReason)
 }
 
 func (pl *TestScorePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
@@ -150,10 +153,10 @@ type TestPlugin struct {
 }
 
 func (pl *TestPlugin) AddPod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
-	return framework.NewStatus(framework.Code(pl.inj.PreFilterAddPodStatus), "injected status")
+	return framework.NewStatus(framework.Code(pl.inj.PreFilterAddPodStatus), injectReason)
 }
 func (pl *TestPlugin) RemovePod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
-	return framework.NewStatus(framework.Code(pl.inj.PreFilterRemovePodStatus), "injected status")
+	return framework.NewStatus(framework.Code(pl.inj.PreFilterRemovePodStatus), injectReason)
 }
 
 func (pl *TestPlugin) Name() string {
@@ -165,7 +168,7 @@ func (pl *TestPlugin) Less(*framework.QueuedPodInfo, *framework.QueuedPodInfo) b
 }
 
 func (pl *TestPlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
-	return 0, framework.NewStatus(framework.Code(pl.inj.ScoreStatus), "injected status")
+	return 0, framework.NewStatus(framework.Code(pl.inj.ScoreStatus), injectReason)
 }
 
 func (pl *TestPlugin) ScoreExtensions() framework.ScoreExtensions {
@@ -173,7 +176,7 @@ func (pl *TestPlugin) ScoreExtensions() framework.ScoreExtensions {
 }
 
 func (pl *TestPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
-	return nil, framework.NewStatus(framework.Code(pl.inj.PreFilterStatus), "injected status")
+	return nil, framework.NewStatus(framework.Code(pl.inj.PreFilterStatus), injectReason)
 }
 
 func (pl *TestPlugin) PreFilterExtensions() framework.PreFilterExtensions {
@@ -181,37 +184,37 @@ func (pl *TestPlugin) PreFilterExtensions() framework.PreFilterExtensions {
 }
 
 func (pl *TestPlugin) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	return framework.NewStatus(framework.Code(pl.inj.FilterStatus), "injected filter status")
+	return framework.NewStatus(framework.Code(pl.inj.FilterStatus), injectFilterReason)
 }
 
 func (pl *TestPlugin) PostFilter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
-	return nil, framework.NewStatus(framework.Code(pl.inj.PostFilterStatus), "injected status")
+	return nil, framework.NewStatus(framework.Code(pl.inj.PostFilterStatus), injectReason)
 }
 
 func (pl *TestPlugin) PreScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
-	return framework.NewStatus(framework.Code(pl.inj.PreScoreStatus), "injected status")
+	return framework.NewStatus(framework.Code(pl.inj.PreScoreStatus), injectReason)
 }
 
 func (pl *TestPlugin) Reserve(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) *framework.Status {
-	return framework.NewStatus(framework.Code(pl.inj.ReserveStatus), "injected status")
+	return framework.NewStatus(framework.Code(pl.inj.ReserveStatus), injectReason)
 }
 
 func (pl *TestPlugin) Unreserve(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) {
 }
 
 func (pl *TestPlugin) PreBind(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) *framework.Status {
-	return framework.NewStatus(framework.Code(pl.inj.PreBindStatus), "injected status")
+	return framework.NewStatus(framework.Code(pl.inj.PreBindStatus), injectReason)
 }
 
 func (pl *TestPlugin) PostBind(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) {
 }
 
 func (pl *TestPlugin) Permit(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (*framework.Status, time.Duration) {
-	return framework.NewStatus(framework.Code(pl.inj.PermitStatus), "injected status"), time.Duration(0)
+	return framework.NewStatus(framework.Code(pl.inj.PermitStatus), injectReason), time.Duration(0)
 }
 
 func (pl *TestPlugin) Bind(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) *framework.Status {
-	return framework.NewStatus(framework.Code(pl.inj.BindStatus), "injected status")
+	return framework.NewStatus(framework.Code(pl.inj.BindStatus), injectReason)
 }
 
 // TestPreFilterPlugin only implements PreFilterPlugin interface.
@@ -374,8 +377,8 @@ var nodes = []*v1.Node{
 }
 
 var (
-	errInjectedStatus       = errors.New("injected status")
-	errInjectedFilterStatus = errors.New("injected filter status")
+	errInjectedStatus       = errors.New(injectReason)
+	errInjectedFilterStatus = errors.New(injectFilterReason)
 )
 
 func newFrameworkWithQueueSortAndBind(r Registry, profile config.KubeSchedulerProfile, stopCh <-chan struct{}, opts ...Option) (framework.Framework, error) {
@@ -1307,9 +1310,9 @@ func TestFilterPlugins(t *testing.T) {
 					inj:  injectedResult{FilterStatus: int(framework.Unschedulable)},
 				},
 			},
-			wantStatus: framework.NewStatus(framework.Unschedulable, "injected filter status").WithFailedPlugin("TestPlugin"),
+			wantStatus: framework.NewStatus(framework.Unschedulable, injectFilterReason).WithFailedPlugin("TestPlugin"),
 			wantStatusMap: framework.PluginToStatus{
-				"TestPlugin": framework.NewStatus(framework.Unschedulable, "injected filter status").WithFailedPlugin("TestPlugin"),
+				"TestPlugin": framework.NewStatus(framework.Unschedulable, injectFilterReason).WithFailedPlugin("TestPlugin"),
 			},
 		},
 		{
@@ -1321,9 +1324,9 @@ func TestFilterPlugins(t *testing.T) {
 						FilterStatus: int(framework.UnschedulableAndUnresolvable)},
 				},
 			},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected filter status").WithFailedPlugin("TestPlugin"),
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, injectFilterReason).WithFailedPlugin("TestPlugin"),
 			wantStatusMap: framework.PluginToStatus{
-				"TestPlugin": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected filter status").WithFailedPlugin("TestPlugin"),
+				"TestPlugin": framework.NewStatus(framework.UnschedulableAndUnresolvable, injectFilterReason).WithFailedPlugin("TestPlugin"),
 			},
 		},
 		// following tests cover multiple-plugins scenarios
@@ -1409,9 +1412,9 @@ func TestFilterPlugins(t *testing.T) {
 					inj:  injectedResult{FilterStatus: int(framework.Unschedulable)},
 				},
 			},
-			wantStatus: framework.NewStatus(framework.Unschedulable, "injected filter status").WithFailedPlugin("TestPlugin2"),
+			wantStatus: framework.NewStatus(framework.Unschedulable, injectFilterReason).WithFailedPlugin("TestPlugin2"),
 			wantStatusMap: framework.PluginToStatus{
-				"TestPlugin2": framework.NewStatus(framework.Unschedulable, "injected filter status").WithFailedPlugin("TestPlugin2"),
+				"TestPlugin2": framework.NewStatus(framework.Unschedulable, injectFilterReason).WithFailedPlugin("TestPlugin2"),
 			},
 		},
 	}
@@ -1467,7 +1470,7 @@ func TestPostFilterPlugins(t *testing.T) {
 					inj:  injectedResult{PostFilterStatus: int(framework.Success)},
 				},
 			},
-			wantStatus: framework.NewStatus(framework.Success, "injected status"),
+			wantStatus: framework.NewStatus(framework.Success, injectReason),
 		},
 		{
 			name: "plugin1 failed to make a Pod schedulable, followed by plugin2 which makes the Pod schedulable",
@@ -1481,7 +1484,7 @@ func TestPostFilterPlugins(t *testing.T) {
 					inj:  injectedResult{PostFilterStatus: int(framework.Success)},
 				},
 			},
-			wantStatus: framework.NewStatus(framework.Success, "injected status"),
+			wantStatus: framework.NewStatus(framework.Success, injectReason),
 		},
 		{
 			name: "plugin1 makes a Pod schedulable, followed by plugin2 which cannot make the Pod schedulable",
@@ -1495,7 +1498,7 @@ func TestPostFilterPlugins(t *testing.T) {
 					inj:  injectedResult{PostFilterStatus: int(framework.Unschedulable)},
 				},
 			},
-			wantStatus: framework.NewStatus(framework.Success, "injected status"),
+			wantStatus: framework.NewStatus(framework.Success, injectReason),
 		},
 	}
 
@@ -1712,7 +1715,7 @@ func TestPreBindPlugins(t *testing.T) {
 					inj:  injectedResult{PreBindStatus: int(framework.Unschedulable)},
 				},
 			},
-			wantStatus: framework.AsStatus(fmt.Errorf(`running PreBind plugin "TestPlugin": %w`, errInjectedStatus)),
+			wantStatus: framework.NewStatus(framework.Unschedulable, injectReason).WithFailedPlugin("TestPlugin"),
 		},
 		{
 			name: "ErrorPreBindPlugin",
@@ -1732,7 +1735,7 @@ func TestPreBindPlugins(t *testing.T) {
 					inj:  injectedResult{PreBindStatus: int(framework.UnschedulableAndUnresolvable)},
 				},
 			},
-			wantStatus: framework.AsStatus(fmt.Errorf(`running PreBind plugin "TestPlugin": %w`, errInjectedStatus)),
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, injectReason).WithFailedPlugin("TestPlugin"),
 		},
 		{
 			name: "SuccessErrorPreBindPlugins",
@@ -1802,7 +1805,7 @@ func TestPreBindPlugins(t *testing.T) {
 					inj:  injectedResult{PreBindStatus: int(framework.Success)},
 				},
 			},
-			wantStatus: framework.AsStatus(fmt.Errorf(`running PreBind plugin "TestPlugin": %w`, errInjectedStatus)),
+			wantStatus: framework.NewStatus(framework.Unschedulable, injectReason).WithFailedPlugin("TestPlugin"),
 		},
 	}
 
@@ -2028,7 +2031,7 @@ func TestPermitPlugins(t *testing.T) {
 					inj:  injectedResult{PermitStatus: int(framework.Unschedulable)},
 				},
 			},
-			want: framework.NewStatus(framework.Unschedulable, "injected status").WithFailedPlugin("TestPlugin"),
+			want: framework.NewStatus(framework.Unschedulable, injectReason).WithFailedPlugin("TestPlugin"),
 		},
 		{
 			name: "ErrorPermitPlugin",
@@ -2048,7 +2051,7 @@ func TestPermitPlugins(t *testing.T) {
 					inj:  injectedResult{PermitStatus: int(framework.UnschedulableAndUnresolvable)},
 				},
 			},
-			want: framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected status").WithFailedPlugin("TestPlugin"),
+			want: framework.NewStatus(framework.UnschedulableAndUnresolvable, injectReason).WithFailedPlugin("TestPlugin"),
 		},
 		{
 			name: "WaitPermitPlugin",
@@ -2341,7 +2344,7 @@ func TestRunBindPlugins(t *testing.T) {
 		{
 			name:       "invalid status",
 			injects:    []framework.Code{framework.Unschedulable},
-			wantStatus: framework.Error,
+			wantStatus: framework.Unschedulable,
 		},
 		{
 			name:       "simple error",
@@ -2356,7 +2359,7 @@ func TestRunBindPlugins(t *testing.T) {
 		{
 			name:       "invalid status, returns error",
 			injects:    []framework.Code{framework.Skip, framework.UnschedulableAndUnresolvable},
-			wantStatus: framework.Error,
+			wantStatus: framework.UnschedulableAndUnresolvable,
 		},
 		{
 			name:       "error after success status, returns success",
