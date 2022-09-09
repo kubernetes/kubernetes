@@ -26,7 +26,7 @@ require (
 	google.golang.org/protobuf v1.28.1
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
-	k8s.io/klog/v2 v2.80.0
+	k8s.io/klog/v2 v2.80.1
 	k8s.io/kube-openapi v0.0.0-20220803162953-67bda5d908f1
 	k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3
