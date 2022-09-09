@@ -42,7 +42,7 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/google/cadvisor v0.45.0
 	github.com/google/gnostic v0.5.7-v3refs
-	github.com/google/go-cmp v0.5.6
+	github.com/google/go-cmp v0.5.8
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.2
 	github.com/heketi/heketi v10.3.0+incompatible
@@ -53,8 +53,8 @@ require (
 	github.com/mrunalp/fileutils v0.5.0
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/mvdan/xurls v1.1.0
-	github.com/onsi/ginkgo/v2 v2.1.4
-	github.com/onsi/gomega v1.19.0
+	github.com/onsi/ginkgo/v2 v2.1.6
+	github.com/onsi/gomega v1.20.1
 	github.com/opencontainers/runc v1.1.3
 	github.com/opencontainers/selinux v1.10.0
 	github.com/pkg/errors v0.9.1
@@ -247,7 +247,6 @@ require (
 	golang.org/x/exp v0.0.0-20210220032938-85be41e4509f // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/text v0.3.7 // indirect
-	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
@@ -390,7 +389,7 @@ replace (
 	github.com/google/cadvisor => github.com/google/cadvisor v0.45.0
 	github.com/google/cel-go => github.com/google/cel-go v0.12.5
 	github.com/google/gnostic => github.com/google/gnostic v0.5.7-v3refs
-	github.com/google/go-cmp => github.com/google/go-cmp v0.5.6
+	github.com/google/go-cmp => github.com/google/go-cmp v0.5.8
 	github.com/google/gofuzz => github.com/google/gofuzz v1.1.0
 	github.com/google/martian/v3 => github.com/google/martian/v3 v3.2.1
 	github.com/google/pprof => github.com/google/pprof v0.0.0-20210407192527-94a9f03dee38
@@ -454,8 +453,8 @@ replace (
 	github.com/mxk/go-flowrate => github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 	github.com/niemeyer/pretty => github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e
 	github.com/olekukonko/tablewriter => github.com/olekukonko/tablewriter v0.0.4
-	github.com/onsi/ginkgo/v2 => github.com/onsi/ginkgo/v2 v2.1.4
-	github.com/onsi/gomega => github.com/onsi/gomega v1.19.0
+	github.com/onsi/ginkgo/v2 => github.com/onsi/ginkgo/v2 v2.1.6
+	github.com/onsi/gomega => github.com/onsi/gomega v1.20.1
 	github.com/opencontainers/go-digest => github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.2
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.3

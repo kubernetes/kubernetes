@@ -630,7 +630,7 @@ func JustAfterEach(args ...interface{}) bool {
 }
 
 /*
-BeforeAll nodes are Setup nodes that can occur inside Ordered contaienrs.  They run just once before any specs in the Ordered container run.
+BeforeAll nodes are Setup nodes that can occur inside Ordered containers.  They run just once before any specs in the Ordered container run.
 
 Multiple BeforeAll nodes can be defined in a given Ordered container however they cannot be nested inside any other container.
 
@@ -643,7 +643,7 @@ func BeforeAll(args ...interface{}) bool {
 }
 
 /*
-AfterAll nodes are Setup nodes that can occur inside Ordered contaienrs.  They run just once after all specs in the Ordered container have run.
+AfterAll nodes are Setup nodes that can occur inside Ordered containers.  They run just once after all specs in the Ordered container have run.
 
 Multiple AfterAll nodes can be defined in a given Ordered container however they cannot be nested inside any other container.
 
