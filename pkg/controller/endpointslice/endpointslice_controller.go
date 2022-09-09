@@ -69,7 +69,7 @@ const (
 	// defaultSyncBackOff is the default backoff period for syncService calls.
 	defaultSyncBackOff = 1 * time.Second
 	// maxSyncBackOff is the max backoff period for syncService calls.
-	maxSyncBackOff = 100 * time.Second
+	maxSyncBackOff = 1000 * time.Second
 
 	// controllerName is a unique value used with LabelManagedBy to indicated
 	// the component managing an EndpointSlice.
