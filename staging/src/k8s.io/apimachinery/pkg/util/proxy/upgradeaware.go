@@ -83,6 +83,8 @@ type UpgradeAwareHandler struct {
 	MaxBytesPerSec int64
 	// Responder is passed errors that occur while setting up proxying.
 	Responder ErrorResponder
+	// Reject to forward redirect response
+	RejectForwardingRedirects bool
 }
 
 const defaultFlushInterval = 200 * time.Millisecond
@@ -257,6 +259,31 @@ func (h *UpgradeAwareHandler) ServeHTTP(w http.ResponseWriter, req *http.Request
 	proxy.Transport = h.Transport
 	proxy.FlushInterval = h.FlushInterval
 	proxy.ErrorLog = log.New(noSuppressPanicError{}, "", log.LstdFlags)
+	if h.RejectForwardingRedirects {
+		oldModifyResponse := proxy.ModifyResponse
+		proxy.ModifyResponse = func(response *http.Response) error {
+			code := response.StatusCode
+			if code >= 300 && code <= 399 {
+				// close the original response
+				response.Body.Close()
+				msg := "the backend attempted to redirect this request, which is not permitted"
+				// replace the response
+				*response = http.Response{
+					StatusCode:    http.StatusBadGateway,
+					Status:        fmt.Sprintf("%d %s", response.StatusCode, http.StatusText(response.StatusCode)),
+					Body:          io.NopCloser(strings.NewReader(msg)),
+					ContentLength: int64(len(msg)),
+				}
+			} else {
+				if oldModifyResponse != nil {
+					if err := oldModifyResponse(response); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		}
+	}
 	if h.Responder != nil {
 		// if an optional error interceptor/responder was provided wire it
 		// the custom responder might be used for providing a unified error reporting
