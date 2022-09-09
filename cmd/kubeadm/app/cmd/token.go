@@ -83,7 +83,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		// cobra will print usage information, but still exit cleanly.
 		// We want to return an error code in these cases so that the
 		// user knows that their command was invalid.
-		RunE: cmdutil.SubCmdRunE("token"),
+		Run: cmdutil.SubCmdRun(),
 	}
 
 	options.AddKubeConfigFlag(tokenCmd.PersistentFlags(), &kubeConfigFile)
@@ -127,7 +127,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 
 			klog.V(1).Infoln("[token] getting Clientsets from kubeconfig file")
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
-			client, err := cmdutil.GetClientset(kubeConfigFile, dryRun)
+			client, err := cmdutil.GetClientSet(kubeConfigFile, dryRun)
 			if err != nil {
 				return err
 			}
@@ -159,7 +159,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		`),
 		RunE: func(tokenCmd *cobra.Command, args []string) error {
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
-			client, err := cmdutil.GetClientset(kubeConfigFile, dryRun)
+			client, err := cmdutil.GetClientSet(kubeConfigFile, dryRun)
 			if err != nil {
 				return err
 			}
@@ -193,7 +193,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 				return errors.Errorf("missing subcommand; 'token delete' is missing token of form %q", bootstrapapi.BootstrapTokenIDPattern)
 			}
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
-			client, err := cmdutil.GetClientset(kubeConfigFile, dryRun)
+			client, err := cmdutil.GetClientSet(kubeConfigFile, dryRun)
 			if err != nil {
 				return err
 			}
