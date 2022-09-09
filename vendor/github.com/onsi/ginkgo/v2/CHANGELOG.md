@@ -1,3 +1,27 @@
+## 2.2.0
+
+### Generate real-time Progress Reports [f91377c]
+
+Ginkgo can now generate Progress Reports to point users at the current running line of code (including a preview of the actual source code) and a best guess at the most relevant subroutines.
+
+These Progress Reports allow users to debug stuck or slow tests without exiting the Ginkgo process.  A Progress Report can be generated at any time by sending Ginkgo a `SIGINFO` (`^T` on MacOS/BSD) or `SIGUSR1`.
+
+In addition, the user can specify `--poll-progress-after` and `--poll-progress-interval` to have Ginkgo start periodically emitting progress reports if a given node takes too long.  These can be overriden/set on a per-node basis with the `PollProgressAfter` and `PollProgressInterval` decorators.
+
+Progress Reports are emitted to stdout, and also stored in the machine-redable report formats that Ginkgo supports.
+
+Ginkgo also uses this progress reporting infrastructure under the hood when handling timeouts and interrupts.  This yields much more focused, useful, and informative stack traces than previously.
+
+### Features
+- `BeforeSuite`, `AfterSuite`, `SynchronizedBeforeSuite`, `SynchronizedAfterSuite`, and `ReportAfterSuite` now support (the relevant subset of) decorators.  These can be passed in _after_ the callback functions that are usually passed into these nodes.
+
+  As a result the **signature of these methods has changed** and now includes a trailing `args ...interface{}`.  For most users simply using the DSL, this change is transparent.  However if you were assigning one of these functions to a custom variable (or passing it around) then your code may need to change to reflect the new signature.
+
+### Maintenance
+- Modernize the invocation of Ginkgo in github actions [0ffde58]
+- Update reocmmended CI settings in docs [896bbb9]
+- Speed up unnecessarily slow integration test [6d3a90e]
+
 ## 2.1.6
 
 ### Fixes
@@ -77,7 +101,7 @@ See [https://onsi.github.io/ginkgo/MIGRATING_TO_V2](https://onsi.github.io/ginkg
 Ginkgo 2.0 now has a Release Candidate.  1.16.5 advertises the existence of the RC.
 1.16.5 deprecates GinkgoParallelNode in favor of GinkgoParallelProcess
 
-You can silence the RC advertisement by setting an `ACK_GINKG_RC=true` environment variable or creating a file in your home directory called `.ack-ginkgo-rc`
+You can silence the RC advertisement by setting an `ACK_GINKGO_RC=true` environment variable or creating a file in your home directory called `.ack-ginkgo-rc`
 
 ## 1.16.4
 
@@ -184,7 +208,7 @@ You can silence the RC advertisement by setting an `ACK_GINKG_RC=true` environme
 - replace tail package with maintained one. this fixes go get errors (#667) [4ba33d4]
 - improve ginkgo performance - makes progress on #644 [a14f98e]
 - fix convert integration tests [1f8ba69]
-- fix typo succesful -> successful (#663) [1ea49cf]
+- fix typo successful -> successful (#663) [1ea49cf]
 - Fix invalid link (#658) [b886136]
 - convert utility : Include comments from source (#657) [1077c6d]
 - Explain what BDD means [d79e7fb]
@@ -278,7 +302,7 @@ You can silence the RC advertisement by setting an `ACK_GINKG_RC=true` environme
 - Make generated Junit file compatible with "Maven Surefire" (#488) [e51bee6]
 - all: gofmt [000d317]
 - Increase eventually timeout to 30s [c73579c]
-- Clarify asynchronous test behaviour [294d8f4]
+- Clarify asynchronous test behavior [294d8f4]
 - Travis badge should only show master [26d2143]
 
 ## 1.5.0 5/10/2018
@@ -296,13 +320,13 @@ You can silence the RC advertisement by setting an `ACK_GINKG_RC=true` environme
 - When running a test and calculating the coverage using the `-coverprofile` and `-outputdir` flags, Ginkgo fails with an error if the directory does not exist. This is due to an [issue in go 1.10](https://github.com/golang/go/issues/24588) (#446) [b36a6e0]
 - `unfocus` command ignores vendor folder (#459) [e5e551c, c556e43, a3b6351, 9a820dd]
 - Ignore packages whose tests are all ignored by go (#456) [7430ca7, 6d8be98]
-- Increase the threshold when checking time measuments (#455) [2f714bf, 68f622c]
+- Increase the threshold when checking time measurements (#455) [2f714bf, 68f622c]
 - Fix race condition in coverage tests (#423) [a5a8ff7, ab9c08b]
 - Add an extra new line after reporting spec run completion for test2json [874520d]
 - added name name field to junit reported testsuite [ae61c63]
 - Do not set the run time of a spec when the dryRun flag is used (#438) [457e2d9, ba8e856]
 - Process FWhen and FSpecify when unfocusing (#434) [9008c7b, ee65bd, df87dfe]
-- Synchronise the access to the state of specs to avoid race conditions (#430) [7d481bc, ae6829d]
+- Synchronies the access to the state of specs to avoid race conditions (#430) [7d481bc, ae6829d]
 - Added Duration on GinkgoTestDescription (#383) [5f49dad, 528417e, 0747408, 329d7ed]
 - Fix Ginkgo stack trace on failure for Specify (#415) [b977ede, 65ca40e, 6c46eb8]
 - Update README with Go 1.6+, Golang -> Go (#409) [17f6b97, bc14b66, 20d1598]

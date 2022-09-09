@@ -94,6 +94,10 @@ func (client *httpClient) PostSuiteDidEnd(report types.Report) error {
 	return client.post("/suite-did-end", report)
 }
 
+func (client *httpClient) PostEmitProgressReport(report types.ProgressReport) error {
+	return client.post("/progress-report", report)
+}
+
 func (client *httpClient) PostSynchronizedBeforeSuiteCompleted(state types.SpecState, data []byte) error {
 	beforeSuiteState := BeforeSuiteState{
 		State: state,

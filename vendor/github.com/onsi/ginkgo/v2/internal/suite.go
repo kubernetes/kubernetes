@@ -36,20 +36,35 @@ type Suite struct {
 	interruptHandler  interrupt_handler.InterruptHandlerInterface
 	config            types.SuiteConfig
 
-	skipAll                         bool
-	report                          types.Report
-	currentSpecReport               types.SpecReport
-	currentSpecReportUserAccessLock *sync.Mutex
-	currentNode                     Node
+	skipAll              bool
+	report               types.Report
+	currentSpecReport    types.SpecReport
+	currentNode          Node
+	currentNodeStartTime time.Time
+
+	progressStepCursor ProgressStepCursor
+
+	/*
+		We don't need to lock around all operations.  Just those that *could* happen concurrently.
+
+		Suite, generally, only runs one node at a time - and so the possibiity for races is small.  In fact, the presence of a race usually indicates the user has launched a goroutine that has leaked past the node it was launched in.
+
+		However, there are some operations that can happen concurrently:
+
+		- AddReportEntry and CurrentSpecReport can be accessed at any point by the user - including in goroutines that outlive the node intentionally (see, e.g. #1020).  They both form a self-contained read-write pair and so a lock in them is sufficent.
+		- generateProgressReport can be invoked at any point in time by an interrupt or a progres poll.  Moreover, it requires access to currentSpecReport, currentNode, currentNodeStartTime, and progressStepCursor.  To make it threadsafe we need to lock around generateProgressReport when we read those variables _and_ everywhere those variables are *written*.  In general we don't need to worry about all possible field writes to these variables as what `generateProgressReport` does with these variables is fairly selective (hence the name of the lock).  Specifically, we dont' need to lock around state and failure message changes on `currentSpecReport` - just the setting of the variable itself.
+	*/
+	selectiveLock *sync.Mutex
 
 	client parallel_support.Client
 }
 
 func NewSuite() *Suite {
 	return &Suite{
-		tree:                            &TreeNode{},
-		phase:                           PhaseBuildTopLevel,
-		currentSpecReportUserAccessLock: &sync.Mutex{},
+		tree:  &TreeNode{},
+		phase: PhaseBuildTopLevel,
+
+		selectiveLock: &sync.Mutex{},
 	}
 }
 
@@ -66,7 +81,7 @@ func (suite *Suite) BuildTree() error {
 	return nil
 }
 
-func (suite *Suite) Run(description string, suiteLabels Labels, suitePath string, failer *Failer, reporter reporters.Reporter, writer WriterInterface, outputInterceptor OutputInterceptor, interruptHandler interrupt_handler.InterruptHandlerInterface, client parallel_support.Client, suiteConfig types.SuiteConfig) (bool, bool) {
+func (suite *Suite) Run(description string, suiteLabels Labels, suitePath string, failer *Failer, reporter reporters.Reporter, writer WriterInterface, outputInterceptor OutputInterceptor, interruptHandler interrupt_handler.InterruptHandlerInterface, client parallel_support.Client, progressSignalRegistrar ProgressSignalRegistrar, suiteConfig types.SuiteConfig) (bool, bool) {
 	if suite.phase != PhaseBuildTree {
 		panic("cannot run before building the tree = call suite.BuildTree() first")
 	}
@@ -83,7 +98,11 @@ func (suite *Suite) Run(description string, suiteLabels Labels, suitePath string
 	suite.interruptHandler = interruptHandler
 	suite.config = suiteConfig
 
+	cancelProgressHandler := progressSignalRegistrar(suite.handleProgressSignal)
+
 	success := suite.runSpecs(description, suiteLabels, suitePath, hasProgrammaticFocus, specs)
+
+	cancelProgressHandler()
 
 	return success, hasProgrammaticFocus
 }
@@ -212,11 +231,22 @@ func (suite *Suite) pushCleanupNode(node Node) error {
 }
 
 /*
+  Pushing and popping the Step Cursor stack
+*/
+
+func (suite *Suite) SetProgressStepCursor(cursor ProgressStepCursor) {
+	suite.selectiveLock.Lock()
+	defer suite.selectiveLock.Unlock()
+
+	suite.progressStepCursor = cursor
+}
+
+/*
   Spec Running methods - used during PhaseRun
 */
 func (suite *Suite) CurrentSpecReport() types.SpecReport {
-	suite.currentSpecReportUserAccessLock.Lock()
-	defer suite.currentSpecReportUserAccessLock.Unlock()
+	suite.selectiveLock.Lock()
+	defer suite.selectiveLock.Unlock()
 	report := suite.currentSpecReport
 	if suite.writer != nil {
 		report.CapturedGinkgoWriterOutput = string(suite.writer.Bytes())
@@ -227,13 +257,44 @@ func (suite *Suite) CurrentSpecReport() types.SpecReport {
 }
 
 func (suite *Suite) AddReportEntry(entry ReportEntry) error {
-	suite.currentSpecReportUserAccessLock.Lock()
-	defer suite.currentSpecReportUserAccessLock.Unlock()
+	suite.selectiveLock.Lock()
+	defer suite.selectiveLock.Unlock()
 	if suite.phase != PhaseRun {
 		return types.GinkgoErrors.AddReportEntryNotDuringRunPhase(entry.Location)
 	}
 	suite.currentSpecReport.ReportEntries = append(suite.currentSpecReport.ReportEntries, entry)
 	return nil
+}
+
+func (suite *Suite) generateProgressReport(fullReport bool) types.ProgressReport {
+	suite.selectiveLock.Lock()
+	defer suite.selectiveLock.Unlock()
+
+	stepCursor := suite.progressStepCursor
+
+	gwOutput := suite.currentSpecReport.CapturedGinkgoWriterOutput + string(suite.writer.Bytes())
+	pr, err := NewProgressReport(suite.isRunningInParallel(), suite.currentSpecReport, suite.currentNode, suite.currentNodeStartTime, stepCursor, gwOutput, suite.config.SourceRoots, fullReport)
+
+	if err != nil {
+		fmt.Printf("{{red}}Failed to generate progress report:{{/}}\n%s\n", err.Error())
+	}
+	return pr
+}
+
+func (suite *Suite) handleProgressSignal() {
+	report := suite.generateProgressReport(false)
+
+	suite.selectiveLock.Lock()
+	suite.currentSpecReport.ProgressReports = append(suite.currentSpecReport.ProgressReports, report.WithoutCapturedGinkgoWriterOutput())
+	suite.selectiveLock.Unlock()
+
+	suite.reporter.EmitProgressReport(report)
+	if suite.isRunningInParallel() {
+		err := suite.client.PostEmitProgressReport(report)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+	}
 }
 
 func (suite *Suite) isRunningInParallel() bool {
@@ -344,11 +405,14 @@ func (suite *Suite) runBeforeSuite(numSpecsThatWillBeRun int) {
 	interruptStatus := suite.interruptHandler.Status()
 	beforeSuiteNode := suite.suiteNodes.FirstNodeWithType(types.NodeTypeBeforeSuite | types.NodeTypeSynchronizedBeforeSuite)
 	if !beforeSuiteNode.IsZero() && !interruptStatus.Interrupted && numSpecsThatWillBeRun > 0 {
+		suite.selectiveLock.Lock()
 		suite.currentSpecReport = types.SpecReport{
 			LeafNodeType:     beforeSuiteNode.NodeType,
 			LeafNodeLocation: beforeSuiteNode.CodeLocation,
 			ParallelProcess:  suite.config.ParallelProcess,
 		}
+		suite.selectiveLock.Unlock()
+
 		suite.reporter.WillRun(suite.currentSpecReport)
 		suite.runSuiteNode(beforeSuiteNode, interruptStatus.Channel)
 		if suite.currentSpecReport.State.Is(types.SpecStateSkipped) {
@@ -362,11 +426,14 @@ func (suite *Suite) runBeforeSuite(numSpecsThatWillBeRun int) {
 func (suite *Suite) runAfterSuiteCleanup(numSpecsThatWillBeRun int) {
 	afterSuiteNode := suite.suiteNodes.FirstNodeWithType(types.NodeTypeAfterSuite | types.NodeTypeSynchronizedAfterSuite)
 	if !afterSuiteNode.IsZero() && numSpecsThatWillBeRun > 0 {
+		suite.selectiveLock.Lock()
 		suite.currentSpecReport = types.SpecReport{
 			LeafNodeType:     afterSuiteNode.NodeType,
 			LeafNodeLocation: afterSuiteNode.CodeLocation,
 			ParallelProcess:  suite.config.ParallelProcess,
 		}
+		suite.selectiveLock.Unlock()
+
 		suite.reporter.WillRun(suite.currentSpecReport)
 		suite.runSuiteNode(afterSuiteNode, suite.interruptHandler.Status().Channel)
 		suite.processCurrentSpecReport()
@@ -375,11 +442,14 @@ func (suite *Suite) runAfterSuiteCleanup(numSpecsThatWillBeRun int) {
 	afterSuiteCleanup := suite.cleanupNodes.WithType(types.NodeTypeCleanupAfterSuite).Reverse()
 	if len(afterSuiteCleanup) > 0 {
 		for _, cleanupNode := range afterSuiteCleanup {
+			suite.selectiveLock.Lock()
 			suite.currentSpecReport = types.SpecReport{
 				LeafNodeType:     cleanupNode.NodeType,
 				LeafNodeLocation: cleanupNode.CodeLocation,
 				ParallelProcess:  suite.config.ParallelProcess,
 			}
+			suite.selectiveLock.Unlock()
+
 			suite.reporter.WillRun(suite.currentSpecReport)
 			suite.runSuiteNode(cleanupNode, suite.interruptHandler.Status().Channel)
 			suite.processCurrentSpecReport()
@@ -389,12 +459,15 @@ func (suite *Suite) runAfterSuiteCleanup(numSpecsThatWillBeRun int) {
 
 func (suite *Suite) runReportAfterSuite() {
 	for _, node := range suite.suiteNodes.WithType(types.NodeTypeReportAfterSuite) {
+		suite.selectiveLock.Lock()
 		suite.currentSpecReport = types.SpecReport{
 			LeafNodeType:     node.NodeType,
 			LeafNodeLocation: node.CodeLocation,
 			LeafNodeText:     node.Text,
 			ParallelProcess:  suite.config.ParallelProcess,
 		}
+		suite.selectiveLock.Unlock()
+
 		suite.reporter.WillRun(suite.currentSpecReport)
 		suite.runReportAfterSuiteNode(node, suite.report)
 		suite.processCurrentSpecReport()
@@ -564,9 +637,16 @@ func (suite *Suite) runNode(node Node, interruptChannel chan interface{}, text s
 		suite.cleanupNodes = suite.cleanupNodes.WithoutNode(node)
 	}
 
+	suite.selectiveLock.Lock()
 	suite.currentNode = node
+	suite.currentNodeStartTime = time.Now()
+	suite.progressStepCursor = ProgressStepCursor{}
+	suite.selectiveLock.Unlock()
 	defer func() {
+		suite.selectiveLock.Lock()
 		suite.currentNode = Node{}
+		suite.currentNodeStartTime = time.Time{}
+		suite.selectiveLock.Unlock()
 	}()
 
 	if suite.config.EmitSpecProgress && !node.MarkedSuppressProgressReporting {
@@ -606,17 +686,44 @@ func (suite *Suite) runNode(node Node, interruptChannel chan interface{}, text s
 		finished = true
 	}()
 
-	select {
-	case outcome := <-outcomeC:
-		failureFromRun := <-failureC
-		if outcome == types.SpecStatePassed {
-			return outcome, types.Failure{}
+	var emitProgressNow <-chan time.Time
+	var progressPoller *time.Timer
+	var pollProgressAfter, pollProgressInterval = suite.config.PollProgressAfter, suite.config.PollProgressInterval
+	if node.PollProgressAfter >= 0 {
+		pollProgressAfter = node.PollProgressAfter
+	}
+	if node.PollProgressInterval >= 0 {
+		pollProgressInterval = node.PollProgressInterval
+	}
+
+	if pollProgressAfter > 0 {
+		progressPoller = time.NewTimer(pollProgressAfter)
+		emitProgressNow = progressPoller.C
+		defer progressPoller.Stop()
+	}
+
+	for {
+		select {
+		case outcome := <-outcomeC:
+			failureFromRun := <-failureC
+			if outcome == types.SpecStatePassed {
+				return outcome, types.Failure{}
+			}
+			failure.Message, failure.Location, failure.ForwardedPanic = failureFromRun.Message, failureFromRun.Location, failureFromRun.ForwardedPanic
+			return outcome, failure
+		case <-interruptChannel:
+			reason, includeProgressReport := suite.interruptHandler.InterruptMessage()
+			failure.Message, failure.Location = reason, node.CodeLocation
+			if includeProgressReport {
+				failure.ProgressReport = suite.generateProgressReport(true).WithoutCapturedGinkgoWriterOutput()
+			}
+			return types.SpecStateInterrupted, failure
+		case <-emitProgressNow:
+			suite.handleProgressSignal()
+			if pollProgressInterval > 0 {
+				progressPoller.Reset(pollProgressInterval)
+			}
 		}
-		failure.Message, failure.Location, failure.ForwardedPanic = failureFromRun.Message, failureFromRun.Location, failureFromRun.ForwardedPanic
-		return outcome, failure
-	case <-interruptChannel:
-		failure.Message, failure.Location = suite.interruptHandler.InterruptMessageWithStackTraces(), node.CodeLocation
-		return types.SpecStateInterrupted, failure
 	}
 }
 
