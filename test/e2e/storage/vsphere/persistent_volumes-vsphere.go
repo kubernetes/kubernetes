@@ -75,35 +75,48 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() 
 		volLabel = labels.Set{e2epv.VolumeSelectorKey: ns}
 		selector = metav1.SetAsLabelSelector(volLabel)
 
-		if volumePath == "" {
-			volumePath, err = nodeInfo.VSphere.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
-			framework.ExpectNoError(err)
-			pvConfig = e2epv.PersistentVolumeConfig{
-				NamePrefix: "vspherepv-",
-				Labels:     volLabel,
-				PVSource: v1.PersistentVolumeSource{
-					VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
-						VolumePath: volumePath,
-						FSType:     "ext4",
-					},
+		volumePath, err = nodeInfo.VSphere.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
+		framework.ExpectNoError(err)
+		ginkgo.DeferCleanup(func() {
+			nodeInfo.VSphere.DeleteVolume(volumePath, nodeInfo.DataCenterRef)
+		})
+		pvConfig = e2epv.PersistentVolumeConfig{
+			NamePrefix: "vspherepv-",
+			Labels:     volLabel,
+			PVSource: v1.PersistentVolumeSource{
+				VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
+					VolumePath: volumePath,
+					FSType:     "ext4",
 				},
-				Prebind: nil,
-			}
-			emptyStorageClass := ""
-			pvcConfig = e2epv.PersistentVolumeClaimConfig{
-				Selector:         selector,
-				StorageClassName: &emptyStorageClass,
-			}
+			},
+			Prebind: nil,
+		}
+		emptyStorageClass := ""
+		pvcConfig = e2epv.PersistentVolumeClaimConfig{
+			Selector:         selector,
+			StorageClassName: &emptyStorageClass,
 		}
 		ginkgo.By("Creating the PV and PVC")
 		pv, pvc, err = e2epv.CreatePVPVC(c, f.Timeouts, pvConfig, pvcConfig, ns, false)
 		framework.ExpectNoError(err)
+		ginkgo.DeferCleanup(func() {
+			framework.ExpectNoError(e2epv.DeletePersistentVolume(c, pv.Name), "AfterEach: failed to delete PV ", pv.Name)
+		})
+		ginkgo.DeferCleanup(func() {
+			framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvc.Name, ns), "AfterEach: failed to delete PVC ", pvc.Name)
+		})
 		framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv, pvc))
 
 		ginkgo.By("Creating the Client Pod")
 		clientPod, err = e2epod.CreateClientPod(c, ns, pvc)
 		framework.ExpectNoError(err)
 		node = clientPod.Spec.NodeName
+		ginkgo.DeferCleanup(func() {
+			framework.ExpectNoError(e2epod.DeletePodWithWait(c, clientPod), "AfterEach: failed to delete pod ", clientPod.Name)
+		})
+		ginkgo.DeferCleanup(func() {
+			framework.ExpectNoError(waitForVSphereDiskToDetach(volumePath, node), "wait for vsphere disk to detach")
+		})
 
 		ginkgo.By("Verify disk should be attached to the node")
 		isAttached, err := diskIsAttached(volumePath, node)
@@ -112,42 +125,6 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() 
 			framework.Failf("Disk %s is not attached with the node", volumePath)
 		}
 	})
-
-	ginkgo.AfterEach(func() {
-		framework.Logf("AfterEach: Cleaning up test resources")
-		if c != nil {
-			framework.ExpectNoError(e2epod.DeletePodWithWait(c, clientPod), "AfterEach: failed to delete pod ", clientPod.Name)
-
-			if pv != nil {
-				framework.ExpectNoError(e2epv.DeletePersistentVolume(c, pv.Name), "AfterEach: failed to delete PV ", pv.Name)
-			}
-			if pvc != nil {
-				framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvc.Name, ns), "AfterEach: failed to delete PVC ", pvc.Name)
-			}
-		}
-	})
-	/*
-		Clean up
-
-		1. Wait and verify volume is detached from the node
-		2. Delete PV
-		3. Delete Volume (vmdk)
-	*/
-	framework.AddCleanupAction(func() {
-		// Cleanup actions will be called even when the tests are skipped and leaves namespace unset.
-		if len(ns) > 0 && len(volumePath) > 0 {
-			framework.ExpectNoError(waitForVSphereDiskToDetach(volumePath, node))
-			nodeInfo.VSphere.DeleteVolume(volumePath, nodeInfo.DataCenterRef)
-		}
-	})
-
-	/*
-		Delete the PVC and then the pod.  Expect the pod to succeed in unmounting and detaching PD on delete.
-
-		Test Steps:
-		1. Delete PVC.
-		2. Delete POD, POD deletion should succeed.
-	*/
 
 	ginkgo.It("should test that deleting a PVC before the pod does not cause pod deletion to fail on vsphere volume detach", func() {
 		ginkgo.By("Deleting the Claim")

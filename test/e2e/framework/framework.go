@@ -98,19 +98,6 @@ type Framework struct {
 	// Flaky operation failures in an e2e test can be captured through this.
 	flakeReport *FlakeReport
 
-	// To make sure that this framework cleans up after itself, no matter what,
-	// we install a Cleanup action before each test and clear it after.  If we
-	// should abort, the AfterSuite hook should run all Cleanup actions.
-	cleanupHandle CleanupActionHandle
-
-	// afterEaches is a map of name to function to be called after each test.  These are not
-	// cleared.  The call order is randomized so that no dependencies can grow between
-	// the various afterEaches
-	afterEaches map[string]AfterEachActionFunc
-
-	// beforeEachStarted indicates that BeforeEach has started
-	beforeEachStarted bool
-
 	// configuration for framework's client
 	Options Options
 
@@ -124,9 +111,6 @@ type Framework struct {
 	// Timeouts contains the custom timeouts used during the test execution.
 	Timeouts *TimeoutContext
 }
-
-// AfterEachActionFunc is a function that can be called after each test
-type AfterEachActionFunc func(f *Framework, failed bool)
 
 // TestDataSummary is an interface for managing test data.
 type TestDataSummary interface {
@@ -149,8 +133,10 @@ func NewFrameworkWithCustomTimeouts(baseName string, timeouts *TimeoutContext) *
 	return f
 }
 
-// NewDefaultFramework makes a new framework and sets up a BeforeEach/AfterEach for
-// you (you can write additional before/after each functions).
+// NewDefaultFramework makes a new framework and sets up a BeforeEach which
+// initializes the framework instance. It cleans up with a DeferCleanup,
+// which runs last, so a AfterEach in the test still has a valid framework
+// instance.
 func NewDefaultFramework(baseName string) *Framework {
 	options := Options{
 		ClientQPS:   20,
@@ -169,72 +155,60 @@ func NewFramework(baseName string, options Options, client clientset.Interface) 
 		Timeouts:                 NewTimeoutContextWithDefaults(),
 	}
 
-	f.AddAfterEach("dumpNamespaceInfo", func(f *Framework, failed bool) {
-		if !failed {
-			return
-		}
-		if !TestContext.DumpLogsOnFailure {
-			return
-		}
-		if !f.SkipNamespaceCreation {
-			for _, ns := range f.namespacesToDelete {
-				DumpAllNamespaceInfo(f.ClientSet, ns.Name)
-			}
-		}
-	})
-
 	ginkgo.BeforeEach(f.BeforeEach)
-	ginkgo.AfterEach(f.AfterEach)
 
 	return f
 }
 
 // BeforeEach gets a client and makes a namespace.
 func (f *Framework) BeforeEach() {
-	f.beforeEachStarted = true
+	// DeferCleanup, in constrast to AfterEach, triggers execution in
+	// first-in-last-out order. This ensures that the framework instance
+	// remains valid as long as possible.
+	//
+	// In addition, AfterEach will not be called if a test never gets here.
+	ginkgo.DeferCleanup(f.AfterEach)
 
-	// The fact that we need this feels like a bug in ginkgo.
-	// https://github.com/onsi/ginkgo/v2/issues/222
-	f.cleanupHandle = AddCleanupAction(f.AfterEach)
-	if f.ClientSet == nil {
-		ginkgo.By("Creating a kubernetes client")
-		config, err := LoadConfig()
-		ExpectNoError(err)
+	// Registered later and thus runs before deleting namespaces.
+	ginkgo.DeferCleanup(f.dumpNamespaceInfo)
 
-		config.QPS = f.Options.ClientQPS
-		config.Burst = f.Options.ClientBurst
-		if f.Options.GroupVersion != nil {
-			config.GroupVersion = f.Options.GroupVersion
-		}
-		if TestContext.KubeAPIContentType != "" {
-			config.ContentType = TestContext.KubeAPIContentType
-		}
-		f.clientConfig = rest.CopyConfig(config)
-		f.ClientSet, err = clientset.NewForConfig(config)
-		ExpectNoError(err)
-		f.DynamicClient, err = dynamic.NewForConfig(config)
-		ExpectNoError(err)
+	ginkgo.By("Creating a kubernetes client")
+	config, err := LoadConfig()
+	ExpectNoError(err)
 
-		// create scales getter, set GroupVersion and NegotiatedSerializer to default values
-		// as they are required when creating a REST client.
-		if config.GroupVersion == nil {
-			config.GroupVersion = &schema.GroupVersion{}
-		}
-		if config.NegotiatedSerializer == nil {
-			config.NegotiatedSerializer = scheme.Codecs
-		}
-		restClient, err := rest.RESTClientFor(config)
-		ExpectNoError(err)
-		discoClient, err := discovery.NewDiscoveryClientForConfig(config)
-		ExpectNoError(err)
-		cachedDiscoClient := cacheddiscovery.NewMemCacheClient(discoClient)
-		restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscoClient)
-		restMapper.Reset()
-		resolver := scaleclient.NewDiscoveryScaleKindResolver(cachedDiscoClient)
-		f.ScalesGetter = scaleclient.New(restClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
-
-		TestContext.CloudConfig.Provider.FrameworkBeforeEach(f)
+	config.QPS = f.Options.ClientQPS
+	config.Burst = f.Options.ClientBurst
+	if f.Options.GroupVersion != nil {
+		config.GroupVersion = f.Options.GroupVersion
 	}
+	if TestContext.KubeAPIContentType != "" {
+		config.ContentType = TestContext.KubeAPIContentType
+	}
+	f.clientConfig = rest.CopyConfig(config)
+	f.ClientSet, err = clientset.NewForConfig(config)
+	ExpectNoError(err)
+	f.DynamicClient, err = dynamic.NewForConfig(config)
+	ExpectNoError(err)
+
+	// create scales getter, set GroupVersion and NegotiatedSerializer to default values
+	// as they are required when creating a REST client.
+	if config.GroupVersion == nil {
+		config.GroupVersion = &schema.GroupVersion{}
+	}
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = scheme.Codecs
+	}
+	restClient, err := rest.RESTClientFor(config)
+	ExpectNoError(err)
+	discoClient, err := discovery.NewDiscoveryClientForConfig(config)
+	ExpectNoError(err)
+	cachedDiscoClient := cacheddiscovery.NewMemCacheClient(discoClient)
+	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscoClient)
+	restMapper.Reset()
+	resolver := scaleclient.NewDiscoveryScaleKindResolver(cachedDiscoClient)
+	f.ScalesGetter = scaleclient.New(restClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
+
+	TestContext.CloudConfig.Provider.FrameworkBeforeEach(f)
 
 	if !f.SkipNamespaceCreation {
 		ginkgo.By(fmt.Sprintf("Building a namespace api object, basename %s", f.BaseName))
@@ -317,6 +291,22 @@ func (f *Framework) BeforeEach() {
 	f.flakeReport = NewFlakeReport()
 }
 
+func (f *Framework) dumpNamespaceInfo() {
+	if !ginkgo.CurrentSpecReport().Failed() {
+		return
+	}
+	if !TestContext.DumpLogsOnFailure {
+		return
+	}
+	ginkgo.By("dump namespace information after failure", func() {
+		if !f.SkipNamespaceCreation {
+			for _, ns := range f.namespacesToDelete {
+				DumpAllNamespaceInfo(f.ClientSet, ns.Name)
+			}
+		}
+	})
+}
+
 // printSummaries prints summaries of tests.
 func printSummaries(summaries []TestDataSummary, testBaseName string) {
 	now := time.Now()
@@ -354,29 +344,8 @@ func printSummaries(summaries []TestDataSummary, testBaseName string) {
 	}
 }
 
-// AddAfterEach is a way to add a function to be called after every test.  The execution order is intentionally random
-// to avoid growing dependencies.  If you register the same name twice, it is a coding error and will panic.
-func (f *Framework) AddAfterEach(name string, fn AfterEachActionFunc) {
-	if _, ok := f.afterEaches[name]; ok {
-		panic(fmt.Sprintf("%q is already registered", name))
-	}
-
-	if f.afterEaches == nil {
-		f.afterEaches = map[string]AfterEachActionFunc{}
-	}
-	f.afterEaches[name] = fn
-}
-
 // AfterEach deletes the namespace, after reading its events.
 func (f *Framework) AfterEach() {
-	// If BeforeEach never started AfterEach should be skipped.
-	// Currently some tests under e2e/storage have this condition.
-	if !f.beforeEachStarted {
-		return
-	}
-
-	RemoveCleanupAction(f.cleanupHandle)
-
 	// This should not happen. Given ClientSet is a public field a test must have updated it!
 	// Error out early before any API calls during cleanup.
 	if f.ClientSet == nil {
@@ -429,11 +398,6 @@ func (f *Framework) AfterEach() {
 			Failf(strings.Join(messages, ","))
 		}
 	}()
-
-	// run all aftereach functions in random order to ensure no dependencies grow
-	for _, afterEachFn := range f.afterEaches {
-		afterEachFn(f, ginkgo.CurrentSpecReport().Failed())
-	}
 
 	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" && f.gatherer != nil {
 		ginkgo.By("Collecting resource usage data")

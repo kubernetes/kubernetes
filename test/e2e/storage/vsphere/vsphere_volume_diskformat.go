@@ -65,7 +65,6 @@ var _ = utils.SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 		client            clientset.Interface
 		namespace         string
 		nodeName          string
-		isNodeLabeled     bool
 		nodeKeyValueLabel map[string]string
 		nodeLabelValue    string
 	)
@@ -74,20 +73,11 @@ var _ = utils.SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		if !isNodeLabeled {
-			nodeName = GetReadySchedulableRandomNodeInfo().Name
-			nodeLabelValue = "vsphere_e2e_" + string(uuid.NewUUID())
-			nodeKeyValueLabel = make(map[string]string)
-			nodeKeyValueLabel[NodeLabelKey] = nodeLabelValue
-			framework.AddOrUpdateLabelOnNode(client, nodeName, NodeLabelKey, nodeLabelValue)
-			isNodeLabeled = true
-		}
-	})
-	framework.AddCleanupAction(func() {
-		// Cleanup actions will be called even when the tests are skipped and leaves namespace unset.
-		if len(namespace) > 0 && len(nodeLabelValue) > 0 {
-			framework.RemoveLabelOffNode(client, nodeName, NodeLabelKey)
-		}
+		nodeName = GetReadySchedulableRandomNodeInfo().Name
+		nodeLabelValue = "vsphere_e2e_" + string(uuid.NewUUID())
+		nodeKeyValueLabel = map[string]string{NodeLabelKey: nodeLabelValue}
+		framework.AddOrUpdateLabelOnNode(client, nodeName, NodeLabelKey, nodeLabelValue)
+		ginkgo.DeferCleanup(framework.RemoveLabelOffNode, client, nodeName, NodeLabelKey)
 	})
 
 	ginkgo.It("verify disk format type - eagerzeroedthick is honored for dynamically provisioned pv using storageclass", func() {

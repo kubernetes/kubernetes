@@ -85,7 +85,6 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 var _ = ginkgo.SynchronizedAfterSuite(func() {
 	progressReporter.SetEndMsg()
-	CleanupSuite()
 }, func() {
 	AfterSuiteActions()
 })
