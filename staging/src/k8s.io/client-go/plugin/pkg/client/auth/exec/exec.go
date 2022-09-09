@@ -200,6 +200,9 @@ func newAuthenticator(c *cache, isTerminalFunc func(int) bool, config *api.ExecC
 		environ:         os.Environ,
 
 		connTracker: connTracker,
+		dialerWithConnTracker: func(dial connrotation.DialFunc) connrotation.DialFunc {
+			return connrotation.NewDialerWithTracker(dial, connTracker).DialContext
+		},
 	}
 
 	for _, env := range config.Env {
@@ -241,6 +244,11 @@ func isInteractive(isTerminalFunc func(int) bool, config *api.ExecConfig) (bool,
 	return shouldBeInteractive, nil
 }
 
+type connectionTracker interface {
+	CloseAllGraceful()
+	Len() int
+}
+
 // Authenticator is a client credential provider that rotates credentials by executing a plugin.
 // The plugin input and output are defined by the API group client.authentication.k8s.io.
 type Authenticator struct {
@@ -266,7 +274,9 @@ type Authenticator struct {
 	environ         func() []string
 
 	// connTracker tracks all connections opened that we need to close when rotating a client certificate
-	connTracker *connrotation.ConnectionTracker
+	// stubbable for testing
+	connTracker           connectionTracker
+	dialerWithConnTracker func(connrotation.DialFunc) connrotation.DialFunc
 
 	// Cached results.
 	//
@@ -314,8 +324,7 @@ func (a *Authenticator) UpdateTransportConfig(c *transport.Config) error {
 	if c.Dial != nil {
 		// if c has a custom dialer, we have to wrap it
 		// TLS config caching is not supported for this config
-		d := connrotation.NewDialerWithTracker(c.Dial, a.connTracker)
-		c.Dial = d.DialContext
+		c.Dial = a.dialerWithConnTracker(c.Dial)
 		c.DialHolder = nil
 	} else {
 		c.Dial = a.dial.Dial
@@ -504,7 +513,7 @@ func (a *Authenticator) refreshCredsLocked() error {
 		if oldCreds.cert != nil && oldCreds.cert.Leaf != nil {
 			metrics.ClientCertRotationAge.Observe(time.Since(oldCreds.cert.Leaf.NotBefore))
 		}
-		a.connTracker.CloseAll()
+		a.connTracker.CloseAllGraceful() // only close connections that are past the TLS handshake
 	}
 
 	expiry := time.Time{}

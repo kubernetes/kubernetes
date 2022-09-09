@@ -25,6 +25,7 @@ import (
 	"context"
 	"net"
 	"sync"
+	"sync/atomic"
 )
 
 // DialFunc is a shorthand for signature of net.DialContext.
@@ -81,8 +82,25 @@ func (c *ConnectionTracker) CloseAll() {
 	c.mu.Unlock()
 
 	for conn := range conns {
-		conn.Close()
+		_ = conn.Close()
 	}
+}
+
+// CloseAllGraceful forcibly closes all tracked connections that have been marked by GetCertOrTLSHandshakeComplete.
+func (c *ConnectionTracker) CloseAllGraceful() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for conn := range c.conns {
+		conn.closeIfGetCertOrTLSHandshakeComplete() // let conn remove itself from c.conns if it is actually closed
+	}
+}
+
+func (c *ConnectionTracker) Len() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return len(c.conns)
 }
 
 // Track adds the connection to the list of tracked connections,
@@ -122,7 +140,14 @@ func (d *Dialer) DialContext(ctx context.Context, network, address string) (net.
 	return d.ConnectionTracker.Track(conn), nil
 }
 
+type GracefulRotation interface {
+	GetCertOrTLSHandshakeComplete()
+}
+
+var _ GracefulRotation = &closableConn{}
+
 type closableConn struct {
+	marked  atomic.Bool
 	onClose func()
 	net.Conn
 }
@@ -130,4 +155,18 @@ type closableConn struct {
 func (c *closableConn) Close() error {
 	go c.onClose()
 	return c.Conn.Close()
+}
+
+func (c *closableConn) closeIfGetCertOrTLSHandshakeComplete() {
+	if !c.marked.Load() {
+		return
+	}
+	_ = c.Close()
+}
+
+func (c *closableConn) GetCertOrTLSHandshakeComplete() {
+	if rotation, ok := c.Conn.(GracefulRotation); ok {
+		rotation.GetCertOrTLSHandshakeComplete()
+	}
+	c.marked.Store(true)
 }

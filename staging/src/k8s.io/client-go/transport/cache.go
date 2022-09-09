@@ -18,6 +18,7 @@ package transport
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -27,6 +28,7 @@ import (
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/connrotation"
 )
 
 // TlsTransportCache caches TLS http.RoundTrippers different configurations. The
@@ -107,9 +109,11 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		}).DialContext
 	}
 
+	hasGetCert := tlsConfig != nil && tlsConfig.GetClientCertificate != nil
+
 	// If we use are reloading files, we need to handle certificate rotation properly
 	// TODO(jackkleeman): We can also add rotation here when config.HasCertCallback() is true
-	if config.TLS.ReloadTLSFiles {
+	if hasGetCert && config.TLS.ReloadTLSFiles {
 		dynamicCertDialer := certRotatingDialer(tlsConfig.GetClientCertificate, dial)
 		tlsConfig.GetClientCertificate = dynamicCertDialer.GetClientCertificate
 		dial = dynamicCertDialer.connDialer.DialContext
@@ -130,12 +134,63 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		DisableCompression:  config.DisableCompression,
 	})
 
+	isStatic := config.HasCertAuth() && !config.TLS.ReloadTLSFiles
+	if !isStatic && hasGetCert {
+		setDialTLSContextForRotation(transport)
+	}
+
 	if canCache {
 		// Cache a single transport for these options
 		c.transports[key] = transport
 	}
 
 	return transport, nil
+}
+
+func setDialTLSContextForRotation(rt *http.Transport) {
+	rt.DialTLSContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		rawConn, err := rt.DialContext(ctx, network, addr)
+		if err != nil {
+			return nil, err
+		}
+
+		// make a copy to avoid polluting global cache
+		tlsConfig := rt.TLSClientConfig.Clone()
+
+		// if no ServerName is set, infer it from the addr we are connecting to
+		if tlsConfig.ServerName == "" {
+			hostname, _, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, err
+			}
+			tlsConfig.ServerName = hostname
+		}
+
+		// inform our connection rotation logic of when the TLS handshake is complete
+		rotation, ok := rawConn.(connrotation.GracefulRotation)
+		if !ok {
+			return nil, fmt.Errorf("dialer must provide connection that implements connrotation.GracefulRotation")
+		}
+
+		defer rotation.GetCertOrTLSHandshakeComplete() // in case cert callback is not called
+
+		getCert := tlsConfig.GetClientCertificate
+		tlsConfig.GetClientCertificate = func(cri *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+			defer rotation.GetCertOrTLSHandshakeComplete() // the returned cert is now "in use"
+			return getCert(cri)
+		}
+
+		handshakeCtx, cancel := context.WithTimeout(ctx, rt.TLSHandshakeTimeout)
+		defer cancel()
+
+		conn := tls.Client(rawConn, tlsConfig)
+		if err := conn.HandshakeContext(handshakeCtx); err != nil {
+			go rawConn.Close()
+			return nil, err
+		}
+
+		return conn, nil
+	}
 }
 
 // tlsConfigKey returns a unique key for tls.Config objects returned from TLSConfigFor
