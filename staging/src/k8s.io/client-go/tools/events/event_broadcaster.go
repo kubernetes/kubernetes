@@ -56,9 +56,11 @@ var defaultSleepDuration = 10 * time.Second
 
 // TODO: validate impact of copying and investigate hashing
 type eventKey struct {
+	eventType           string
 	action              string
 	reason              string
 	reportingController string
+	reportingInstance   string
 	regarding           corev1.ObjectReference
 	related             corev1.ObjectReference
 }
@@ -289,9 +291,11 @@ func createPatchBytesForSeries(event *eventsv1.Event) ([]byte, error) {
 
 func getKey(event *eventsv1.Event) eventKey {
 	key := eventKey{
+		eventType:           event.Type,
 		action:              event.Action,
 		reason:              event.Reason,
 		reportingController: event.ReportingController,
+		reportingInstance:   event.ReportingInstance,
 		regarding:           event.Regarding,
 	}
 	if event.Related != nil {
