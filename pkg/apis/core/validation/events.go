@@ -48,13 +48,12 @@ func ValidateEventCreate(event *core.Event, requestVersion schema.GroupVersion) 
 
 	// Strict validation applies to creation via events.k8s.io/v1 API and newer.
 	allErrs = append(allErrs, ValidateObjectMeta(&event.ObjectMeta, true, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, validateV1EventSeries(event)...)
 	zeroTime := time.Time{}
 	if event.EventTime.Time == zeroTime {
 		allErrs = append(allErrs, field.Required(field.NewPath("eventTime"), ""))
 	}
 	if event.Type != v1.EventTypeNormal && event.Type != v1.EventTypeWarning {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("type"), "", fmt.Sprintf("has invalid value: %v", event.Type)))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("type"), event.Type, fmt.Sprintf("should be %q or %q", v1.EventTypeNormal, v1.EventTypeWarning)))
 	}
 	if event.FirstTimestamp.Time != zeroTime {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("firstTimestamp"), "", "needs to be unset"))
@@ -67,6 +66,9 @@ func ValidateEventCreate(event *core.Event, requestVersion schema.GroupVersion) 
 	}
 	if event.Source.Component != "" || event.Source.Host != "" {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("source"), "", "needs to be unset"))
+	}
+	if event.Series != nil {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("series"), event.Series, "needs to be nil when an event is created"))
 	}
 	return allErrs
 }
@@ -93,7 +95,6 @@ func ValidateEventUpdate(newEvent, oldEvent *core.Event, requestVersion schema.G
 	allErrs = append(allErrs, ValidateImmutableField(newEvent.FirstTimestamp, oldEvent.FirstTimestamp, field.NewPath("firstTimestamp"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newEvent.LastTimestamp, oldEvent.LastTimestamp, field.NewPath("lastTimestamp"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newEvent.Count, oldEvent.Count, field.NewPath("count"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newEvent.Reason, oldEvent.Reason, field.NewPath("reason"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newEvent.Type, oldEvent.Type, field.NewPath("type"))...)
 
 	// Disallow changes to eventTime greater than microsecond-level precision.
