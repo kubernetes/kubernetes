@@ -17,6 +17,7 @@ limitations under the License.
 package transport
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -50,6 +51,9 @@ type tlsCacheKey struct {
 	serverName         string
 	nextProtos         string
 	disableCompression bool
+	// these functions are wrapped to allow them to be used as map keys
+	getCert *GetCertHolder
+	dial    *DialHolder
 }
 
 func (t tlsCacheKey) String() string {
@@ -57,7 +61,8 @@ func (t tlsCacheKey) String() string {
 	if len(t.keyData) > 0 {
 		keyText = "<redacted>"
 	}
-	return fmt.Sprintf("insecure:%v, caData:%#v, certData:%#v, keyData:%s, serverName:%s, disableCompression:%t", t.insecure, t.caData, t.certData, keyText, t.serverName, t.disableCompression)
+	return fmt.Sprintf("insecure:%v, caData:%#v, certData:%#v, keyData:%s, serverName:%s, disableCompression:%t, getCert:%p, dial:%p",
+		t.insecure, t.caData, t.certData, keyText, t.serverName, t.disableCompression, t.getCert, t.dial)
 }
 
 func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
@@ -87,8 +92,10 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		return http.DefaultTransport, nil
 	}
 
-	dial := config.Dial
-	if dial == nil {
+	var dial func(ctx context.Context, network, address string) (net.Conn, error)
+	if config.Dial != nil {
+		dial = config.Dial
+	} else {
 		dial = (&net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
@@ -133,8 +140,16 @@ func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 		return tlsCacheKey{}, false, err
 	}
 
-	if c.TLS.GetCert != nil || c.Dial != nil || c.Proxy != nil {
+	if c.Proxy != nil {
 		// cannot determine equality for functions
+		return tlsCacheKey{}, false, nil
+	}
+	if c.Dial != nil && c.DialHolder == nil {
+		// cannot determine equality for dial function that doesn't have non-nil DialHolder set as well
+		return tlsCacheKey{}, false, nil
+	}
+	if c.TLS.GetCert != nil && c.TLS.GetCertHolder == nil {
+		// cannot determine equality for getCert function that doesn't have non-nil GetCertHolder set as well
 		return tlsCacheKey{}, false, nil
 	}
 
@@ -144,6 +159,8 @@ func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 		serverName:         c.TLS.ServerName,
 		nextProtos:         strings.Join(c.TLS.NextProtos, ","),
 		disableCompression: c.DisableCompression,
+		getCert:            c.TLS.GetCertHolder,
+		dial:               c.DialHolder,
 	}
 
 	if c.TLS.ReloadTLSFiles {
