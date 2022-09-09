@@ -110,10 +110,11 @@ func createAggregatorConfig(
 			SharedInformerFactory: externalInformers,
 		},
 		ExtraConfig: aggregatorapiserver.ExtraConfig{
-			ProxyClientCertFile: commandOptions.ProxyClientCertFile,
-			ProxyClientKeyFile:  commandOptions.ProxyClientKeyFile,
-			ServiceResolver:     serviceResolver,
-			ProxyTransport:      proxyTransport,
+			ProxyClientCertFile:       commandOptions.ProxyClientCertFile,
+			ProxyClientKeyFile:        commandOptions.ProxyClientKeyFile,
+			ServiceResolver:           serviceResolver,
+			ProxyTransport:            proxyTransport,
+			RejectForwardingRedirects: commandOptions.AggregatorRejectForwardingRedirects,
 		},
 	}
 
