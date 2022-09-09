@@ -989,12 +989,6 @@ func TestPrebindPlugin(t *testing.T) {
 			succeedOnRetry: true,
 		},
 		{
-			name:           "reject on 1st try but succeed on retry",
-			fail:           false,
-			reject:         true,
-			succeedOnRetry: true,
-		},
-		{
 			name:             "failure on preBind moves unschedulable pods",
 			fail:             true,
 			unschedulablePod: st.MakePod().Name("unschedulable-pod").Namespace(testCtx.NS.Name).Container(imageutils.GetPauseImageName()).Obj(),
@@ -1022,13 +1016,17 @@ func TestPrebindPlugin(t *testing.T) {
 				t.Errorf("Error while creating a test pod: %v", err)
 			}
 
-			if test.fail || test.reject {
+			if test.fail {
 				if test.succeedOnRetry {
 					if err = testutils.WaitForPodToScheduleWithTimeout(testCtx.ClientSet, pod, 10*time.Second); err != nil {
 						t.Errorf("Expected the pod to be schedulable on retry, but got an error: %v", err)
 					}
 				} else if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
 					t.Errorf("Expected a scheduling error, but didn't get it. error: %v", err)
+				}
+			} else if test.reject {
+				if err = testutils.WaitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
+					t.Errorf("Expected the pod to be unschedulable")
 				}
 			} else if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
 				t.Errorf("Expected the pod to be scheduled. error: %v", err)
@@ -1212,27 +1210,27 @@ func TestUnReservePermitPlugins(t *testing.T) {
 	tests := []struct {
 		name   string
 		plugin *PermitPlugin
-		fail   bool
+		reject bool
 	}{
 		{
-			name: "All Reserve plugins passed, but a Permit plugin was rejected",
-			fail: true,
+			name:   "All Reserve plugins passed, but a Permit plugin was rejected",
+			reject: true,
 			plugin: &PermitPlugin{
 				name:         "rejectedPermitPlugin",
 				rejectPermit: true,
 			},
 		},
 		{
-			name: "All Reserve plugins passed, but a Permit plugin timeout in waiting",
-			fail: true,
+			name:   "All Reserve plugins passed, but a Permit plugin timeout in waiting",
+			reject: true,
 			plugin: &PermitPlugin{
 				name:          "timeoutPermitPlugin",
 				timeoutPermit: true,
 			},
 		},
 		{
-			name: "The Permit plugin succeed",
-			fail: false,
+			name:   "The Permit plugin succeed",
+			reject: false,
 			plugin: &PermitPlugin{
 				name: "succeedPermitPlugin",
 			},
@@ -1264,7 +1262,7 @@ func TestUnReservePermitPlugins(t *testing.T) {
 				t.Errorf("Error while creating a test pod: %v", err)
 			}
 
-			if test.fail {
+			if test.reject {
 				if err = waitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
 				}
@@ -1296,22 +1294,22 @@ func TestUnReservePermitPlugins(t *testing.T) {
 // TestUnReservePreBindPlugins tests unreserve of Prebind plugins.
 func TestUnReservePreBindPlugins(t *testing.T) {
 	tests := []struct {
-		name   string
-		plugin *PreBindPlugin
-		fail   bool
+		name       string
+		plugin     *PreBindPlugin
+		wantReject bool
 	}{
 		{
-			name: "All Reserve plugins passed, but a PreBind plugin failed",
-			fail: true,
+			name:       "All Reserve plugins passed, but a PreBind plugin failed",
+			wantReject: true,
 			plugin: &PreBindPlugin{
 				podUIDs:       make(map[types.UID]struct{}),
 				rejectPreBind: true,
 			},
 		},
 		{
-			name:   "All Reserve plugins passed, and PreBind plugin succeed",
-			fail:   false,
-			plugin: &PreBindPlugin{podUIDs: make(map[types.UID]struct{})},
+			name:       "All Reserve plugins passed, and PreBind plugin succeed",
+			wantReject: false,
+			plugin:     &PreBindPlugin{podUIDs: make(map[types.UID]struct{})},
 		},
 	}
 
@@ -1340,8 +1338,8 @@ func TestUnReservePreBindPlugins(t *testing.T) {
 				t.Errorf("Error while creating a test pod: %v", err)
 			}
 
-			if test.fail {
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+			if test.wantReject {
+				if err = waitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Expected a reasons other than Unschedulable, but got: %v", err)
 				}
 

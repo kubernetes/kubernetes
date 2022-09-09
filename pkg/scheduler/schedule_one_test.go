@@ -1061,9 +1061,9 @@ func TestSchedulerBinding(t *testing.T) {
 				nodeInfoSnapshot:         nil,
 				percentageOfNodesToScore: 0,
 			}
-			err = sched.bind(ctx, fwk, pod, "node", nil)
-			if err != nil {
-				t.Error(err)
+			status := sched.bind(ctx, fwk, pod, "node", nil)
+			if !status.IsSuccess() {
+				t.Error(status.AsError())
 			}
 
 			// Checking default binding.
