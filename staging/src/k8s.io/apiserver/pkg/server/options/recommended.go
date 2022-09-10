@@ -141,7 +141,7 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 			}
 			config.FlowControl = utilflowcontrol.New(
 				config.SharedInformerFactory,
-				kubernetes.NewForConfigOrDie(config.ClientConfig).FlowcontrolV1beta2(),
+				kubernetes.NewForConfigOrDie(config.ClientConfig).FlowcontrolV1beta3(),
 				config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight,
 				config.RequestTimeout/4,
 			)
