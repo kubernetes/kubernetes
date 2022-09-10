@@ -43,13 +43,13 @@ type awsElasticBlockStoreAttacher struct {
 	awsVolumes aws.Volumes
 }
 
-var _ volume.Attacher = &awsElasticBlockStoreAttacher{}
+var _ volume.Attacher = (*awsElasticBlockStoreAttacher)(nil)
 
-var _ volume.DeviceMounter = &awsElasticBlockStoreAttacher{}
+var _ volume.DeviceMounter = (*awsElasticBlockStoreAttacher)(nil)
 
-var _ volume.AttachableVolumePlugin = &awsElasticBlockStorePlugin{}
+var _ volume.AttachableVolumePlugin = (*awsElasticBlockStorePlugin)(nil)
 
-var _ volume.DeviceMountableVolumePlugin = &awsElasticBlockStorePlugin{}
+var _ volume.DeviceMountableVolumePlugin = (*awsElasticBlockStorePlugin)(nil)
 
 func (plugin *awsElasticBlockStorePlugin) NewAttacher() (volume.Attacher, error) {
 	awsCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
@@ -234,7 +234,7 @@ func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, dev
 		return err
 	}
 
-	options := []string{}
+	var options []string
 	if readOnly {
 		options = append(options, "ro")
 	}
@@ -255,9 +255,9 @@ type awsElasticBlockStoreDetacher struct {
 	awsVolumes aws.Volumes
 }
 
-var _ volume.Detacher = &awsElasticBlockStoreDetacher{}
+var _ volume.Detacher = (*awsElasticBlockStoreDetacher)(nil)
 
-var _ volume.DeviceUnmounter = &awsElasticBlockStoreDetacher{}
+var _ volume.DeviceUnmounter = (*awsElasticBlockStoreDetacher)(nil)
 
 func (plugin *awsElasticBlockStorePlugin) NewDetacher() (volume.Detacher, error) {
 	awsCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
