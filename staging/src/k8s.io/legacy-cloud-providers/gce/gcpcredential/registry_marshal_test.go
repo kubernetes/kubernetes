@@ -19,9 +19,10 @@ package gcpcredential
 import (
 	"encoding/base64"
 	"encoding/json"
-	"k8s.io/cloud-provider/credentialconfig"
 	"reflect"
 	"testing"
+
+	"k8s.io/cloud-provider/credentialconfig"
 )
 
 // Code copied (and edited to replace DockerConfig* with RegistryConfig*) from:

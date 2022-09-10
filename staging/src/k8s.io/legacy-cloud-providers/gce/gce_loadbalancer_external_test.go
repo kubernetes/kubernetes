@@ -22,10 +22,11 @@ package gce
 import (
 	"context"
 	"fmt"
-	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	compute "google.golang.org/api/compute/v1"
@@ -81,37 +82,47 @@ func TestEnsureStaticIPWithTier(t *testing.T) {
 	t.Parallel()
 
 	s, err := fakeGCECloud(DefaultTestClusterValues())
-	require.NoError(t, err)
+	if err != nil {
+		serviceName := "some-service"
 
-	serviceName := "some-service"
-
-	for desc, tc := range map[string]struct {
-		name     string
-		netTier  cloud.NetworkTier
-		expected string
-	}{
-		"Premium (default)": {
-			name:     "foo-1",
-			netTier:  cloud.NetworkTierPremium,
-			expected: "PREMIUM",
-		},
-		"Standard": {
-			name:     "foo-2",
-			netTier:  cloud.NetworkTierStandard,
-			expected: "STANDARD",
-		},
-	} {
-		t.Run(desc, func(t *testing.T) {
-			ip, existed, err := ensureStaticIP(s, tc.name, serviceName, s.region, "", tc.netTier)
-			assert.NoError(t, err)
-			assert.False(t, existed)
-			assert.NotEqual(t, ip, "")
-			// Get the Address from the fake address service and verify that the tier
-			// is set correctly.
-			Addr, err := s.GetRegionAddress(tc.name, s.region)
-			require.NoError(t, err)
-			assert.Equal(t, tc.expected, Addr.NetworkTier)
-		})
+		for desc, tc := range map[string]struct {
+			name     string
+			netTier  cloud.NetworkTier
+			expected string
+		}{
+			"Premium (default)": {
+				name:     "foo-1",
+				netTier:  cloud.NetworkTierPremium,
+				expected: "PREMIUM",
+			},
+			"Standard": {
+				name:     "foo-2",
+				netTier:  cloud.NetworkTierStandard,
+				expected: "STANDARD",
+			},
+		} {
+			t.Run(desc, func(t *testing.T) {
+				ip, existed, err := ensureStaticIP(s, tc.name, serviceName, s.region, "", tc.netTier)
+				if err != nil {
+					t.Error(err)
+				}
+				if existed != false {
+					t.Errorf("TestName(%s): want: %t, got: %t", desc, false, existed)
+				}
+				if ip != "" {
+					t.Errorf("TestName(%s): want: %s, got: %s", desc, "", ip)
+				}
+				// Get the Address from the fake address service and verify that the tier
+				// is set correctly.
+				Addr, err := s.GetRegionAddress(tc.name, s.region)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if tc.expected != Addr.NetworkTier {
+					t.Errorf("TestName(%s): want: %s, got: %s", desc, tc.expected, Addr.NetworkTier)
+				}
+			})
+		}
 	}
 }
 
@@ -166,8 +177,12 @@ func TestVerifyRequestedIP(t *testing.T) {
 				s.ReserveRegionAddress(addr, s.region)
 			}
 			isUserOwnedIP, err := verifyUserRequestedIP(s, s.region, tc.requestedIP, tc.fwdRuleIP, lbRef, tc.netTier)
-			assert.Equal(t, tc.expectErr, err != nil, fmt.Sprintf("err: %v", err))
-			assert.Equal(t, tc.expectUserOwned, isUserOwnedIP)
+			if tc.expectErr != (err != nil) {
+				t.Error(err)
+			}
+			if tc.expectUserOwned != isUserOwnedIP {
+				t.Errorf("TestName(%s): want: %t, got: %t", desc, tc.expectUserOwned, isUserOwnedIP)
+			}
 		})
 	}
 }
@@ -216,17 +231,25 @@ func TestCreateForwardingRuleWithTier(t *testing.T) {
 	} {
 		t.Run(desc, func(t *testing.T) {
 			s, err := fakeGCECloud(vals)
-			require.NoError(t, err)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			lbName := tc.expectedRule.Name
 			ipAddr := tc.expectedRule.IPAddress
 
 			err = createForwardingRule(s, lbName, serviceName, s.region, ipAddr, target, ports, tc.netTier)
-			assert.NoError(t, err)
+			if err != nil {
+				t.Error(err)
+			}
 
 			Rule, err := s.GetRegionForwardingRule(lbName, s.region)
-			assert.NoError(t, err)
-			assert.Equal(t, tc.expectedRule, Rule)
+			if err != nil {
+				t.Error(err)
+			}
+			if !cmp.Equal(tc.expectedRule, Rule) {
+				t.Errorf("TestName(%s): want: %v, got: %v", desc, tc.expectedRule, Rule)
+			}
 		})
 	}
 }
@@ -237,7 +260,9 @@ func TestDeleteAddressWithWrongTier(t *testing.T) {
 	lbRef := "test-lb"
 
 	s, err := fakeGCECloud(DefaultTestClusterValues())
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for desc, tc := range map[string]struct {
 		addrName     string
@@ -275,16 +300,24 @@ func TestDeleteAddressWithWrongTier(t *testing.T) {
 
 			// Sanity check to ensure we inject the right address.
 			_, err = s.GetRegionAddress(tc.addrName, s.region)
-			require.NoError(t, err)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			err = deleteAddressWithWrongTier(s, s.region, tc.addrName, lbRef, tc.netTier)
-			assert.NoError(t, err)
+			if err != nil {
+				t.Error(err)
+			}
 			// Check whether the address still exists.
 			_, err = s.GetRegionAddress(tc.addrName, s.region)
-			if tc.expectDelete {
-				assert.True(t, isNotFound(err))
-			} else {
-				assert.NoError(t, err)
+			if !tc.expectDelete {
+				if err != nil {
+					t.Error(err)
+				}
+				return
+			}
+			if isNotFound(err) != true {
+				t.Errorf("TestName(%s): want: %t, got: %t", desc, true, isNotFound(err))
 			}
 		})
 	}
@@ -312,10 +345,14 @@ func TestShouldNotRecreateLBWhenNetworkTiersMismatch(t *testing.T) {
 	nodeNames := []string{"test-node-1"}
 
 	gce, err := fakeGCECloud(vals)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	svc := fakeLoadbalancerService("")
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	staticIP := "1.2.3.4"
 	gce.ReserveRegionAddress(&compute.Address{Address: staticIP, Name: "foo", NetworkTier: cloud.NetworkTierStandard.ToGCEValue()}, vals.Region)
 
@@ -377,7 +414,9 @@ func TestShouldNotRecreateLBWhenNetworkTiersMismatch(t *testing.T) {
 
 		lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
 		fwdRule, err := gce.GetRegionForwardingRule(lbName, gce.region)
-		assert.NoError(t, err)
+		if err != nil {
+			t.Error(err)
+		}
 		if fwdRule.NetworkTier != tc.expectNetTier {
 			t.Fatalf("for test case %q, expect fwdRule.NetworkTier == %q, got %v ", tc.desc, tc.expectNetTier, fwdRule.NetworkTier)
 		}
@@ -392,12 +431,18 @@ func TestEnsureExternalLoadBalancer(t *testing.T) {
 	nodeNames := []string{"test-node-1"}
 
 	gce, err := fakeGCECloud(vals)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	svc := fakeLoadbalancerService("")
 	status, err := createExternalLoadBalancer(gce, svc, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, status.Ingress)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(status.Ingress) == 0 {
+		t.Error("Ingress is empty")
+	}
 
 	assertExternalLbResources(t, gce, svc, vals, nodeNames)
 }
@@ -409,24 +454,34 @@ func TestUpdateExternalLoadBalancer(t *testing.T) {
 	nodeName := "test-node-1"
 
 	gce, err := fakeGCECloud((DefaultTestClusterValues()))
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	svc := fakeLoadbalancerService("")
 	_, err = createExternalLoadBalancer(gce, svc, []string{nodeName}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Error(err)
+	}
 
 	newNodeName := "test-node-2"
 	newNodes, err := createAndInsertNodes(gce, []string{nodeName, newNodeName}, vals.ZoneName)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Error(err)
+	}
 
 	// Add the new node, then check that it is properly added to the TargetPool
 	err = gce.updateExternalLoadBalancer("", svc, newNodes)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Error(err)
+	}
 
 	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
 
 	pool, err := gce.GetTargetPool(lbName, gce.region)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// TODO: when testify is updated to v1.2.0+, use ElementsMatch instead
 	assert.Contains(
@@ -442,40 +497,56 @@ func TestUpdateExternalLoadBalancer(t *testing.T) {
 	)
 
 	newNodes, err = createAndInsertNodes(gce, []string{nodeName}, vals.ZoneName)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Error(err)
+	}
 
 	// Remove the new node by calling updateExternalLoadBalancer with a list
 	// only containing the old node, and test that the TargetPool no longer
 	// contains the new node.
 	err = gce.updateExternalLoadBalancer(vals.ClusterName, svc, newNodes)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Error(err)
+	}
 
 	pool, err = gce.GetTargetPool(lbName, gce.region)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	assert.Equal(
-		t,
-		[]string{fmt.Sprintf("/zones/%s/instances/%s", vals.ZoneName, nodeName)},
-		pool.Instances,
-	)
+	if diff := cmp.Diff([]string{fmt.Sprintf("/zones/%s/instances/%s", vals.ZoneName, nodeName)}, pool.Instances); diff != "" {
+		t.Errorf("want Instances diff (-want +got): %s", diff)
+	}
 
 	anotherNewNodeName := "test-node-3"
 	newNodes, err = createAndInsertNodes(gce, []string{nodeName, newNodeName, anotherNewNodeName}, vals.ZoneName)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Error(err)
+	}
 
 	// delete one of the existing nodes, but include it in the list
 	err = gce.DeleteInstance(gce.ProjectID(), vals.ZoneName, nodeName)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// The update should ignore the reference to non-existent node "test-node-1", but update target pool with rest of the valid nodes.
 	err = gce.updateExternalLoadBalancer(vals.ClusterName, svc, newNodes)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Error(err)
+	}
 
 	pool, err = gce.GetTargetPool(lbName, gce.region)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	namePrefix := fmt.Sprintf("/zones/%s/instances/", vals.ZoneName)
-	assert.ElementsMatch(t, pool.Instances, []string{namePrefix + newNodeName, namePrefix + anotherNewNodeName})
+	targetInstances := []string{namePrefix + newNodeName, namePrefix + anotherNewNodeName}
+	sort.Strings(pool.Instances)
+	if diff := cmp.Diff(targetInstances, pool.Instances); diff != "" {
+		t.Errorf("want Instances diff (-want +got): %s", diff)
+	}
 }
 
 func TestEnsureExternalLoadBalancerDeleted(t *testing.T) {
@@ -483,14 +554,20 @@ func TestEnsureExternalLoadBalancerDeleted(t *testing.T) {
 
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	svc := fakeLoadbalancerService("")
 	_, err = createExternalLoadBalancer(gce, svc, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Error(err)
+	}
 
 	err = gce.ensureExternalLoadBalancerDeleted(vals.ClusterName, vals.ClusterID, svc)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Error(err)
+	}
 
 	assertExternalLbResourcesDeleted(t, gce, svc, vals, true)
 }
@@ -500,14 +577,18 @@ func TestLoadBalancerWrongTierResourceDeletion(t *testing.T) {
 
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	svc := fakeLoadbalancerService("")
 	svc.Annotations = map[string]string{NetworkTierAnnotationKey: "Premium"}
 
 	// cloud.NetworkTier defaults to Premium
 	desiredTier, err := gce.getServiceNetworkTier(svc)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	assert.Equal(t, cloud.NetworkTierPremium, desiredTier)
 
 	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
@@ -524,7 +605,9 @@ func TestLoadBalancerWrongTierResourceDeletion(t *testing.T) {
 		svc.Spec.Ports,
 		cloud.NetworkTierStandard,
 	)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	addressObj := &compute.Address{
 		Name:        lbName,
@@ -533,19 +616,29 @@ func TestLoadBalancerWrongTierResourceDeletion(t *testing.T) {
 	}
 
 	err = gce.ReserveRegionAddress(addressObj, gce.region)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	_, err = createExternalLoadBalancer(gce, svc, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Expect forwarding rule tier to not be Standard
 	tier, err := gce.getNetworkTierFromForwardingRule(lbName, gce.region)
-	assert.NoError(t, err)
-	assert.Equal(t, cloud.NetworkTierDefault.ToGCEValue(), tier)
+	if err != nil {
+		t.Error(err)
+	}
+	if cloud.NetworkTierDefault.ToGCEValue() != tier {
+		t.Errorf("want: %v, got: %v", cloud.NetworkTierDefault.ToGCEValue(), tier)
+	}
 
 	// Expect address to be deleted
 	_, err = gce.GetRegionAddress(lbName, gce.region)
-	assert.True(t, isNotFound(err))
+	if !cmp.Equal(true, isNotFound(err)) {
+		t.Errorf("want: %t, got: %t", true, isNotFound(err))
+	}
 }
 
 func TestEnsureExternalLoadBalancerFailsIfInvalidNetworkTier(t *testing.T) {
@@ -553,18 +646,23 @@ func TestEnsureExternalLoadBalancerFailsIfInvalidNetworkTier(t *testing.T) {
 
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(DefaultTestClusterValues())
-	require.NoError(t, err)
+	if err != nil {
+		t.Error(err)
+	}
 	nodeNames := []string{"test-node-1"}
 
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
-	require.NoError(t, err)
+	if err != nil {
+		t.Error(err)
+	}
 
 	svc := fakeLoadbalancerService("")
 	svc.Annotations = map[string]string{NetworkTierAnnotationKey: wrongTier}
 
 	_, err = gce.ensureExternalLoadBalancer(vals.ClusterName, vals.ClusterID, svc, nil, nodes)
-	require.Error(t, err)
-	assert.EqualError(t, err, errStrUnsupportedTier)
+	if !cmp.Equal(err.Error(), errStrUnsupportedTier) {
+		t.Errorf("want: %s, got: %s", errStrUnsupportedTier, err.Error())
+	}
 }
 
 func TestEnsureExternalLoadBalancerFailsWithNoNodes(t *testing.T) {
@@ -1726,7 +1824,7 @@ func TestFirewallObject(t *testing.T) {
 			}
 			ret.SourceRanges = nil
 			expectedFirewall.SourceRanges = nil
-			if !reflect.DeepEqual(*ret, expectedFirewall) {
+			if !cmp.Equal(*ret, expectedFirewall) {
 				t.Errorf("expect firewall to be %+v, but got %+v", expectedFirewall, ret)
 			}
 		})

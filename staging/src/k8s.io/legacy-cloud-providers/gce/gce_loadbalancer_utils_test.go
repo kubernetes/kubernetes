@@ -30,11 +30,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	compute "google.golang.org/api/compute/v1"
-
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
+	"github.com/google/go-cmp/cmp"
+	"google.golang.org/api/compute/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
@@ -139,29 +137,55 @@ func assertExternalLbResources(t *testing.T, gce *Cloud, apiService *v1.Service,
 
 	for _, fwName := range fwNames {
 		firewall, err := gce.GetFirewall(fwName)
-		require.NoError(t, err)
-		assert.Equal(t, nodeNames, firewall.TargetTags)
-		assert.NotEmpty(t, firewall.SourceRanges)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(nodeNames, firewall.TargetTags); diff != "" {
+			t.Errorf("want node names diff (-want +got): %s", diff)
+		}
+		if len(firewall.SourceRanges) == 0 {
+			t.Error("SourceRanges is empty")
+		}
 	}
 
 	// Check that TargetPool is Created
 	pool, err := gce.GetTargetPool(lbName, gce.region)
-	require.NoError(t, err)
-	assert.Equal(t, lbName, pool.Name)
-	assert.NotEmpty(t, pool.HealthChecks)
-	assert.Equal(t, 1, len(pool.Instances))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lbName != pool.Name {
+		t.Errorf("want: %s, got: %s", lbName, pool.Name)
+	}
+	if len(pool.HealthChecks) == 0 {
+		t.Error("HealthChecks is empty")
+	}
+	if len(pool.Instances) != 1 {
+		t.Errorf("want: %d, got: %d", 1, len(pool.Instances))
+	}
 
 	// Check that HealthCheck is created
 	healthcheck, err := gce.GetHTTPHealthCheck(hcName)
-	require.NoError(t, err)
-	assert.Equal(t, hcName, healthcheck.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hcName != healthcheck.Name {
+		t.Errorf("want: %s, got: %s", hcName, healthcheck.Name)
+	}
 
 	// Check that ForwardingRule is created
 	fwdRule, err := gce.GetRegionForwardingRule(lbName, gce.region)
-	require.NoError(t, err)
-	assert.Equal(t, lbName, fwdRule.Name)
-	assert.Equal(t, "TCP", fwdRule.IPProtocol)
-	assert.Equal(t, "123-123", fwdRule.PortRange)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lbName != fwdRule.Name {
+		t.Errorf("want: %s, got: %s", lbName, fwdRule.Name)
+	}
+	if "TCP" != fwdRule.IPProtocol {
+		t.Errorf("want: %s, got: %s", lbName, fwdRule.IPProtocol)
+	}
+	if "123-123" != fwdRule.PortRange {
+		t.Errorf("want: %s, got: %s", lbName, fwdRule.PortRange)
+	}
 }
 
 func assertExternalLbResourcesDeleted(t *testing.T, gce *Cloud, apiService *v1.Service, vals TestClusterValues, firewallsDeleted bool) {
@@ -177,26 +201,41 @@ func assertExternalLbResourcesDeleted(t *testing.T, gce *Cloud, apiService *v1.S
 
 		for _, fwName := range fwNames {
 			firewall, err := gce.GetFirewall(fwName)
-			require.Error(t, err)
-			assert.Nil(t, firewall)
+			if err == nil {
+				t.Fatal(err)
+			}
+			if firewall != nil {
+				t.Error("firewall is not nil")
+			}
 		}
 
 		// Check forwarding rule is deleted
 		fwdRule, err := gce.GetRegionForwardingRule(lbName, gce.region)
-		require.Error(t, err)
-		assert.Nil(t, fwdRule)
+		if err == nil {
+			t.Fatal(err)
+		}
+		if fwdRule != nil {
+			t.Error("firewall is not nil")
+		}
 	}
 
 	// Check that TargetPool is deleted
 	pool, err := gce.GetTargetPool(lbName, gce.region)
-	require.Error(t, err)
-	assert.Nil(t, pool)
+	if err == nil {
+		t.Fatal(err)
+	}
+	if pool != nil {
+		t.Error("pool is not nil")
+	}
 
 	// Check that HealthCheck is deleted
 	healthcheck, err := gce.GetHTTPHealthCheck(hcName)
-	require.Error(t, err)
-	assert.Nil(t, healthcheck)
-
+	if err == nil {
+		t.Fatal(err)
+	}
+	if healthcheck != nil {
+		t.Error("healthcheck is not nil")
+	}
 }
 
 func assertInternalLbResources(t *testing.T, gce *Cloud, apiService *v1.Service, vals TestClusterValues, nodeNames []string) {
@@ -205,8 +244,12 @@ func assertInternalLbResources(t *testing.T, gce *Cloud, apiService *v1.Service,
 	// Check that Instance Group is created
 	igName := makeInstanceGroupName(vals.ClusterID)
 	ig, err := gce.GetInstanceGroup(igName, vals.ZoneName)
-	assert.NoError(t, err)
-	assert.Equal(t, igName, ig.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if igName != ig.Name {
+		t.Errorf("want: %s, got: %s", igName, ig.Name)
+	}
 
 	// Check that Firewalls are created for the LoadBalancer and the HealthCheck
 	fwNames := []string{
@@ -216,17 +259,27 @@ func assertInternalLbResources(t *testing.T, gce *Cloud, apiService *v1.Service,
 
 	for _, fwName := range fwNames {
 		firewall, err := gce.GetFirewall(fwName)
-		require.NoError(t, err)
-		assert.Equal(t, nodeNames, firewall.TargetTags)
-		assert.NotEmpty(t, firewall.SourceRanges)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(nodeNames, firewall.TargetTags); diff != "" {
+			t.Errorf("want node names diff (-want +got): %s", diff)
+		}
+		if len(firewall.SourceRanges) == 0 {
+			t.Error("SourceRanges is empty")
+		}
 	}
 
 	// Check that HealthCheck is created
 	sharedHealthCheck := !servicehelpers.RequestsOnlyLocalTraffic(apiService)
 	hcName := makeHealthCheckName(lbName, vals.ClusterID, sharedHealthCheck)
 	healthcheck, err := gce.GetHealthCheck(hcName)
-	require.NoError(t, err)
-	assert.Equal(t, hcName, healthcheck.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hcName != healthcheck.Name {
+		t.Errorf("want: %s, got: %s", hcName, healthcheck.Name)
+	}
 
 	// Check that BackendService exists
 	sharedBackend := shareBackendService(apiService)
@@ -234,27 +287,43 @@ func assertInternalLbResources(t *testing.T, gce *Cloud, apiService *v1.Service,
 	backendServiceLink := gce.getBackendServiceLink(backendServiceName)
 
 	bs, err := gce.GetRegionBackendService(backendServiceName, gce.region)
-	require.NoError(t, err)
-	assert.Equal(t, "TCP", bs.Protocol)
-	assert.Equal(
-		t,
-		[]string{healthcheck.SelfLink},
-		bs.HealthChecks,
-	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if "TCP" != bs.Protocol {
+		t.Errorf("want: %s, got: %s", "TCP", bs.Protocol)
+	}
+	if diff := cmp.Diff([]string{healthcheck.SelfLink}, bs.HealthChecks); diff != "" {
+		t.Errorf("want health checks diff (-want +got): %s", diff)
+	}
 
 	// Check that ForwardingRule is created
 	fwdRule, err := gce.GetRegionForwardingRule(lbName, gce.region)
-	require.NoError(t, err)
-	assert.Equal(t, lbName, fwdRule.Name)
-	assert.Equal(t, "TCP", fwdRule.IPProtocol)
-	assert.Equal(t, backendServiceLink, fwdRule.BackendService)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lbName != fwdRule.Name {
+		t.Errorf("want: %s, got: %s", lbName, fwdRule.Name)
+	}
+	if "TCP" != fwdRule.IPProtocol {
+		t.Errorf("want: %s, got: %s", "TCP", fwdRule.IPProtocol)
+	}
+	if backendServiceLink != fwdRule.BackendService {
+		t.Errorf("want: %s, got: %s", backendServiceLink, fwdRule.BackendService)
+	}
 	// if no Subnetwork specified, defaults to the GCE NetworkURL
-	assert.Equal(t, gce.NetworkURL(), fwdRule.Subnetwork)
+	if gce.NetworkURL() != fwdRule.Subnetwork {
+		t.Errorf("want: %s, got: %s", gce.NetworkURL(), fwdRule.Subnetwork)
+	}
 
 	// Check that the IP address has been released. IP is only reserved until ensure function exits.
 	ip, err := gce.GetRegionAddress(lbName, gce.region)
-	require.Error(t, err)
-	assert.Nil(t, ip)
+	if err == nil {
+		t.Fatal(err)
+	}
+	if ip != nil {
+		t.Error("ip is not nil")
+	}
 }
 
 func assertInternalLbResourcesDeleted(t *testing.T, gce *Cloud, apiService *v1.Service, vals TestClusterValues, firewallsDeleted bool) {
@@ -273,31 +342,51 @@ func assertInternalLbResourcesDeleted(t *testing.T, gce *Cloud, apiService *v1.S
 
 		for _, fwName := range fwNames {
 			firewall, err := gce.GetFirewall(fwName)
-			require.Error(t, err)
-			assert.Nil(t, firewall)
+			if err == nil {
+				t.Fatal(err)
+			}
+			if firewall != nil {
+				t.Error("firewall is not nil")
+			}
 		}
 
 		// Check forwarding rule is deleted
 		fwdRule, err := gce.GetRegionForwardingRule(lbName, gce.region)
-		require.Error(t, err)
-		assert.Nil(t, fwdRule)
+		if err == nil {
+			t.Fatal(err)
+		}
+		if fwdRule != nil {
+			t.Error("fwdRule is not nil")
+		}
 	}
 
 	// Check that Instance Group is deleted
 	igName := makeInstanceGroupName(vals.ClusterID)
 	ig, err := gce.GetInstanceGroup(igName, vals.ZoneName)
-	assert.Error(t, err)
-	assert.Nil(t, ig)
+	if err == nil {
+		t.Fatal(err)
+	}
+	if ig != nil {
+		t.Error("ig is not nil")
+	}
 
 	// Check that HealthCheck is deleted
 	healthcheck, err := gce.GetHealthCheck(hcName)
-	require.Error(t, err)
-	assert.Nil(t, healthcheck)
+	if err == nil {
+		t.Fatal(err)
+	}
+	if healthcheck != nil {
+		t.Error("healthcheck is not nil")
+	}
 
 	// Check that the IP address has been released
 	ip, err := gce.GetRegionAddress(lbName, gce.region)
-	require.Error(t, err)
-	assert.Nil(t, ip)
+	if err == nil {
+		t.Fatal(err)
+	}
+	if ip != nil {
+		t.Error("ip is not nil")
+	}
 }
 
 func checkEvent(t *testing.T, recorder *record.FakeRecorder, expected string, shouldMatch bool) bool {

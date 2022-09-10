@@ -23,8 +23,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -33,26 +32,44 @@ func TestGetLoadBalancer(t *testing.T) {
 
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	apiService := fakeLoadbalancerService("")
 
-	// When a loadbalancer has not been created
+	// When a load balancer has not been created
 	status, found, err := gce.GetLoadBalancer(context.Background(), vals.ClusterName, apiService)
-	assert.Nil(t, status)
-	assert.False(t, found)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status != nil {
+		t.Errorf("expected=%v, got=%v", nil, status)
+	}
+	if found != false {
+		t.Errorf("expected=%t, got=%t", false, found)
+	}
 
 	nodeNames := []string{"test-node-1"}
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	expectedStatus, err := gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, apiService, nodes)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	status, found, err = gce.GetLoadBalancer(context.Background(), vals.ClusterName, apiService)
-	assert.Equal(t, expectedStatus, status)
-	assert.True(t, found)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cmp.Equal(expectedStatus, status) {
+		t.Errorf("expected=%v, got=%v", expectedStatus, status)
+	}
+	if found != true {
+		t.Errorf("expected=%t, got=%t", true, found)
+	}
 }
 
 func TestEnsureLoadBalancerCreatesExternalLb(t *testing.T) {
@@ -60,16 +77,24 @@ func TestEnsureLoadBalancerCreatesExternalLb(t *testing.T) {
 
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	nodeNames := []string{"test-node-1"}
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	apiService := fakeLoadbalancerService("")
 	status, err := gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, apiService, nodes)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, status.Ingress)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Ingress == nil {
+		t.Error("status.Ingress is nil")
+	}
 	assertExternalLbResources(t, gce, apiService, vals, nodeNames)
 }
 
@@ -78,18 +103,28 @@ func TestEnsureLoadBalancerCreatesInternalLb(t *testing.T) {
 
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	nodeNames := []string{"test-node-1"}
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	apiService := fakeLoadbalancerService(string(LBTypeInternal))
 	apiService, err = gce.client.CoreV1().Services(apiService.Namespace).Create(context.TODO(), apiService, metav1.CreateOptions{})
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	status, err := gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, apiService, nodes)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, status.Ingress)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Ingress == nil {
+		t.Error("status.Ingress is nil")
+	}
 	assertInternalLbResources(t, gce, apiService, vals, nodeNames)
 }
 
@@ -98,18 +133,26 @@ func TestEnsureLoadBalancerDeletesExistingInternalLb(t *testing.T) {
 
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	nodeNames := []string{"test-node-1"}
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	apiService := fakeLoadbalancerService("")
 	createInternalLoadBalancer(gce, apiService, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 
 	status, err := gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, apiService, nodes)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, status.Ingress)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Ingress == nil {
+		t.Error("status.Ingress is nil")
+	}
 
 	assertExternalLbResources(t, gce, apiService, vals, nodeNames)
 	assertInternalLbResourcesDeleted(t, gce, apiService, vals, false)
@@ -120,21 +163,31 @@ func TestEnsureLoadBalancerDeletesExistingExternalLb(t *testing.T) {
 
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	nodeNames := []string{"test-node-1"}
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	apiService := fakeLoadbalancerService("")
 	createExternalLoadBalancer(gce, apiService, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 
 	apiService = fakeLoadbalancerService(string(LBTypeInternal))
 	apiService, err = gce.client.CoreV1().Services(apiService.Namespace).Create(context.TODO(), apiService, metav1.CreateOptions{})
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	status, err := gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, apiService, nodes)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, status.Ingress)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Ingress == nil {
+		t.Error("status.Ingress is nil")
+	}
 
 	assertInternalLbResources(t, gce, apiService, vals, nodeNames)
 	assertExternalLbResourcesDeleted(t, gce, apiService, vals, false)
@@ -145,17 +198,23 @@ func TestEnsureLoadBalancerDeletedDeletesExternalLb(t *testing.T) {
 
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	nodeNames := []string{"test-node-1"}
 	_, err = createAndInsertNodes(gce, nodeNames, vals.ZoneName)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	apiService := fakeLoadbalancerService("")
 	createExternalLoadBalancer(gce, apiService, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 
 	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, apiService)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	assertExternalLbResourcesDeleted(t, gce, apiService, vals, true)
 }
 
@@ -164,19 +223,27 @@ func TestEnsureLoadBalancerDeletedDeletesInternalLb(t *testing.T) {
 
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	nodeNames := []string{"test-node-1"}
 	_, err = createAndInsertNodes(gce, nodeNames, vals.ZoneName)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	apiService := fakeLoadbalancerService(string(LBTypeInternal))
 	apiService, err = gce.client.CoreV1().Services(apiService.Namespace).Create(context.TODO(), apiService, metav1.CreateOptions{})
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	createInternalLoadBalancer(gce, apiService, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 
 	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, apiService)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	assertInternalLbResourcesDeleted(t, gce, apiService, vals, true)
 }
 
@@ -188,7 +255,9 @@ func TestProjectsBasePath(t *testing.T) {
 	expectProjectsBasePath := "https://compute.googleapis.com/compute/v1/projects/"
 	// See https://github.com/kubernetes/kubernetes/issues/102757, the endpoint can have mtls in some cases.
 	expectMtlsProjectsBasePath := "https://compute.mtls.googleapis.com/compute/v1/projects/"
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if gce.projectsBasePath != expectProjectsBasePath && gce.projectsBasePath != expectMtlsProjectsBasePath {
 		t.Errorf("Compute projectsBasePath has changed. Got %q, want %q or %q", gce.projectsBasePath, expectProjectsBasePath, expectMtlsProjectsBasePath)
 	}

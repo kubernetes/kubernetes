@@ -23,8 +23,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/google/go-cmp/cmp"
 	compute "google.golang.org/api/compute/v1"
 )
 
@@ -37,7 +36,9 @@ var vals = DefaultTestClusterValues()
 // TestAddressManagerNoRequestedIP tests the typical case of passing in no requested IP
 func TestAddressManagerNoRequestedIP(t *testing.T) {
 	svc, err := fakeGCECloud(vals)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	targetIP := ""
 
 	mgr := newAddressManager(svc, testSvcName, vals.Region, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
@@ -48,7 +49,9 @@ func TestAddressManagerNoRequestedIP(t *testing.T) {
 // TestAddressManagerBasic tests the typical case of reserving and unreserving an address.
 func TestAddressManagerBasic(t *testing.T) {
 	svc, err := fakeGCECloud(vals)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	targetIP := "1.1.1.1"
 
 	mgr := newAddressManager(svc, testSvcName, vals.Region, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
@@ -60,12 +63,16 @@ func TestAddressManagerBasic(t *testing.T) {
 // to the requested address (forwarding rule or loadbalancer IP).
 func TestAddressManagerOrphaned(t *testing.T) {
 	svc, err := fakeGCECloud(vals)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	targetIP := "1.1.1.1"
 
 	addr := &compute.Address{Name: testLBName, Address: targetIP, AddressType: string(cloud.SchemeInternal)}
 	err = svc.ReserveRegionAddress(addr, vals.Region)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	mgr := newAddressManager(svc, testSvcName, vals.Region, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
 	testHoldAddress(t, mgr, svc, testLBName, vals.Region, targetIP, string(cloud.SchemeInternal))
@@ -76,13 +83,17 @@ func TestAddressManagerOrphaned(t *testing.T) {
 // an IP other than the forwarding rule or loadbalancer IP.
 func TestAddressManagerOutdatedOrphan(t *testing.T) {
 	svc, err := fakeGCECloud(vals)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	previousAddress := "1.1.0.0"
 	targetIP := "1.1.1.1"
 
 	addr := &compute.Address{Name: testLBName, Address: previousAddress, AddressType: string(cloud.SchemeExternal)}
 	err = svc.ReserveRegionAddress(addr, vals.Region)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	mgr := newAddressManager(svc, testSvcName, vals.Region, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
 	testHoldAddress(t, mgr, svc, testLBName, vals.Region, targetIP, string(cloud.SchemeInternal))
@@ -93,21 +104,33 @@ func TestAddressManagerOutdatedOrphan(t *testing.T) {
 // owned by the controller.
 func TestAddressManagerExternallyOwned(t *testing.T) {
 	svc, err := fakeGCECloud(vals)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	targetIP := "1.1.1.1"
 
 	addr := &compute.Address{Name: "my-important-address", Address: targetIP, AddressType: string(cloud.SchemeInternal)}
 	err = svc.ReserveRegionAddress(addr, vals.Region)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	mgr := newAddressManager(svc, testSvcName, vals.Region, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
 	ipToUse, err := mgr.HoldAddress()
-	require.NoError(t, err)
-	assert.NotEmpty(t, ipToUse)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ipToUse) == 0 {
+		t.Error("ipToUse is empty")
+	}
 
 	ad, err := svc.GetRegionAddress(testLBName, vals.Region)
-	assert.True(t, isNotFound(err))
-	require.Nil(t, ad)
+	if !cmp.Equal(true, isNotFound(err)) {
+		t.Errorf("want: %t, got: %t", true, isNotFound(err))
+	}
+	if ad != nil {
+		t.Error("ad is nil")
+	}
 
 	testReleaseAddress(t, mgr, svc, testLBName, vals.Region)
 }
@@ -116,35 +139,57 @@ func TestAddressManagerExternallyOwned(t *testing.T) {
 // owned by the controller. However, this address has the wrong type.
 func TestAddressManagerBadExternallyOwned(t *testing.T) {
 	svc, err := fakeGCECloud(vals)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	targetIP := "1.1.1.1"
 
 	addr := &compute.Address{Name: "my-important-address", Address: targetIP, AddressType: string(cloud.SchemeExternal)}
 	err = svc.ReserveRegionAddress(addr, vals.Region)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	mgr := newAddressManager(svc, testSvcName, vals.Region, testSubnet, testLBName, targetIP, cloud.SchemeInternal)
 	ad, err := mgr.HoldAddress()
-	assert.Error(t, err) // FIXME
-	require.Equal(t, ad, "")
+	if err == nil { // FIXME
+		t.Error(err)
+	}
+	if ad != "" {
+		t.Errorf("want: %s, got: %s", "", ad)
+	}
 }
 
 func testHoldAddress(t *testing.T, mgr *addressManager, svc CloudAddressService, name, region, targetIP, scheme string) {
 	ipToUse, err := mgr.HoldAddress()
-	require.NoError(t, err)
-	assert.NotEmpty(t, ipToUse)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ipToUse == "" {
+		t.Error("ipToUse is not empty")
+	}
 
 	addr, err := svc.GetRegionAddress(name, region)
-	require.NoError(t, err)
-	if targetIP != "" {
-		assert.EqualValues(t, targetIP, addr.Address)
+	if err != nil {
+		t.Fatal(err)
 	}
-	assert.EqualValues(t, scheme, addr.AddressType)
+	if targetIP != "" {
+		if targetIP != addr.Address {
+			t.Errorf("want: %s, got: %s", targetIP, addr.Address)
+		}
+	}
+	if scheme != addr.AddressType {
+		t.Errorf("want: %s, got: %s", scheme, addr.AddressType)
+	}
 }
 
 func testReleaseAddress(t *testing.T, mgr *addressManager, svc CloudAddressService, name, region string) {
 	err := mgr.ReleaseAddress()
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	_, err = svc.GetRegionAddress(name, region)
-	assert.True(t, isNotFound(err))
+	if !cmp.Equal(true, isNotFound(err)) {
+		t.Errorf("want: %t, got: %t", true, isNotFound(err))
+	}
 }

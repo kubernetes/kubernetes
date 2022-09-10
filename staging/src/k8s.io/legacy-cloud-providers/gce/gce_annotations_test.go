@@ -23,10 +23,9 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
-	"k8s.io/api/core/v1"
+	"github.com/google/go-cmp/cmp"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestServiceNetworkTierAnnotationKey(t *testing.T) {
@@ -67,8 +66,14 @@ func TestServiceNetworkTierAnnotationKey(t *testing.T) {
 			svc := createTestService()
 			svc.Annotations = testCase.annotations
 			actualTier, err := GetServiceNetworkTier(svc)
-			assert.Equal(t, testCase.expectedTier, actualTier)
-			assert.Equal(t, testCase.expectErr, err != nil)
+			if !cmp.Equal(testCase.expectedTier, actualTier) {
+				t.Errorf("TestName(%s): want %v, got: %v", testName, testCase.expectedTier, actualTier)
+			}
+			if !cmp.Equal(testCase.expectErr, err != nil) {
+				if !cmp.Equal(testCase.expectedTier, actualTier) {
+					t.Errorf("TestName(%s): want %t, got: %t", testName, testCase.expectErr, err != nil)
+				}
+			}
 		})
 	}
 }

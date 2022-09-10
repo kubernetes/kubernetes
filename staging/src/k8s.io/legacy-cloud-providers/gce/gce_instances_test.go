@@ -22,22 +22,23 @@ package gce
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestInstanceExists(t *testing.T) {
 	gce, err := fakeGCECloud(DefaultTestClusterValues())
-	require.NoError(t, err)
-
+	if err != nil {
+		t.Fatal(err)
+	}
 	nodeNames := []string{"test-node-1"}
 	_, err = createAndInsertNodes(gce, nodeNames, vals.ZoneName)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	testcases := []struct {
 		name        string
@@ -63,8 +64,12 @@ func TestInstanceExists(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: test.nodeName}}
 			exist, err := gce.InstanceExists(context.TODO(), node)
-			assert.Equal(t, test.expectedErr, err, test.name)
-			assert.Equal(t, test.exist, exist, test.name)
+			if !reflect.DeepEqual(test.expectedErr, err) {
+				t.Errorf("TestName(%s): want: %s, got: %s", test.name, test.expectedErr, err)
+			}
+			if test.exist != exist {
+				t.Errorf("TestName(%s): want: %t, got: %t", test.name, test.exist, exist)
+			}
 		})
 	}
 }
