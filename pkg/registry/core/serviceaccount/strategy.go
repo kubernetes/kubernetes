@@ -18,9 +18,14 @@ package serviceaccount
 
 import (
 	"context"
+	"fmt"
 
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/generic"
+	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -77,6 +82,41 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 // WarningsOnUpdate returns warnings for the given update.
 func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
+}
+
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	sa, ok := obj.(*api.ServiceAccount)
+	if !ok {
+		return nil, nil, fmt.Errorf("not a service account")
+	}
+	namespaceName := fields.Set{"metadata.namespace/metadata.name": fmt.Sprintf("%s/%s", sa.ObjectMeta.Namespace, sa.ObjectMeta.Name)}
+	return labels.Set(sa.Labels), generic.MergeFieldsSets(generic.ObjectMetaFieldsSet(&sa.ObjectMeta, true), namespaceName), nil
+}
+
+// Matcher returns a selection predicate for a given label and field selector.
+func Matcher(label labels.Selector, field fields.Selector) pkgstorage.SelectionPredicate {
+	matchedName, _ := field.RequiresExactMatch("metadata.name")
+	matchedNamespace, _ := field.RequiresExactMatch("metadata.namespace")
+	concat := field
+	if matchedName != "" && matchedNamespace != "" {
+		concat = fields.AndSelectors(field, fields.OneTermEqualSelector("metadata.namespace/metadata.name", fmt.Sprintf("%s/%s", matchedNamespace, matchedName)))
+	}
+	return pkgstorage.SelectionPredicate{
+		Label:       label,
+		Field:       concat,
+		GetAttrs:    GetAttrs,
+		IndexFields: []string{"metadata.namespace/metadata.name"},
+	}
+}
+
+// NamespaceNameTriggerFunc returns concatenated value of metadata.namespace and metadata.name of given object.
+func NamespaceNameTriggerFunc(obj runtime.Object) string {
+	sa, ok := obj.(*api.ServiceAccount)
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("%s/%s", sa.ObjectMeta.Namespace, sa.ObjectMeta.Name)
 }
 
 func (strategy) AllowUnconditionalUpdate() bool {

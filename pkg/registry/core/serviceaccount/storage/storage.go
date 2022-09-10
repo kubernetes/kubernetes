@@ -25,6 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/storage"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -43,6 +44,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter, issuer token.TokenGenerator, 
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &api.ServiceAccount{} },
 		NewListFunc:               func() runtime.Object { return &api.ServiceAccountList{} },
+		PredicateFunc:             serviceaccount.Matcher,
 		DefaultQualifiedResource:  api.Resource("serviceaccounts"),
 		SingularQualifiedResource: api.Resource("serviceaccount"),
 
@@ -53,7 +55,13 @@ func NewREST(optsGetter generic.RESTOptionsGetter, issuer token.TokenGenerator, 
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter}
+	options := &generic.StoreOptions{
+		RESTOptions: optsGetter,
+		AttrFunc:    serviceaccount.GetAttrs,
+		TriggerFunc: map[string]storage.IndexerFunc{
+			"metadata.namespace/metadata.name": serviceaccount.NamespaceNameTriggerFunc,
+		},
+	}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, err
 	}

@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -45,11 +46,36 @@ func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
 	return rest, server
 }
 
+func newDecoratedStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
+	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
+	restOptions := generic.RESTOptions{
+		StorageConfig:           etcdStorage,
+		Decorator:               genericregistry.StorageWithCacher(),
+		DeleteCollectionWorkers: 1,
+		ResourcePrefix:          "serviceaccounts",
+	}
+	rest, err := NewREST(restOptions, nil, nil, 0, nil, nil, false)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
+	return rest, server
+}
+
 func validNewServiceAccount(name string) *api.ServiceAccount {
 	return &api.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: metav1.NamespaceDefault,
+		},
+		Secrets: []api.ObjectReference{},
+	}
+}
+
+func validNewServiceAccountWithNamespace(name, namespace string) *api.ServiceAccount {
+	return &api.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
 		},
 		Secrets: []api.ObjectReference{},
 	}
@@ -130,6 +156,29 @@ func TestWatch(t *testing.T) {
 		// matching fields
 		[]fields.Set{
 			{"metadata.name": "foo"},
+		},
+		// not matching fields
+		[]fields.Set{
+			{"metadata.name": "bar"},
+			{"name": "foo"},
+		},
+	)
+}
+
+func TestWatchWithCache(t *testing.T) {
+	storage, server := newDecoratedStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	test := genericregistrytest.New(t, storage.Store)
+	test.TestWatch(
+		validNewServiceAccountWithNamespace("foo", "test"),
+		nil,
+		nil,
+		// matching fields
+		[]fields.Set{{
+			"metadata.namespace": "test",
+			"metadata.name":      "foo",
+		},
 		},
 		// not matching fields
 		[]fields.Set{
