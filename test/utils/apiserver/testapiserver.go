@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/cert"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/test/utils/kubeconfig"
 )
 
 // TestAPIServer provides access to a running apiserver instance.
@@ -90,7 +91,7 @@ func writeKubeConfigForWardleServerToKASConnection(t *testing.T, kubeClientConfi
 		t.Logf("CA bundle %v\n", dynamiccertificates.GetHumanCertDetail(curr))
 	}
 
-	adminKubeConfig := CreateKubeConfig(wardleToKASKubeClientConfig)
+	adminKubeConfig := kubeconfig.CreateKubeConfig(wardleToKASKubeClientConfig)
 	tmpDir := t.TempDir()
 	kubeConfigFile := path.Join(tmpDir, "kube.config")
 	if err := clientcmd.WriteToFile(*adminKubeConfig, kubeConfigFile); err != nil {
