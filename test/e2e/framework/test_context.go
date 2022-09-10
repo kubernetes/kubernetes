@@ -39,7 +39,7 @@ import (
 	"k8s.io/klog/v2"
 
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	testapiserver "k8s.io/kubernetes/test/utils/apiserver"
+	"k8s.io/kubernetes/test/utils/kubeconfig"
 )
 
 const (
@@ -460,7 +460,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 		// Check if we can use the in-cluster config
 		if clusterConfig, err := restclient.InClusterConfig(); err == nil {
 			if tempFile, err := os.CreateTemp(os.TempDir(), "kubeconfig-"); err == nil {
-				kubeConfig := testapiserver.CreateKubeConfig(clusterConfig)
+				kubeConfig := kubeconfig.CreateKubeConfig(clusterConfig)
 				clientcmd.WriteToFile(*kubeConfig, tempFile.Name())
 				t.KubeConfig = tempFile.Name()
 				klog.V(4).Infof("Using a temporary kubeconfig file from in-cluster config : %s", tempFile.Name())
