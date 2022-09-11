@@ -30,7 +30,7 @@ type ClientHandler interface {
 	PluginListAndWatchReceiver(string, *api.ListAndWatchResponse)
 }
 
-
+// TODO: evaluate whether we need these error definitions.
 const (
 	// errFailedToDialDevicePlugin is the error raised when the device plugin could not be
 	// reached on the registered socket
