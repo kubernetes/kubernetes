@@ -159,4 +159,4 @@ func (v mergeStrategy) doConflictDetect(e apply.Element) error {
 	return v.strategic.doConflictDetect(e)
 }
 
-var _ apply.Strategy = &mergeStrategy{}
+var _ apply.Strategy = (*mergeStrategy)(nil)

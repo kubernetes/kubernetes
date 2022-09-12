@@ -329,7 +329,7 @@ type InfoObject struct {
 	genericclioptions.IOStreams
 }
 
-var _ Object = &InfoObject{}
+var _ Object = (*InfoObject)(nil)
 
 // Returns the live version of the object
 func (obj InfoObject) Live() runtime.Object {

@@ -17,6 +17,7 @@ limitations under the License.
 package set
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -240,7 +241,7 @@ func updateSelectorForObject(obj runtime.Object, selector metav1.LabelSelector) 
 		if len(selector.MatchExpressions) > 0 {
 			return nil, fmt.Errorf("match expression %v not supported on this object", selector.MatchExpressions)
 		}
-		dst := make(map[string]string)
+		dst := make(map[string]string, len(selector.MatchLabels))
 		for label, value := range selector.MatchLabels {
 			dst[label] = value
 		}
@@ -251,7 +252,7 @@ func updateSelectorForObject(obj runtime.Object, selector metav1.LabelSelector) 
 	case *v1.Service:
 		t.Spec.Selector, err = copyOldSelector()
 	default:
-		err = fmt.Errorf("setting a selector is only supported for Services")
+		err = errors.New("setting a selector is only supported for Services")
 	}
 	return err
 }

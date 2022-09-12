@@ -62,7 +62,7 @@ func getName(params map[string]string) (string, error) {
 
 // getParams returns map of generic parameters.
 func getParams(genericParams map[string]interface{}) (map[string]string, error) {
-	params := map[string]string{}
+	params := make(map[string]string, len(genericParams))
 	for key, value := range genericParams {
 		strVal, isString := value.(string)
 		if !isString {
@@ -75,7 +75,7 @@ func getParams(genericParams map[string]interface{}) (map[string]string, error) 
 
 // getArgs returns arguments for the container command.
 func getArgs(genericParams map[string]interface{}) ([]string, error) {
-	args := []string{}
+	var args []string
 	val, found := genericParams["args"]
 	if found {
 		var isArray bool

@@ -75,7 +75,7 @@ type sizeQueue struct {
 }
 
 // make sure sizeQueue implements the resize.TerminalSizeQueue interface
-var _ remotecommand.TerminalSizeQueue = &sizeQueue{}
+var _ remotecommand.TerminalSizeQueue = (*sizeQueue)(nil)
 
 // monitorSize primes resizeChan with initialSizes and then monitors for resize events. With each
 // new event, it sends the current terminal size to resizeChan.

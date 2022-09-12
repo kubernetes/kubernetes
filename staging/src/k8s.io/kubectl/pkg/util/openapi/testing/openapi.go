@@ -30,7 +30,7 @@ type FakeResources struct {
 	fake testing.Fake
 }
 
-var _ openapi.Resources = &FakeResources{}
+var _ openapi.Resources = (*FakeResources)(nil)
 
 // NewFakeResources creates a new FakeResources.
 func NewFakeResources(path string) *FakeResources {

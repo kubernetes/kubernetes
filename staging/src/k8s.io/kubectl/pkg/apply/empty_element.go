@@ -67,4 +67,4 @@ func (e EmptyElement) HasRemote() bool {
 	return false
 }
 
-var _ Element = &EmptyElement{}
+var _ Element = (*EmptyElement)(nil)

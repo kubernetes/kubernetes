@@ -50,7 +50,7 @@ type PodDeleteList struct {
 
 // Pods returns a list of all pods marked for deletion after filtering.
 func (l *PodDeleteList) Pods() []corev1.Pod {
-	pods := []corev1.Pod{}
+	pods := make([]corev1.Pod, 0, len(l.items))
 	for _, i := range l.items {
 		if i.Status.Delete {
 			pods = append(pods, i.Pod)
@@ -68,7 +68,7 @@ func (l *PodDeleteList) Warnings() string {
 		}
 	}
 
-	msgs := []string{}
+	msgs := make([]string, 0, len(ps))
 	for key, pods := range ps {
 		msgs = append(msgs, fmt.Sprintf("%s: %s", key, strings.Join(pods, ", ")))
 	}

@@ -104,4 +104,4 @@ func (v replaceStrategy) doConflictDetect(e apply.Element) error {
 	return v.strategic.doConflictDetect(e)
 }
 
-var _ apply.Strategy = &replaceStrategy{}
+var _ apply.Strategy = (*replaceStrategy)(nil)

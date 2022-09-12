@@ -259,7 +259,7 @@ func (o *CreateJobOptions) createJob() *batchv1.Job {
 }
 
 func (o *CreateJobOptions) createJobFromCronJob(cronJob *batchv1.CronJob) *batchv1.Job {
-	annotations := make(map[string]string)
+	annotations := make(map[string]string, len(cronJob.Spec.JobTemplate.Annotations)+1)
 	annotations["cronjob.kubernetes.io/instantiate"] = "manual"
 	for k, v := range cronJob.Spec.JobTemplate.Annotations {
 		annotations[k] = v

@@ -45,7 +45,7 @@ type MatchVersionFlags struct {
 	matchesServerVersionErr     error
 }
 
-var _ genericclioptions.RESTClientGetter = &MatchVersionFlags{}
+var _ genericclioptions.RESTClientGetter = (*MatchVersionFlags)(nil)
 
 func (f *MatchVersionFlags) checkMatchingServerVersion() error {
 	f.checkServerVersion.Do(func() {

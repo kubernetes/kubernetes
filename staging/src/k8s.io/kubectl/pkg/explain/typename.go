@@ -27,7 +27,7 @@ type typeName struct {
 	Name string
 }
 
-var _ proto.SchemaVisitor = &typeName{}
+var _ proto.SchemaVisitor = (*typeName)(nil)
 
 // VisitArray adds the [] prefix and recurses.
 func (t *typeName) VisitArray(a *proto.Array) {

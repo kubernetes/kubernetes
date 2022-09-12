@@ -106,4 +106,4 @@ func (v delegatingStrategy) doConflictDetect(e apply.Element) error {
 	return nil
 }
 
-var _ apply.Strategy = &delegatingStrategy{}
+var _ apply.Strategy = (*delegatingStrategy)(nil)

@@ -296,7 +296,7 @@ func (o *CreateIngressOptions) createIngress() *networkingv1.Ingress {
 
 func (o *CreateIngressOptions) buildAnnotations() map[string]string {
 
-	var annotations = make(map[string]string)
+	var annotations = make(map[string]string, len(o.Annotations))
 
 	for _, annotation := range o.Annotations {
 		an := strings.SplitN(annotation, "=", 2)
@@ -326,7 +326,7 @@ func (o *CreateIngressOptions) buildIngressSpec() networkingv1.IngressSpec {
 func (o *CreateIngressOptions) buildTLSRules() []networkingv1.IngressTLS {
 	hostAlreadyPresent := make(map[string]struct{})
 
-	ingressTLSs := []networkingv1.IngressTLS{}
+	var ingressTLSs []networkingv1.IngressTLS
 	var secret string
 
 	for _, rule := range o.Rules {

@@ -36,7 +36,7 @@ func (e ListElement) Merge(v Strategy) (Result, error) {
 	return v.MergeList(e)
 }
 
-var _ Element = &ListElement{}
+var _ Element = (*ListElement)(nil)
 
 // ListElementData contains the recorded, local and remote data for a list
 type ListElementData struct {
@@ -78,4 +78,4 @@ func (e ListElement) HasConflict() error {
 	return nil
 }
 
-var _ ConflictDetector = &ListElement{}
+var _ ConflictDetector = (*ListElement)(nil)

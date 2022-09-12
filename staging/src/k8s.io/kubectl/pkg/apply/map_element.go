@@ -41,7 +41,7 @@ func (e MapElement) GetValues() map[string]Element {
 	return e.Values
 }
 
-var _ Element = &MapElement{}
+var _ Element = (*MapElement)(nil)
 
 // MapElementData contains the recorded, local and remote data for a map or type
 type MapElementData struct {
@@ -83,4 +83,4 @@ func (e MapElement) HasConflict() error {
 	return nil
 }
 
-var _ ConflictDetector = &MapElement{}
+var _ ConflictDetector = (*MapElement)(nil)

@@ -27,7 +27,7 @@ import (
 const linebreak = "\n"
 
 // ASCIIRenderer implements blackfriday.Renderer
-var _ blackfriday.Renderer = &ASCIIRenderer{}
+var _ blackfriday.Renderer = (*ASCIIRenderer)(nil)
 
 // ASCIIRenderer is a blackfriday.Renderer intended for rendering markdown
 // documents as plain text, well suited for human reading on terminals.

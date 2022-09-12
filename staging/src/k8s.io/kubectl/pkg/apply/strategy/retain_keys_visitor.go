@@ -18,6 +18,7 @@ package strategy
 
 import (
 	"fmt"
+
 	"k8s.io/kubectl/pkg/apply"
 )
 
@@ -74,4 +75,4 @@ func (v retainKeysStrategy) MergeEmpty(diff apply.EmptyElement) (apply.Result, e
 	return v.merge.MergeEmpty(diff)
 }
 
-var _ apply.Strategy = &retainKeysStrategy{}
+var _ apply.Strategy = (*retainKeysStrategy)(nil)

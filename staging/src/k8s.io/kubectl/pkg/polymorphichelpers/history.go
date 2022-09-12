@@ -107,7 +107,7 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 		return "", err
 	}
 
-	historyInfo := make(map[int64]*corev1.PodTemplateSpec)
+	historyInfo := make(map[int64]*corev1.PodTemplateSpec, len(allRSs))
 	for _, rs := range allRSs {
 		v, err := deploymentutil.Revision(rs)
 		if err != nil {
@@ -165,7 +165,7 @@ func (h *DeploymentHistoryViewer) GetHistory(namespace, name string) (map[int64]
 		return nil, err
 	}
 
-	result := make(map[int64]runtime.Object)
+	result := make(map[int64]runtime.Object, len(allRSs))
 	for _, rs := range allRSs {
 		v, err := deploymentutil.Revision(rs)
 		if err != nil {
@@ -212,7 +212,7 @@ func (h *DaemonSetHistoryViewer) GetHistory(namespace, name string) (map[int64]r
 		return nil, err
 	}
 
-	result := make(map[int64]runtime.Object)
+	result := make(map[int64]runtime.Object, len(history))
 	for _, h := range history {
 		applied, err := applyDaemonSetHistory(ds, h)
 		if err != nil {
@@ -298,7 +298,7 @@ func (h *StatefulSetHistoryViewer) GetHistory(namespace, name string) (map[int64
 		return nil, err
 	}
 
-	result := make(map[int64]runtime.Object)
+	result := make(map[int64]runtime.Object, len(history))
 	for _, h := range history {
 		applied, err := applyStatefulSetHistory(sts, h)
 		if err != nil {

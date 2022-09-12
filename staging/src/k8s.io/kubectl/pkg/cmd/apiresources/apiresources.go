@@ -150,7 +150,7 @@ func (o *APIResourceOptions) RunAPIResources(cmd *cobra.Command, f cmdutil.Facto
 		discoveryclient.Invalidate()
 	}
 
-	errs := []error{}
+	var errs []error
 	lists, err := discoveryclient.ServerPreferredResources()
 	if err != nil {
 		errs = append(errs, err)

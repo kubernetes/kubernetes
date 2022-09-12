@@ -33,7 +33,7 @@ type CachedOpenAPIGetter struct {
 	err           error
 }
 
-var _ discovery.OpenAPISchemaInterface = &CachedOpenAPIGetter{}
+var _ discovery.OpenAPISchemaInterface = (*CachedOpenAPIGetter)(nil)
 
 // NewOpenAPIGetter returns an object to return OpenAPIDatas which reads
 // from a server, and then stores in memory for subsequent invocations

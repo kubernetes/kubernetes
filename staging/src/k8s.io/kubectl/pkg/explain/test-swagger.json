@@ -43,7 +43,7 @@
       "description": "Control character %",
       "properties": {
         "field1": {
-          "description": "Control character %",
+          "description": "Control character %"
         }
       },
       "x-kubernetes-group-version-kind": [

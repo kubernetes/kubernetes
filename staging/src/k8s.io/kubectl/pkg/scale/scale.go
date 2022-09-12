@@ -113,7 +113,7 @@ type genericScaler struct {
 	scaleNamespacer scaleclient.ScalesGetter
 }
 
-var _ Scaler = &genericScaler{}
+var _ Scaler = (*genericScaler)(nil)
 
 // ScaleSimple updates a scale of a given resource. It returns the resourceVersion of the scale if the update was successful.
 func (s *genericScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint, gvr schema.GroupVersionResource, dryRun bool) (updatedResourceVersion string, err error) {

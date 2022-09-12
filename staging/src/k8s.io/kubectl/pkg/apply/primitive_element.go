@@ -33,7 +33,7 @@ func (e PrimitiveElement) Merge(v Strategy) (Result, error) {
 	return v.MergePrimitive(e)
 }
 
-var _ Element = &PrimitiveElement{}
+var _ Element = (*PrimitiveElement)(nil)
 
 // HasConflict returns ConflictError if primitive element has conflict field.
 // Conflicts happen when either of the following conditions:
@@ -51,4 +51,4 @@ func (e PrimitiveElement) HasConflict() error {
 	return nil
 }
 
-var _ ConflictDetector = &PrimitiveElement{}
+var _ ConflictDetector = (*PrimitiveElement)(nil)

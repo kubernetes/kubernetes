@@ -45,7 +45,7 @@ type document struct {
 	doc       *openapi_v2.Document
 }
 
-var _ Resources = &document{}
+var _ Resources = (*document)(nil)
 
 // NewOpenAPIData creates a new `Resources` out of the openapi document
 func NewOpenAPIData(doc *openapi_v2.Document) (Resources, error) {

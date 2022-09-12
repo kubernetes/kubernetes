@@ -135,7 +135,7 @@ type prefixWriter struct {
 	out io.Writer
 }
 
-var _ PrefixWriter = &prefixWriter{}
+var _ PrefixWriter = (*prefixWriter)(nil)
 
 // NewPrefixWriter creates a new PrefixWriter.
 func NewPrefixWriter(out io.Writer) PrefixWriter {
@@ -168,7 +168,7 @@ type nestedPrefixWriter struct {
 	indent int
 }
 
-var _ PrefixWriter = &prefixWriter{}
+var _ PrefixWriter = (*prefixWriter)(nil)
 
 // NewPrefixWriter creates a new PrefixWriter.
 func NewNestedPrefixWriter(out PrefixWriter, indent int) PrefixWriter {

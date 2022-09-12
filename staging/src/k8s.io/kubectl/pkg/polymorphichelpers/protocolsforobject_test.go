@@ -17,9 +17,8 @@ limitations under the License.
 package polymorphichelpers
 
 import (
-	"testing"
-
 	"reflect"
+	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"

@@ -41,7 +41,7 @@ type modelPrinter struct {
 	Error        error
 }
 
-var _ proto.SchemaVisitor = &modelPrinter{}
+var _ proto.SchemaVisitor = (*modelPrinter)(nil)
 
 func (m *modelPrinter) PrintKindAndVersion() error {
 	if err := m.Writer.Write("KIND:     %s", m.GVK.Kind); err != nil {

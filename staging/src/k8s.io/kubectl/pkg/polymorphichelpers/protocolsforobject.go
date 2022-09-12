@@ -62,7 +62,7 @@ func protocolsForObject(object runtime.Object) (map[string]string, error) {
 }
 
 func getProtocols(spec corev1.PodSpec) map[string]string {
-	result := make(map[string]string)
+	result := make(map[string]string, len(spec.Containers))
 	for _, container := range spec.Containers {
 		for _, port := range container.Ports {
 			// Empty protocol must be defaulted (TCP)
@@ -77,7 +77,7 @@ func getProtocols(spec corev1.PodSpec) map[string]string {
 
 // Extracts the protocols exposed by a service from the given service spec.
 func getServiceProtocols(spec corev1.ServiceSpec) map[string]string {
-	result := make(map[string]string)
+	result := make(map[string]string, len(spec.Ports))
 	for _, servicePort := range spec.Ports {
 		// Empty protocol must be defaulted (TCP)
 		if len(servicePort.Protocol) == 0 {

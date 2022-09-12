@@ -28,9 +28,9 @@ type recursiveFieldsPrinter struct {
 	Error  error
 }
 
-var _ proto.SchemaVisitor = &recursiveFieldsPrinter{}
-var _ fieldsPrinter = &recursiveFieldsPrinter{}
-var visitedReferences = map[string]struct{}{}
+var _ proto.SchemaVisitor = (*recursiveFieldsPrinter)(nil)
+var _ fieldsPrinter = (*recursiveFieldsPrinter)(nil)
+var visitedReferences = make(map[string]struct{})
 
 // VisitArray is just a passthrough.
 func (f *recursiveFieldsPrinter) VisitArray(a *proto.Array) {

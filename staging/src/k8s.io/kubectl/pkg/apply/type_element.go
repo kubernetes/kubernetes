@@ -52,5 +52,5 @@ func (e TypeElement) HasConflict() error {
 	return nil
 }
 
-var _ Element = &TypeElement{}
-var _ ConflictDetector = &TypeElement{}
+var _ Element = (*TypeElement)(nil)
+var _ ConflictDetector = (*TypeElement)(nil)
