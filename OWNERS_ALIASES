@@ -441,13 +441,17 @@ aliases:
     - yujuhong
     - ehashman
   sig-scalability-approvers:
-    - mm4tt
+    - marseel
+    - mborsz
     - wojtek-t
+  # emeritus:
+  # - mm4tt
   sig-scalability-reviewers:
     - marseel
     - mborsz
-    - mm4tt
     - wojtek-t
+  # emeritus:
+  # - mm4tt
   sig-scheduling-api-reviewers:
     - alculquicondor
   sig-storage-api-reviewers:
