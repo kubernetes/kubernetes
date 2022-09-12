@@ -773,6 +773,7 @@ function indent() {
 
 function codegen::subprojects() {
     # Call generation on sub-projects.
+    #FIXME: broken
     local subs=(
         staging/src/k8s.io/code-generator/examples
         staging/src/k8s.io/kube-aggregator

@@ -23,7 +23,7 @@ set -o pipefail
 
 if [ "$#" -lt 5 ] || [ "${1}" == "--help" ]; then
   cat <<EOF
-Usage: $(basename "$0") <generators> <output-package> <internal-apis-package> <extensiona-apis-package> <groups-versions> ...
+Usage: $(basename "$0") <generators> <output-package> <internal-apis-package> <extension-apis-package> <groups-versions> ...
 
   <generators>        the generators comma separated to run (applyconfiguration,client,conversion,deepcopy,defaulter,informer,lister,openapi).
   <output-package>    the output package name (e.g. github.com/example/project/pkg/generated).
@@ -67,20 +67,17 @@ fi
 (
   # To support running this script from anywhere, first cd into this directory,
   # and then install with forced module mode on and fully qualified name.
-  cd "$(dirname "${0}")"
-  BINS=(
-      applyconfiguration-gen
-      client-gen
-      conversion-gen
-      deepcopy-gen
+  bins=(
       defaulter-gen
-      informer-gen
+      conversion-gen
+      client-gen
       lister-gen
+      informer-gen
+      deepcopy-gen
       openapi-gen
   )
-  # Compile all the tools at once - it's slightly faster but also just simpler.
-  # shellcheck disable=2046 # printf word-splitting is intentional
-  GO111MODULE=on go install $(printf "k8s.io/code-generator/cmd/%s " "${BINS[@]}")
+  cd "$(dirname "${0}")"
+  GO111MODULE=on go install $(printf -- "k8s.io/code-generator/cmd/%s " "${bins[@]}")
 )
 
 # Go installs the above commands to get installed in $GOBIN if defined, and $GOPATH/bin otherwise:
@@ -120,6 +117,7 @@ for GVs in ${GROUPS_WITH_VERSIONS}; do
   done
 done
 
+#FIXME: don't assume GOPATH?
 if grep -qw "deepcopy" <<<"${GENS}"; then
   # Nuke existing files
   for dir in $(GO111MODULE=on go list -f '{{.Dir}}' "${ALL_FQ_APIS[@]}"); do
@@ -130,8 +128,8 @@ if grep -qw "deepcopy" <<<"${GENS}"; then
 
   echo "Generating deepcopy funcs"
   "${gobin}/deepcopy-gen" \
-      --input-dirs "$(codegen::join , "${ALL_FQ_APIS[@]}")" \
       -O zz_generated.deepcopy \
+      $(printf -- "--input-dirs %s " "${ALL_FQ_APIS[@]}") \
       "$@"
 fi
 
@@ -145,8 +143,8 @@ if grep -qw "defaulter" <<<"${GENS}"; then
 
   echo "Generating defaulters"
   "${gobin}/defaulter-gen"  \
-      --input-dirs "$(codegen::join , "${EXT_FQ_APIS[@]}")" \
       -O zz_generated.defaults \
+      $(printf -- "--input-dirs %s " "${EXT_FQ_APIS[@]}") \
       "$@"
 fi
 
@@ -160,8 +158,8 @@ if grep -qw "conversion" <<<"${GENS}"; then
 
   echo "Generating conversions"
   "${gobin}/conversion-gen" \
-      --input-dirs "$(codegen::join , "${ALL_FQ_APIS[@]}")" \
       -O zz_generated.conversion \
+      $(printf -- "--input-dirs %s " "${ALL_FQ_APIS[@]}") \
       "$@"
 fi
 
@@ -205,9 +203,9 @@ if grep -qw "client" <<<"${GENS}"; then
   "${gobin}/client-gen" \
       --clientset-name "${CLIENTSET_NAME}" \
       --input-base "" \
-      --input "$(codegen::join , "${EXT_FQ_APIS[@]}")" \
-      --output-package "${OUTPUT_PKG}/${CLIENTSET_PKG}" \
       --apply-configuration-package "${APPLY_CONFIGURATION_PACKAGE:-}" \
+      --output-package "${OUTPUT_PKG}/${CLIENTSET_PKG}" \
+      $(printf -- "--input %s " "${EXT_FQ_APIS[@]}") \
       "$@"
 fi
 
@@ -227,8 +225,8 @@ if grep -qw "lister" <<<"${GENS}"; then
 
   echo "Generating listers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/listers"
   "${gobin}/lister-gen" \
-      --input-dirs "$(codegen::join , "${EXT_FQ_APIS[@]}")" \
       --output-package "${OUTPUT_PKG}/listers" \
+      $(printf -- "--input-dirs %s " "${ALL_FQ_APIS[@]}") \
       "$@"
 fi
 
@@ -246,13 +244,14 @@ if grep -qw "informer" <<<"${GENS}"; then
 
   echo "Generating informers for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/informers"
   "${gobin}/informer-gen" \
-      --input-dirs "$(codegen::join , "${EXT_FQ_APIS[@]}")" \
       --versioned-clientset-package "${OUTPUT_PKG}/${CLIENTSET_PKG}/${CLIENTSET_NAME}" \
       --listers-package "${OUTPUT_PKG}/listers" \
       --output-package "${OUTPUT_PKG}/informers" \
+      $(printf -- "--input-dirs %s " "${ALL_FQ_APIS[@]}") \
       "$@"
 fi
 
+#FIXME: broken
 if grep -qw "openapi" <<<"${GENS}"; then
   # Nuke existing files
   for dir in $(GO111MODULE=on go list -f '{{.Dir}}' "${FQ_APIS[@]}"); do
@@ -264,9 +263,20 @@ if grep -qw "openapi" <<<"${GENS}"; then
   echo "Generating OpenAPI definitions for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/openapi"
   declare -a OPENAPI_EXTRA_PACKAGES
   "${gobin}/openapi-gen" \
-      --input-dirs "$(codegen::join , "${EXT_FQ_APIS[@]}" "${OPENAPI_EXTRA_PACKAGES[@]+"${OPENAPI_EXTRA_PACKAGES[@]}"}")" \
-      --input-dirs "k8s.io/apimachinery/pkg/apis/meta/v1,k8s.io/apimachinery/pkg/runtime,k8s.io/apimachinery/pkg/version" \
       --output-package "${OUTPUT_PKG}/openapi" \
       -O zz_generated.openapi \
+      $(printf -- "--input-dirs %s " "${EXT_FQ_APIS[@]}" "${OPENAPI_EXTRA_PACKAGES[@]}") \
+      --input-dirs k8s.io/apimachinery/pkg/apis/meta/v1 \
+      --input-dirs k8s.io/apimachinery/pkg/runtime \
+      --input-dirs k8s.io/apimachinery/pkg/version \
       "$@"
 fi
+# Writing openapi output to ./...
+# Not respecting output base?
+#Wrote: ./k8s.io/code-generator/examples/apiserver/openapi/zz_generated.openapi.go
+# Flags
+#--output-package k8s.io/code-generator/examples/apiserver/openapi 
+#--output-base staging/src/k8s.io/code-generator/hack/../../.. 
+# Debug:
+# /home/thockin/go/bin/openapi-gen --output-package k8s.io/code-generator/examples/apiserver/openapi -O zz_generated.openapi --input-dirs k8s.io/code-generator/examples/apiserver/apis/example/v1 --input-dirs k8s.io/code-generator/examples/apiserver/apis/example2/v1 --input-dirs k8s.io/code-generator/examples/apiserver/apis/example3.io/v1 --input-dirs k8s.io/apimachinery/pkg/apis/meta/v1 --input-dirs k8s.io/apimachinery/pkg/runtime --input-dirs k8s.io/apimachinery/pkg/version --output-base staging/src/k8s.io/code-generator/hack/../../.. --go-header-file staging/src/k8s.io/code-generator/hack/../hack/boilerplate.go.txt
+
