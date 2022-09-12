@@ -77,7 +77,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			PackagePath: arguments.OutputPackagePath,
 			HeaderText:  header,
 			// FIXME: this naming is pretty awful, but OutputPackagePath is not used anywhere!
-			Source: arguments.OutputPackagePath,
+			Source: filepath.Join(arguments.OutputBase, arguments.OutputPackagePath),
 			GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 				return []generator.Generator{
 					newOpenAPIGen(
