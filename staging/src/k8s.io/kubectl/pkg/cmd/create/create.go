@@ -157,6 +157,7 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 	cmd.AddCommand(NewCmdCreateCronJob(f, ioStreams))
 	cmd.AddCommand(NewCmdCreateIngress(f, ioStreams))
 	cmd.AddCommand(NewCmdCreateToken(f, ioStreams))
+	cmd.AddCommand(NewCmdCreateNetworkPolicy(f, ioStreams))
 	return cmd
 }
 
