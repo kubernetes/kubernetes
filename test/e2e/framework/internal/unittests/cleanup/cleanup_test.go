@@ -23,6 +23,8 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/internal/output"
 	testapiserver "k8s.io/kubernetes/test/utils/apiserver"
@@ -32,8 +34,6 @@ import (
 // Be careful when moving it around or changing the import statements above.
 // Here are some intentionally blank lines that can be removed to compensate
 // for future additional import statements.
-//
-//
 //
 //
 //
@@ -104,6 +104,24 @@ STEP: Destroying namespace "test-namespace-zzz" for this suite.
 )
 
 func TestCleanup(t *testing.T) {
+	// The control plane is noisy and randomly logs through klog, for example:
+	// E0912 07:08:46.100164   75466 controller.go:254] unable to sync kubernetes service: Endpoints "kubernetes" is invalid: subsets[0].addresses[0].ip: Invalid value: "127.0.0.1": may not be in the loopback range (127.0.0.0/8, ::1/128)
+	//
+	// By creating a ktesting logger and registering that as global
+	// default logger we get the control plane output into the
+	// "go test" output in case of a failure (useful for debugging!)
+	// while keeping it out of the captured Ginkgo output that
+	// the test is comparing below.
+	//
+	// There are some small drawbacks:
+	// - The source code location for control plane log messages
+	//   is shown as klog.go because klog does not properly
+	//   skip its own helper functions. That's okay, normally
+	//   ktesting should not be installed as logging backend like this.
+	// - klog.Infof messages are printed with an extra newline.
+	logger, _ := ktesting.NewTestContext(t)
+	klog.SetLogger(logger)
+
 	apiServer := testapiserver.StartAPITestServer(t)
 
 	// This simulates how test/e2e uses the framework and how users
