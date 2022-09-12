@@ -179,13 +179,6 @@ const (
 	// Enables kubelet to detect CSI volume condition and send the event of the abnormal volume to the corresponding pod that is using it.
 	CSIVolumeHealth featuregate.Feature = "CSIVolumeHealth"
 
-	// owner: @enj
-	// beta: v1.22
-	// ga: v1.24
-	//
-	// Allows clients to request a duration for certificates issued via the Kubernetes CSR API.
-	CSRDuration featuregate.Feature = "CSRDuration"
-
 	// owner: @adrianreber
 	// kep: http://kep.k8s.io/2008
 	// alpha: v1.25
@@ -920,8 +913,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIStorageCapacity: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
 	CSIVolumeHealth: {Default: false, PreRelease: featuregate.Alpha},
-
-	CSRDuration: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
 	ContainerCheckpoint: {Default: false, PreRelease: featuregate.Alpha},
 
