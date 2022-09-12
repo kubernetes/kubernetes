@@ -117,24 +117,14 @@ the cloud specific control loops shipped with Kubernetes.`,
 	if flag.CommandLine.Lookup("cloud-provider-gce-l7lb-src-cidrs") != nil {
 		globalflag.Register(namedFlagSets.FlagSet("generic"), "cloud-provider-gce-l7lb-src-cidrs")
 	}
-	for _, f := range namedFlagSets.FlagSets {
-		fs.AddFlagSet(f)
-	}
-	for _, f := range additionalFlags.FlagSets {
+
+	allFlagSets := cliflag.MergeNamedFlagSets(namedFlagSets, additionalFlags)
+	for _, f := range allFlagSets.FlagSets {
 		fs.AddFlagSet(f)
 	}
 
-	usageFmt := "Usage:\n  %s\n"
 	cols, _, _ := term.TerminalSize(cmd.OutOrStdout())
-	cmd.SetUsageFunc(func(cmd *cobra.Command) error {
-		fmt.Fprintf(cmd.OutOrStderr(), usageFmt, cmd.UseLine())
-		cliflag.PrintSections(cmd.OutOrStderr(), namedFlagSets, cols)
-		return nil
-	})
-	cmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n"+usageFmt, cmd.Long, cmd.UseLine())
-		cliflag.PrintSections(cmd.OutOrStdout(), namedFlagSets, cols)
-	})
+	cliflag.SetUsageAndHelpFunc(cmd, allFlagSets, cols)
 
 	return cmd
 }

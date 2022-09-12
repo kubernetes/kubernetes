@@ -58,6 +58,17 @@ func (nfs *NamedFlagSets) FlagSet(name string) *pflag.FlagSet {
 	return nfs.FlagSets[name]
 }
 
+// MergeNamedFlagSets merges the given NamedFlagSets into a new NamedFlagSets instance with all flags combined.
+func MergeNamedFlagSets(nfss ...NamedFlagSets) NamedFlagSets {
+	newNFS := NamedFlagSets{}
+	for _, nfs := range nfss {
+		for _, flagName := range nfs.Order {
+			*newNFS.FlagSet(flagName) = *nfs.FlagSet(flagName)
+		}
+	}
+	return newNFS
+}
+
 // PrintSections prints the given names flag sets in sections, with the maximal given column number.
 // If cols is zero, lines are not wrapped.
 func PrintSections(w io.Writer, fss NamedFlagSets, cols int) {
