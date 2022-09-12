@@ -18,6 +18,7 @@ package proxy
 
 import (
 	"fmt"
+	"io"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/csi-test/mock/service"
@@ -37,7 +38,7 @@ func (p PodDirIO) DirExists(path string) (bool, error) {
 		"sh",
 		"-c",
 		fmt.Sprintf("if ! [ -e '%s' ]; then echo notexist; elif [ -d '%s' ]; then echo dir; else echo nodir; fi", path, path),
-	})
+	}, nil)
 	if err != nil {
 		return false, fmt.Errorf("error executing dir test commands: stderr=%q, %v", stderr, err)
 	}
@@ -54,27 +55,36 @@ func (p PodDirIO) DirExists(path string) (bool, error) {
 }
 
 func (p PodDirIO) Mkdir(path string) error {
-	_, stderr, err := p.execute([]string{"mkdir", path})
+	_, stderr, err := p.execute([]string{"mkdir", path}, nil)
 	if err != nil {
 		return fmt.Errorf("mkdir %q: stderr=%q, %v", path, stderr, err)
 	}
 	return nil
 }
 
+func (p PodDirIO) CreateFile(path string, content io.Reader) error {
+	_, stderr, err := p.execute([]string{"dd", "of=" + path}, content)
+	if err != nil {
+		return fmt.Errorf("dd of=%s: stderr=%q, %v", path, stderr, err)
+	}
+	return nil
+}
+
 func (p PodDirIO) RemoveAll(path string) error {
-	_, stderr, err := p.execute([]string{"rm", "-rf", path})
+	_, stderr, err := p.execute([]string{"rm", "-rf", path}, nil)
 	if err != nil {
 		return fmt.Errorf("rm -rf %q: stderr=%q, %v", path, stderr, err)
 	}
 	return nil
 }
 
-func (p PodDirIO) execute(command []string) (string, string, error) {
+func (p PodDirIO) execute(command []string, stdin io.Reader) (string, string, error) {
 	return p.F.ExecWithOptions(framework.ExecOptions{
 		Command:       command,
 		Namespace:     p.Namespace,
 		PodName:       p.PodName,
 		ContainerName: p.ContainerName,
+		Stdin:         stdin,
 		CaptureStdout: true,
 		CaptureStderr: true,
 		Quiet:         true,

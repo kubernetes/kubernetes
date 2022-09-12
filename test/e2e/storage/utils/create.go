@@ -275,6 +275,7 @@ var factories = map[What]ItemFactory{
 	{"ClusterRoleBinding"}:       &clusterRoleBindingFactory{},
 	{"CSIDriver"}:                &csiDriverFactory{},
 	{"DaemonSet"}:                &daemonSetFactory{},
+	{"ReplicaSet"}:               &replicaSetFactory{},
 	{"Role"}:                     &roleFactory{},
 	{"RoleBinding"}:              &roleBindingFactory{},
 	{"Secret"}:                   &secretFactory{},
@@ -375,6 +376,14 @@ func patchItemRecursively(f *framework.Framework, driverNamespace *v1.Namespace,
 			return err
 		}
 	case *appsv1.DaemonSet:
+		PatchNamespace(f, driverNamespace, &item.ObjectMeta.Namespace)
+		if err := patchContainerImages(item.Spec.Template.Spec.Containers); err != nil {
+			return err
+		}
+		if err := patchContainerImages(item.Spec.Template.Spec.InitContainers); err != nil {
+			return err
+		}
+	case *appsv1.ReplicaSet:
 		PatchNamespace(f, driverNamespace, &item.ObjectMeta.Namespace)
 		if err := patchContainerImages(item.Spec.Template.Spec.Containers); err != nil {
 			return err
@@ -578,6 +587,27 @@ func (*daemonSetFactory) Create(f *framework.Framework, ns *v1.Namespace, i inte
 	client := f.ClientSet.AppsV1().DaemonSets(ns.Name)
 	if _, err := client.Create(context.TODO(), item, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("create DaemonSet: %w", err)
+	}
+	return func() error {
+		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
+	}, nil
+}
+
+type replicaSetFactory struct{}
+
+func (f *replicaSetFactory) New() runtime.Object {
+	return &appsv1.ReplicaSet{}
+}
+
+func (*replicaSetFactory) Create(f *framework.Framework, ns *v1.Namespace, i interface{}) (func() error, error) {
+	item, ok := i.(*appsv1.ReplicaSet)
+	if !ok {
+		return nil, errorItemNotSupported
+	}
+
+	client := f.ClientSet.AppsV1().ReplicaSets(ns.Name)
+	if _, err := client.Create(context.TODO(), item, metav1.CreateOptions{}); err != nil {
+		return nil, fmt.Errorf("create ReplicaSet: %w", err)
 	}
 	return func() error {
 		return client.Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
