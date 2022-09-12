@@ -95,14 +95,23 @@ var (
 			Help:           "Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods.",
 			StabilityLevel: metrics.STABLE,
 		}, []string{"queue"})
+	// SchedulerGoroutines isn't called in some parts where goroutines start.
+	// Goroutines metric replaces SchedulerGoroutines metric. Goroutine metric tracks all goroutines.
 	SchedulerGoroutines = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
+			Subsystem:         SchedulerSubsystem,
+			DeprecatedVersion: "1.26.0",
+			Name:              "scheduler_goroutines",
+			Help:              "Number of running goroutines split by the work they do such as binding. This metric is replaced by the \"goroutines\" metric.",
+			StabilityLevel:    metrics.ALPHA,
+		}, []string{"work"})
+	Goroutines = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
 			Subsystem:      SchedulerSubsystem,
-			Name:           "scheduler_goroutines",
+			Name:           "goroutines",
 			Help:           "Number of running goroutines split by the work they do such as binding.",
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"work"})
-
+		}, []string{"operation"})
 	PodSchedulingDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
@@ -194,6 +203,7 @@ var (
 		PluginExecutionDuration,
 		SchedulerQueueIncomingPods,
 		SchedulerGoroutines,
+		Goroutines,
 		PermitWaitDuration,
 		CacheSize,
 		unschedulableReasons,

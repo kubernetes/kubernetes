@@ -925,7 +925,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 				Score: s,
 			}
 		}
-	})
+	}, score)
 	if err := errCh.ReceiveError(); err != nil {
 		return nil, framework.AsStatus(fmt.Errorf("running Score plugins: %w", err))
 	}
@@ -943,7 +943,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 			errCh.SendErrorWithCancel(err, cancel)
 			return
 		}
-	})
+	}, score)
 	if err := errCh.ReceiveError(); err != nil {
 		return nil, framework.AsStatus(fmt.Errorf("running Normalize on Score plugins: %w", err))
 	}
@@ -964,7 +964,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 			}
 			nodeScoreList[i].Score = nodeScore.Score * int64(weight)
 		}
-	})
+	}, score)
 	if err := errCh.ReceiveError(); err != nil {
 		return nil, framework.AsStatus(fmt.Errorf("applying score defaultWeights on Score plugins: %w", err))
 	}

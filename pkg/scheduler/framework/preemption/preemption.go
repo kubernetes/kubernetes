@@ -611,6 +611,6 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, pod *v1.Pod, potentia
 		nodeStatuses[nodeInfoCopy.Node().Name] = status
 		statusesLock.Unlock()
 	}
-	fh.Parallelizer().Until(ctx, len(potentialNodes), checkNode)
+	fh.Parallelizer().Until(ctx, len(potentialNodes), checkNode, ev.PluginName)
 	return append(nonViolatingCandidates.get(), violatingCandidates.get()...), nodeStatuses, utilerrors.NewAggregate(errs)
 }

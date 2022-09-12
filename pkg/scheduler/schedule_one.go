@@ -103,6 +103,8 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 
 		metrics.SchedulerGoroutines.WithLabelValues(metrics.Binding).Inc()
 		defer metrics.SchedulerGoroutines.WithLabelValues(metrics.Binding).Dec()
+		metrics.Goroutines.WithLabelValues(metrics.Binding).Inc()
+		defer metrics.Goroutines.WithLabelValues(metrics.Binding).Dec()
 
 		sched.bindingCycle(bindingCycleCtx, state, fwk, scheduleResult, assumedPodInfo, podsToActivate, start)
 	}()
@@ -563,7 +565,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 
 	// Stops searching for more nodes once the configured number of feasible nodes
 	// are found.
-	fwk.Parallelizer().Until(ctx, numAllNodes, checkNode)
+	fwk.Parallelizer().Until(ctx, numAllNodes, checkNode, frameworkruntime.Filter)
 	feasibleNodes = feasibleNodes[:feasibleNodesLen]
 	if err := errCh.ReceiveError(); err != nil {
 		statusCode = framework.Error
@@ -718,8 +720,10 @@ func prioritizeNodes(
 			wg.Add(1)
 			go func(extIndex int) {
 				metrics.SchedulerGoroutines.WithLabelValues(metrics.PrioritizingExtender).Inc()
+				metrics.Goroutines.WithLabelValues(metrics.PrioritizingExtender).Inc()
 				defer func() {
 					metrics.SchedulerGoroutines.WithLabelValues(metrics.PrioritizingExtender).Dec()
+					metrics.Goroutines.WithLabelValues(metrics.PrioritizingExtender).Dec()
 					wg.Done()
 				}()
 				prioritizedList, weight, err := extenders[extIndex].Prioritize(pod, nodes)
