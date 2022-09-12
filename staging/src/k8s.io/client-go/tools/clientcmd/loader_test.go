@@ -73,8 +73,8 @@ var (
 			"red-user":    {Token: "a-different-red-token"},
 			"yellow-user": {Token: "yellow-token"}},
 		Clusters: map[string]*clientcmdapi.Cluster{
-			"cow-cluster":    {Server: "http://a-different-cow.org:8080", InsecureSkipTLSVerify: true},
-			"donkey-cluster": {Server: "http://donkey.org:8080", InsecureSkipTLSVerify: true}},
+			"cow-cluster":    {Server: "http://a-different-cow.org:8080", InsecureSkipTLSVerify: true, DisableCompression: true},
+			"donkey-cluster": {Server: "http://donkey.org:8080", InsecureSkipTLSVerify: true, DisableCompression: true}},
 		CurrentContext: "federal-context",
 	}
 )
@@ -736,6 +736,7 @@ func Example_mergingSomeWithConflict() {
 	//     server: http://cow.org:8080
 	//   name: cow-cluster
 	// - cluster:
+	//     disable-compression: true
 	//     insecure-skip-tls-verify: true
 	//     server: http://donkey.org:8080
 	//   name: donkey-cluster
