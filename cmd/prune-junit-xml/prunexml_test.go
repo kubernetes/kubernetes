@@ -19,7 +19,6 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
 )
@@ -62,5 +61,7 @@ func TestPruneXML(t *testing.T) {
 	writer := bufio.NewWriter(&output)
 	_ = streamXML(writer, suites)
 	_ = writer.Flush()
-	assert.Equal(t, outputXML, string(output.Bytes()), "xml was not pruned correctly")
+	if outputXML != string(output.Bytes()) {
+		t.Errorf("xml was not pruned correctly. \nwant: %s \ngot: %s", outputXML, string(output.Bytes()))
+	}
 }

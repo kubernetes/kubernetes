@@ -25,15 +25,15 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
@@ -739,15 +739,25 @@ func TestNewCSR(t *testing.T) {
 		t.Errorf("invalid signature on CSR: %v", err)
 	}
 
-	assert.ElementsMatch(t, certConfig.Organization, csr.Subject.Organization, "organizations not equal")
+	sort.Strings(certConfig.Organization)
+	sort.Strings(csr.Subject.Organization)
+	if diff := cmp.Diff(certConfig.Organization, csr.Subject.Organization); diff != "" {
+		t.Errorf("organizations not equal. \ndiff: %s", diff)
+	}
 
 	if csr.Subject.CommonName != certConfig.CommonName {
 		t.Errorf("expected common name %q, got %q", certConfig.CommonName, csr.Subject.CommonName)
 	}
 
-	assert.ElementsMatch(t, certConfig.AltNames.DNSNames, csr.DNSNames, "dns names not equal")
+	sort.Strings(certConfig.AltNames.DNSNames)
+	sort.Strings(csr.DNSNames)
+	if diff := cmp.Diff(certConfig.AltNames.DNSNames, csr.DNSNames); diff != "" {
+		t.Errorf("dns names not equal. \ndiff: %s", diff)
+	}
 
-	assert.Len(t, csr.IPAddresses, len(certConfig.AltNames.IPs))
+	if len(csr.IPAddresses) != len(certConfig.AltNames.IPs) {
+		t.Errorf("want: %d got: %d", len(csr.IPAddresses), len(certConfig.AltNames.IPs))
+	}
 
 	for i, ip := range csr.IPAddresses {
 		if !ip.Equal(certConfig.AltNames.IPs[i]) {

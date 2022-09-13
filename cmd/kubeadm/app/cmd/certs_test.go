@@ -28,11 +28,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"k8s.io/client-go/tools/clientcmd"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -330,24 +327,34 @@ func TestRunGenCSR(t *testing.T) {
 	}
 
 	err := runGenCSR(nil, &config)
-	require.NoError(t, err, "expected runGenCSR to not fail")
+	if err != nil {
+		t.Fatalf("expected runGenCSR to not fail. err: %s", err)
+	}
 
 	t.Log("The command generates key and CSR files in the configured --cert-dir")
 	for _, name := range expectedCertificates {
 		_, err = pkiutil.TryLoadKeyFromDisk(certDir, name)
-		assert.NoErrorf(t, err, "failed to load key file: %s", name)
+		if err != nil {
+			t.Errorf("failed to load key file: %s, err: %s", name, err)
+		}
 
 		_, err = pkiutil.TryLoadCSRFromDisk(certDir, name)
-		assert.NoError(t, err, "failed to load CSR file: %s", name)
+		if err != nil {
+			t.Errorf("failed to load CSR file: %s, err: %s", name, err)
+		}
 	}
 
 	t.Log("The command generates kubeconfig files in the configured --kubeconfig-dir")
 	for _, name := range expectedKubeConfigs {
 		_, err = clientcmd.LoadFromFile(kubeConfigDir + "/" + name + ".conf")
-		assert.NoErrorf(t, err, "failed to load kubeconfig file: %s", name)
+		if err != nil {
+			t.Errorf("failed to load kubeconfig file: %s, err: %s", name, err)
+		}
 
 		_, err = pkiutil.TryLoadCSRFromDisk(kubeConfigDir, name+".conf")
-		assert.NoError(t, err, "failed to load kubeconfig CSR file: %s", name)
+		if err != nil {
+			t.Errorf("failed to load kubeconfig CSR file: %s, err: %s", name, err)
+		}
 	}
 }
 
@@ -356,17 +363,23 @@ func TestGenCSRConfig(t *testing.T) {
 
 	hasCertDir := func(expected string) assertion {
 		return func(t *testing.T, config *genCSRConfig) {
-			assert.Equal(t, expected, config.kubeadmConfig.CertificatesDir)
+			if expected != config.kubeadmConfig.CertificatesDir {
+				t.Errorf("want: %s got: %s", expected, config.kubeadmConfig.CertificatesDir)
+			}
 		}
 	}
 	hasKubeConfigDir := func(expected string) assertion {
 		return func(t *testing.T, config *genCSRConfig) {
-			assert.Equal(t, expected, config.kubeConfigDir)
+			if expected != config.kubeConfigDir {
+				t.Errorf("want: %s got: %s", expected, config.kubeConfigDir)
+			}
 		}
 	}
 	hasAdvertiseAddress := func(expected string) assertion {
 		return func(t *testing.T, config *genCSRConfig) {
-			assert.Equal(t, expected, config.kubeadmConfig.LocalAPIEndpoint.AdvertiseAddress)
+			if expected != config.kubeadmConfig.LocalAPIEndpoint.AdvertiseAddress {
+				t.Errorf("want: %s got: %s", expected, config.kubeadmConfig.LocalAPIEndpoint.AdvertiseAddress)
+			}
 		}
 	}
 
@@ -393,9 +406,13 @@ kubernetesVersion: %s`,
 	customConfigPath := tmpDir + "/kubeadm.conf"
 
 	f, err := os.Create(customConfigPath)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	_, err = f.Write([]byte(kubeadmConfig))
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tests := []struct {
 		name       string
@@ -456,13 +473,19 @@ kubernetesVersion: %s`,
 			flagset := pflag.NewFlagSet("flags-for-gencsr", pflag.ContinueOnError)
 			config := newGenCSRConfig()
 			config.addFlagSet(flagset)
-			require.NoError(t, flagset.Parse(test.flags))
+			if err := flagset.Parse(test.flags); err != nil {
+				t.Fatal(err)
+			}
 
 			err := config.load()
 			if test.expectErr {
-				assert.Error(t, err)
+				if err == nil {
+					t.Error(err)
+				}
 			} else {
-				assert.NoError(t, err)
+				if err != nil {
+					t.Error(err)
+				}
 			}
 			for _, assertFunc := range test.assertions {
 				assertFunc(t, config)

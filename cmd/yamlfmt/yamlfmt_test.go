@@ -19,7 +19,6 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -48,5 +47,7 @@ labels:
 	writer := bufio.NewWriter(&output)
 	_ = streamYaml(writer, &indent, node)
 	_ = writer.Flush()
-	assert.Equal(t, outputYaml, string(output.Bytes()), "yaml was not formatted correctly")
+	if outputYaml != string(output.Bytes()) {
+		t.Errorf("yaml was not formatted correctly. \nwant: %s \ngot: %s", outputYaml, string(output.Bytes()))
+	}
 }

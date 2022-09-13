@@ -28,13 +28,10 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-
-	"github.com/stretchr/testify/assert"
-
-	"k8s.io/utils/pointer"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	componentbaseconfig "k8s.io/component-base/config"
+	"k8s.io/utils/pointer"
+
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 )
 
@@ -283,7 +280,9 @@ nodePortAddresses:
 
 		config, err := options.loadConfig([]byte(yaml))
 
-		assert.NoError(t, err, "unexpected error for %s: %v", tc.name, err)
+		if err != nil {
+			t.Errorf("unexpected error for %s: %v", tc.name, err)
+		}
 
 		if !reflect.DeepEqual(expected, config) {
 			t.Fatalf("unexpected config for %s, diff = %s", tc.name, cmp.Diff(config, expected))
@@ -348,12 +347,12 @@ func TestLoadConfigFailures(t *testing.T) {
 			config := fmt.Sprintf("%s\n%s", version, tc.config)
 			_, err := options.loadConfig([]byte(config))
 
-			if assert.Error(t, err, tc.name) {
-				if tc.expErr != "" {
-					assert.Contains(t, err.Error(), tc.expErr)
+			if err != nil {
+				if tc.expErr != "" && !strings.Contains(err.Error(), tc.expErr) {
+					t.Errorf("TestName(%s): \ngot err: %s \nnot contains: %s", tc.name, err.Error(), tc.expErr)
 				}
-				if tc.checkFn != nil {
-					assert.True(t, tc.checkFn(err), tc.name)
+				if tc.checkFn != nil && true != tc.checkFn(err) {
+					t.Errorf("TestName(%s): want: %t got: %t", tc.name, true, tc.checkFn(err))
 				}
 			}
 		})
@@ -401,7 +400,9 @@ func TestProcessHostnameOverrideFlag(t *testing.T) {
 					t.Fatalf("should error for this case %s", tc.name)
 				}
 			} else {
-				assert.NoError(t, err, "unexpected error %v", err)
+				if err != nil {
+					t.Errorf("unexpected error %v", err)
+				}
 				if tc.expectedHostname != options.config.HostnameOverride {
 					t.Fatalf("expected hostname: %s, but got: %s", tc.expectedHostname, options.config.HostnameOverride)
 				}

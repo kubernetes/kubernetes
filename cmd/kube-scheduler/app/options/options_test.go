@@ -23,11 +23,11 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1530,11 +1530,11 @@ profiles:
 			// handle errors
 			if err != nil {
 				if tc.expectedError != "" || tc.checkErrFn != nil {
-					if tc.expectedError != "" {
-						assert.Contains(t, err.Error(), tc.expectedError)
+					if tc.expectedError != "" && !strings.Contains(err.Error(), tc.expectedError) {
+						t.Errorf("TestName(%s): \ngot err: %s \nnot contains: %s", tc.name, err.Error(), tc.expectedError)
 					}
-					if tc.checkErrFn != nil {
-						assert.True(t, tc.checkErrFn(err), "got error: %v", err)
+					if tc.checkErrFn != nil && true != tc.checkErrFn(err) {
+						t.Errorf("TestName(%s): got error: %v", tc.name, err)
 					}
 					return
 				}
