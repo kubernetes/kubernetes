@@ -51,10 +51,10 @@ type awsElasticBlockStorePlugin struct {
 	host volume.VolumeHost
 }
 
-var _ volume.VolumePlugin = (*awsElasticBlockStorePlugin)(nil)
-var _ volume.PersistentVolumePlugin = (*awsElasticBlockStorePlugin)(nil)
-var _ volume.DeletableVolumePlugin = (*awsElasticBlockStorePlugin)(nil)
-var _ volume.ProvisionableVolumePlugin = (*awsElasticBlockStorePlugin)(nil)
+var _ volume.VolumePlugin = &awsElasticBlockStorePlugin{}
+var _ volume.PersistentVolumePlugin = &awsElasticBlockStorePlugin{}
+var _ volume.DeletableVolumePlugin = &awsElasticBlockStorePlugin{}
+var _ volume.ProvisionableVolumePlugin = &awsElasticBlockStorePlugin{}
 
 const (
 	awsElasticBlockStorePluginName = "kubernetes.io/aws-ebs"
@@ -311,9 +311,9 @@ func (plugin *awsElasticBlockStorePlugin) NodeExpand(resizeOptions volume.NodeRe
 	return true, nil
 }
 
-var _ volume.NodeExpandableVolumePlugin = (*awsElasticBlockStorePlugin)(nil)
-var _ volume.ExpandableVolumePlugin = (*awsElasticBlockStorePlugin)(nil)
-var _ volume.VolumePluginWithAttachLimits = (*awsElasticBlockStorePlugin)(nil)
+var _ volume.NodeExpandableVolumePlugin = &awsElasticBlockStorePlugin{}
+var _ volume.ExpandableVolumePlugin = &awsElasticBlockStorePlugin{}
+var _ volume.VolumePluginWithAttachLimits = &awsElasticBlockStorePlugin{}
 
 // Abstract interface to PD operations.
 type ebsManager interface {
@@ -350,7 +350,7 @@ type awsElasticBlockStoreMounter struct {
 	mountOptions []string
 }
 
-var _ volume.Mounter = (*awsElasticBlockStoreMounter)(nil)
+var _ volume.Mounter = &awsElasticBlockStoreMounter{}
 
 func (b *awsElasticBlockStoreMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
@@ -448,7 +448,7 @@ type awsElasticBlockStoreUnmounter struct {
 	*awsElasticBlockStore
 }
 
-var _ volume.Unmounter = (*awsElasticBlockStoreUnmounter)(nil)
+var _ volume.Unmounter = &awsElasticBlockStoreUnmounter{}
 
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
@@ -465,7 +465,7 @@ type awsElasticBlockStoreDeleter struct {
 	*awsElasticBlockStore
 }
 
-var _ volume.Deleter = (*awsElasticBlockStoreDeleter)(nil)
+var _ volume.Deleter = &awsElasticBlockStoreDeleter{}
 
 func (d *awsElasticBlockStoreDeleter) GetPath() string {
 	return getPath(d.podUID, d.volName, d.plugin.host)
@@ -480,7 +480,7 @@ type awsElasticBlockStoreProvisioner struct {
 	options volume.VolumeOptions
 }
 
-var _ volume.Provisioner = (*awsElasticBlockStoreProvisioner)(nil)
+var _ volume.Provisioner = &awsElasticBlockStoreProvisioner{}
 
 func (c *awsElasticBlockStoreProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
 	if !util.ContainsAllAccessModes(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
@@ -534,10 +534,10 @@ func (c *awsElasticBlockStoreProvisioner) Provision(selectedNode *v1.Node, allow
 		pv.Spec.AccessModes = c.plugin.GetAccessModes()
 	}
 
-	requirements := make([]v1.NodeSelectorRequirement, 0)
+	requirements := make([]v1.NodeSelectorRequirement, 0, len(labels))
 	if len(labels) != 0 {
 		if pv.Labels == nil {
-			pv.Labels = make(map[string]string)
+			pv.Labels = make(map[string]string, len(labels))
 		}
 		for k, v := range labels {
 			pv.Labels[k] = v

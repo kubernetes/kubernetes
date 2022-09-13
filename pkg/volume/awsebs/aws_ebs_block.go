@@ -37,7 +37,7 @@ import (
 	"k8s.io/legacy-cloud-providers/aws"
 )
 
-var _ volume.BlockVolumePlugin = (*awsElasticBlockStorePlugin)(nil)
+var _ volume.BlockVolumePlugin = &awsElasticBlockStorePlugin{}
 
 func (plugin *awsElasticBlockStorePlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, mapPath string) (*volume.Spec, error) {
 	pluginDir := plugin.host.GetVolumeDevicePluginDir(awsElasticBlockStorePluginName)
@@ -145,14 +145,14 @@ type awsElasticBlockStoreUnmapper struct {
 	*awsElasticBlockStore
 }
 
-var _ volume.BlockVolumeUnmapper = (*awsElasticBlockStoreUnmapper)(nil)
+var _ volume.BlockVolumeUnmapper = &awsElasticBlockStoreUnmapper{}
 
 type awsElasticBlockStoreMapper struct {
 	*awsElasticBlockStore
 	readOnly bool
 }
 
-var _ volume.BlockVolumeMapper = (*awsElasticBlockStoreMapper)(nil)
+var _ volume.BlockVolumeMapper = &awsElasticBlockStoreMapper{}
 
 // GetGlobalMapPath returns global map path and error
 // path: plugins/kubernetes.io/{PluginName}/volumeDevices/volumeID
