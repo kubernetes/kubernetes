@@ -326,13 +326,8 @@ function kube::build::short_hash() {
   echo "${short_hash:0:10}"
 }
 
-# Pedantically kill, wait-on and remove a container. The -f -v options
-# to rm don't actually seem to get the job done, so force kill the
-# container, wait to ensure it's stopped, then try the remove. This is
-# a workaround for bug https://github.com/docker/docker/issues/3968.
+
 function kube::build::destroy_container() {
-  "${DOCKER[@]}" kill "$1" >/dev/null 2>&1 || true
-  "${DOCKER[@]}" wait "$1" >/dev/null 2>&1 || true
   "${DOCKER[@]}" rm -f -v "$1" >/dev/null 2>&1 || true
 }
 
