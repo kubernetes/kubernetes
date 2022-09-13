@@ -39,8 +39,33 @@ func NewEtcdMigrateServer(cfg *EtcdMigrateCfg, client EtcdMigrateClient) *EtcdMi
 }
 
 // Start starts an etcd server as a separate process, waits until it has started, and returns a exec.Cmd.
-// TODO: Add support for listening to client via TLS.
-func (r *EtcdMigrateServer) Start(version *EtcdVersion) error {
+// to support TLS listener for client
+
+package main
+
+import (
+    // "fmt"
+    // "io"
+    "net/http"
+    "log"
+)
+
+func HelloServer(w http.ResponseWriter, req *http.Request) {
+    w.Header().Set("Content-Type", "text/plain")
+    w.Write([]byte("This is an example server.\n"))
+    // fmt.Fprintf(w, "This is an example server.\n")
+    // io.WriteString(w, "This is an example server.\n")
+}
+
+func main() {
+    http.HandleFunc("/hello", HelloServer)
+    err := http.ListenAndServeTLS(":443", "server.crt", "server.key", nil)
+    if err != nil {
+        log.Fatal("ListenAndServe: ", err)
+    }
+}
+
+func (r *EtcdMigrateServer) Start(version *EtcdVersio/n) error {
 	etcdCmd := exec.Command(
 		fmt.Sprintf("%s/etcd-%s", r.cfg.binPath, version),
 		"--name", r.cfg.name,
