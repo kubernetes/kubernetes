@@ -518,11 +518,6 @@ function install-containerd-ubuntu {
   # Override to latest versions of containerd and runc
   systemctl stop containerd
   if [[ -n "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" ]]; then
-    # TODO(https://github.com/containerd/containerd/issues/2901): Remove this check once containerd has arm64 release.
-    if [[ $(dpkg --print-architecture) != "amd64" ]]; then
-      echo "Unable to automatically install containerd in non-amd64 image. Bailing out..."
-      exit 2
-    fi
     # containerd versions have slightly different url(s), so try both
     # shellcheck disable=SC2086
     ( curl ${CURL_FLAGS} \
@@ -534,11 +529,6 @@ function install-containerd-ubuntu {
     | tar --overwrite -xzv -C /usr/
   fi
   if [[ -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
-    # TODO: Remove this check once runc has arm64 release.
-    if [[ $(dpkg --print-architecture) != "amd64" ]]; then
-      echo "Unable to automatically install runc in non-amd64. Bailing out..."
-      exit 2
-    fi
     # shellcheck disable=SC2086
     curl ${CURL_FLAGS} \
       --location \
