@@ -23,9 +23,9 @@ type (
 	ProdTabEntry struct {
 		String     string
 		Id         string
-		NTType     int
-		Index      int
-		NumSymbols int
+		NTType     uint
+		Index      uint
+		NumSymbols uint
 		ReduceFunc func([]Attrib) (Attrib, error)
 	}
 	Attrib interface {
