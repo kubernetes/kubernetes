@@ -80,6 +80,10 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 		ruleResolvers []authorizer.RuleResolver
 	)
 
+	// Add SystemPrivilegedGroup as an authorizing group
+	tokenAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
+	authorizers = append(authorizers, tokenAuthorizer)
+
 	for _, authorizationMode := range config.AuthorizationModes {
 		// Keep cases in sync with constant list in k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes/modes.go.
 		switch authorizationMode {
@@ -144,10 +148,6 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 			return nil, nil, fmt.Errorf("unknown authorization mode %s specified", authorizationMode)
 		}
 	}
-
-	// Add SystemPrivilegedGroup as an authorizing group
-	tokenAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
-	authorizers = append(authorizers, tokenAuthorizer)
 
 	return union.New(authorizers...), union.NewRuleResolvers(ruleResolvers...), nil
 }
