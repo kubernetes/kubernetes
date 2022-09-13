@@ -168,24 +168,24 @@ func TestCreateNetworkPolicy(t *testing.T) {
 				ObjectMeta: objectMeta,
 				Spec: networkingv1.NetworkPolicySpec{
 					Ingress: []networkingv1.NetworkPolicyIngressRule{
-						{
+						networkingv1.NetworkPolicyIngressRule{
 							Ports: []networkingv1.NetworkPolicyPort{
-								{
+								networkingv1.NetworkPolicyPort{
 									Protocol: func() *v1.Protocol { i := v1.ProtocolUDP; return &i }(),
 									Port:     func() *intstr.IntOrString { i := intstr.FromInt(53); return &i }(),
 								},
-								{
+								networkingv1.NetworkPolicyPort{
 									Protocol: func() *v1.Protocol { i := v1.ProtocolTCP; return &i }(),
 									Port:     func() *intstr.IntOrString { i := intstr.FromInt(53); return &i }(),
 								},
 							},
 							From: []networkingv1.NetworkPolicyPeer{
-								{
+								networkingv1.NetworkPolicyPeer{
 									NamespaceSelector: &metav1.LabelSelector{
 										MatchLabels: map[string]string{"kubernetes.io/metadata.name": "default"},
 									},
 								},
-								{
+								networkingv1.NetworkPolicyPeer{
 									PodSelector: &metav1.LabelSelector{
 										MatchLabels: map[string]string{"app": "nginx"},
 									},
@@ -203,30 +203,30 @@ func TestCreateNetworkPolicy(t *testing.T) {
 				ObjectMeta: objectMeta,
 				Spec: networkingv1.NetworkPolicySpec{
 					Ingress: []networkingv1.NetworkPolicyIngressRule{
-						{
+						networkingv1.NetworkPolicyIngressRule{
 							Ports: []networkingv1.NetworkPolicyPort{
-								{
+								networkingv1.NetworkPolicyPort{
 									Protocol: func() *v1.Protocol { i := v1.ProtocolUDP; return &i }(),
 									Port:     func() *intstr.IntOrString { i := intstr.FromInt(53); return &i }(),
 								},
-								{
+								networkingv1.NetworkPolicyPort{
 									Protocol: func() *v1.Protocol { i := v1.ProtocolTCP; return &i }(),
 									Port:     func() *intstr.IntOrString { i := intstr.FromInt(53); return &i }(),
 								},
 							},
 						},
-						{
+						networkingv1.NetworkPolicyIngressRule{
 							From: []networkingv1.NetworkPolicyPeer{
-								{
+								networkingv1.NetworkPolicyPeer{
 									PodSelector: &metav1.LabelSelector{
 										MatchLabels: map[string]string{"app": "nginx"},
 									},
 								},
 							},
 						},
-						{
+						networkingv1.NetworkPolicyIngressRule{
 							From: []networkingv1.NetworkPolicyPeer{
-								{
+								networkingv1.NetworkPolicyPeer{
 									NamespaceSelector: &metav1.LabelSelector{
 										MatchLabels: map[string]string{"kubernetes.io/metadata.name": "default"},
 									},
