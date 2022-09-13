@@ -187,7 +187,7 @@ type ImageMeta struct {
 	// +optional
 	ImageTag string `json:"imageTag,omitempty"`
 
-	//TODO: evaluate if we need also a ImageName based on user feedbacks
+	//EVALUATED (The tag ImageName is important as it is used in multiple files)
 }
 
 // APIEndpoint struct contains elements of API server instance deployed on a node.
