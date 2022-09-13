@@ -254,25 +254,6 @@ function check-curl-proxy-code()
   return 1
 }
 
-# TODO: Remove this function when we do the retry inside the kubectl commands. See #15333.
-function kubectl-with-retry()
-{
-  ERROR_FILE="${KUBE_TEMP}/kubectl-error"
-  preserve_err_file=${PRESERVE_ERR_FILE:-false}
-  for count in {0..3}; do
-    kubectl "$@" 2> "${ERROR_FILE}" || true
-    if grep -q "the object has been modified" "${ERROR_FILE}"; then
-      kube::log::status "retry $1, error: $(cat "${ERROR_FILE}")"
-      rm "${ERROR_FILE}"
-      sleep $((2**count))
-    else
-      if [ "$preserve_err_file" != true ] ; then
-        rm "${ERROR_FILE}"
-      fi
-      break
-    fi
-  done
-}
 
 # Waits for the pods with the given label to match the list of names. Don't call
 # this function unless you know the exact pod names, or expect no pods.
