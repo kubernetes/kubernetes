@@ -157,11 +157,9 @@ export ENABLE_DOCKER_REGISTRY_CACHE=true
 #   glbc           - CE L7 Load Balancer Controller
 export ENABLE_L7_LOADBALANCING="${KUBE_ENABLE_L7_LOADBALANCING:-glbc}"
 
-# Optional: Enable Metrics Server. Metrics Server should be enable everywhere,
-# since it's a critical component, but in the first release we need a way to disable
-# this in case of stability issues.
-# TODO(piosz) remove this option once Metrics Server became a stable thing.
-export ENABLE_METRICS_SERVER="${KUBE_ENABLE_METRICS_SERVER:-true}"
+# Enable Metrics Server. Metrics Server should be enable everywhere,
+# since it's a critical component.
+export ENABLE_METRICS_SERVER=true
 
 # Optional: Metadata agent to setup as part of the cluster bring up:
 #   none        - No metadata agent
