@@ -107,7 +107,6 @@ var args = []string{
 	"--enable-dynamic-provisioning=false",
 	"--enable-garbage-collector=false",
 	"--enable-hostpath-provisioner=true",
-	"--enable-taint-manager=false",
 	"--cluster-signing-duration=10h",
 	"--flex-volume-plugin-dir=/flex-volume-plugin",
 	"--volume-host-cidr-denylist=127.0.0.1/28,feed::/16",
@@ -344,7 +343,6 @@ func TestAddFlags(t *testing.T) {
 		},
 		NodeLifecycleController: &NodeLifecycleControllerOptions{
 			&nodelifecycleconfig.NodeLifecycleControllerConfiguration{
-				EnableTaintManager:        false,
 				NodeEvictionRate:          0.2,
 				SecondaryNodeEvictionRate: 0.05,
 				NodeMonitorGracePeriod:    metav1.Duration{Duration: 30 * time.Second},
@@ -589,7 +587,6 @@ func TestApplyTo(t *testing.T) {
 				NodeCIDRMaskSizeIPv6: 108,
 			},
 			NodeLifecycleController: nodelifecycleconfig.NodeLifecycleControllerConfiguration{
-				EnableTaintManager:        false,
 				NodeEvictionRate:          0.2,
 				SecondaryNodeEvictionRate: 0.05,
 				NodeMonitorGracePeriod:    metav1.Duration{Duration: 30 * time.Second},
@@ -1164,7 +1161,6 @@ func TestValidateControllersOptions(t *testing.T) {
 			expectErrors: false,
 			validate: (&NodeLifecycleControllerOptions{
 				&nodelifecycleconfig.NodeLifecycleControllerConfiguration{
-					EnableTaintManager:        false,
 					NodeEvictionRate:          0.2,
 					SecondaryNodeEvictionRate: 0.05,
 					NodeMonitorGracePeriod:    metav1.Duration{Duration: 30 * time.Second},
