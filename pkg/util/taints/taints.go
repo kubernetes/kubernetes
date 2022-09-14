@@ -232,16 +232,21 @@ func TaintKeyExists(taints []v1.Taint, taintKeyToMatch string) bool {
 	return false
 }
 
-func TaintSetDiff(t1, t2 []v1.Taint) (taintsToAdd []*v1.Taint, taintsToRemove []*v1.Taint) {
-	for _, taint := range t1 {
-		if !TaintExists(t2, &taint) {
+// TaintSetDiff finds the difference between two taint slices and
+// returns all new and removed elements of the new slice relative to the old slice.
+// for example:
+// input: taintsNew=[a b] taintsOld=[a c]
+// output: taintsToAdd=[b] taintsToRemove=[c]
+func TaintSetDiff(taintsNew, taintsOld []v1.Taint) (taintsToAdd []*v1.Taint, taintsToRemove []*v1.Taint) {
+	for _, taint := range taintsNew {
+		if !TaintExists(taintsOld, &taint) {
 			t := taint
 			taintsToAdd = append(taintsToAdd, &t)
 		}
 	}
 
-	for _, taint := range t2 {
-		if !TaintExists(t1, &taint) {
+	for _, taint := range taintsOld {
+		if !TaintExists(taintsNew, &taint) {
 			t := taint
 			taintsToRemove = append(taintsToRemove, &t)
 		}
@@ -250,6 +255,7 @@ func TaintSetDiff(t1, t2 []v1.Taint) (taintsToAdd []*v1.Taint, taintsToRemove []
 	return
 }
 
+// TaintSetFilter filters from the taint slice according to the passed fn function to get the filtered taint slice.
 func TaintSetFilter(taints []v1.Taint, fn func(*v1.Taint) bool) []v1.Taint {
 	res := []v1.Taint{}
 
