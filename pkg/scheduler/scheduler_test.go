@@ -49,6 +49,7 @@ import (
 )
 
 func TestSchedulerCreation(t *testing.T) {
+	t.Parallel()
 	invalidRegistry := map[string]frameworkruntime.PluginFactory{
 		defaultbinder.Name: defaultbinder.New,
 	}
@@ -166,7 +167,9 @@ func TestSchedulerCreation(t *testing.T) {
 	}
 
 	for _, tc := range cases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			client := fake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
@@ -231,6 +234,7 @@ func TestSchedulerCreation(t *testing.T) {
 }
 
 func TestFailureHandler(t *testing.T) {
+	t.Parallel()
 	testPod := st.MakePod().Name("test-pod").Namespace(v1.NamespaceDefault).Obj()
 	testPodUpdated := testPod.DeepCopy()
 	testPodUpdated.Labels = map[string]string{"foo": ""}
@@ -262,7 +266,9 @@ func TestFailureHandler(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
@@ -314,6 +320,7 @@ func TestFailureHandler(t *testing.T) {
 }
 
 func TestFailureHandler_NodeNotFound(t *testing.T) {
+	t.Parallel()
 	nodeFoo := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	nodeBar := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
 	testPod := st.MakePod().Name("test-pod").Namespace(v1.NamespaceDefault).Obj()
@@ -340,7 +347,9 @@ func TestFailureHandler_NodeNotFound(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
@@ -383,6 +392,7 @@ func TestFailureHandler_NodeNotFound(t *testing.T) {
 }
 
 func TestFailureHandler_PodAlreadyBound(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -476,6 +486,7 @@ func initScheduler(stop <-chan struct{}, cache internalcache.Cache, queue intern
 }
 
 func TestInitPluginsWithIndexers(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		// the plugin registration ordering must not matter, being map traversal random
@@ -538,7 +549,9 @@ func TestInitPluginsWithIndexers(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			fakeInformerFactory := NewInformerFactory(&fake.Clientset{}, 0*time.Second)
 
 			var registerPluginFuncs []st.RegisterPluginFunc
