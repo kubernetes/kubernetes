@@ -155,7 +155,7 @@ func NewFramework(baseName string, options Options, client clientset.Interface) 
 		Timeouts:                 NewTimeoutContextWithDefaults(),
 	}
 
-	ginkgo.BeforeEach(f.BeforeEach)
+	ginkgo.BeforeEach(f.BeforeEach, AnnotatedLocation("set up framework"))
 
 	return f
 }
@@ -167,10 +167,10 @@ func (f *Framework) BeforeEach() {
 	// remains valid as long as possible.
 	//
 	// In addition, AfterEach will not be called if a test never gets here.
-	ginkgo.DeferCleanup(f.AfterEach)
+	ginkgo.DeferCleanup(f.AfterEach, AnnotatedLocation("tear down framework"))
 
 	// Registered later and thus runs before deleting namespaces.
-	ginkgo.DeferCleanup(f.dumpNamespaceInfo)
+	ginkgo.DeferCleanup(f.dumpNamespaceInfo, AnnotatedLocation("dump namespaces"))
 
 	ginkgo.By("Creating a kubernetes client")
 	config, err := LoadConfig()

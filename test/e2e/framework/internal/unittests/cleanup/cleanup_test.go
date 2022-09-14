@@ -49,7 +49,7 @@ import (
 //
 // This must be line #50.
 
-var _ = ginkgo.Describe("framework", func() {
+var _ = ginkgo.Describe("e2e", func() {
 	ginkgo.BeforeEach(func() {
 		framework.Logf("before")
 	})
@@ -75,30 +75,30 @@ var _ = ginkgo.Describe("framework", func() {
 })
 
 const (
-	ginkgoOutput = `[BeforeEach] framework
+	ginkgoOutput = `[BeforeEach] e2e
   cleanup_test.go:53
 INFO: before
-[BeforeEach] framework
-  framework.go:xxx
+[BeforeEach] e2e
+  set up framework | framework.go:xxx
 STEP: Creating a kubernetes client
 INFO: >>> kubeConfig: yyy/kube.config
 STEP: Building a namespace api object, basename test-namespace
 INFO: Skipping waiting for service account
 [It] works
   cleanup_test.go:66
-[AfterEach] framework
+[AfterEach] e2e
   cleanup_test.go:59
 INFO: after
-[DeferCleanup] framework
+[DeferCleanup] e2e
   cleanup_test.go:71
 INFO: cleanup first
-[DeferCleanup] framework
+[DeferCleanup] e2e
   cleanup_test.go:68
 INFO: cleanup last
-[DeferCleanup] framework
-  framework.go:xxx
-[DeferCleanup] framework
-  framework.go:xxx
+[DeferCleanup] e2e
+  dump namespaces | framework.go:xxx
+[DeferCleanup] e2e
+  tear down framework | framework.go:xxx
 STEP: Destroying namespace "test-namespace-zzz" for this suite.
 `
 )
@@ -145,7 +145,7 @@ func TestCleanup(t *testing.T) {
 
 	expected := output.SuiteResults{
 		output.TestResult{
-			Name:            "framework works",
+			Name:            "e2e works",
 			NormalizeOutput: normalizeOutput,
 			Output:          ginkgoOutput,
 		},
