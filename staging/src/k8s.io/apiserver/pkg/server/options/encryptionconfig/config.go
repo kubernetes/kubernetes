@@ -126,7 +126,7 @@ func LoadEncryptionConfig(filepath string, stopCh <-chan struct{}) (map[schema.G
 }
 
 // getKMSPluginHealthzCheckers extracts KMSPluginProbes from the EncryptionConfig.
-func getKMSPluginHealthzCheckers(config *apiserverconfig.EncryptionConfiguration) (
+func getKMSPluginHealthzCheckers(config *apiserverconfig.EncryptionConfiguration, stopCh <-chan struct{}) (
 	[]healthz.HealthChecker,
 	map[string]keyIDGetterFunc,
 	map[string]envelope.Service,
@@ -134,7 +134,7 @@ func getKMSPluginHealthzCheckers(config *apiserverconfig.EncryptionConfiguration
 	error,
 ) {
 	var result []healthz.HealthChecker
-	probes, keyIDGetters, v1Services, v2Services, err := getKMSPluginProbes(config)
+	probes, keyIDGetters, v1Services, v2Services, err := getKMSPluginProbes(config, stopCh)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -150,13 +150,16 @@ type healthChecker interface {
 	toHealthzCheck(idx int) healthz.HealthChecker
 }
 
-func getKMSPluginProbes(config *apiserverconfig.EncryptionConfiguration) (
+func getKMSPluginProbes(config *apiserverconfig.EncryptionConfiguration, stopCh <-chan struct{}) (
 	[]healthChecker,
 	map[string]keyIDGetterFunc,
 	map[string]envelope.Service,
 	map[string]envelopekmsv2.Service,
 	error,
 ) {
+	// we ignore the cancel func because this context should only be canceled when stopCh is closed
+	ctx, _ := wait.ContextForChannel(stopCh)
+
 	var result []healthChecker
 
 	keyIDGetters := map[string]keyIDGetterFunc{}
@@ -304,7 +307,6 @@ func getTransformerOverrides(
 	config *apiserverconfig.EncryptionConfiguration,
 	keyIDGetters map[string]keyIDGetterFunc,
 	v1Services map[string]envelope.Service, v2Services map[string]envelopekmsv2.Service,
-	stopCh <-chan struct{},
 ) (map[schema.GroupResource]value.Transformer, error) {
 	resourceToPrefixTransformer := map[schema.GroupResource][]value.PrefixTransformer{}
 
@@ -312,7 +314,7 @@ func getTransformerOverrides(
 	for _, resourceConfig := range config.Resources {
 		resourceConfig := resourceConfig
 
-		transformers, err := prefixTransformers(resourceConfig, keyIDGetters, v1Services, v2Services, stopCh)
+		transformers, err := prefixTransformers(resourceConfig, keyIDGetters, v1Services, v2Services)
 		if err != nil {
 			return nil, err
 		}
@@ -370,11 +372,7 @@ func prefixTransformers(
 	keyIDGetters map[string]keyIDGetterFunc,
 	v1Services map[string]envelope.Service,
 	v2Services map[string]envelopekmsv2.Service,
-	stopCh <-chan struct{},
 ) ([]value.PrefixTransformer, error) {
-	// we ignore the cancel func because this context should only be canceled when stopCh is closed
-	ctx, _ := wait.ContextForChannel(stopCh)
-
 	var result []value.PrefixTransformer
 	for _, provider := range config.Providers {
 		provider := provider

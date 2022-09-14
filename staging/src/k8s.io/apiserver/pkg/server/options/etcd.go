@@ -258,12 +258,12 @@ func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
 	return nil
 }
 
-func (s *EtcdOptions) LoadEncryptionConfig() (map[schema.GroupResource]value.Transformer, []healthz.HealthChecker, error) {
+func (s *EtcdOptions) LoadEncryptionConfig(stopCh <-chan struct{}) (map[schema.GroupResource]value.Transformer, []healthz.HealthChecker, error) {
 	s.encryptionProviderConfigOnce.Do(func() {
 		if len(s.EncryptionProviderConfigFilepath) == 0 {
 			return
 		}
-		s.transformers, s.kmsHealthChecks, s.encryptionProviderConfigErr = encryptionconfig.LoadEncryptionConfig(s.EncryptionProviderConfigFilepath)
+		s.transformers, s.kmsHealthChecks, s.encryptionProviderConfigErr = encryptionconfig.LoadEncryptionConfig(s.EncryptionProviderConfigFilepath, stopCh)
 	})
 	return s.transformers, s.kmsHealthChecks, s.encryptionProviderConfigErr
 }

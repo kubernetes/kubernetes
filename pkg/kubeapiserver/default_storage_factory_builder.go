@@ -90,7 +90,7 @@ type StorageFactoryConfig struct {
 	Serializer                runtime.StorageSerializer
 	ResourceEncodingOverrides []schema.GroupVersionResource
 	EtcdServersOverrides      []string
-	LoadEncryptionConfig      func() (map[schema.GroupResource]value.Transformer, []healthz.HealthChecker, error)
+	LoadEncryptionConfig      func(stopCh <-chan struct{}) (map[schema.GroupResource]value.Transformer, []healthz.HealthChecker, error)
 }
 
 // Complete completes the StorageFactoryConfig with provided etcdOptions returning completedStorageFactoryConfig.
