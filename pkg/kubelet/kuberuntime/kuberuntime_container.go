@@ -490,6 +490,29 @@ func (m *kubeGenericRuntimeManager) readLastStringFromContainerLogs(path string)
 	return buf.String()
 }
 
+func (m *kubeGenericRuntimeManager) convertToKubeContainerStatus(status *runtimeapi.ContainerStatus) (cStatus *kubecontainer.Status) {
+	cStatus = toKubeContainerStatus(status, m.runtimeName)
+	if status.State == runtimeapi.ContainerState_CONTAINER_EXITED {
+		// Populate the termination message if needed.
+		annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
+		// If a container cannot even be started, it certainly does not have logs, so no need to fallbackToLogs.
+		fallbackToLogs := annotatedInfo.TerminationMessagePolicy == v1.TerminationMessageFallbackToLogsOnError &&
+			cStatus.ExitCode != 0 && cStatus.Reason != "ContainerCannotRun"
+		tMessage, checkLogs := getTerminationMessage(status, annotatedInfo.TerminationMessagePath, fallbackToLogs)
+		if checkLogs {
+			tMessage = m.readLastStringFromContainerLogs(status.GetLogPath())
+		}
+		// Enrich the termination message written by the application is not empty
+		if len(tMessage) != 0 {
+			if len(cStatus.Message) != 0 {
+				cStatus.Message += ": "
+			}
+			cStatus.Message += tMessage
+		}
+	}
+	return cStatus
+}
+
 // getPodContainerStatuses gets all containers' statuses for the pod.
 func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context, uid kubetypes.UID, name, namespace string) ([]*kubecontainer.Status, error) {
 	// Select all containers of the given pod.
@@ -521,25 +544,7 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context,
 		if status == nil {
 			return nil, remote.ErrContainerStatusNil
 		}
-		cStatus := toKubeContainerStatus(status, m.runtimeName)
-		if status.State == runtimeapi.ContainerState_CONTAINER_EXITED {
-			// Populate the termination message if needed.
-			annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
-			// If a container cannot even be started, it certainly does not have logs, so no need to fallbackToLogs.
-			fallbackToLogs := annotatedInfo.TerminationMessagePolicy == v1.TerminationMessageFallbackToLogsOnError &&
-				cStatus.ExitCode != 0 && cStatus.Reason != "ContainerCannotRun"
-			tMessage, checkLogs := getTerminationMessage(status, annotatedInfo.TerminationMessagePath, fallbackToLogs)
-			if checkLogs {
-				tMessage = m.readLastStringFromContainerLogs(status.GetLogPath())
-			}
-			// Enrich the termination message written by the application is not empty
-			if len(tMessage) != 0 {
-				if len(cStatus.Message) != 0 {
-					cStatus.Message += ": "
-				}
-				cStatus.Message += tMessage
-			}
-		}
+		cStatus := m.convertToKubeContainerStatus(status)
 		statuses = append(statuses, cStatus)
 	}
 
