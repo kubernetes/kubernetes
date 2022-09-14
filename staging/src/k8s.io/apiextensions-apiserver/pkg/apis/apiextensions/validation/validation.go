@@ -1376,24 +1376,24 @@ func SchemaHas(s *apiextensions.JSONSchemaProps, pred func(s *apiextensions.JSON
 		if s.Items != nil && SchemaHas(s.Items.Schema, pred) {
 			return true
 		}
-		for _, s := range s.Items.JSONSchemas {
-			if SchemaHas(&s, pred) {
+		for i := range s.Items.JSONSchemas {
+			if SchemaHas(&s.Items.JSONSchemas[i], pred) {
 				return true
 			}
 		}
 	}
-	for _, s := range s.AllOf {
-		if SchemaHas(&s, pred) {
+	for i := range s.AllOf {
+		if SchemaHas(&s.AllOf[i], pred) {
 			return true
 		}
 	}
-	for _, s := range s.AnyOf {
-		if SchemaHas(&s, pred) {
+	for i := range s.AnyOf {
+		if SchemaHas(&s.AnyOf[i], pred) {
 			return true
 		}
 	}
-	for _, s := range s.OneOf {
-		if SchemaHas(&s, pred) {
+	for i := range s.OneOf {
+		if SchemaHas(&s.OneOf[i], pred) {
 			return true
 		}
 	}
