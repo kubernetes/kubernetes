@@ -92,11 +92,10 @@ func (nc *nodeLifecycleController) doEviction(fakeNodeHandler *testutil.FakeNode
 	defer nc.evictorLock.Unlock()
 	zones := testutil.GetZones(fakeNodeHandler)
 	for _, zone := range zones {
-		nc.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
+		nc.zoneNoExecuteTainter[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
 			uid, _ := value.UID.(string)
 			pods, _ := nc.getPodsAssignedToNode(value.Value)
 			controllerutil.DeletePods(context.TODO(), fakeNodeHandler, pods, nc.recorder, value.Value, uid, nc.daemonSetStore)
-			_ = nc.nodeEvictionMap.setStatus(value.Value, evicted)
 			return true, 0
 		})
 	}
@@ -154,7 +153,6 @@ func newNodeLifecycleControllerFromClient(
 	nodeMonitorGracePeriod time.Duration,
 	nodeStartupGracePeriod time.Duration,
 	nodeMonitorPeriod time.Duration,
-	useTaints bool,
 ) (*nodeLifecycleController, error) {
 
 	factory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
@@ -178,7 +176,6 @@ func newNodeLifecycleControllerFromClient(
 		secondaryEvictionLimiterQPS,
 		largeClusterThreshold,
 		unhealthyZoneThreshold,
-		useTaints,
 	)
 	if err != nil {
 		return nil, err
@@ -375,7 +372,7 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 				},
 			},
 			secondNodeNewStatus: healthyNodeNewStatus,
-			expectedEvictPods:   false,
+			expectedEvictPods:   true,
 			description:         "Node created long time ago, and kubelet posted NotReady for a short period of time.",
 		},
 		// Pod is ds-managed, and kubelet posted NotReady for a long period of time.
@@ -606,7 +603,7 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 				},
 			},
 			secondNodeNewStatus: healthyNodeNewStatus,
-			expectedEvictPods:   false,
+			expectedEvictPods:   true,
 			description:         "Node created long time ago, node controller posted Unknown for a short period of time.",
 		},
 		// Node created long time ago, node controller posted Unknown for a long period of time.
@@ -691,7 +688,7 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 			testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod,
 			testNodeMonitorPeriod,
-			false)
+		)
 		nodeController.now = func() metav1.Time { return fakeNow }
 		nodeController.recorder = testutil.NewFakeRecorder()
 		nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(item.fakeNodeHandler.Clientset)
@@ -721,8 +718,8 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 		}
 		zones := testutil.GetZones(item.fakeNodeHandler)
 		for _, zone := range zones {
-			if _, ok := nodeController.zonePodEvictor[zone]; ok {
-				nodeController.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
+			if _, ok := nodeController.zoneNoExecuteTainter[zone]; ok {
+				nodeController.zoneNoExecuteTainter[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
 					nodeUID, _ := value.UID.(string)
 					pods, err := nodeController.getPodsAssignedToNode(value.Value)
 					if err != nil {
@@ -860,7 +857,7 @@ func TestPodStatusChange(t *testing.T) {
 			testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod,
 			testNodeMonitorPeriod,
-			false)
+		)
 		nodeController.now = func() metav1.Time { return fakeNow }
 		nodeController.recorder = testutil.NewFakeRecorder()
 		nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(item.fakeNodeHandler.Clientset)
@@ -883,7 +880,7 @@ func TestPodStatusChange(t *testing.T) {
 		}
 		zones := testutil.GetZones(item.fakeNodeHandler)
 		for _, zone := range zones {
-			nodeController.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
+			nodeController.zoneNoExecuteTainter[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
 				nodeUID, _ := value.UID.(string)
 				pods, err := nodeController.getPodsAssignedToNode(value.Value)
 				if err != nil {
@@ -1422,7 +1419,7 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 			testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod,
 			testNodeMonitorPeriod,
-			false)
+		)
 		nodeController.now = func() metav1.Time { return fakeNow }
 		nodeController.recorder = testutil.NewFakeRecorder()
 		nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
@@ -1709,7 +1706,7 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 			testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod,
 			testNodeMonitorPeriod,
-			false)
+		)
 		nodeController.now = func() metav1.Time { return fakeNow }
 		nodeController.recorder = testutil.NewFakeRecorder()
 		nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(item.fakeNodeHandler.Clientset)
@@ -2253,7 +2250,7 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 				testNodeMonitorGracePeriod,
 				testNodeStartupGracePeriod,
 				testNodeMonitorPeriod,
-				false)
+			)
 			nodeController.now = func() metav1.Time { return fakeNow }
 			nodeController.recorder = testutil.NewFakeRecorder()
 			nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(item.fakeNodeHandler.Clientset)
@@ -2418,7 +2415,7 @@ func TestMonitorNodeHealthMarkPodsNotReady(t *testing.T) {
 			testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod,
 			testNodeMonitorPeriod,
-			false)
+		)
 		nodeController.now = func() metav1.Time { return fakeNow }
 		nodeController.recorder = testutil.NewFakeRecorder()
 		nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(item.fakeNodeHandler.Clientset)
@@ -2602,7 +2599,7 @@ func TestMonitorNodeHealthMarkPodsNotReadyRetry(t *testing.T) {
 				testNodeMonitorGracePeriod,
 				testNodeStartupGracePeriod,
 				testNodeMonitorPeriod,
-				false)
+			)
 			if item.updateReactor != nil {
 				item.fakeNodeHandler.Clientset.PrependReactor("update", "pods", item.updateReactor)
 			}
@@ -2737,7 +2734,7 @@ func TestApplyNoExecuteTaints(t *testing.T) {
 		testNodeMonitorGracePeriod,
 		testNodeStartupGracePeriod,
 		testNodeMonitorPeriod,
-		true)
+	)
 	nodeController.now = func() metav1.Time { return fakeNow }
 	nodeController.recorder = testutil.NewFakeRecorder()
 	nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
@@ -2892,7 +2889,7 @@ func TestApplyNoExecuteTaintsToNodesEnqueueTwice(t *testing.T) {
 		testNodeMonitorGracePeriod,
 		testNodeStartupGracePeriod,
 		testNodeMonitorPeriod,
-		true)
+	)
 	nodeController.now = func() metav1.Time { return fakeNow }
 	nodeController.recorder = testutil.NewFakeRecorder()
 	nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
@@ -3117,7 +3114,7 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 		testNodeMonitorGracePeriod,
 		testNodeStartupGracePeriod,
 		testNodeMonitorPeriod,
-		true)
+	)
 	nodeController.now = func() metav1.Time { return fakeNow }
 	nodeController.recorder = testutil.NewFakeRecorder()
 	nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
@@ -3222,7 +3219,7 @@ func TestTaintsNodeByCondition(t *testing.T) {
 		testNodeMonitorGracePeriod,
 		testNodeStartupGracePeriod,
 		testNodeMonitorPeriod,
-		true)
+	)
 	nodeController.now = func() metav1.Time { return fakeNow }
 	nodeController.recorder = testutil.NewFakeRecorder()
 	nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
@@ -3425,7 +3422,7 @@ func TestNodeEventGeneration(t *testing.T) {
 		testNodeMonitorGracePeriod,
 		testNodeStartupGracePeriod,
 		testNodeMonitorPeriod,
-		false)
+	)
 	nodeController.now = func() metav1.Time { return fakeNow }
 	fakeRecorder := testutil.NewFakeRecorder()
 	nodeController.recorder = fakeRecorder
@@ -3499,7 +3496,7 @@ func TestReconcileNodeLabels(t *testing.T) {
 		testNodeMonitorGracePeriod,
 		testNodeStartupGracePeriod,
 		testNodeMonitorPeriod,
-		true)
+	)
 	nodeController.now = func() metav1.Time { return fakeNow }
 	nodeController.recorder = testutil.NewFakeRecorder()
 	nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
@@ -3643,7 +3640,7 @@ func TestTryUpdateNodeHealth(t *testing.T) {
 		testNodeMonitorGracePeriod,
 		testNodeStartupGracePeriod,
 		testNodeMonitorPeriod,
-		true)
+	)
 	nodeController.now = func() metav1.Time { return fakeNow }
 	nodeController.recorder = testutil.NewFakeRecorder()
 	nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
