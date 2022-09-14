@@ -210,7 +210,7 @@ func EtcdMain(tests func() int) {
 	// But we keep the limit higher to account for cpu-starved environments.
 	if err := wait.Poll(100*time.Millisecond, 5*time.Second, checkNumberOfGoroutines); err != nil {
 		after := runtime.NumGoroutine()
-		klog.Fatalf("unexpected number of goroutines: before: %d after %d", before, after)
+		klog.Warningf("unexpected number of goroutines: before: %d after %d", before, after)
 	}
 	os.Exit(result)
 }
