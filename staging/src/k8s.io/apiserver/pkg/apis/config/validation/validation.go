@@ -195,7 +195,13 @@ func validateKMSConfiguration(c *config.KMSConfiguration, fieldPath *field.Path,
 
 func validateKMSCacheSize(c *config.KMSConfiguration, fieldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if *c.CacheSize == 0 {
+
+	// In defaulting, we set the cache size to the default value only when API version is v1.
+	// So, for v2 API version, we expect the cache size field to be nil.
+	if c.APIVersion != "v1" && c.CacheSize != nil {
+		allErrs = append(allErrs, field.Invalid(fieldPath, *c.CacheSize, "cachesize is not supported in v2"))
+	}
+	if c.APIVersion == "v1" && *c.CacheSize == 0 {
 		allErrs = append(allErrs, field.Invalid(fieldPath, *c.CacheSize, fmt.Sprintf(nonZeroErrFmt, "cachesize")))
 	}
 
