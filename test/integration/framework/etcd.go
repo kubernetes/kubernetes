@@ -214,7 +214,7 @@ func EtcdMain(tests func() int) {
 		after := runtime.NumGoroutine()
 		stacktraces := make([]byte, 1<<20)
 		runtime.Stack(stacktraces, true)
-		klog.Fatalf("unexpected number of goroutines: before: %d after %d\n%sd", before, after, string(stacktraces))
+		klog.Warningf("unexpected number of goroutines: before: %d after %d\n%sd", before, after, string(stacktraces))
 	}
 	os.Exit(result)
 }
