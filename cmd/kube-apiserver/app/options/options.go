@@ -181,7 +181,7 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 	fs.MarkDeprecated("apiserver-count", "apiserver-count is deprecated and will be removed in a future version.")
 
 	fs.StringVar(&s.EndpointReconcilerType, "endpoint-reconciler-type", string(s.EndpointReconcilerType),
-		"Use an endpoint reconciler ("+strings.Join(reconcilers.AllTypes.Names(), ", ")+") master-count is deprecated, and will be removed in a future version.")
+		"Use an endpoint reconciler ("+strings.Join(reconcilers.AllTypes.Names(), ", ")+") apiserver-count is deprecated, and will be removed in a future version.")
 
 	fs.IntVar(&s.IdentityLeaseDurationSeconds, "identity-lease-duration-seconds", s.IdentityLeaseDurationSeconds,
 		"The duration of kube-apiserver lease in seconds, must be a positive number. (In use when the APIServerIdentity feature gate is enabled.)")
