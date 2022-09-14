@@ -185,7 +185,6 @@ func TestStructure(t *testing.T) {
 									Name:       "foo",
 									Endpoint:   "unix:///tmp/kms-provider-2.socket",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
-									CacheSize:  &cacheSize,
 									APIVersion: "v2",
 								},
 							},
@@ -210,7 +209,6 @@ func TestStructure(t *testing.T) {
 									Name:       "foo",
 									Endpoint:   "unix:///tmp/kms-provider-1.socket",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
-									CacheSize:  &cacheSize,
 									APIVersion: "v2",
 								},
 							},
@@ -219,7 +217,6 @@ func TestStructure(t *testing.T) {
 									Name:       "foo",
 									Endpoint:   "unix:///tmp/kms-provider-2.socket",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
-									CacheSize:  &cacheSize,
 									APIVersion: "v2",
 								},
 							},
@@ -244,7 +241,6 @@ func TestStructure(t *testing.T) {
 									Name:       "foo",
 									Endpoint:   "unix:///tmp/kms-provider-1.socket",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
-									CacheSize:  &cacheSize,
 									APIVersion: "v2",
 								},
 							},
@@ -258,7 +254,6 @@ func TestStructure(t *testing.T) {
 									Name:       "foo",
 									Endpoint:   "unix:///tmp/kms-provider-2.socket",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
-									CacheSize:  &cacheSize,
 									APIVersion: "v2",
 								},
 							},
@@ -297,7 +292,6 @@ func TestStructure(t *testing.T) {
 									Name:       "foo",
 									Endpoint:   "unix:///tmp/kms-provider-2.socket",
 									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
-									CacheSize:  &cacheSize,
 									APIVersion: "v2",
 								},
 							},
@@ -539,20 +533,27 @@ func TestKMSProviderCacheSize(t *testing.T) {
 	}{
 		{
 			desc: "valid positive cache size",
-			in:   &config.KMSConfiguration{CacheSize: &positiveCacheSize},
+			in:   &config.KMSConfiguration{APIVersion: "v1", CacheSize: &positiveCacheSize},
 			want: field.ErrorList{},
 		},
 		{
 			desc: "invalid zero cache size",
-			in:   &config.KMSConfiguration{CacheSize: &zeroCacheSize},
+			in:   &config.KMSConfiguration{APIVersion: "v1", CacheSize: &zeroCacheSize},
 			want: field.ErrorList{
 				field.Invalid(cacheField, int32(0), fmt.Sprintf(nonZeroErrFmt, "cachesize")),
 			},
 		},
 		{
 			desc: "valid negative caches size",
-			in:   &config.KMSConfiguration{CacheSize: &negativeCacheSize},
+			in:   &config.KMSConfiguration{APIVersion: "v1", CacheSize: &negativeCacheSize},
 			want: field.ErrorList{},
+		},
+		{
+			desc: "cache size set with v2 provider",
+			in:   &config.KMSConfiguration{CacheSize: &positiveCacheSize, APIVersion: "v2"},
+			want: field.ErrorList{
+				field.Invalid(cacheField, positiveCacheSize, "cachesize is not supported in v2"),
+			},
 		},
 	}
 

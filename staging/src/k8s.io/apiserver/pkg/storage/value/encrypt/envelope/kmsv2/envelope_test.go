@@ -26,18 +26,20 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 	kmstypes "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2/v2alpha1"
 	kmsservice "k8s.io/kms/service"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 const (
-	testText              = "abcdefghijklmnopqrstuvwxyz"
-	testContextText       = "0123456789"
-	testEnvelopeCacheSize = 10
-	testKeyVersion        = "1"
+	testText        = "abcdefghijklmnopqrstuvwxyz"
+	testContextText = "0123456789"
+	testKeyVersion  = "1"
+	testCacheTTL    = 10 * time.Second
 )
 
 // testEnvelopeService is a mock Envelope service which can be used to simulate remote Envelope services
@@ -109,36 +111,33 @@ func newTestEnvelopeService() *testEnvelopeService {
 func TestEnvelopeCaching(t *testing.T) {
 	testCases := []struct {
 		desc                     string
-		cacheSize                int
+		cacheTTL                 time.Duration
 		simulateKMSPluginFailure bool
 		expectedError            string
 	}{
 		{
-			desc:                     "positive cache size should withstand plugin failure",
-			cacheSize:                1000,
+			desc:                     "entry in cache should withstand plugin failure",
+			cacheTTL:                 5 * time.Minute,
 			simulateKMSPluginFailure: true,
 		},
 		{
-			desc:                     "cache disabled size should not withstand plugin failure",
-			cacheSize:                0,
+			desc:                     "cache entry expired should not withstand plugin failure",
+			cacheTTL:                 1 * time.Millisecond,
 			simulateKMSPluginFailure: true,
 			expectedError:            "failed to decrypt DEK, error: Envelope service was disabled",
-		},
-		{
-			desc:                     "cache disabled, no plugin failure should succeed",
-			cacheSize:                0,
-			simulateKMSPluginFailure: false,
 		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
 			envelopeService := newTestEnvelopeService()
-			envelopeTransformer := NewEnvelopeTransformer(envelopeService,
+			fakeClock := testingclock.NewFakeClock(time.Now())
+			envelopeTransformer := newEnvelopeTransformerWithClock(envelopeService,
 				func(ctx context.Context) (string, error) {
 					return "", nil
 				},
-				tt.cacheSize, aestransformer.NewGCMTransformer)
+				aestransformer.NewGCMTransformer, tt.cacheTTL, fakeClock)
+
 			ctx := context.Background()
 			dataCtx := value.DefaultContext([]byte(testContextText))
 			originalText := []byte(testText)
@@ -156,6 +155,8 @@ func TestEnvelopeCaching(t *testing.T) {
 			}
 
 			envelopeService.SetDisabledStatus(tt.simulateKMSPluginFailure)
+			fakeClock.Step(2 * time.Minute)
+			// Subsequent read for the same data should work fine due to caching.
 			untransformedData, _, err = envelopeTransformer.TransformFromStorage(ctx, transformedData, dataCtx)
 			if tt.expectedError != "" {
 				if err == nil {
@@ -173,45 +174,6 @@ func TestEnvelopeCaching(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-// Makes Envelope transformer hit cache limit, throws error if it misbehaves.
-func TestEnvelopeCacheLimit(t *testing.T) {
-	envelopeTransformer := NewEnvelopeTransformer(newTestEnvelopeService(),
-		func(ctx context.Context) (string, error) {
-			return "", nil
-		},
-		testEnvelopeCacheSize, aestransformer.NewGCMTransformer)
-
-	ctx := context.Background()
-	dataCtx := value.DefaultContext([]byte(testContextText))
-
-	transformedOutputs := map[int][]byte{}
-
-	// Overwrite lots of entries in the map
-	for i := 0; i < 2*testEnvelopeCacheSize; i++ {
-		numberText := []byte(strconv.Itoa(i))
-
-		res, err := envelopeTransformer.TransformToStorage(ctx, numberText, dataCtx)
-		transformedOutputs[i] = res
-		if err != nil {
-			t.Fatalf("envelopeTransformer: error while transforming data (%v) to storage: %s", numberText, err)
-		}
-	}
-
-	// Try reading all the data now, ensuring cache misses don't cause a concern.
-	for i := 0; i < 2*testEnvelopeCacheSize; i++ {
-		numberText := []byte(strconv.Itoa(i))
-
-		output, _, err := envelopeTransformer.TransformFromStorage(ctx, transformedOutputs[i], dataCtx)
-		if err != nil {
-			t.Fatalf("envelopeTransformer: error while transforming data (%v) from storage: %s", transformedOutputs[i], err)
-		}
-
-		if !bytes.Equal(numberText, output) {
-			t.Fatalf("envelopeTransformer transformed data incorrectly using cache. Expected: %v, got %v", numberText, output)
-		}
 	}
 }
 
@@ -253,7 +215,7 @@ func TestEnvelopeTransformerKeyIDGetter(t *testing.T) {
 				func(ctx context.Context) (string, error) {
 					return tt.testKeyID, tt.testErr
 				},
-				0, aestransformer.NewGCMTransformer)
+				aestransformer.NewGCMTransformer)
 
 			ctx := context.Background()
 			dataCtx := value.DefaultContext([]byte(testContextText))
@@ -321,7 +283,7 @@ func TestTransformToStorageError(t *testing.T) {
 				func(ctx context.Context) (string, error) {
 					return "", nil
 				},
-				0, aestransformer.NewGCMTransformer)
+				aestransformer.NewGCMTransformer)
 			ctx := context.Background()
 			dataCtx := value.DefaultContext([]byte(testContextText))
 

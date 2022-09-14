@@ -39,11 +39,12 @@ func SetDefaults_KMSConfiguration(obj *KMSConfiguration) {
 		obj.Timeout = defaultTimeout
 	}
 
-	if obj.CacheSize == nil {
-		obj.CacheSize = &defaultCacheSize
-	}
-
 	if obj.APIVersion == "" {
 		obj.APIVersion = defaultAPIVersion
+	}
+
+	// cacheSize is relevant only for kms v1
+	if obj.CacheSize == nil && obj.APIVersion == "v1" {
+		obj.CacheSize = &defaultCacheSize
 	}
 }
