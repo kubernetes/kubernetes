@@ -20,8 +20,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -94,13 +93,16 @@ func TestOmitManagedFieldsPrinter(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			r := require.New(t)
 			delegate := func(o runtime.Object, w io.Writer) error {
-				r.Equal(tc.expected, o)
+				if !cmp.Equal(tc.expected, o) {
+					t.Errorf("want: %v, got: %v", tc.expected, o)
+				}
 				return nil
 			}
 			p := OmitManagedFieldsPrinter{Delegate: testResourcePrinter(delegate)}
-			r.NoError(p.PrintObj(tc.object, nil))
+			if err := p.PrintObj(tc.object, nil); err != nil {
+				t.Error(err)
+			}
 		})
 	}
 }

@@ -25,12 +25,13 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/stretchr/testify/assert"
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestVisitorHttpGet(t *testing.T) {
@@ -54,7 +55,9 @@ func TestVisitorHttpGet(t *testing.T) {
 		{
 			name: "Test retries on errors",
 			httpRetries: func(url string) (int, string, io.ReadCloser, error) {
-				assert.Equal(t, "hello", url)
+				if "hello" != url {
+					t.Errorf("want: %s, got: %s", "hello", url)
+				}
 				i++
 				if i > 2 {
 					return 0, "", nil, fmt.Errorf("Failed to get http")
@@ -73,7 +76,9 @@ func TestVisitorHttpGet(t *testing.T) {
 		{
 			name: "Test that 500s are retried",
 			httpRetries: func(url string) (int, string, io.ReadCloser, error) {
-				assert.Equal(t, "hello", url)
+				if "hello" != url {
+					t.Errorf("want: %s, got: %s", "hello", url)
+				}
 				i++
 				return 501, "Status", ioutil.NopCloser(new(bytes.Buffer)), nil
 			},
@@ -87,7 +92,9 @@ func TestVisitorHttpGet(t *testing.T) {
 		{
 			name: "Test that 300s are not retried",
 			httpRetries: func(url string) (int, string, io.ReadCloser, error) {
-				assert.Equal(t, "hello", url)
+				if "hello" != url {
+					t.Errorf("want: %s, got: %s", "hello", url)
+				}
 				i++
 				return 300, "Status", ioutil.NopCloser(new(bytes.Buffer)), nil
 
@@ -102,7 +109,9 @@ func TestVisitorHttpGet(t *testing.T) {
 		{
 			name: "Test attempt count is respected",
 			httpRetries: func(url string) (int, string, io.ReadCloser, error) {
-				assert.Equal(t, "hello", url)
+				if "hello" != url {
+					t.Errorf("want: %s, got: %s", "hello", url)
+				}
 				i++
 				return 501, "Status", ioutil.NopCloser(new(bytes.Buffer)), nil
 
@@ -130,7 +139,9 @@ func TestVisitorHttpGet(t *testing.T) {
 		{
 			name: "Test Success",
 			httpRetries: func(url string) (int, string, io.ReadCloser, error) {
-				assert.Equal(t, "hello", url)
+				if "hello" != url {
+					t.Errorf("want: %s, got: %s", "hello", url)
+				}
 				i++
 				if i > 1 {
 					return 200, "Status", ioutil.NopCloser(new(bytes.Buffer)), nil
@@ -154,18 +165,27 @@ func TestVisitorHttpGet(t *testing.T) {
 			actualBytes, actualErr := readHttpWithRetries(tt.httpRetries, tt.args.duration, tt.args.u, tt.args.attempts)
 
 			if tt.isNotNil {
-				assert.Nil(t, actualErr)
-				assert.NotNil(t, actualBytes)
+				if actualErr != nil {
+					t.Error(actualErr)
+				}
+				if actualBytes == nil {
+					t.Error("actualBytes is nil")
+				}
 			} else {
 				if tt.expectedErr != nil {
-					assert.Equal(t, tt.expectedErr, actualErr)
-				} else {
-					assert.Error(t, actualErr)
+					if !reflect.DeepEqual(tt.expectedErr, actualErr) {
+						t.Errorf("want: %s, got: %s", tt.expectedErr, actualErr)
+					}
+				} else if actualErr == nil {
+					t.Error(actualErr)
 				}
-				assert.Nil(t, actualBytes)
+				if actualBytes != nil {
+					t.Error("actualBytes is not nil")
+				}
 			}
-
-			assert.Equal(t, tt.count, i)
+			if tt.count != i {
+				t.Errorf("want: %d, got: %d", tt.count, i)
+			}
 		})
 	}
 }
@@ -341,7 +361,9 @@ func TestExpandPathsToFileVisitors(t *testing.T) {
 				case *fs.PathError:
 					if tt.expectPathError {
 						// The other details of PathError are os-specific, so only assert that the error has the path
-						assert.Equal(t, tt.path, e.Path)
+						if tt.path != e.Path {
+							t.Errorf("want: %s, got: %s", tt.path, e.Path)
+						}
 						return
 					}
 				}
@@ -352,7 +374,9 @@ func TestExpandPathsToFileVisitors(t *testing.T) {
 			for _, v := range visitors {
 				actualPaths = append(actualPaths, v.(*FileVisitor).Path)
 			}
-			assert.Equal(t, tt.expectedPaths, actualPaths)
+			if diff := cmp.Diff(tt.expectedPaths, actualPaths); diff != "" {
+				t.Error(diff)
+			}
 		})
 	}
 }
