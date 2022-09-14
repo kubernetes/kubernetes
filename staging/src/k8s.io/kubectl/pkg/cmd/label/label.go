@@ -277,6 +277,7 @@ func (o *LabelOptions) RunLabel() error {
 	}
 
 	// TODO: support bulk generic output a la Get
+	operationCounter := 0
 	return r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
@@ -392,6 +393,11 @@ func (o *LabelOptions) RunLabel() error {
 		if err != nil {
 			return err
 		}
+
+		if operationCounter > 0 && *o.PrintFlags.OutputFormat == "yaml" {
+			fmt.Fprintf(o.Out, "---\n")
+		}
+		operationCounter++
 		return printer.PrintObj(info.Object, o.Out)
 	})
 }
