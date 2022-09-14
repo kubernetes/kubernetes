@@ -19,6 +19,7 @@ limitations under the License.
 package azure
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
@@ -37,7 +38,7 @@ const (
 
 // CreateFileShare creates a file share, using a matching storage account type, account kind, etc.
 // storage account will be created if specified account is not found
-func (az *Cloud) CreateFileShare(accountOptions *AccountOptions, shareOptions *fileclient.ShareOptions) (string, string, error) {
+func (az *Cloud) CreateFileShare(ctx context.Context, accountOptions *AccountOptions, shareOptions *fileclient.ShareOptions) (string, string, error) {
 	if accountOptions == nil {
 		return "", "", fmt.Errorf("account options is nil")
 	}
@@ -58,7 +59,7 @@ func (az *Cloud) CreateFileShare(accountOptions *AccountOptions, shareOptions *f
 		return "", "", fmt.Errorf("could not get storage key for storage account %s: %v", accountOptions.Name, err)
 	}
 
-	if err := az.createFileShare(accountOptions.ResourceGroup, accountName, shareOptions); err != nil {
+	if err := az.createFileShare(ctx, accountOptions.ResourceGroup, accountName, shareOptions); err != nil {
 		return "", "", fmt.Errorf("failed to create share %s in account %s: %v", shareOptions.Name, accountName, err)
 	}
 	klog.V(4).Infof("created share %s in account %s", shareOptions.Name, accountOptions.Name)
@@ -66,8 +67,8 @@ func (az *Cloud) CreateFileShare(accountOptions *AccountOptions, shareOptions *f
 }
 
 // DeleteFileShare deletes a file share using storage account name and key
-func (az *Cloud) DeleteFileShare(resourceGroup, accountName, shareName string) error {
-	if err := az.deleteFileShare(resourceGroup, accountName, shareName); err != nil {
+func (az *Cloud) DeleteFileShare(ctx context.Context, resourceGroup, accountName, shareName string) error {
+	if err := az.deleteFileShare(ctx, resourceGroup, accountName, shareName); err != nil {
 		return err
 	}
 	klog.V(4).Infof("share %s deleted", shareName)
@@ -75,11 +76,11 @@ func (az *Cloud) DeleteFileShare(resourceGroup, accountName, shareName string) e
 }
 
 // ResizeFileShare resizes a file share
-func (az *Cloud) ResizeFileShare(resourceGroup, accountName, name string, sizeGiB int) error {
-	return az.resizeFileShare(resourceGroup, accountName, name, sizeGiB)
+func (az *Cloud) ResizeFileShare(ctx context.Context, resourceGroup, accountName, name string, sizeGiB int) error {
+	return az.resizeFileShare(ctx, resourceGroup, accountName, name, sizeGiB)
 }
 
 // GetFileShare gets a file share
-func (az *Cloud) GetFileShare(resourceGroupName, accountName, name string) (storage.FileShare, error) {
-	return az.getFileShare(resourceGroupName, accountName, name)
+func (az *Cloud) GetFileShare(ctx context.Context, resourceGroupName, accountName, name string) (storage.FileShare, error) {
+	return az.getFileShare(ctx, resourceGroupName, accountName, name)
 }

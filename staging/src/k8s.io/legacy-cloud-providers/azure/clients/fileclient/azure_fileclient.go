@@ -53,11 +53,11 @@ func New(config *azclients.ClientConfig) *Client {
 }
 
 // CreateFileShare creates a file share
-func (c *Client) CreateFileShare(resourceGroupName, accountName string, shareOptions *ShareOptions) error {
+func (c *Client) CreateFileShare(ctx context.Context, resourceGroupName, accountName string, shareOptions *ShareOptions) error {
 	if shareOptions == nil {
 		return fmt.Errorf("share options is nil")
 	}
-	result, err := c.GetFileShare(resourceGroupName, accountName, shareOptions.Name)
+	result, err := c.GetFileShare(ctx, resourceGroupName, accountName, shareOptions.Name)
 	if err == nil {
 		klog.V(2).Infof("file share(%s) under account(%s) rg(%s) already exists", shareOptions.Name, accountName, resourceGroupName)
 		return nil
@@ -76,23 +76,23 @@ func (c *Client) CreateFileShare(resourceGroupName, accountName string, shareOpt
 		Name:                &shareOptions.Name,
 		FileShareProperties: fileShareProperties,
 	}
-	_, err = c.fileSharesClient.Create(context.Background(), resourceGroupName, accountName, shareOptions.Name, fileShare)
+	_, err = c.fileSharesClient.Create(ctx, resourceGroupName, accountName, shareOptions.Name, fileShare)
 
 	return err
 }
 
 // DeleteFileShare deletes a file share
-func (c *Client) DeleteFileShare(resourceGroupName, accountName, name string) error {
-	_, err := c.fileSharesClient.Delete(context.Background(), resourceGroupName, accountName, name)
+func (c *Client) DeleteFileShare(ctx context.Context, resourceGroupName, accountName, name string) error {
+	_, err := c.fileSharesClient.Delete(ctx, resourceGroupName, accountName, name)
 
 	return err
 }
 
 // ResizeFileShare resizes a file share
-func (c *Client) ResizeFileShare(resourceGroupName, accountName, name string, sizeGiB int) error {
+func (c *Client) ResizeFileShare(ctx context.Context, resourceGroupName, accountName, name string, sizeGiB int) error {
 	quota := int32(sizeGiB)
 
-	share, err := c.fileSharesClient.Get(context.Background(), resourceGroupName, accountName, name, storage.Stats)
+	share, err := c.fileSharesClient.Get(ctx, resourceGroupName, accountName, name, storage.Stats)
 	if err != nil {
 		return fmt.Errorf("failed to get file share(%s), : %v", name, err)
 	}
@@ -104,7 +104,7 @@ func (c *Client) ResizeFileShare(resourceGroupName, accountName, name string, si
 	}
 
 	share.FileShareProperties.ShareQuota = &quota
-	_, err = c.fileSharesClient.Update(context.Background(), resourceGroupName, accountName, name, share)
+	_, err = c.fileSharesClient.Update(ctx, resourceGroupName, accountName, name, share)
 	if err != nil {
 		return fmt.Errorf("failed to update quota on file share(%s), err: %v", name, err)
 	}
@@ -115,6 +115,6 @@ func (c *Client) ResizeFileShare(resourceGroupName, accountName, name string, si
 }
 
 // GetFileShare gets a file share
-func (c *Client) GetFileShare(resourceGroupName, accountName, name string) (storage.FileShare, error) {
-	return c.fileSharesClient.Get(context.Background(), resourceGroupName, accountName, name, storage.Stats)
+func (c *Client) GetFileShare(ctx context.Context, resourceGroupName, accountName, name string) (storage.FileShare, error) {
+	return c.fileSharesClient.Get(ctx, resourceGroupName, accountName, name, storage.Stats)
 }

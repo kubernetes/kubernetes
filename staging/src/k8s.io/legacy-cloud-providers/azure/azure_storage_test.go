@@ -19,6 +19,7 @@ limitations under the License.
 package azure
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -142,7 +143,7 @@ func TestCreateFileShare(t *testing.T) {
 	for _, test := range tests {
 		mockFileClient := mockfileclient.NewMockInterface(ctrl)
 		cloud.FileClient = mockFileClient
-		mockFileClient.EXPECT().CreateFileShare(gomock.Any(), gomock.Any(), gomock.Any()).Return(test.err).AnyTimes()
+		mockFileClient.EXPECT().CreateFileShare(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(test.err).AnyTimes()
 
 		mockStorageAccountsClient := mockstorageaccountclient.NewMockInterface(ctrl)
 		cloud.StorageAccountClient = mockStorageAccountsClient
@@ -164,7 +165,7 @@ func TestCreateFileShare(t *testing.T) {
 			RequestGiB: test.gb,
 		}
 
-		account, key, err := cloud.CreateFileShare(mockAccount, mockFileShare)
+		account, key, err := cloud.CreateFileShare(context.TODO(), mockAccount, mockFileShare)
 		if test.expectErr && err == nil {
 			t.Errorf("unexpected non-error")
 			continue
@@ -215,9 +216,9 @@ func TestDeleteFileShare(t *testing.T) {
 	for _, test := range tests {
 		mockFileClient := mockfileclient.NewMockInterface(ctrl)
 		cloud.FileClient = mockFileClient
-		mockFileClient.EXPECT().DeleteFileShare(gomock.Any(), gomock.Any(), gomock.Any()).Return(test.err).Times(1)
+		mockFileClient.EXPECT().DeleteFileShare(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(test.err).Times(1)
 
-		err := cloud.DeleteFileShare(test.rg, test.acct, test.name)
+		err := cloud.DeleteFileShare(context.TODO(), test.rg, test.acct, test.name)
 		if test.expectErr && err == nil {
 			t.Errorf("unexpected non-error")
 			continue
@@ -235,7 +236,7 @@ func TestResizeFileShare(t *testing.T) {
 
 	cloud := &Cloud{}
 	mockFileClient := mockfileclient.NewMockInterface(ctrl)
-	mockFileClient.EXPECT().ResizeFileShare(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mockFileClient.EXPECT().ResizeFileShare(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	cloud.FileClient = mockFileClient
 
 	tests := []struct {
@@ -260,7 +261,7 @@ func TestResizeFileShare(t *testing.T) {
 		mockStorageAccountsClient := mockstorageaccountclient.NewMockInterface(ctrl)
 		cloud.StorageAccountClient = mockStorageAccountsClient
 
-		err := cloud.ResizeFileShare(test.rg, test.acct, test.name, test.gb)
+		err := cloud.ResizeFileShare(context.TODO(), test.rg, test.acct, test.name, test.gb)
 		if test.expectErr && err == nil {
 			t.Errorf("unexpected non-error")
 			continue
@@ -278,7 +279,7 @@ func TestGetFileShare(t *testing.T) {
 
 	cloud := &Cloud{}
 	mockFileClient := mockfileclient.NewMockInterface(ctrl)
-	mockFileClient.EXPECT().GetFileShare(gomock.Any(), gomock.Any(), gomock.Any()).Return(storage.FileShare{}, nil).AnyTimes()
+	mockFileClient.EXPECT().GetFileShare(context.TODO(), gomock.Any(), gomock.Any(), gomock.Any()).Return(storage.FileShare{}, nil).AnyTimes()
 	cloud.FileClient = mockFileClient
 
 	tests := []struct {
@@ -301,7 +302,7 @@ func TestGetFileShare(t *testing.T) {
 		mockStorageAccountsClient := mockstorageaccountclient.NewMockInterface(ctrl)
 		cloud.StorageAccountClient = mockStorageAccountsClient
 
-		_, err := cloud.GetFileShare(test.rg, test.acct, test.name)
+		_, err := cloud.GetFileShare(context.TODO(), test.rg, test.acct, test.name)
 		if test.expectErr && err == nil {
 			t.Errorf("unexpected non-error")
 			continue
