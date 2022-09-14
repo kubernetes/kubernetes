@@ -474,7 +474,7 @@ kube::golang::verify_go_version() {
   if [[ -z "$(command -v go)" ]]; then
     kube::log::usage_from_stdin <<EOF
 Can't find 'go' in PATH, please fix and retry.
-See http://golang.org/doc/install for installation instructions.
+See https://go.dev/doc/install for installation instructions.
 EOF
     return 2
   fi
