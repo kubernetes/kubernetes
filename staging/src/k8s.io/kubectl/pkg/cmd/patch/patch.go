@@ -80,7 +80,9 @@ var (
 	patchLong = templates.LongDesc(i18n.T(`
 		Update fields of a resource using strategic merge patch, a JSON merge patch, or a JSON patch.
 
-		JSON and YAML formats are accepted.`))
+		JSON and YAML formats are accepted.
+
+		Note: Strategic merge patch is not supported for custom resources.`))
 
 	patchExample = templates.Examples(i18n.T(`
 		# Partially update a node using a strategic merge patch, specifying the patch as JSON
