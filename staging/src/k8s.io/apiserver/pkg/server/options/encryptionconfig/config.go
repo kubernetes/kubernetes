@@ -125,14 +125,6 @@ type healthChecker interface {
 	toHealthzCheck(idx int) healthz.HealthChecker
 }
 
-var (
-	// The factory to create kms service. This is to make writing test easier.
-	envelopeServiceFactory = envelope.NewGRPCService
-
-	// The factory to create kmsv2 service.
-	envelopeKMSv2ServiceFactory = envelopekmsv2.NewGRPCService
-)
-
 func getTransformerOverridesAndKMSPluginProbes(config *apiserverconfig.EncryptionConfiguration, stopCh <-chan struct{}) (map[schema.GroupResource]value.Transformer, []healthChecker, error) {
 	resourceToPrefixTransformer := map[schema.GroupResource][]value.PrefixTransformer{}
 	var probes []healthChecker
@@ -268,6 +260,14 @@ func loadConfig(filepath string) (*apiserverconfig.EncryptionConfiguration, erro
 
 	return config, validation.ValidateEncryptionConfiguration(config).ToAggregate()
 }
+
+var (
+	// The factory to create kms service. This is to make writing test easier.
+	envelopeServiceFactory = envelope.NewGRPCService
+
+	// The factory to create kmsv2 service.
+	envelopeKMSv2ServiceFactory = envelopekmsv2.NewGRPCService
+)
 
 func prefixTransformersAndProbes(config apiserverconfig.ResourceConfiguration, stopCh <-chan struct{}) ([]value.PrefixTransformer, []healthChecker, error) {
 	// we ignore the cancel func because this context should only be canceled when stopCh is closed
