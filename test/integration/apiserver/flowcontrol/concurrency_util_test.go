@@ -18,17 +18,9 @@ package flowcontrol
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
-	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -37,18 +29,11 @@ import (
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
 
-	authorizationv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/testcerts"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	webhookutil "k8s.io/apiserver/pkg/util/webhook"
-	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controlplane"
@@ -65,21 +50,6 @@ const (
 	testWarmUpTime                     = 2 * time.Second
 	testTime                           = 10 * time.Second
 )
-
-func setupWithAuthorizer(t testing.TB, maxReadonlyRequestsInFlight, maxMutatingRequestsInFlight int, authz authorizer.Authorizer) (*rest.Config, framework.TearDownFunc) {
-	_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
-		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-			// Ensure all clients are allowed to send requests.
-			opts.Authorization.Modes = []string{"AlwaysAllow"}
-			opts.GenericServerRunOptions.MaxRequestsInFlight = maxReadonlyRequestsInFlight
-			opts.GenericServerRunOptions.MaxMutatingRequestsInFlight = maxMutatingRequestsInFlight
-		},
-		ModifyServerConfig: func(config *controlplane.Config) {
-			config.GenericConfig.Authorization.Authorizer = authz
-		},
-	})
-	return kubeConfig, tearDownFn
-}
 
 type SumAndCount struct {
 	Sum   float64
@@ -153,6 +123,17 @@ func intervalMetricAvg(snapshot0, snapshot1 metricSnapshot, plLabel string) plMe
 	}
 }
 
+type noxuDelayingAuthorizer struct {
+	Authorizer authorizer.Authorizer
+}
+
+func (d *noxuDelayingAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+	if a.GetUser().GetName() == "noxu1" || a.GetUser().GetName() == "noxu2" {
+		time.Sleep(fakeworkDuration) // simulate fake work with sleep
+	}
+	return d.Authorizer.Authorize(ctx, a)
+}
+
 // TestConcurrencyIsolation tests the concurrency isolation between priority levels.
 // The test defines two priority levels for this purpose, and corresponding flow schemas.
 // To one priority level, this test sends many more concurrent requests than the configuration
@@ -161,27 +142,26 @@ func intervalMetricAvg(snapshot0, snapshot1 metricSnapshot, plLabel string) plMe
 // recognizing that there are uncontrolled overheads in the system.
 //
 // This test differs from TestPriorityLevelIsolation since TestPriorityLevelIsolation checks throughput instead
-// of concurrency. In order to mitigate the effects of system noise, authorization webhook is used to artificially
+// of concurrency. In order to mitigate the effects of system noise, a delaying authorizer is used to artificially
 // increase request execution time to make the system noise relatively insignificant.
 // Secondarily, this test also checks the observed seat utilizations against values derived from expecting that
 // the throughput observed by the client equals the execution throughput observed by the server.
 func TestConcurrencyIsolation(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIPriorityAndFairness, true)()
 	// NOTE: disabling the feature should fail the test
-	// start webhook server
-	serv := &mockV1Service{allow: true, statusCode: 200}
-	s, err := NewV1TestServer(serv, testcerts.ServerCert, testcerts.ServerKey, testcerts.CACert)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer s.Close()
 
-	authorizer, err := newV1Authorizer(s.URL, testcerts.ClientCert, testcerts.ClientKey, testcerts.CACert, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	kubeConfig, closeFn := setupWithAuthorizer(t, 10, 10, authorizer)
+	_, kubeConfig, closeFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			// Ensure all clients are allowed to send requests.
+			opts.Authorization.Modes = []string{"AlwaysAllow"}
+			opts.GenericServerRunOptions.MaxRequestsInFlight = 10
+			opts.GenericServerRunOptions.MaxMutatingRequestsInFlight = 10
+		},
+		ModifyServerConfig: func(config *controlplane.Config) {
+			// Wrap default authorizer with one that delays requests from noxu clients
+			config.GenericConfig.Authorization.Authorizer = &noxuDelayingAuthorizer{config.GenericConfig.Authorization.Authorizer}
+		},
+	})
 	defer closeFn()
 
 	loopbackClient := clientset.NewForConfigOrDie(kubeConfig)
@@ -376,142 +356,4 @@ func getRequestMetricsSnapshot(c clientset.Interface) (metricSnapshot, error) {
 			snapshot[plLabel] = entry
 		}
 	}
-}
-
-// Webhook authorizer code copied from staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook/webhook_v1_test.go with minor changes
-// V1Service mocks a remote service.
-type V1Service interface {
-	Review(*authorizationv1.SubjectAccessReview)
-	HTTPStatusCode() int
-}
-
-// NewV1TestServer wraps a V1Service as an httptest.Server.
-func NewV1TestServer(s V1Service, cert, key, caCert []byte) (*httptest.Server, error) {
-	const webhookPath = "/testserver"
-	var tlsConfig *tls.Config
-	if cert != nil {
-		cert, err := tls.X509KeyPair(cert, key)
-		if err != nil {
-			return nil, err
-		}
-		tlsConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
-	}
-
-	if caCert != nil {
-		rootCAs := x509.NewCertPool()
-		rootCAs.AppendCertsFromPEM(caCert)
-		if tlsConfig == nil {
-			tlsConfig = &tls.Config{}
-		}
-		tlsConfig.ClientCAs = rootCAs
-		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
-	}
-
-	serveHTTP := func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
-			http.Error(w, fmt.Sprintf("unexpected method: %v", r.Method), http.StatusMethodNotAllowed)
-			return
-		}
-		if r.URL.Path != webhookPath {
-			http.Error(w, fmt.Sprintf("unexpected path: %v", r.URL.Path), http.StatusNotFound)
-			return
-		}
-
-		var review authorizationv1.SubjectAccessReview
-		bodyData, _ := ioutil.ReadAll(r.Body)
-		if err := json.Unmarshal(bodyData, &review); err != nil {
-			http.Error(w, fmt.Sprintf("failed to decode body: %v", err), http.StatusBadRequest)
-			return
-		}
-
-		// ensure we received the serialized review as expected
-		if review.APIVersion != "authorization.k8s.io/v1" {
-			http.Error(w, fmt.Sprintf("wrong api version: %s", string(bodyData)), http.StatusBadRequest)
-			return
-		}
-		// once we have a successful request, always call the review to record that we were called
-		s.Review(&review)
-		if s.HTTPStatusCode() < 200 || s.HTTPStatusCode() >= 300 {
-			http.Error(w, "HTTP Error", s.HTTPStatusCode())
-			return
-		}
-		type status struct {
-			Allowed         bool   `json:"allowed"`
-			Reason          string `json:"reason"`
-			EvaluationError string `json:"evaluationError"`
-		}
-		resp := struct {
-			APIVersion string `json:"apiVersion"`
-			Status     status `json:"status"`
-		}{
-			APIVersion: authorizationv1.SchemeGroupVersion.String(),
-			Status:     status{review.Status.Allowed, review.Status.Reason, review.Status.EvaluationError},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
-	}
-
-	server := httptest.NewUnstartedServer(http.HandlerFunc(serveHTTP))
-	server.TLS = tlsConfig
-	server.StartTLS()
-
-	// Adjust the path to point to our custom path
-	serverURL, _ := url.Parse(server.URL)
-	serverURL.Path = webhookPath
-	server.URL = serverURL.String()
-
-	return server, nil
-}
-
-// A service that can be set to allow all or deny all authorization requests.
-type mockV1Service struct {
-	allow      bool
-	statusCode int
-}
-
-func (m *mockV1Service) Review(r *authorizationv1.SubjectAccessReview) {
-	if r.Spec.User == "noxu1" || r.Spec.User == "noxu2" {
-		time.Sleep(fakeworkDuration) // simulate fake work with sleep
-	}
-	r.Status.Allowed = m.allow
-}
-func (m *mockV1Service) HTTPStatusCode() int { return m.statusCode }
-
-// newV1Authorizer creates a temporary kubeconfig file from the provided arguments and attempts to load
-// a new WebhookAuthorizer from it.
-func newV1Authorizer(callbackURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration) (*webhook.WebhookAuthorizer, error) {
-	tempfile, err := ioutil.TempFile("", "")
-	if err != nil {
-		return nil, err
-	}
-	p := tempfile.Name()
-	defer os.Remove(p)
-	config := v1.Config{
-		Clusters: []v1.NamedCluster{
-			{
-				Cluster: v1.Cluster{Server: callbackURL, CertificateAuthorityData: ca},
-			},
-		},
-		AuthInfos: []v1.NamedAuthInfo{
-			{
-				AuthInfo: v1.AuthInfo{ClientCertificateData: clientCert, ClientKeyData: clientKey},
-			},
-		},
-	}
-	if err := json.NewEncoder(tempfile).Encode(config); err != nil {
-		return nil, err
-	}
-	clientConfig, err := webhookutil.LoadKubeconfig(p, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return webhook.New(clientConfig, "v1", cacheTime, cacheTime, testRetryBackoff)
-}
-
-var testRetryBackoff = wait.Backoff{
-	Duration: 5 * time.Millisecond,
-	Factor:   1.5,
-	Jitter:   0.2,
-	Steps:    5,
 }
