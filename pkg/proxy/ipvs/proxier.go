@@ -1807,13 +1807,13 @@ func (proxier *Proxier) writeIptablesRules() {
 	// https://github.com/kubernetes/kubernetes/issues/72236
 	proxier.filterRules.Write(
 		"-A", string(kubeIPVSFilterChain),
-		"-m", "set", "--match-set", proxier.ipsetList[kubeLoadBalancerSet].Name, "dst,dst", "-j", "ACCEPT")
+		"-m", "set", "--match-set", proxier.ipsetList[kubeLoadBalancerSet].Name, "dst,dst", "-j", "RETURN")
 	proxier.filterRules.Write(
 		"-A", string(kubeIPVSFilterChain),
-		"-m", "set", "--match-set", proxier.ipsetList[kubeClusterIPSet].Name, "dst,dst", "-j", "ACCEPT")
+		"-m", "set", "--match-set", proxier.ipsetList[kubeClusterIPSet].Name, "dst,dst", "-j", "RETURN")
 	proxier.filterRules.Write(
 		"-A", string(kubeIPVSFilterChain),
-		"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPSet].Name, "dst,dst", "-j", "ACCEPT")
+		"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPSet].Name, "dst,dst", "-j", "RETURN")
 	proxier.filterRules.Write(
 		"-A", string(kubeIPVSFilterChain),
 		"-m", "conntrack", "--ctstate", "NEW",
