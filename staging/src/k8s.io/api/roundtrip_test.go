@@ -50,6 +50,7 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	imagepolicyv1alpha1 "k8s.io/api/imagepolicy/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
@@ -108,6 +109,7 @@ var groups = []runtime.SchemeBuilder{
 	extensionsv1beta1.SchemeBuilder,
 	flowcontrolv1alpha1.SchemeBuilder,
 	flowcontrolv1beta1.SchemeBuilder,
+	flowcontrolv1beta2.SchemeBuilder,
 	imagepolicyv1alpha1.SchemeBuilder,
 	networkingv1.SchemeBuilder,
 	networkingv1beta1.SchemeBuilder,
