@@ -447,8 +447,7 @@ func (p *PriorityQueue) flushBackoffQCompleted() {
 			break
 		}
 		pod := rawPodInfo.(*framework.QueuedPodInfo).Pod
-		boTime := p.getBackoffTime(rawPodInfo.(*framework.QueuedPodInfo))
-		if boTime.After(p.clock.Now()) {
+		if p.isPodBackingoff(rawPodInfo.(*framework.QueuedPodInfo)) {
 			break
 		}
 		_, err := p.podBackoffQ.Pop()

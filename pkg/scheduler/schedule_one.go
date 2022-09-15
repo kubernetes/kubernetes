@@ -197,7 +197,7 @@ func (sched *Scheduler) schedulingCycle(ctx context.Context, state *framework.Cy
 			metrics.PodScheduleError(fwk.ProfileName(), metrics.SinceInSeconds(start))
 			reason = v1.PodReasonSchedulerError
 		}
-		// One of the plugins returned status different than success or wait.
+		// One of the plugins returned status different from success or wait.
 		fwk.RunReservePluginsUnreserve(ctx, state, assumedPod, scheduleResult.SuggestedHost)
 		if forgetErr := sched.Cache.ForgetPod(assumedPod); forgetErr != nil {
 			klog.ErrorS(forgetErr, "Scheduler cache ForgetPod failed")
