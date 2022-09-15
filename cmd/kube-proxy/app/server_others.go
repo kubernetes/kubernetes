@@ -90,9 +90,6 @@ func newProxyServer(
 		return nil, fmt.Errorf("unable to register configz: %s", err)
 	}
 
-	var ipvsInterface utilipvs.Interface
-	var ipsetInterface utilipset.Interface
-
 	if len(config.ShowHiddenMetricsForVersion) > 0 {
 		metrics.SetShowHidden()
 	}
@@ -176,7 +173,11 @@ func newProxyServer(
 		}
 	}
 
-	if proxyMode == proxyconfigapi.ProxyModeIPTables {
+	var ipvsInterface utilipvs.Interface
+	var ipsetInterface utilipset.Interface
+
+	switch proxyMode {
+	case proxyconfigapi.ProxyModeIPTables:
 		klog.InfoS("Using iptables Proxier")
 		if config.IPTables.MasqueradeBit == nil {
 			// MasqueradeBit must be specified or defaulted.
@@ -239,7 +240,9 @@ func newProxyServer(
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
 		proxymetrics.RegisterMetrics()
-	} else if proxyMode == proxyconfigapi.ProxyModeIPVS {
+
+	case proxyconfigapi.ProxyModeIPVS:
+		klog.InfoS("Using ipvs Proxier")
 		kernelHandler := ipvs.NewLinuxKernelHandler()
 		ipsetInterface = utilipset.New(execer)
 		if err := ipvs.CanUseIPVSProxier(kernelHandler, ipsetInterface, config.IPVS.Scheduler); err != nil {
@@ -247,7 +250,6 @@ func newProxyServer(
 		}
 		ipvsInterface = utilipvs.New()
 
-		klog.InfoS("Using ipvs Proxier")
 		if dualStack {
 			klog.InfoS("Creating dualStackProxier for ipvs")
 
@@ -320,7 +322,8 @@ func newProxyServer(
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
 		proxymetrics.RegisterMetrics()
-	} else {
+
+	case proxyconfigapi.ProxyModeUserspace:
 		klog.InfoS("Using userspace Proxier")
 		klog.InfoS("The userspace proxier is now deprecated and will be removed in a future release, please use 'iptables' or 'ipvs' instead")
 
@@ -339,6 +342,8 @@ func newProxyServer(
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
+	default:
+		return nil, fmt.Errorf("unsupported proxy mode: %v", proxyMode)
 	}
 
 	useEndpointSlices := true
@@ -549,7 +554,7 @@ func cidrTuple(cidrList string) [2]string {
 
 func getProxyMode(proxyMode proxyconfigapi.ProxyMode) proxyconfigapi.ProxyMode {
 	if proxyMode == "" {
-		klog.InfoS("Using iptables proxy")
+		klog.InfoS("Using iptables proxy by default")
 		return proxyconfigapi.ProxyModeIPTables
 	} else {
 		return proxyMode
