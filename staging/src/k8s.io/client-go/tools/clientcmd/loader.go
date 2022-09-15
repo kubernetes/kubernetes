@@ -286,8 +286,8 @@ func (rules *ClientConfigLoadingRules) Migrate() error {
 		if err != nil {
 			return err
 		}
-		// destination is created with mode 0600 before umask
-		err = os.WriteFile(destination, data, 0600)
+		// destination is created with mode 0644 before umask
+		err = os.WriteFile(destination, data, 0644)
 		if err != nil {
 			return err
 		}
