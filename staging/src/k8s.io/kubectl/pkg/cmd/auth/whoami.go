@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sort"
 
 	"github.com/spf13/cobra"
 	authenticationv1alpha1 "k8s.io/api/authentication/v1alpha1"
@@ -191,7 +192,14 @@ func printTableSelfSubjectAccessReview(obj runtime.Object, out io.Writer) error 
 	}
 
 	if len(ui.Extra) > 0 {
-		for k, v := range ui.Extra {
+		sortedKeys := make([]string, 0, len(ui.Extra))
+		for k := range ui.Extra {
+			sortedKeys = append(sortedKeys, k)
+		}
+		sort.Strings(sortedKeys)
+
+		for _, k := range sortedKeys {
+			v := ui.Extra[k]
 			_, err := fmt.Fprintf(w, "Extra: %s\t%v\n", k, v)
 			if err != nil {
 				return fmt.Errorf("cannot write an extra: %w", err)
