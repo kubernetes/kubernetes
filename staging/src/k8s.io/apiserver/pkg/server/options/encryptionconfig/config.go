@@ -98,6 +98,33 @@ func (p *kmsv2PluginProbe) toHealthzCheck(idx int) healthz.HealthChecker {
 	})
 }
 
+func LoadEncryptionConfig(filepath string, stopCh <-chan struct{}) (map[schema.GroupResource]value.Transformer, []healthz.HealthChecker, error) {
+	config, err := loadConfig(filepath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error while parsing file: %v", err)
+	}
+
+	return getTransformerOverridesAndKMSPluginHealthzCheckers(config, stopCh)
+}
+
+func getTransformerOverridesAndKMSPluginHealthzCheckers(config *apiserverconfig.EncryptionConfiguration, stopCh <-chan struct{}) (map[schema.GroupResource]value.Transformer, []healthz.HealthChecker, error) {
+	var kmsHealthChecks []healthz.HealthChecker
+	transformers, probes, err := getTransformerOverridesAndKMSPluginProbes(config, stopCh)
+	if err != nil {
+		return nil, nil, err
+	}
+	for i := range probes {
+		probe := probes[i]
+		kmsHealthChecks = append(kmsHealthChecks, probe.toHealthzCheck(i))
+	}
+
+	return transformers, kmsHealthChecks, nil
+}
+
+type healthChecker interface {
+	toHealthzCheck(idx int) healthz.HealthChecker
+}
+
 var (
 	// The factory to create kms service. This is to make writing test easier.
 	envelopeServiceFactory = envelope.NewGRPCService
@@ -106,127 +133,38 @@ var (
 	envelopeKMSv2ServiceFactory = envelopekmsv2.NewGRPCService
 )
 
-func LoadEncryptionConfig(filepath string, stopCh <-chan struct{}) (map[schema.GroupResource]value.Transformer, []healthz.HealthChecker, error) {
-	config, err := loadConfig(filepath)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error while parsing file: %v", err)
-	}
+func getTransformerOverridesAndKMSPluginProbes(config *apiserverconfig.EncryptionConfiguration, stopCh <-chan struct{}) (map[schema.GroupResource]value.Transformer, []healthChecker, error) {
+	resourceToPrefixTransformer := map[schema.GroupResource][]value.PrefixTransformer{}
+	var probes []healthChecker
 
-	kmsHealthChecks, keyIDGetters, v1Services, v2Services, err := getKMSPluginHealthzCheckers(config, stopCh)
-	if err != nil {
-		return nil, nil, err
-	}
+	// For each entry in the configuration
+	for _, resourceConfig := range config.Resources {
+		resourceConfig := resourceConfig
 
-	transformers, err := getTransformerOverrides(config, keyIDGetters, v1Services, v2Services)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return transformers, kmsHealthChecks, nil
-}
-
-// getKMSPluginHealthzCheckers extracts KMSPluginProbes from the EncryptionConfig.
-func getKMSPluginHealthzCheckers(config *apiserverconfig.EncryptionConfiguration, stopCh <-chan struct{}) (
-	[]healthz.HealthChecker,
-	map[string]keyIDGetterFunc,
-	map[string]envelope.Service,
-	map[string]envelopekmsv2.Service,
-	error,
-) {
-	var result []healthz.HealthChecker
-	probes, keyIDGetters, v1Services, v2Services, err := getKMSPluginProbes(config, stopCh)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-	for i := range probes {
-		probe := probes[i]
-		result = append(result, probe.toHealthzCheck(i))
-	}
-
-	return result, keyIDGetters, v1Services, v2Services, nil
-}
-
-type healthChecker interface {
-	toHealthzCheck(idx int) healthz.HealthChecker
-}
-
-func getKMSPluginProbes(config *apiserverconfig.EncryptionConfiguration, stopCh <-chan struct{}) (
-	[]healthChecker,
-	map[string]keyIDGetterFunc,
-	map[string]envelope.Service,
-	map[string]envelopekmsv2.Service,
-	error,
-) {
-	// we ignore the cancel func because this context should only be canceled when stopCh is closed
-	ctx, _ := wait.ContextForChannel(stopCh)
-
-	var result []healthChecker
-
-	keyIDGetters := map[string]keyIDGetterFunc{}
-	v1Services := map[string]envelope.Service{}
-	v2Services := map[string]envelopekmsv2.Service{}
-	for _, r := range config.Resources {
-		r := r
-		for _, p := range r.Providers {
-			p := p
-			if p.KMS == nil {
-				continue
-			}
-
-			kmsName := p.KMS.Name
-
-			// TODO add validation that checks that all KMS plugins with name X have the same config Y
-			if _, ok := v1Services[kmsName]; ok {
-				continue
-			}
-			if _, ok := v2Services[kmsName]; ok {
-				continue
-			}
-
-			switch p.KMS.APIVersion {
-			case kmsAPIVersionV1:
-				s, err := envelopeServiceFactory(ctx, p.KMS.Endpoint, p.KMS.Timeout.Duration)
-				if err != nil {
-					return nil, nil, nil, nil, fmt.Errorf("could not configure KMSv1-Plugin's probe %q, error: %v", kmsName, err)
-				}
-
-				v1Services[kmsName] = s
-				result = append(result, &kmsPluginProbe{
-					name:         kmsName,
-					ttl:          kmsPluginHealthzNegativeTTL,
-					service:      s,
-					l:            &sync.Mutex{},
-					lastResponse: &kmsPluginHealthzResponse{},
-				})
-
-			case kmsAPIVersionV2:
-				if !utilfeature.DefaultFeatureGate.Enabled(features.KMSv2) {
-					return nil, nil, nil, nil, fmt.Errorf("could not configure KMSv2-Plugin's probe %q, KMSv2 feature is not enabled", kmsName)
-				}
-
-				s, err := envelopeKMSv2ServiceFactory(ctx, p.KMS.Endpoint, p.KMS.Timeout.Duration)
-				if err != nil {
-					return nil, nil, nil, nil, fmt.Errorf("could not configure KMSv2-Plugin's probe %q, error: %v", kmsName, err)
-				}
-
-				h := &kmsv2PluginProbe{
-					name:         kmsName,
-					ttl:          kmsPluginHealthzNegativeTTL,
-					service:      s,
-					l:            &sync.Mutex{},
-					lastResponse: &kmsPluginHealthzResponse{},
-				}
-				keyIDGetters[kmsName] = h.check
-				v2Services[kmsName] = s
-				result = append(result, h)
-
-			default:
-				return nil, nil, nil, nil, fmt.Errorf("could not configure KMS Plugin's probe %q, unsupported KMS API version %q", kmsName, p.KMS.APIVersion)
-			}
+		transformers, p, err := prefixTransformersAndProbes(resourceConfig, stopCh)
+		if err != nil {
+			return nil, nil, err
 		}
+
+		// For each resource, create a list of providers to use
+		for _, resource := range resourceConfig.Resources {
+			resource := resource
+			gr := schema.ParseGroupResource(resource)
+			resourceToPrefixTransformer[gr] = append(
+				resourceToPrefixTransformer[gr], transformers...)
+		}
+
+		probes = append(probes, p...)
 	}
 
-	return result, keyIDGetters, v1Services, v2Services, nil
+	transformers := make(map[schema.GroupResource]value.Transformer, len(resourceToPrefixTransformer))
+	for gr, transList := range resourceToPrefixTransformer {
+		gr := gr
+		transList := transList
+		transformers[gr] = value.NewMutableTransformer(value.NewPrefixTransformers(fmt.Errorf("no matching prefix found"), transList...))
+	}
+
+	return transformers, probes, nil
 }
 
 // Check encrypts and decrypts test data against KMS-Plugin's gRPC endpoint.
@@ -302,42 +240,6 @@ func isKMSv2ProviderHealthy(name string, response *envelopekmsv2.StatusResponse)
 	return nil
 }
 
-// getTransformerOverrides returns the transformer overrides by reading and parsing the encryption provider configuration file
-func getTransformerOverrides(
-	config *apiserverconfig.EncryptionConfiguration,
-	keyIDGetters map[string]keyIDGetterFunc,
-	v1Services map[string]envelope.Service, v2Services map[string]envelopekmsv2.Service,
-) (map[schema.GroupResource]value.Transformer, error) {
-	resourceToPrefixTransformer := map[schema.GroupResource][]value.PrefixTransformer{}
-
-	// For each entry in the configuration
-	for _, resourceConfig := range config.Resources {
-		resourceConfig := resourceConfig
-
-		transformers, err := prefixTransformers(resourceConfig, keyIDGetters, v1Services, v2Services)
-		if err != nil {
-			return nil, err
-		}
-
-		// For each resource, create a list of providers to use
-		for _, resource := range resourceConfig.Resources {
-			resource := resource
-			gr := schema.ParseGroupResource(resource)
-			resourceToPrefixTransformer[gr] = append(
-				resourceToPrefixTransformer[gr], transformers...)
-		}
-	}
-
-	result := make(map[schema.GroupResource]value.Transformer, len(resourceToPrefixTransformer))
-	for gr, transList := range resourceToPrefixTransformer {
-		gr := gr
-		transList := transList
-		result[gr] = value.NewMutableTransformer(value.NewPrefixTransformers(fmt.Errorf("no matching prefix found"), transList...))
-	}
-	return result, nil
-
-}
-
 func loadConfig(filepath string) (*apiserverconfig.EncryptionConfiguration, error) {
 	f, err := os.Open(filepath)
 	if err != nil {
@@ -367,13 +269,13 @@ func loadConfig(filepath string) (*apiserverconfig.EncryptionConfiguration, erro
 	return config, validation.ValidateEncryptionConfiguration(config).ToAggregate()
 }
 
-func prefixTransformers(
-	config apiserverconfig.ResourceConfiguration,
-	keyIDGetters map[string]keyIDGetterFunc,
-	v1Services map[string]envelope.Service,
-	v2Services map[string]envelopekmsv2.Service,
-) ([]value.PrefixTransformer, error) {
-	var result []value.PrefixTransformer
+func prefixTransformersAndProbes(config apiserverconfig.ResourceConfiguration, stopCh <-chan struct{}) ([]value.PrefixTransformer, []healthChecker, error) {
+	// we ignore the cancel func because this context should only be canceled when stopCh is closed
+	ctx, _ := wait.ContextForChannel(stopCh)
+
+	var transformers []value.PrefixTransformer
+	var probes []healthChecker
+
 	for _, provider := range config.Providers {
 		provider := provider
 		var (
@@ -384,53 +286,79 @@ func prefixTransformers(
 		switch {
 		case provider.AESGCM != nil:
 			transformer, err = aesPrefixTransformer(provider.AESGCM, aestransformer.NewGCMTransformer, aesGCMTransformerPrefixV1)
+
 		case provider.AESCBC != nil:
 			transformer, err = aesPrefixTransformer(provider.AESCBC, aestransformer.NewCBCTransformer, aesCBCTransformerPrefixV1)
+
 		case provider.Secretbox != nil:
 			transformer, err = secretboxPrefixTransformer(provider.Secretbox)
+
 		case provider.KMS != nil:
+			// TODO add validation that checks that all KMS plugins with name X have the same config Y
 			kmsName := provider.KMS.Name
 			switch provider.KMS.APIVersion {
 			case kmsAPIVersionV1:
-				envelopeService, ok := v1Services[kmsName]
-				if !ok {
-					return nil, fmt.Errorf("could not find service for KMS plugin %q", kmsName)
+				envelopeService, err := envelopeServiceFactory(ctx, provider.KMS.Endpoint, provider.KMS.Timeout.Duration)
+				if err != nil {
+					return nil, nil, fmt.Errorf("could not configure KMSv1-Plugin's probe %q, error: %v", kmsName, err)
 				}
+
+				probe := &kmsPluginProbe{
+					name:         kmsName,
+					ttl:          kmsPluginHealthzNegativeTTL,
+					service:      envelopeService,
+					l:            &sync.Mutex{},
+					lastResponse: &kmsPluginHealthzResponse{},
+				}
+
+				probes = append(probes, probe)
+
 				transformer, err = envelopePrefixTransformer(provider.KMS, envelopeService, kmsTransformerPrefixV1)
+
 			case kmsAPIVersionV2:
 				if !utilfeature.DefaultFeatureGate.Enabled(features.KMSv2) {
-					return nil, fmt.Errorf("could not configure KMSv2 plugin %q, KMSv2 feature is not enabled", kmsName)
+					return nil, nil, fmt.Errorf("could not configure KMSv2 plugin %q, KMSv2 feature is not enabled", kmsName)
 				}
 
-				keyIDGetter, ok := keyIDGetters[kmsName]
-				if !ok {
-					return nil, fmt.Errorf("missing key ID getter for KMSv2 plugin %q", kmsName)
+				envelopeService, err := envelopeKMSv2ServiceFactory(ctx, provider.KMS.Endpoint, provider.KMS.Timeout.Duration)
+				if err != nil {
+					return nil, nil, fmt.Errorf("could not configure KMSv2-Plugin's probe %q, error: %v", kmsName, err)
 				}
 
-				envelopeService, ok := v2Services[kmsName]
-				if !ok {
-					return nil, fmt.Errorf("could not find service for KMS plugin %q", kmsName)
+				probe := &kmsv2PluginProbe{
+					name:         kmsName,
+					ttl:          kmsPluginHealthzNegativeTTL,
+					service:      envelopeService,
+					l:            &sync.Mutex{},
+					lastResponse: &kmsPluginHealthzResponse{},
 				}
 
-				transformer, err = envelopekmsv2PrefixTransformer(provider.KMS, keyIDGetter, envelopeService, kmsTransformerPrefixV2)
+				probes = append(probes, probe)
+
+				transformer, err = envelopekmsv2PrefixTransformer(provider.KMS, probe.check, envelopeService, kmsTransformerPrefixV2)
+
 			default:
-				return nil, fmt.Errorf("could not configure KMS plugin %q, unsupported KMS API version %q", kmsName, provider.KMS.APIVersion)
+				return nil, nil, fmt.Errorf("could not configure KMS plugin %q, unsupported KMS API version %q", kmsName, provider.KMS.APIVersion)
 			}
+
 		case provider.Identity != nil:
 			transformer = value.PrefixTransformer{
 				Transformer: identity.NewEncryptCheckTransformer(),
 				Prefix:      []byte{},
 			}
+
 		default:
-			return nil, errors.New("provider does not contain any of the expected providers: KMS, AESGCM, AESCBC, Secretbox, Identity")
+			return nil, nil, errors.New("provider does not contain any of the expected providers: KMS, AESGCM, AESCBC, Secretbox, Identity")
 		}
 
 		if err != nil {
-			return result, err
+			return nil, nil, err
 		}
-		result = append(result, transformer)
+
+		transformers = append(transformers, transformer)
 	}
-	return result, nil
+
+	return transformers, probes, nil
 }
 
 type blockTransformerFunc func(cipher.Block) value.Transformer

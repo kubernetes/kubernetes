@@ -320,7 +320,7 @@ func TestKMSPluginHealthz(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			got, _, _, _, err := getKMSPluginProbes(config, ctx.Done())
+			_, got, err := getTransformerOverridesAndKMSPluginProbes(config, ctx.Done())
 			if err != nil && !tt.wantErr {
 				t.Fatalf("got %v, want nil for error", err)
 			}
