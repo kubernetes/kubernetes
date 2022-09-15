@@ -95,6 +95,7 @@ for more information about scheduling and the kube-scheduler component.`,
 		},
 	}
 
+	//(o *Options) initFlags()
 	nfs := opts.Flags
 	verflag.AddFlags(nfs.FlagSet("global"))
 	globalflag.AddGlobalFlags(nfs.FlagSet("global"), cmd.Name(), logs.SkipLoggingConfigurationFlags())
@@ -133,6 +134,7 @@ func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Op
 		cancel()
 	}()
 
+	//将以前的逻辑合并到了Setup中.
 	cc, sched, err := Setup(ctx, opts, registryOptions...)
 	if err != nil {
 		return err
@@ -149,6 +151,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	klog.InfoS("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
 
 	// Configz registration.
+	//在configz中注册, 感觉是将所有的配置文件, 统一注册管理起来了.
 	if cz, err := configz.New("componentconfig"); err == nil {
 		cz.Set(cc.ComponentConfig)
 	} else {
@@ -187,6 +190,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	}
 
 	// Start all informers.
+	//启动所有的informers
 	cc.InformerFactory.Start(ctx.Done())
 	// DynInformerFactory can be nil in tests.
 	if cc.DynInformerFactory != nil {
@@ -194,6 +198,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	}
 
 	// Wait for all caches to sync before scheduling.
+	//等到缓存同步完成.
 	cc.InformerFactory.WaitForCacheSync(ctx.Done())
 	// DynInformerFactory can be nil in tests.
 	if cc.DynInformerFactory != nil {
@@ -201,6 +206,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	}
 
 	// If leader election is enabled, runCommand via LeaderElector until done and exit.
+	//leader 选举.
 	if cc.LeaderElection != nil {
 		cc.LeaderElection.Callbacks = leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
@@ -306,12 +312,23 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 		return nil, nil, utilerrors.NewAggregate(errs)
 	}
 
+	//根据配置, 生成schedulerappconfig.Config{}结构体.
+	//主要参数
+	//	c.Client = client
+	//	c.KubeConfig = kubeConfig
+	//	//scheduler中不需要resync.
+	//	c.InformerFactory = scheduler.NewInformerFactory(client, 0)
+	//	dynClient := dynamic.NewForConfigOrDie(kubeConfig)
+	//	c.DynInformerFactory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynClient, 0, corev1.NamespaceAll, nil)
+	//	c.LeaderElection = leaderElectionConfig
+	
 	c, err := opts.Config()
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// Get the completed config
+	//completedConfig struct 封装c, schedulerappconfig.Config
 	cc := c.Complete()
 
 	outOfTreeRegistry := make(runtime.Registry)
@@ -324,6 +341,7 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 	recorderFactory := getRecorderFactory(&cc)
 	completedProfiles := make([]kubeschedulerconfig.KubeSchedulerProfile, 0)
 	// Create the scheduler.
+	//创建调度的实体. 之前在Run里面的逻辑, 移动到这里来了.
 	sched, err := scheduler.New(cc.Client,
 		cc.InformerFactory,
 		cc.DynInformerFactory,
@@ -331,6 +349,7 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 		ctx.Done(),
 		scheduler.WithComponentConfigVersion(cc.ComponentConfig.TypeMeta.APIVersion),
 		scheduler.WithKubeConfig(cc.KubeConfig),
+		//如果指定了其他的profile, 则applyDefaultProfile=false
 		scheduler.WithProfiles(cc.ComponentConfig.Profiles...),
 		scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
 		scheduler.WithFrameworkOutOfTreeRegistry(outOfTreeRegistry),

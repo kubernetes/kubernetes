@@ -40,6 +40,7 @@ var (
 // "stop" is the channel that would close the background goroutine.
 func New(ttl time.Duration, stop <-chan struct{}) Cache {
 	cache := newCache(ttl, cleanAssumedPeriod, stop)
+	//清理过期的assumed的pod
 	cache.run()
 	return cache
 }
@@ -53,6 +54,7 @@ type nodeInfoListItem struct {
 	prev *nodeInfoListItem
 }
 
+//呵呵, schedulerCache改名字了.
 type cacheImpl struct {
 	stop   <-chan struct{}
 	ttl    time.Duration
@@ -216,24 +218,31 @@ func (cache *cacheImpl) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 	// Start from the head of the NodeInfo doubly linked list and update snapshot
 	// of NodeInfos updated after the last snapshot.
 	for node := cache.headNode; node != nil; node = node.next {
+		//如果迭代小于snap版本号, 则不用更新, 已经是最新的了.
 		if node.info.Generation <= snapshotGeneration {
 			// all the nodes are updated before the existing snapshot. We are done.
 			break
 		}
 		if np := node.info.Node(); np != nil {
 			existing, ok := nodeSnapshot.nodeInfoMap[np.Name]
+			//快照中不存在, 则放空对象进去.
 			if !ok {
 				updateAllLists = true
 				existing = &framework.NodeInfo{}
 				nodeSnapshot.nodeInfoMap[np.Name] = existing
 			}
+			//完全拷贝当前节点的信息.
 			clone := node.info.Clone()
 			// We track nodes that have pods with affinity, here we check if this node changed its
 			// status from having pods with affinity to NOT having pods with affinity or the other
 			// way around.
+			//检查是否从有pod affinity 到没有pod affinity
+			//根据对应的标志, 放入对应的队列中. 所以判断有或者没有就够了,
 			if (len(existing.PodsWithAffinity) > 0) != (len(clone.PodsWithAffinity) > 0) {
 				updateNodesHavePodsWithAffinity = true
 			}
+			//检查是否从有pod anti affinity 到没有pod anti affinity
+			//根据对应的标志, 放入对应的队列中. 所以判断有或者没有就够了,
 			if (len(existing.PodsWithRequiredAntiAffinity) > 0) != (len(clone.PodsWithRequiredAntiAffinity) > 0) {
 				updateNodesHavePodsWithRequiredAntiAffinity = true
 			}
@@ -250,11 +259,16 @@ func (cache *cacheImpl) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 	// Comparing to pods in nodeTree.
 	// Deleted nodes get removed from the tree, but they might remain in the nodes map
 	// if they still have non-deleted Pods.
+	//nodeSnapshot中节点数 > cache中节点数量
+	//根据当前cache中节点信息, 更新snapshot中节点信息, 移除多余节点.
+	// 如果cache节点数 > nodeSnapshot中节点数 呢 ? 会不会在上面for逻辑中处理?
+	// 这里需要关注在cache添加节点时相关的逻辑操作.
 	if len(nodeSnapshot.nodeInfoMap) > cache.nodeTree.numNodes {
 		cache.removeDeletedNodesFromSnapshot(nodeSnapshot)
 		updateAllLists = true
 	}
 
+	//更新几个list 根据对应的标志, 放入对应的队列中. 所以判断有或者没有就够了,
 	if updateAllLists || updateNodesHavePodsWithAffinity || updateNodesHavePodsWithRequiredAntiAffinity {
 		cache.updateNodeInfoSnapshotList(nodeSnapshot, updateAllLists)
 	}
@@ -275,6 +289,7 @@ func (cache *cacheImpl) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 	return nil
 }
 
+//更新几个list, 根据对应的标志, 放入对应的队列中. 所以判断有或者没有就够了,
 func (cache *cacheImpl) updateNodeInfoSnapshotList(snapshot *Snapshot, updateAll bool) {
 	snapshot.havePodsWithAffinityNodeInfoList = make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
 	snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
@@ -418,12 +433,15 @@ func (cache *cacheImpl) addPod(pod *v1.Pod, assumePod bool) error {
 		n = newNodeInfoListItem(framework.NewNodeInfo())
 		cache.nodes[pod.Spec.NodeName] = n
 	}
+	//节点信息, nodeInfo更新pod, 并统计相关信息.
 	n.info.AddPod(pod)
 	cache.moveNodeInfoToHead(pod.Spec.NodeName)
 	ps := &podState{
 		pod: pod,
 	}
+	//记录该pod
 	cache.podStates[key] = ps
+	//如果是assumed 则, 更新assumedPods中添加pods
 	if assumePod {
 		cache.assumedPods.Insert(key)
 	}
@@ -443,15 +461,18 @@ func (cache *cacheImpl) updatePod(oldPod, newPod *v1.Pod) error {
 // removed and there are no more pods left in the node, cleans up the node from
 // the cache.
 func (cache *cacheImpl) removePod(pod *v1.Pod) error {
+	//重新获取key. pod的uid
 	key, err := framework.GetPodKey(pod)
 	if err != nil {
 		return err
 	}
 
+	//从缓存的nodes信息中获取节点信息.
 	n, ok := cache.nodes[pod.Spec.NodeName]
 	if !ok {
 		klog.ErrorS(nil, "Node not found when trying to remove pod", "node", klog.KRef("", pod.Spec.NodeName), "pod", klog.KObj(pod))
 	} else {
+		//节点缓存中, 删除pod
 		if err := n.info.RemovePod(pod); err != nil {
 			return err
 		}
@@ -462,6 +483,7 @@ func (cache *cacheImpl) removePod(pod *v1.Pod) error {
 		}
 	}
 
+	//删除cache中podStates和 assumedPods信息中的pod
 	delete(cache.podStates, key)
 	delete(cache.assumedPods, key)
 	return nil
@@ -723,11 +745,13 @@ func (cache *cacheImpl) cleanupAssumedPods(now time.Time) {
 			klog.ErrorS(nil, "Key found in assumed set but not in podStates, potentially a logical error")
 			os.Exit(1)
 		}
+		//绑定还没有完成, 则继续等待.
 		if !ps.bindingFinished {
 			klog.V(5).InfoS("Could not expire cache for pod as binding is still in progress",
 				"pod", klog.KObj(ps.pod))
 			continue
 		}
+		//绑定已经完成, 且超时, 则移除.
 		if now.After(*ps.deadline) {
 			klog.InfoS("Pod expired", "pod", klog.KObj(ps.pod))
 			if err := cache.removePod(ps.pod); err != nil {

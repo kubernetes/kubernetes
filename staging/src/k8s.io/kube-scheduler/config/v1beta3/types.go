@@ -195,6 +195,7 @@ type Plugins struct {
 	PostBind PluginSet `json:"postBind,omitempty"`
 
 	// MultiPoint is a simplified config section to enable plugins for all valid extension points.
+	//自动注册到每个适用的点上.
 	// Plugins enabled through MultiPoint will automatically register for every individual extension
 	// point the plugin has implemented. Disabling a plugin through MultiPoint disables that behavior.
 	// The same is true for disabling "*" through MultiPoint (no default plugins will be automatically registered).

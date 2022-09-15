@@ -170,6 +170,7 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 	// If a waiting pod is rejected, it indicates it's previously assumed and we're
 	// removing it from the scheduler cache. In this case, signal a AssignedPodDelete
 	// event to immediately retry some unscheduled Pods.
+	//通知等待的抢占逻辑的goroutine, 不需要继续等待. 如果是已经assumed的pod, 肯定会被从cache中删除, 会释放, 然后再看看是否将相关的pod放入active或者backoff中.
 	if fwk.RejectWaitingPod(pod.UID) {
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.AssignedPodDelete, nil)
 	}
@@ -187,6 +188,7 @@ func (sched *Scheduler) addPodToCache(obj interface{}) {
 		klog.ErrorS(err, "Scheduler cache AddPod failed", "pod", klog.KObj(pod))
 	}
 
+	//查找未调度中符合当前pod亲和性的pod, 重新放入调度的队列中.
 	sched.SchedulingQueue.AssignedPodAdded(pod)
 }
 
@@ -231,6 +233,7 @@ func (sched *Scheduler) deletePodFromCache(obj interface{}) {
 		klog.ErrorS(err, "Scheduler cache RemovePod failed", "pod", klog.KObj(pod))
 	}
 
+	//碰到pod删除事件, 则会将unschdulablePods移动到active或者backoffq中.
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.AssignedPodDelete, nil)
 }
 
@@ -253,6 +256,7 @@ func addAllEventHandlers(
 	gvkMap map[framework.GVK]framework.ActionType,
 ) {
 	// scheduled pod cache
+	//注册pod的informer
 	informerFactory.Core().V1().Pods().Informer().AddEventHandler(
 		cache.FilteringResourceEventHandler{
 			FilterFunc: func(obj interface{}) bool {
@@ -280,11 +284,13 @@ func addAllEventHandlers(
 		},
 	)
 	// unscheduled pod queue
+	//挑选未调度的pod. 放入调度的queue中.
 	informerFactory.Core().V1().Pods().Informer().AddEventHandler(
 		cache.FilteringResourceEventHandler{
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
 				case *v1.Pod:
+					//没有分配节点的pod, 且与调度器中名字一致的pod
 					return !assignedPod(t) && responsibleForPod(t, sched.Profiles)
 				case cache.DeletedFinalStateUnknown:
 					if pod, ok := t.Obj.(*v1.Pod); ok {
@@ -315,6 +321,8 @@ func addAllEventHandlers(
 		},
 	)
 
+	//evnet的handler
+	//会根据一些时间, 将未调度的pod移动到activeq或者backoffq中.
 	buildEvtResHandler := func(at framework.ActionType, gvk framework.GVK, shortGVK string) cache.ResourceEventHandlerFuncs {
 		funcs := cache.ResourceEventHandlerFuncs{}
 		if at&framework.Add != 0 {
@@ -338,6 +346,7 @@ func addAllEventHandlers(
 		return funcs
 	}
 
+	//加强了csi的调度.
 	for gvk, at := range gvkMap {
 		switch gvk {
 		case framework.Node, framework.Pod:

@@ -361,6 +361,8 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*
 // 1. Update the pvCache with the new prebound PV.
 // 2. Update the pvcCache with the new PVCs with annotations set
 // 3. Update PodVolumes again with cached API updates for PVs and PVCs.
+//绑定pv和pvc
+//
 func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string, podVolumes *PodVolumes) (allFullyBound bool, err error) {
 	klog.V(4).InfoS("AssumePodVolumes", "pod", klog.KObj(assumedPod), "node", klog.KRef("", nodeName))
 	defer func() {
@@ -369,6 +371,7 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string, pod
 		}
 	}()
 
+	//判断pvc是不是都绑定了pv.
 	if allBound := b.arePodVolumesBound(assumedPod); allBound {
 		klog.V(4).InfoS("AssumePodVolumes: all PVCs bound and nothing to do", "pod", klog.KObj(assumedPod), "node", klog.KRef("", nodeName))
 		return true, nil
@@ -432,6 +435,14 @@ func (b *volumeBinder) RevertAssumedPodVolumes(podVolumes *PodVolumes) {
 // BindPodVolumes gets the cached bindings and PVCs to provision in pod's volumes information,
 // makes the API update for those PVs/PVCs, and waits for the PVCs to be completely bound
 // by the PV controller.
+// 1. Initiate the volume binding by making the API call to prebind the PV
+// to its matching PVC.
+// 2. Trigger the volume provisioning by making the API call to set related
+// annotations on the PVC
+// 3. Wait for PVCs to be completely bound by the PV controller
+//1. 初始化volume 绑定
+//2. 触发volume provisioning, 通过pvc的 annotation
+//3. pvc等待pv 控制器绑定完成
 func (b *volumeBinder) BindPodVolumes(assumedPod *v1.Pod, podVolumes *PodVolumes) (err error) {
 	klog.V(4).InfoS("BindPodVolumes", "pod", klog.KObj(assumedPod), "node", klog.KRef("", assumedPod.Spec.NodeName))
 
@@ -711,6 +722,7 @@ func (b *volumeBinder) isPVCBound(namespace, pvcName string) (bool, *v1.Persiste
 		return false, nil, fmt.Errorf("error getting PVC %q: %v", pvcKey, err)
 	}
 
+	//通过annotation判断是否绑定成功
 	fullyBound := b.isPVCFullyBound(pvc)
 	if fullyBound {
 		klog.V(5).InfoS("PVC is fully bound to PV", "PVC", klog.KObj(pvc), "PV", klog.KRef("", pvc.Spec.VolumeName))

@@ -82,6 +82,7 @@ func NewOptions() *Options {
 		Deprecated: &DeprecatedOptions{
 			PodMaxInUnschedulablePodsDuration: 5 * time.Minute,
 		},
+		//封装了leader选举的参数.
 		LeaderElection: &componentbaseconfig.LeaderElectionConfiguration{
 			LeaderElect:       true,
 			LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
@@ -271,17 +272,20 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 	}
 
 	// Prepare kube config.
+	//创建kubeconfig配置.
 	kubeConfig, err := createKubeConfig(c.ComponentConfig.ClientConnection, o.Master)
 	if err != nil {
 		return nil, err
 	}
 
 	// Prepare kube clients.
+	//创建两个clientset
 	client, eventClient, err := createClients(kubeConfig)
 	if err != nil {
 		return nil, err
 	}
 
+	//封装的eventBroadcasterAdapterImpl, 里面封装的evnetBroadcaster.
 	c.EventBroadcaster = events.NewEventBroadcasterAdapter(eventClient)
 
 	// Set up leader election if enabled.
@@ -293,6 +297,16 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 			schedulerName = c.ComponentConfig.Profiles[0].SchedulerName
 		}
 		coreRecorder := c.EventBroadcaster.DeprecatedNewLegacyRecorder(schedulerName)
+		// &leaderelection.LeaderElectionConfig{
+		//		Lock:            rl,
+		//		LeaseDuration:   config.LeaseDuration.Duration,
+		//		RenewDeadline:   config.RenewDeadline.Duration,
+		//		RetryPeriod:     config.RetryPeriod.Duration,
+		//		WatchDog:        leaderelection.NewLeaderHealthzAdaptor(time.Second * 20),
+		//		Name:            "kube-scheduler",
+		//		ReleaseOnCancel: true,
+		//	}
+		//rl: resourceLock
 		leaderElectionConfig, err = makeLeaderElectionConfig(c.ComponentConfig.LeaderElection, kubeConfig, coreRecorder)
 		if err != nil {
 			return nil, err
@@ -301,6 +315,7 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 
 	c.Client = client
 	c.KubeConfig = kubeConfig
+	//scheduler中不需要resync.
 	c.InformerFactory = scheduler.NewInformerFactory(client, 0)
 	dynClient := dynamic.NewForConfigOrDie(kubeConfig)
 	c.DynInformerFactory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynClient, 0, corev1.NamespaceAll, nil)
@@ -319,6 +334,7 @@ func makeLeaderElectionConfig(config componentbaseconfig.LeaderElectionConfigura
 	// add a uniquifier so that two processes on the same host don't accidentally both become active
 	id := hostname + "_" + string(uuid.NewUUID())
 
+	//创建了lease lock, LeaseLock结构体
 	rl, err := resourcelock.NewFromKubeconfig(config.ResourceLock,
 		config.ResourceNamespace,
 		config.ResourceName,

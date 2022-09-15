@@ -227,6 +227,7 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 		return framework.NewStatus(framework.Error, "node not found")
 	}
 
+	//获取当前扩展点的数据结构体
 	state, err := getStateData(cs)
 	if err != nil {
 		return framework.AsStatus(err)
@@ -318,6 +319,9 @@ func (pl *VolumeBinding) Reserve(ctx context.Context, cs *framework.CycleState, 
 //
 // If binding errors, times out or gets undone, then an error will be returned to
 // retry scheduling.
+//1. 初始化volume 绑定
+//2. 触发volume provisioning, 通过pvc的 annotation
+//3. pvc等待pv 控制器绑定完成
 func (pl *VolumeBinding) PreBind(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	s, err := getStateData(cs)
 	if err != nil {

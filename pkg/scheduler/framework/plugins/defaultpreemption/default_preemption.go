@@ -96,6 +96,8 @@ func (pl *DefaultPreemption) PostFilter(ctx context.Context, state *framework.Cy
 		Interface:  pl,
 	}
 
+	//m framework.NodeToStatusMap 节点信息.
+	//运行抢占逻辑.
 	result, status := pe.Preempt(ctx, pod, m)
 	if status.Message() != "" {
 		return result, framework.NewStatus(status.Code(), "preemption: "+status.Message())
@@ -154,7 +156,9 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 		return nil
 	}
 	addPod := func(api *framework.PodInfo) error {
+		//添加pod并没有返回成功或者失败.
 		nodeInfo.AddPodInfo(api)
+		//只有运行插件异常时, 才会返回 错误信息.
 		status := pl.fh.RunPreFilterExtensionAddPod(ctx, state, pod, api, nodeInfo)
 		if !status.IsSuccess() {
 			return status.AsError()
@@ -166,6 +170,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	podPriority := corev1helpers.PodPriority(pod)
 	for _, pi := range nodeInfo.Pods {
 		if corev1helpers.PodPriority(pi.Pod) < podPriority {
+			//优先级小于, 则在node 信息中删除节点信息.
 			potentialVictims = append(potentialVictims, pi)
 			if err := removePod(pi); err != nil {
 				return nil, 0, framework.AsStatus(err)
@@ -174,6 +179,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	}
 
 	// No potential victims are found, and so we don't need to evaluate the node again since its state didn't change.
+	//没有找到, 直接返回找不到.
 	if len(potentialVictims) == 0 {
 		message := fmt.Sprintf("No preemption victims found for incoming pod")
 		return nil, 0, framework.NewStatus(framework.UnschedulableAndUnresolvable, message)
@@ -185,20 +191,28 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	// inter-pod affinity to one or more victims, but we have decided not to
 	// support this case for performance reasons. Having affinity to lower
 	// priority pods is not a recommended configuration anyway.
+	//当移除所有pod都无法符合条件, 当前节点可能不适合抢占. 产生这种可能的原因是因为pod的亲和性. 但是因为性能问题, 不支持当前场景.
+	//这时候nodeInfo已经移除了所有优先级小于的pod, 添加当前pod到nodeInfo中, 判断是否可以正常添加成功.
 	if status := pl.fh.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo); !status.IsSuccess() {
 		return nil, 0, status
 	}
 	var victims []*v1.Pod
 	numViolatingVictim := 0
+	//pod排序, 优先级从大到小
 	sort.Slice(potentialVictims, func(i, j int) bool { return util.MoreImportantPod(potentialVictims[i].Pod, potentialVictims[j].Pod) })
 	// Try to reprieve as many pods as possible. We first try to reprieve the PDB
 	// violating victims and then other non-violating ones. In both cases, we start
 	// from the highest priority victims.
+	//查看驱逐的pod 是否违反了 PodDisruptionBudget
+	//.spec.selector .spec.minAvailable .spec.maxUnavailable
+	//pdbs是获取的所有的pdb集合.
+	//判断违反pdb的pod集合, 没有违反pdb的集合.
 	violatingVictims, nonViolatingVictims := filterPodsWithPDBViolation(potentialVictims, pdbs)
 	reprievePod := func(pi *framework.PodInfo) (bool, error) {
 		if err := addPod(pi); err != nil {
 			return false, err
 		}
+		//再运行一遍调度. 判断能否添加成功.
 		status := pl.fh.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo)
 		fits := status.IsSuccess()
 		if !fits {
@@ -211,19 +225,25 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 		}
 		return fits, nil
 	}
+	//首先尝试将违反pdb的集合添加回nodeinfo
+	//即使违反了pdb, 也会
 	for _, p := range violatingVictims {
 		if fits, err := reprievePod(p); err != nil {
 			return nil, 0, framework.AsStatus(err)
 		} else if !fits {
+			//计算违反pdb的pod数量
 			numViolatingVictim++
 		}
 	}
 	// Now we try to reprieve non-violating victims.
+	//将没有违反pdb的node添加回nodeinfo中.
 	for _, p := range nonViolatingVictims {
 		if _, err := reprievePod(p); err != nil {
 			return nil, 0, framework.AsStatus(err)
 		}
 	}
+	//numViolatingVictim计算违反pdb的pod数量
+	//victims 需要驱逐的pod.
 	return victims, numViolatingVictim, framework.NewStatus(framework.Success)
 }
 
@@ -235,6 +255,9 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 // considered for preemption.
 // We look at the node that is nominated for this pod and as long as there are
 // terminating pods on the node, we don't consider this for preempting more pods.
+//判断是否可以抢占节点.
+//1. 已经设置抢占节点的, 进行pod驱逐.
+//2. 如果没有设置抢占节点的, 直接返回true.
 func (pl *DefaultPreemption) PodEligibleToPreemptOthers(pod *v1.Pod, nominatedNodeStatus *framework.Status) (bool, string) {
 	if pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy == v1.PreemptNever {
 		return false, fmt.Sprint("not eligible due to preemptionPolicy=Never.")
@@ -272,6 +295,7 @@ func filterPodsWithPDBViolation(podInfos []*framework.PodInfo, pdbs []*policy.Po
 		pdbsAllowed[i] = pdb.Status.DisruptionsAllowed
 	}
 
+	//两重循环, 想想有没有办法优化.
 	for _, podInfo := range podInfos {
 		pod := podInfo.Pod
 		pdbForPodIsViolated := false

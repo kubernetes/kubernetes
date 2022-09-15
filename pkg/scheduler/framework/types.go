@@ -104,6 +104,7 @@ type QueuedPodInfo struct {
 	// latency for a pod.
 	InitialAttemptTimestamp time.Time
 	// If a Pod failed in a scheduling cycle, record the plugin names it failed by.
+	//记录失败的plugin的名称.
 	UnschedulablePlugins sets.String
 }
 
@@ -648,18 +649,23 @@ func removeFromSlice(s []*PodInfo, k string) []*PodInfo {
 }
 
 // RemovePod subtracts pod information from this NodeInfo.
+//从当前node 中删除该pod信息.
 func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 	k, err := GetPodKey(pod)
 	if err != nil {
 		return err
 	}
+	//有亲和性
 	if podWithAffinity(pod) {
+		//从node PodsWithAffinity中删除该pod, 为啥?
 		n.PodsWithAffinity = removeFromSlice(n.PodsWithAffinity, k)
 	}
+	//如果有反亲和性, 则删除反亲和性列表中pod.
 	if podWithRequiredAntiAffinity(pod) {
 		n.PodsWithRequiredAntiAffinity = removeFromSlice(n.PodsWithRequiredAntiAffinity, k)
 	}
 
+	//删除pod, 同时计算cpu , 内存, 存储.
 	for i := range n.Pods {
 		k2, err := GetPodKey(n.Pods[i].Pod)
 		if err != nil {
@@ -686,9 +692,12 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 			n.NonZeroRequested.Memory -= non0Mem
 
 			// Release ports when remove Pods.
+			//释放节点的port
 			n.updateUsedPorts(pod, false)
+			//更新pvc的计数
 			n.updatePVCRefCounts(pod, false)
 
+			//迭代版本号
 			n.Generation = nextGeneration()
 			n.resetSlicesIfEmpty()
 			return nil

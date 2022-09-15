@@ -289,6 +289,13 @@ func NewPriorityQueue(
 }
 
 // Run starts the goroutine to pump from podBackoffQ to activeQ
+//将podBackoffQ中超时的pod从podBackoffQ从放入activeQ中.
+//将unschedulableQ中超时未调度的pod从unschedulableQ中移入podBackoffQ或activeQ中
+//那么问题来了, 什么时候将active queue中的pod放入backoff queue中呢?
+//什么时候会将pod放入unscheduler queue呢?
+//在调度失败时, 将调用AddUnschedulableIfNotPresent方法
+//如果cache改变了(pop pod又进行了调度), 则进入unschedulable等待
+//如果cache没有改变, 则进行一个降级等待, 进入backoff queue. 等待时间会短一些.
 func (p *PriorityQueue) Run() {
 	go wait.Until(p.flushBackoffQCompleted, 1.0*time.Second, p.stop)
 	go wait.Until(p.flushUnschedulablePodsLeftover, 30*time.Second, p.stop)
@@ -300,6 +307,7 @@ func (p *PriorityQueue) Add(pod *v1.Pod) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	pInfo := p.newQueuedPodInfo(pod)
+	//添加到activeQ
 	if err := p.activeQ.Add(pInfo); err != nil {
 		klog.ErrorS(err, "Error adding pod to the active queue", "pod", klog.KObj(pod))
 		return err
@@ -309,10 +317,12 @@ func (p *PriorityQueue) Add(pod *v1.Pod) error {
 		p.unschedulablePods.delete(pod)
 	}
 	// Delete pod from backoffQ if it is backing off
+	//backoff queue中删除.
 	if err := p.podBackoffQ.Delete(pInfo); err == nil {
 		klog.ErrorS(nil, "Error: pod is already in the podBackoff queue", "pod", klog.KObj(pod))
 	}
 	metrics.SchedulerQueueIncomingPods.WithLabelValues("active", PodAdd).Inc()
+	//会先记录下当前pod中nominatedNodename 更新缓存信息.
 	p.PodNominator.AddNominatedPod(pInfo.PodInfo, nil)
 	p.cond.Broadcast()
 
@@ -412,12 +422,14 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.QueuedPodI
 	for plugin := range pInfo.UnschedulablePlugins {
 		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Inc()
 	}
+	//如果收到moveRequestCycle, 且moveRequestCycle > 当前podSchedulingCycle, 则放入backoff queue中.
 	if p.moveRequestCycle >= podSchedulingCycle {
 		if err := p.podBackoffQ.Add(pInfo); err != nil {
 			return fmt.Errorf("error adding pod %v to the backoff queue: %v", pod.Name, err)
 		}
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", ScheduleAttemptFailure).Inc()
 	} else {
+		//否则放入unschedulablePods中.
 		p.unschedulablePods.addOrUpdate(pInfo)
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("unschedulable", ScheduleAttemptFailure).Inc()
 
@@ -428,6 +440,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.QueuedPodI
 }
 
 // flushBackoffQCompleted Moves all pods from backoffQ which have completed backoff in to activeQ
+//将backoff中的pod放入activeQ中.
 func (p *PriorityQueue) flushBackoffQCompleted() {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -438,7 +451,9 @@ func (p *PriorityQueue) flushBackoffQCompleted() {
 			break
 		}
 		pod := rawPodInfo.(*framework.QueuedPodInfo).Pod
+		//获取pod的过期时间.
 		boTime := p.getBackoffTime(rawPodInfo.(*framework.QueuedPodInfo))
+		//没有过期则跳过.
 		if boTime.After(p.clock.Now()) {
 			break
 		}
@@ -447,6 +462,7 @@ func (p *PriorityQueue) flushBackoffQCompleted() {
 			klog.ErrorS(err, "Unable to pop pod from backoff queue despite backoff completion", "pod", klog.KObj(pod))
 			break
 		}
+		//重新放入activeQ中.
 		p.activeQ.Add(rawPodInfo)
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("active", BackoffComplete).Inc()
 		broadcast = true
@@ -459,6 +475,7 @@ func (p *PriorityQueue) flushBackoffQCompleted() {
 
 // flushUnschedulablePodsLeftover moves pods which stay in unschedulablePods
 // longer than podMaxInUnschedulablePodsDuration to backoffQ or activeQ.
+//定时将unschedulablePods 超过最大等待时间的pod 放入active或者backoff queue中.
 func (p *PriorityQueue) flushUnschedulablePodsLeftover() {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -492,12 +509,14 @@ func (p *PriorityQueue) Pop() (*framework.QueuedPodInfo, error) {
 		}
 		p.cond.Wait()
 	}
+	//activeQ实际上是个堆.
 	obj, err := p.activeQ.Pop()
 	if err != nil {
 		return nil, err
 	}
 	pInfo := obj.(*framework.QueuedPodInfo)
 	pInfo.Attempts++
+	//每次弹出pod, 调度轮次加1
 	p.schedulingCycle++
 	return pInfo, nil
 }
@@ -630,11 +649,14 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.
 		// Note: we don't run the check if pInfo.UnschedulablePlugins is nil, which denotes
 		// either there is some abnormal error, or scheduling the pod failed by plugins other than PreFilter, Filter and Permit.
 		// In that case, it's desired to move it anyways.
+		//如果事件不能使pod可调度, 则跳过.
+		//在一些非PreFilter, Filter and Permit 插件外运行的错误, 只是正常的错误, 无论如何都会移动这个pod.
 		if len(pInfo.UnschedulablePlugins) != 0 && !p.podMatchesEvent(pInfo, event) {
 			continue
 		}
 		moved = true
 		pod := pInfo.Pod
+		//根据尝试调度的次数计算等待时间. 初始化等待时间* 2倍.
 		if p.isPodBackingoff(pInfo) {
 			if err := p.podBackoffQ.Add(pInfo); err != nil {
 				klog.ErrorS(err, "Error adding pod to the backoff queue", "pod", klog.KObj(pod))
@@ -651,6 +673,7 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.
 			}
 		}
 	}
+	//当触发movePodsToActiveOrBackoffQueue时, 就会重置moveRequestCycle
 	p.moveRequestCycle = p.schedulingCycle
 	if moved {
 		p.cond.Broadcast()
@@ -860,15 +883,19 @@ func (npm *nominator) add(pi *framework.PodInfo, nominatingInfo *framework.Nomin
 	npm.delete(pi.Pod)
 
 	var nodeName string
+	//如果nominatingInfo 为nil 则返回ModeNoop
 	if nominatingInfo.Mode() == framework.ModeOverride {
 		nodeName = nominatingInfo.NominatedNodeName
 	} else if nominatingInfo.Mode() == framework.ModeNoop {
 		if pi.Pod.Status.NominatedNodeName == "" {
 			return
 		}
+		
+		//在nil模式下, 取pod中配置的nominatedNodeName, 并记录跟踪.
 		nodeName = pi.Pod.Status.NominatedNodeName
 	}
 
+	//重新获取pod, 判断最新的pod是否已经被删除或者调度.
 	if npm.podLister != nil {
 		// If the pod was removed or if it was already scheduled, don't nominate it.
 		updatedPod, err := npm.podLister.Pods(pi.Pod.Namespace).Get(pi.Pod.Name)
@@ -882,6 +909,7 @@ func (npm *nominator) add(pi *framework.PodInfo, nominatingInfo *framework.Nomin
 		}
 	}
 
+	//记录pod 到nodename的映射
 	npm.nominatedPodToNode[pi.Pod.UID] = nodeName
 	for _, npi := range npm.nominatedPods[nodeName] {
 		if npi.Pod.UID == pi.Pod.UID {
@@ -889,6 +917,7 @@ func (npm *nominator) add(pi *framework.PodInfo, nominatingInfo *framework.Nomin
 			return
 		}
 	}
+	//记录节点对应nominatedPods的记录.
 	npm.nominatedPods[nodeName] = append(npm.nominatedPods[nodeName], pi)
 }
 
@@ -982,11 +1011,14 @@ func (p *PriorityQueue) podMatchesEvent(podInfo *framework.QueuedPodInfo, cluste
 		//   Note the ActionTypes don't need to be *identical*. We check if the ANDed value
 		//   is zero or not. In this way, it's easy to tell Update&Delete is not compatible,
 		//   but Update&All is.
+		//IsWildCard 是否为通用的.
 		evtMatch := evt.IsWildCard() ||
 			(evt.Resource == clusterEvent.Resource && evt.ActionType&clusterEvent.ActionType != 0)
 
 		// Secondly verify the plugin name matches.
 		// Note that if it doesn't match, we shouldn't continue to search.
+		//取一个交集. 查看交集
+		//如果有交集则返回true.
 		if evtMatch && intersect(nameSet, podInfo.UnschedulablePlugins) {
 			return true
 		}

@@ -73,6 +73,7 @@ const (
 	// preemption would not change anything. Plugins should return Unschedulable if it is possible
 	// that the pod can get scheduled with preemption.
 	// The accompanying status message should explain why the pod is unschedulable.
+	//抢占也不管用的节点.
 	UnschedulableAndUnresolvable
 	// Wait is used when a Permit plugin finds a pod scheduling should wait.
 	Wait

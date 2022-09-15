@@ -33,6 +33,21 @@ var defaultResourceSpec = []v1beta3.ResourceSpec{
 	{Name: string(v1.ResourceMemory), Weight: 1},
 }
 
+//注册默认函数
+// func RegisterDefaults(scheme *runtime.Scheme) error {
+//	scheme.AddTypeDefaultingFunc(&v1beta3.DefaultPreemptionArgs{}, func(obj interface{}) { SetObjectDefaults_DefaultPreemptionArgs(obj.(*v1beta3.DefaultPreemptionArgs)) })
+//	scheme.AddTypeDefaultingFunc(&v1beta3.InterPodAffinityArgs{}, func(obj interface{}) { SetObjectDefaults_InterPodAffinityArgs(obj.(*v1beta3.InterPodAffinityArgs)) })
+//	scheme.AddTypeDefaultingFunc(&v1beta3.KubeSchedulerConfiguration{}, func(obj interface{}) {
+//		SetObjectDefaults_KubeSchedulerConfiguration(obj.(*v1beta3.KubeSchedulerConfiguration))
+//	})
+//	scheme.AddTypeDefaultingFunc(&v1beta3.NodeResourcesBalancedAllocationArgs{}, func(obj interface{}) {
+//		SetObjectDefaults_NodeResourcesBalancedAllocationArgs(obj.(*v1beta3.NodeResourcesBalancedAllocationArgs))
+//	})
+//	scheme.AddTypeDefaultingFunc(&v1beta3.NodeResourcesFitArgs{}, func(obj interface{}) { SetObjectDefaults_NodeResourcesFitArgs(obj.(*v1beta3.NodeResourcesFitArgs)) })
+//	scheme.AddTypeDefaultingFunc(&v1beta3.PodTopologySpreadArgs{}, func(obj interface{}) { SetObjectDefaults_PodTopologySpreadArgs(obj.(*v1beta3.PodTopologySpreadArgs)) })
+//	scheme.AddTypeDefaultingFunc(&v1beta3.VolumeBindingArgs{}, func(obj interface{}) { SetObjectDefaults_VolumeBindingArgs(obj.(*v1beta3.VolumeBindingArgs)) })
+//	return nil
+// }
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
@@ -41,6 +56,7 @@ func pluginsNames(p *v1beta3.Plugins) []string {
 	if p == nil {
 		return nil
 	}
+	//实例化PluginSet结构体.
 	extensions := []v1beta3.PluginSet{
 		p.MultiPoint,
 		p.PreFilter,
@@ -57,6 +73,7 @@ func pluginsNames(p *v1beta3.Plugins) []string {
 	}
 	n := sets.NewString()
 	for _, e := range extensions {
+		//获取enabled的插件, 然后将名字放入set中.
 		for _, pg := range e.Enabled {
 			n.Insert(pg.Name)
 		}
@@ -66,6 +83,8 @@ func pluginsNames(p *v1beta3.Plugins) []string {
 
 func setDefaults_KubeSchedulerProfile(prof *v1beta3.KubeSchedulerProfile) {
 	// Set default plugins.
+	//默认的plugins和 配置文件中配置的plugins
+	//getDefaultPlugins 默认开启的plugins
 	prof.Plugins = mergePlugins(getDefaultPlugins(), prof.Plugins)
 	// Set default plugin configs.
 	scheme := GetPluginArgConversionScheme()
@@ -80,6 +99,7 @@ func setDefaults_KubeSchedulerProfile(prof *v1beta3.KubeSchedulerProfile) {
 	}
 
 	// Append default configs for plugins that didn't have one explicitly set.
+	//获取了所有的plugins 名字.
 	for _, name := range pluginsNames(prof.Plugins) {
 		if existingConfigs.Has(name) {
 			continue
@@ -92,6 +112,7 @@ func setDefaults_KubeSchedulerProfile(prof *v1beta3.KubeSchedulerProfile) {
 		}
 		scheme.Default(args)
 		args.GetObjectKind().SetGroupVersionKind(gvk)
+		//处理prof.PluginConfig
 		prof.PluginConfig = append(prof.PluginConfig, v1beta3.PluginConfig{
 			Name: name,
 			Args: runtime.RawExtension{Object: args},
@@ -115,12 +136,14 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta3.KubeSchedulerConfigurat
 	}
 
 	// Add the default set of plugins and apply the configuration.
+	//配置默认的plugins
 	for i := range obj.Profiles {
 		prof := &obj.Profiles[i]
 		setDefaults_KubeSchedulerProfile(prof)
 	}
 
 	if obj.PercentageOfNodesToScore == nil {
+		//默认自适应模式.
 		percentageOfNodesToScore := int32(config.DefaultPercentageOfNodesToScore)
 		obj.PercentageOfNodesToScore = &percentageOfNodesToScore
 	}

@@ -222,6 +222,7 @@ func NewFromKubeconfig(lockType string, ns string, name string, rlc ResourceLock
 		timeout = time.Second
 	}
 	config.Timeout = timeout
+	//创建了 leader选举的 clientset
 	leaderElectionClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "leader-election"))
 	return New(lockType, ns, name, leaderElectionClient.CoreV1(), leaderElectionClient.CoordinationV1(), rlc)
 }

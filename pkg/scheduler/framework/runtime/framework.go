@@ -73,6 +73,7 @@ var allClusterEvents = []framework.ClusterEvent{
 type frameworkImpl struct {
 	registry             Registry
 	snapshotSharedLister framework.SharedLister
+	//运行抢占插件时, 会将等待的pod放入waitingPods中
 	waitingPods          *waitingPodsMap
 	scorePluginWeight    map[string]int
 	queueSortPlugins     []framework.QueueSortPlugin
@@ -251,6 +252,32 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 		opt(&options)
 	}
 
+	// runtime.Registry{
+	//		selectorspread.Name:                  selectorspread.New,
+	//		imagelocality.Name:                   imagelocality.New,
+	//		tainttoleration.Name:                 tainttoleration.New,
+	//		nodename.Name:                        nodename.New,
+	//		nodeports.Name:                       nodeports.New,
+	//		nodeaffinity.Name:                    nodeaffinity.New,
+	//		podtopologyspread.Name:               runtime.FactoryAdapter(fts, podtopologyspread.New),
+	//		nodeunschedulable.Name:               nodeunschedulable.New,
+	//		noderesources.Name:                   runtime.FactoryAdapter(fts, noderesources.NewFit),
+	//		noderesources.BalancedAllocationName: runtime.FactoryAdapter(fts, noderesources.NewBalancedAllocation),
+	//		volumebinding.Name:                   runtime.FactoryAdapter(fts, volumebinding.New),
+	//		volumerestrictions.Name:              runtime.FactoryAdapter(fts, volumerestrictions.New),
+	//		volumezone.Name:                      volumezone.New,
+	//		nodevolumelimits.CSIName:             runtime.FactoryAdapter(fts, nodevolumelimits.NewCSI),
+	//		nodevolumelimits.EBSName:             runtime.FactoryAdapter(fts, nodevolumelimits.NewEBS),
+	//		nodevolumelimits.GCEPDName:           runtime.FactoryAdapter(fts, nodevolumelimits.NewGCEPD),
+	//		nodevolumelimits.AzureDiskName:       runtime.FactoryAdapter(fts, nodevolumelimits.NewAzureDisk),
+	//		nodevolumelimits.CinderName:          runtime.FactoryAdapter(fts, nodevolumelimits.NewCinder),
+	//		interpodaffinity.Name:                interpodaffinity.New,
+	//		queuesort.Name:                       queuesort.New,
+	//		defaultbinder.Name:                   defaultbinder.New,
+	//		defaultpreemption.Name:               runtime.FactoryAdapter(fts, defaultpreemption.New),
+	//	}
+	//具体启用的插件名字, func getDefaultPlugins() *v1beta3.Plugins
+	//在profile
 	f := &frameworkImpl{
 		registry:             r,
 		snapshotSharedLister: options.snapshotSharedLister,
@@ -276,6 +303,7 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 	}
 
 	// get needed plugins from config
+	//查找到所有需要的插件的名字.
 	pg := f.pluginsNeeded(profile.Plugins)
 
 	pluginConfig := make(map[string]runtime.Object, len(profile.PluginConfig))
@@ -295,6 +323,7 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 	pluginsMap := make(map[string]framework.Plugin)
 	for name, factory := range r {
 		// initialize only needed plugins.
+		//根据registry 初始化plugin
 		if _, ok := pg[name]; !ok {
 			continue
 		}
@@ -306,24 +335,32 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 				Args: args,
 			})
 		}
+		//传入frameworkImpl结构体
 		p, err := factory(args, f)
 		if err != nil {
 			return nil, fmt.Errorf("initializing plugin %q: %w", name, err)
 		}
+		//将实例化好的plugin 放入map中.
 		pluginsMap[name] = p
 
 		// Update ClusterEventMap in place.
+		//注册plugin的事件到 clusterEventMap
+		//用于后续节点 pod csi等信息发生变化时, 判断事件是否可以触发一些unschedulable pod重新放入active/backoff q中.
 		fillEventToPluginMap(p, options.clusterEventMap)
 	}
 
 	// initialize plugins per individual extension points
+	//获取所有的调度中可以扩展的扩展点.
+	//这里只处理普通的扩展点.
 	for _, e := range f.getExtensionPoints(profile.Plugins) {
+		//preFilterPlugins     []framework.PreFilterPlugin,
 		if err := updatePluginList(e.slicePtr, *e.plugins, pluginsMap); err != nil {
 			return nil, err
 		}
 	}
 
 	// initialize multiPoint plugins to their expanded extension points
+	//这里处理multiPoint的逻辑.
 	if len(profile.Plugins.MultiPoint.Enabled) > 0 {
 		if err := f.expandMultiPointPlugins(profile, pluginsMap); err != nil {
 			return nil, err
@@ -434,14 +471,18 @@ func (os *orderedSet) delete(s string) {
 	}
 }
 
+//扩展multiPoint plugins的逻辑
+//默认所有都是multiPoint的 plugins
 func (f *frameworkImpl) expandMultiPointPlugins(profile *config.KubeSchedulerProfile, pluginsMap map[string]framework.Plugin) error {
 	// initialize MultiPoint plugins
+	//获取framework的扩展点对应的插件对象
 	for _, e := range f.getExtensionPoints(profile.Plugins) {
 		plugins := reflect.ValueOf(e.slicePtr).Elem()
 		pluginType := plugins.Type().Elem()
 		// build enabledSet of plugins already registered via normal extension points
 		// to check double registration
 		enabledSet := newOrderedSet()
+		//首先注册到的对应的扩展点的
 		for _, plugin := range e.plugins.Enabled {
 			enabledSet.insert(plugin.Name)
 		}
@@ -466,6 +507,7 @@ func (f *frameworkImpl) expandMultiPointPlugins(profile *config.KubeSchedulerPro
 			}
 
 			// if this plugin doesn't implement the type for the current extension we're trying to expand, skip
+			//通过反射的方式判断是否实现了某个插入点.
 			if !reflect.TypeOf(pg).Implements(pluginType) {
 				continue
 			}
@@ -500,6 +542,9 @@ func (f *frameworkImpl) expandMultiPointPlugins(profile *config.KubeSchedulerPro
 		// - part 1: overridePlugins. Their order stay intact as how they're specified in regular extension point.
 		// - part 2: multiPointEnabled - i.e., plugin defined in multipoint but not in regular extension point.
 		// - part 3: other plugins (excluded by part 1 & 2) in regular extension point.
+		//优先级顺序, 1. 首先注册到对应扩展点的plugins
+		//2. multipoint 的plugins
+		//3. 其他的plugins
 		newPlugins := reflect.New(reflect.TypeOf(e.slicePtr).Elem()).Elem()
 		// part 1
 		for _, name := range enabledSet.list {
@@ -543,15 +588,18 @@ func fillEventToPluginMap(p framework.Plugin, eventToPlugins map[framework.Clust
 }
 
 func registerClusterEvents(name string, eventToPlugins map[framework.ClusterEvent]sets.String, evts []framework.ClusterEvent) {
+	//evts, 影响插件通过可能的事件集合.
 	for _, evt := range evts {
 		if eventToPlugins[evt] == nil {
 			eventToPlugins[evt] = sets.NewString(name)
 		} else {
+			//将事件 --> 插件的名字.
 			eventToPlugins[evt].Insert(name)
 		}
 	}
 }
 
+//
 func updatePluginList(pluginList interface{}, pluginSet config.PluginSet, pluginsMap map[string]framework.Plugin) error {
 	plugins := reflect.ValueOf(pluginList).Elem()
 	pluginType := plugins.Type().Elem()
@@ -614,9 +662,11 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 			}
 			return nil, framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", pl.Name(), status.AsError())).WithFailedPlugin(pl.Name())
 		}
+		//判断预筛选的插件是否返回了指定的节点.
 		if !r.AllNodes() {
 			pluginsWithNodes = append(pluginsWithNodes, pl.Name())
 		}
+		//各个插件返回的节点集合的交集.
 		result = result.Merge(r)
 		if !result.AllNodes() && len(result.NodeNames) == 0 {
 			msg := fmt.Sprintf("node(s) didn't satisfy plugin(s) %v simultaneously", pluginsWithNodes)
@@ -627,6 +677,7 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 		}
 
 	}
+	//返回PreFilter的节点
 	return result, nil
 }
 
@@ -795,6 +846,8 @@ func (f *frameworkImpl) runPostFilterPlugin(ctx context.Context, pl framework.Po
 // and add the nominated pods. Removal of the victims is done by
 // SelectVictimsOnNode(). Preempt removes victims from PreFilter state and
 // NodeInfo before calling this function.
+//节点检查时, 先把当前节点上的准备抢占的pod添加到节点上. 计算是否通过
+//然后第二次不考虑待抢占的pod, 然后计算是否通过.
 func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, state *framework.CycleState, pod *v1.Pod, info *framework.NodeInfo) *framework.Status {
 	var status *framework.Status
 
@@ -817,15 +870,28 @@ func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, s
 	// the nominated pods are treated as not running. We can't just assume the
 	// nominated pods are running because they are not running right now and in fact,
 	// they may end up getting scheduled to a different node.
+	//有时候会运行两次
+	//当有更大(>=)优先级的 nominated pod被放入节点上, 重新会再运行一次. 因为对于nominated pod 时, 可能不会通过, 例如inter-pod affinity原因.
+	//如果没有nominated pod时, 则不会运行第二次.
+	// 第一次考虑节点上待抢占的pod. 综合计算是否可以通过. 如果不通过则返回.
+	//第二次不考虑节点上待抢占的pod, 计算是否可以通过. 不通过返回. 通过则是success
 	for i := 0; i < 2; i++ {
 		stateToUse := state
 		nodeInfoToUse := info
 		if i == 0 {
 			var err error
+			//查找queue中, 是否有Nominatednoded pod 且大于当前pod优先级, pod信息添加到节点统计上.
+			//考虑在抢占场景下, 此时的info中是添加该节点上待抢占的pod 且优先级高于当前pod.
+			//第一次使用的是添加了待抢占的pod的info信息走逻辑.
 			podsAdded, stateToUse, nodeInfoToUse, err = addNominatedPods(ctx, f, pod, state, info)
 			if err != nil {
 				return framework.AsStatus(err)
 			}
+			//没有需要添加的待抢占的pod
+			//有添加的, 但是最后调度失败了.
+			//直接就返回, 不需要进行第二次.
+			//如果有抢占的pod, 且调度成功了. 需要运行第二次.
+			//第二次的时候stateToUse和nodeInfoToUse重新被赋值.
 		} else if !podsAdded || !status.IsSuccess() {
 			break
 		}
@@ -843,12 +909,14 @@ func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, s
 // addNominatedPods adds pods with equal or greater priority which are nominated
 // to run on the node. It returns 1) whether any pod was added, 2) augmented cycleState,
 // 3) augmented nodeInfo.
+//将待抢占的节点放入node上. 查看是否成功.
 func addNominatedPods(ctx context.Context, fh framework.Handle, pod *v1.Pod, state *framework.CycleState, nodeInfo *framework.NodeInfo) (bool, *framework.CycleState, *framework.NodeInfo, error) {
 	if fh == nil || nodeInfo.Node() == nil {
 		// This may happen only in tests.
 		return false, state, nodeInfo, nil
 	}
 	nominatedPodInfos := fh.NominatedPodsForNode(nodeInfo.Node().Name)
+	//如果节点上找不到待抢占的pod. 则直接返回.
 	if len(nominatedPodInfos) == 0 {
 		return false, state, nodeInfo, nil
 	}
@@ -856,6 +924,7 @@ func addNominatedPods(ctx context.Context, fh framework.Handle, pod *v1.Pod, sta
 	stateOut := state.Clone()
 	podsAdded := false
 	for _, pi := range nominatedPodInfos {
+		//只有大于等于的当前pod 优先级的 nominated pod 才可以被添加进来.
 		if corev1.PodPriority(pi.Pod) >= corev1.PodPriority(pod) && pi.Pod.UID != pod.UID {
 			nodeInfoOut.AddPodInfo(pi)
 			status := fh.RunPreFilterExtensionAddPod(ctx, stateOut, pod, pi, nodeInfoOut)
@@ -1143,6 +1212,7 @@ func (f *frameworkImpl) runReservePluginUnreserve(ctx context.Context, pl framew
 // plugins returns "Wait", then this function will create and add waiting pod
 // to a map of currently waiting pods and return status with "Wait" code.
 // Pod will remain waiting pod for the minimum duration returned by the permit plugins.
+//抢占的逻辑
 func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (status *framework.Status) {
 	startTime := time.Now()
 	defer func() {
@@ -1172,8 +1242,10 @@ func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state *framework.C
 			}
 		}
 	}
+	//如果需要等待, 则等待.
 	if statusCode == framework.Wait {
 		waitingPod := newWaitingPod(pod, pluginsWaitTime)
+		//运行抢占插件时, 会将等待的pod放入waitingPods中
 		f.waitingPods.add(waitingPod)
 		msg := fmt.Sprintf("one or more plugins asked to wait and no plugin rejected pod %q", pod.Name)
 		klog.V(4).InfoS("One or more plugins asked to wait and no plugin rejected pod", "pod", klog.KObj(pod))
@@ -1241,6 +1313,7 @@ func (f *frameworkImpl) GetWaitingPod(uid types.UID) framework.WaitingPod {
 
 // RejectWaitingPod rejects a WaitingPod given its UID.
 // The returned value indicates if the given pod is waiting or not.
+//通知bind的goroutine, 不用继续等待了.
 func (f *frameworkImpl) RejectWaitingPod(uid types.UID) bool {
 	if waitingPod := f.waitingPods.get(uid); waitingPod != nil {
 		waitingPod.Reject("", "removed")
@@ -1322,12 +1395,13 @@ func (f *frameworkImpl) pluginsNeeded(plugins *config.Plugins) sets.String {
 		}
 	}
 
+	//根据挂载点找到对应的plugins名字.
 	for _, e := range f.getExtensionPoints(plugins) {
 		find(e.plugins)
 	}
 	// Parse MultiPoint separately since they are not returned by f.getExtensionPoints()
 	find(&plugins.MultiPoint)
-
+	//查找到所有相关的插件的名字.
 	return pgSet
 }
 

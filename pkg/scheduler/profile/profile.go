@@ -38,6 +38,31 @@ func newProfile(cfg config.KubeSchedulerProfile, r frameworkruntime.Registry, re
 	opts ...frameworkruntime.Option) (framework.Framework, error) {
 	recorder := recorderFact(cfg.SchedulerName)
 	opts = append(opts, frameworkruntime.WithEventRecorder(recorder))
+	// runtime.Registry{
+	//		selectorspread.Name:                  selectorspread.New,
+	//		imagelocality.Name:                   imagelocality.New,
+	//		tainttoleration.Name:                 tainttoleration.New,
+	//		nodename.Name:                        nodename.New,
+	//		nodeports.Name:                       nodeports.New,
+	//		nodeaffinity.Name:                    nodeaffinity.New,
+	//		podtopologyspread.Name:               runtime.FactoryAdapter(fts, podtopologyspread.New),
+	//		nodeunschedulable.Name:               nodeunschedulable.New,
+	//		noderesources.Name:                   runtime.FactoryAdapter(fts, noderesources.NewFit),
+	//		noderesources.BalancedAllocationName: runtime.FactoryAdapter(fts, noderesources.NewBalancedAllocation),
+	//		volumebinding.Name:                   runtime.FactoryAdapter(fts, volumebinding.New),
+	//		volumerestrictions.Name:              runtime.FactoryAdapter(fts, volumerestrictions.New),
+	//		volumezone.Name:                      volumezone.New,
+	//		nodevolumelimits.CSIName:             runtime.FactoryAdapter(fts, nodevolumelimits.NewCSI),
+	//		nodevolumelimits.EBSName:             runtime.FactoryAdapter(fts, nodevolumelimits.NewEBS),
+	//		nodevolumelimits.GCEPDName:           runtime.FactoryAdapter(fts, nodevolumelimits.NewGCEPD),
+	//		nodevolumelimits.AzureDiskName:       runtime.FactoryAdapter(fts, nodevolumelimits.NewAzureDisk),
+	//		nodevolumelimits.CinderName:          runtime.FactoryAdapter(fts, nodevolumelimits.NewCinder),
+	//		interpodaffinity.Name:                interpodaffinity.New,
+	//		queuesort.Name:                       queuesort.New,
+	//		defaultbinder.Name:                   defaultbinder.New,
+	//		defaultpreemption.Name:               runtime.FactoryAdapter(fts, defaultpreemption.New),
+	//	}
+	//具体启用的插件名字, func getDefaultPlugins() *v1beta3.Plugins
 	return frameworkruntime.NewFramework(r, &cfg, opts...)
 }
 
@@ -50,6 +75,7 @@ func NewMap(cfgs []config.KubeSchedulerProfile, r frameworkruntime.Registry, rec
 	m := make(Map)
 	v := cfgValidator{m: m}
 
+	//根据配置, 创建对应的profile, 然后创建对应的frameworkimpl对象.
 	for _, cfg := range cfgs {
 		p, err := newProfile(cfg, r, recorderFact, opts...)
 		if err != nil {

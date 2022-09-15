@@ -243,21 +243,32 @@ func New(client clientset.Interface,
 		stopEverything = wait.NeverStop
 	}
 
+	//默认 applyDefaultProfile=true
 	options := defaultSchedulerOptions
+	//生成调度器相关配置选项.
+	//如果指定了其他的profile, 则applyDefaultProfile=false
+	//那么问题来了, 怎么配置加载其他的调度框架呢?
 	for _, opt := range opts {
 		opt(&options)
 	}
 
 	if options.applyDefaultProfile {
 		var versionedCfg v1beta3.KubeSchedulerConfiguration
+		//默认的参数配置 pkg/scheduler/apis/config/v1beta3/defaults.go
+		//传入的v1beta3.KubeSchedulerConfiguration对象
+		//实际上调用SetDefaults_KubeSchedulerConfiguration函数
 		scheme.Scheme.Default(&versionedCfg)
 		cfg := schedulerapi.KubeSchedulerConfiguration{}
 		if err := scheme.Scheme.Convert(&versionedCfg, &cfg, nil); err != nil {
 			return nil, err
 		}
+		//生成的默认的profile
 		options.profiles = cfg.Profiles
 	}
 
+	//注册插件
+	//开启了几个默认的特性.
+	//同时注册了几个相关New函数.
 	registry := frameworkplugins.NewInTreeRegistry()
 	if err := registry.Merge(options.frameworkOutOfTreeRegistry); err != nil {
 		return nil, err
@@ -265,19 +276,26 @@ func New(client clientset.Interface,
 
 	metrics.Register()
 
+	//这里设计和实现是怎么回事呢?
 	extenders, err := buildExtenders(options.extenders, options.profiles)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't build extenders: %w", err)
 	}
 
+	//这里没有注册informer, 只是获取了相关的接口.
 	podLister := informerFactory.Core().V1().Pods().Lister()
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 
 	// The nominator will be passed all the way to framework instantiation.
+	//这里是新添加的
+	// nominator struct
 	nominator := internalqueue.NewPodNominator(podLister)
+	//快照.
 	snapshot := internalcache.NewEmptySnapshot()
 	clusterEventMap := make(map[framework.ClusterEvent]sets.String)
 
+	//将需要加载的profiles, 合成算法map
+	//实例化算法
 	profiles, err := profile.NewMap(options.profiles, registry, recorderFactory,
 		frameworkruntime.WithComponentConfigVersion(options.componentConfigVersion),
 		frameworkruntime.WithClientSet(client),
@@ -298,6 +316,7 @@ func New(client clientset.Interface,
 		return nil, errors.New("at least one profile is required")
 	}
 
+	//创建优先级的queue.
 	podQueue := internalqueue.NewSchedulingQueue(
 		profiles[options.profiles[0].SchedulerName].QueueSortFunc(),
 		informerFactory,
@@ -308,12 +327,16 @@ func New(client clientset.Interface,
 		internalqueue.WithPodMaxInUnschedulablePodsDuration(options.podMaxInUnschedulablePodsDuration),
 	)
 
+	//创建缓存, 存放nodes信息, pod信息等.
 	schedulerCache := internalcache.New(durationToExpireAssumedPod, stopEverything)
 
 	// Setup cache debugger.
 	debugger := cachedebugger.New(nodeLister, podLister, schedulerCache, podQueue)
 	debugger.ListenForSignal(stopEverything)
 
+	//以前根据不同的来源, 指定算法, 现在直接简化了.
+	//那么算法的加载在哪里呢?
+	//之前指定的名字, 找到调度算法的集合, 然后实例化各种插件. 现在直接就没了.
 	sched := newScheduler(
 		schedulerCache,
 		extenders,
@@ -327,14 +350,23 @@ func New(client clientset.Interface,
 		options.percentageOfNodesToScore,
 	)
 
+	//最基础的pod, node
+	//还有pv pvc sc csidriver, csinodes, csistoragecapacity等相关资源的监听.
 	addAllEventHandlers(sched, informerFactory, dynInformerFactory, unionedGVKs(clusterEventMap))
 
 	return sched, nil
 }
 
 // Run begins watching and scheduling. It starts scheduling and blocked until the context is done.
+//调度运行主逻辑.
 func (sched *Scheduler) Run(ctx context.Context) {
+	//下面的func New(client clientset.Interface,中创建的sched
+	//func NewSchedulingQueue(lessFn framework.LessFunc, opts ...Option) SchedulingQueue {
+	//优先级queue, PriorityQueue结构体
+	//将等待超时的pod从podBackoffQ从放入activeQ中
+	//将超时未调度的pod从unschedulableQ中移入podBackoffQ或activeQ中
 	sched.SchedulingQueue.Run()
+	//循环调度流程, 调度的主流程.
 	wait.UntilWithContext(ctx, sched.scheduleOne, 0)
 	sched.SchedulingQueue.Close()
 }
@@ -383,6 +415,7 @@ func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodL
 
 		// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
 		podInfo.PodInfo = framework.NewPodInfo(cachedPod.DeepCopy())
+		//调度失败后放入unschedulable中
 		if err := podQueue.AddUnschedulableIfNotPresent(podInfo, podQueue.SchedulingCycle()); err != nil {
 			klog.ErrorS(err, "Error occurred")
 		}

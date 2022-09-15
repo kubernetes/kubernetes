@@ -135,6 +135,12 @@ type Evaluator struct {
 //   the nominatedNodeName.
 // - <non-nil PostFilterResult}, Success>. It's the regular happy path
 //   and the non-empty nominatedNodeName will be applied to the preemptor pod.
+//四种可能的返回值.
+// <nil, Error> 有异常
+// <nil, Unschedulable> 等待抢占执行完成.
+// <non-nil PostFilterResult, Unschedulable> 不能被抢占,
+// <non-nil PostFilterResult}, Success> 成功抢占, 设置pod的 nominatedNodeName
+
 func (ev *Evaluator) Preempt(ctx context.Context, pod *v1.Pod, m framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
 	// 0) Fetch the latest version of <pod>.
 	// It's safe to directly fetch pod here. Because the informer cache has already been
@@ -148,18 +154,25 @@ func (ev *Evaluator) Preempt(ctx context.Context, pod *v1.Pod, m framework.NodeT
 	}
 
 	// 1) Ensure the preemptor is eligible to preempt other pods.
+	//pod可能设置了NominatedNodeName , 也可能没有设置. 如果没有设置则返回true
+	//如果设置了, 发现了节点上比他优先级小的pod, 则进行pod驱逐. 返回false.
+	//如果设置了, 且优先级低的都驱逐了. 则返回true.
+	//这里的逻辑比之前好多了. 不管怎样, 抢占的pod 没有执行完, 1. 都会走抢占的逻辑, 2. 同时会走正常的流程看看是否可以找得到其他节点.
+	//判断是否已经设置了抢占, 但是抢占失败了.
 	if ok, msg := ev.PodEligibleToPreemptOthers(pod, m[pod.Status.NominatedNodeName]); !ok {
 		klog.V(5).InfoS("Pod is not eligible for preemption", "pod", klog.KObj(pod), "reason", msg)
 		return nil, framework.NewStatus(framework.Unschedulable, msg)
 	}
 
 	// 2) Find all preemption candidates.
+	//超找所有合适的候选者.
 	candidates, nodeToStatusMap, err := ev.findCandidates(ctx, pod, m)
 	if err != nil && len(candidates) == 0 {
 		return nil, framework.AsStatus(err)
 	}
 
 	// Return a FitError only when there are no candidates that fit the pod.
+	//如果为0 则找不到.
 	if len(candidates) == 0 {
 		fitError := &framework.FitError{
 			Pod:         pod,
@@ -180,6 +193,7 @@ func (ev *Evaluator) Preempt(ctx context.Context, pod *v1.Pod, m framework.NodeT
 	}
 
 	// 4) Find the best candidate.
+	//挑选最合适的抢占的node
 	bestCandidate := ev.SelectCandidate(candidates)
 	if bestCandidate == nil || len(bestCandidate.Name()) == 0 {
 		return nil, framework.NewStatus(framework.Unschedulable, "no candidate node for preemption")
@@ -196,6 +210,7 @@ func (ev *Evaluator) Preempt(ctx context.Context, pod *v1.Pod, m framework.NodeT
 // FindCandidates calculates a slice of preemption candidates.
 // Each candidate is executable to make the given <pod> schedulable.
 func (ev *Evaluator) findCandidates(ctx context.Context, pod *v1.Pod, m framework.NodeToStatusMap) ([]Candidate, framework.NodeToStatusMap, error) {
+	//获取节点信息.
 	allNodes, err := ev.Handler.SnapshotSharedLister().NodeInfos().List()
 	if err != nil {
 		return nil, nil, err
@@ -203,6 +218,7 @@ func (ev *Evaluator) findCandidates(ctx context.Context, pod *v1.Pod, m framewor
 	if len(allNodes) == 0 {
 		return nil, nil, errors.New("no nodes available")
 	}
+	//所有节点中, 剔除了抢占也不管用的节点.
 	potentialNodes, unschedulableNodeStatus := nodesWherePreemptionMightHelp(allNodes, m)
 	if len(potentialNodes) == 0 {
 		klog.V(3).InfoS("Preemption will not help schedule pod on any node", "pod", klog.KObj(pod))
@@ -214,11 +230,16 @@ func (ev *Evaluator) findCandidates(ctx context.Context, pod *v1.Pod, m framewor
 		return nil, unschedulableNodeStatus, nil
 	}
 
+	//这里是干嘛的?!
+	//需要查看驱逐的pod 是否违反了 PodDisruptionBudget
+	//.spec.selector .spec.minAvailable .spec.maxUnavailable
+	//获取所有的相关的pdb
 	pdbs, err := getPodDisruptionBudgets(ev.PdbLister)
 	if err != nil {
 		return nil, nil, err
 	}
 
+	//随机一个偏移量和容量.
 	offset, numCandidates := ev.GetOffsetAndNumCandidates(int32(len(potentialNodes)))
 	if klogV := klog.V(5); klogV.Enabled() {
 		var sample []string
@@ -227,7 +248,16 @@ func (ev *Evaluator) findCandidates(ctx context.Context, pod *v1.Pod, m framewor
 		}
 		klogV.InfoS("Selecting candidates from a pool of nodes", "potentialNodesCount", len(potentialNodes), "offset", offset, "sampleLength", len(sample), "sample", sample, "candidates", numCandidates)
 	}
+	//挑选被抢占的节点.
+	//运行抢占逻辑
+	//1. 驱逐所有优先级比较小的pod, 然后尝试添加pod到节点上, 判断是否添加成功.
+	//2. 如果添加成功, 则计算将驱逐的pod按照优先级排序, 然后分成是否违反pdb, 分成两类.
+	//3. 将违反的pdb的pod, 添加到nodeinfo中, 然后走调度逻辑, 判断是否可以添加成功.
+	//4. 将没有违反的pdb的pod, 尽量的添加到node中, 同样走调度的逻辑.
+	//返回需要被驱逐的pod, 同时返回违反pdb的pod数量.
+	//返回所有候选者(是否违反pdb)
 	candidates, nodeStatuses, err := ev.DryRunPreemption(ctx, pod, potentialNodes, pdbs, offset, numCandidates)
+	//添加了之前调度失败的节点 + 抢占失败的节点.
 	for node, nodeStatus := range unschedulableNodeStatus {
 		nodeStatuses[node] = nodeStatus
 	}
@@ -306,7 +336,9 @@ func (ev *Evaluator) SelectCandidate(candidates []Candidate) Candidate {
 		return candidates[0]
 	}
 
+	//返回节点对应驱逐的pod map
 	victimsMap := ev.CandidatesToVictimsMap(candidates)
+	//挑选一个节点进行抢占.
 	candidateNode := pickOneNodeForPreemption(victimsMap)
 
 	// Same as candidatesToVictimsMap, this logic is not applicable for out-of-tree
@@ -334,8 +366,10 @@ func (ev *Evaluator) prepareCandidate(c Candidate, pod *v1.Pod, pluginName strin
 	for _, victim := range c.Victims().Pods {
 		// If the victim is a WaitingPod, send a reject message to the PermitPlugin.
 		// Otherwise we should delete the victim.
+		//framework中的waitingPod是怎么来的?
 		if waitingPod := fh.GetWaitingPod(victim.UID); waitingPod != nil {
 			waitingPod.Reject(pluginName, "preempted")
+			//删除pod
 		} else if err := util.DeletePod(cs, victim); err != nil {
 			klog.ErrorS(err, "Preempting pod", "pod", klog.KObj(victim), "preemptor", klog.KObj(pod))
 			return framework.AsStatus(err)
@@ -349,6 +383,7 @@ func (ev *Evaluator) prepareCandidate(c Candidate, pod *v1.Pod, pluginName strin
 	// this node. So, we should remove their nomination. Removing their
 	// nomination updates these pods and moves them to the active queue. It
 	// lets scheduler find another place for them.
+	//将低优先级的抢占的pod进行删除. 同样的, 在考量调度时筛选时, 不能添加优先级过低的nominated pod.
 	nominatedPods := getLowerPriorityNominatedPods(fh, pod, c.Name())
 	if err := util.ClearNominatedNodeName(cs, nominatedPods...); err != nil {
 		klog.ErrorS(err, "Cannot clear 'NominatedNodeName' field")
@@ -367,6 +402,7 @@ func nodesWherePreemptionMightHelp(nodes []*framework.NodeInfo, m framework.Node
 		name := node.Node().Name
 		// We rely on the status by each plugin - 'Unschedulable' or 'UnschedulableAndUnresolvable'
 		// to determine whether preemption may help or not on the node.
+		//过滤调抢占也不管用的节点. 在前面过滤的时候就考虑到了.
 		if m[name].Code() == framework.UnschedulableAndUnresolvable {
 			nodeStatuses[node.Node().Name] = framework.NewStatus(framework.UnschedulableAndUnresolvable, "Preemption is not helpful for scheduling")
 			continue
@@ -394,6 +430,12 @@ func getPodDisruptionBudgets(pdbLister policylisters.PodDisruptionBudgetLister) 
 // 6. If there are still ties, the first such node is picked (sort of randomly).
 // The 'minNodes1' and 'minNodes2' are being reused here to save the memory
 // allocation and garbage collection time.
+//1. 挑选违反pdb最小的
+//2. 挑选最大优先级中最小的.
+//3. 所有victims优先级总和最小.
+//4. 找最少数量pods
+//5. 最高优先级的pod最近启动的
+//6. 随机.
 func pickOneNodeForPreemption(nodesToVictims map[string]*extenderv1.Victims) string {
 	if len(nodesToVictims) == 0 {
 		return ""
@@ -546,7 +588,9 @@ func getLowerPriorityNominatedPods(pn framework.PodNominator, pod *v1.Pod, nodeN
 func (ev *Evaluator) DryRunPreemption(ctx context.Context, pod *v1.Pod, potentialNodes []*framework.NodeInfo,
 	pdbs []*policy.PodDisruptionBudget, offset int32, numCandidates int32) ([]Candidate, framework.NodeToStatusMap, error) {
 	fh := ev.Handler
+	//驱逐的pod中, 没哟违反pdb的.
 	nonViolatingCandidates := newCandidateList(numCandidates)
+	//驱逐的pod中, 有违反pdb的.
 	violatingCandidates := newCandidateList(numCandidates)
 	parallelCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -556,6 +600,12 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, pod *v1.Pod, potentia
 	checkNode := func(i int) {
 		nodeInfoCopy := potentialNodes[(int(offset)+i)%len(potentialNodes)].Clone()
 		stateCopy := ev.State.Clone()
+		//运行抢占逻辑
+		//1. 驱逐所有优先级比较小的pod, 然后尝试添加pod到节点上, 判断是否添加成功.
+		//2. 如果添加成功, 则计算将驱逐的pod按照优先级排序, 然后分成是否违反pdb, 分成两类.
+		//3. 将违反的pdb的pod, 添加到nodeinfo中, 然后走调度逻辑, 判断是否可以添加成功.
+		//4. 将没有违反的pdb的pod, 尽量的添加到node中, 同样走调度的逻辑.
+		//返回需要被驱逐的pod, 同时返回违反pdb的pod数量.
 		pods, numPDBViolations, status := ev.SelectVictimsOnNode(ctx, stateCopy, pod, nodeInfoCopy, pdbs)
 		if status.IsSuccess() && len(pods) != 0 {
 			victims := extenderv1.Victims{
@@ -566,12 +616,15 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, pod *v1.Pod, potentia
 				victims: &victims,
 				name:    nodeInfoCopy.Node().Name,
 			}
+			//没有违反pdb
 			if numPDBViolations == 0 {
 				nonViolatingCandidates.add(c)
 			} else {
+				//违反pdb的集合
 				violatingCandidates.add(c)
 			}
 			nvcSize, vcSize := nonViolatingCandidates.size(), violatingCandidates.size()
+			//如果又未违反pdb的, 且两者之和大于候选者, 则不需要继续检查了.
 			if nvcSize > 0 && nvcSize+vcSize >= numCandidates {
 				cancel()
 			}
@@ -587,6 +640,7 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, pod *v1.Pod, potentia
 		nodeStatuses[nodeInfoCopy.Node().Name] = status
 		statusesLock.Unlock()
 	}
+	//并行检查节点.
 	fh.Parallelizer().Until(parallelCtx, len(potentialNodes), checkNode)
 	return append(nonViolatingCandidates.get(), violatingCandidates.get()...), nodeStatuses, utilerrors.NewAggregate(errs)
 }
