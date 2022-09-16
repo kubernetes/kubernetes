@@ -987,7 +987,7 @@ func TestPluginCanAttach(t *testing.T) {
 
 			pluginCanAttach, err := plug.CanAttach(test.spec)
 			if err != nil && !test.shouldFail {
-				t.Fatalf("unexected plugin.CanAttach error: %s", err)
+				t.Fatalf("unexpected plugin.CanAttach error: %s", err)
 			}
 			if pluginCanAttach != test.canAttach {
 				t.Fatalf("expecting plugin.CanAttach %t got %t", test.canAttach, pluginCanAttach)
@@ -1062,7 +1062,7 @@ func TestPluginFindAttachablePlugin(t *testing.T) {
 
 			plugin, err := plugMgr.FindAttachablePluginBySpec(test.spec)
 			if err != nil && !test.shouldFail {
-				t.Fatalf("unexected error calling pluginMgr.FindAttachablePluginBySpec: %s", err)
+				t.Fatalf("unexpected error calling pluginMgr.FindAttachablePluginBySpec: %s", err)
 			}
 			if (plugin != nil) != test.canAttach {
 				t.Fatal("expecting attachable plugin, but got nil")
