@@ -1567,7 +1567,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Tail call iptables rules for ipset, make sure only call iptables once
 	// in a single loop per ip set.
-	proxier.writeIptablesRules()
+	proxier.writeIptablesRules(nodeIPs)
 
 	// Sync iptables rules.
 	// NOTE: NoFlushTables is used so we don't flush non-kubernetes chains in the table.
@@ -1647,7 +1647,7 @@ func (proxier *Proxier) syncProxyRules() {
 // writeIptablesRules write all iptables rules to proxier.natRules or proxier.FilterRules that ipvs proxier needed
 // according to proxier.ipsetList information and the ipset match relationship that `ipsetWithIptablesChain` specified.
 // some ipset(kubeClusterIPSet for example) have particular match rules and iptables jump relation should be sync separately.
-func (proxier *Proxier) writeIptablesRules() {
+func (proxier *Proxier) writeIptablesRules(nodeIPs []net.IP) {
 	// We are creating those slices ones here to avoid memory reallocations
 	// in every loop. Note that reuse the memory, instead of doing:
 	//   slice = <some new slice>
@@ -1751,12 +1751,14 @@ func (proxier *Proxier) writeIptablesRules() {
 		externalIPRules(args)
 	}
 
-	// -A KUBE-SERVICES  -m addrtype  --dst-type LOCAL -j KUBE-NODE-PORT
-	args = append(args[:0],
-		"-A", string(kubeServicesChain),
-		"-m", "addrtype", "--dst-type", "LOCAL",
-	)
-	proxier.natRules.Write(args, "-j", string(kubeNodePortChain))
+	// -A KUBE-SERVICES  -d nodeAddress -j KUBE-NODE-PORT
+	for _, address := range nodeIPs {
+		proxier.natRules.Write(
+			"-A", string(kubeServicesChain),
+			"-m", "comment", "--comment", `"kubernetes service nodeports;"`,
+			"-d", address.String(),
+			"-j", string(kubeNodePortChain))
+	}
 
 	// mark for masquerading for KUBE-LOAD-BALANCER
 	proxier.natRules.Write(

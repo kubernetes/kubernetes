@@ -672,7 +672,7 @@ func TestNodePortIPv4(t *testing.T) {
 				string(kubeServicesChain): {{
 					JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
 				}, {
-					JumpChain: string(kubeNodePortChain), MatchSet: "",
+					JumpChain: string(kubeNodePortChain), DestinationAddress: "100.101.102.103",
 				}, {
 					JumpChain: "ACCEPT", MatchSet: kubeClusterIPSet,
 				}},
@@ -1024,6 +1024,130 @@ func TestNodePortIPv4(t *testing.T) {
 			if test.expectedIPSets != nil {
 				checkIPSet(t, fp, test.expectedIPSets)
 			}
+
+			if test.expectedIptablesChains != nil {
+				checkIptables(t, ipt, test.expectedIptablesChains)
+			}
+		})
+	}
+}
+
+func TestNodePortKubeServiceChainDestinationOnNodeIPs(t *testing.T) {
+	tests := []struct {
+		name                   string
+		nodeIPs                []net.IP
+		nodePortAddresses      []string
+		expectedIptablesChains netlinktest.ExpectedIptablesChain
+	}{
+		{
+			name: "IPv4: node port service on a node with IPv4 nodeIP",
+			nodeIPs: []net.IP{
+				netutils.ParseIPSloppy("100.101.102.103"),
+			},
+			nodePortAddresses: []string{},
+			expectedIptablesChains: netlinktest.ExpectedIptablesChain{
+				string(kubeServicesChain): {{
+					JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
+				}, {
+					JumpChain: string(kubeNodePortChain), DestinationAddress: "100.101.102.103",
+				}, {
+					JumpChain: "ACCEPT", MatchSet: kubeClusterIPSet,
+				}},
+			},
+		},
+		{
+			name: "IPv4: node port service on a node with IPv4 nodeIP, but this ip not contains in nodePortAddresses",
+			nodeIPs: []net.IP{
+				netutils.ParseIPSloppy("100.101.102.103"),
+			},
+			nodePortAddresses: []string{"192.168.0.0/16"},
+			expectedIptablesChains: netlinktest.ExpectedIptablesChain{
+				string(kubeServicesChain): {{
+					JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
+				}, {
+					JumpChain: "ACCEPT", MatchSet: kubeClusterIPSet,
+				}},
+			},
+		},
+		{
+			name: "IPv4: node port service on a node with multiple IPv4 nodeIPs, set nodePortAddress to specify one cidr",
+			nodeIPs: []net.IP{
+				netutils.ParseIPSloppy("100.101.102.103"),
+				netutils.ParseIPSloppy("192.168.0.53"),
+			},
+			nodePortAddresses: []string{"192.168.0.0/16"},
+			expectedIptablesChains: netlinktest.ExpectedIptablesChain{
+				string(kubeServicesChain): {{
+					JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
+				}, {
+					JumpChain: string(kubeNodePortChain), DestinationAddress: "192.168.0.53",
+				}, {
+					JumpChain: "ACCEPT", MatchSet: kubeClusterIPSet,
+				}},
+			},
+		},
+		{
+			name: "IPv4: node port service on a node with multiple IPv4 nodeIP, set nodePortAddress to empty",
+			nodeIPs: []net.IP{
+				netutils.ParseIPSloppy("100.101.102.103"),
+				netutils.ParseIPSloppy("192.168.0.53"),
+			},
+			nodePortAddresses: []string{},
+			expectedIptablesChains: netlinktest.ExpectedIptablesChain{
+				string(kubeServicesChain): {{
+					JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
+				}, {
+					JumpChain: string(kubeNodePortChain), DestinationAddress: "100.101.102.103",
+				}, {
+					JumpChain: string(kubeNodePortChain), DestinationAddress: "192.168.0.53",
+				}, {
+					JumpChain: "ACCEPT", MatchSet: kubeClusterIPSet,
+				}},
+			},
+		},
+	}
+
+	tcpProtocol := v1.ProtocolTCP
+	svc := makeTestService("ns1", "svc1", func(svc *v1.Service) {
+		svc.Spec.Type = "NodePort"
+		svc.Spec.ClusterIP = "10.20.30.41"
+		svc.Spec.Ports = []v1.ServicePort{{
+			Name:     "p80",
+			Port:     int32(80),
+			Protocol: v1.ProtocolTCP,
+			NodePort: int32(3001),
+		}}
+	})
+
+	eps := makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"10.180.0.1"},
+		}}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     pointer.String("p80"),
+			Port:     pointer.Int32(80),
+			Protocol: &tcpProtocol,
+		}}
+	})
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ipt := iptablestest.NewFake()
+			ipvs := ipvstest.NewFake()
+			ipset := ipsettest.NewFake(testIPSetVersion)
+			fp := NewFakeProxier(ipt, ipvs, ipset, test.nodeIPs, nil, v1.IPv4Protocol)
+			fp.nodePortAddresses = test.nodePortAddresses
+
+			makeServiceMap(fp, svc)
+			populateEndpointSlices(fp, eps)
+			for index, ip := range test.nodeIPs {
+				itf := net.Interface{Index: index, MTU: 0, Name: fmt.Sprintf("eth-%d", index), HardwareAddr: nil, Flags: 0}
+				addrs := []net.Addr{&net.IPNet{IP: ip}}
+				fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
+			}
+
+			fp.syncProxyRules()
 
 			if test.expectedIptablesChains != nil {
 				checkIptables(t, ipt, test.expectedIptablesChains)
@@ -2056,8 +2180,6 @@ func TestLoadBalancer(t *testing.T) {
 		}, {
 			JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
 		}, {
-			JumpChain: string(kubeNodePortChain), MatchSet: "",
-		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeClusterIPSet,
 		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeLoadBalancerSet,
@@ -2154,7 +2276,7 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 		string(kubeServicesChain): {{
 			JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
 		}, {
-			JumpChain: string(kubeNodePortChain), MatchSet: "",
+			JumpChain: string(kubeNodePortChain), DestinationAddress: "100.101.102.103",
 		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeClusterIPSet,
 		}},
@@ -2328,8 +2450,6 @@ func TestLoadBalancerSourceRanges(t *testing.T) {
 		}, {
 			JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
 		}, {
-			JumpChain: string(kubeNodePortChain), MatchSet: "",
-		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeClusterIPSet,
 		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeLoadBalancerSet,
@@ -2408,7 +2528,6 @@ func TestAcceptIPVSTraffic(t *testing.T) {
 			{JumpChain: string(kubeMarkMasqChain), MatchSet: kubeExternalIPSet},
 			{JumpChain: "ACCEPT", MatchSet: kubeExternalIPSet}, // With externalTrafficOnlyArgs
 			{JumpChain: "ACCEPT", MatchSet: kubeExternalIPSet}, // With dstLocalOnlyArgs
-			{JumpChain: string(kubeNodePortChain), MatchSet: ""},
 			{JumpChain: "ACCEPT", MatchSet: kubeClusterIPSet},
 			{JumpChain: "ACCEPT", MatchSet: kubeLoadBalancerSet},
 		},
@@ -2504,8 +2623,6 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 			JumpChain: string(kubeLoadBalancerChain), MatchSet: kubeLoadBalancerSet,
 		}, {
 			JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
-		}, {
-			JumpChain: string(kubeNodePortChain), MatchSet: "",
 		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeClusterIPSet,
 		}, {
@@ -3955,6 +4072,9 @@ func checkIptables(t *testing.T, ipt *iptablestest.FakeIPTables, epIpt netlinkte
 			}
 			if (epRule.MatchSet == "" && rule.MatchSet != nil) || (epRule.MatchSet != "" && (rule.MatchSet == nil || rule.MatchSet.Value != epRule.MatchSet)) {
 				t.Errorf("Expected MatchSet=%s JumpChain=%s, got %s", epRule.MatchSet, epRule.JumpChain, rule.Raw)
+			}
+			if (epRule.DestinationAddress == "" && rule.DestinationAddress != nil) || (epRule.DestinationAddress != "" && (rule.DestinationAddress == nil || rule.DestinationAddress.Value != epRule.DestinationAddress)) {
+				t.Errorf("Expected DestinationAddress=%s JumpChain=%s, got %s", epRule.DestinationAddress, epRule.JumpChain, rule.Raw)
 			}
 		}
 	}
