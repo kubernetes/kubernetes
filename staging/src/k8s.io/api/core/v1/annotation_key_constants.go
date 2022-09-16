@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This file should be consistent with pkg/api/annotation_key_constants.go.
+// This file should be consistent with pkg/apis/core/annotation_key_constants.go.
 
 package v1
 
