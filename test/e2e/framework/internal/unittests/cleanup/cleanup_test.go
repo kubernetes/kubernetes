@@ -1,3 +1,5 @@
+//go:build linux && amd64
+
 /*
 Copyright 2022 The Kubernetes Authors.
 
@@ -13,6 +15,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
+// This test uses etcd that is only fully supported for AMD64 and Linux
+// https://etcd.io/docs/v3.5/op-guide/supported-platform/#support-tiers
 
 package cleanup
 
@@ -34,11 +39,6 @@ import (
 // Be careful when moving it around or changing the import statements above.
 // Here are some intentionally blank lines that can be removed to compensate
 // for future additional import statements.
-//
-//
-//
-//
-//
 //
 //
 //
