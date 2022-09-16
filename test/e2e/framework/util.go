@@ -328,7 +328,10 @@ func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountN
 		}
 		return false, nil
 	})
-	return err
+	if err != nil {
+		return fmt.Errorf("wait for service account %q in namespace %q: %w", serviceAccountName, ns, err)
+	}
+	return nil
 }
 
 // WaitForDefaultServiceAccountInNamespace waits for the default service account to be provisioned
