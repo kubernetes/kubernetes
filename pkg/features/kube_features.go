@@ -485,7 +485,7 @@ const (
 	// owner: @andrewsykim @adisky
 	// alpha: v1.20
 	// beta: v1.24
-	// ga: v1.25
+	// ga: v1.26
 	//
 	// Enable kubelet exec plugins for image pull credentials.
 	KubeletCredentialProviders featuregate.Feature = "KubeletCredentialProviders"
