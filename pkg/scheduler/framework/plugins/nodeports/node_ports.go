@@ -40,9 +40,6 @@ const (
 	// preFilterStateKey is the key in CycleState to NodePorts pre-computed data.
 	// Using the name of the plugin will likely help us avoid collisions with other plugins.
 	preFilterStateKey = "PreFilter" + Name
-
-	// ErrReason when node ports aren't available.
-	ErrReason = "node(s) didn't have free ports for the requested pod ports"
 )
 
 type preFilterState []*v1.ContainerPort
@@ -116,9 +113,10 @@ func (pl *NodePorts) Filter(ctx context.Context, cycleState *framework.CycleStat
 		return framework.AsStatus(err)
 	}
 
-	fits := fitsPorts(wantPorts, nodeInfo)
+	fits, message := fitsPorts(wantPorts, nodeInfo)
 	if !fits {
-		return framework.NewStatus(framework.Unschedulable, ErrReason)
+		errReason := fmt.Sprintf("node(s) didn't have free ports for the requested pod ports (%s)", message)
+		return framework.NewStatus(framework.Unschedulable, errReason)
 	}
 
 	return nil
@@ -126,18 +124,20 @@ func (pl *NodePorts) Filter(ctx context.Context, cycleState *framework.CycleStat
 
 // Fits checks if the pod fits the node.
 func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo) bool {
-	return fitsPorts(getContainerPorts(pod), nodeInfo)
+	fits, _ := fitsPorts(getContainerPorts(pod), nodeInfo)
+	return fits
 }
 
-func fitsPorts(wantPorts []*v1.ContainerPort, nodeInfo *framework.NodeInfo) bool {
+func fitsPorts(wantPorts []*v1.ContainerPort, nodeInfo *framework.NodeInfo) (bool, string) {
 	// try to see whether existingPorts and wantPorts will conflict or not
 	existingPorts := nodeInfo.UsedPorts
 	for _, cp := range wantPorts {
 		if existingPorts.CheckConflict(cp.HostIP, string(cp.Protocol), cp.HostPort) {
-			return false
+			message := fmt.Sprintf("%s:%d/%s", cp.HostIP, cp.HostPort, string(cp.Protocol))
+			return false, message
 		}
 	}
-	return true
+	return true, ""
 }
 
 // New initializes a new plugin and returns it.

@@ -68,14 +68,14 @@ func TestNodePorts(t *testing.T) {
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "UDP/127.0.0.1/8080")),
 			name:       "same udp port",
-			wantStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
+			wantStatus: framework.NewStatus(framework.Unschedulable, "node(s) didn't have free ports for the requested pod ports (127.0.0.1:8080/UDP)"),
 		},
 		{
 			pod: newPod("m1", "TCP/127.0.0.1/8080"),
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "TCP/127.0.0.1/8080")),
 			name:       "same tcp port",
-			wantStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
+			wantStatus: framework.NewStatus(framework.Unschedulable, "node(s) didn't have free ports for the requested pod ports (127.0.0.1:8080/TCP)"),
 		},
 		{
 			pod: newPod("m1", "TCP/127.0.0.1/8080"),
@@ -94,35 +94,35 @@ func TestNodePorts(t *testing.T) {
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "UDP/127.0.0.1/8080")),
 			name:       "second udp port conflict",
-			wantStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
+			wantStatus: framework.NewStatus(framework.Unschedulable, "node(s) didn't have free ports for the requested pod ports (127.0.0.1:8080/UDP)"),
 		},
 		{
 			pod: newPod("m1", "TCP/127.0.0.1/8001", "UDP/127.0.0.1/8080"),
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "TCP/127.0.0.1/8001", "UDP/127.0.0.1/8081")),
 			name:       "first tcp port conflict",
-			wantStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
+			wantStatus: framework.NewStatus(framework.Unschedulable, "node(s) didn't have free ports for the requested pod ports (127.0.0.1:8001/TCP)"),
 		},
 		{
 			pod: newPod("m1", "TCP/0.0.0.0/8001"),
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "TCP/127.0.0.1/8001")),
 			name:       "first tcp port conflict due to 0.0.0.0 hostIP",
-			wantStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
+			wantStatus: framework.NewStatus(framework.Unschedulable, "node(s) didn't have free ports for the requested pod ports (0.0.0.0:8001/TCP)"),
 		},
 		{
 			pod: newPod("m1", "TCP/10.0.10.10/8001", "TCP/0.0.0.0/8001"),
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "TCP/127.0.0.1/8001")),
 			name:       "TCP hostPort conflict due to 0.0.0.0 hostIP",
-			wantStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
+			wantStatus: framework.NewStatus(framework.Unschedulable, "node(s) didn't have free ports for the requested pod ports (0.0.0.0:8001/TCP)"),
 		},
 		{
 			pod: newPod("m1", "TCP/127.0.0.1/8001"),
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "TCP/0.0.0.0/8001")),
 			name:       "second tcp port conflict to 0.0.0.0 hostIP",
-			wantStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
+			wantStatus: framework.NewStatus(framework.Unschedulable, "node(s) didn't have free ports for the requested pod ports (127.0.0.1:8001/TCP)"),
 		},
 		{
 			pod: newPod("m1", "UDP/127.0.0.1/8001"),
@@ -135,7 +135,7 @@ func TestNodePorts(t *testing.T) {
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "TCP/0.0.0.0/8001", "UDP/0.0.0.0/8001")),
 			name:       "UDP hostPort conflict due to 0.0.0.0 hostIP",
-			wantStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
+			wantStatus: framework.NewStatus(framework.Unschedulable, "node(s) didn't have free ports for the requested pod ports (127.0.0.1:8001/UDP)"),
 		},
 	}
 
