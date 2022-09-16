@@ -245,7 +245,7 @@ func ExecInStatefulPods(c clientset.Interface, ss *appsv1.StatefulSet, cmd strin
 	return nil
 }
 
-// udpate updates a statefulset, and it is only used within rest.go
+// update updates a statefulset, and it is only used within rest.go
 func update(c clientset.Interface, ns, name string, update func(ss *appsv1.StatefulSet)) *appsv1.StatefulSet {
 	for i := 0; i < 3; i++ {
 		ss, err := c.AppsV1().StatefulSets(ns).Get(context.TODO(), name, metav1.GetOptions{})

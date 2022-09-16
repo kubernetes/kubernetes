@@ -417,7 +417,7 @@ func (j *TestJig) waitForAvailableEndpoint(timeout time.Duration) error {
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				if es, ok := obj.(*discoveryv1.EndpointSlice); ok {
-					// TODO: currently we only consider addreses in 1 slice, but services with
+					// TODO: currently we only consider addresses in 1 slice, but services with
 					// a large number of endpoints (>1000) may have multiple slices. Some slices
 					// with only a few addresses. We should check the addresses in all slices.
 					if len(es.Endpoints) > 0 && len(es.Endpoints[0].Addresses) > 0 {
@@ -427,7 +427,7 @@ func (j *TestJig) waitForAvailableEndpoint(timeout time.Duration) error {
 			},
 			UpdateFunc: func(old, cur interface{}) {
 				if es, ok := cur.(*discoveryv1.EndpointSlice); ok {
-					// TODO: currently we only consider addreses in 1 slice, but services with
+					// TODO: currently we only consider addresses in 1 slice, but services with
 					// a large number of endpoints (>1000) may have multiple slices. Some slices
 					// with only a few addresses. We should check the addresses in all slices.
 					if len(es.Endpoints) > 0 && len(es.Endpoints[0].Addresses) > 0 {
@@ -854,12 +854,12 @@ func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v
 		// If the node's internal address points to localhost, then we are not
 		// able to test the service reachability via that address
 		if isInvalidOrLocalhostAddress(internalAddr) {
-			framework.Logf("skipping testEndpointReachability() for internal adddress %s", internalAddr)
+			framework.Logf("skipping testEndpointReachability() for internal address %s", internalAddr)
 			continue
 		}
 		// Check service reachability on the node internalIP which is same family as clusterIP
 		if isClusterIPV4 != netutils.IsIPv4String(internalAddr) {
-			framework.Logf("skipping testEndpointReachability() for internal adddress %s as it does not match clusterIP (%s) family", internalAddr, clusterIP)
+			framework.Logf("skipping testEndpointReachability() for internal address %s as it does not match clusterIP (%s) family", internalAddr, clusterIP)
 			continue
 		}
 
@@ -872,7 +872,7 @@ func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v
 		externalAddrs := e2enode.CollectAddresses(nodes, v1.NodeExternalIP)
 		for _, externalAddr := range externalAddrs {
 			if isClusterIPV4 != netutils.IsIPv4String(externalAddr) {
-				framework.Logf("skipping testEndpointReachability() for external adddress %s as it does not match clusterIP (%s) family", externalAddr, clusterIP)
+				framework.Logf("skipping testEndpointReachability() for external address %s as it does not match clusterIP (%s) family", externalAddr, clusterIP)
 				continue
 			}
 			err := testEndpointReachability(externalAddr, sp.NodePort, sp.Protocol, pod)

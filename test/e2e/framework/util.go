@@ -1370,7 +1370,7 @@ func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 // WatchEventSequenceVerifier ...
 // manages a watch for a given resource, ensures that events take place in a given order, retries the test on failure
 //
-//	testContext         cancelation signal across API boundries, e.g: context.TODO()
+//	testContext         cancellation signal across API boundaries, e.g: context.TODO()
 //	dc                  sets up a client to the API
 //	resourceType        specify the type of resource
 //	namespace           select a namespace

@@ -151,7 +151,7 @@ Conformance tests.
 
 ## Testing images
 
-Once the image has been built and pushed to an accesible registry, you can run the tests using that image
+Once the image has been built and pushed to an accessible registry, you can run the tests using that image
 by having the environment variable `KUBE_TEST_REPO_LIST` set before running the tests that are using the
 image:
 

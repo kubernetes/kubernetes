@@ -185,7 +185,7 @@ func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image s
 	replicas := int32(1)
 
 	// Create a ReplicaSet for a service that serves its hostname.
-	// The source for the Docker containter kubernetes/serve_hostname is
+	// The source for the Docker container kubernetes/serve_hostname is
 	// in contrib/for-demos/serve_hostname
 	framework.Logf("Creating ReplicaSet %s", name)
 	newRS := newRS(name, replicas, map[string]string{"name": name}, name, image, []string{"serve-hostname"})

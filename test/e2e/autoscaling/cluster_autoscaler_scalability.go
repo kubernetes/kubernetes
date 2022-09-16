@@ -501,7 +501,7 @@ type podBatch struct {
 // 1. Create replication controllers that eat up all the space that should be
 // empty after setup, making sure they end up on different nodes by specifying
 // conflicting host port
-// 2. Create targer RC that will generate the load on the cluster
+// 2. Create target RC that will generate the load on the cluster
 // 3. Remove the rcs created in 1.
 func distributeLoad(f *framework.Framework, namespace string, id string, podDistribution []podBatch,
 	podMemRequestMegabytes int, nodeMemCapacity int, labels map[string]string, timeout time.Duration) func() error {

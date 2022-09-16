@@ -512,7 +512,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		// See kubernetes/contrib/ingress/echoheaders/nginx.conf for content of response
 		_, err := jig.Run(nil)
 		framework.ExpectNoError(err)
-		// Make sure acceptPod is running. There are certain chances that pod might be teminated due to unexpected reasons.
+		// Make sure acceptPod is running. There are certain chances that pod might be terminated due to unexpected reasons.
 		acceptPod, err = cs.CoreV1().Pods(namespace).Get(context.TODO(), acceptPod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Unable to get pod %s", acceptPod.Name)
 		framework.ExpectEqual(acceptPod.Status.Phase, v1.PodRunning)
@@ -542,7 +542,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		checkReachabilityFromPod(true, loadBalancerCreateTimeout, namespace, acceptPod.Name, svcIP)
 		checkReachabilityFromPod(false, loadBalancerCreateTimeout, namespace, dropPod.Name, svcIP)
 
-		// Make sure dropPod is running. There are certain chances that the pod might be teminated due to unexpected reasons.
+		// Make sure dropPod is running. There are certain chances that the pod might be terminated due to unexpected reasons.
 		dropPod, err = cs.CoreV1().Pods(namespace).Get(context.TODO(), dropPod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Unable to get pod %s", dropPod.Name)
 		framework.ExpectEqual(acceptPod.Status.Phase, v1.PodRunning)

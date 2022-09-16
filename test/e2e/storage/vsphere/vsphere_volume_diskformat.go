@@ -159,7 +159,7 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 }
 
 func verifyDiskFormat(client clientset.Interface, nodeName string, pvVolumePath string, diskFormat string) bool {
-	ginkgo.By("Verifing disk format")
+	ginkgo.By("Verifying disk format")
 	eagerlyScrub := false
 	thinProvisioned := false
 	diskFound := false

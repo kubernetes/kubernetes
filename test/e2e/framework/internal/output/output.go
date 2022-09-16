@@ -70,7 +70,7 @@ type TestResult struct {
 	Output string
 	// Failure is SpecSummary.Failure.Message with varying parts stripped.
 	Failure string
-	// Stack is a normalized version (just file names, function parametes stripped) of
+	// Stack is a normalized version (just file names, function parameters stripped) of
 	// Ginkgo's FullStackTrace of a failure. Empty if no failure.
 	Stack string
 	// Called to normalize the actual output string before comparison if non-nil.

@@ -3754,7 +3754,7 @@ var _ = common.SIGDescribe("Services", func() {
 })
 
 // execAffinityTestForSessionAffinityTimeout is a helper function that wrap the logic of
-// affinity test for non-load-balancer services. Session afinity will be
+// affinity test for non-load-balancer services. Session affinity will be
 // enabled when the service is created and a short timeout will be configured so
 // session affinity must change after the timeout expirese.
 func execAffinityTestForSessionAffinityTimeout(f *framework.Framework, cs clientset.Interface, svc *v1.Service) {
@@ -3853,7 +3853,7 @@ func execAffinityTestForNonLBService(f *framework.Framework, cs clientset.Interf
 }
 
 // execAffinityTestForNonLBServiceWithOptionalTransition is a helper function that wrap the logic of
-// affinity test for non-load-balancer services. Session afinity will be
+// affinity test for non-load-balancer services. Session affinity will be
 // enabled when the service is created. If parameter isTransitionTest is true,
 // session affinity will be switched off/on and test if the service converges
 // to a stable affinity state.
