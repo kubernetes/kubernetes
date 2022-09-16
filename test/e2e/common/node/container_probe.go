@@ -26,6 +26,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -612,6 +613,9 @@ done
 		err = wait.PollImmediate(framework.Poll, f.Timeouts.PodDelete, func() (bool, error) {
 			pod, err := podClient.Get(context.Background(), podName, metav1.GetOptions{})
 			if err != nil {
+				if apierrors.IsNotFound(err) {
+					return true, nil
+				}
 				return false, err
 			}
 			// verify the pod ready status has reported not ready
@@ -695,6 +699,9 @@ done
 		err = wait.PollImmediate(framework.Poll, f.Timeouts.PodDelete, func() (bool, error) {
 			pod, err := podClient.Get(context.Background(), podName, metav1.GetOptions{})
 			if err != nil {
+				if apierrors.IsNotFound(err) {
+					return true, nil
+				}
 				return false, err
 			}
 			// verify the pod ready status has reported not ready
