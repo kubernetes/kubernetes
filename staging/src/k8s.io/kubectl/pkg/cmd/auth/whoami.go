@@ -20,13 +20,13 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"sort"
 
 	"github.com/spf13/cobra"
 	authenticationv1alpha1 "k8s.io/api/authentication/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	authenticationv1alpha1client "k8s.io/client-go/kubernetes/typed/authentication/v1alpha1"
@@ -192,13 +192,7 @@ func printTableSelfSubjectAccessReview(obj runtime.Object, out io.Writer) error 
 	}
 
 	if len(ui.Extra) > 0 {
-		sortedKeys := make([]string, 0, len(ui.Extra))
-		for k := range ui.Extra {
-			sortedKeys = append(sortedKeys, k)
-		}
-		sort.Strings(sortedKeys)
-
-		for _, k := range sortedKeys {
+		for _, k := range sets.StringKeySet(ui.Extra).List() {
 			v := ui.Extra[k]
 			_, err := fmt.Fprintf(w, "Extra: %s\t%v\n", k, v)
 			if err != nil {
