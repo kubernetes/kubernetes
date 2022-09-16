@@ -92,8 +92,9 @@ type frameworkImpl struct {
 	eventRecorder   events.EventRecorder
 	informerFactory informers.SharedInformerFactory
 
-	metricsRecorder *metricsRecorder
-	profileName     string
+	metricsRecorder          *metricsRecorder
+	profileName              string
+	percentageOfNodesToScore *int32
 
 	extenders []framework.Extender
 	framework.PodNominator
@@ -271,6 +272,7 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, stopCh <-cha
 	}
 
 	f.profileName = profile.SchedulerName
+	f.percentageOfNodesToScore = profile.PercentageOfNodesToScore
 	if profile.Plugins == nil {
 		return f, nil
 	}
@@ -287,9 +289,10 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, stopCh <-cha
 		pluginConfig[name] = profile.PluginConfig[i].Args
 	}
 	outputProfile := config.KubeSchedulerProfile{
-		SchedulerName: f.profileName,
-		Plugins:       profile.Plugins,
-		PluginConfig:  make([]config.PluginConfig, 0, len(pg)),
+		SchedulerName:            f.profileName,
+		PercentageOfNodesToScore: f.percentageOfNodesToScore,
+		Plugins:                  profile.Plugins,
+		PluginConfig:             make([]config.PluginConfig, 0, len(pg)),
 	}
 
 	pluginsMap := make(map[string]framework.Plugin)
@@ -1338,6 +1341,11 @@ func (f *frameworkImpl) pluginsNeeded(plugins *config.Plugins) sets.String {
 // ProfileName returns the profile name associated to this framework.
 func (f *frameworkImpl) ProfileName() string {
 	return f.profileName
+}
+
+// PercentageOfNodesToScore returns percentageOfNodesToScore associated to a profile.
+func (f *frameworkImpl) PercentageOfNodesToScore() *int32 {
+	return f.percentageOfNodesToScore
 }
 
 // Parallelizer returns a parallelizer holding parallelism for scheduler.

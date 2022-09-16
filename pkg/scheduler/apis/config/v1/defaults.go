@@ -121,8 +121,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *configv1.KubeSchedulerConfigura
 	}
 
 	if obj.PercentageOfNodesToScore == nil {
-		percentageOfNodesToScore := int32(config.DefaultPercentageOfNodesToScore)
-		obj.PercentageOfNodesToScore = &percentageOfNodesToScore
+		obj.PercentageOfNodesToScore = pointer.Int32(config.DefaultPercentageOfNodesToScore)
 	}
 
 	if len(obj.LeaderElection.ResourceLock) == 0 {

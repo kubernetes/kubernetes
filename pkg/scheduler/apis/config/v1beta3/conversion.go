@@ -105,3 +105,9 @@ func convertToExternalPluginConfigArgs(out *v1beta3.KubeSchedulerConfiguration) 
 	}
 	return nil
 }
+
+// Convert_config_KubeSchedulerProfile_To_v1beta3_KubeSchedulerProfile called auto coversion by
+// ignoring per profile PercentageOfNodesToScore.
+func Convert_config_KubeSchedulerProfile_To_v1beta3_KubeSchedulerProfile(in *config.KubeSchedulerProfile, out *v1beta3.KubeSchedulerProfile, s conversion.Scope) error {
+	return autoConvert_config_KubeSchedulerProfile_To_v1beta3_KubeSchedulerProfile(in, out, s)
+}

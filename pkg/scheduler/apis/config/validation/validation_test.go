@@ -27,6 +27,7 @@ import (
 	configv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta3"
+	"k8s.io/utils/pointer"
 )
 
 func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
@@ -54,7 +55,7 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 		},
 		PodInitialBackoffSeconds: podInitialBackoffSeconds,
 		PodMaxBackoffSeconds:     podMaxBackoffSeconds,
-		PercentageOfNodesToScore: 35,
+		PercentageOfNodesToScore: pointer.Int32(35),
 		Profiles: []config.KubeSchedulerProfile{
 			{
 				SchedulerName: "me",
@@ -113,13 +114,22 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 	healthzBindAddrInvalid.HealthzBindAddress = "0.0.0.0:9090"
 
 	percentageOfNodesToScore101 := validConfig.DeepCopy()
-	percentageOfNodesToScore101.PercentageOfNodesToScore = int32(101)
+	percentageOfNodesToScore101.PercentageOfNodesToScore = pointer.Int32(101)
+
+	percentageOfNodesToScoreNegative := validConfig.DeepCopy()
+	percentageOfNodesToScoreNegative.PercentageOfNodesToScore = pointer.Int32(-1)
 
 	schedulerNameNotSet := validConfig.DeepCopy()
 	schedulerNameNotSet.Profiles[1].SchedulerName = ""
 
 	repeatedSchedulerName := validConfig.DeepCopy()
 	repeatedSchedulerName.Profiles[0].SchedulerName = "other"
+
+	profilePercentageOfNodesToScore101 := validConfig.DeepCopy()
+	profilePercentageOfNodesToScore101.Profiles[1].PercentageOfNodesToScore = pointer.Int32(101)
+
+	profilePercentageOfNodesToScoreNegative := validConfig.DeepCopy()
+	profilePercentageOfNodesToScoreNegative.Profiles[1].PercentageOfNodesToScore = pointer.Int32(-1)
 
 	differentQueueSort := validConfig.DeepCopy()
 	differentQueueSort.Profiles[1].Plugins.QueueSort.Enabled[0].Name = "AnotherSort"
@@ -237,9 +247,14 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 			config:         healthzBindAddrInvalid,
 			errorString:    "must be empty or with an explicit 0 port",
 		},
-		"bad-percentage-of-nodes-to-score": {
+		"greater-than-100-percentage-of-nodes-to-score": {
 			expectedToFail: true,
 			config:         percentageOfNodesToScore101,
+			errorString:    "not in valid range [0-100]",
+		},
+		"negative-percentage-of-nodes-to-score": {
+			expectedToFail: true,
+			config:         percentageOfNodesToScoreNegative,
 			errorString:    "not in valid range [0-100]",
 		},
 		"scheduler-name-not-set": {
@@ -251,6 +266,16 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 			expectedToFail: true,
 			config:         repeatedSchedulerName,
 			errorString:    "Duplicate value",
+		},
+		"greater-than-100-profile-percentage-of-nodes-to-score": {
+			expectedToFail: true,
+			config:         profilePercentageOfNodesToScore101,
+			errorString:    "not in valid range [0-100]",
+		},
+		"negative-100-profile-percentage-of-nodes-to-score": {
+			expectedToFail: true,
+			config:         profilePercentageOfNodesToScoreNegative,
+			errorString:    "not in valid range [0-100]",
 		},
 		"different-queue-sort": {
 			expectedToFail: true,
@@ -345,7 +370,7 @@ func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
 		},
 		PodInitialBackoffSeconds: podInitialBackoffSeconds,
 		PodMaxBackoffSeconds:     podMaxBackoffSeconds,
-		PercentageOfNodesToScore: 35,
+		PercentageOfNodesToScore: pointer.Int32(35),
 		Profiles: []config.KubeSchedulerProfile{
 			{
 				SchedulerName: "me",
@@ -404,13 +429,22 @@ func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
 	healthzBindAddrInvalid.HealthzBindAddress = "0.0.0.0:9090"
 
 	percentageOfNodesToScore101 := validConfig.DeepCopy()
-	percentageOfNodesToScore101.PercentageOfNodesToScore = int32(101)
+	percentageOfNodesToScore101.PercentageOfNodesToScore = pointer.Int32(101)
+
+	percentageOfNodesToScoreNegative := validConfig.DeepCopy()
+	percentageOfNodesToScoreNegative.Profiles[1].PercentageOfNodesToScore = pointer.Int32(-1)
 
 	schedulerNameNotSet := validConfig.DeepCopy()
 	schedulerNameNotSet.Profiles[1].SchedulerName = ""
 
 	repeatedSchedulerName := validConfig.DeepCopy()
 	repeatedSchedulerName.Profiles[0].SchedulerName = "other"
+
+	profilePercentageOfNodesToScore101 := validConfig.DeepCopy()
+	profilePercentageOfNodesToScore101.Profiles[1].PercentageOfNodesToScore = pointer.Int32(101)
+
+	profilePercentageOfNodesToScoreNegative := validConfig.DeepCopy()
+	profilePercentageOfNodesToScoreNegative.Profiles[1].PercentageOfNodesToScore = pointer.Int32(-1)
 
 	differentQueueSort := validConfig.DeepCopy()
 	differentQueueSort.Profiles[1].Plugins.QueueSort.Enabled[0].Name = "AnotherSort"
@@ -533,6 +567,11 @@ func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
 			config:         percentageOfNodesToScore101,
 			errorString:    "not in valid range [0-100]",
 		},
+		"negative-percentage-of-nodes-to-score": {
+			expectedToFail: true,
+			config:         percentageOfNodesToScoreNegative,
+			errorString:    "not in valid range [0-100]",
+		},
 		"scheduler-name-not-set": {
 			expectedToFail: true,
 			config:         schedulerNameNotSet,
@@ -542,6 +581,16 @@ func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
 			expectedToFail: true,
 			config:         repeatedSchedulerName,
 			errorString:    "Duplicate value",
+		},
+		"greater-than-100-profile-percentage-of-nodes-to-score": {
+			expectedToFail: true,
+			config:         profilePercentageOfNodesToScore101,
+			errorString:    "not in valid range [0-100]",
+		},
+		"negative-100-profile-percentage-of-nodes-to-score": {
+			expectedToFail: true,
+			config:         profilePercentageOfNodesToScoreNegative,
+			errorString:    "not in valid range [0-100]",
 		},
 		"different-queue-sort": {
 			expectedToFail: true,
@@ -636,10 +685,10 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 		},
 		PodInitialBackoffSeconds: podInitialBackoffSeconds,
 		PodMaxBackoffSeconds:     podMaxBackoffSeconds,
-		PercentageOfNodesToScore: 35,
 		Profiles: []config.KubeSchedulerProfile{
 			{
-				SchedulerName: "me",
+				SchedulerName:            "me",
+				PercentageOfNodesToScore: pointer.Int32(35),
 				Plugins: &config.Plugins{
 					QueueSort: config.PluginSet{
 						Enabled: []config.Plugin{{Name: "CustomSort"}},
@@ -656,7 +705,8 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 				},
 			},
 			{
-				SchedulerName: "other",
+				SchedulerName:            "other",
+				PercentageOfNodesToScore: pointer.Int32(35),
 				Plugins: &config.Plugins{
 					QueueSort: config.PluginSet{
 						Enabled: []config.Plugin{{Name: "CustomSort"}},
@@ -695,13 +745,22 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 	healthzBindAddrInvalid.HealthzBindAddress = "0.0.0.0:9090"
 
 	percentageOfNodesToScore101 := validConfig.DeepCopy()
-	percentageOfNodesToScore101.PercentageOfNodesToScore = int32(101)
+	percentageOfNodesToScore101.PercentageOfNodesToScore = pointer.Int32(101)
+
+	percentageOfNodesToScoreNegative := validConfig.DeepCopy()
+	percentageOfNodesToScoreNegative.PercentageOfNodesToScore = pointer.Int32(-1)
 
 	schedulerNameNotSet := validConfig.DeepCopy()
 	schedulerNameNotSet.Profiles[1].SchedulerName = ""
 
 	repeatedSchedulerName := validConfig.DeepCopy()
 	repeatedSchedulerName.Profiles[0].SchedulerName = "other"
+
+	profilePercentageOfNodesToScore101 := validConfig.DeepCopy()
+	profilePercentageOfNodesToScore101.Profiles[1].PercentageOfNodesToScore = pointer.Int32(101)
+
+	profilePercentageOfNodesToScoreNegative := validConfig.DeepCopy()
+	profilePercentageOfNodesToScoreNegative.Profiles[1].PercentageOfNodesToScore = pointer.Int32(-1)
 
 	differentQueueSort := validConfig.DeepCopy()
 	differentQueueSort.Profiles[1].Plugins.QueueSort.Enabled[0].Name = "AnotherSort"
@@ -827,6 +886,11 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 			config:         percentageOfNodesToScore101,
 			errorString:    "not in valid range [0-100]",
 		},
+		"negative-percentage-of-nodes-to-score": {
+			expectedToFail: true,
+			config:         percentageOfNodesToScoreNegative,
+			errorString:    "not in valid range [0-100]",
+		},
 		"scheduler-name-not-set": {
 			expectedToFail: true,
 			config:         schedulerNameNotSet,
@@ -836,6 +900,16 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 			expectedToFail: true,
 			config:         repeatedSchedulerName,
 			errorString:    "Duplicate value",
+		},
+		"greater-than-100-profile-percentage-of-nodes-to-score": {
+			expectedToFail: true,
+			config:         profilePercentageOfNodesToScore101,
+			errorString:    "not in valid range [0-100]",
+		},
+		"negative-profile-percentage-of-nodes-to-score": {
+			expectedToFail: true,
+			config:         profilePercentageOfNodesToScoreNegative,
+			errorString:    "not in valid range [0-100]",
 		},
 		"different-queue-sort": {
 			expectedToFail: true,

@@ -104,8 +104,9 @@ func (s *Scheduler) applyDefaultHandlers() {
 }
 
 type schedulerOptions struct {
-	componentConfigVersion            string
-	kubeConfig                        *restclient.Config
+	componentConfigVersion string
+	kubeConfig             *restclient.Config
+	// Overridden by profile level percentageOfNodesToScore if set in v1.
 	percentageOfNodesToScore          int32
 	podInitialBackoffSeconds          int64
 	podMaxBackoffSeconds              int64
@@ -166,10 +167,13 @@ func WithParallelism(threads int32) Option {
 	}
 }
 
-// WithPercentageOfNodesToScore sets percentageOfNodesToScore for Scheduler, the default value is 50
-func WithPercentageOfNodesToScore(percentageOfNodesToScore int32) Option {
+// WithPercentageOfNodesToScore sets percentageOfNodesToScore for Scheduler.
+// The default value of 0 will use an adaptive percentage: 50 - (num of nodes)/125.
+func WithPercentageOfNodesToScore(percentageOfNodesToScore *int32) Option {
 	return func(o *schedulerOptions) {
-		o.percentageOfNodesToScore = percentageOfNodesToScore
+		if percentageOfNodesToScore != nil {
+			o.percentageOfNodesToScore = *percentageOfNodesToScore
+		}
 	}
 }
 
