@@ -403,7 +403,9 @@ func WaitTimeoutForPodRunningInNamespace(c clientset.Interface, podName, namespa
 		switch pod.Status.Phase {
 		case v1.PodRunning:
 			return true, nil
-		case v1.PodFailed, v1.PodSucceeded:
+		case v1.PodFailed:
+			return false, errPodFailed
+		case v1.PodSucceeded:
 			return false, errPodCompleted
 		}
 		return false, nil
@@ -441,7 +443,10 @@ func WaitForPodNoLongerRunningInNamespace(c clientset.Interface, podName, namesp
 func WaitTimeoutForPodReadyInNamespace(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
 	return WaitForPodCondition(c, namespace, podName, "running and ready", timeout, func(pod *v1.Pod) (bool, error) {
 		switch pod.Status.Phase {
-		case v1.PodFailed, v1.PodSucceeded:
+		case v1.PodFailed:
+			e2elog.Logf("The phase of Pod %s is %s which is unexpected, pod status: %#v", pod.Name, pod.Status.Phase, pod.Status)
+			return false, errPodFailed
+		case v1.PodSucceeded:
 			e2elog.Logf("The phase of Pod %s is %s which is unexpected, pod status: %#v", pod.Name, pod.Status.Phase, pod.Status)
 			return false, errPodCompleted
 		case v1.PodRunning:
