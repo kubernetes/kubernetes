@@ -253,7 +253,7 @@ func (rl *respLogger) Log() {
 		// which can be modified in another goroutine when apiserver request times out.
 		// For example authentication filter modifies request's headers,
 		// This can cause apiserver to crash with unrecoverable fatal error.
-		// More info about concurrent read and write for maps: https://golang.org/doc/go1.6#runtime
+		// More info about concurrent read and write for maps: https://go.dev/doc/go1.6#runtime
 		"userAgent", rl.userAgent,
 		"audit-ID", auditID,
 		"srcIP", rl.req.RemoteAddr,

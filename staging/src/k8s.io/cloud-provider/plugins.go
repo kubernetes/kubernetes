@@ -159,7 +159,7 @@ func InitCloudProvider(name string, configFilePath string) (Interface, error) {
 		cloud, err = GetCloudProvider(name, config)
 	} else {
 		// Pass explicit nil so plugins can actually check for nil. See
-		// "Why is my nil error value not equal to nil?" in golang.org/doc/faq.
+		// "Why is my nil error value not equal to nil?" in go.dev/doc/faq.
 		cloud, err = GetCloudProvider(name, nil)
 	}
 
