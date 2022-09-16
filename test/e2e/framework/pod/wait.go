@@ -81,6 +81,39 @@ func TimeoutError(msg string, observedObjects ...interface{}) *timeoutError {
 	}
 }
 
+// FinalError constructs an error that indicates to a poll function that
+// polling can be stopped immediately because some permanent error has been
+// encountered that is not going to go away.
+//
+// TODO (@pohly): move this into framework once the refactoring from
+// https://github.com/kubernetes/kubernetes/pull/112043 allows it. Right now it
+// leads to circular dependencies.
+func FinalError(err error) error {
+	return &FinalErr{Err: err}
+}
+
+type FinalErr struct {
+	Err error
+}
+
+func (err *FinalErr) Error() string {
+	if err.Err != nil {
+		return fmt.Sprintf("final error: %s", err.Err.Error())
+	}
+	return "final error, exact problem unknown"
+}
+
+func (err *FinalErr) Unwrap() error {
+	return err.Err
+}
+
+// IsFinal checks whether the error was marked as final by wrapping some error
+// with FinalError.
+func IsFinal(err error) bool {
+	var finalErr *FinalErr
+	return errors.As(err, &finalErr)
+}
+
 // maybeTimeoutError returns a TimeoutError if err is a timeout. Otherwise, wrap err.
 // taskFormat and taskArgs should be the task being performed when the error occurred,
 // e.g. "waiting for pod to be running".
@@ -244,6 +277,8 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 }
 
 // WaitForPodCondition waits a pods to be matched to the given condition.
+// If the condition callback returns an error that matches FinalErr (checked with IsFinal),
+// then polling aborts early.
 func WaitForPodCondition(c clientset.Interface, ns, podName, conditionDesc string, timeout time.Duration, condition podCondition) error {
 	e2elog.Logf("Waiting up to %v for pod %q in namespace %q to be %q", timeout, podName, ns, conditionDesc)
 	var (
@@ -268,8 +303,10 @@ func WaitForPodCondition(c clientset.Interface, ns, podName, conditionDesc strin
 			}
 			return true, err
 		} else if err != nil {
-			// TODO(#109732): stop polling and return the error in this case.
 			e2elog.Logf("Error evaluating pod condition %s: %v", conditionDesc, err)
+			if IsFinal(err) {
+				return false, err
+			}
 		}
 		return false, nil
 	})
