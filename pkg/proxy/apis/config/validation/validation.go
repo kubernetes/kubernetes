@@ -42,7 +42,7 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 
 	effectiveFeatures := utilfeature.DefaultFeatureGate.DeepCopy()
 	if err := effectiveFeatures.SetFromMap(config.FeatureGates); err != nil {
-		allErrs = append(allErrs, field.Invalid(newPath.Child("featureGates"), config.FeatureGates, err.Error()))
+		allErrs = append(allErrs, field.Invalid(newPath.Child("FeatureGates"), config.FeatureGates, err.Error()))
 	}
 
 	allErrs = append(allErrs, validateKubeProxyIPTablesConfiguration(config.IPTables, newPath.Child("KubeProxyIPTablesConfiguration"))...)
