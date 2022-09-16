@@ -61,7 +61,6 @@ export KUBE_OUTPUT_HOSTBIN
 
 # list of all available group versions.  This should be used when generated code
 # or when starting an API server that you want to have everything.
-# most preferred version for a group should appear first
 KUBE_AVAILABLE_GROUP_VERSIONS="${KUBE_AVAILABLE_GROUP_VERSIONS:-\
 v1 \
 admissionregistration.k8s.io/v1 \
