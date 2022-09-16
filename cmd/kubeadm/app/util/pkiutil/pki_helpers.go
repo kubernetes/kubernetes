@@ -348,7 +348,7 @@ func TryLoadCSRAndKeyFromDisk(pkiPath, name string) (*x509.CertificateRequest, c
 }
 
 // TryLoadPrivatePublicKeyFromDisk tries to load the key from the disk and validates that it is valid
-func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, *rsa.PublicKey, error) {
+func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (crypto.PrivateKey, crypto.PublicKey, error) {
 	privateKeyPath := pathForKey(pkiPath, name)
 
 	// Parse the private key from a file
@@ -365,15 +365,15 @@ func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, *rs
 		return nil, nil, errors.Wrapf(err, "couldn't load the public key file %s", publicKeyPath)
 	}
 
-	// Allow RSA format only
-	k, ok := privKey.(*rsa.PrivateKey)
-	if !ok {
-		return nil, nil, errors.Errorf("the private key file %s isn't in RSA format", privateKeyPath)
+	// Allow RSA and ECDSA formats only
+	switch k := privKey.(type) {
+	case *rsa.PrivateKey:
+		return k, pubKeys[0].(*rsa.PublicKey), nil
+	case *ecdsa.PrivateKey:
+		return k, pubKeys[0].(*ecdsa.PublicKey), nil
+	default:
+		return nil, nil, errors.Errorf("the private key file %s is neither in RSA nor ECDSA format", privateKeyPath)
 	}
-
-	p := pubKeys[0].(*rsa.PublicKey)
-
-	return k, p, nil
 }
 
 // TryLoadCSRFromDisk tries to load the CSR from the disk
