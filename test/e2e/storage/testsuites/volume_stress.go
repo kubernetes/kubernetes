@@ -225,7 +225,7 @@ func (t *volumeStressTestSuite) DefineTests(driver storageframework.TestDriver, 
 							framework.Failf("Failed to wait for pod-%v [%+v] turn into running status. Error: %v", podIndex, pod, err)
 						}
 
-						// TODO: write data per pod and validate it everytime
+						// TODO: write data per pod and validate it every time
 
 						err = e2epod.DeletePodWithWait(f.ClientSet, pod)
 						if err != nil {

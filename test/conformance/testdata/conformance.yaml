@@ -826,7 +826,7 @@
   file: test/e2e/apps/job.go
 - testname: Jobs, active pods, graceful termination
   codename: '[sig-apps] Job should delete a job [Conformance]'
-  description: Create a job. Ensure the active pods reflect paralellism in the namespace
+  description: Create a job. Ensure the active pods reflect parallelism in the namespace
     and delete the job. Job MUST be deleted successfully.
   release: v1.15
   file: test/e2e/apps/job.go
@@ -2165,7 +2165,7 @@
     killed and restarted incrementing restart count to 1. The liveness probe must
     fail again after restart once the http handler for /healthz enpoind on the Pod
     returns an http error after 10 seconds from the start. Restart counts MUST increment
-    everytime health check fails, measure upto 5 restart.
+    every time health check fails, measure up to 5 restart.
   release: v1.9
   file: test/e2e/common/node/container_probe.go
 - testname: Pod readiness probe, with initial delay
@@ -2680,9 +2680,9 @@
   codename: '[sig-storage] EmptyDir volumes pod should support shared volumes between
     containers [Conformance]'
   description: A Pod created with an 'emptyDir' Volume, should share volumes between
-    the containeres in the pod. The two busybox image containers shoud share the volumes
-    mounted to the pod. The main container shoud wait until the sub container drops
-    a file, and main container acess the shared data.
+    the containeres in the pod. The two busybox image containers should share the
+    volumes mounted to the pod. The main container should wait until the sub container
+    drops a file, and main container access the shared data.
   release: v1.15
   file: test/e2e/common/storage/empty_dir.go
 - testname: EmptyDir, medium default, volume mode 0644

@@ -162,7 +162,7 @@ func NewFramework(baseName string, options Options, client clientset.Interface) 
 
 // BeforeEach gets a client and makes a namespace.
 func (f *Framework) BeforeEach() {
-	// DeferCleanup, in constrast to AfterEach, triggers execution in
+	// DeferCleanup, in contrast to AfterEach, triggers execution in
 	// first-in-last-out order. This ensures that the framework instance
 	// remains valid as long as possible.
 	//

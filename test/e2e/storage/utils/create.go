@@ -316,7 +316,7 @@ func patchItemRecursively(f *framework.Framework, driverNamespace *v1.Namespace,
 	case *rbacv1.RoleRef:
 		// TODO: avoid hard-coding this special name. Perhaps add a Framework.PredefinedRoles
 		// which contains all role names that are defined cluster-wide before the test starts?
-		// All those names are excempt from renaming. That list could be populated by querying
+		// All those names are exempt from renaming. That list could be populated by querying
 		// and get extended by tests.
 		if item.Name != "e2e-test-privileged-psp" {
 			PatchName(f, &item.Name)

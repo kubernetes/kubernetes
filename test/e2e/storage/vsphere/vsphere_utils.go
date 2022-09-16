@@ -306,7 +306,7 @@ func getVSpherePodSpecWithClaim(claimName string, nodeSelectorKV map[string]stri
 	return pod
 }
 
-// func to get pod spec with given volume paths, node selector lables and container commands
+// func to get pod spec with given volume paths, node selector labels and container commands
 func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[string]string, commands []string) *v1.Pod {
 	var volumeMounts []v1.VolumeMount
 	var volumes []v1.Volume
@@ -613,7 +613,7 @@ func getVMXFilePath(vmObject *object.VirtualMachine) (vmxPath string) {
 	return vmxPath
 }
 
-// verify ready node count. Try upto 3 minutes. Return true if count is expected count
+// verify ready node count. Try up to 3 minutes. Return true if count is expected count
 func verifyReadyNodeCount(client clientset.Interface, expectedNodes int) bool {
 	numNodes := 0
 	for i := 0; i < 36; i++ {

@@ -433,7 +433,7 @@ var _ = SIGDescribe("Secrets", func() {
 	})
 
 	// The secret is in pending during volume creation until the secret objects are available
-	// or until mount the secret volume times out. There is no secret object defined for the pod, so it should return timout exception unless it is marked optional.
+	// or until mount the secret volume times out. There is no secret object defined for the pod, so it should return timeout exception unless it is marked optional.
 	// Slow (~5 mins)
 	ginkgo.It("Should fail non-optional pod creation due to secret object does not exist [Slow]", func() {
 		volumeMountPath := "/etc/secret-volumes"

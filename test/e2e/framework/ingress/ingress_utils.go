@@ -796,7 +796,7 @@ func (j *TestJig) WaitForIngressToStable() {
 		}
 		return true, nil
 	}); err != nil {
-		framework.Failf("error in waiting for ingress to stablize: %v", err)
+		framework.Failf("error in waiting for ingress to stabilize: %v", err)
 	}
 }
 

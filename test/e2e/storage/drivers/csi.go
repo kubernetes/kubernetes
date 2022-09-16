@@ -394,7 +394,7 @@ func (c *MockCSICalls) Get() []MockCSICall {
 	return c.calls[:]
 }
 
-// Add appens one new call at the end.
+// Add appends one new call at the end.
 func (c *MockCSICalls) Add(call MockCSICall) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
