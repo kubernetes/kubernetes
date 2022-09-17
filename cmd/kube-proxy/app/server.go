@@ -19,6 +19,7 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	goflag "flag"
 	"fmt"
 	"net"
@@ -88,7 +89,7 @@ import (
 
 // proxyRun defines the interface to run a specified ProxyServer
 type proxyRun interface {
-	Run() error
+	Run(context.Context) error
 }
 
 // Options contains everything necessary to create and run a proxy server.
@@ -302,6 +303,9 @@ func (o *Options) Run() error {
 		return o.writeConfigFile()
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	if o.CleanupAndExit {
 		return cleanupAndExit()
 	}
@@ -312,19 +316,19 @@ func (o *Options) Run() error {
 	}
 
 	o.proxyServer = proxyServer
-	return o.runLoop()
+	return o.runLoop(ctx)
 }
 
 // runLoop will watch on the update change of the proxy server's configuration file.
 // Return an error when updated
-func (o *Options) runLoop() error {
+func (o *Options) runLoop(ctx context.Context) error {
 	if o.watcher != nil {
 		o.watcher.Run()
 	}
 
 	// run the proxy in goroutine
 	go func() {
-		err := o.proxyServer.Run()
+		err := o.proxyServer.Run(ctx)
 		o.errCh <- err
 	}()
 
@@ -582,32 +586,36 @@ func createClients(config componentbaseconfig.ClientConnectionConfiguration, mas
 	return client, eventClient.CoreV1(), nil
 }
 
-func serveHealthz(hz healthcheck.ProxierHealthUpdater, errCh chan error) {
+func serveHealthz(ctx context.Context, hz healthcheck.ProxierHealthUpdater, errCh chan error) {
 	if hz == nil {
 		return
 	}
 
-	fn := func() {
+	serveCtx, cancel := context.WithCancel(ctx)
+
+	fn := func(ctx context.Context) {
 		err := hz.Run()
 		if err != nil {
 			klog.ErrorS(err, "Healthz server failed")
 			if errCh != nil {
 				errCh <- fmt.Errorf("healthz server failed: %v", err)
 				// if in hardfail mode, never retry again
-				blockCh := make(chan error)
-				<-blockCh
+				cancel()
 			}
 		} else {
 			klog.ErrorS(nil, "Healthz server returned without error")
 		}
 	}
-	go wait.Until(fn, 5*time.Second, wait.NeverStop)
+
+	go wait.UntilWithContext(serveCtx, fn, 5*time.Second)
 }
 
-func serveMetrics(bindAddress string, proxyMode kubeproxyconfig.ProxyMode, enableProfiling bool, errCh chan error) {
+func serveMetrics(ctx context.Context, bindAddress string, proxyMode kubeproxyconfig.ProxyMode, enableProfiling bool, errCh chan error) {
 	if len(bindAddress) == 0 {
 		return
 	}
+
+	serveCtx, cancel := context.WithCancel(ctx)
 
 	proxyMux := mux.NewPathRecorderMux("kube-proxy")
 	healthz.InstallHandler(proxyMux)
@@ -626,7 +634,7 @@ func serveMetrics(bindAddress string, proxyMode kubeproxyconfig.ProxyMode, enabl
 
 	configz.InstallHandler(proxyMux)
 
-	fn := func() {
+	fn := func(ctx context.Context) {
 		err := http.ListenAndServe(bindAddress, proxyMux)
 		if err != nil {
 			err = fmt.Errorf("starting metrics server failed: %v", err)
@@ -634,20 +642,19 @@ func serveMetrics(bindAddress string, proxyMode kubeproxyconfig.ProxyMode, enabl
 			if errCh != nil {
 				errCh <- err
 				// if in hardfail mode, never retry again
-				blockCh := make(chan error)
-				<-blockCh
+				cancel()
 			}
 		}
 	}
-	go wait.Until(fn, 5*time.Second, wait.NeverStop)
+
+	go wait.UntilWithContext(serveCtx, fn, 5*time.Second)
 }
 
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
 // TODO: At the moment, Run() cannot return a nil error, otherwise it's caller will never exit. Update callers of Run to handle nil errors.
-func (s *ProxyServer) Run() error {
+func (s *ProxyServer) Run(ctx context.Context) error {
 	// To help debugging, immediately log version
 	klog.InfoS("Version info", "version", version.Get())
-
 	klog.InfoS("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
 
 	// TODO(vmarmol): Use container config for this.
@@ -672,10 +679,10 @@ func (s *ProxyServer) Run() error {
 	}
 
 	// Start up a healthz server if requested
-	serveHealthz(s.HealthzServer, errCh)
+	serveHealthz(ctx, s.HealthzServer, errCh)
 
 	// Start up a metrics server if requested
-	serveMetrics(s.MetricsBindAddress, s.ProxyMode, s.EnableProfiling, errCh)
+	serveMetrics(ctx, s.MetricsBindAddress, s.ProxyMode, s.EnableProfiling, errCh)
 
 	// Tune conntrack, if requested
 	// Conntracker is always nil for windows
