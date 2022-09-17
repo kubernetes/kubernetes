@@ -52,7 +52,7 @@ func FindPort(pod *v1.Pod, svcPort *v1.ServicePort) (int, error) {
 type ContainerType int
 
 const (
-	// Containers are for normal containers
+	// Containers is for normal containers
 	Containers ContainerType = 1 << iota
 	// InitContainers is for init containers
 	InitContainers
