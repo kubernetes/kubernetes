@@ -112,7 +112,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		EnableLogsHandler:                 true,
 		EventTTL:                          1 * time.Hour,
 		MasterCount:                       1,
-		EndpointReconcilerType:            string(reconcilers.LeaseEndpointReconcilerType),
+		EndpointReconcilerType:            reconcilers.LeaseEndpointReconcilerType,
 		IdentityLeaseDurationSeconds:      3600,
 		IdentityLeaseRenewIntervalSeconds: 10,
 		KubeletConfig: kubeletclient.KubeletClientConfig{
@@ -180,7 +180,7 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 		"The number of apiservers running in the cluster, must be a positive number. (In use when --endpoint-reconciler-type=master-count is enabled.)")
 	fs.MarkDeprecated("apiserver-count", "apiserver-count is deprecated and will be removed in a future version.")
 
-	fs.StringVar(&s.EndpointReconcilerType, "endpoint-reconciler-type", string(s.EndpointReconcilerType),
+	fs.StringVar(&s.EndpointReconcilerType, "endpoint-reconciler-type", s.EndpointReconcilerType,
 		"Use an endpoint reconciler ("+strings.Join(reconcilers.AllTypes.Names(), ", ")+") master-count is deprecated, and will be removed in a future version.")
 
 	fs.IntVar(&s.IdentityLeaseDurationSeconds, "identity-lease-duration-seconds", s.IdentityLeaseDurationSeconds,
