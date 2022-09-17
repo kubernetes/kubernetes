@@ -108,7 +108,7 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, t
 		logReduction: logreduction.NewLogReduction(identicalErrorDelay),
 	}
 
-	if err := service.determineAPIVersion(conn); err != nil {
+	if err := service.determineAPIVersion(conn, endpoint); err != nil {
 		return nil, err
 	}
 
@@ -128,7 +128,7 @@ func (r *remoteRuntimeService) useV1API() bool {
 // being upgraded, then the container runtime must also support the initially
 // selected version or the redial is expected to fail, which requires a restart
 // of kubelet.
-func (r *remoteRuntimeService) determineAPIVersion(conn *grpc.ClientConn) error {
+func (r *remoteRuntimeService) determineAPIVersion(conn *grpc.ClientConn, endpoint string) error {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -143,7 +143,7 @@ func (r *remoteRuntimeService) determineAPIVersion(conn *grpc.ClientConn) error 
 		r.runtimeClientV1alpha2 = runtimeapiV1alpha2.NewRuntimeServiceClient(conn)
 
 	} else {
-		return fmt.Errorf("unable to determine runtime API version: %w", err)
+		return fmt.Errorf("unable to determine runtime API version with %q, or API is not implemented: %w", endpoint, err)
 	}
 
 	return nil
