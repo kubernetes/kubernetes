@@ -95,8 +95,18 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {
 // generated in this directory, and cluster logs will also be saved.
 // This function is called on each Ginkgo node in parallel mode.
 func RunE2ETests(t *testing.T) {
+	// InitLogs disables contextual logging, without a way to enable it again
+	// in the E2E test suite because it has no feature gates. It used to have a
+	// misleading --feature-gates parameter but that didn't do what users
+	// and developers expected (define which features the cluster supports)
+	// and therefore got removed.
+	//
+	// Because contextual logging is useful and should get tested, it gets
+	// re-enabled here unconditionally.
 	logs.InitLogs()
 	defer logs.FlushLogs()
+	klog.EnableContextualLogging(true)
+
 	progressReporter = e2ereporters.NewProgressReporter(framework.TestContext.ProgressReportURL)
 	gomega.RegisterFailHandler(framework.Fail)
 
