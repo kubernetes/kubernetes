@@ -32,8 +32,10 @@ import (
 // The input object is assumed to be in the internal version of an API and is converted
 // to the given version first.
 // If PrintObj() is called multiple times, objects are separated with a '---' separator.
+
+var printCount int64
+
 type YAMLPrinter struct {
-	printCount int64
 }
 
 // PrintObj prints the data as YAML.
@@ -45,8 +47,8 @@ func (p *YAMLPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		return fmt.Errorf(InternalObjectPrinterErr)
 	}
 
-	count := atomic.AddInt64(&p.printCount, 1)
-	if count > 1 {
+	atomic.AddInt64(&printCount, 1)
+	if printCount > 1 {
 		if _, err := w.Write([]byte("---\n")); err != nil {
 			return err
 		}
