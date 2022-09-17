@@ -710,6 +710,7 @@ func TestRejectForwardingRedirectsOption(t *testing.T) {
 		name                      string
 		rejectForwardingRedirects bool
 		serverStatusCode          int
+		redirect                  string
 		expectStatusCode          int
 		expectBody                []byte
 	}{
@@ -724,8 +725,24 @@ func TestRejectForwardingRedirectsOption(t *testing.T) {
 			name:                      "reject redirection enabled in proxy, backend server sending 301 response",
 			rejectForwardingRedirects: true,
 			serverStatusCode:          301,
+			redirect:                  "/",
 			expectStatusCode:          502,
 			expectBody:                []byte(`the backend attempted to redirect this request, which is not permitted`),
+		},
+		{
+			name:                      "reject redirection enabled in proxy, backend server sending 304 response with a location header",
+			rejectForwardingRedirects: true,
+			serverStatusCode:          304,
+			redirect:                  "/",
+			expectStatusCode:          502,
+			expectBody:                []byte(`the backend attempted to redirect this request, which is not permitted`),
+		},
+		{
+			name:                      "reject redirection enabled in proxy, backend server sending 304 response with no location header",
+			rejectForwardingRedirects: true,
+			serverStatusCode:          304,
+			expectStatusCode:          304,
+			expectBody:                []byte{}, // client doesn't read the body for 304 responses
 		},
 		{
 			name:                      "reject redirection disabled in proxy, backend server sending 200 response",
@@ -738,6 +755,7 @@ func TestRejectForwardingRedirectsOption(t *testing.T) {
 			name:                      "reject redirection disabled in proxy, backend server sending 301 response",
 			rejectForwardingRedirects: false,
 			serverStatusCode:          301,
+			redirect:                  "/",
 			expectStatusCode:          301,
 			expectBody:                originalBody,
 		},
@@ -746,6 +764,9 @@ func TestRejectForwardingRedirectsOption(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Set up a backend server
 			backendServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if tc.redirect != "" {
+					w.Header().Set("Location", tc.redirect)
+				}
 				w.WriteHeader(tc.serverStatusCode)
 				w.Write(originalBody)
 			}))
