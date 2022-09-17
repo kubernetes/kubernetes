@@ -97,6 +97,12 @@ func (g *GeneratorArgs) WithoutDefaultFlagParsing() *GeneratorArgs {
 	return g
 }
 
+// Simpler:
+//   inputs are real arguments, not flags, can be pkgs or dirs
+//   --output-dir is a semi-custom (genericArgs.EnableOutputDir())
+//   otherwise input is assumed to be decided by the tool, usually same as input
+//     maybe that is a tool.Get OutDir() method
+//   drop output-package?  or treat it the same way
 func (g *GeneratorArgs) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVarP(&g.InputDirs, "input-dirs", "i", g.InputDirs, "Comma-separated list of import paths to get input types from.")
 	fs.StringVarP(&g.OutputBase, "output-base", "o", g.OutputBase, "Output base; defaults to current dir.")
