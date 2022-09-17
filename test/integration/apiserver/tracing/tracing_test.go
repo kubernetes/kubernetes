@@ -107,7 +107,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 
 func containsNodeListSpan(req *traceservice.ExportTraceServiceRequest) bool {
 	for _, resourceSpans := range req.GetResourceSpans() {
-		for _, instrumentationSpans := range resourceSpans.GetInstrumentationLibrarySpans() {
+		for _, instrumentationSpans := range resourceSpans.GetScopeSpans() {
 			for _, span := range instrumentationSpans.GetSpans() {
 				if span.Name != "KubernetesAPI" {
 					continue
