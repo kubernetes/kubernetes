@@ -263,7 +263,7 @@ func (h *UpgradeAwareHandler) ServeHTTP(w http.ResponseWriter, req *http.Request
 		oldModifyResponse := proxy.ModifyResponse
 		proxy.ModifyResponse = func(response *http.Response) error {
 			code := response.StatusCode
-			if code >= 300 && code <= 399 {
+			if code >= 300 && code <= 399 && len(response.Header.Get("Location")) > 0 {
 				// close the original response
 				response.Body.Close()
 				msg := "the backend attempted to redirect this request, which is not permitted"
