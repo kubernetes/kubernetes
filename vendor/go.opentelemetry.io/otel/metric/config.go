@@ -14,85 +14,26 @@
 
 package metric // import "go.opentelemetry.io/otel/metric"
 
-import (
-	"go.opentelemetry.io/otel/unit"
-)
-
-// InstrumentConfig contains options for metric instrument descriptors.
-type InstrumentConfig struct {
-	// Description describes the instrument in human-readable terms.
-	Description string
-	// Unit describes the measurement unit for a instrument.
-	Unit unit.Unit
-	// InstrumentationName is the name of the library providing
-	// instrumentation.
-	InstrumentationName string
-	// InstrumentationVersion is the version of the library providing
-	// instrumentation.
-	InstrumentationVersion string
-}
-
-// InstrumentOption is an interface for applying metric instrument options.
-type InstrumentOption interface {
-	// ApplyMeter is used to set a InstrumentOption value of a
-	// InstrumentConfig.
-	ApplyInstrument(*InstrumentConfig)
-}
-
-// NewInstrumentConfig creates a new InstrumentConfig
-// and applies all the given options.
-func NewInstrumentConfig(opts ...InstrumentOption) InstrumentConfig {
-	var config InstrumentConfig
-	for _, o := range opts {
-		o.ApplyInstrument(&config)
-	}
-	return config
-}
-
-// WithDescription applies provided description.
-func WithDescription(desc string) InstrumentOption {
-	return descriptionOption(desc)
-}
-
-type descriptionOption string
-
-func (d descriptionOption) ApplyInstrument(config *InstrumentConfig) {
-	config.Description = string(d)
-}
-
-// WithUnit applies provided unit.
-func WithUnit(unit unit.Unit) InstrumentOption {
-	return unitOption(unit)
-}
-
-type unitOption unit.Unit
-
-func (u unitOption) ApplyInstrument(config *InstrumentConfig) {
-	config.Unit = unit.Unit(u)
-}
-
-// WithInstrumentationName sets the instrumentation name.
-func WithInstrumentationName(name string) InstrumentOption {
-	return instrumentationNameOption(name)
-}
-
-type instrumentationNameOption string
-
-func (i instrumentationNameOption) ApplyInstrument(config *InstrumentConfig) {
-	config.InstrumentationName = string(i)
-}
-
 // MeterConfig contains options for Meters.
 type MeterConfig struct {
-	// InstrumentationVersion is the version of the library providing
-	// instrumentation.
-	InstrumentationVersion string
+	instrumentationVersion string
+	schemaURL              string
+}
+
+// InstrumentationVersion is the version of the library providing instrumentation.
+func (cfg MeterConfig) InstrumentationVersion() string {
+	return cfg.instrumentationVersion
+}
+
+// SchemaURL is the schema_url of the library providing instrumentation.
+func (cfg MeterConfig) SchemaURL() string {
+	return cfg.schemaURL
 }
 
 // MeterOption is an interface for applying Meter options.
 type MeterOption interface {
-	// ApplyMeter is used to set a MeterOption value of a MeterConfig.
-	ApplyMeter(*MeterConfig)
+	// applyMeter is used to set a MeterOption value of a MeterConfig.
+	applyMeter(MeterConfig) MeterConfig
 }
 
 // NewMeterConfig creates a new MeterConfig and applies
@@ -100,29 +41,29 @@ type MeterOption interface {
 func NewMeterConfig(opts ...MeterOption) MeterConfig {
 	var config MeterConfig
 	for _, o := range opts {
-		o.ApplyMeter(&config)
+		config = o.applyMeter(config)
 	}
 	return config
 }
 
-// InstrumentationOption is an interface for applying instrumentation specific
-// options.
-type InstrumentationOption interface {
-	InstrumentOption
-	MeterOption
+type meterOptionFunc func(MeterConfig) MeterConfig
+
+func (fn meterOptionFunc) applyMeter(cfg MeterConfig) MeterConfig {
+	return fn(cfg)
 }
 
 // WithInstrumentationVersion sets the instrumentation version.
-func WithInstrumentationVersion(version string) InstrumentationOption {
-	return instrumentationVersionOption(version)
+func WithInstrumentationVersion(version string) MeterOption {
+	return meterOptionFunc(func(config MeterConfig) MeterConfig {
+		config.instrumentationVersion = version
+		return config
+	})
 }
 
-type instrumentationVersionOption string
-
-func (i instrumentationVersionOption) ApplyMeter(config *MeterConfig) {
-	config.InstrumentationVersion = string(i)
-}
-
-func (i instrumentationVersionOption) ApplyInstrument(config *InstrumentConfig) {
-	config.InstrumentationVersion = string(i)
+// WithSchemaURL sets the schema URL.
+func WithSchemaURL(schemaURL string) MeterOption {
+	return meterOptionFunc(func(config MeterConfig) MeterConfig {
+		config.schemaURL = schemaURL
+		return config
+	})
 }

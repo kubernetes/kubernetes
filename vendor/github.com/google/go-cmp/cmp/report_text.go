@@ -393,6 +393,7 @@ func (s diffStats) Append(ds diffStats) diffStats {
 // String prints a humanly-readable summary of coalesced records.
 //
 // Example:
+//
 //	diffStats{Name: "Field", NumIgnored: 5}.String() => "5 ignored fields"
 func (s diffStats) String() string {
 	var ss []string

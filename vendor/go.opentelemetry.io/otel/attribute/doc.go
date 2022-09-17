@@ -12,9 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// package attribute provides key and value attributes.
-//
-// This package is currently in a pre-GA phase. Backwards incompatible changes
-// may be introduced in subsequent minor version releases as we work to track
-// the evolving OpenTelemetry specification and user feedback.
+// Package attribute provides key and value attributes.
 package attribute // import "go.opentelemetry.io/otel/attribute"
