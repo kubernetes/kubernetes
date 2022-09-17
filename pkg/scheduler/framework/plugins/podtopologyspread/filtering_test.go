@@ -56,7 +56,7 @@ var (
 	fooSelector        = st.MakeLabelSelector().Exists("foo").Obj()
 	barSelector        = st.MakeLabelSelector().Exists("bar").Obj()
 
-	taints = []v1.Taint{{Key: v1.TaintNodeUnschedulable, Value: "", Effect: v1.TaintEffectPreferNoSchedule}}
+	taints = []v1.Taint{{Key: v1.TaintNodeUnschedulable, Value: "", Effect: v1.TaintEffectNoSchedule}}
 )
 
 func (p *criticalPaths) sort() {
