@@ -63,7 +63,7 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration) (in
 
 	service := &remoteImageService{timeout: connectionTimeout}
 
-	if err := service.determineAPIVersion(conn); err != nil {
+	if err := service.determineAPIVersion(conn, endpoint); err != nil {
 		return nil, err
 	}
 
@@ -84,7 +84,7 @@ func (r *remoteImageService) useV1API() bool {
 // being upgraded, then the container runtime must also support the initially
 // selected version or the redial is expected to fail, which requires a restart
 // of kubelet.
-func (r *remoteImageService) determineAPIVersion(conn *grpc.ClientConn) error {
+func (r *remoteImageService) determineAPIVersion(conn *grpc.ClientConn, endpoint string) error {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -99,7 +99,7 @@ func (r *remoteImageService) determineAPIVersion(conn *grpc.ClientConn) error {
 		r.imageClientV1alpha2 = runtimeapiV1alpha2.NewImageServiceClient(conn)
 
 	} else {
-		return fmt.Errorf("unable to determine image API version: %w", err)
+		return fmt.Errorf("unable to determine image API version with %q, or API is not implemented: %w", endpoint, err)
 	}
 
 	return nil
