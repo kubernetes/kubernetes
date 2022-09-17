@@ -236,7 +236,7 @@ func podToEndpointAddressForService(svc *v1.Service, pod *v1.Pod) (*v1.EndpointA
 			// this is *most probably* the case.
 
 			// if the family was incorrectly identified then this will be corrected once the
-			// the upgrade is completed (controller connects to api-server that correctly defaults services)
+			// upgrade is completed (controller connects to api-server that correctly defaults services)
 			if utilnet.IsIPv6String(pod.Status.PodIP) {
 				ipFamily = v1.IPv6Protocol
 			}
