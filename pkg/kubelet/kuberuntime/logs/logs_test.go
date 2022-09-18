@@ -19,16 +19,16 @@ package logs
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
-	apitesting "k8s.io/cri-api/pkg/apis/testing"
-	"k8s.io/utils/pointer"
 	"os"
 	"testing"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
+	apitesting "k8s.io/cri-api/pkg/apis/testing"
+	"k8s.io/utils/pointer"
+
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -72,7 +72,7 @@ func TestLogOptions(t *testing.T) {
 }
 
 func TestReadLogs(t *testing.T) {
-	file, err := ioutil.TempFile("", "TestFollowLogs")
+	file, err := os.CreateTemp("", "TestFollowLogs")
 	if err != nil {
 		t.Fatalf("unable to create temp file")
 	}
