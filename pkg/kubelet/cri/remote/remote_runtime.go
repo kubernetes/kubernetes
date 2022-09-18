@@ -141,6 +141,9 @@ func (r *remoteRuntimeService) determineAPIVersion(conn *grpc.ClientConn) error 
 	} else if status.Code(err) == codes.Unimplemented {
 		klog.V(2).InfoS("Falling back to CRI v1alpha2 runtime API (deprecated)")
 		r.runtimeClientV1alpha2 = runtimeapiV1alpha2.NewRuntimeServiceClient(conn)
+		if _, err := r.runtimeClientV1alpha2.Version(ctx, &runtimeapiV1alpha2.VersionRequest{}); err != nil {
+			return fmt.Errorf("call CRI v1alpha2 runtime Version API failed: %w", err)
+		}
 
 	} else {
 		return fmt.Errorf("unable to determine runtime API version: %w", err)

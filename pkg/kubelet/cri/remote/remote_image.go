@@ -97,6 +97,9 @@ func (r *remoteImageService) determineAPIVersion(conn *grpc.ClientConn) error {
 	} else if status.Code(err) == codes.Unimplemented {
 		klog.V(2).InfoS("Falling back to CRI v1alpha2 image API (deprecated)")
 		r.imageClientV1alpha2 = runtimeapiV1alpha2.NewImageServiceClient(conn)
+		if _, err := r.imageClientV1alpha2.ImageFsInfo(ctx, &runtimeapiV1alpha2.ImageFsInfoRequest{}); err != nil {
+			return fmt.Errorf("call CRI v1alpha2 image ImageFsInfo API failed: %w", err)
+		}
 
 	} else {
 		return fmt.Errorf("unable to determine image API version: %w", err)
