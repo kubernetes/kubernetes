@@ -333,9 +333,13 @@ func (o *Options) runLoop(ctx context.Context) error {
 	}()
 
 	for {
-		err := <-o.errCh
-		if err != nil {
-			return err
+		select {
+		case <-ctx.Done():
+			return nil
+		case err := <-o.errCh:
+			if err != nil {
+				return err
+			}
 		}
 	}
 }
@@ -675,6 +679,7 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	var errCh chan error
 	if s.BindAddressHardFail {
 		errCh = make(chan error)
+		defer close(errCh)
 	}
 
 	// Start up a healthz server if requested
@@ -785,7 +790,13 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 
 	go s.Proxier.SyncLoop()
 
-	return <-errCh
+	select {
+	case <-ctx.Done():
+		// We return nil here for we're exiting.
+		return nil
+	case err := <-errCh:
+		return err
+	}
 }
 
 func (s *ProxyServer) birthCry() {
