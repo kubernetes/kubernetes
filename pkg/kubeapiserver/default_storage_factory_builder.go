@@ -111,7 +111,7 @@ type completedStorageFactoryConfig struct {
 }
 
 // New returns a new storage factory created from the completed storage factory configuration.
-func (c *completedStorageFactoryConfig) New() (*serverstorage.DefaultStorageFactory, error) {
+func (c *completedStorageFactoryConfig) New(stopCh <-chan struct{}) (*serverstorage.DefaultStorageFactory, error) {
 	resourceEncodingConfig := resourceconfig.MergeResourceEncodingConfigs(c.DefaultResourceEncoding, c.ResourceEncodingOverrides)
 	storageFactory := serverstorage.NewDefaultStorageFactory(
 		c.StorageConfig,
@@ -142,7 +142,7 @@ func (c *completedStorageFactoryConfig) New() (*serverstorage.DefaultStorageFact
 		storageFactory.SetEtcdLocation(groupResource, servers)
 	}
 	if len(c.EncryptionProviderConfigFilepath) != 0 {
-		transformerOverrides, err := encryptionconfig.GetTransformerOverrides(c.EncryptionProviderConfigFilepath)
+		transformerOverrides, err := encryptionconfig.GetTransformerOverrides(c.EncryptionProviderConfigFilepath, stopCh)
 		if err != nil {
 			return nil, err
 		}

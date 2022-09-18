@@ -1838,7 +1838,7 @@ func verifyStatefulSetPVCsExistWithOwnerRefs(c clientset.Interface, ss *appsv1.S
 	set := getStatefulSet(c, ss.Namespace, ss.Name)
 	setUID := set.GetUID()
 	if setUID == "" {
-		framework.Failf("Statefulset %s mising UID", ss.Name)
+		framework.Failf("Statefulset %s missing UID", ss.Name)
 	}
 	return wait.PollImmediate(e2estatefulset.StatefulSetPoll, e2estatefulset.StatefulSetTimeout, func() (bool, error) {
 		pvcList, err := c.CoreV1().PersistentVolumeClaims(ss.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: klabels.Everything().String()})

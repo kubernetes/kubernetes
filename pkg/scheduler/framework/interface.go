@@ -250,6 +250,9 @@ func NewStatus(code Code, reasons ...string) *Status {
 
 // AsStatus wraps an error in a Status.
 func AsStatus(err error) *Status {
+	if err == nil {
+		return nil
+	}
 	return &Status{
 		code:    Error,
 		reasons: []string{err.Error()},

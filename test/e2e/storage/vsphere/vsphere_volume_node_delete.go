@@ -55,7 +55,9 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 		ginkgo.By("Get total Ready nodes")
 		nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(nodeList.Items) > 1, true, "At least 2 nodes are required for this test")
+		if len(nodeList.Items) < 2 {
+			framework.Failf("At least 2 nodes are required for this test, got instead: %v", len(nodeList.Items))
+		}
 
 		totalNodesCount := len(nodeList.Items)
 		nodeVM := nodeList.Items[0]

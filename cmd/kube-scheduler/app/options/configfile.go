@@ -52,8 +52,11 @@ func loadConfig(data []byte) (*config.KubeSchedulerConfiguration, error) {
 		// conversion. See KubeSchedulerConfiguration internal type definition for
 		// more details.
 		cfgObj.TypeMeta.APIVersion = gvk.GroupVersion().String()
-		if cfgObj.TypeMeta.APIVersion == configv1beta2.SchemeGroupVersion.String() {
-			klog.InfoS("KubeSchedulerConfiguration v1beta2 is deprecated in v1.25, will be removed in v1.26")
+		switch cfgObj.TypeMeta.APIVersion {
+		case configv1beta2.SchemeGroupVersion.String():
+			klog.InfoS("KubeSchedulerConfiguration v1beta2 is deprecated in v1.25, will be removed in v1.28")
+		case configv1beta3.SchemeGroupVersion.String():
+			klog.InfoS("KubeSchedulerConfiguration v1beta3 is deprecated in v1.26, will be removed in v1.29")
 		}
 		return cfgObj, nil
 	}

@@ -436,7 +436,7 @@ func (config *NetworkingTestConfig) GetHTTPCodeFromTestContainer(path, targetIP 
 //     success. If 0, then we return as soon as all endpoints succeed.
 //   - There is no logical change to test results if faillures happen AFTER endpoints have succeeded,
 //     hence over-padding minTries will NOT reverse a successful result and is thus not very useful yet
-//     (See the TODO about checking probability, which isnt implemented yet).
+//     (See the TODO about checking probability, which isn't implemented yet).
 //   - maxTries is the maximum number of curl/echo attempts before an error is returned.  The
 //     smaller this number is, the less 'slack' there is for declaring success.
 //   - if maxTries < expectedEps, this test is guaranteed to return an error, because all endpoints won't be hit.

@@ -211,7 +211,7 @@ const (
 	// TLSBootstrapTimeout specifies how long kubeadm should wait for the kubelet to perform the TLS Bootstrap
 	TLSBootstrapTimeout = 5 * time.Minute
 	// TLSBootstrapRetryInterval specifies how long kubeadm should wait before retrying the TLS Bootstrap check
-	TLSBootstrapRetryInterval = 5 * time.Second
+	TLSBootstrapRetryInterval = 1 * time.Second
 	// APICallWithWriteTimeout specifies how long kubeadm should wait for api calls with at least one write
 	APICallWithWriteTimeout = 40 * time.Second
 	// APICallWithReadTimeout specifies how long kubeadm should wait for api calls with only reads
@@ -309,7 +309,7 @@ const (
 	MinExternalEtcdVersion = "3.2.18"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.5.4-0"
+	DefaultEtcdVersion = "3.5.5-0"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -476,10 +476,10 @@ var (
 		19: "3.4.13-0",
 		20: "3.4.13-0",
 		21: "3.4.13-0",
-		22: "3.5.4-0",
-		23: "3.5.4-0",
-		24: "3.5.4-0",
-		25: "3.5.4-0",
+		22: "3.5.5-0",
+		23: "3.5.5-0",
+		24: "3.5.5-0",
+		25: "3.5.5-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows

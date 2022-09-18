@@ -55,7 +55,7 @@ dependencies:
 
   # etcd
   - name: "etcd"
-    version: 3.5.4
+    version: 3.5.5
     refPaths:
     - path: cluster/gce/manifests/etcd.manifest
       match: etcd_docker_tag|etcd_version
@@ -73,7 +73,7 @@ dependencies:
       match: configs\[Etcd\] = Config{list\.GcEtcdRegistry, "etcd", "\d+\.\d+.\d+(-(alpha|beta|rc).\d+)?(-\d+)?"}
 
   - name: "etcd-image"
-    version: 3.5.4
+    version: 3.5.5
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
@@ -81,14 +81,14 @@ dependencies:
 
   # From https://github.com/etcd-io/etcd/blob/main/Makefile
   - name: "golang: etcd release version"
-    version: 1.16.15 # for etcd v3.5.4: https://github.com/etcd-io/etcd/blob/08407ff7600eb16c4445d5f21c4fafaf19412e24/Makefile#L58
+    version: 1.16.15 # for etcd v3.5.5: https://github.com/etcd-io/etcd/blob/19002cfc689fba2b8f56605e5797bf79f8b61fdd/Makefile#L58
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: 'GOLANG_VERSION\?=\d+.\d+(alpha|beta|rc)?\.?(\d+)?'
 
   # Golang
   - name: "golang: upstream version"
-    version: 1.19
+    version: 1.19.1
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: staging/publishing/rules.yaml
@@ -109,7 +109,7 @@ dependencies:
       match: minimum_go_version=go([0-9]+\.[0-9]+)
 
   - name: "registry.k8s.io/kube-cross: dependents"
-    version: v1.25.0-go1.19-bullseye.0
+    version: v1.25.0-go1.19.1-bullseye.0
     refPaths:
     - path: build/build-image/cross/VERSION
 
@@ -139,7 +139,7 @@ dependencies:
       match: configs\[DistrolessIptables\] = Config{list\.BuildImageRegistry, "distroless-iptables", "v([0-9]+)\.([0-9]+)\.([0-9]+)"}
 
   - name: "registry.k8s.io/go-runner: dependents"
-    version: v2.3.1-go1.19-bullseye.0
+    version: v2.3.1-go1.19.1-bullseye.0
     refPaths:
     - path: build/common.sh
       match: __default_go_runner_version=

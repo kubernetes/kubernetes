@@ -39,6 +39,10 @@ func New(config *Config) (http.RoundTripper, error) {
 		return nil, fmt.Errorf("using a custom transport with TLS certificate options or the insecure flag is not allowed")
 	}
 
+	if !isValidHolders(config) {
+		return nil, fmt.Errorf("misconfigured holder for dialer or cert callback")
+	}
+
 	var (
 		rt  http.RoundTripper
 		err error
@@ -54,6 +58,18 @@ func New(config *Config) (http.RoundTripper, error) {
 	}
 
 	return HTTPWrappersForConfig(config, rt)
+}
+
+func isValidHolders(config *Config) bool {
+	if config.TLS.GetCertHolder != nil && config.TLS.GetCertHolder.GetCert == nil {
+		return false
+	}
+
+	if config.DialHolder != nil && config.DialHolder.Dial == nil {
+		return false
+	}
+
+	return true
 }
 
 // TLSConfigFor returns a tls.Config that will provide the transport level security defined
@@ -116,7 +132,7 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 				return dynamicCertLoader()
 			}
 			if c.HasCertCallback() {
-				cert, err := c.TLS.GetCert()
+				cert, err := c.TLS.GetCertHolder.GetCert()
 				if err != nil {
 					return nil, err
 				}

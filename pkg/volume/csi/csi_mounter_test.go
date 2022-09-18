@@ -107,10 +107,13 @@ func TestMounterGetPath(t *testing.T) {
 
 func TestMounterSetUp(t *testing.T) {
 	tests := []struct {
-		name                  string
-		driver                string
-		volumeContext         map[string]string
-		expectedVolumeContext map[string]string
+		name                     string
+		driver                   string
+		volumeContext            map[string]string
+		seLinuxLabel             string
+		enableSELinuxFeatureGate bool
+		expectedSELinuxContext   string
+		expectedVolumeContext    map[string]string
 	}{
 		{
 			name:                  "no pod info",
@@ -154,12 +157,39 @@ func TestMounterSetUp(t *testing.T) {
 			volumeContext:         nil,
 			expectedVolumeContext: map[string]string{"csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns", "csi.storage.k8s.io/ephemeral": "false"},
 		},
+		{
+			name:                     "should include SELinux mount options, if feature-gate is enabled and driver supports it",
+			driver:                   "supports_selinux",
+			volumeContext:            nil,
+			seLinuxLabel:             "s0,c0",
+			expectedSELinuxContext:   "context=\"s0,c0\"",
+			enableSELinuxFeatureGate: true,
+			expectedVolumeContext:    nil,
+		},
+		{
+			name:                     "should not include selinux mount options, if feature gate is enabled but driver does not support it",
+			driver:                   "no_selinux",
+			seLinuxLabel:             "s0,c0",
+			volumeContext:            nil,
+			enableSELinuxFeatureGate: true,
+			expectedVolumeContext:    nil,
+		},
+		{
+			name:                     "should not include selinux mount option, if feature gate is enabled but CSIDriver does not exist",
+			driver:                   "not_found_selinux",
+			seLinuxLabel:             "s0,c0",
+			volumeContext:            nil,
+			enableSELinuxFeatureGate: true,
+			expectedVolumeContext:    nil,
+		},
 	}
 
 	noPodMountInfo := false
 	currentPodInfoMount := true
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, test.enableSELinuxFeatureGate)()
+
 			modes := []storage.VolumeLifecycleMode{
 				storage.VolumeLifecyclePersistent,
 			}
@@ -167,6 +197,8 @@ func TestMounterSetUp(t *testing.T) {
 				getTestCSIDriver("no-info", &noPodMountInfo, nil, modes),
 				getTestCSIDriver("info", &currentPodInfoMount, nil, modes),
 				getTestCSIDriver("nil", nil, nil, modes),
+				getTestCSIDriver("supports_selinux", &noPodMountInfo, nil, modes),
+				getTestCSIDriver("no_selinux", &noPodMountInfo, nil, modes),
 			)
 			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
@@ -226,10 +258,20 @@ func TestMounterSetUp(t *testing.T) {
 			var mounterArgs volume.MounterArgs
 			fsGroup := int64(2000)
 			mounterArgs.FsGroup = &fsGroup
+
+			if test.seLinuxLabel != "" {
+				mounterArgs.SELinuxLabel = test.seLinuxLabel
+			}
+
+			expectedMountOptions := pv.Spec.MountOptions
+
+			if test.expectedSELinuxContext != "" {
+				expectedMountOptions = append(expectedMountOptions, test.expectedSELinuxContext)
+			}
+
 			if err := csiMounter.SetUp(mounterArgs); err != nil {
 				t.Fatalf("mounter.Setup failed: %v", err)
 			}
-
 			//Test the default value of file system type is not overridden
 			if len(csiMounter.spec.PersistentVolume.Spec.CSI.FSType) != 0 {
 				t.Errorf("default value of file system type was overridden by type %s", csiMounter.spec.PersistentVolume.Spec.CSI.FSType)
@@ -253,8 +295,8 @@ func TestMounterSetUp(t *testing.T) {
 			if vol.Path != csiMounter.GetPath() {
 				t.Errorf("csi server expected path %s, got %s", csiMounter.GetPath(), vol.Path)
 			}
-			if !reflect.DeepEqual(vol.MountFlags, pv.Spec.MountOptions) {
-				t.Errorf("csi server expected mount options %v, got %v", pv.Spec.MountOptions, vol.MountFlags)
+			if !reflect.DeepEqual(vol.MountFlags, expectedMountOptions) {
+				t.Errorf("csi server expected mount options %v, got %v", expectedMountOptions, vol.MountFlags)
 			}
 			if !reflect.DeepEqual(vol.VolumeContext, test.expectedVolumeContext) {
 				t.Errorf("csi server expected volumeContext %+v, got %+v", test.expectedVolumeContext, vol.VolumeContext)

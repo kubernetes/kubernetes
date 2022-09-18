@@ -688,7 +688,7 @@ func WaitForContainerRunning(c clientset.Interface, namespace, podName, containe
 
 // handleWaitingAPIErrror handles an error from an API request in the context of a Wait function.
 // If the error is retryable, sleep the recommended delay and ignore the error.
-// If the erorr is terminal, return it.
+// If the error is terminal, return it.
 func handleWaitingAPIError(err error, retryNotFound bool, taskFormat string, taskArgs ...interface{}) (bool, error) {
 	taskDescription := fmt.Sprintf(taskFormat, taskArgs...)
 	if retryNotFound && apierrors.IsNotFound(err) {

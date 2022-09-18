@@ -1114,7 +1114,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 
 		}
 		// Call SetUpDevice if blockVolumeMapper implements CustomBlockVolumeMapper
-		if customBlockVolumeMapper, ok := blockVolumeMapper.(volume.CustomBlockVolumeMapper); ok {
+		if customBlockVolumeMapper, ok := blockVolumeMapper.(volume.CustomBlockVolumeMapper); ok && actualStateOfWorld.GetDeviceMountState(volumeToMount.VolumeName) != DeviceGloballyMounted {
 			var mapErr error
 			stagingPath, mapErr = customBlockVolumeMapper.SetUpDevice()
 			if mapErr != nil {

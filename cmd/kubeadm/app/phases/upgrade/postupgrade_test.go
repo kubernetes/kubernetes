@@ -39,14 +39,14 @@ func TestMoveFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create cert file %s: %v", certPath, err)
 	}
-	defer certFile.Close()
+	certFile.Close()
 
 	keyPath := filepath.Join(tmpdir, constants.APIServerKeyName)
 	keyFile, err := os.OpenFile(keyPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
 	if err != nil {
 		t.Fatalf("Failed to create key file %s: %v", keyPath, err)
 	}
-	defer keyFile.Close()
+	keyFile.Close()
 
 	subDir := filepath.Join(tmpdir, "expired")
 	if err := os.Mkdir(subDir, 0766); err != nil {

@@ -152,7 +152,7 @@ func (f *IngressScaleFramework) CleanupScaleTest() []error {
 	if f.ScaleTestDeploy != nil {
 		f.Logger.Infof("Cleaning up deployment %s...", f.ScaleTestDeploy.Name)
 		if err := f.Clientset.AppsV1().Deployments(f.ScaleTestDeploy.Namespace).Delete(context.TODO(), f.ScaleTestDeploy.Name, metav1.DeleteOptions{}); err != nil {
-			errs = append(errs, fmt.Errorf("error while delting deployment %s/%s: %v", f.ScaleTestDeploy.Namespace, f.ScaleTestDeploy.Name, err))
+			errs = append(errs, fmt.Errorf("error while deleting deployment %s/%s: %v", f.ScaleTestDeploy.Namespace, f.ScaleTestDeploy.Name, err))
 		}
 	}
 

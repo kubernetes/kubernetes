@@ -458,6 +458,19 @@ func TestEnoughRequests(t *testing.T) {
 				},
 			},
 		},
+		{
+			pod: newResourcePod(
+				framework.Resource{
+					MilliCPU: 1,
+					Memory:   1,
+					ScalarResources: map[v1.ResourceName]int64{
+						extendedResourceA: 0,
+					}}),
+			nodeInfo: framework.NewNodeInfo(newResourcePod(framework.Resource{
+				MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 6}})),
+			name:                      "skip checking extended resource request with quantity zero via resource groups",
+			wantInsufficientResources: []InsufficientResource{},
+		},
 	}
 
 	for _, test := range enoughPodsTests {

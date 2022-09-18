@@ -229,7 +229,9 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	err = waitForStatefulSetReplicasReady(statefulSet.Name, ns, c, framework.Poll, statefulSetReadyTimeout)
 	if err != nil {
 		pod := getPod(c, ns, regionalPDLabels)
-		framework.ExpectEqual(podutil.IsPodReadyConditionTrue(pod.Status), true, "The statefulset pod has the following conditions: %s", pod.Status.Conditions)
+		if !podutil.IsPodReadyConditionTrue(pod.Status) {
+			framework.Failf("The statefulset pod %s was expected to be ready, instead has the following conditions: %v", pod.Name, pod.Status.Conditions)
+		}
 		framework.ExpectNoError(err)
 	}
 
@@ -279,7 +281,9 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	err = waitForStatefulSetReplicasReady(statefulSet.Name, ns, c, 3*time.Second, framework.RestartPodReadyAgainTimeout)
 	if err != nil {
 		pod := getPod(c, ns, regionalPDLabels)
-		framework.ExpectEqual(podutil.IsPodReadyConditionTrue(pod.Status), true, "The statefulset pod has the following conditions: %s", pod.Status.Conditions)
+		if !podutil.IsPodReadyConditionTrue(pod.Status) {
+			framework.Failf("The statefulset pod %s was expected to be ready, instead has the following conditions: %v", pod.Name, pod.Status.Conditions)
+		}
 		framework.ExpectNoError(err)
 	}
 

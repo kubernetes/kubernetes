@@ -404,7 +404,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 				if podName == podGroup+"1" {
 					framework.Logf("Noticed Pod %q gets evicted.", podName)
 				} else if podName == podGroup+"2" {
-					framework.Failf("Unexepected Pod %q gets evicted.", podName)
+					framework.Failf("Unexpected Pod %q gets evicted.", podName)
 					return
 				}
 			}

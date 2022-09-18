@@ -174,7 +174,9 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 				o.ResourceName = resourceTokens[1]
 			}
 		default:
-			return errors.New("you must specify two or three arguments: verb, resource, and optional resourceName")
+			errString := "you must specify two arguments: verb resource or verb resource/resourceName."
+			usageString := "See 'kubectl auth can-i -h' for help and examples."
+			return errors.New(fmt.Sprintf("%s\n%s", errString, usageString))
 		}
 	}
 

@@ -283,7 +283,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 				err = e2eevents.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, f.Timeouts.ClaimProvision)
 				// Events are unreliable, don't depend on the event. It's used only to speed up the test.
 				if err != nil {
-					framework.Logf("Warning: did not get event about provisioing failed")
+					framework.Logf("Warning: did not get event about provisioning failed")
 				}
 
 				// Check the pvc is still pending

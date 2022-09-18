@@ -17,7 +17,9 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
 	"github.com/spf13/pflag"
+	"time"
 
 	attachdetachconfig "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config"
 )
@@ -56,5 +58,10 @@ func (o *AttachDetachControllerOptions) Validate() []error {
 	}
 
 	errs := []error{}
+
+	if o.ReconcilerSyncLoopPeriod.Duration < time.Second {
+		errs = append(errs, fmt.Errorf("duration time must be greater than one second as set via command line option reconcile-sync-loop-period"))
+	}
+
 	return errs
 }

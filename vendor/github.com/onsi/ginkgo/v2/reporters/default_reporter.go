@@ -251,9 +251,13 @@ func (r *DefaultReporter) DidRun(report types.SpecReport) {
 
 func (r *DefaultReporter) SuiteDidEnd(report types.Report) {
 	failures := report.SpecReports.WithState(types.SpecStateFailureStates)
-	if len(failures) > 1 {
+	if len(failures) > 0 {
 		r.emitBlock("\n\n")
-		r.emitBlock(r.f("{{red}}{{bold}}Summarizing %d Failures:{{/}}", len(failures)))
+		if len(failures) > 1 {
+			r.emitBlock(r.f("{{red}}{{bold}}Summarizing %d Failures:{{/}}", len(failures)))
+		} else {
+			r.emitBlock(r.f("{{red}}{{bold}}Summarizing 1 Failure:{{/}}"))
+		}
 		for _, specReport := range failures {
 			highlightColor, heading := "{{red}}", "[FAIL]"
 			switch specReport.State {

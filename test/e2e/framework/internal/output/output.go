@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-func TestGinkgoOutput(t *testing.T, expected SuiteResults) {
+func TestGinkgoOutput(t *testing.T, expected SuiteResults, runSpecsArgs ...interface{}) {
 	// Run the Ginkgo suite with spec results collected via ReportAfterEach
 	// in adddition to the default one. To see what the full
 	// Ginkgo output looks like, run this test with "go test -v".
@@ -39,12 +39,12 @@ func TestGinkgoOutput(t *testing.T, expected SuiteResults) {
 		report = append(report, spec)
 	})
 	fakeT := &testing.T{}
-	ginkgo.RunSpecs(fakeT, "Logging Suite")
+	ginkgo.RunSpecs(fakeT, "Logging Suite", runSpecsArgs...)
 
 	// Now check the output.
 	actual := normalizeReport(report)
 
-	if assert.Equal(t, len(expected), len(actual), "Should have %d test results, got: %v", actual) {
+	if assert.Equal(t, len(expected), len(actual), "Should have %d test results, got: %v", len(expected), actual) {
 		for i := 0; i < len(expected); i++ {
 			assert.Equal(t, expected[i].Name, actual[i].Name, "name from test #%d", i)
 			output := actual[i].Output
@@ -70,7 +70,7 @@ type TestResult struct {
 	Output string
 	// Failure is SpecSummary.Failure.Message with varying parts stripped.
 	Failure string
-	// Stack is a normalized version (just file names, function parametes stripped) of
+	// Stack is a normalized version (just file names, function parameters stripped) of
 	// Ginkgo's FullStackTrace of a failure. Empty if no failure.
 	Stack string
 	// Called to normalize the actual output string before comparison if non-nil.
@@ -103,9 +103,13 @@ var timePrefix = regexp.MustCompile(`(?m)^[[:alpha:]]{3} +[[:digit:]]{1,2} +[[:d
 // elapsedSuffix matches "Elapsed: 16.189µs"
 var elapsedSuffix = regexp.MustCompile(`Elapsed: [[:digit:]]+(\.[[:digit:]]+)?(µs|ns|ms|s|m)`)
 
+// timeSuffix matches "09/06/22 15:36:43.445" as printed by Ginkgo v2 for log output.
+var timeSuffix = regexp.MustCompile(`(?m)[[:space:]][[:digit:]]{2}/[[:digit:]]{2}/[[:digit:]]{2} [[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}\.[[:digit:]]{1,3}$`)
+
 func stripTimes(in string) string {
 	out := timePrefix.ReplaceAllString(in, "")
 	out = elapsedSuffix.ReplaceAllString(out, "Elapsed: <elapsed>")
+	out = timeSuffix.ReplaceAllString(out, "")
 	return out
 }
 
@@ -122,6 +126,9 @@ var stackLocation = regexp.MustCompile(`(?:/|vendor/|test/|GOROOT/).*/([[:^space
 
 // functionArgs matches "<function name>(...)".
 var functionArgs = regexp.MustCompile(`([[:alpha:]]+)\(.*\)`)
+
+// klogPrefix matches "I0822 16:10:39.343790  989127 "
+var klogPrefix = regexp.MustCompile(`(?m)^[IEF][[:digit:]]{4} [[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}\.[[:digit:]]{6}[[:space:]]+[[:digit:]]+ `)
 
 // testFailureOutput matches TestFailureOutput() and its source followed by additional stack entries:
 //
@@ -145,5 +152,6 @@ func normalizeLocation(in string) string {
 	out = stackLocation.ReplaceAllString(out, "$1")
 	out = functionArgs.ReplaceAllString(out, "$1()")
 	out = testFailureOutput.ReplaceAllString(out, "")
+	out = klogPrefix.ReplaceAllString(out, "<klog> ")
 	return out
 }

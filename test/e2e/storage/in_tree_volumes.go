@@ -30,7 +30,6 @@ import (
 // List of testDrivers to be executed in below loop
 var testDrivers = []func() storageframework.TestDriver{
 	drivers.InitNFSDriver,
-	drivers.InitGlusterFSDriver,
 	drivers.InitISCSIDriver,
 	drivers.InitRbdDriver,
 	drivers.InitCephFSDriver,

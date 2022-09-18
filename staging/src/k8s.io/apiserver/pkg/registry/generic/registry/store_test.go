@@ -2845,3 +2845,72 @@ func TestValidateIndexers(t *testing.T) {
 		}
 	}
 }
+
+type predictableNameGenerator struct {
+	index int
+}
+
+func (p *predictableNameGenerator) GenerateName(base string) string {
+	p.index++
+	return fmt.Sprintf("%s%d", base, p.index)
+}
+
+func TestStoreCreateGenerateNameConflict(t *testing.T) {
+	// podA will be stored with name foo12345
+	podA := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "test"},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
+	// podB will generate the same name as podA "foo1" in the first try
+	podB := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{GenerateName: "foo", Namespace: "test"},
+		Spec:       example.PodSpec{NodeName: "machine2"},
+	}
+
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+	// re-define delete strategy to have graceful delete capability
+	defaultCreateStrategy := &testRESTStrategy{scheme, &predictableNameGenerator{}, true, false, true}
+	registry.CreateStrategy = defaultCreateStrategy
+
+	// create the object (DeepCopy because the registry mutates the objects)
+	objA, err := registry.Create(testContext, podA.DeepCopy(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// get the object
+	checkobjA, err := registry.Get(testContext, podA.Name, &metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// verify objects are equal
+	if e, a := objA, checkobjA; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %#v, got %#v", e, a)
+	}
+
+	// now try to create the second pod (DeepCopy because the registry mutate the objects)
+	_, err = registry.Create(testContext, podB.DeepCopy(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if !errors.IsAlreadyExists(err) {
+		t.Errorf("Unexpected error: %+v", err)
+	}
+
+	// check the 'alraedy exists' msg correspond to the generated name
+	msg := &err.(*errors.StatusError).ErrStatus.Message
+	if !strings.Contains(*msg, "already exists, the server was not able to generate a unique name for the object") {
+		t.Errorf("Unexpected error without the 'was not able to generate a unique name' in message: %v", err)
+	}
+
+	// now try to create the second pod again
+	objB, err := registry.Create(testContext, podB.DeepCopy(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if objB.(*example.Pod).Name != "foo2" && objB.(*example.Pod).GenerateName != "foo" {
+		t.Errorf("Unexpected object: %+v", objB)
+	}
+
+}

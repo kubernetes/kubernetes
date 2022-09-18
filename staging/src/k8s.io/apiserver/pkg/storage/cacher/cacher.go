@@ -670,7 +670,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	}
 
 	trace := utiltrace.New("cacher list",
-		utiltrace.Field{"audit-id", endpointsrequest.GetAuditIDTruncated(ctx)},
+		utiltrace.Field{Key: "audit-id", Value: endpointsrequest.GetAuditIDTruncated(ctx)},
 		utiltrace.Field{Key: "type", Value: c.groupResource.String()})
 	defer trace.LogIfLong(500 * time.Millisecond)
 

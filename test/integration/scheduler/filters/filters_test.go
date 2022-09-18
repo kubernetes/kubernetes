@@ -57,7 +57,7 @@ const pollInterval = 100 * time.Millisecond
 var (
 	ignorePolicy = v1.NodeInclusionPolicyIgnore
 	honorPolicy  = v1.NodeInclusionPolicyHonor
-	taints       = []v1.Taint{{Key: v1.TaintNodeUnschedulable, Value: "", Effect: v1.TaintEffectPreferNoSchedule}}
+	taints       = []v1.Taint{{Key: v1.TaintNodeUnschedulable, Value: "", Effect: v1.TaintEffectNoSchedule}}
 )
 
 // TestInterPodAffinity verifies that scheduler's inter pod affinity and

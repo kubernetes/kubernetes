@@ -194,12 +194,8 @@ func (t *volumeStressTestSuite) DefineTests(driver storageframework.TestDriver, 
 
 	ginkgo.BeforeEach(func() {
 		init()
+		ginkgo.DeferCleanup(cleanup)
 		createPodsAndVolumes()
-	})
-
-	// See #96177, this is necessary for cleaning up resources when tests are interrupted.
-	f.AddAfterEach("cleanup", func(f *framework.Framework, failed bool) {
-		cleanup()
 	})
 
 	ginkgo.It("multiple pods should access different volumes repeatedly [Slow] [Serial]", func() {
@@ -229,7 +225,7 @@ func (t *volumeStressTestSuite) DefineTests(driver storageframework.TestDriver, 
 							framework.Failf("Failed to wait for pod-%v [%+v] turn into running status. Error: %v", podIndex, pod, err)
 						}
 
-						// TODO: write data per pod and validate it everytime
+						// TODO: write data per pod and validate it every time
 
 						err = e2epod.DeletePodWithWait(f.ClientSet, pod)
 						if err != nil {

@@ -59,7 +59,7 @@ var (
 		RegistryPullQPS:                 5,
 		HairpinMode:                     kubeletconfig.PromiscuousBridge,
 		NodeLeaseDurationSeconds:        1,
-		CPUCFSQuotaPeriod:               metav1.Duration{Duration: 25 * time.Microsecond},
+		CPUCFSQuotaPeriod:               metav1.Duration{Duration: 25 * time.Millisecond},
 		TopologyManagerScope:            kubeletconfig.PodTopologyManagerScope,
 		TopologyManagerPolicy:           kubeletconfig.SingleNumaNodeTopologyManagerPolicy,
 		ShutdownGracePeriod:             metav1.Duration{Duration: 30 * time.Second},
@@ -145,10 +145,10 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			name: "specify CPUCFSQuotaPeriod without enabling CPUCFSQuotaPeriod",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 				conf.FeatureGates = map[string]bool{"CustomCPUCFSQuotaPeriod": false}
-				conf.CPUCFSQuotaPeriod = metav1.Duration{Duration: 200 * time.Microsecond}
+				conf.CPUCFSQuotaPeriod = metav1.Duration{Duration: 200 * time.Millisecond}
 				return conf
 			},
-			errMsg: "invalid configuration: cpuCFSQuotaPeriod (--cpu-cfs-quota-period) {200µs} requires feature gate CustomCPUCFSQuotaPeriod",
+			errMsg: "invalid configuration: cpuCFSQuotaPeriod (--cpu-cfs-quota-period) {200ms} requires feature gate CustomCPUCFSQuotaPeriod",
 		},
 		{
 			name: "invalid CPUCFSQuotaPeriod",
@@ -157,7 +157,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				conf.CPUCFSQuotaPeriod = metav1.Duration{Duration: 2 * time.Second}
 				return conf
 			},
-			errMsg: "invalid configuration: cpuCFSQuotaPeriod (--cpu-cfs-quota-period) {2s} must be between 1usec and 1sec, inclusive",
+			errMsg: "invalid configuration: cpuCFSQuotaPeriod (--cpu-cfs-quota-period) {2s} must be between 1ms and 1sec, inclusive",
 		},
 		{
 			name: "invalid ImageGCHighThresholdPercent",

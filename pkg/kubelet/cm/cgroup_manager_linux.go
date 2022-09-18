@@ -19,7 +19,6 @@ package cm
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -320,7 +319,7 @@ func getCpuWeight(cpuShares *uint64) uint64 {
 
 // readUnifiedControllers reads the controllers available at the specified cgroup
 func readUnifiedControllers(path string) (sets.String, error) {
-	controllersFileContent, err := ioutil.ReadFile(filepath.Join(path, "cgroup.controllers"))
+	controllersFileContent, err := os.ReadFile(filepath.Join(path, "cgroup.controllers"))
 	if err != nil {
 		return nil, err
 	}

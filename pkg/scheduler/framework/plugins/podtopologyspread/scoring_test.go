@@ -1408,7 +1408,7 @@ func BenchmarkTestDefaultEvenPodsSpreadPriority(b *testing.B) {
 					score, _ := p.Score(ctx, state, pod, n.Name)
 					gotList[i] = framework.NodeScore{Name: n.Name, Score: score}
 				}
-				p.parallelizer.Until(ctx, len(filteredNodes), scoreNode)
+				p.parallelizer.Until(ctx, len(filteredNodes), scoreNode, "")
 				status = p.NormalizeScore(ctx, state, pod, gotList)
 				if !status.IsSuccess() {
 					b.Fatal(status)

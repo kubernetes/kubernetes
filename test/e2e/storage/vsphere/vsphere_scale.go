@@ -86,8 +86,12 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 		volumesPerPod = GetAndExpectIntEnvVar(VCPScaleVolumesPerPod)
 
 		numberOfInstances = GetAndExpectIntEnvVar(VCPScaleInstances)
-		framework.ExpectNotEqual(numberOfInstances > 5, true, "Maximum allowed instances are 5")
-		framework.ExpectNotEqual(numberOfInstances > volumeCount, true, "Number of instances should be less than the total volume count")
+		if numberOfInstances > 5 {
+			framework.Failf("Maximum 5 instances allowed, got instead: %v", numberOfInstances)
+		}
+		if numberOfInstances > volumeCount {
+			framework.Failf("Number of instances: %v cannot be greater than volume count: %v", numberOfInstances, volumeCount)
+		}
 
 		policyName = GetAndExpectStringEnvVar(SPBMPolicyName)
 		datastoreName = GetAndExpectStringEnvVar(StorageClassDatastoreName)
@@ -103,18 +107,11 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 			e2eskipper.Skipf("Cannot attach %d volumes to %d nodes. Maximum volumes that can be attached on %d nodes is %d", volumeCount, len(nodes.Items), len(nodes.Items), volumesPerNode*len(nodes.Items))
 		}
 		nodeSelectorList = createNodeLabels(client, namespace, nodes)
-	})
-
-	/*
-		Remove labels from all the nodes
-	*/
-	framework.AddCleanupAction(func() {
-		// Cleanup actions will be called even when the tests are skipped and leaves namespace unset.
-		if len(namespace) > 0 && nodes != nil {
+		ginkgo.DeferCleanup(func() {
 			for _, node := range nodes.Items {
 				framework.RemoveLabelOffNode(client, node.Name, NodeLabelKey)
 			}
-		}
+		})
 	})
 
 	ginkgo.It("vsphere scale tests", func() {

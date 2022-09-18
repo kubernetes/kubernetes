@@ -137,9 +137,9 @@ func (m *ManagerImpl) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymana
 }
 
 func (m *ManagerImpl) deviceHasTopologyAlignment(resource string) bool {
-	// If any device has Topology set, we assume they care about alignment.
-	for device := range m.allDevices[resource] {
-		if m.allDevices[resource][device].Topology != nil {
+	// If any device has Topology NUMANodes available, we assume they care about alignment.
+	for _, device := range m.allDevices[resource] {
+		if device.Topology != nil && len(device.Topology.Nodes) > 0 {
 			return true
 		}
 	}

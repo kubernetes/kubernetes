@@ -296,13 +296,14 @@ func NewServiceChangeTracker(makeServiceInfo makeServicePortFunc, ipFamily v1.IP
 // Delete item
 //   - pass <service, nil> as the <previous, current> pair.
 func (sct *ServiceChangeTracker) Update(previous, current *v1.Service) bool {
+	// This is unexpected, we should return false directly.
+	if previous == nil && current == nil {
+		return false
+	}
+
 	svc := current
 	if svc == nil {
 		svc = previous
-	}
-	// previous == nil && current == nil is unexpected, we should return false directly.
-	if svc == nil {
-		return false
 	}
 	metrics.ServiceChangesTotal.Inc()
 	namespacedName := types.NamespacedName{Namespace: svc.Namespace, Name: svc.Name}

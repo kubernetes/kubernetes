@@ -250,16 +250,7 @@ func CreateKubeAPIServerConfig(s completedServerRunOptions) (
 		return nil, nil, nil, err
 	}
 
-	capabilities.Initialize(capabilities.Capabilities{
-		AllowPrivileged: s.AllowPrivileged,
-		// TODO(vmarmol): Implement support for HostNetworkSources.
-		PrivilegedSources: capabilities.PrivilegedSources{
-			HostNetworkSources: []string{},
-			HostPIDSources:     []string{},
-			HostIPCSources:     []string{},
-		},
-		PerConnectionBandwidthLimitBytesPerSec: s.MaxConnectionBytesPerSec,
-	})
+	capabilities.Setup(s.AllowPrivileged, s.MaxConnectionBytesPerSec)
 
 	s.Metrics.Apply()
 	serviceaccount.RegisterMetrics()
@@ -412,7 +403,7 @@ func buildGenericConfig(
 		lastErr = err
 		return
 	}
-	storageFactory, lastErr = completedStorageFactoryConfig.New()
+	storageFactory, lastErr = completedStorageFactoryConfig.New(genericConfig.DrainedNotify())
 	if lastErr != nil {
 		return
 	}
@@ -641,7 +632,27 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 	return options, nil
 }
 
+var testServiceResolver webhook.ServiceResolver
+
+// SetServiceResolverForTests allows the service resolver to be overridden during tests.
+// Tests using this function must run serially as this function is not safe to call concurrently with server start.
+func SetServiceResolverForTests(resolver webhook.ServiceResolver) func() {
+	if testServiceResolver != nil {
+		panic("test service resolver is set: tests are either running concurrently or clean up was skipped")
+	}
+
+	testServiceResolver = resolver
+
+	return func() {
+		testServiceResolver = nil
+	}
+}
+
 func buildServiceResolver(enabledAggregatorRouting bool, hostname string, informer clientgoinformers.SharedInformerFactory) webhook.ServiceResolver {
+	if testServiceResolver != nil {
+		return testServiceResolver
+	}
+
 	var serviceResolver webhook.ServiceResolver
 	if enabledAggregatorRouting {
 		serviceResolver = aggregatorapiserver.NewEndpointServiceResolver(

@@ -43,6 +43,12 @@ const (
 	// Enables usage of any object for volume data source in PVCs
 	AnyVolumeDataSource featuregate.Feature = "AnyVolumeDataSource"
 
+	// owner: @nabokihms
+	// alpha: v1.26
+	//
+	// Enables API to get self subject attributes after authentication.
+	APISelfSubjectReview featuregate.Feature = "APISelfSubjectReview"
+
 	// owner: @tallclair
 	// beta: v1.4
 	AppArmor featuregate.Feature = "AppArmor"
@@ -178,13 +184,6 @@ const (
 	//
 	// Enables kubelet to detect CSI volume condition and send the event of the abnormal volume to the corresponding pod that is using it.
 	CSIVolumeHealth featuregate.Feature = "CSIVolumeHealth"
-
-	// owner: @enj
-	// beta: v1.22
-	// ga: v1.24
-	//
-	// Allows clients to request a duration for certificates issued via the Kubernetes CSR API.
-	CSRDuration featuregate.Feature = "CSRDuration"
 
 	// owner: @adrianreber
 	// kep: http://kep.k8s.io/2008
@@ -885,6 +884,8 @@ func init() {
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	AnyVolumeDataSource: {Default: true, PreRelease: featuregate.Beta}, // on by default in 1.24
 
+	APISelfSubjectReview: {Default: false, PreRelease: featuregate.Alpha},
+
 	AppArmor: {Default: true, PreRelease: featuregate.Beta},
 
 	CPUCFSQuotaPeriod: {Default: false, PreRelease: featuregate.Alpha},
@@ -920,8 +921,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIStorageCapacity: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
 	CSIVolumeHealth: {Default: false, PreRelease: featuregate.Alpha},
-
-	CSRDuration: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
 	ContainerCheckpoint: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -1113,6 +1112,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
+
+	genericfeatures.AggregatedDiscoveryEndpoint: {Default: false, PreRelease: featuregate.Alpha},
 
 	genericfeatures.APIListChunking: {Default: true, PreRelease: featuregate.Beta},
 

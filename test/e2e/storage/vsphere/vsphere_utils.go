@@ -306,7 +306,7 @@ func getVSpherePodSpecWithClaim(claimName string, nodeSelectorKV map[string]stri
 	return pod
 }
 
-// func to get pod spec with given volume paths, node selector lables and container commands
+// func to get pod spec with given volume paths, node selector labels and container commands
 func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[string]string, commands []string) *v1.Pod {
 	var volumeMounts []v1.VolumeMount
 	var volumes []v1.Volume
@@ -378,7 +378,9 @@ func verifyVSphereVolumesAccessible(c clientset.Interface, pod *v1.Pod, persiste
 		// Verify disks are attached to the node
 		isAttached, err := diskIsAttached(pv.Spec.VsphereVolume.VolumePath, nodeName)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(isAttached, true, fmt.Sprintf("disk %v is not attached with the node", pv.Spec.VsphereVolume.VolumePath))
+		if !isAttached {
+			framework.Failf("disk %v is not attached to the node: %v", pv.Spec.VsphereVolume.VolumePath, nodeName)
+		}
 		// Verify Volumes are accessible
 		filepath := filepath.Join("/mnt/", fmt.Sprintf("volume%v", index+1), "/emptyFile.txt")
 		_, err = framework.LookForStringInPodExec(namespace, pod.Name, []string{"/bin/touch", filepath}, "", time.Minute)
@@ -611,7 +613,7 @@ func getVMXFilePath(vmObject *object.VirtualMachine) (vmxPath string) {
 	return vmxPath
 }
 
-// verify ready node count. Try upto 3 minutes. Return true if count is expected count
+// verify ready node count. Try up to 3 minutes. Return true if count is expected count
 func verifyReadyNodeCount(client clientset.Interface, expectedNodes int) bool {
 	numNodes := 0
 	for i := 0; i < 36; i++ {
@@ -788,7 +790,9 @@ func invokeVCenterServiceControl(command, service, host string) error {
 func expectVolumeToBeAttached(nodeName, volumePath string) {
 	isAttached, err := diskIsAttached(volumePath, nodeName)
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(isAttached, true, fmt.Sprintf("disk: %s is not attached with the node", volumePath))
+	if !isAttached {
+		framework.Failf("Volume: %s is not attached to the node: %v", volumePath, nodeName)
+	}
 }
 
 // expectVolumesToBeAttached checks if the given Volumes are attached to the

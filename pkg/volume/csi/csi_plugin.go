@@ -579,6 +579,9 @@ func (p *csiPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error)
 		}
 		csiDriver, err := p.getCSIDriver(driver)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, nil
+			}
 			return false, err
 		}
 		if csiDriver.Spec.SELinuxMount != nil {

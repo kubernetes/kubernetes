@@ -28,7 +28,7 @@ import (
 
 // GetKubeletVersion is helper function that returns version of kubelet available in $PATH
 func GetKubeletVersion(execer utilsexec.Interface) (*version.Version, error) {
-	kubeletVersionRegex := regexp.MustCompile(`^\s*Kubernetes v((0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)([-0-9a-zA-Z_\.+]*)?)\s*$`)
+	kubeletVersionRegex := regexp.MustCompile(`^\s*Kubernetes v((0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)([-\w.+]*)?)\s*$`)
 
 	command := execer.Command("kubelet", "--version")
 	out, err := command.Output()

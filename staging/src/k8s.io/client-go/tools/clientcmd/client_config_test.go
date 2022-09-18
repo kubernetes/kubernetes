@@ -138,6 +138,22 @@ func createCAValidTestConfig() *clientcmdapi.Config {
 	return config
 }
 
+func TestDisableCompression(t *testing.T) {
+	config := createValidTestConfig()
+	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
+		ClusterInfo: clientcmdapi.Cluster{
+			DisableCompression: true,
+		},
+	}, nil)
+
+	actualCfg, err := clientBuilder.ClientConfig()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	matchBoolArg(true, actualCfg.DisableCompression, t)
+}
+
 func TestInsecureOverridesCA(t *testing.T) {
 	config := createCAValidTestConfig()
 	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
