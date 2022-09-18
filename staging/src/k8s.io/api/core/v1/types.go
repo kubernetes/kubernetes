@@ -493,8 +493,8 @@ type PersistentVolumeClaimSpec struct {
 	// +optional
 	VolumeMode *PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,6,opt,name=volumeMode,casttype=PersistentVolumeMode"`
 	// dataSource field can be used to specify either:
-	// * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)
-	// * An existing PVC (PersistentVolumeClaim)
+	// - An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)
+	// - An existing PVC (PersistentVolumeClaim)
 	// If the provisioner or an external controller can support the specified data source,
 	// it will create a new volume based on the contents of the specified data source.
 	// If the AnyVolumeDataSource feature gate is enabled, this field will always have
@@ -512,9 +512,9 @@ type PersistentVolumeClaimSpec struct {
 	// compatibility, both fields (DataSource and DataSourceRef) will be set to the same
 	// value automatically if one of them is empty and the other is non-empty.
 	// There are two important differences between DataSource and DataSourceRef:
-	// * While DataSource only allows two specific types of objects, DataSourceRef
+	// - While DataSource only allows two specific types of objects, DataSourceRef
 	//   allows any non-core object, as well as PersistentVolumeClaim objects.
-	// * While DataSource ignores disallowed values (dropping them), DataSourceRef
+	// - While DataSource ignores disallowed values (dropping them), DataSourceRef
 	//   preserves all values, and generates an error if a disallowed value is
 	//   specified.
 	// (Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.
@@ -4701,9 +4701,9 @@ type ServiceList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ServiceAccount binds together:
-// * a name, understood by users, and perhaps by peripheral systems, for an identity
-// * a principal that can be authenticated and authorized
-// * a set of secrets
+// - a name, understood by users, and perhaps by peripheral systems, for an identity
+// - a principal that can be authenticated and authorized
+// - a set of secrets
 type ServiceAccount struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.

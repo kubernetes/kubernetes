@@ -1268,10 +1268,10 @@ func (c *linuxContainer) makeCriuRestoreMountpoints(m *configs.Mount) error {
 	case "cgroup":
 		// No mount point(s) need to be created:
 		//
-		// * for v1, mount points are saved by CRIU because
+		// - for v1, mount points are saved by CRIU because
 		//   /sys/fs/cgroup is a tmpfs mount
 		//
-		// * for v2, /sys/fs/cgroup is a real mount, but
+		// - for v2, /sys/fs/cgroup is a real mount, but
 		//   the mountpoint appears as soon as /sys is mounted
 		return nil
 	case "bind":
@@ -1396,8 +1396,8 @@ func (c *linuxContainer) Restore(process *Process, criuOpts *CriuOpts) error {
 	}
 	defer imageDir.Close()
 	// CRIU has a few requirements for a root directory:
-	// * it must be a mount point
-	// * its parent must not be overmounted
+	// - it must be a mount point
+	// - its parent must not be overmounted
 	// c.config.Rootfs is bind-mounted to a temporary directory
 	// to satisfy these requirements.
 	root := filepath.Join(c.root, "criu-root")

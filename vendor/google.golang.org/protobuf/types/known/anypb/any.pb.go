@@ -228,10 +228,10 @@ type Any struct {
 	// scheme `http`, `https`, or no scheme, one can optionally set up a type
 	// server that maps type URLs to message definitions as follows:
 	//
-	// * If no scheme is provided, `https` is assumed.
-	// * An HTTP GET on the URL must yield a [google.protobuf.Type][]
+	// - If no scheme is provided, `https` is assumed.
+	// - An HTTP GET on the URL must yield a [google.protobuf.Type][]
 	//   value in binary format, or produce an error.
-	// * Applications are allowed to cache lookup results based on the
+	// - Applications are allowed to cache lookup results based on the
 	//   URL, or have them precompiled into a binary to avoid any
 	//   lookup. Therefore, binary compatibility needs to be preserved
 	//   on changes to types. (Use versioned type names to manage

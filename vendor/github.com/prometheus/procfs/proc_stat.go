@@ -144,8 +144,8 @@ func (p Proc) Stat() (ProcStat, error) {
 
 	// Check the following resources for the details about the particular stat
 	// fields and their data types:
-	// * https://man7.org/linux/man-pages/man5/proc.5.html
-	// * https://man7.org/linux/man-pages/man3/scanf.3.html
+	// - https://man7.org/linux/man-pages/man5/proc.5.html
+	// - https://man7.org/linux/man-pages/man3/scanf.3.html
 	_, err = fmt.Fscan(
 		bytes.NewBuffer(data[r+2:]),
 		&s.State,

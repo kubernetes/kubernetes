@@ -87,7 +87,7 @@ type namespacedResourcesDeleter struct {
 //     (updates the namespace phase if it is not yet marked terminating)
 //
 // After deleting the resources:
-// * It removes finalizer token from the given namespace.
+// - It removes finalizer token from the given namespace.
 //
 // Returns an error if any of those steps fail.
 // Returns ResourcesRemainingError if it deleted some resources but needs

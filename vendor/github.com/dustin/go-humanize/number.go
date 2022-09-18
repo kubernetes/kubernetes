@@ -42,9 +42,9 @@ var (
 )
 
 // FormatFloat produces a formatted number as string based on the following user-specified criteria:
-// * thousands separator
-// * decimal separator
-// * decimal precision
+// - thousands separator
+// - decimal separator
+// - decimal precision
 //
 // Usage: s := RenderFloat(format, n)
 // The format parameter tells how to render the number n.

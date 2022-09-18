@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
@@ -62,9 +62,9 @@ func NewSyncManager(cloud cloudprovider.Interface, nodeName types.NodeName, sync
 		// nodeAddressesErr) of the sync loop under the condition that a result has
 		// been saved at least once. The semantics here are:
 		//
-		// * Readers of the result will wait on the monitor until the first result
+		// - Readers of the result will wait on the monitor until the first result
 		//   has been saved.
-		// * The sync loop (i.e. the only writer), will signal all waiters every
+		// - The sync loop (i.e. the only writer), will signal all waiters every
 		//   time it updates the result.
 		nodeAddressesMonitor: sync.NewCond(&sync.Mutex{}),
 	}

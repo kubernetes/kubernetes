@@ -56,9 +56,9 @@ func NewE2EServices(monitorParent bool) *E2EServices {
 // want their glog output to pollute the test result. So we run the binary in
 // run-services-mode to start e2e services in another process.
 // The function starts 2 processes:
-// * internal e2e services: services which statically linked in the test binary - apiserver, etcd and
+// - internal e2e services: services which statically linked in the test binary - apiserver, etcd and
 // namespace controller.
-// * kubelet: kubelet binary is outside. (We plan to move main kubelet start logic out when we have
+// - kubelet: kubelet binary is outside. (We plan to move main kubelet start logic out when we have
 // standard kubelet launcher)
 func (e *E2EServices) Start(featureGates map[string]bool) error {
 	var err error

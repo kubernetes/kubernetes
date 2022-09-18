@@ -43,9 +43,9 @@ import (
 const (
 	// namespaceDeletionGracePeriod is the time period to wait before processing a received namespace event.
 	// This allows time for the following to occur:
-	// * lifecycle admission plugins on HA apiservers to also observe a namespace
+	// - lifecycle admission plugins on HA apiservers to also observe a namespace
 	//   deletion and prevent new objects from being created in the terminating namespace
-	// * non-leader etcd servers to observe last-minute object creations in a namespace
+	// - non-leader etcd servers to observe last-minute object creations in a namespace
 	//   so this controller's cleanup can actually clean up all objects
 	namespaceDeletionGracePeriod = 5 * time.Second
 )

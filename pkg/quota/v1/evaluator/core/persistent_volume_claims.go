@@ -48,8 +48,8 @@ var pvcResources = []corev1.ResourceName{
 // For example, if you want to quota storage by storage class, you would have a declaration
 // that follows <storage-class>.storageclass.storage.k8s.io/<resource>.
 // For example:
-// * gold.storageclass.storage.k8s.io/: 500Gi
-// * bronze.storageclass.storage.k8s.io/requests.storage: 500Gi
+// - gold.storageclass.storage.k8s.io/: 500Gi
+// - bronze.storageclass.storage.k8s.io/requests.storage: 500Gi
 const storageClassSuffix string = ".storageclass.storage.k8s.io/"
 
 /* TODO: prune?

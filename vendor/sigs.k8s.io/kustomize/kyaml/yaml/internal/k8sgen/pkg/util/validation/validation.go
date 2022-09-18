@@ -119,10 +119,10 @@ func IsFullyQualifiedDomainName(fldPath *field.Path, name string) field.ErrorLis
 
 // Allowed characters in an HTTP Path as defined by RFC 3986. A HTTP path may
 // contain:
-// * unreserved characters (alphanumeric, '-', '.', '_', '~')
-// * percent-encoded octets
-// * sub-delims ("!", "$", "&", "'", "(", ")", "*", "+", ",", ";", "=")
-// * a colon character (":")
+// - unreserved characters (alphanumeric, '-', '.', '_', '~')
+// - percent-encoded octets
+// - sub-delims ("!", "$", "&", "'", "(", ")", "*", "+", ",", ";", "=")
+// - a colon character (":")
 const httpPathFmt string = `[A-Za-z0-9/\-._~%!$&'()*+,;=:]+`
 
 var httpPathRegexp = regexp.MustCompile("^" + httpPathFmt + "$")

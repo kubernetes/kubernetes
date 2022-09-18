@@ -29,7 +29,7 @@ import (
 	"k8s.io/klog/v2"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -617,8 +617,8 @@ func (dc *DeploymentController) syncDeployment(ctx context.Context, key string) 
 	// List all Pods owned by this Deployment, grouped by their ReplicaSet.
 	// Current uses of the podMap are:
 	//
-	// * check if a Pod is labeled correctly with the pod-template-hash label.
-	// * check that no old Pods are running in the middle of Recreate Deployments.
+	// - check if a Pod is labeled correctly with the pod-template-hash label.
+	// - check that no old Pods are running in the middle of Recreate Deployments.
 	podMap, err := dc.getPodMapForDeployment(d, rsList)
 	if err != nil {
 		return err

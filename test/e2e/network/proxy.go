@@ -546,8 +546,8 @@ func validateProxyVerbRequest(client *http.Client, urlString string, httpVerb st
 
 func doProxy(f *framework.Framework, path string, i int) (body []byte, statusCode int, d time.Duration, err error) {
 	// About all of the proxy accesses in this file:
-	// * AbsPath is used because it preserves the trailing '/'.
-	// * Do().Raw() is used (instead of DoRaw()) because it will turn an
+	// - AbsPath is used because it preserves the trailing '/'.
+	// - Do().Raw() is used (instead of DoRaw()) because it will turn an
 	//   error from apiserver proxy into an actual error, and there is no
 	//   chance of the things we are talking to being confused for an error
 	//   that apiserver would have emitted.

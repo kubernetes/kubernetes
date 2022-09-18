@@ -23,7 +23,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/moby/sys/mountinfo"
 	"io/fs"
 	"io/ioutil"
 	"os"
@@ -33,6 +32,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/moby/sys/mountinfo"
 
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
@@ -195,15 +196,15 @@ func (mounter *Mounter) doMount(mounterPath string, mountCmd string, source stri
 		// systemd-run --description=... --scope -- mount -t <type> <what> <where>
 		//
 		// Expected flow:
-		// * systemd-run creates a transient scope (=~ cgroup) and executes its
+		// - systemd-run creates a transient scope (=~ cgroup) and executes its
 		//   argument (/bin/mount) there.
-		// * mount does its job, forks a fuse daemon if necessary and finishes.
+		// - mount does its job, forks a fuse daemon if necessary and finishes.
 		//   (systemd-run --scope finishes at this point, returning mount's exit
 		//   code and stdout/stderr - thats one of --scope benefits).
-		// * systemd keeps the fuse daemon running in the scope (i.e. in its own
+		// - systemd keeps the fuse daemon running in the scope (i.e. in its own
 		//   cgroup) until the fuse daemon dies (another --scope benefit).
 		//   Kubelet service can be restarted and the fuse daemon survives.
-		// * When the fuse daemon dies (e.g. during unmount) systemd removes the
+		// - When the fuse daemon dies (e.g. during unmount) systemd removes the
 		//   scope automatically.
 		//
 		// systemd-mount is not used because it's too new for older distros

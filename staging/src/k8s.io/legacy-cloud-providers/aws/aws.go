@@ -4604,10 +4604,10 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 		// fail. We delete the loadbalancer first. This does leave the
 		// possibility of zombie target groups if DeleteLoadBalancer() fails
 		//
-		// * Get target groups for NLB
-		// * Delete Load Balancer
-		// * Delete target groups
-		// * Clean up SecurityGroupRules
+		// - Get target groups for NLB
+		// - Delete Load Balancer
+		// - Delete target groups
+		// - Clean up SecurityGroupRules
 		{
 
 			targetGroups, err := c.elbv2.DescribeTargetGroups(

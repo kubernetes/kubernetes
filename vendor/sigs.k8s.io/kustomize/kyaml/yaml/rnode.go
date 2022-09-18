@@ -326,10 +326,10 @@ func (rn *RNode) GetMeta() (ResourceMeta, error) {
 //
 // Analogous to http://www.linfo.org/pipes.html
 //
-// * rn is provided as input to the first Filter.
-// * if any Filter returns an error, immediately return the error
-// * if any Filter returns a nil RNode, immediately return nil, nil
-// * if all Filters succeed with non-empty results, return the final result
+// - rn is provided as input to the first Filter.
+// - if any Filter returns an error, immediately return the error
+// - if any Filter returns a nil RNode, immediately return nil, nil
+// - if all Filters succeed with non-empty results, return the final result
 func (rn *RNode) Pipe(functions ...Filter) (*RNode, error) {
 	// check if rn is nil to make chaining Pipe calls easier
 	if rn == nil {

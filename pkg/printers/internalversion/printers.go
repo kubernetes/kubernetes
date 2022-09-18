@@ -1665,8 +1665,8 @@ func getNodeInternalIP(node *api.Node) string {
 
 // findNodeRoles returns the roles of a given node.
 // The roles are determined by looking for:
-// * a node-role.kubernetes.io/<role>="" label
-// * a kubernetes.io/role="<role>" label
+// - a node-role.kubernetes.io/<role>="" label
+// - a kubernetes.io/role="<role>" label
 func findNodeRoles(node *api.Node) []string {
 	roles := sets.NewString()
 	for k, v := range node.Labels {

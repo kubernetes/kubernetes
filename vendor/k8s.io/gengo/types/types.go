@@ -351,7 +351,7 @@ type Type struct {
 	ConstValue *string
 
 	// TODO: Add:
-	// * channel direction
+	// - channel direction
 
 	// If Kind == Array
 	Len int64

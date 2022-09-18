@@ -1050,8 +1050,8 @@ func TestConflictingData(t *testing.T) {
 			},
 		},
 		// child in namespace A with owner reference to namespaced type in namespace B
-		// * should be deleted immediately
-		// * event should be logged in namespace A with involvedObject of bad-child indicating the error
+		// - should be deleted immediately
+		// - event should be logged in namespace A with involvedObject of bad-child indicating the error
 		{
 			name: "bad child in ns1 -> owner in ns2 (child first)",
 			steps: []step{
@@ -1137,8 +1137,8 @@ func TestConflictingData(t *testing.T) {
 			},
 		},
 		// child that is cluster-scoped with owner reference to namespaced type in namespace B
-		// * should not be deleted
-		// * event should be logged in namespace kube-system with involvedObject of bad-child indicating the error
+		// - should not be deleted
+		// - event should be logged in namespace kube-system with involvedObject of bad-child indicating the error
 		{
 			name: "bad cluster-scoped child -> owner in ns1 (child first)",
 			steps: []step{
@@ -1205,9 +1205,9 @@ func TestConflictingData(t *testing.T) {
 			},
 		},
 		// child pointing at non-preferred still-served apiVersion of parent object (e.g. rbac/v1beta1)
-		// * should not be deleted prematurely
-		// * should not repeatedly poll attemptToDelete while waiting
-		// * should be deleted when the actual parent is deleted
+		// - should not be deleted prematurely
+		// - should not repeatedly poll attemptToDelete while waiting
+		// - should be deleted when the actual parent is deleted
 		{
 			name: "good child -> existing owner with non-preferred accessible API version",
 			steps: []step{
@@ -1282,8 +1282,8 @@ func TestConflictingData(t *testing.T) {
 			},
 		},
 		// child pointing at no-longer-served apiVersion of still-existing parent object (e.g. extensions/v1beta1 deployment)
-		// * should not be deleted (this is indistinguishable from referencing an unknown kind/version)
-		// * virtual parent should not repeatedly poll attemptToDelete once real parent is observed
+		// - should not be deleted (this is indistinguishable from referencing an unknown kind/version)
+		// - virtual parent should not repeatedly poll attemptToDelete once real parent is observed
 		{
 			name: "child -> existing owner with inaccessible API version (child first)",
 			steps: []step{
@@ -1394,9 +1394,9 @@ func TestConflictingData(t *testing.T) {
 			},
 		},
 		// child pointing at no-longer-served apiVersion of no-longer-existing parent object (e.g. extensions/v1beta1 deployment)
-		// * should not be deleted (this is indistinguishable from referencing an unknown kind/version)
-		// * should repeatedly poll attemptToDelete
-		// * should not block deletion of legitimate children of missing deployment
+		// - should not be deleted (this is indistinguishable from referencing an unknown kind/version)
+		// - should repeatedly poll attemptToDelete
+		// - should not block deletion of legitimate children of missing deployment
 		{
 			name: "child -> non-existent owner with inaccessible API version (inaccessible parent apiVersion first)",
 			steps: []step{
@@ -1584,8 +1584,8 @@ func TestConflictingData(t *testing.T) {
 			},
 		},
 		// child pointing at incorrect apiVersion/kind of still-existing parent object (e.g. core/v1 Secret with uid=123, where an apps/v1 Deployment with uid=123 exists)
-		// * should be deleted immediately
-		// * should not trigger deletion of legitimate children of parent
+		// - should be deleted immediately
+		// - should not trigger deletion of legitimate children of parent
 		{
 			name: "bad child -> existing owner with incorrect API version (bad child, good child, bad parent delete, good parent)",
 			steps: []step{

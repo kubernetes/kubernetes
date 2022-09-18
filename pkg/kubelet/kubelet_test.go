@@ -2068,11 +2068,11 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 			},
 		},
 		// For terminated container:
-		// * If there is no recent start error record, State should be Terminated, LastTerminationState should be retrieved from
+		// - If there is no recent start error record, State should be Terminated, LastTerminationState should be retrieved from
 		// second latest terminated status;
-		// * If there is recent start error record, State should be Waiting, LastTerminationState should be retrieved from latest
+		// - If there is recent start error record, State should be Waiting, LastTerminationState should be retrieved from latest
 		// terminated status;
-		// * If ExitCode = 0, restart policy is RestartPolicyOnFailure, the container shouldn't be restarted. No matter there is
+		// - If ExitCode = 0, restart policy is RestartPolicyOnFailure, the container shouldn't be restarted. No matter there is
 		// recent start error or not, State should be Terminated, LastTerminationState should be retrieved from second latest
 		// terminated status.
 		{
@@ -2138,9 +2138,9 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 			},
 		},
 		// For Unknown Container Status:
-		// * In certain situations a container can be running and fail to retrieve the status which results in
-		// * a transition to the Unknown state. Prior to this fix, a container would make an invalid transition
-		// * from Running->Waiting. This test validates the correct behavior of transitioning from Running->Terminated.
+		// - In certain situations a container can be running and fail to retrieve the status which results in
+		// - a transition to the Unknown state. Prior to this fix, a container would make an invalid transition
+		// - from Running->Waiting. This test validates the correct behavior of transitioning from Running->Terminated.
 		{
 			containers: []v1.Container{{Name: "unknown"}},
 			statuses: []*kubecontainer.Status{

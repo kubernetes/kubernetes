@@ -54,18 +54,18 @@ type CompatibilityTestOptions struct {
 	// TestDataDirCurrentVersion points to a directory containing compatibility test data for the current version.
 	// Complete() populates this with "<TestDataDir>/HEAD" if unset.
 	// Within this directory, `<group>.<version>.<kind>.[json|yaml|pb]` files are required to exist, and are:
-	// * verified to match serialized FilledObjects[GVK]
-	// * verified to decode without error
-	// * verified to round-trip byte-for-byte when re-encoded
-	// * verified to be semantically equal when decoded into memory
+	// - verified to match serialized FilledObjects[GVK]
+	// - verified to decode without error
+	// - verified to round-trip byte-for-byte when re-encoded
+	// - verified to be semantically equal when decoded into memory
 	TestDataDirCurrentVersion string
 
 	// TestDataDirsPreviousVersions is a list of directories containing compatibility test data for previous versions.
 	// Complete() populates this with "<TestDataDir>/v*" directories if nil.
 	// Within these directories, `<group>.<version>.<kind>.[json|yaml|pb]` files are optional. If present, they are:
-	// * verified to decode without error
-	// * verified to round-trip byte-for-byte when re-encoded (or to match a `<group>.<version>.<kind>.[json|yaml|pb].after_roundtrip.[json|yaml|pb]` file if it exists)
-	// * verified to be semantically equal when decoded into memory
+	// - verified to decode without error
+	// - verified to round-trip byte-for-byte when re-encoded (or to match a `<group>.<version>.<kind>.[json|yaml|pb].after_roundtrip.[json|yaml|pb]` file if it exists)
+	// - verified to be semantically equal when decoded into memory
 	TestDataDirsPreviousVersions []string
 
 	// Kinds is a list of fully qualified kinds to test.

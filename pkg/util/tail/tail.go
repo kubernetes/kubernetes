@@ -62,8 +62,8 @@ func ReadAtMost(path string, max int64) ([]byte, bool, error) {
 }
 
 // FindTailLineStartIndex returns the start of last nth line.
-// * If n < 0, return the beginning of the file.
-// * If n >= 0, return the beginning of last nth line.
+// - If n < 0, return the beginning of the file.
+// - If n >= 0, return the beginning of last nth line.
 // Notice that if the last line is incomplete (no end-of-line), it will not be counted
 // as one line.
 func FindTailLineStartIndex(f io.ReadSeeker, n int64) (int64, error) {

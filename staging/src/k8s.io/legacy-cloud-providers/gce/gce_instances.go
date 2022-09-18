@@ -713,8 +713,8 @@ func (g *Cloud) isCurrentInstance(instanceID string) bool {
 }
 
 // ComputeHostTags grabs all tags from all instances being added to the pool.
-// * The longest tag that is a prefix of the instance name is used
-// * If any instance has no matching prefix tag, return error
+// - The longest tag that is a prefix of the instance name is used
+// - If any instance has no matching prefix tag, return error
 // Invoking this method to get host tags is risky since it depends on the
 // format of the host names in the cluster. Only use it as a fallback if
 // gce.nodeTags is unspecified

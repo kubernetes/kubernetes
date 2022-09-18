@@ -44,9 +44,9 @@ const (
 
 // ValidateStructural checks that s is a structural schema with the invariants:
 //
-// * structurality: both `ForbiddenGenerics` and `ForbiddenExtensions` only have zero values, with the two exceptions for IntOrString.
-// * RawExtension: for every schema with `x-kubernetes-embedded-resource: true`, `x-kubernetes-preserve-unknown-fields: true` and `type: object` are set
-// * IntOrString: for `x-kubernetes-int-or-string: true` either `type` is empty under `anyOf` and `allOf` or the schema structure is one of these:
+// - structurality: both `ForbiddenGenerics` and `ForbiddenExtensions` only have zero values, with the two exceptions for IntOrString.
+// - RawExtension: for every schema with `x-kubernetes-embedded-resource: true`, `x-kubernetes-preserve-unknown-fields: true` and `type: object` are set
+// - IntOrString: for `x-kubernetes-int-or-string: true` either `type` is empty under `anyOf` and `allOf` or the schema structure is one of these:
 //
 //  1. anyOf:
 //     - type: integer
@@ -57,9 +57,9 @@ const (
 //     - type: string
 //     - ... zero or more
 //
-// * every specified field or array in s is also specified outside of value validation.
-// * metadata at the root can only restrict the name and generateName, and not be specified at all in nested contexts.
-// * additionalProperties at the root is not allowed.
+// - every specified field or array in s is also specified outside of value validation.
+// - metadata at the root can only restrict the name and generateName, and not be specified at all in nested contexts.
+// - additionalProperties at the root is not allowed.
 func ValidateStructural(fldPath *field.Path, s *Structural) field.ErrorList {
 	allErrs := field.ErrorList{}
 

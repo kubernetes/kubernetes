@@ -464,9 +464,9 @@ type DeviceSpec struct {
 	// Path of the device on the host.
 	HostPath string `protobuf:"bytes,2,opt,name=host_path,json=hostPath,proto3" json:"host_path,omitempty"`
 	// Cgroups permissions of the device, candidates are one or more of
-	// * r - allows container to read from the specified device.
-	// * w - allows container to write to the specified device.
-	// * m - allows container to create device files that do not yet exist.
+	// - r - allows container to read from the specified device.
+	// - w - allows container to write to the specified device.
+	// - m - allows container to create device files that do not yet exist.
 	Permissions          string   `protobuf:"bytes,3,opt,name=permissions,proto3" json:"permissions,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_sizecache        int32    `json:"-"`

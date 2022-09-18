@@ -535,8 +535,8 @@ var (
 )
 
 // checkBindings runs through all the PVCs in the Pod and checks:
-// * if the PVC is fully bound
-// * if there are any conditions that require binding to fail and be retried
+// - if the PVC is fully bound
+// - if there are any conditions that require binding to fail and be retried
 //
 // It returns true when all of the Pod's PVCs are fully bound, and error if
 // binding (and scheduling) needs to be retried

@@ -95,12 +95,12 @@ type Manager struct {
 
 // GetServiceAccountToken gets a service account token for a pod from cache or
 // from the TokenRequest API. This process is as follows:
-// * Check the cache for the current token request.
-// * If the token exists and does not require a refresh, return the current token.
-// * Attempt to refresh the token.
-// * If the token is refreshed successfully, save it in the cache and return the token.
-// * If refresh fails and the old token is still valid, log an error and return the old token.
-// * If refresh fails and the old token is no longer valid, return an error
+// - Check the cache for the current token request.
+// - If the token exists and does not require a refresh, return the current token.
+// - Attempt to refresh the token.
+// - If the token is refreshed successfully, save it in the cache and return the token.
+// - If refresh fails and the old token is still valid, log an error and return the old token.
+// - If refresh fails and the old token is no longer valid, return an error
 func (m *Manager) GetServiceAccountToken(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
 	key := keyFunc(name, namespace, tr)
 

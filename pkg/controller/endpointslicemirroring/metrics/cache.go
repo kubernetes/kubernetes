@@ -90,8 +90,8 @@ func (spc *EndpointPortCache) numEndpoints() int {
 // UpdateEndpointPortCache updates a EndpointPortCache in the global cache for a
 // given Service and updates the corresponding metrics.
 // Parameters:
-// * endpointsNN refers to a NamespacedName representing the Endpoints resource.
-// * epCache refers to a EndpointPortCache for the specified Endpoints reosource.
+// - endpointsNN refers to a NamespacedName representing the Endpoints resource.
+// - epCache refers to a EndpointPortCache for the specified Endpoints reosource.
 func (c *Cache) UpdateEndpointPortCache(endpointsNN types.NamespacedName, epCache *EndpointPortCache) {
 	c.lock.Lock()
 	defer c.lock.Unlock()

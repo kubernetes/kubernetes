@@ -101,8 +101,8 @@ func (spc *ServicePortCache) totals(maxEndpointsPerSlice int) (int, int, int) {
 // UpdateServicePortCache updates a ServicePortCache in the global cache for a
 // given Service and updates the corresponding metrics.
 // Parameters:
-// * serviceNN refers to a NamespacedName representing the Service.
-// * spCache refers to a ServicePortCache for the specified Service.
+// - serviceNN refers to a NamespacedName representing the Service.
+// - spCache refers to a ServicePortCache for the specified Service.
 func (c *Cache) UpdateServicePortCache(serviceNN types.NamespacedName, spCache *ServicePortCache) {
 	c.lock.Lock()
 	defer c.lock.Unlock()

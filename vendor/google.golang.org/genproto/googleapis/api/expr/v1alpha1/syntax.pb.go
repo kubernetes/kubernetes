@@ -997,13 +997,13 @@ func (x *Expr_CreateStruct) GetEntries() []*Expr_CreateStruct_Entry {
 // Aggregate type macros may be applied to all elements in a list or all keys
 // in a map:
 //
-// *  `all`, `exists`, `exists_one` -  test a predicate expression against
+// -  `all`, `exists`, `exists_one` -  test a predicate expression against
 //    the inputs and return `true` if the predicate is satisfied for all,
 //    any, or only one value `list.all(x, x < 10)`.
-// *  `filter` - test a predicate expression against the inputs and return
+// -  `filter` - test a predicate expression against the inputs and return
 //    the subset of elements which satisfy the predicate:
 //    `payments.filter(p, p > 1000)`.
-// *  `map` - apply an expression to all elements in the input and return the
+// -  `map` - apply an expression to all elements in the input and return the
 //    output aggregate type: `[1, 2, 3].map(i, i * i)`.
 //
 // The `has(m.x)` macro tests whether the property `x` is present in struct

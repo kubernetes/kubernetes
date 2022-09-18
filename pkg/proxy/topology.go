@@ -139,11 +139,11 @@ func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels m
 
 // canUseTopology returns true if topology aware routing is enabled and properly configured
 // in this cluster. That is, it checks that:
-// * The TopologyAwareHints feature is enabled
-// * The "service.kubernetes.io/topology-aware-hints" annotation on this Service is set to "Auto"
-// * The node's labels include "topology.kubernetes.io/zone"
-// * All of the endpoints for this Service have a topology hint
-// * At least one endpoint for this Service is hinted for this node's zone.
+// - The TopologyAwareHints feature is enabled
+// - The "service.kubernetes.io/topology-aware-hints" annotation on this Service is set to "Auto"
+// - The node's labels include "topology.kubernetes.io/zone"
+// - All of the endpoints for this Service have a topology hint
+// - At least one endpoint for this Service is hinted for this node's zone.
 func canUseTopology(endpoints []Endpoint, svcInfo ServicePort, nodeLabels map[string]string) bool {
 	hintsAnnotation := svcInfo.HintsAnnotation()
 	if hintsAnnotation != "Auto" && hintsAnnotation != "auto" {

@@ -211,9 +211,9 @@ func (s *Updater) Apply(liveObject, configObject *typed.TypedValue, version fiel
 }
 
 // prune will remove a field, list or map item, iff:
-// * applyingManager applied it last time
-// * applyingManager didn't apply it this time
-// * no other applier claims to manage it
+// - applyingManager applied it last time
+// - applyingManager didn't apply it this time
+// - no other applier claims to manage it
 func (s *Updater) prune(merged *typed.TypedValue, managers fieldpath.ManagedFields, applyingManager string, lastSet fieldpath.VersionedSet) (*typed.TypedValue, error) {
 	if lastSet == nil || lastSet.Set().Empty() {
 		return merged, nil

@@ -128,9 +128,9 @@ func StaticResyncPeriodFunc(resyncPeriod time.Duration) ResyncPeriodFunc {
 //	ControlleeExpectation = pair of atomic counters to track controllee's creation/deletion
 //	ControllerExpectationsStore = TTLStore + a ControlleeExpectation per controller
 //
-// * Once set expectations can only be lowered
-// * A controller isn't synced till its expectations are either fulfilled, or expire
-// * Controllers that don't set expectations will get woken up for every matching controllee
+// - Once set expectations can only be lowered
+// - A controller isn't synced till its expectations are either fulfilled, or expire
+// - Controllers that don't set expectations will get woken up for every matching controllee
 
 // ExpKeyFunc to parse out the key from a ControlleeExpectation
 var ExpKeyFunc = func(obj interface{}) (string, error) {

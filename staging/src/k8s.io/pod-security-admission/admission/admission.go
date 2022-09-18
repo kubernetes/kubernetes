@@ -278,10 +278,10 @@ func (a *Admission) ValidateNamespace(ctx context.Context, attrs api.Attributes)
 		}
 
 		// Skip dry-running pods:
-		// * if the enforce policy is unchanged
-		// * if the new enforce policy is privileged
-		// * if the new enforce is the same version and level was relaxed
-		// * for exempt namespaces
+		// - if the enforce policy is unchanged
+		// - if the new enforce policy is privileged
+		// - if the new enforce is the same version and level was relaxed
+		// - for exempt namespaces
 		if newPolicy.Enforce == oldPolicy.Enforce {
 			return sharedAllowedResponse
 		}
@@ -627,7 +627,7 @@ func (a *Admission) PolicyToEvaluate(labels map[string]string) (api.Policy, fiel
 
 // isSignificantPodUpdate determines whether a pod update should trigger a policy evaluation.
 // Relevant mutable pod fields as of 1.21 are image annotations:
-// * https://github.com/kubernetes/kubernetes/blob/release-1.21/pkg/apis/core/validation/validation.go#L3947-L3949
+// - https://github.com/kubernetes/kubernetes/blob/release-1.21/pkg/apis/core/validation/validation.go#L3947-L3949
 func isSignificantPodUpdate(pod, oldPod *corev1.Pod) bool {
 	// TODO: invert this logic to only allow specific update types.
 	if len(pod.Spec.Containers) != len(oldPod.Spec.Containers) {

@@ -400,11 +400,11 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 // not ready and containing no containers.
 //
 // GarbageCollect consists of the following steps:
-// * gets evictable containers which are not active and created more than gcPolicy.MinAge ago.
-// * removes oldest dead containers for each pod by enforcing gcPolicy.MaxPerPodContainer.
-// * removes oldest dead containers by enforcing gcPolicy.MaxContainers.
-// * gets evictable sandboxes which are not ready and contains no containers.
-// * removes evictable sandboxes.
+// - gets evictable containers which are not active and created more than gcPolicy.MinAge ago.
+// - removes oldest dead containers for each pod by enforcing gcPolicy.MaxPerPodContainer.
+// - removes oldest dead containers by enforcing gcPolicy.MaxContainers.
+// - gets evictable sandboxes which are not ready and contains no containers.
+// - removes evictable sandboxes.
 func (cgc *containerGC) GarbageCollect(gcPolicy kubecontainer.GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error {
 	errors := []error{}
 	// Remove evictable containers

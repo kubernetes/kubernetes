@@ -542,9 +542,9 @@ type defaultIDGenerator struct {
 	// divisible by 8, on both 32-bit and 64-bit machines when
 	// performing atomic increments and accesses.
 	// See:
-	// * https://github.com/census-instrumentation/opencensus-go/issues/587
-	// * https://github.com/census-instrumentation/opencensus-go/issues/865
-	// * https://golang.org/pkg/sync/atomic/#pkg-note-BUG
+	// - https://github.com/census-instrumentation/opencensus-go/issues/587
+	// - https://github.com/census-instrumentation/opencensus-go/issues/865
+	// - https://golang.org/pkg/sync/atomic/#pkg-note-BUG
 	nextSpanID uint64
 	spanIDInc  uint64
 

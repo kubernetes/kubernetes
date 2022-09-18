@@ -35,9 +35,9 @@ type EndpointSlice struct {
 	// All addresses in this slice must be the same type. This field is
 	// immutable after creation. The following address types are currently
 	// supported:
-	// * IPv4: Represents an IPv4 Address.
-	// * IPv6: Represents an IPv6 Address.
-	// * FQDN: Represents a Fully Qualified Domain Name.
+	// - IPv4: Represents an IPv4 Address.
+	// - IPv6: Represents an IPv6 Address.
+	// - FQDN: Represents a Fully Qualified Domain Name.
 	AddressType AddressType
 	// endpoints is a list of unique endpoints in this slice. Each slice may
 	// include a maximum of 1000 endpoints.
@@ -150,9 +150,9 @@ type EndpointPort struct {
 	// name. If the EndpointSlice is derived from a Kubernetes service, this
 	// corresponds to the Service.ports[].name.
 	// Name must either be an empty string or pass DNS_LABEL validation:
-	// * must be no more than 63 characters long.
-	// * must consist of lower case alphanumeric characters or '-'.
-	// * must start and end with an alphanumeric character.
+	// - must be no more than 63 characters long.
+	// - must consist of lower case alphanumeric characters or '-'.
+	// - must start and end with an alphanumeric character.
 	Name *string
 	// The IP protocol for this port.
 	// Must be UDP, TCP, or SCTP.

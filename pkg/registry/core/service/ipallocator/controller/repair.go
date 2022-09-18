@@ -44,10 +44,10 @@ import (
 // and logs any errors, and then sets the compacted and accurate list of all allocated IPs.
 //
 // Handles:
-// * Duplicate ClusterIP assignments caused by operator action or undetected race conditions
-// * ClusterIPs that do not match the currently configured range
-// * Allocations to services that were not actually created due to a crash or powerloss
-// * Migrates old versions of Kubernetes services into the atomic ipallocator model automatically
+// - Duplicate ClusterIP assignments caused by operator action or undetected race conditions
+// - ClusterIPs that do not match the currently configured range
+// - Allocations to services that were not actually created due to a crash or powerloss
+// - Migrates old versions of Kubernetes services into the atomic ipallocator model automatically
 //
 // Can be run at infrequent intervals, and is best performed on startup of the master.
 // Is level driven and idempotent - all valid ClusterIPs will be updated into the ipallocator

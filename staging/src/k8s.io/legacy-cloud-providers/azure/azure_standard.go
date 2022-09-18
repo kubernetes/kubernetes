@@ -166,7 +166,7 @@ func (az *Cloud) getAzureLoadBalancerName(clusterName string, vmSetName string, 
 
 // isMasterNode returns true if the node has a master role label.
 // The master role is determined by looking for:
-// * a kubernetes.io/role="master" label
+// - a kubernetes.io/role="master" label
 func isMasterNode(node *v1.Node) bool {
 	if val, ok := node.Labels[nodeLabelRole]; ok && val == "master" {
 		return true

@@ -57,13 +57,13 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 	// are necessary, and let the core loop create new instances on those nodes.
 	//
 	// Assumptions:
-	// * Expect manage loop to allow no more than one pod per node
-	// * Expect manage loop will create new pods
-	// * Expect manage loop will handle failed pods
-	// * Deleted pods do not count as unavailable so that updates make progress when nodes are down
+	// - Expect manage loop to allow no more than one pod per node
+	// - Expect manage loop will create new pods
+	// - Expect manage loop will handle failed pods
+	// - Deleted pods do not count as unavailable so that updates make progress when nodes are down
 	// Invariants:
-	// * The number of new pods that are unavailable must be less than maxUnavailable
-	// * A node with an available old pod is a candidate for deletion if it does not violate other invariants
+	// - The number of new pods that are unavailable must be less than maxUnavailable
+	// - A node with an available old pod is a candidate for deletion if it does not violate other invariants
 	//
 	if maxSurge == 0 {
 		var numUnavailable int
@@ -130,14 +130,14 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 	// to maxSurge extra pods
 	//
 	// Assumptions:
-	// * Expect manage loop to allow no more than two pods per node, one old, one new
-	// * Expect manage loop will create new pods if there are no pods on node
-	// * Expect manage loop will handle failed pods
-	// * Deleted pods do not count as unavailable so that updates make progress when nodes are down
+	// - Expect manage loop to allow no more than two pods per node, one old, one new
+	// - Expect manage loop will create new pods if there are no pods on node
+	// - Expect manage loop will handle failed pods
+	// - Deleted pods do not count as unavailable so that updates make progress when nodes are down
 	// Invariants:
-	// * A node with an unavailable old pod is a candidate for immediate new pod creation
-	// * An old available pod is deleted if a new pod is available
-	// * No more than maxSurge new pods are created for old available pods at any one time
+	// - A node with an unavailable old pod is a candidate for immediate new pod creation
+	// - An old available pod is deleted if a new pod is available
+	// - No more than maxSurge new pods are created for old available pods at any one time
 	//
 	var oldPodsToDelete []string
 	var candidateNewNodes []string

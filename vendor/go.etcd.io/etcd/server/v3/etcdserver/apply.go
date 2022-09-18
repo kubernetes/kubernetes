@@ -549,10 +549,10 @@ func applyCompares(rv mvcc.ReadView, cmps []*pb.Compare) bool {
 // If the comparison succeeds, it returns true. Otherwise, returns false.
 func applyCompare(rv mvcc.ReadView, c *pb.Compare) bool {
 	// TODO: possible optimizations
-	// * chunk reads for large ranges to conserve memory
-	// * rewrite rules for common patterns:
+	// - chunk reads for large ranges to conserve memory
+	// - rewrite rules for common patterns:
 	//	ex. "[a, b) createrev > 0" => "limit 1 /\ kvs > 0"
-	// * caching
+	// - caching
 	rr, err := rv.Range(context.TODO(), c.Key, mkGteRange(c.RangeEnd), mvcc.RangeOptions{})
 	if err != nil {
 		return false

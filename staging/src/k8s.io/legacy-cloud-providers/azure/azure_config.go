@@ -35,9 +35,9 @@ const (
 )
 
 // The config type for Azure cloud provider secret. Supported values are:
-// * file   : The values are read from local cloud-config file.
-// * secret : The values from secret would override all configures from local cloud-config file.
-// * merge  : The values from secret would override only configurations that are explicitly set in the secret. This is the default value.
+// - file   : The values are read from local cloud-config file.
+// - secret : The values from secret would override all configures from local cloud-config file.
+// - merge  : The values from secret would override only configurations that are explicitly set in the secret. This is the default value.
 type cloudConfigType string
 
 const (

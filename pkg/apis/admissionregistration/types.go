@@ -421,10 +421,10 @@ type MutatingWebhook struct {
 	// if the object being admitted is modified by other admission plugins after the initial webhook call.
 	// Webhooks that specify this option *must* be idempotent, and hence able to process objects they previously admitted.
 	// Note:
-	// * the number of additional invocations is not guaranteed to be exactly one.
-	// * if additional invocations result in further modifications to the object, webhooks are not guaranteed to be invoked again.
-	// * webhooks that use this option may be reordered to minimize the number of additional invocations.
-	// * to validate an object after all mutations are guaranteed complete, use a validating admission webhook instead.
+	// - the number of additional invocations is not guaranteed to be exactly one.
+	// - if additional invocations result in further modifications to the object, webhooks are not guaranteed to be invoked again.
+	// - webhooks that use this option may be reordered to minimize the number of additional invocations.
+	// - to validate an object after all mutations are guaranteed complete, use a validating admission webhook instead.
 	//
 	// Defaults to "Never".
 	// +optional

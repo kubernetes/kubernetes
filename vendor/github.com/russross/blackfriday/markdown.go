@@ -310,21 +310,21 @@ func MarkdownBasic(input []byte) []byte {
 // MarkdownCommon is a convenience function for simple rendering.
 // It processes markdown input with common extensions enabled, including:
 //
-// * Smartypants processing with smart fractions and LaTeX dashes
+// - Smartypants processing with smart fractions and LaTeX dashes
 //
-// * Intra-word emphasis suppression
+// - Intra-word emphasis suppression
 //
-// * Tables
+// - Tables
 //
-// * Fenced code blocks
+// - Fenced code blocks
 //
-// * Autolinking
+// - Autolinking
 //
-// * Strikethrough support
+// - Strikethrough support
 //
-// * Strict header parsing
+// - Strict header parsing
 //
-// * Custom Header IDs
+// - Custom Header IDs
 func MarkdownCommon(input []byte) []byte {
 	// set up the HTML renderer
 	renderer := HtmlRenderer(commonHtmlFlags, "", "")

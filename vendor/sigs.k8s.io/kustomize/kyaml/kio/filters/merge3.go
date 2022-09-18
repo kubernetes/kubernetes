@@ -289,11 +289,11 @@ func duplicateError(source, filePath string) error {
 
 // DefaultResourceHandler is the default implementation of the ResourceHandler
 // interface. It uses the following rules:
-// * Keep dest if resource only exists in dest.
-// * Keep updated if resource added in updated.
-// * Delete dest if updated has been deleted.
-// * Don't add the resource back if removed from dest.
-// * Otherwise merge.
+// - Keep dest if resource only exists in dest.
+// - Keep updated if resource added in updated.
+// - Delete dest if updated has been deleted.
+// - Don't add the resource back if removed from dest.
+// - Otherwise merge.
 type DefaultResourceHandler struct{}
 
 func (*DefaultResourceHandler) Handle(original, updated, dest *yaml.RNode) (ResourceMergeStrategy, error) {

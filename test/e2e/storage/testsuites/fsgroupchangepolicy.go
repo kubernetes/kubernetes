@@ -145,8 +145,8 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 		finalExpectedSubDirFileOwnership  int    // Final expected ownership of the file in the sub directory (/mnt/volume1/subdir/file2), as part of the second pod
 		// Whether the test can run for drivers that support volumeMountGroup capability.
 		// For CSI drivers that support volumeMountGroup:
-		// * OnRootMismatch policy is not supported.
-		// * It may not be possible to chgrp after mounting a volume.
+		// - OnRootMismatch policy is not supported.
+		// - It may not be possible to chgrp after mounting a volume.
 		supportsVolumeMountGroup bool
 	}{
 		// Test cases for 'Always' policy

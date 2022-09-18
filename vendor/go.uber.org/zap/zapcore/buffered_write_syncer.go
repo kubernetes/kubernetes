@@ -112,8 +112,8 @@ func (s *BufferedWriteSyncer) Write(bs []byte) (int, error) {
 	}
 
 	// To avoid partial writes from being flushed, we manually flush the existing buffer if:
-	// * The current write doesn't fit into the buffer fully, and
-	// * The buffer is not empty (since bufio will not split large writes when the buffer is empty)
+	// - The current write doesn't fit into the buffer fully, and
+	// - The buffer is not empty (since bufio will not split large writes when the buffer is empty)
 	if len(bs) > s.writer.Available() && s.writer.Buffered() > 0 {
 		if err := s.writer.Flush(); err != nil {
 			return 0, err

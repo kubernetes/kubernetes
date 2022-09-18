@@ -69,9 +69,9 @@ func NewVersionedAttributes(attr admission.Attributes, gvk schema.GroupVersionKi
 // ConvertVersionedAttributes converts VersionedObject and VersionedOldObject to the specified kind, if needed.
 // If attr.VersionedKind already matches the requested kind, no conversion is performed.
 // If conversion is required:
-// * attr.VersionedObject is used as the source for the new object if Dirty=true (and is round-tripped through attr.Attributes.Object, clearing Dirty in the process)
-// * attr.Attributes.Object is used as the source for the new object if Dirty=false
-// * attr.Attributes.OldObject is used as the source for the old object
+// - attr.VersionedObject is used as the source for the new object if Dirty=true (and is round-tripped through attr.Attributes.Object, clearing Dirty in the process)
+// - attr.Attributes.Object is used as the source for the new object if Dirty=false
+// - attr.Attributes.OldObject is used as the source for the old object
 func ConvertVersionedAttributes(attr *VersionedAttributes, gvk schema.GroupVersionKind, o admission.ObjectInterfaces) error {
 	// we already have the desired kind, we're done
 	if attr.VersionedKind == gvk {

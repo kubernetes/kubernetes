@@ -59,8 +59,8 @@ type certificateValidationOptions struct {
 	allowBothApprovedAndDenied bool
 
 	// The following are bad things we tolerate for compatibility reasons:
-	// * in requests made via the v1beta1 API
-	// * in update requests where the problem is already present in the persisted object
+	// - in requests made via the v1beta1 API
+	// - in update requests where the problem is already present in the persisted object
 
 	// allow modifying status.certificate on an update where the old object has a different certificate
 	allowResettingCertificate bool

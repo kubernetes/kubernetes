@@ -81,14 +81,14 @@ func (s *Set) Intersection(s2 *Set) *Set {
 }
 
 // Difference returns a Set containing elements which:
-// * appear in s
-// * do not appear in s2
+// - appear in s
+// - do not appear in s2
 //
 // In other words, for leaf fields, this acts like a regular set difference
 // operation. When non leaf fields are compared with leaf fields ("parents"
 // which contain "children"), the effect is:
-// * parent - child = parent
-// * child - parent = {empty set}
+// - parent - child = parent
+// - child - parent = {empty set}
 func (s *Set) Difference(s2 *Set) *Set {
 	return &Set{
 		Members:  *s.Members.Difference(&s2.Members),
@@ -97,8 +97,8 @@ func (s *Set) Difference(s2 *Set) *Set {
 }
 
 // RecursiveDifference returns a Set containing elements which:
-// * appear in s
-// * do not appear in s2
+// - appear in s
+// - do not appear in s2
 //
 // Compared to a regular difference,
 // this removes every field **and its children** from s that is contained in s2.

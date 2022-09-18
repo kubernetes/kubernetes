@@ -26,8 +26,8 @@ import (
 
 // For the proc file format details,
 // See:
-// * Linux 2.6.23 https://elixir.bootlin.com/linux/v2.6.23/source/net/core/dev.c#L2343
-// * Linux 4.17 https://elixir.bootlin.com/linux/v4.17/source/net/core/net-procfs.c#L162
+// - Linux 2.6.23 https://elixir.bootlin.com/linux/v2.6.23/source/net/core/dev.c#L2343
+// - Linux 4.17 https://elixir.bootlin.com/linux/v4.17/source/net/core/net-procfs.c#L162
 // and https://elixir.bootlin.com/linux/v4.17/source/include/linux/netdevice.h#L2810.
 
 // SoftnetStat contains a single row of data from /proc/net/softnet_stat.

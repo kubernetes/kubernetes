@@ -88,12 +88,12 @@ type OperationExecutor interface {
 	// If a volume has 'Filesystem' volumeMode, MountVolume mounts the
 	// volume to the pod specified in volumeToMount.
 	// Specifically it will:
-	// * Wait for the device to finish attaching (for attachable volumes only).
-	// * Mount device to global mount path (for attachable volumes only).
-	// * Update actual state of world to reflect volume is globally mounted (for
+	// - Wait for the device to finish attaching (for attachable volumes only).
+	// - Mount device to global mount path (for attachable volumes only).
+	// - Update actual state of world to reflect volume is globally mounted (for
 	//   attachable volumes only).
-	// * Mount the volume to the pod specific path.
-	// * Update actual state of world to reflect volume is mounted to the pod
+	// - Mount the volume to the pod specific path.
+	// - Update actual state of world to reflect volume is mounted to the pod
 	//   path.
 	// The parameter "isRemount" is informational and used to adjust logging
 	// verbosity. An initial mount is more log-worthy than a remount, for
@@ -102,11 +102,11 @@ type OperationExecutor interface {
 	// For 'Block' volumeMode, this method creates a symbolic link to
 	// the volume from both the pod specified in volumeToMount and global map path.
 	// Specifically it will:
-	// * Wait for the device to finish attaching (for attachable volumes only).
-	// * Update actual state of world to reflect volume is globally mounted/mapped.
-	// * Map volume to global map path using symbolic link.
-	// * Map the volume to the pod device map path using symbolic link.
-	// * Update actual state of world to reflect volume is mounted/mapped to the pod path.
+	// - Wait for the device to finish attaching (for attachable volumes only).
+	// - Update actual state of world to reflect volume is globally mounted/mapped.
+	// - Map volume to global map path using symbolic link.
+	// - Map the volume to the pod device map path using symbolic link.
+	// - Update actual state of world to reflect volume is mounted/mapped to the pod path.
 	MountVolume(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater, isRemount bool) error
 
 	// If a volume has 'Filesystem' volumeMode, UnmountVolume unmounts the

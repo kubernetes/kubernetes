@@ -156,8 +156,8 @@ func (p *Markdown) block(data []byte) {
 
 		// an itemized/unordered list:
 		//
-		// * Item 1
-		// * Item 2
+		// - Item 1
+		// - Item 2
 		//
 		// also works with + or -
 		if p.uliPrefix(data) > 0 {

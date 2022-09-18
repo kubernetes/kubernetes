@@ -749,9 +749,9 @@ func DeploymentTimedOut(deployment *apps.Deployment, newStatus *apps.DeploymentS
 	// If the previous condition has been a successful rollout then we shouldn't try to
 	// estimate any progress. Scenario:
 	//
-	// * progressDeadlineSeconds is smaller than the difference between now and the time
+	// - progressDeadlineSeconds is smaller than the difference between now and the time
 	//   the last rollout finished in the past.
-	// * the creation of a new ReplicaSet triggers a resync of the Deployment prior to the
+	// - the creation of a new ReplicaSet triggers a resync of the Deployment prior to the
 	//   cached copy of the Deployment getting updated with the status.condition that indicates
 	//   the creation of the new ReplicaSet.
 	//

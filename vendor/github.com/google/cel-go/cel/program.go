@@ -36,9 +36,9 @@ type Program interface {
 	// If the `OptTrackState`, `OptTrackCost` or `OptExhaustiveEval` flags are used, the `details` response will
 	// be non-nil. Given this caveat on `details`, the return state from evaluation will be:
 	//
-	// *  `val`, `details`, `nil` - Successful evaluation of a non-error result.
-	// *  `val`, `details`, `err` - Successful evaluation to an error result.
-	// *  `nil`, `details`, `err` - Unsuccessful evaluation.
+	// -  `val`, `details`, `nil` - Successful evaluation of a non-error result.
+	// -  `val`, `details`, `err` - Successful evaluation to an error result.
+	// -  `nil`, `details`, `err` - Unsuccessful evaluation.
 	//
 	// An unsuccessful evaluation is typically the result of a series of incompatible `EnvOption`
 	// or `ProgramOption` values used in the creation of the evaluation environment or executable

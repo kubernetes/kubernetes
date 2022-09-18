@@ -166,10 +166,10 @@ func calcRestartCountByLogDir(path string) (int, error) {
 
 // startContainer starts a container and returns a message indicates why it is failed on error.
 // It starts the container through the following steps:
-// * pull the image
-// * create the container
-// * start the container
-// * run the post start lifecycle hooks (if applicable)
+// - pull the image
+// - create the container
+// - start the container
+// - run the post start lifecycle hooks (if applicable)
 func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandboxConfig *runtimeapi.PodSandboxConfig, spec *startSpec, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, podIP string, podIPs []string) (string, error) {
 	container := spec.container
 
@@ -654,8 +654,8 @@ func (m *kubeGenericRuntimeManager) restoreSpecsFromContainerLabels(containerID 
 }
 
 // killContainer kills a container through the following steps:
-// * Run the pre-stop lifecycle hooks (if applicable).
-// * Stop the container.
+// - Run the pre-stop lifecycle hooks (if applicable).
+// - Stop the container.
 func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubecontainer.ContainerID, containerName string, message string, reason containerKillReason, gracePeriodOverride *int64) error {
 	var containerSpec *v1.Container
 	if pod != nil {
