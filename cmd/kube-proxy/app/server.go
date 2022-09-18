@@ -667,8 +667,7 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	}
 
 	if s.Broadcaster != nil && s.EventClient != nil {
-		stopCh := make(chan struct{})
-		s.Broadcaster.StartRecordingToSink(stopCh)
+		s.Broadcaster.StartRecordingToSink(ctx.Done())
 	}
 
 	// TODO(thockin): make it possible for healthz and metrics to be on the same port.
@@ -750,21 +749,21 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	// are registered yet.
 	serviceConfig := config.NewServiceConfig(informerFactory.Core().V1().Services(), s.ConfigSyncPeriod)
 	serviceConfig.RegisterEventHandler(s.Proxier)
-	go serviceConfig.Run(wait.NeverStop)
+	go serviceConfig.Run(ctx.Done())
 
 	if endpointsHandler, ok := s.Proxier.(config.EndpointsHandler); ok && !s.UseEndpointSlices {
 		endpointsConfig := config.NewEndpointsConfig(informerFactory.Core().V1().Endpoints(), s.ConfigSyncPeriod)
 		endpointsConfig.RegisterEventHandler(endpointsHandler)
-		go endpointsConfig.Run(wait.NeverStop)
+		go endpointsConfig.Run(ctx.Done())
 	} else {
 		endpointSliceConfig := config.NewEndpointSliceConfig(informerFactory.Discovery().V1().EndpointSlices(), s.ConfigSyncPeriod)
 		endpointSliceConfig.RegisterEventHandler(s.Proxier)
-		go endpointSliceConfig.Run(wait.NeverStop)
+		go endpointSliceConfig.Run(ctx.Done())
 	}
 
 	// This has to start after the calls to NewServiceConfig and NewEndpointsConfig because those
 	// functions must configure their shared informer event handlers first.
-	informerFactory.Start(wait.NeverStop)
+	informerFactory.Start(ctx.Done())
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
 		// Make an informer that selects for our nodename.
@@ -774,11 +773,11 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 			}))
 		nodeConfig := config.NewNodeConfig(currentNodeInformerFactory.Core().V1().Nodes(), s.ConfigSyncPeriod)
 		nodeConfig.RegisterEventHandler(s.Proxier)
-		go nodeConfig.Run(wait.NeverStop)
+		go nodeConfig.Run(ctx.Done())
 
 		// This has to start after the calls to NewNodeConfig because that must
 		// configure the shared informer event handler first.
-		currentNodeInformerFactory.Start(wait.NeverStop)
+		currentNodeInformerFactory.Start(ctx.Done())
 	}
 
 	// Birth Cry after the birth is successful
