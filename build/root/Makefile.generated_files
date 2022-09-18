@@ -133,6 +133,9 @@ endif
 #
 
 
+# This is the header we stick at the top of every generated file.
+BOILERPLATE_FILENAME := staging/src/k8s.io/code-generator/hack/boilerplate.go.txt
+
 # prerelease-lifecycle generation
 #
 # Any package that wants prerelease-lifecycle functions generated must include a
@@ -179,6 +182,7 @@ gen_prerelease_lifecycle: $(PRERELEASE_LIFECYCLE_GEN) $(META_DIR)/$(PRERELEASE_L
 	    ./hack/run-in-gopath.sh $(PRERELEASE_LIFECYCLE_GEN)                        \
 	        --v $(KUBE_VERBOSE)                                                    \
 	        --logtostderr                                                          \
+	        -h $(BOILERPLATE_FILENAME)                                             \
 	        -i "$$pkgs"                                                            \
 	        -O $(PRERELEASE_LIFECYCLE_BASENAME)                                    \
 	        "$$@";                                                                 \
@@ -274,6 +278,7 @@ gen_deepcopy: $(DEEPCOPY_GEN) $(META_DIR)/$(DEEPCOPY_GEN).todo
 	    ./hack/run-in-gopath.sh $(DEEPCOPY_GEN)                        \
 	        --v $(KUBE_VERBOSE)                                        \
 	        --logtostderr                                              \
+	        -h $(BOILERPLATE_FILENAME)                                 \
 	        -i "$$pkgs"                                                \
 	        --bounding-dirs $(PRJ_SRC_PATH),"k8s.io/api"               \
 	        -O $(DEEPCOPY_BASENAME)                                    \
@@ -378,6 +383,7 @@ gen_defaulter: $(DEFAULTER_GEN) $(META_DIR)/$(DEFAULTER_GEN).todo
 	    ./hack/run-in-gopath.sh $(DEFAULTER_GEN)                        \
 	        --v $(KUBE_VERBOSE)                                         \
 	        --logtostderr                                               \
+	        -h $(BOILERPLATE_FILENAME)                                  \
 	        -i "$$pkgs"                                                 \
 	        --extra-peer-dirs $$(echo $(DEFAULTER_EXTRA_PEER_PKGS) | sed 's/ /,/g') \
 	        -O $(DEFAULTER_BASENAME)                                    \
@@ -494,6 +500,7 @@ gen_conversion: $(CONVERSION_GEN) $(META_DIR)/$(CONVERSION_GEN).todo
 	        --extra-dirs $$(echo $(CONVERSION_EXTRA_PKGS) | sed 's/ /,/g') \
 	        --v $(KUBE_VERBOSE)                                          \
 	        --logtostderr                                                \
+	        -h $(BOILERPLATE_FILENAME)                                   \
 	        -i "$$pkgs"                                                  \
 	        -O $(CONVERSION_BASENAME)                                    \
 	        "$$@";                                                       \
@@ -546,7 +553,6 @@ $(CONVERSION_GEN): $(GODEPS_k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/c
 # The result file, in each pkg, of open-api generation.
 OPENAPI_BASENAME := $(GENERATED_FILE_PREFIX)openapi
 OPENAPI_FILENAME := $(OPENAPI_BASENAME).go
-BOILERPLATE_FILENAME := vendor/k8s.io/code-generator/hack/boilerplate.go.txt
 IGNORED_REPORT_FILENAME := $(OUT_DIR)/ignored_violations.report
 
 API_RULE_CHECK_FAILURE_MESSAGE = "ERROR: \n\t $(1) API rule check failed. Reported violations differ from known violations. Please read api/api-rules/README.md to resolve the failure in $(2). \n"
@@ -633,10 +639,10 @@ $$($(prefix)_OPENAPI_OUTFILE): $$(OPENAPI_GEN) $$($(prefix)_KNOWN_VIOLATION_FILE
 	./hack/run-in-gopath.sh $$(OPENAPI_GEN)                                                      \
 	    --v $$(KUBE_VERBOSE)                                                                     \
 	    --logtostderr                                                                            \
+	    -h $$(BOILERPLATE_FILENAME)                                                              \
 	    -i $$$$(echo $$(addprefix $(PRJ_SRC_PATH)/, $$($(prefix)_OPENAPI_DIRS)) | sed 's/ /,/g') \
 	    -p $$(PRJ_SRC_PATH)/$$($(prefix)_OPENAPI_OUTPUT_PKG)                                     \
 	    -O $$(OPENAPI_BASENAME)                                                                  \
-	    -h $$(BOILERPLATE_FILENAME)                                                              \
 	    -r $$($(prefix)_REPORT_FILENAME)                                                         \
 	    "$$$$@"
 	test -f $$($(prefix)_KNOWN_VIOLATION_FILENAME) || touch $$($(prefix)_KNOWN_VIOLATION_FILENAME)

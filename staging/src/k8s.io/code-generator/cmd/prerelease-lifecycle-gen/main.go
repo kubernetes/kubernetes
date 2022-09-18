@@ -40,17 +40,12 @@ import (
 	"github.com/spf13/pflag"
 	generatorargs "k8s.io/code-generator/cmd/prerelease-lifecycle-gen/args"
 	statusgenerators "k8s.io/code-generator/cmd/prerelease-lifecycle-gen/prerelease-lifecycle-generators"
-	"k8s.io/code-generator/pkg/util"
 	"k8s.io/klog/v2"
 )
 
 func main() {
 	klog.InitFlags(nil)
 	genericArgs, customArgs := generatorargs.NewDefaults()
-
-	// Override defaults.
-	// TODO: move this out of prerelease-lifecycle-gen
-	genericArgs.GoHeaderFilePath = util.BoilerplatePath()
 
 	genericArgs.AddFlags(pflag.CommandLine)
 	customArgs.AddFlags(pflag.CommandLine)
