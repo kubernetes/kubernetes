@@ -49,16 +49,11 @@ import (
 	"k8s.io/klog/v2"
 
 	generatorargs "k8s.io/code-generator/cmd/defaulter-gen/args"
-	"k8s.io/code-generator/pkg/util"
 )
 
 func main() {
 	klog.InitFlags(nil)
 	genericArgs, customArgs := generatorargs.NewDefaults()
-
-	// Override defaults.
-	// TODO: move this out of defaulter-gen
-	genericArgs.GoHeaderFilePath = util.BoilerplatePath()
 
 	genericArgs.AddFlags(pflag.CommandLine)
 	customArgs.AddFlags(pflag.CommandLine)
