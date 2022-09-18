@@ -185,9 +185,11 @@ func (r *ControllerExpectations) DeleteExpectations(controllerKey string) {
 // manager.
 func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) bool {
 	if exp, exists, err := r.GetExpectations(controllerKey); exists {
+		//判断当前控制对象 不需要增加也不需要减少.
 		if exp.Fulfilled() {
 			klog.V(4).Infof("Controller expectations fulfilled %#v", exp)
 			return true
+			//判断是否过期
 		} else if exp.isExpired() {
 			klog.V(4).Infof("Controller expectations expired %#v", exp)
 			return true
@@ -321,6 +323,7 @@ type UIDTrackingControllerExpectations struct {
 	uidStoreLock sync.Mutex
 	// Store used for the UIDs associated with any expectation tracked via the
 	// ControllerExpectationsInterface.
+	//存储的是uid 对应的pod名字的集合.
 	uidStore cache.Store
 }
 
@@ -358,10 +361,12 @@ func (u *UIDTrackingControllerExpectations) DeletionObserved(rcKey, deleteKey st
 	u.uidStoreLock.Lock()
 	defer u.uidStoreLock.Unlock()
 
+	//根据名字获取uid.
 	uids := u.GetUIDs(rcKey)
 	if uids != nil && uids.Has(deleteKey) {
 		klog.V(4).Infof("Controller %v received delete for pod %v", rcKey, deleteKey)
 		u.ControllerExpectationsInterface.DeletionObserved(rcKey)
+		//找到了对应的rs的uid. 则删除该pod记录.
 		uids.Delete(deleteKey)
 	}
 }

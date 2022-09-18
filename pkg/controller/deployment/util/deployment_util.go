@@ -608,6 +608,7 @@ func EqualIgnoreHash(template1, template2 *v1.PodTemplateSpec) bool {
 }
 
 // FindNewReplicaSet returns the new RS this given deployment targets (the one with the same pod template).
+//在并发场景下可能会存在多个最新的rs. 只返回最旧的且匹配的的rs.
 func FindNewReplicaSet(deployment *apps.Deployment, rsList []*apps.ReplicaSet) *apps.ReplicaSet {
 	sort.Sort(controller.ReplicaSetsByCreationTimestamp(rsList))
 	for i := range rsList {
@@ -628,6 +629,7 @@ func FindNewReplicaSet(deployment *apps.Deployment, rsList []*apps.ReplicaSet) *
 func FindOldReplicaSets(deployment *apps.Deployment, rsList []*apps.ReplicaSet) ([]*apps.ReplicaSet, []*apps.ReplicaSet) {
 	var requiredRSs []*apps.ReplicaSet
 	var allRSs []*apps.ReplicaSet
+	//如何确定最新的rs. 这里有点意思. 
 	newRS := FindNewReplicaSet(deployment, rsList)
 	for _, rs := range rsList {
 		// Filter out new replica set

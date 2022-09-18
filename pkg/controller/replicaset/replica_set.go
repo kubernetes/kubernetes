@@ -90,11 +90,14 @@ type ReplicaSetController struct {
 
 	// A ReplicaSet is temporarily suspended after creating/deleting these many replicas.
 	// It resumes normal action after observing the watch events for them.
+	//一次性最大处理的pod数量
 	burstReplicas int
 	// To allow injection of syncReplicaSet for testing.
 	syncHandler func(ctx context.Context, rsKey string) error
 
 	// A TTLCache of pod creates/deletes each rc expects to see.
+	//rs uid对应的pods集合.
+	//封装了ControllerExpectationsInterface, 里面是封装的cache. 实际上是pod的计数.
 	expectations *controller.UIDTrackingControllerExpectations
 
 	// A store of ReplicaSets, populated by the shared informer passed to NewReplicaSetController
@@ -146,15 +149,20 @@ func NewBaseController(rsInformer appsinformers.ReplicaSetInformer, podInformer 
 		kubeClient:       kubeClient,
 		podControl:       podControl,
 		burstReplicas:    burstReplicas,
+		//跟踪 期望pod
 		expectations:     controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
+		//根据速度限制器, 创建一个queue.
+		//如果超过了速率, 或者满了, 怎么办呢? apiserver那里应该会有方式处理. 应该会利用非阻塞机制做缓存.
 		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), queueName),
 	}
 
+	//添加rs的事件回调
 	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    rsc.addRS,
 		UpdateFunc: rsc.updateRS,
 		DeleteFunc: rsc.deleteRS,
 	})
+	//根据controller id进行区分.
 	rsInformer.Informer().AddIndexers(cache.Indexers{
 		controllerUIDIndex: func(obj interface{}) ([]string, error) {
 			rs, ok := obj.(*apps.ReplicaSet)
@@ -172,6 +180,7 @@ func NewBaseController(rsInformer appsinformers.ReplicaSetInformer, podInformer 
 	rsc.rsLister = rsInformer.Lister()
 	rsc.rsListerSynced = rsInformer.Informer().HasSynced
 
+	//添加pod的回调.
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: rsc.addPod,
 		// This invokes the ReplicaSet for every pod change, eg: host assignment. Though this might seem like
@@ -264,6 +273,7 @@ func (rsc *ReplicaSetController) getPodReplicaSets(pod *v1.Pod) []*apps.ReplicaS
 func (rsc *ReplicaSetController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *apps.ReplicaSet {
 	// We can't look up by UID, so look up by Name and then verify UID.
 	// Don't even try to look up by Name if it's the wrong Kind.
+	//过滤kind
 	if controllerRef.Kind != rsc.Kind {
 		return nil
 	}
@@ -311,6 +321,7 @@ func (rsc *ReplicaSetController) updateRS(old, cur interface{}) {
 	curRS := cur.(*apps.ReplicaSet)
 
 	// TODO: make a KEP and fix informers to always call the delete event handler on re-create
+	//为什么会出现两个uid不同呢?
 	if curRS.UID != oldRS.UID {
 		key, err := controller.KeyFunc(oldRS)
 		if err != nil {
@@ -338,6 +349,7 @@ func (rsc *ReplicaSetController) updateRS(old, cur interface{}) {
 	if *(oldRS.Spec.Replicas) != *(curRS.Spec.Replicas) {
 		klog.V(4).Infof("%v %v updated. Desired pod count change: %d->%d", rsc.Kind, curRS.Name, *(oldRS.Spec.Replicas), *(curRS.Spec.Replicas))
 	}
+	//入队的只是id
 	rsc.enqueueRS(curRS)
 }
 
@@ -371,6 +383,8 @@ func (rsc *ReplicaSetController) deleteRS(obj interface{}) {
 }
 
 // When a pod is created, enqueue the replica set that manages it and update its expectations.
+//对于pod来说, 只有通过controllerref才能判断属于哪种资源的下的pod.
+//处理的都是rs.. 跟pod无关.
 func (rsc *ReplicaSetController) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
 
@@ -383,6 +397,7 @@ func (rsc *ReplicaSetController) addPod(obj interface{}) {
 
 	// If it has a ControllerRef, that's all that matters.
 	if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil {
+		//找到rs
 		rs := rsc.resolveControllerRef(pod.Namespace, controllerRef)
 		if rs == nil {
 			return
@@ -417,6 +432,7 @@ func (rsc *ReplicaSetController) addPod(obj interface{}) {
 func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 	curPod := cur.(*v1.Pod)
 	oldPod := old.(*v1.Pod)
+	//resourceVersion没有变化则返回.
 	if curPod.ResourceVersion == oldPod.ResourceVersion {
 		// Periodic resync will send update events for all known pods.
 		// Two different versions of the same pod will always have different RVs.
@@ -424,13 +440,18 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 	}
 
 	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
+	//更新了删除时间戳, 走删除的逻辑.
 	if curPod.DeletionTimestamp != nil {
 		// when a pod is deleted gracefully it's deletion timestamp is first modified to reflect a grace period,
 		// and after such time has passed, the kubelet actually deletes it from the store. We receive an update
 		// for modification of the deletion timestamp and expect an rs to create more replicas asap, not wait
 		// until the kubelet actually deletes the pod. This is different from the Phase of a pod changing, because
 		// an rs never initiates a phase change, and so is never asleep waiting for the same.
+		//如果优雅的删除, 则会先更新删除的时间戳. 等时间过了, kubelet才会从store中删除.
+		//如果于此同时想要创建更多的pod, 不会等待kubelet的删除, 直接删除.
+		//删除rskey中pods集合中pod, 同时删除计数.
 		rsc.deletePod(curPod)
+		//为什么只有labels不一样的时候才会删除旧的pod呢?
 		if labelChanged {
 			// we don't need to check the oldPod.DeletionTimestamp because DeletionTimestamp cannot be unset.
 			rsc.deletePod(oldPod)
@@ -440,9 +461,11 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 
 	curControllerRef := metav1.GetControllerOf(curPod)
 	oldControllerRef := metav1.GetControllerOf(oldPod)
+	//为什么controller ref会发生变化呢?
 	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
 	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
+		//如果controller变更了, 则入队rs的queue.
 		if rs := rsc.resolveControllerRef(oldPod.Namespace, oldControllerRef); rs != nil {
 			rsc.enqueueRS(rs)
 		}
@@ -463,6 +486,7 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 		// a Pod transitioned to Ready.
 		// Note that this still suffers from #29229, we are just moving the problem one level
 		// "closer" to kubelet (from the deployment to the replica set controller).
+		//当旧pod没有处于condition的 ready 状态, 而新的pod处于ready 状态, 且最小ready时间 > 0, 则延迟入队.
 		if !podutil.IsPodReady(oldPod) && podutil.IsPodReady(curPod) && rs.Spec.MinReadySeconds > 0 {
 			klog.V(2).Infof("%v %q will be enqueued after %ds for availability check", rsc.Kind, rs.Name, rs.Spec.MinReadySeconds)
 			// Add a second to avoid milliseconds skew in AddAfter.
@@ -474,6 +498,9 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 
 	// Otherwise, it's an orphan. If anything changed, sync matching controllers
 	// to see if anyone wants to adopt it now.
+	
+	//可能是个孤儿pod.
+	//如果label 改变, 或者controller变化则入队对应的rs.
 	if labelChanged || controllerRefChanged {
 		rss := rsc.getPodReplicaSets(curPod)
 		if len(rss) == 0 {
@@ -523,6 +550,8 @@ func (rsc *ReplicaSetController) deletePod(obj interface{}) {
 		return
 	}
 	klog.V(4).Infof("Pod %s/%s deleted through %v, timestamp %+v: %#v.", pod.Namespace, pod.Name, utilruntime.GetCaller(), pod.DeletionTimestamp, pod)
+	//rs名字和pod名字
+	//删除rs对应的pods集合中的pod, 同时减少rs的pod计数.
 	rsc.expectations.DeletionObserved(rsKey, controller.PodKey(pod))
 	rsc.queue.Add(rsKey)
 }
@@ -541,6 +570,7 @@ func (rsc *ReplicaSetController) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer rsc.queue.Done(key)
 
+	//同步当前replica set状态.
 	err := rsc.syncHandler(ctx, key.(string))
 	if err == nil {
 		rsc.queue.Forget(key)
@@ -548,6 +578,7 @@ func (rsc *ReplicaSetController) processNextWorkItem(ctx context.Context) bool {
 	}
 
 	utilruntime.HandleError(fmt.Errorf("sync %q failed with %v", key, err))
+	//如果出错, 重新入队.
 	rsc.queue.AddRateLimited(key)
 
 	return true
@@ -563,6 +594,7 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for %v %#v: %v", rsc.Kind, rs, err))
 		return nil
 	}
+	//如果小于0, 则说明还没有到达目标数量.
 	if diff < 0 {
 		diff *= -1
 		if diff > rsc.burstReplicas {
@@ -573,6 +605,7 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 		// UID, which would require locking *across* the create, which will turn
 		// into a performance bottleneck. We should generate a UID for the pod
 		// beforehand and store it via ExpectCreations.
+		//创建Exception, 设定当前目标
 		rsc.expectations.ExpectCreations(rsKey, diff)
 		klog.V(2).InfoS("Too few replicas", "replicaSet", klog.KObj(rs), "need", *(rs.Spec.Replicas), "creating", diff)
 		// Batch the pod creates. Batch sizes start at SlowStartInitialBatchSize
@@ -583,7 +616,9 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 		// prevented from spamming the API service with the pod create requests
 		// after one of its pods fails.  Conveniently, this also prevents the
 		// event spam that those failures would generate.
+		// 指数创建.
 		successfulCreations, err := slowStartBatch(diff, controller.SlowStartInitialBatchSize, func() error {
+			//在创建时就传入了controller ref的.
 			err := rsc.podControl.CreatePods(ctx, rs.Namespace, &rs.Spec.Template, rs, metav1.NewControllerRef(rs, rsc.GroupVersionKind))
 			if err != nil {
 				if apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
@@ -598,8 +633,10 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 		// Any skipped pods that we never attempted to start shouldn't be expected.
 		// The skipped pods will be retried later. The next controller resync will
 		// retry the slow start process.
+		//逐步创建pod
 		if skippedPods := diff - successfulCreations; skippedPods > 0 {
 			klog.V(2).Infof("Slow-start failure. Skipping creation of %d pods, decrementing expectations for %v %v/%v", skippedPods, rsc.Kind, rs.Namespace, rs.Name)
+			//创建失败, 则减少计数.
 			for i := 0; i < skippedPods; i++ {
 				// Decrement the expected number of creates because the informer won't observe this pod
 				rsc.expectations.CreationObserved(rsKey)
@@ -607,15 +644,27 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 		}
 		return err
 	} else if diff > 0 {
+		//说明有创建多余的.
 		if diff > rsc.burstReplicas {
 			diff = rsc.burstReplicas
 		}
 		klog.V(2).InfoS("Too many replicas", "replicaSet", klog.KObj(rs), "need", *(rs.Spec.Replicas), "deleting", diff)
 
+		//获取所有replica set相关联的pod
 		relatedPods, err := rsc.getIndirectlyRelatedPods(rs)
 		utilruntime.HandleError(err)
 
 		// Choose which Pods to delete, preferring those in earlier phases of startup.
+		//有啥用呢, 排序了, 返回的还是filteredPods, 难道在排序中更改了filteredPods顺序?
+		//删除pod顺序
+		// 按照下面的排序规则，从上到下进行排序，各个条件相互互斥，符合其中一个条件则排序完成：
+		// （1）优先删除没有绑定node的pod；
+		// （2）优先删除处于Pending状态的pod，然后是Unknown，最后才是Running；
+		// （3）优先删除Not ready的pod，然后才是ready的pod；
+		// （4）按同node上所属replicaset的pod数量排序，优先删除所属replicaset的pod数量多的node上的pod；
+		// （5）按pod ready的时间排序，优先删除ready时间最短的pod；
+		// （6）优先删除pod中容器重启次数较多的pod；
+		// （7）按pod创建时间排序，优先删除创建时间最短的pod。
 		podsToDelete := getPodsToDelete(filteredPods, relatedPods, diff)
 
 		// Snapshot the UIDs (ns/name) of the pods we're expecting to see
@@ -661,6 +710,7 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 // syncReplicaSet will sync the ReplicaSet with the given key if it has had its expectations fulfilled,
 // meaning it did not expect to see any more of its pods created or deleted. This function is not meant to be
 // invoked concurrently with the same key.
+//
 func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string) error {
 	startTime := time.Now()
 	defer func() {
@@ -671,6 +721,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	if err != nil {
 		return err
 	}
+	//重新获取数据,
 	rs, err := rsc.rsLister.ReplicaSets(namespace).Get(name)
 	if apierrors.IsNotFound(err) {
 		klog.V(4).Infof("%v %v has been deleted", rsc.Kind, key)
@@ -681,7 +732,9 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 		return err
 	}
 
+	//判断是否需要重新同步, 主要是看是否已经满足当前数量. true 已经满足, false, 没有满足.
 	rsNeedsSync := rsc.expectations.SatisfiedExpectations(key)
+	//当前rs的选择器.
 	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error converting pod selector to selector for rs %v/%v: %v", namespace, name, err))
@@ -691,21 +744,30 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	// list all pods to include the pods that don't match the rs`s selector
 	// anymore but has the stale controller ref.
 	// TODO: Do the List and Filter in a single pass, or use an index.
+	//获取对应的namespace下所有的pods
+	//这里的获取是否可以优化, 获取不同条件的pod? 相当于逻辑放入apiserver里面.
 	allPods, err := rsc.podLister.Pods(rs.Namespace).List(labels.Everything())
 	if err != nil {
 		return err
 	}
 	// Ignore inactive pods.
+	//活动的pod, 不是success 也不是failed, 也不是删除的pod.
+	//就是正在进行创建中的pod. pending和runing的pod
 	filteredPods := controller.FilterActivePods(allPods)
 
 	// NOTE: filteredPods are pointing to objects from cache - if you need to
 	// modify them, you need to copy it first.
+	//当前rs, 当前选择器, 当前正在创建中的pod.
+	//将当前pending和running状态的pod.
+	//返回当前rs合适的pods
 	filteredPods, err = rsc.claimPods(ctx, rs, selector, filteredPods)
 	if err != nil {
 		return err
 	}
 
 	var manageReplicasErr error
+	//如果已经同步完成, 且没有删除rs.
+	//创建或者删除pod. 在创建pod的时候添加了controller ref
 	if rsNeedsSync && rs.DeletionTimestamp == nil {
 		manageReplicasErr = rsc.manageReplicas(ctx, filteredPods, rs)
 	}
@@ -720,6 +782,8 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 		return err
 	}
 	// Resync the ReplicaSet after MinReadySeconds as a last line of defense to guard against clock-skew.
+	//如果available != 目标副本, 则等待一段时间后继续入队.
+	//创建完成之后, 不会再有事件, 如果还有没available的pod, 则再插入事件.
 	if manageReplicasErr == nil && updatedRS.Spec.MinReadySeconds > 0 &&
 		updatedRS.Status.ReadyReplicas == *(updatedRS.Spec.Replicas) &&
 		updatedRS.Status.AvailableReplicas != *(updatedRS.Spec.Replicas) {
@@ -732,6 +796,7 @@ func (rsc *ReplicaSetController) claimPods(ctx context.Context, rs *apps.Replica
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
 	canAdoptFunc := controller.RecheckDeletionTimestamp(func(ctx context.Context) (metav1.Object, error) {
+		//根据名字重新获取rs
 		fresh, err := rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace).Get(ctx, rs.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
@@ -741,6 +806,7 @@ func (rsc *ReplicaSetController) claimPods(ctx context.Context, rs *apps.Replica
 		}
 		return fresh, nil
 	})
+	//创建rs对应的controller ref manager.
 	cm := controller.NewPodControllerRefManager(rsc.podControl, rs, selector, rsc.GroupVersionKind, canAdoptFunc)
 	return cm.ClaimPods(ctx, filteredPods)
 }
@@ -787,12 +853,14 @@ func slowStartBatch(count int, initialBatchSize int, fn func() error) (int, erro
 func (rsc *ReplicaSetController) getIndirectlyRelatedPods(rs *apps.ReplicaSet) ([]*v1.Pod, error) {
 	var relatedPods []*v1.Pod
 	seen := make(map[types.UID]*apps.ReplicaSet)
+	//获取相关联的rs, 同一个deployment下的rs.
 	for _, relatedRS := range rsc.getReplicaSetsWithSameController(rs) {
 		selector, err := metav1.LabelSelectorAsSelector(relatedRS.Spec.Selector)
 		if err != nil {
 			// This object has an invalid selector, it does not match any pods
 			continue
 		}
+		//每次发送请求, 筛选指定的pod.
 		pods, err := rsc.podLister.Pods(relatedRS.Namespace).List(selector)
 		if err != nil {
 			return nil, err
@@ -814,7 +882,10 @@ func getPodsToDelete(filteredPods, relatedPods []*v1.Pod, diff int) []*v1.Pod {
 	// No need to sort pods if we are about to delete all of them.
 	// diff will always be <= len(filteredPods), so not need to handle > case.
 	if diff < len(filteredPods) {
+		//将pod进行了一个排序, pod排序的值为该节点上relatedPod中active的数量值.
+		//active pod, pending/running pod, 哪个节点上的pod多. 先删除哪个节点上的pod.
 		podsWithRanks := getPodsRankedByRelatedPodsOnSameNode(filteredPods, relatedPods)
+		//排序中可能会移动filteredPods?!!!
 		sort.Sort(podsWithRanks)
 		reportSortingDeletionAgeRatioMetric(filteredPods, diff)
 	}

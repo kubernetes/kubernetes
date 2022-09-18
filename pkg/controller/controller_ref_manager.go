@@ -68,11 +68,14 @@ func (m *BaseControllerRefManager) CanAdopt(ctx context.Context) error {
 // No reconciliation will be attempted if the controller is being deleted.
 func (m *BaseControllerRefManager) ClaimObject(ctx context.Context, obj metav1.Object, match func(metav1.Object) bool, adopt, release func(context.Context, metav1.Object) error) (bool, error) {
 	controllerRef := metav1.GetControllerOfNoCopy(obj)
+	//如果对象已经有controller  ref
 	if controllerRef != nil {
+		//当前的pod ref 与 ref manager 的uid不一样, 则直接返回. 不是当前ref manager 控制的.
 		if controllerRef.UID != m.Controller.GetUID() {
 			// Owned by someone else. Ignore.
 			return false, nil
 		}
+		//uid 一致, 且labels 匹配. 则直接返回, 属于当前 ref manager的.
 		if match(obj) {
 			// We already own it and the selector matches.
 			// Return true (successfully claimed) before checking deletion timestamp.
@@ -82,9 +85,13 @@ func (m *BaseControllerRefManager) ClaimObject(ctx context.Context, obj metav1.O
 		}
 		// Owned by us but selector doesn't match.
 		// Try to release, unless we're being deleted.
+		//如果ref uid 一样, 但是labels不一样 怎么办?
+		//如果当前ref 将要被删除, 则不处理后续
 		if m.Controller.GetDeletionTimestamp() != nil {
 			return false, nil
 		}
+		//释放对应资源. 删除controller ref
+		//对于pod, 如果是rs, 会删除pod 上关于uid的 controller ref 信息.
 		if err := release(ctx, obj); err != nil {
 			// If the pod no longer exists, ignore the error.
 			if errors.IsNotFound(err) {
@@ -99,21 +106,25 @@ func (m *BaseControllerRefManager) ClaimObject(ctx context.Context, obj metav1.O
 	}
 
 	// It's an orphan.
+	//如果当前controller ref 标记删除, 或者不匹配, 则跳过.
 	if m.Controller.GetDeletionTimestamp() != nil || !match(obj) {
 		// Ignore if we're being deleted or selector doesn't match.
 		return false, nil
 	}
+	//如果pod 已经被删除则跳过.
 	if obj.GetDeletionTimestamp() != nil {
 		// Ignore if the object is being deleted
 		return false, nil
 	}
 
+	//检查namespace是否匹配. 按理说不应该会出现.
 	if len(m.Controller.GetNamespace()) > 0 && m.Controller.GetNamespace() != obj.GetNamespace() {
 		// Ignore if namespace not match
 		return false, nil
 	}
 
 	// Selector matches. Try to adopt.
+	//如果匹配标签. 且没有controller ref.
 	if err := adopt(ctx, obj); err != nil {
 		// If the pod no longer exists, ignore the error.
 		if errors.IsNotFound(err) {
@@ -184,12 +195,14 @@ func (m *PodControllerRefManager) ClaimPods(ctx context.Context, pods []*v1.Pod,
 	var claimed []*v1.Pod
 	var errlist []error
 
+	//pod是否匹配当前的rs
 	match := func(obj metav1.Object) bool {
 		pod := obj.(*v1.Pod)
 		// Check selector first so filters only run on potentially matching Pods.
 		if !m.Selector.Matches(labels.Set(pod.Labels)) {
 			return false
 		}
+		//在rs的时候这里没有传递filter
 		for _, filter := range filters {
 			if !filter(pod) {
 				return false
@@ -197,9 +210,11 @@ func (m *PodControllerRefManager) ClaimPods(ctx context.Context, pods []*v1.Pod,
 		}
 		return true
 	}
+	//patch pod, 将controllerref放入pod
 	adopt := func(ctx context.Context, obj metav1.Object) error {
 		return m.AdoptPod(ctx, obj.(*v1.Pod))
 	}
+	//patch pod, pod 的controller ref 删除当前的 ref
 	release := func(ctx context.Context, obj metav1.Object) error {
 		return m.ReleasePod(ctx, obj.(*v1.Pod))
 	}
@@ -219,6 +234,7 @@ func (m *PodControllerRefManager) ClaimPods(ctx context.Context, pods []*v1.Pod,
 
 // AdoptPod sends a patch to take control of the pod. It returns the error if
 // the patching fails.
+//patch controller ref
 func (m *PodControllerRefManager) AdoptPod(ctx context.Context, pod *v1.Pod) error {
 	if err := m.CanAdopt(ctx); err != nil {
 		return fmt.Errorf("can't adopt Pod %v/%v (%v): %v", pod.Namespace, pod.Name, pod.UID, err)
@@ -230,6 +246,7 @@ func (m *PodControllerRefManager) AdoptPod(ctx context.Context, pod *v1.Pod) err
 	if err != nil {
 		return err
 	}
+	//patch controller ref
 	return m.podControl.PatchPod(ctx, pod.Namespace, pod.Name, patchBytes)
 }
 

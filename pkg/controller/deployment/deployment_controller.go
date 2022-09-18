@@ -207,6 +207,7 @@ func (dc *DeploymentController) addReplicaSet(obj interface{}) {
 	}
 
 	// If it has a ControllerRef, that's all that matters.
+	//如果有controller ref.. 直接解析放入队列中
 	if controllerRef := metav1.GetControllerOf(rs); controllerRef != nil {
 		d := dc.resolveControllerRef(rs.Namespace, controllerRef)
 		if d == nil {
@@ -219,6 +220,7 @@ func (dc *DeploymentController) addReplicaSet(obj interface{}) {
 
 	// Otherwise, it's an orphan. Get a list of all matching Deployments and sync
 	// them to see if anyone wants to adopt it.
+	//根据labels匹配对应的deploy
 	ds := dc.getDeploymentsForReplicaSet(rs)
 	if len(ds) == 0 {
 		return
@@ -264,6 +266,8 @@ func (dc *DeploymentController) updateReplicaSet(old, cur interface{}) {
 
 	curControllerRef := metav1.GetControllerOf(curRS)
 	oldControllerRef := metav1.GetControllerOf(oldRS)
+	
+	//不一样 则入队
 	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
 	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
@@ -273,6 +277,7 @@ func (dc *DeploymentController) updateReplicaSet(old, cur interface{}) {
 	}
 
 	// If it has a ControllerRef, that's all that matters.
+	//对于rs, 直接解析的controller ref.
 	if curControllerRef != nil {
 		d := dc.resolveControllerRef(curRS.Namespace, curControllerRef)
 		if d == nil {
@@ -355,12 +360,16 @@ func (dc *DeploymentController) deletePod(obj interface{}) {
 		}
 	}
 	klog.V(4).InfoS("Pod deleted", "pod", klog.KObj(pod))
+	// 获取pod对应的deployment. 且只有为recreate策略时才会触发.
+	//因为recreate策略是只有删除完成后才会重新创建pod/
 	if d := dc.getDeploymentForPod(pod); d != nil && d.Spec.Strategy.Type == apps.RecreateDeploymentStrategyType {
 		// Sync if this Deployment now has no more Pods.
+		//根据selector选择rs
 		rsList, err := util.ListReplicaSets(d, util.RsListFromClient(dc.client.AppsV1()))
 		if err != nil {
 			return
 		}
+		//根据selector找到对应的pod
 		podMap, err := dc.getPodMapForDeployment(d, rsList)
 		if err != nil {
 			return
@@ -369,6 +378,7 @@ func (dc *DeploymentController) deletePod(obj interface{}) {
 		for _, podList := range podMap {
 			numPods += len(podList)
 		}
+		//如果所有pod 为0, 入队.
 		if numPods == 0 {
 			dc.enqueueDeployment(d)
 		}
@@ -513,6 +523,7 @@ func (dc *DeploymentController) getReplicaSetsForDeployment(ctx context.Context,
 	}
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing ReplicaSets (see #42639).
+	//每次添加之前先确定deployment是否被删除 跟垃圾回收机制有关系的.
 	canAdoptFunc := controller.RecheckDeletionTimestamp(func(ctx context.Context) (metav1.Object, error) {
 		fresh, err := dc.client.AppsV1().Deployments(d.Namespace).Get(ctx, d.Name, metav1.GetOptions{})
 		if err != nil {
@@ -612,6 +623,9 @@ func (dc *DeploymentController) syncDeployment(ctx context.Context, key string) 
 	//
 	// * check if a Pod is labeled correctly with the pod-template-hash label.
 	// * check that no old Pods are running in the middle of Recreate Deployments.
+	// 1. 检查pod的label 是否正确.
+	// 2. recreate 策略的deploy 是否有旧的pod.
+	//返回rs对应的pod集合.
 	podMap, err := dc.getPodMapForDeployment(d, rsList)
 	if err != nil {
 		return err

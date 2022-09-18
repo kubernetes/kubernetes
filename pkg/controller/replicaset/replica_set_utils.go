@@ -38,6 +38,7 @@ func updateReplicaSetStatus(c appsclient.ReplicaSetInterface, rs *apps.ReplicaSe
 	// This is the steady state. It happens when the ReplicaSet doesn't have any expectations, since
 	// we do a periodic relist every 30s. If the generations differ but the replicas are
 	// the same, a caller might've resized to the same replica count.
+	//如果都相等, 则返回.
 	if rs.Status.Replicas == newStatus.Replicas &&
 		rs.Status.FullyLabeledReplicas == newStatus.FullyLabeledReplicas &&
 		rs.Status.ReadyReplicas == newStatus.ReadyReplicas &&
@@ -83,6 +84,7 @@ func updateReplicaSetStatus(c appsclient.ReplicaSetInterface, rs *apps.ReplicaSe
 	return nil, updateErr
 }
 
+//filteredPods 当前rs中处理的pod(添加或者删除controller ref).
 func calculateStatus(rs *apps.ReplicaSet, filteredPods []*v1.Pod, manageReplicasErr error) apps.ReplicaSetStatus {
 	newStatus := rs.Status
 	// Count the number of pods that have labels matching the labels of the pod
@@ -93,7 +95,9 @@ func calculateStatus(rs *apps.ReplicaSet, filteredPods []*v1.Pod, manageReplicas
 	fullyLabeledReplicasCount := 0
 	readyReplicasCount := 0
 	availableReplicasCount := 0
+	//获取ts的label
 	templateLabel := labels.Set(rs.Spec.Template.Labels).AsSelectorPreValidated()
+	//根据当前rs新添加的pod, 计算当前的值.
 	for _, pod := range filteredPods {
 		if templateLabel.Matches(labels.Set(pod.Labels)) {
 			fullyLabeledReplicasCount++
@@ -106,7 +110,9 @@ func calculateStatus(rs *apps.ReplicaSet, filteredPods []*v1.Pod, manageReplicas
 		}
 	}
 
+	//获取所有的condition, 是否有failure的条件.
 	failureCond := GetCondition(rs.Status, apps.ReplicaSetReplicaFailure)
+	//如果有错, 且, 找不到failure 条件. 则设置.
 	if manageReplicasErr != nil && failureCond == nil {
 		var reason string
 		if diff := len(filteredPods) - int(*(rs.Spec.Replicas)); diff < 0 {
@@ -117,6 +123,7 @@ func calculateStatus(rs *apps.ReplicaSet, filteredPods []*v1.Pod, manageReplicas
 		cond := NewReplicaSetCondition(apps.ReplicaSetReplicaFailure, v1.ConditionTrue, reason, manageReplicasErr.Error())
 		SetCondition(&newStatus, cond)
 	} else if manageReplicasErr == nil && failureCond != nil {
+		//移除错误的condition
 		RemoveCondition(&newStatus, apps.ReplicaSetReplicaFailure)
 	}
 
