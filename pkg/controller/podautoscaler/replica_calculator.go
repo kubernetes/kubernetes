@@ -175,7 +175,7 @@ func (c *ReplicaCalculator) GetMetricReplicas(currentReplicas int32, targetUtili
 }
 
 // calcPlainMetricReplicas calculates the desired replicas for plain (i.e. non-utilization percentage) metrics.
-func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMetricsInfo, currentReplicas int32, targetUtilization int64, namespace string, selector labels.Selector, resource v1.ResourceName) (replicaCount int32, utilization int64, err error) {
+func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMetricsInfo, currentReplicas int32, targetUsage int64, namespace string, selector labels.Selector, resource v1.ResourceName) (replicaCount int32, utilization int64, err error) {
 
 	podList, err := c.podLister.Pods(namespace).List(selector)
 	if err != nil {
@@ -194,7 +194,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 		return 0, 0, fmt.Errorf("did not receive metrics for any ready pods")
 	}
 
-	usageRatio, utilization := metricsclient.GetMetricUtilizationRatio(metrics, targetUtilization)
+	usageRatio, utilization := metricsclient.GetMetricUtilizationRatio(metrics, targetUsage)
 
 	scaleUpWithUnready := len(unreadyPods) > 0 && usageRatio > 1.0
 
@@ -212,7 +212,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 		if usageRatio < 1.0 {
 			// on a scale-down, treat missing pods as using exactly the target amount
 			for podName := range missingPods {
-				metrics[podName] = metricsclient.PodMetric{Value: targetUtilization}
+				metrics[podName] = metricsclient.PodMetric{Value: targetUsage}
 			}
 		} else {
 			// on a scale-up, treat missing pods as using 0% of the resource request
@@ -230,7 +230,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 	}
 
 	// re-run the utilization calculation with our new numbers
-	newUsageRatio, _ := metricsclient.GetMetricUtilizationRatio(metrics, targetUtilization)
+	newUsageRatio, _ := metricsclient.GetMetricUtilizationRatio(metrics, targetUsage)
 
 	if math.Abs(1.0-newUsageRatio) <= c.tolerance || (usageRatio < 1.0 && newUsageRatio > 1.0) || (usageRatio > 1.0 && newUsageRatio < 1.0) {
 		// return the current replicas if the change would be too small,
