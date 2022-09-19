@@ -341,9 +341,7 @@ func (b *builder) buildRoute(root, path, httpMethod, actionVerb, operationVerb s
 			string(types.JSONPatchType),
 			string(types.MergePatchType),
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-			supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
-		}
+		supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
 
 		route.Consumes(supportedTypes...)
 	} else {

@@ -159,7 +159,7 @@ func TestSyncClusterRole(t *testing.T) {
 			expectedClusterRoleApply: nil,
 		}}
 
-	for _, serverSideApplyEnabled := range []bool{true, false} {
+	for _, serverSideApplyEnabled := range []bool{true} {
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
 				indexer := cache.NewIndexer(controller.KeyFunc, cache.Indexers{})

@@ -22,7 +22,6 @@ import (
 	"sort"
 	"time"
 
-	"k8s.io/apiserver/pkg/features"
 	rbacv1ac "k8s.io/client-go/applyconfigurations/rbac/v1"
 	"k8s.io/klog/v2"
 
@@ -33,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	rbacinformers "k8s.io/client-go/informers/rbac/v1"
 	rbacclient "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	rbaclisters "k8s.io/client-go/listers/rbac/v1"
@@ -125,18 +123,7 @@ func (c *ClusterRoleAggregationController) syncClusterRole(ctx context.Context, 
 		return nil
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-		err = c.applyClusterRoles(ctx, sharedClusterRole.Name, newPolicyRules)
-		if errors.IsUnsupportedMediaType(err) { // TODO: Remove this fallback at least one release after ServerSideApply GA
-			// When Server Side Apply is not enabled, fallback to Update. This is required when running
-			// 1.21 since api-server can be 1.20 during the upgrade/downgrade.
-			// Since Server Side Apply is enabled by default in Beta, this fallback only kicks in
-			// if the feature has been disabled using its feature flag.
-			err = c.updateClusterRoles(ctx, sharedClusterRole, newPolicyRules)
-		}
-	} else {
-		err = c.updateClusterRoles(ctx, sharedClusterRole, newPolicyRules)
-	}
+	err = c.applyClusterRoles(ctx, sharedClusterRole.Name, newPolicyRules)
 	return err
 }
 
@@ -146,16 +133,6 @@ func (c *ClusterRoleAggregationController) applyClusterRoles(ctx context.Context
 
 	opts := metav1.ApplyOptions{FieldManager: "clusterrole-aggregation-controller", Force: true}
 	_, err := c.clusterRoleClient.ClusterRoles().Apply(ctx, clusterRoleApply, opts)
-	return err
-}
-
-func (c *ClusterRoleAggregationController) updateClusterRoles(ctx context.Context, sharedClusterRole *rbacv1.ClusterRole, newPolicyRules []rbacv1.PolicyRule) error {
-	clusterRole := sharedClusterRole.DeepCopy()
-	clusterRole.Rules = nil
-	for _, rule := range newPolicyRules {
-		clusterRole.Rules = append(clusterRole.Rules, *rule.DeepCopy())
-	}
-	_, err := c.clusterRoleClient.ClusterRoles().Update(ctx, clusterRole, metav1.UpdateOptions{})
 	return err
 }
 

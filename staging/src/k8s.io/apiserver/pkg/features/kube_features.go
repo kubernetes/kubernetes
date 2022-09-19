@@ -154,14 +154,6 @@ const (
 	// Deprecates and removes SelfLink from ObjectMeta and ListMeta.
 	RemoveSelfLink featuregate.Feature = "RemoveSelfLink"
 
-	// owner: @apelisse, @lavalamp
-	// alpha: v1.14
-	// beta: v1.16
-	// stable: v1.22
-	//
-	// Server-side apply. Merging happens on the server.
-	ServerSideApply featuregate.Feature = "ServerSideApply"
-
 	// owner: @kevindelgado
 	// kep: http://kep.k8s.io/2885
 	// alpha: v1.23
@@ -230,8 +222,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	RemainingItemCount: {Default: true, PreRelease: featuregate.Beta},
 
 	RemoveSelfLink: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-
-	ServerSideApply: {Default: true, PreRelease: featuregate.GA},
 
 	ServerSideFieldValidation: {Default: true, PreRelease: featuregate.Beta},
 
