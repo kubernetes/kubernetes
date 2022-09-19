@@ -1381,7 +1381,7 @@ func (proxier *Proxier) syncProxyRules() {
 					klog.ErrorS(err, "Policy creation failed")
 					continue
 				}
-				lbIngressIP.hnsID = hnsLoadBalancer.hnsID
+				lbIngressIP.hnsID = hnsLoadBalancer.hnsID // Prince Pereira: Check with Sravanth
 				klog.V(3).InfoS("Hns LoadBalancer resource created for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)
 			} else {
 				klog.V(3).InfoS("Skipped creating Hns LoadBalancer for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)
