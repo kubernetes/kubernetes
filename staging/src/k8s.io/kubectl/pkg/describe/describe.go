@@ -855,8 +855,8 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 	})
 }
 
-func printController(controllee metav1.Object) string {
-	if controllerRef := metav1.GetControllerOf(controllee); controllerRef != nil {
+func printController(controller metav1.Object) string {
+	if controllerRef := metav1.GetControllerOf(controller); controllerRef != nil {
 		return fmt.Sprintf("%s/%s", controllerRef.Kind, controllerRef.Name)
 	}
 	return ""
