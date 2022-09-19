@@ -103,6 +103,14 @@ func NoFileCompletions(cmd *Command, args []string, toComplete string) ([]string
 	return nil, ShellCompDirectiveNoFileComp
 }
 
+// FixedCompletions can be used to create a completion function which always
+// returns the same results.
+func FixedCompletions(choices []string, directive ShellCompDirective) func(cmd *Command, args []string, toComplete string) ([]string, ShellCompDirective) {
+	return func(cmd *Command, args []string, toComplete string) ([]string, ShellCompDirective) {
+		return choices, directive
+	}
+}
+
 // RegisterFlagCompletionFunc should be called to register a function to provide completion for a flag.
 func (c *Command) RegisterFlagCompletionFunc(flagName string, f func(cmd *Command, args []string, toComplete string) ([]string, ShellCompDirective)) error {
 	flag := c.Flag(flagName)
@@ -170,6 +178,12 @@ func (c *Command) initCompleteCmd(args []string) {
 
 			noDescriptions := (cmd.CalledAs() == ShellCompNoDescRequestCmd)
 			for _, comp := range completions {
+				if GetActiveHelpConfig(finalCmd) == activeHelpGlobalDisable {
+					// Remove all activeHelp entries in this case
+					if strings.HasPrefix(comp, activeHelpMarker) {
+						continue
+					}
+				}
 				if noDescriptions {
 					// Remove any description that may be included following a tab character.
 					comp = strings.Split(comp, "\t")[0]
@@ -311,8 +325,11 @@ func (c *Command) getCompletions(args []string) (*Command, []string, ShellCompDi
 	var completions []string
 	var directive ShellCompDirective
 
+	// Enforce flag groups before doing flag completions
+	finalCmd.enforceFlagGroupsForCompletion()
+
 	// Note that we want to perform flagname completion even if finalCmd.DisableFlagParsing==true;
-	// doing this allows for completion of persistant flag names even for commands that disable flag parsing.
+	// doing this allows for completion of persistent flag names even for commands that disable flag parsing.
 	//
 	// When doing completion of a flag name, as soon as an argument starts with
 	// a '-' we know it is a flag.  We cannot use isFlagArg() here as it requires
@@ -644,7 +661,7 @@ To load completions for every new session, execute once:
 
 #### macOS:
 
-	%[1]s completion bash > /usr/local/etc/bash_completion.d/%[1]s
+	%[1]s completion bash > $(brew --prefix)/etc/bash_completion.d/%[1]s
 
 You will need to start a new shell for this setup to take effect.
 `, c.Root().Name()),
@@ -669,6 +686,10 @@ to enable it.  You can execute the following once:
 
 	echo "autoload -U compinit; compinit" >> ~/.zshrc
 
+To load completions in your current shell session:
+
+	source <(%[1]s completion zsh); compdef _%[1]s %[1]s
+
 To load completions for every new session, execute once:
 
 #### Linux:
@@ -677,7 +698,7 @@ To load completions for every new session, execute once:
 
 #### macOS:
 
-	%[1]s completion zsh > /usr/local/share/zsh/site-functions/_%[1]s
+	%[1]s completion zsh > $(brew --prefix)/share/zsh/site-functions/_%[1]s
 
 You will need to start a new shell for this setup to take effect.
 `, c.Root().Name()),

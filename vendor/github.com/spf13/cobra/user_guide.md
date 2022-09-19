@@ -32,7 +32,7 @@ func main() {
 Cobra-CLI is its own program that will create your application and add any
 commands you want. It's the easiest way to incorporate Cobra into your application.
 
-For complete details on using the Cobra generator, please refer to [The Cobra-CLI Generator README](https://github.com/spf13/cobra-cli/blob/master/README.md)
+For complete details on using the Cobra generator, please refer to [The Cobra-CLI Generator README](https://github.com/spf13/cobra-cli/blob/main/README.md)
 
 ## Using the Cobra Library
 
@@ -51,7 +51,7 @@ var rootCmd = &cobra.Command{
   Short: "Hugo is a very fast static site generator",
   Long: `A Fast and Flexible Static Site Generator built with
                 love by spf13 and friends in Go.
-                Complete documentation is available at http://hugo.spf13.com`,
+                Complete documentation is available at https://gohugo.io/documentation/`,
   Run: func(cmd *cobra.Command, args []string) {
     // Do Stuff Here
   },
@@ -300,10 +300,34 @@ rootCmd.PersistentFlags().StringVarP(&Region, "region", "r", "", "AWS region (re
 rootCmd.MarkPersistentFlagRequired("region")
 ```
 
+### Flag Groups
+
+If you have different flags that must be provided together (e.g. if they provide the `--username` flag they MUST provide the `--password` flag as well) then 
+Cobra can enforce that requirement:
+```go
+rootCmd.Flags().StringVarP(&u, "username", "u", "", "Username (required if password is set)")
+rootCmd.Flags().StringVarP(&pw, "password", "p", "", "Password (required if username is set)")
+rootCmd.MarkFlagsRequiredTogether("username", "password")
+``` 
+
+You can also prevent different flags from being provided together if they represent mutually 
+exclusive options such as specifying an output format as either `--json` or `--yaml` but never both:
+```go
+rootCmd.Flags().BoolVar(&u, "json", false, "Output in JSON")
+rootCmd.Flags().BoolVar(&pw, "yaml", false, "Output in YAML")
+rootCmd.MarkFlagsMutuallyExclusive("json", "yaml")
+```
+
+In both of these cases:
+  - both local and persistent flags can be used
+    - **NOTE:** the group is only enforced on commands where every flag is defined
+  - a flag may appear in multiple groups
+  - a group may contain any number of flags
+
 ## Positional and Custom Arguments
 
-Validation of positional arguments can be specified using the `Args` field
-of `Command`.
+Validation of positional arguments can be specified using the `Args` field of `Command`.
+If `Args` is undefined or `nil`, it defaults to `ArbitraryArgs`.
 
 The following validators are built in:
 
@@ -405,7 +429,7 @@ a count and a string.`,
 }
 ```
 
-For a more complete example of a larger application, please checkout [Hugo](http://gohugo.io/).
+For a more complete example of a larger application, please checkout [Hugo](https://gohugo.io/).
 
 ## Help Command
 
@@ -603,7 +627,7 @@ Did you mean this?
 Run 'hugo --help' for usage.
 ```
 
-Suggestions are automatic based on every subcommand registered and use an implementation of [Levenshtein distance](http://en.wikipedia.org/wiki/Levenshtein_distance). Every registered command that matches a minimum distance of 2 (ignoring case) will be displayed as a suggestion.
+Suggestions are automatic based on every subcommand registered and use an implementation of [Levenshtein distance](https://en.wikipedia.org/wiki/Levenshtein_distance). Every registered command that matches a minimum distance of 2 (ignoring case) will be displayed as a suggestion.
 
 If you need to disable suggestions or tweak the string distance in your command, use:
 
@@ -636,3 +660,7 @@ Cobra can generate documentation based on subcommands, flags, etc. Read more abo
 ## Generating shell completions
 
 Cobra can generate a shell-completion file for the following shells: bash, zsh, fish, PowerShell. If you add more information to your commands, these completions can be amazingly powerful and flexible.  Read more about it in [Shell Completions](shell_completions.md).
+
+## Providing Active Help
+
+Cobra makes use of the shell-completion system to define a framework allowing you to provide Active Help to your users.  Active Help are messages (hints, warnings, etc) printed as the program is being used.  Read more about it in [Active Help](active_help.md).

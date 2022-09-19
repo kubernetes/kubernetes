@@ -26,7 +26,7 @@ require (
 	github.com/coredns/corefile-migration v1.0.17
 	github.com/coreos/go-oidc v2.1.0+incompatible
 	github.com/coreos/go-systemd/v22 v22.3.2
-	github.com/cpuguy83/go-md2man/v2 v2.0.1
+	github.com/cpuguy83/go-md2man/v2 v2.0.2
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/distribution v2.8.1+incompatible
 	github.com/docker/go-units v0.4.0
@@ -62,7 +62,7 @@ require (
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.37.0
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/spf13/cobra v1.4.0
+	github.com/spf13/cobra v1.5.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.0
 	github.com/vishvananda/netlink v1.1.0
@@ -320,7 +320,7 @@ replace (
 	github.com/coreos/go-oidc => github.com/coreos/go-oidc v2.1.0+incompatible
 	github.com/coreos/go-semver => github.com/coreos/go-semver v0.3.0
 	github.com/coreos/go-systemd/v22 => github.com/coreos/go-systemd/v22 v22.3.2
-	github.com/cpuguy83/go-md2man/v2 => github.com/cpuguy83/go-md2man/v2 v2.0.1
+	github.com/cpuguy83/go-md2man/v2 => github.com/cpuguy83/go-md2man/v2 v2.0.2
 	github.com/creack/pty => github.com/creack/pty v1.1.11
 	github.com/cyphar/filepath-securejoin => github.com/cyphar/filepath-securejoin v0.2.3
 	github.com/davecgh/go-spew => github.com/davecgh/go-spew v1.1.1
@@ -469,7 +469,7 @@ replace (
 	github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.8.1
 	github.com/soheilhy/cmux => github.com/soheilhy/cmux v0.1.5
 	github.com/spf13/afero => github.com/spf13/afero v1.6.0
-	github.com/spf13/cobra => github.com/spf13/cobra v1.4.0
+	github.com/spf13/cobra => github.com/spf13/cobra v1.5.0
 	github.com/spf13/pflag => github.com/spf13/pflag v1.0.5
 	github.com/stoewer/go-strcase => github.com/stoewer/go-strcase v1.2.0
 	github.com/stretchr/objx => github.com/stretchr/objx v0.4.0

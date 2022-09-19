@@ -40,7 +40,7 @@ Bash:
   # Linux:
   $ %[1]s completion bash > /etc/bash_completion.d/%[1]s
   # macOS:
-  $ %[1]s completion bash > /usr/local/etc/bash_completion.d/%[1]s
+  $ %[1]s completion bash > $(brew --prefix)/etc/bash_completion.d/%[1]s
 
 Zsh:
 
@@ -122,7 +122,7 @@ For example, if you want `kubectl get [tab][tab]` to show a list of valid "nouns
 Some simplified code from `kubectl get` looks like:
 
 ```go
-validArgs []string = { "pod", "node", "service", "replicationcontroller" }
+validArgs = []string{ "pod", "node", "service", "replicationcontroller" }
 
 cmd := &cobra.Command{
 	Use:     "get [(-o|--output=)json|yaml|template|...] (RESOURCE [NAME] | RESOURCE/NAME ...)",
@@ -148,7 +148,7 @@ node   pod   replicationcontroller   service
 If your nouns have aliases, you can define them alongside `ValidArgs` using `ArgAliases`:
 
 ```go
-argAliases []string = { "pods", "nodes", "services", "svc", "replicationcontrollers", "rc" }
+argAliases = []string { "pods", "nodes", "services", "svc", "replicationcontrollers", "rc" }
 
 cmd := &cobra.Command{
     ...

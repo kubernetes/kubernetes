@@ -61,6 +61,7 @@ Register-ArgumentCompleter -CommandName '%[1]s' -ScriptBlock {
     # Prepare the command to request completions for the program.
     # Split the command at the first space to separate the program and arguments.
     $Program,$Arguments = $Command.Split(" ",2)
+
     $RequestComp="$Program %[2]s $Arguments"
     __%[1]s_debug "RequestComp: $RequestComp"
 
@@ -90,10 +91,12 @@ Register-ArgumentCompleter -CommandName '%[1]s' -ScriptBlock {
     }
 
     __%[1]s_debug "Calling $RequestComp"
+    # First disable ActiveHelp which is not supported for Powershell
+    $env:%[8]s=0
+
     #call the command store the output in $out and redirect stderr and stdout to null
     # $Out is an array contains each line per element
     Invoke-Expression -OutVariable out "$RequestComp" 2>&1 | Out-Null
-
 
     # get directive from last line
     [int]$Directive = $Out[-1].TrimStart(':')
@@ -242,7 +245,7 @@ Register-ArgumentCompleter -CommandName '%[1]s' -ScriptBlock {
 }
 `, name, compCmd,
 		ShellCompDirectiveError, ShellCompDirectiveNoSpace, ShellCompDirectiveNoFileComp,
-		ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs))
+		ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs, activeHelpEnvVar(name)))
 }
 
 func (c *Command) genPowerShellCompletion(w io.Writer, includeDesc bool) error {
