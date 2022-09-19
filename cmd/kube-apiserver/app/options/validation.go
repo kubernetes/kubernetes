@@ -124,10 +124,11 @@ func validateTokenRequest(options *ServerRunOptions) []error {
 
 func validateAPIPriorityAndFairness(options *ServerRunOptions) []error {
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && options.GenericServerRunOptions.EnablePriorityAndFairness {
-		// If none of the following runtime config options are specified, APF is
-		// assumed to be turned on.
+		// If none of the following runtime config options are specified,
+		// APF is assumed to be turned on. The internal APF controller uses
+		// v1beta3 so it should be enabled.
 		enabledAPIString := options.APIEnablement.RuntimeConfig.String()
-		testConfigs := []string{"flowcontrol.apiserver.k8s.io/v1beta2", "flowcontrol.apiserver.k8s.io/v1beta1", "api/beta", "api/all"} // in the order of precedence
+		testConfigs := []string{"flowcontrol.apiserver.k8s.io/v1beta3", "api/beta", "api/all"} // in the order of precedence
 		for _, testConfig := range testConfigs {
 			if strings.Contains(enabledAPIString, fmt.Sprintf("%s=false", testConfig)) {
 				return []error{fmt.Errorf("--runtime-config=%s=false conflicts with --enable-priority-and-fairness=true and --feature-gates=APIPriorityAndFairness=true", testConfig)}
