@@ -527,7 +527,7 @@ func populateDefaultValue(node *callNode, t *types.Type, tags string, commentLin
 		defaultString = getNestedDefault(t)
 	}
 	if len(defaultMap) > 1 {
-		klog.Fatalf("Found more than one default tag for %v", t.Kind)
+		klog.Fatalf("Found more than one default tag for %v %v %v %v", t.Kind, t, tags, node)
 	} else if len(defaultMap) == 0 {
 		return node
 	}

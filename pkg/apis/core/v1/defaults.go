@@ -17,8 +17,6 @@ limitations under the License.
 package v1
 
 import (
-	"time"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -57,10 +55,6 @@ func SetDefaults_ReplicationController(obj *v1.ReplicationController) {
 			obj.Labels = labels
 		}
 	}
-	if obj.Spec.Replicas == nil {
-		obj.Spec.Replicas = new(int32)
-		*obj.Spec.Replicas = 1
-	}
 }
 func SetDefaults_Volume(obj *v1.Volume) {
 	if pointer.AllPtrFieldsNil(&obj.VolumeSource) {
@@ -81,12 +75,6 @@ func SetDefaults_Container(obj *v1.Container) {
 			obj.ImagePullPolicy = v1.PullIfNotPresent
 		}
 	}
-	if obj.TerminationMessagePath == "" {
-		obj.TerminationMessagePath = v1.TerminationMessagePathDefault
-	}
-	if obj.TerminationMessagePolicy == "" {
-		obj.TerminationMessagePolicy = v1.TerminationMessageReadFile
-	}
 }
 
 func SetDefaults_EphemeralContainer(obj *v1.EphemeralContainer) {
@@ -94,9 +82,6 @@ func SetDefaults_EphemeralContainer(obj *v1.EphemeralContainer) {
 }
 
 func SetDefaults_Service(obj *v1.Service) {
-	if obj.Spec.SessionAffinity == "" {
-		obj.Spec.SessionAffinity = v1.ServiceAffinityNone
-	}
 	if obj.Spec.SessionAffinity == v1.ServiceAffinityNone {
 		obj.Spec.SessionAffinityConfig = nil
 	}
@@ -110,14 +95,8 @@ func SetDefaults_Service(obj *v1.Service) {
 			}
 		}
 	}
-	if obj.Spec.Type == "" {
-		obj.Spec.Type = v1.ServiceTypeClusterIP
-	}
 	for i := range obj.Spec.Ports {
 		sp := &obj.Spec.Ports[i]
-		if sp.Protocol == "" {
-			sp.Protocol = v1.ProtocolTCP
-		}
 		if sp.TargetPort == intstr.FromInt(0) || sp.TargetPort == intstr.FromString("") {
 			sp.TargetPort = intstr.FromInt(int(sp.Port))
 		}
@@ -175,86 +154,19 @@ func SetDefaults_Pod(obj *v1.Pod) {
 			}
 		}
 	}
-	if obj.Spec.EnableServiceLinks == nil {
-		enableServiceLinks := v1.DefaultEnableServiceLinks
-		obj.Spec.EnableServiceLinks = &enableServiceLinks
-	}
 }
 func SetDefaults_PodSpec(obj *v1.PodSpec) {
 	// New fields added here will break upgrade tests:
 	// https://github.com/kubernetes/kubernetes/issues/69445
 	// In most cases the new defaulted field can added to SetDefaults_Pod instead of here, so
 	// that it only materializes in the Pod object and not all objects with a PodSpec field.
-	if obj.DNSPolicy == "" {
-		obj.DNSPolicy = v1.DNSClusterFirst
-	}
-	if obj.RestartPolicy == "" {
-		obj.RestartPolicy = v1.RestartPolicyAlways
-	}
 	if obj.HostNetwork {
 		defaultHostNetworkPorts(&obj.Containers)
 		defaultHostNetworkPorts(&obj.InitContainers)
 	}
-	if obj.SecurityContext == nil {
-		obj.SecurityContext = &v1.PodSecurityContext{}
-	}
-	if obj.TerminationGracePeriodSeconds == nil {
-		period := int64(v1.DefaultTerminationGracePeriodSeconds)
-		obj.TerminationGracePeriodSeconds = &period
-	}
-	if obj.SchedulerName == "" {
-		obj.SchedulerName = v1.DefaultSchedulerName
-	}
 }
-func SetDefaults_Probe(obj *v1.Probe) {
-	if obj.TimeoutSeconds == 0 {
-		obj.TimeoutSeconds = 1
-	}
-	if obj.PeriodSeconds == 0 {
-		obj.PeriodSeconds = 10
-	}
-	if obj.SuccessThreshold == 0 {
-		obj.SuccessThreshold = 1
-	}
-	if obj.FailureThreshold == 0 {
-		obj.FailureThreshold = 3
-	}
-}
-func SetDefaults_SecretVolumeSource(obj *v1.SecretVolumeSource) {
-	if obj.DefaultMode == nil {
-		perm := int32(v1.SecretVolumeSourceDefaultMode)
-		obj.DefaultMode = &perm
-	}
-}
-func SetDefaults_ConfigMapVolumeSource(obj *v1.ConfigMapVolumeSource) {
-	if obj.DefaultMode == nil {
-		perm := int32(v1.ConfigMapVolumeSourceDefaultMode)
-		obj.DefaultMode = &perm
-	}
-}
-func SetDefaults_DownwardAPIVolumeSource(obj *v1.DownwardAPIVolumeSource) {
-	if obj.DefaultMode == nil {
-		perm := int32(v1.DownwardAPIVolumeSourceDefaultMode)
-		obj.DefaultMode = &perm
-	}
-}
-func SetDefaults_Secret(obj *v1.Secret) {
-	if obj.Type == "" {
-		obj.Type = v1.SecretTypeOpaque
-	}
-}
-func SetDefaults_ProjectedVolumeSource(obj *v1.ProjectedVolumeSource) {
-	if obj.DefaultMode == nil {
-		perm := int32(v1.ProjectedVolumeSourceDefaultMode)
-		obj.DefaultMode = &perm
-	}
-}
-func SetDefaults_ServiceAccountTokenProjection(obj *v1.ServiceAccountTokenProjection) {
-	hour := int64(time.Hour.Seconds())
-	if obj.ExpirationSeconds == nil {
-		obj.ExpirationSeconds = &hour
-	}
-}
+
+//FIXME: left off here
 func SetDefaults_PersistentVolume(obj *v1.PersistentVolume) {
 	if obj.Status.Phase == "" {
 		obj.Status.Phase = v1.VolumePending
