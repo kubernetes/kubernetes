@@ -565,7 +565,7 @@ function kube::build::run_build_command_ex() {
 }
 
 function kube::build::rsync_probe {
-  # Wait unil rsync is up and running.
+  # Wait until rsync is up and running.
   local tries=20
   while (( tries > 0 )) ; do
     if rsync "rsync://k8s@${1}:${2}/" \
