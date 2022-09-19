@@ -257,6 +257,34 @@ func TestWorkEstimator(t *testing.T) {
 			initialSeatsExpected: maximumSeats,
 		},
 		{
+			name:       "request verb is list, metadata.name specified",
+			requestURI: "http://server/apis/foo.bar/v1/events?fieldSelector=metadata.name%3Dtest",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				Name:     "test",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			counts: map[string]int64{
+				"events.foo.bar": 799,
+			},
+			initialSeatsExpected: minimumSeats,
+		},
+		{
+			name:       "request verb is list, metadata.name, resourceVersion and limit specified",
+			requestURI: "http://server/apis/foo.bar/v1/events?fieldSelector=metadata.name%3Dtest&limit=500&resourceVersion=0",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				Name:     "test",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			counts: map[string]int64{
+				"events.foo.bar": 799,
+			},
+			initialSeatsExpected: minimumSeats,
+		},
+		{
 			name:       "request verb is create, no watches",
 			requestURI: "http://server/apis/foo.bar/v1/foos",
 			requestInfo: &apirequest.RequestInfo{
