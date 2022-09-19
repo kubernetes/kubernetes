@@ -249,7 +249,7 @@ func (gcc *PodGCController) gcOrphaned(ctx context.Context, pods []*v1.Pod, node
 		if err := gcc.markFailedAndDeletePodWithCondition(ctx, pod, condition); err != nil {
 			utilruntime.HandleError(err)
 		} else {
-			klog.V(0).InfoS("Forced deletion of orphaned Pod succeeded", "pod", klog.KObj(pod))
+			klog.InfoS("Forced deletion of orphaned Pod succeeded", "pod", klog.KObj(pod))
 		}
 	}
 }
@@ -298,7 +298,7 @@ func (gcc *PodGCController) gcUnscheduledTerminating(ctx context.Context, pods [
 		if err := gcc.markFailedAndDeletePod(ctx, pod); err != nil {
 			utilruntime.HandleError(err)
 		} else {
-			klog.V(0).InfoS("Forced deletion of unscheduled terminating Pod succeeded", "pod", klog.KObj(pod))
+			klog.InfoS("Forced deletion of unscheduled terminating Pod succeeded", "pod", klog.KObj(pod))
 		}
 	}
 }

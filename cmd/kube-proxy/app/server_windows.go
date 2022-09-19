@@ -105,9 +105,9 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string
 	proxyMode := getProxyMode(config.Mode, winkernel.WindowsKernelCompatTester{})
 	dualStackMode := getDualStackMode(config.Winkernel.NetworkName, winkernel.DualStackCompatTester{})
 	if proxyMode == proxyconfigapi.ProxyModeKernelspace {
-		klog.V(0).InfoS("Using Kernelspace Proxier.")
+		klog.InfoS("Using Kernelspace Proxier.")
 		if dualStackMode {
-			klog.V(0).InfoS("Creating dualStackProxier for Windows kernel.")
+			klog.InfoS("Creating dualStackProxier for Windows kernel.")
 
 			proxier, err = winkernel.NewDualStackProxier(
 				config.IPTables.SyncPeriod.Duration,
@@ -146,8 +146,8 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string
 
 		winkernel.RegisterMetrics()
 	} else {
-		klog.V(0).InfoS("Using userspace Proxier.")
-		klog.V(0).InfoS("The userspace proxier is now deprecated and will be removed in a future release, please use 'kernelspace' instead")
+		klog.InfoS("Using userspace Proxier.")
+		klog.InfoS("The userspace proxier is now deprecated and will be removed in a future release, please use 'kernelspace' instead")
 		execer := exec.New()
 		var netshInterface utilnetsh.Interface
 		netshInterface = utilnetsh.New(execer)
