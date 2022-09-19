@@ -1589,6 +1589,12 @@ message ContainerEventResponse {
 
     // ID of the sandbox container
     PodSandboxMetadata pod_sandbox_metadata = 4;
+
+    // Sandbox statuses
+    repeated PodSandboxStatus pod_sandbox_statuses = 5;
+
+    // Container statuses
+    repeated ContainerStatus containers_statuses = 6;
 }
 
 enum ContainerEventType {
