@@ -45,6 +45,10 @@ import (
 
 // TestEvictionForNoExecuteTaintAddedByUser tests taint-based eviction for a node tainted NoExecute
 func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
+	// we need at least 2 nodes to prevent lifecycle manager from entering "fully-disrupted" mode
+	nodeCount := 3
+	nodeIndex := 1 // the exact node doesn't matter, pick one
+
 	tests := map[string]struct {
 		enablePodDisruptionConditions bool
 	}{
@@ -58,8 +62,6 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			nodeIndex := 1
-			nodeCount := 3
 			var nodes []*v1.Node
 			for i := 0; i < nodeCount; i++ {
 				node := &v1.Node{
@@ -132,8 +134,7 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 				true,             // Run taint manager
 			)
 			if err != nil {
-				t.Errorf("Failed to create node controller: %v", err)
-				return
+				t.Fatalf("Failed to create node controller: %v", err)
 			}
 
 			// Waiting for all controllers to sync
@@ -146,7 +147,7 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 			for index := range nodes {
 				nodes[index], err = cs.CoreV1().Nodes().Create(testCtx.Ctx, nodes[index], metav1.CreateOptions{})
 				if err != nil {
-					t.Errorf("Failed to create node, err: %v", err)
+					t.Fatalf("Failed to create node, err: %v", err)
 				}
 			}
 
