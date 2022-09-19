@@ -65,6 +65,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	runtimeresource "k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -148,11 +149,13 @@ func (pw *prefixWriter) Write(level int, format string, a ...interface{}) {
 	for i := 0; i < level; i++ {
 		prefix += levelSpace
 	}
-	fmt.Fprintf(pw.out, prefix+format, a...)
+	output := fmt.Sprintf(prefix+format, a...)
+	printers.WriteEscaped(pw.out, output)
 }
 
 func (pw *prefixWriter) WriteLine(a ...interface{}) {
-	fmt.Fprintln(pw.out, a...)
+	output := fmt.Sprintln(a...)
+	printers.WriteEscaped(pw.out, output)
 }
 
 func (pw *prefixWriter) Flush() {
