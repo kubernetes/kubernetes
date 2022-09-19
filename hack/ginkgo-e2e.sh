@@ -198,6 +198,9 @@ fi
   --dns-domain="${KUBE_DNS_DOMAIN:-cluster.local}" \
   --prepull-images="${PREPULL_IMAGES:-false}" \
   --ginkgo.slow-spec-threshold="${GINKGO_SLOW_SPEC_THRESHOLD:-300s}" \
+  --ginkgo.poll-progress-after="${GINKGO_POLL_PROGRESS_AFTER:-300s}" \
+  --ginkgo.poll-progress-interval="${GINKGO_POLL_PROGRESS_INTERVAL:-20s}" \
+  --ginkgo.source-root="${KUBE_ROOT}" \
   ${MASTER_OS_DISTRIBUTION:+"--master-os-distro=${MASTER_OS_DISTRIBUTION}"} \
   ${NODE_OS_DISTRIBUTION:+"--node-os-distro=${NODE_OS_DISTRIBUTION}"} \
   ${NUM_NODES:+"--num-nodes=${NUM_NODES}"} \
