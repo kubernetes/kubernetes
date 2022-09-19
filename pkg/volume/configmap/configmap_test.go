@@ -357,7 +357,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Failed to GetVolumeName: %v", err)
 	}
 	if vName != "test_volume_name/test_configmap_name" {
-		t.Errorf("Got unexpect VolumeName %v", vName)
+		t.Errorf("Got unexpected VolumeName %v", vName)
 	}
 
 	volumePath := mounter.GetPath()
@@ -481,7 +481,7 @@ func TestPluginOptional(t *testing.T) {
 		t.Errorf("Failed to GetVolumeName: %v", err)
 	}
 	if vName != "test_volume_name/test_configmap_name" {
-		t.Errorf("Got unexpect VolumeName %v", vName)
+		t.Errorf("Got unexpected VolumeName %v", vName)
 	}
 
 	volumePath := mounter.GetPath()
@@ -580,7 +580,7 @@ func TestPluginKeysOptional(t *testing.T) {
 		t.Errorf("Failed to GetVolumeName: %v", err)
 	}
 	if vName != "test_volume_name/test_configmap_name" {
-		t.Errorf("Got unexpect VolumeName %v", vName)
+		t.Errorf("Got unexpected VolumeName %v", vName)
 	}
 
 	volumePath := mounter.GetPath()
@@ -660,7 +660,7 @@ func TestInvalidConfigMapSetup(t *testing.T) {
 		t.Errorf("Failed to GetVolumeName: %v", err)
 	}
 	if vName != "test_volume_name/test_configmap_name" {
-		t.Errorf("Got unexpect VolumeName %v", vName)
+		t.Errorf("Got unexpected VolumeName %v", vName)
 	}
 
 	volumePath := mounter.GetPath()

@@ -288,7 +288,7 @@ func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volu
 
 // ConstructBlockVolumeSpec creates a new volume.Spec with following steps.
 //   - Searches a file whose name is {pod uuid} under volume plugin directory.
-//   - If a file is found, then retreives volumePluginDependentPath from globalMapPathUUID.
+//   - If a file is found, then retrieves volumePluginDependentPath from globalMapPathUUID.
 //   - Once volumePluginDependentPath is obtained, store volume information to VolumeSource
 //
 // examples:

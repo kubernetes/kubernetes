@@ -52,7 +52,7 @@ func (handler *deviceHandler) FindMultipathDeviceForDevice(device string) string
 	return ""
 }
 
-// findDeviceForPath Find the underlaying disk for a linked path such as /dev/disk/by-path/XXXX or /dev/mapper/XXXX
+// findDeviceForPath Find the underlying disk for a linked path such as /dev/disk/by-path/XXXX or /dev/mapper/XXXX
 // will return sdX or hdX etc, if /dev/sdX is passed in then sdX will be returned
 func findDeviceForPath(path string, io IoUtil) (string, error) {
 	devicePath, err := io.EvalSymlinks(path)
