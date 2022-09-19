@@ -19,7 +19,8 @@ import (
 // UnmarshalOptions configures the unmarshaler.
 //
 // Example usage:
-//   err := UnmarshalOptions{DiscardUnknown: true}.Unmarshal(b, m)
+//
+//	err := UnmarshalOptions{DiscardUnknown: true}.Unmarshal(b, m)
 type UnmarshalOptions struct {
 	pragma.NoUnkeyedLiterals
 

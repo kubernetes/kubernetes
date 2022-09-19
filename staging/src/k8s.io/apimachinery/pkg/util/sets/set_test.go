@@ -118,6 +118,19 @@ func TestStringSetDifference(t *testing.T) {
 	}
 }
 
+func TestStringSetSymmetricDifference(t *testing.T) {
+	a := NewString("1", "2", "3")
+	b := NewString("1", "2", "4", "5")
+	c := a.SymmetricDifference(b)
+	d := b.SymmetricDifference(a)
+	if !c.Equal(NewString("3", "4", "5")) {
+		t.Errorf("Unexpected contents: %#v", c.List())
+	}
+	if !d.Equal(NewString("3", "4", "5")) {
+		t.Errorf("Unexpected contents: %#v", d.List())
+	}
+}
+
 func TestStringSetHasAny(t *testing.T) {
 	a := NewString("1", "2", "3")
 

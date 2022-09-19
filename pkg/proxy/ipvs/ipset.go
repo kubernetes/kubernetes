@@ -78,6 +78,9 @@ const (
 
 	kubeHealthCheckNodePortSetComment = "Kubernetes health check node port"
 	kubeHealthCheckNodePortSet        = "KUBE-HEALTH-CHECK-NODE-PORT"
+
+	kubeIPVSSetComment = "Addresses on the ipvs interface"
+	kubeIPVSSet        = "KUBE-IPVS-IPS"
 )
 
 // IPSetVersioner can query the current ipset version.

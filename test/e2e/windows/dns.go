@@ -127,7 +127,7 @@ var _ = SIGDescribe("[Feature:Windows] DNS", func() {
 		})
 		framework.Logf("Result of curling the kubernetes service... (Failure ok, only testing for the sake of DNS resolution) %v ... error = %v", stdout, err)
 
-		// curl returns an error if the host isnt resolved, otherwise, it will return a passing result.
+		// curl returns an error if the host isn't resolved, otherwise, it will return a passing result.
 		if err != nil {
 			framework.ExpectNoError(err)
 		}

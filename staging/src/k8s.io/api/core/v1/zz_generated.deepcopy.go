@@ -3954,6 +3954,11 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 		*out = new(PodOS)
 		**out = **in
 	}
+	if in.HostUsers != nil {
+		in, out := &in.HostUsers, &out.HostUsers
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 func TestEndpointsMapFromESC(t *testing.T) {
@@ -40,7 +40,7 @@ func TestEndpointsMapFromESC(t *testing.T) {
 			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			hostname:       "host1",
 			endpointSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(80), pointer.Int32(443)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
@@ -58,8 +58,8 @@ func TestEndpointsMapFromESC(t *testing.T) {
 		"2 slices, same port": {
 			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			endpointSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{}, []*int32{utilpointer.Int32Ptr(80)}),
-				generateEndpointSlice("svc1", "ns1", 2, 3, 999, 999, []string{}, []*int32{utilpointer.Int32Ptr(80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{}, []*int32{pointer.Int32(80)}),
+				generateEndpointSlice("svc1", "ns1", 2, 3, 999, 999, []string{}, []*int32{pointer.Int32(80)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
@@ -77,8 +77,8 @@ func TestEndpointsMapFromESC(t *testing.T) {
 		"2 overlapping slices, same port": {
 			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			endpointSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{}, []*int32{utilpointer.Int32Ptr(80)}),
-				generateEndpointSlice("svc1", "ns1", 1, 4, 999, 999, []string{}, []*int32{utilpointer.Int32Ptr(80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{}, []*int32{pointer.Int32(80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 4, 999, 999, []string{}, []*int32{pointer.Int32(80)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
@@ -96,8 +96,8 @@ func TestEndpointsMapFromESC(t *testing.T) {
 		"2 slices, overlapping endpoints, some endpoints unready in 1 or both": {
 			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			endpointSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 10, 3, 999, []string{}, []*int32{utilpointer.Int32Ptr(80)}),
-				generateEndpointSlice("svc1", "ns1", 1, 10, 6, 999, []string{}, []*int32{utilpointer.Int32Ptr(80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 10, 3, 999, []string{}, []*int32{pointer.Int32(80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 10, 6, 999, []string{}, []*int32{pointer.Int32(80)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
@@ -118,8 +118,8 @@ func TestEndpointsMapFromESC(t *testing.T) {
 		"2 slices, overlapping endpoints, some endpoints unready and some endpoints terminating": {
 			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			endpointSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 10, 3, 5, []string{}, []*int32{utilpointer.Int32Ptr(80)}),
-				generateEndpointSlice("svc1", "ns1", 1, 10, 6, 5, []string{}, []*int32{utilpointer.Int32Ptr(80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 10, 3, 5, []string{}, []*int32{pointer.Int32(80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 10, 6, 5, []string{}, []*int32{pointer.Int32(80)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
@@ -139,8 +139,8 @@ func TestEndpointsMapFromESC(t *testing.T) {
 		"2 slices, overlapping endpoints, all unready": {
 			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			endpointSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 10, 1, 999, []string{}, []*int32{utilpointer.Int32Ptr(80)}),
-				generateEndpointSlice("svc1", "ns1", 1, 10, 1, 999, []string{}, []*int32{utilpointer.Int32Ptr(80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 10, 1, 999, []string{}, []*int32{pointer.Int32(80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 10, 1, 999, []string{}, []*int32{pointer.Int32(80)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
@@ -160,9 +160,9 @@ func TestEndpointsMapFromESC(t *testing.T) {
 		"3 slices with different services and namespaces": {
 			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			endpointSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{}, []*int32{utilpointer.Int32Ptr(80)}),
-				generateEndpointSlice("svc2", "ns1", 2, 3, 999, 999, []string{}, []*int32{utilpointer.Int32Ptr(80)}),
-				generateEndpointSlice("svc1", "ns2", 3, 3, 999, 999, []string{}, []*int32{utilpointer.Int32Ptr(80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{}, []*int32{pointer.Int32(80)}),
+				generateEndpointSlice("svc2", "ns1", 2, 3, 999, 999, []string{}, []*int32{pointer.Int32(80)}),
+				generateEndpointSlice("svc1", "ns2", 3, 3, 999, 999, []string{}, []*int32{pointer.Int32(80)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
@@ -188,8 +188,8 @@ func TestEndpointsMapFromESC(t *testing.T) {
 			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			hostname:       "host1",
 			endpointSlices: []*discovery.EndpointSlice{
-				generateEndpointSliceWithOffset("svc1", "ns1", 1, 1, 2, 999, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80)}),
-				generateEndpointSliceWithOffset("svc1", "ns1", 2, 1, 2, 999, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(8080)}),
+				generateEndpointSliceWithOffset("svc1", "ns1", 1, 1, 2, 999, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(80)}),
+				generateEndpointSliceWithOffset("svc1", "ns1", 2, 1, 2, 999, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(8080)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
@@ -228,7 +228,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			hostname:       "host1",
 			endpointSlices: []*discovery.EndpointSlice{
-				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(80)}),
 			},
 			expectedMap: spToEndpointMap{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
@@ -263,8 +263,8 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			hostname:       "host1",
 			endpointSlices: []*discovery.EndpointSlice{
-				generateEndpointSliceWithOffset("svc1", "ns1", 1, 1, 2, 999, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80)}),
-				generateEndpointSliceWithOffset("svc1", "ns1", 2, 1, 2, 999, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(8080)}),
+				generateEndpointSliceWithOffset("svc1", "ns1", 1, 1, 2, 999, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(80)}),
+				generateEndpointSliceWithOffset("svc1", "ns1", 2, 1, 2, 999, 999, []string{"host1", "host2"}, []*int32{pointer.Int32(8080)}),
 			},
 			expectedMap: spToEndpointMap{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
@@ -325,8 +325,8 @@ func TestEsInfoChanged(t *testing.T) {
 	p80 := int32(80)
 	p443 := int32(443)
 	tcpProto := v1.ProtocolTCP
-	port80 := discovery.EndpointPort{Port: &p80, Name: utilpointer.StringPtr("http"), Protocol: &tcpProto}
-	port443 := discovery.EndpointPort{Port: &p443, Name: utilpointer.StringPtr("https"), Protocol: &tcpProto}
+	port80 := discovery.EndpointPort{Port: &p80, Name: pointer.String("http"), Protocol: &tcpProto}
+	port443 := discovery.EndpointPort{Port: &p443, Name: pointer.String("https"), Protocol: &tcpProto}
 	endpoint1 := discovery.Endpoint{Addresses: []string{"10.0.1.0"}}
 	endpoint2 := discovery.Endpoint{Addresses: []string{"10.0.1.1"}}
 
@@ -476,7 +476,7 @@ func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, of
 
 	for i, portNum := range portNums {
 		endpointSlice.Ports = append(endpointSlice.Ports, discovery.EndpointPort{
-			Name:     utilpointer.StringPtr(fmt.Sprintf("port-%d", i)),
+			Name:     pointer.String(fmt.Sprintf("port-%d", i)),
 			Port:     portNum,
 			Protocol: &tcpProtocol,
 		})
@@ -486,9 +486,9 @@ func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, of
 		readyCondition := i%unreadyMod != 0
 		terminatingCondition := i%terminatingMod == 0
 
-		ready := utilpointer.BoolPtr(readyCondition && !terminatingCondition)
-		serving := utilpointer.BoolPtr(readyCondition)
-		terminating := utilpointer.BoolPtr(terminatingCondition)
+		ready := pointer.Bool(readyCondition && !terminatingCondition)
+		serving := pointer.Bool(readyCondition)
+		terminating := pointer.Bool(terminatingCondition)
 
 		endpoint := discovery.Endpoint{
 			Addresses: []string{fmt.Sprintf("10.0.%d.%d", offset, i)},

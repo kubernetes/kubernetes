@@ -83,6 +83,23 @@ run_daemonset_history_tests() {
   kube::test::wait_object_assert daemonset "{{range.items}}{{${image_field1:?}}}:{{end}}" "${IMAGE_DAEMONSET_R2_2}:"
   kube::test::get_object_assert daemonset "{{range.items}}{{${container_len:?}}}{{end}}" "2"
   kube::test::wait_object_assert controllerrevisions "{{range.items}}{{${annotations_field:?}}}:{{end}}" ".*rollingupdate-daemonset-rv2.yaml --record.*"
+  # Get rollout history
+  output_message=$(kubectl rollout history daemonset)
+  kube::test::if_has_string "${output_message}" "daemonset.apps/bind"
+  kube::test::if_has_string "${output_message}" "REVISION  CHANGE-CAUSE"
+  kube::test::if_has_string "${output_message}" "1         kubectl apply"
+  kube::test::if_has_string "${output_message}" "2         kubectl apply"
+  # Get rollout history for a single revision
+  output_message=$(kubectl rollout history daemonset --revision=1)
+  kube::test::if_has_string "${output_message}" "daemonset.apps/bind with revision #1"
+  kube::test::if_has_string "${output_message}" "Pod Template:"
+  kube::test::if_has_string "${output_message}" "${IMAGE_PAUSE_V2}"
+  # Get rollout history for a different single revision
+  output_message=$(kubectl rollout history daemonset --revision=2)
+  kube::test::if_has_string "${output_message}" "daemonset.apps/bind with revision #2"
+  kube::test::if_has_string "${output_message}" "Pod Template:"
+  kube::test::if_has_string "${output_message}" "${IMAGE_DAEMONSET_R2}"
+  kube::test::if_has_string "${output_message}" "${IMAGE_DAEMONSET_R2_2}"
   # Rollback to revision 1 with dry-run - should be no-op
   kubectl rollout undo daemonset --dry-run=client "${kube_flags[@]:?}"
   kubectl rollout undo daemonset --dry-run=server "${kube_flags[@]:?}"
@@ -93,6 +110,12 @@ run_daemonset_history_tests() {
   kubectl rollout undo daemonset --to-revision=1 "${kube_flags[@]:?}"
   kube::test::wait_object_assert daemonset "{{range.items}}{{${image_field0:?}}}:{{end}}" "${IMAGE_PAUSE_V2}:"
   kube::test::get_object_assert daemonset "{{range.items}}{{${container_len:?}}}{{end}}" "1"
+  # Get rollout history
+  output_message=$(kubectl rollout history daemonset)
+  kube::test::if_has_string "${output_message}" "daemonset.apps/bind"
+  kube::test::if_has_string "${output_message}" "REVISION  CHANGE-CAUSE"
+  kube::test::if_has_string "${output_message}" "2         kubectl apply"
+  kube::test::if_has_string "${output_message}" "3         kubectl apply"
   # Rollback to revision 1000000 - should fail
   output_message=$(! kubectl rollout undo daemonset --to-revision=1000000 "${kube_flags[@]:?}" 2>&1)
   kube::test::if_has_string "${output_message}" "unable to find specified revision"
@@ -103,6 +126,12 @@ run_daemonset_history_tests() {
   kube::test::wait_object_assert daemonset "{{range.items}}{{${image_field0:?}}}:{{end}}" "${IMAGE_DAEMONSET_R2}:"
   kube::test::wait_object_assert daemonset "{{range.items}}{{${image_field1:?}}}:{{end}}" "${IMAGE_DAEMONSET_R2_2}:"
   kube::test::get_object_assert daemonset "{{range.items}}{{${container_len:?}}}{{end}}" "2"
+  # Get rollout history
+  output_message=$(kubectl rollout history daemonset)
+  kube::test::if_has_string "${output_message}" "daemonset.apps/bind"
+  kube::test::if_has_string "${output_message}" "REVISION  CHANGE-CAUSE"
+  kube::test::if_has_string "${output_message}" "3         kubectl apply"
+  kube::test::if_has_string "${output_message}" "4         kubectl apply"
   # Clean up
   kubectl delete -f hack/testdata/rollingupdate-daemonset.yaml "${kube_flags[@]:?}"
 
@@ -440,6 +469,40 @@ run_deployment_tests() {
   kubectl delete configmap test-set-env-config "${kube_flags[@]:?}"
   kubectl delete secret test-set-env-secret "${kube_flags[@]:?}"
 
+  ### Get rollout history
+  # Pre-condition: no deployment exists
+  kube::test::get_object_assert deployment "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+  # Create a deployment
+  kubectl create -f hack/testdata/deployment-multicontainer.yaml "${kube_flags[@]:?}"
+  kube::test::get_object_assert deployment "{{range.items}}{{${id_field:?}}}:{{end}}" 'nginx-deployment:'
+  kube::test::get_object_assert deployment "{{range.items}}{{${image_field0:?}}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
+  kube::test::get_object_assert deployment "{{range.items}}{{${image_field1:?}}}:{{end}}" "${IMAGE_PERL}:"
+  # Set the deployment's image
+  kubectl set image deployment nginx-deployment nginx="${IMAGE_DEPLOYMENT_R2}" "${kube_flags[@]:?}"
+  kube::test::get_object_assert deployment "{{range.items}}{{${image_field0:?}}}:{{end}}" "${IMAGE_DEPLOYMENT_R2}:"
+  kube::test::get_object_assert deployment "{{range.items}}{{${image_field1:?}}}:{{end}}" "${IMAGE_PERL}:"
+  # Get rollout history
+  output_message=$(kubectl rollout history deployment nginx-deployment)
+  kube::test::if_has_string "${output_message}" "deployment.apps/nginx-deployment"
+  kube::test::if_has_string "${output_message}" "REVISION  CHANGE-CAUSE"
+  kube::test::if_has_string "${output_message}" "1         <none>"
+  kube::test::if_has_string "${output_message}" "2         <none>"
+  kube::test::if_has_not_string "${output_message}" "3         <none>"
+  # Get rollout history for a single revision
+  output_message=$(kubectl rollout history deployment nginx-deployment --revision=1)
+  kube::test::if_has_string "${output_message}" "deployment.apps/nginx-deployment with revision #1"
+  kube::test::if_has_string "${output_message}" "Pod Template:"
+  kube::test::if_has_string "${output_message}" "${IMAGE_DEPLOYMENT_R1}"
+  kube::test::if_has_string "${output_message}" "${IMAGE_PERL}"
+  # Get rollout history for a different single revision
+  output_message=$(kubectl rollout history deployment nginx-deployment --revision=2)
+  kube::test::if_has_string "${output_message}" "deployment.apps/nginx-deployment with revision #2"
+  kube::test::if_has_string "${output_message}" "Pod Template:"
+  kube::test::if_has_string "${output_message}" "${IMAGE_DEPLOYMENT_R2}"
+  kube::test::if_has_string "${output_message}" "${IMAGE_PERL}"
+  # Clean up
+  kubectl delete deployment nginx-deployment "${kube_flags[@]:?}"
+
   set +o nounset
   set +o errexit
 }
@@ -468,6 +531,23 @@ run_statefulset_history_tests() {
   kube::test::wait_object_assert statefulset "{{range.items}}{{${image_field1:?}}}:{{end}}" "${IMAGE_PAUSE_V2}:"
   kube::test::get_object_assert statefulset "{{range.items}}{{${container_len:?}}}{{end}}" "2"
   kube::test::wait_object_assert controllerrevisions "{{range.items}}{{${annotations_field:?}}}:{{end}}" ".*rollingupdate-statefulset-rv2.yaml --record.*"
+  # Get rollout history
+  output_message=$(kubectl rollout history statefulset)
+  kube::test::if_has_string "${output_message}" "statefulset.apps/nginx"
+  kube::test::if_has_string "${output_message}" "REVISION  CHANGE-CAUSE"
+  kube::test::if_has_string "${output_message}" "1         kubectl apply"
+  kube::test::if_has_string "${output_message}" "2         kubectl apply"
+  # Get rollout history for a single revision
+  output_message=$(kubectl rollout history statefulset --revision=1)
+  kube::test::if_has_string "${output_message}" "statefulset.apps/nginx with revision #1"
+  kube::test::if_has_string "${output_message}" "Pod Template:"
+  kube::test::if_has_string "${output_message}" "${IMAGE_STATEFULSET_R1}"
+  # Get rollout history for a different single revision
+  output_message=$(kubectl rollout history statefulset --revision=2)
+  kube::test::if_has_string "${output_message}" "statefulset.apps/nginx with revision #2"
+  kube::test::if_has_string "${output_message}" "Pod Template:"
+  kube::test::if_has_string "${output_message}" "${IMAGE_STATEFULSET_R2}"
+  kube::test::if_has_string "${output_message}" "${IMAGE_PAUSE_V2}"
   # Rollback to revision 1 with dry-run - should be no-op
   kubectl rollout undo statefulset --dry-run=client "${kube_flags[@]:?}"
   kubectl rollout undo statefulset --dry-run=server "${kube_flags[@]:?}"
@@ -478,6 +558,12 @@ run_statefulset_history_tests() {
   kubectl rollout undo statefulset --to-revision=1 "${kube_flags[@]:?}"
   kube::test::wait_object_assert statefulset "{{range.items}}{{${image_field0:?}}}:{{end}}" "${IMAGE_STATEFULSET_R1}:"
   kube::test::get_object_assert statefulset "{{range.items}}{{${container_len:?}}}{{end}}" "1"
+  # Get rollout history
+  output_message=$(kubectl rollout history statefulset)
+  kube::test::if_has_string "${output_message}" "statefulset.apps/nginx"
+  kube::test::if_has_string "${output_message}" "REVISION  CHANGE-CAUSE"
+  kube::test::if_has_string "${output_message}" "2         kubectl apply"
+  kube::test::if_has_string "${output_message}" "3         kubectl apply"
   # Rollback to revision 1000000 - should fail
   output_message=$(! kubectl rollout undo statefulset --to-revision=1000000 "${kube_flags[@]:?}" 2>&1)
   kube::test::if_has_string "${output_message}" "unable to find specified revision"
@@ -488,6 +574,12 @@ run_statefulset_history_tests() {
   kube::test::wait_object_assert statefulset "{{range.items}}{{${image_field0:?}}}:{{end}}" "${IMAGE_STATEFULSET_R2}:"
   kube::test::wait_object_assert statefulset "{{range.items}}{{${image_field1:?}}}:{{end}}" "${IMAGE_PAUSE_V2}:"
   kube::test::get_object_assert statefulset "{{range.items}}{{${container_len:?}}}{{end}}" "2"
+  # Get rollout history
+  output_message=$(kubectl rollout history statefulset)
+  kube::test::if_has_string "${output_message}" "statefulset.apps/nginx"
+  kube::test::if_has_string "${output_message}" "REVISION  CHANGE-CAUSE"
+  kube::test::if_has_string "${output_message}" "3         kubectl apply"
+  kube::test::if_has_string "${output_message}" "4         kubectl apply"
   # Clean up - delete newest configuration
   kubectl delete -f hack/testdata/rollingupdate-statefulset-rv2.yaml "${kube_flags[@]:?}"
   # Post-condition: no pods from statefulset controller

@@ -87,7 +87,9 @@ func makeTestVol(name string, driverName string) *api.Volume {
 
 func getTestCSIDriver(name string, podInfoMount *bool, attachable *bool, volumeLifecycleModes []storagev1.VolumeLifecycleMode) *storagev1.CSIDriver {
 	defaultFSGroupPolicy := storagev1.ReadWriteOnceWithFSTypeFSGroupPolicy
-	return &storagev1.CSIDriver{
+	seLinuxMountSupport := true
+	noSElinuxMountSupport := false
+	driver := &storagev1.CSIDriver{
 		ObjectMeta: meta.ObjectMeta{
 			Name: name,
 		},
@@ -98,6 +100,13 @@ func getTestCSIDriver(name string, podInfoMount *bool, attachable *bool, volumeL
 			FSGroupPolicy:        &defaultFSGroupPolicy,
 		},
 	}
+	switch driver.Name {
+	case "supports_selinux":
+		driver.Spec.SELinuxMount = &seLinuxMountSupport
+	case "no_selinux":
+		driver.Spec.SELinuxMount = &noSElinuxMountSupport
+	}
+	return driver
 }
 
 func TestSaveVolumeData(t *testing.T) {

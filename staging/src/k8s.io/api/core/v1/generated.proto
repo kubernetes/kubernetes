@@ -2951,6 +2951,7 @@ message PersistentVolumeSpec {
   // claim.VolumeName is the authoritative bind between PV and PVC.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#binding
   // +optional
+  // +structType=granular
   optional ObjectReference claimRef = 4;
 
   // persistentVolumeReclaimPolicy defines what happens to a persistent volume when released from its claim.
@@ -3712,6 +3713,7 @@ message PodSpec {
   // If the OS field is set to windows, following fields must be unset:
   // - spec.hostPID
   // - spec.hostIPC
+  // - spec.hostUsers
   // - spec.securityContext.seLinuxOptions
   // - spec.securityContext.seccompProfile
   // - spec.securityContext.fsGroup
@@ -3732,6 +3734,19 @@ message PodSpec {
   // - spec.containers[*].securityContext.runAsGroup
   // +optional
   optional PodOS os = 36;
+
+  // Use the host's user namespace.
+  // Optional: Default to true.
+  // If set to true or not present, the pod will be run in the host user namespace, useful
+  // for when the pod needs a feature only available to the host user namespace, such as
+  // loading a kernel module with CAP_SYS_MODULE.
+  // When set to false, a new userns is created for the pod. Setting false is useful for
+  // mitigating container breakout vulnerabilities even allowing users to run their
+  // containers as root without actually having root privileges on the host.
+  // This field is alpha-level and is only honored by servers that enable the UserNamespacesSupport feature.
+  // +k8s:conversion-gen=false
+  // +optional
+  optional bool hostUsers = 37;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -4278,7 +4293,7 @@ message ReplicationControllerSpec {
 // ReplicationControllerStatus represents the current status of a replication
 // controller.
 message ReplicationControllerStatus {
-  // Replicas is the most recently oberved number of replicas.
+  // Replicas is the most recently observed number of replicas.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#what-is-a-replicationcontroller
   optional int32 replicas = 1;
 
@@ -5118,6 +5133,7 @@ message ServiceSpec {
   // service or not.  If this field is specified when creating a Service
   // which does not need it, creation will fail. This field will be wiped
   // when updating a Service to no longer need it (e.g. changing type).
+  // This field cannot be updated once set.
   // +optional
   optional int32 healthCheckNodePort = 12;
 

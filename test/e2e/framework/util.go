@@ -328,7 +328,10 @@ func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountN
 		}
 		return false, nil
 	})
-	return err
+	if err != nil {
+		return fmt.Errorf("wait for service account %q in namespace %q: %w", serviceAccountName, ns, err)
+	}
+	return nil
 }
 
 // WaitForDefaultServiceAccountInNamespace waits for the default service account to be provisioned
@@ -1367,7 +1370,7 @@ func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 // WatchEventSequenceVerifier ...
 // manages a watch for a given resource, ensures that events take place in a given order, retries the test on failure
 //
-//	testContext         cancelation signal across API boundries, e.g: context.TODO()
+//	testContext         cancellation signal across API boundaries, e.g: context.TODO()
 //	dc                  sets up a client to the API
 //	resourceType        specify the type of resource
 //	namespace           select a namespace

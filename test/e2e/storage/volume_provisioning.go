@@ -19,7 +19,6 @@ package storage
 import (
 	"context"
 	"fmt"
-	"net"
 	"strings"
 	"time"
 
@@ -51,7 +50,6 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -286,34 +284,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 						framework.ExpectNoError(err, "checkAWSEBS gp2 encrypted")
 					},
 				},
-				// OpenStack generic tests (works on all OpenStack deployments)
-				{
-					Name:           "generic Cinder volume on OpenStack",
-					CloudProviders: []string{"openstack"},
-					Timeouts:       f.Timeouts,
-					Provisioner:    "kubernetes.io/cinder",
-					Parameters:     map[string]string{},
-					ClaimSize:      "1.5Gi",
-					ExpectedSize:   "2Gi",
-					PvCheck: func(claim *v1.PersistentVolumeClaim) {
-						testsuites.PVWriteReadSingleNodeCheck(c, f.Timeouts, claim, e2epod.NodeSelection{})
-					},
-				},
-				{
-					Name:           "Cinder volume with empty volume type and zone on OpenStack",
-					CloudProviders: []string{"openstack"},
-					Timeouts:       f.Timeouts,
-					Provisioner:    "kubernetes.io/cinder",
-					Parameters: map[string]string{
-						"type":         "",
-						"availability": "",
-					},
-					ClaimSize:    "1.5Gi",
-					ExpectedSize: "2Gi",
-					PvCheck: func(claim *v1.PersistentVolumeClaim) {
-						testsuites.PVWriteReadSingleNodeCheck(c, f.Timeouts, claim, e2epod.NodeSelection{})
-					},
-				},
 				// vSphere generic test
 				{
 					Name:           "generic vSphere volume",
@@ -429,7 +399,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			// not being deleted.
 			// NOTE:  Polls until no PVs are detected, times out at 5 minutes.
 
-			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
+			e2eskipper.SkipUnlessProviderIs("gce", "aws", "gke", "vsphere", "azure")
 
 			const raceAttempts int = 100
 			var residualPVs []*v1.PersistentVolume
@@ -605,7 +575,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 	ginkgo.Describe("DynamicProvisioner Default", func() {
 		ginkgo.It("should create and delete default persistent volumes [Slow]", func() {
-			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
+			e2eskipper.SkipUnlessProviderIs("gce", "aws", "gke", "vsphere", "azure")
 			e2epv.SkipIfNoDefaultStorageClass(c)
 
 			ginkgo.By("creating a claim with no annotation")
@@ -631,7 +601,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		ginkgo.It("should be disabled by changing the default annotation [Serial] [Disruptive]", func() {
-			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
+			e2eskipper.SkipUnlessProviderIs("gce", "aws", "gke", "vsphere", "azure")
 			e2epv.SkipIfNoDefaultStorageClass(c)
 
 			scName, scErr := e2epv.GetDefaultStorageClassName(c)
@@ -670,7 +640,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		ginkgo.It("should be disabled by removing the default annotation [Serial] [Disruptive]", func() {
-			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
+			e2eskipper.SkipUnlessProviderIs("gce", "aws", "gke", "vsphere", "azure")
 			e2epv.SkipIfNoDefaultStorageClass(c)
 
 			scName, scErr := e2epv.GetDefaultStorageClassName(c)
@@ -705,37 +675,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(context.TODO(), claim.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(claim.Status.Phase, v1.ClaimPending)
-		})
-	})
-
-	ginkgo.Describe("GlusterDynamicProvisioner", func() {
-		ginkgo.It("should create and delete persistent volumes [fast]", func() {
-			e2eskipper.SkipIfProviderIs("gke")
-			ginkgo.By("creating a Gluster DP server Pod")
-			pod := startGlusterDpServerPod(c, ns)
-			serverURL := "http://" + net.JoinHostPort(pod.Status.PodIP, "8081")
-			ginkgo.By("creating a StorageClass")
-			test := testsuites.StorageClassTest{
-				Client:       c,
-				Name:         "Gluster Dynamic provisioner test",
-				Provisioner:  "kubernetes.io/glusterfs",
-				Timeouts:     f.Timeouts,
-				ClaimSize:    "2Gi",
-				ExpectedSize: "2Gi",
-				Parameters:   map[string]string{"resturl": serverURL},
-			}
-			storageClass, clearStorageClass := testsuites.SetupStorageClass(test.Client, newStorageClass(test, ns, "glusterdptest"))
-			defer clearStorageClass()
-			test.Class = storageClass
-
-			ginkgo.By("creating a claim object with a suffix for gluster dynamic provisioner")
-			test.Claim = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
-				ClaimSize:        test.ClaimSize,
-				StorageClassName: &test.Class.Name,
-				VolumeMode:       &test.VolumeMode,
-			}, ns)
-
-			test.TestDynamicProvisioning()
 		})
 	})
 
@@ -844,8 +783,6 @@ func getDefaultPluginName() string {
 		return "kubernetes.io/gce-pd"
 	case framework.ProviderIs("aws"):
 		return "kubernetes.io/aws-ebs"
-	case framework.ProviderIs("openstack"):
-		return "kubernetes.io/cinder"
 	case framework.ProviderIs("vsphere"):
 		return "kubernetes.io/vsphere-volume"
 	case framework.ProviderIs("azure"):
@@ -908,55 +845,6 @@ func getStorageClass(
 		Parameters:        parameters,
 		VolumeBindingMode: bindingMode,
 	}
-}
-
-func startGlusterDpServerPod(c clientset.Interface, ns string) *v1.Pod {
-	podClient := c.CoreV1().Pods(ns)
-
-	provisionerPod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "glusterdynamic-provisioner-",
-		},
-
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "glusterdynamic-provisioner",
-					Image: imageutils.GetE2EImage(imageutils.GlusterDynamicProvisioner),
-					Args: []string{
-						"-config=" + "/etc/heketi/heketi.json",
-					},
-					Ports: []v1.ContainerPort{
-						{Name: "heketi", ContainerPort: 8081},
-					},
-					Env: []v1.EnvVar{
-						{
-							Name: "POD_IP",
-							ValueFrom: &v1.EnvVarSource{
-								FieldRef: &v1.ObjectFieldSelector{
-									FieldPath: "status.podIP",
-								},
-							},
-						},
-					},
-					ImagePullPolicy: v1.PullIfNotPresent,
-				},
-			},
-		},
-	}
-	provisionerPod, err := podClient.Create(context.TODO(), provisionerPod, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "Failed to create %s pod: %v", provisionerPod.Name, err)
-
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(c, provisionerPod))
-
-	ginkgo.By("locating the provisioner pod")
-	pod, err := podClient.Get(context.TODO(), provisionerPod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "Cannot locate the provisioner pod %v: %v", provisionerPod.Name, err)
-	return pod
 }
 
 // waitForProvisionedVolumesDelete is a polling wrapper to scan all PersistentVolumes for any associated to the test's

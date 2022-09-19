@@ -87,21 +87,19 @@ func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSe
 // The context is optional and can be nil. This method will perform optional content compression if requested by
 // a client and the feature gate for APIResponseCompression is enabled.
 func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
-	disableCompression := request.CompressionDisabledFrom(req.Context())
 	trace := utiltrace.New("SerializeObject",
 		utiltrace.Field{"audit-id", request.GetAuditIDTruncated(req.Context())},
 		utiltrace.Field{"method", req.Method},
 		utiltrace.Field{"url", req.URL.Path},
 		utiltrace.Field{"protocol", req.Proto},
 		utiltrace.Field{"mediaType", mediaType},
-		utiltrace.Field{"encoder", encoder.Identifier()},
-		utiltrace.Field{"disableCompression", disableCompression})
+		utiltrace.Field{"encoder", encoder.Identifier()})
 	defer trace.LogIfLong(5 * time.Second)
 
 	w := &deferredResponseWriter{
 		mediaType:       mediaType,
 		statusCode:      statusCode,
-		contentEncoding: negotiateContentEncoding(req, disableCompression),
+		contentEncoding: negotiateContentEncoding(req),
 		hw:              hw,
 		trace:           trace,
 	}
@@ -146,8 +144,10 @@ var gzipPool = &sync.Pool{
 }
 
 const (
-	// defaultGzipContentEncodingLevel is set to 4 which uses less CPU than the default level
-	defaultGzipContentEncodingLevel = 4
+	// defaultGzipContentEncodingLevel is set to 1 which uses least CPU compared to higher levels, yet offers
+	// similar compression ratios (off by at most 1.5x, but typically within 1.1x-1.3x). For further details see -
+	// https://github.com/kubernetes/kubernetes/issues/112296
+	defaultGzipContentEncodingLevel = 1
 	// defaultGzipThresholdBytes is compared to the size of the first write from the stream
 	// (usually the entire object), and if the size is smaller no gzipping will be performed
 	// if the client requests it.
@@ -157,12 +157,12 @@ const (
 // negotiateContentEncoding returns a supported client-requested content encoding for the
 // provided request. It will return the empty string if no supported content encoding was
 // found or if response compression is disabled.
-func negotiateContentEncoding(req *http.Request, disableCompression bool) string {
+func negotiateContentEncoding(req *http.Request) string {
 	encoding := req.Header.Get("Accept-Encoding")
 	if len(encoding) == 0 {
 		return ""
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.APIResponseCompression) || disableCompression {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.APIResponseCompression) {
 		return ""
 	}
 	for len(encoding) > 0 {

@@ -125,6 +125,10 @@ func (plugin *rbdPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (plugin *rbdPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+
 func (plugin *rbdPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,

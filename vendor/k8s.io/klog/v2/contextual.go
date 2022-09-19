@@ -47,8 +47,9 @@ var (
 // If set, all log lines will be suppressed from the regular output, and
 // redirected to the logr implementation.
 // Use as:
-//   ...
-//   klog.SetLogger(zapr.NewLogger(zapLog))
+//
+//	...
+//	klog.SetLogger(zapr.NewLogger(zapLog))
 //
 // To remove a backing logr implemention, use ClearLogger. Setting an
 // empty logger with SetLogger(logr.Logger{}) does not work.

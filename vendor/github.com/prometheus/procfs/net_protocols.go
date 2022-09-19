@@ -23,7 +23,7 @@ import (
 	"github.com/prometheus/procfs/internal/util"
 )
 
-// NetProtocolStats stores the contents from /proc/net/protocols
+// NetProtocolStats stores the contents from /proc/net/protocols.
 type NetProtocolStats map[string]NetProtocolStatLine
 
 // NetProtocolStatLine contains a single line parsed from /proc/net/protocols. We
@@ -41,7 +41,7 @@ type NetProtocolStatLine struct {
 	Capabilities NetProtocolCapabilities
 }
 
-// NetProtocolCapabilities contains a list of capabilities for each protocol
+// NetProtocolCapabilities contains a list of capabilities for each protocol.
 type NetProtocolCapabilities struct {
 	Close               bool // 8
 	Connect             bool // 9

@@ -20,21 +20,20 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
 
-	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
@@ -43,14 +42,13 @@ import (
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
 
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
 // Note that the mark-control-plane phase is left out, not needed, and no token is created as that doesn't belong to the upgrade
 func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, patchesDir string, dryRun bool, out io.Writer) error {
-	errs := []error{}
+	var errs []error
 
 	// Upload currently used configuration to the cluster
 	// Note: This is done right in the beginning of cluster initialization; as we might want to make other phases
@@ -67,6 +65,12 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	// Write the new kubelet config down to disk and the env file if needed
 	if err := writeKubeletConfigFiles(client, cfg, patchesDir, dryRun, out); err != nil {
 		errs = append(errs, err)
+	}
+
+	// TODO: Temporary workaround. Remove in 1.27:
+	// https://github.com/kubernetes/kubeadm/issues/2626
+	if err := CleanupKubeletDynamicEnvFileContainerRuntime(dryRun); err != nil {
+		return err
 	}
 
 	// Annotate the node with the crisocket information, sourced either from the InitConfiguration struct or
@@ -187,7 +191,7 @@ func GetKubeletDir(dryRun bool) (string, error) {
 
 // moveFiles moves files from one directory to another.
 func moveFiles(files map[string]string) error {
-	filesToRecover := map[string]string{}
+	filesToRecover := make(map[string]string, len(files))
 	for from, to := range files {
 		if err := os.Rename(from, to); err != nil {
 			return rollbackFiles(filesToRecover, err)
@@ -208,49 +212,33 @@ func rollbackFiles(files map[string]string, originalErr error) error {
 	return errors.Errorf("couldn't move these files: %v. Got errors: %v", files, errorsutil.NewAggregate(errs))
 }
 
-// RemoveOldControlPlaneTaint finds all nodes with the new "control-plane" node-role label
-// and removes the old "control-plane" taint to them.
-// TODO: https://github.com/kubernetes/kubeadm/issues/2200
-func RemoveOldControlPlaneTaint(client clientset.Interface) error {
-	selectorControlPlane := labels.SelectorFromSet(labels.Set(map[string]string{
-		kubeadmconstants.LabelNodeRoleControlPlane: "",
-	}))
-	nodes, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
-		LabelSelector: selectorControlPlane.String(),
-	})
-	if err != nil {
-		return errors.Wrapf(err, "could not list nodes labeled with %q", kubeadmconstants.LabelNodeRoleControlPlane)
+// CleanupKubeletDynamicEnvFileContainerRuntime reads the kubelet dynamic environment file
+// from disk, ensure that the container runtime flag is removed.
+// TODO: Temporary workaround. Remove in 1.27:
+// https://github.com/kubernetes/kubeadm/issues/2626
+func CleanupKubeletDynamicEnvFileContainerRuntime(dryRun bool) error {
+	filePath := filepath.Join(kubeadmconstants.KubeletRunDirectory, kubeadmconstants.KubeletEnvFileName)
+	if dryRun {
+		fmt.Printf("[dryrun] Would ensure that %q does not include a --container-runtime flag\n", filePath)
+		return nil
 	}
-
-	for _, n := range nodes.Items {
-		// Check if the node has the old taint
-		hasOldTaint := false
-		taints := []v1.Taint{}
-		for _, t := range n.Spec.Taints {
-			if t.String() == kubeadmconstants.OldControlPlaneTaint.String() {
-				hasOldTaint = true
-				continue
-			}
-			// Collect all other taints
-			taints = append(taints, t)
-		}
-		// If the old taint is present remove it
-		if hasOldTaint {
-			err = apiclient.PatchNode(client, n.Name, func(n *v1.Node) {
-				n.Spec.Taints = taints
-			})
-			if err != nil {
-				return err
-			}
-		}
+	klog.V(2).Infof("Ensuring that %q does not include a --container-runtime flag", filePath)
+	bytes, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return errors.Wrapf(err, "failed to read kubelet configuration from file %q", filePath)
+	}
+	updated := cleanupKubeletDynamicEnvFileContainerRuntime(string(bytes))
+	if err := ioutil.WriteFile(filePath, []byte(updated), 0644); err != nil {
+		return errors.Wrapf(err, "failed to write kubelet configuration to the file %q", filePath)
 	}
 	return nil
 }
 
-func updateKubeletDynamicEnvFileWithURLScheme(str string) string {
+func cleanupKubeletDynamicEnvFileContainerRuntime(str string) string {
 	const (
-		flag   = "container-runtime-endpoint"
-		scheme = kubeadmapiv1.DefaultContainerRuntimeURLScheme + "://"
+		// `remote` is the only possible value
+		containerRuntimeFlag = "container-runtime"
+		endpointFlag         = "container-runtime-endpoint"
 	)
 	// Trim the prefix
 	str = strings.TrimLeft(str, fmt.Sprintf("%s=\"", kubeadmconstants.KubeletEnvFileVariableName))
@@ -260,29 +248,29 @@ func updateKubeletDynamicEnvFileWithURLScheme(str string) string {
 	// its value to have the scheme prefix.
 	split := strings.Split(str, " ")
 	for i, s := range split {
-		if !strings.Contains(s, flag) {
+		if !(strings.Contains(s, containerRuntimeFlag) && !strings.Contains(s, endpointFlag)) {
 			continue
 		}
 		keyValue := strings.Split(s, "=")
 		if len(keyValue) < 2 {
 			// Post init/join, the user may have edited the file and has flags that are not
 			// followed by "=". If that is the case the next argument must be the value
-			// of the endpoint flag and if its not a flag itself. Update that argument with
-			// the scheme instead.
+			// of the endpoint flag and if its not a flag itself.
 			if i+1 < len(split) {
 				nextArg := split[i+1]
-				if !strings.HasPrefix(nextArg, "-") && !strings.HasPrefix(nextArg, scheme) {
-					split[i+1] = scheme + nextArg
+				if strings.HasPrefix(nextArg, "-") {
+					// remove the flag only
+					split = append(split[:i], split[i+1:]...)
+				} else {
+					// remove the flag and value
+					split = append(split[:i], split[i+2:]...)
 				}
 			}
 			continue
 		}
-		if len(keyValue[1]) == 0 || strings.HasPrefix(keyValue[1], scheme) {
-			continue // The flag value already has the URL scheme prefix or is empty
-		}
-		// Missing prefix. Add it and update the key=value pair
-		keyValue[1] = scheme + keyValue[1]
-		split[i] = strings.Join(keyValue, "=")
+
+		// remove the flag and value in one
+		split = append(split[:i], split[i+1:]...)
 	}
 	str = strings.Join(split, " ")
 	return fmt.Sprintf("%s=\"%s", kubeadmconstants.KubeletEnvFileVariableName, str)

@@ -18,7 +18,6 @@ package devicemanager
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -78,7 +77,7 @@ func (m *wrappedManagerImpl) PluginListAndWatchReceiver(r string, resp *pluginap
 }
 
 func tmpSocketDir() (socketDir, socketName, pluginSocketName string, err error) {
-	socketDir, err = ioutil.TempDir("", "device_plugin")
+	socketDir, err = os.MkdirTemp("", "device_plugin")
 	if err != nil {
 		return
 	}
@@ -592,7 +591,7 @@ func TestCheckpoint(t *testing.T) {
 	resourceName2 := "domain2.com/resource2"
 	resourceName3 := "domain2.com/resource3"
 	as := assert.New(t)
-	tmpDir, err := ioutil.TempDir("", "checkpoint")
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.Nil(err)
 	defer os.RemoveAll(tmpDir)
 	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
@@ -910,7 +909,7 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 	podsStub := activePodsStub{
 		activePods: []*v1.Pod{},
 	}
-	tmpDir, err := ioutil.TempDir("", "checkpoint")
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.Nil(err)
 	defer os.RemoveAll(tmpDir)
 	testManager, err := getTestManager(tmpDir, podsStub.getActivePods, testResources)
@@ -1009,7 +1008,7 @@ func TestGetDeviceRunContainerOptions(t *testing.T) {
 	}
 	as := require.New(t)
 
-	tmpDir, err := ioutil.TempDir("", "checkpoint")
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.Nil(err)
 	defer os.RemoveAll(tmpDir)
 
@@ -1071,7 +1070,7 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 	podsStub := activePodsStub{
 		activePods: []*v1.Pod{},
 	}
-	tmpDir, err := ioutil.TempDir("", "checkpoint")
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.Nil(err)
 	defer os.RemoveAll(tmpDir)
 
@@ -1162,7 +1161,7 @@ func TestUpdatePluginResources(t *testing.T) {
 
 	as := assert.New(t)
 	monitorCallback := func(resourceName string, devices []pluginapi.Device) {}
-	tmpDir, err := ioutil.TempDir("", "checkpoint")
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.Nil(err)
 	defer os.RemoveAll(tmpDir)
 
@@ -1220,7 +1219,7 @@ func TestDevicePreStartContainer(t *testing.T) {
 	podsStub := activePodsStub{
 		activePods: []*v1.Pod{},
 	}
-	tmpDir, err := ioutil.TempDir("", "checkpoint")
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.Nil(err)
 	defer os.RemoveAll(tmpDir)
 
@@ -1282,7 +1281,7 @@ func TestDevicePreStartContainer(t *testing.T) {
 
 func TestResetExtendedResource(t *testing.T) {
 	as := assert.New(t)
-	tmpDir, err := ioutil.TempDir("", "checkpoint")
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.Nil(err)
 	defer os.RemoveAll(tmpDir)
 	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
@@ -1392,7 +1391,7 @@ func TestReadPreNUMACheckpoint(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
 
-	err = ioutil.WriteFile(filepath.Join(socketDir, deviceManagerCheckpointFilename), []byte(oldCheckpoint), 0644)
+	err = os.WriteFile(filepath.Join(socketDir, deviceManagerCheckpointFilename), []byte(oldCheckpoint), 0644)
 	require.NoError(t, err)
 
 	topologyStore := topologymanager.NewFakeManager()

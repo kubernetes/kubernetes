@@ -28,7 +28,6 @@ import (
 
 type externalApplyConfigurationValue struct {
 	externals *map[types.Name]string
-	changed   bool
 }
 
 func NewExternalApplyConfigurationValue(externals *map[types.Name]string, def []string) *externalApplyConfigurationValue {
@@ -45,10 +44,6 @@ func NewExternalApplyConfigurationValue(externals *map[types.Name]string, def []
 var _ flag.Value = &externalApplyConfigurationValue{}
 
 func (s *externalApplyConfigurationValue) set(vs []string) error {
-	if !s.changed {
-		*s.externals = map[types.Name]string{}
-	}
-
 	for _, input := range vs {
 		typ, pkg, err := parseExternalMapping(input)
 		if err != nil {
@@ -71,6 +66,7 @@ func (s *externalApplyConfigurationValue) Set(val string) error {
 	if err := s.set(vs); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -114,12 +110,13 @@ func parseExternalMapping(mapping string) (typ types.Name, pkg string, err error
 	}
 	packageTypeStr := parts[0]
 	pkg = parts[1]
-	ptParts := strings.Split(packageTypeStr, ".")
-	if len(ptParts) != 2 {
-		return types.Name{}, "", fmt.Errorf("expected package and type of the form <package>#<typeName> but got %s", packageTypeStr)
+	// need to split on the *last* dot, since k8s.io (and other valid packages) have a dot in it
+	lastDot := strings.LastIndex(packageTypeStr, ".")
+	if lastDot == -1 || lastDot == len(packageTypeStr)-1 {
+		return types.Name{}, "", fmt.Errorf("expected package and type of the form <package>.<typeName> but got %s", packageTypeStr)
 	}
-	structPkg := ptParts[0]
-	structType := ptParts[1]
+	structPkg := packageTypeStr[:lastDot]
+	structType := packageTypeStr[lastDot+1:]
 
 	return types.Name{Package: structPkg, Name: structType}, pkg, nil
 }

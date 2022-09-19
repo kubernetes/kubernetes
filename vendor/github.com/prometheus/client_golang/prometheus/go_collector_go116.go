@@ -40,13 +40,28 @@ type goCollector struct {
 //
 // Deprecated: Use collectors.NewGoCollector instead.
 func NewGoCollector() Collector {
+	msMetrics := goRuntimeMemStats()
+	msMetrics = append(msMetrics, struct {
+		desc    *Desc
+		eval    func(*runtime.MemStats) float64
+		valType ValueType
+	}{
+		// This metric is omitted in Go1.17+, see https://github.com/prometheus/client_golang/issues/842#issuecomment-861812034
+		desc: NewDesc(
+			memstatNamespace("gc_cpu_fraction"),
+			"The fraction of this program's available CPU time used by the GC since the program started.",
+			nil, nil,
+		),
+		eval:    func(ms *runtime.MemStats) float64 { return ms.GCCPUFraction },
+		valType: GaugeValue,
+	})
 	return &goCollector{
 		base:      newBaseGoCollector(),
 		msLast:    &runtime.MemStats{},
 		msRead:    runtime.ReadMemStats,
 		msMaxWait: time.Second,
 		msMaxAge:  5 * time.Minute,
-		msMetrics: goRuntimeMemStats(),
+		msMetrics: msMetrics,
 	}
 }
 

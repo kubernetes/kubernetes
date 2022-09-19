@@ -87,6 +87,10 @@ func (plugin *testPlugins) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (plugin *testPlugins) SupportsSELinuxContextMount(spec *Spec) (bool, error) {
+	return false, nil
+}
+
 func (plugin *testPlugins) NewMounter(spec *Spec, podRef *v1.Pod, opts VolumeOptions) (Mounter, error) {
 	return nil, nil
 }

@@ -31,8 +31,8 @@ limitations under the License.
  * Note that the server containers are for testing purposes only and should not
  * be used in production.
  *
- * 2) With server outside of Kubernetes (Cinder, ...)
- * Appropriate server (e.g. OpenStack Cinder) must exist somewhere outside
+ * 2) With server outside of Kubernetes
+ * Appropriate server must exist somewhere outside
  * the tested Kubernetes cluster. The test itself creates a new volume,
  * and checks, that Kubernetes can use it as a volume.
  */
@@ -164,65 +164,6 @@ func NewNFSServer(cs clientset.Interface, namespace string, args []string) (conf
 		host = "[" + host + "]"
 	}
 	return config, pod, host
-}
-
-// NewGlusterfsServer is a GlusterFS-specific wrapper for CreateStorageServer. Also creates the gluster endpoints object.
-func NewGlusterfsServer(cs clientset.Interface, namespace string) (config TestConfig, pod *v1.Pod, ip string) {
-	config = TestConfig{
-		Namespace:   namespace,
-		Prefix:      "gluster",
-		ServerImage: imageutils.GetE2EImage(imageutils.VolumeGlusterServer),
-		ServerPorts: []int{24007, 24008, 49152},
-	}
-	pod, ip = CreateStorageServer(cs, config)
-
-	service := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: config.Prefix + "-server",
-		},
-		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{
-				{
-					Protocol: v1.ProtocolTCP,
-					Port:     24007,
-				},
-			},
-		},
-	}
-
-	_, err := cs.CoreV1().Services(namespace).Create(context.TODO(), service, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create service for Gluster server")
-
-	ginkgo.By("creating Gluster endpoints")
-	endpoints := &v1.Endpoints{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Endpoints",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: config.Prefix + "-server",
-		},
-		Subsets: []v1.EndpointSubset{
-			{
-				Addresses: []v1.EndpointAddress{
-					{
-						IP: ip,
-					},
-				},
-				Ports: []v1.EndpointPort{
-					{
-						Name:     "gluster",
-						Port:     24007,
-						Protocol: v1.ProtocolTCP,
-					},
-				},
-			},
-		},
-	}
-	_, err = cs.CoreV1().Endpoints(namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create endpoints for Gluster server")
-
-	return config, pod, ip
 }
 
 // CreateStorageServer is a wrapper for startVolumeServer(). A storage server config is passed in, and a pod pointer
@@ -606,6 +547,7 @@ func testVolumeClient(f *framework.Framework, config TestConfig, fsGroup *int64,
 	ec := &v1.EphemeralContainer{
 		EphemeralContainerCommon: v1.EphemeralContainerCommon(clientPod.Spec.Containers[0]),
 	}
+	ec.Resources = v1.ResourceRequirements{}
 	ec.Name = "volume-ephemeral-container"
 	err = f.PodClient().AddEphemeralContainerSync(clientPod, ec, timeouts.PodStart)
 	// The API server will return NotFound for the subresource when the feature is disabled

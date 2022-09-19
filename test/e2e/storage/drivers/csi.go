@@ -27,7 +27,7 @@ limitations under the License.
  * Note that the server containers are for testing purposes only and should not
  * be used in production.
  *
- * 2) With server or cloud provider outside of Kubernetes (Cinder, GCE, AWS, Azure, ...)
+ * 2) With server or cloud provider outside of Kubernetes (GCE, AWS, Azure, ...)
  * Appropriate server or cloud provider must exist somewhere outside
  * the tested Kubernetes cluster. CreateVolume will create a new volume to be
  * used in the TestSuites for inlineVolume or DynamicPV tests.
@@ -394,7 +394,7 @@ func (c *MockCSICalls) Get() []MockCSICall {
 	return c.calls[:]
 }
 
-// Add appens one new call at the end.
+// Add appends one new call at the end.
 func (c *MockCSICalls) Add(call MockCSICall) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -987,8 +987,6 @@ func generateDriverCleanupFunc(
 	driverName, testns, driverns string,
 	driverCleanup, cancelLogging func()) func() {
 
-	cleanupHandle := new(framework.CleanupActionHandle)
-
 	// Cleanup CSI driver and namespaces. This function needs to be idempotent and can be
 	// concurrently called from defer (or AfterEach) and AfterSuite action hooks.
 	cleanupFunc := func() {
@@ -1003,13 +1001,7 @@ func generateDriverCleanupFunc(
 
 		ginkgo.By(fmt.Sprintf("deleting the driver namespace: %s", driverns))
 		tryFunc(func() { f.DeleteNamespace(driverns) })
-		// cleanup function has already ran and hence we don't need to run it again.
-		// We do this as very last action because in-case defer(or AfterEach) races
-		// with AfterSuite and test routine gets killed then this block still
-		// runs in AfterSuite
-		framework.RemoveCleanupAction(*cleanupHandle)
 	}
 
-	*cleanupHandle = framework.AddCleanupAction(cleanupFunc)
 	return cleanupFunc
 }

@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -538,38 +539,44 @@ func TestTryLoadKeyFromDisk(t *testing.T) {
 
 func TestPathsForCertAndKey(t *testing.T) {
 	crtPath, keyPath := PathsForCertAndKey("/foo", "bar")
-	if crtPath != "/foo/bar.crt" {
+	expectedPath := filepath.FromSlash("/foo/bar.crt")
+	if crtPath != expectedPath {
 		t.Errorf("unexpected certificate path: %s", crtPath)
 	}
-	if keyPath != "/foo/bar.key" {
+	expectedPath = filepath.FromSlash("/foo/bar.key")
+	if keyPath != expectedPath {
 		t.Errorf("unexpected key path: %s", keyPath)
 	}
 }
 
 func TestPathForCert(t *testing.T) {
 	crtPath := pathForCert("/foo", "bar")
-	if crtPath != "/foo/bar.crt" {
+	expectedPath := filepath.FromSlash("/foo/bar.crt")
+	if crtPath != expectedPath {
 		t.Errorf("unexpected certificate path: %s", crtPath)
 	}
 }
 
 func TestPathForKey(t *testing.T) {
 	keyPath := pathForKey("/foo", "bar")
-	if keyPath != "/foo/bar.key" {
+	expectedPath := filepath.FromSlash("/foo/bar.key")
+	if keyPath != expectedPath {
 		t.Errorf("unexpected certificate path: %s", keyPath)
 	}
 }
 
 func TestPathForPublicKey(t *testing.T) {
 	pubPath := pathForPublicKey("/foo", "bar")
-	if pubPath != "/foo/bar.pub" {
+	expectedPath := filepath.FromSlash("/foo/bar.pub")
+	if pubPath != expectedPath {
 		t.Errorf("unexpected certificate path: %s", pubPath)
 	}
 }
 
 func TestPathForCSR(t *testing.T) {
 	csrPath := pathForCSR("/foo", "bar")
-	if csrPath != "/foo/bar.csr" {
+	expectedPath := filepath.FromSlash("/foo/bar.csr")
+	if csrPath != expectedPath {
 		t.Errorf("unexpected certificate path: %s", csrPath)
 	}
 }

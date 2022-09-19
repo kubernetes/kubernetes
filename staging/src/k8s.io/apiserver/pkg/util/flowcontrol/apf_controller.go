@@ -869,12 +869,14 @@ func (cfgCtlr *configController) maybeReap(plName string) {
 		klog.V(7).Infof("plName=%s, plState==nil", plName)
 		return
 	}
-	if plState.queues != nil {
-		useless := plState.quiescing && plState.numPending == 0 && plState.queues.IsIdle()
-		klog.V(7).Infof("plState.quiescing=%v, plState.numPending=%d, useless=%v", plState.quiescing, plState.numPending, useless)
-		if !useless {
-			return
-		}
+	if plState.queues == nil {
+		klog.V(7).Infof("plName=%s, plState.queues==nil", plName)
+		return
+	}
+	useless := plState.quiescing && plState.numPending == 0 && plState.queues.IsIdle()
+	klog.V(7).Infof("plState.quiescing=%v, plState.numPending=%d, useless=%v", plState.quiescing, plState.numPending, useless)
+	if !useless {
+		return
 	}
 	klog.V(3).Infof("Triggered API priority and fairness config reloading because priority level %s is undesired and idle", plName)
 	cfgCtlr.configQueue.Add(0)

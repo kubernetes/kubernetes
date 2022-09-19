@@ -909,6 +909,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			run(t, test)
@@ -968,6 +969,10 @@ func (plugin *mockVolumePlugin) SupportsBulkVolumeVerification() bool {
 
 func (plugin *mockVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	return nil, nil
+}
+
+func (plugin *mockVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
 }
 
 func (plugin *mockVolumePlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {

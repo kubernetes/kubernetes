@@ -421,48 +421,6 @@ func TestTranslateTopologyFromCSIToInTree(t *testing.T) {
 				v1.LabelTopologyRegion: "us-east1",
 			},
 		},
-		{
-			name:         "cinder translation",
-			key:          CinderTopologyKey,
-			expErr:       false,
-			regionParser: nil,
-			pv: &v1.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "cinder", Namespace: "myns",
-				},
-				Spec: v1.PersistentVolumeSpec{
-					NodeAffinity: &v1.VolumeNodeAffinity{
-						Required: &v1.NodeSelector{
-							NodeSelectorTerms: []v1.NodeSelectorTerm{
-								{
-									MatchExpressions: []v1.NodeSelectorRequirement{
-										{
-											Key:      CinderTopologyKey,
-											Operator: v1.NodeSelectorOpIn,
-											Values:   []string{"nova"},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			expectedNodeSelectorTerms: []v1.NodeSelectorTerm{
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      v1.LabelTopologyZone,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"nova"},
-						},
-					},
-				},
-			},
-			expectedLabels: map[string]string{
-				v1.LabelTopologyZone: "nova",
-			},
-		},
 	}
 
 	for _, tc := range testCases {

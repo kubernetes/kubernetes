@@ -440,7 +440,7 @@ type KubeletConfiguration struct {
 	// +optional
 	CPUCFSQuota *bool `json:"cpuCFSQuota,omitempty"`
 	// cpuCFSQuotaPeriod is the CPU CFS quota period value, `cpu.cfs_period_us`.
-	// The value must be between 1 us and 1 second, inclusive.
+	// The value must be between 1 ms and 1 second, inclusive.
 	// Requires the CustomCPUCFSQuotaPeriod feature gate to be enabled.
 	// Default: "100ms"
 	// +optional
@@ -786,6 +786,17 @@ type KubeletConfiguration struct {
 	// +featureGate=KubeletTracing
 	// +optional
 	Tracing *tracingapi.TracingConfiguration `json:"tracing,omitempty"`
+
+	// LocalStorageCapacityIsolation enables local ephemeral storage isolation feature. The default setting is true.
+	// This feature allows users to set request/limit for container's ephemeral storage and manage it in a similar way
+	// as cpu and memory. It also allows setting sizeLimit for emptyDir volume, which will trigger pod eviction if disk
+	// usage from the volume exceeds the limit.
+	// This feature depends on the capability of detecting correct root file system disk usage. For certain systems,
+	// such as kind rootless, if this capability cannot be supported, the feature LocalStorageCapacityIsolation should be
+	// disabled. Once disabled, user should not set request/limit for container's ephemeral storage, or sizeLimit for emptyDir.
+	// Default: true
+	// +optional
+	LocalStorageCapacityIsolation *bool `json:"localStorageCapacityIsolation,omitempty"`
 }
 
 type KubeletAuthorizationMode string

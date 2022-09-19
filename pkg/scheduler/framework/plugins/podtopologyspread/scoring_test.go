@@ -27,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -87,8 +86,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.NewString(),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64Ptr(0),
-					{key: "zone", value: "zone2"}: pointer.Int64Ptr(0),
+					{key: "zone", value: "zone1"}: pointer.Int64(0),
+					{key: "zone", value: "zone2"}: pointer.Int64(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2), topologyNormalizingWeight(3)},
 			},
@@ -128,7 +127,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.NewString("node-x"),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64Ptr(0),
+					{key: "zone", value: "zone1"}: pointer.Int64(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1), topologyNormalizingWeight(2)},
 			},
@@ -170,8 +169,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.NewString(),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: v1.LabelTopologyZone, value: "mars"}: pointer.Int64Ptr(0),
-					{key: v1.LabelTopologyZone, value: ""}:     pointer.Int64Ptr(0),
+					{key: v1.LabelTopologyZone, value: "mars"}: pointer.Int64(0),
+					{key: v1.LabelTopologyZone, value: ""}:     pointer.Int64(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(4), topologyNormalizingWeight(2)},
 			},
@@ -221,7 +220,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.NewString(),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "planet", value: "mars"}: pointer.Int64Ptr(0),
+					{key: "planet", value: "mars"}: pointer.Int64(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1), topologyNormalizingWeight(1)},
 			},
@@ -285,7 +284,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.NewString(),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{"planet", "mars"}: pointer.Int64Ptr(0),
+					{"planet", "mars"}: pointer.Int64(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1)},
 			},
@@ -317,8 +316,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.NewString(),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64Ptr(0),
-					{key: "zone", value: "zone2"}: pointer.Int64Ptr(0),
+					{key: "zone", value: "zone1"}: pointer.Int64(0),
+					{key: "zone", value: "zone2"}: pointer.Int64(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
@@ -351,8 +350,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.NewString(),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64Ptr(0),
-					{key: "zone", value: "zone2"}: pointer.Int64Ptr(0),
+					{key: "zone", value: "zone1"}: pointer.Int64(0),
+					{key: "zone", value: "zone2"}: pointer.Int64(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
@@ -385,8 +384,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.NewString(),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64Ptr(0),
-					{key: "zone", value: "zone2"}: pointer.Int64Ptr(0),
+					{key: "zone", value: "zone1"}: pointer.Int64(0),
+					{key: "zone", value: "zone2"}: pointer.Int64(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
@@ -419,8 +418,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.NewString(),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64Ptr(0),
-					{key: "zone", value: "zone2"}: pointer.Int64Ptr(0),
+					{key: "zone", value: "zone1"}: pointer.Int64(0),
+					{key: "zone", value: "zone2"}: pointer.Int64(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
@@ -452,8 +451,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.NewString(),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64Ptr(0),
-					{key: "zone", value: "zone2"}: pointer.Int64Ptr(0),
+					{key: "zone", value: "zone1"}: pointer.Int64(0),
+					{key: "zone", value: "zone2"}: pointer.Int64(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
@@ -485,8 +484,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				},
 				IgnoredNodes: sets.NewString(),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: pointer.Int64Ptr(0),
-					{key: "zone", value: "zone2"}: pointer.Int64Ptr(0),
+					{key: "zone", value: "zone1"}: pointer.Int64(0),
+					{key: "zone", value: "zone2"}: pointer.Int64(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
@@ -498,7 +497,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(tt.objs...), 0)
-			f, err := frameworkruntime.NewFramework(nil, nil, wait.NeverStop,
+			f, err := frameworkruntime.NewFramework(nil, nil, ctx.Done(),
 				frameworkruntime.WithSnapshotSharedLister(cache.NewSnapshot(nil, tt.nodes)),
 				frameworkruntime.WithInformerFactory(informerFactory))
 			if err != nil {
@@ -1382,7 +1381,7 @@ func BenchmarkTestDefaultEvenPodsSpreadPriority(b *testing.B) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			f, err := frameworkruntime.NewFramework(nil, nil, wait.NeverStop,
+			f, err := frameworkruntime.NewFramework(nil, nil, ctx.Done(),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory))
 			if err != nil {
@@ -1409,7 +1408,7 @@ func BenchmarkTestDefaultEvenPodsSpreadPriority(b *testing.B) {
 					score, _ := p.Score(ctx, state, pod, n.Name)
 					gotList[i] = framework.NodeScore{Name: n.Name, Score: score}
 				}
-				p.parallelizer.Until(ctx, len(filteredNodes), scoreNode)
+				p.parallelizer.Until(ctx, len(filteredNodes), scoreNode, "")
 				status = p.NormalizeScore(ctx, state, pod, gotList)
 				if !status.IsSuccess() {
 					b.Fatal(status)

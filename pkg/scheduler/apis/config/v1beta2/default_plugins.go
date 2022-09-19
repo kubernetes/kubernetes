@@ -79,16 +79,16 @@ func getDefaultPlugins() *v1beta2.Plugins {
 		},
 		Score: v1beta2.PluginSet{
 			Enabled: []v1beta2.Plugin{
-				{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32Ptr(1)},
-				{Name: names.ImageLocality, Weight: pointer.Int32Ptr(1)},
-				{Name: names.InterPodAffinity, Weight: pointer.Int32Ptr(1)},
-				{Name: names.NodeResourcesFit, Weight: pointer.Int32Ptr(1)},
-				{Name: names.NodeAffinity, Weight: pointer.Int32Ptr(1)},
+				{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32(1)},
+				{Name: names.ImageLocality, Weight: pointer.Int32(1)},
+				{Name: names.InterPodAffinity, Weight: pointer.Int32(1)},
+				{Name: names.NodeResourcesFit, Weight: pointer.Int32(1)},
+				{Name: names.NodeAffinity, Weight: pointer.Int32(1)},
 				// Weight is doubled because:
 				// - This is a score coming from user preference.
 				// - It makes its signal comparable to NodeResourcesFit.LeastAllocated.
-				{Name: names.PodTopologySpread, Weight: pointer.Int32Ptr(2)},
-				{Name: names.TaintToleration, Weight: pointer.Int32Ptr(1)},
+				{Name: names.PodTopologySpread, Weight: pointer.Int32(2)},
+				{Name: names.TaintToleration, Weight: pointer.Int32(1)},
 			},
 		},
 		Reserve: v1beta2.PluginSet{
@@ -114,7 +114,7 @@ func getDefaultPlugins() *v1beta2.Plugins {
 
 func applyFeatureGates(config *v1beta2.Plugins) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
-		config.Score.Enabled = append(config.Score.Enabled, v1beta2.Plugin{Name: names.VolumeBinding, Weight: pointer.Int32Ptr(1)})
+		config.Score.Enabled = append(config.Score.Enabled, v1beta2.Plugin{Name: names.VolumeBinding, Weight: pointer.Int32(1)})
 	}
 }
 

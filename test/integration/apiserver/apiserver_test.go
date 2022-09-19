@@ -246,6 +246,7 @@ func TestCacheControl(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			defer resp.Body.Close()
 			cc := resp.Header.Get("Cache-Control")
 			if !strings.Contains(cc, "private") {
 				t.Errorf("expected private cache-control, got %q", cc)
@@ -291,6 +292,7 @@ func TestHSTS(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			defer resp.Body.Close()
 			cc := resp.Header.Get("Strict-Transport-Security")
 			if !strings.Contains(cc, "max-age=31536000; includeSubDomains") {
 				t.Errorf("expected max-age=31536000; includeSubDomains, got %q", cc)

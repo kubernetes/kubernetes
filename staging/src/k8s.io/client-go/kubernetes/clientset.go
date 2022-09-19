@@ -30,6 +30,7 @@ import (
 	appsv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
 	appsv1beta2 "k8s.io/client-go/kubernetes/typed/apps/v1beta2"
 	authenticationv1 "k8s.io/client-go/kubernetes/typed/authentication/v1"
+	authenticationv1alpha1 "k8s.io/client-go/kubernetes/typed/authentication/v1alpha1"
 	authenticationv1beta1 "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
 	authorizationv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	authorizationv1beta1 "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
@@ -53,6 +54,7 @@ import (
 	flowcontrolv1beta1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1"
 	flowcontrolv1beta2 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
+	networkingv1alpha1 "k8s.io/client-go/kubernetes/typed/networking/v1alpha1"
 	networkingv1beta1 "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
 	nodev1 "k8s.io/client-go/kubernetes/typed/node/v1"
 	nodev1alpha1 "k8s.io/client-go/kubernetes/typed/node/v1alpha1"
@@ -81,6 +83,7 @@ type Interface interface {
 	AppsV1beta1() appsv1beta1.AppsV1beta1Interface
 	AppsV1beta2() appsv1beta2.AppsV1beta2Interface
 	AuthenticationV1() authenticationv1.AuthenticationV1Interface
+	AuthenticationV1alpha1() authenticationv1alpha1.AuthenticationV1alpha1Interface
 	AuthenticationV1beta1() authenticationv1beta1.AuthenticationV1beta1Interface
 	AuthorizationV1() authorizationv1.AuthorizationV1Interface
 	AuthorizationV1beta1() authorizationv1beta1.AuthorizationV1beta1Interface
@@ -104,6 +107,7 @@ type Interface interface {
 	FlowcontrolV1beta1() flowcontrolv1beta1.FlowcontrolV1beta1Interface
 	FlowcontrolV1beta2() flowcontrolv1beta2.FlowcontrolV1beta2Interface
 	NetworkingV1() networkingv1.NetworkingV1Interface
+	NetworkingV1alpha1() networkingv1alpha1.NetworkingV1alpha1Interface
 	NetworkingV1beta1() networkingv1beta1.NetworkingV1beta1Interface
 	NodeV1() nodev1.NodeV1Interface
 	NodeV1alpha1() nodev1alpha1.NodeV1alpha1Interface
@@ -132,6 +136,7 @@ type Clientset struct {
 	appsV1beta1                  *appsv1beta1.AppsV1beta1Client
 	appsV1beta2                  *appsv1beta2.AppsV1beta2Client
 	authenticationV1             *authenticationv1.AuthenticationV1Client
+	authenticationV1alpha1       *authenticationv1alpha1.AuthenticationV1alpha1Client
 	authenticationV1beta1        *authenticationv1beta1.AuthenticationV1beta1Client
 	authorizationV1              *authorizationv1.AuthorizationV1Client
 	authorizationV1beta1         *authorizationv1beta1.AuthorizationV1beta1Client
@@ -155,6 +160,7 @@ type Clientset struct {
 	flowcontrolV1beta1           *flowcontrolv1beta1.FlowcontrolV1beta1Client
 	flowcontrolV1beta2           *flowcontrolv1beta2.FlowcontrolV1beta2Client
 	networkingV1                 *networkingv1.NetworkingV1Client
+	networkingV1alpha1           *networkingv1alpha1.NetworkingV1alpha1Client
 	networkingV1beta1            *networkingv1beta1.NetworkingV1beta1Client
 	nodeV1                       *nodev1.NodeV1Client
 	nodeV1alpha1                 *nodev1alpha1.NodeV1alpha1Client
@@ -205,6 +211,11 @@ func (c *Clientset) AppsV1beta2() appsv1beta2.AppsV1beta2Interface {
 // AuthenticationV1 retrieves the AuthenticationV1Client
 func (c *Clientset) AuthenticationV1() authenticationv1.AuthenticationV1Interface {
 	return c.authenticationV1
+}
+
+// AuthenticationV1alpha1 retrieves the AuthenticationV1alpha1Client
+func (c *Clientset) AuthenticationV1alpha1() authenticationv1alpha1.AuthenticationV1alpha1Interface {
+	return c.authenticationV1alpha1
 }
 
 // AuthenticationV1beta1 retrieves the AuthenticationV1beta1Client
@@ -320,6 +331,11 @@ func (c *Clientset) FlowcontrolV1beta2() flowcontrolv1beta2.FlowcontrolV1beta2In
 // NetworkingV1 retrieves the NetworkingV1Client
 func (c *Clientset) NetworkingV1() networkingv1.NetworkingV1Interface {
 	return c.networkingV1
+}
+
+// NetworkingV1alpha1 retrieves the NetworkingV1alpha1Client
+func (c *Clientset) NetworkingV1alpha1() networkingv1alpha1.NetworkingV1alpha1Interface {
+	return c.networkingV1alpha1
 }
 
 // NetworkingV1beta1 retrieves the NetworkingV1beta1Client
@@ -469,6 +485,10 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
+	cs.authenticationV1alpha1, err = authenticationv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
 	cs.authenticationV1beta1, err = authenticationv1beta1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
@@ -561,6 +581,10 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
+	cs.networkingV1alpha1, err = networkingv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
 	cs.networkingV1beta1, err = networkingv1beta1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
@@ -649,6 +673,7 @@ func New(c rest.Interface) *Clientset {
 	cs.appsV1beta1 = appsv1beta1.New(c)
 	cs.appsV1beta2 = appsv1beta2.New(c)
 	cs.authenticationV1 = authenticationv1.New(c)
+	cs.authenticationV1alpha1 = authenticationv1alpha1.New(c)
 	cs.authenticationV1beta1 = authenticationv1beta1.New(c)
 	cs.authorizationV1 = authorizationv1.New(c)
 	cs.authorizationV1beta1 = authorizationv1beta1.New(c)
@@ -672,6 +697,7 @@ func New(c rest.Interface) *Clientset {
 	cs.flowcontrolV1beta1 = flowcontrolv1beta1.New(c)
 	cs.flowcontrolV1beta2 = flowcontrolv1beta2.New(c)
 	cs.networkingV1 = networkingv1.New(c)
+	cs.networkingV1alpha1 = networkingv1alpha1.New(c)
 	cs.networkingV1beta1 = networkingv1beta1.New(c)
 	cs.nodeV1 = nodev1.New(c)
 	cs.nodeV1alpha1 = nodev1alpha1.New(c)

@@ -483,6 +483,10 @@ func (plugin *TestPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (plugin *TestPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+
 func (plugin *TestPlugin) GetErrorEncountered() bool {
 	plugin.pluginLock.RLock()
 	defer plugin.pluginLock.RUnlock()

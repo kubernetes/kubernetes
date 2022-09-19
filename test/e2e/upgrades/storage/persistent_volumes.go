@@ -47,7 +47,7 @@ const (
 func (t *PersistentVolumeUpgradeTest) Setup(f *framework.Framework) {
 
 	var err error
-	e2eskipper.SkipUnlessProviderIs("gce", "gke", "openstack", "aws", "vsphere", "azure")
+	e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws", "vsphere", "azure")
 
 	ns := f.Namespace.Name
 

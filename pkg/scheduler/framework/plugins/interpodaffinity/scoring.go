@@ -22,7 +22,7 @@ import (
 	"math"
 	"sync/atomic"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
@@ -203,7 +203,7 @@ func (pl *InterPodAffinity) PreScore(
 			topoScores[atomic.AddInt32(&index, 1)] = topoScore
 		}
 	}
-	pl.parallelizer.Until(pCtx, len(allNodes), processNode)
+	pl.parallelizer.Until(pCtx, len(allNodes), processNode, pl.Name())
 
 	for i := 0; i <= int(index); i++ {
 		state.topologyScore.append(topoScores[i])

@@ -63,6 +63,7 @@ const (
 	customMetricName                = "QPS"
 	serviceInitializationTimeout    = 2 * time.Minute
 	serviceInitializationInterval   = 15 * time.Second
+	megabytes                       = 1024 * 1024
 )
 
 var (
@@ -76,11 +77,22 @@ var (
 	KindDeployment = schema.GroupVersionKind{Group: "apps", Version: "v1beta2", Kind: "Deployment"}
 	// KindReplicaSet is the GVK for ReplicaSet
 	KindReplicaSet = schema.GroupVersionKind{Group: "apps", Version: "v1beta2", Kind: "ReplicaSet"}
+	// KindCRD is the GVK for CRD for test purposes
+	KindCRD = schema.GroupVersionKind{Group: "test", Version: "v1", Kind: "TestCustomCRD"}
+)
+
+// ScalingDirection identifies the scale direction for HPA Behavior.
+type ScalingDirection int
+
+const (
+	DirectionUnknown ScalingDirection = iota
+	ScaleUpDirection
+	ScaleDownDirection
 )
 
 /*
-ResourceConsumer is a tool for testing. It helps create specified usage of CPU or memory (Warning: memory not supported)
-typical use case:
+ResourceConsumer is a tool for testing. It helps to create a specified usage of CPU or memory.
+Typical use case:
 rc.ConsumeCPU(600)
 // ... check your assumption here
 rc.ConsumeCPU(300)
@@ -135,8 +147,8 @@ func getSidecarContainer(name string, cpuLimit, memLimit int64) v1.Container {
 	}
 
 	if memLimit > 0 {
-		container.Resources.Limits[v1.ResourceMemory] = *resource.NewQuantity(memLimit*1024*1024, resource.DecimalSI)
-		container.Resources.Requests[v1.ResourceMemory] = *resource.NewQuantity(memLimit*1024*1024, resource.DecimalSI)
+		container.Resources.Limits[v1.ResourceMemory] = *resource.NewQuantity(memLimit*megabytes, resource.DecimalSI)
+		container.Resources.Requests[v1.ResourceMemory] = *resource.NewQuantity(memLimit*megabytes, resource.DecimalSI)
 	}
 
 	return container
@@ -606,33 +618,57 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 		c, ns, controllerName, 1, startServiceInterval, startServiceTimeout))
 }
 
-// CreateCPUHorizontalPodAutoscaler create a horizontalPodAutoscaler with CPU target
-// for consuming resources.
-func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, maxRepl int32) *autoscalingv1.HorizontalPodAutoscaler {
-	hpa := &autoscalingv1.HorizontalPodAutoscaler{
+func CreateHorizontalPodAutoscaler(rc *ResourceConsumer, targetRef autoscalingv2.CrossVersionObjectReference, namespace string, metrics []autoscalingv2.MetricSpec, resourceType v1.ResourceName, metricTargetType autoscalingv2.MetricTargetType, metricTargetValue, minReplicas, maxReplicas int32) *autoscalingv2.HorizontalPodAutoscaler {
+	hpa := &autoscalingv2.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      rc.name,
-			Namespace: rc.nsName,
+			Name:      targetRef.Name,
+			Namespace: namespace,
 		},
-		Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
-			ScaleTargetRef: autoscalingv1.CrossVersionObjectReference{
-				APIVersion: rc.kind.GroupVersion().String(),
-				Kind:       rc.kind.Kind,
-				Name:       rc.name,
-			},
-			MinReplicas:                    &minReplicas,
-			MaxReplicas:                    maxRepl,
-			TargetCPUUtilizationPercentage: &cpu,
+		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: targetRef,
+			MinReplicas:    &minReplicas,
+			MaxReplicas:    maxReplicas,
+			Metrics:        metrics,
 		},
 	}
-	hpa, errHPA := rc.clientSet.AutoscalingV1().HorizontalPodAutoscalers(rc.nsName).Create(context.TODO(), hpa, metav1.CreateOptions{})
+	hpa, errHPA := rc.clientSet.AutoscalingV2().HorizontalPodAutoscalers(namespace).Create(context.TODO(), hpa, metav1.CreateOptions{})
 	framework.ExpectNoError(errHPA)
 	return hpa
+}
+
+func CreateResourceHorizontalPodAutoscaler(rc *ResourceConsumer, resourceType v1.ResourceName, metricTargetType autoscalingv2.MetricTargetType, metricTargetValue, minReplicas, maxReplicas int32) *autoscalingv2.HorizontalPodAutoscaler {
+	targetRef := autoscalingv2.CrossVersionObjectReference{
+		APIVersion: rc.kind.GroupVersion().String(),
+		Kind:       rc.kind.Kind,
+		Name:       rc.name,
+	}
+	metrics := []autoscalingv2.MetricSpec{
+		{
+			Type: autoscalingv2.ResourceMetricSourceType,
+			Resource: &autoscalingv2.ResourceMetricSource{
+				Name:   resourceType,
+				Target: CreateMetricTargetWithType(resourceType, metricTargetType, metricTargetValue),
+			},
+		},
+	}
+	return CreateHorizontalPodAutoscaler(rc, targetRef, rc.nsName, metrics, resourceType, metricTargetType, metricTargetValue, minReplicas, maxReplicas)
+}
+
+func CreateCPUResourceHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, maxReplicas int32) *autoscalingv2.HorizontalPodAutoscaler {
+	return CreateResourceHorizontalPodAutoscaler(rc, v1.ResourceCPU, autoscalingv2.UtilizationMetricType, cpu, minReplicas, maxReplicas)
 }
 
 // DeleteHorizontalPodAutoscaler delete the horizontalPodAutoscaler for consuming resources.
 func DeleteHorizontalPodAutoscaler(rc *ResourceConsumer, autoscalerName string) {
 	rc.clientSet.AutoscalingV1().HorizontalPodAutoscalers(rc.nsName).Delete(context.TODO(), autoscalerName, metav1.DeleteOptions{})
+}
+
+func CustomCRDTargetRef() autoscalingv2.CrossVersionObjectReference {
+	return autoscalingv2.CrossVersionObjectReference{
+		Kind:       "TestCustomCRD",
+		Name:       "test-custom-crd",
+		APIVersion: "test/v1",
+	}
 }
 
 // runReplicaSet launches (and verifies correctness) of a replicaset.
@@ -643,45 +679,50 @@ func runReplicaSet(config testutils.ReplicaSetConfig) error {
 	return testutils.RunReplicaSet(config)
 }
 
-// CreateContainerResourceCPUHorizontalPodAutoscaler create a horizontal pod autoscaler with container resource target
-// for consuming resources.
-func CreateContainerResourceCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, maxRepl int32) *autoscalingv2.HorizontalPodAutoscaler {
-	hpa := &autoscalingv2.HorizontalPodAutoscaler{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      rc.name,
-			Namespace: rc.nsName,
-		},
-		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
-			ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
-				APIVersion: rc.kind.GroupVersion().String(),
-				Kind:       rc.kind.Kind,
-				Name:       rc.name,
-			},
-			MinReplicas: &minReplicas,
-			MaxReplicas: maxRepl,
-			Metrics: []autoscalingv2.MetricSpec{
-				{
-					Type: "ContainerResource",
-					ContainerResource: &autoscalingv2.ContainerResourceMetricSource{
-						Name:      "cpu",
-						Container: rc.name,
-						Target: autoscalingv2.MetricTarget{
-							Type:               "Utilization",
-							AverageUtilization: &cpu,
-						},
-					},
-				},
+func CreateContainerResourceHorizontalPodAutoscaler(rc *ResourceConsumer, resourceType v1.ResourceName, metricTargetType autoscalingv2.MetricTargetType, metricTargetValue, minReplicas, maxReplicas int32) *autoscalingv2.HorizontalPodAutoscaler {
+	targetRef := autoscalingv2.CrossVersionObjectReference{
+		APIVersion: rc.kind.GroupVersion().String(),
+		Kind:       rc.kind.Kind,
+		Name:       rc.name,
+	}
+	metrics := []autoscalingv2.MetricSpec{
+		{
+			Type: autoscalingv2.ContainerResourceMetricSourceType,
+			ContainerResource: &autoscalingv2.ContainerResourceMetricSource{
+				Name:      resourceType,
+				Container: rc.name,
+				Target:    CreateMetricTargetWithType(resourceType, metricTargetType, metricTargetValue),
 			},
 		},
 	}
-	hpa, errHPA := rc.clientSet.AutoscalingV2().HorizontalPodAutoscalers(rc.nsName).Create(context.TODO(), hpa, metav1.CreateOptions{})
-	framework.ExpectNoError(errHPA)
-	return hpa
+	return CreateHorizontalPodAutoscaler(rc, targetRef, rc.nsName, metrics, resourceType, metricTargetType, metricTargetValue, minReplicas, maxReplicas)
 }
 
 // DeleteContainerResourceHPA delete the horizontalPodAutoscaler for consuming resources.
 func DeleteContainerResourceHPA(rc *ResourceConsumer, autoscalerName string) {
 	rc.clientSet.AutoscalingV2().HorizontalPodAutoscalers(rc.nsName).Delete(context.TODO(), autoscalerName, metav1.DeleteOptions{})
+}
+
+func CreateMetricTargetWithType(resourceType v1.ResourceName, targetType autoscalingv2.MetricTargetType, targetValue int32) autoscalingv2.MetricTarget {
+	var metricTarget autoscalingv2.MetricTarget
+	if targetType == autoscalingv2.UtilizationMetricType {
+		metricTarget = autoscalingv2.MetricTarget{
+			Type:               targetType,
+			AverageUtilization: &targetValue,
+		}
+	} else if targetType == autoscalingv2.AverageValueMetricType {
+		var averageValue *resource.Quantity
+		if resourceType == v1.ResourceCPU {
+			averageValue = resource.NewMilliQuantity(int64(targetValue), resource.DecimalSI)
+		} else {
+			averageValue = resource.NewQuantity(int64(targetValue*megabytes), resource.DecimalSI)
+		}
+		metricTarget = autoscalingv2.MetricTarget{
+			Type:         targetType,
+			AverageValue: averageValue,
+		}
+	}
+	return metricTarget
 }
 
 func CreateCPUHorizontalPodAutoscalerWithBehavior(rc *ResourceConsumer, cpu int32, minReplicas int32, maxRepl int32, behavior *autoscalingv2.HorizontalPodAutoscalerBehavior) *autoscalingv2.HorizontalPodAutoscaler {
@@ -725,38 +766,65 @@ func HPABehaviorWithScaleUpAndDownRules(scaleUpRule, scaleDownRule *autoscalingv
 	}
 }
 
-func HPAStabilizationWindowScalingRule(stabilizationDuration int32) *autoscalingv2.HPAScalingRules {
+func HPABehaviorWithScalingRuleInDirection(scalingDirection ScalingDirection, rule *autoscalingv2.HPAScalingRules) *autoscalingv2.HorizontalPodAutoscalerBehavior {
+	var scaleUpRule, scaleDownRule *autoscalingv2.HPAScalingRules
+	if scalingDirection == ScaleUpDirection {
+		scaleUpRule = rule
+	}
+	if scalingDirection == ScaleDownDirection {
+		scaleDownRule = rule
+	}
+	return HPABehaviorWithScaleUpAndDownRules(scaleUpRule, scaleDownRule)
+}
+
+func HPAScalingRuleWithStabilizationWindow(stabilizationDuration int32) *autoscalingv2.HPAScalingRules {
 	return &autoscalingv2.HPAScalingRules{
 		StabilizationWindowSeconds: &stabilizationDuration,
 	}
 }
 
-func HPAPolicyDisabledScalingRule() *autoscalingv2.HPAScalingRules {
+func HPAScalingRuleWithPolicyDisabled() *autoscalingv2.HPAScalingRules {
 	disabledPolicy := autoscalingv2.DisabledPolicySelect
 	return &autoscalingv2.HPAScalingRules{
 		SelectPolicy: &disabledPolicy,
 	}
 }
 
+func HPAScalingRuleWithScalingPolicy(policyType autoscalingv2.HPAScalingPolicyType, value, periodSeconds int32) *autoscalingv2.HPAScalingRules {
+	stabilizationWindowDisabledDuration := int32(0)
+	selectPolicy := autoscalingv2.MaxChangePolicySelect
+	return &autoscalingv2.HPAScalingRules{
+		Policies: []autoscalingv2.HPAScalingPolicy{
+			{
+				Type:          policyType,
+				Value:         value,
+				PeriodSeconds: periodSeconds,
+			},
+		},
+		SelectPolicy:               &selectPolicy,
+		StabilizationWindowSeconds: &stabilizationWindowDisabledDuration,
+	}
+}
+
 func HPABehaviorWithStabilizationWindows(upscaleStabilization, downscaleStabilization time.Duration) *autoscalingv2.HorizontalPodAutoscalerBehavior {
-	return HPABehaviorWithScaleUpAndDownRules(
-		/*scaleUpRule=*/ HPAStabilizationWindowScalingRule(int32(upscaleStabilization.Seconds())),
-		/*scaleDownRule=*/ HPAStabilizationWindowScalingRule(int32(downscaleStabilization.Seconds())),
-	)
+	scaleUpRule := HPAScalingRuleWithStabilizationWindow(int32(upscaleStabilization.Seconds()))
+	scaleDownRule := HPAScalingRuleWithStabilizationWindow(int32(downscaleStabilization.Seconds()))
+	return HPABehaviorWithScaleUpAndDownRules(scaleUpRule, scaleDownRule)
 }
 
-func HPABehaviorWithScaleUpDisabled() *autoscalingv2.HorizontalPodAutoscalerBehavior {
-	return HPABehaviorWithScaleUpAndDownRules(
-		/*scaleUpRule=*/ HPAPolicyDisabledScalingRule(),
-		/*scaleDownRule=*/ nil,
-	)
+func HPABehaviorWithScaleDisabled(scalingDirection ScalingDirection) *autoscalingv2.HorizontalPodAutoscalerBehavior {
+	scalingRule := HPAScalingRuleWithPolicyDisabled()
+	return HPABehaviorWithScalingRuleInDirection(scalingDirection, scalingRule)
 }
 
-func HPABehaviorWithScaleDownDisabled() *autoscalingv2.HorizontalPodAutoscalerBehavior {
-	return HPABehaviorWithScaleUpAndDownRules(
-		/*scaleUpRule=*/ nil,
-		/*scaleDownRule=*/ HPAPolicyDisabledScalingRule(),
-	)
+func HPABehaviorWithScaleLimitedByNumberOfPods(scalingDirection ScalingDirection, numberOfPods, periodSeconds int32) *autoscalingv2.HorizontalPodAutoscalerBehavior {
+	scalingRule := HPAScalingRuleWithScalingPolicy(autoscalingv2.PodsScalingPolicy, numberOfPods, periodSeconds)
+	return HPABehaviorWithScalingRuleInDirection(scalingDirection, scalingRule)
+}
+
+func HPABehaviorWithScaleLimitedByPercentage(scalingDirection ScalingDirection, percentage, periodSeconds int32) *autoscalingv2.HorizontalPodAutoscalerBehavior {
+	scalingRule := HPAScalingRuleWithScalingPolicy(autoscalingv2.PercentScalingPolicy, percentage, periodSeconds)
+	return HPABehaviorWithScalingRuleInDirection(scalingDirection, scalingRule)
 }
 
 func DeleteHPAWithBehavior(rc *ResourceConsumer, autoscalerName string) {

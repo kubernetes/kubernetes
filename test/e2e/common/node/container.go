@@ -136,7 +136,7 @@ const (
 	ContainerStateUnknown ContainerState = "Unknown"
 )
 
-// GetContainerState returns current state the container represents among its lifecyle
+// GetContainerState returns current state the container represents among its lifecycle
 func GetContainerState(state v1.ContainerState) ContainerState {
 	if state.Waiting != nil {
 		return ContainerStateWaiting

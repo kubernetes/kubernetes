@@ -424,6 +424,11 @@ func (cnc *CloudNodeController) syncNode(ctx context.Context, nodeName string) e
 	if err != nil {
 		return fmt.Errorf("failed to get instance metadata for node %s: %v", nodeName, err)
 	}
+	if instanceMetadata == nil {
+		// do nothing when external cloud providers provide nil instanceMetadata
+		klog.Infof("Skip sync node %s because cloud provided nil metadata", nodeName)
+		return nil
+	}
 
 	nodeModifiers, err := cnc.getNodeModifiersFromCloudProvider(ctx, providerID, copyNode, instanceMetadata)
 	if err != nil {

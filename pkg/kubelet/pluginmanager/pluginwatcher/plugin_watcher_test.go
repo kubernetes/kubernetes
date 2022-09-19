@@ -19,7 +19,6 @@ package pluginwatcher
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sync"
 	"testing"
@@ -46,7 +45,7 @@ func init() {
 	flag.StringVar(&logLevel, "logLevel", "6", "test")
 	flag.Lookup("v").Value.Set(logLevel)
 
-	d, err := ioutil.TempDir("", "plugin_test")
+	d, err := os.MkdirTemp("", "plugin_test")
 	if err != nil {
 		panic(fmt.Sprintf("Could not create a temp directory: %s", d))
 	}

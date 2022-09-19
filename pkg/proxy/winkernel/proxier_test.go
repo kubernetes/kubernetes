@@ -40,7 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/winkernel/mocks"
 	"k8s.io/kubernetes/pkg/util/async"
 	netutils "k8s.io/utils/net"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -291,8 +291,8 @@ func TestCreateRemoteEndpointOverlay(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName.Port),
-				Port:     utilpointer.Int32(int32(svcPort)),
+				Name:     pointer.String(svcPortName.Port),
+				Port:     pointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -356,8 +356,8 @@ func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.String(svcPortName.Port),
-				Port:     utilpointer.Int32(int32(svcPort)),
+				Name:     pointer.String(svcPortName.Port),
+				Port:     pointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -438,8 +438,8 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName1.Port),
-				Port:     utilpointer.Int32(int32(svcPort1)),
+				Name:     pointer.String(svcPortName1.Port),
+				Port:     pointer.Int32(int32(svcPort1)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -449,8 +449,8 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName2.Port),
-				Port:     utilpointer.Int32(int32(svcPort2)),
+				Name:     pointer.String(svcPortName2.Port),
+				Port:     pointer.Int32(int32(svcPort2)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -497,8 +497,8 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName2.Port),
-				Port:     utilpointer.Int32(int32(svcPort2)),
+				Name:     pointer.String(svcPortName2.Port),
+				Port:     pointer.Int32(int32(svcPort2)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -582,8 +582,8 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName1.Port),
-				Port:     utilpointer.Int32(int32(svcPort1)),
+				Name:     pointer.String(svcPortName1.Port),
+				Port:     pointer.Int32(int32(svcPort1)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -593,8 +593,8 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName2.Port),
-				Port:     utilpointer.Int32(int32(svcPort2)),
+				Name:     pointer.String(svcPortName2.Port),
+				Port:     pointer.Int32(int32(svcPort2)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -651,8 +651,8 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName1.Port),
-				Port:     utilpointer.Int32(int32(svcPort1)),
+				Name:     pointer.String(svcPortName1.Port),
+				Port:     pointer.Int32(int32(svcPort1)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -662,13 +662,13 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName1.Port),
-				Port:     utilpointer.Int32(int32(svcPort1)),
+				Name:     pointer.String(svcPortName1.Port),
+				Port:     pointer.Int32(int32(svcPort1)),
 				Protocol: &tcpProtocol,
 			},
 				{
-					Name:     utilpointer.StringPtr("p443"),
-					Port:     utilpointer.Int32(int32(443)),
+					Name:     pointer.String("p443"),
+					Port:     pointer.Int32(int32(443)),
 					Protocol: &tcpProtocol,
 				}}
 		}))
@@ -736,8 +736,8 @@ func TestCreateLoadBalancer(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName.Port),
-				Port:     utilpointer.Int32(int32(svcPort)),
+				Name:     pointer.String(svcPortName.Port),
+				Port:     pointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -803,8 +803,8 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName.Port),
-				Port:     utilpointer.Int32(int32(svcPort)),
+				Name:     pointer.String(svcPortName.Port),
+				Port:     pointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -868,14 +868,14 @@ func TestEndpointSlice(t *testing.T) {
 		},
 		Ports: []discovery.EndpointPort{{
 			Name:     &svcPortName.Port,
-			Port:     utilpointer.Int32Ptr(80),
+			Port:     pointer.Int32(80),
 			Protocol: &tcpProtocol,
 		}},
 		AddressType: discovery.AddressTypeIPv4,
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"192.168.2.3"},
-			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			NodeName:   utilpointer.StringPtr("testhost2"),
+			Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+			NodeName:   pointer.String("testhost2"),
 		}},
 	}
 

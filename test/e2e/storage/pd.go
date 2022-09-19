@@ -252,6 +252,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 		for _, t := range tests {
 			numPDs := t.numPDs
 			numContainers := t.numContainers
+			t := t
 
 			ginkgo.It(fmt.Sprintf("using %d containers and %d PDs", numContainers, numPDs), func() {
 				e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")

@@ -342,9 +342,7 @@ type Deployment struct {
 
 // DeploymentSpec specifies the state of a Deployment.
 type DeploymentSpec struct {
-	// Number of desired pods. This is a pointer to distinguish between explicit
-	// zero and not specified. Defaults to 1.
-	// +optional
+	// Number of desired pods.
 	Replicas int32
 
 	// Label selector for pods. Existing ReplicaSets whose pods are

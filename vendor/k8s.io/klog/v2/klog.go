@@ -39,39 +39,38 @@
 // This package provides several flags that modify this behavior.
 // As a result, flag.Parse must be called before any logging is done.
 //
-//	-logtostderr=true
-//		Logs are written to standard error instead of to files.
-//              This shortcuts most of the usual output routing:
-//              -alsologtostderr, -stderrthreshold and -log_dir have no
-//              effect and output redirection at runtime with SetOutput is
-//              ignored.
-//	-alsologtostderr=false
-//		Logs are written to standard error as well as to files.
-//	-stderrthreshold=ERROR
-//		Log events at or above this severity are logged to standard
-//		error as well as to files.
-//	-log_dir=""
-//		Log files will be written to this directory instead of the
-//		default temporary directory.
+//		-logtostderr=true
+//			Logs are written to standard error instead of to files.
+//	             This shortcuts most of the usual output routing:
+//	             -alsologtostderr, -stderrthreshold and -log_dir have no
+//	             effect and output redirection at runtime with SetOutput is
+//	             ignored.
+//		-alsologtostderr=false
+//			Logs are written to standard error as well as to files.
+//		-stderrthreshold=ERROR
+//			Log events at or above this severity are logged to standard
+//			error as well as to files.
+//		-log_dir=""
+//			Log files will be written to this directory instead of the
+//			default temporary directory.
 //
-//	Other flags provide aids to debugging.
+//		Other flags provide aids to debugging.
 //
-//	-log_backtrace_at=""
-//		When set to a file and line number holding a logging statement,
-//		such as
-//			-log_backtrace_at=gopherflakes.go:234
-//		a stack trace will be written to the Info log whenever execution
-//		hits that statement. (Unlike with -vmodule, the ".go" must be
-//		present.)
-//	-v=0
-//		Enable V-leveled logging at the specified level.
-//	-vmodule=""
-//		The syntax of the argument is a comma-separated list of pattern=N,
-//		where pattern is a literal file name (minus the ".go" suffix) or
-//		"glob" pattern and N is a V level. For instance,
-//			-vmodule=gopher*=3
-//		sets the V level to 3 in all Go files whose names begin "gopher".
-//
+//		-log_backtrace_at=""
+//			When set to a file and line number holding a logging statement,
+//			such as
+//				-log_backtrace_at=gopherflakes.go:234
+//			a stack trace will be written to the Info log whenever execution
+//			hits that statement. (Unlike with -vmodule, the ".go" must be
+//			present.)
+//		-v=0
+//			Enable V-leveled logging at the specified level.
+//		-vmodule=""
+//			The syntax of the argument is a comma-separated list of pattern=N,
+//			where pattern is a literal file name (minus the ".go" suffix) or
+//			"glob" pattern and N is a V level. For instance,
+//				-vmodule=gopher*=3
+//			sets the V level to 3 in all Go files whose names begin "gopher".
 package klog
 
 import (
@@ -397,45 +396,48 @@ type flushSyncWriter interface {
 	io.Writer
 }
 
-// init sets up the defaults.
+var logging loggingT
+var commandLine flag.FlagSet
+
+// init sets up the defaults and creates command line flags.
 func init() {
+	commandLine.StringVar(&logging.logDir, "log_dir", "", "If non-empty, write log files in this directory (no effect when -logtostderr=true)")
+	commandLine.StringVar(&logging.logFile, "log_file", "", "If non-empty, use this log file (no effect when -logtostderr=true)")
+	commandLine.Uint64Var(&logging.logFileMaxSizeMB, "log_file_max_size", 1800,
+		"Defines the maximum size a log file can grow to (no effect when -logtostderr=true). Unit is megabytes. "+
+			"If the value is 0, the maximum file size is unlimited.")
+	commandLine.BoolVar(&logging.toStderr, "logtostderr", true, "log to standard error instead of files")
+	commandLine.BoolVar(&logging.alsoToStderr, "alsologtostderr", false, "log to standard error as well as files (no effect when -logtostderr=true)")
+	logging.setVState(0, nil, false)
+	commandLine.Var(&logging.verbosity, "v", "number for the log level verbosity")
+	commandLine.BoolVar(&logging.addDirHeader, "add_dir_header", false, "If true, adds the file directory to the header of the log messages")
+	commandLine.BoolVar(&logging.skipHeaders, "skip_headers", false, "If true, avoid header prefixes in the log messages")
+	commandLine.BoolVar(&logging.oneOutput, "one_output", false, "If true, only write logs to their native severity level (vs also writing to each lower severity level; no effect when -logtostderr=true)")
+	commandLine.BoolVar(&logging.skipLogHeaders, "skip_log_headers", false, "If true, avoid headers when opening log files (no effect when -logtostderr=true)")
 	logging.stderrThreshold = severityValue{
 		Severity: severity.ErrorLog, // Default stderrThreshold is ERROR.
 	}
-	logging.setVState(0, nil, false)
-	logging.logDir = ""
-	logging.logFile = ""
-	logging.logFileMaxSizeMB = 1800
-	logging.toStderr = true
-	logging.alsoToStderr = false
-	logging.skipHeaders = false
-	logging.addDirHeader = false
-	logging.skipLogHeaders = false
-	logging.oneOutput = false
+	commandLine.Var(&logging.stderrThreshold, "stderrthreshold", "logs at or above this threshold go to stderr when writing to files and stderr (no effect when -logtostderr=true or -alsologtostderr=false)")
+	commandLine.Var(&logging.vmodule, "vmodule", "comma-separated list of pattern=N settings for file-filtered logging")
+	commandLine.Var(&logging.traceLocation, "log_backtrace_at", "when logging hits line file:N, emit a stack trace")
+
+	logging.settings.contextualLoggingEnabled = true
 	logging.flushD = newFlushDaemon(logging.lockAndFlushAll, nil)
 }
 
 // InitFlags is for explicitly initializing the flags.
+// It may get called repeatedly for different flagsets, but not
+// twice for the same one. May get called concurrently
+// to other goroutines using klog. However, only some flags
+// may get set concurrently (see implementation).
 func InitFlags(flagset *flag.FlagSet) {
 	if flagset == nil {
 		flagset = flag.CommandLine
 	}
 
-	flagset.StringVar(&logging.logDir, "log_dir", logging.logDir, "If non-empty, write log files in this directory (no effect when -logtostderr=true)")
-	flagset.StringVar(&logging.logFile, "log_file", logging.logFile, "If non-empty, use this log file (no effect when -logtostderr=true)")
-	flagset.Uint64Var(&logging.logFileMaxSizeMB, "log_file_max_size", logging.logFileMaxSizeMB,
-		"Defines the maximum size a log file can grow to (no effect when -logtostderr=true). Unit is megabytes. "+
-			"If the value is 0, the maximum file size is unlimited.")
-	flagset.BoolVar(&logging.toStderr, "logtostderr", logging.toStderr, "log to standard error instead of files")
-	flagset.BoolVar(&logging.alsoToStderr, "alsologtostderr", logging.alsoToStderr, "log to standard error as well as files (no effect when -logtostderr=true)")
-	flagset.Var(&logging.verbosity, "v", "number for the log level verbosity")
-	flagset.BoolVar(&logging.addDirHeader, "add_dir_header", logging.addDirHeader, "If true, adds the file directory to the header of the log messages")
-	flagset.BoolVar(&logging.skipHeaders, "skip_headers", logging.skipHeaders, "If true, avoid header prefixes in the log messages")
-	flagset.BoolVar(&logging.oneOutput, "one_output", logging.oneOutput, "If true, only write logs to their native severity level (vs also writing to each lower severity level; no effect when -logtostderr=true)")
-	flagset.BoolVar(&logging.skipLogHeaders, "skip_log_headers", logging.skipLogHeaders, "If true, avoid headers when opening log files (no effect when -logtostderr=true)")
-	flagset.Var(&logging.stderrThreshold, "stderrthreshold", "logs at or above this threshold go to stderr when writing to files and stderr (no effect when -logtostderr=true or -alsologtostderr=false)")
-	flagset.Var(&logging.vmodule, "vmodule", "comma-separated list of pattern=N settings for file-filtered logging")
-	flagset.Var(&logging.traceLocation, "log_backtrace_at", "when logging hits line file:N, emit a stack trace")
+	commandLine.VisitAll(func(f *flag.Flag) {
+		flagset.Var(f.Value, f.Name, f.Usage)
+	})
 }
 
 // Flush flushes all pending log I/O.
@@ -550,12 +552,6 @@ type loggingT struct {
 	vmap map[uintptr]Level
 }
 
-var logging = loggingT{
-	settings: settings{
-		contextualLoggingEnabled: true,
-	},
-}
-
 // setVState sets a consistent state for V logging.
 // l.mu is held.
 func (l *loggingT) setVState(verbosity Level, filter []modulePat, setFilter bool) {
@@ -633,8 +629,11 @@ It returns a buffer containing the formatted header and the user's file and line
 The depth specifies how many stack frames above lives the source line to be identified in the log message.
 
 Log lines have this form:
+
 	Lmmdd hh:mm:ss.uuuuuu threadid file:line] msg...
+
 where the fields are defined as follows:
+
 	L                A single character, representing the log level (eg 'I' for INFO)
 	mm               The month (zero padded; ie May is '05')
 	dd               The day (zero padded)
@@ -1298,9 +1297,13 @@ func newVerbose(level Level, b bool) Verbose {
 // The returned value is a struct of type Verbose, which implements Info, Infoln
 // and Infof. These methods will write to the Info log if called.
 // Thus, one may write either
+//
 //	if klog.V(2).Enabled() { klog.Info("log this") }
+//
 // or
+//
 //	klog.V(2).Info("log this")
+//
 // The second form is shorter but the first is cheaper if logging is off because it does
 // not evaluate its arguments.
 //
@@ -1582,10 +1585,10 @@ func ErrorSDepth(depth int, err error, msg string, keysAndValues ...interface{})
 //
 // Callers who want more control over handling of fatal events may instead use a
 // combination of different functions:
-// - some info or error logging function, optionally with a stack trace
-//   value generated by github.com/go-logr/lib/dbg.Backtrace
-// - Flush to flush pending log data
-// - panic, os.Exit or returning to the caller with an error
+//   - some info or error logging function, optionally with a stack trace
+//     value generated by github.com/go-logr/lib/dbg.Backtrace
+//   - Flush to flush pending log data
+//   - panic, os.Exit or returning to the caller with an error
 //
 // Arguments are handled in the manner of fmt.Print; a newline is appended if missing.
 func Fatal(args ...interface{}) {

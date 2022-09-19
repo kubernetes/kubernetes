@@ -39,8 +39,7 @@ export GO111MODULE=on
 echo "installing golangci-lint and logcheck plugin from hack/tools into ${GOBIN}"
 pushd "${KUBE_ROOT}/hack/tools" >/dev/null
   go install github.com/golangci/golangci-lint/cmd/golangci-lint
-# TODO(golang): Need to fix this to work with golang 1.19
-#  go build -o "${GOBIN}/logcheck.so" -buildmode=plugin sigs.k8s.io/logtools/logcheck/plugin
+  go build -o "${GOBIN}/logcheck.so" -buildmode=plugin sigs.k8s.io/logtools/logcheck/plugin
 popd >/dev/null
 
 cd "${KUBE_ROOT}"
@@ -55,8 +54,7 @@ cd "${KUBE_ROOT}"
 ## the configuration and running this script multiple times,
 ## otherwise golangci-lint will report stale results:
 ## _output/local/bin/golangci-lint cache clean
-# TODO(golang): Need to fix this to work with golang 1.19
-#export LOGCHECK_CONFIG="${KUBE_ROOT}/hack/logcheck.conf"
+export LOGCHECK_CONFIG="${KUBE_ROOT}/hack/logcheck.conf"
 
 echo 'running golangci-lint ' >&2
 res=0

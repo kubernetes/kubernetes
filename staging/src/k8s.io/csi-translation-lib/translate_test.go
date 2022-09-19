@@ -189,17 +189,6 @@ func TestTopologyTranslation(t *testing.T) {
 			pv:                   makeAWSEBSPV(kubernetesGATopologyLabels, makeTopology(v1.LabelTopologyZone, "us-east-2a")),
 			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.AWSEBSTopologyKey, "us-east-2a"),
 		},
-		// Cinder test cases: test mosty topology key, i.e., don't repeat testing done with GCE
-		{
-			name:                 "OpenStack Cinder with zone labels",
-			pv:                   makeCinderPV(kubernetesBetaTopologyLabels, nil /*topology*/),
-			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.CinderTopologyKey, "us-east-1a"),
-		},
-		{
-			name:                 "OpenStack Cinder with zone labels and topology",
-			pv:                   makeCinderPV(kubernetesBetaTopologyLabels, makeTopology(v1.LabelFailureDomainBetaZone, "us-east-2a")),
-			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.CinderTopologyKey, "us-east-2a"),
-		},
 	}
 
 	for _, test := range testCases {
@@ -297,18 +286,6 @@ func makeAWSEBSPV(labels map[string]string, topology *v1.NodeSelectorRequirement
 			FSType:    "ext3",
 			Partition: 1,
 			ReadOnly:  true,
-		},
-	}
-	return pv
-}
-
-func makeCinderPV(labels map[string]string, topology *v1.NodeSelectorRequirement) *v1.PersistentVolume {
-	pv := makePV(labels, topology)
-	pv.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
-		Cinder: &v1.CinderPersistentVolumeSource{
-			VolumeID: "vol1",
-			FSType:   "ext4",
-			ReadOnly: false,
 		},
 	}
 	return pv
@@ -412,12 +389,6 @@ func generateUniqueVolumeSource(driverName string) (v1.VolumeSource, error) {
 			},
 		}, nil
 
-	case plugins.CinderDriverName:
-		return v1.VolumeSource{
-			Cinder: &v1.CinderVolumeSource{
-				VolumeID: string(uuid.NewUUID()),
-			},
-		}, nil
 	case plugins.AzureDiskDriverName:
 		return v1.VolumeSource{
 			AzureDisk: &v1.AzureDiskVolumeSource{

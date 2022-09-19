@@ -29,10 +29,8 @@ import (
 	api "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	utilstrings "k8s.io/utils/strings"
 )
@@ -151,7 +149,7 @@ func getSourceFromSpec(spec *volume.Spec) (*api.CSIVolumeSource, *api.CSIPersist
 	if spec.Volume != nil && spec.PersistentVolume != nil {
 		return nil, nil, fmt.Errorf("volume.Spec has both volume and persistent volume sources")
 	}
-	if spec.Volume != nil && spec.Volume.CSI != nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+	if spec.Volume != nil && spec.Volume.CSI != nil {
 		return spec.Volume.CSI, nil, nil
 	}
 	if spec.PersistentVolume != nil &&
@@ -187,7 +185,7 @@ func GetCSIDriverName(spec *volume.Spec) (string, error) {
 	}
 
 	switch {
-	case volSrc != nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume):
+	case volSrc != nil:
 		return volSrc.Driver, nil
 	case pvSrc != nil:
 		return pvSrc.Driver, nil
@@ -212,9 +210,7 @@ func getPodInfoAttrs(pod *api.Pod, volumeMode storage.VolumeLifecycleMode) map[s
 		"csi.storage.k8s.io/pod.namespace":       pod.Namespace,
 		"csi.storage.k8s.io/pod.uid":             string(pod.UID),
 		"csi.storage.k8s.io/serviceAccount.name": pod.Spec.ServiceAccountName,
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
-		attrs["csi.storage.k8s.io/ephemeral"] = strconv.FormatBool(volumeMode == storage.VolumeLifecycleEphemeral)
+		"csi.storage.k8s.io/ephemeral":           strconv.FormatBool(volumeMode == storage.VolumeLifecycleEphemeral),
 	}
 	return attrs
 }

@@ -111,10 +111,11 @@ func createAggregatorConfig(
 			SharedInformerFactory: externalInformers,
 		},
 		ExtraConfig: aggregatorapiserver.ExtraConfig{
-			ProxyClientCertFile: commandOptions.ProxyClientCertFile,
-			ProxyClientKeyFile:  commandOptions.ProxyClientKeyFile,
-			ServiceResolver:     serviceResolver,
-			ProxyTransport:      proxyTransport,
+			ProxyClientCertFile:       commandOptions.ProxyClientCertFile,
+			ProxyClientKeyFile:        commandOptions.ProxyClientKeyFile,
+			ServiceResolver:           serviceResolver,
+			ProxyTransport:            proxyTransport,
+			RejectForwardingRedirects: commandOptions.AggregatorRejectForwardingRedirects,
 		},
 	}
 
@@ -250,6 +251,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "events.k8s.io", Version: "v1"}:                      {group: 17750, version: 15},
 	{Group: "events.k8s.io", Version: "v1beta1"}:                 {group: 17750, version: 5},
 	{Group: "authentication.k8s.io", Version: "v1"}:              {group: 17700, version: 15},
+	{Group: "authentication.k8s.io", Version: "v1alpha1"}:        {group: 17700, version: 1},
 	{Group: "authorization.k8s.io", Version: "v1"}:               {group: 17600, version: 15},
 	{Group: "autoscaling", Version: "v1"}:                        {group: 17500, version: 15},
 	{Group: "autoscaling", Version: "v2"}:                        {group: 17500, version: 30},
@@ -260,6 +262,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "batch", Version: "v2alpha1"}:                        {group: 17400, version: 9},
 	{Group: "certificates.k8s.io", Version: "v1"}:                {group: 17300, version: 15},
 	{Group: "networking.k8s.io", Version: "v1"}:                  {group: 17200, version: 15},
+	{Group: "networking.k8s.io", Version: "v1alpha1"}:            {group: 17200, version: 1},
 	{Group: "policy", Version: "v1"}:                             {group: 17100, version: 15},
 	{Group: "policy", Version: "v1beta1"}:                        {group: 17100, version: 9},
 	{Group: "rbac.authorization.k8s.io", Version: "v1"}:          {group: 17000, version: 15},

@@ -110,7 +110,7 @@ func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Ob
 		pathPrefix:          path.Join("/", prefix),
 		groupResource:       groupResource,
 		groupResourceString: groupResource.String(),
-		watcher:             newWatcher(c, codec, newFunc, versioner, transformer),
+		watcher:             newWatcher(c, codec, groupResource, newFunc, versioner, transformer),
 		leaseManager:        newDefaultLeaseManager(c, leaseManagerConfig),
 	}
 	return result
@@ -126,7 +126,7 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 	key = path.Join(s.pathPrefix, key)
 	startTime := time.Now()
 	getResp, err := s.client.KV.Get(ctx, key)
-	metrics.RecordEtcdRequestLatency("get", getTypeName(out), startTime)
+	metrics.RecordEtcdRequestLatency("get", s.groupResourceString, startTime)
 	if err != nil {
 		return err
 	}
@@ -153,9 +153,10 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 // Create implements storage.Interface.Create.
 func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
 	trace := utiltrace.New("Create etcd3",
-		utiltrace.Field{"audit-id", endpointsrequest.GetAuditIDTruncated(ctx)},
-		utiltrace.Field{"key", key},
-		utiltrace.Field{"type", getTypeName(obj)},
+		utiltrace.Field{Key: "audit-id", Value: endpointsrequest.GetAuditIDTruncated(ctx)},
+		utiltrace.Field{Key: "key", Value: key},
+		utiltrace.Field{Key: "type", Value: getTypeName(obj)},
+		utiltrace.Field{Key: "resource", Value: s.groupResourceString},
 	)
 	defer trace.LogIfLong(500 * time.Millisecond)
 	if version, err := s.versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
@@ -166,7 +167,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	}
 	trace.Step("About to Encode")
 	data, err := runtime.Encode(s.codec, obj)
-	trace.Step("Encode finished", utiltrace.Field{"len", len(data)}, utiltrace.Field{"err", err})
+	trace.Step("Encode finished", utiltrace.Field{Key: "len", Value: len(data)}, utiltrace.Field{Key: "err", Value: err})
 	if err != nil {
 		return err
 	}
@@ -178,7 +179,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	}
 
 	newData, err := s.transformer.TransformToStorage(ctx, data, authenticatedDataString(key))
-	trace.Step("TransformToStorage finished", utiltrace.Field{"err", err})
+	trace.Step("TransformToStorage finished", utiltrace.Field{Key: "err", Value: err})
 	if err != nil {
 		return storage.NewInternalError(err.Error())
 	}
@@ -189,8 +190,8 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	).Then(
 		clientv3.OpPut(key, string(newData), opts...),
 	).Commit()
-	metrics.RecordEtcdRequestLatency("create", getTypeName(obj), startTime)
-	trace.Step("Txn call finished", utiltrace.Field{"err", err})
+	metrics.RecordEtcdRequestLatency("create", s.groupResourceString, startTime)
+	trace.Step("Txn call finished", utiltrace.Field{Key: "err", Value: err})
 	if err != nil {
 		return err
 	}
@@ -202,7 +203,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	if out != nil {
 		putResp := txnResp.Responses[0].GetResponsePut()
 		err = decode(s.codec, s.versioner, data, out, putResp.Header.Revision)
-		trace.Step("decode finished", utiltrace.Field{"len", len(data)}, utiltrace.Field{"err", err})
+		trace.Step("decode finished", utiltrace.Field{Key: "len", Value: len(data)}, utiltrace.Field{Key: "err", Value: err})
 		return err
 	}
 	return nil
@@ -226,7 +227,7 @@ func (s *store) conditionalDelete(
 	getCurrentState := func() (*objState, error) {
 		startTime := time.Now()
 		getResp, err := s.client.KV.Get(ctx, key)
-		metrics.RecordEtcdRequestLatency("get", getTypeName(out), startTime)
+		metrics.RecordEtcdRequestLatency("get", s.groupResourceString, startTime)
 		if err != nil {
 			return nil, err
 		}
@@ -308,7 +309,7 @@ func (s *store) conditionalDelete(
 		).Else(
 			clientv3.OpGet(key),
 		).Commit()
-		metrics.RecordEtcdRequestLatency("delete", getTypeName(out), startTime)
+		metrics.RecordEtcdRequestLatency("delete", s.groupResourceString, startTime)
 		if err != nil {
 			return err
 		}
@@ -331,9 +332,10 @@ func (s *store) GuaranteedUpdate(
 	ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
 	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
 	trace := utiltrace.New("GuaranteedUpdate etcd3",
-		utiltrace.Field{"audit-id", endpointsrequest.GetAuditIDTruncated(ctx)},
-		utiltrace.Field{"key", key},
-		utiltrace.Field{"type", getTypeName(destination)})
+		utiltrace.Field{Key: "audit-id", Value: endpointsrequest.GetAuditIDTruncated(ctx)},
+		utiltrace.Field{Key: "key", Value: key},
+		utiltrace.Field{Key: "type", Value: getTypeName(destination)},
+		utiltrace.Field{Key: "resource", Value: s.groupResourceString})
 	defer trace.LogIfLong(500 * time.Millisecond)
 
 	v, err := conversion.EnforcePtr(destination)
@@ -345,7 +347,7 @@ func (s *store) GuaranteedUpdate(
 	getCurrentState := func() (*objState, error) {
 		startTime := time.Now()
 		getResp, err := s.client.KV.Get(ctx, key)
-		metrics.RecordEtcdRequestLatency("get", getTypeName(destination), startTime)
+		metrics.RecordEtcdRequestLatency("get", s.groupResourceString, startTime)
 		if err != nil {
 			return nil, err
 		}
@@ -414,7 +416,7 @@ func (s *store) GuaranteedUpdate(
 
 		trace.Step("About to Encode")
 		data, err := runtime.Encode(s.codec, ret)
-		trace.Step("Encode finished", utiltrace.Field{"len", len(data)}, utiltrace.Field{"err", err})
+		trace.Step("Encode finished", utiltrace.Field{Key: "len", Value: len(data)}, utiltrace.Field{Key: "err", Value: err})
 		if err != nil {
 			return err
 		}
@@ -440,7 +442,7 @@ func (s *store) GuaranteedUpdate(
 		}
 
 		newData, err := s.transformer.TransformToStorage(ctx, data, transformContext)
-		trace.Step("TransformToStorage finished", utiltrace.Field{"err", err})
+		trace.Step("TransformToStorage finished", utiltrace.Field{Key: "err", Value: err})
 		if err != nil {
 			return storage.NewInternalError(err.Error())
 		}
@@ -459,8 +461,8 @@ func (s *store) GuaranteedUpdate(
 		).Else(
 			clientv3.OpGet(key),
 		).Commit()
-		metrics.RecordEtcdRequestLatency("update", getTypeName(destination), startTime)
-		trace.Step("Txn call finished", utiltrace.Field{"err", err})
+		metrics.RecordEtcdRequestLatency("update", s.groupResourceString, startTime)
+		trace.Step("Txn call finished", utiltrace.Field{Key: "err", Value: err})
 		if err != nil {
 			return err
 		}
@@ -479,7 +481,7 @@ func (s *store) GuaranteedUpdate(
 		putResp := txnResp.Responses[0].GetResponsePut()
 
 		err = decode(s.codec, s.versioner, data, destination, putResp.Header.Revision)
-		trace.Step("decode finished", utiltrace.Field{"len", len(data)}, utiltrace.Field{"err", err})
+		trace.Step("decode finished", utiltrace.Field{Key: "len", Value: len(data)}, utiltrace.Field{Key: "err", Value: err})
 		return err
 	}
 }
@@ -527,12 +529,12 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	match := opts.ResourceVersionMatch
 	pred := opts.Predicate
 	trace := utiltrace.New(fmt.Sprintf("List(recursive=%v) etcd3", recursive),
-		utiltrace.Field{"audit-id", endpointsrequest.GetAuditIDTruncated(ctx)},
-		utiltrace.Field{"key", key},
-		utiltrace.Field{"resourceVersion", resourceVersion},
-		utiltrace.Field{"resourceVersionMatch", match},
-		utiltrace.Field{"limit", pred.Limit},
-		utiltrace.Field{"continue", pred.Continue})
+		utiltrace.Field{Key: "audit-id", Value: endpointsrequest.GetAuditIDTruncated(ctx)},
+		utiltrace.Field{Key: "key", Value: key},
+		utiltrace.Field{Key: "resourceVersion", Value: resourceVersion},
+		utiltrace.Field{Key: "resourceVersionMatch", Value: match},
+		utiltrace.Field{Key: "limit", Value: pred.Limit},
+		utiltrace.Field{Key: "continue", Value: pred.Continue})
 	defer trace.LogIfLong(500 * time.Millisecond)
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
@@ -659,9 +661,9 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		startTime := time.Now()
 		getResp, err = s.client.KV.Get(ctx, key, options...)
 		if recursive {
-			metrics.RecordEtcdRequestLatency("list", getTypeName(listPtr), startTime)
+			metrics.RecordEtcdRequestLatency("list", s.groupResourceString, startTime)
 		} else {
-			metrics.RecordEtcdRequestLatency("get", getTypeName(listPtr), startTime)
+			metrics.RecordEtcdRequestLatency("get", s.groupResourceString, startTime)
 		}
 		if err != nil {
 			return interpretListError(err, len(pred.Continue) > 0, continueKey, keyPrefix)

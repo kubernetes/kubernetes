@@ -18,10 +18,15 @@ package framework_test
 
 import (
 	"errors"
+	"os"
+	"path"
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/internal/output"
 )
@@ -30,11 +35,6 @@ import (
 // Be careful when moving it around or changing the import statements above.
 // Here are some intentionally blank lines that can be removed to compensate
 // for future additional import statements.
-//
-//
-//
-//
-//
 //
 // This must be line #39.
 
@@ -68,6 +68,10 @@ var _ = ginkgo.Describe("log", func() {
 	})
 	ginkgo.It("fails with helper", func() {
 		failHelper("I'm failing with helper.")
+	})
+	ginkgo.It("redirects klog", func() {
+		klog.Info("hello world")
+		klog.Error(nil, "not really an error")
 	})
 })
 
@@ -172,7 +176,43 @@ k8s.io/kubernetes/test/e2e/framework_test.glob..func1.7()
 k8s.io/kubernetes/test/e2e/framework_test.glob..func1.7()
 	log_test.go:70`,
 		},
+		output.TestResult{
+			Name: "log redirects klog",
+			Output: `INFO: before
+<klog> log_test.go:73] hello world
+<klog> log_test.go:74] <nil>not really an error` + commonOutput,
+			Failure: `true is never false either
+Expected
+    <bool>: true
+to equal
+    <bool>: false`,
+			Stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()
+	log_test.go:52`,
+		},
 	}
+
+	// Simulate the test setup as in a normal e2e test which uses the
+	// framework, but remember to restore klog settings when we are done.
+	state := klog.CaptureState()
+	defer state.Restore()
+	var testContext framework.TestContextType
+	framework.AfterReadingAllFlags(&testContext)
+
+	oldStderr := os.Stderr
+	tmp := t.TempDir()
+	filename := path.Join(tmp, "stderr.log")
+	f, err := os.Create(filename)
+	require.NoError(t, err, "create temporary file")
+	os.Stderr = f
+	defer func() {
+		os.Stderr = oldStderr
+
+		err := f.Close()
+		require.NoError(t, err, "close temporary file")
+		actual, err := os.ReadFile(filename)
+		require.NoError(t, err, "read temporary file")
+		assert.Empty(t, string(actual), "no output on stderr")
+	}()
 
 	output.TestGinkgoOutput(t, expected)
 }

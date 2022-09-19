@@ -28,13 +28,12 @@ import (
 const (
 	// SchedulerSubsystem - subsystem name used by scheduler
 	SchedulerSubsystem = "scheduler"
-	// Below are possible values for the operation label. Each represents a substep of e2e scheduling:
+	// Below are possible values for the work label.
 
-	// PrioritizingExtender - prioritizing extender operation label value
+	// PrioritizingExtender - prioritizing extender work label value
 	PrioritizingExtender = "prioritizing_extender"
-	// Binding - binding operation label value
+	// Binding - binding work label value
 	Binding = "binding"
-	// E2eScheduling - e2e scheduling operation label value
 )
 
 // All the histogram based metrics have 1ms as size for the smallest bucket.
@@ -96,14 +95,23 @@ var (
 			Help:           "Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods.",
 			StabilityLevel: metrics.STABLE,
 		}, []string{"queue"})
+	// SchedulerGoroutines isn't called in some parts where goroutines start.
+	// Goroutines metric replaces SchedulerGoroutines metric. Goroutine metric tracks all goroutines.
 	SchedulerGoroutines = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
+			Subsystem:         SchedulerSubsystem,
+			DeprecatedVersion: "1.26.0",
+			Name:              "scheduler_goroutines",
+			Help:              "Number of running goroutines split by the work they do such as binding. This metric is replaced by the \"goroutines\" metric.",
+			StabilityLevel:    metrics.ALPHA,
+		}, []string{"work"})
+	Goroutines = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
 			Subsystem:      SchedulerSubsystem,
-			Name:           "scheduler_goroutines",
+			Name:           "goroutines",
 			Help:           "Number of running goroutines split by the work they do such as binding.",
 			StabilityLevel: metrics.ALPHA,
-		}, []string{"work"})
-
+		}, []string{"operation"})
 	PodSchedulingDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
@@ -195,6 +203,7 @@ var (
 		PluginExecutionDuration,
 		SchedulerQueueIncomingPods,
 		SchedulerGoroutines,
+		Goroutines,
 		PermitWaitDuration,
 		CacheSize,
 		unschedulableReasons,

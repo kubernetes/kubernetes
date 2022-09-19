@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"sync"
@@ -34,15 +33,20 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	apiserverconfigv1 "k8s.io/apiserver/pkg/apis/config/v1"
 	"k8s.io/apiserver/pkg/apis/config/validation"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
+	envelopekmsv2 "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/secretbox"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 const (
@@ -50,8 +54,11 @@ const (
 	aesGCMTransformerPrefixV1    = "k8s:enc:aesgcm:v1:"
 	secretboxTransformerPrefixV1 = "k8s:enc:secretbox:v1:"
 	kmsTransformerPrefixV1       = "k8s:enc:kms:v1:"
+	kmsTransformerPrefixV2       = "k8s:enc:kms:v2:"
 	kmsPluginHealthzNegativeTTL  = 3 * time.Second
 	kmsPluginHealthzPositiveTTL  = 20 * time.Second
+	kmsAPIVersionV1              = "v1"
+	kmsAPIVersionV2              = "v2"
 )
 
 type kmsPluginHealthzResponse struct {
@@ -67,60 +74,109 @@ type kmsPluginProbe struct {
 	l            *sync.Mutex
 }
 
+type kmsv2PluginProbe struct {
+	name string
+	ttl  time.Duration
+	envelopekmsv2.Service
+	lastResponse *kmsPluginHealthzResponse
+	l            *sync.Mutex
+}
+
 func (h *kmsPluginProbe) toHealthzCheck(idx int) healthz.HealthChecker {
 	return healthz.NamedCheck(fmt.Sprintf("kms-provider-%d", idx), func(r *http.Request) error {
 		return h.Check()
 	})
 }
 
+func (p *kmsv2PluginProbe) toHealthzCheck(idx int) healthz.HealthChecker {
+	return healthz.NamedCheck(fmt.Sprintf("kms-provider-%d", idx), func(r *http.Request) error {
+		return p.Check()
+	})
+}
+
 // GetKMSPluginHealthzCheckers extracts KMSPluginProbes from the EncryptionConfig.
-func GetKMSPluginHealthzCheckers(filepath string) ([]healthz.HealthChecker, error) {
+func GetKMSPluginHealthzCheckers(filepath string, stopCh <-chan struct{}) ([]healthz.HealthChecker, error) {
 	f, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("error opening encryption provider configuration file %q: %v", filepath, err)
 	}
 	defer f.Close()
+
 	var result []healthz.HealthChecker
-	probes, err := getKMSPluginProbes(f)
+	probes, err := getKMSPluginProbes(f, stopCh)
 	if err != nil {
 		return nil, err
 	}
-
 	for i, p := range probes {
 		probe := p
-		result = append(result, probe.toHealthzCheck(i))
+		switch t := probe.(type) {
+		case *kmsPluginProbe:
+			result = append(result, t.toHealthzCheck(i))
+		case *kmsv2PluginProbe:
+			result = append(result, t.toHealthzCheck(i))
+		default:
+			return nil, fmt.Errorf("unsupported KMS plugin type: %T", t)
+		}
 	}
+
 	return result, nil
 }
 
-func getKMSPluginProbes(reader io.Reader) ([]*kmsPluginProbe, error) {
-	var result []*kmsPluginProbe
+func getKMSPluginProbes(reader io.Reader, stopCh <-chan struct{}) ([]interface{}, error) {
+	// we ignore the cancel func because this context should only be canceled when stopCh is closed
+	ctx, _ := wait.ContextForChannel(stopCh)
 
-	configFileContents, err := ioutil.ReadAll(reader)
+	var result []interface{}
+
+	configFileContents, err := io.ReadAll(reader)
 	if err != nil {
-		return result, fmt.Errorf("could not read content of encryption provider configuration: %v", err)
+		return nil, fmt.Errorf("could not read content of encryption provider configuration: %v", err)
 	}
 
 	config, err := loadConfig(configFileContents)
 	if err != nil {
-		return result, fmt.Errorf("error while parsing encryption provider configuration: %v", err)
+		return nil, fmt.Errorf("error while parsing encryption provider configuration: %v", err)
 	}
 
 	for _, r := range config.Resources {
 		for _, p := range r.Providers {
 			if p.KMS != nil {
-				s, err := envelope.NewGRPCService(p.KMS.Endpoint, p.KMS.Timeout.Duration)
-				if err != nil {
-					return nil, fmt.Errorf("could not configure KMS-Plugin's probe %q, error: %v", p.KMS.Name, err)
-				}
+				switch p.KMS.APIVersion {
+				case kmsAPIVersionV1:
+					s, err := envelope.NewGRPCService(ctx, p.KMS.Endpoint, p.KMS.Timeout.Duration)
+					if err != nil {
+						return nil, fmt.Errorf("could not configure KMSv1-Plugin's probe %q, error: %v", p.KMS.Name, err)
+					}
 
-				result = append(result, &kmsPluginProbe{
-					name:         p.KMS.Name,
-					ttl:          kmsPluginHealthzNegativeTTL,
-					Service:      s,
-					l:            &sync.Mutex{},
-					lastResponse: &kmsPluginHealthzResponse{},
-				})
+					result = append(result, &kmsPluginProbe{
+						name:         p.KMS.Name,
+						ttl:          kmsPluginHealthzNegativeTTL,
+						Service:      s,
+						l:            &sync.Mutex{},
+						lastResponse: &kmsPluginHealthzResponse{},
+					})
+
+				case kmsAPIVersionV2:
+					if !utilfeature.DefaultFeatureGate.Enabled(features.KMSv2) {
+						return nil, fmt.Errorf("could not configure KMSv2-Plugin's probe %q, KMSv2 feature is not enabled", p.KMS.Name)
+					}
+
+					s, err := envelopekmsv2.NewGRPCService(ctx, p.KMS.Endpoint, p.KMS.Timeout.Duration)
+					if err != nil {
+						return nil, fmt.Errorf("could not configure KMSv2-Plugin's probe %q, error: %v", p.KMS.Name, err)
+					}
+
+					result = append(result, &kmsv2PluginProbe{
+						name:         p.KMS.Name,
+						ttl:          kmsPluginHealthzNegativeTTL,
+						Service:      s,
+						l:            &sync.Mutex{},
+						lastResponse: &kmsPluginHealthzResponse{},
+					})
+
+				default:
+					return nil, fmt.Errorf("could not configure KMS Plugin's probe %q, unsupported KMS API version %q", p.KMS.Name, p.KMS.APIVersion)
+				}
 			}
 		}
 	}
@@ -155,23 +211,70 @@ func (h *kmsPluginProbe) Check() error {
 	return nil
 }
 
+// Check gets the healthz status of the KMSv2-Plugin using the Status() method.
+func (h *kmsv2PluginProbe) Check() error {
+	h.l.Lock()
+	defer h.l.Unlock()
+
+	if (time.Since(h.lastResponse.received)) < h.ttl {
+		return h.lastResponse.err
+	}
+
+	ctx := context.Background()
+	p, err := h.Service.Status(ctx)
+	if err != nil {
+		h.lastResponse = &kmsPluginHealthzResponse{err: err, received: time.Now()}
+		h.ttl = kmsPluginHealthzNegativeTTL
+		return fmt.Errorf("failed to perform status section of the healthz check for KMS Provider %s, error: %v", h.name, err)
+	}
+
+	if err := isKMSv2ProviderHealthy(h.name, p); err != nil {
+		h.lastResponse = &kmsPluginHealthzResponse{err: err, received: time.Now()}
+		h.ttl = kmsPluginHealthzNegativeTTL
+		return err
+	}
+
+	h.lastResponse = &kmsPluginHealthzResponse{err: nil, received: time.Now()}
+	h.ttl = kmsPluginHealthzPositiveTTL
+	return nil
+}
+
+// isKMSv2ProviderHealthy checks if the KMSv2-Plugin is healthy.
+func isKMSv2ProviderHealthy(name string, response *envelopekmsv2.StatusResponse) error {
+	var errs []error
+	if response.Healthz != "ok" {
+		errs = append(errs, fmt.Errorf("got unexpected healthz status: %s", response.Healthz))
+	}
+	if response.Version != envelopekmsv2.KMSAPIVersion {
+		errs = append(errs, fmt.Errorf("expected KMSv2 API version %s, got %s", envelopekmsv2.KMSAPIVersion, response.Version))
+	}
+	if len(response.KeyID) == 0 {
+		errs = append(errs, fmt.Errorf("expected KMSv2 KeyID to be set, got %s", response.KeyID))
+	}
+
+	if err := utilerrors.Reduce(utilerrors.NewAggregate(errs)); err != nil {
+		return fmt.Errorf("kmsv2 Provider %s is not healthy, error: %v", name, err)
+	}
+	return nil
+}
+
 // GetTransformerOverrides returns the transformer overrides by reading and parsing the encryption provider configuration file
-func GetTransformerOverrides(filepath string) (map[schema.GroupResource]value.Transformer, error) {
+func GetTransformerOverrides(filepath string, stopCh <-chan struct{}) (map[schema.GroupResource]value.Transformer, error) {
 	f, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("error opening encryption provider configuration file %q: %v", filepath, err)
 	}
 	defer f.Close()
 
-	result, err := parseEncryptionConfiguration(f)
+	result, err := parseEncryptionConfiguration(f, stopCh)
 	if err != nil {
 		return nil, fmt.Errorf("error while parsing encryption provider configuration file %q: %v", filepath, err)
 	}
 	return result, nil
 }
 
-func parseEncryptionConfiguration(f io.Reader) (map[schema.GroupResource]value.Transformer, error) {
-	configFileContents, err := ioutil.ReadAll(f)
+func parseEncryptionConfiguration(f io.Reader, stopCh <-chan struct{}) (map[schema.GroupResource]value.Transformer, error) {
+	configFileContents, err := io.ReadAll(f)
 	if err != nil {
 		return nil, fmt.Errorf("could not read contents: %v", err)
 	}
@@ -185,7 +288,7 @@ func parseEncryptionConfiguration(f io.Reader) (map[schema.GroupResource]value.T
 
 	// For each entry in the configuration
 	for _, resourceConfig := range config.Resources {
-		transformers, err := prefixTransformers(&resourceConfig)
+		transformers, err := prefixTransformers(&resourceConfig, stopCh)
 		if err != nil {
 			return nil, err
 		}
@@ -209,8 +312,8 @@ func parseEncryptionConfiguration(f io.Reader) (map[schema.GroupResource]value.T
 func loadConfig(data []byte) (*apiserverconfig.EncryptionConfiguration, error) {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
-	apiserverconfig.AddToScheme(scheme)
-	apiserverconfigv1.AddToScheme(scheme)
+	utilruntime.Must(apiserverconfig.AddToScheme(scheme))
+	utilruntime.Must(apiserverconfigv1.AddToScheme(scheme))
 
 	configObj, gvk, err := codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
@@ -224,10 +327,18 @@ func loadConfig(data []byte) (*apiserverconfig.EncryptionConfiguration, error) {
 	return config, validation.ValidateEncryptionConfiguration(config).ToAggregate()
 }
 
-// The factory to create kms service. This is to make writing test easier.
-var envelopeServiceFactory = envelope.NewGRPCService
+var (
+	// The factory to create kms service. This is to make writing test easier.
+	envelopeServiceFactory = envelope.NewGRPCService
 
-func prefixTransformers(config *apiserverconfig.ResourceConfiguration) ([]value.PrefixTransformer, error) {
+	// The factory to create kmsv2 service.
+	envelopeKMSv2ServiceFactory = envelopekmsv2.NewGRPCService
+)
+
+func prefixTransformers(config *apiserverconfig.ResourceConfiguration, stopCh <-chan struct{}) ([]value.PrefixTransformer, error) {
+	// we ignore the cancel func because this context should only be canceled when stopCh is closed
+	ctx, _ := wait.ContextForChannel(stopCh)
+
 	var result []value.PrefixTransformer
 	for _, provider := range config.Providers {
 		var (
@@ -243,13 +354,26 @@ func prefixTransformers(config *apiserverconfig.ResourceConfiguration) ([]value.
 		case provider.Secretbox != nil:
 			transformer, err = secretboxPrefixTransformer(provider.Secretbox)
 		case provider.KMS != nil:
-			var envelopeService envelope.Service
-			envelopeService, err = envelopeServiceFactory(provider.KMS.Endpoint, provider.KMS.Timeout.Duration)
-			if err != nil {
-				return nil, fmt.Errorf("could not configure KMS plugin %q, error: %v", provider.KMS.Name, err)
-			}
+			switch provider.KMS.APIVersion {
+			case kmsAPIVersionV1:
+				var envelopeService envelope.Service
+				if envelopeService, err = envelopeServiceFactory(ctx, provider.KMS.Endpoint, provider.KMS.Timeout.Duration); err != nil {
+					return nil, fmt.Errorf("could not configure KMS plugin %q, error: %v", provider.KMS.Name, err)
+				}
+				transformer, err = envelopePrefixTransformer(provider.KMS, envelopeService, kmsTransformerPrefixV1)
+			case kmsAPIVersionV2:
+				if !utilfeature.DefaultFeatureGate.Enabled(features.KMSv2) {
+					return nil, fmt.Errorf("could not configure KMSv2 plugin %q, KMSv2 feature is not enabled", provider.KMS.Name)
+				}
 
-			transformer, err = envelopePrefixTransformer(provider.KMS, envelopeService, kmsTransformerPrefixV1)
+				var envelopeService envelopekmsv2.Service
+				if envelopeService, err = envelopeKMSv2ServiceFactory(ctx, provider.KMS.Endpoint, provider.KMS.Timeout.Duration); err != nil {
+					return nil, fmt.Errorf("could not configure KMSv2 plugin %q, error: %v", provider.KMS.Name, err)
+				}
+				transformer, err = envelopekmsv2PrefixTransformer(provider.KMS, envelopeService, kmsTransformerPrefixV2)
+			default:
+				return nil, fmt.Errorf("could not configure KMS plugin %q, unsupported KMS API version %q", provider.KMS.Name, provider.KMS.APIVersion)
+			}
 		case provider.Identity != nil:
 			transformer = value.PrefixTransformer{
 				Transformer: identity.NewEncryptCheckTransformer(),
@@ -376,6 +500,18 @@ func envelopePrefixTransformer(config *apiserverconfig.KMSConfiguration, envelop
 	}
 
 	envelopeTransformer, err := envelope.NewEnvelopeTransformer(envelopeService, int(*config.CacheSize), baseTransformerFunc)
+	if err != nil {
+		return value.PrefixTransformer{}, err
+	}
+	return value.PrefixTransformer{
+		Transformer: envelopeTransformer,
+		Prefix:      []byte(prefix + config.Name + ":"),
+	}, nil
+}
+
+func envelopekmsv2PrefixTransformer(config *apiserverconfig.KMSConfiguration, envelopeService envelopekmsv2.Service, prefix string) (value.PrefixTransformer, error) {
+	// using AES-GCM by default for encrypting data with KMSv2
+	envelopeTransformer, err := envelopekmsv2.NewEnvelopeTransformer(envelopeService, int(*config.CacheSize), aestransformer.NewGCMTransformer)
 	if err != nil {
 		return value.PrefixTransformer{}, err
 	}

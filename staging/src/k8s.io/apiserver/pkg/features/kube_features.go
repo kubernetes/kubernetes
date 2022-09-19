@@ -35,6 +35,13 @@ const (
 	// of code conflicts because changes are more likely to be scattered
 	// across the file.
 
+	// owner: @jefftree @alexzielenski
+	// alpha: v1.26
+	//
+	// Enables an single HTTP endpoint /discovery/<version> which supports native HTTP
+	// caching with ETags containing all APIResources known to the apiserver.
+	AggregatedDiscoveryEndpoint featuregate.Feature = "AggregatedDiscoveryEndpoint"
+
 	// owner: @smarterclayton
 	// alpha: v1.8
 	// beta: v1.9
@@ -106,6 +113,13 @@ const (
 	//
 	// Allows for updating watchcache resource version with progress notify events.
 	EfficientWatchResumption featuregate.Feature = "EfficientWatchResumption"
+
+	// owner: @aramase
+	// kep: http://kep.k8s.io/3299
+	// alpha: v1.25
+	//
+	// Enables KMS v2 API for encryption at rest.
+	KMSv2 featuregate.Feature = "KMSv2"
 
 	// owner: @jiahuif
 	// kep: http://kep.k8s.io/2887
@@ -187,6 +201,8 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+	AggregatedDiscoveryEndpoint: {Default: false, PreRelease: featuregate.Alpha},
+
 	APIListChunking: {Default: true, PreRelease: featuregate.Beta},
 
 	APIPriorityAndFairness: {Default: true, PreRelease: featuregate.Beta},
@@ -201,9 +217,11 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.Beta},
 
-	DryRun: {Default: true, PreRelease: featuregate.GA},
+	DryRun: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+
+	KMSv2: {Default: false, PreRelease: featuregate.Alpha},
 
 	OpenAPIEnums: {Default: true, PreRelease: featuregate.Beta},
 

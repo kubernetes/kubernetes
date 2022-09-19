@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"path"
 
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
@@ -65,6 +66,7 @@ type resetOptions struct {
 	ignorePreflightErrors []string
 	kubeconfigPath        string
 	dryRun                bool
+	cleanupTmpDir         bool
 }
 
 // resetData defines all the runtime information used when running the kubeadm reset workflow;
@@ -78,8 +80,8 @@ type resetData struct {
 	inputReader           io.Reader
 	outputWriter          io.Writer
 	cfg                   *kubeadmapi.InitConfiguration
-	dirsToClean           []string
 	dryRun                bool
+	cleanupTmpDir         bool
 }
 
 // newResetOptions returns a struct ready for being used for creating cmd join flags.
@@ -88,6 +90,7 @@ func newResetOptions() *resetOptions {
 		certificatesDir: kubeadmapiv1.DefaultCertificatesDir,
 		forceReset:      false,
 		kubeconfigPath:  kubeadmconstants.GetAdminKubeConfigPath(),
+		cleanupTmpDir:   false,
 	}
 }
 
@@ -95,7 +98,7 @@ func newResetOptions() *resetOptions {
 func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out io.Writer) (*resetData, error) {
 	var cfg *kubeadmapi.InitConfiguration
 
-	client, err := cmdutil.GetClientset(options.kubeconfigPath, false)
+	client, err := cmdutil.GetClientSet(options.kubeconfigPath, false)
 	if err == nil {
 		klog.V(1).Infof("[reset] Loaded client set from kubeconfig file: %s", options.kubeconfigPath)
 		cfg, err = configutil.FetchInitConfigurationFromCluster(client, nil, "reset", false, false)
@@ -137,6 +140,7 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 		outputWriter:          out,
 		cfg:                   cfg,
 		dryRun:                options.dryRun,
+		cleanupTmpDir:         options.cleanupTmpDir,
 	}, nil
 }
 
@@ -161,6 +165,10 @@ func AddResetFlags(flagSet *flag.FlagSet, resetOptions *resetOptions) {
 		&resetOptions.dryRun, options.DryRun, resetOptions.dryRun,
 		"Don't apply any changes; just output what would be done.",
 	)
+	flagSet.BoolVar(
+		&resetOptions.cleanupTmpDir, options.CleanupTmpDir, resetOptions.cleanupTmpDir,
+		fmt.Sprintf("Cleanup the %q directory", path.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.TempDirForKubeadm)),
+	)
 
 	options.AddKubeConfigFlag(flagSet, &resetOptions.kubeconfigPath)
 	options.AddIgnorePreflightErrorsFlag(flagSet, &resetOptions.ignorePreflightErrors)
@@ -178,19 +186,10 @@ func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 		Use:   "reset",
 		Short: "Performs a best effort revert of changes made to this host by 'kubeadm init' or 'kubeadm join'",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := resetRunner.InitData(args)
+			err := resetRunner.Run(args)
 			if err != nil {
 				return err
 			}
-
-			err = resetRunner.Run(args)
-			if err != nil {
-				return err
-			}
-
-			// Then clean contents from the stateful kubelet, etcd and cni directories
-			data := c.(*resetData)
-			cleanDirs(data)
 
 			// output help text instructing user how to remove cni folders
 			fmt.Print(cniCleanupInstructions)
@@ -220,29 +219,19 @@ func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 	return cmd
 }
 
-func cleanDirs(data *resetData) {
-	if data.DryRun() {
-		fmt.Printf("[reset] Would delete contents of stateful directories: %v\n", data.dirsToClean)
-		return
-	}
-
-	fmt.Printf("[reset] Deleting contents of stateful directories: %v\n", data.dirsToClean)
-	for _, dir := range data.dirsToClean {
-		klog.V(1).Infof("[reset] Deleting contents of %s", dir)
-		if err := phases.CleanDir(dir); err != nil {
-			klog.Warningf("[reset] Failed to delete contents of %q directory: %v", dir, err)
-		}
-	}
-}
-
 // Cfg returns the InitConfiguration.
 func (r *resetData) Cfg() *kubeadmapi.InitConfiguration {
 	return r.cfg
 }
 
-// DryRun returns the DryRun flag.
+// DryRun returns the dryRun flag.
 func (r *resetData) DryRun() bool {
 	return r.dryRun
+}
+
+// CleanupTmpDir returns the cleanupTmpDir flag.
+func (r *resetData) CleanupTmpDir() bool {
+	return r.cleanupTmpDir
 }
 
 // CertificatesDir returns the CertificatesDir.
@@ -268,11 +257,6 @@ func (r *resetData) InputReader() io.Reader {
 // IgnorePreflightErrors returns the list of preflight errors to ignore.
 func (r *resetData) IgnorePreflightErrors() sets.String {
 	return r.ignorePreflightErrors
-}
-
-// AddDirsToClean add a list of dirs to the list of dirs that will be removed.
-func (r *resetData) AddDirsToClean(dirs ...string) {
-	r.dirsToClean = append(r.dirsToClean, dirs...)
 }
 
 // CRISocketPath returns the criSocketPath.

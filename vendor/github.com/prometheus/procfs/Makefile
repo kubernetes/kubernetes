@@ -14,18 +14,18 @@
 include Makefile.common
 
 %/.unpacked: %.ttar
-	@echo ">> extracting fixtures"
+	@echo ">> extracting fixtures $*"
 	./ttar -C $(dir $*) -x -f $*.ttar
 	touch $@
 
-fixtures: fixtures/.unpacked
+fixtures: testdata/fixtures/.unpacked
 
 update_fixtures:
-	rm -vf fixtures/.unpacked
-	./ttar -c -f fixtures.ttar fixtures/
+	rm -vf testdata/fixtures/.unpacked
+	./ttar -c -f testdata/fixtures.ttar -C testdata/ fixtures/
 
 .PHONY: build
 build:
 
 .PHONY: test
-test: fixtures/.unpacked common-test
+test: testdata/fixtures/.unpacked common-test
