@@ -33502,7 +33502,9 @@ func schema_k8sio_api_flowcontrol_v1beta3_FlowSchemaStatus(ref common.ReferenceC
 								"x-kubernetes-list-map-keys": []interface{}{
 									"type",
 								},
-								"x-kubernetes-list-type": "map",
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "type",
+								"x-kubernetes-patch-strategy":  "merge",
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -33975,7 +33977,9 @@ func schema_k8sio_api_flowcontrol_v1beta3_PriorityLevelConfigurationStatus(ref c
 								"x-kubernetes-list-map-keys": []interface{}{
 									"type",
 								},
-								"x-kubernetes-list-type": "map",
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "type",
+								"x-kubernetes-patch-strategy":  "merge",
 							},
 						},
 						SchemaProps: spec.SchemaProps{

@@ -298,6 +298,8 @@ type FlowSchemaStatus struct {
 	// `conditions` is a list of the current states of FlowSchema.
 	// +listType=map
 	// +listMapKey=type
+	// +patchMergeKey=type
+	// +patchStrategy=merge
 	// +optional
 	Conditions []FlowSchemaCondition
 }
@@ -488,6 +490,8 @@ type PriorityLevelConfigurationStatus struct {
 	// `conditions` is the current state of "request-priority".
 	// +listType=map
 	// +listMapKey=type
+	// +patchMergeKey=type
+	// +patchStrategy=merge
 	// +optional
 	Conditions []PriorityLevelConfigurationCondition
 }
