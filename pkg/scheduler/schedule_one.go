@@ -711,40 +711,31 @@ func prioritizeNodes(
 
 	if len(extenders) != 0 && nodes != nil {
 		var mu sync.Mutex
-		var wg sync.WaitGroup
 		combinedScores := make(map[string]int64, len(nodes))
-		for i := range extenders {
-			if !extenders[i].IsInterested(pod) {
-				continue
+		fwk.Parallelizer().Until(ctx, len(extenders), func(extIndex int) {
+			metrics.SchedulerGoroutines.WithLabelValues(metrics.PrioritizingExtender).Inc()
+			defer metrics.SchedulerGoroutines.WithLabelValues(metrics.PrioritizingExtender).Dec()
+
+			if !extenders[extIndex].IsInterested(pod) {
+				return
 			}
-			wg.Add(1)
-			go func(extIndex int) {
-				metrics.SchedulerGoroutines.WithLabelValues(metrics.PrioritizingExtender).Inc()
-				metrics.Goroutines.WithLabelValues(metrics.PrioritizingExtender).Inc()
-				defer func() {
-					metrics.SchedulerGoroutines.WithLabelValues(metrics.PrioritizingExtender).Dec()
-					metrics.Goroutines.WithLabelValues(metrics.PrioritizingExtender).Dec()
-					wg.Done()
-				}()
-				prioritizedList, weight, err := extenders[extIndex].Prioritize(pod, nodes)
-				if err != nil {
-					// Prioritization errors from extender can be ignored, let k8s/other extenders determine the priorities
-					klog.V(5).InfoS("Failed to run extender's priority function. No score given by this extender.", "error", err, "pod", klog.KObj(pod), "extender", extenders[extIndex].Name())
-					return
+
+			prioritizedList, weight, err := extenders[extIndex].Prioritize(pod, nodes)
+			if err != nil {
+				// Prioritization errors from extender can be ignored, let k8s/other extenders determine the priorities
+				klog.V(5).InfoS("Failed to run extender's priority function. No score given by this extender.", "error", err, "pod", klog.KObj(pod), "extender", extenders[extIndex].Name())
+				return
+			}
+			mu.Lock()
+			for i := range *prioritizedList {
+				host, score := (*prioritizedList)[i].Host, (*prioritizedList)[i].Score
+				if klogV.Enabled() {
+					klogV.InfoS("Extender scored node for pod", "pod", klog.KObj(pod), "extender", extenders[extIndex].Name(), "node", host, "score", score)
 				}
-				mu.Lock()
-				for i := range *prioritizedList {
-					host, score := (*prioritizedList)[i].Host, (*prioritizedList)[i].Score
-					if klogV.Enabled() {
-						klogV.InfoS("Extender scored node for pod", "pod", klog.KObj(pod), "extender", extenders[extIndex].Name(), "node", host, "score", score)
-					}
-					combinedScores[host] += score * weight
-				}
-				mu.Unlock()
-			}(i)
-		}
-		// wait for all go routines to finish
-		wg.Wait()
+				combinedScores[host] += score * weight
+			}
+			mu.Unlock()
+		}, metrics.PrioritizingExtender)
 		for i := range result {
 			// MaxExtenderPriority may diverge from the max priority used in the scheduler and defined by MaxNodeScore,
 			// therefore we need to scale the score returned by extenders to the score range used by the scheduler.
