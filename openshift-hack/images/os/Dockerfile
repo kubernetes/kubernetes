@@ -1,6 +1,4 @@
-# fedora:29 is an image built within the release scripts:
-# https://github.com/openshift/release/blob/b45a09d248b8cdb8fe3bf5f3cfa0b4fee57d04c8/ci-operator/config/openshift/kubernetes/openshift-kubernetes-release-4.10.yaml#L63-L65
-FROM fedora:29 AS build
+FROM centos:stream9 As build
 
 # the registry is defined here:
 # https://github.com/openshift/release/blob/b45a09d248b8cdb8fe3bf5f3cfa0b4fee57d04c8/ci-operator/config/openshift/kubernetes/openshift-kubernetes-release-4.10.yaml#L68
