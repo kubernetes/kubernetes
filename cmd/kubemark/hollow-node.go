@@ -131,8 +131,8 @@ func (c *hollowNodeConfig) bootstrapClientConfig() error {
 	return nil
 }
 
-func (c *hollowNodeConfig) createHollowKubeletOptions() *kubemark.HollowKubletOptions {
-	return &kubemark.HollowKubletOptions{
+func (c *hollowNodeConfig) createHollowKubeletOptions() *kubemark.HollowKubeletOptions {
+	return &kubemark.HollowKubeletOptions{
 		NodeName:            c.NodeName,
 		KubeletPort:         c.KubeletPort,
 		KubeletReadOnlyPort: c.KubeletReadOnlyPort,
