@@ -6,7 +6,7 @@ go 1.19
 
 require (
 	github.com/google/gofuzz v1.1.0
-	github.com/spf13/cobra v1.4.0
+	github.com/spf13/cobra v1.5.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/apiserver v0.0.0
 	k8s.io/client-go v0.0.0
