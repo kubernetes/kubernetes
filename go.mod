@@ -33,7 +33,7 @@ require (
 	github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153
 	github.com/emicklei/go-restful/v3 v3.9.0
 	github.com/evanphx/json-patch v4.12.0+incompatible
-	github.com/fsnotify/fsnotify v1.4.9
+	github.com/fsnotify/fsnotify v1.5.4
 	github.com/go-logr/logr v1.2.3
 	github.com/godbus/dbus/v5 v5.0.6
 	github.com/gogo/protobuf v1.3.2
@@ -345,7 +345,7 @@ replace (
 	github.com/fogleman/gg => github.com/fogleman/gg v1.2.1-0.20190220221249-0403632d5b90
 	github.com/form3tech-oss/jwt-go => github.com/form3tech-oss/jwt-go v3.2.3+incompatible
 	github.com/frankban/quicktest => github.com/frankban/quicktest v1.11.3
-	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.4.9
+	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.5.4
 	github.com/fvbommel/sortorder => github.com/fvbommel/sortorder v1.0.1
 	github.com/getkin/kin-openapi => github.com/getkin/kin-openapi v0.76.0
 	github.com/getsentry/raven-go => github.com/getsentry/raven-go v0.2.0

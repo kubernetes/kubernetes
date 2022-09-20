@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build freebsd || openbsd || netbsd || dragonfly || darwin
 // +build freebsd openbsd netbsd dragonfly darwin
 
 package fsnotify
@@ -145,6 +146,19 @@ func (w *Watcher) Remove(name string) error {
 	}
 
 	return nil
+}
+
+// WatchList returns the directories and files that are being monitered.
+func (w *Watcher) WatchList() []string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	entries := make([]string, 0, len(w.watches))
+	for pathname := range w.watches {
+		entries = append(entries, pathname)
+	}
+
+	return entries
 }
 
 // Watch all events (except NOTE_EXTEND, NOTE_LINK, NOTE_REVOKE)
