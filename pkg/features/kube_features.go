@@ -411,14 +411,6 @@ const (
 	// Disables the vSphere in-tree driver.
 	InTreePluginvSphereUnregister featuregate.Feature = "InTreePluginvSphereUnregister"
 
-	// owner: @alculquicondor
-	// alpha: v1.21
-	// beta: v1.22
-	// stable: v1.24
-	//
-	// Allows Job controller to manage Pod completions per completion index.
-	IndexedJob featuregate.Feature = "IndexedJob"
-
 	// owner: @danwinship
 	// kep: http://kep.k8s.io/3178
 	// alpha: v1.25
@@ -763,14 +755,6 @@ const (
 	// StatefulSetMinReadySeconds allows minReadySeconds to be respected by StatefulSet controller
 	StatefulSetMinReadySeconds featuregate.Feature = "StatefulSetMinReadySeconds"
 
-	// owner: @adtac
-	// alpha: v1.21
-	// beta: v1.22
-	// GA: v1.24
-	//
-	// Allows jobs to be created in the suspended state.
-	SuspendJob featuregate.Feature = "SuspendJob"
-
 	// owner: @robscott
 	// kep: http://kep.k8s.io/2433
 	// alpha: v1.21
@@ -949,8 +933,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	InTreePluginvSphereUnregister: {Default: false, PreRelease: featuregate.Alpha},
 
-	IndexedJob: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
-
 	IPTablesOwnershipCleanup: {Default: false, PreRelease: featuregate.Alpha},
 
 	JobPodFailurePolicy: {Default: false, PreRelease: featuregate.Alpha},
@@ -1044,8 +1026,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	StatefulSetAutoDeletePVC: {Default: false, PreRelease: featuregate.Alpha},
 
 	StatefulSetMinReadySeconds: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
-
-	SuspendJob: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
 	TopologyAwareHints: {Default: true, PreRelease: featuregate.Beta},
 
