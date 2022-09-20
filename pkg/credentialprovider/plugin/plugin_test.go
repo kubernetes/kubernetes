@@ -39,20 +39,12 @@ import (
 )
 
 type fakeExecPlugin struct {
-	cacheKeyType  credentialproviderapi.PluginCacheKeyType
-	cacheDuration time.Duration
-
-	auth map[string]credentialproviderapi.AuthConfig
+	data []byte
+	err  error
 }
 
-func (f *fakeExecPlugin) ExecPlugin(ctx context.Context, image string) (*credentialproviderapi.CredentialProviderResponse, error) {
-	return &credentialproviderapi.CredentialProviderResponse{
-		CacheKeyType: f.cacheKeyType,
-		CacheDuration: &metav1.Duration{
-			Duration: f.cacheDuration,
-		},
-		Auth: f.auth,
-	}, nil
+func (f *fakeExecPlugin) ExecPlugin(ctx context.Context, image string) ([]byte, error) {
+	return f.data, f.err
 }
 
 func Test_Provide(t *testing.T) {
@@ -66,18 +58,13 @@ func Test_Provide(t *testing.T) {
 		{
 			name: "exact image match, with Registry cache key",
 			pluginProvider: &pluginProvider{
+				apiVersion:     credentialproviderv1beta1.SchemeGroupVersion.String(),
 				clock:          tclock,
 				lastCachePurge: tclock.Now(),
 				matchImages:    []string{"test.registry.io"},
 				cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
 				plugin: &fakeExecPlugin{
-					cacheKeyType: credentialproviderapi.RegistryPluginCacheKeyType,
-					auth: map[string]credentialproviderapi.AuthConfig{
-						"test.registry.io": {
-							Username: "user",
-							Password: "password",
-						},
-					},
+					data: []byte(`{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1beta1","cacheKeyType":"Registry","cacheDuration":"1m","auth":{"test.registry.io":{"username":"user","password":"password"}}}`),
 				},
 			},
 			image: "test.registry.io/foo/bar",
@@ -91,18 +78,13 @@ func Test_Provide(t *testing.T) {
 		{
 			name: "exact image match, with Image cache key",
 			pluginProvider: &pluginProvider{
+				apiVersion:     credentialproviderv1beta1.SchemeGroupVersion.String(),
 				clock:          tclock,
 				lastCachePurge: tclock.Now(),
 				matchImages:    []string{"test.registry.io/foo/bar"},
 				cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
 				plugin: &fakeExecPlugin{
-					cacheKeyType: credentialproviderapi.ImagePluginCacheKeyType,
-					auth: map[string]credentialproviderapi.AuthConfig{
-						"test.registry.io/foo/bar": {
-							Username: "user",
-							Password: "password",
-						},
-					},
+					data: []byte(`{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1beta1","cacheKeyType":"Image","cacheDuration":"1m","auth":{"test.registry.io/foo/bar":{"username":"user","password":"password"}}}`),
 				},
 			},
 			image: "test.registry.io/foo/bar",
@@ -116,18 +98,13 @@ func Test_Provide(t *testing.T) {
 		{
 			name: "exact image match, with Global cache key",
 			pluginProvider: &pluginProvider{
+				apiVersion:     credentialproviderv1beta1.SchemeGroupVersion.String(),
 				clock:          tclock,
 				lastCachePurge: tclock.Now(),
 				matchImages:    []string{"test.registry.io"},
 				cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
 				plugin: &fakeExecPlugin{
-					cacheKeyType: credentialproviderapi.GlobalPluginCacheKeyType,
-					auth: map[string]credentialproviderapi.AuthConfig{
-						"test.registry.io": {
-							Username: "user",
-							Password: "password",
-						},
-					},
+					data: []byte(`{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1beta1","cacheKeyType":"Global","cacheDuration":"1m","auth":{"test.registry.io":{"username":"user","password":"password"}}}`),
 				},
 			},
 			image: "test.registry.io",
@@ -141,18 +118,13 @@ func Test_Provide(t *testing.T) {
 		{
 			name: "wild card image match, with Registry cache key",
 			pluginProvider: &pluginProvider{
+				apiVersion:     credentialproviderv1beta1.SchemeGroupVersion.String(),
 				clock:          tclock,
 				lastCachePurge: tclock.Now(),
 				matchImages:    []string{"*.registry.io:8080"},
 				cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
 				plugin: &fakeExecPlugin{
-					cacheKeyType: credentialproviderapi.RegistryPluginCacheKeyType,
-					auth: map[string]credentialproviderapi.AuthConfig{
-						"*.registry.io:8080": {
-							Username: "user",
-							Password: "password",
-						},
-					},
+					data: []byte(`{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1beta1","cacheKeyType":"Registry","cacheDuration":"1m","auth":{"*.registry.io:8080":{"username":"user","password":"password"}}}`),
 				},
 			},
 			image: "test.registry.io:8080/foo",
@@ -166,18 +138,13 @@ func Test_Provide(t *testing.T) {
 		{
 			name: "wild card image match, with Image cache key",
 			pluginProvider: &pluginProvider{
+				apiVersion:     credentialproviderv1beta1.SchemeGroupVersion.String(),
 				clock:          tclock,
 				lastCachePurge: tclock.Now(),
 				matchImages:    []string{"*.*.registry.io"},
 				cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
 				plugin: &fakeExecPlugin{
-					cacheKeyType: credentialproviderapi.ImagePluginCacheKeyType,
-					auth: map[string]credentialproviderapi.AuthConfig{
-						"*.*.registry.io": {
-							Username: "user",
-							Password: "password",
-						},
-					},
+					data: []byte(`{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1beta1","cacheKeyType":"Registry","cacheDuration":"1m","auth":{"*.*.registry.io":{"username":"user","password":"password"}}}`),
 				},
 			},
 			image: "foo.bar.registry.io/foo/bar",
@@ -191,18 +158,13 @@ func Test_Provide(t *testing.T) {
 		{
 			name: "wild card image match, with Global cache key",
 			pluginProvider: &pluginProvider{
+				apiVersion:     credentialproviderv1beta1.SchemeGroupVersion.String(),
 				clock:          tclock,
 				lastCachePurge: tclock.Now(),
 				matchImages:    []string{"*.registry.io"},
 				cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
 				plugin: &fakeExecPlugin{
-					cacheKeyType: credentialproviderapi.GlobalPluginCacheKeyType,
-					auth: map[string]credentialproviderapi.AuthConfig{
-						"*.registry.io": {
-							Username: "user",
-							Password: "password",
-						},
-					},
+					data: []byte(`{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1beta1","cacheKeyType":"Global","cacheDuration":"1m","auth":{"*.registry.io":{"username":"user","password":"password"}}}`),
 				},
 			},
 			image: "test.registry.io",
@@ -257,19 +219,13 @@ func Test_ProvideParallel(t *testing.T) {
 	}
 
 	pluginProvider := &pluginProvider{
+		apiVersion:     credentialproviderv1beta1.SchemeGroupVersion.String(),
 		clock:          tclock,
 		lastCachePurge: tclock.Now(),
 		matchImages:    []string{"test1.registry.io", "test2.registry.io", "test3.registry.io", "test4.registry.io"},
 		cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
 		plugin: &fakeExecPlugin{
-			cacheDuration: time.Minute * 1,
-			cacheKeyType:  credentialproviderapi.RegistryPluginCacheKeyType,
-			auth: map[string]credentialproviderapi.AuthConfig{
-				"test.registry.io": {
-					Username: "user",
-					Password: "password",
-				},
-			},
+			data: []byte(`{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1beta1","cacheKeyType":"Registry","cacheDuration":"1m","auth":{"test.registry.io":{"username":"user","password":"password"}}}`),
 		},
 	}
 
@@ -308,6 +264,7 @@ func Test_ProvideParallel(t *testing.T) {
 func Test_getCachedCredentials(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	p := &pluginProvider{
+		apiVersion:     credentialproviderv1beta1.SchemeGroupVersion.String(),
 		clock:          fakeClock,
 		lastCachePurge: fakeClock.Now(),
 		cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: fakeClock}),
@@ -524,9 +481,7 @@ func Test_decodeResponse(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			e := &execPlugin{}
-
-			decodedResponse, err := e.decodeResponse(testcase.data)
+			decodedResponse, err := decodeResponse(testcase.data)
 			if err != nil && !testcase.expectedErr {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -547,19 +502,13 @@ func Test_decodeResponse(t *testing.T) {
 func Test_RegistryCacheKeyType(t *testing.T) {
 	tclock := clock.RealClock{}
 	pluginProvider := &pluginProvider{
+		apiVersion:     credentialproviderv1beta1.SchemeGroupVersion.String(),
 		clock:          tclock,
 		lastCachePurge: tclock.Now(),
 		matchImages:    []string{"*.registry.io"},
 		cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
 		plugin: &fakeExecPlugin{
-			cacheKeyType:  credentialproviderapi.RegistryPluginCacheKeyType,
-			cacheDuration: time.Hour,
-			auth: map[string]credentialproviderapi.AuthConfig{
-				"*.registry.io": {
-					Username: "user",
-					Password: "password",
-				},
-			},
+			data: []byte(`{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1beta1","cacheKeyType":"Registry","cacheDuration":"1h","auth":{"*.registry.io":{"username":"user","password":"password"}}}`),
 		},
 	}
 
@@ -600,19 +549,13 @@ func Test_RegistryCacheKeyType(t *testing.T) {
 func Test_ImageCacheKeyType(t *testing.T) {
 	tclock := clock.RealClock{}
 	pluginProvider := &pluginProvider{
+		apiVersion:     credentialproviderv1beta1.SchemeGroupVersion.String(),
 		clock:          tclock,
 		lastCachePurge: tclock.Now(),
 		matchImages:    []string{"*.registry.io"},
 		cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
 		plugin: &fakeExecPlugin{
-			cacheKeyType:  credentialproviderapi.ImagePluginCacheKeyType,
-			cacheDuration: time.Hour,
-			auth: map[string]credentialproviderapi.AuthConfig{
-				"*.registry.io": {
-					Username: "user",
-					Password: "password",
-				},
-			},
+			data: []byte(`{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1beta1","cacheKeyType":"Image","cacheDuration":"1h","auth":{"*.registry.io":{"username":"user","password":"password"}}}`),
 		},
 	}
 
@@ -653,19 +596,13 @@ func Test_ImageCacheKeyType(t *testing.T) {
 func Test_GlobalCacheKeyType(t *testing.T) {
 	tclock := clock.RealClock{}
 	pluginProvider := &pluginProvider{
+		apiVersion:     credentialproviderv1beta1.SchemeGroupVersion.String(),
 		clock:          tclock,
 		lastCachePurge: tclock.Now(),
 		matchImages:    []string{"*.registry.io"},
 		cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
 		plugin: &fakeExecPlugin{
-			cacheKeyType:  credentialproviderapi.GlobalPluginCacheKeyType,
-			cacheDuration: time.Hour,
-			auth: map[string]credentialproviderapi.AuthConfig{
-				"*.registry.io": {
-					Username: "user",
-					Password: "password",
-				},
-			},
+			data: []byte(`{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1beta1","cacheKeyType":"Global","cacheDuration":"1h","auth":{"*.registry.io":{"username":"user","password":"password"}}}`),
 		},
 	}
 
@@ -706,19 +643,13 @@ func Test_GlobalCacheKeyType(t *testing.T) {
 func Test_NoCacheResponse(t *testing.T) {
 	tclock := clock.RealClock{}
 	pluginProvider := &pluginProvider{
+		apiVersion:     credentialproviderv1beta1.SchemeGroupVersion.String(),
 		clock:          tclock,
 		lastCachePurge: tclock.Now(),
 		matchImages:    []string{"*.registry.io"},
 		cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
 		plugin: &fakeExecPlugin{
-			cacheKeyType:  credentialproviderapi.GlobalPluginCacheKeyType,
-			cacheDuration: 0, // no cache
-			auth: map[string]credentialproviderapi.AuthConfig{
-				"*.registry.io": {
-					Username: "user",
-					Password: "password",
-				},
-			},
+			data: []byte(`{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1beta1","cacheKeyType":"Global","cacheDuration":"0","auth":{"*.registry.io":{"username":"user","password":"password"}}}`),
 		},
 	}
 
