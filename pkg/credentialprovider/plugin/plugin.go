@@ -19,7 +19,6 @@ package plugin
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -135,9 +134,9 @@ func newPluginProvider(pluginBinDir string, provider kubeletconfig.CredentialPro
 		cache:                cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: clock}),
 		defaultCacheDuration: provider.DefaultCacheDuration.Duration,
 		lastCachePurge:       clock.Now(),
+		apiVersion:           provider.APIVersion,
 		plugin: &execPlugin{
 			name:         provider.Name,
-			apiVersion:   provider.APIVersion,
 			encoder:      codecs.EncoderForVersion(info.Serializer, gv),
 			pluginBinDir: pluginBinDir,
 			args:         provider.Args,
@@ -159,6 +158,11 @@ type pluginProvider struct {
 	// The plugin provider will not return any credentials for images that do not match
 	// against this list of match URLs.
 	matchImages []string
+
+	// apiVersion is the version for the CredentialProviderRequest and CredentialProviderReponse kubelet
+	// APIs configured for plugins. Plugins MUST return a response in the same apiVersion
+	// set here.
+	apiVersion string
 
 	// cache stores DockerConfig entries with an expiration time based on the cache duration
 	// returned from the credential provider plugin.
@@ -221,18 +225,31 @@ func (p *pluginProvider) Provide(image string) credentialprovider.DockerConfig {
 	// foo.bar.registry
 	// foo.bar.registry/image1
 	// foo.bar.registry/image2
-	res, err, _ := p.group.Do(image, func() (interface{}, error) {
+	out, err, _ := p.group.Do(image, func() (interface{}, error) {
 		return p.plugin.ExecPlugin(context.Background(), image)
 	})
-
 	if err != nil {
 		klog.Errorf("Failed getting credential from external registry credential provider: %v", err)
 		return credentialprovider.DockerConfig{}
 	}
 
-	response, ok := res.(*credentialproviderapi.CredentialProviderResponse)
-	if !ok {
-		klog.Errorf("Invalid response type returned by external credential provider")
+	data := out.([]byte)
+	// check that the response apiVersion matches what is expected
+	gvk, err := json.DefaultMetaFactory.Interpret(data)
+	if err != nil {
+		klog.Errorf("Error reading GVK from response: %v", err)
+		return credentialprovider.DockerConfig{}
+	}
+
+	if gvk.GroupVersion().String() != p.apiVersion {
+		klog.Errorf("apiVersion from credential plugin response did not match expected apiVersion:%s, actual apiVersion:%s", p.apiVersion, gvk.GroupVersion().String())
+		return credentialprovider.DockerConfig{}
+	}
+
+	response, err := decodeResponse(data)
+	if err != nil {
+		// err is explicitly not wrapped since it may contain credentials in the response.
+		klog.Error("error decoding credential provider plugin response from stdout")
 		return credentialprovider.DockerConfig{}
 	}
 
@@ -349,7 +366,7 @@ func (p *pluginProvider) getCachedCredentials(image string) (credentialprovider.
 // Plugin is the interface calling ExecPlugin. This is mainly for testability
 // so tests don't have to actually exec any processes.
 type Plugin interface {
-	ExecPlugin(ctx context.Context, image string) (*credentialproviderapi.CredentialProviderResponse, error)
+	ExecPlugin(ctx context.Context, image string) ([]byte, error)
 }
 
 // execPlugin is the implementation of the Plugin interface that execs a credential provider plugin based
@@ -357,7 +374,6 @@ type Plugin interface {
 // plugin directory provided by the kubelet.
 type execPlugin struct {
 	name         string
-	apiVersion   string
 	encoder      runtime.Encoder
 	args         []string
 	envVars      []kubeletconfig.ExecEnvVar
@@ -371,7 +387,7 @@ type execPlugin struct {
 //
 // The plugin is expected to receive the CredentialProviderRequest API via stdin from the kubelet and
 // return CredentialProviderResponse via stdout.
-func (e *execPlugin) ExecPlugin(ctx context.Context, image string) (*credentialproviderapi.CredentialProviderResponse, error) {
+func (e *execPlugin) ExecPlugin(ctx context.Context, image string) ([]byte, error) {
 	klog.V(5).Infof("Getting image %s credentials from external exec plugin %s", image, e.name)
 
 	authRequest := &credentialproviderapi.CredentialProviderRequest{Image: image}
@@ -409,24 +425,7 @@ func (e *execPlugin) ExecPlugin(ctx context.Context, image string) (*credentialp
 		return nil, err
 	}
 
-	data = stdout.Bytes()
-	// check that the response apiVersion matches what is expected
-	gvk, err := json.DefaultMetaFactory.Interpret(data)
-	if err != nil {
-		return nil, fmt.Errorf("error reading GVK from response: %w", err)
-	}
-
-	if gvk.GroupVersion().String() != e.apiVersion {
-		return nil, fmt.Errorf("apiVersion from credential plugin response did not match expected apiVersion:%s, actual apiVersion:%s", e.apiVersion, gvk.GroupVersion().String())
-	}
-
-	response, err := e.decodeResponse(data)
-	if err != nil {
-		// err is explicitly not wrapped since it may contain credentials in the response.
-		return nil, errors.New("error decoding credential provider plugin response from stdout")
-	}
-
-	return response, nil
+	return stdout.Bytes(), nil
 }
 
 func (e *execPlugin) runPlugin(ctx context.Context, cmd *exec.Cmd, image string) error {
@@ -456,7 +455,7 @@ func (e *execPlugin) encodeRequest(request *credentialproviderapi.CredentialProv
 }
 
 // decodeResponse decodes data into the internal CredentialProviderResponse type
-func (e *execPlugin) decodeResponse(data []byte) (*credentialproviderapi.CredentialProviderResponse, error) {
+func decodeResponse(data []byte) (*credentialproviderapi.CredentialProviderResponse, error) {
 	obj, gvk, err := codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
 		return nil, err
