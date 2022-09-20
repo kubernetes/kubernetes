@@ -260,6 +260,41 @@ func TestFsUserFrom(t *testing.T) {
 	}
 }
 
+func TestHasMountRefs(t *testing.T) {
+	testCases := map[string]struct {
+		mountPath string
+		mountRefs []string
+		expected  bool
+	}{
+		"plugin mounts only": {
+			mountPath: "/var/lib/kubelet/plugins/kubernetes.io/some-plugin/mounts/volume-XXXX",
+			mountRefs: []string{
+				"/home/somewhere/var/lib/kubelet/plugins/kubernetes.io/some-plugin/mounts/volume-XXXX",
+				"/var/lib/kubelet/plugins/kubernetes.io/some-plugin/mounts/volume-XXXX",
+				"/mnt/kubelet/plugins/kubernetes.io/some-plugin/mounts/volume-XXXX",
+				"/mnt/plugins/kubernetes.io/some-plugin/mounts/volume-XXXX",
+			},
+			expected: false,
+		},
+		"extra local mount": {
+			mountPath: "/var/lib/kubelet/plugins/kubernetes.io/some-plugin/mounts/volume-XXXX",
+			mountRefs: []string{
+				"/home/somewhere/var/lib/kubelet/plugins/kubernetes.io/some-plugin/mounts/volume-XXXX",
+				"/local/data/kubernetes.io/some-plugin/mounts/volume-XXXX",
+				"/mnt/kubelet/plugins/kubernetes.io/some-plugin/mounts/volume-XXXX",
+				"/mnt/plugins/kubernetes.io/some-plugin/mounts/volume-XXXX",
+			},
+			expected: true,
+		},
+	}
+	for name, test := range testCases {
+		actual := HasMountRefs(test.mountPath, test.mountRefs)
+		if actual != test.expected {
+			t.Errorf("for %s expected %v but got %v", name, test.expected, actual)
+		}
+	}
+}
+
 func TestMountOptionFromSpec(t *testing.T) {
 	scenarios := map[string]struct {
 		volume            *volume.Spec
