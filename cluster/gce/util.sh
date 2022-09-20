@@ -20,8 +20,8 @@
 # config-default.sh.
 readonly GCE_MAX_LOCAL_SSD=8
 
-PS4='Line $LINENO @ $(date +"%T.%3N"): '
-set -o xtrace
+# PS4='Line $LINENO @ $(date +"%T.%3N"): '
+# set -o xtrace
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
@@ -3529,6 +3529,9 @@ function remove-replica-from-etcd() {
 # API calls and exceeding API quota. It is important to bring down the instances before bringing
 # down the firewall rules and routes.
 function kube-down() {
+  PS4='Line $LINENO @ $(date +"%T.%3N"): '
+  set -o xtrace
+
   local -r batch=200
 
   detect-project

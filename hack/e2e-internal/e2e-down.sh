@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+PS4='Line $LINENO @ $(date +"%T.%3N"): '
+set -o xtrace
+
 set -o errexit
 set -o nounset
 set -o pipefail
