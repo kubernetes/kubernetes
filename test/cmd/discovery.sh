@@ -27,7 +27,7 @@ run_RESTMapper_evaluation_tests() {
 
   RESTMAPPER_ERROR_FILE="${KUBE_TEMP}/restmapper-error"
 
-  ### Non-existent resource type should give a recognizeable error
+  ### Non-existent resource type should give a recognizable error
   # Pre-condition: None
   # Command
   kubectl get "${kube_flags[@]:?}" unknownresourcetype 2>"${RESTMAPPER_ERROR_FILE}" || true
