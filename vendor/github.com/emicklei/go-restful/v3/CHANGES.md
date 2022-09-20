@@ -1,5 +1,9 @@
 # Change history of go-restful
 
+## [v3.9.0] - 20221-07-21
+
+- add support for http.Handler implementations to work as FilterFunction, issue #504 (thanks to https://github.com/ggicci)
+
 ## [v3.8.0] - 20221-06-06
 
 - use exact matching of allowed domain entries, issue #489 (#493)

@@ -143,7 +143,7 @@ func (interceptor *genericOutputInterceptor) ResumeIntercepting() {
 		go startPipeFactory(interceptor.pipeChannel, interceptor.shutdown)
 	}
 
-	// Now we make a pipe, we'll use this to redirect the input to the 1 and 2 file descriptors (this is how everything else in the world is tring to log to stdout and stderr)
+	// Now we make a pipe, we'll use this to redirect the input to the 1 and 2 file descriptors (this is how everything else in the world is string to log to stdout and stderr)
 	// we get the pipe from our pipe factory.  it runs in the background so we can request the next pipe while the spec being intercepted is running
 	interceptor.pipe = <-interceptor.pipeChannel
 

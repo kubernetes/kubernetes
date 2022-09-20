@@ -171,8 +171,8 @@ func GenerateJUnitReport(report types.Report, dst string) error {
 			Classname: report.SuiteDescription,
 			Status:    spec.State.String(),
 			Time:      spec.RunTime.Seconds(),
-			SystemOut: systemOutForUnstructureReporters(spec),
-			SystemErr: spec.CapturedGinkgoWriterOutput,
+			SystemOut: systemOutForUnstructuredReporters(spec),
+			SystemErr: systemErrForUnstructuredReporters(spec),
 		}
 		suite.Tests += 1
 
@@ -198,7 +198,7 @@ func GenerateJUnitReport(report types.Report, dst string) error {
 			test.Error = &JUnitError{
 				Message:     "interrupted",
 				Type:        "interrupted",
-				Description: spec.Failure.Message,
+				Description: interruptDescriptionForUnstructuredReporters(spec.Failure),
 			}
 			suite.Errors += 1
 		case types.SpecStateAborted:
@@ -278,7 +278,38 @@ func MergeAndCleanupJUnitReports(sources []string, dst string) ([]string, error)
 	return messages, f.Close()
 }
 
-func systemOutForUnstructureReporters(spec types.SpecReport) string {
+func interruptDescriptionForUnstructuredReporters(failure types.Failure) string {
+	out := &strings.Builder{}
+	out.WriteString(failure.Message + "\n")
+	NewDefaultReporter(types.ReporterConfig{NoColor: true}, out).EmitProgressReport(failure.ProgressReport)
+	return out.String()
+}
+
+func systemErrForUnstructuredReporters(spec types.SpecReport) string {
+	out := &strings.Builder{}
+	gw := spec.CapturedGinkgoWriterOutput
+	cursor := 0
+	for _, pr := range spec.ProgressReports {
+		if cursor < pr.GinkgoWriterOffset {
+			if pr.GinkgoWriterOffset < len(gw) {
+				out.WriteString(gw[cursor:pr.GinkgoWriterOffset])
+				cursor = pr.GinkgoWriterOffset
+			} else if cursor < len(gw) {
+				out.WriteString(gw[cursor:])
+				cursor = len(gw)
+			}
+		}
+		NewDefaultReporter(types.ReporterConfig{NoColor: true}, out).EmitProgressReport(pr)
+	}
+
+	if cursor < len(gw) {
+		out.WriteString(gw[cursor:])
+	}
+
+	return out.String()
+}
+
+func systemOutForUnstructuredReporters(spec types.SpecReport) string {
 	systemOut := spec.CapturedStdOutErr
 	if len(spec.ReportEntries) > 0 {
 		systemOut += "\nReport Entries:\n"

@@ -203,7 +203,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			shouldFail: true,
 		},
 		{
-			name:     "incompete spec",
+			name:     "incomplete spec",
 			specName: "pv2",
 			driver:   "simple-driver",
 			volName:  "vol2",
@@ -434,7 +434,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 
 			dataFile := filepath.Join(filepath.Dir(mounter.GetPath()), volDataFileName)
 			if _, err := os.Stat(dataFile); err != nil {
-				t.Fatalf("csiTest.VolumeAll meatadata JSON file not found: %s", dataFile)
+				t.Fatalf("csiTest.VolumeAll metadata JSON file not found: %s", dataFile)
 			}
 			t.Log("csiTest.VolumeAll JSON datafile generated OK:", dataFile)
 

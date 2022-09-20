@@ -125,7 +125,7 @@ func evalSymlink(path string) (string, error) {
 		klog.V(4).Infof("Path '%s' has a target %s. Return its original form.", path, linkedPath)
 		return path, nil
 	}
-	// If the target is not an absoluate path, join iit with the current upperpath
+	// If the target is not an absolute path, join iit with the current upperpath
 	if !filepath.IsAbs(linkedPath) {
 		linkedPath = filepath.Join(getUpperPath(upperpath), linkedPath)
 	}

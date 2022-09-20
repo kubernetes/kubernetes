@@ -59,7 +59,7 @@ OncePerOrdered is a decorator that allows you to mark outer BeforeEach, AfterEac
 per ordered context.  Normally these setup nodes run around each individual spec, with OncePerOrdered they will run once around the set of specs in an ordered container.
 The behavior for non-Ordered containers/specs is unchanged.
 
-You can learh more here: https://onsi.github.io/ginkgo/#setup-around-ordered-containers-the-onceperordered-decorator
+You can learn more here: https://onsi.github.io/ginkgo/#setup-around-ordered-containers-the-onceperordered-decorator
 You can learn more about decorators here: https://onsi.github.io/ginkgo/#decorator-reference
 */
 const OncePerOrdered = internal.OncePerOrdered
@@ -80,6 +80,20 @@ Labels are the type for spec Label decorators.  Use Label(...) to construct Labe
 You can learn more here: https://onsi.github.io/ginkgo/#spec-labels
 */
 type Labels = internal.Labels
+
+/*
+PollProgressAfter allows you to override the configured value for --poll-progress-after for a particular node.
+
+Ginkgo will start emitting node progress if the node is still running after a duration of PollProgressAfter.  This allows you to get quicker feedback about the state of a long-running spec.
+*/
+type PollProgressAfter = internal.PollProgressAfter
+
+/*
+PollProgressInterval allows you to override the configured value for --poll-progress-interval for a particular node.
+
+Once a node has been running for longer than PollProgressAfter Ginkgo will emit node progress periodically at an interval of PollProgresInterval.
+*/
+type PollProgressInterval = internal.PollProgressInterval
 
 /*
 SuppressProgressReporting is a decorator that allows you to disable progress reporting of a particular node.  This is useful if `ginkgo -v -progress` is generating too much noise; particularly

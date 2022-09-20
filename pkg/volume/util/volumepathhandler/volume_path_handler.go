@@ -42,9 +42,9 @@ type BlockVolumePathHandler interface {
 	UnmapDevice(mapPath string, linkName string, bindMount bool) error
 	// RemovePath removes a file or directory on specified map path
 	RemoveMapPath(mapPath string) error
-	// IsSymlinkExist retruns true if specified symbolic link exists
+	// IsSymlinkExist returns true if specified symbolic link exists
 	IsSymlinkExist(mapPath string) (bool, error)
-	// IsDeviceBindMountExist retruns true if specified bind mount exists
+	// IsDeviceBindMountExist returns true if specified bind mount exists
 	IsDeviceBindMountExist(mapPath string) (bool, error)
 	// GetDeviceBindMountRefs searches bind mounts under global map path
 	GetDeviceBindMountRefs(devPath string, mapPath string) ([]string, error)
