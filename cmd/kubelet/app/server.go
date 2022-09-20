@@ -39,9 +39,9 @@ import (
 	"k8s.io/mount-utils"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"go.opentelemetry.io/otel/exporters/otlp/otlpgrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	otelsdkresource "go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/semconv"
+	"go.opentelemetry.io/otel/semconv/v1.12.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1281,7 +1281,7 @@ func newTracerProvider(s *options.KubeletServer) (oteltrace.TracerProvider, erro
 			semconv.HostNameKey.String(hostname),
 		),
 	}
-	tp, err := tracing.NewProvider(context.Background(), s.KubeletConfiguration.Tracing, []otlpgrpc.Option{}, resourceOpts)
+	tp, err := tracing.NewProvider(context.Background(), s.KubeletConfiguration.Tracing, []otlptracegrpc.Option{}, resourceOpts)
 	if err != nil {
 		return nil, fmt.Errorf("could not configure tracer provider: %v", err)
 	}

@@ -82,7 +82,7 @@ type http2Server struct {
 	// updates, reset streams, and various settings) to the controller.
 	controlBuf *controlBuffer
 	fc         *trInFlow
-	stats      stats.Handler
+	stats      []stats.Handler
 	// Keepalive and max-age parameters for the server.
 	kp keepalive.ServerParameters
 	// Keepalive enforcement policy.
@@ -257,7 +257,7 @@ func NewServerTransport(conn net.Conn, config *ServerConfig) (_ ServerTransport,
 		fc:                &trInFlow{limit: uint32(icwz)},
 		state:             reachable,
 		activeStreams:     make(map[uint32]*Stream),
-		stats:             config.StatsHandler,
+		stats:             config.StatsHandlers,
 		kp:                kp,
 		idle:              time.Now(),
 		kep:               kep,
@@ -272,13 +272,13 @@ func NewServerTransport(conn net.Conn, config *ServerConfig) (_ ServerTransport,
 			updateFlowControl: t.updateFlowControl,
 		}
 	}
-	if t.stats != nil {
-		t.ctx = t.stats.TagConn(t.ctx, &stats.ConnTagInfo{
+	for _, sh := range t.stats {
+		t.ctx = sh.TagConn(t.ctx, &stats.ConnTagInfo{
 			RemoteAddr: t.remoteAddr,
 			LocalAddr:  t.localAddr,
 		})
 		connBegin := &stats.ConnBegin{}
-		t.stats.HandleConn(t.ctx, connBegin)
+		sh.HandleConn(t.ctx, connBegin)
 	}
 	t.channelzID, err = channelz.RegisterNormalSocket(t, config.ChannelzParentID, fmt.Sprintf("%s -> %s", t.remoteAddr, t.localAddr))
 	if err != nil {
@@ -570,8 +570,8 @@ func (t *http2Server) operateHeaders(frame *http2.MetaHeadersFrame, handle func(
 		t.adjustWindow(s, uint32(n))
 	}
 	s.ctx = traceCtx(s.ctx, s.method)
-	if t.stats != nil {
-		s.ctx = t.stats.TagRPC(s.ctx, &stats.RPCTagInfo{FullMethodName: s.method})
+	for _, sh := range t.stats {
+		s.ctx = sh.TagRPC(s.ctx, &stats.RPCTagInfo{FullMethodName: s.method})
 		inHeader := &stats.InHeader{
 			FullMethod:  s.method,
 			RemoteAddr:  t.remoteAddr,
@@ -580,7 +580,7 @@ func (t *http2Server) operateHeaders(frame *http2.MetaHeadersFrame, handle func(
 			WireLength:  int(frame.Header().Length),
 			Header:      metadata.MD(mdata).Copy(),
 		}
-		t.stats.HandleRPC(s.ctx, inHeader)
+		sh.HandleRPC(s.ctx, inHeader)
 	}
 	s.ctxDone = s.ctx.Done()
 	s.wq = newWriteQuota(defaultWriteQuota, s.ctxDone)
@@ -945,15 +945,16 @@ func (t *http2Server) streamContextErr(s *Stream) error {
 
 // WriteHeader sends the header metadata md back to the client.
 func (t *http2Server) WriteHeader(s *Stream, md metadata.MD) error {
-	if s.updateHeaderSent() {
-		return ErrIllegalHeaderWrite
-	}
-
+	s.hdrMu.Lock()
+	defer s.hdrMu.Unlock()
 	if s.getState() == streamDone {
 		return t.streamContextErr(s)
 	}
 
-	s.hdrMu.Lock()
+	if s.updateHeaderSent() {
+		return ErrIllegalHeaderWrite
+	}
+
 	if md.Len() > 0 {
 		if s.header.Len() > 0 {
 			s.header = metadata.Join(s.header, md)
@@ -962,10 +963,8 @@ func (t *http2Server) WriteHeader(s *Stream, md metadata.MD) error {
 		}
 	}
 	if err := t.writeHeaderLocked(s); err != nil {
-		s.hdrMu.Unlock()
 		return status.Convert(err).Err()
 	}
-	s.hdrMu.Unlock()
 	return nil
 }
 
@@ -996,14 +995,14 @@ func (t *http2Server) writeHeaderLocked(s *Stream) error {
 		t.closeStream(s, true, http2.ErrCodeInternal, false)
 		return ErrHeaderListSizeLimitViolation
 	}
-	if t.stats != nil {
+	for _, sh := range t.stats {
 		// Note: Headers are compressed with hpack after this call returns.
 		// No WireLength field is set here.
 		outHeader := &stats.OutHeader{
 			Header:      s.header.Copy(),
 			Compression: s.sendCompress,
 		}
-		t.stats.HandleRPC(s.Context(), outHeader)
+		sh.HandleRPC(s.Context(), outHeader)
 	}
 	return nil
 }
@@ -1013,17 +1012,19 @@ func (t *http2Server) writeHeaderLocked(s *Stream) error {
 // TODO(zhaoq): Now it indicates the end of entire stream. Revisit if early
 // OK is adopted.
 func (t *http2Server) WriteStatus(s *Stream, st *status.Status) error {
+	s.hdrMu.Lock()
+	defer s.hdrMu.Unlock()
+
 	if s.getState() == streamDone {
 		return nil
 	}
-	s.hdrMu.Lock()
+
 	// TODO(mmukhi): Benchmark if the performance gets better if count the metadata and other header fields
 	// first and create a slice of that exact size.
 	headerFields := make([]hpack.HeaderField, 0, 2) // grpc-status and grpc-message will be there if none else.
 	if !s.updateHeaderSent() {                      // No headers have been sent.
 		if len(s.header) > 0 { // Send a separate header frame.
 			if err := t.writeHeaderLocked(s); err != nil {
-				s.hdrMu.Unlock()
 				return err
 			}
 		} else { // Send a trailer only response.
@@ -1052,7 +1053,7 @@ func (t *http2Server) WriteStatus(s *Stream, st *status.Status) error {
 		endStream: true,
 		onWrite:   t.setResetPingStrikes,
 	}
-	s.hdrMu.Unlock()
+
 	success, err := t.controlBuf.execute(t.checkForHeaderListSize, trailingHeader)
 	if !success {
 		if err != nil {
@@ -1064,10 +1065,10 @@ func (t *http2Server) WriteStatus(s *Stream, st *status.Status) error {
 	// Send a RST_STREAM after the trailers if the client has not already half-closed.
 	rst := s.getState() == streamActive
 	t.finishStream(s, rst, http2.ErrCodeNo, trailingHeader, true)
-	if t.stats != nil {
+	for _, sh := range t.stats {
 		// Note: The trailer fields are compressed with hpack after this call returns.
 		// No WireLength field is set here.
-		t.stats.HandleRPC(s.Context(), &stats.OutTrailer{
+		sh.HandleRPC(s.Context(), &stats.OutTrailer{
 			Trailer: s.trailer.Copy(),
 		})
 	}
@@ -1222,9 +1223,9 @@ func (t *http2Server) Close() {
 	for _, s := range streams {
 		s.cancel()
 	}
-	if t.stats != nil {
+	for _, sh := range t.stats {
 		connEnd := &stats.ConnEnd{}
-		t.stats.HandleConn(t.ctx, connEnd)
+		sh.HandleConn(t.ctx, connEnd)
 	}
 }
 

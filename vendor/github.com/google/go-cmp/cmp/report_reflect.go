@@ -16,6 +16,13 @@ import (
 	"github.com/google/go-cmp/cmp/internal/value"
 )
 
+var (
+	anyType    = reflect.TypeOf((*interface{})(nil)).Elem()
+	stringType = reflect.TypeOf((*string)(nil)).Elem()
+	bytesType  = reflect.TypeOf((*[]byte)(nil)).Elem()
+	byteType   = reflect.TypeOf((*byte)(nil)).Elem()
+)
+
 type formatValueOptions struct {
 	// AvoidStringer controls whether to avoid calling custom stringer
 	// methods like error.Error or fmt.Stringer.String.
@@ -184,7 +191,7 @@ func (opts formatOptions) FormatValue(v reflect.Value, parentKind reflect.Kind, 
 		}
 		for i := 0; i < v.NumField(); i++ {
 			vv := v.Field(i)
-			if value.IsZero(vv) {
+			if vv.IsZero() {
 				continue // Elide fields with zero values
 			}
 			if len(list) == maxLen {
@@ -205,7 +212,7 @@ func (opts formatOptions) FormatValue(v reflect.Value, parentKind reflect.Kind, 
 		}
 
 		// Check whether this is a []byte of text data.
-		if t.Elem() == reflect.TypeOf(byte(0)) {
+		if t.Elem() == byteType {
 			b := v.Bytes()
 			isPrintSpace := func(r rune) bool { return unicode.IsPrint(r) || unicode.IsSpace(r) }
 			if len(b) > 0 && utf8.Valid(b) && len(bytes.TrimFunc(b, isPrintSpace)) == 0 {

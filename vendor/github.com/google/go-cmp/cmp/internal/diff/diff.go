@@ -127,9 +127,9 @@ var randBool = rand.New(rand.NewSource(time.Now().Unix())).Intn(2) == 0
 // This function returns an edit-script, which is a sequence of operations
 // needed to convert one list into the other. The following invariants for
 // the edit-script are maintained:
-//	• eq == (es.Dist()==0)
-//	• nx == es.LenX()
-//	• ny == es.LenY()
+//   - eq == (es.Dist()==0)
+//   - nx == es.LenX()
+//   - ny == es.LenY()
 //
 // This algorithm is not guaranteed to be an optimal solution (i.e., one that
 // produces an edit-script with a minimal Levenshtein distance). This algorithm
@@ -169,12 +169,13 @@ func Difference(nx, ny int, f EqualFunc) (es EditScript) {
 	// A diagonal edge is equivalent to a matching symbol between both X and Y.
 
 	// Invariants:
-	//	• 0 ≤ fwdPath.X ≤ (fwdFrontier.X, revFrontier.X) ≤ revPath.X ≤ nx
-	//	• 0 ≤ fwdPath.Y ≤ (fwdFrontier.Y, revFrontier.Y) ≤ revPath.Y ≤ ny
+	//   - 0 ≤ fwdPath.X ≤ (fwdFrontier.X, revFrontier.X) ≤ revPath.X ≤ nx
+	//   - 0 ≤ fwdPath.Y ≤ (fwdFrontier.Y, revFrontier.Y) ≤ revPath.Y ≤ ny
 	//
 	// In general:
-	//	• fwdFrontier.X < revFrontier.X
-	//	• fwdFrontier.Y < revFrontier.Y
+	//   - fwdFrontier.X < revFrontier.X
+	//   - fwdFrontier.Y < revFrontier.Y
+	//
 	// Unless, it is time for the algorithm to terminate.
 	fwdPath := path{+1, point{0, 0}, make(EditScript, 0, (nx+ny)/2)}
 	revPath := path{-1, point{nx, ny}, make(EditScript, 0)}
@@ -195,19 +196,21 @@ func Difference(nx, ny int, f EqualFunc) (es EditScript) {
 	// computing sub-optimal edit-scripts between two lists.
 	//
 	// The algorithm is approximately as follows:
-	//	• Searching for differences switches back-and-forth between
-	//	a search that starts at the beginning (the top-left corner), and
-	//	a search that starts at the end (the bottom-right corner). The goal of
-	//	the search is connect with the search from the opposite corner.
-	//	• As we search, we build a path in a greedy manner, where the first
-	//	match seen is added to the path (this is sub-optimal, but provides a
-	//	decent result in practice). When matches are found, we try the next pair
-	//	of symbols in the lists and follow all matches as far as possible.
-	//	• When searching for matches, we search along a diagonal going through
-	//	through the "frontier" point. If no matches are found, we advance the
-	//	frontier towards the opposite corner.
-	//	• This algorithm terminates when either the X coordinates or the
-	//	Y coordinates of the forward and reverse frontier points ever intersect.
+	//   - Searching for differences switches back-and-forth between
+	//     a search that starts at the beginning (the top-left corner), and
+	//     a search that starts at the end (the bottom-right corner).
+	//     The goal of the search is connect with the search
+	//     from the opposite corner.
+	//   - As we search, we build a path in a greedy manner,
+	//     where the first match seen is added to the path (this is sub-optimal,
+	//     but provides a decent result in practice). When matches are found,
+	//     we try the next pair of symbols in the lists and follow all matches
+	//     as far as possible.
+	//   - When searching for matches, we search along a diagonal going through
+	//     through the "frontier" point. If no matches are found,
+	//     we advance the frontier towards the opposite corner.
+	//   - This algorithm terminates when either the X coordinates or the
+	//     Y coordinates of the forward and reverse frontier points ever intersect.
 
 	// This algorithm is correct even if searching only in the forward direction
 	// or in the reverse direction. We do both because it is commonly observed
@@ -389,6 +392,7 @@ type point struct{ X, Y int }
 func (p *point) add(dx, dy int) { p.X += dx; p.Y += dy }
 
 // zigzag maps a consecutive sequence of integers to a zig-zag sequence.
+//
 //	[0 1 2 3 4 5 ...] => [0 -1 +1 -2 +2 ...]
 func zigzag(x int) int {
 	if x&1 != 0 {

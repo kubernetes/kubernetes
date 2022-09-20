@@ -42,14 +42,14 @@ var binLogger Logger
 
 var grpclogLogger = grpclog.Component("binarylog")
 
-// SetLogger sets the binarg logger.
+// SetLogger sets the binary logger.
 //
 // Only call this at init time.
 func SetLogger(l Logger) {
 	binLogger = l
 }
 
-// GetLogger gets the binarg logger.
+// GetLogger gets the binary logger.
 //
 // Only call this at init time.
 func GetLogger() Logger {

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -107,15 +108,18 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 
 func containsNodeListSpan(req *traceservice.ExportTraceServiceRequest) bool {
 	for _, resourceSpans := range req.GetResourceSpans() {
-		for _, instrumentationSpans := range resourceSpans.GetInstrumentationLibrarySpans() {
+		for _, instrumentationSpans := range resourceSpans.GetScopeSpans() {
 			for _, span := range instrumentationSpans.GetSpans() {
-				if span.Name != "KubernetesAPI" {
+				if span.Name != "HTTP GET" {
 					continue
 				}
 				for _, attr := range span.GetAttributes() {
-					if attr.GetKey() == "http.target" && attr.GetValue().GetStringValue() == "/api/v1/nodes" {
-						// We found our request!
-						return true
+					if attr.GetKey() == "http.url" {
+						value := attr.GetValue().GetStringValue()
+						if strings.HasSuffix(value, "/api/v1/nodes") {
+							// We found our request!
+							return true
+						}
 					}
 				}
 			}
