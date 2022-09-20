@@ -221,10 +221,12 @@ func (e *Runner) Run(args []string) error {
 		return errors.New(msg.String())
 	}
 
-	// builds the runner data
-	var data RunData
-	if data, err = e.InitData(args); err != nil {
-		return err
+	// builds the runner data if the runtime data is not initialized
+	data := e.runData
+	if data == nil {
+		if data, err = e.InitData(args); err != nil {
+			return err
+		}
 	}
 
 	err = e.visitAll(func(p *phaseRunner) error {
