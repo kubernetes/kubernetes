@@ -1,25 +1,23 @@
-// Copyright 2010 The Go Authors. All rights reserved.
+// Copyright 2022 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build solaris
-// +build solaris
+//go:build !darwin && !dragonfly && !freebsd && !openbsd && !linux && !netbsd && !solaris && !windows
+// +build !darwin,!dragonfly,!freebsd,!openbsd,!linux,!netbsd,!solaris,!windows
 
 package fsnotify
 
 import (
-	"errors"
+	"fmt"
+	"runtime"
 )
 
 // Watcher watches a set of files, delivering events to a channel.
-type Watcher struct {
-	Events chan Event
-	Errors chan error
-}
+type Watcher struct{}
 
 // NewWatcher establishes a new watcher with the underlying OS and begins waiting for events.
 func NewWatcher() (*Watcher, error) {
-	return nil, errors.New("FEN based watcher not yet supported for fsnotify\n")
+	return nil, fmt.Errorf("fsnotify not supported on %s", runtime.GOOS)
 }
 
 // Close removes all watches and closes the events channel.

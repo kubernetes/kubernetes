@@ -269,8 +269,8 @@ github.com/felixge/httpsnoop
 # github.com/form3tech-oss/jwt-go v3.2.3+incompatible => github.com/form3tech-oss/jwt-go v3.2.3+incompatible
 ## explicit
 github.com/form3tech-oss/jwt-go
-# github.com/fsnotify/fsnotify v1.4.9 => github.com/fsnotify/fsnotify v1.4.9
-## explicit; go 1.13
+# github.com/fsnotify/fsnotify v1.5.4 => github.com/fsnotify/fsnotify v1.5.4
+## explicit; go 1.16
 github.com/fsnotify/fsnotify
 # github.com/fvbommel/sortorder v1.0.1 => github.com/fvbommel/sortorder v1.0.1
 ## explicit; go 1.13
@@ -2599,7 +2599,7 @@ sigs.k8s.io/yaml
 # github.com/fogleman/gg => github.com/fogleman/gg v1.2.1-0.20190220221249-0403632d5b90
 # github.com/form3tech-oss/jwt-go => github.com/form3tech-oss/jwt-go v3.2.3+incompatible
 # github.com/frankban/quicktest => github.com/frankban/quicktest v1.11.3
-# github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.4.9
+# github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.5.4
 # github.com/fvbommel/sortorder => github.com/fvbommel/sortorder v1.0.1
 # github.com/getkin/kin-openapi => github.com/getkin/kin-openapi v0.76.0
 # github.com/getsentry/raven-go => github.com/getsentry/raven-go v0.2.0

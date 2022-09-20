@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build windows
 // +build windows
 
 package fsnotify
@@ -11,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"sync"
 	"syscall"
@@ -93,6 +95,21 @@ func (w *Watcher) Remove(name string) error {
 		return err
 	}
 	return <-in.reply
+}
+
+// WatchList returns the directories and files that are being monitered.
+func (w *Watcher) WatchList() []string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	entries := make([]string, 0, len(w.watches))
+	for _, entry := range w.watches {
+		for _, watchEntry := range entry {
+			entries = append(entries, watchEntry.path)
+		}
+	}
+
+	return entries
 }
 
 const (
@@ -451,8 +468,16 @@ func (w *Watcher) readEvents() {
 
 			// Point "raw" to the event in the buffer
 			raw := (*syscall.FileNotifyInformation)(unsafe.Pointer(&watch.buf[offset]))
-			buf := (*[syscall.MAX_PATH]uint16)(unsafe.Pointer(&raw.FileName))
-			name := syscall.UTF16ToString(buf[:raw.FileNameLength/2])
+			// TODO: Consider using unsafe.Slice that is available from go1.17
+			// https://stackoverflow.com/questions/51187973/how-to-create-an-array-or-a-slice-from-an-array-unsafe-pointer-in-golang
+			// instead of using a fixed syscall.MAX_PATH buf, we create a buf that is the size of the path name
+			size := int(raw.FileNameLength / 2)
+			var buf []uint16
+			sh := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
+			sh.Data = uintptr(unsafe.Pointer(&raw.FileName))
+			sh.Len = size
+			sh.Cap = size
+			name := syscall.UTF16ToString(buf)
 			fullname := filepath.Join(watch.path, name)
 
 			var mask uint64
