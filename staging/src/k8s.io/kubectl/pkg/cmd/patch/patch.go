@@ -23,9 +23,11 @@ import (
 	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -272,6 +274,9 @@ func (o *PatchOptions) RunPatch() error {
 				WithSubresource(o.Subresource)
 			patchedObj, err := helper.Patch(namespace, name, patchType, patchBytes, nil)
 			if err != nil {
+				if apierrors.IsUnsupportedMediaType(err) {
+					return errors.Wrap(err, fmt.Sprintf("%s is not supported by %s", patchType, mapping.GroupVersionKind))
+				}
 				return err
 			}
 
