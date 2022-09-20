@@ -30,7 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
@@ -96,6 +95,10 @@ func TestGetsSelfAttributes(t *testing.T) {
 	}
 
 	kubeClient, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1alpha1=true")
+			opts.Authorization.Modes = []string{"AlwaysAllow"}
+		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Unset BearerToken to disable BearerToken authenticator.
 			config.GenericConfig.LoopbackClientConfig.BearerToken = ""
@@ -104,10 +107,6 @@ func TestGetsSelfAttributes(t *testing.T) {
 				defer respMu.RUnlock()
 				return &authenticator.Response{User: response}, true, nil
 			})
-			config.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
-		},
-		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-			opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1alpha1=true")
 		},
 	})
 	defer tearDownFn()
@@ -156,6 +155,10 @@ func TestGetsSelfAttributesError(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APISelfSubjectReview, true)()
 
 	kubeClient, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1alpha1=true")
+			opts.Authorization.Modes = []string{"AlwaysAllow"}
+		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			// Unset BearerToken to disable BearerToken authenticator.
 			config.GenericConfig.LoopbackClientConfig.BearerToken = ""
@@ -170,10 +173,6 @@ func TestGetsSelfAttributesError(t *testing.T) {
 
 				return nil, false, fmt.Errorf("test error")
 			})
-			config.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
-		},
-		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-			opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1alpha1=true")
 		},
 	})
 	defer tearDownFn()
