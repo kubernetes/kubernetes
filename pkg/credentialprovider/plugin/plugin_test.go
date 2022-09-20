@@ -56,7 +56,7 @@ func Test_Provide(t *testing.T) {
 		dockerconfig   credentialprovider.DockerConfig
 	}{
 		{
-			name: "exact image match, with Registry cache key",
+			name: "[v1beta1] exact image match, with Registry cache key",
 			pluginProvider: &pluginProvider{
 				apiVersion:     credentialproviderv1beta1.SchemeGroupVersion.String(),
 				clock:          tclock,
@@ -76,7 +76,27 @@ func Test_Provide(t *testing.T) {
 			},
 		},
 		{
-			name: "exact image match, with Image cache key",
+			name: "[v1alpha1] exact image match, with Registry cache key",
+			pluginProvider: &pluginProvider{
+				apiVersion:     credentialproviderv1alpha1.SchemeGroupVersion.String(),
+				clock:          tclock,
+				lastCachePurge: tclock.Now(),
+				matchImages:    []string{"test.registry.io"},
+				cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
+				plugin: &fakeExecPlugin{
+					data: []byte(`{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1alpha1","cacheKeyType":"Registry","cacheDuration":"1m","auth":{"test.registry.io":{"username":"user","password":"password"}}}`),
+				},
+			},
+			image: "test.registry.io/foo/bar",
+			dockerconfig: credentialprovider.DockerConfig{
+				"test.registry.io": credentialprovider.DockerConfigEntry{
+					Username: "user",
+					Password: "password",
+				},
+			},
+		},
+		{
+			name: "[v1beta1] exact image match, with Image cache key",
 			pluginProvider: &pluginProvider{
 				apiVersion:     credentialproviderv1beta1.SchemeGroupVersion.String(),
 				clock:          tclock,
@@ -96,7 +116,27 @@ func Test_Provide(t *testing.T) {
 			},
 		},
 		{
-			name: "exact image match, with Global cache key",
+			name: "[v1alpha1] exact image match, with Image cache key",
+			pluginProvider: &pluginProvider{
+				apiVersion:     credentialproviderv1alpha1.SchemeGroupVersion.String(),
+				clock:          tclock,
+				lastCachePurge: tclock.Now(),
+				matchImages:    []string{"test.registry.io/foo/bar"},
+				cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
+				plugin: &fakeExecPlugin{
+					data: []byte(`{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1alpha1","cacheKeyType":"Image","cacheDuration":"1m","auth":{"test.registry.io/foo/bar":{"username":"user","password":"password"}}}`),
+				},
+			},
+			image: "test.registry.io/foo/bar",
+			dockerconfig: credentialprovider.DockerConfig{
+				"test.registry.io/foo/bar": credentialprovider.DockerConfigEntry{
+					Username: "user",
+					Password: "password",
+				},
+			},
+		},
+		{
+			name: "[v1beta1] exact image match, with Global cache key",
 			pluginProvider: &pluginProvider{
 				apiVersion:     credentialproviderv1beta1.SchemeGroupVersion.String(),
 				clock:          tclock,
@@ -116,7 +156,27 @@ func Test_Provide(t *testing.T) {
 			},
 		},
 		{
-			name: "wild card image match, with Registry cache key",
+			name: "[v1alpha1] exact image match, with Global cache key",
+			pluginProvider: &pluginProvider{
+				apiVersion:     credentialproviderv1alpha1.SchemeGroupVersion.String(),
+				clock:          tclock,
+				lastCachePurge: tclock.Now(),
+				matchImages:    []string{"test.registry.io"},
+				cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
+				plugin: &fakeExecPlugin{
+					data: []byte(`{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1alpha1","cacheKeyType":"Global","cacheDuration":"1m","auth":{"test.registry.io":{"username":"user","password":"password"}}}`),
+				},
+			},
+			image: "test.registry.io",
+			dockerconfig: credentialprovider.DockerConfig{
+				"test.registry.io": credentialprovider.DockerConfigEntry{
+					Username: "user",
+					Password: "password",
+				},
+			},
+		},
+		{
+			name: "[v1beta1] wild card image match, with Registry cache key",
 			pluginProvider: &pluginProvider{
 				apiVersion:     credentialproviderv1beta1.SchemeGroupVersion.String(),
 				clock:          tclock,
@@ -136,7 +196,27 @@ func Test_Provide(t *testing.T) {
 			},
 		},
 		{
-			name: "wild card image match, with Image cache key",
+			name: "[v1alpha1] wild card image match, with Registry cache key",
+			pluginProvider: &pluginProvider{
+				apiVersion:     credentialproviderv1alpha1.SchemeGroupVersion.String(),
+				clock:          tclock,
+				lastCachePurge: tclock.Now(),
+				matchImages:    []string{"*.registry.io:8080"},
+				cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
+				plugin: &fakeExecPlugin{
+					data: []byte(`{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1alpha1","cacheKeyType":"Registry","cacheDuration":"1m","auth":{"*.registry.io:8080":{"username":"user","password":"password"}}}`),
+				},
+			},
+			image: "test.registry.io:8080/foo",
+			dockerconfig: credentialprovider.DockerConfig{
+				"*.registry.io:8080": credentialprovider.DockerConfigEntry{
+					Username: "user",
+					Password: "password",
+				},
+			},
+		},
+		{
+			name: "[v1beta1] wild card image match, with Image cache key",
 			pluginProvider: &pluginProvider{
 				apiVersion:     credentialproviderv1beta1.SchemeGroupVersion.String(),
 				clock:          tclock,
@@ -156,7 +236,27 @@ func Test_Provide(t *testing.T) {
 			},
 		},
 		{
-			name: "wild card image match, with Global cache key",
+			name: "[v1alpha1] wild card image match, with Image cache key",
+			pluginProvider: &pluginProvider{
+				apiVersion:     credentialproviderv1alpha1.SchemeGroupVersion.String(),
+				clock:          tclock,
+				lastCachePurge: tclock.Now(),
+				matchImages:    []string{"*.*.registry.io"},
+				cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
+				plugin: &fakeExecPlugin{
+					data: []byte(`{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1alpha1","cacheKeyType":"Registry","cacheDuration":"1m","auth":{"*.*.registry.io":{"username":"user","password":"password"}}}`),
+				},
+			},
+			image: "foo.bar.registry.io/foo/bar",
+			dockerconfig: credentialprovider.DockerConfig{
+				"*.*.registry.io": credentialprovider.DockerConfigEntry{
+					Username: "user",
+					Password: "password",
+				},
+			},
+		},
+		{
+			name: "[v1beta1] wild card image match, with Global cache key",
 			pluginProvider: &pluginProvider{
 				apiVersion:     credentialproviderv1beta1.SchemeGroupVersion.String(),
 				clock:          tclock,
@@ -165,6 +265,26 @@ func Test_Provide(t *testing.T) {
 				cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
 				plugin: &fakeExecPlugin{
 					data: []byte(`{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1beta1","cacheKeyType":"Global","cacheDuration":"1m","auth":{"*.registry.io":{"username":"user","password":"password"}}}`),
+				},
+			},
+			image: "test.registry.io",
+			dockerconfig: credentialprovider.DockerConfig{
+				"*.registry.io": credentialprovider.DockerConfigEntry{
+					Username: "user",
+					Password: "password",
+				},
+			},
+		},
+		{
+			name: "[v1alpha1] wild card image match, with Global cache key",
+			pluginProvider: &pluginProvider{
+				apiVersion:     credentialproviderv1alpha1.SchemeGroupVersion.String(),
+				clock:          tclock,
+				lastCachePurge: tclock.Now(),
+				matchImages:    []string{"*.registry.io"},
+				cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
+				plugin: &fakeExecPlugin{
+					data: []byte(`{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1alpha1","cacheKeyType":"Global","cacheDuration":"1m","auth":{"*.registry.io":{"username":"user","password":"password"}}}`),
 				},
 			},
 			image: "test.registry.io",
