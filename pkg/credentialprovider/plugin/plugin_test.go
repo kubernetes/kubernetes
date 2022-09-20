@@ -295,6 +295,21 @@ func Test_Provide(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "kubelet configured with v1beta1 but plugin returns v1alpha1",
+			pluginProvider: &pluginProvider{
+				apiVersion:     credentialproviderv1beta1.SchemeGroupVersion.String(),
+				clock:          tclock,
+				lastCachePurge: tclock.Now(),
+				matchImages:    []string{"*.registry.io"},
+				cache:          cache.NewExpirationStore(cacheKeyFunc, &cacheExpirationPolicy{clock: tclock}),
+				plugin: &fakeExecPlugin{
+					data: []byte(`{"kind":"CredentialProviderResponse","apiVersion":"credentialprovider.kubelet.k8s.io/v1alpha1","cacheKeyType":"Global","cacheDuration":"1m","auth":{"*.registry.io":{"username":"user","password":"password"}}}`),
+				},
+			},
+			image:        "test.registry.io",
+			dockerconfig: credentialprovider.DockerConfig{},
+		},
 	}
 
 	for _, testcase := range testcases {
