@@ -75,7 +75,7 @@ func (validatingWebhookConfigurationStrategy) WarningsOnCreate(ctx context.Conte
 func (validatingWebhookConfigurationStrategy) Canonicalize(obj runtime.Object) {
 }
 
-// AllowCreateOnUpdate is true for validatingWebhookConfiguration; this means you may create one with a PUT request.
+// AllowCreateOnUpdate is false for validatingWebhookConfiguration; this means a POST is needed to create one.
 func (validatingWebhookConfigurationStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
