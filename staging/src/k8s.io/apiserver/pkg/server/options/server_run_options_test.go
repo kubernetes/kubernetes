@@ -180,9 +180,9 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
-				ShutdownDelayDuration:       -time.Second,
+				ShutdownDelayDuration:       time.Second,
 			},
-			expectErr: "--advertise-port 843235 must be between 0 and 65535, inclusive. 0 for turning off",
+			expectErr: "--advertise-port 843235 must be between 0 and 65535, inclusive",
 		},
 		{
 			name: "Test when ServerRunOptions is valid",
