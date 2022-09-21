@@ -18,7 +18,6 @@ package args
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/spf13/pflag"
 	"k8s.io/gengo/args"
@@ -35,11 +34,10 @@ type CustomArgs struct {
 // NewDefaults returns default arguments for the generator. Returning the arguments instead
 // of using default flag parsing allows registering custom arguments afterwards
 func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
-	// Default() sets a couple of flag default values for example the boilerplate.
+	// Default() sets a couple of flag default values.
 	// WithoutDefaultFlagParsing() disables implicit addition of command line flags and parsing,
 	// which allows registering custom arguments afterwards
 	genericArgs := args.Default().WithoutDefaultFlagParsing()
-	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kube-openapi/boilerplate/boilerplate.go.txt")
 
 	customArgs := &CustomArgs{}
 	genericArgs.CustomArgs = customArgs
