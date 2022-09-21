@@ -124,7 +124,7 @@ func (s *ServerRunOptions) Validate() []error {
 	errors := []error{}
 
 	if s.AdvertisePort < 0 || s.AdvertisePort > 65535 {
-		errors = append(errors, fmt.Errorf("--advertise-port %v must be between 0 and 65535, inclusive. 0 for turning off", s.AdvertisePort))
+		errors = append(errors, fmt.Errorf("--advertise-port %v must be between 0 and 65535, inclusive", s.AdvertisePort))
 	}
 	if s.LivezGracePeriod < 0 {
 		errors = append(errors, fmt.Errorf("--livez-grace-period can not be a negative value"))
