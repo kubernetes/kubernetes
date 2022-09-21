@@ -627,129 +627,94 @@ func TestMultiAPIServerNodePortAllocation(t *testing.T) {
 
 }
 
-// TestMultiMasterDefaultPort tests that the bind port of the kube-apiserver is then used as targetPort in the kubernetes.default.svc server
-// and also as port in the kubernetes.default.svc endpoints
-func TestMultiMasterDefaultPort(t *testing.T) {
-	var kubeAPIServers []*kubeapiservertesting.TestServer
-	var clientAPIServers []*kubernetes.Clientset
+// TestAPIServerDefaultPort tests that the bind port of the kube-apiserver is then used as targetPort in
+// the kubernetes.default.svc service and also as the port in the kubernetes.default.svc endpoints
+func TestAPIServerDefaultPort(t *testing.T) {
 	etcd := framework.SharedEtcd()
 
-	instanceOptions := &kubeapiservertesting.TestServerInstanceOptions{
-		DisableStorageCleanup: true,
-	}
+	instanceOptions := kubeapiservertesting.NewDefaultTestServerOptions()
 
-	// cleanup the registry storage
-	defer registry.CleanupStorage()
+	// start apiserver
+	t.Log("starting api server")
+	server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{
+		"--endpoint-reconciler-type", "lease",
+		"--advertise-address", fmt.Sprintf("10.0.1.1"),
+	}, etcd)
+	defer server.TearDownFn()
 
-	// create 1 api servers and 1 clients: cannot test with multiple ones because then there would be a conflict as each one has a different bind port configured
-	for i := 0; i < 1; i++ {
-		// start master count api server
-		t.Logf("starting api server: %d", i)
-		server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{
-			"--endpoint-reconciler-type", "lease",
-			"--advertise-address", fmt.Sprintf("10.0.1.%v", i+1),
-		}, etcd)
-		kubeAPIServers = append(kubeAPIServers, server)
-
-		// verify kube API servers have registered and create a client
-		if err := wait.PollImmediate(3*time.Second, 2*time.Minute, func() (bool, error) {
-			client, err := kubernetes.NewForConfig(kubeAPIServers[i].ClientConfig)
-			if err != nil {
-				t.Logf("create client error: %v", err)
-				return false, nil
-			}
-			clientAPIServers = append(clientAPIServers, client)
-			services, err := client.CoreV1().Services("default").Get(context.TODO(), "kubernetes", metav1.GetOptions{})
-			if err != nil {
-				t.Logf("error fetching services: %v", err)
-				return false, nil
-			}
-			if !reflect.DeepEqual([]int{server.ServerOpts.SecureServing.BindPort}, getServiceTargetPorts(services)) {
-				t.Logf("error comparing target port in services with bind port set: Bind port %v vs targetPort %v", server.ServerOpts.SecureServing.BindPort, getServiceTargetPorts(services))
-				return false, nil
-			}
-			endpoints, err := client.CoreV1().Endpoints("default").Get(context.TODO(), "kubernetes", metav1.GetOptions{})
-			if err != nil {
-				t.Logf("error fetching endpoints: %v", err)
-				return false, nil
-			}
-			if !reflect.DeepEqual([]int{server.ServerOpts.SecureServing.BindPort}, getEndpointPorts(endpoints)) {
-				t.Logf("error comparing endpoints port with advertise-port: %v", getEndpointPorts(endpoints))
-				return false, nil
-			}
-			return true, nil
-		}); err != nil {
-			t.Fatalf("did not find only lease endpoints: %v", err)
+	// verify kube API server has registered and create a client
+	if err := wait.PollImmediate(3*time.Second, 2*time.Minute, func() (bool, error) {
+		client, err := kubernetes.NewForConfig(server.ClientConfig)
+		if err != nil {
+			t.Logf("create client error: %v", err)
+			return false, nil
 		}
+		services, err := client.CoreV1().Services("default").Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+		if err != nil {
+			t.Logf("error fetching services: %v", err)
+			return false, nil
+		}
+		if e, a := []int{server.ServerOpts.SecureServing.BindPort}, getServiceTargetPorts(services); !reflect.DeepEqual(e, a) {
+			t.Logf("error comparing target port in services with bind port set: Bind port %v vs targetPort %v", server.ServerOpts.SecureServing.BindPort, a)
+			return false, nil
+		}
+		endpoints, err := client.CoreV1().Endpoints("default").Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+		if err != nil {
+			t.Logf("error fetching endpoints: %v", err)
+			return false, nil
+		}
+		if e, a := []int{server.ServerOpts.SecureServing.BindPort}, getEndpointPorts(endpoints); !reflect.DeepEqual(e, a) {
+			t.Logf("error comparing target port in endpoints with bind port set: Bind port %v vs targetPort %v", server.ServerOpts.SecureServing.BindPort, a)
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatalf("did not find only lease endpoints: %v", err)
 	}
-
-	// shutdown the api servers
-	for _, server := range kubeAPIServers {
-		server.TearDownFn()
-	}
-
 }
 
 // TestMultiMasterAdvertisePort tests that when using the --advertise-port the targetPort in the kubernetes.default.svc server
 // and also as port in the kubernetes.default.svc endpoints and it's the value specified there
-func TestMultiMasterAdvertisePort(t *testing.T) {
-	var kubeAPIServers []*kubeapiservertesting.TestServer
-	var clientAPIServers []*kubernetes.Clientset
+func TestAPIServerAdvertisePort(t *testing.T) {
 	etcd := framework.SharedEtcd()
+	instanceOptions := kubeapiservertesting.NewDefaultTestServerOptions()
 
-	instanceOptions := &kubeapiservertesting.TestServerInstanceOptions{
-		DisableStorageCleanup: true,
-	}
+	// start apiserver
+	t.Log("starting api server")
+	server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{
+		"--endpoint-reconciler-type", "lease",
+		"--advertise-address", fmt.Sprintf("10.0.1.1"),
+		"--advertise-port", "8443",
+	}, etcd)
+	defer server.TearDownFn()
 
-	// cleanup the registry storage
-	defer registry.CleanupStorage()
-
-	// create 2 api servers and 2 clients
-	for i := 0; i < 2; i++ {
-		// start master count api server
-		t.Logf("starting api server: %d", i)
-		server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{
-			"--endpoint-reconciler-type", "lease",
-			"--advertise-address", fmt.Sprintf("10.0.1.%v", i+1),
-			"--advertise-port", "8443",
-		}, etcd)
-		kubeAPIServers = append(kubeAPIServers, server)
-
-		// verify kube API servers have registered and create a client
-		if err := wait.PollImmediate(3*time.Second, 2*time.Minute, func() (bool, error) {
-			client, err := kubernetes.NewForConfig(kubeAPIServers[i].ClientConfig)
-			if err != nil {
-				t.Logf("create client error: %v", err)
-				return false, nil
-			}
-			clientAPIServers = append(clientAPIServers, client)
-			services, err := client.CoreV1().Services("default").Get(context.TODO(), "kubernetes", metav1.GetOptions{})
-			if err != nil {
-				t.Logf("error fetching services: %v", err)
-				return false, nil
-			}
-			if !reflect.DeepEqual([]int{server.ServerOpts.GenericServerRunOptions.AdvertisePort}, getServiceTargetPorts(services)) {
-				t.Logf("error comparing target port in services with advertise-port set: %v", getServiceTargetPorts(services))
-				return false, nil
-			}
-			endpoints, err := client.CoreV1().Endpoints("default").Get(context.TODO(), "kubernetes", metav1.GetOptions{})
-			if err != nil {
-				t.Logf("error fetching endpoints: %v", err)
-				return false, nil
-			}
-			if !reflect.DeepEqual([]int{server.ServerOpts.GenericServerRunOptions.AdvertisePort}, getEndpointPorts(endpoints)) {
-				t.Logf("error comparing endpoints port with advertise-port: %v", getEndpointPorts(endpoints))
-				return false, nil
-			}
-			return true, nil
-		}); err != nil {
-			t.Fatalf("did not find only lease endpoints: %v", err)
+	// verify kube API server has registered and create a client
+	if err := wait.PollImmediate(3*time.Second, 2*time.Minute, func() (bool, error) {
+		client, err := kubernetes.NewForConfig(server.ClientConfig)
+		if err != nil {
+			t.Logf("create client error: %v", err)
+			return false, nil
 		}
+		services, err := client.CoreV1().Services("default").Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+		if err != nil {
+			t.Logf("error fetching services: %v", err)
+			return false, nil
+		}
+		if e, a := []int{server.ServerOpts.SecureServing.BindPort}, getServiceTargetPorts(services); !reflect.DeepEqual(e, a) {
+			t.Logf("error comparing target port in services with bind port set: Bind port %v vs targetPort %v", server.ServerOpts.SecureServing.BindPort, a)
+			return false, nil
+		}
+		endpoints, err := client.CoreV1().Endpoints("default").Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+		if err != nil {
+			t.Logf("error fetching endpoints: %v", err)
+			return false, nil
+		}
+		if e, a := []int{server.ServerOpts.SecureServing.BindPort}, getEndpointPorts(endpoints); !reflect.DeepEqual(e, a) {
+			t.Logf("error comparing target port in endpoints with bind port set: Bind port %v vs targetPort %v", server.ServerOpts.SecureServing.BindPort, a)
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatalf("did not find only lease endpoints: %v", err)
 	}
-
-	// shutdown the api servers
-	for _, server := range kubeAPIServers {
-		server.TearDownFn()
-	}
-
 }
