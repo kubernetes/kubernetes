@@ -22,6 +22,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -33,46 +34,52 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func determineAvoidNoopTimestampUpdatesEnabled() bool {
-	if avoidNoopTimestampUpdatesString, exists := os.LookupEnv("KUBE_APISERVER_AVOID_NOOP_SSA_TIMESTAMP_UPDATES"); exists {
-		if ret, err := strconv.ParseBool(avoidNoopTimestampUpdatesString); err == nil {
-			return ret
-		} else {
-			klog.Errorf("failed to parse envar KUBE_APISERVER_AVOID_NOOP_SSA_TIMESTAMP_UPDATES: %v", err)
-		}
-	}
-
-	// enabled by default
-	return true
-}
-
 var (
-	avoidNoopTimestampUpdatesEnabled = determineAvoidNoopTimestampUpdatesEnabled()
+	avoidTimestampEqualities     conversion.Equalities
+	initAvoidTimestampEqualities sync.Once
 )
+
+func getAvoidTimestampEqualities() conversion.Equalities {
+	initAvoidTimestampEqualities.Do(func() {
+		if avoidNoopTimestampUpdatesString, exists := os.LookupEnv("KUBE_APISERVER_AVOID_NOOP_SSA_TIMESTAMP_UPDATES"); exists {
+			if ret, err := strconv.ParseBool(avoidNoopTimestampUpdatesString); err == nil && !ret {
+				// leave avoidTimestampEqualities empty.
+				return
+			} else {
+				klog.Errorf("failed to parse envar KUBE_APISERVER_AVOID_NOOP_SSA_TIMESTAMP_UPDATES: %v", err)
+			}
+		}
+
+		var eqs = equality.Semantic.Copy()
+		err := eqs.AddFunc(
+			func(a, b metav1.ManagedFieldsEntry) bool {
+				// Two objects' managed fields are equivalent if, ignoring timestamp,
+				//	the objects are deeply equal.
+				a.Time = nil
+				b.Time = nil
+				return reflect.DeepEqual(a, b)
+			},
+		)
+
+		if err != nil {
+			panic(fmt.Errorf("failed to instantiate semantic equalities: %w", err))
+		}
+
+		avoidTimestampEqualities = eqs
+	})
+	return avoidTimestampEqualities
+}
 
 type AvoidNoopTransformer struct {
 	equalities conversion.Equalities
 }
 
 func NewAvoidNoopTransformer(toAdd ...interface{}) (*AvoidNoopTransformer, error) {
-	var eqs = equality.Semantic.Copy()
-	err := eqs.AddFunc(
-		func(a, b metav1.ManagedFieldsEntry) bool {
-			// Two objects' managed fields are equivalent if, ignoring timestamp,
-			//	the objects are deeply equal.
-			a.Time = nil
-			b.Time = nil
-			return reflect.DeepEqual(a, b)
-		},
-	)
+	var eqs = getAvoidTimestampEqualities().Copy()
 
+	err := eqs.AddFuncs(toAdd...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate semantic equalities: %w", err)
-	}
-
-	err = eqs.AddFuncs(toAdd...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate semantic equalities: %w", err)
+		return nil, err
 	}
 
 	return &AvoidNoopTransformer{
@@ -86,7 +93,7 @@ func (a AvoidNoopTransformer) Transform(_ context.Context,
 	newObj runtime.Object,
 	oldObj runtime.Object,
 ) (res runtime.Object, err error) {
-	if !avoidNoopTimestampUpdatesEnabled {
+	if len(a.equalities.Equalities) == 0 {
 		return newObj, nil
 	}
 
