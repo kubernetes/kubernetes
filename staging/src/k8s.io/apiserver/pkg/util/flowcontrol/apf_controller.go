@@ -545,7 +545,7 @@ func (meal *cfgMeal) digestNewPLsLocked(newPLs []*flowcontrol.PriorityLevelConfi
 			state.quiescing = false
 		}
 		if state.pl.Spec.Limited != nil {
-			meal.shareSum += float64(state.pl.Spec.Limited.AssuredConcurrencyShares)
+			meal.shareSum += float64(state.pl.Spec.Limited.NominalConcurrencyShares)
 		}
 		meal.haveExemptPL = meal.haveExemptPL || pl.Name == flowcontrol.PriorityLevelConfigurationNameExempt
 		meal.haveCatchAllPL = meal.haveCatchAllPL || pl.Name == flowcontrol.PriorityLevelConfigurationNameCatchAll
@@ -648,7 +648,7 @@ func (meal *cfgMeal) processOldPLsLocked() {
 			// priority level continues to get a concurrency
 			// allocation determined by all the share values in the
 			// regular way.
-			meal.shareSum += float64(plState.pl.Spec.Limited.AssuredConcurrencyShares)
+			meal.shareSum += float64(plState.pl.Spec.Limited.NominalConcurrencyShares)
 		}
 		meal.haveExemptPL = meal.haveExemptPL || plName == flowcontrol.PriorityLevelConfigurationNameExempt
 		meal.haveCatchAllPL = meal.haveCatchAllPL || plName == flowcontrol.PriorityLevelConfigurationNameCatchAll
@@ -669,7 +669,7 @@ func (meal *cfgMeal) finishQueueSetReconfigsLocked() {
 		// The use of math.Ceil here means that the results might sum
 		// to a little more than serverConcurrencyLimit but the
 		// difference will be negligible.
-		concurrencyLimit := int(math.Ceil(float64(meal.cfgCtlr.serverConcurrencyLimit) * float64(plState.pl.Spec.Limited.AssuredConcurrencyShares) / meal.shareSum))
+		concurrencyLimit := int(math.Ceil(float64(meal.cfgCtlr.serverConcurrencyLimit) * float64(plState.pl.Spec.Limited.NominalConcurrencyShares) / meal.shareSum))
 		metrics.UpdateSharedConcurrencyLimit(plName, concurrencyLimit)
 		meal.maxExecutingRequests += concurrencyLimit
 		var waitLimit int
@@ -679,9 +679,9 @@ func (meal *cfgMeal) finishQueueSetReconfigsLocked() {
 		meal.maxWaitingRequests += waitLimit
 
 		if plState.queues == nil {
-			klog.V(5).Infof("Introducing queues for priority level %q: config=%s, concurrencyLimit=%d, quiescing=%v (shares=%v, shareSum=%v)", plName, fcfmt.Fmt(plState.pl.Spec), concurrencyLimit, plState.quiescing, plState.pl.Spec.Limited.AssuredConcurrencyShares, meal.shareSum)
+			klog.V(5).Infof("Introducing queues for priority level %q: config=%s, concurrencyLimit=%d, quiescing=%v (shares=%v, shareSum=%v)", plName, fcfmt.Fmt(plState.pl.Spec), concurrencyLimit, plState.quiescing, plState.pl.Spec.Limited.NominalConcurrencyShares, meal.shareSum)
 		} else {
-			klog.V(5).Infof("Retaining queues for priority level %q: config=%s, concurrencyLimit=%d, quiescing=%v, numPending=%d (shares=%v, shareSum=%v)", plName, fcfmt.Fmt(plState.pl.Spec), concurrencyLimit, plState.quiescing, plState.numPending, plState.pl.Spec.Limited.AssuredConcurrencyShares, meal.shareSum)
+			klog.V(5).Infof("Retaining queues for priority level %q: config=%s, concurrencyLimit=%d, quiescing=%v, numPending=%d (shares=%v, shareSum=%v)", plName, fcfmt.Fmt(plState.pl.Spec), concurrencyLimit, plState.quiescing, plState.numPending, plState.pl.Spec.Limited.NominalConcurrencyShares, meal.shareSum)
 		}
 		plState.queues = plState.qsCompleter.Complete(fq.DispatchingConfig{ConcurrencyLimit: concurrencyLimit})
 	}
@@ -781,7 +781,7 @@ func (meal *cfgMeal) imaginePL(proto *flowcontrol.PriorityLevelConfiguration, re
 		execSeatsObs:  execSeatsObs,
 	}
 	if proto.Spec.Limited != nil {
-		meal.shareSum += float64(proto.Spec.Limited.AssuredConcurrencyShares)
+		meal.shareSum += float64(proto.Spec.Limited.NominalConcurrencyShares)
 	}
 }
 

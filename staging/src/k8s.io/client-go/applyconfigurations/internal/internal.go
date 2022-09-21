@@ -9346,14 +9346,14 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.flowcontrol.v1beta3.LimitedPriorityLevelConfiguration
   map:
     fields:
-    - name: assuredConcurrencyShares
-      type:
-        scalar: numeric
-      default: 0
     - name: limitResponse
       type:
         namedType: io.k8s.api.flowcontrol.v1beta3.LimitResponse
       default: {}
+    - name: nominalConcurrencyShares
+      type:
+        scalar: numeric
+      default: 0
 - name: io.k8s.api.flowcontrol.v1beta3.NonResourcePolicyRule
   map:
     fields:

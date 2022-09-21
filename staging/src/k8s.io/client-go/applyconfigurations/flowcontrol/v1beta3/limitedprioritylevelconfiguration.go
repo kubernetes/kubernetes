@@ -21,7 +21,7 @@ package v1beta3
 // LimitedPriorityLevelConfigurationApplyConfiguration represents an declarative configuration of the LimitedPriorityLevelConfiguration type for use
 // with apply.
 type LimitedPriorityLevelConfigurationApplyConfiguration struct {
-	AssuredConcurrencyShares *int32                           `json:"assuredConcurrencyShares,omitempty"`
+	NominalConcurrencyShares *int32                           `json:"nominalConcurrencyShares,omitempty"`
 	LimitResponse            *LimitResponseApplyConfiguration `json:"limitResponse,omitempty"`
 }
 
@@ -31,11 +31,11 @@ func LimitedPriorityLevelConfiguration() *LimitedPriorityLevelConfigurationApply
 	return &LimitedPriorityLevelConfigurationApplyConfiguration{}
 }
 
-// WithAssuredConcurrencyShares sets the AssuredConcurrencyShares field in the declarative configuration to the given value
+// WithNominalConcurrencyShares sets the NominalConcurrencyShares field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the AssuredConcurrencyShares field is set to the value of the last call.
-func (b *LimitedPriorityLevelConfigurationApplyConfiguration) WithAssuredConcurrencyShares(value int32) *LimitedPriorityLevelConfigurationApplyConfiguration {
-	b.AssuredConcurrencyShares = &value
+// If called multiple times, the NominalConcurrencyShares field is set to the value of the last call.
+func (b *LimitedPriorityLevelConfigurationApplyConfiguration) WithNominalConcurrencyShares(value int32) *LimitedPriorityLevelConfigurationApplyConfiguration {
+	b.NominalConcurrencyShares = &value
 	return b
 }
 

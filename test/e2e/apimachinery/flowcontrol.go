@@ -256,7 +256,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 
 // createPriorityLevel creates a priority level with the provided assured
 // concurrency share.
-func createPriorityLevel(f *framework.Framework, priorityLevelName string, assuredConcurrencyShares int32) (*flowcontrol.PriorityLevelConfiguration, func()) {
+func createPriorityLevel(f *framework.Framework, priorityLevelName string, nominalConcurrencyShares int32) (*flowcontrol.PriorityLevelConfiguration, func()) {
 	createdPriorityLevel, err := f.ClientSet.FlowcontrolV1beta3().PriorityLevelConfigurations().Create(
 		context.TODO(),
 		&flowcontrol.PriorityLevelConfiguration{
@@ -266,7 +266,7 @@ func createPriorityLevel(f *framework.Framework, priorityLevelName string, assur
 			Spec: flowcontrol.PriorityLevelConfigurationSpec{
 				Type: flowcontrol.PriorityLevelEnablementLimited,
 				Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-					AssuredConcurrencyShares: assuredConcurrencyShares,
+					NominalConcurrencyShares: nominalConcurrencyShares,
 					LimitResponse: flowcontrol.LimitResponse{
 						Type: flowcontrol.LimitResponseTypeReject,
 					},
