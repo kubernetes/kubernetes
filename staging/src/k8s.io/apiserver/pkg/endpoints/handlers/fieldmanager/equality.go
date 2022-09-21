@@ -39,10 +39,10 @@ var (
 	// changed from the previous object.  If it is semantically unchanged, the
 	// write is ignored.
 	//
-	// SemanticEqualities are functions with the signature:
+	// Customqualities are functions with the signature:
 	//		func (a, b T) bool
 	//
-	// SemanticEqualities can be used to control how the change comparison is
+	// Customqualities can be used to control how the change comparison is
 	// performed for a type of object, T
 	CustomEqualities             []interface{}
 	avoidTimestampEqualities     conversion.Equalities
@@ -87,7 +87,8 @@ func getAvoidTimestampEqualities() conversion.Equalities {
 
 // IgnoreManagedFieldsTimestampsTransformer reverts timestamp updates
 // if the non-managed parts of the object are equivalent
-func IgnoreManagedFieldsTimestampsTransformer(_ context.Context,
+func IgnoreManagedFieldsTimestampsTransformer(
+	_ context.Context,
 	newObj runtime.Object,
 	oldObj runtime.Object,
 ) (res runtime.Object, err error) {
