@@ -82,7 +82,6 @@ type APIGroupVersion struct {
 	Namer                 runtime.Namer
 	UnsafeConvertor       runtime.ObjectConvertor
 	TypeConverter         fieldmanager.TypeConverter
-	AvoidNoopTransformer  *fieldmanager.AvoidNoopTransformer
 
 	EquivalentResourceRegistry runtime.EquivalentResourceRegistry
 
