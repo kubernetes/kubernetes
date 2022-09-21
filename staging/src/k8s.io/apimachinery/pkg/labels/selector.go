@@ -74,9 +74,11 @@ type Selector interface {
 	RequiresExactMatch(label string) (value string, found bool)
 }
 
+var everythingSelector Selector = internalSelector{}
+
 // Everything returns a selector that matches all labels.
 func Everything() Selector {
-	return internalSelector{}
+	return everythingSelector
 }
 
 type nothingSelector struct{}
@@ -91,9 +93,11 @@ func (n nothingSelector) RequiresExactMatch(label string) (value string, found b
 	return "", false
 }
 
+var internalNothingSelector Selector = nothingSelector{}
+
 // Nothing returns a selector that matches no labels
 func Nothing() Selector {
-	return nothingSelector{}
+	return internalNothingSelector
 }
 
 // NewSelector returns a nil selector
