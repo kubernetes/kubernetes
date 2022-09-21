@@ -1290,6 +1290,17 @@ func TestFilterPlugins(t *testing.T) {
 			wantStatusMap: framework.PluginToStatus{},
 		},
 		{
+			name: "SkipFilter",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin",
+					inj:  injectedResult{FilterStatus: int(framework.Skip)},
+				},
+			},
+			wantStatus:    nil,
+			wantStatusMap: framework.PluginToStatus{},
+		},
+		{
 			name: "ErrorFilter",
 			plugins: []*TestPlugin{
 				{
