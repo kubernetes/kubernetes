@@ -36,6 +36,7 @@ func (dc *DeploymentController) rolloutRecreate(ctx context.Context, d *apps.Dep
 	activeOldRSs := controller.FilterActiveReplicaSets(oldRSs)
 
 	// scale down old replica sets.
+	//缩容旧的rs
 	scaledDown, err := dc.scaleDownOldReplicaSetsForRecreate(ctx, activeOldRSs, d)
 	if err != nil {
 		return err

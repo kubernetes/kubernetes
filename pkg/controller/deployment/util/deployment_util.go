@@ -231,6 +231,7 @@ func Revision(obj runtime.Object) (int64, error) {
 // copying required deployment annotations to it; it returns true if replica set's annotation is changed.
 func SetNewReplicaSetAnnotations(deployment *apps.Deployment, newRS *apps.ReplicaSet, newRevision string, exists bool, revHistoryLimitInChars int) bool {
 	// First, copy deployment's annotations (except for apply and revision annotations)
+	//copy deployment 的annotation 到 newRS中. annotationChanged true or false
 	annotationChanged := copyDeploymentAnnotationsToReplicaSet(deployment, newRS)
 	// Then, update replica set's revision annotation
 	if newRS.Annotations == nil {
@@ -255,6 +256,8 @@ func SetNewReplicaSetAnnotations(deployment *apps.Deployment, newRS *apps.Replic
 		klog.Warningf("Updating replica set revision NewRevision not int %s", err)
 		return false
 	}
+	//如果rs版本号小于 则更新
+	//为什么复制annotation呢?  创建新的rs的时候
 	if oldRevisionInt < newRevisionInt {
 		newRS.Annotations[RevisionAnnotation] = newRevision
 		annotationChanged = true
@@ -263,15 +266,21 @@ func SetNewReplicaSetAnnotations(deployment *apps.Deployment, newRS *apps.Replic
 	// If a revision annotation already existed and this replica set was updated with a new revision
 	// then that means we are rolling back to this replica set. We need to preserve the old revisions
 	// for historical information.
+	//如果rs存在oldRevision ,且小于 newRevision
 	if ok && oldRevisionInt < newRevisionInt {
+		//获取rs中历史版本
+		//"deployment.kubernetes.io/revision-history"
 		revisionHistoryAnnotation := newRS.Annotations[RevisionHistoryAnnotation]
 		oldRevisions := strings.Split(revisionHistoryAnnotation, ",")
 		if len(oldRevisions[0]) == 0 {
 			newRS.Annotations[RevisionHistoryAnnotation] = oldRevision
 		} else {
+			//字符串长度
 			totalLen := len(revisionHistoryAnnotation) + len(oldRevision) + 1
 			// index for the starting position in oldRevisions
 			start := 0
+			//如果长度超过限制.
+			//删除多少元素, 可以不超标. 不一定删除一个或者两个.
 			for totalLen > revHistoryLimitInChars && start < len(oldRevisions) {
 				totalLen = totalLen - len(oldRevisions[start]) - 1
 				start++
@@ -285,6 +294,7 @@ func SetNewReplicaSetAnnotations(deployment *apps.Deployment, newRS *apps.Replic
 		}
 	}
 	// If the new replica set is about to be created, we need to add replica annotations to it.
+	//不存在最新的rs时走这个逻辑.
 	if !exists && SetReplicasAnnotations(newRS, *(deployment.Spec.Replicas), *(deployment.Spec.Replicas)+MaxSurge(*deployment)) {
 		annotationChanged = true
 	}
@@ -332,7 +342,11 @@ func copyDeploymentAnnotationsToReplicaSet(deployment *apps.Deployment, rs *apps
 // This action should be done if and only if the deployment is rolling back to this rs.
 // Note that apply and revision annotations are not changed.
 func SetDeploymentAnnotationsTo(deployment *apps.Deployment, rollbackToRS *apps.ReplicaSet) {
+	//重新复制deploy的annotations.
+	//将原来的deployment - 跳过的annotations.
 	deployment.Annotations = getSkippedAnnotations(deployment.Annotations)
+	//将rs的annotation复制到deploy中. 跳过revision和replicas相关的annotation.
+	//revision annotation 会在getNewReplicaSet中处理.
 	for k, v := range rollbackToRS.Annotations {
 		if !skipCopyAnnotation(k) {
 			deployment.Annotations[k] = v
@@ -358,6 +372,7 @@ func FindActiveOrLatest(newRS *apps.ReplicaSet, oldRSs []*apps.ReplicaSet) *apps
 	}
 
 	sort.Sort(sort.Reverse(controller.ReplicaSetsByCreationTimestamp(oldRSs)))
+	//所有有副本(pod) 的rs
 	allRSs := controller.FilterActiveReplicaSets(append(oldRSs, newRS))
 
 	switch len(allRSs) {
@@ -465,14 +480,19 @@ func MaxSurge(deployment apps.Deployment) int32 {
 // GetProportion will estimate the proportion for the provided replica set using 1. the current size
 // of the parent deployment, 2. the replica count that needs be added on the replica sets of the
 // deployment, and 3. the total replicas added in the replica sets of the deployment so far.
+//deploymentReplicasToAdd 最大能够添加的数量.
 func GetProportion(rs *apps.ReplicaSet, d apps.Deployment, deploymentReplicasToAdd, deploymentReplicasAdded int32) int32 {
 	if rs == nil || *(rs.Spec.Replicas) == 0 || deploymentReplicasToAdd == 0 || deploymentReplicasToAdd == deploymentReplicasAdded {
 		return int32(0)
 	}
 
+	//根据deploy最大值, 等比例 计算rs的需要增加的量.
+	//如果是减少pod时, rsFraction为负数.
 	rsFraction := getReplicaSetFraction(*rs, d)
+	//deployment 最大添加的pod数量 - rs中已经添加的pod.
 	allowed := deploymentReplicasToAdd - deploymentReplicasAdded
 
+	//如果还有允许添加的量 则返回 增加的量和允许的量最小值
 	if deploymentReplicasToAdd > 0 {
 		// Use the minimum between the replica set fraction and the maximum allowed replicas
 		// when scaling up. This way we ensure we will not scale up more than the allowed
@@ -482,6 +502,7 @@ func GetProportion(rs *apps.ReplicaSet, d apps.Deployment, deploymentReplicasToA
 	// Use the maximum between the replica set fraction and the maximum allowed replicas
 	// when scaling down. This way we ensure we will not scale down more than the allowed
 	// replicas we can remove.
+	//当减少pod时, 都是负数. 所以找最大的.
 	return integer.Int32Max(rsFraction, allowed)
 }
 
@@ -493,7 +514,9 @@ func getReplicaSetFraction(rs apps.ReplicaSet, d apps.Deployment) int32 {
 		return -*(rs.Spec.Replicas)
 	}
 
+	//d最大允许的pod数量.
 	deploymentReplicas := *(d.Spec.Replicas) + MaxSurge(d)
+	//从annotation中获取最大数量.  如果有则以annotation中的值为准.
 	annotatedReplicas, ok := getMaxReplicasAnnotation(&rs)
 	if !ok {
 		// If we cannot find the annotation then fallback to the current deployment size. Note that this
@@ -609,9 +632,11 @@ func EqualIgnoreHash(template1, template2 *v1.PodTemplateSpec) bool {
 
 // FindNewReplicaSet returns the new RS this given deployment targets (the one with the same pod template).
 //在并发场景下可能会存在多个最新的rs. 只返回最旧的且匹配的的rs.
+//如果连续回滚, 出现一样的temp怎么办呢? 相同的temp 应该只能保留一份. 具体需要看看回滚的逻辑.
 func FindNewReplicaSet(deployment *apps.Deployment, rsList []*apps.ReplicaSet) *apps.ReplicaSet {
 	sort.Sort(controller.ReplicaSetsByCreationTimestamp(rsList))
 	for i := range rsList {
+		//忽略hash, 比对rs 的template和deployment.
 		if EqualIgnoreHash(&rsList[i].Spec.Template, &deployment.Spec.Template) {
 			// In rare cases, such as after cluster upgrades, Deployment may end up with
 			// having more than one new ReplicaSets that have the same template as its template,

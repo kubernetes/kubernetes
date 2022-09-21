@@ -35,12 +35,15 @@ func (dc *DeploymentController) rolloutRolling(ctx context.Context, d *apps.Depl
 		return err
 	}
 	allRSs := append(oldRSs, newRS)
+	//先增加再降.
 
 	// Scale up, if we can.
+	//在不超过副本数+ maxSurge情况下, 先进行扩容.
 	scaledUp, err := dc.reconcileNewReplicaSet(ctx, allRSs, newRS, d)
 	if err != nil {
 		return err
 	}
+	//如果需要扩容
 	if scaledUp {
 		// Update DeploymentStatus
 		return dc.syncRolloutStatus(ctx, allRSs, newRS, d)
@@ -71,15 +74,18 @@ func (dc *DeploymentController) reconcileNewReplicaSet(ctx context.Context, allR
 		// Scaling not required.
 		return false, nil
 	}
+	//如果新的rs 副本数量 > deploy 的副本数量. 对rs进行缩容.
 	if *(newRS.Spec.Replicas) > *(deployment.Spec.Replicas) {
 		// Scale down.
 		scaled, _, err := dc.scaleReplicaSetAndRecordEvent(ctx, newRS, *(deployment.Spec.Replicas), deployment)
 		return scaled, err
 	}
+	//获取最新的rs的副本数 . 如果可以扩容, 增加上扩容的量. 如果不可以扩容或者缩容, 则返回原rs 副本数.
 	newReplicasCount, err := deploymentutil.NewRSNewReplicas(deployment, allRSs, newRS)
 	if err != nil {
 		return false, err
 	}
+	//扩容逻辑.
 	scaled, _, err := dc.scaleReplicaSetAndRecordEvent(ctx, newRS, newReplicasCount, deployment)
 	return scaled, err
 }
@@ -91,9 +97,13 @@ func (dc *DeploymentController) reconcileOldReplicaSets(ctx context.Context, all
 		return false, nil
 	}
 
+	//获取所有rs的pod
 	allPodsCount := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
 	klog.V(4).Infof("New replica set %s/%s has %d available pods.", newRS.Namespace, newRS.Name, newRS.Status.AvailableReplicas)
 	maxUnavailable := deploymentutil.MaxUnavailable(*deployment)
+	//有两种情况下会处理旧副本.
+	// 1. 旧的rs中有 unhealthy的
+	// 2. 如果新的rs 已经更新, 且副本都已经ready, 则处理旧的rs.
 
 	// Check if we can scale down. We can scale down in the following 2 cases:
 	// * Some old replica sets have unhealthy replicas, we could safely scale down those unhealthy replicas since that won't further
@@ -115,6 +125,7 @@ func (dc *DeploymentController) reconcileOldReplicaSets(ctx context.Context, all
 	// * Deployment is updated, newRS is created with 3 replicas, oldRS is scaled down to 8, and newRS is scaled up to 5.
 	// * The new replica set pods crashloop and never become available.
 	// * allPodsCount is 13. minAvailable is 8. newRSPodsUnavailable is 5.
+	//如果节点失效. 导致旧rs的pod不可用.
 	// * A node fails and causes one of the oldRS pods to become unavailable. However, 13 - 8 - 5 = 0, so the oldRS won't be scaled down.
 	// * The user notices the crashloop and does kubectl rollout undo to rollback.
 	// * newRSPodsUnavailable is 1, since we rolled back to the good replica set, so maxScaledDown = 13 - 8 - 1 = 4. 4 of the crashlooping pods will be scaled down.
@@ -134,6 +145,7 @@ func (dc *DeploymentController) reconcileOldReplicaSets(ctx context.Context, all
 
 	// Clean up unhealthy replicas first, otherwise unhealthy replicas will block deployment
 	// and cause timeout. See https://github.com/kubernetes/kubernetes/issues/16737
+	//删除unhealthy pod.
 	oldRSs, cleanupCount, err := dc.cleanupUnhealthyReplicas(ctx, oldRSs, deployment, maxScaledDown)
 	if err != nil {
 		return false, nil
@@ -172,7 +184,8 @@ func (dc *DeploymentController) cleanupUnhealthyReplicas(ctx context.Context, ol
 			// no unhealthy replicas found, no scaling required.
 			continue
 		}
-
+		//如果replicas > available 的pod数量. 则删除unhealthy pod.
+		//最多还可以删除多少. rs能删除多少unhealthy pod
 		scaledDownCount := int32(integer.IntMin(int(maxCleanupCount-totalScaledDown), int(*(targetRS.Spec.Replicas)-targetRS.Status.AvailableReplicas)))
 		newReplicasCount := *(targetRS.Spec.Replicas) - scaledDownCount
 		if newReplicasCount > *(targetRS.Spec.Replicas) {
@@ -206,6 +219,7 @@ func (dc *DeploymentController) scaleDownOldReplicaSetsForRollingUpdate(ctx cont
 	sort.Sort(controller.ReplicaSetsByCreationTimestamp(oldRSs))
 
 	totalScaledDown := int32(0)
+	//当前available pod - 最小available的pod数量 就是可以缩容的pod数量.
 	totalScaleDownCount := availablePodCount - minAvailable
 	for _, targetRS := range oldRSs {
 		if totalScaledDown >= totalScaleDownCount {

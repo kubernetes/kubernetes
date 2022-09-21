@@ -98,6 +98,8 @@ func (dc *DeploymentController) syncRolloutStatus(ctx context.Context, allRSs []
 
 	// Move failure conditions of all replica sets in deployment conditions. For now,
 	// only one failure condition is returned from getReplicaFailures.
+	//找到rs ReplicaSetReplicaFailure cond
+	//如果有则更新deploy ReplicaSetReplicaFailure cond
 	if replicaFailureCond := dc.getReplicaFailures(allRSs, newRS); len(replicaFailureCond) > 0 {
 		// There will be only one ReplicaFailure condition on the replica set.
 		util.SetDeploymentCondition(&newStatus, replicaFailureCond[0])
@@ -114,6 +116,7 @@ func (dc *DeploymentController) syncRolloutStatus(ctx context.Context, allRSs []
 
 	newDeployment := d
 	newDeployment.Status = newStatus
+	//更新deploy 状态.
 	_, err := dc.client.AppsV1().Deployments(newDeployment.Namespace).UpdateStatus(ctx, newDeployment, metav1.UpdateOptions{})
 	return err
 }

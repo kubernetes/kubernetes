@@ -614,6 +614,7 @@ func (dc *DeploymentController) syncDeployment(ctx context.Context, key string) 
 
 	// List ReplicaSets owned by this Deployment, while reconciling ControllerRef
 	// through adoption/orphaning.
+	//查找labels相同的rs
 	rsList, err := dc.getReplicaSetsForDeployment(ctx, d)
 	if err != nil {
 		return err
@@ -631,17 +632,22 @@ func (dc *DeploymentController) syncDeployment(ctx context.Context, key string) 
 		return err
 	}
 
+	//如果已经删除则同步状态.
 	if d.DeletionTimestamp != nil {
 		return dc.syncStatusOnly(ctx, d, rsList)
 	}
 
+	//逻辑走到这里说明有删除的时间戳了?!
 	// Update deployment conditions with an Unknown condition when pausing/resuming
 	// a deployment. In this way, we can be sure that we won't timeout when a user
 	// resumes a Deployment with a set progressDeadlineSeconds.
+	//在pause/resume时 会先更新一个Unknown condition. 当用户 设置progressDeadlineSeconds deploy时不会超时
+	//检查当前spec.paused与progressing cond的原因是否为paused.
 	if err = dc.checkPausedConditions(ctx, d); err != nil {
 		return err
 	}
 
+	//如果暂停状态.
 	if d.Spec.Paused {
 		return dc.sync(ctx, d, rsList)
 	}
@@ -649,10 +655,17 @@ func (dc *DeploymentController) syncDeployment(ctx context.Context, key string) 
 	// rollback is not re-entrant in case the underlying replica sets are updated with a new
 	// revision so we should ensure that we won't proceed to update replica sets until we
 	// make sure that the deployment has cleaned up its rollback spec in subsequent enqueues.
+	//当rollback new revision是不可重入的(回滚最近一个版本? ). 所以我们必须clean rollback spec. 然后再更新replica
 	if getRollbackTo(d) != nil {
 		return dc.rollback(ctx, d, rsList)
 	}
 
+	//如果annotation中的desired-replicas 是否等于deploy的 replicas.
+	//筛选有pod的rs
+	//如果此时正在滚动更新呢?
+	//怎么区分扩容和rollout逻辑呢? 说白了, 怎么让rollout逻辑不满足扩容逻辑呢?
+	//rollback 和 rollout 逻辑并不会变更当前副本数.
+	//在rolling过程中所有的rs的replicas应该是一致的.
 	scalingEvent, err := dc.isScalingEvent(ctx, d, rsList)
 	if err != nil {
 		return err
