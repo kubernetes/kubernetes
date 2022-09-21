@@ -3936,7 +3936,6 @@ type ServiceSpec struct {
 	// implementation (e.g. cloud providers) should ignore Services that set this field.
 	// This field can only be set when creating or updating a Service to type 'LoadBalancer'.
 	// Once set, it can not be changed. This field will be wiped when a service is updated to a non 'LoadBalancer' type.
-	// +featureGate=LoadBalancerClass
 	// +optional
 	LoadBalancerClass *string
 

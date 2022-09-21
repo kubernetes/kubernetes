@@ -716,24 +716,6 @@ const (
 	// Subdivide the ClusterIP range for dynamic and static IP allocation.
 	ServiceIPStaticSubrange featuregate.Feature = "ServiceIPStaticSubrange"
 
-	// owner: @andrewsykim @uablrek
-	// kep: http://kep.k8s.io/1864
-	// alpha: v1.20
-	// beta: v1.22
-	// ga: v1.24
-	//
-	// Allows control if NodePorts shall be created for services with "type: LoadBalancer" by defining the spec.AllocateLoadBalancerNodePorts field (bool)
-	ServiceLBNodePortControl featuregate.Feature = "ServiceLBNodePortControl"
-
-	// owner: @andrewsykim @XudongLiuHarold
-	// kep: http://kep.k8s.io/1959
-	// alpha: v1.21
-	// beta: v1.22
-	// GA: v1.24
-	//
-	// Enable support multiple Service "type: LoadBalancer" implementations in a cluster by specifying LoadBalancerClass
-	ServiceLoadBalancerClass featuregate.Feature = "ServiceLoadBalancerClass"
-
 	// owner: @derekwaynecarr
 	// alpha: v1.20
 	// beta: v1.22
@@ -1016,10 +998,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ServiceIPStaticSubrange: {Default: true, PreRelease: featuregate.Beta},
 
 	ServiceInternalTrafficPolicy: {Default: true, PreRelease: featuregate.Beta},
-
-	ServiceLBNodePortControl: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
-
-	ServiceLoadBalancerClass: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
 	SizeMemoryBackedVolumes: {Default: true, PreRelease: featuregate.Beta},
 
