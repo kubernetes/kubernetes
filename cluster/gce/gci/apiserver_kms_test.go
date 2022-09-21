@@ -141,7 +141,7 @@ func TestEncryptionProviderConfig(t *testing.T) {
 func TestKMSIntegration(t *testing.T) {
 	var (
 		socketPath  = "/var/run/kmsplugin"
-		dirOrCreate = v1.HostPathType(v1.HostPathDirectoryOrCreate)
+		dirOrCreate = v1.HostPathDirectoryOrCreate
 		socketName  = "kmssocket"
 	)
 	testCases := []struct {

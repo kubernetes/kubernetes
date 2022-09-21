@@ -166,9 +166,11 @@ type auditTester struct {
 }
 
 func (t *auditTester) testResources(level audit.Level, usrVerbRes ...interface{}) {
-	verbs := []string{}
-	users := []user.Info{}
-	resources := []Resource{}
+	var (
+		verbs     []string
+		users     []user.Info
+		resources []Resource
+	)
 	for _, arg := range usrVerbRes {
 		switch v := arg.(type) {
 		case string:
