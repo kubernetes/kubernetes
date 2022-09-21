@@ -809,11 +809,48 @@ func BenchmarkSelectorFromValidatedSet(b *testing.B) {
 		"foo": "foo",
 		"bar": "bar",
 	}
+	matchee := Set(map[string]string{
+		"foo":   "foo",
+		"bar":   "bar",
+		"extra": "label",
+	})
 
 	for i := 0; i < b.N; i++ {
-		if SelectorFromValidatedSet(set).Empty() {
+		s := SelectorFromValidatedSet(set)
+		if s.Empty() {
 			b.Errorf("Unexpected selector")
 		}
+		if !s.Matches(matchee) {
+			b.Errorf("Unexpected match")
+		}
+	}
+}
+
+func TestSetSelectorString(t *testing.T) {
+	cases := []struct {
+		set Set
+		out string
+	}{
+		{
+			Set{},
+			"",
+		},
+		{
+			Set{"app": "foo"},
+			"app=foo",
+		},
+		{
+			Set{"app": "foo", "a": "b"},
+			"a=b,app=foo",
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.out, func(t *testing.T) {
+			if got := setSelector(tt.set).String(); tt.out != got {
+				t.Fatalf("expected %v, got %v", tt.out, got)
+			}
+		})
 	}
 }
 
@@ -899,19 +936,13 @@ func TestValidatedSelectorFromSet(t *testing.T) {
 	tests := []struct {
 		name             string
 		input            Set
-		expectedSelector internalSelector
+		expectedSelector Selector
 		expectedError    field.ErrorList
 	}{
 		{
-			name:  "Simple Set, no error",
-			input: Set{"key": "val"},
-			expectedSelector: internalSelector{
-				Requirement{
-					key:       "key",
-					operator:  selection.Equals,
-					strValues: []string{"val"},
-				},
-			},
+			name:             "Simple Set, no error",
+			input:            Set{"key": "val"},
+			expectedSelector: setSelector{"key": "val"},
 		},
 		{
 			name:  "Invalid Set, value too long",
