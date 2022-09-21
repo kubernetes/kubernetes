@@ -35,6 +35,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 			name: "Test when MaxRequestsInFlight is negative value",
 			testOptions: &ServerRunOptions{
 				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
+				AdvertisePort:               443,
 				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 				MaxRequestsInFlight:         -400,
 				MaxMutatingRequestsInFlight: 200,
@@ -49,6 +50,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 			name: "Test when MaxMutatingRequestsInFlight is negative value",
 			testOptions: &ServerRunOptions{
 				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
+				AdvertisePort:               443,
 				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 				MaxRequestsInFlight:         400,
 				MaxMutatingRequestsInFlight: -200,
@@ -63,6 +65,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 			name: "Test when RequestTimeout is negative value",
 			testOptions: &ServerRunOptions{
 				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
+				AdvertisePort:               443,
 				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 				MaxRequestsInFlight:         400,
 				MaxMutatingRequestsInFlight: 200,
@@ -77,6 +80,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 			name: "Test when MinRequestTimeout is negative value",
 			testOptions: &ServerRunOptions{
 				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
+				AdvertisePort:               443,
 				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 				MaxRequestsInFlight:         400,
 				MaxMutatingRequestsInFlight: 200,
@@ -91,6 +95,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 			name: "Test when JSONPatchMaxCopyBytes is negative value",
 			testOptions: &ServerRunOptions{
 				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
+				AdvertisePort:               443,
 				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 				MaxRequestsInFlight:         400,
 				MaxMutatingRequestsInFlight: 200,
@@ -105,6 +110,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 			name: "Test when MaxRequestBodyBytes is negative value",
 			testOptions: &ServerRunOptions{
 				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
+				AdvertisePort:               443,
 				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 				MaxRequestsInFlight:         400,
 				MaxMutatingRequestsInFlight: 200,
@@ -119,6 +125,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 			name: "Test when LivezGracePeriod is negative value",
 			testOptions: &ServerRunOptions{
 				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
+				AdvertisePort:               443,
 				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 				MaxRequestsInFlight:         400,
 				MaxMutatingRequestsInFlight: 200,
@@ -134,6 +141,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 			name: "Test when MinimalShutdownDuration is negative value",
 			testOptions: &ServerRunOptions{
 				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
+				AdvertisePort:               443,
 				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 				MaxRequestsInFlight:         400,
 				MaxMutatingRequestsInFlight: 200,
@@ -161,9 +169,26 @@ func TestServerRunOptionsValidate(t *testing.T) {
 			expectErr: "--strict-transport-security-directives invalid, allowed values: max-age=expireTime, includeSubDomains, preload. see https://tools.ietf.org/html/rfc6797#section-6.1 for more information",
 		},
 		{
+			name: "Test when AdvertisePort is too high value",
+			testOptions: &ServerRunOptions{
+				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
+				AdvertisePort:               843235,
+				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
+				MaxRequestsInFlight:         400,
+				MaxMutatingRequestsInFlight: 200,
+				RequestTimeout:              time.Duration(2) * time.Minute,
+				MinRequestTimeout:           1800,
+				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
+				MaxRequestBodyBytes:         10 * 1024 * 1024,
+				ShutdownDelayDuration:       -time.Second,
+			},
+			expectErr: "--advertise-port 843235 must be between 0 and 65535, inclusive. 0 for turning off",
+		},
+		{
 			name: "Test when ServerRunOptions is valid",
 			testOptions: &ServerRunOptions{
 				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
+				AdvertisePort:               443,
 				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 				HSTSDirectives:              []string{"max-age=31536000", "includeSubDomains", "preload"},
 				MaxRequestsInFlight:         400,

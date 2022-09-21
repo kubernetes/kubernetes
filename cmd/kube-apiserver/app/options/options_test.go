@@ -54,6 +54,7 @@ func TestAddFlags(t *testing.T) {
 		"--enable-admission-plugins=AlwaysDeny",
 		"--admission-control-config-file=/admission-control-config",
 		"--advertise-address=192.168.10.10",
+		"--advertise-port=6443",
 		"--allow-privileged=false",
 		"--anonymous-auth=false",
 		"--apiserver-count=5",
@@ -132,6 +133,7 @@ func TestAddFlags(t *testing.T) {
 		AllowPrivileged:        false,
 		GenericServerRunOptions: &apiserveroptions.ServerRunOptions{
 			AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
+			AdvertisePort:               6443,
 			CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 			MaxRequestsInFlight:         400,
 			MaxMutatingRequestsInFlight: 200,

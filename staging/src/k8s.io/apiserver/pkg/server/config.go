@@ -251,6 +251,11 @@ type Config struct {
 	// rejected with a 429 status code and a 'Retry-After' response.
 	ShutdownSendRetryAfter bool
 
+	// AdvertisePort is used when the targetPort and port used in the kubernetes.default.svc service and
+	// endpoint is different than the one used for binding. This configuration is needed in case of a front proxy is
+	// used in front of kube-apiserver
+	AdvertisePort int
+
 	//===========================================================================
 	// values below here are targets for removal
 	//===========================================================================
