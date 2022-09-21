@@ -716,6 +716,9 @@ func (f *frameworkImpl) RunFilterPlugins(
 	statuses := make(framework.PluginToStatus)
 	for _, pl := range f.filterPlugins {
 		pluginStatus := f.runFilterPlugin(ctx, pl, state, pod, nodeInfo)
+		if pluginStatus.IsSkip() {
+			continue
+		}
 		if !pluginStatus.IsSuccess() {
 			if !pluginStatus.IsUnschedulable() {
 				// Filter plugins are not supposed to return any status other than
