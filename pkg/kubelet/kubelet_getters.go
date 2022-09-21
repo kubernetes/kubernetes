@@ -303,7 +303,7 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 	if pathExists, pathErr := mount.PathExists(podVolDir); pathErr != nil {
 		return volumes, fmt.Errorf("error checking if path %q exists: %v", podVolDir, pathErr)
 	} else if !pathExists {
-		klog.InfoS("Path does not exist", "path", podVolDir)
+		klog.V(6).InfoS("Path does not exist", "path", podVolDir)
 		return volumes, nil
 	}
 
