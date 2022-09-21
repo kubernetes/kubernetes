@@ -225,8 +225,8 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, pod *v1.Pod, conta
 	} else {
 		// store/create hashMatch map entry for auth config hash key used to pull the image
 		// for this imageref (digest)
-		digest := m.ensureSecretPulledImage[imageRef]
-		if digest == nil {
+		digest, ok := m.ensureSecretPulledImage[imageRef]
+		if !ok {
 			digest = &ensureSecretPulledImageDigest{HashMatch: make(map[string]bool)}
 			m.ensureSecretPulledImage[imageRef] = digest
 		}
@@ -301,8 +301,8 @@ func (m *imageManager) isEnsuredBySecret(imageRef string, image kubecontainer.Im
 
 		hash := kubecontainer.HashAuth(auth)
 		if hash != "" {
-			digest := m.ensureSecretPulledImage[imageRef]
-			if digest != nil {
+			digest, ok := m.ensureSecretPulledImage[imageRef]
+			if ok {
 				if digest.HashMatch[hash] {
 					ensuredBySecret = true
 					return

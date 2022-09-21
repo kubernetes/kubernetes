@@ -432,14 +432,18 @@ func TestShouldPullImage(t *testing.T) {
 		},
 	}
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEnsureSecretPulledImages, true)()
-
-	for i, test := range tests {
-		sp := shouldPullImage(test.container, test.imagePresent, test.pulledBySecret, test.ensuredBySecret)
-		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
-			assert.Equal(t, test.expectedWithFGOn, sp, "TestCase[%d]: %s ensured image fg enabled", i, test.description)
-		} else {
+	t.Run("disabled_features", func(t *testing.T) {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEnsureSecretPulledImages, false)()
+		for i, test := range tests {
+			sp := shouldPullImage(test.container, test.imagePresent, test.pulledBySecret, test.ensuredBySecret)
 			assert.Equal(t, test.expectedWithFGOff, sp, "TestCase[%d]: %s ensured image fg disabled", i, test.description)
 		}
-	}
+	})
+	t.Run("enabled_features", func(t *testing.T) {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEnsureSecretPulledImages, true)()
+		for i, test := range tests {
+			sp := shouldPullImage(test.container, test.imagePresent, test.pulledBySecret, test.ensuredBySecret)
+			assert.Equal(t, test.expectedWithFGOn, sp, "TestCase[%d]: %s ensured image fg enabled", i, test.description)
+		}
+	})
 }
