@@ -1533,7 +1533,7 @@ profiles:
 					if tc.expectedError != "" && !strings.Contains(err.Error(), tc.expectedError) {
 						t.Errorf("TestName(%s): \ngot err: %s \nnot contains: %s", tc.name, err.Error(), tc.expectedError)
 					}
-					if tc.checkErrFn != nil && true != tc.checkErrFn(err) {
+					if tc.checkErrFn != nil && !tc.checkErrFn(err) {
 						t.Errorf("TestName(%s): got error: %v", tc.name, err)
 					}
 					return

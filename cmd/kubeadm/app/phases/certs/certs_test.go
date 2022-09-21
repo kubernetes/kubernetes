@@ -25,11 +25,11 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
+	"k8s.io/utils/strings/slices"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	certutil "k8s.io/client-go/util/cert"
@@ -739,8 +739,6 @@ func TestNewCSR(t *testing.T) {
 		t.Errorf("invalid signature on CSR: %v", err)
 	}
 
-	sort.Strings(certConfig.Organization)
-	sort.Strings(csr.Subject.Organization)
 	if diff := cmp.Diff(certConfig.Organization, csr.Subject.Organization); diff != "" {
 		t.Errorf("organizations not equal. \ndiff: %s", diff)
 	}
@@ -749,10 +747,10 @@ func TestNewCSR(t *testing.T) {
 		t.Errorf("expected common name %q, got %q", certConfig.CommonName, csr.Subject.CommonName)
 	}
 
-	sort.Strings(certConfig.AltNames.DNSNames)
-	sort.Strings(csr.DNSNames)
-	if diff := cmp.Diff(certConfig.AltNames.DNSNames, csr.DNSNames); diff != "" {
-		t.Errorf("dns names not equal. \ndiff: %s", diff)
+	for _, dnsName := range certConfig.AltNames.DNSNames {
+		if !slices.Contains(csr.DNSNames, dnsName) {
+			t.Fatalf("dns names not equal. want: %v, got: %v", certConfig.AltNames.DNSNames, csr.DNSNames)
+		}
 	}
 
 	if len(csr.IPAddresses) != len(certConfig.AltNames.IPs) {
