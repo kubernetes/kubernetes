@@ -93,12 +93,6 @@ github.com/Microsoft/hcsshim/osversion
 # github.com/NYTimes/gziphandler v1.1.1 => github.com/NYTimes/gziphandler v1.1.1
 ## explicit; go 1.11
 github.com/NYTimes/gziphandler
-# github.com/PuerkitoBio/purell v1.1.1 => github.com/PuerkitoBio/purell v1.1.1
-## explicit
-github.com/PuerkitoBio/purell
-# github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 => github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
-## explicit
-github.com/PuerkitoBio/urlesc
 # github.com/antlr/antlr4/runtime/Go/antlr v1.4.10 => github.com/antlr/antlr4/runtime/Go/antlr v1.4.10
 ## explicit; go 1.16
 github.com/antlr/antlr4/runtime/Go/antlr
@@ -291,9 +285,10 @@ github.com/go-logr/zapr
 # github.com/go-openapi/jsonpointer v0.19.5 => github.com/go-openapi/jsonpointer v0.19.5
 ## explicit; go 1.13
 github.com/go-openapi/jsonpointer
-# github.com/go-openapi/jsonreference v0.19.5 => github.com/go-openapi/jsonreference v0.19.5
+# github.com/go-openapi/jsonreference v0.20.0 => github.com/go-openapi/jsonreference v0.20.0
 ## explicit; go 1.13
 github.com/go-openapi/jsonreference
+github.com/go-openapi/jsonreference/internal
 # github.com/go-openapi/swag v0.19.14 => github.com/go-openapi/swag v0.19.14
 ## explicit; go 1.11
 github.com/go-openapi/swag
@@ -2614,7 +2609,7 @@ sigs.k8s.io/yaml
 # github.com/go-logr/stdr => github.com/go-logr/stdr v1.2.2
 # github.com/go-logr/zapr => github.com/go-logr/zapr v1.2.3
 # github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.5
-# github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.5
+# github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.20.0
 # github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.14
 # github.com/go-stack/stack => github.com/go-stack/stack v1.8.0
 # github.com/go-task/slim-sprig => github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0
