@@ -140,8 +140,6 @@ require (
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
-	github.com/PuerkitoBio/purell v1.1.1 // indirect
-	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr v1.4.10 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -168,7 +166,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-logr/zapr v1.2.3 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
-	github.com/go-openapi/jsonreference v0.19.5 // indirect
+	github.com/go-openapi/jsonreference v0.20.0 // indirect
 	github.com/go-openapi/swag v0.19.14 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 // indirect
 	github.com/gofrs/uuid v4.0.0+incompatible // indirect
@@ -359,7 +357,7 @@ replace (
 	github.com/go-logr/stdr => github.com/go-logr/stdr v1.2.2
 	github.com/go-logr/zapr => github.com/go-logr/zapr v1.2.3
 	github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.5
-	github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.5
+	github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.20.0
 	github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.14
 	github.com/go-stack/stack => github.com/go-stack/stack v1.8.0
 	github.com/go-task/slim-sprig => github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0
