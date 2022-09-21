@@ -255,8 +255,11 @@ name | architectures
 
 ### Bug or Regression
 
+- Allow Label section in vsphere e2e cloudprovider configuration ([#112478](https://github.com/kubernetes/kubernetes/pull/112478), [@gnufied](https://github.com/gnufied)) [SIG Storage and Testing]
 - Correct the calculating error in podTopologySpread plugin to avoid unexpected scheduling results. ([#112531](https://github.com/kubernetes/kubernetes/pull/112531), [@kerthcet](https://github.com/kerthcet)) [SIG Scheduling]
 - Kube-apiserver: gzip compression switched from level 4 to level 1 to improve large list call latencies in exchange for higher network bandwidth usage (10-50% higher). This increases the headroom before very large unpaged list calls exceed request timeout limits. ([#112398](https://github.com/kubernetes/kubernetes/pull/112398), [@shyamjvs](https://github.com/shyamjvs)) [SIG API Machinery]
+- Kube-apiserver: resolved a regression that treated `304 Not Modified` responses from aggregated API servers as internal errors ([#112527](https://github.com/kubernetes/kubernetes/pull/112527), [@liggitt](https://github.com/liggitt)) [SIG API Machinery]
+- Kubeadm: allow RSA and ECDSA format keys in preflight check ([#112534](https://github.com/kubernetes/kubernetes/pull/112534), [@SataQiu](https://github.com/SataQiu)) [SIG Cluster Lifecycle]
 
 ## Dependencies
 
