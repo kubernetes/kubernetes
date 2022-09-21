@@ -35,6 +35,16 @@ import (
 )
 
 var (
+	// For each update, the new object is checked to see if it is semantically
+	// changed from the previous object.  If it is semantically unchanged, the
+	// write is ignored.
+	//
+	// SemanticEqualities are functions with the signature:
+	//		func (a, b T) bool
+	//
+	// SemanticEqualities can be used to control how the change comparison is
+	// performed for a type of object, T
+	CustomEqualities             []interface{}
 	avoidTimestampEqualities     conversion.Equalities
 	initAvoidTimestampEqualities sync.Once
 )
@@ -65,35 +75,24 @@ func getAvoidTimestampEqualities() conversion.Equalities {
 			panic(fmt.Errorf("failed to instantiate semantic equalities: %w", err))
 		}
 
+		err = eqs.AddFuncs(CustomEqualities...)
+		if err != nil {
+			panic(fmt.Errorf("failed to instantiate semantic equalities: %w", err))
+		}
+
 		avoidTimestampEqualities = eqs
 	})
 	return avoidTimestampEqualities
 }
 
-type AvoidNoopTransformer struct {
-	equalities conversion.Equalities
-}
-
-func NewAvoidNoopTransformer(toAdd ...interface{}) (*AvoidNoopTransformer, error) {
-	var eqs = getAvoidTimestampEqualities().Copy()
-
-	err := eqs.AddFuncs(toAdd...)
-	if err != nil {
-		return nil, err
-	}
-
-	return &AvoidNoopTransformer{
-		equalities: eqs,
-	}, nil
-}
-
 // IgnoreManagedFieldsTimestampsTransformer reverts timestamp updates
 // if the non-managed parts of the object are equivalent
-func (a AvoidNoopTransformer) Transform(_ context.Context,
+func IgnoreManagedFieldsTimestampsTransformer(_ context.Context,
 	newObj runtime.Object,
 	oldObj runtime.Object,
 ) (res runtime.Object, err error) {
-	if len(a.equalities.Equalities) == 0 {
+	equalities := getAvoidTimestampEqualities()
+	if len(equalities.Equalities) == 0 {
 		return newObj, nil
 	}
 
@@ -170,11 +169,11 @@ func (a AvoidNoopTransformer) Transform(_ context.Context,
 	// This condition ensures the managed fields are always compared first. If
 	//	this check fails, the if statement will short circuit. If the check
 	// 	succeeds the slow path is taken which compares entire objects.
-	if !a.equalities.DeepEqualWithNilDifferentFromEmpty(oldManagedFields, newManagedFields) {
+	if !equalities.DeepEqualWithNilDifferentFromEmpty(oldManagedFields, newManagedFields) {
 		return newObj, nil
 	}
 
-	if a.equalities.DeepEqualWithNilDifferentFromEmpty(newObj, oldObj) {
+	if equalities.DeepEqualWithNilDifferentFromEmpty(newObj, oldObj) {
 		// Remove any changed timestamps, so that timestamp is not the only
 		// change seen by etcd.
 		//

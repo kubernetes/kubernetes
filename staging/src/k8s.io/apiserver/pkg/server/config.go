@@ -50,7 +50,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/endpoints/filterlatency"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -258,17 +257,6 @@ type Config struct {
 
 	// StorageVersionManager holds the storage versions of the API resources installed by this server.
 	StorageVersionManager storageversion.Manager
-
-	// For each update, the new object is checked to see if it is semantically
-	// changed from the previous object.  If it is semantically unchanged, the
-	// write is ignored.
-	//
-	// SemanticEqualities are functions with the signature:
-	//		func (a, b T) bool
-	//
-	// SemanticEqualities can be used to control how the change comparison is
-	// performed for a type of object, T
-	SemanticEqualities []interface{}
 }
 
 type RecommendedConfig struct {
@@ -672,12 +660,6 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		Version: c.Version,
 
 		muxAndDiscoveryCompleteSignals: map[string]<-chan struct{}{},
-	}
-
-	if noopTransformer, err := fieldmanager.NewAvoidNoopTransformer(c.SemanticEqualities...); err != nil {
-		return nil, err
-	} else {
-		s.noopTransformer = noopTransformer
 	}
 
 	for {

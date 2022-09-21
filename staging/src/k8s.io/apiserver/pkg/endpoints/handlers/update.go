@@ -196,8 +196,8 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 		// like normalized fields, defaulted fields and other
 		// mutations.
 		// Only makes sense when SSA field manager is being used
-		if scope.AvoidNoopTransformer != nil {
-			transformers = append(transformers, scope.AvoidNoopTransformer.Transform)
+		if scope.FieldManager != nil {
+			transformers = append(transformers, fieldmanager.IgnoreManagedFieldsTimestampsTransformer)
 		}
 
 		createAuthorizerAttributes := authorizer.AttributesRecord{
