@@ -39,9 +39,7 @@ func TestFlags(t *testing.T) {
 	fs.SetOutput(&output)
 	fs.PrintDefaults()
 	want := `      --log-flush-frequency duration   Maximum number of seconds between log flushes (default 5s)
-      --logging-format string          Sets the log format. Permitted formats: "text".
-                                       Non-default formats don't honor these flags: --add-dir-header, --alsologtostderr, --log-backtrace-at, --log-dir, --log-file, --log-file-max-size, --logtostderr, --one-output, --skip-headers, --skip-log-headers, --stderrthreshold, --vmodule.
-                                       Non-default choices are currently alpha and subject to change without warning. (default "text")
+      --logging-format string          Sets the log format. Permitted formats: "text". (default "text")
   -v, --v Level                        number for the log level verbosity
       --vmodule pattern=N,...          comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)
 `
