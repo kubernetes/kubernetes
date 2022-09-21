@@ -66,7 +66,7 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 		})
 	})
 
-	ginkgo.Describe("[Serial] [Slow] ReplicaSet", func() {
+	ginkgo.Describe("[Serial] [Slow] [TEMPTEST] ReplicaSet", func() {
 		ginkgo.It(titleUp, func() {
 			scaleUp("rs", e2eautoscaling.KindReplicaSet, cpuResource, utilizationMetricType, false, f)
 		})

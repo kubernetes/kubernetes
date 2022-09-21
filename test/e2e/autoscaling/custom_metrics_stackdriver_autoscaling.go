@@ -322,12 +322,14 @@ var _ = SIGDescribe("[HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod aut
 
 		ginkgo.It("should not scale down when one metric is missing (Container Resource and External Metrics)", func() {
 			initialReplicas := 2
+			metric1Value := externalMetricValue
+			metric1Target := 3 * metric1Value
 			// First metric a container resource metric which is missing.
 			// Second metric is external metric which is present, it should cause scale down if the first metric wasn't missing.
 			metricSpecs := []autoscalingv2.MetricSpec{
 				containerResourceMetricSpecWithAverageUtilizationTarget("container-resource-metric", 50),
 				externalMetricSpecWithTarget("external_metric", externalMetricTarget{
-					value:     2 * externalMetricValue,
+					value:     metric1Target,
 					isAverage: false,
 				}),
 			}
@@ -335,7 +337,7 @@ var _ = SIGDescribe("[HPA] [Feature:CustomMetricsAutoscaling] Horizontal pod aut
 				{
 					Name:        "stackdriver-exporter-metric",
 					MetricName:  "external_metric",
-					MetricValue: externalMetricValue,
+					MetricValue: metric1Value,
 				},
 				// Container Resource metric is missing from here.
 			}
@@ -452,7 +454,7 @@ func (tc *CustomMetricTestCase) Run() {
 	waitForReplicas(tc.deployment.ObjectMeta.Name, tc.framework.Namespace.ObjectMeta.Name, tc.kubeClient, 15*time.Minute, tc.scaledReplicas)
 
 	if tc.verifyStability {
-		ensureDesiredReplicasInRange(tc.deployment.ObjectMeta.Name, tc.framework.Namespace.ObjectMeta.Name, tc.kubeClient, tc.scaledReplicas, tc.scaledReplicas, 10*time.Minute)
+		ensureDesiredReplicasInRange(tc.deployment.ObjectMeta.Name, tc.framework.Namespace.ObjectMeta.Name, tc.kubeClient, tc.scaledReplicas, tc.scaledReplicas, 5*time.Minute)
 	}
 }
 
