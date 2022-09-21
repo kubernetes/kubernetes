@@ -169,7 +169,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 			expectErr: "--strict-transport-security-directives invalid, allowed values: max-age=expireTime, includeSubDomains, preload. see https://tools.ietf.org/html/rfc6797#section-6.1 for more information",
 		},
 		{
-			name: "Test when AdvertisePort is too high value",
+			name: "Test when PublicPort is too high value",
 			testOptions: &ServerRunOptions{
 				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
 				AdvertisePort:               843235,

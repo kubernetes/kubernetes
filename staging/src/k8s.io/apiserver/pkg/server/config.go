@@ -251,11 +251,6 @@ type Config struct {
 	// rejected with a 429 status code and a 'Retry-After' response.
 	ShutdownSendRetryAfter bool
 
-	// AdvertisePort is used when the targetPort and port used in the kubernetes.default.svc service and
-	// endpoint is different than the one used for binding. This configuration is needed in case of a front proxy is
-	// used in front of kube-apiserver
-	AdvertisePort int
-
 	//===========================================================================
 	// values below here are targets for removal
 	//===========================================================================
@@ -264,6 +259,11 @@ type Config struct {
 	// kube-proxy, services, etc.) can reach the GenericAPIServer.
 	// If nil or 0.0.0.0, the host's default interface will be used.
 	PublicAddress net.IP
+
+	// PublicPort is used when the targetPort and port used in the kubernetes.default.svc service and
+	// endpoint is different than the one used for binding. This configuration is needed in case of a front proxy is
+	// used in front of kube-apiserver.
+	PublicPort int
 
 	// EquivalentResourceRegistry provides information about resources equivalent to a given resource,
 	// and the kind associated with a given resource. As resources are installed, they are registered here.

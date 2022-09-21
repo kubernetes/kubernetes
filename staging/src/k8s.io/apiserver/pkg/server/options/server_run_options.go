@@ -97,7 +97,7 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.MaxRequestBodyBytes = s.MaxRequestBodyBytes
 	c.PublicAddress = s.AdvertiseAddress
 	c.ShutdownSendRetryAfter = s.ShutdownSendRetryAfter
-	c.AdvertisePort = s.AdvertisePort
+	c.PublicPort = s.AdvertisePort
 	return nil
 }
 
