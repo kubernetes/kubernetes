@@ -416,6 +416,8 @@ name | architectures
 ### Bug or Regression
 
 - Kube-apiserver: gzip compression switched from level 4 to level 1 to improve large list call latencies in exchange for higher network bandwidth usage (10-50% higher). This increases the headroom before very large unpaged list calls exceed request timeout limits. ([#112400](https://github.com/kubernetes/kubernetes/pull/112400), [@shyamjvs](https://github.com/shyamjvs)) [SIG API Machinery]
+- Kube-apiserver: resolved a regression that treated `304 Not Modified` responses from aggregated API servers as internal errors ([#112529](https://github.com/kubernetes/kubernetes/pull/112529), [@liggitt](https://github.com/liggitt)) [SIG API Machinery]
+- Kubeadm: allow RSA and ECDSA format keys in preflight check ([#112536](https://github.com/kubernetes/kubernetes/pull/112536), [@SataQiu](https://github.com/SataQiu)) [SIG Cluster Lifecycle]
 
 ## Dependencies
 
