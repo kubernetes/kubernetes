@@ -30,7 +30,7 @@ const (
 	PriorityLevelConfigurationDefaultHandSize                 int32 = 8
 	PriorityLevelConfigurationDefaultQueues                   int32 = 64
 	PriorityLevelConfigurationDefaultQueueLengthLimit         int32 = 50
-	PriorityLevelConfigurationDefaultAssuredConcurrencyShares int32 = 30
+	PriorityLevelConfigurationDefaultNominalConcurrencyShares int32 = 30
 )
 
 // SetDefaults_FlowSchema sets default values for flow schema
@@ -41,8 +41,8 @@ func SetDefaults_FlowSchemaSpec(spec *v1beta3.FlowSchemaSpec) {
 }
 
 func SetDefaults_LimitedPriorityLevelConfiguration(lplc *v1beta3.LimitedPriorityLevelConfiguration) {
-	if lplc.AssuredConcurrencyShares == 0 {
-		lplc.AssuredConcurrencyShares = PriorityLevelConfigurationDefaultAssuredConcurrencyShares
+	if lplc.NominalConcurrencyShares == 0 {
+		lplc.NominalConcurrencyShares = PriorityLevelConfigurationDefaultNominalConcurrencyShares
 	}
 }
 

@@ -1268,7 +1268,7 @@ func newConfiguration(fsName, plName, user string, concurrency int32, queueLengt
 		Spec: flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				AssuredConcurrencyShares: concurrency,
+				NominalConcurrencyShares: concurrency,
 				LimitResponse: flowcontrol.LimitResponse{
 					Type:    responseType,
 					Queuing: qcfg,

@@ -22,7 +22,12 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
+	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
+	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
@@ -910,7 +915,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 	badSpec := flowcontrol.PriorityLevelConfigurationSpec{
 		Type: flowcontrol.PriorityLevelEnablementLimited,
 		Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-			AssuredConcurrencyShares: 42,
+			NominalConcurrencyShares: 42,
 			LimitResponse: flowcontrol.LimitResponse{
 				Type: flowcontrol.LimitResponseTypeReject},
 		},
@@ -966,7 +971,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
 					Type: flowcontrol.PriorityLevelEnablementLimited,
 					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-						AssuredConcurrencyShares: 42,
+						NominalConcurrencyShares: 42,
 						LimitResponse: flowcontrol.LimitResponse{
 							Type: flowcontrol.LimitResponseTypeReject},
 					},
@@ -983,7 +988,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
 					Type: flowcontrol.PriorityLevelEnablementLimited,
 					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-						AssuredConcurrencyShares: 100,
+						NominalConcurrencyShares: 100,
 						LimitResponse: flowcontrol.LimitResponse{
 							Type: flowcontrol.LimitResponseTypeReject,
 							Queuing: &flowcontrol.QueuingConfiguration{
@@ -1013,7 +1018,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
 					Type: flowcontrol.PriorityLevelEnablementLimited,
 					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-						AssuredConcurrencyShares: 5,
+						NominalConcurrencyShares: 5,
 						LimitResponse: flowcontrol.LimitResponse{
 							Type: flowcontrol.LimitResponseTypeReject,
 						}}},
@@ -1029,7 +1034,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
 					Type: flowcontrol.PriorityLevelEnablementLimited,
 					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-						AssuredConcurrencyShares: 100,
+						NominalConcurrencyShares: 100,
 						LimitResponse: flowcontrol.LimitResponse{
 							Type: flowcontrol.LimitResponseTypeQueue,
 						}}},
@@ -1045,7 +1050,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
 					Type: flowcontrol.PriorityLevelEnablementLimited,
 					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-						AssuredConcurrencyShares: 100,
+						NominalConcurrencyShares: 100,
 						LimitResponse: flowcontrol.LimitResponse{
 							Type: flowcontrol.LimitResponseTypeQueue,
 							Queuing: &flowcontrol.QueuingConfiguration{
@@ -1065,7 +1070,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
 					Type: flowcontrol.PriorityLevelEnablementLimited,
 					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-						AssuredConcurrencyShares: 100,
+						NominalConcurrencyShares: 100,
 						LimitResponse: flowcontrol.LimitResponse{
 							Type: flowcontrol.LimitResponseTypeQueue,
 							Queuing: &flowcontrol.QueuingConfiguration{
@@ -1087,7 +1092,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
 					Type: flowcontrol.PriorityLevelEnablementLimited,
 					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-						AssuredConcurrencyShares: 100,
+						NominalConcurrencyShares: 100,
 						LimitResponse: flowcontrol.LimitResponse{
 							Type: flowcontrol.LimitResponseTypeQueue,
 							Queuing: &flowcontrol.QueuingConfiguration{
@@ -1109,7 +1114,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
 					Type: flowcontrol.PriorityLevelEnablementLimited,
 					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-						AssuredConcurrencyShares: 100,
+						NominalConcurrencyShares: 100,
 						LimitResponse: flowcontrol.LimitResponse{
 							Type: flowcontrol.LimitResponseTypeQueue,
 							Queuing: &flowcontrol.QueuingConfiguration{
@@ -1132,7 +1137,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
 					Type: flowcontrol.PriorityLevelEnablementLimited,
 					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-						AssuredConcurrencyShares: 100,
+						NominalConcurrencyShares: 100,
 						LimitResponse: flowcontrol.LimitResponse{
 							Type: flowcontrol.LimitResponseTypeQueue,
 							Queuing: &flowcontrol.QueuingConfiguration{
@@ -1152,7 +1157,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
 					Type: flowcontrol.PriorityLevelEnablementLimited,
 					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-						AssuredConcurrencyShares: 100,
+						NominalConcurrencyShares: 100,
 						LimitResponse: flowcontrol.LimitResponse{
 							Type: flowcontrol.LimitResponseTypeQueue,
 							Queuing: &flowcontrol.QueuingConfiguration{
@@ -1168,7 +1173,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			errs := ValidatePriorityLevelConfiguration(testCase.priorityLevelConfiguration)
+			errs := ValidatePriorityLevelConfiguration(testCase.priorityLevelConfiguration, flowcontrolv1beta3.SchemeGroupVersion)
 			if !assert.ElementsMatch(t, testCase.expectedErrors, errs) {
 				t.Logf("mismatch: %v", cmp.Diff(testCase.expectedErrors, errs))
 			}
@@ -1355,6 +1360,77 @@ func TestValidateNonResourceURLPath(t *testing.T) {
 			err := ValidateNonResourceURLPath(testCase.path, field.NewPath(""))
 			assert.Equal(t, testCase.expectingError, err != nil,
 				"actual error: %v", err)
+		})
+	}
+}
+
+func TestValidateLimitedPriorityLevelConfiguration(t *testing.T) {
+	errExpectedFn := func(fieldName string) field.ErrorList {
+		return field.ErrorList{
+			field.Invalid(field.NewPath("spec").Child("limited").Child(fieldName), int32(0), "must be positive"),
+		}
+	}
+
+	tests := []struct {
+		requestVersion    schema.GroupVersion
+		concurrencyShares int32
+		errExpected       field.ErrorList
+	}{
+		{
+			requestVersion:    flowcontrolv1alpha1.SchemeGroupVersion,
+			concurrencyShares: 0,
+			errExpected:       errExpectedFn("assuredConcurrencyShares"),
+		},
+		{
+			requestVersion:    flowcontrolv1beta1.SchemeGroupVersion,
+			concurrencyShares: 0,
+			errExpected:       errExpectedFn("assuredConcurrencyShares"),
+		},
+		{
+			requestVersion:    flowcontrolv1beta2.SchemeGroupVersion,
+			concurrencyShares: 0,
+			errExpected:       errExpectedFn("assuredConcurrencyShares"),
+		},
+		{
+			requestVersion:    flowcontrolv1beta3.SchemeGroupVersion,
+			concurrencyShares: 0,
+			errExpected:       errExpectedFn("nominalConcurrencyShares"),
+		},
+		{
+			// let's simulate a post v1beta3 version, we expect the
+			// error to return the new field introduced in v1beta3.
+			requestVersion:    schema.GroupVersion{Group: flowcontrolv1beta3.GroupName, Version: "v1"},
+			concurrencyShares: 0,
+			errExpected:       errExpectedFn("nominalConcurrencyShares"),
+		},
+		{
+			// this should never really happen in real life, the request
+			// context should always contain the request {group, version}
+			requestVersion:    schema.GroupVersion{},
+			concurrencyShares: 0,
+			errExpected:       errExpectedFn("nominalConcurrencyShares"),
+		},
+		{
+			requestVersion:    flowcontrolv1beta3.SchemeGroupVersion,
+			concurrencyShares: 100,
+			errExpected:       nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.requestVersion.String(), func(t *testing.T) {
+			configuration := &flowcontrol.LimitedPriorityLevelConfiguration{
+				NominalConcurrencyShares: test.concurrencyShares,
+				LimitResponse: flowcontrol.LimitResponse{
+					Type: flowcontrol.LimitResponseTypeReject,
+				},
+			}
+			specPath := field.NewPath("spec").Child("limited")
+
+			errGot := ValidateLimitedPriorityLevelConfiguration(configuration, test.requestVersion, specPath)
+			if !cmp.Equal(test.errExpected, errGot) {
+				t.Errorf("Expected error: %v, diff: %s", test.errExpected, cmp.Diff(test.errExpected, errGot))
+			}
 		})
 	}
 }

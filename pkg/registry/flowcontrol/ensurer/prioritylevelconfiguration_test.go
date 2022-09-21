@@ -248,7 +248,7 @@ func TestPriorityLevelSpecChanged(t *testing.T) {
 		Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
 			Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
 			Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
-				AssuredConcurrencyShares: 1,
+				NominalConcurrencyShares: 1,
 			},
 		},
 	}
@@ -256,7 +256,7 @@ func TestPriorityLevelSpecChanged(t *testing.T) {
 		Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
 			Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
 			Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
-				AssuredConcurrencyShares: flowcontrolapisv1beta3.PriorityLevelConfigurationDefaultAssuredConcurrencyShares,
+				NominalConcurrencyShares: flowcontrolapisv1beta3.PriorityLevelConfigurationDefaultNominalConcurrencyShares,
 				LimitResponse: flowcontrolv1beta3.LimitResponse{
 					Type: flowcontrolv1beta3.LimitResponseTypeReject,
 				},
@@ -468,10 +468,10 @@ func (b *plBuilder) WithAutoUpdateAnnotation(value string) *plBuilder {
 	return b
 }
 
-func (b *plBuilder) WithLimited(assuredConcurrencyShares int32) *plBuilder {
+func (b *plBuilder) WithLimited(nominalConcurrencyShares int32) *plBuilder {
 	b.object.Spec.Type = flowcontrolv1beta3.PriorityLevelEnablementLimited
 	b.object.Spec.Limited = &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
-		AssuredConcurrencyShares: assuredConcurrencyShares,
+		NominalConcurrencyShares: nominalConcurrencyShares,
 		LimitResponse: flowcontrolv1beta3.LimitResponse{
 			Type: flowcontrolv1beta3.LimitResponseTypeReject,
 		},

@@ -237,7 +237,7 @@ func createPriorityLevelAndBindingFlowSchemaForUser(c clientset.Interface, usern
 		Spec: flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				AssuredConcurrencyShares: int32(concurrencyShares),
+				NominalConcurrencyShares: int32(concurrencyShares),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{
