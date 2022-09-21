@@ -101,8 +101,8 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 		}
 	}
 
-	if c.GenericConfig.AdvertisePort > 0 {
-		publicServicePort = int(c.GenericConfig.AdvertisePort)
+	if c.GenericConfig.PublicPort > 0 {
+		publicServicePort = int(c.GenericConfig.PublicPort)
 	}
 
 	systemNamespaces := []string{metav1.NamespaceSystem, metav1.NamespacePublic, corev1.NamespaceNodeLease}
