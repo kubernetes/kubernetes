@@ -100,6 +100,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	if !ok {
 		klog.Fatalf("Wrong CustomArgs type: %T", arguments.CustomArgs)
 	}
+	includedTypesOverrides := customArgs.IncludedTypesOverrides
 
 	internalVersionPackagePath := filepath.Join(arguments.OutputPackagePath)
 	externalVersionPackagePath := filepath.Join(arguments.OutputPackagePath)
@@ -160,10 +161,25 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		}
 
 		var typesToGenerate []*types.Type
-		for _, t := range p.Types {
-			tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
-			if !tags.GenerateClient || tags.NoVerbs || !tags.HasVerb("list") || !tags.HasVerb("watch") {
-				continue
+		for n, t := range p.Types {
+			// filter out types which are not included in user specified overrides.
+			typesOverride, ok := includedTypesOverrides[gv]
+			if ok {
+				found := false
+				for _, typeStr := range typesOverride {
+					if typeStr == n {
+						found = true
+						break
+					}
+				}
+				if !found {
+					continue
+				}
+			} else {
+				tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
+				if !tags.GenerateClient || tags.NoVerbs || !tags.HasVerb("list") || !tags.HasVerb("watch") {
+					continue
+				}
 			}
 
 			typesToGenerate = append(typesToGenerate, t)

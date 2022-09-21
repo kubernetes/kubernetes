@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
+	listergenargs "k8s.io/code-generator/cmd/lister-gen/args"
 
 	"k8s.io/klog/v2"
 )
@@ -65,6 +66,12 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
+
+	customArgs, ok := arguments.CustomArgs.(*listergenargs.CustomArgs)
+	if !ok {
+		klog.Fatalf("Wrong CustomArgs type: %T", arguments.CustomArgs)
+	}
+	includedTypesOverrides := customArgs.IncludedTypesOverrides
 
 	var packageList generator.Packages
 	for _, inputDir := range arguments.InputDirs {
@@ -106,11 +113,27 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		}
 
 		var typesToGenerate []*types.Type
-		for _, t := range p.Types {
-			tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
-			if !tags.GenerateClient || !tags.HasVerb("list") || !tags.HasVerb("get") {
-				continue
+		for n, t := range p.Types {
+			// filter out types which are not included in user specified overrides.
+			typesOverride, ok := includedTypesOverrides[gv]
+			if ok {
+				found := false
+				for _, typeStr := range typesOverride {
+					if typeStr == n {
+						found = true
+						break
+					}
+				}
+				if !found {
+					continue
+				}
+			} else {
+				tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
+				if !tags.GenerateClient || !tags.HasVerb("list") || !tags.HasVerb("get") {
+					continue
+				}
 			}
+
 			typesToGenerate = append(typesToGenerate, t)
 		}
 		if len(typesToGenerate) == 0 {
