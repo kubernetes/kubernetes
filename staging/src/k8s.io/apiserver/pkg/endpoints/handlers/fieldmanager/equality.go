@@ -35,16 +35,6 @@ import (
 )
 
 var (
-	// For each update, the new object is checked to see if it is semantically
-	// changed from the previous object.  If it is semantically unchanged, the
-	// write is ignored.
-	//
-	// Customqualities are functions with the signature:
-	//		func (a, b T) bool
-	//
-	// Customqualities can be used to control how the change comparison is
-	// performed for a type of object, T
-	CustomEqualities             []interface{}
 	avoidTimestampEqualities     conversion.Equalities
 	initAvoidTimestampEqualities sync.Once
 )
@@ -71,11 +61,6 @@ func getAvoidTimestampEqualities() conversion.Equalities {
 			},
 		)
 
-		if err != nil {
-			panic(fmt.Errorf("failed to instantiate semantic equalities: %w", err))
-		}
-
-		err = eqs.AddFuncs(CustomEqualities...)
 		if err != nil {
 			panic(fmt.Errorf("failed to instantiate semantic equalities: %w", err))
 		}
