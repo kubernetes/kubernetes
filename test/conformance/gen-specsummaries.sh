@@ -23,9 +23,6 @@ KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")"/../.. && pwd -P)
 cd "${KUBE_ROOT}"
 
 # build ginkgo and e2e.test
-# NOTE: we do *not* use `make WHAT=...` because we do *not* want to be running
-# make generated_files when diffing things (see: hack/verify-conformance-yaml.sh)
-# other update/verify already handle the generated files
 hack/make-rules/build.sh github.com/onsi/ginkgo/v2/ginkgo test/e2e/e2e.test
 
 # dump spec
