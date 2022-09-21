@@ -23,17 +23,6 @@ import (
 	"regexp"
 )
 
-// QuotaID is generic quota identifier.
-// Data type based on quotactl(2).
-type QuotaID int32
-
-const (
-	// UnknownQuotaID -- cannot determine whether a quota is in force
-	UnknownQuotaID QuotaID = -1
-	// BadQuotaID -- Invalid quota
-	BadQuotaID QuotaID = 0
-)
-
 // QuotaType -- type of quota to be applied
 type QuotaType int
 
