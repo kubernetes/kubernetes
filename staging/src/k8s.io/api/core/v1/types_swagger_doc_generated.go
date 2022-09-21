@@ -1189,7 +1189,7 @@ var map_NodeSpec = map[string]string{
 	"providerID":    "ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>",
 	"unschedulable": "Unschedulable controls node schedulability of new pods. By default, node is schedulable. More info: https://kubernetes.io/docs/concepts/nodes/node/#manual-node-administration",
 	"taints":        "If specified, the node's taints.",
-	"configSource":  "Deprecated: Previously used to specify the source of the node's configuration for the DynamicKubeletConfig feature. This feature is removed from Kubelets as of 1.24 and will be fully removed in 1.26.",
+	"configSource":  "Deprecated: Previously used to specify the source of the node's configuration for the DynamicKubeletConfig feature. This feature is removed.",
 	"externalID":    "Deprecated. Not all kubelets will set this field. Remove field after 1.13. see: https://issues.k8s.io/61966",
 }
 
