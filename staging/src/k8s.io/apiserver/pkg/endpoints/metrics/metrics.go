@@ -114,6 +114,21 @@ var (
 			// dependant on user configuration.
 			Buckets: []float64{0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3,
 				4, 5, 6, 8, 10, 15, 20, 30, 45, 60},
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.27.0",
+		},
+		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
+	)
+	requestSliLatencies = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Subsystem: APIServerComponent,
+			Name:      "request_sli_duration_seconds",
+			Help:      "Response latency distribution (not counting webhook duration) in seconds for each verb, group, version, resource, subresource, scope and component.",
+			// This metric is supplementary to the requestLatencies metric.
+			// It measures request duration excluding webhooks as they are mostly
+			// dependant on user configuration.
+			Buckets: []float64{0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3,
+				4, 5, 6, 8, 10, 15, 20, 30, 45, 60},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
@@ -273,6 +288,7 @@ var (
 		longRunningRequestsGauge,
 		requestLatencies,
 		requestSloLatencies,
+		requestSliLatencies,
 		fieldValidationRequestLatencies,
 		responseSizes,
 		TLSHandshakeErrors,
@@ -519,8 +535,9 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 	fieldValidationRequestLatencies.WithContext(req.Context()).WithLabelValues(fieldValidation, fieldValidationEnabled)
 
 	if wd, ok := request.LatencyTrackersFrom(req.Context()); ok {
-		sloLatency := elapsedSeconds - (wd.MutatingWebhookTracker.GetLatency() + wd.ValidatingWebhookTracker.GetLatency()).Seconds()
-		requestSloLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(sloLatency)
+		sliLatency := elapsedSeconds - (wd.MutatingWebhookTracker.GetLatency() + wd.ValidatingWebhookTracker.GetLatency()).Seconds()
+		requestSloLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(sliLatency)
+		requestSliLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(sliLatency)
 	}
 	// We are only interested in response sizes of read requests.
 	if verb == "GET" || verb == "LIST" {
