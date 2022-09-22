@@ -63,35 +63,40 @@ type RuntimeHelper interface {
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
 // TODO(yifan): Think about how to refactor this.
-func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus *PodStatus) bool {
+func ShouldContainerBeRestarted(pod *v1.Pod, containerStatus *Status, isInitContainer bool) bool {
+	// If the init container is terminated with exit code 0, it won't be restarted.
+	if isInitContainer {
+		if containerStatus != nil && containerStatus.State == ContainerStateExited && containerStatus.ExitCode == 0 {
+			return false
+		}
+	}
 	// Once a pod has been marked deleted, it should not be restarted
 	if pod.DeletionTimestamp != nil {
 		return false
 	}
-	// Get latest container status.
-	status := podStatus.FindContainerStatusByName(container.Name)
+
 	// If the container was never started before, we should start it.
 	// NOTE(random-liu): If all historical containers were GC'd, we'll also return true here.
-	if status == nil {
+	if containerStatus == nil {
 		return true
 	}
 	// Check whether container is running
-	if status.State == ContainerStateRunning {
+	if containerStatus.State == ContainerStateRunning {
 		return false
 	}
 	// Always restart container in the unknown, or in the created state.
-	if status.State == ContainerStateUnknown || status.State == ContainerStateCreated {
+	if containerStatus.State == ContainerStateUnknown || containerStatus.State == ContainerStateCreated {
 		return true
 	}
 	// Check RestartPolicy for dead container
 	if pod.Spec.RestartPolicy == v1.RestartPolicyNever {
-		klog.V(4).InfoS("Already ran container, do nothing", "pod", klog.KObj(pod), "containerName", container.Name)
+		klog.V(4).InfoS("Already ran container, do nothing", "pod", klog.KObj(pod), "containerName", containerStatus.Name)
 		return false
 	}
 	if pod.Spec.RestartPolicy == v1.RestartPolicyOnFailure {
 		// Check the exit code.
-		if status.ExitCode == 0 {
-			klog.V(4).InfoS("Already successfully ran container, do nothing", "pod", klog.KObj(pod), "containerName", container.Name)
+		if containerStatus.ExitCode == 0 {
+			klog.V(4).InfoS("Already successfully ran container, do nothing", "pod", klog.KObj(pod), "containerName", containerStatus.Name)
 			return false
 		}
 	}
