@@ -6417,7 +6417,7 @@ func validateWindowsHostProcessPod(podSpec *core.PodSpec, fieldPath *field.Path,
 
 		switch {
 		case containerHostProcess != nil && *containerHostProcess:
-			// Container explitly sets hostProcess=true
+			// Container explicitly sets hostProcess=true
 			hostProcessContainerCount++
 		case containerHostProcess == nil && podHostProcess != nil && *podHostProcess:
 			// Container inherits hostProcess=true from pod settings
