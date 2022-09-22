@@ -25,27 +25,26 @@ import (
 )
 
 var (
-	// featureEnabled is a Prometheus Gauge metrics used for recording the enablement of a k8s feature.
-	featureEnabled = k8smetrics.NewGaugeVec(
+	// featureInfo is a Prometheus Gauge metrics used for recording the enablement of a k8s feature.
+	featureInfo = k8smetrics.NewGaugeVec(
 		&k8smetrics.GaugeOpts{
 			Namespace:      "k8s",
-			Name:           "feature_enabled",
-			Help:           "This metric records the result of whether a feature is enabled.",
+			Name:           "feature_info",
+			Help:           "This metric records the data about the stage and enablement of a k8s feature.",
 			StabilityLevel: k8smetrics.ALPHA,
 		},
-		[]string{"name", "enabled"},
+		[]string{"name", "stage", "enabled"},
 	)
 )
 
 func init() {
-	legacyregistry.MustRegister(featureEnabled)
+	legacyregistry.MustRegister(featureInfo)
 }
 
-func ResetFeatureEnabledMetric() {
-	featureEnabled.Reset()
+func ResetFeatureInfoMetric() {
+	featureInfo.Reset()
 }
 
-func RecordFeatureEnabled(ctx context.Context, name string, enabled bool) error {
-	featureEnabled.WithContext(ctx).WithLabelValues(name, fmt.Sprintf("%v", enabled)).Set(1)
-	return nil
+func RecordFeatureInfo(ctx context.Context, name string, stage string, enabled bool) {
+	featureInfo.WithContext(ctx).WithLabelValues(name, stage, fmt.Sprintf("%v", enabled)).Set(1)
 }

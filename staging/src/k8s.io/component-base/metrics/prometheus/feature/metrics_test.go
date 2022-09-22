@@ -26,48 +26,48 @@ import (
 )
 
 var (
-	testedMetrics = []string{"k8s_feature_enabled"}
+	testedMetrics = []string{"k8s_feature_info"}
 )
 
 func TestObserveHealthcheck(t *testing.T) {
 	defer legacyregistry.Reset()
-	defer ResetFeatureEnabledMetric()
+	defer ResetFeatureInfoMetric()
 
 	testCases := []struct {
 		desc    string
 		name    string
+		stage   string
 		enabled bool
 		want    string
 	}{
 		{
 			desc:    "test enabled",
 			name:    "feature-a",
+			stage:   "ALPHA",
 			enabled: true,
 			want: `
-       	# HELP k8s_feature_enabled [ALPHA] This metric records the result of whether a feature is enabled.
-        # TYPE k8s_feature_enabled gauge
-        k8s_feature_enabled{enabled="true",name="feature-a"} 1
+       	# HELP k8s_feature_info [ALPHA] This metric records the data about the stage and enablement of a k8s feature.
+        # TYPE k8s_feature_info gauge
+        k8s_feature_info{enabled="true",name="feature-a",stage="ALPHA"} 1
 `,
 		},
 		{
 			desc:    "test disabled",
 			name:    "feature-b",
+			stage:   "BETA",
 			enabled: false,
 			want: `
-       	# HELP k8s_feature_enabled [ALPHA] This metric records the result of whether a feature is enabled.
-        # TYPE k8s_feature_enabled gauge
-        k8s_feature_enabled{enabled="false",name="feature-b"} 1
+       	# HELP k8s_feature_info [ALPHA] This metric records the data about the stage and enablement of a k8s feature.
+        # TYPE k8s_feature_info gauge
+        k8s_feature_info{enabled="false",name="feature-b",stage="BETA"} 1
 `,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.desc, func(t *testing.T) {
-			defer ResetFeatureEnabledMetric()
-			err := RecordFeatureEnabled(context.Background(), test.name, test.enabled)
-			if err != nil {
-				t.Errorf("unexpected err: %v", err)
-			}
+			defer ResetFeatureInfoMetric()
+			RecordFeatureInfo(context.Background(), test.name, test.stage, test.enabled)
 
 			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(test.want), testedMetrics...); err != nil {
 				t.Fatal(err)
