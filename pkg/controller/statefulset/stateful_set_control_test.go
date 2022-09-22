@@ -942,17 +942,17 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 
 }
 
-func setupForInvariant(t *testing.T) (*apps.StatefulSet, *fakeObjectManager, StatefulSetControlInterface, intstr.IntOrString, int) {
-	totalPods := 6
+func setupForInvariant(t *testing.T, totalPods int, maxUnavailableInt int, minReadySecs int, partition int) (*apps.StatefulSet, *fakeObjectManager, StatefulSetControlInterface, int) {
 	set := newStatefulSet(totalPods)
 	// update all pods >=3(3,4,5)
-	var partition int32 = 3
-	var maxUnavailable = intstr.FromInt(2)
+	var partitionInt32 int32 = int32(partition)
+	maxUnavailable := intstr.FromInt(maxUnavailableInt)
+	set = setMinReadySeconds(set, int32(minReadySecs))
 	set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
 		Type: apps.RollingUpdateStatefulSetStrategyType,
 		RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
 			return &apps.RollingUpdateStatefulSetStrategy{
-				Partition:      &partition,
+				Partition:      &partitionInt32,
 				MaxUnavailable: &maxUnavailable,
 			}
 		}(),
@@ -968,7 +968,7 @@ func setupForInvariant(t *testing.T) (*apps.StatefulSet, *fakeObjectManager, Sta
 		t.Fatal(err)
 	}
 
-	return set, spc, ssc, maxUnavailable, totalPods
+	return set, spc, ssc, totalPods
 }
 
 func TestStatefulSetControlRollingUpdateWithMaxUnavailableInOrderedModeVerifyInvariant(t *testing.T) {
@@ -978,23 +978,105 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableInOrderedModeVerifyInv
 	// to add more params here.
 	testCases := []struct {
 		ordinalOfPodToTerminate []int
+		ordinalOfPodUnavailable map[int]struct{}
+		expectedPodsAfterUpdate int
+		totalNumberPods         int
+		rollingUpdatePartition  int
+		minReadySecs            int
 	}{
+		{
+			ordinalOfPodToTerminate: []int{},
+			totalNumberPods:         6,
+			rollingUpdatePartition:  3,
+			expectedPodsAfterUpdate: 4,
+		},
+		{
+			ordinalOfPodToTerminate: []int{5},
+			totalNumberPods:         6,
+			rollingUpdatePartition:  3,
+			expectedPodsAfterUpdate: 5,
+		},
+		{
+			ordinalOfPodToTerminate: []int{3},
+			totalNumberPods:         6,
+			rollingUpdatePartition:  3,
+			expectedPodsAfterUpdate: 5,
+		},
+		{
+			ordinalOfPodToTerminate: []int{4},
+			totalNumberPods:         6,
+			rollingUpdatePartition:  3,
+			expectedPodsAfterUpdate: 5,
+		},
+		{
+			ordinalOfPodToTerminate: []int{5, 4},
+			totalNumberPods:         6,
+			rollingUpdatePartition:  3,
+			expectedPodsAfterUpdate: 6,
+		},
+		{
+			ordinalOfPodToTerminate: []int{5, 3},
+			totalNumberPods:         6,
+			rollingUpdatePartition:  3,
+			expectedPodsAfterUpdate: 6,
+		},
+		{
+			ordinalOfPodToTerminate: []int{4, 3},
+			totalNumberPods:         6,
+			rollingUpdatePartition:  3,
+			expectedPodsAfterUpdate: 6,
+		},
+		{
+			ordinalOfPodToTerminate: []int{5, 4, 3},
+			totalNumberPods:         6,
+			rollingUpdatePartition:  3,
+			expectedPodsAfterUpdate: 6,
+		},
+		{
+			ordinalOfPodToTerminate: []int{2}, // note this is an ordinal greater than partition(3)
+			totalNumberPods:         6,
+			rollingUpdatePartition:  3,
+			expectedPodsAfterUpdate: 5,
+		},
+		{
+			ordinalOfPodToTerminate: []int{1}, // note this is an ordinal greater than partition(3)
+			totalNumberPods:         6,
+			rollingUpdatePartition:  3,
+			expectedPodsAfterUpdate: 5,
+		},
 
-		{[]int{}},
-		{[]int{5}},
-		{[]int{3}},
-		{[]int{4}},
-		{[]int{5, 4}},
-		{[]int{5, 3}},
-		{[]int{4, 3}},
-		{[]int{5, 4, 3}},
-		{[]int{2}}, // note this is an ordinal greater than partition(3)
-		{[]int{1}}, // note this is an ordinal greater than partition(3)
+		{
+			ordinalOfPodUnavailable: map[int]struct{}{
+				0: {},
+				1: {},
+			},
+			totalNumberPods:         3,
+			minReadySecs:            2,
+			expectedPodsAfterUpdate: 3,
+		},
+		{
+			ordinalOfPodUnavailable: map[int]struct{}{
+				1: {},
+			},
+			totalNumberPods:         3,
+			minReadySecs:            2,
+			expectedPodsAfterUpdate: 2,
+		},
+		{
+			ordinalOfPodToTerminate: []int{2},
+			ordinalOfPodUnavailable: map[int]struct{}{
+				1: {},
+			},
+			totalNumberPods:         3,
+			minReadySecs:            2,
+			expectedPodsAfterUpdate: 3,
+		},
 	}
 	for _, tc := range testCases {
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, true)()
-		set, spc, ssc, maxUnavailable, totalPods := setupForInvariant(t)
-		t.Run(fmt.Sprintf("terminating pod at ordinal %d", tc.ordinalOfPodToTerminate), func(t *testing.T) {
+		maxUnavailable := 2
+		set, spc, ssc, totalPods := setupForInvariant(t, tc.totalNumberPods, maxUnavailable, tc.minReadySecs, tc.rollingUpdatePartition)
+		t.Run(fmt.Sprintf("terminating %d; unavailable %v", tc.ordinalOfPodToTerminate, tc.ordinalOfPodUnavailable), func(t *testing.T) {
 			status := apps.StatefulSetStatus{Replicas: int32(totalPods)}
 			updateRevision := &apps.ControllerRevision{}
 
@@ -1003,6 +1085,15 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableInOrderedModeVerifyInv
 				_, err := spc.addTerminatingPod(set, tc.ordinalOfPodToTerminate[i])
 				if err != nil {
 					t.Fatal(err)
+				}
+			}
+
+			for i := 0; i < totalPods; i++ {
+				if _, ok := tc.ordinalOfPodUnavailable[i]; ok {
+					// set to some time in the future
+					spc.setPodAvailable(set, i, time.Now().Add(time.Duration(2*tc.minReadySecs)*time.Second))
+				} else {
+					spc.setPodAvailable(set, i, time.Now().Add(time.Duration(-tc.minReadySecs)*time.Second))
 				}
 			}
 
@@ -1033,15 +1124,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableInOrderedModeVerifyInv
 
 			sort.Sort(ascendingOrdinal(pods))
 
-			expecteddPodsToBeDeleted := maxUnavailable.IntValue() - len(tc.ordinalOfPodToTerminate)
-			if expecteddPodsToBeDeleted < 0 {
-				expecteddPodsToBeDeleted = 0
-			}
-
-			expectedPodsAfterUpdate := totalPods - expecteddPodsToBeDeleted
-
-			if len(pods) != expectedPodsAfterUpdate {
-				t.Errorf("Expected pods %v, got pods %v", expectedPodsAfterUpdate, len(pods))
+			if len(pods) != tc.expectedPodsAfterUpdate {
+				t.Errorf("Expected pods %v, got pods %v", tc.expectedPodsAfterUpdate, len(pods))
 			}
 
 		})
