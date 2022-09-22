@@ -103,6 +103,62 @@ func Int32Equal(a, b *int32) bool {
 	return *a == *b
 }
 
+// Uint returns a pointer to an uint
+func Uint(i uint) *uint {
+	return &i
+}
+
+// UintPtr is a function variable referring to Uint.
+// Deprecated: Use Uint instead.
+var UintPtr = Uint // for back-compat
+
+// UintDeref dereferences the uint ptr and returns it if not nil, or else
+// returns def.
+func UintDeref(ptr *uint, def uint) uint {
+	if ptr != nil {
+		return *ptr
+	}
+	return def
+}
+
+// UintPtrDerefOr is a function variable referring to UintDeref.
+// Deprecated: Use UintDeref instead.
+var UintPtrDerefOr = UintDeref // for back-compat
+
+// Uint32 returns a pointer to an uint32.
+func Uint32(i uint32) *uint32 {
+	return &i
+}
+
+// Uint32Ptr is a function variable referring to Uint32.
+// Deprecated: Use Uint32 instead.
+var Uint32Ptr = Uint32 // for back-compat
+
+// Uint32Deref dereferences the uint32 ptr and returns it if not nil, or else
+// returns def.
+func Uint32Deref(ptr *uint32, def uint32) uint32 {
+	if ptr != nil {
+		return *ptr
+	}
+	return def
+}
+
+// Uint32PtrDerefOr is a function variable referring to Uint32Deref.
+// Deprecated: Use Uint32Deref instead.
+var Uint32PtrDerefOr = Uint32Deref // for back-compat
+
+// Uint32Equal returns true if both arguments are nil or both arguments
+// dereference to the same value.
+func Uint32Equal(a, b *uint32) bool {
+	if (a == nil) != (b == nil) {
+		return false
+	}
+	if a == nil {
+		return true
+	}
+	return *a == *b
+}
+
 // Int64 returns a pointer to an int64.
 func Int64(i int64) *int64 {
 	return &i
@@ -128,6 +184,40 @@ var Int64PtrDerefOr = Int64Deref // for back-compat
 // Int64Equal returns true if both arguments are nil or both arguments
 // dereference to the same value.
 func Int64Equal(a, b *int64) bool {
+	if (a == nil) != (b == nil) {
+		return false
+	}
+	if a == nil {
+		return true
+	}
+	return *a == *b
+}
+
+// Uint64 returns a pointer to an uint64.
+func Uint64(i uint64) *uint64 {
+	return &i
+}
+
+// Uint64Ptr is a function variable referring to Uint64.
+// Deprecated: Use Uint64 instead.
+var Uint64Ptr = Uint64 // for back-compat
+
+// Uint64Deref dereferences the uint64 ptr and returns it if not nil, or else
+// returns def.
+func Uint64Deref(ptr *uint64, def uint64) uint64 {
+	if ptr != nil {
+		return *ptr
+	}
+	return def
+}
+
+// Uint64PtrDerefOr is a function variable referring to Uint64Deref.
+// Deprecated: Use Uint64Deref instead.
+var Uint64PtrDerefOr = Uint64Deref // for back-compat
+
+// Uint64Equal returns true if both arguments are nil or both arguments
+// dereference to the same value.
+func Uint64Equal(a, b *uint64) bool {
 	if (a == nil) != (b == nil) {
 		return false
 	}
