@@ -26,22 +26,29 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	testutils "k8s.io/kubernetes/test/utils"
+	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
 
-	scaleclient "k8s.io/client-go/scale"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -59,11 +66,17 @@ const (
 	rcIsNil                         = "ERROR: replicationController = nil"
 	deploymentIsNil                 = "ERROR: deployment = nil"
 	rsIsNil                         = "ERROR: replicaset = nil"
+	crdIsNil                        = "ERROR: CRD = nil"
 	invalidKind                     = "ERROR: invalid workload kind for resource consumer"
 	customMetricName                = "QPS"
 	serviceInitializationTimeout    = 2 * time.Minute
 	serviceInitializationInterval   = 15 * time.Second
 	megabytes                       = 1024 * 1024
+	crdVersion                      = "v1"
+	crdKind                         = "TestCRD"
+	crdGroup                        = "autoscalinge2e.example.com"
+	crdName                         = "testcrd"
+	crdNamePlural                   = "testcrds"
 )
 
 var (
@@ -78,7 +91,7 @@ var (
 	// KindReplicaSet is the GVK for ReplicaSet
 	KindReplicaSet = schema.GroupVersionKind{Group: "apps", Version: "v1beta2", Kind: "ReplicaSet"}
 	// KindCRD is the GVK for CRD for test purposes
-	KindCRD = schema.GroupVersionKind{Group: "test", Version: "v1", Kind: "TestCustomCRD"}
+	KindCRD = schema.GroupVersionKind{Group: crdGroup, Version: crdVersion, Kind: crdKind}
 )
 
 // ScalingDirection identifies the scale direction for HPA Behavior.
@@ -104,6 +117,9 @@ type ResourceConsumer struct {
 	kind                     schema.GroupVersionKind
 	nsName                   string
 	clientSet                clientset.Interface
+	apiExtensionClient       crdclientset.Interface
+	dynamicClient            dynamic.Interface
+	resourceClient           dynamic.ResourceInterface
 	scaleClient              scaleclient.ScalesGetter
 	cpu                      chan int
 	mem                      chan int
@@ -177,7 +193,15 @@ func newResourceConsumer(name, nsName string, kind schema.GroupVersionKind, repl
 		additionalContainers = append(additionalContainers, sidecarContainer)
 	}
 
-	runServiceAndWorkloadForResourceConsumer(clientset, nsName, name, kind, replicas, cpuLimit, memLimit, podAnnotations, serviceAnnotations, additionalContainers)
+	config, err := framework.LoadConfig()
+	framework.ExpectNoError(err)
+	apiExtensionClient, err := crdclientset.NewForConfig(config)
+	framework.ExpectNoError(err)
+	dynamicClient, err := dynamic.NewForConfig(config)
+	framework.ExpectNoError(err)
+	resourceClient := dynamicClient.Resource(schema.GroupVersionResource{Group: crdGroup, Version: crdVersion, Resource: crdNamePlural}).Namespace(nsName)
+
+	runServiceAndWorkloadForResourceConsumer(clientset, resourceClient, apiExtensionClient, nsName, name, kind, replicas, cpuLimit, memLimit, podAnnotations, serviceAnnotations, additionalContainers)
 	controllerName := name + "-ctrl"
 	// If sidecar is enabled and busy, run service and consumer for sidecar
 	if sidecarStatus == Enable && sidecarType == Busy {
@@ -191,7 +215,10 @@ func newResourceConsumer(name, nsName string, kind schema.GroupVersionKind, repl
 		kind:                     kind,
 		nsName:                   nsName,
 		clientSet:                clientset,
+		apiExtensionClient:       apiExtensionClient,
 		scaleClient:              scaleClient,
+		resourceClient:           resourceClient,
+		dynamicClient:            dynamicClient,
 		cpu:                      make(chan int),
 		mem:                      make(chan int),
 		customMetric:             make(chan int),
@@ -416,6 +443,23 @@ func (rc *ResourceConsumer) GetReplicas() int {
 			framework.Failf(rsIsNil)
 		}
 		return int(rs.Status.ReadyReplicas)
+	case KindCRD:
+		deployment, err := rc.clientSet.AppsV1().Deployments(rc.nsName).Get(context.TODO(), rc.name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		if deployment == nil {
+			framework.Failf(deploymentIsNil)
+		}
+		deploymentReplicas := int64(deployment.Status.ReadyReplicas)
+
+		scale, err := rc.scaleClient.Scales(rc.nsName).Get(context.TODO(), schema.GroupResource{Group: crdGroup, Resource: crdNamePlural}, rc.name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		crdInstance, err := rc.resourceClient.Get(context.TODO(), rc.name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		// Update custom resource's status.replicas with child Deployment's current number of ready replicas.
+		framework.ExpectNoError(unstructured.SetNestedField(crdInstance.Object, deploymentReplicas, "status", "replicas"))
+		_, err = rc.resourceClient.Update(context.TODO(), crdInstance, metav1.UpdateOptions{})
+		framework.ExpectNoError(err)
+		return int(scale.Spec.Replicas)
 	default:
 		framework.Failf(invalidKind)
 	}
@@ -493,7 +537,14 @@ func (rc *ResourceConsumer) CleanUp() {
 	// Wait some time to ensure all child goroutines are finished.
 	time.Sleep(10 * time.Second)
 	kind := rc.kind.GroupKind()
-	framework.ExpectNoError(e2eresource.DeleteResourceAndWaitForGC(rc.clientSet, kind, rc.nsName, rc.name))
+	if kind.Kind == crdKind {
+		gvr := schema.GroupVersionResource{Group: crdGroup, Version: crdVersion, Resource: crdNamePlural}
+		framework.ExpectNoError(e2eresource.DeleteCustomResourceAndWaitForGC(rc.clientSet, rc.dynamicClient, rc.scaleClient, gvr, rc.nsName, rc.name))
+
+	} else {
+		framework.ExpectNoError(e2eresource.DeleteResourceAndWaitForGC(rc.clientSet, kind, rc.nsName, rc.name))
+	}
+
 	framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(context.TODO(), rc.name, metav1.DeleteOptions{}))
 	framework.ExpectNoError(e2eresource.DeleteResourceAndWaitForGC(rc.clientSet, schema.GroupKind{Kind: "ReplicationController"}, rc.nsName, rc.controllerName))
 	framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(context.TODO(), rc.name+"-ctrl", metav1.DeleteOptions{}))
@@ -554,7 +605,7 @@ func runServiceAndSidecarForResourceConsumer(c clientset.Interface, ns, name str
 		c, ns, controllerName, 1, startServiceInterval, startServiceTimeout))
 }
 
-func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name string, kind schema.GroupVersionKind, replicas int, cpuLimitMillis, memLimitMb int64, podAnnotations, serviceAnnotations map[string]string, additionalContainers []v1.Container) {
+func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, resourceClient dynamic.ResourceInterface, apiExtensionClient crdclientset.Interface, ns, name string, kind schema.GroupVersionKind, replicas int, cpuLimitMillis, memLimitMb int64, podAnnotations, serviceAnnotations map[string]string, additionalContainers []v1.Container) {
 	ginkgo.By(fmt.Sprintf("Running consuming RC %s via %s with %v replicas", name, kind, replicas))
 	_, err := createService(c, name, ns, serviceAnnotations, map[string]string{"name": name}, port, targetPort)
 	framework.ExpectNoError(err)
@@ -574,23 +625,42 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 		AdditionalContainers: additionalContainers,
 	}
 
+	dpConfig := testutils.DeploymentConfig{
+		RCConfig: rcConfig,
+	}
+	dpConfig.NodeDumpFunc = framework.DumpNodeDebugInfo
+	dpConfig.ContainerDumpFunc = e2ekubectl.LogFailedContainers
+
 	switch kind {
 	case KindRC:
 		framework.ExpectNoError(e2erc.RunRC(rcConfig))
 	case KindDeployment:
-		dpConfig := testutils.DeploymentConfig{
-			RCConfig: rcConfig,
-		}
-		ginkgo.By(fmt.Sprintf("creating deployment %s in namespace %s", dpConfig.Name, dpConfig.Namespace))
-		dpConfig.NodeDumpFunc = framework.DumpNodeDebugInfo
-		dpConfig.ContainerDumpFunc = e2ekubectl.LogFailedContainers
+		ginkgo.By(fmt.Sprintf("Creating deployment %s in namespace %s", dpConfig.Name, dpConfig.Namespace))
 		framework.ExpectNoError(testutils.RunDeployment(dpConfig))
 	case KindReplicaSet:
 		rsConfig := testutils.ReplicaSetConfig{
 			RCConfig: rcConfig,
 		}
-		ginkgo.By(fmt.Sprintf("creating replicaset %s in namespace %s", rsConfig.Name, rsConfig.Namespace))
+		ginkgo.By(fmt.Sprintf("Creating replicaset %s in namespace %s", rsConfig.Name, rsConfig.Namespace))
 		framework.ExpectNoError(runReplicaSet(rsConfig))
+	case KindCRD:
+		crd := CreateCustomResourceDefinition(apiExtensionClient)
+		crdInstance, err := CreateCustomSubresourceInstance(ns, name, resourceClient, crd)
+		framework.ExpectNoError(err)
+
+		ginkgo.By(fmt.Sprintf("Creating deployment %s backing CRD in namespace %s", dpConfig.Name, dpConfig.Namespace))
+		framework.ExpectNoError(testutils.RunDeployment(dpConfig))
+
+		deployment, err := c.AppsV1().Deployments(dpConfig.Namespace).Get(context.TODO(), dpConfig.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		deployment.SetOwnerReferences([]metav1.OwnerReference{{
+			APIVersion: kind.GroupVersion().String(),
+			Kind:       crdKind,
+			Name:       name,
+			UID:        crdInstance.GetUID(),
+		}})
+		_, err = c.AppsV1().Deployments(dpConfig.Namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
+		framework.ExpectNoError(err)
 	default:
 		framework.Failf(invalidKind)
 	}
@@ -661,14 +731,6 @@ func CreateCPUResourceHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minRepl
 // DeleteHorizontalPodAutoscaler delete the horizontalPodAutoscaler for consuming resources.
 func DeleteHorizontalPodAutoscaler(rc *ResourceConsumer, autoscalerName string) {
 	rc.clientSet.AutoscalingV1().HorizontalPodAutoscalers(rc.nsName).Delete(context.TODO(), autoscalerName, metav1.DeleteOptions{})
-}
-
-func CustomCRDTargetRef() autoscalingv2.CrossVersionObjectReference {
-	return autoscalingv2.CrossVersionObjectReference{
-		Kind:       "TestCustomCRD",
-		Name:       "test-custom-crd",
-		APIVersion: "test/v1",
-	}
 }
 
 // runReplicaSet launches (and verifies correctness) of a replicaset.
@@ -846,3 +908,94 @@ const (
 	Busy SidecarWorkloadType = "Busy"
 	Idle SidecarWorkloadType = "Idle"
 )
+
+func CreateCustomResourceDefinition(c crdclientset.Interface) *apiextensionsv1.CustomResourceDefinition {
+	crdSchema := &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: crdNamePlural + "." + crdGroup},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: crdGroup,
+			Scope: apiextensionsv1.ResourceScope("Namespaced"),
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
+				Plural:   crdNamePlural,
+				Singular: crdName,
+				Kind:     crdKind,
+				ListKind: "TestCRDList",
+			},
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{{
+				Name:    crdVersion,
+				Served:  true,
+				Storage: true,
+				Schema:  fixtures.AllowAllSchema(),
+				Subresources: &apiextensionsv1.CustomResourceSubresources{
+					Scale: &apiextensionsv1.CustomResourceSubresourceScale{
+						SpecReplicasPath:   ".spec.replicas",
+						StatusReplicasPath: ".status.replicas",
+						LabelSelectorPath:  utilpointer.String(".status.selector"),
+					},
+				},
+			}},
+		},
+		Status: apiextensionsv1.CustomResourceDefinitionStatus{},
+	}
+	// Create Custom Resource Definition if it's not present.
+	crd, err := c.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), crdSchema.Name, metav1.GetOptions{})
+	if err != nil {
+		crd, err = c.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), crdSchema, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		// Wait until just created CRD appears in discovery.
+		err = wait.PollImmediate(500*time.Millisecond, 30*time.Second, func() (bool, error) {
+			return ExistsInDiscovery(crd, c, "v1")
+		})
+		framework.ExpectNoError(err)
+		ginkgo.By(fmt.Sprintf("Successfully created Custom Resource Definition: %v", crd))
+	}
+	return crd
+}
+
+func ExistsInDiscovery(crd *apiextensionsv1.CustomResourceDefinition, apiExtensionsClient crdclientset.Interface, version string) (bool, error) {
+	groupResource, err := apiExtensionsClient.Discovery().ServerResourcesForGroupVersion(crd.Spec.Group + "/" + version)
+	if err != nil {
+		return false, err
+	}
+	for _, g := range groupResource.APIResources {
+		if g.Name == crd.Spec.Names.Plural {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func CreateCustomSubresourceInstance(namespace, name string, client dynamic.ResourceInterface, definition *apiextensionsv1.CustomResourceDefinition) (*unstructured.Unstructured, error) {
+	instance := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": crdGroup + "/" + crdVersion,
+			"kind":       crdKind,
+			"metadata": map[string]interface{}{
+				"namespace": namespace,
+				"name":      name,
+			},
+			"spec": map[string]interface{}{
+				"num":      int64(1),
+				"replicas": int64(1),
+			},
+			"status": map[string]interface{}{
+				"replicas": int64(1),
+				"selector": "name=" + name,
+			},
+		},
+	}
+	instance, err := client.Create(context.TODO(), instance, metav1.CreateOptions{})
+	if err != nil {
+		framework.Logf("%#v", instance)
+		return nil, err
+	}
+	createdObjectMeta, err := meta.Accessor(instance)
+	if err != nil {
+		return nil, fmt.Errorf("Error while creating object meta: %v", err)
+	}
+	if len(createdObjectMeta.GetUID()) == 0 {
+		return nil, fmt.Errorf("Missing UUID: %v", instance)
+	}
+	ginkgo.By(fmt.Sprintf("Successfully created instance of CRD of kind %v: %v", definition.Kind, instance))
+	return instance, nil
+}

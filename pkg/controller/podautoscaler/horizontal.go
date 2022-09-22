@@ -246,7 +246,6 @@ func (a *HorizontalController) processNextWorkItem(ctx context.Context) bool {
 // all metrics computed.
 func (a *HorizontalController) computeReplicasForMetrics(ctx context.Context, hpa *autoscalingv2.HorizontalPodAutoscaler, scale *autoscalingv1.Scale,
 	metricSpecs []autoscalingv2.MetricSpec) (replicas int32, metric string, statuses []autoscalingv2.MetricStatus, timestamp time.Time, err error) {
-
 	if scale.Status.Selector == "" {
 		errMsg := "selector is required"
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "SelectorRequired", errMsg)
