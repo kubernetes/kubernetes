@@ -1625,7 +1625,6 @@ k8s.io/apiserver/plugin/pkg/audit/log
 k8s.io/apiserver/plugin/pkg/audit/truncate
 k8s.io/apiserver/plugin/pkg/audit/webhook
 k8s.io/apiserver/plugin/pkg/authenticator/token/oidc
-k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest
 k8s.io/apiserver/plugin/pkg/authenticator/token/webhook
 k8s.io/apiserver/plugin/pkg/authorizer/webhook
 # k8s.io/cli-runtime v0.0.0 => ./staging/src/k8s.io/cli-runtime

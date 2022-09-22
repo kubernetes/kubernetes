@@ -35,9 +35,11 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
+	unionauthn "k8s.io/apiserver/pkg/authentication/request/union"
 	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	unionauthz "k8s.io/apiserver/pkg/authorization/union"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -552,10 +554,16 @@ func TestRBAC(t *testing.T) {
 					// Also disable namespace lifecycle to workaroung the test limitation that first creates
 					// roles/rolebindings and only then creates corresponding namespaces.
 					opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "NamespaceLifecycle"}
+					// Disable built-in authorizers
+					opts.Authorization.Modes = []string{"AlwaysDeny"}
 				},
 				ModifyServerConfig: func(config *controlplane.Config) {
-					config.GenericConfig.Authentication.Authenticator = authenticator
-					config.GenericConfig.Authorization.Authorizer, tearDownAuthorizerFn = newRBACAuthorizer(t, config)
+					// Append our custom test authenticator
+					config.GenericConfig.Authentication.Authenticator = unionauthn.New(config.GenericConfig.Authentication.Authenticator, authenticator)
+					// Append our custom test authorizer
+					var rbacAuthz authorizer.Authorizer
+					rbacAuthz, tearDownAuthorizerFn = newRBACAuthorizer(t, config)
+					config.GenericConfig.Authorization.Authorizer = unionauthz.New(config.GenericConfig.Authorization.Authorizer, rbacAuthz)
 				},
 			})
 			defer tearDownFn()
@@ -666,20 +674,9 @@ func TestRBAC(t *testing.T) {
 }
 
 func TestBootstrapping(t *testing.T) {
-	superUser := "admin/system:masters"
-
-	var tearDownAuthorizerFn func()
-	defer func() {
-		if tearDownAuthorizerFn != nil {
-			tearDownAuthorizerFn()
-		}
-	}()
 	clientset, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
-		ModifyServerConfig: func(config *controlplane.Config) {
-			config.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
-				superUser: {Name: "admin", Groups: []string{"system:masters"}},
-			}))
-			config.GenericConfig.Authorization.Authorizer, tearDownAuthorizerFn = newRBACAuthorizer(t, config)
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			opts.Authorization.Modes = []string{"RBAC"}
 		},
 	})
 	defer tearDownFn()
@@ -732,14 +729,6 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 			tearDownFn()
 		}
 	}()
-	var tearDownAuthorizerFn func()
-	defer func() {
-		if tearDownAuthorizerFn != nil {
-			tearDownAuthorizerFn()
-		}
-	}()
-
-	superUser := "admin/system:masters"
 
 	etcdConfig := framework.SharedEtcd()
 
@@ -747,12 +736,7 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Ensure we're using the same etcd across apiserver restarts.
 			opts.Etcd.StorageConfig = *etcdConfig
-		},
-		ModifyServerConfig: func(config *controlplane.Config) {
-			config.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
-				superUser: {Name: "admin", Groups: []string{"system:masters"}},
-			}))
-			config.GenericConfig.Authorization.Authorizer, tearDownAuthorizerFn = newRBACAuthorizer(t, config)
+			opts.Authorization.Modes = []string{"RBAC"}
 		},
 	})
 
@@ -793,8 +777,6 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 	// Stop the first API server.
 	tearDownFn()
 	tearDownFn = nil
-	tearDownAuthorizerFn()
-	tearDownAuthorizerFn = nil
 
 	// Check that upgraded API servers inherit `system:public-info-viewer` settings from
 	// `system:discovery`, and respect auto-reconciliation annotations.
@@ -802,12 +784,7 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Ensure we're using the same etcd across apiserver restarts.
 			opts.Etcd.StorageConfig = *etcdConfig
-		},
-		ModifyServerConfig: func(config *controlplane.Config) {
-			config.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
-				superUser: {Name: "admin", Groups: []string{"system:masters"}},
-			}))
-			config.GenericConfig.Authorization.Authorizer, tearDownAuthorizerFn = newRBACAuthorizer(t, config)
+			opts.Authorization.Modes = []string{"RBAC"}
 		},
 	})
 
