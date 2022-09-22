@@ -32,6 +32,7 @@ import (
 )
 
 func createLegacyIPAM(
+	logger klog.Logger,
 	ic *Controller,
 	nodeInformer coreinformers.NodeInformer,
 	cloud cloudprovider.Interface,
@@ -58,14 +59,16 @@ func createLegacyIPAM(
 		cidr = clusterCIDRs[0]
 	}
 	if len(clusterCIDRs) > 1 {
-		klog.Warningf("Multiple cidrs were configured with FromCluster or FromCloud. cidrs except first one were discarded")
+		logger.Info("Multiple cidrs were configured with FromCluster or FromCloud. cidrs except first one were discarded")
 	}
 	ipamc, err := ipam.NewController(cfg, kubeClient, cloud, cidr, serviceCIDR, nodeCIDRMaskSizes[0])
 	if err != nil {
-		klog.Fatalf("Error creating ipam controller: %v", err)
+		logger.Error(err, "Error creating ipam controller")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
-	if err := ipamc.Start(nodeInformer); err != nil {
-		klog.Fatalf("Error trying to Init(): %v", err)
+	if err := ipamc.Start(logger, nodeInformer); err != nil {
+		logger.Error(err, "Error trying to Init()")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	return ipamc
 }

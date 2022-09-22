@@ -20,6 +20,7 @@ limitations under the License.
 package ipam
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"sync"
@@ -113,10 +114,10 @@ func NewController(
 // Start initializes the Controller with the existing list of nodes and
 // registers the informers for node changes. This will start synchronization
 // of the node and cloud CIDR range allocations.
-func (c *Controller) Start(nodeInformer informers.NodeInformer) error {
-	klog.InfoS("Starting IPAM controller", "config", c.config)
+func (c *Controller) Start(logger klog.Logger, nodeInformer informers.NodeInformer) error {
+	logger.Info("Starting IPAM controller", "config", c.config)
 
-	nodes, err := listNodes(c.adapter.k8s)
+	nodes, err := listNodes(logger, c.adapter.k8s)
 	if err != nil {
 		return err
 	}
@@ -125,9 +126,9 @@ func (c *Controller) Start(nodeInformer informers.NodeInformer) error {
 			_, cidrRange, err := netutils.ParseCIDRSloppy(node.Spec.PodCIDR)
 			if err == nil {
 				c.set.Occupy(cidrRange)
-				klog.V(3).InfoS("Occupying CIDR for node", "CIDR", node.Spec.PodCIDR, "node", node.Name)
+				logger.V(3).Info("Occupying CIDR for node", "CIDR", node.Spec.PodCIDR, "node", klog.KObj(&node))
 			} else {
-				klog.ErrorS(err, "Node has an invalid CIDR", "node", node.Name, "CIDR", node.Spec.PodCIDR)
+				logger.Error(err, "Node has an invalid CIDR", "node", klog.KObj(&node), "CIDR", node.Spec.PodCIDR)
 			}
 		}
 
@@ -138,24 +139,30 @@ func (c *Controller) Start(nodeInformer informers.NodeInformer) error {
 			// XXX/bowei -- stagger the start of each sync cycle.
 			syncer := c.newSyncer(node.Name)
 			c.syncers[node.Name] = syncer
-			go syncer.Loop(nil)
+			go syncer.Loop(logger, nil)
 		}()
 	}
 
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    controllerutil.CreateAddNodeHandler(c.onAdd),
-		UpdateFunc: controllerutil.CreateUpdateNodeHandler(c.onUpdate),
-		DeleteFunc: controllerutil.CreateDeleteNodeHandler(c.onDelete),
+		AddFunc: controllerutil.CreateAddNodeHandler(func(node *v1.Node) error {
+			return c.onAdd(logger, node)
+		}),
+		UpdateFunc: controllerutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
+			return c.onUpdate(logger, newNode)
+		}),
+		DeleteFunc: controllerutil.CreateDeleteNodeHandler(func(node *v1.Node) error {
+			return c.onDelete(logger, node)
+		}),
 	})
 
 	return nil
 }
 
-func (c *Controller) Run(stopCh <-chan struct{}) {
+func (c *Controller) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 
-	go c.adapter.Run(stopCh)
-	<-stopCh
+	go c.adapter.Run(ctx)
+	<-ctx.Done()
 }
 
 // occupyServiceCIDR removes the service CIDR range from the cluster CIDR if it
@@ -192,7 +199,7 @@ func (c *Controller) newSyncer(name string) *nodesync.NodeSync {
 	return nodesync.New(ns, c.adapter, c.adapter, c.config.Mode, name, c.set)
 }
 
-func (c *Controller) onAdd(node *v1.Node) error {
+func (c *Controller) onAdd(logger klog.Logger, node *v1.Node) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -200,30 +207,30 @@ func (c *Controller) onAdd(node *v1.Node) error {
 	if !ok {
 		syncer = c.newSyncer(node.Name)
 		c.syncers[node.Name] = syncer
-		go syncer.Loop(nil)
+		go syncer.Loop(logger, nil)
 	} else {
-		klog.InfoS("Add for node that already exists", "node", node.Name)
+		logger.Info("Add for node that already exists", "node", klog.KObj(node))
 	}
 	syncer.Update(node)
 
 	return nil
 }
 
-func (c *Controller) onUpdate(_, node *v1.Node) error {
+func (c *Controller) onUpdate(logger klog.Logger, node *v1.Node) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	if sync, ok := c.syncers[node.Name]; ok {
 		sync.Update(node)
 	} else {
-		klog.ErrorS(nil, "Received update for non-existent node", "node", node.Name)
+		logger.Error(nil, "Received update for non-existent node", "node", klog.KObj(node))
 		return fmt.Errorf("unknown node %q", node.Name)
 	}
 
 	return nil
 }
 
-func (c *Controller) onDelete(node *v1.Node) error {
+func (c *Controller) onDelete(logger klog.Logger, node *v1.Node) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -231,7 +238,7 @@ func (c *Controller) onDelete(node *v1.Node) error {
 		syncer.Delete(node)
 		delete(c.syncers, node.Name)
 	} else {
-		klog.InfoS("Node was already deleted", "node", node.Name)
+		logger.Info("Node was already deleted", "node", klog.KObj(node))
 	}
 
 	return nil

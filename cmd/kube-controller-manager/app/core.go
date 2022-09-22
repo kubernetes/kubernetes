@@ -154,7 +154,9 @@ func startNodeIpamController(ctx context.Context, controllerContext ControllerCo
 		clusterCIDRInformer = controllerContext.InformerFactory.Networking().V1alpha1().ClusterCIDRs()
 	}
 
+	ctx = klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "NodeIpamController"))
 	nodeIpamController, err := nodeipamcontroller.NewNodeIpamController(
+		ctx,
 		controllerContext.InformerFactory.Core().V1().Nodes(),
 		clusterCIDRInformer,
 		controllerContext.Cloud,
@@ -168,7 +170,7 @@ func startNodeIpamController(ctx context.Context, controllerContext ControllerCo
 	if err != nil {
 		return nil, true, err
 	}
-	go nodeIpamController.RunWithMetrics(ctx.Done(), controllerContext.ControllerManagerMetrics)
+	go nodeIpamController.RunWithMetrics(ctx, controllerContext.ControllerManagerMetrics)
 	return nil, true, nil
 }
 
