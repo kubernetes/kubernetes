@@ -622,14 +622,6 @@ const (
 	// sandbox creation and network configuration completes successfully
 	PodHasNetworkCondition featuregate.Feature = "PodHasNetworkCondition"
 
-	// owner: @egernst
-	// alpha: v1.16
-	// beta: v1.18
-	// ga: v1.24
-	//
-	// Enables PodOverhead, for accounting pod overheads which are specific to a given RuntimeClass
-	PodOverhead featuregate.Feature = "PodOverhead"
-
 	// owner: @liggitt, @tallclair, sig-auth
 	// alpha: v1.22
 	// beta: v1.23
@@ -972,8 +964,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodDisruptionConditions: {Default: false, PreRelease: featuregate.Alpha},
 
 	PodHasNetworkCondition: {Default: false, PreRelease: featuregate.Alpha},
-
-	PodOverhead: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
 	PodSecurity: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 

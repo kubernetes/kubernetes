@@ -177,7 +177,7 @@ func recordMetricWithUnit(
 }
 
 // podRequestsAndLimitsByLifecycle returns a dictionary of all defined resources summed up for all
-// containers of the pod. If PodOverhead feature is enabled, pod overhead is added to the
+// containers of the pod. Pod overhead is added to the
 // total container resource requests and to the total container limits which have a
 // non-zero quantity. The caller may avoid allocations of resource lists by passing
 // a requests and limits list to the function, which will be cleared before use.
