@@ -969,6 +969,251 @@ func TestUncertainVolumeMounts(t *testing.T) {
 	}
 }
 
+func Test_PodExistsInVolume(t *testing.T) {
+	// testcases
+	tests := []struct {
+		name                            string
+		shouldMarkVolumeAsAttached      bool
+		shouldMarkVolumeAsMounted       bool
+		shouldMarkVolumeRemountRequired bool
+		currentVolumeCapacity           resource.Quantity
+		assert                          func(t *testing.T, podExistsInVolume bool, actualDevicePath string, err error)
+		devicePath                      string
+	}{
+		{
+			name:                            "pod exists in vloume",
+			shouldMarkVolumeAsAttached:      true,
+			shouldMarkVolumeAsMounted:       true,
+			shouldMarkVolumeRemountRequired: false,
+			currentVolumeCapacity:           resource.MustParse("1Gi"),
+			devicePath:                      "fake/device/path",
+			assert: func(t *testing.T, podExistsInVolume bool, actualDevicePath string, err error) {
+				if !podExistsInVolume {
+					t.Fatalf(
+						"ASW PodExistsInVolume result invalid. Expected: <true> Actual: <%v>",
+						podExistsInVolume)
+				}
+
+				if actualDevicePath != "fake/device/path" {
+					t.Fatalf(
+						"Invalid devicePath. Expected: <%q> Actual: <%q> ",
+						"fake/device/path",
+						actualDevicePath)
+				}
+
+				if err != nil {
+					t.Fatalf(
+						"ASW PodExistsInVolume failed. Expected: <no error> Actual: <%v>", err)
+				}
+			},
+		},
+		{
+			name:                            "pod not exists in volume",
+			shouldMarkVolumeAsAttached:      true,
+			shouldMarkVolumeAsMounted:       false,
+			shouldMarkVolumeRemountRequired: false,
+			currentVolumeCapacity:           resource.MustParse("1Gi"),
+			assert: func(t *testing.T, podExistsInVolume bool, actualDevicePath string, err error) {
+				if podExistsInVolume {
+					t.Fatalf(
+						"ASW PodExistsInVolume result invalid. Expected: <false> Actual: <%v>",
+						podExistsInVolume)
+				}
+				if actualDevicePath != "" {
+					t.Fatalf(
+						"Invalid devicePath. Expected: <%q> Actual: <%q> ",
+						"",
+						actualDevicePath)
+				}
+				if err != nil {
+					t.Fatalf(
+						"ASW PodExistsInVolume failed. Expected: <no error> Actual: <%T>", err)
+				}
+			},
+		},
+		{
+			name:                            "volume not attached",
+			shouldMarkVolumeAsAttached:      false,
+			shouldMarkVolumeAsMounted:       false,
+			shouldMarkVolumeRemountRequired: false,
+			currentVolumeCapacity:           resource.MustParse("1Gi"),
+			assert: func(t *testing.T, podExistsInVolume bool, actualDevicePath string, err error) {
+				if podExistsInVolume {
+					t.Fatalf(
+						"ASW PodExistsInVolume result invalid. Expected: <false> Actual: <%v>",
+						podExistsInVolume)
+				}
+				if actualDevicePath != "" {
+					t.Fatalf(
+						"Invalid devicePath. Expected: <%q> Actual: <%q> ",
+						"",
+						actualDevicePath)
+				}
+				fmt.Printf("%T", err)
+				if !IsVolumeNotAttachedError(err) {
+					t.Fatalf(
+						"ASW PodExistsInVolume failed. Expected: <cache.volumeNotAttachedError> Actual: <%T>", err)
+				}
+			},
+		},
+		{
+			name:                            "pod exists with remount required",
+			shouldMarkVolumeAsAttached:      true,
+			shouldMarkVolumeAsMounted:       true,
+			shouldMarkVolumeRemountRequired: true,
+			currentVolumeCapacity:           resource.MustParse("1Gi"),
+			devicePath:                      "fake/device/path",
+			assert: func(t *testing.T, podExistsInVolume bool, actualDevicePath string, err error) {
+				if !podExistsInVolume {
+					t.Fatalf(
+						"ASW PodExistsInVolume result invalid. Expected: <true> Actual: <%v>",
+						podExistsInVolume)
+				}
+				if actualDevicePath != "fake/device/path" {
+					t.Fatalf(
+						"Invalid devicePath. Expected: <%q> Actual: <%q> ",
+						"fake/device/path",
+						actualDevicePath)
+				}
+				if !IsRemountRequiredError(err) {
+					t.Fatalf(
+						"ASW PodExistsInVolume failed. Expected: <cache.remountRequiredError> Actual: <%T>", err)
+				}
+			},
+		},
+		{
+			name:                       "pod exists with resize required",
+			shouldMarkVolumeAsAttached: true,
+			shouldMarkVolumeAsMounted:  true,
+			currentVolumeCapacity:      resource.MustParse("2Gi"),
+			devicePath:                 "fake/device/path",
+			assert: func(t *testing.T, podExistsInVolume bool, actualDevicePath string, err error) {
+				if !podExistsInVolume {
+					t.Fatalf(
+						"ASW PodExistsInVolume result invalid. Expected: <true> Actual: <%v>",
+						podExistsInVolume)
+				}
+				if actualDevicePath != "fake/device/path" {
+					t.Fatalf(
+						"Invalid devicePath. Expected: <%q> Actual: <%q> ",
+						"fake/device/path",
+						actualDevicePath)
+				}
+				if !IsFSResizeRequiredError(err) {
+					t.Fatalf(
+						"ASW PodExistsInVolume failed. Expected: <cache.FsResizeRequiredError> Actual: <%T>", err)
+				}
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// arrange
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod1",
+					UID:       "pod1uid",
+					Namespace: "ns",
+				},
+				Spec: v1.PodSpec{},
+			}
+			podName := util.GetUniquePodName(pod)
+			mode := v1.PersistentVolumeBlock
+			volumeCapacity := resource.MustParse("1Gi")
+			gcepv := &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{UID: "001", Name: "volume-name"},
+				Spec: v1.PersistentVolumeSpec{
+					Capacity:               v1.ResourceList{v1.ResourceName(v1.ResourceStorage): volumeCapacity},
+					PersistentVolumeSource: v1.PersistentVolumeSource{GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{PDName: "fake-device1"}},
+					AccessModes: []v1.PersistentVolumeAccessMode{
+						v1.ReadWriteOnce,
+						v1.ReadOnlyMany,
+					},
+					VolumeMode: &mode,
+					ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "pvc-volume-name"},
+				},
+			}
+			volumeSpec := &volume.Spec{
+				PersistentVolume: gcepv,
+			}
+
+			// init testing volumePluginMgr
+			volumePluginMgr, fakeVolumePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
+
+			// set remount support to fakeVolumePlugin so that we can mark volume remount
+			fakeVolumePlugin.SupportsRemount = true
+
+			asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
+
+			// fetch plugin
+			plugin, err := volumePluginMgr.FindPluginBySpec(volumeSpec)
+			require.NoError(t, err)
+
+			// generate volume name
+			volumeName, err := util.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
+			require.NoError(t, err)
+
+			// mark volume as attached if needed
+			if test.shouldMarkVolumeAsAttached {
+				err = asw.MarkVolumeAsAttached(volumeName, volumeSpec, "", test.devicePath)
+				require.NoError(t, err)
+			}
+
+			// init volume capacity in ASW
+			initVolumeCapacity := volumeCapacity.DeepCopy()
+			asw.InitializeClaimSize(volumeName, &initVolumeCapacity)
+
+			// mark volume as mounted if needed
+			if test.shouldMarkVolumeAsMounted {
+				blockplugin, err := volumePluginMgr.FindMapperPluginBySpec(volumeSpec)
+				if err != nil {
+					t.Fatalf(
+						"volumePluginMgr.FindMapperPluginBySpec failed to find volume plugin for %#v with: %v",
+						volumeSpec,
+						err)
+				}
+
+				mounter, err := plugin.NewMounter(volumeSpec, pod, volume.VolumeOptions{})
+				if err != nil {
+					t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
+				}
+
+				mapper, err := blockplugin.NewBlockVolumeMapper(volumeSpec, pod, volume.VolumeOptions{})
+				if err != nil {
+					t.Fatalf("NewBlockVolumeMapper failed. Expected: <no error> Actual: <%v>", err)
+				}
+
+				markVolumeOpts := operationexecutor.MarkVolumeOpts{
+					PodName:             podName,
+					PodUID:              pod.UID,
+					VolumeName:          volumeName,
+					Mounter:             mounter,
+					BlockVolumeMapper:   mapper,
+					OuterVolumeSpecName: volumeSpec.Name(),
+					VolumeSpec:          volumeSpec,
+					VolumeMountState:    operationexecutor.VolumeMounted,
+				}
+				err = asw.MarkVolumeAsMounted(markVolumeOpts)
+				if err != nil {
+					t.Fatalf("MarkVolumeAsMounted failed. Expected: <no error> Actual: <%v>", err)
+				}
+			}
+
+			// mark volume remount required if needed
+			if test.shouldMarkVolumeRemountRequired {
+				asw.MarkRemountRequired(podName)
+			}
+
+			// Act
+			exists, path, err := asw.PodExistsInVolume(podName, volumeName, test.currentVolumeCapacity.DeepCopy(), "")
+
+			// Assert
+			test.assert(t, exists, path, err)
+		})
+	}
+}
+
 func verifyVolumeExistsInGloballyMountedVolumes(
 	t *testing.T, expectedVolumeName v1.UniqueVolumeName, asw ActualStateOfWorld) {
 	globallyMountedVolumes := asw.GetGloballyMountedVolumes()
