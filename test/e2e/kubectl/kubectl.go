@@ -1940,17 +1940,8 @@ metadata:
 	})
 
 	ginkgo.Describe("Kubectl events", func() {
-		var podName string
-
-		ginkgo.BeforeEach(func() {
-			podName = "e2e-test-httpd-pod"
-		})
-
-		ginkgo.AfterEach(func() {
-			framework.RunKubectlOrDie(ns, "delete", "pods", podName)
-		})
-
-		framework.ConformanceIt("should show event when pod is created ", func() {
+		ginkgo.It("should show event when pod is created ", func() {
+			podName := "e2e-test-httpd-pod"
 			ginkgo.By("running the image " + httpdImage)
 			framework.RunKubectlOrDie(ns, "run", podName, "--image="+httpdImage, podRunningTimeoutArg, "--labels=run="+podName)
 
