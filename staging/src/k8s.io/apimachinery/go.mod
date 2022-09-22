@@ -23,7 +23,7 @@ require (
 	github.com/onsi/ginkgo v1.14.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.8.0
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
 	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect

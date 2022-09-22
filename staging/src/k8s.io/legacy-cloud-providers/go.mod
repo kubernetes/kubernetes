@@ -21,8 +21,7 @@ require (
 	github.com/gophercloud/gophercloud v0.1.0
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/rubiojr/go-vhd v0.0.0-20200706105327-02e210299021
-	github.com/stretchr/objx v0.2.0 // indirect
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.8.0
 	github.com/vmware/govmomi v0.20.3
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
