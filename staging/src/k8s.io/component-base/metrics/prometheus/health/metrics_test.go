@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	testedMetrics = []string{"k8s_healthcheck", "k8s_healthchecks_total"}
+	testedMetrics = []string{"kubernetes_healthcheck", "kubernetes_healthchecks_total"}
 )
 
 func TestObserveHealthcheck(t *testing.T) {
@@ -35,14 +35,14 @@ func TestObserveHealthcheck(t *testing.T) {
 	initialState := Error
 	healthcheckName := "healthcheck-a"
 	initialOutput := `
-        # HELP k8s_healthcheck [ALPHA] This metric records the result of a single healthcheck.
-        # TYPE k8s_healthcheck gauge
-        k8s_healthcheck{name="healthcheck-a",status="error",type="healthz"} 1
-        k8s_healthcheck{name="healthcheck-a",status="pending",type="healthz"} 0
-        k8s_healthcheck{name="healthcheck-a",status="success",type="healthz"} 0
-        # HELP k8s_healthchecks_total [ALPHA] This metric records the results of all healthcheck.
-        # TYPE k8s_healthchecks_total counter
-        k8s_healthchecks_total{name="healthcheck-a",status="error",type="healthz"} 1
+        # HELP kubernetes_healthcheck [ALPHA] This metric records the result of a single healthcheck.
+        # TYPE kubernetes_healthcheck gauge
+        kubernetes_healthcheck{name="healthcheck-a",status="error",type="healthz"} 1
+        kubernetes_healthcheck{name="healthcheck-a",status="pending",type="healthz"} 0
+        kubernetes_healthcheck{name="healthcheck-a",status="success",type="healthz"} 0
+        # HELP kubernetes_healthchecks_total [ALPHA] This metric records the results of all healthcheck.
+        # TYPE kubernetes_healthchecks_total counter
+        kubernetes_healthchecks_total{name="healthcheck-a",status="error",type="healthz"} 1
 `
 	testCases := []struct {
 		desc     string
@@ -57,15 +57,15 @@ func TestObserveHealthcheck(t *testing.T) {
 			hcType:   Healthz,
 			hcStatus: Pending,
 			want: `
-        # HELP k8s_healthcheck [ALPHA] This metric records the result of a single healthcheck.
-        # TYPE k8s_healthcheck gauge
-        k8s_healthcheck{name="healthcheck-a",status="error",type="healthz"} 0
-        k8s_healthcheck{name="healthcheck-a",status="pending",type="healthz"} 1
-        k8s_healthcheck{name="healthcheck-a",status="success",type="healthz"} 0
-        # HELP k8s_healthchecks_total [ALPHA] This metric records the results of all healthcheck.
-        # TYPE k8s_healthchecks_total counter
-        k8s_healthchecks_total{name="healthcheck-a",status="error",type="healthz"} 1
-        k8s_healthchecks_total{name="healthcheck-a",status="pending",type="healthz"} 1
+        # HELP kubernetes_healthcheck [ALPHA] This metric records the result of a single healthcheck.
+        # TYPE kubernetes_healthcheck gauge
+        kubernetes_healthcheck{name="healthcheck-a",status="error",type="healthz"} 0
+        kubernetes_healthcheck{name="healthcheck-a",status="pending",type="healthz"} 1
+        kubernetes_healthcheck{name="healthcheck-a",status="success",type="healthz"} 0
+        # HELP kubernetes_healthchecks_total [ALPHA] This metric records the results of all healthcheck.
+        # TYPE kubernetes_healthchecks_total counter
+        kubernetes_healthchecks_total{name="healthcheck-a",status="error",type="healthz"} 1
+        kubernetes_healthchecks_total{name="healthcheck-a",status="pending",type="healthz"} 1
 `,
 		},
 		{
@@ -74,15 +74,15 @@ func TestObserveHealthcheck(t *testing.T) {
 			hcType:   Healthz,
 			hcStatus: Success,
 			want: `
-        # HELP k8s_healthcheck [ALPHA] This metric records the result of a single healthcheck.
-        # TYPE k8s_healthcheck gauge
-        k8s_healthcheck{name="healthcheck-a",status="error",type="healthz"} 0
-        k8s_healthcheck{name="healthcheck-a",status="pending",type="healthz"} 0
-        k8s_healthcheck{name="healthcheck-a",status="success",type="healthz"} 1
-        # HELP k8s_healthchecks_total [ALPHA] This metric records the results of all healthcheck.
-        # TYPE k8s_healthchecks_total counter
-        k8s_healthchecks_total{name="healthcheck-a",status="error",type="healthz"} 1
-        k8s_healthchecks_total{name="healthcheck-a",status="success",type="healthz"} 1
+        # HELP kubernetes_healthcheck [ALPHA] This metric records the result of a single healthcheck.
+        # TYPE kubernetes_healthcheck gauge
+        kubernetes_healthcheck{name="healthcheck-a",status="error",type="healthz"} 0
+        kubernetes_healthcheck{name="healthcheck-a",status="pending",type="healthz"} 0
+        kubernetes_healthcheck{name="healthcheck-a",status="success",type="healthz"} 1
+        # HELP kubernetes_healthchecks_total [ALPHA] This metric records the results of all healthcheck.
+        # TYPE kubernetes_healthchecks_total counter
+        kubernetes_healthchecks_total{name="healthcheck-a",status="error",type="healthz"} 1
+        kubernetes_healthchecks_total{name="healthcheck-a",status="success",type="healthz"} 1
 `,
 		},
 	}

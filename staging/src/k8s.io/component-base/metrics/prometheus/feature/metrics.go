@@ -28,7 +28,7 @@ var (
 	// featureInfo is a Prometheus Gauge metrics used for recording the enablement of a k8s feature.
 	featureInfo = k8smetrics.NewGaugeVec(
 		&k8smetrics.GaugeOpts{
-			Namespace:      "k8s",
+			Namespace:      "kubernetes",
 			Name:           "feature_info",
 			Help:           "This metric records the data about the stage and enablement of a k8s feature.",
 			StabilityLevel: k8smetrics.ALPHA,
