@@ -44,7 +44,7 @@ var (
 	// healthcheck is a Prometheus Gauge metrics used for recording the results of a k8s healthcheck.
 	healthcheck = k8smetrics.NewGaugeVec(
 		&k8smetrics.GaugeOpts{
-			Namespace:      "k8s",
+			Namespace:      "kubernetes",
 			Name:           "healthcheck",
 			Help:           "This metric records the result of a single healthcheck.",
 			StabilityLevel: k8smetrics.ALPHA,
@@ -55,7 +55,7 @@ var (
 	// healthchecksTotal is a Prometheus Counter metrics used for counting the results of a k8s healthcheck.
 	healthchecksTotal = k8smetrics.NewCounterVec(
 		&k8smetrics.CounterOpts{
-			Namespace:      "k8s",
+			Namespace:      "kubernetes",
 			Name:           "healthchecks_total",
 			Help:           "This metric records the results of all healthcheck.",
 			StabilityLevel: k8smetrics.ALPHA,
