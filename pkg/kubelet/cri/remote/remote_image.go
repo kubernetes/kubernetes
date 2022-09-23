@@ -22,15 +22,20 @@ import (
 	"fmt"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	tracing "k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	runtimeapiV1alpha2 "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
@@ -42,7 +47,7 @@ type remoteImageService struct {
 }
 
 // NewRemoteImageService creates a new internalapi.ImageManagerService.
-func NewRemoteImageService(endpoint string, connectionTimeout time.Duration) (internalapi.ImageManagerService, error) {
+func NewRemoteImageService(endpoint string, connectionTimeout time.Duration, tp trace.TracerProvider) (internalapi.ImageManagerService, error) {
 	klog.V(3).InfoS("Connecting to image service", "endpoint", endpoint)
 	addr, dialer, err := util.GetAddressAndDialer(endpoint)
 	if err != nil {
@@ -52,10 +57,24 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration) (in
 	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
 	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, addr,
+	dialOpts := []grpc.DialOption{}
+	dialOpts = append(dialOpts,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
+		tracingOpts := []otelgrpc.Option{
+			otelgrpc.WithPropagators(tracing.Propagators()),
+			otelgrpc.WithTracerProvider(tp),
+		}
+		// Even if there is no TracerProvider, the otelgrpc still handles context propagation.
+		// See https://github.com/open-telemetry/opentelemetry-go/tree/main/example/passthrough
+		dialOpts = append(dialOpts,
+			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor(tracingOpts...)),
+			grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor(tracingOpts...)))
+	}
+
+	conn, err := grpc.DialContext(ctx, addr, dialOpts...)
 	if err != nil {
 		klog.ErrorS(err, "Connect remote image service failed", "address", addr)
 		return nil, err
