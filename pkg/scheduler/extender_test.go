@@ -41,7 +41,6 @@ import (
 )
 
 func TestSchedulerWithExtenders(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name            string
 		registerPlugins []st.RegisterPluginFunc
@@ -331,7 +330,6 @@ func createNode(name string) *v1.Node {
 }
 
 func TestIsInterested(t *testing.T) {
-	t.Parallel()
 	mem := &HTTPExtender{
 		managedResources: sets.NewString(),
 	}
@@ -374,9 +372,7 @@ func TestIsInterested(t *testing.T) {
 			want: true,
 		},
 	} {
-		tc := tc
 		t.Run(tc.label, func(t *testing.T) {
-			t.Parallel()
 			if got := tc.extender.IsInterested(tc.pod); got != tc.want {
 				t.Fatalf("IsInterested(%v) = %v, wanted %v", tc.pod, got, tc.want)
 			}
@@ -385,7 +381,6 @@ func TestIsInterested(t *testing.T) {
 }
 
 func TestConvertToMetaVictims(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name              string
 		nodeNameToVictims map[string]*extenderv1.Victims
@@ -428,9 +423,7 @@ func TestConvertToMetaVictims(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			if got := convertToMetaVictims(tt.nodeNameToVictims); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("convertToMetaVictims() = %v, want %v", got, tt.want)
 			}
@@ -439,7 +432,6 @@ func TestConvertToMetaVictims(t *testing.T) {
 }
 
 func TestConvertToVictims(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name                  string
 		httpExtender          *HTTPExtender
@@ -496,9 +488,7 @@ func TestConvertToVictims(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			// nodeInfos instantiations
 			nodeInfoList := make([]*framework.NodeInfo, 0, len(tt.nodeNames))
 			for i, nm := range tt.nodeNames {

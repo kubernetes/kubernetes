@@ -319,7 +319,6 @@ func (t *TestPlugin) Filter(ctx context.Context, state *framework.CycleState, po
 }
 
 func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
-	t.Parallel()
 	nodes := []runtime.Object{
 		st.MakeNode().Name("node1").UID("node1").Obj(),
 		st.MakeNode().Name("node2").UID("node2").Obj(),
@@ -446,7 +445,6 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 }
 
 func TestSchedulerScheduleOne(t *testing.T) {
-	t.Parallel()
 	testNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", UID: types.UID("node1")}}
 	client := clientsetfake.NewSimpleClientset(&testNode)
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
@@ -641,7 +639,6 @@ func TestSchedulerScheduleOne(t *testing.T) {
 }
 
 func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
-	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
@@ -707,7 +704,6 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 }
 
 func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
-	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
@@ -777,7 +773,6 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 }
 
 func TestSchedulerFailedSchedulingReasons(t *testing.T) {
-	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
@@ -860,7 +855,6 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 }
 
 func TestSchedulerWithVolumeBinding(t *testing.T) {
-	t.Parallel()
 	findErr := fmt.Errorf("find err")
 	assumeErr := fmt.Errorf("assume err")
 	bindErr := fmt.Errorf("bind err")
@@ -1007,7 +1001,6 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 }
 
 func TestSchedulerBinding(t *testing.T) {
-	t.Parallel()
 	table := []struct {
 		podName      string
 		extenders    []framework.Extender
@@ -1043,9 +1036,7 @@ func TestSchedulerBinding(t *testing.T) {
 	}
 
 	for _, test := range table {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
 			pod := st.MakePod().Name(test.podName).Obj()
 			defaultBound := false
 			client := clientsetfake.NewSimpleClientset(pod)
@@ -1093,7 +1084,6 @@ func TestSchedulerBinding(t *testing.T) {
 }
 
 func TestUpdatePod(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name                     string
 		currentPodConditions     []v1.PodCondition
@@ -1235,9 +1225,7 @@ func TestUpdatePod(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
 			actualPatchRequests := 0
 			var actualPatchData string
 			cs := &clientsetfake.Clientset{}
@@ -1275,7 +1263,6 @@ func TestUpdatePod(t *testing.T) {
 }
 
 func TestSelectHost(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name          string
 		list          framework.NodeScoreList
@@ -1323,9 +1310,7 @@ func TestSelectHost(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
 			// increase the randomness
 			for i := 0; i < 10; i++ {
 				got, err := selectHost(test.list)
@@ -1347,7 +1332,6 @@ func TestSelectHost(t *testing.T) {
 }
 
 func TestFindNodesThatPassExtenders(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name                  string
 		extenders             []st.FakeExtender
@@ -1499,9 +1483,7 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			var extenders []framework.Extender
 			for ii := range tt.extenders {
 				extenders = append(extenders, &tt.extenders[ii])
@@ -1529,7 +1511,6 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 }
 
 func TestSchedulerSchedulePod(t *testing.T) {
-	t.Parallel()
 	fts := feature.Features{}
 	tests := []struct {
 		name               string
@@ -1995,9 +1976,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
 			cache := internalcache.New(time.Duration(0), wait.NeverStop)
 			for _, pod := range test.pods {
 				cache.AddPod(pod)
@@ -2146,12 +2125,10 @@ func TestFindFitSomeError(t *testing.T) {
 	}
 
 	for _, node := range nodes {
-		node := node
 		if node.Name == pod.Name {
 			continue
 		}
 		t.Run(node.Name, func(t *testing.T) {
-			t.Parallel()
 			status, found := diagnosis.NodeToStatusMap[node.Name]
 			if !found {
 				t.Errorf("failed to find node %v in %v", node.Name, diagnosis.NodeToStatusMap)
@@ -2232,7 +2209,6 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 //     is the one being scheduled.
 //   - don't get the same score no matter what we schedule.
 func TestZeroRequest(t *testing.T) {
-	t.Parallel()
 	// A pod with no resources. We expect spreading to count it as having the default resources.
 	noResources := v1.PodSpec{
 		Containers: []v1.Container{
@@ -2321,9 +2297,7 @@ func TestZeroRequest(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
 			client := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
@@ -2383,7 +2357,6 @@ func TestZeroRequest(t *testing.T) {
 var lowPriority, midPriority, highPriority = int32(0), int32(100), int32(1000)
 
 func TestNumFeasibleNodesToFind(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name                     string
 		percentageOfNodesToScore int32
@@ -2425,9 +2398,7 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			sched := &Scheduler{
 				percentageOfNodesToScore: tt.percentageOfNodesToScore,
 			}
@@ -2482,7 +2453,6 @@ func TestFairEvaluationForNodes(t *testing.T) {
 }
 
 func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name                  string
 		pod                   *v1.Pod
@@ -2509,9 +2479,7 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
 			// create three nodes in the cluster.
 			nodes := makeNodeList([]string{"node1", "node2", "node3"})
 			client := clientsetfake.NewSimpleClientset(test.pod)

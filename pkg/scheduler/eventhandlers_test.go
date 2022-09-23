@@ -48,7 +48,6 @@ import (
 )
 
 func TestNodeAllocatableChanged(t *testing.T) {
-	t.Parallel()
 	newQuantity := func(value int64) resource.Quantity {
 		return *resource.NewQuantity(value, resource.BinarySI)
 	}
@@ -71,9 +70,7 @@ func TestNodeAllocatableChanged(t *testing.T) {
 			NewAllocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024), v1.ResourceStorage: newQuantity(1024)},
 		},
 	} {
-		test := test
 		t.Run(test.Name, func(t *testing.T) {
-			t.Parallel()
 			oldNode := &v1.Node{Status: v1.NodeStatus{Allocatable: test.OldAllocatable}}
 			newNode := &v1.Node{Status: v1.NodeStatus{Allocatable: test.NewAllocatable}}
 			changed := nodeAllocatableChanged(newNode, oldNode)
@@ -85,7 +82,6 @@ func TestNodeAllocatableChanged(t *testing.T) {
 }
 
 func TestNodeLabelsChanged(t *testing.T) {
-	t.Parallel()
 	for _, test := range []struct {
 		Name      string
 		Changed   bool
@@ -106,9 +102,7 @@ func TestNodeLabelsChanged(t *testing.T) {
 			NewLabels: map[string]string{"foo": "bar", "test": "value"},
 		},
 	} {
-		test := test
 		t.Run(test.Name, func(t *testing.T) {
-			t.Parallel()
 			oldNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: test.OldLabels}}
 			newNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: test.NewLabels}}
 			changed := nodeLabelsChanged(newNode, oldNode)
@@ -120,7 +114,6 @@ func TestNodeLabelsChanged(t *testing.T) {
 }
 
 func TestNodeTaintsChanged(t *testing.T) {
-	t.Parallel()
 	for _, test := range []struct {
 		Name      string
 		Changed   bool
@@ -140,9 +133,7 @@ func TestNodeTaintsChanged(t *testing.T) {
 			NewTaints: []v1.Taint{{Key: "key", Value: "value2"}},
 		},
 	} {
-		test := test
 		t.Run(test.Name, func(t *testing.T) {
-			t.Parallel()
 			oldNode := &v1.Node{Spec: v1.NodeSpec{Taints: test.OldTaints}}
 			newNode := &v1.Node{Spec: v1.NodeSpec{Taints: test.NewTaints}}
 			changed := nodeTaintsChanged(newNode, oldNode)
@@ -154,7 +145,6 @@ func TestNodeTaintsChanged(t *testing.T) {
 }
 
 func TestNodeConditionsChanged(t *testing.T) {
-	t.Parallel()
 	nodeConditionType := reflect.TypeOf(v1.NodeCondition{})
 	if nodeConditionType.NumField() != 6 {
 		t.Errorf("NodeCondition type has changed. The nodeConditionsChanged() function must be reevaluated.")
@@ -197,9 +187,7 @@ func TestNodeConditionsChanged(t *testing.T) {
 			NewConditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}},
 		},
 	} {
-		test := test
 		t.Run(test.Name, func(t *testing.T) {
-			t.Parallel()
 			oldNode := &v1.Node{Status: v1.NodeStatus{Conditions: test.OldConditions}}
 			newNode := &v1.Node{Status: v1.NodeStatus{Conditions: test.NewConditions}}
 			changed := nodeConditionsChanged(newNode, oldNode)
@@ -211,7 +199,6 @@ func TestNodeConditionsChanged(t *testing.T) {
 }
 
 func TestUpdatePodInCache(t *testing.T) {
-	t.Parallel()
 	ttl := 10 * time.Second
 	nodeName := "node"
 
@@ -232,9 +219,7 @@ func TestUpdatePodInCache(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			sched := &Scheduler{
@@ -266,7 +251,6 @@ func withPodName(pod *v1.Pod, name string) *v1.Pod {
 }
 
 func TestPreCheckForNode(t *testing.T) {
-	t.Parallel()
 	cpu4 := map[v1.ResourceName]string{v1.ResourceCPU: "4"}
 	cpu8 := map[v1.ResourceName]string{v1.ResourceCPU: "8"}
 	cpu16 := map[v1.ResourceName]string{v1.ResourceCPU: "16"}
@@ -353,9 +337,7 @@ func TestPreCheckForNode(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			nodeInfo := framework.NewNodeInfo(tt.existingPods...)
 			nodeInfo.SetNode(tt.nodeFn())
 			preCheckFn := preCheckForNode(nodeInfo)
@@ -374,7 +356,6 @@ func TestPreCheckForNode(t *testing.T) {
 
 // test for informers of resources we care about is registered
 func TestAddAllEventHandlers(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name                   string
 		gvkMap                 map[framework.GVK]framework.ActionType
@@ -448,9 +429,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 	localSchemeBuilder.AddToScheme(scheme)
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
@@ -482,7 +461,6 @@ func TestAddAllEventHandlers(t *testing.T) {
 }
 
 func TestAdmissionCheck(t *testing.T) {
-	t.Parallel()
 	nodeaffinityError := AdmissionResult{Name: nodeaffinity.Name, Reason: nodeaffinity.ErrReasonPod}
 	nodenameError := AdmissionResult{Name: nodename.Name, Reason: nodename.ErrReason}
 	nodeportsError := AdmissionResult{Name: nodeports.Name, Reason: nodeports.ErrReason}
@@ -524,9 +502,7 @@ func TestAdmissionCheck(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			nodeInfo := framework.NewNodeInfo(tt.existingPods...)
 			nodeInfo.SetNode(tt.node)
 
