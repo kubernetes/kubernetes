@@ -17,7 +17,7 @@ limitations under the License.
 package protobuf
 
 import (
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/types"
 	"k8s.io/klog/v2"
 )
 
