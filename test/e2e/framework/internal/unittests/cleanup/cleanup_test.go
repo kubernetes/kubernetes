@@ -56,11 +56,25 @@ var _ = ginkgo.Describe("e2e", func() {
 
 	f := framework.NewDefaultFramework("test-namespace")
 
+	// BeforeEach/AfterEach run in first-in-first-out order.
+
+	ginkgo.BeforeEach(func() {
+		framework.Logf("before #1")
+	})
+
+	ginkgo.BeforeEach(func() {
+		framework.Logf("before #2")
+	})
+
 	ginkgo.AfterEach(func() {
-		framework.Logf("after")
+		framework.Logf("after #1")
 		if f.ClientSet == nil {
 			framework.Fail("Wrong order of cleanup operations: framework.AfterEach already ran and cleared f.ClientSet.")
 		}
+	})
+
+	ginkgo.AfterEach(func() {
+		framework.Logf("after #2")
 	})
 
 	ginkgo.It("works", func() {
@@ -74,6 +88,16 @@ var _ = ginkgo.Describe("e2e", func() {
 	})
 })
 
+func init() {
+	framework.NewFrameworkExtensions = append(framework.NewFrameworkExtensions,
+		// This callback runs directly after NewDefaultFramework is done.
+		func(f *framework.Framework) {
+			ginkgo.BeforeEach(func() { framework.Logf("extension before") })
+			ginkgo.AfterEach(func() { framework.Logf("extension after") })
+		},
+	)
+}
+
 const (
 	ginkgoOutput = `[BeforeEach] e2e
   cleanup_test.go:53
@@ -84,16 +108,31 @@ STEP: Creating a kubernetes client
 INFO: >>> kubeConfig: yyy/kube.config
 STEP: Building a namespace api object, basename test-namespace
 INFO: Skipping waiting for service account
+[BeforeEach] e2e
+  cleanup_test.go:95
+INFO: extension before
+[BeforeEach] e2e
+  cleanup_test.go:61
+INFO: before #1
+[BeforeEach] e2e
+  cleanup_test.go:65
+INFO: before #2
 [It] works
-  cleanup_test.go:66
+  cleanup_test.go:80
 [AfterEach] e2e
-  cleanup_test.go:59
-INFO: after
+  cleanup_test.go:96
+INFO: extension after
+[AfterEach] e2e
+  cleanup_test.go:69
+INFO: after #1
+[AfterEach] e2e
+  cleanup_test.go:76
+INFO: after #2
 [DeferCleanup] e2e
-  cleanup_test.go:71
+  cleanup_test.go:85
 INFO: cleanup first
 [DeferCleanup] e2e
-  cleanup_test.go:68
+  cleanup_test.go:82
 INFO: cleanup last
 [DeferCleanup] e2e
   dump namespaces | framework.go:xxx
