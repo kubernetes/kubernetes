@@ -356,6 +356,9 @@ $(go mod why "${loopback_deps[@]}")"
   popd >/dev/null 2>&1
 done
 echo "=== tidying root" >> "${LOG_FILE}"
+kube::util::list_staging_repos \
+| while read -r X; do echo "-replace k8s.io/${X}=./staging/src/k8s.io/${X}"; done \
+| xargs -L 100 go mod edit
 go mod tidy >>"${LOG_FILE}" 2>&1
 
 # prune unused pinned non-local replace directives
