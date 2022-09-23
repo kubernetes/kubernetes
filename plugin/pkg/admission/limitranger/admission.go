@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/sync/singleflight"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -64,6 +65,7 @@ type LimitRanger struct {
 	// This let's us handle the case of latent caches, by looking up actual results for a namespace on cache miss/no results.
 	// We track the lookup result here so that for repeated requests, we don't look it up very often.
 	liveLookupCache *lru.Cache
+	group           singleflight.Group
 	liveTTL         time.Duration
 }
 
@@ -161,21 +163,23 @@ func (l *LimitRanger) GetLimitRanges(a admission.Attributes) ([]*corev1.LimitRan
 	if len(items) == 0 {
 		lruItemObj, ok := l.liveLookupCache.Get(a.GetNamespace())
 		if !ok || lruItemObj.(liveLookupEntry).expiry.Before(time.Now()) {
-			// TODO: If there are multiple operations at the same time and cache has just expired,
-			// this may cause multiple List operations being issued at the same time.
-			// If there is already in-flight List() for a given namespace, we should wait until
-			// it is finished and cache is updated instead of doing the same, also to avoid
-			// throttling - see #22422 for details.
-			liveList, err := l.client.CoreV1().LimitRanges(a.GetNamespace()).List(context.TODO(), metav1.ListOptions{})
+			// Fixed: #22422
+			// use singleflight to alleviate simultaneous calls to
+			lruItemObj, err, _ = l.group.Do(a.GetNamespace(), func() (interface{}, error) {
+				liveList, err := l.client.CoreV1().LimitRanges(a.GetNamespace()).List(context.TODO(), metav1.ListOptions{})
+				if err != nil {
+					return nil, admission.NewForbidden(a, err)
+				}
+				newEntry := liveLookupEntry{expiry: time.Now().Add(l.liveTTL)}
+				for i := range liveList.Items {
+					newEntry.items = append(newEntry.items, &liveList.Items[i])
+				}
+				l.liveLookupCache.Add(a.GetNamespace(), newEntry)
+				return newEntry, nil
+			})
 			if err != nil {
-				return nil, admission.NewForbidden(a, err)
+				return nil, err
 			}
-			newEntry := liveLookupEntry{expiry: time.Now().Add(l.liveTTL)}
-			for i := range liveList.Items {
-				newEntry.items = append(newEntry.items, &liveList.Items[i])
-			}
-			l.liveLookupCache.Add(a.GetNamespace(), newEntry)
-			lruItemObj = newEntry
 		}
 		lruEntry := lruItemObj.(liveLookupEntry)
 
