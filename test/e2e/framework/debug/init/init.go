@@ -27,17 +27,6 @@ import (
 	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 )
 
-var (
-	// TODO: this variable used to be a field in framework.Framework. It is
-	// not clear how it was ever set. https://grep.app/search?q=AddonResourceConstraints
-	// returns only the default initialization with an empty map. Perhaps it can be removed?
-
-	// Constraints that passed to a check which is executed after data is gathered to
-	// see if 99% of results are within acceptable bounds. It has to be injected in the test,
-	// as expectations vary greatly. Constraints are grouped by the container names.
-	AddonResourceConstraints map[string]e2edebug.ResourceConstraint
-)
-
 func init() {
 	framework.NewFrameworkExtensions = append(framework.NewFrameworkExtensions,
 		func(f *framework.Framework) {
@@ -98,7 +87,7 @@ func init() {
 					go gatherer.StartGatheringData()
 					ginkgo.DeferCleanup(func() {
 						ginkgo.By("Collecting resource usage data", func() {
-							summary, resourceViolationError := gatherer.StopAndSummarize([]int{90, 99, 100}, AddonResourceConstraints)
+							summary, resourceViolationError := gatherer.StopAndSummarize([]int{90, 99, 100}, nil /* no constraints */)
 							// Always record the summary, even if there was an error.
 							f.TestSummaries = append(f.TestSummaries, summary)
 							// Now fail if there was an error.
