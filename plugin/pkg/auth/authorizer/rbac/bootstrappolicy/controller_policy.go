@@ -255,6 +255,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			},
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+			role.Rules = append(role.Rules, rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("pods").RuleOrDie())
 			role.Rules = append(role.Rules, rbacv1helpers.NewRule("patch").Groups(legacyGroup).Resources("pods/status").RuleOrDie())
 		}
 		return role
