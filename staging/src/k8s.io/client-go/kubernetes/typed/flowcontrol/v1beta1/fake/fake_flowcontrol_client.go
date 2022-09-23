@@ -20,12 +20,12 @@ package fake
 
 import (
 	v1beta1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1"
-	rest "k8s.io/client-go/rest"
-	testing "k8s.io/client-go/testing"
+	clientgorest "k8s.io/client-go/rest"
+	clientgotesting "k8s.io/client-go/testing"
 )
 
 type FakeFlowcontrolV1beta1 struct {
-	*testing.Fake
+	*clientgotesting.Fake
 }
 
 func (c *FakeFlowcontrolV1beta1) FlowSchemas() v1beta1.FlowSchemaInterface {
@@ -38,7 +38,7 @@ func (c *FakeFlowcontrolV1beta1) PriorityLevelConfigurations() v1beta1.PriorityL
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeFlowcontrolV1beta1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
+func (c *FakeFlowcontrolV1beta1) RESTClient() clientgorest.Interface {
+	var ret *clientgorest.RESTClient
 	return ret
 }

@@ -20,12 +20,12 @@ package fake
 
 import (
 	v1 "k8s.io/client-go/kubernetes/typed/node/v1"
-	rest "k8s.io/client-go/rest"
-	testing "k8s.io/client-go/testing"
+	clientgorest "k8s.io/client-go/rest"
+	clientgotesting "k8s.io/client-go/testing"
 )
 
 type FakeNodeV1 struct {
-	*testing.Fake
+	*clientgotesting.Fake
 }
 
 func (c *FakeNodeV1) RuntimeClasses() v1.RuntimeClassInterface {
@@ -34,7 +34,7 @@ func (c *FakeNodeV1) RuntimeClasses() v1.RuntimeClassInterface {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeNodeV1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
+func (c *FakeNodeV1) RESTClient() clientgorest.Interface {
+	var ret *clientgorest.RESTClient
 	return ret
 }

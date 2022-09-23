@@ -20,17 +20,17 @@ package v1beta1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1beta1 "k8s.io/api/storage/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	storagev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apistoragev1beta1 "k8s.io/api/storage/v1beta1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsstoragev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // CSIDriversGetter has a method to return a CSIDriverInterface.
@@ -41,21 +41,21 @@ type CSIDriversGetter interface {
 
 // CSIDriverInterface has methods to work with CSIDriver resources.
 type CSIDriverInterface interface {
-	Create(ctx context.Context, cSIDriver *v1beta1.CSIDriver, opts v1.CreateOptions) (*v1beta1.CSIDriver, error)
-	Update(ctx context.Context, cSIDriver *v1beta1.CSIDriver, opts v1.UpdateOptions) (*v1beta1.CSIDriver, error)
-	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.CSIDriver, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.CSIDriverList, error)
-	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.CSIDriver, err error)
-	Apply(ctx context.Context, cSIDriver *storagev1beta1.CSIDriverApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.CSIDriver, err error)
+	Create(ctx context.Context, cSIDriver *apistoragev1beta1.CSIDriver, opts apismetav1.CreateOptions) (*apistoragev1beta1.CSIDriver, error)
+	Update(ctx context.Context, cSIDriver *apistoragev1beta1.CSIDriver, opts apismetav1.UpdateOptions) (*apistoragev1beta1.CSIDriver, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apistoragev1beta1.CSIDriver, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apistoragev1beta1.CSIDriverList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apistoragev1beta1.CSIDriver, err error)
+	Apply(ctx context.Context, cSIDriver *applyconfigurationsstoragev1beta1.CSIDriverApplyConfiguration, opts apismetav1.ApplyOptions) (result *apistoragev1beta1.CSIDriver, err error)
 	CSIDriverExpansion
 }
 
 // cSIDrivers implements CSIDriverInterface
 type cSIDrivers struct {
-	client rest.Interface
+	client clientgorest.Interface
 }
 
 // newCSIDrivers returns a CSIDrivers
@@ -66,35 +66,35 @@ func newCSIDrivers(c *StorageV1beta1Client) *cSIDrivers {
 }
 
 // Get takes name of the cSIDriver, and returns the corresponding cSIDriver object, and an error if there is any.
-func (c *cSIDrivers) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.CSIDriver, err error) {
-	result = &v1beta1.CSIDriver{}
+func (c *cSIDrivers) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apistoragev1beta1.CSIDriver, err error) {
+	result = &apistoragev1beta1.CSIDriver{}
 	err = c.client.Get().
 		Resource("csidrivers").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of CSIDrivers that match those selectors.
-func (c *cSIDrivers) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.CSIDriverList, err error) {
+func (c *cSIDrivers) List(ctx context.Context, opts apismetav1.ListOptions) (result *apistoragev1beta1.CSIDriverList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1beta1.CSIDriverList{}
+	result = &apistoragev1beta1.CSIDriverList{}
 	err = c.client.Get().
 		Resource("csidrivers").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested cSIDrivers.
-func (c *cSIDrivers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested cSIDrivers.
+func (c *cSIDrivers) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -102,17 +102,17 @@ func (c *cSIDrivers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Inte
 	opts.Watch = true
 	return c.client.Get().
 		Resource("csidrivers").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a cSIDriver and creates it.  Returns the server's representation of the cSIDriver, and an error, if there is any.
-func (c *cSIDrivers) Create(ctx context.Context, cSIDriver *v1beta1.CSIDriver, opts v1.CreateOptions) (result *v1beta1.CSIDriver, err error) {
-	result = &v1beta1.CSIDriver{}
+func (c *cSIDrivers) Create(ctx context.Context, cSIDriver *apistoragev1beta1.CSIDriver, opts apismetav1.CreateOptions) (result *apistoragev1beta1.CSIDriver, err error) {
+	result = &apistoragev1beta1.CSIDriver{}
 	err = c.client.Post().
 		Resource("csidrivers").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(cSIDriver).
 		Do(ctx).
 		Into(result)
@@ -120,12 +120,12 @@ func (c *cSIDrivers) Create(ctx context.Context, cSIDriver *v1beta1.CSIDriver, o
 }
 
 // Update takes the representation of a cSIDriver and updates it. Returns the server's representation of the cSIDriver, and an error, if there is any.
-func (c *cSIDrivers) Update(ctx context.Context, cSIDriver *v1beta1.CSIDriver, opts v1.UpdateOptions) (result *v1beta1.CSIDriver, err error) {
-	result = &v1beta1.CSIDriver{}
+func (c *cSIDrivers) Update(ctx context.Context, cSIDriver *apistoragev1beta1.CSIDriver, opts apismetav1.UpdateOptions) (result *apistoragev1beta1.CSIDriver, err error) {
+	result = &apistoragev1beta1.CSIDriver{}
 	err = c.client.Put().
 		Resource("csidrivers").
 		Name(cSIDriver.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(cSIDriver).
 		Do(ctx).
 		Into(result)
@@ -133,7 +133,7 @@ func (c *cSIDrivers) Update(ctx context.Context, cSIDriver *v1beta1.CSIDriver, o
 }
 
 // Delete takes name of the cSIDriver and deletes it. Returns an error if one occurs.
-func (c *cSIDrivers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *cSIDrivers) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("csidrivers").
 		Name(name).
@@ -143,14 +143,14 @@ func (c *cSIDrivers) Delete(ctx context.Context, name string, opts v1.DeleteOpti
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *cSIDrivers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *cSIDrivers) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Resource("csidrivers").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -158,13 +158,13 @@ func (c *cSIDrivers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions
 }
 
 // Patch applies the patch and returns the patched cSIDriver.
-func (c *cSIDrivers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.CSIDriver, err error) {
-	result = &v1beta1.CSIDriver{}
+func (c *cSIDrivers) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apistoragev1beta1.CSIDriver, err error) {
+	result = &apistoragev1beta1.CSIDriver{}
 	err = c.client.Patch(pt).
 		Resource("csidrivers").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -172,7 +172,7 @@ func (c *cSIDrivers) Patch(ctx context.Context, name string, pt types.PatchType,
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied cSIDriver.
-func (c *cSIDrivers) Apply(ctx context.Context, cSIDriver *storagev1beta1.CSIDriverApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.CSIDriver, err error) {
+func (c *cSIDrivers) Apply(ctx context.Context, cSIDriver *applyconfigurationsstoragev1beta1.CSIDriverApplyConfiguration, opts apismetav1.ApplyOptions) (result *apistoragev1beta1.CSIDriver, err error) {
 	if cSIDriver == nil {
 		return nil, fmt.Errorf("cSIDriver provided to Apply must not be nil")
 	}
@@ -185,11 +185,11 @@ func (c *cSIDrivers) Apply(ctx context.Context, cSIDriver *storagev1beta1.CSIDri
 	if name == nil {
 		return nil, fmt.Errorf("cSIDriver.Name must be provided to Apply")
 	}
-	result = &v1beta1.CSIDriver{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apistoragev1beta1.CSIDriver{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Resource("csidrivers").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

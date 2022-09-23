@@ -20,17 +20,17 @@ package v1beta1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1beta1 "k8s.io/api/extensions/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	extensionsv1beta1 "k8s.io/client-go/applyconfigurations/extensions/v1beta1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apiextensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsextensionsv1beta1 "k8s.io/client-go/applyconfigurations/extensions/v1beta1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // ReplicaSetsGetter has a method to return a ReplicaSetInterface.
@@ -41,27 +41,27 @@ type ReplicaSetsGetter interface {
 
 // ReplicaSetInterface has methods to work with ReplicaSet resources.
 type ReplicaSetInterface interface {
-	Create(ctx context.Context, replicaSet *v1beta1.ReplicaSet, opts v1.CreateOptions) (*v1beta1.ReplicaSet, error)
-	Update(ctx context.Context, replicaSet *v1beta1.ReplicaSet, opts v1.UpdateOptions) (*v1beta1.ReplicaSet, error)
-	UpdateStatus(ctx context.Context, replicaSet *v1beta1.ReplicaSet, opts v1.UpdateOptions) (*v1beta1.ReplicaSet, error)
-	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.ReplicaSet, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.ReplicaSetList, error)
-	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.ReplicaSet, err error)
-	Apply(ctx context.Context, replicaSet *extensionsv1beta1.ReplicaSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.ReplicaSet, err error)
-	ApplyStatus(ctx context.Context, replicaSet *extensionsv1beta1.ReplicaSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.ReplicaSet, err error)
-	GetScale(ctx context.Context, replicaSetName string, options v1.GetOptions) (*v1beta1.Scale, error)
-	UpdateScale(ctx context.Context, replicaSetName string, scale *v1beta1.Scale, opts v1.UpdateOptions) (*v1beta1.Scale, error)
-	ApplyScale(ctx context.Context, replicaSetName string, scale *extensionsv1beta1.ScaleApplyConfiguration, opts v1.ApplyOptions) (*v1beta1.Scale, error)
+	Create(ctx context.Context, replicaSet *apiextensionsv1beta1.ReplicaSet, opts apismetav1.CreateOptions) (*apiextensionsv1beta1.ReplicaSet, error)
+	Update(ctx context.Context, replicaSet *apiextensionsv1beta1.ReplicaSet, opts apismetav1.UpdateOptions) (*apiextensionsv1beta1.ReplicaSet, error)
+	UpdateStatus(ctx context.Context, replicaSet *apiextensionsv1beta1.ReplicaSet, opts apismetav1.UpdateOptions) (*apiextensionsv1beta1.ReplicaSet, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apiextensionsv1beta1.ReplicaSet, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apiextensionsv1beta1.ReplicaSetList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apiextensionsv1beta1.ReplicaSet, err error)
+	Apply(ctx context.Context, replicaSet *applyconfigurationsextensionsv1beta1.ReplicaSetApplyConfiguration, opts apismetav1.ApplyOptions) (result *apiextensionsv1beta1.ReplicaSet, err error)
+	ApplyStatus(ctx context.Context, replicaSet *applyconfigurationsextensionsv1beta1.ReplicaSetApplyConfiguration, opts apismetav1.ApplyOptions) (result *apiextensionsv1beta1.ReplicaSet, err error)
+	GetScale(ctx context.Context, replicaSetName string, options apismetav1.GetOptions) (*apiextensionsv1beta1.Scale, error)
+	UpdateScale(ctx context.Context, replicaSetName string, scale *apiextensionsv1beta1.Scale, opts apismetav1.UpdateOptions) (*apiextensionsv1beta1.Scale, error)
+	ApplyScale(ctx context.Context, replicaSetName string, scale *applyconfigurationsextensionsv1beta1.ScaleApplyConfiguration, opts apismetav1.ApplyOptions) (*apiextensionsv1beta1.Scale, error)
 
 	ReplicaSetExpansion
 }
 
 // replicaSets implements ReplicaSetInterface
 type replicaSets struct {
-	client rest.Interface
+	client clientgorest.Interface
 	ns     string
 }
 
@@ -74,37 +74,37 @@ func newReplicaSets(c *ExtensionsV1beta1Client, namespace string) *replicaSets {
 }
 
 // Get takes name of the replicaSet, and returns the corresponding replicaSet object, and an error if there is any.
-func (c *replicaSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.ReplicaSet, err error) {
-	result = &v1beta1.ReplicaSet{}
+func (c *replicaSets) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apiextensionsv1beta1.ReplicaSet, err error) {
+	result = &apiextensionsv1beta1.ReplicaSet{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of ReplicaSets that match those selectors.
-func (c *replicaSets) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.ReplicaSetList, err error) {
+func (c *replicaSets) List(ctx context.Context, opts apismetav1.ListOptions) (result *apiextensionsv1beta1.ReplicaSetList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1beta1.ReplicaSetList{}
+	result = &apiextensionsv1beta1.ReplicaSetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("replicasets").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested replicaSets.
-func (c *replicaSets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested replicaSets.
+func (c *replicaSets) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -113,18 +113,18 @@ func (c *replicaSets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Int
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("replicasets").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a replicaSet and creates it.  Returns the server's representation of the replicaSet, and an error, if there is any.
-func (c *replicaSets) Create(ctx context.Context, replicaSet *v1beta1.ReplicaSet, opts v1.CreateOptions) (result *v1beta1.ReplicaSet, err error) {
-	result = &v1beta1.ReplicaSet{}
+func (c *replicaSets) Create(ctx context.Context, replicaSet *apiextensionsv1beta1.ReplicaSet, opts apismetav1.CreateOptions) (result *apiextensionsv1beta1.ReplicaSet, err error) {
+	result = &apiextensionsv1beta1.ReplicaSet{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("replicasets").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(replicaSet).
 		Do(ctx).
 		Into(result)
@@ -132,13 +132,13 @@ func (c *replicaSets) Create(ctx context.Context, replicaSet *v1beta1.ReplicaSet
 }
 
 // Update takes the representation of a replicaSet and updates it. Returns the server's representation of the replicaSet, and an error, if there is any.
-func (c *replicaSets) Update(ctx context.Context, replicaSet *v1beta1.ReplicaSet, opts v1.UpdateOptions) (result *v1beta1.ReplicaSet, err error) {
-	result = &v1beta1.ReplicaSet{}
+func (c *replicaSets) Update(ctx context.Context, replicaSet *apiextensionsv1beta1.ReplicaSet, opts apismetav1.UpdateOptions) (result *apiextensionsv1beta1.ReplicaSet, err error) {
+	result = &apiextensionsv1beta1.ReplicaSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(replicaSet.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(replicaSet).
 		Do(ctx).
 		Into(result)
@@ -147,14 +147,14 @@ func (c *replicaSets) Update(ctx context.Context, replicaSet *v1beta1.ReplicaSet
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *replicaSets) UpdateStatus(ctx context.Context, replicaSet *v1beta1.ReplicaSet, opts v1.UpdateOptions) (result *v1beta1.ReplicaSet, err error) {
-	result = &v1beta1.ReplicaSet{}
+func (c *replicaSets) UpdateStatus(ctx context.Context, replicaSet *apiextensionsv1beta1.ReplicaSet, opts apismetav1.UpdateOptions) (result *apiextensionsv1beta1.ReplicaSet, err error) {
+	result = &apiextensionsv1beta1.ReplicaSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(replicaSet.Name).
 		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(replicaSet).
 		Do(ctx).
 		Into(result)
@@ -162,7 +162,7 @@ func (c *replicaSets) UpdateStatus(ctx context.Context, replicaSet *v1beta1.Repl
 }
 
 // Delete takes name of the replicaSet and deletes it. Returns an error if one occurs.
-func (c *replicaSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *replicaSets) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("replicasets").
@@ -173,7 +173,7 @@ func (c *replicaSets) Delete(ctx context.Context, name string, opts v1.DeleteOpt
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *replicaSets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *replicaSets) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
@@ -181,7 +181,7 @@ func (c *replicaSets) DeleteCollection(ctx context.Context, opts v1.DeleteOption
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("replicasets").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -189,14 +189,14 @@ func (c *replicaSets) DeleteCollection(ctx context.Context, opts v1.DeleteOption
 }
 
 // Patch applies the patch and returns the patched replicaSet.
-func (c *replicaSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.ReplicaSet, err error) {
-	result = &v1beta1.ReplicaSet{}
+func (c *replicaSets) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apiextensionsv1beta1.ReplicaSet, err error) {
+	result = &apiextensionsv1beta1.ReplicaSet{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -204,7 +204,7 @@ func (c *replicaSets) Patch(ctx context.Context, name string, pt types.PatchType
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied replicaSet.
-func (c *replicaSets) Apply(ctx context.Context, replicaSet *extensionsv1beta1.ReplicaSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.ReplicaSet, err error) {
+func (c *replicaSets) Apply(ctx context.Context, replicaSet *applyconfigurationsextensionsv1beta1.ReplicaSetApplyConfiguration, opts apismetav1.ApplyOptions) (result *apiextensionsv1beta1.ReplicaSet, err error) {
 	if replicaSet == nil {
 		return nil, fmt.Errorf("replicaSet provided to Apply must not be nil")
 	}
@@ -217,12 +217,12 @@ func (c *replicaSets) Apply(ctx context.Context, replicaSet *extensionsv1beta1.R
 	if name == nil {
 		return nil, fmt.Errorf("replicaSet.Name must be provided to Apply")
 	}
-	result = &v1beta1.ReplicaSet{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apiextensionsv1beta1.ReplicaSet{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -231,7 +231,7 @@ func (c *replicaSets) Apply(ctx context.Context, replicaSet *extensionsv1beta1.R
 
 // ApplyStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *replicaSets) ApplyStatus(ctx context.Context, replicaSet *extensionsv1beta1.ReplicaSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.ReplicaSet, err error) {
+func (c *replicaSets) ApplyStatus(ctx context.Context, replicaSet *applyconfigurationsextensionsv1beta1.ReplicaSetApplyConfiguration, opts apismetav1.ApplyOptions) (result *apiextensionsv1beta1.ReplicaSet, err error) {
 	if replicaSet == nil {
 		return nil, fmt.Errorf("replicaSet provided to Apply must not be nil")
 	}
@@ -246,42 +246,42 @@ func (c *replicaSets) ApplyStatus(ctx context.Context, replicaSet *extensionsv1b
 		return nil, fmt.Errorf("replicaSet.Name must be provided to Apply")
 	}
 
-	result = &v1beta1.ReplicaSet{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apiextensionsv1beta1.ReplicaSet{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(*name).
 		SubResource("status").
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// GetScale takes name of the replicaSet, and returns the corresponding v1beta1.Scale object, and an error if there is any.
-func (c *replicaSets) GetScale(ctx context.Context, replicaSetName string, options v1.GetOptions) (result *v1beta1.Scale, err error) {
-	result = &v1beta1.Scale{}
+// GetScale takes name of the replicaSet, and returns the corresponding apiextensionsv1beta1.Scale object, and an error if there is any.
+func (c *replicaSets) GetScale(ctx context.Context, replicaSetName string, options apismetav1.GetOptions) (result *apiextensionsv1beta1.Scale, err error) {
+	result = &apiextensionsv1beta1.Scale{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(replicaSetName).
 		SubResource("scale").
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // UpdateScale takes the top resource name and the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *replicaSets) UpdateScale(ctx context.Context, replicaSetName string, scale *v1beta1.Scale, opts v1.UpdateOptions) (result *v1beta1.Scale, err error) {
-	result = &v1beta1.Scale{}
+func (c *replicaSets) UpdateScale(ctx context.Context, replicaSetName string, scale *apiextensionsv1beta1.Scale, opts apismetav1.UpdateOptions) (result *apiextensionsv1beta1.Scale, err error) {
+	result = &apiextensionsv1beta1.Scale{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(replicaSetName).
 		SubResource("scale").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(scale).
 		Do(ctx).
 		Into(result)
@@ -290,7 +290,7 @@ func (c *replicaSets) UpdateScale(ctx context.Context, replicaSetName string, sc
 
 // ApplyScale takes top resource name and the apply declarative configuration for scale,
 // applies it and returns the applied scale, and an error, if there is any.
-func (c *replicaSets) ApplyScale(ctx context.Context, replicaSetName string, scale *extensionsv1beta1.ScaleApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Scale, err error) {
+func (c *replicaSets) ApplyScale(ctx context.Context, replicaSetName string, scale *applyconfigurationsextensionsv1beta1.ScaleApplyConfiguration, opts apismetav1.ApplyOptions) (result *apiextensionsv1beta1.Scale, err error) {
 	if scale == nil {
 		return nil, fmt.Errorf("scale provided to ApplyScale must not be nil")
 	}
@@ -300,13 +300,13 @@ func (c *replicaSets) ApplyScale(ctx context.Context, replicaSetName string, sca
 		return nil, err
 	}
 
-	result = &v1beta1.Scale{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apiextensionsv1beta1.Scale{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(replicaSetName).
 		SubResource("scale").
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

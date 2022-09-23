@@ -70,17 +70,17 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	pkgruntimeschema "k8s.io/apimachinery/pkg/runtime/schema"
+	pkgruntimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	pkgutilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
-var Scheme = runtime.NewScheme()
-var Codecs = serializer.NewCodecFactory(Scheme)
-var ParameterCodec = runtime.NewParameterCodec(Scheme)
-var localSchemeBuilder = runtime.SchemeBuilder{
+var Scheme = apimachinerypkgruntime.NewScheme()
+var Codecs = pkgruntimeserializer.NewCodecFactory(Scheme)
+var ParameterCodec = apimachinerypkgruntime.NewParameterCodec(Scheme)
+var localSchemeBuilder = apimachinerypkgruntime.SchemeBuilder{
 	admissionregistrationv1.AddToScheme,
 	admissionregistrationv1alpha1.AddToScheme,
 	admissionregistrationv1beta1.AddToScheme,
@@ -151,6 +151,6 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 var AddToScheme = localSchemeBuilder.AddToScheme
 
 func init() {
-	v1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
-	utilruntime.Must(AddToScheme(Scheme))
+	apismetav1.AddToGroupVersion(Scheme, pkgruntimeschema.GroupVersion{Version: "v1"})
+	pkgutilruntime.Must(AddToScheme(Scheme))
 }

@@ -21,13 +21,13 @@ package v1
 import (
 	"net/http"
 
-	v1 "k8s.io/api/authorization/v1"
+	apiauthorizationv1 "k8s.io/api/authorization/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 type AuthorizationV1Interface interface {
-	RESTClient() rest.Interface
+	RESTClient() clientgorest.Interface
 	LocalSubjectAccessReviewsGetter
 	SelfSubjectAccessReviewsGetter
 	SelfSubjectRulesReviewsGetter
@@ -36,7 +36,7 @@ type AuthorizationV1Interface interface {
 
 // AuthorizationV1Client is used to interact with features provided by the authorization.k8s.io group.
 type AuthorizationV1Client struct {
-	restClient rest.Interface
+	restClient clientgorest.Interface
 }
 
 func (c *AuthorizationV1Client) LocalSubjectAccessReviews(namespace string) LocalSubjectAccessReviewInterface {
@@ -58,12 +58,12 @@ func (c *AuthorizationV1Client) SubjectAccessReviews() SubjectAccessReviewInterf
 // NewForConfig creates a new AuthorizationV1Client for the given config.
 // NewForConfig is equivalent to NewForConfigAndClient(c, httpClient),
 // where httpClient was generated with rest.HTTPClientFor(c).
-func NewForConfig(c *rest.Config) (*AuthorizationV1Client, error) {
+func NewForConfig(c *clientgorest.Config) (*AuthorizationV1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	httpClient, err := rest.HTTPClientFor(&config)
+	httpClient, err := clientgorest.HTTPClientFor(&config)
 	if err != nil {
 		return nil, err
 	}
@@ -72,12 +72,12 @@ func NewForConfig(c *rest.Config) (*AuthorizationV1Client, error) {
 
 // NewForConfigAndClient creates a new AuthorizationV1Client for the given config and http client.
 // Note the http client provided takes precedence over the configured transport values.
-func NewForConfigAndClient(c *rest.Config, h *http.Client) (*AuthorizationV1Client, error) {
+func NewForConfigAndClient(c *clientgorest.Config, h *http.Client) (*AuthorizationV1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := rest.RESTClientForConfigAndClient(&config, h)
+	client, err := clientgorest.RESTClientForConfigAndClient(&config, h)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func NewForConfigAndClient(c *rest.Config, h *http.Client) (*AuthorizationV1Clie
 
 // NewForConfigOrDie creates a new AuthorizationV1Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *rest.Config) *AuthorizationV1Client {
+func NewForConfigOrDie(c *clientgorest.Config) *AuthorizationV1Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -95,18 +95,18 @@ func NewForConfigOrDie(c *rest.Config) *AuthorizationV1Client {
 }
 
 // New creates a new AuthorizationV1Client for the given RESTClient.
-func New(c rest.Interface) *AuthorizationV1Client {
+func New(c clientgorest.Interface) *AuthorizationV1Client {
 	return &AuthorizationV1Client{c}
 }
 
-func setConfigDefaults(config *rest.Config) error {
-	gv := v1.SchemeGroupVersion
+func setConfigDefaults(config *clientgorest.Config) error {
+	gv := apiauthorizationv1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
 	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 
 	if config.UserAgent == "" {
-		config.UserAgent = rest.DefaultKubernetesUserAgent()
+		config.UserAgent = clientgorest.DefaultKubernetesUserAgent()
 	}
 
 	return nil
@@ -114,7 +114,7 @@ func setConfigDefaults(config *rest.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *AuthorizationV1Client) RESTClient() rest.Interface {
+func (c *AuthorizationV1Client) RESTClient() clientgorest.Interface {
 	if c == nil {
 		return nil
 	}

@@ -20,17 +20,17 @@ package v1beta1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1beta1 "k8s.io/api/discovery/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	discoveryv1beta1 "k8s.io/client-go/applyconfigurations/discovery/v1beta1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apidiscoveryv1beta1 "k8s.io/api/discovery/v1beta1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsdiscoveryv1beta1 "k8s.io/client-go/applyconfigurations/discovery/v1beta1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // EndpointSlicesGetter has a method to return a EndpointSliceInterface.
@@ -41,21 +41,21 @@ type EndpointSlicesGetter interface {
 
 // EndpointSliceInterface has methods to work with EndpointSlice resources.
 type EndpointSliceInterface interface {
-	Create(ctx context.Context, endpointSlice *v1beta1.EndpointSlice, opts v1.CreateOptions) (*v1beta1.EndpointSlice, error)
-	Update(ctx context.Context, endpointSlice *v1beta1.EndpointSlice, opts v1.UpdateOptions) (*v1beta1.EndpointSlice, error)
-	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.EndpointSlice, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.EndpointSliceList, error)
-	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.EndpointSlice, err error)
-	Apply(ctx context.Context, endpointSlice *discoveryv1beta1.EndpointSliceApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.EndpointSlice, err error)
+	Create(ctx context.Context, endpointSlice *apidiscoveryv1beta1.EndpointSlice, opts apismetav1.CreateOptions) (*apidiscoveryv1beta1.EndpointSlice, error)
+	Update(ctx context.Context, endpointSlice *apidiscoveryv1beta1.EndpointSlice, opts apismetav1.UpdateOptions) (*apidiscoveryv1beta1.EndpointSlice, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apidiscoveryv1beta1.EndpointSlice, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apidiscoveryv1beta1.EndpointSliceList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apidiscoveryv1beta1.EndpointSlice, err error)
+	Apply(ctx context.Context, endpointSlice *applyconfigurationsdiscoveryv1beta1.EndpointSliceApplyConfiguration, opts apismetav1.ApplyOptions) (result *apidiscoveryv1beta1.EndpointSlice, err error)
 	EndpointSliceExpansion
 }
 
 // endpointSlices implements EndpointSliceInterface
 type endpointSlices struct {
-	client rest.Interface
+	client clientgorest.Interface
 	ns     string
 }
 
@@ -68,37 +68,37 @@ func newEndpointSlices(c *DiscoveryV1beta1Client, namespace string) *endpointSli
 }
 
 // Get takes name of the endpointSlice, and returns the corresponding endpointSlice object, and an error if there is any.
-func (c *endpointSlices) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.EndpointSlice, err error) {
-	result = &v1beta1.EndpointSlice{}
+func (c *endpointSlices) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apidiscoveryv1beta1.EndpointSlice, err error) {
+	result = &apidiscoveryv1beta1.EndpointSlice{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("endpointslices").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of EndpointSlices that match those selectors.
-func (c *endpointSlices) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.EndpointSliceList, err error) {
+func (c *endpointSlices) List(ctx context.Context, opts apismetav1.ListOptions) (result *apidiscoveryv1beta1.EndpointSliceList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1beta1.EndpointSliceList{}
+	result = &apidiscoveryv1beta1.EndpointSliceList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("endpointslices").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested endpointSlices.
-func (c *endpointSlices) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested endpointSlices.
+func (c *endpointSlices) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -107,18 +107,18 @@ func (c *endpointSlices) Watch(ctx context.Context, opts v1.ListOptions) (watch.
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("endpointslices").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a endpointSlice and creates it.  Returns the server's representation of the endpointSlice, and an error, if there is any.
-func (c *endpointSlices) Create(ctx context.Context, endpointSlice *v1beta1.EndpointSlice, opts v1.CreateOptions) (result *v1beta1.EndpointSlice, err error) {
-	result = &v1beta1.EndpointSlice{}
+func (c *endpointSlices) Create(ctx context.Context, endpointSlice *apidiscoveryv1beta1.EndpointSlice, opts apismetav1.CreateOptions) (result *apidiscoveryv1beta1.EndpointSlice, err error) {
+	result = &apidiscoveryv1beta1.EndpointSlice{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("endpointslices").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(endpointSlice).
 		Do(ctx).
 		Into(result)
@@ -126,13 +126,13 @@ func (c *endpointSlices) Create(ctx context.Context, endpointSlice *v1beta1.Endp
 }
 
 // Update takes the representation of a endpointSlice and updates it. Returns the server's representation of the endpointSlice, and an error, if there is any.
-func (c *endpointSlices) Update(ctx context.Context, endpointSlice *v1beta1.EndpointSlice, opts v1.UpdateOptions) (result *v1beta1.EndpointSlice, err error) {
-	result = &v1beta1.EndpointSlice{}
+func (c *endpointSlices) Update(ctx context.Context, endpointSlice *apidiscoveryv1beta1.EndpointSlice, opts apismetav1.UpdateOptions) (result *apidiscoveryv1beta1.EndpointSlice, err error) {
+	result = &apidiscoveryv1beta1.EndpointSlice{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("endpointslices").
 		Name(endpointSlice.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(endpointSlice).
 		Do(ctx).
 		Into(result)
@@ -140,7 +140,7 @@ func (c *endpointSlices) Update(ctx context.Context, endpointSlice *v1beta1.Endp
 }
 
 // Delete takes name of the endpointSlice and deletes it. Returns an error if one occurs.
-func (c *endpointSlices) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *endpointSlices) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("endpointslices").
@@ -151,7 +151,7 @@ func (c *endpointSlices) Delete(ctx context.Context, name string, opts v1.Delete
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *endpointSlices) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *endpointSlices) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
@@ -159,7 +159,7 @@ func (c *endpointSlices) DeleteCollection(ctx context.Context, opts v1.DeleteOpt
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("endpointslices").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -167,14 +167,14 @@ func (c *endpointSlices) DeleteCollection(ctx context.Context, opts v1.DeleteOpt
 }
 
 // Patch applies the patch and returns the patched endpointSlice.
-func (c *endpointSlices) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.EndpointSlice, err error) {
-	result = &v1beta1.EndpointSlice{}
+func (c *endpointSlices) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apidiscoveryv1beta1.EndpointSlice, err error) {
+	result = &apidiscoveryv1beta1.EndpointSlice{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("endpointslices").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -182,7 +182,7 @@ func (c *endpointSlices) Patch(ctx context.Context, name string, pt types.PatchT
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied endpointSlice.
-func (c *endpointSlices) Apply(ctx context.Context, endpointSlice *discoveryv1beta1.EndpointSliceApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.EndpointSlice, err error) {
+func (c *endpointSlices) Apply(ctx context.Context, endpointSlice *applyconfigurationsdiscoveryv1beta1.EndpointSliceApplyConfiguration, opts apismetav1.ApplyOptions) (result *apidiscoveryv1beta1.EndpointSlice, err error) {
 	if endpointSlice == nil {
 		return nil, fmt.Errorf("endpointSlice provided to Apply must not be nil")
 	}
@@ -195,12 +195,12 @@ func (c *endpointSlices) Apply(ctx context.Context, endpointSlice *discoveryv1be
 	if name == nil {
 		return nil, fmt.Errorf("endpointSlice.Name must be provided to Apply")
 	}
-	result = &v1beta1.EndpointSlice{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apidiscoveryv1beta1.EndpointSlice{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("endpointslices").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

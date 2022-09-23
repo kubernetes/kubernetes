@@ -20,17 +20,17 @@ package v1beta1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	admissionregistrationv1beta1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1beta1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apiadmissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsadmissionregistrationv1beta1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1beta1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // MutatingWebhookConfigurationsGetter has a method to return a MutatingWebhookConfigurationInterface.
@@ -41,21 +41,21 @@ type MutatingWebhookConfigurationsGetter interface {
 
 // MutatingWebhookConfigurationInterface has methods to work with MutatingWebhookConfiguration resources.
 type MutatingWebhookConfigurationInterface interface {
-	Create(ctx context.Context, mutatingWebhookConfiguration *v1beta1.MutatingWebhookConfiguration, opts v1.CreateOptions) (*v1beta1.MutatingWebhookConfiguration, error)
-	Update(ctx context.Context, mutatingWebhookConfiguration *v1beta1.MutatingWebhookConfiguration, opts v1.UpdateOptions) (*v1beta1.MutatingWebhookConfiguration, error)
-	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.MutatingWebhookConfiguration, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.MutatingWebhookConfigurationList, error)
-	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.MutatingWebhookConfiguration, err error)
-	Apply(ctx context.Context, mutatingWebhookConfiguration *admissionregistrationv1beta1.MutatingWebhookConfigurationApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.MutatingWebhookConfiguration, err error)
+	Create(ctx context.Context, mutatingWebhookConfiguration *apiadmissionregistrationv1beta1.MutatingWebhookConfiguration, opts apismetav1.CreateOptions) (*apiadmissionregistrationv1beta1.MutatingWebhookConfiguration, error)
+	Update(ctx context.Context, mutatingWebhookConfiguration *apiadmissionregistrationv1beta1.MutatingWebhookConfiguration, opts apismetav1.UpdateOptions) (*apiadmissionregistrationv1beta1.MutatingWebhookConfiguration, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apiadmissionregistrationv1beta1.MutatingWebhookConfiguration, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apiadmissionregistrationv1beta1.MutatingWebhookConfigurationList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apiadmissionregistrationv1beta1.MutatingWebhookConfiguration, err error)
+	Apply(ctx context.Context, mutatingWebhookConfiguration *applyconfigurationsadmissionregistrationv1beta1.MutatingWebhookConfigurationApplyConfiguration, opts apismetav1.ApplyOptions) (result *apiadmissionregistrationv1beta1.MutatingWebhookConfiguration, err error)
 	MutatingWebhookConfigurationExpansion
 }
 
 // mutatingWebhookConfigurations implements MutatingWebhookConfigurationInterface
 type mutatingWebhookConfigurations struct {
-	client rest.Interface
+	client clientgorest.Interface
 }
 
 // newMutatingWebhookConfigurations returns a MutatingWebhookConfigurations
@@ -66,35 +66,35 @@ func newMutatingWebhookConfigurations(c *AdmissionregistrationV1beta1Client) *mu
 }
 
 // Get takes name of the mutatingWebhookConfiguration, and returns the corresponding mutatingWebhookConfiguration object, and an error if there is any.
-func (c *mutatingWebhookConfigurations) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.MutatingWebhookConfiguration, err error) {
-	result = &v1beta1.MutatingWebhookConfiguration{}
+func (c *mutatingWebhookConfigurations) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apiadmissionregistrationv1beta1.MutatingWebhookConfiguration, err error) {
+	result = &apiadmissionregistrationv1beta1.MutatingWebhookConfiguration{}
 	err = c.client.Get().
 		Resource("mutatingwebhookconfigurations").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of MutatingWebhookConfigurations that match those selectors.
-func (c *mutatingWebhookConfigurations) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.MutatingWebhookConfigurationList, err error) {
+func (c *mutatingWebhookConfigurations) List(ctx context.Context, opts apismetav1.ListOptions) (result *apiadmissionregistrationv1beta1.MutatingWebhookConfigurationList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1beta1.MutatingWebhookConfigurationList{}
+	result = &apiadmissionregistrationv1beta1.MutatingWebhookConfigurationList{}
 	err = c.client.Get().
 		Resource("mutatingwebhookconfigurations").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested mutatingWebhookConfigurations.
-func (c *mutatingWebhookConfigurations) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested mutatingWebhookConfigurations.
+func (c *mutatingWebhookConfigurations) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -102,17 +102,17 @@ func (c *mutatingWebhookConfigurations) Watch(ctx context.Context, opts v1.ListO
 	opts.Watch = true
 	return c.client.Get().
 		Resource("mutatingwebhookconfigurations").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a mutatingWebhookConfiguration and creates it.  Returns the server's representation of the mutatingWebhookConfiguration, and an error, if there is any.
-func (c *mutatingWebhookConfigurations) Create(ctx context.Context, mutatingWebhookConfiguration *v1beta1.MutatingWebhookConfiguration, opts v1.CreateOptions) (result *v1beta1.MutatingWebhookConfiguration, err error) {
-	result = &v1beta1.MutatingWebhookConfiguration{}
+func (c *mutatingWebhookConfigurations) Create(ctx context.Context, mutatingWebhookConfiguration *apiadmissionregistrationv1beta1.MutatingWebhookConfiguration, opts apismetav1.CreateOptions) (result *apiadmissionregistrationv1beta1.MutatingWebhookConfiguration, err error) {
+	result = &apiadmissionregistrationv1beta1.MutatingWebhookConfiguration{}
 	err = c.client.Post().
 		Resource("mutatingwebhookconfigurations").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(mutatingWebhookConfiguration).
 		Do(ctx).
 		Into(result)
@@ -120,12 +120,12 @@ func (c *mutatingWebhookConfigurations) Create(ctx context.Context, mutatingWebh
 }
 
 // Update takes the representation of a mutatingWebhookConfiguration and updates it. Returns the server's representation of the mutatingWebhookConfiguration, and an error, if there is any.
-func (c *mutatingWebhookConfigurations) Update(ctx context.Context, mutatingWebhookConfiguration *v1beta1.MutatingWebhookConfiguration, opts v1.UpdateOptions) (result *v1beta1.MutatingWebhookConfiguration, err error) {
-	result = &v1beta1.MutatingWebhookConfiguration{}
+func (c *mutatingWebhookConfigurations) Update(ctx context.Context, mutatingWebhookConfiguration *apiadmissionregistrationv1beta1.MutatingWebhookConfiguration, opts apismetav1.UpdateOptions) (result *apiadmissionregistrationv1beta1.MutatingWebhookConfiguration, err error) {
+	result = &apiadmissionregistrationv1beta1.MutatingWebhookConfiguration{}
 	err = c.client.Put().
 		Resource("mutatingwebhookconfigurations").
 		Name(mutatingWebhookConfiguration.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(mutatingWebhookConfiguration).
 		Do(ctx).
 		Into(result)
@@ -133,7 +133,7 @@ func (c *mutatingWebhookConfigurations) Update(ctx context.Context, mutatingWebh
 }
 
 // Delete takes name of the mutatingWebhookConfiguration and deletes it. Returns an error if one occurs.
-func (c *mutatingWebhookConfigurations) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *mutatingWebhookConfigurations) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("mutatingwebhookconfigurations").
 		Name(name).
@@ -143,14 +143,14 @@ func (c *mutatingWebhookConfigurations) Delete(ctx context.Context, name string,
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *mutatingWebhookConfigurations) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *mutatingWebhookConfigurations) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Resource("mutatingwebhookconfigurations").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -158,13 +158,13 @@ func (c *mutatingWebhookConfigurations) DeleteCollection(ctx context.Context, op
 }
 
 // Patch applies the patch and returns the patched mutatingWebhookConfiguration.
-func (c *mutatingWebhookConfigurations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.MutatingWebhookConfiguration, err error) {
-	result = &v1beta1.MutatingWebhookConfiguration{}
+func (c *mutatingWebhookConfigurations) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apiadmissionregistrationv1beta1.MutatingWebhookConfiguration, err error) {
+	result = &apiadmissionregistrationv1beta1.MutatingWebhookConfiguration{}
 	err = c.client.Patch(pt).
 		Resource("mutatingwebhookconfigurations").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -172,7 +172,7 @@ func (c *mutatingWebhookConfigurations) Patch(ctx context.Context, name string, 
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied mutatingWebhookConfiguration.
-func (c *mutatingWebhookConfigurations) Apply(ctx context.Context, mutatingWebhookConfiguration *admissionregistrationv1beta1.MutatingWebhookConfigurationApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.MutatingWebhookConfiguration, err error) {
+func (c *mutatingWebhookConfigurations) Apply(ctx context.Context, mutatingWebhookConfiguration *applyconfigurationsadmissionregistrationv1beta1.MutatingWebhookConfigurationApplyConfiguration, opts apismetav1.ApplyOptions) (result *apiadmissionregistrationv1beta1.MutatingWebhookConfiguration, err error) {
 	if mutatingWebhookConfiguration == nil {
 		return nil, fmt.Errorf("mutatingWebhookConfiguration provided to Apply must not be nil")
 	}
@@ -185,11 +185,11 @@ func (c *mutatingWebhookConfigurations) Apply(ctx context.Context, mutatingWebho
 	if name == nil {
 		return nil, fmt.Errorf("mutatingWebhookConfiguration.Name must be provided to Apply")
 	}
-	result = &v1beta1.MutatingWebhookConfiguration{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apiadmissionregistrationv1beta1.MutatingWebhookConfiguration{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Resource("mutatingwebhookconfigurations").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

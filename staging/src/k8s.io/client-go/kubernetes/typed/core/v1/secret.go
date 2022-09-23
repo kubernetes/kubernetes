@@ -20,17 +20,17 @@ package v1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apicorev1 "k8s.io/api/core/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // SecretsGetter has a method to return a SecretInterface.
@@ -41,21 +41,21 @@ type SecretsGetter interface {
 
 // SecretInterface has methods to work with Secret resources.
 type SecretInterface interface {
-	Create(ctx context.Context, secret *v1.Secret, opts metav1.CreateOptions) (*v1.Secret, error)
-	Update(ctx context.Context, secret *v1.Secret, opts metav1.UpdateOptions) (*v1.Secret, error)
-	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Secret, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.SecretList, error)
-	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Secret, err error)
-	Apply(ctx context.Context, secret *corev1.SecretApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Secret, err error)
+	Create(ctx context.Context, secret *apicorev1.Secret, opts apismetav1.CreateOptions) (*apicorev1.Secret, error)
+	Update(ctx context.Context, secret *apicorev1.Secret, opts apismetav1.UpdateOptions) (*apicorev1.Secret, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apicorev1.Secret, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apicorev1.SecretList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apicorev1.Secret, err error)
+	Apply(ctx context.Context, secret *applyconfigurationscorev1.SecretApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.Secret, err error)
 	SecretExpansion
 }
 
 // secrets implements SecretInterface
 type secrets struct {
-	client rest.Interface
+	client clientgorest.Interface
 	ns     string
 }
 
@@ -68,37 +68,37 @@ func newSecrets(c *CoreV1Client, namespace string) *secrets {
 }
 
 // Get takes name of the secret, and returns the corresponding secret object, and an error if there is any.
-func (c *secrets) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Secret, err error) {
-	result = &v1.Secret{}
+func (c *secrets) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apicorev1.Secret, err error) {
+	result = &apicorev1.Secret{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("secrets").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Secrets that match those selectors.
-func (c *secrets) List(ctx context.Context, opts metav1.ListOptions) (result *v1.SecretList, err error) {
+func (c *secrets) List(ctx context.Context, opts apismetav1.ListOptions) (result *apicorev1.SecretList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1.SecretList{}
+	result = &apicorev1.SecretList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("secrets").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested secrets.
-func (c *secrets) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested secrets.
+func (c *secrets) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -107,18 +107,18 @@ func (c *secrets) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Int
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("secrets").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a secret and creates it.  Returns the server's representation of the secret, and an error, if there is any.
-func (c *secrets) Create(ctx context.Context, secret *v1.Secret, opts metav1.CreateOptions) (result *v1.Secret, err error) {
-	result = &v1.Secret{}
+func (c *secrets) Create(ctx context.Context, secret *apicorev1.Secret, opts apismetav1.CreateOptions) (result *apicorev1.Secret, err error) {
+	result = &apicorev1.Secret{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("secrets").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(secret).
 		Do(ctx).
 		Into(result)
@@ -126,13 +126,13 @@ func (c *secrets) Create(ctx context.Context, secret *v1.Secret, opts metav1.Cre
 }
 
 // Update takes the representation of a secret and updates it. Returns the server's representation of the secret, and an error, if there is any.
-func (c *secrets) Update(ctx context.Context, secret *v1.Secret, opts metav1.UpdateOptions) (result *v1.Secret, err error) {
-	result = &v1.Secret{}
+func (c *secrets) Update(ctx context.Context, secret *apicorev1.Secret, opts apismetav1.UpdateOptions) (result *apicorev1.Secret, err error) {
+	result = &apicorev1.Secret{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("secrets").
 		Name(secret.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(secret).
 		Do(ctx).
 		Into(result)
@@ -140,7 +140,7 @@ func (c *secrets) Update(ctx context.Context, secret *v1.Secret, opts metav1.Upd
 }
 
 // Delete takes name of the secret and deletes it. Returns an error if one occurs.
-func (c *secrets) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
+func (c *secrets) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("secrets").
@@ -151,7 +151,7 @@ func (c *secrets) Delete(ctx context.Context, name string, opts metav1.DeleteOpt
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *secrets) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+func (c *secrets) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
@@ -159,7 +159,7 @@ func (c *secrets) DeleteCollection(ctx context.Context, opts metav1.DeleteOption
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("secrets").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -167,14 +167,14 @@ func (c *secrets) DeleteCollection(ctx context.Context, opts metav1.DeleteOption
 }
 
 // Patch applies the patch and returns the patched secret.
-func (c *secrets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Secret, err error) {
-	result = &v1.Secret{}
+func (c *secrets) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apicorev1.Secret, err error) {
+	result = &apicorev1.Secret{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("secrets").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -182,7 +182,7 @@ func (c *secrets) Patch(ctx context.Context, name string, pt types.PatchType, da
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied secret.
-func (c *secrets) Apply(ctx context.Context, secret *corev1.SecretApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Secret, err error) {
+func (c *secrets) Apply(ctx context.Context, secret *applyconfigurationscorev1.SecretApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.Secret, err error) {
 	if secret == nil {
 		return nil, fmt.Errorf("secret provided to Apply must not be nil")
 	}
@@ -195,12 +195,12 @@ func (c *secrets) Apply(ctx context.Context, secret *corev1.SecretApplyConfigura
 	if name == nil {
 		return nil, fmt.Errorf("secret.Name must be provided to Apply")
 	}
-	result = &v1.Secret{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apicorev1.Secret{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("secrets").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

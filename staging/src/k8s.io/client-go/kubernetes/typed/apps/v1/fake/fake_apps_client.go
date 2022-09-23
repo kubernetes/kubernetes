@@ -20,12 +20,12 @@ package fake
 
 import (
 	v1 "k8s.io/client-go/kubernetes/typed/apps/v1"
-	rest "k8s.io/client-go/rest"
-	testing "k8s.io/client-go/testing"
+	clientgorest "k8s.io/client-go/rest"
+	clientgotesting "k8s.io/client-go/testing"
 )
 
 type FakeAppsV1 struct {
-	*testing.Fake
+	*clientgotesting.Fake
 }
 
 func (c *FakeAppsV1) ControllerRevisions(namespace string) v1.ControllerRevisionInterface {
@@ -50,7 +50,7 @@ func (c *FakeAppsV1) StatefulSets(namespace string) v1.StatefulSetInterface {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeAppsV1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
+func (c *FakeAppsV1) RESTClient() clientgorest.Interface {
+	var ret *clientgorest.RESTClient
 	return ret
 }

@@ -21,10 +21,10 @@ package v1alpha1
 import (
 	"context"
 
-	v1alpha1 "k8s.io/api/authentication/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apiauthenticationv1alpha1 "k8s.io/api/authentication/v1alpha1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // SelfSubjectReviewsGetter has a method to return a SelfSubjectReviewInterface.
@@ -35,13 +35,13 @@ type SelfSubjectReviewsGetter interface {
 
 // SelfSubjectReviewInterface has methods to work with SelfSubjectReview resources.
 type SelfSubjectReviewInterface interface {
-	Create(ctx context.Context, selfSubjectReview *v1alpha1.SelfSubjectReview, opts v1.CreateOptions) (*v1alpha1.SelfSubjectReview, error)
+	Create(ctx context.Context, selfSubjectReview *apiauthenticationv1alpha1.SelfSubjectReview, opts apismetav1.CreateOptions) (*apiauthenticationv1alpha1.SelfSubjectReview, error)
 	SelfSubjectReviewExpansion
 }
 
 // selfSubjectReviews implements SelfSubjectReviewInterface
 type selfSubjectReviews struct {
-	client rest.Interface
+	client clientgorest.Interface
 }
 
 // newSelfSubjectReviews returns a SelfSubjectReviews
@@ -52,11 +52,11 @@ func newSelfSubjectReviews(c *AuthenticationV1alpha1Client) *selfSubjectReviews 
 }
 
 // Create takes the representation of a selfSubjectReview and creates it.  Returns the server's representation of the selfSubjectReview, and an error, if there is any.
-func (c *selfSubjectReviews) Create(ctx context.Context, selfSubjectReview *v1alpha1.SelfSubjectReview, opts v1.CreateOptions) (result *v1alpha1.SelfSubjectReview, err error) {
-	result = &v1alpha1.SelfSubjectReview{}
+func (c *selfSubjectReviews) Create(ctx context.Context, selfSubjectReview *apiauthenticationv1alpha1.SelfSubjectReview, opts apismetav1.CreateOptions) (result *apiauthenticationv1alpha1.SelfSubjectReview, err error) {
+	result = &apiauthenticationv1alpha1.SelfSubjectReview{}
 	err = c.client.Post().
 		Resource("selfsubjectreviews").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(selfSubjectReview).
 		Do(ctx).
 		Into(result)

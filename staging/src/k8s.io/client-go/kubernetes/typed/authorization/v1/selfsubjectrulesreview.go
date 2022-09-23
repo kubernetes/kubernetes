@@ -21,10 +21,10 @@ package v1
 import (
 	"context"
 
-	v1 "k8s.io/api/authorization/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apiauthorizationv1 "k8s.io/api/authorization/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // SelfSubjectRulesReviewsGetter has a method to return a SelfSubjectRulesReviewInterface.
@@ -35,13 +35,13 @@ type SelfSubjectRulesReviewsGetter interface {
 
 // SelfSubjectRulesReviewInterface has methods to work with SelfSubjectRulesReview resources.
 type SelfSubjectRulesReviewInterface interface {
-	Create(ctx context.Context, selfSubjectRulesReview *v1.SelfSubjectRulesReview, opts metav1.CreateOptions) (*v1.SelfSubjectRulesReview, error)
+	Create(ctx context.Context, selfSubjectRulesReview *apiauthorizationv1.SelfSubjectRulesReview, opts apismetav1.CreateOptions) (*apiauthorizationv1.SelfSubjectRulesReview, error)
 	SelfSubjectRulesReviewExpansion
 }
 
 // selfSubjectRulesReviews implements SelfSubjectRulesReviewInterface
 type selfSubjectRulesReviews struct {
-	client rest.Interface
+	client clientgorest.Interface
 }
 
 // newSelfSubjectRulesReviews returns a SelfSubjectRulesReviews
@@ -52,11 +52,11 @@ func newSelfSubjectRulesReviews(c *AuthorizationV1Client) *selfSubjectRulesRevie
 }
 
 // Create takes the representation of a selfSubjectRulesReview and creates it.  Returns the server's representation of the selfSubjectRulesReview, and an error, if there is any.
-func (c *selfSubjectRulesReviews) Create(ctx context.Context, selfSubjectRulesReview *v1.SelfSubjectRulesReview, opts metav1.CreateOptions) (result *v1.SelfSubjectRulesReview, err error) {
-	result = &v1.SelfSubjectRulesReview{}
+func (c *selfSubjectRulesReviews) Create(ctx context.Context, selfSubjectRulesReview *apiauthorizationv1.SelfSubjectRulesReview, opts apismetav1.CreateOptions) (result *apiauthorizationv1.SelfSubjectRulesReview, err error) {
+	result = &apiauthorizationv1.SelfSubjectRulesReview{}
 	err = c.client.Post().
 		Resource("selfsubjectrulesreviews").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(selfSubjectRulesReview).
 		Do(ctx).
 		Into(result)

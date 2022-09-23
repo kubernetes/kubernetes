@@ -21,10 +21,10 @@ package v1beta1
 import (
 	"context"
 
-	v1beta1 "k8s.io/api/authorization/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apiauthorizationv1beta1 "k8s.io/api/authorization/v1beta1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // SubjectAccessReviewsGetter has a method to return a SubjectAccessReviewInterface.
@@ -35,13 +35,13 @@ type SubjectAccessReviewsGetter interface {
 
 // SubjectAccessReviewInterface has methods to work with SubjectAccessReview resources.
 type SubjectAccessReviewInterface interface {
-	Create(ctx context.Context, subjectAccessReview *v1beta1.SubjectAccessReview, opts v1.CreateOptions) (*v1beta1.SubjectAccessReview, error)
+	Create(ctx context.Context, subjectAccessReview *apiauthorizationv1beta1.SubjectAccessReview, opts apismetav1.CreateOptions) (*apiauthorizationv1beta1.SubjectAccessReview, error)
 	SubjectAccessReviewExpansion
 }
 
 // subjectAccessReviews implements SubjectAccessReviewInterface
 type subjectAccessReviews struct {
-	client rest.Interface
+	client clientgorest.Interface
 }
 
 // newSubjectAccessReviews returns a SubjectAccessReviews
@@ -52,11 +52,11 @@ func newSubjectAccessReviews(c *AuthorizationV1beta1Client) *subjectAccessReview
 }
 
 // Create takes the representation of a subjectAccessReview and creates it.  Returns the server's representation of the subjectAccessReview, and an error, if there is any.
-func (c *subjectAccessReviews) Create(ctx context.Context, subjectAccessReview *v1beta1.SubjectAccessReview, opts v1.CreateOptions) (result *v1beta1.SubjectAccessReview, err error) {
-	result = &v1beta1.SubjectAccessReview{}
+func (c *subjectAccessReviews) Create(ctx context.Context, subjectAccessReview *apiauthorizationv1beta1.SubjectAccessReview, opts apismetav1.CreateOptions) (result *apiauthorizationv1beta1.SubjectAccessReview, err error) {
+	result = &apiauthorizationv1beta1.SubjectAccessReview{}
 	err = c.client.Post().
 		Resource("subjectaccessreviews").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(subjectAccessReview).
 		Do(ctx).
 		Into(result)

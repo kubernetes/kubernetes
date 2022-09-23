@@ -20,17 +20,17 @@ package v1alpha1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1alpha1 "k8s.io/api/rbac/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	rbacv1alpha1 "k8s.io/client-go/applyconfigurations/rbac/v1alpha1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apirbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsrbacv1alpha1 "k8s.io/client-go/applyconfigurations/rbac/v1alpha1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // RolesGetter has a method to return a RoleInterface.
@@ -41,21 +41,21 @@ type RolesGetter interface {
 
 // RoleInterface has methods to work with Role resources.
 type RoleInterface interface {
-	Create(ctx context.Context, role *v1alpha1.Role, opts v1.CreateOptions) (*v1alpha1.Role, error)
-	Update(ctx context.Context, role *v1alpha1.Role, opts v1.UpdateOptions) (*v1alpha1.Role, error)
-	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.Role, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.RoleList, error)
-	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Role, err error)
-	Apply(ctx context.Context, role *rbacv1alpha1.RoleApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.Role, err error)
+	Create(ctx context.Context, role *apirbacv1alpha1.Role, opts apismetav1.CreateOptions) (*apirbacv1alpha1.Role, error)
+	Update(ctx context.Context, role *apirbacv1alpha1.Role, opts apismetav1.UpdateOptions) (*apirbacv1alpha1.Role, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apirbacv1alpha1.Role, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apirbacv1alpha1.RoleList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apirbacv1alpha1.Role, err error)
+	Apply(ctx context.Context, role *applyconfigurationsrbacv1alpha1.RoleApplyConfiguration, opts apismetav1.ApplyOptions) (result *apirbacv1alpha1.Role, err error)
 	RoleExpansion
 }
 
 // roles implements RoleInterface
 type roles struct {
-	client rest.Interface
+	client clientgorest.Interface
 	ns     string
 }
 
@@ -68,37 +68,37 @@ func newRoles(c *RbacV1alpha1Client, namespace string) *roles {
 }
 
 // Get takes name of the role, and returns the corresponding role object, and an error if there is any.
-func (c *roles) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.Role, err error) {
-	result = &v1alpha1.Role{}
+func (c *roles) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apirbacv1alpha1.Role, err error) {
+	result = &apirbacv1alpha1.Role{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("roles").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Roles that match those selectors.
-func (c *roles) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.RoleList, err error) {
+func (c *roles) List(ctx context.Context, opts apismetav1.ListOptions) (result *apirbacv1alpha1.RoleList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1alpha1.RoleList{}
+	result = &apirbacv1alpha1.RoleList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("roles").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested roles.
-func (c *roles) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested roles.
+func (c *roles) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -107,18 +107,18 @@ func (c *roles) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("roles").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a role and creates it.  Returns the server's representation of the role, and an error, if there is any.
-func (c *roles) Create(ctx context.Context, role *v1alpha1.Role, opts v1.CreateOptions) (result *v1alpha1.Role, err error) {
-	result = &v1alpha1.Role{}
+func (c *roles) Create(ctx context.Context, role *apirbacv1alpha1.Role, opts apismetav1.CreateOptions) (result *apirbacv1alpha1.Role, err error) {
+	result = &apirbacv1alpha1.Role{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("roles").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(role).
 		Do(ctx).
 		Into(result)
@@ -126,13 +126,13 @@ func (c *roles) Create(ctx context.Context, role *v1alpha1.Role, opts v1.CreateO
 }
 
 // Update takes the representation of a role and updates it. Returns the server's representation of the role, and an error, if there is any.
-func (c *roles) Update(ctx context.Context, role *v1alpha1.Role, opts v1.UpdateOptions) (result *v1alpha1.Role, err error) {
-	result = &v1alpha1.Role{}
+func (c *roles) Update(ctx context.Context, role *apirbacv1alpha1.Role, opts apismetav1.UpdateOptions) (result *apirbacv1alpha1.Role, err error) {
+	result = &apirbacv1alpha1.Role{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("roles").
 		Name(role.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(role).
 		Do(ctx).
 		Into(result)
@@ -140,7 +140,7 @@ func (c *roles) Update(ctx context.Context, role *v1alpha1.Role, opts v1.UpdateO
 }
 
 // Delete takes name of the role and deletes it. Returns an error if one occurs.
-func (c *roles) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *roles) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("roles").
@@ -151,7 +151,7 @@ func (c *roles) Delete(ctx context.Context, name string, opts v1.DeleteOptions) 
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *roles) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *roles) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
@@ -159,7 +159,7 @@ func (c *roles) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, lis
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("roles").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -167,14 +167,14 @@ func (c *roles) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, lis
 }
 
 // Patch applies the patch and returns the patched role.
-func (c *roles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Role, err error) {
-	result = &v1alpha1.Role{}
+func (c *roles) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apirbacv1alpha1.Role, err error) {
+	result = &apirbacv1alpha1.Role{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("roles").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -182,7 +182,7 @@ func (c *roles) Patch(ctx context.Context, name string, pt types.PatchType, data
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied role.
-func (c *roles) Apply(ctx context.Context, role *rbacv1alpha1.RoleApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.Role, err error) {
+func (c *roles) Apply(ctx context.Context, role *applyconfigurationsrbacv1alpha1.RoleApplyConfiguration, opts apismetav1.ApplyOptions) (result *apirbacv1alpha1.Role, err error) {
 	if role == nil {
 		return nil, fmt.Errorf("role provided to Apply must not be nil")
 	}
@@ -195,12 +195,12 @@ func (c *roles) Apply(ctx context.Context, role *rbacv1alpha1.RoleApplyConfigura
 	if name == nil {
 		return nil, fmt.Errorf("role.Name must be provided to Apply")
 	}
-	result = &v1alpha1.Role{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apirbacv1alpha1.Role{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("roles").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

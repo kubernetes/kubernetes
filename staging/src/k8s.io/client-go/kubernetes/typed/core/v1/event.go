@@ -20,17 +20,17 @@ package v1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apicorev1 "k8s.io/api/core/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // EventsGetter has a method to return a EventInterface.
@@ -41,21 +41,21 @@ type EventsGetter interface {
 
 // EventInterface has methods to work with Event resources.
 type EventInterface interface {
-	Create(ctx context.Context, event *v1.Event, opts metav1.CreateOptions) (*v1.Event, error)
-	Update(ctx context.Context, event *v1.Event, opts metav1.UpdateOptions) (*v1.Event, error)
-	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Event, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.EventList, error)
-	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Event, err error)
-	Apply(ctx context.Context, event *corev1.EventApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Event, err error)
+	Create(ctx context.Context, event *apicorev1.Event, opts apismetav1.CreateOptions) (*apicorev1.Event, error)
+	Update(ctx context.Context, event *apicorev1.Event, opts apismetav1.UpdateOptions) (*apicorev1.Event, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apicorev1.Event, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apicorev1.EventList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apicorev1.Event, err error)
+	Apply(ctx context.Context, event *applyconfigurationscorev1.EventApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.Event, err error)
 	EventExpansion
 }
 
 // events implements EventInterface
 type events struct {
-	client rest.Interface
+	client clientgorest.Interface
 	ns     string
 }
 
@@ -68,37 +68,37 @@ func newEvents(c *CoreV1Client, namespace string) *events {
 }
 
 // Get takes name of the event, and returns the corresponding event object, and an error if there is any.
-func (c *events) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Event, err error) {
-	result = &v1.Event{}
+func (c *events) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apicorev1.Event, err error) {
+	result = &apicorev1.Event{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("events").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Events that match those selectors.
-func (c *events) List(ctx context.Context, opts metav1.ListOptions) (result *v1.EventList, err error) {
+func (c *events) List(ctx context.Context, opts apismetav1.ListOptions) (result *apicorev1.EventList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1.EventList{}
+	result = &apicorev1.EventList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("events").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested events.
-func (c *events) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested events.
+func (c *events) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -107,18 +107,18 @@ func (c *events) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Inte
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("events").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a event and creates it.  Returns the server's representation of the event, and an error, if there is any.
-func (c *events) Create(ctx context.Context, event *v1.Event, opts metav1.CreateOptions) (result *v1.Event, err error) {
-	result = &v1.Event{}
+func (c *events) Create(ctx context.Context, event *apicorev1.Event, opts apismetav1.CreateOptions) (result *apicorev1.Event, err error) {
+	result = &apicorev1.Event{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("events").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(event).
 		Do(ctx).
 		Into(result)
@@ -126,13 +126,13 @@ func (c *events) Create(ctx context.Context, event *v1.Event, opts metav1.Create
 }
 
 // Update takes the representation of a event and updates it. Returns the server's representation of the event, and an error, if there is any.
-func (c *events) Update(ctx context.Context, event *v1.Event, opts metav1.UpdateOptions) (result *v1.Event, err error) {
-	result = &v1.Event{}
+func (c *events) Update(ctx context.Context, event *apicorev1.Event, opts apismetav1.UpdateOptions) (result *apicorev1.Event, err error) {
+	result = &apicorev1.Event{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("events").
 		Name(event.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(event).
 		Do(ctx).
 		Into(result)
@@ -140,7 +140,7 @@ func (c *events) Update(ctx context.Context, event *v1.Event, opts metav1.Update
 }
 
 // Delete takes name of the event and deletes it. Returns an error if one occurs.
-func (c *events) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
+func (c *events) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("events").
@@ -151,7 +151,7 @@ func (c *events) Delete(ctx context.Context, name string, opts metav1.DeleteOpti
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *events) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+func (c *events) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
@@ -159,7 +159,7 @@ func (c *events) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("events").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -167,14 +167,14 @@ func (c *events) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions
 }
 
 // Patch applies the patch and returns the patched event.
-func (c *events) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Event, err error) {
-	result = &v1.Event{}
+func (c *events) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apicorev1.Event, err error) {
+	result = &apicorev1.Event{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("events").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -182,7 +182,7 @@ func (c *events) Patch(ctx context.Context, name string, pt types.PatchType, dat
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied event.
-func (c *events) Apply(ctx context.Context, event *corev1.EventApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Event, err error) {
+func (c *events) Apply(ctx context.Context, event *applyconfigurationscorev1.EventApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.Event, err error) {
 	if event == nil {
 		return nil, fmt.Errorf("event provided to Apply must not be nil")
 	}
@@ -195,12 +195,12 @@ func (c *events) Apply(ctx context.Context, event *corev1.EventApplyConfiguratio
 	if name == nil {
 		return nil, fmt.Errorf("event.Name must be provided to Apply")
 	}
-	result = &v1.Event{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apicorev1.Event{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("events").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

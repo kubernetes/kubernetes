@@ -20,17 +20,17 @@ package v1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1 "k8s.io/api/coordination/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	coordinationv1 "k8s.io/client-go/applyconfigurations/coordination/v1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apicoordinationv1 "k8s.io/api/coordination/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationscoordinationv1 "k8s.io/client-go/applyconfigurations/coordination/v1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // LeasesGetter has a method to return a LeaseInterface.
@@ -41,21 +41,21 @@ type LeasesGetter interface {
 
 // LeaseInterface has methods to work with Lease resources.
 type LeaseInterface interface {
-	Create(ctx context.Context, lease *v1.Lease, opts metav1.CreateOptions) (*v1.Lease, error)
-	Update(ctx context.Context, lease *v1.Lease, opts metav1.UpdateOptions) (*v1.Lease, error)
-	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Lease, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.LeaseList, error)
-	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Lease, err error)
-	Apply(ctx context.Context, lease *coordinationv1.LeaseApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Lease, err error)
+	Create(ctx context.Context, lease *apicoordinationv1.Lease, opts apismetav1.CreateOptions) (*apicoordinationv1.Lease, error)
+	Update(ctx context.Context, lease *apicoordinationv1.Lease, opts apismetav1.UpdateOptions) (*apicoordinationv1.Lease, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apicoordinationv1.Lease, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apicoordinationv1.LeaseList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apicoordinationv1.Lease, err error)
+	Apply(ctx context.Context, lease *applyconfigurationscoordinationv1.LeaseApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicoordinationv1.Lease, err error)
 	LeaseExpansion
 }
 
 // leases implements LeaseInterface
 type leases struct {
-	client rest.Interface
+	client clientgorest.Interface
 	ns     string
 }
 
@@ -68,37 +68,37 @@ func newLeases(c *CoordinationV1Client, namespace string) *leases {
 }
 
 // Get takes name of the lease, and returns the corresponding lease object, and an error if there is any.
-func (c *leases) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Lease, err error) {
-	result = &v1.Lease{}
+func (c *leases) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apicoordinationv1.Lease, err error) {
+	result = &apicoordinationv1.Lease{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("leases").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Leases that match those selectors.
-func (c *leases) List(ctx context.Context, opts metav1.ListOptions) (result *v1.LeaseList, err error) {
+func (c *leases) List(ctx context.Context, opts apismetav1.ListOptions) (result *apicoordinationv1.LeaseList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1.LeaseList{}
+	result = &apicoordinationv1.LeaseList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("leases").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested leases.
-func (c *leases) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested leases.
+func (c *leases) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -107,18 +107,18 @@ func (c *leases) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Inte
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("leases").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a lease and creates it.  Returns the server's representation of the lease, and an error, if there is any.
-func (c *leases) Create(ctx context.Context, lease *v1.Lease, opts metav1.CreateOptions) (result *v1.Lease, err error) {
-	result = &v1.Lease{}
+func (c *leases) Create(ctx context.Context, lease *apicoordinationv1.Lease, opts apismetav1.CreateOptions) (result *apicoordinationv1.Lease, err error) {
+	result = &apicoordinationv1.Lease{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("leases").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(lease).
 		Do(ctx).
 		Into(result)
@@ -126,13 +126,13 @@ func (c *leases) Create(ctx context.Context, lease *v1.Lease, opts metav1.Create
 }
 
 // Update takes the representation of a lease and updates it. Returns the server's representation of the lease, and an error, if there is any.
-func (c *leases) Update(ctx context.Context, lease *v1.Lease, opts metav1.UpdateOptions) (result *v1.Lease, err error) {
-	result = &v1.Lease{}
+func (c *leases) Update(ctx context.Context, lease *apicoordinationv1.Lease, opts apismetav1.UpdateOptions) (result *apicoordinationv1.Lease, err error) {
+	result = &apicoordinationv1.Lease{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("leases").
 		Name(lease.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(lease).
 		Do(ctx).
 		Into(result)
@@ -140,7 +140,7 @@ func (c *leases) Update(ctx context.Context, lease *v1.Lease, opts metav1.Update
 }
 
 // Delete takes name of the lease and deletes it. Returns an error if one occurs.
-func (c *leases) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
+func (c *leases) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("leases").
@@ -151,7 +151,7 @@ func (c *leases) Delete(ctx context.Context, name string, opts metav1.DeleteOpti
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *leases) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+func (c *leases) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
@@ -159,7 +159,7 @@ func (c *leases) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("leases").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -167,14 +167,14 @@ func (c *leases) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions
 }
 
 // Patch applies the patch and returns the patched lease.
-func (c *leases) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Lease, err error) {
-	result = &v1.Lease{}
+func (c *leases) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apicoordinationv1.Lease, err error) {
+	result = &apicoordinationv1.Lease{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("leases").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -182,7 +182,7 @@ func (c *leases) Patch(ctx context.Context, name string, pt types.PatchType, dat
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied lease.
-func (c *leases) Apply(ctx context.Context, lease *coordinationv1.LeaseApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Lease, err error) {
+func (c *leases) Apply(ctx context.Context, lease *applyconfigurationscoordinationv1.LeaseApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicoordinationv1.Lease, err error) {
 	if lease == nil {
 		return nil, fmt.Errorf("lease provided to Apply must not be nil")
 	}
@@ -195,12 +195,12 @@ func (c *leases) Apply(ctx context.Context, lease *coordinationv1.LeaseApplyConf
 	if name == nil {
 		return nil, fmt.Errorf("lease.Name must be provided to Apply")
 	}
-	result = &v1.Lease{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apicoordinationv1.Lease{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("leases").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

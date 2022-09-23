@@ -20,17 +20,17 @@ package v1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apicorev1 "k8s.io/api/core/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // PersistentVolumeClaimsGetter has a method to return a PersistentVolumeClaimInterface.
@@ -41,23 +41,23 @@ type PersistentVolumeClaimsGetter interface {
 
 // PersistentVolumeClaimInterface has methods to work with PersistentVolumeClaim resources.
 type PersistentVolumeClaimInterface interface {
-	Create(ctx context.Context, persistentVolumeClaim *v1.PersistentVolumeClaim, opts metav1.CreateOptions) (*v1.PersistentVolumeClaim, error)
-	Update(ctx context.Context, persistentVolumeClaim *v1.PersistentVolumeClaim, opts metav1.UpdateOptions) (*v1.PersistentVolumeClaim, error)
-	UpdateStatus(ctx context.Context, persistentVolumeClaim *v1.PersistentVolumeClaim, opts metav1.UpdateOptions) (*v1.PersistentVolumeClaim, error)
-	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.PersistentVolumeClaim, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.PersistentVolumeClaimList, error)
-	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PersistentVolumeClaim, err error)
-	Apply(ctx context.Context, persistentVolumeClaim *corev1.PersistentVolumeClaimApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PersistentVolumeClaim, err error)
-	ApplyStatus(ctx context.Context, persistentVolumeClaim *corev1.PersistentVolumeClaimApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PersistentVolumeClaim, err error)
+	Create(ctx context.Context, persistentVolumeClaim *apicorev1.PersistentVolumeClaim, opts apismetav1.CreateOptions) (*apicorev1.PersistentVolumeClaim, error)
+	Update(ctx context.Context, persistentVolumeClaim *apicorev1.PersistentVolumeClaim, opts apismetav1.UpdateOptions) (*apicorev1.PersistentVolumeClaim, error)
+	UpdateStatus(ctx context.Context, persistentVolumeClaim *apicorev1.PersistentVolumeClaim, opts apismetav1.UpdateOptions) (*apicorev1.PersistentVolumeClaim, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apicorev1.PersistentVolumeClaim, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apicorev1.PersistentVolumeClaimList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apicorev1.PersistentVolumeClaim, err error)
+	Apply(ctx context.Context, persistentVolumeClaim *applyconfigurationscorev1.PersistentVolumeClaimApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.PersistentVolumeClaim, err error)
+	ApplyStatus(ctx context.Context, persistentVolumeClaim *applyconfigurationscorev1.PersistentVolumeClaimApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.PersistentVolumeClaim, err error)
 	PersistentVolumeClaimExpansion
 }
 
 // persistentVolumeClaims implements PersistentVolumeClaimInterface
 type persistentVolumeClaims struct {
-	client rest.Interface
+	client clientgorest.Interface
 	ns     string
 }
 
@@ -70,37 +70,37 @@ func newPersistentVolumeClaims(c *CoreV1Client, namespace string) *persistentVol
 }
 
 // Get takes name of the persistentVolumeClaim, and returns the corresponding persistentVolumeClaim object, and an error if there is any.
-func (c *persistentVolumeClaims) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.PersistentVolumeClaim, err error) {
-	result = &v1.PersistentVolumeClaim{}
+func (c *persistentVolumeClaims) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apicorev1.PersistentVolumeClaim, err error) {
+	result = &apicorev1.PersistentVolumeClaim{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of PersistentVolumeClaims that match those selectors.
-func (c *persistentVolumeClaims) List(ctx context.Context, opts metav1.ListOptions) (result *v1.PersistentVolumeClaimList, err error) {
+func (c *persistentVolumeClaims) List(ctx context.Context, opts apismetav1.ListOptions) (result *apicorev1.PersistentVolumeClaimList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1.PersistentVolumeClaimList{}
+	result = &apicorev1.PersistentVolumeClaimList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested persistentVolumeClaims.
-func (c *persistentVolumeClaims) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested persistentVolumeClaims.
+func (c *persistentVolumeClaims) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -109,18 +109,18 @@ func (c *persistentVolumeClaims) Watch(ctx context.Context, opts metav1.ListOpti
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a persistentVolumeClaim and creates it.  Returns the server's representation of the persistentVolumeClaim, and an error, if there is any.
-func (c *persistentVolumeClaims) Create(ctx context.Context, persistentVolumeClaim *v1.PersistentVolumeClaim, opts metav1.CreateOptions) (result *v1.PersistentVolumeClaim, err error) {
-	result = &v1.PersistentVolumeClaim{}
+func (c *persistentVolumeClaims) Create(ctx context.Context, persistentVolumeClaim *apicorev1.PersistentVolumeClaim, opts apismetav1.CreateOptions) (result *apicorev1.PersistentVolumeClaim, err error) {
+	result = &apicorev1.PersistentVolumeClaim{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(persistentVolumeClaim).
 		Do(ctx).
 		Into(result)
@@ -128,13 +128,13 @@ func (c *persistentVolumeClaims) Create(ctx context.Context, persistentVolumeCla
 }
 
 // Update takes the representation of a persistentVolumeClaim and updates it. Returns the server's representation of the persistentVolumeClaim, and an error, if there is any.
-func (c *persistentVolumeClaims) Update(ctx context.Context, persistentVolumeClaim *v1.PersistentVolumeClaim, opts metav1.UpdateOptions) (result *v1.PersistentVolumeClaim, err error) {
-	result = &v1.PersistentVolumeClaim{}
+func (c *persistentVolumeClaims) Update(ctx context.Context, persistentVolumeClaim *apicorev1.PersistentVolumeClaim, opts apismetav1.UpdateOptions) (result *apicorev1.PersistentVolumeClaim, err error) {
+	result = &apicorev1.PersistentVolumeClaim{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
 		Name(persistentVolumeClaim.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(persistentVolumeClaim).
 		Do(ctx).
 		Into(result)
@@ -143,14 +143,14 @@ func (c *persistentVolumeClaims) Update(ctx context.Context, persistentVolumeCla
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *persistentVolumeClaims) UpdateStatus(ctx context.Context, persistentVolumeClaim *v1.PersistentVolumeClaim, opts metav1.UpdateOptions) (result *v1.PersistentVolumeClaim, err error) {
-	result = &v1.PersistentVolumeClaim{}
+func (c *persistentVolumeClaims) UpdateStatus(ctx context.Context, persistentVolumeClaim *apicorev1.PersistentVolumeClaim, opts apismetav1.UpdateOptions) (result *apicorev1.PersistentVolumeClaim, err error) {
+	result = &apicorev1.PersistentVolumeClaim{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
 		Name(persistentVolumeClaim.Name).
 		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(persistentVolumeClaim).
 		Do(ctx).
 		Into(result)
@@ -158,7 +158,7 @@ func (c *persistentVolumeClaims) UpdateStatus(ctx context.Context, persistentVol
 }
 
 // Delete takes name of the persistentVolumeClaim and deletes it. Returns an error if one occurs.
-func (c *persistentVolumeClaims) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
+func (c *persistentVolumeClaims) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
@@ -169,7 +169,7 @@ func (c *persistentVolumeClaims) Delete(ctx context.Context, name string, opts m
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *persistentVolumeClaims) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+func (c *persistentVolumeClaims) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
@@ -177,7 +177,7 @@ func (c *persistentVolumeClaims) DeleteCollection(ctx context.Context, opts meta
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -185,14 +185,14 @@ func (c *persistentVolumeClaims) DeleteCollection(ctx context.Context, opts meta
 }
 
 // Patch applies the patch and returns the patched persistentVolumeClaim.
-func (c *persistentVolumeClaims) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PersistentVolumeClaim, err error) {
-	result = &v1.PersistentVolumeClaim{}
+func (c *persistentVolumeClaims) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apicorev1.PersistentVolumeClaim, err error) {
+	result = &apicorev1.PersistentVolumeClaim{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -200,7 +200,7 @@ func (c *persistentVolumeClaims) Patch(ctx context.Context, name string, pt type
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied persistentVolumeClaim.
-func (c *persistentVolumeClaims) Apply(ctx context.Context, persistentVolumeClaim *corev1.PersistentVolumeClaimApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PersistentVolumeClaim, err error) {
+func (c *persistentVolumeClaims) Apply(ctx context.Context, persistentVolumeClaim *applyconfigurationscorev1.PersistentVolumeClaimApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.PersistentVolumeClaim, err error) {
 	if persistentVolumeClaim == nil {
 		return nil, fmt.Errorf("persistentVolumeClaim provided to Apply must not be nil")
 	}
@@ -213,12 +213,12 @@ func (c *persistentVolumeClaims) Apply(ctx context.Context, persistentVolumeClai
 	if name == nil {
 		return nil, fmt.Errorf("persistentVolumeClaim.Name must be provided to Apply")
 	}
-	result = &v1.PersistentVolumeClaim{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apicorev1.PersistentVolumeClaim{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -227,7 +227,7 @@ func (c *persistentVolumeClaims) Apply(ctx context.Context, persistentVolumeClai
 
 // ApplyStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *persistentVolumeClaims) ApplyStatus(ctx context.Context, persistentVolumeClaim *corev1.PersistentVolumeClaimApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PersistentVolumeClaim, err error) {
+func (c *persistentVolumeClaims) ApplyStatus(ctx context.Context, persistentVolumeClaim *applyconfigurationscorev1.PersistentVolumeClaimApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.PersistentVolumeClaim, err error) {
 	if persistentVolumeClaim == nil {
 		return nil, fmt.Errorf("persistentVolumeClaim provided to Apply must not be nil")
 	}
@@ -242,13 +242,13 @@ func (c *persistentVolumeClaims) ApplyStatus(ctx context.Context, persistentVolu
 		return nil, fmt.Errorf("persistentVolumeClaim.Name must be provided to Apply")
 	}
 
-	result = &v1.PersistentVolumeClaim{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apicorev1.PersistentVolumeClaim{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("persistentvolumeclaims").
 		Name(*name).
 		SubResource("status").
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

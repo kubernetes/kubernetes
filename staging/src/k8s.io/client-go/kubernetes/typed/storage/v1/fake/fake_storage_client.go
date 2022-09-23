@@ -20,12 +20,12 @@ package fake
 
 import (
 	v1 "k8s.io/client-go/kubernetes/typed/storage/v1"
-	rest "k8s.io/client-go/rest"
-	testing "k8s.io/client-go/testing"
+	clientgorest "k8s.io/client-go/rest"
+	clientgotesting "k8s.io/client-go/testing"
 )
 
 type FakeStorageV1 struct {
-	*testing.Fake
+	*clientgotesting.Fake
 }
 
 func (c *FakeStorageV1) CSIDrivers() v1.CSIDriverInterface {
@@ -50,7 +50,7 @@ func (c *FakeStorageV1) VolumeAttachments() v1.VolumeAttachmentInterface {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeStorageV1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
+func (c *FakeStorageV1) RESTClient() clientgorest.Interface {
+	var ret *clientgorest.RESTClient
 	return ret
 }

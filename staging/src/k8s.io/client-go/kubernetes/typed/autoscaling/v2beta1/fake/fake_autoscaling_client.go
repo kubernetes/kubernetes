@@ -20,12 +20,12 @@ package fake
 
 import (
 	v2beta1 "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta1"
-	rest "k8s.io/client-go/rest"
-	testing "k8s.io/client-go/testing"
+	clientgorest "k8s.io/client-go/rest"
+	clientgotesting "k8s.io/client-go/testing"
 )
 
 type FakeAutoscalingV2beta1 struct {
-	*testing.Fake
+	*clientgotesting.Fake
 }
 
 func (c *FakeAutoscalingV2beta1) HorizontalPodAutoscalers(namespace string) v2beta1.HorizontalPodAutoscalerInterface {
@@ -34,7 +34,7 @@ func (c *FakeAutoscalingV2beta1) HorizontalPodAutoscalers(namespace string) v2be
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeAutoscalingV2beta1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
+func (c *FakeAutoscalingV2beta1) RESTClient() clientgorest.Interface {
+	var ret *clientgorest.RESTClient
 	return ret
 }

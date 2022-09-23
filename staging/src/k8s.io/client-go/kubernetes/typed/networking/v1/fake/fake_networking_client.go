@@ -20,12 +20,12 @@ package fake
 
 import (
 	v1 "k8s.io/client-go/kubernetes/typed/networking/v1"
-	rest "k8s.io/client-go/rest"
-	testing "k8s.io/client-go/testing"
+	clientgorest "k8s.io/client-go/rest"
+	clientgotesting "k8s.io/client-go/testing"
 )
 
 type FakeNetworkingV1 struct {
-	*testing.Fake
+	*clientgotesting.Fake
 }
 
 func (c *FakeNetworkingV1) Ingresses(namespace string) v1.IngressInterface {
@@ -42,7 +42,7 @@ func (c *FakeNetworkingV1) NetworkPolicies(namespace string) v1.NetworkPolicyInt
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeNetworkingV1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
+func (c *FakeNetworkingV1) RESTClient() clientgorest.Interface {
+	var ret *clientgorest.RESTClient
 	return ret
 }

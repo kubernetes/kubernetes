@@ -20,12 +20,12 @@ package fake
 
 import (
 	v1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
-	rest "k8s.io/client-go/rest"
-	testing "k8s.io/client-go/testing"
+	clientgorest "k8s.io/client-go/rest"
+	clientgotesting "k8s.io/client-go/testing"
 )
 
 type FakeExtensionsV1beta1 struct {
-	*testing.Fake
+	*clientgotesting.Fake
 }
 
 func (c *FakeExtensionsV1beta1) DaemonSets(namespace string) v1beta1.DaemonSetInterface {
@@ -50,7 +50,7 @@ func (c *FakeExtensionsV1beta1) ReplicaSets(namespace string) v1beta1.ReplicaSet
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeExtensionsV1beta1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
+func (c *FakeExtensionsV1beta1) RESTClient() clientgorest.Interface {
+	var ret *clientgorest.RESTClient
 	return ret
 }

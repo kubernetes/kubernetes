@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	rest "k8s.io/client-go/rest"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // EvictionsGetter has a method to return a EvictionInterface.
@@ -35,7 +35,7 @@ type EvictionInterface interface {
 
 // evictions implements EvictionInterface
 type evictions struct {
-	client rest.Interface
+	client clientgorest.Interface
 	ns     string
 }
 

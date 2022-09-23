@@ -17,8 +17,8 @@ limitations under the License.
 package namer
 
 import (
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 )
 
 // TagOverrideNamer is a namer which pulls names from a given tag, if specified,

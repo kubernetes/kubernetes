@@ -20,12 +20,12 @@ package fake
 
 import (
 	v1beta1 "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
-	rest "k8s.io/client-go/rest"
-	testing "k8s.io/client-go/testing"
+	clientgorest "k8s.io/client-go/rest"
+	clientgotesting "k8s.io/client-go/testing"
 )
 
 type FakeNetworkingV1beta1 struct {
-	*testing.Fake
+	*clientgotesting.Fake
 }
 
 func (c *FakeNetworkingV1beta1) Ingresses(namespace string) v1beta1.IngressInterface {
@@ -38,7 +38,7 @@ func (c *FakeNetworkingV1beta1) IngressClasses() v1beta1.IngressClassInterface {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeNetworkingV1beta1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
+func (c *FakeNetworkingV1beta1) RESTClient() clientgorest.Interface {
+	var ret *clientgorest.RESTClient
 	return ret
 }

@@ -20,17 +20,17 @@ package v1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apicorev1 "k8s.io/api/core/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // LimitRangesGetter has a method to return a LimitRangeInterface.
@@ -41,21 +41,21 @@ type LimitRangesGetter interface {
 
 // LimitRangeInterface has methods to work with LimitRange resources.
 type LimitRangeInterface interface {
-	Create(ctx context.Context, limitRange *v1.LimitRange, opts metav1.CreateOptions) (*v1.LimitRange, error)
-	Update(ctx context.Context, limitRange *v1.LimitRange, opts metav1.UpdateOptions) (*v1.LimitRange, error)
-	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.LimitRange, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.LimitRangeList, error)
-	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.LimitRange, err error)
-	Apply(ctx context.Context, limitRange *corev1.LimitRangeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.LimitRange, err error)
+	Create(ctx context.Context, limitRange *apicorev1.LimitRange, opts apismetav1.CreateOptions) (*apicorev1.LimitRange, error)
+	Update(ctx context.Context, limitRange *apicorev1.LimitRange, opts apismetav1.UpdateOptions) (*apicorev1.LimitRange, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apicorev1.LimitRange, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apicorev1.LimitRangeList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apicorev1.LimitRange, err error)
+	Apply(ctx context.Context, limitRange *applyconfigurationscorev1.LimitRangeApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.LimitRange, err error)
 	LimitRangeExpansion
 }
 
 // limitRanges implements LimitRangeInterface
 type limitRanges struct {
-	client rest.Interface
+	client clientgorest.Interface
 	ns     string
 }
 
@@ -68,37 +68,37 @@ func newLimitRanges(c *CoreV1Client, namespace string) *limitRanges {
 }
 
 // Get takes name of the limitRange, and returns the corresponding limitRange object, and an error if there is any.
-func (c *limitRanges) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.LimitRange, err error) {
-	result = &v1.LimitRange{}
+func (c *limitRanges) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apicorev1.LimitRange, err error) {
+	result = &apicorev1.LimitRange{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("limitranges").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of LimitRanges that match those selectors.
-func (c *limitRanges) List(ctx context.Context, opts metav1.ListOptions) (result *v1.LimitRangeList, err error) {
+func (c *limitRanges) List(ctx context.Context, opts apismetav1.ListOptions) (result *apicorev1.LimitRangeList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1.LimitRangeList{}
+	result = &apicorev1.LimitRangeList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("limitranges").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested limitRanges.
-func (c *limitRanges) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested limitRanges.
+func (c *limitRanges) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -107,18 +107,18 @@ func (c *limitRanges) Watch(ctx context.Context, opts metav1.ListOptions) (watch
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("limitranges").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a limitRange and creates it.  Returns the server's representation of the limitRange, and an error, if there is any.
-func (c *limitRanges) Create(ctx context.Context, limitRange *v1.LimitRange, opts metav1.CreateOptions) (result *v1.LimitRange, err error) {
-	result = &v1.LimitRange{}
+func (c *limitRanges) Create(ctx context.Context, limitRange *apicorev1.LimitRange, opts apismetav1.CreateOptions) (result *apicorev1.LimitRange, err error) {
+	result = &apicorev1.LimitRange{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("limitranges").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(limitRange).
 		Do(ctx).
 		Into(result)
@@ -126,13 +126,13 @@ func (c *limitRanges) Create(ctx context.Context, limitRange *v1.LimitRange, opt
 }
 
 // Update takes the representation of a limitRange and updates it. Returns the server's representation of the limitRange, and an error, if there is any.
-func (c *limitRanges) Update(ctx context.Context, limitRange *v1.LimitRange, opts metav1.UpdateOptions) (result *v1.LimitRange, err error) {
-	result = &v1.LimitRange{}
+func (c *limitRanges) Update(ctx context.Context, limitRange *apicorev1.LimitRange, opts apismetav1.UpdateOptions) (result *apicorev1.LimitRange, err error) {
+	result = &apicorev1.LimitRange{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("limitranges").
 		Name(limitRange.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(limitRange).
 		Do(ctx).
 		Into(result)
@@ -140,7 +140,7 @@ func (c *limitRanges) Update(ctx context.Context, limitRange *v1.LimitRange, opt
 }
 
 // Delete takes name of the limitRange and deletes it. Returns an error if one occurs.
-func (c *limitRanges) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
+func (c *limitRanges) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("limitranges").
@@ -151,7 +151,7 @@ func (c *limitRanges) Delete(ctx context.Context, name string, opts metav1.Delet
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *limitRanges) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+func (c *limitRanges) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
@@ -159,7 +159,7 @@ func (c *limitRanges) DeleteCollection(ctx context.Context, opts metav1.DeleteOp
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("limitranges").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -167,14 +167,14 @@ func (c *limitRanges) DeleteCollection(ctx context.Context, opts metav1.DeleteOp
 }
 
 // Patch applies the patch and returns the patched limitRange.
-func (c *limitRanges) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.LimitRange, err error) {
-	result = &v1.LimitRange{}
+func (c *limitRanges) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apicorev1.LimitRange, err error) {
+	result = &apicorev1.LimitRange{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("limitranges").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -182,7 +182,7 @@ func (c *limitRanges) Patch(ctx context.Context, name string, pt types.PatchType
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied limitRange.
-func (c *limitRanges) Apply(ctx context.Context, limitRange *corev1.LimitRangeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.LimitRange, err error) {
+func (c *limitRanges) Apply(ctx context.Context, limitRange *applyconfigurationscorev1.LimitRangeApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.LimitRange, err error) {
 	if limitRange == nil {
 		return nil, fmt.Errorf("limitRange provided to Apply must not be nil")
 	}
@@ -195,12 +195,12 @@ func (c *limitRanges) Apply(ctx context.Context, limitRange *corev1.LimitRangeAp
 	if name == nil {
 		return nil, fmt.Errorf("limitRange.Name must be provided to Apply")
 	}
-	result = &v1.LimitRange{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apicorev1.LimitRange{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("limitranges").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

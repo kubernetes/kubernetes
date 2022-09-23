@@ -20,12 +20,12 @@ package fake
 
 import (
 	v1 "k8s.io/client-go/kubernetes/typed/events/v1"
-	rest "k8s.io/client-go/rest"
-	testing "k8s.io/client-go/testing"
+	clientgorest "k8s.io/client-go/rest"
+	clientgotesting "k8s.io/client-go/testing"
 )
 
 type FakeEventsV1 struct {
-	*testing.Fake
+	*clientgotesting.Fake
 }
 
 func (c *FakeEventsV1) Events(namespace string) v1.EventInterface {
@@ -34,7 +34,7 @@ func (c *FakeEventsV1) Events(namespace string) v1.EventInterface {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeEventsV1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
+func (c *FakeEventsV1) RESTClient() clientgorest.Interface {
+	var ret *clientgorest.RESTClient
 	return ret
 }

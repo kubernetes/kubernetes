@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"net/http"
 
-	discovery "k8s.io/client-go/discovery"
+	clientgodiscovery "k8s.io/client-go/discovery"
 	admissionregistrationv1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
 	admissionregistrationv1alpha1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1"
 	admissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1"
@@ -74,12 +74,12 @@ import (
 	storagev1 "k8s.io/client-go/kubernetes/typed/storage/v1"
 	storagev1alpha1 "k8s.io/client-go/kubernetes/typed/storage/v1alpha1"
 	storagev1beta1 "k8s.io/client-go/kubernetes/typed/storage/v1beta1"
-	rest "k8s.io/client-go/rest"
-	flowcontrol "k8s.io/client-go/util/flowcontrol"
+	clientgorest "k8s.io/client-go/rest"
+	clientgoutilflowcontrol "k8s.io/client-go/util/flowcontrol"
 )
 
 type Interface interface {
-	Discovery() discovery.DiscoveryInterface
+	Discovery() clientgodiscovery.DiscoveryInterface
 	AdmissionregistrationV1() admissionregistrationv1.AdmissionregistrationV1Interface
 	AdmissionregistrationV1alpha1() admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Interface
 	AdmissionregistrationV1beta1() admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface
@@ -135,7 +135,7 @@ type Interface interface {
 
 // Clientset contains the clients for groups.
 type Clientset struct {
-	*discovery.DiscoveryClient
+	*clientgodiscovery.DiscoveryClient
 	admissionregistrationV1       *admissionregistrationv1.AdmissionregistrationV1Client
 	admissionregistrationV1alpha1 *admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Client
 	admissionregistrationV1beta1  *admissionregistrationv1beta1.AdmissionregistrationV1beta1Client
@@ -445,7 +445,7 @@ func (c *Clientset) StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface {
 }
 
 // Discovery retrieves the DiscoveryClient
-func (c *Clientset) Discovery() discovery.DiscoveryInterface {
+func (c *Clientset) Discovery() clientgodiscovery.DiscoveryInterface {
 	if c == nil {
 		return nil
 	}
@@ -457,15 +457,15 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 // NewForConfig will generate a rate-limiter in configShallowCopy.
 // NewForConfig is equivalent to NewForConfigAndClient(c, httpClient),
 // where httpClient was generated with rest.HTTPClientFor(c).
-func NewForConfig(c *rest.Config) (*Clientset, error) {
+func NewForConfig(c *clientgorest.Config) (*Clientset, error) {
 	configShallowCopy := *c
 
 	if configShallowCopy.UserAgent == "" {
-		configShallowCopy.UserAgent = rest.DefaultKubernetesUserAgent()
+		configShallowCopy.UserAgent = clientgorest.DefaultKubernetesUserAgent()
 	}
 
 	// share the transport between all clients
-	httpClient, err := rest.HTTPClientFor(&configShallowCopy)
+	httpClient, err := clientgorest.HTTPClientFor(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -477,13 +477,13 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // Note the http client provided takes precedence over the configured transport values.
 // If config's RateLimiter is not set and QPS and Burst are acceptable,
 // NewForConfigAndClient will generate a rate-limiter in configShallowCopy.
-func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset, error) {
+func NewForConfigAndClient(c *clientgorest.Config, httpClient *http.Client) (*Clientset, error) {
 	configShallowCopy := *c
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
 		if configShallowCopy.Burst <= 0 {
 			return nil, fmt.Errorf("burst is required to be greater than 0 when RateLimiter is not set and QPS is set to greater than 0")
 		}
-		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
+		configShallowCopy.RateLimiter = clientgoutilflowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
 
 	var cs Clientset
@@ -693,7 +693,7 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 		return nil, err
 	}
 
-	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfigAndClient(&configShallowCopy, httpClient)
+	cs.DiscoveryClient, err = clientgodiscovery.NewDiscoveryClientForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
 	}
@@ -702,7 +702,7 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 
 // NewForConfigOrDie creates a new Clientset for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *rest.Config) *Clientset {
+func NewForConfigOrDie(c *clientgorest.Config) *Clientset {
 	cs, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -711,7 +711,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 }
 
 // New creates a new Clientset for the given RESTClient.
-func New(c rest.Interface) *Clientset {
+func New(c clientgorest.Interface) *Clientset {
 	var cs Clientset
 	cs.admissionregistrationV1 = admissionregistrationv1.New(c)
 	cs.admissionregistrationV1alpha1 = admissionregistrationv1alpha1.New(c)
@@ -765,6 +765,6 @@ func New(c rest.Interface) *Clientset {
 	cs.storageV1 = storagev1.New(c)
 	cs.storageV1alpha1 = storagev1alpha1.New(c)
 
-	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
+	cs.DiscoveryClient = clientgodiscovery.NewDiscoveryClient(c)
 	return &cs
 }

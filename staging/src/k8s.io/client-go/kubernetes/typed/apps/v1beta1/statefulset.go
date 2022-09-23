@@ -20,17 +20,17 @@ package v1beta1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1beta1 "k8s.io/api/apps/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	appsv1beta1 "k8s.io/client-go/applyconfigurations/apps/v1beta1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apiappsv1beta1 "k8s.io/api/apps/v1beta1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsappsv1beta1 "k8s.io/client-go/applyconfigurations/apps/v1beta1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // StatefulSetsGetter has a method to return a StatefulSetInterface.
@@ -41,23 +41,23 @@ type StatefulSetsGetter interface {
 
 // StatefulSetInterface has methods to work with StatefulSet resources.
 type StatefulSetInterface interface {
-	Create(ctx context.Context, statefulSet *v1beta1.StatefulSet, opts v1.CreateOptions) (*v1beta1.StatefulSet, error)
-	Update(ctx context.Context, statefulSet *v1beta1.StatefulSet, opts v1.UpdateOptions) (*v1beta1.StatefulSet, error)
-	UpdateStatus(ctx context.Context, statefulSet *v1beta1.StatefulSet, opts v1.UpdateOptions) (*v1beta1.StatefulSet, error)
-	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.StatefulSet, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.StatefulSetList, error)
-	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.StatefulSet, err error)
-	Apply(ctx context.Context, statefulSet *appsv1beta1.StatefulSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.StatefulSet, err error)
-	ApplyStatus(ctx context.Context, statefulSet *appsv1beta1.StatefulSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.StatefulSet, err error)
+	Create(ctx context.Context, statefulSet *apiappsv1beta1.StatefulSet, opts apismetav1.CreateOptions) (*apiappsv1beta1.StatefulSet, error)
+	Update(ctx context.Context, statefulSet *apiappsv1beta1.StatefulSet, opts apismetav1.UpdateOptions) (*apiappsv1beta1.StatefulSet, error)
+	UpdateStatus(ctx context.Context, statefulSet *apiappsv1beta1.StatefulSet, opts apismetav1.UpdateOptions) (*apiappsv1beta1.StatefulSet, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apiappsv1beta1.StatefulSet, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apiappsv1beta1.StatefulSetList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apiappsv1beta1.StatefulSet, err error)
+	Apply(ctx context.Context, statefulSet *applyconfigurationsappsv1beta1.StatefulSetApplyConfiguration, opts apismetav1.ApplyOptions) (result *apiappsv1beta1.StatefulSet, err error)
+	ApplyStatus(ctx context.Context, statefulSet *applyconfigurationsappsv1beta1.StatefulSetApplyConfiguration, opts apismetav1.ApplyOptions) (result *apiappsv1beta1.StatefulSet, err error)
 	StatefulSetExpansion
 }
 
 // statefulSets implements StatefulSetInterface
 type statefulSets struct {
-	client rest.Interface
+	client clientgorest.Interface
 	ns     string
 }
 
@@ -70,37 +70,37 @@ func newStatefulSets(c *AppsV1beta1Client, namespace string) *statefulSets {
 }
 
 // Get takes name of the statefulSet, and returns the corresponding statefulSet object, and an error if there is any.
-func (c *statefulSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.StatefulSet, err error) {
-	result = &v1beta1.StatefulSet{}
+func (c *statefulSets) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apiappsv1beta1.StatefulSet, err error) {
+	result = &apiappsv1beta1.StatefulSet{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("statefulsets").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of StatefulSets that match those selectors.
-func (c *statefulSets) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.StatefulSetList, err error) {
+func (c *statefulSets) List(ctx context.Context, opts apismetav1.ListOptions) (result *apiappsv1beta1.StatefulSetList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1beta1.StatefulSetList{}
+	result = &apiappsv1beta1.StatefulSetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("statefulsets").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested statefulSets.
-func (c *statefulSets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested statefulSets.
+func (c *statefulSets) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -109,18 +109,18 @@ func (c *statefulSets) Watch(ctx context.Context, opts v1.ListOptions) (watch.In
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("statefulsets").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a statefulSet and creates it.  Returns the server's representation of the statefulSet, and an error, if there is any.
-func (c *statefulSets) Create(ctx context.Context, statefulSet *v1beta1.StatefulSet, opts v1.CreateOptions) (result *v1beta1.StatefulSet, err error) {
-	result = &v1beta1.StatefulSet{}
+func (c *statefulSets) Create(ctx context.Context, statefulSet *apiappsv1beta1.StatefulSet, opts apismetav1.CreateOptions) (result *apiappsv1beta1.StatefulSet, err error) {
+	result = &apiappsv1beta1.StatefulSet{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("statefulsets").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(statefulSet).
 		Do(ctx).
 		Into(result)
@@ -128,13 +128,13 @@ func (c *statefulSets) Create(ctx context.Context, statefulSet *v1beta1.Stateful
 }
 
 // Update takes the representation of a statefulSet and updates it. Returns the server's representation of the statefulSet, and an error, if there is any.
-func (c *statefulSets) Update(ctx context.Context, statefulSet *v1beta1.StatefulSet, opts v1.UpdateOptions) (result *v1beta1.StatefulSet, err error) {
-	result = &v1beta1.StatefulSet{}
+func (c *statefulSets) Update(ctx context.Context, statefulSet *apiappsv1beta1.StatefulSet, opts apismetav1.UpdateOptions) (result *apiappsv1beta1.StatefulSet, err error) {
+	result = &apiappsv1beta1.StatefulSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("statefulsets").
 		Name(statefulSet.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(statefulSet).
 		Do(ctx).
 		Into(result)
@@ -143,14 +143,14 @@ func (c *statefulSets) Update(ctx context.Context, statefulSet *v1beta1.Stateful
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *statefulSets) UpdateStatus(ctx context.Context, statefulSet *v1beta1.StatefulSet, opts v1.UpdateOptions) (result *v1beta1.StatefulSet, err error) {
-	result = &v1beta1.StatefulSet{}
+func (c *statefulSets) UpdateStatus(ctx context.Context, statefulSet *apiappsv1beta1.StatefulSet, opts apismetav1.UpdateOptions) (result *apiappsv1beta1.StatefulSet, err error) {
+	result = &apiappsv1beta1.StatefulSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("statefulsets").
 		Name(statefulSet.Name).
 		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(statefulSet).
 		Do(ctx).
 		Into(result)
@@ -158,7 +158,7 @@ func (c *statefulSets) UpdateStatus(ctx context.Context, statefulSet *v1beta1.St
 }
 
 // Delete takes name of the statefulSet and deletes it. Returns an error if one occurs.
-func (c *statefulSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *statefulSets) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("statefulsets").
@@ -169,7 +169,7 @@ func (c *statefulSets) Delete(ctx context.Context, name string, opts v1.DeleteOp
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *statefulSets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *statefulSets) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
@@ -177,7 +177,7 @@ func (c *statefulSets) DeleteCollection(ctx context.Context, opts v1.DeleteOptio
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("statefulsets").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -185,14 +185,14 @@ func (c *statefulSets) DeleteCollection(ctx context.Context, opts v1.DeleteOptio
 }
 
 // Patch applies the patch and returns the patched statefulSet.
-func (c *statefulSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.StatefulSet, err error) {
-	result = &v1beta1.StatefulSet{}
+func (c *statefulSets) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apiappsv1beta1.StatefulSet, err error) {
+	result = &apiappsv1beta1.StatefulSet{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("statefulsets").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -200,7 +200,7 @@ func (c *statefulSets) Patch(ctx context.Context, name string, pt types.PatchTyp
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied statefulSet.
-func (c *statefulSets) Apply(ctx context.Context, statefulSet *appsv1beta1.StatefulSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.StatefulSet, err error) {
+func (c *statefulSets) Apply(ctx context.Context, statefulSet *applyconfigurationsappsv1beta1.StatefulSetApplyConfiguration, opts apismetav1.ApplyOptions) (result *apiappsv1beta1.StatefulSet, err error) {
 	if statefulSet == nil {
 		return nil, fmt.Errorf("statefulSet provided to Apply must not be nil")
 	}
@@ -213,12 +213,12 @@ func (c *statefulSets) Apply(ctx context.Context, statefulSet *appsv1beta1.State
 	if name == nil {
 		return nil, fmt.Errorf("statefulSet.Name must be provided to Apply")
 	}
-	result = &v1beta1.StatefulSet{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apiappsv1beta1.StatefulSet{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("statefulsets").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -227,7 +227,7 @@ func (c *statefulSets) Apply(ctx context.Context, statefulSet *appsv1beta1.State
 
 // ApplyStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *statefulSets) ApplyStatus(ctx context.Context, statefulSet *appsv1beta1.StatefulSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.StatefulSet, err error) {
+func (c *statefulSets) ApplyStatus(ctx context.Context, statefulSet *applyconfigurationsappsv1beta1.StatefulSetApplyConfiguration, opts apismetav1.ApplyOptions) (result *apiappsv1beta1.StatefulSet, err error) {
 	if statefulSet == nil {
 		return nil, fmt.Errorf("statefulSet provided to Apply must not be nil")
 	}
@@ -242,13 +242,13 @@ func (c *statefulSets) ApplyStatus(ctx context.Context, statefulSet *appsv1beta1
 		return nil, fmt.Errorf("statefulSet.Name must be provided to Apply")
 	}
 
-	result = &v1beta1.StatefulSet{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apiappsv1beta1.StatefulSet{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("statefulsets").
 		Name(*name).
 		SubResource("status").
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

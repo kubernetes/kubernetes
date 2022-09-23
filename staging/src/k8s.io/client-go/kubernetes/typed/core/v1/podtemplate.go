@@ -20,17 +20,17 @@ package v1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apicorev1 "k8s.io/api/core/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // PodTemplatesGetter has a method to return a PodTemplateInterface.
@@ -41,21 +41,21 @@ type PodTemplatesGetter interface {
 
 // PodTemplateInterface has methods to work with PodTemplate resources.
 type PodTemplateInterface interface {
-	Create(ctx context.Context, podTemplate *v1.PodTemplate, opts metav1.CreateOptions) (*v1.PodTemplate, error)
-	Update(ctx context.Context, podTemplate *v1.PodTemplate, opts metav1.UpdateOptions) (*v1.PodTemplate, error)
-	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.PodTemplate, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.PodTemplateList, error)
-	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PodTemplate, err error)
-	Apply(ctx context.Context, podTemplate *corev1.PodTemplateApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PodTemplate, err error)
+	Create(ctx context.Context, podTemplate *apicorev1.PodTemplate, opts apismetav1.CreateOptions) (*apicorev1.PodTemplate, error)
+	Update(ctx context.Context, podTemplate *apicorev1.PodTemplate, opts apismetav1.UpdateOptions) (*apicorev1.PodTemplate, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apicorev1.PodTemplate, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apicorev1.PodTemplateList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apicorev1.PodTemplate, err error)
+	Apply(ctx context.Context, podTemplate *applyconfigurationscorev1.PodTemplateApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.PodTemplate, err error)
 	PodTemplateExpansion
 }
 
 // podTemplates implements PodTemplateInterface
 type podTemplates struct {
-	client rest.Interface
+	client clientgorest.Interface
 	ns     string
 }
 
@@ -68,37 +68,37 @@ func newPodTemplates(c *CoreV1Client, namespace string) *podTemplates {
 }
 
 // Get takes name of the podTemplate, and returns the corresponding podTemplate object, and an error if there is any.
-func (c *podTemplates) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.PodTemplate, err error) {
-	result = &v1.PodTemplate{}
+func (c *podTemplates) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apicorev1.PodTemplate, err error) {
+	result = &apicorev1.PodTemplate{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("podtemplates").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of PodTemplates that match those selectors.
-func (c *podTemplates) List(ctx context.Context, opts metav1.ListOptions) (result *v1.PodTemplateList, err error) {
+func (c *podTemplates) List(ctx context.Context, opts apismetav1.ListOptions) (result *apicorev1.PodTemplateList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1.PodTemplateList{}
+	result = &apicorev1.PodTemplateList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("podtemplates").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested podTemplates.
-func (c *podTemplates) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested podTemplates.
+func (c *podTemplates) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -107,18 +107,18 @@ func (c *podTemplates) Watch(ctx context.Context, opts metav1.ListOptions) (watc
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("podtemplates").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a podTemplate and creates it.  Returns the server's representation of the podTemplate, and an error, if there is any.
-func (c *podTemplates) Create(ctx context.Context, podTemplate *v1.PodTemplate, opts metav1.CreateOptions) (result *v1.PodTemplate, err error) {
-	result = &v1.PodTemplate{}
+func (c *podTemplates) Create(ctx context.Context, podTemplate *apicorev1.PodTemplate, opts apismetav1.CreateOptions) (result *apicorev1.PodTemplate, err error) {
+	result = &apicorev1.PodTemplate{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("podtemplates").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(podTemplate).
 		Do(ctx).
 		Into(result)
@@ -126,13 +126,13 @@ func (c *podTemplates) Create(ctx context.Context, podTemplate *v1.PodTemplate, 
 }
 
 // Update takes the representation of a podTemplate and updates it. Returns the server's representation of the podTemplate, and an error, if there is any.
-func (c *podTemplates) Update(ctx context.Context, podTemplate *v1.PodTemplate, opts metav1.UpdateOptions) (result *v1.PodTemplate, err error) {
-	result = &v1.PodTemplate{}
+func (c *podTemplates) Update(ctx context.Context, podTemplate *apicorev1.PodTemplate, opts apismetav1.UpdateOptions) (result *apicorev1.PodTemplate, err error) {
+	result = &apicorev1.PodTemplate{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("podtemplates").
 		Name(podTemplate.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(podTemplate).
 		Do(ctx).
 		Into(result)
@@ -140,7 +140,7 @@ func (c *podTemplates) Update(ctx context.Context, podTemplate *v1.PodTemplate, 
 }
 
 // Delete takes name of the podTemplate and deletes it. Returns an error if one occurs.
-func (c *podTemplates) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
+func (c *podTemplates) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("podtemplates").
@@ -151,7 +151,7 @@ func (c *podTemplates) Delete(ctx context.Context, name string, opts metav1.Dele
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *podTemplates) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+func (c *podTemplates) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
@@ -159,7 +159,7 @@ func (c *podTemplates) DeleteCollection(ctx context.Context, opts metav1.DeleteO
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("podtemplates").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -167,14 +167,14 @@ func (c *podTemplates) DeleteCollection(ctx context.Context, opts metav1.DeleteO
 }
 
 // Patch applies the patch and returns the patched podTemplate.
-func (c *podTemplates) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PodTemplate, err error) {
-	result = &v1.PodTemplate{}
+func (c *podTemplates) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apicorev1.PodTemplate, err error) {
+	result = &apicorev1.PodTemplate{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("podtemplates").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -182,7 +182,7 @@ func (c *podTemplates) Patch(ctx context.Context, name string, pt types.PatchTyp
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied podTemplate.
-func (c *podTemplates) Apply(ctx context.Context, podTemplate *corev1.PodTemplateApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PodTemplate, err error) {
+func (c *podTemplates) Apply(ctx context.Context, podTemplate *applyconfigurationscorev1.PodTemplateApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.PodTemplate, err error) {
 	if podTemplate == nil {
 		return nil, fmt.Errorf("podTemplate provided to Apply must not be nil")
 	}
@@ -195,12 +195,12 @@ func (c *podTemplates) Apply(ctx context.Context, podTemplate *corev1.PodTemplat
 	if name == nil {
 		return nil, fmt.Errorf("podTemplate.Name must be provided to Apply")
 	}
-	result = &v1.PodTemplate{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apicorev1.PodTemplate{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("podtemplates").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

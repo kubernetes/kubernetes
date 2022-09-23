@@ -20,17 +20,17 @@ package v1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1 "k8s.io/api/storage/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	storagev1 "k8s.io/client-go/applyconfigurations/storage/v1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apistoragev1 "k8s.io/api/storage/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsstoragev1 "k8s.io/client-go/applyconfigurations/storage/v1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // CSIStorageCapacitiesGetter has a method to return a CSIStorageCapacityInterface.
@@ -41,21 +41,21 @@ type CSIStorageCapacitiesGetter interface {
 
 // CSIStorageCapacityInterface has methods to work with CSIStorageCapacity resources.
 type CSIStorageCapacityInterface interface {
-	Create(ctx context.Context, cSIStorageCapacity *v1.CSIStorageCapacity, opts metav1.CreateOptions) (*v1.CSIStorageCapacity, error)
-	Update(ctx context.Context, cSIStorageCapacity *v1.CSIStorageCapacity, opts metav1.UpdateOptions) (*v1.CSIStorageCapacity, error)
-	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.CSIStorageCapacity, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.CSIStorageCapacityList, error)
-	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.CSIStorageCapacity, err error)
-	Apply(ctx context.Context, cSIStorageCapacity *storagev1.CSIStorageCapacityApplyConfiguration, opts metav1.ApplyOptions) (result *v1.CSIStorageCapacity, err error)
+	Create(ctx context.Context, cSIStorageCapacity *apistoragev1.CSIStorageCapacity, opts apismetav1.CreateOptions) (*apistoragev1.CSIStorageCapacity, error)
+	Update(ctx context.Context, cSIStorageCapacity *apistoragev1.CSIStorageCapacity, opts apismetav1.UpdateOptions) (*apistoragev1.CSIStorageCapacity, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apistoragev1.CSIStorageCapacity, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apistoragev1.CSIStorageCapacityList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apistoragev1.CSIStorageCapacity, err error)
+	Apply(ctx context.Context, cSIStorageCapacity *applyconfigurationsstoragev1.CSIStorageCapacityApplyConfiguration, opts apismetav1.ApplyOptions) (result *apistoragev1.CSIStorageCapacity, err error)
 	CSIStorageCapacityExpansion
 }
 
 // cSIStorageCapacities implements CSIStorageCapacityInterface
 type cSIStorageCapacities struct {
-	client rest.Interface
+	client clientgorest.Interface
 	ns     string
 }
 
@@ -68,37 +68,37 @@ func newCSIStorageCapacities(c *StorageV1Client, namespace string) *cSIStorageCa
 }
 
 // Get takes name of the cSIStorageCapacity, and returns the corresponding cSIStorageCapacity object, and an error if there is any.
-func (c *cSIStorageCapacities) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.CSIStorageCapacity, err error) {
-	result = &v1.CSIStorageCapacity{}
+func (c *cSIStorageCapacities) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apistoragev1.CSIStorageCapacity, err error) {
+	result = &apistoragev1.CSIStorageCapacity{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("csistoragecapacities").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of CSIStorageCapacities that match those selectors.
-func (c *cSIStorageCapacities) List(ctx context.Context, opts metav1.ListOptions) (result *v1.CSIStorageCapacityList, err error) {
+func (c *cSIStorageCapacities) List(ctx context.Context, opts apismetav1.ListOptions) (result *apistoragev1.CSIStorageCapacityList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1.CSIStorageCapacityList{}
+	result = &apistoragev1.CSIStorageCapacityList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("csistoragecapacities").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested cSIStorageCapacities.
-func (c *cSIStorageCapacities) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested cSIStorageCapacities.
+func (c *cSIStorageCapacities) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -107,18 +107,18 @@ func (c *cSIStorageCapacities) Watch(ctx context.Context, opts metav1.ListOption
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("csistoragecapacities").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a cSIStorageCapacity and creates it.  Returns the server's representation of the cSIStorageCapacity, and an error, if there is any.
-func (c *cSIStorageCapacities) Create(ctx context.Context, cSIStorageCapacity *v1.CSIStorageCapacity, opts metav1.CreateOptions) (result *v1.CSIStorageCapacity, err error) {
-	result = &v1.CSIStorageCapacity{}
+func (c *cSIStorageCapacities) Create(ctx context.Context, cSIStorageCapacity *apistoragev1.CSIStorageCapacity, opts apismetav1.CreateOptions) (result *apistoragev1.CSIStorageCapacity, err error) {
+	result = &apistoragev1.CSIStorageCapacity{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("csistoragecapacities").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(cSIStorageCapacity).
 		Do(ctx).
 		Into(result)
@@ -126,13 +126,13 @@ func (c *cSIStorageCapacities) Create(ctx context.Context, cSIStorageCapacity *v
 }
 
 // Update takes the representation of a cSIStorageCapacity and updates it. Returns the server's representation of the cSIStorageCapacity, and an error, if there is any.
-func (c *cSIStorageCapacities) Update(ctx context.Context, cSIStorageCapacity *v1.CSIStorageCapacity, opts metav1.UpdateOptions) (result *v1.CSIStorageCapacity, err error) {
-	result = &v1.CSIStorageCapacity{}
+func (c *cSIStorageCapacities) Update(ctx context.Context, cSIStorageCapacity *apistoragev1.CSIStorageCapacity, opts apismetav1.UpdateOptions) (result *apistoragev1.CSIStorageCapacity, err error) {
+	result = &apistoragev1.CSIStorageCapacity{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("csistoragecapacities").
 		Name(cSIStorageCapacity.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(cSIStorageCapacity).
 		Do(ctx).
 		Into(result)
@@ -140,7 +140,7 @@ func (c *cSIStorageCapacities) Update(ctx context.Context, cSIStorageCapacity *v
 }
 
 // Delete takes name of the cSIStorageCapacity and deletes it. Returns an error if one occurs.
-func (c *cSIStorageCapacities) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
+func (c *cSIStorageCapacities) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("csistoragecapacities").
@@ -151,7 +151,7 @@ func (c *cSIStorageCapacities) Delete(ctx context.Context, name string, opts met
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *cSIStorageCapacities) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+func (c *cSIStorageCapacities) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
@@ -159,7 +159,7 @@ func (c *cSIStorageCapacities) DeleteCollection(ctx context.Context, opts metav1
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("csistoragecapacities").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -167,14 +167,14 @@ func (c *cSIStorageCapacities) DeleteCollection(ctx context.Context, opts metav1
 }
 
 // Patch applies the patch and returns the patched cSIStorageCapacity.
-func (c *cSIStorageCapacities) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.CSIStorageCapacity, err error) {
-	result = &v1.CSIStorageCapacity{}
+func (c *cSIStorageCapacities) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apistoragev1.CSIStorageCapacity, err error) {
+	result = &apistoragev1.CSIStorageCapacity{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("csistoragecapacities").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -182,7 +182,7 @@ func (c *cSIStorageCapacities) Patch(ctx context.Context, name string, pt types.
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied cSIStorageCapacity.
-func (c *cSIStorageCapacities) Apply(ctx context.Context, cSIStorageCapacity *storagev1.CSIStorageCapacityApplyConfiguration, opts metav1.ApplyOptions) (result *v1.CSIStorageCapacity, err error) {
+func (c *cSIStorageCapacities) Apply(ctx context.Context, cSIStorageCapacity *applyconfigurationsstoragev1.CSIStorageCapacityApplyConfiguration, opts apismetav1.ApplyOptions) (result *apistoragev1.CSIStorageCapacity, err error) {
 	if cSIStorageCapacity == nil {
 		return nil, fmt.Errorf("cSIStorageCapacity provided to Apply must not be nil")
 	}
@@ -195,12 +195,12 @@ func (c *cSIStorageCapacities) Apply(ctx context.Context, cSIStorageCapacity *st
 	if name == nil {
 		return nil, fmt.Errorf("cSIStorageCapacity.Name must be provided to Apply")
 	}
-	result = &v1.CSIStorageCapacity{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apistoragev1.CSIStorageCapacity{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("csistoragecapacities").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

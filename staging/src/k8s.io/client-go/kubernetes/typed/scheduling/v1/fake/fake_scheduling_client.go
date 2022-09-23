@@ -20,12 +20,12 @@ package fake
 
 import (
 	v1 "k8s.io/client-go/kubernetes/typed/scheduling/v1"
-	rest "k8s.io/client-go/rest"
-	testing "k8s.io/client-go/testing"
+	clientgorest "k8s.io/client-go/rest"
+	clientgotesting "k8s.io/client-go/testing"
 )
 
 type FakeSchedulingV1 struct {
-	*testing.Fake
+	*clientgotesting.Fake
 }
 
 func (c *FakeSchedulingV1) PriorityClasses() v1.PriorityClassInterface {
@@ -34,7 +34,7 @@ func (c *FakeSchedulingV1) PriorityClasses() v1.PriorityClassInterface {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeSchedulingV1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
+func (c *FakeSchedulingV1) RESTClient() clientgorest.Interface {
+	var ret *clientgorest.RESTClient
 	return ret
 }

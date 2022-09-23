@@ -20,17 +20,17 @@ package v1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1 "k8s.io/api/networking/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	networkingv1 "k8s.io/client-go/applyconfigurations/networking/v1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apinetworkingv1 "k8s.io/api/networking/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsnetworkingv1 "k8s.io/client-go/applyconfigurations/networking/v1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // NetworkPoliciesGetter has a method to return a NetworkPolicyInterface.
@@ -41,21 +41,23 @@ type NetworkPoliciesGetter interface {
 
 // NetworkPolicyInterface has methods to work with NetworkPolicy resources.
 type NetworkPolicyInterface interface {
-	Create(ctx context.Context, networkPolicy *v1.NetworkPolicy, opts metav1.CreateOptions) (*v1.NetworkPolicy, error)
-	Update(ctx context.Context, networkPolicy *v1.NetworkPolicy, opts metav1.UpdateOptions) (*v1.NetworkPolicy, error)
-	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.NetworkPolicy, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.NetworkPolicyList, error)
-	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.NetworkPolicy, err error)
-	Apply(ctx context.Context, networkPolicy *networkingv1.NetworkPolicyApplyConfiguration, opts metav1.ApplyOptions) (result *v1.NetworkPolicy, err error)
+	Create(ctx context.Context, networkPolicy *apinetworkingv1.NetworkPolicy, opts apismetav1.CreateOptions) (*apinetworkingv1.NetworkPolicy, error)
+	Update(ctx context.Context, networkPolicy *apinetworkingv1.NetworkPolicy, opts apismetav1.UpdateOptions) (*apinetworkingv1.NetworkPolicy, error)
+	UpdateStatus(ctx context.Context, networkPolicy *apinetworkingv1.NetworkPolicy, opts apismetav1.UpdateOptions) (*apinetworkingv1.NetworkPolicy, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apinetworkingv1.NetworkPolicy, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apinetworkingv1.NetworkPolicyList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apinetworkingv1.NetworkPolicy, err error)
+	Apply(ctx context.Context, networkPolicy *applyconfigurationsnetworkingv1.NetworkPolicyApplyConfiguration, opts apismetav1.ApplyOptions) (result *apinetworkingv1.NetworkPolicy, err error)
+	ApplyStatus(ctx context.Context, networkPolicy *applyconfigurationsnetworkingv1.NetworkPolicyApplyConfiguration, opts apismetav1.ApplyOptions) (result *apinetworkingv1.NetworkPolicy, err error)
 	NetworkPolicyExpansion
 }
 
 // networkPolicies implements NetworkPolicyInterface
 type networkPolicies struct {
-	client rest.Interface
+	client clientgorest.Interface
 	ns     string
 }
 
@@ -68,37 +70,37 @@ func newNetworkPolicies(c *NetworkingV1Client, namespace string) *networkPolicie
 }
 
 // Get takes name of the networkPolicy, and returns the corresponding networkPolicy object, and an error if there is any.
-func (c *networkPolicies) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.NetworkPolicy, err error) {
-	result = &v1.NetworkPolicy{}
+func (c *networkPolicies) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apinetworkingv1.NetworkPolicy, err error) {
+	result = &apinetworkingv1.NetworkPolicy{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("networkpolicies").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of NetworkPolicies that match those selectors.
-func (c *networkPolicies) List(ctx context.Context, opts metav1.ListOptions) (result *v1.NetworkPolicyList, err error) {
+func (c *networkPolicies) List(ctx context.Context, opts apismetav1.ListOptions) (result *apinetworkingv1.NetworkPolicyList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1.NetworkPolicyList{}
+	result = &apinetworkingv1.NetworkPolicyList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("networkpolicies").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested networkPolicies.
-func (c *networkPolicies) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested networkPolicies.
+func (c *networkPolicies) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -107,18 +109,18 @@ func (c *networkPolicies) Watch(ctx context.Context, opts metav1.ListOptions) (w
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("networkpolicies").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a networkPolicy and creates it.  Returns the server's representation of the networkPolicy, and an error, if there is any.
-func (c *networkPolicies) Create(ctx context.Context, networkPolicy *v1.NetworkPolicy, opts metav1.CreateOptions) (result *v1.NetworkPolicy, err error) {
-	result = &v1.NetworkPolicy{}
+func (c *networkPolicies) Create(ctx context.Context, networkPolicy *apinetworkingv1.NetworkPolicy, opts apismetav1.CreateOptions) (result *apinetworkingv1.NetworkPolicy, err error) {
+	result = &apinetworkingv1.NetworkPolicy{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("networkpolicies").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(networkPolicy).
 		Do(ctx).
 		Into(result)
@@ -126,13 +128,29 @@ func (c *networkPolicies) Create(ctx context.Context, networkPolicy *v1.NetworkP
 }
 
 // Update takes the representation of a networkPolicy and updates it. Returns the server's representation of the networkPolicy, and an error, if there is any.
-func (c *networkPolicies) Update(ctx context.Context, networkPolicy *v1.NetworkPolicy, opts metav1.UpdateOptions) (result *v1.NetworkPolicy, err error) {
-	result = &v1.NetworkPolicy{}
+func (c *networkPolicies) Update(ctx context.Context, networkPolicy *apinetworkingv1.NetworkPolicy, opts apismetav1.UpdateOptions) (result *apinetworkingv1.NetworkPolicy, err error) {
+	result = &apinetworkingv1.NetworkPolicy{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("networkpolicies").
 		Name(networkPolicy.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
+		Body(networkPolicy).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *networkPolicies) UpdateStatus(ctx context.Context, networkPolicy *apinetworkingv1.NetworkPolicy, opts apismetav1.UpdateOptions) (result *apinetworkingv1.NetworkPolicy, err error) {
+	result = &apinetworkingv1.NetworkPolicy{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("networkpolicies").
+		Name(networkPolicy.Name).
+		SubResource("status").
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(networkPolicy).
 		Do(ctx).
 		Into(result)
@@ -140,7 +158,7 @@ func (c *networkPolicies) Update(ctx context.Context, networkPolicy *v1.NetworkP
 }
 
 // Delete takes name of the networkPolicy and deletes it. Returns an error if one occurs.
-func (c *networkPolicies) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
+func (c *networkPolicies) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("networkpolicies").
@@ -151,7 +169,7 @@ func (c *networkPolicies) Delete(ctx context.Context, name string, opts metav1.D
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *networkPolicies) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+func (c *networkPolicies) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
@@ -159,7 +177,7 @@ func (c *networkPolicies) DeleteCollection(ctx context.Context, opts metav1.Dele
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("networkpolicies").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -167,14 +185,14 @@ func (c *networkPolicies) DeleteCollection(ctx context.Context, opts metav1.Dele
 }
 
 // Patch applies the patch and returns the patched networkPolicy.
-func (c *networkPolicies) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.NetworkPolicy, err error) {
-	result = &v1.NetworkPolicy{}
+func (c *networkPolicies) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apinetworkingv1.NetworkPolicy, err error) {
+	result = &apinetworkingv1.NetworkPolicy{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("networkpolicies").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -182,7 +200,7 @@ func (c *networkPolicies) Patch(ctx context.Context, name string, pt types.Patch
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied networkPolicy.
-func (c *networkPolicies) Apply(ctx context.Context, networkPolicy *networkingv1.NetworkPolicyApplyConfiguration, opts metav1.ApplyOptions) (result *v1.NetworkPolicy, err error) {
+func (c *networkPolicies) Apply(ctx context.Context, networkPolicy *applyconfigurationsnetworkingv1.NetworkPolicyApplyConfiguration, opts apismetav1.ApplyOptions) (result *apinetworkingv1.NetworkPolicy, err error) {
 	if networkPolicy == nil {
 		return nil, fmt.Errorf("networkPolicy provided to Apply must not be nil")
 	}
@@ -195,12 +213,42 @@ func (c *networkPolicies) Apply(ctx context.Context, networkPolicy *networkingv1
 	if name == nil {
 		return nil, fmt.Errorf("networkPolicy.Name must be provided to Apply")
 	}
-	result = &v1.NetworkPolicy{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apinetworkingv1.NetworkPolicy{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("networkpolicies").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *networkPolicies) ApplyStatus(ctx context.Context, networkPolicy *applyconfigurationsnetworkingv1.NetworkPolicyApplyConfiguration, opts apismetav1.ApplyOptions) (result *apinetworkingv1.NetworkPolicy, err error) {
+	if networkPolicy == nil {
+		return nil, fmt.Errorf("networkPolicy provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(networkPolicy)
+	if err != nil {
+		return nil, err
+	}
+
+	name := networkPolicy.Name
+	if name == nil {
+		return nil, fmt.Errorf("networkPolicy.Name must be provided to Apply")
+	}
+
+	result = &apinetworkingv1.NetworkPolicy{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("networkpolicies").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

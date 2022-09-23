@@ -32,10 +32,6 @@ func main() {
 	klog.InitFlags(nil)
 	genericArgs, customArgs := generatorargs.NewDefaults()
 
-	// Override defaults.
-	// TODO: move this out of client-gen
-	genericArgs.OutputPackagePath = "k8s.io/kubernetes/pkg/client/clientset_generated/"
-
 	genericArgs.AddFlags(pflag.CommandLine)
 	customArgs.AddFlags(pflag.CommandLine, "k8s.io/kubernetes/pkg/apis") // TODO: move this input path out of client-gen
 	flag.Set("logtostderr", "true")

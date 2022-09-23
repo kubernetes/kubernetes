@@ -20,17 +20,17 @@ package v1alpha1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1alpha1 "k8s.io/api/node/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	nodev1alpha1 "k8s.io/client-go/applyconfigurations/node/v1alpha1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apinodev1alpha1 "k8s.io/api/node/v1alpha1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsnodev1alpha1 "k8s.io/client-go/applyconfigurations/node/v1alpha1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // RuntimeClassesGetter has a method to return a RuntimeClassInterface.
@@ -41,21 +41,21 @@ type RuntimeClassesGetter interface {
 
 // RuntimeClassInterface has methods to work with RuntimeClass resources.
 type RuntimeClassInterface interface {
-	Create(ctx context.Context, runtimeClass *v1alpha1.RuntimeClass, opts v1.CreateOptions) (*v1alpha1.RuntimeClass, error)
-	Update(ctx context.Context, runtimeClass *v1alpha1.RuntimeClass, opts v1.UpdateOptions) (*v1alpha1.RuntimeClass, error)
-	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.RuntimeClass, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.RuntimeClassList, error)
-	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.RuntimeClass, err error)
-	Apply(ctx context.Context, runtimeClass *nodev1alpha1.RuntimeClassApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.RuntimeClass, err error)
+	Create(ctx context.Context, runtimeClass *apinodev1alpha1.RuntimeClass, opts apismetav1.CreateOptions) (*apinodev1alpha1.RuntimeClass, error)
+	Update(ctx context.Context, runtimeClass *apinodev1alpha1.RuntimeClass, opts apismetav1.UpdateOptions) (*apinodev1alpha1.RuntimeClass, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apinodev1alpha1.RuntimeClass, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apinodev1alpha1.RuntimeClassList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apinodev1alpha1.RuntimeClass, err error)
+	Apply(ctx context.Context, runtimeClass *applyconfigurationsnodev1alpha1.RuntimeClassApplyConfiguration, opts apismetav1.ApplyOptions) (result *apinodev1alpha1.RuntimeClass, err error)
 	RuntimeClassExpansion
 }
 
 // runtimeClasses implements RuntimeClassInterface
 type runtimeClasses struct {
-	client rest.Interface
+	client clientgorest.Interface
 }
 
 // newRuntimeClasses returns a RuntimeClasses
@@ -66,35 +66,35 @@ func newRuntimeClasses(c *NodeV1alpha1Client) *runtimeClasses {
 }
 
 // Get takes name of the runtimeClass, and returns the corresponding runtimeClass object, and an error if there is any.
-func (c *runtimeClasses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.RuntimeClass, err error) {
-	result = &v1alpha1.RuntimeClass{}
+func (c *runtimeClasses) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apinodev1alpha1.RuntimeClass, err error) {
+	result = &apinodev1alpha1.RuntimeClass{}
 	err = c.client.Get().
 		Resource("runtimeclasses").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of RuntimeClasses that match those selectors.
-func (c *runtimeClasses) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.RuntimeClassList, err error) {
+func (c *runtimeClasses) List(ctx context.Context, opts apismetav1.ListOptions) (result *apinodev1alpha1.RuntimeClassList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1alpha1.RuntimeClassList{}
+	result = &apinodev1alpha1.RuntimeClassList{}
 	err = c.client.Get().
 		Resource("runtimeclasses").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested runtimeClasses.
-func (c *runtimeClasses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested runtimeClasses.
+func (c *runtimeClasses) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -102,17 +102,17 @@ func (c *runtimeClasses) Watch(ctx context.Context, opts v1.ListOptions) (watch.
 	opts.Watch = true
 	return c.client.Get().
 		Resource("runtimeclasses").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a runtimeClass and creates it.  Returns the server's representation of the runtimeClass, and an error, if there is any.
-func (c *runtimeClasses) Create(ctx context.Context, runtimeClass *v1alpha1.RuntimeClass, opts v1.CreateOptions) (result *v1alpha1.RuntimeClass, err error) {
-	result = &v1alpha1.RuntimeClass{}
+func (c *runtimeClasses) Create(ctx context.Context, runtimeClass *apinodev1alpha1.RuntimeClass, opts apismetav1.CreateOptions) (result *apinodev1alpha1.RuntimeClass, err error) {
+	result = &apinodev1alpha1.RuntimeClass{}
 	err = c.client.Post().
 		Resource("runtimeclasses").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(runtimeClass).
 		Do(ctx).
 		Into(result)
@@ -120,12 +120,12 @@ func (c *runtimeClasses) Create(ctx context.Context, runtimeClass *v1alpha1.Runt
 }
 
 // Update takes the representation of a runtimeClass and updates it. Returns the server's representation of the runtimeClass, and an error, if there is any.
-func (c *runtimeClasses) Update(ctx context.Context, runtimeClass *v1alpha1.RuntimeClass, opts v1.UpdateOptions) (result *v1alpha1.RuntimeClass, err error) {
-	result = &v1alpha1.RuntimeClass{}
+func (c *runtimeClasses) Update(ctx context.Context, runtimeClass *apinodev1alpha1.RuntimeClass, opts apismetav1.UpdateOptions) (result *apinodev1alpha1.RuntimeClass, err error) {
+	result = &apinodev1alpha1.RuntimeClass{}
 	err = c.client.Put().
 		Resource("runtimeclasses").
 		Name(runtimeClass.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(runtimeClass).
 		Do(ctx).
 		Into(result)
@@ -133,7 +133,7 @@ func (c *runtimeClasses) Update(ctx context.Context, runtimeClass *v1alpha1.Runt
 }
 
 // Delete takes name of the runtimeClass and deletes it. Returns an error if one occurs.
-func (c *runtimeClasses) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *runtimeClasses) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("runtimeclasses").
 		Name(name).
@@ -143,14 +143,14 @@ func (c *runtimeClasses) Delete(ctx context.Context, name string, opts v1.Delete
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *runtimeClasses) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *runtimeClasses) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Resource("runtimeclasses").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -158,13 +158,13 @@ func (c *runtimeClasses) DeleteCollection(ctx context.Context, opts v1.DeleteOpt
 }
 
 // Patch applies the patch and returns the patched runtimeClass.
-func (c *runtimeClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.RuntimeClass, err error) {
-	result = &v1alpha1.RuntimeClass{}
+func (c *runtimeClasses) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apinodev1alpha1.RuntimeClass, err error) {
+	result = &apinodev1alpha1.RuntimeClass{}
 	err = c.client.Patch(pt).
 		Resource("runtimeclasses").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -172,7 +172,7 @@ func (c *runtimeClasses) Patch(ctx context.Context, name string, pt types.PatchT
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied runtimeClass.
-func (c *runtimeClasses) Apply(ctx context.Context, runtimeClass *nodev1alpha1.RuntimeClassApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.RuntimeClass, err error) {
+func (c *runtimeClasses) Apply(ctx context.Context, runtimeClass *applyconfigurationsnodev1alpha1.RuntimeClassApplyConfiguration, opts apismetav1.ApplyOptions) (result *apinodev1alpha1.RuntimeClass, err error) {
 	if runtimeClass == nil {
 		return nil, fmt.Errorf("runtimeClass provided to Apply must not be nil")
 	}
@@ -185,11 +185,11 @@ func (c *runtimeClasses) Apply(ctx context.Context, runtimeClass *nodev1alpha1.R
 	if name == nil {
 		return nil, fmt.Errorf("runtimeClass.Name must be provided to Apply")
 	}
-	result = &v1alpha1.RuntimeClass{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apinodev1alpha1.RuntimeClass{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Resource("runtimeclasses").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

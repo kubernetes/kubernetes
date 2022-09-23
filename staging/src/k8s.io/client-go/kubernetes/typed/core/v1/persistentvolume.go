@@ -20,17 +20,17 @@ package v1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apicorev1 "k8s.io/api/core/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // PersistentVolumesGetter has a method to return a PersistentVolumeInterface.
@@ -41,23 +41,23 @@ type PersistentVolumesGetter interface {
 
 // PersistentVolumeInterface has methods to work with PersistentVolume resources.
 type PersistentVolumeInterface interface {
-	Create(ctx context.Context, persistentVolume *v1.PersistentVolume, opts metav1.CreateOptions) (*v1.PersistentVolume, error)
-	Update(ctx context.Context, persistentVolume *v1.PersistentVolume, opts metav1.UpdateOptions) (*v1.PersistentVolume, error)
-	UpdateStatus(ctx context.Context, persistentVolume *v1.PersistentVolume, opts metav1.UpdateOptions) (*v1.PersistentVolume, error)
-	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.PersistentVolume, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.PersistentVolumeList, error)
-	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PersistentVolume, err error)
-	Apply(ctx context.Context, persistentVolume *corev1.PersistentVolumeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PersistentVolume, err error)
-	ApplyStatus(ctx context.Context, persistentVolume *corev1.PersistentVolumeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PersistentVolume, err error)
+	Create(ctx context.Context, persistentVolume *apicorev1.PersistentVolume, opts apismetav1.CreateOptions) (*apicorev1.PersistentVolume, error)
+	Update(ctx context.Context, persistentVolume *apicorev1.PersistentVolume, opts apismetav1.UpdateOptions) (*apicorev1.PersistentVolume, error)
+	UpdateStatus(ctx context.Context, persistentVolume *apicorev1.PersistentVolume, opts apismetav1.UpdateOptions) (*apicorev1.PersistentVolume, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apicorev1.PersistentVolume, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apicorev1.PersistentVolumeList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apicorev1.PersistentVolume, err error)
+	Apply(ctx context.Context, persistentVolume *applyconfigurationscorev1.PersistentVolumeApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.PersistentVolume, err error)
+	ApplyStatus(ctx context.Context, persistentVolume *applyconfigurationscorev1.PersistentVolumeApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.PersistentVolume, err error)
 	PersistentVolumeExpansion
 }
 
 // persistentVolumes implements PersistentVolumeInterface
 type persistentVolumes struct {
-	client rest.Interface
+	client clientgorest.Interface
 }
 
 // newPersistentVolumes returns a PersistentVolumes
@@ -68,35 +68,35 @@ func newPersistentVolumes(c *CoreV1Client) *persistentVolumes {
 }
 
 // Get takes name of the persistentVolume, and returns the corresponding persistentVolume object, and an error if there is any.
-func (c *persistentVolumes) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.PersistentVolume, err error) {
-	result = &v1.PersistentVolume{}
+func (c *persistentVolumes) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apicorev1.PersistentVolume, err error) {
+	result = &apicorev1.PersistentVolume{}
 	err = c.client.Get().
 		Resource("persistentvolumes").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of PersistentVolumes that match those selectors.
-func (c *persistentVolumes) List(ctx context.Context, opts metav1.ListOptions) (result *v1.PersistentVolumeList, err error) {
+func (c *persistentVolumes) List(ctx context.Context, opts apismetav1.ListOptions) (result *apicorev1.PersistentVolumeList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1.PersistentVolumeList{}
+	result = &apicorev1.PersistentVolumeList{}
 	err = c.client.Get().
 		Resource("persistentvolumes").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested persistentVolumes.
-func (c *persistentVolumes) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested persistentVolumes.
+func (c *persistentVolumes) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -104,17 +104,17 @@ func (c *persistentVolumes) Watch(ctx context.Context, opts metav1.ListOptions) 
 	opts.Watch = true
 	return c.client.Get().
 		Resource("persistentvolumes").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a persistentVolume and creates it.  Returns the server's representation of the persistentVolume, and an error, if there is any.
-func (c *persistentVolumes) Create(ctx context.Context, persistentVolume *v1.PersistentVolume, opts metav1.CreateOptions) (result *v1.PersistentVolume, err error) {
-	result = &v1.PersistentVolume{}
+func (c *persistentVolumes) Create(ctx context.Context, persistentVolume *apicorev1.PersistentVolume, opts apismetav1.CreateOptions) (result *apicorev1.PersistentVolume, err error) {
+	result = &apicorev1.PersistentVolume{}
 	err = c.client.Post().
 		Resource("persistentvolumes").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(persistentVolume).
 		Do(ctx).
 		Into(result)
@@ -122,12 +122,12 @@ func (c *persistentVolumes) Create(ctx context.Context, persistentVolume *v1.Per
 }
 
 // Update takes the representation of a persistentVolume and updates it. Returns the server's representation of the persistentVolume, and an error, if there is any.
-func (c *persistentVolumes) Update(ctx context.Context, persistentVolume *v1.PersistentVolume, opts metav1.UpdateOptions) (result *v1.PersistentVolume, err error) {
-	result = &v1.PersistentVolume{}
+func (c *persistentVolumes) Update(ctx context.Context, persistentVolume *apicorev1.PersistentVolume, opts apismetav1.UpdateOptions) (result *apicorev1.PersistentVolume, err error) {
+	result = &apicorev1.PersistentVolume{}
 	err = c.client.Put().
 		Resource("persistentvolumes").
 		Name(persistentVolume.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(persistentVolume).
 		Do(ctx).
 		Into(result)
@@ -136,13 +136,13 @@ func (c *persistentVolumes) Update(ctx context.Context, persistentVolume *v1.Per
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *persistentVolumes) UpdateStatus(ctx context.Context, persistentVolume *v1.PersistentVolume, opts metav1.UpdateOptions) (result *v1.PersistentVolume, err error) {
-	result = &v1.PersistentVolume{}
+func (c *persistentVolumes) UpdateStatus(ctx context.Context, persistentVolume *apicorev1.PersistentVolume, opts apismetav1.UpdateOptions) (result *apicorev1.PersistentVolume, err error) {
+	result = &apicorev1.PersistentVolume{}
 	err = c.client.Put().
 		Resource("persistentvolumes").
 		Name(persistentVolume.Name).
 		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(persistentVolume).
 		Do(ctx).
 		Into(result)
@@ -150,7 +150,7 @@ func (c *persistentVolumes) UpdateStatus(ctx context.Context, persistentVolume *
 }
 
 // Delete takes name of the persistentVolume and deletes it. Returns an error if one occurs.
-func (c *persistentVolumes) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
+func (c *persistentVolumes) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("persistentvolumes").
 		Name(name).
@@ -160,14 +160,14 @@ func (c *persistentVolumes) Delete(ctx context.Context, name string, opts metav1
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *persistentVolumes) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+func (c *persistentVolumes) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Resource("persistentvolumes").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -175,13 +175,13 @@ func (c *persistentVolumes) DeleteCollection(ctx context.Context, opts metav1.De
 }
 
 // Patch applies the patch and returns the patched persistentVolume.
-func (c *persistentVolumes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PersistentVolume, err error) {
-	result = &v1.PersistentVolume{}
+func (c *persistentVolumes) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apicorev1.PersistentVolume, err error) {
+	result = &apicorev1.PersistentVolume{}
 	err = c.client.Patch(pt).
 		Resource("persistentvolumes").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -189,7 +189,7 @@ func (c *persistentVolumes) Patch(ctx context.Context, name string, pt types.Pat
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied persistentVolume.
-func (c *persistentVolumes) Apply(ctx context.Context, persistentVolume *corev1.PersistentVolumeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PersistentVolume, err error) {
+func (c *persistentVolumes) Apply(ctx context.Context, persistentVolume *applyconfigurationscorev1.PersistentVolumeApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.PersistentVolume, err error) {
 	if persistentVolume == nil {
 		return nil, fmt.Errorf("persistentVolume provided to Apply must not be nil")
 	}
@@ -202,11 +202,11 @@ func (c *persistentVolumes) Apply(ctx context.Context, persistentVolume *corev1.
 	if name == nil {
 		return nil, fmt.Errorf("persistentVolume.Name must be provided to Apply")
 	}
-	result = &v1.PersistentVolume{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apicorev1.PersistentVolume{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Resource("persistentvolumes").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -215,7 +215,7 @@ func (c *persistentVolumes) Apply(ctx context.Context, persistentVolume *corev1.
 
 // ApplyStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *persistentVolumes) ApplyStatus(ctx context.Context, persistentVolume *corev1.PersistentVolumeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PersistentVolume, err error) {
+func (c *persistentVolumes) ApplyStatus(ctx context.Context, persistentVolume *applyconfigurationscorev1.PersistentVolumeApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.PersistentVolume, err error) {
 	if persistentVolume == nil {
 		return nil, fmt.Errorf("persistentVolume provided to Apply must not be nil")
 	}
@@ -230,12 +230,12 @@ func (c *persistentVolumes) ApplyStatus(ctx context.Context, persistentVolume *c
 		return nil, fmt.Errorf("persistentVolume.Name must be provided to Apply")
 	}
 
-	result = &v1.PersistentVolume{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apicorev1.PersistentVolume{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Resource("persistentvolumes").
 		Name(*name).
 		SubResource("status").
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

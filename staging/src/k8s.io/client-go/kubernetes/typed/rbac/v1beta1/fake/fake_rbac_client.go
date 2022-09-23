@@ -20,12 +20,12 @@ package fake
 
 import (
 	v1beta1 "k8s.io/client-go/kubernetes/typed/rbac/v1beta1"
-	rest "k8s.io/client-go/rest"
-	testing "k8s.io/client-go/testing"
+	clientgorest "k8s.io/client-go/rest"
+	clientgotesting "k8s.io/client-go/testing"
 )
 
 type FakeRbacV1beta1 struct {
-	*testing.Fake
+	*clientgotesting.Fake
 }
 
 func (c *FakeRbacV1beta1) ClusterRoles() v1beta1.ClusterRoleInterface {
@@ -46,7 +46,7 @@ func (c *FakeRbacV1beta1) RoleBindings(namespace string) v1beta1.RoleBindingInte
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeRbacV1beta1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
+func (c *FakeRbacV1beta1) RESTClient() clientgorest.Interface {
+	var ret *clientgorest.RESTClient
 	return ret
 }

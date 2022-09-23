@@ -20,12 +20,12 @@ package fake
 
 import (
 	v1 "k8s.io/client-go/kubernetes/typed/certificates/v1"
-	rest "k8s.io/client-go/rest"
-	testing "k8s.io/client-go/testing"
+	clientgorest "k8s.io/client-go/rest"
+	clientgotesting "k8s.io/client-go/testing"
 )
 
 type FakeCertificatesV1 struct {
-	*testing.Fake
+	*clientgotesting.Fake
 }
 
 func (c *FakeCertificatesV1) CertificateSigningRequests() v1.CertificateSigningRequestInterface {
@@ -34,7 +34,7 @@ func (c *FakeCertificatesV1) CertificateSigningRequests() v1.CertificateSigningR
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeCertificatesV1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
+func (c *FakeCertificatesV1) RESTClient() clientgorest.Interface {
+	var ret *clientgorest.RESTClient
 	return ret
 }

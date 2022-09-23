@@ -20,17 +20,17 @@ package v1alpha1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1alpha1 "k8s.io/api/rbac/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	rbacv1alpha1 "k8s.io/client-go/applyconfigurations/rbac/v1alpha1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apirbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsrbacv1alpha1 "k8s.io/client-go/applyconfigurations/rbac/v1alpha1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // ClusterRolesGetter has a method to return a ClusterRoleInterface.
@@ -41,21 +41,21 @@ type ClusterRolesGetter interface {
 
 // ClusterRoleInterface has methods to work with ClusterRole resources.
 type ClusterRoleInterface interface {
-	Create(ctx context.Context, clusterRole *v1alpha1.ClusterRole, opts v1.CreateOptions) (*v1alpha1.ClusterRole, error)
-	Update(ctx context.Context, clusterRole *v1alpha1.ClusterRole, opts v1.UpdateOptions) (*v1alpha1.ClusterRole, error)
-	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.ClusterRole, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.ClusterRoleList, error)
-	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ClusterRole, err error)
-	Apply(ctx context.Context, clusterRole *rbacv1alpha1.ClusterRoleApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterRole, err error)
+	Create(ctx context.Context, clusterRole *apirbacv1alpha1.ClusterRole, opts apismetav1.CreateOptions) (*apirbacv1alpha1.ClusterRole, error)
+	Update(ctx context.Context, clusterRole *apirbacv1alpha1.ClusterRole, opts apismetav1.UpdateOptions) (*apirbacv1alpha1.ClusterRole, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apirbacv1alpha1.ClusterRole, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apirbacv1alpha1.ClusterRoleList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apirbacv1alpha1.ClusterRole, err error)
+	Apply(ctx context.Context, clusterRole *applyconfigurationsrbacv1alpha1.ClusterRoleApplyConfiguration, opts apismetav1.ApplyOptions) (result *apirbacv1alpha1.ClusterRole, err error)
 	ClusterRoleExpansion
 }
 
 // clusterRoles implements ClusterRoleInterface
 type clusterRoles struct {
-	client rest.Interface
+	client clientgorest.Interface
 }
 
 // newClusterRoles returns a ClusterRoles
@@ -66,35 +66,35 @@ func newClusterRoles(c *RbacV1alpha1Client) *clusterRoles {
 }
 
 // Get takes name of the clusterRole, and returns the corresponding clusterRole object, and an error if there is any.
-func (c *clusterRoles) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ClusterRole, err error) {
-	result = &v1alpha1.ClusterRole{}
+func (c *clusterRoles) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apirbacv1alpha1.ClusterRole, err error) {
+	result = &apirbacv1alpha1.ClusterRole{}
 	err = c.client.Get().
 		Resource("clusterroles").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of ClusterRoles that match those selectors.
-func (c *clusterRoles) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ClusterRoleList, err error) {
+func (c *clusterRoles) List(ctx context.Context, opts apismetav1.ListOptions) (result *apirbacv1alpha1.ClusterRoleList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1alpha1.ClusterRoleList{}
+	result = &apirbacv1alpha1.ClusterRoleList{}
 	err = c.client.Get().
 		Resource("clusterroles").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested clusterRoles.
-func (c *clusterRoles) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested clusterRoles.
+func (c *clusterRoles) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -102,17 +102,17 @@ func (c *clusterRoles) Watch(ctx context.Context, opts v1.ListOptions) (watch.In
 	opts.Watch = true
 	return c.client.Get().
 		Resource("clusterroles").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a clusterRole and creates it.  Returns the server's representation of the clusterRole, and an error, if there is any.
-func (c *clusterRoles) Create(ctx context.Context, clusterRole *v1alpha1.ClusterRole, opts v1.CreateOptions) (result *v1alpha1.ClusterRole, err error) {
-	result = &v1alpha1.ClusterRole{}
+func (c *clusterRoles) Create(ctx context.Context, clusterRole *apirbacv1alpha1.ClusterRole, opts apismetav1.CreateOptions) (result *apirbacv1alpha1.ClusterRole, err error) {
+	result = &apirbacv1alpha1.ClusterRole{}
 	err = c.client.Post().
 		Resource("clusterroles").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(clusterRole).
 		Do(ctx).
 		Into(result)
@@ -120,12 +120,12 @@ func (c *clusterRoles) Create(ctx context.Context, clusterRole *v1alpha1.Cluster
 }
 
 // Update takes the representation of a clusterRole and updates it. Returns the server's representation of the clusterRole, and an error, if there is any.
-func (c *clusterRoles) Update(ctx context.Context, clusterRole *v1alpha1.ClusterRole, opts v1.UpdateOptions) (result *v1alpha1.ClusterRole, err error) {
-	result = &v1alpha1.ClusterRole{}
+func (c *clusterRoles) Update(ctx context.Context, clusterRole *apirbacv1alpha1.ClusterRole, opts apismetav1.UpdateOptions) (result *apirbacv1alpha1.ClusterRole, err error) {
+	result = &apirbacv1alpha1.ClusterRole{}
 	err = c.client.Put().
 		Resource("clusterroles").
 		Name(clusterRole.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(clusterRole).
 		Do(ctx).
 		Into(result)
@@ -133,7 +133,7 @@ func (c *clusterRoles) Update(ctx context.Context, clusterRole *v1alpha1.Cluster
 }
 
 // Delete takes name of the clusterRole and deletes it. Returns an error if one occurs.
-func (c *clusterRoles) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *clusterRoles) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("clusterroles").
 		Name(name).
@@ -143,14 +143,14 @@ func (c *clusterRoles) Delete(ctx context.Context, name string, opts v1.DeleteOp
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *clusterRoles) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *clusterRoles) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Resource("clusterroles").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -158,13 +158,13 @@ func (c *clusterRoles) DeleteCollection(ctx context.Context, opts v1.DeleteOptio
 }
 
 // Patch applies the patch and returns the patched clusterRole.
-func (c *clusterRoles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ClusterRole, err error) {
-	result = &v1alpha1.ClusterRole{}
+func (c *clusterRoles) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apirbacv1alpha1.ClusterRole, err error) {
+	result = &apirbacv1alpha1.ClusterRole{}
 	err = c.client.Patch(pt).
 		Resource("clusterroles").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -172,7 +172,7 @@ func (c *clusterRoles) Patch(ctx context.Context, name string, pt types.PatchTyp
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied clusterRole.
-func (c *clusterRoles) Apply(ctx context.Context, clusterRole *rbacv1alpha1.ClusterRoleApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterRole, err error) {
+func (c *clusterRoles) Apply(ctx context.Context, clusterRole *applyconfigurationsrbacv1alpha1.ClusterRoleApplyConfiguration, opts apismetav1.ApplyOptions) (result *apirbacv1alpha1.ClusterRole, err error) {
 	if clusterRole == nil {
 		return nil, fmt.Errorf("clusterRole provided to Apply must not be nil")
 	}
@@ -185,11 +185,11 @@ func (c *clusterRoles) Apply(ctx context.Context, clusterRole *rbacv1alpha1.Clus
 	if name == nil {
 		return nil, fmt.Errorf("clusterRole.Name must be provided to Apply")
 	}
-	result = &v1alpha1.ClusterRole{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apirbacv1alpha1.ClusterRole{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Resource("clusterroles").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

@@ -20,17 +20,17 @@ package v2beta2
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v2beta2 "k8s.io/api/autoscaling/v2beta2"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	autoscalingv2beta2 "k8s.io/client-go/applyconfigurations/autoscaling/v2beta2"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apiautoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsautoscalingv2beta2 "k8s.io/client-go/applyconfigurations/autoscaling/v2beta2"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // HorizontalPodAutoscalersGetter has a method to return a HorizontalPodAutoscalerInterface.
@@ -41,23 +41,23 @@ type HorizontalPodAutoscalersGetter interface {
 
 // HorizontalPodAutoscalerInterface has methods to work with HorizontalPodAutoscaler resources.
 type HorizontalPodAutoscalerInterface interface {
-	Create(ctx context.Context, horizontalPodAutoscaler *v2beta2.HorizontalPodAutoscaler, opts v1.CreateOptions) (*v2beta2.HorizontalPodAutoscaler, error)
-	Update(ctx context.Context, horizontalPodAutoscaler *v2beta2.HorizontalPodAutoscaler, opts v1.UpdateOptions) (*v2beta2.HorizontalPodAutoscaler, error)
-	UpdateStatus(ctx context.Context, horizontalPodAutoscaler *v2beta2.HorizontalPodAutoscaler, opts v1.UpdateOptions) (*v2beta2.HorizontalPodAutoscaler, error)
-	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v2beta2.HorizontalPodAutoscaler, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v2beta2.HorizontalPodAutoscalerList, error)
-	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2beta2.HorizontalPodAutoscaler, err error)
-	Apply(ctx context.Context, horizontalPodAutoscaler *autoscalingv2beta2.HorizontalPodAutoscalerApplyConfiguration, opts v1.ApplyOptions) (result *v2beta2.HorizontalPodAutoscaler, err error)
-	ApplyStatus(ctx context.Context, horizontalPodAutoscaler *autoscalingv2beta2.HorizontalPodAutoscalerApplyConfiguration, opts v1.ApplyOptions) (result *v2beta2.HorizontalPodAutoscaler, err error)
+	Create(ctx context.Context, horizontalPodAutoscaler *apiautoscalingv2beta2.HorizontalPodAutoscaler, opts apismetav1.CreateOptions) (*apiautoscalingv2beta2.HorizontalPodAutoscaler, error)
+	Update(ctx context.Context, horizontalPodAutoscaler *apiautoscalingv2beta2.HorizontalPodAutoscaler, opts apismetav1.UpdateOptions) (*apiautoscalingv2beta2.HorizontalPodAutoscaler, error)
+	UpdateStatus(ctx context.Context, horizontalPodAutoscaler *apiautoscalingv2beta2.HorizontalPodAutoscaler, opts apismetav1.UpdateOptions) (*apiautoscalingv2beta2.HorizontalPodAutoscaler, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apiautoscalingv2beta2.HorizontalPodAutoscaler, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apiautoscalingv2beta2.HorizontalPodAutoscalerList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apiautoscalingv2beta2.HorizontalPodAutoscaler, err error)
+	Apply(ctx context.Context, horizontalPodAutoscaler *applyconfigurationsautoscalingv2beta2.HorizontalPodAutoscalerApplyConfiguration, opts apismetav1.ApplyOptions) (result *apiautoscalingv2beta2.HorizontalPodAutoscaler, err error)
+	ApplyStatus(ctx context.Context, horizontalPodAutoscaler *applyconfigurationsautoscalingv2beta2.HorizontalPodAutoscalerApplyConfiguration, opts apismetav1.ApplyOptions) (result *apiautoscalingv2beta2.HorizontalPodAutoscaler, err error)
 	HorizontalPodAutoscalerExpansion
 }
 
 // horizontalPodAutoscalers implements HorizontalPodAutoscalerInterface
 type horizontalPodAutoscalers struct {
-	client rest.Interface
+	client clientgorest.Interface
 	ns     string
 }
 
@@ -70,37 +70,37 @@ func newHorizontalPodAutoscalers(c *AutoscalingV2beta2Client, namespace string) 
 }
 
 // Get takes name of the horizontalPodAutoscaler, and returns the corresponding horizontalPodAutoscaler object, and an error if there is any.
-func (c *horizontalPodAutoscalers) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2beta2.HorizontalPodAutoscaler, err error) {
-	result = &v2beta2.HorizontalPodAutoscaler{}
+func (c *horizontalPodAutoscalers) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apiautoscalingv2beta2.HorizontalPodAutoscaler, err error) {
+	result = &apiautoscalingv2beta2.HorizontalPodAutoscaler{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of HorizontalPodAutoscalers that match those selectors.
-func (c *horizontalPodAutoscalers) List(ctx context.Context, opts v1.ListOptions) (result *v2beta2.HorizontalPodAutoscalerList, err error) {
+func (c *horizontalPodAutoscalers) List(ctx context.Context, opts apismetav1.ListOptions) (result *apiautoscalingv2beta2.HorizontalPodAutoscalerList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v2beta2.HorizontalPodAutoscalerList{}
+	result = &apiautoscalingv2beta2.HorizontalPodAutoscalerList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested horizontalPodAutoscalers.
-func (c *horizontalPodAutoscalers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested horizontalPodAutoscalers.
+func (c *horizontalPodAutoscalers) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -109,18 +109,18 @@ func (c *horizontalPodAutoscalers) Watch(ctx context.Context, opts v1.ListOption
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a horizontalPodAutoscaler and creates it.  Returns the server's representation of the horizontalPodAutoscaler, and an error, if there is any.
-func (c *horizontalPodAutoscalers) Create(ctx context.Context, horizontalPodAutoscaler *v2beta2.HorizontalPodAutoscaler, opts v1.CreateOptions) (result *v2beta2.HorizontalPodAutoscaler, err error) {
-	result = &v2beta2.HorizontalPodAutoscaler{}
+func (c *horizontalPodAutoscalers) Create(ctx context.Context, horizontalPodAutoscaler *apiautoscalingv2beta2.HorizontalPodAutoscaler, opts apismetav1.CreateOptions) (result *apiautoscalingv2beta2.HorizontalPodAutoscaler, err error) {
+	result = &apiautoscalingv2beta2.HorizontalPodAutoscaler{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(horizontalPodAutoscaler).
 		Do(ctx).
 		Into(result)
@@ -128,13 +128,13 @@ func (c *horizontalPodAutoscalers) Create(ctx context.Context, horizontalPodAuto
 }
 
 // Update takes the representation of a horizontalPodAutoscaler and updates it. Returns the server's representation of the horizontalPodAutoscaler, and an error, if there is any.
-func (c *horizontalPodAutoscalers) Update(ctx context.Context, horizontalPodAutoscaler *v2beta2.HorizontalPodAutoscaler, opts v1.UpdateOptions) (result *v2beta2.HorizontalPodAutoscaler, err error) {
-	result = &v2beta2.HorizontalPodAutoscaler{}
+func (c *horizontalPodAutoscalers) Update(ctx context.Context, horizontalPodAutoscaler *apiautoscalingv2beta2.HorizontalPodAutoscaler, opts apismetav1.UpdateOptions) (result *apiautoscalingv2beta2.HorizontalPodAutoscaler, err error) {
+	result = &apiautoscalingv2beta2.HorizontalPodAutoscaler{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
 		Name(horizontalPodAutoscaler.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(horizontalPodAutoscaler).
 		Do(ctx).
 		Into(result)
@@ -143,14 +143,14 @@ func (c *horizontalPodAutoscalers) Update(ctx context.Context, horizontalPodAuto
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *horizontalPodAutoscalers) UpdateStatus(ctx context.Context, horizontalPodAutoscaler *v2beta2.HorizontalPodAutoscaler, opts v1.UpdateOptions) (result *v2beta2.HorizontalPodAutoscaler, err error) {
-	result = &v2beta2.HorizontalPodAutoscaler{}
+func (c *horizontalPodAutoscalers) UpdateStatus(ctx context.Context, horizontalPodAutoscaler *apiautoscalingv2beta2.HorizontalPodAutoscaler, opts apismetav1.UpdateOptions) (result *apiautoscalingv2beta2.HorizontalPodAutoscaler, err error) {
+	result = &apiautoscalingv2beta2.HorizontalPodAutoscaler{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
 		Name(horizontalPodAutoscaler.Name).
 		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(horizontalPodAutoscaler).
 		Do(ctx).
 		Into(result)
@@ -158,7 +158,7 @@ func (c *horizontalPodAutoscalers) UpdateStatus(ctx context.Context, horizontalP
 }
 
 // Delete takes name of the horizontalPodAutoscaler and deletes it. Returns an error if one occurs.
-func (c *horizontalPodAutoscalers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *horizontalPodAutoscalers) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
@@ -169,7 +169,7 @@ func (c *horizontalPodAutoscalers) Delete(ctx context.Context, name string, opts
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *horizontalPodAutoscalers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *horizontalPodAutoscalers) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
@@ -177,7 +177,7 @@ func (c *horizontalPodAutoscalers) DeleteCollection(ctx context.Context, opts v1
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -185,14 +185,14 @@ func (c *horizontalPodAutoscalers) DeleteCollection(ctx context.Context, opts v1
 }
 
 // Patch applies the patch and returns the patched horizontalPodAutoscaler.
-func (c *horizontalPodAutoscalers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2beta2.HorizontalPodAutoscaler, err error) {
-	result = &v2beta2.HorizontalPodAutoscaler{}
+func (c *horizontalPodAutoscalers) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apiautoscalingv2beta2.HorizontalPodAutoscaler, err error) {
+	result = &apiautoscalingv2beta2.HorizontalPodAutoscaler{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -200,7 +200,7 @@ func (c *horizontalPodAutoscalers) Patch(ctx context.Context, name string, pt ty
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied horizontalPodAutoscaler.
-func (c *horizontalPodAutoscalers) Apply(ctx context.Context, horizontalPodAutoscaler *autoscalingv2beta2.HorizontalPodAutoscalerApplyConfiguration, opts v1.ApplyOptions) (result *v2beta2.HorizontalPodAutoscaler, err error) {
+func (c *horizontalPodAutoscalers) Apply(ctx context.Context, horizontalPodAutoscaler *applyconfigurationsautoscalingv2beta2.HorizontalPodAutoscalerApplyConfiguration, opts apismetav1.ApplyOptions) (result *apiautoscalingv2beta2.HorizontalPodAutoscaler, err error) {
 	if horizontalPodAutoscaler == nil {
 		return nil, fmt.Errorf("horizontalPodAutoscaler provided to Apply must not be nil")
 	}
@@ -213,12 +213,12 @@ func (c *horizontalPodAutoscalers) Apply(ctx context.Context, horizontalPodAutos
 	if name == nil {
 		return nil, fmt.Errorf("horizontalPodAutoscaler.Name must be provided to Apply")
 	}
-	result = &v2beta2.HorizontalPodAutoscaler{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apiautoscalingv2beta2.HorizontalPodAutoscaler{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -227,7 +227,7 @@ func (c *horizontalPodAutoscalers) Apply(ctx context.Context, horizontalPodAutos
 
 // ApplyStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *horizontalPodAutoscalers) ApplyStatus(ctx context.Context, horizontalPodAutoscaler *autoscalingv2beta2.HorizontalPodAutoscalerApplyConfiguration, opts v1.ApplyOptions) (result *v2beta2.HorizontalPodAutoscaler, err error) {
+func (c *horizontalPodAutoscalers) ApplyStatus(ctx context.Context, horizontalPodAutoscaler *applyconfigurationsautoscalingv2beta2.HorizontalPodAutoscalerApplyConfiguration, opts apismetav1.ApplyOptions) (result *apiautoscalingv2beta2.HorizontalPodAutoscaler, err error) {
 	if horizontalPodAutoscaler == nil {
 		return nil, fmt.Errorf("horizontalPodAutoscaler provided to Apply must not be nil")
 	}
@@ -242,13 +242,13 @@ func (c *horizontalPodAutoscalers) ApplyStatus(ctx context.Context, horizontalPo
 		return nil, fmt.Errorf("horizontalPodAutoscaler.Name must be provided to Apply")
 	}
 
-	result = &v2beta2.HorizontalPodAutoscaler{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apiautoscalingv2beta2.HorizontalPodAutoscaler{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("horizontalpodautoscalers").
 		Name(*name).
 		SubResource("status").
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

@@ -21,10 +21,10 @@ package v1beta1
 import (
 	"context"
 
-	v1beta1 "k8s.io/api/authentication/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apiauthenticationv1beta1 "k8s.io/api/authentication/v1beta1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // TokenReviewsGetter has a method to return a TokenReviewInterface.
@@ -35,13 +35,13 @@ type TokenReviewsGetter interface {
 
 // TokenReviewInterface has methods to work with TokenReview resources.
 type TokenReviewInterface interface {
-	Create(ctx context.Context, tokenReview *v1beta1.TokenReview, opts v1.CreateOptions) (*v1beta1.TokenReview, error)
+	Create(ctx context.Context, tokenReview *apiauthenticationv1beta1.TokenReview, opts apismetav1.CreateOptions) (*apiauthenticationv1beta1.TokenReview, error)
 	TokenReviewExpansion
 }
 
 // tokenReviews implements TokenReviewInterface
 type tokenReviews struct {
-	client rest.Interface
+	client clientgorest.Interface
 }
 
 // newTokenReviews returns a TokenReviews
@@ -52,11 +52,11 @@ func newTokenReviews(c *AuthenticationV1beta1Client) *tokenReviews {
 }
 
 // Create takes the representation of a tokenReview and creates it.  Returns the server's representation of the tokenReview, and an error, if there is any.
-func (c *tokenReviews) Create(ctx context.Context, tokenReview *v1beta1.TokenReview, opts v1.CreateOptions) (result *v1beta1.TokenReview, err error) {
-	result = &v1beta1.TokenReview{}
+func (c *tokenReviews) Create(ctx context.Context, tokenReview *apiauthenticationv1beta1.TokenReview, opts apismetav1.CreateOptions) (result *apiauthenticationv1beta1.TokenReview, err error) {
+	result = &apiauthenticationv1beta1.TokenReview{}
 	err = c.client.Post().
 		Resource("tokenreviews").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(tokenReview).
 		Do(ctx).
 		Into(result)

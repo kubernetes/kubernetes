@@ -20,12 +20,12 @@ package fake
 
 import (
 	v1alpha1 "k8s.io/client-go/kubernetes/typed/networking/v1alpha1"
-	rest "k8s.io/client-go/rest"
-	testing "k8s.io/client-go/testing"
+	clientgorest "k8s.io/client-go/rest"
+	clientgotesting "k8s.io/client-go/testing"
 )
 
 type FakeNetworkingV1alpha1 struct {
-	*testing.Fake
+	*clientgotesting.Fake
 }
 
 func (c *FakeNetworkingV1alpha1) ClusterCIDRs() v1alpha1.ClusterCIDRInterface {
@@ -38,7 +38,7 @@ func (c *FakeNetworkingV1alpha1) IPAddresses() v1alpha1.IPAddressInterface {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeNetworkingV1alpha1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
+func (c *FakeNetworkingV1alpha1) RESTClient() clientgorest.Interface {
+	var ret *clientgorest.RESTClient
 	return ret
 }

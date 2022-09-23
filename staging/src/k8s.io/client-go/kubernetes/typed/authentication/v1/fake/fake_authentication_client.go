@@ -20,12 +20,12 @@ package fake
 
 import (
 	v1 "k8s.io/client-go/kubernetes/typed/authentication/v1"
-	rest "k8s.io/client-go/rest"
-	testing "k8s.io/client-go/testing"
+	clientgorest "k8s.io/client-go/rest"
+	clientgotesting "k8s.io/client-go/testing"
 )
 
 type FakeAuthenticationV1 struct {
-	*testing.Fake
+	*clientgotesting.Fake
 }
 
 func (c *FakeAuthenticationV1) SelfSubjectReviews() v1.SelfSubjectReviewInterface {
@@ -38,7 +38,7 @@ func (c *FakeAuthenticationV1) TokenReviews() v1.TokenReviewInterface {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeAuthenticationV1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
+func (c *FakeAuthenticationV1) RESTClient() clientgorest.Interface {
+	var ret *clientgorest.RESTClient
 	return ret
 }

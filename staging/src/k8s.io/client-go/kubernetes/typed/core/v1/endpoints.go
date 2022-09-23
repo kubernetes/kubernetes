@@ -20,17 +20,17 @@ package v1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apicorev1 "k8s.io/api/core/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // EndpointsGetter has a method to return a EndpointsInterface.
@@ -41,21 +41,21 @@ type EndpointsGetter interface {
 
 // EndpointsInterface has methods to work with Endpoints resources.
 type EndpointsInterface interface {
-	Create(ctx context.Context, endpoints *v1.Endpoints, opts metav1.CreateOptions) (*v1.Endpoints, error)
-	Update(ctx context.Context, endpoints *v1.Endpoints, opts metav1.UpdateOptions) (*v1.Endpoints, error)
-	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Endpoints, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.EndpointsList, error)
-	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Endpoints, err error)
-	Apply(ctx context.Context, endpoints *corev1.EndpointsApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Endpoints, err error)
+	Create(ctx context.Context, endpoints *apicorev1.Endpoints, opts apismetav1.CreateOptions) (*apicorev1.Endpoints, error)
+	Update(ctx context.Context, endpoints *apicorev1.Endpoints, opts apismetav1.UpdateOptions) (*apicorev1.Endpoints, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apicorev1.Endpoints, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apicorev1.EndpointsList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apicorev1.Endpoints, err error)
+	Apply(ctx context.Context, endpoints *applyconfigurationscorev1.EndpointsApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.Endpoints, err error)
 	EndpointsExpansion
 }
 
 // endpoints implements EndpointsInterface
 type endpoints struct {
-	client rest.Interface
+	client clientgorest.Interface
 	ns     string
 }
 
@@ -68,37 +68,37 @@ func newEndpoints(c *CoreV1Client, namespace string) *endpoints {
 }
 
 // Get takes name of the endpoints, and returns the corresponding endpoints object, and an error if there is any.
-func (c *endpoints) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Endpoints, err error) {
-	result = &v1.Endpoints{}
+func (c *endpoints) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apicorev1.Endpoints, err error) {
+	result = &apicorev1.Endpoints{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("endpoints").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Endpoints that match those selectors.
-func (c *endpoints) List(ctx context.Context, opts metav1.ListOptions) (result *v1.EndpointsList, err error) {
+func (c *endpoints) List(ctx context.Context, opts apismetav1.ListOptions) (result *apicorev1.EndpointsList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1.EndpointsList{}
+	result = &apicorev1.EndpointsList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("endpoints").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested endpoints.
-func (c *endpoints) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested endpoints.
+func (c *endpoints) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -107,18 +107,18 @@ func (c *endpoints) Watch(ctx context.Context, opts metav1.ListOptions) (watch.I
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("endpoints").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a endpoints and creates it.  Returns the server's representation of the endpoints, and an error, if there is any.
-func (c *endpoints) Create(ctx context.Context, endpoints *v1.Endpoints, opts metav1.CreateOptions) (result *v1.Endpoints, err error) {
-	result = &v1.Endpoints{}
+func (c *endpoints) Create(ctx context.Context, endpoints *apicorev1.Endpoints, opts apismetav1.CreateOptions) (result *apicorev1.Endpoints, err error) {
+	result = &apicorev1.Endpoints{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("endpoints").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(endpoints).
 		Do(ctx).
 		Into(result)
@@ -126,13 +126,13 @@ func (c *endpoints) Create(ctx context.Context, endpoints *v1.Endpoints, opts me
 }
 
 // Update takes the representation of a endpoints and updates it. Returns the server's representation of the endpoints, and an error, if there is any.
-func (c *endpoints) Update(ctx context.Context, endpoints *v1.Endpoints, opts metav1.UpdateOptions) (result *v1.Endpoints, err error) {
-	result = &v1.Endpoints{}
+func (c *endpoints) Update(ctx context.Context, endpoints *apicorev1.Endpoints, opts apismetav1.UpdateOptions) (result *apicorev1.Endpoints, err error) {
+	result = &apicorev1.Endpoints{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("endpoints").
 		Name(endpoints.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(endpoints).
 		Do(ctx).
 		Into(result)
@@ -140,7 +140,7 @@ func (c *endpoints) Update(ctx context.Context, endpoints *v1.Endpoints, opts me
 }
 
 // Delete takes name of the endpoints and deletes it. Returns an error if one occurs.
-func (c *endpoints) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
+func (c *endpoints) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("endpoints").
@@ -151,7 +151,7 @@ func (c *endpoints) Delete(ctx context.Context, name string, opts metav1.DeleteO
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *endpoints) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+func (c *endpoints) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
@@ -159,7 +159,7 @@ func (c *endpoints) DeleteCollection(ctx context.Context, opts metav1.DeleteOpti
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("endpoints").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -167,14 +167,14 @@ func (c *endpoints) DeleteCollection(ctx context.Context, opts metav1.DeleteOpti
 }
 
 // Patch applies the patch and returns the patched endpoints.
-func (c *endpoints) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Endpoints, err error) {
-	result = &v1.Endpoints{}
+func (c *endpoints) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apicorev1.Endpoints, err error) {
+	result = &apicorev1.Endpoints{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("endpoints").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -182,7 +182,7 @@ func (c *endpoints) Patch(ctx context.Context, name string, pt types.PatchType, 
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied endpoints.
-func (c *endpoints) Apply(ctx context.Context, endpoints *corev1.EndpointsApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Endpoints, err error) {
+func (c *endpoints) Apply(ctx context.Context, endpoints *applyconfigurationscorev1.EndpointsApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.Endpoints, err error) {
 	if endpoints == nil {
 		return nil, fmt.Errorf("endpoints provided to Apply must not be nil")
 	}
@@ -195,12 +195,12 @@ func (c *endpoints) Apply(ctx context.Context, endpoints *corev1.EndpointsApplyC
 	if name == nil {
 		return nil, fmt.Errorf("endpoints.Name must be provided to Apply")
 	}
-	result = &v1.Endpoints{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apicorev1.Endpoints{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("endpoints").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

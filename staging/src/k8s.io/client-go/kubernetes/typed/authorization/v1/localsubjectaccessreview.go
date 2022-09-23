@@ -21,10 +21,10 @@ package v1
 import (
 	"context"
 
-	v1 "k8s.io/api/authorization/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apiauthorizationv1 "k8s.io/api/authorization/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // LocalSubjectAccessReviewsGetter has a method to return a LocalSubjectAccessReviewInterface.
@@ -35,13 +35,13 @@ type LocalSubjectAccessReviewsGetter interface {
 
 // LocalSubjectAccessReviewInterface has methods to work with LocalSubjectAccessReview resources.
 type LocalSubjectAccessReviewInterface interface {
-	Create(ctx context.Context, localSubjectAccessReview *v1.LocalSubjectAccessReview, opts metav1.CreateOptions) (*v1.LocalSubjectAccessReview, error)
+	Create(ctx context.Context, localSubjectAccessReview *apiauthorizationv1.LocalSubjectAccessReview, opts apismetav1.CreateOptions) (*apiauthorizationv1.LocalSubjectAccessReview, error)
 	LocalSubjectAccessReviewExpansion
 }
 
 // localSubjectAccessReviews implements LocalSubjectAccessReviewInterface
 type localSubjectAccessReviews struct {
-	client rest.Interface
+	client clientgorest.Interface
 	ns     string
 }
 
@@ -54,12 +54,12 @@ func newLocalSubjectAccessReviews(c *AuthorizationV1Client, namespace string) *l
 }
 
 // Create takes the representation of a localSubjectAccessReview and creates it.  Returns the server's representation of the localSubjectAccessReview, and an error, if there is any.
-func (c *localSubjectAccessReviews) Create(ctx context.Context, localSubjectAccessReview *v1.LocalSubjectAccessReview, opts metav1.CreateOptions) (result *v1.LocalSubjectAccessReview, err error) {
-	result = &v1.LocalSubjectAccessReview{}
+func (c *localSubjectAccessReviews) Create(ctx context.Context, localSubjectAccessReview *apiauthorizationv1.LocalSubjectAccessReview, opts apismetav1.CreateOptions) (result *apiauthorizationv1.LocalSubjectAccessReview, err error) {
+	result = &apiauthorizationv1.LocalSubjectAccessReview{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("localsubjectaccessreviews").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(localSubjectAccessReview).
 		Do(ctx).
 		Into(result)

@@ -20,17 +20,17 @@ package v1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apicorev1 "k8s.io/api/core/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // PodsGetter has a method to return a PodInterface.
@@ -41,25 +41,25 @@ type PodsGetter interface {
 
 // PodInterface has methods to work with Pod resources.
 type PodInterface interface {
-	Create(ctx context.Context, pod *v1.Pod, opts metav1.CreateOptions) (*v1.Pod, error)
-	Update(ctx context.Context, pod *v1.Pod, opts metav1.UpdateOptions) (*v1.Pod, error)
-	UpdateStatus(ctx context.Context, pod *v1.Pod, opts metav1.UpdateOptions) (*v1.Pod, error)
-	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Pod, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.PodList, error)
-	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Pod, err error)
-	Apply(ctx context.Context, pod *corev1.PodApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Pod, err error)
-	ApplyStatus(ctx context.Context, pod *corev1.PodApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Pod, err error)
-	UpdateEphemeralContainers(ctx context.Context, podName string, pod *v1.Pod, opts metav1.UpdateOptions) (*v1.Pod, error)
+	Create(ctx context.Context, pod *apicorev1.Pod, opts apismetav1.CreateOptions) (*apicorev1.Pod, error)
+	Update(ctx context.Context, pod *apicorev1.Pod, opts apismetav1.UpdateOptions) (*apicorev1.Pod, error)
+	UpdateStatus(ctx context.Context, pod *apicorev1.Pod, opts apismetav1.UpdateOptions) (*apicorev1.Pod, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apicorev1.Pod, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apicorev1.PodList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apicorev1.Pod, err error)
+	Apply(ctx context.Context, pod *applyconfigurationscorev1.PodApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.Pod, err error)
+	ApplyStatus(ctx context.Context, pod *applyconfigurationscorev1.PodApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.Pod, err error)
+	UpdateEphemeralContainers(ctx context.Context, podName string, pod *apicorev1.Pod, opts apismetav1.UpdateOptions) (*apicorev1.Pod, error)
 
 	PodExpansion
 }
 
 // pods implements PodInterface
 type pods struct {
-	client rest.Interface
+	client clientgorest.Interface
 	ns     string
 }
 
@@ -72,37 +72,37 @@ func newPods(c *CoreV1Client, namespace string) *pods {
 }
 
 // Get takes name of the pod, and returns the corresponding pod object, and an error if there is any.
-func (c *pods) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Pod, err error) {
-	result = &v1.Pod{}
+func (c *pods) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apicorev1.Pod, err error) {
+	result = &apicorev1.Pod{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("pods").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Pods that match those selectors.
-func (c *pods) List(ctx context.Context, opts metav1.ListOptions) (result *v1.PodList, err error) {
+func (c *pods) List(ctx context.Context, opts apismetav1.ListOptions) (result *apicorev1.PodList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1.PodList{}
+	result = &apicorev1.PodList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("pods").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested pods.
-func (c *pods) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested pods.
+func (c *pods) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -111,18 +111,18 @@ func (c *pods) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interf
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("pods").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a pod and creates it.  Returns the server's representation of the pod, and an error, if there is any.
-func (c *pods) Create(ctx context.Context, pod *v1.Pod, opts metav1.CreateOptions) (result *v1.Pod, err error) {
-	result = &v1.Pod{}
+func (c *pods) Create(ctx context.Context, pod *apicorev1.Pod, opts apismetav1.CreateOptions) (result *apicorev1.Pod, err error) {
+	result = &apicorev1.Pod{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("pods").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(pod).
 		Do(ctx).
 		Into(result)
@@ -130,13 +130,13 @@ func (c *pods) Create(ctx context.Context, pod *v1.Pod, opts metav1.CreateOption
 }
 
 // Update takes the representation of a pod and updates it. Returns the server's representation of the pod, and an error, if there is any.
-func (c *pods) Update(ctx context.Context, pod *v1.Pod, opts metav1.UpdateOptions) (result *v1.Pod, err error) {
-	result = &v1.Pod{}
+func (c *pods) Update(ctx context.Context, pod *apicorev1.Pod, opts apismetav1.UpdateOptions) (result *apicorev1.Pod, err error) {
+	result = &apicorev1.Pod{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("pods").
 		Name(pod.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(pod).
 		Do(ctx).
 		Into(result)
@@ -145,14 +145,14 @@ func (c *pods) Update(ctx context.Context, pod *v1.Pod, opts metav1.UpdateOption
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *pods) UpdateStatus(ctx context.Context, pod *v1.Pod, opts metav1.UpdateOptions) (result *v1.Pod, err error) {
-	result = &v1.Pod{}
+func (c *pods) UpdateStatus(ctx context.Context, pod *apicorev1.Pod, opts apismetav1.UpdateOptions) (result *apicorev1.Pod, err error) {
+	result = &apicorev1.Pod{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("pods").
 		Name(pod.Name).
 		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(pod).
 		Do(ctx).
 		Into(result)
@@ -160,7 +160,7 @@ func (c *pods) UpdateStatus(ctx context.Context, pod *v1.Pod, opts metav1.Update
 }
 
 // Delete takes name of the pod and deletes it. Returns an error if one occurs.
-func (c *pods) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
+func (c *pods) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("pods").
@@ -171,7 +171,7 @@ func (c *pods) Delete(ctx context.Context, name string, opts metav1.DeleteOption
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *pods) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+func (c *pods) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
@@ -179,7 +179,7 @@ func (c *pods) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, 
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("pods").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -187,14 +187,14 @@ func (c *pods) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, 
 }
 
 // Patch applies the patch and returns the patched pod.
-func (c *pods) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Pod, err error) {
-	result = &v1.Pod{}
+func (c *pods) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apicorev1.Pod, err error) {
+	result = &apicorev1.Pod{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("pods").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -202,7 +202,7 @@ func (c *pods) Patch(ctx context.Context, name string, pt types.PatchType, data 
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied pod.
-func (c *pods) Apply(ctx context.Context, pod *corev1.PodApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Pod, err error) {
+func (c *pods) Apply(ctx context.Context, pod *applyconfigurationscorev1.PodApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.Pod, err error) {
 	if pod == nil {
 		return nil, fmt.Errorf("pod provided to Apply must not be nil")
 	}
@@ -215,12 +215,12 @@ func (c *pods) Apply(ctx context.Context, pod *corev1.PodApplyConfiguration, opt
 	if name == nil {
 		return nil, fmt.Errorf("pod.Name must be provided to Apply")
 	}
-	result = &v1.Pod{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apicorev1.Pod{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("pods").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -229,7 +229,7 @@ func (c *pods) Apply(ctx context.Context, pod *corev1.PodApplyConfiguration, opt
 
 // ApplyStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *pods) ApplyStatus(ctx context.Context, pod *corev1.PodApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Pod, err error) {
+func (c *pods) ApplyStatus(ctx context.Context, pod *applyconfigurationscorev1.PodApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.Pod, err error) {
 	if pod == nil {
 		return nil, fmt.Errorf("pod provided to Apply must not be nil")
 	}
@@ -244,13 +244,13 @@ func (c *pods) ApplyStatus(ctx context.Context, pod *corev1.PodApplyConfiguratio
 		return nil, fmt.Errorf("pod.Name must be provided to Apply")
 	}
 
-	result = &v1.Pod{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apicorev1.Pod{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("pods").
 		Name(*name).
 		SubResource("status").
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -258,14 +258,14 @@ func (c *pods) ApplyStatus(ctx context.Context, pod *corev1.PodApplyConfiguratio
 }
 
 // UpdateEphemeralContainers takes the top resource name and the representation of a pod and updates it. Returns the server's representation of the pod, and an error, if there is any.
-func (c *pods) UpdateEphemeralContainers(ctx context.Context, podName string, pod *v1.Pod, opts metav1.UpdateOptions) (result *v1.Pod, err error) {
-	result = &v1.Pod{}
+func (c *pods) UpdateEphemeralContainers(ctx context.Context, podName string, pod *apicorev1.Pod, opts apismetav1.UpdateOptions) (result *apicorev1.Pod, err error) {
+	result = &apicorev1.Pod{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("pods").
 		Name(podName).
 		SubResource("ephemeralcontainers").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(pod).
 		Do(ctx).
 		Into(result)

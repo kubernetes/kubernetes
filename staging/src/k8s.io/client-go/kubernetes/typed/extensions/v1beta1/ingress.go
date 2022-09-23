@@ -20,17 +20,17 @@ package v1beta1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1beta1 "k8s.io/api/extensions/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	extensionsv1beta1 "k8s.io/client-go/applyconfigurations/extensions/v1beta1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apiextensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsextensionsv1beta1 "k8s.io/client-go/applyconfigurations/extensions/v1beta1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // IngressesGetter has a method to return a IngressInterface.
@@ -41,23 +41,23 @@ type IngressesGetter interface {
 
 // IngressInterface has methods to work with Ingress resources.
 type IngressInterface interface {
-	Create(ctx context.Context, ingress *v1beta1.Ingress, opts v1.CreateOptions) (*v1beta1.Ingress, error)
-	Update(ctx context.Context, ingress *v1beta1.Ingress, opts v1.UpdateOptions) (*v1beta1.Ingress, error)
-	UpdateStatus(ctx context.Context, ingress *v1beta1.Ingress, opts v1.UpdateOptions) (*v1beta1.Ingress, error)
-	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.Ingress, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.IngressList, error)
-	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Ingress, err error)
-	Apply(ctx context.Context, ingress *extensionsv1beta1.IngressApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Ingress, err error)
-	ApplyStatus(ctx context.Context, ingress *extensionsv1beta1.IngressApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Ingress, err error)
+	Create(ctx context.Context, ingress *apiextensionsv1beta1.Ingress, opts apismetav1.CreateOptions) (*apiextensionsv1beta1.Ingress, error)
+	Update(ctx context.Context, ingress *apiextensionsv1beta1.Ingress, opts apismetav1.UpdateOptions) (*apiextensionsv1beta1.Ingress, error)
+	UpdateStatus(ctx context.Context, ingress *apiextensionsv1beta1.Ingress, opts apismetav1.UpdateOptions) (*apiextensionsv1beta1.Ingress, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apiextensionsv1beta1.Ingress, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apiextensionsv1beta1.IngressList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apiextensionsv1beta1.Ingress, err error)
+	Apply(ctx context.Context, ingress *applyconfigurationsextensionsv1beta1.IngressApplyConfiguration, opts apismetav1.ApplyOptions) (result *apiextensionsv1beta1.Ingress, err error)
+	ApplyStatus(ctx context.Context, ingress *applyconfigurationsextensionsv1beta1.IngressApplyConfiguration, opts apismetav1.ApplyOptions) (result *apiextensionsv1beta1.Ingress, err error)
 	IngressExpansion
 }
 
 // ingresses implements IngressInterface
 type ingresses struct {
-	client rest.Interface
+	client clientgorest.Interface
 	ns     string
 }
 
@@ -70,37 +70,37 @@ func newIngresses(c *ExtensionsV1beta1Client, namespace string) *ingresses {
 }
 
 // Get takes name of the ingress, and returns the corresponding ingress object, and an error if there is any.
-func (c *ingresses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.Ingress, err error) {
-	result = &v1beta1.Ingress{}
+func (c *ingresses) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apiextensionsv1beta1.Ingress, err error) {
+	result = &apiextensionsv1beta1.Ingress{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("ingresses").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Ingresses that match those selectors.
-func (c *ingresses) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.IngressList, err error) {
+func (c *ingresses) List(ctx context.Context, opts apismetav1.ListOptions) (result *apiextensionsv1beta1.IngressList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1beta1.IngressList{}
+	result = &apiextensionsv1beta1.IngressList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("ingresses").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested ingresses.
-func (c *ingresses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested ingresses.
+func (c *ingresses) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -109,18 +109,18 @@ func (c *ingresses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Inter
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("ingresses").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a ingress and creates it.  Returns the server's representation of the ingress, and an error, if there is any.
-func (c *ingresses) Create(ctx context.Context, ingress *v1beta1.Ingress, opts v1.CreateOptions) (result *v1beta1.Ingress, err error) {
-	result = &v1beta1.Ingress{}
+func (c *ingresses) Create(ctx context.Context, ingress *apiextensionsv1beta1.Ingress, opts apismetav1.CreateOptions) (result *apiextensionsv1beta1.Ingress, err error) {
+	result = &apiextensionsv1beta1.Ingress{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("ingresses").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(ingress).
 		Do(ctx).
 		Into(result)
@@ -128,13 +128,13 @@ func (c *ingresses) Create(ctx context.Context, ingress *v1beta1.Ingress, opts v
 }
 
 // Update takes the representation of a ingress and updates it. Returns the server's representation of the ingress, and an error, if there is any.
-func (c *ingresses) Update(ctx context.Context, ingress *v1beta1.Ingress, opts v1.UpdateOptions) (result *v1beta1.Ingress, err error) {
-	result = &v1beta1.Ingress{}
+func (c *ingresses) Update(ctx context.Context, ingress *apiextensionsv1beta1.Ingress, opts apismetav1.UpdateOptions) (result *apiextensionsv1beta1.Ingress, err error) {
+	result = &apiextensionsv1beta1.Ingress{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("ingresses").
 		Name(ingress.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(ingress).
 		Do(ctx).
 		Into(result)
@@ -143,14 +143,14 @@ func (c *ingresses) Update(ctx context.Context, ingress *v1beta1.Ingress, opts v
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *ingresses) UpdateStatus(ctx context.Context, ingress *v1beta1.Ingress, opts v1.UpdateOptions) (result *v1beta1.Ingress, err error) {
-	result = &v1beta1.Ingress{}
+func (c *ingresses) UpdateStatus(ctx context.Context, ingress *apiextensionsv1beta1.Ingress, opts apismetav1.UpdateOptions) (result *apiextensionsv1beta1.Ingress, err error) {
+	result = &apiextensionsv1beta1.Ingress{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("ingresses").
 		Name(ingress.Name).
 		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(ingress).
 		Do(ctx).
 		Into(result)
@@ -158,7 +158,7 @@ func (c *ingresses) UpdateStatus(ctx context.Context, ingress *v1beta1.Ingress, 
 }
 
 // Delete takes name of the ingress and deletes it. Returns an error if one occurs.
-func (c *ingresses) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *ingresses) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("ingresses").
@@ -169,7 +169,7 @@ func (c *ingresses) Delete(ctx context.Context, name string, opts v1.DeleteOptio
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *ingresses) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *ingresses) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
@@ -177,7 +177,7 @@ func (c *ingresses) DeleteCollection(ctx context.Context, opts v1.DeleteOptions,
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("ingresses").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -185,14 +185,14 @@ func (c *ingresses) DeleteCollection(ctx context.Context, opts v1.DeleteOptions,
 }
 
 // Patch applies the patch and returns the patched ingress.
-func (c *ingresses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Ingress, err error) {
-	result = &v1beta1.Ingress{}
+func (c *ingresses) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apiextensionsv1beta1.Ingress, err error) {
+	result = &apiextensionsv1beta1.Ingress{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("ingresses").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -200,7 +200,7 @@ func (c *ingresses) Patch(ctx context.Context, name string, pt types.PatchType, 
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied ingress.
-func (c *ingresses) Apply(ctx context.Context, ingress *extensionsv1beta1.IngressApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Ingress, err error) {
+func (c *ingresses) Apply(ctx context.Context, ingress *applyconfigurationsextensionsv1beta1.IngressApplyConfiguration, opts apismetav1.ApplyOptions) (result *apiextensionsv1beta1.Ingress, err error) {
 	if ingress == nil {
 		return nil, fmt.Errorf("ingress provided to Apply must not be nil")
 	}
@@ -213,12 +213,12 @@ func (c *ingresses) Apply(ctx context.Context, ingress *extensionsv1beta1.Ingres
 	if name == nil {
 		return nil, fmt.Errorf("ingress.Name must be provided to Apply")
 	}
-	result = &v1beta1.Ingress{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apiextensionsv1beta1.Ingress{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("ingresses").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -227,7 +227,7 @@ func (c *ingresses) Apply(ctx context.Context, ingress *extensionsv1beta1.Ingres
 
 // ApplyStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *ingresses) ApplyStatus(ctx context.Context, ingress *extensionsv1beta1.IngressApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Ingress, err error) {
+func (c *ingresses) ApplyStatus(ctx context.Context, ingress *applyconfigurationsextensionsv1beta1.IngressApplyConfiguration, opts apismetav1.ApplyOptions) (result *apiextensionsv1beta1.Ingress, err error) {
 	if ingress == nil {
 		return nil, fmt.Errorf("ingress provided to Apply must not be nil")
 	}
@@ -242,13 +242,13 @@ func (c *ingresses) ApplyStatus(ctx context.Context, ingress *extensionsv1beta1.
 		return nil, fmt.Errorf("ingress.Name must be provided to Apply")
 	}
 
-	result = &v1beta1.Ingress{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apiextensionsv1beta1.Ingress{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("ingresses").
 		Name(*name).
 		SubResource("status").
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

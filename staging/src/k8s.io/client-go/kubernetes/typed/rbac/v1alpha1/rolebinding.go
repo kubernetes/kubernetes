@@ -20,17 +20,17 @@ package v1alpha1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1alpha1 "k8s.io/api/rbac/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	rbacv1alpha1 "k8s.io/client-go/applyconfigurations/rbac/v1alpha1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apirbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsrbacv1alpha1 "k8s.io/client-go/applyconfigurations/rbac/v1alpha1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // RoleBindingsGetter has a method to return a RoleBindingInterface.
@@ -41,21 +41,21 @@ type RoleBindingsGetter interface {
 
 // RoleBindingInterface has methods to work with RoleBinding resources.
 type RoleBindingInterface interface {
-	Create(ctx context.Context, roleBinding *v1alpha1.RoleBinding, opts v1.CreateOptions) (*v1alpha1.RoleBinding, error)
-	Update(ctx context.Context, roleBinding *v1alpha1.RoleBinding, opts v1.UpdateOptions) (*v1alpha1.RoleBinding, error)
-	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.RoleBinding, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.RoleBindingList, error)
-	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.RoleBinding, err error)
-	Apply(ctx context.Context, roleBinding *rbacv1alpha1.RoleBindingApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.RoleBinding, err error)
+	Create(ctx context.Context, roleBinding *apirbacv1alpha1.RoleBinding, opts apismetav1.CreateOptions) (*apirbacv1alpha1.RoleBinding, error)
+	Update(ctx context.Context, roleBinding *apirbacv1alpha1.RoleBinding, opts apismetav1.UpdateOptions) (*apirbacv1alpha1.RoleBinding, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apirbacv1alpha1.RoleBinding, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apirbacv1alpha1.RoleBindingList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apirbacv1alpha1.RoleBinding, err error)
+	Apply(ctx context.Context, roleBinding *applyconfigurationsrbacv1alpha1.RoleBindingApplyConfiguration, opts apismetav1.ApplyOptions) (result *apirbacv1alpha1.RoleBinding, err error)
 	RoleBindingExpansion
 }
 
 // roleBindings implements RoleBindingInterface
 type roleBindings struct {
-	client rest.Interface
+	client clientgorest.Interface
 	ns     string
 }
 
@@ -68,37 +68,37 @@ func newRoleBindings(c *RbacV1alpha1Client, namespace string) *roleBindings {
 }
 
 // Get takes name of the roleBinding, and returns the corresponding roleBinding object, and an error if there is any.
-func (c *roleBindings) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.RoleBinding, err error) {
-	result = &v1alpha1.RoleBinding{}
+func (c *roleBindings) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apirbacv1alpha1.RoleBinding, err error) {
+	result = &apirbacv1alpha1.RoleBinding{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("rolebindings").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of RoleBindings that match those selectors.
-func (c *roleBindings) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.RoleBindingList, err error) {
+func (c *roleBindings) List(ctx context.Context, opts apismetav1.ListOptions) (result *apirbacv1alpha1.RoleBindingList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1alpha1.RoleBindingList{}
+	result = &apirbacv1alpha1.RoleBindingList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("rolebindings").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested roleBindings.
-func (c *roleBindings) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested roleBindings.
+func (c *roleBindings) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -107,18 +107,18 @@ func (c *roleBindings) Watch(ctx context.Context, opts v1.ListOptions) (watch.In
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("rolebindings").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a roleBinding and creates it.  Returns the server's representation of the roleBinding, and an error, if there is any.
-func (c *roleBindings) Create(ctx context.Context, roleBinding *v1alpha1.RoleBinding, opts v1.CreateOptions) (result *v1alpha1.RoleBinding, err error) {
-	result = &v1alpha1.RoleBinding{}
+func (c *roleBindings) Create(ctx context.Context, roleBinding *apirbacv1alpha1.RoleBinding, opts apismetav1.CreateOptions) (result *apirbacv1alpha1.RoleBinding, err error) {
+	result = &apirbacv1alpha1.RoleBinding{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("rolebindings").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(roleBinding).
 		Do(ctx).
 		Into(result)
@@ -126,13 +126,13 @@ func (c *roleBindings) Create(ctx context.Context, roleBinding *v1alpha1.RoleBin
 }
 
 // Update takes the representation of a roleBinding and updates it. Returns the server's representation of the roleBinding, and an error, if there is any.
-func (c *roleBindings) Update(ctx context.Context, roleBinding *v1alpha1.RoleBinding, opts v1.UpdateOptions) (result *v1alpha1.RoleBinding, err error) {
-	result = &v1alpha1.RoleBinding{}
+func (c *roleBindings) Update(ctx context.Context, roleBinding *apirbacv1alpha1.RoleBinding, opts apismetav1.UpdateOptions) (result *apirbacv1alpha1.RoleBinding, err error) {
+	result = &apirbacv1alpha1.RoleBinding{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("rolebindings").
 		Name(roleBinding.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(roleBinding).
 		Do(ctx).
 		Into(result)
@@ -140,7 +140,7 @@ func (c *roleBindings) Update(ctx context.Context, roleBinding *v1alpha1.RoleBin
 }
 
 // Delete takes name of the roleBinding and deletes it. Returns an error if one occurs.
-func (c *roleBindings) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *roleBindings) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("rolebindings").
@@ -151,7 +151,7 @@ func (c *roleBindings) Delete(ctx context.Context, name string, opts v1.DeleteOp
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *roleBindings) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *roleBindings) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
@@ -159,7 +159,7 @@ func (c *roleBindings) DeleteCollection(ctx context.Context, opts v1.DeleteOptio
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("rolebindings").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -167,14 +167,14 @@ func (c *roleBindings) DeleteCollection(ctx context.Context, opts v1.DeleteOptio
 }
 
 // Patch applies the patch and returns the patched roleBinding.
-func (c *roleBindings) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.RoleBinding, err error) {
-	result = &v1alpha1.RoleBinding{}
+func (c *roleBindings) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apirbacv1alpha1.RoleBinding, err error) {
+	result = &apirbacv1alpha1.RoleBinding{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("rolebindings").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -182,7 +182,7 @@ func (c *roleBindings) Patch(ctx context.Context, name string, pt types.PatchTyp
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied roleBinding.
-func (c *roleBindings) Apply(ctx context.Context, roleBinding *rbacv1alpha1.RoleBindingApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.RoleBinding, err error) {
+func (c *roleBindings) Apply(ctx context.Context, roleBinding *applyconfigurationsrbacv1alpha1.RoleBindingApplyConfiguration, opts apismetav1.ApplyOptions) (result *apirbacv1alpha1.RoleBinding, err error) {
 	if roleBinding == nil {
 		return nil, fmt.Errorf("roleBinding provided to Apply must not be nil")
 	}
@@ -195,12 +195,12 @@ func (c *roleBindings) Apply(ctx context.Context, roleBinding *rbacv1alpha1.Role
 	if name == nil {
 		return nil, fmt.Errorf("roleBinding.Name must be provided to Apply")
 	}
-	result = &v1alpha1.RoleBinding{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apirbacv1alpha1.RoleBinding{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("rolebindings").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

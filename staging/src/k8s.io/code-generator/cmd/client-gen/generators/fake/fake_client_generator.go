@@ -20,8 +20,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/types"
 
 	clientgenargs "k8s.io/code-generator/cmd/client-gen/args"
 	scheme "k8s.io/code-generator/cmd/client-gen/generators/scheme"
@@ -29,17 +29,16 @@ import (
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 )
 
-func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clientsetPackage string, groupPackageName string, groupGoName string, inputPackage string, applyBuilderPackage string, boilerplate []byte) generator.Package {
+func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clientsetPackage string, groupPackageName string, groupGoName string, srcTreePath string, inputPackage string, applyBuilderPackage string, boilerplate []byte) generator.Package {
 	outputPackage := filepath.Join(clientsetPackage, "typed", strings.ToLower(groupPackageName), strings.ToLower(gv.Version.NonEmpty()), "fake")
 	// TODO: should make this a function, called by here and in client-generator.go
 	realClientPackage := filepath.Join(clientsetPackage, "typed", strings.ToLower(groupPackageName), strings.ToLower(gv.Version.NonEmpty()))
 	return &generator.DefaultPackage{
-		PackageName: "fake",
-		PackagePath: outputPackage,
-		HeaderText:  boilerplate,
-		PackageDocumentation: []byte(
-			`// Package fake has the automatically generated clients.
-`),
+		PackageName:          "fake",
+		PackagePath:          outputPackage,
+		HeaderText:           boilerplate,
+		Source:               filepath.Join(srcTreePath, outputPackage),
+		PackageDocumentation: []byte("// Package fake has the automatically generated clients.\n"),
 		// GeneratorFunc returns a list of generators. Each generator makes a
 		// single file.
 		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
@@ -85,16 +84,16 @@ func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 	}
 }
 
-func PackageForClientset(customArgs *clientgenargs.CustomArgs, clientsetPackage string, groupGoNames map[clientgentypes.GroupVersion]string, boilerplate []byte) generator.Package {
+func PackageForClientset(customArgs *clientgenargs.CustomArgs, clientsetPackage string, srcTreePath string, groupGoNames map[clientgentypes.GroupVersion]string, boilerplate []byte) generator.Package {
+	fakePkgPath := filepath.Join(clientsetPackage, "fake")
 	return &generator.DefaultPackage{
 		// TODO: we'll generate fake clientset for different release in the future.
 		// Package name and path are hard coded for now.
-		PackageName: "fake",
-		PackagePath: filepath.Join(clientsetPackage, "fake"),
-		HeaderText:  boilerplate,
-		PackageDocumentation: []byte(
-			`// This package has the automatically generated fake clientset.
-`),
+		PackageName:          "fake",
+		PackagePath:          fakePkgPath,
+		HeaderText:           boilerplate,
+		Source:               filepath.Join(srcTreePath, fakePkgPath),
+		PackageDocumentation: []byte("// This package has the automatically generated fake clientset.\n"),
 		// GeneratorFunc returns a list of generators. Each generator generates a
 		// single file.
 		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {

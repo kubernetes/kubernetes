@@ -20,17 +20,17 @@ package v1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apicorev1 "k8s.io/api/core/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // ComponentStatusesGetter has a method to return a ComponentStatusInterface.
@@ -41,21 +41,21 @@ type ComponentStatusesGetter interface {
 
 // ComponentStatusInterface has methods to work with ComponentStatus resources.
 type ComponentStatusInterface interface {
-	Create(ctx context.Context, componentStatus *v1.ComponentStatus, opts metav1.CreateOptions) (*v1.ComponentStatus, error)
-	Update(ctx context.Context, componentStatus *v1.ComponentStatus, opts metav1.UpdateOptions) (*v1.ComponentStatus, error)
-	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ComponentStatus, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ComponentStatusList, error)
-	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ComponentStatus, err error)
-	Apply(ctx context.Context, componentStatus *corev1.ComponentStatusApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ComponentStatus, err error)
+	Create(ctx context.Context, componentStatus *apicorev1.ComponentStatus, opts apismetav1.CreateOptions) (*apicorev1.ComponentStatus, error)
+	Update(ctx context.Context, componentStatus *apicorev1.ComponentStatus, opts apismetav1.UpdateOptions) (*apicorev1.ComponentStatus, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apicorev1.ComponentStatus, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apicorev1.ComponentStatusList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apicorev1.ComponentStatus, err error)
+	Apply(ctx context.Context, componentStatus *applyconfigurationscorev1.ComponentStatusApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.ComponentStatus, err error)
 	ComponentStatusExpansion
 }
 
 // componentStatuses implements ComponentStatusInterface
 type componentStatuses struct {
-	client rest.Interface
+	client clientgorest.Interface
 }
 
 // newComponentStatuses returns a ComponentStatuses
@@ -66,35 +66,35 @@ func newComponentStatuses(c *CoreV1Client) *componentStatuses {
 }
 
 // Get takes name of the componentStatus, and returns the corresponding componentStatus object, and an error if there is any.
-func (c *componentStatuses) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ComponentStatus, err error) {
-	result = &v1.ComponentStatus{}
+func (c *componentStatuses) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apicorev1.ComponentStatus, err error) {
+	result = &apicorev1.ComponentStatus{}
 	err = c.client.Get().
 		Resource("componentstatuses").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of ComponentStatuses that match those selectors.
-func (c *componentStatuses) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ComponentStatusList, err error) {
+func (c *componentStatuses) List(ctx context.Context, opts apismetav1.ListOptions) (result *apicorev1.ComponentStatusList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1.ComponentStatusList{}
+	result = &apicorev1.ComponentStatusList{}
 	err = c.client.Get().
 		Resource("componentstatuses").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested componentStatuses.
-func (c *componentStatuses) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested componentStatuses.
+func (c *componentStatuses) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -102,17 +102,17 @@ func (c *componentStatuses) Watch(ctx context.Context, opts metav1.ListOptions) 
 	opts.Watch = true
 	return c.client.Get().
 		Resource("componentstatuses").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a componentStatus and creates it.  Returns the server's representation of the componentStatus, and an error, if there is any.
-func (c *componentStatuses) Create(ctx context.Context, componentStatus *v1.ComponentStatus, opts metav1.CreateOptions) (result *v1.ComponentStatus, err error) {
-	result = &v1.ComponentStatus{}
+func (c *componentStatuses) Create(ctx context.Context, componentStatus *apicorev1.ComponentStatus, opts apismetav1.CreateOptions) (result *apicorev1.ComponentStatus, err error) {
+	result = &apicorev1.ComponentStatus{}
 	err = c.client.Post().
 		Resource("componentstatuses").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(componentStatus).
 		Do(ctx).
 		Into(result)
@@ -120,12 +120,12 @@ func (c *componentStatuses) Create(ctx context.Context, componentStatus *v1.Comp
 }
 
 // Update takes the representation of a componentStatus and updates it. Returns the server's representation of the componentStatus, and an error, if there is any.
-func (c *componentStatuses) Update(ctx context.Context, componentStatus *v1.ComponentStatus, opts metav1.UpdateOptions) (result *v1.ComponentStatus, err error) {
-	result = &v1.ComponentStatus{}
+func (c *componentStatuses) Update(ctx context.Context, componentStatus *apicorev1.ComponentStatus, opts apismetav1.UpdateOptions) (result *apicorev1.ComponentStatus, err error) {
+	result = &apicorev1.ComponentStatus{}
 	err = c.client.Put().
 		Resource("componentstatuses").
 		Name(componentStatus.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(componentStatus).
 		Do(ctx).
 		Into(result)
@@ -133,7 +133,7 @@ func (c *componentStatuses) Update(ctx context.Context, componentStatus *v1.Comp
 }
 
 // Delete takes name of the componentStatus and deletes it. Returns an error if one occurs.
-func (c *componentStatuses) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
+func (c *componentStatuses) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("componentstatuses").
 		Name(name).
@@ -143,14 +143,14 @@ func (c *componentStatuses) Delete(ctx context.Context, name string, opts metav1
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *componentStatuses) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+func (c *componentStatuses) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Resource("componentstatuses").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -158,13 +158,13 @@ func (c *componentStatuses) DeleteCollection(ctx context.Context, opts metav1.De
 }
 
 // Patch applies the patch and returns the patched componentStatus.
-func (c *componentStatuses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ComponentStatus, err error) {
-	result = &v1.ComponentStatus{}
+func (c *componentStatuses) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apicorev1.ComponentStatus, err error) {
+	result = &apicorev1.ComponentStatus{}
 	err = c.client.Patch(pt).
 		Resource("componentstatuses").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -172,7 +172,7 @@ func (c *componentStatuses) Patch(ctx context.Context, name string, pt types.Pat
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied componentStatus.
-func (c *componentStatuses) Apply(ctx context.Context, componentStatus *corev1.ComponentStatusApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ComponentStatus, err error) {
+func (c *componentStatuses) Apply(ctx context.Context, componentStatus *applyconfigurationscorev1.ComponentStatusApplyConfiguration, opts apismetav1.ApplyOptions) (result *apicorev1.ComponentStatus, err error) {
 	if componentStatus == nil {
 		return nil, fmt.Errorf("componentStatus provided to Apply must not be nil")
 	}
@@ -185,11 +185,11 @@ func (c *componentStatuses) Apply(ctx context.Context, componentStatus *corev1.C
 	if name == nil {
 		return nil, fmt.Errorf("componentStatus.Name must be provided to Apply")
 	}
-	result = &v1.ComponentStatus{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apicorev1.ComponentStatus{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Resource("componentstatuses").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

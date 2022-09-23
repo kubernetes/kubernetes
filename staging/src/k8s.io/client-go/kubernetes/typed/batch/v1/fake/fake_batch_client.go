@@ -20,12 +20,12 @@ package fake
 
 import (
 	v1 "k8s.io/client-go/kubernetes/typed/batch/v1"
-	rest "k8s.io/client-go/rest"
-	testing "k8s.io/client-go/testing"
+	clientgorest "k8s.io/client-go/rest"
+	clientgotesting "k8s.io/client-go/testing"
 )
 
 type FakeBatchV1 struct {
-	*testing.Fake
+	*clientgotesting.Fake
 }
 
 func (c *FakeBatchV1) CronJobs(namespace string) v1.CronJobInterface {
@@ -38,7 +38,7 @@ func (c *FakeBatchV1) Jobs(namespace string) v1.JobInterface {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeBatchV1) RESTClient() rest.Interface {
-	var ret *rest.RESTClient
+func (c *FakeBatchV1) RESTClient() clientgorest.Interface {
+	var ret *clientgorest.RESTClient
 	return ret
 }

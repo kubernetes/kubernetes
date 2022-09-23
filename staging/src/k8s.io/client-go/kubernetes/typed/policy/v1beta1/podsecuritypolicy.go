@@ -20,17 +20,17 @@ package v1beta1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1beta1 "k8s.io/api/policy/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	policyv1beta1 "k8s.io/client-go/applyconfigurations/policy/v1beta1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apipolicyv1beta1 "k8s.io/api/policy/v1beta1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationspolicyv1beta1 "k8s.io/client-go/applyconfigurations/policy/v1beta1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // PodSecurityPoliciesGetter has a method to return a PodSecurityPolicyInterface.
@@ -41,21 +41,21 @@ type PodSecurityPoliciesGetter interface {
 
 // PodSecurityPolicyInterface has methods to work with PodSecurityPolicy resources.
 type PodSecurityPolicyInterface interface {
-	Create(ctx context.Context, podSecurityPolicy *v1beta1.PodSecurityPolicy, opts v1.CreateOptions) (*v1beta1.PodSecurityPolicy, error)
-	Update(ctx context.Context, podSecurityPolicy *v1beta1.PodSecurityPolicy, opts v1.UpdateOptions) (*v1beta1.PodSecurityPolicy, error)
-	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.PodSecurityPolicy, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.PodSecurityPolicyList, error)
-	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.PodSecurityPolicy, err error)
-	Apply(ctx context.Context, podSecurityPolicy *policyv1beta1.PodSecurityPolicyApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.PodSecurityPolicy, err error)
+	Create(ctx context.Context, podSecurityPolicy *apipolicyv1beta1.PodSecurityPolicy, opts apismetav1.CreateOptions) (*apipolicyv1beta1.PodSecurityPolicy, error)
+	Update(ctx context.Context, podSecurityPolicy *apipolicyv1beta1.PodSecurityPolicy, opts apismetav1.UpdateOptions) (*apipolicyv1beta1.PodSecurityPolicy, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apipolicyv1beta1.PodSecurityPolicy, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apipolicyv1beta1.PodSecurityPolicyList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apipolicyv1beta1.PodSecurityPolicy, err error)
+	Apply(ctx context.Context, podSecurityPolicy *applyconfigurationspolicyv1beta1.PodSecurityPolicyApplyConfiguration, opts apismetav1.ApplyOptions) (result *apipolicyv1beta1.PodSecurityPolicy, err error)
 	PodSecurityPolicyExpansion
 }
 
 // podSecurityPolicies implements PodSecurityPolicyInterface
 type podSecurityPolicies struct {
-	client rest.Interface
+	client clientgorest.Interface
 }
 
 // newPodSecurityPolicies returns a PodSecurityPolicies
@@ -66,35 +66,35 @@ func newPodSecurityPolicies(c *PolicyV1beta1Client) *podSecurityPolicies {
 }
 
 // Get takes name of the podSecurityPolicy, and returns the corresponding podSecurityPolicy object, and an error if there is any.
-func (c *podSecurityPolicies) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.PodSecurityPolicy, err error) {
-	result = &v1beta1.PodSecurityPolicy{}
+func (c *podSecurityPolicies) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apipolicyv1beta1.PodSecurityPolicy, err error) {
+	result = &apipolicyv1beta1.PodSecurityPolicy{}
 	err = c.client.Get().
 		Resource("podsecuritypolicies").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of PodSecurityPolicies that match those selectors.
-func (c *podSecurityPolicies) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.PodSecurityPolicyList, err error) {
+func (c *podSecurityPolicies) List(ctx context.Context, opts apismetav1.ListOptions) (result *apipolicyv1beta1.PodSecurityPolicyList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1beta1.PodSecurityPolicyList{}
+	result = &apipolicyv1beta1.PodSecurityPolicyList{}
 	err = c.client.Get().
 		Resource("podsecuritypolicies").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested podSecurityPolicies.
-func (c *podSecurityPolicies) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested podSecurityPolicies.
+func (c *podSecurityPolicies) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -102,17 +102,17 @@ func (c *podSecurityPolicies) Watch(ctx context.Context, opts v1.ListOptions) (w
 	opts.Watch = true
 	return c.client.Get().
 		Resource("podsecuritypolicies").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a podSecurityPolicy and creates it.  Returns the server's representation of the podSecurityPolicy, and an error, if there is any.
-func (c *podSecurityPolicies) Create(ctx context.Context, podSecurityPolicy *v1beta1.PodSecurityPolicy, opts v1.CreateOptions) (result *v1beta1.PodSecurityPolicy, err error) {
-	result = &v1beta1.PodSecurityPolicy{}
+func (c *podSecurityPolicies) Create(ctx context.Context, podSecurityPolicy *apipolicyv1beta1.PodSecurityPolicy, opts apismetav1.CreateOptions) (result *apipolicyv1beta1.PodSecurityPolicy, err error) {
+	result = &apipolicyv1beta1.PodSecurityPolicy{}
 	err = c.client.Post().
 		Resource("podsecuritypolicies").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(podSecurityPolicy).
 		Do(ctx).
 		Into(result)
@@ -120,12 +120,12 @@ func (c *podSecurityPolicies) Create(ctx context.Context, podSecurityPolicy *v1b
 }
 
 // Update takes the representation of a podSecurityPolicy and updates it. Returns the server's representation of the podSecurityPolicy, and an error, if there is any.
-func (c *podSecurityPolicies) Update(ctx context.Context, podSecurityPolicy *v1beta1.PodSecurityPolicy, opts v1.UpdateOptions) (result *v1beta1.PodSecurityPolicy, err error) {
-	result = &v1beta1.PodSecurityPolicy{}
+func (c *podSecurityPolicies) Update(ctx context.Context, podSecurityPolicy *apipolicyv1beta1.PodSecurityPolicy, opts apismetav1.UpdateOptions) (result *apipolicyv1beta1.PodSecurityPolicy, err error) {
+	result = &apipolicyv1beta1.PodSecurityPolicy{}
 	err = c.client.Put().
 		Resource("podsecuritypolicies").
 		Name(podSecurityPolicy.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(podSecurityPolicy).
 		Do(ctx).
 		Into(result)
@@ -133,7 +133,7 @@ func (c *podSecurityPolicies) Update(ctx context.Context, podSecurityPolicy *v1b
 }
 
 // Delete takes name of the podSecurityPolicy and deletes it. Returns an error if one occurs.
-func (c *podSecurityPolicies) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *podSecurityPolicies) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("podsecuritypolicies").
 		Name(name).
@@ -143,14 +143,14 @@ func (c *podSecurityPolicies) Delete(ctx context.Context, name string, opts v1.D
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *podSecurityPolicies) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *podSecurityPolicies) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Resource("podsecuritypolicies").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -158,13 +158,13 @@ func (c *podSecurityPolicies) DeleteCollection(ctx context.Context, opts v1.Dele
 }
 
 // Patch applies the patch and returns the patched podSecurityPolicy.
-func (c *podSecurityPolicies) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.PodSecurityPolicy, err error) {
-	result = &v1beta1.PodSecurityPolicy{}
+func (c *podSecurityPolicies) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apipolicyv1beta1.PodSecurityPolicy, err error) {
+	result = &apipolicyv1beta1.PodSecurityPolicy{}
 	err = c.client.Patch(pt).
 		Resource("podsecuritypolicies").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -172,7 +172,7 @@ func (c *podSecurityPolicies) Patch(ctx context.Context, name string, pt types.P
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied podSecurityPolicy.
-func (c *podSecurityPolicies) Apply(ctx context.Context, podSecurityPolicy *policyv1beta1.PodSecurityPolicyApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.PodSecurityPolicy, err error) {
+func (c *podSecurityPolicies) Apply(ctx context.Context, podSecurityPolicy *applyconfigurationspolicyv1beta1.PodSecurityPolicyApplyConfiguration, opts apismetav1.ApplyOptions) (result *apipolicyv1beta1.PodSecurityPolicy, err error) {
 	if podSecurityPolicy == nil {
 		return nil, fmt.Errorf("podSecurityPolicy provided to Apply must not be nil")
 	}
@@ -185,11 +185,11 @@ func (c *podSecurityPolicies) Apply(ctx context.Context, podSecurityPolicy *poli
 	if name == nil {
 		return nil, fmt.Errorf("podSecurityPolicy.Name must be provided to Apply")
 	}
-	result = &v1beta1.PodSecurityPolicy{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apipolicyv1beta1.PodSecurityPolicy{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Resource("podsecuritypolicies").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

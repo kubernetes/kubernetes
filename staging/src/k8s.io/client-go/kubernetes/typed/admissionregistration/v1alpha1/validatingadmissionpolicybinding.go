@@ -20,17 +20,17 @@ package v1alpha1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	admissionregistrationv1alpha1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apiadmissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsadmissionregistrationv1alpha1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // ValidatingAdmissionPolicyBindingsGetter has a method to return a ValidatingAdmissionPolicyBindingInterface.
@@ -41,21 +41,21 @@ type ValidatingAdmissionPolicyBindingsGetter interface {
 
 // ValidatingAdmissionPolicyBindingInterface has methods to work with ValidatingAdmissionPolicyBinding resources.
 type ValidatingAdmissionPolicyBindingInterface interface {
-	Create(ctx context.Context, validatingAdmissionPolicyBinding *v1alpha1.ValidatingAdmissionPolicyBinding, opts v1.CreateOptions) (*v1alpha1.ValidatingAdmissionPolicyBinding, error)
-	Update(ctx context.Context, validatingAdmissionPolicyBinding *v1alpha1.ValidatingAdmissionPolicyBinding, opts v1.UpdateOptions) (*v1alpha1.ValidatingAdmissionPolicyBinding, error)
-	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.ValidatingAdmissionPolicyBinding, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.ValidatingAdmissionPolicyBindingList, error)
-	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ValidatingAdmissionPolicyBinding, err error)
-	Apply(ctx context.Context, validatingAdmissionPolicyBinding *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ValidatingAdmissionPolicyBinding, err error)
+	Create(ctx context.Context, validatingAdmissionPolicyBinding *apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, opts apismetav1.CreateOptions) (*apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, error)
+	Update(ctx context.Context, validatingAdmissionPolicyBinding *apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, opts apismetav1.UpdateOptions) (*apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, err error)
+	Apply(ctx context.Context, validatingAdmissionPolicyBinding *applyconfigurationsadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingApplyConfiguration, opts apismetav1.ApplyOptions) (result *apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, err error)
 	ValidatingAdmissionPolicyBindingExpansion
 }
 
 // validatingAdmissionPolicyBindings implements ValidatingAdmissionPolicyBindingInterface
 type validatingAdmissionPolicyBindings struct {
-	client rest.Interface
+	client clientgorest.Interface
 }
 
 // newValidatingAdmissionPolicyBindings returns a ValidatingAdmissionPolicyBindings
@@ -66,35 +66,35 @@ func newValidatingAdmissionPolicyBindings(c *AdmissionregistrationV1alpha1Client
 }
 
 // Get takes name of the validatingAdmissionPolicyBinding, and returns the corresponding validatingAdmissionPolicyBinding object, and an error if there is any.
-func (c *validatingAdmissionPolicyBindings) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ValidatingAdmissionPolicyBinding, err error) {
-	result = &v1alpha1.ValidatingAdmissionPolicyBinding{}
+func (c *validatingAdmissionPolicyBindings) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, err error) {
+	result = &apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding{}
 	err = c.client.Get().
 		Resource("validatingadmissionpolicybindings").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of ValidatingAdmissionPolicyBindings that match those selectors.
-func (c *validatingAdmissionPolicyBindings) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ValidatingAdmissionPolicyBindingList, err error) {
+func (c *validatingAdmissionPolicyBindings) List(ctx context.Context, opts apismetav1.ListOptions) (result *apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1alpha1.ValidatingAdmissionPolicyBindingList{}
+	result = &apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingList{}
 	err = c.client.Get().
 		Resource("validatingadmissionpolicybindings").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested validatingAdmissionPolicyBindings.
-func (c *validatingAdmissionPolicyBindings) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested validatingAdmissionPolicyBindings.
+func (c *validatingAdmissionPolicyBindings) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -102,17 +102,17 @@ func (c *validatingAdmissionPolicyBindings) Watch(ctx context.Context, opts v1.L
 	opts.Watch = true
 	return c.client.Get().
 		Resource("validatingadmissionpolicybindings").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a validatingAdmissionPolicyBinding and creates it.  Returns the server's representation of the validatingAdmissionPolicyBinding, and an error, if there is any.
-func (c *validatingAdmissionPolicyBindings) Create(ctx context.Context, validatingAdmissionPolicyBinding *v1alpha1.ValidatingAdmissionPolicyBinding, opts v1.CreateOptions) (result *v1alpha1.ValidatingAdmissionPolicyBinding, err error) {
-	result = &v1alpha1.ValidatingAdmissionPolicyBinding{}
+func (c *validatingAdmissionPolicyBindings) Create(ctx context.Context, validatingAdmissionPolicyBinding *apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, opts apismetav1.CreateOptions) (result *apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, err error) {
+	result = &apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding{}
 	err = c.client.Post().
 		Resource("validatingadmissionpolicybindings").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(validatingAdmissionPolicyBinding).
 		Do(ctx).
 		Into(result)
@@ -120,12 +120,12 @@ func (c *validatingAdmissionPolicyBindings) Create(ctx context.Context, validati
 }
 
 // Update takes the representation of a validatingAdmissionPolicyBinding and updates it. Returns the server's representation of the validatingAdmissionPolicyBinding, and an error, if there is any.
-func (c *validatingAdmissionPolicyBindings) Update(ctx context.Context, validatingAdmissionPolicyBinding *v1alpha1.ValidatingAdmissionPolicyBinding, opts v1.UpdateOptions) (result *v1alpha1.ValidatingAdmissionPolicyBinding, err error) {
-	result = &v1alpha1.ValidatingAdmissionPolicyBinding{}
+func (c *validatingAdmissionPolicyBindings) Update(ctx context.Context, validatingAdmissionPolicyBinding *apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, opts apismetav1.UpdateOptions) (result *apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, err error) {
+	result = &apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding{}
 	err = c.client.Put().
 		Resource("validatingadmissionpolicybindings").
 		Name(validatingAdmissionPolicyBinding.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(validatingAdmissionPolicyBinding).
 		Do(ctx).
 		Into(result)
@@ -133,7 +133,7 @@ func (c *validatingAdmissionPolicyBindings) Update(ctx context.Context, validati
 }
 
 // Delete takes name of the validatingAdmissionPolicyBinding and deletes it. Returns an error if one occurs.
-func (c *validatingAdmissionPolicyBindings) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *validatingAdmissionPolicyBindings) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Resource("validatingadmissionpolicybindings").
 		Name(name).
@@ -143,14 +143,14 @@ func (c *validatingAdmissionPolicyBindings) Delete(ctx context.Context, name str
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *validatingAdmissionPolicyBindings) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *validatingAdmissionPolicyBindings) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Resource("validatingadmissionpolicybindings").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -158,13 +158,13 @@ func (c *validatingAdmissionPolicyBindings) DeleteCollection(ctx context.Context
 }
 
 // Patch applies the patch and returns the patched validatingAdmissionPolicyBinding.
-func (c *validatingAdmissionPolicyBindings) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ValidatingAdmissionPolicyBinding, err error) {
-	result = &v1alpha1.ValidatingAdmissionPolicyBinding{}
+func (c *validatingAdmissionPolicyBindings) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, err error) {
+	result = &apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding{}
 	err = c.client.Patch(pt).
 		Resource("validatingadmissionpolicybindings").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -172,7 +172,7 @@ func (c *validatingAdmissionPolicyBindings) Patch(ctx context.Context, name stri
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied validatingAdmissionPolicyBinding.
-func (c *validatingAdmissionPolicyBindings) Apply(ctx context.Context, validatingAdmissionPolicyBinding *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ValidatingAdmissionPolicyBinding, err error) {
+func (c *validatingAdmissionPolicyBindings) Apply(ctx context.Context, validatingAdmissionPolicyBinding *applyconfigurationsadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBindingApplyConfiguration, opts apismetav1.ApplyOptions) (result *apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding, err error) {
 	if validatingAdmissionPolicyBinding == nil {
 		return nil, fmt.Errorf("validatingAdmissionPolicyBinding provided to Apply must not be nil")
 	}
@@ -185,11 +185,11 @@ func (c *validatingAdmissionPolicyBindings) Apply(ctx context.Context, validatin
 	if name == nil {
 		return nil, fmt.Errorf("validatingAdmissionPolicyBinding.Name must be provided to Apply")
 	}
-	result = &v1alpha1.ValidatingAdmissionPolicyBinding{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apiadmissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Resource("validatingadmissionpolicybindings").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

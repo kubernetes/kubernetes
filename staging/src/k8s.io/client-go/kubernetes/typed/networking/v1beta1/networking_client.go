@@ -21,20 +21,20 @@ package v1beta1
 import (
 	"net/http"
 
-	v1beta1 "k8s.io/api/networking/v1beta1"
+	apinetworkingv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 type NetworkingV1beta1Interface interface {
-	RESTClient() rest.Interface
+	RESTClient() clientgorest.Interface
 	IngressesGetter
 	IngressClassesGetter
 }
 
 // NetworkingV1beta1Client is used to interact with features provided by the networking.k8s.io group.
 type NetworkingV1beta1Client struct {
-	restClient rest.Interface
+	restClient clientgorest.Interface
 }
 
 func (c *NetworkingV1beta1Client) Ingresses(namespace string) IngressInterface {
@@ -48,12 +48,12 @@ func (c *NetworkingV1beta1Client) IngressClasses() IngressClassInterface {
 // NewForConfig creates a new NetworkingV1beta1Client for the given config.
 // NewForConfig is equivalent to NewForConfigAndClient(c, httpClient),
 // where httpClient was generated with rest.HTTPClientFor(c).
-func NewForConfig(c *rest.Config) (*NetworkingV1beta1Client, error) {
+func NewForConfig(c *clientgorest.Config) (*NetworkingV1beta1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	httpClient, err := rest.HTTPClientFor(&config)
+	httpClient, err := clientgorest.HTTPClientFor(&config)
 	if err != nil {
 		return nil, err
 	}
@@ -62,12 +62,12 @@ func NewForConfig(c *rest.Config) (*NetworkingV1beta1Client, error) {
 
 // NewForConfigAndClient creates a new NetworkingV1beta1Client for the given config and http client.
 // Note the http client provided takes precedence over the configured transport values.
-func NewForConfigAndClient(c *rest.Config, h *http.Client) (*NetworkingV1beta1Client, error) {
+func NewForConfigAndClient(c *clientgorest.Config, h *http.Client) (*NetworkingV1beta1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := rest.RESTClientForConfigAndClient(&config, h)
+	client, err := clientgorest.RESTClientForConfigAndClient(&config, h)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func NewForConfigAndClient(c *rest.Config, h *http.Client) (*NetworkingV1beta1Cl
 
 // NewForConfigOrDie creates a new NetworkingV1beta1Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *rest.Config) *NetworkingV1beta1Client {
+func NewForConfigOrDie(c *clientgorest.Config) *NetworkingV1beta1Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -85,18 +85,18 @@ func NewForConfigOrDie(c *rest.Config) *NetworkingV1beta1Client {
 }
 
 // New creates a new NetworkingV1beta1Client for the given RESTClient.
-func New(c rest.Interface) *NetworkingV1beta1Client {
+func New(c clientgorest.Interface) *NetworkingV1beta1Client {
 	return &NetworkingV1beta1Client{c}
 }
 
-func setConfigDefaults(config *rest.Config) error {
-	gv := v1beta1.SchemeGroupVersion
+func setConfigDefaults(config *clientgorest.Config) error {
+	gv := apinetworkingv1beta1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
 	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 
 	if config.UserAgent == "" {
-		config.UserAgent = rest.DefaultKubernetesUserAgent()
+		config.UserAgent = clientgorest.DefaultKubernetesUserAgent()
 	}
 
 	return nil
@@ -104,7 +104,7 @@ func setConfigDefaults(config *rest.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *NetworkingV1beta1Client) RESTClient() rest.Interface {
+func (c *NetworkingV1beta1Client) RESTClient() clientgorest.Interface {
 	if c == nil {
 		return nil
 	}

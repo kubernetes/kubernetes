@@ -20,17 +20,17 @@ package v1
 
 import (
 	"context"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	v1 "k8s.io/api/batch/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	batchv1 "k8s.io/client-go/applyconfigurations/batch/v1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	apibatchv1 "k8s.io/api/batch/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgtypes "k8s.io/apimachinery/pkg/types"
+	apimachinerypkgwatch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsbatchv1 "k8s.io/client-go/applyconfigurations/batch/v1"
+	clientgokubernetesscheme "k8s.io/client-go/kubernetes/scheme"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 // CronJobsGetter has a method to return a CronJobInterface.
@@ -41,23 +41,23 @@ type CronJobsGetter interface {
 
 // CronJobInterface has methods to work with CronJob resources.
 type CronJobInterface interface {
-	Create(ctx context.Context, cronJob *v1.CronJob, opts metav1.CreateOptions) (*v1.CronJob, error)
-	Update(ctx context.Context, cronJob *v1.CronJob, opts metav1.UpdateOptions) (*v1.CronJob, error)
-	UpdateStatus(ctx context.Context, cronJob *v1.CronJob, opts metav1.UpdateOptions) (*v1.CronJob, error)
-	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
-	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.CronJob, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.CronJobList, error)
-	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.CronJob, err error)
-	Apply(ctx context.Context, cronJob *batchv1.CronJobApplyConfiguration, opts metav1.ApplyOptions) (result *v1.CronJob, err error)
-	ApplyStatus(ctx context.Context, cronJob *batchv1.CronJobApplyConfiguration, opts metav1.ApplyOptions) (result *v1.CronJob, err error)
+	Create(ctx context.Context, cronJob *apibatchv1.CronJob, opts apismetav1.CreateOptions) (*apibatchv1.CronJob, error)
+	Update(ctx context.Context, cronJob *apibatchv1.CronJob, opts apismetav1.UpdateOptions) (*apibatchv1.CronJob, error)
+	UpdateStatus(ctx context.Context, cronJob *apibatchv1.CronJob, opts apismetav1.UpdateOptions) (*apibatchv1.CronJob, error)
+	Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error
+	Get(ctx context.Context, name string, opts apismetav1.GetOptions) (*apibatchv1.CronJob, error)
+	List(ctx context.Context, opts apismetav1.ListOptions) (*apibatchv1.CronJobList, error)
+	Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error)
+	Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apibatchv1.CronJob, err error)
+	Apply(ctx context.Context, cronJob *applyconfigurationsbatchv1.CronJobApplyConfiguration, opts apismetav1.ApplyOptions) (result *apibatchv1.CronJob, err error)
+	ApplyStatus(ctx context.Context, cronJob *applyconfigurationsbatchv1.CronJobApplyConfiguration, opts apismetav1.ApplyOptions) (result *apibatchv1.CronJob, err error)
 	CronJobExpansion
 }
 
 // cronJobs implements CronJobInterface
 type cronJobs struct {
-	client rest.Interface
+	client clientgorest.Interface
 	ns     string
 }
 
@@ -70,37 +70,37 @@ func newCronJobs(c *BatchV1Client, namespace string) *cronJobs {
 }
 
 // Get takes name of the cronJob, and returns the corresponding cronJob object, and an error if there is any.
-func (c *cronJobs) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.CronJob, err error) {
-	result = &v1.CronJob{}
+func (c *cronJobs) Get(ctx context.Context, name string, options apismetav1.GetOptions) (result *apibatchv1.CronJob, err error) {
+	result = &apibatchv1.CronJob{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
+		VersionedParams(&options, clientgokubernetesscheme.ParameterCodec).
 		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of CronJobs that match those selectors.
-func (c *cronJobs) List(ctx context.Context, opts metav1.ListOptions) (result *v1.CronJobList, err error) {
+func (c *cronJobs) List(ctx context.Context, opts apismetav1.ListOptions) (result *apibatchv1.CronJobList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1.CronJobList{}
+	result = &apibatchv1.CronJobList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("cronjobs").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// Watch returns a watch.Interface that watches the requested cronJobs.
-func (c *cronJobs) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+// Watch returns a apimachinerypkgwatch.Interface that watches the requested cronJobs.
+func (c *cronJobs) Watch(ctx context.Context, opts apismetav1.ListOptions) (apimachinerypkgwatch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -109,18 +109,18 @@ func (c *cronJobs) Watch(ctx context.Context, opts metav1.ListOptions) (watch.In
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("cronjobs").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Watch(ctx)
 }
 
 // Create takes the representation of a cronJob and creates it.  Returns the server's representation of the cronJob, and an error, if there is any.
-func (c *cronJobs) Create(ctx context.Context, cronJob *v1.CronJob, opts metav1.CreateOptions) (result *v1.CronJob, err error) {
-	result = &v1.CronJob{}
+func (c *cronJobs) Create(ctx context.Context, cronJob *apibatchv1.CronJob, opts apismetav1.CreateOptions) (result *apibatchv1.CronJob, err error) {
+	result = &apibatchv1.CronJob{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("cronjobs").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(cronJob).
 		Do(ctx).
 		Into(result)
@@ -128,13 +128,13 @@ func (c *cronJobs) Create(ctx context.Context, cronJob *v1.CronJob, opts metav1.
 }
 
 // Update takes the representation of a cronJob and updates it. Returns the server's representation of the cronJob, and an error, if there is any.
-func (c *cronJobs) Update(ctx context.Context, cronJob *v1.CronJob, opts metav1.UpdateOptions) (result *v1.CronJob, err error) {
-	result = &v1.CronJob{}
+func (c *cronJobs) Update(ctx context.Context, cronJob *apibatchv1.CronJob, opts apismetav1.UpdateOptions) (result *apibatchv1.CronJob, err error) {
+	result = &apibatchv1.CronJob{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(cronJob.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(cronJob).
 		Do(ctx).
 		Into(result)
@@ -143,14 +143,14 @@ func (c *cronJobs) Update(ctx context.Context, cronJob *v1.CronJob, opts metav1.
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *cronJobs) UpdateStatus(ctx context.Context, cronJob *v1.CronJob, opts metav1.UpdateOptions) (result *v1.CronJob, err error) {
-	result = &v1.CronJob{}
+func (c *cronJobs) UpdateStatus(ctx context.Context, cronJob *apibatchv1.CronJob, opts apismetav1.UpdateOptions) (result *apibatchv1.CronJob, err error) {
+	result = &apibatchv1.CronJob{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(cronJob.Name).
 		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(cronJob).
 		Do(ctx).
 		Into(result)
@@ -158,7 +158,7 @@ func (c *cronJobs) UpdateStatus(ctx context.Context, cronJob *v1.CronJob, opts m
 }
 
 // Delete takes name of the cronJob and deletes it. Returns an error if one occurs.
-func (c *cronJobs) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
+func (c *cronJobs) Delete(ctx context.Context, name string, opts apismetav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("cronjobs").
@@ -169,7 +169,7 @@ func (c *cronJobs) Delete(ctx context.Context, name string, opts metav1.DeleteOp
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *cronJobs) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+func (c *cronJobs) DeleteCollection(ctx context.Context, opts apismetav1.DeleteOptions, listOpts apismetav1.ListOptions) error {
 	var timeout time.Duration
 	if listOpts.TimeoutSeconds != nil {
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
@@ -177,7 +177,7 @@ func (c *cronJobs) DeleteCollection(ctx context.Context, opts metav1.DeleteOptio
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("cronjobs").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
+		VersionedParams(&listOpts, clientgokubernetesscheme.ParameterCodec).
 		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
@@ -185,14 +185,14 @@ func (c *cronJobs) DeleteCollection(ctx context.Context, opts metav1.DeleteOptio
 }
 
 // Patch applies the patch and returns the patched cronJob.
-func (c *cronJobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.CronJob, err error) {
-	result = &v1.CronJob{}
+func (c *cronJobs) Patch(ctx context.Context, name string, pt apimachinerypkgtypes.PatchType, data []byte, opts apismetav1.PatchOptions, subresources ...string) (result *apibatchv1.CronJob, err error) {
+	result = &apibatchv1.CronJob{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(name).
 		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
+		VersionedParams(&opts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -200,7 +200,7 @@ func (c *cronJobs) Patch(ctx context.Context, name string, pt types.PatchType, d
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied cronJob.
-func (c *cronJobs) Apply(ctx context.Context, cronJob *batchv1.CronJobApplyConfiguration, opts metav1.ApplyOptions) (result *v1.CronJob, err error) {
+func (c *cronJobs) Apply(ctx context.Context, cronJob *applyconfigurationsbatchv1.CronJobApplyConfiguration, opts apismetav1.ApplyOptions) (result *apibatchv1.CronJob, err error) {
 	if cronJob == nil {
 		return nil, fmt.Errorf("cronJob provided to Apply must not be nil")
 	}
@@ -213,12 +213,12 @@ func (c *cronJobs) Apply(ctx context.Context, cronJob *batchv1.CronJobApplyConfi
 	if name == nil {
 		return nil, fmt.Errorf("cronJob.Name must be provided to Apply")
 	}
-	result = &v1.CronJob{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apibatchv1.CronJob{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
@@ -227,7 +227,7 @@ func (c *cronJobs) Apply(ctx context.Context, cronJob *batchv1.CronJobApplyConfi
 
 // ApplyStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *cronJobs) ApplyStatus(ctx context.Context, cronJob *batchv1.CronJobApplyConfiguration, opts metav1.ApplyOptions) (result *v1.CronJob, err error) {
+func (c *cronJobs) ApplyStatus(ctx context.Context, cronJob *applyconfigurationsbatchv1.CronJobApplyConfiguration, opts apismetav1.ApplyOptions) (result *apibatchv1.CronJob, err error) {
 	if cronJob == nil {
 		return nil, fmt.Errorf("cronJob provided to Apply must not be nil")
 	}
@@ -242,13 +242,13 @@ func (c *cronJobs) ApplyStatus(ctx context.Context, cronJob *batchv1.CronJobAppl
 		return nil, fmt.Errorf("cronJob.Name must be provided to Apply")
 	}
 
-	result = &v1.CronJob{}
-	err = c.client.Patch(types.ApplyPatchType).
+	result = &apibatchv1.CronJob{}
+	err = c.client.Patch(apimachinerypkgtypes.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(*name).
 		SubResource("status").
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		VersionedParams(&patchOpts, clientgokubernetesscheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

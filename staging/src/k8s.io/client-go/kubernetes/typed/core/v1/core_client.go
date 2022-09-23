@@ -21,13 +21,13 @@ package v1
 import (
 	"net/http"
 
-	v1 "k8s.io/api/core/v1"
+	apicorev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	clientgorest "k8s.io/client-go/rest"
 )
 
 type CoreV1Interface interface {
-	RESTClient() rest.Interface
+	RESTClient() clientgorest.Interface
 	ComponentStatusesGetter
 	ConfigMapsGetter
 	EndpointsGetter
@@ -48,7 +48,7 @@ type CoreV1Interface interface {
 
 // CoreV1Client is used to interact with features provided by the  group.
 type CoreV1Client struct {
-	restClient rest.Interface
+	restClient clientgorest.Interface
 }
 
 func (c *CoreV1Client) ComponentStatuses() ComponentStatusInterface {
@@ -118,12 +118,12 @@ func (c *CoreV1Client) ServiceAccounts(namespace string) ServiceAccountInterface
 // NewForConfig creates a new CoreV1Client for the given config.
 // NewForConfig is equivalent to NewForConfigAndClient(c, httpClient),
 // where httpClient was generated with rest.HTTPClientFor(c).
-func NewForConfig(c *rest.Config) (*CoreV1Client, error) {
+func NewForConfig(c *clientgorest.Config) (*CoreV1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	httpClient, err := rest.HTTPClientFor(&config)
+	httpClient, err := clientgorest.HTTPClientFor(&config)
 	if err != nil {
 		return nil, err
 	}
@@ -132,12 +132,12 @@ func NewForConfig(c *rest.Config) (*CoreV1Client, error) {
 
 // NewForConfigAndClient creates a new CoreV1Client for the given config and http client.
 // Note the http client provided takes precedence over the configured transport values.
-func NewForConfigAndClient(c *rest.Config, h *http.Client) (*CoreV1Client, error) {
+func NewForConfigAndClient(c *clientgorest.Config, h *http.Client) (*CoreV1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := rest.RESTClientForConfigAndClient(&config, h)
+	client, err := clientgorest.RESTClientForConfigAndClient(&config, h)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +146,7 @@ func NewForConfigAndClient(c *rest.Config, h *http.Client) (*CoreV1Client, error
 
 // NewForConfigOrDie creates a new CoreV1Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *rest.Config) *CoreV1Client {
+func NewForConfigOrDie(c *clientgorest.Config) *CoreV1Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -155,18 +155,18 @@ func NewForConfigOrDie(c *rest.Config) *CoreV1Client {
 }
 
 // New creates a new CoreV1Client for the given RESTClient.
-func New(c rest.Interface) *CoreV1Client {
+func New(c clientgorest.Interface) *CoreV1Client {
 	return &CoreV1Client{c}
 }
 
-func setConfigDefaults(config *rest.Config) error {
-	gv := v1.SchemeGroupVersion
+func setConfigDefaults(config *clientgorest.Config) error {
+	gv := apicorev1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/api"
 	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 
 	if config.UserAgent == "" {
-		config.UserAgent = rest.DefaultKubernetesUserAgent()
+		config.UserAgent = clientgorest.DefaultKubernetesUserAgent()
 	}
 
 	return nil
@@ -174,7 +174,7 @@ func setConfigDefaults(config *rest.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *CoreV1Client) RESTClient() rest.Interface {
+func (c *CoreV1Client) RESTClient() clientgorest.Interface {
 	if c == nil {
 		return nil
 	}
