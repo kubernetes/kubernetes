@@ -23,7 +23,7 @@
     {
       "SelectorRegexp": "k8s[.]io",
       "AllowedPrefixes": [
-        "k8s.io/gengo/examples",
+        "k8s.io/gengo/v2/examples",
         "k8s.io/kubernetes/third_party"
       ],
       "ForbiddenPrefixes": [
@@ -59,7 +59,7 @@
 rules:
   - selectorRegexp: k8s[.]io
     allowedPrefixes:
-      - k8s.io/gengo/examples
+      - k8s.io/gengo/v2/examples
       - k8s.io/kubernetes/third_party
     forbiddenPrefixes:
       - k8s.io/kubernetes/pkg/third_party/deprecated
@@ -94,4 +94,4 @@ inverseRules:
 
 ## Reference
 
-- [import-boss](https://github.com/kubernetes/gengo/tree/master/examples/import-boss)
+- [import-boss](https://github.com/kubernetes/gengo/v2/tree/master/examples/import-boss)
