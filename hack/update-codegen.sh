@@ -27,16 +27,16 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 
 GO111MODULE=on GOPROXY=off go install k8s.io/kubernetes/pkg/generated/openapi/cmd/models-schema
+GO111MODULE=on GOPROXY=off go install k8s.io/code-generator/cmd/applyconfiguration-gen
 GO111MODULE=on GOPROXY=off go install k8s.io/code-generator/cmd/client-gen
 GO111MODULE=on GOPROXY=off go install k8s.io/code-generator/cmd/lister-gen
 GO111MODULE=on GOPROXY=off go install k8s.io/code-generator/cmd/informer-gen
-GO111MODULE=on GOPROXY=off go install k8s.io/code-generator/cmd/applyconfiguration-gen
 
 modelsschema=$(kube::util::find-binary "models-schema")
+applyconfigurationgen=$(kube::util::find-binary "applyconfiguration-gen")
 clientgen=$(kube::util::find-binary "client-gen")
 listergen=$(kube::util::find-binary "lister-gen")
 informergen=$(kube::util::find-binary "informer-gen")
-applyconfigurationgen=$(kube::util::find-binary "applyconfiguration-gen")
 
 IFS=" " read -r -a GROUP_VERSIONS <<< "${KUBE_AVAILABLE_GROUP_VERSIONS}"
 GV_DIRS=()
