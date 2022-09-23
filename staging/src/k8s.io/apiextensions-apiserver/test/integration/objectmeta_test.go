@@ -24,24 +24,25 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc"
 	"sigs.k8s.io/yaml"
 
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
-	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/utils/pointer"
+
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 )
 
 func TestPostInvalidObjectMeta(t *testing.T) {
@@ -465,7 +466,7 @@ func TestEmbeddedResources(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(expected, foo.Object) {
-		t.Errorf("unexpected diff: %s", diff.ObjectDiff(expected, foo.Object))
+		t.Errorf("unexpected diff: %s", cmp.Diff(expected, foo.Object))
 	}
 
 	t.Logf("Trying to create wrongly typed CR")
