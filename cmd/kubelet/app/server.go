@@ -269,6 +269,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			// set up signal context for kubelet shutdown
 			ctx := genericapiserver.SetupSignalContext()
 
+			utilfeature.DefaultMutableFeatureGate.AddMetrics()
 			// run the kubelet
 			return Run(ctx, kubeletServer, kubeletDeps, utilfeature.DefaultFeatureGate)
 		},
