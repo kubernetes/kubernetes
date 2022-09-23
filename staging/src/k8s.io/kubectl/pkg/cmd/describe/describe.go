@@ -69,37 +69,80 @@ var (
 		kubectl describe pods frontend`))
 )
 
-type DescribeOptions struct {
-	CmdParent string
-	Selector  string
-	Namespace string
-
-	Describer  func(*meta.RESTMapping) (describe.ResourceDescriber, error)
-	NewBuilder func() *resource.Builder
-
-	BuilderArgs []string
-
-	EnforceNamespace bool
-	AllNamespaces    bool
-
-	DescriberSettings *describe.DescriberSettings
+// DescribeFlags directly reflect the information that CLI is gathering via flags. They will be converted to Options,
+// which reflect the runtime requirements for the command.
+type DescribeFlags struct {
+	Factory           cmdutil.Factory
+	Selector          string
+	AllNamespaces     bool
 	FilenameOptions   *resource.FilenameOptions
-
+	DescriberSettings *describe.DescriberSettings
 	genericclioptions.IOStreams
 }
 
-func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &DescribeOptions{
+// NewDescribeFlags returns a default DescribeFlags
+func NewDescribeFlags(f cmdutil.Factory, streams genericclioptions.IOStreams) *DescribeFlags {
+	return &DescribeFlags{
+		Factory:         f,
 		FilenameOptions: &resource.FilenameOptions{},
 		DescriberSettings: &describe.DescriberSettings{
 			ShowEvents: true,
 			ChunkSize:  cmdutil.DefaultChunkSize,
 		},
-
-		CmdParent: parent,
-
 		IOStreams: streams,
 	}
+}
+
+// AddFlags registers flags for a cli
+func (flags *DescribeFlags) AddFlags(cmd *cobra.Command) {
+	cmdutil.AddFilenameOptionFlags(cmd, flags.FilenameOptions, "containing the resource to describe")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &flags.Selector)
+	cmd.Flags().BoolVarP(&flags.AllNamespaces, "all-namespaces", "A", flags.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	cmd.Flags().BoolVar(&flags.DescriberSettings.ShowEvents, "show-events", flags.DescriberSettings.ShowEvents, "If true, display events related to the described object.")
+	cmdutil.AddChunkSizeFlag(cmd, &flags.DescriberSettings.ChunkSize)
+}
+
+// ToOptions converts from CLI inputs to runtime input
+func (flags *DescribeFlags) ToOptions(parent string, args []string) (*DescribeOptions, error) {
+
+	var err error
+	namespace, enforceNamespace, err := flags.Factory.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return nil, err
+	}
+
+	if flags.AllNamespaces {
+		enforceNamespace = false
+	}
+
+	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(flags.FilenameOptions.Filenames, flags.FilenameOptions.Kustomize) {
+		return nil, fmt.Errorf("You must specify the type of resource to describe. %s\n", cmdutil.SuggestAPIResources(parent))
+	}
+
+	builderArgs := args
+
+	describer := func(mapping *meta.RESTMapping) (describe.ResourceDescriber, error) {
+		return describe.DescriberFn(flags.Factory, mapping)
+	}
+
+	o := &DescribeOptions{
+		Selector:          flags.Selector,
+		Namespace:         namespace,
+		Describer:         describer,
+		NewBuilder:        flags.Factory.NewBuilder,
+		BuilderArgs:       builderArgs,
+		EnforceNamespace:  enforceNamespace,
+		AllNamespaces:     flags.AllNamespaces,
+		FilenameOptions:   flags.FilenameOptions,
+		DescriberSettings: flags.DescriberSettings,
+		IOStreams:         flags.IOStreams,
+	}
+
+	return o, nil
+}
+
+func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	flags := NewDescribeFlags(f, streams)
 
 	cmd := &cobra.Command{
 		Use:                   "describe (-f FILENAME | TYPE [NAME_PREFIX | -l label] | TYPE/NAME)",
@@ -109,44 +152,16 @@ func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericclioptions.
 		Example:               describeExample,
 		ValidArgsFunction:     completion.ResourceTypeAndNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			o, err := flags.ToOptions(parent, args)
+			cmdutil.CheckErr(err)
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
-	usage := "containing the resource to describe"
-	cmdutil.AddFilenameOptionFlags(cmd, o.FilenameOptions, usage)
-	cmdutil.AddLabelSelectorFlagVar(cmd, &o.Selector)
-	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
-	cmd.Flags().BoolVar(&o.DescriberSettings.ShowEvents, "show-events", o.DescriberSettings.ShowEvents, "If true, display events related to the described object.")
-	cmdutil.AddChunkSizeFlag(cmd, &o.DescriberSettings.ChunkSize)
+
+	flags.AddFlags(cmd)
+
 	return cmd
-}
-
-func (o *DescribeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	var err error
-	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return err
-	}
-
-	if o.AllNamespaces {
-		o.EnforceNamespace = false
-	}
-
-	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames, o.FilenameOptions.Kustomize) {
-		return fmt.Errorf("You must specify the type of resource to describe. %s\n", cmdutil.SuggestAPIResources(o.CmdParent))
-	}
-
-	o.BuilderArgs = args
-
-	o.Describer = func(mapping *meta.RESTMapping) (describe.ResourceDescriber, error) {
-		return describe.DescriberFn(f, mapping)
-	}
-
-	o.NewBuilder = f.NewBuilder
-
-	return nil
 }
 
 func (o *DescribeOptions) Validate() error {
@@ -257,4 +272,23 @@ func (o *DescribeOptions) DescribeMatchingResources(originalError error, resourc
 		return originalError
 	}
 	return nil
+}
+
+type DescribeOptions struct {
+	CmdParent string
+	Selector  string
+	Namespace string
+
+	Describer  func(*meta.RESTMapping) (describe.ResourceDescriber, error)
+	NewBuilder func() *resource.Builder
+
+	BuilderArgs []string
+
+	EnforceNamespace bool
+	AllNamespaces    bool
+
+	DescriberSettings *describe.DescriberSettings
+	FilenameOptions   *resource.FilenameOptions
+
+	genericclioptions.IOStreams
 }
