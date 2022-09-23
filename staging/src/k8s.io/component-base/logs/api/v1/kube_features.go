@@ -22,7 +22,7 @@ import (
 
 const (
 	// owner: @pohly
-	// kep: http://kep.k8s.io/3077
+	// kep: https://kep.k8s.io/3077
 	// alpha: v1.24
 	//
 	// Enables looking up a logger from a context.Context instead of using
