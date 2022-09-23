@@ -539,6 +539,7 @@ func startGarbageCollectorController(ctx context.Context, controllerContext Cont
 
 	// Periodically refresh the RESTMapper with new discovery information and sync
 	// the garbage collector.
+	//每隔30s刷新RESTMapper, 刷新获取资源, 然后创建informer, 将事件添加到workerqueue中.  gc.dependencyGraphBuilder.graphChanges
 	go garbageCollector.Sync(discoveryClient, 30*time.Second, ctx.Done())
 
 	return garbageCollector, true, nil
