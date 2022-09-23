@@ -432,7 +432,7 @@ type KubeletConfiguration struct {
 	// when setting the cgroupv2 memory.high value to enforce MemoryQoS.
 	// Decreasing this factor will set lower high limit for container cgroups and put heavier reclaim pressure
 	// while increasing will put less reclaim pressure.
-	// See http://kep.k8s.io/2570 for more details.
+	// See https://kep.k8s.io/2570 for more details.
 	// Default: 0.8
 	// +featureGate=MemoryQoS
 	// +optional
@@ -446,7 +446,7 @@ type KubeletConfiguration struct {
 	// +optional
 	RegisterNode bool
 	// Tracing specifies the versioned configuration for OpenTelemetry tracing clients.
-	// See http://kep.k8s.io/2832 for more details.
+	// See https://kep.k8s.io/2832 for more details.
 	// +featureGate=KubeletTracing
 	// +optional
 	Tracing *tracingapi.TracingConfiguration
