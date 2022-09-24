@@ -1265,6 +1265,11 @@ EOF
 DOCKER_LOG_MAX_FILE: $(yaml-quote "${DOCKER_LOG_MAX_FILE}")
 EOF
   fi
+  if [ -n "${CLOUD_PROVIDER_FLAG:-}" ]; then
+    cat >>"$file" <<EOF
+CLOUD_PROVIDER_FLAG: $(yaml-quote "${CLOUD_PROVIDER_FLAG}")
+EOF
+  fi
   if [ -n "${FEATURE_GATES:-}" ]; then
     cat >>"$file" <<EOF
 FEATURE_GATES: $(yaml-quote "${FEATURE_GATES}")
