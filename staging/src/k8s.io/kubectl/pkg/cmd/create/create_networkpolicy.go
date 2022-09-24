@@ -17,6 +17,7 @@ limitations under the License.
 package create
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strings"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
+	networkingv1client "k8s.io/client-go/kubernetes/typed/networking/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
@@ -73,16 +75,16 @@ var (
 		kubectl create networkpolicies simple
 
 		# Create a network policy for a namespace that prevents outbound traffic.
-		kubectl create networkpolicies policy-np --policy-types=egress
+		kubectl create networkpolicies policy-np --policy-types egress
 
 		# Create a network policy includes a podSelector which selects the grouping of pods to which the policy applies.
-		kubectl create networkpolicies podselector --pod-selector=app=nginx
+		kubectl create networkpolicies podselector --pod-selector app=nginx
 
 		# Create AND rules. If multiple rules are specified, they are connected using a logical AND (Ports AND From/To).
-		kubectl create networkpolicies and-ingress-np --ingress=ports=udp:53,tcp:53,pod=app:nginx,namespace=kubernetes.io/metadata.name:default
+		kubectl create networkpolicies and-ingress-np --ingress ports=udp:53,tcp:53,pod=app:nginx,namespace=kubernetes.io/metadata.name:default
 
 		# Create OR rules. If multiple rules are specified, they are connected using a logical OR (Ports OR From/To).
-		kubectl create networkpolicies or-ingress-np --ingress=ports=udp:53,tcp:53 --ingress=pod=app:nginx --ingress=namespace=kubernetes.io/metadata.name:default
+		kubectl create networkpolicies or-ingress-np --ingress ports=udp:53,tcp:53 --ingress pod=app:nginx --ingress namespace=kubernetes.io/metadata.name:default
 
 		# Create a network policy with multiple rules, combine logical OR/AND.
 		kubectl create networkpolicies multirules --pod-selector app=nginx \
@@ -108,6 +110,7 @@ type CreateNetworkPolicyOptions struct {
 	Namespace        string
 	EnforceNamespace bool
 
+	Client              networkingv1client.NetworkingV1Interface
 	DryRunStrategy      cmdutil.DryRunStrategy
 	DryRunVerifier      *resource.QueryParamVerifier
 	ValidationDirective string
@@ -135,7 +138,7 @@ func NewCmdCreateNetworkPolicy(f cmdutil.Factory, ioStreams genericclioptions.IO
 	o := NewCreateNetworkPolicyOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use:                   "networkpolicies NAME",
+		Use:                   "networkpolicies NAME [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"networkpolicy", "netpol"},
 		Short:                 i18n.T("Create a network policy"),
@@ -153,10 +156,10 @@ func NewCmdCreateNetworkPolicy(f cmdutil.Factory, ioStreams genericclioptions.IO
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().StringVar(&o.PodSelector, "pod-selector", o.PodSelector, "Each NetworkPolicy includes a podSelector which selects the grouping of pods to which the policy applies.")
-	cmd.Flags().StringArrayVar(&o.PolicyTypes, "policy-types", o.PolicyTypes, `Each NetworkPolicy includes a policyTypes list which may include "none", "ingress" or "egress". This argument is optional.`)
-	cmd.Flags().StringArrayVar(&o.IngressRules, "ingress", o.IngressRules, "Specify multiple ingress rules (ports, pod=podSelector, namespace=namespaceSelector).")
-	cmd.Flags().StringArrayVar(&o.EgressRules, "egress", o.EgressRules, "Specify multiple egress rules (ports, pod=podSelector, namespace=namespaceSelector).")
+	cmd.Flags().StringVarP(&o.PodSelector, "pod-selector", "p", o.PodSelector, "Each NetworkPolicy includes a podSelector which selects the grouping of pods to which the policy applies.")
+	cmd.Flags().StringArrayVarP(&o.PolicyTypes, "policy-types", "t", o.PolicyTypes, `Each NetworkPolicy includes a policyTypes list which may include "none", "ingress" or "egress". This argument is optional.`)
+	cmd.Flags().StringArrayVarP(&o.IngressRules, "ingress", "i", o.IngressRules, "Specify multiple ingress rules (ports, pod=podSelector, namespace=namespaceSelector).")
+	cmd.Flags().StringArrayVarP(&o.EgressRules, "egress", "e", o.EgressRules, "Specify multiple egress rules (ports, pod=podSelector, namespace=namespaceSelector).")
 
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 
@@ -170,6 +173,15 @@ func (o *CreateNetworkPolicyOptions) Complete(f cmdutil.Factory, cmd *cobra.Comm
 		return err
 	}
 	o.Name = name
+
+	clientConfig, err := f.ToRESTConfig()
+	if err != nil {
+		return err
+	}
+	o.Client, err = networkingv1client.NewForConfig(clientConfig)
+	if err != nil {
+		return err
+	}
 
 	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
@@ -277,6 +289,10 @@ func (o *CreateNetworkPolicyOptions) Run() error {
 				return err
 			}
 			createOptions.DryRun = []string{metav1.DryRunAll}
+		}
+		_, err = o.Client.NetworkPolicies(o.Namespace).Create(context.TODO(), networkpolicy, createOptions)
+		if err != nil {
+			return fmt.Errorf("failed to create NetworkPolicy: %v", err)
 		}
 	}
 	return o.PrintObj(networkpolicy)
