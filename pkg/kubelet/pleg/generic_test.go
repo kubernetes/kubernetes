@@ -602,7 +602,7 @@ func TestRelistIPChange(t *testing.T) {
 			podIPs: []string{"192.168.1.5"},
 		},
 		{
-			name:   "tets-1",
+			name:   "test-1",
 			podID:  "test-pod-1",
 			podIPs: []string{"192.168.1.5/24", "2000::"},
 		},
