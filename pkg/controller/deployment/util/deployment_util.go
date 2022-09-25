@@ -264,24 +264,17 @@ func SetNewReplicaSetAnnotations(deployment *apps.Deployment, newRS *apps.Replic
 	// then that means we are rolling back to this replica set. We need to preserve the old revisions
 	// for historical information.
 	if ok && oldRevisionInt < newRevisionInt {
-		revisionHistoryAnnotation := newRS.Annotations[RevisionHistoryAnnotation]
-		oldRevisions := strings.Split(revisionHistoryAnnotation, ",")
-		if len(oldRevisions[0]) == 0 {
+		if revisionHistoryAnnotation, ok := newRS.Annotations[RevisionHistoryAnnotation]; !ok || revisionHistoryAnnotation == "" {
 			newRS.Annotations[RevisionHistoryAnnotation] = oldRevision
+		} else if totalLen := len(revisionHistoryAnnotation) + len(oldRevision) + 1; totalLen <= revHistoryLimitInChars {
+			var builder strings.Builder
+			builder.Grow(totalLen)
+			builder.WriteString(revisionHistoryAnnotation)
+			builder.WriteString(",")
+			builder.WriteString(oldRevision)
+			newRS.Annotations[RevisionHistoryAnnotation] = builder.String()
 		} else {
-			totalLen := len(revisionHistoryAnnotation) + len(oldRevision) + 1
-			// index for the starting position in oldRevisions
-			start := 0
-			for totalLen > revHistoryLimitInChars && start < len(oldRevisions) {
-				totalLen = totalLen - len(oldRevisions[start]) - 1
-				start++
-			}
-			if totalLen <= revHistoryLimitInChars {
-				oldRevisions = append(oldRevisions[start:], oldRevision)
-				newRS.Annotations[RevisionHistoryAnnotation] = strings.Join(oldRevisions, ",")
-			} else {
-				klog.Warningf("Not appending revision due to length limit of %v reached", revHistoryLimitInChars)
-			}
+			klog.Warningf("Not appending revision due to length limit of %v reached", revHistoryLimitInChars)
 		}
 	}
 	// If the new replica set is about to be created, we need to add replica annotations to it.
