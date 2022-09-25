@@ -1024,18 +1024,7 @@ func (asw *actualStateOfWorld) GetAttachedVolumes() []AttachedVolume {
 }
 
 func (asw *actualStateOfWorld) GetUnmountedVolumes() []AttachedVolume {
-	asw.RLock()
-	defer asw.RUnlock()
-	unmountedVolumes := make([]AttachedVolume, 0 /* len */, len(asw.attachedVolumes) /* cap */)
-	for _, volumeObj := range asw.attachedVolumes {
-		if len(volumeObj.mountedPods) == 0 {
-			unmountedVolumes = append(
-				unmountedVolumes,
-				asw.newAttachedVolume(&volumeObj))
-		}
-	}
-
-	return unmountedVolumes
+	return asw.GetAttachedVolumes()
 }
 
 func (asw *actualStateOfWorld) SyncReconstructedVolume(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, outerVolumeSpecName string) {
