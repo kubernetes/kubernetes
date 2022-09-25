@@ -421,7 +421,7 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 			vm.getUnmountedVolumes(uniquePodName, expectedVolumes)
 		// Also get unattached volumes for error message
 		unattachedVolumes :=
-			vm.getUnattachedVolumes(expectedVolumes)
+			vm.getUnattachedVolumes(uniquePodName)
 
 		if len(unmountedVolumes) == 0 {
 			return nil
@@ -476,13 +476,16 @@ func (vm *volumeManager) WaitForUnmount(pod *v1.Pod) error {
 
 // getUnattachedVolumes returns a list of the volumes that are expected to be attached but
 // are not currently attached to the node
-func (vm *volumeManager) getUnattachedVolumes(expectedVolumes []string) []string {
+func (vm *volumeManager) getUnattachedVolumes(uniquePodName types.UniquePodName) []string {
 	unattachedVolumes := []string{}
-	for _, volume := range expectedVolumes {
-		if !vm.actualStateOfWorld.VolumeExists(v1.UniqueVolumeName(volume)) {
-			unattachedVolumes = append(unattachedVolumes, volume)
+	for _, volumeToMount := range vm.desiredStateOfWorld.GetVolumesToMount() {
+		if uniquePodName == volumeToMount.PodName &&
+			volumeToMount.PluginIsAttachable &&
+			!vm.actualStateOfWorld.VolumeExists(volumeToMount.VolumeName) {
+			unattachedVolumes = append(unattachedVolumes, volumeToMount.OuterVolumeSpecName)
 		}
 	}
+
 	return unattachedVolumes
 }
 
