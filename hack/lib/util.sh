@@ -670,7 +670,7 @@ function kube::util::ensure-cfssl {
   if [[ "${host_arch}" != "amd64" ]]; then
     echo "Cannot download cfssl on non-amd64 hosts and cfssl does not appear to be installed."
     echo "Please install cfssl and cfssljson and verify they are in \$PATH."
-    echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go get -u github.com/cloudflare/cfssl/cmd/..."
+    echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go install github.com/cloudflare/cfssl/cmd/...@latest"
     exit 1
   fi
 
@@ -708,7 +708,7 @@ function kube::util::ensure-cfssl {
     CFSSLJSON_BIN="${cfssldir}/cfssljson"
     if [[ ! -x ${CFSSL_BIN} || ! -x ${CFSSLJSON_BIN} ]]; then
       echo "Failed to download 'cfssl'. Please install cfssl and cfssljson and verify they are in \$PATH."
-      echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go get -u github.com/cloudflare/cfssl/cmd/..."
+      echo "Hint: export PATH=\$PATH:\$GOPATH/bin; go install github.com/cloudflare/cfssl/cmd/...@latest"
       exit 1
     fi
   popd > /dev/null || return 1
