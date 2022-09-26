@@ -188,7 +188,7 @@ func VisitPodSecretNames(pod *v1.Pod, visitor Visitor) bool {
 	return true
 }
 
-// visitContainerSecretNames returns true if it finds reference to Secret in the container, otherwise false
+// visitContainerSecretNames returns true unless the visitor returned false when invoked with a secret reference
 func visitContainerSecretNames(container *v1.Container, visitor Visitor) bool {
 	for _, env := range container.EnvFrom {
 		if env.SecretRef != nil {
@@ -237,7 +237,7 @@ func VisitPodConfigmapNames(pod *v1.Pod, visitor Visitor) bool {
 	return true
 }
 
-// visitContainerConfigmapNames returns true if it finds reference to ConfigMap in the container, otherwise false
+// visitContainerConfigmapNames returns true unless the visitor returned false when invoked with a configmap reference
 func visitContainerConfigmapNames(container *v1.Container, visitor Visitor) bool {
 	for _, env := range container.EnvFrom {
 		if env.ConfigMapRef != nil {
