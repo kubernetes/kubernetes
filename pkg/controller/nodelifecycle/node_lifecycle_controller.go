@@ -478,20 +478,6 @@ func NewNodeLifecycleController(
 
 	if nc.runTaintManager {
 		nc.taintManager = scheduler.NewNoExecuteTaintManager(ctx, kubeClient, nc.podLister, nc.nodeLister, nc.getPodsAssignedToNode)
-		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-			AddFunc: controllerutil.CreateAddNodeHandler(func(node *v1.Node) error {
-				nc.taintManager.NodeUpdated(nil, node)
-				return nil
-			}),
-			UpdateFunc: controllerutil.CreateUpdateNodeHandler(func(oldNode, newNode *v1.Node) error {
-				nc.taintManager.NodeUpdated(oldNode, newNode)
-				return nil
-			}),
-			DeleteFunc: controllerutil.CreateDeleteNodeHandler(func(node *v1.Node) error {
-				nc.taintManager.NodeUpdated(node, nil)
-				return nil
-			}),
-		})
 	}
 
 	klog.Infof("Controller will reconcile labels.")
@@ -499,15 +485,24 @@ func NewNodeLifecycleController(
 		AddFunc: controllerutil.CreateAddNodeHandler(func(node *v1.Node) error {
 			nc.nodeUpdateQueue.Add(node.Name)
 			nc.nodeEvictionMap.registerNode(node.Name)
+			if nc.taintManager != nil {
+				nc.taintManager.NodeUpdated(nil, node)
+			}
 			return nil
 		}),
-		UpdateFunc: controllerutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
+		UpdateFunc: controllerutil.CreateUpdateNodeHandler(func(oldNode, newNode *v1.Node) error {
 			nc.nodeUpdateQueue.Add(newNode.Name)
+			if nc.taintManager != nil {
+				nc.taintManager.NodeUpdated(oldNode, newNode)
+			}
 			return nil
 		}),
 		DeleteFunc: controllerutil.CreateDeleteNodeHandler(func(node *v1.Node) error {
 			nc.nodesToRetry.Delete(node.Name)
 			nc.nodeEvictionMap.unregisterNode(node.Name)
+			if nc.taintManager != nil {
+				nc.taintManager.NodeUpdated(node, nil)
+			}
 			return nil
 		}),
 	})
@@ -702,20 +697,20 @@ func (nc *Controller) doNoExecuteTaintingPass(ctx context.Context) {
 			_, condition := controllerutil.GetNodeCondition(&node.Status, v1.NodeReady)
 			// Because we want to mimic NodeStatus.Condition["Ready"] we make "unreachable" and "not ready" taints mutually exclusive.
 			taintToAdd := v1.Taint{}
-			oppositeTaint := v1.Taint{}
+			taintToDel := v1.Taint{}
 			switch condition.Status {
 			case v1.ConditionFalse:
 				taintToAdd = *NotReadyTaintTemplate
-				oppositeTaint = *UnreachableTaintTemplate
+				taintToDel = *UnreachableTaintTemplate
 			case v1.ConditionUnknown:
 				taintToAdd = *UnreachableTaintTemplate
-				oppositeTaint = *NotReadyTaintTemplate
+				taintToDel = *NotReadyTaintTemplate
 			default:
 				// It seems that the Node is ready again, so there's no need to taint it.
 				klog.V(4).Infof("Node %v was in a taint queue, but it's ready now. Ignoring taint request.", value.Value)
 				return true, 0
 			}
-			result := controllerutil.SwapNodeControllerTaint(ctx, nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{&oppositeTaint}, node)
+			result := controllerutil.SwapNodeControllerTaint(ctx, nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{&taintToDel}, node)
 			if result {
 				//count the evictionsNumber
 				zone := nodetopology.GetZoneKey(node)
