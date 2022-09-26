@@ -1990,6 +1990,23 @@ rules:
       branch: release-1.25
       dir: staging/src/k8s.io/pod-security-admission
   library: true
+- destination: dynamic-resource-allocation
+  branches:
+  - name: master
+    dependencies:
+    - repository: apimachinery
+      branch: master
+    - repository: api
+      branch: master
+    - repository: client-go
+      branch: master
+    - repository: component-base
+      branch: master
+    - repository: kubelet
+      branch: master
+    source:
+      branch: master
+      dir: staging/src/k8s.io/dynamic-resource-allocation
 recursive-delete-patterns:
 - '*/.gitattributes'
 default-go-version: 1.19.3
