@@ -27,8 +27,8 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/util"
-	kmsapi "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v2alpha1"
 	"k8s.io/klog/v2"
+	kmsapi "k8s.io/kms/apis/v2alpha1"
 )
 
 const (

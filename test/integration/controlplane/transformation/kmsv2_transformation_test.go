@@ -37,9 +37,9 @@ import (
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 	kmstypes "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2/v2alpha1"
 	kmsv2mock "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing/v2alpha1"
-	kmsv2api "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v2alpha1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	kmsv2api "k8s.io/kms/apis/v2alpha1"
 )
 
 type envelopekmsv2 struct {
