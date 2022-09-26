@@ -67,6 +67,7 @@ import (
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/component-base/logs"
+	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -884,8 +885,10 @@ func installAPI(s *GenericAPIServer, c *Config) {
 	if c.EnableMetrics {
 		if c.EnableProfiling {
 			routes.MetricsWithReset{}.Install(s.Handler.NonGoRestfulMux)
+			slis.SLIMetricsWithReset{}.Install(s.Handler.NonGoRestfulMux)
 		} else {
 			routes.DefaultMetrics{}.Install(s.Handler.NonGoRestfulMux)
+			slis.SLIMetrics{}.Install(s.Handler.NonGoRestfulMux)
 		}
 	}
 
