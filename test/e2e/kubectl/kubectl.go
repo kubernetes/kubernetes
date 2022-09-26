@@ -1939,6 +1939,34 @@ metadata:
 		})
 	})
 
+	ginkgo.Describe("Kubectl events", func() {
+		ginkgo.It("should show event when pod is created ", func() {
+			podName := "e2e-test-httpd-pod"
+			ginkgo.By("running the image " + httpdImage)
+			framework.RunKubectlOrDie(ns, "run", podName, "--image="+httpdImage, podRunningTimeoutArg, "--labels=run="+podName)
+
+			ginkgo.By("verifying the pod " + podName + " is running")
+			label := labels.SelectorFromSet(map[string]string{"run": podName})
+			err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
+			if err != nil {
+				framework.Failf("Failed getting pod %s: %v", podName, err)
+			}
+
+			ginkgo.By("show started event for this pod")
+			events := framework.RunKubectlOrDie(ns, "alpha", "events", "--for=pod/"+podName)
+
+			if !strings.Contains(events, fmt.Sprintf("Normal   Scheduled   Pod/%s", podName)) {
+				framework.Failf("failed to list expected event")
+			}
+
+			ginkgo.By("expect not showing any WARNING message")
+			events = framework.RunKubectlOrDie(ns, "alpha", "events", "--types=WARNING", "--for=pod/"+podName)
+			if events != "" {
+				framework.Failf("unexpected WARNING event fired")
+			}
+		})
+	})
+
 	ginkgo.Describe("Kubectl create quota", func() {
 		ginkgo.It("should create a quota without scopes", func() {
 			quotaName := "million"
