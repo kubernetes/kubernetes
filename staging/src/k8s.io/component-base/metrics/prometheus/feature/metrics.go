@@ -18,7 +18,6 @@ package feature
 
 import (
 	"context"
-	"fmt"
 
 	k8smetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -29,11 +28,11 @@ var (
 	featureInfo = k8smetrics.NewGaugeVec(
 		&k8smetrics.GaugeOpts{
 			Namespace:      "kubernetes",
-			Name:           "feature_info",
+			Name:           "feature_enabled",
 			Help:           "This metric records the data about the stage and enablement of a k8s feature.",
 			StabilityLevel: k8smetrics.ALPHA,
 		},
-		[]string{"name", "stage", "enabled"},
+		[]string{"name", "stage"},
 	)
 )
 
@@ -46,5 +45,9 @@ func ResetFeatureInfoMetric() {
 }
 
 func RecordFeatureInfo(ctx context.Context, name string, stage string, enabled bool) {
-	featureInfo.WithContext(ctx).WithLabelValues(name, stage, fmt.Sprintf("%v", enabled)).Set(1)
+	value := 0.0
+	if enabled {
+		value = 1.0
+	}
+	featureInfo.WithContext(ctx).WithLabelValues(name, stage).Set(value)
 }

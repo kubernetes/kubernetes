@@ -484,7 +484,8 @@ with the apiserver API to configure the proxy.`,
 			if err := opts.Validate(); err != nil {
 				return fmt.Errorf("failed validate: %w", err)
 			}
-
+			// add feature enablement metrics
+			utilfeature.DefaultMutableFeatureGate.AddMetrics()
 			if err := opts.Run(); err != nil {
 				klog.ErrorS(err, "Error running ProxyServer")
 				return err
