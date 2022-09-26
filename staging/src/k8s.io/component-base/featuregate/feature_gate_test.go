@@ -429,22 +429,29 @@ func TestFeatureGateMetrics(t *testing.T) {
 	featuremetrics.ResetFeatureInfoMetric()
 	const testAlphaGate Feature = "TestAlpha"
 	const testBetaGate Feature = "TestBeta"
+	const testAlphaEnabled Feature = "TestAlphaEnabled"
+	const testBetaDisabled Feature = "TestBetaDisabled"
 	testedMetrics := []string{"kubernetes_feature_enabled"}
 	expectedOutput := `
 		# HELP kubernetes_feature_enabled [ALPHA] This metric records the data about the stage and enablement of a k8s feature.
         # TYPE kubernetes_feature_enabled gauge
         kubernetes_feature_enabled{name="TestAlpha",stage="ALPHA"} 0
         kubernetes_feature_enabled{name="TestBeta",stage="BETA"} 1
+		kubernetes_feature_enabled{name="TestAlphaEnabled",stage="ALPHA"} 1
         kubernetes_feature_enabled{name="AllAlpha",stage="ALPHA"} 0
         kubernetes_feature_enabled{name="AllBeta",stage="BETA"} 0
+		kubernetes_feature_enabled{name="TestBetaDisabled",stage="ALPHA"} 0
 `
 
 	f := NewFeatureGate()
 	fMap := map[Feature]FeatureSpec{
-		testAlphaGate: {Default: false, PreRelease: Alpha},
-		testBetaGate:  {Default: true, PreRelease: Beta},
+		testAlphaGate:    {Default: false, PreRelease: Alpha},
+		testAlphaEnabled: {Default: false, PreRelease: Alpha},
+		testBetaGate:     {Default: true, PreRelease: Beta},
+		testBetaDisabled: {Default: true, PreRelease: Alpha},
 	}
 	f.Add(fMap)
+	f.SetFromMap(map[string]bool{"TestAlphaEnabled": true, "TestBetaDisabled": false})
 	f.AddMetrics()
 	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedOutput), testedMetrics...); err != nil {
 		t.Fatal(err)
