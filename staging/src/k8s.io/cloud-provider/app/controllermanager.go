@@ -460,6 +460,7 @@ func CreateControllerContext(s *cloudcontrollerconfig.CompletedConfig, clientBui
 		ResyncPeriod:                    ResyncPeriod(s),
 		ControllerManagerMetrics:        controllersmetrics.NewControllerManagerMetrics("cloud-controller-manager"),
 	}
+	controllersmetrics.Register()
 	return ctx, nil
 }
 
