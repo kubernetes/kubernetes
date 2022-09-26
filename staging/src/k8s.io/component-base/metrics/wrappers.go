@@ -145,6 +145,12 @@ type Gatherer interface {
 	prometheus.Gatherer
 }
 
+// Registerer is the interface for the part of a registry in charge of registering
+// the collected metrics.
+type Registerer interface {
+	prometheus.Registerer
+}
+
 // GaugeFunc is a Gauge whose value is determined at collect time by calling a
 // provided function.
 //

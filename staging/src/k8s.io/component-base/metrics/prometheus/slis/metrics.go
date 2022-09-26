@@ -14,14 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package health
+package slis
 
 import (
 	"context"
 	"errors"
 
 	k8smetrics "k8s.io/component-base/metrics"
-	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 type HealthcheckStatus string
@@ -64,12 +63,11 @@ var (
 	)
 	statuses  = []HealthcheckStatus{Success, Error, Pending}
 	statusSet = map[HealthcheckStatus]struct{}{Success: {}, Error: {}, Pending: {}}
-	checkSet  = map[HealthcheckType]struct{}{Livez: {}, Readyz: {}, Healthz: {}}
 )
 
-func init() {
-	legacyregistry.MustRegister(healthcheck)
-	legacyregistry.MustRegister(healthchecksTotal)
+func Register(registry k8smetrics.KubeRegistry) {
+	registry.Register(healthcheck)
+	registry.Register(healthchecksTotal)
 }
 
 func ResetHealthMetrics() {
@@ -77,19 +75,16 @@ func ResetHealthMetrics() {
 	healthchecksTotal.Reset()
 }
 
-func ObserveHealthcheck(ctx context.Context, name string, healthcheckType HealthcheckType, status HealthcheckStatus) error {
+func ObserveHealthcheck(ctx context.Context, name string, healthcheckType string, status HealthcheckStatus) error {
 	if _, ok := statusSet[status]; !ok {
 		return errors.New("not a valid healthcheck status")
 	}
-	if _, ok := checkSet[healthcheckType]; !ok {
-		return errors.New("not a valid healthcheck type")
-	}
 	for _, s := range statuses {
 		if status != s {
-			healthcheck.WithContext(ctx).WithLabelValues(name, string(healthcheckType), string(s)).Set(0)
+			healthcheck.WithContext(ctx).WithLabelValues(name, healthcheckType, string(s)).Set(0)
 		}
 	}
-	healthchecksTotal.WithContext(ctx).WithLabelValues(name, string(healthcheckType), string(status)).Inc()
-	healthcheck.WithContext(ctx).WithLabelValues(name, string(healthcheckType), string(status)).Set(1)
+	healthchecksTotal.WithContext(ctx).WithLabelValues(name, healthcheckType, string(status)).Inc()
+	healthcheck.WithContext(ctx).WithLabelValues(name, healthcheckType, string(status)).Set(1)
 	return nil
 }

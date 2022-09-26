@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package health
+package slis
 
 import (
 	"context"
 	"strings"
 	"testing"
 
-	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
 )
 
@@ -30,8 +30,10 @@ var (
 )
 
 func TestObserveHealthcheck(t *testing.T) {
-	defer legacyregistry.Reset()
+	registry := metrics.NewKubeRegistry()
+	defer registry.Reset()
 	defer ResetHealthMetrics()
+	Register(registry)
 	initialState := Error
 	healthcheckName := "healthcheck-a"
 	initialOutput := `
@@ -47,14 +49,14 @@ func TestObserveHealthcheck(t *testing.T) {
 	testCases := []struct {
 		desc     string
 		name     string
-		hcType   HealthcheckType
+		hcType   string
 		hcStatus HealthcheckStatus
 		want     string
 	}{
 		{
 			desc:     "test pending",
 			name:     healthcheckName,
-			hcType:   Healthz,
+			hcType:   "healthz",
 			hcStatus: Pending,
 			want: `
         # HELP kubernetes_healthcheck [ALPHA] This metric records the result of a single healthcheck.
@@ -71,7 +73,7 @@ func TestObserveHealthcheck(t *testing.T) {
 		{
 			desc:     "test success",
 			name:     healthcheckName,
-			hcType:   Healthz,
+			hcType:   "healthz",
 			hcStatus: Success,
 			want: `
         # HELP kubernetes_healthcheck [ALPHA] This metric records the result of a single healthcheck.
@@ -95,7 +97,7 @@ func TestObserveHealthcheck(t *testing.T) {
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
 			}
-			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(initialOutput), testedMetrics...); err != nil {
+			if err := testutil.GatherAndCompare(registry, strings.NewReader(initialOutput), testedMetrics...); err != nil {
 				t.Fatal(err)
 			}
 			// now record that we successfully purge state
@@ -103,7 +105,7 @@ func TestObserveHealthcheck(t *testing.T) {
 			if err != nil {
 				t.Errorf("unexpected err: %v", err)
 			}
-			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(test.want), testedMetrics...); err != nil {
+			if err := testutil.GatherAndCompare(registry, strings.NewReader(test.want), testedMetrics...); err != nil {
 				t.Fatal(err)
 			}
 		})
