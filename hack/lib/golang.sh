@@ -273,7 +273,6 @@ kube::golang::test_targets() {
     cmd/genman
     cmd/genyaml
     cmd/genswaggertypedocs
-    cmd/linkcheck
     ginkgo
     test/e2e/e2e.test
     test/conformance/image/go-runner
