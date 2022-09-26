@@ -114,6 +114,17 @@ function ensure_require_replace_directives_for_all_dependencies() {
       | xargs -L 100 go mod edit -fmt
 }
 
+function print_go_mod_section() {
+  local directive="$1"
+  local file="$2"
+
+  if [ -s "${file}" ]; then
+      echo "${directive} ("
+      cat "$file"
+      echo ")"
+  fi
+}
+
 function group_directives() {
   local local_tmp_dir
   local_tmp_dir=$(mktemp -d "${TMP_DIR}/group_replace.XXXX")
@@ -146,15 +157,9 @@ function group_directives() {
   " < go.mod
   {
     cat "${go_mod_other}";
-    echo "require (";
-    cat "${go_mod_require_direct}";
-    echo ")";
-    echo "require (";
-    cat "${go_mod_require_indirect}";
-    echo ")";
-    echo "replace (";
-    cat "${go_mod_replace}";
-    echo ")";
+    print_go_mod_section "require" "${go_mod_require_direct}"
+    print_go_mod_section "require" "${go_mod_require_indirect}"
+    print_go_mod_section "replace" "${go_mod_replace}"
   } > go.mod
 
   go mod edit -fmt
