@@ -21,8 +21,6 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"io"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -43,26 +41,6 @@ const (
 	sampleText        = "abcdefghijklmnopqrstuvwxyz"
 	sampleContextText = "0123456789"
 )
-
-func mustReadConfig(t *testing.T, path string) []byte {
-	t.Helper()
-	f, err := os.Open(path)
-	if err != nil {
-		t.Fatalf("error opening encryption configuration file %q: %v", path, err)
-	}
-	defer f.Close()
-
-	configFileContents, err := io.ReadAll(f)
-	if err != nil {
-		t.Fatalf("could not read contents of encryption config: %v", err)
-	}
-
-	return configFileContents
-}
-
-func mustConfigReader(t *testing.T, path string) io.Reader {
-	return bytes.NewReader(mustReadConfig(t, path))
-}
 
 // testEnvelopeService is a mock envelope service which can be used to simulate remote Envelope services
 // for testing of the envelope transformer with other transformers.
@@ -136,7 +114,7 @@ func newMockErrorEnvelopeKMSv2Service(endpoint string, timeout time.Duration) (e
 
 func TestLegacyConfig(t *testing.T) {
 	legacyV1Config := "testdata/valid-configs/legacy.yaml"
-	legacyConfigObject, err := loadConfig(mustReadConfig(t, legacyV1Config))
+	legacyConfigObject, err := loadConfig(legacyV1Config)
 	cacheSize := int32(10)
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, legacyV1Config)
@@ -199,37 +177,37 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 	// Transforms data using one of them, and tries to untransform using the others.
 	// Repeats this for all possible combinations.
 	correctConfigWithIdentityFirst := "testdata/valid-configs/identity-first.yaml"
-	identityFirstTransformerOverrides, err := parseEncryptionConfiguration(mustConfigReader(t, correctConfigWithIdentityFirst), ctx.Done())
+	identityFirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithIdentityFirst, ctx.Done())
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithIdentityFirst)
 	}
 
 	correctConfigWithAesGcmFirst := "testdata/valid-configs/aes-gcm-first.yaml"
-	aesGcmFirstTransformerOverrides, err := parseEncryptionConfiguration(mustConfigReader(t, correctConfigWithAesGcmFirst), ctx.Done())
+	aesGcmFirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithAesGcmFirst, ctx.Done())
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithAesGcmFirst)
 	}
 
 	correctConfigWithAesCbcFirst := "testdata/valid-configs/aes-cbc-first.yaml"
-	aesCbcFirstTransformerOverrides, err := parseEncryptionConfiguration(mustConfigReader(t, correctConfigWithAesCbcFirst), ctx.Done())
+	aesCbcFirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithAesCbcFirst, ctx.Done())
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithAesCbcFirst)
 	}
 
 	correctConfigWithSecretboxFirst := "testdata/valid-configs/secret-box-first.yaml"
-	secretboxFirstTransformerOverrides, err := parseEncryptionConfiguration(mustConfigReader(t, correctConfigWithSecretboxFirst), ctx.Done())
+	secretboxFirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithSecretboxFirst, ctx.Done())
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithSecretboxFirst)
 	}
 
 	correctConfigWithKMSFirst := "testdata/valid-configs/kms-first.yaml"
-	kmsFirstTransformerOverrides, err := parseEncryptionConfiguration(mustConfigReader(t, correctConfigWithKMSFirst), ctx.Done())
+	kmsFirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithKMSFirst, ctx.Done())
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithKMSFirst)
 	}
 
 	correctConfigWithKMSv2First := "testdata/valid-configs/kmsv2-first.yaml"
-	kmsv2FirstTransformerOverrides, err := parseEncryptionConfiguration(mustConfigReader(t, correctConfigWithKMSv2First), ctx.Done())
+	kmsv2FirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithKMSv2First, ctx.Done())
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithKMSv2First)
 	}
@@ -281,44 +259,33 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 func TestKMSPluginHealthz(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
 
-	ctx := testContext(t)
-
-	service, err := envelope.NewGRPCService(ctx, "unix:///tmp/testprovider.sock", 3*time.Second)
-	if err != nil {
-		t.Fatalf("Could not initialize envelopeService, error: %v", err)
-	}
-	serviceKMSv2, err := envelopekmsv2.NewGRPCService(ctx, "unix:///tmp/testprovider.sock", 3*time.Second)
-	if err != nil {
-		t.Fatalf("Could not initialize kmsv2 envelopeService, error: %v", err)
-	}
-
 	testCases := []struct {
 		desc    string
 		config  string
-		want    []interface{}
-		wantErr bool
+		want    []healthChecker
+		wantErr string
 	}{
 		{
 			desc:   "Install Healthz",
 			config: "testdata/valid-configs/kms/default-timeout.yaml",
-			want: []interface{}{
+			want: []healthChecker{
 				&kmsPluginProbe{
-					name:    "foo",
-					Service: service,
+					name: "foo",
+					ttl:  3 * time.Second,
 				},
 			},
 		},
 		{
 			desc:   "Install multiple healthz",
 			config: "testdata/valid-configs/kms/multiple-providers.yaml",
-			want: []interface{}{
+			want: []healthChecker{
 				&kmsPluginProbe{
-					name:    "foo",
-					Service: service,
+					name: "foo",
+					ttl:  3 * time.Second,
 				},
 				&kmsPluginProbe{
-					name:    "bar",
-					Service: service,
+					name: "bar",
+					ttl:  3 * time.Second,
 				},
 			},
 		},
@@ -329,14 +296,14 @@ func TestKMSPluginHealthz(t *testing.T) {
 		{
 			desc:   "Install multiple healthz with v1 and v2",
 			config: "testdata/valid-configs/kms/multiple-providers-kmsv2.yaml",
-			want: []interface{}{
+			want: []healthChecker{
 				&kmsv2PluginProbe{
-					name:    "foo",
-					Service: serviceKMSv2,
+					name: "foo",
+					ttl:  3 * time.Second,
 				},
 				&kmsPluginProbe{
-					name:    "bar",
-					Service: service,
+					name: "bar",
+					ttl:  3 * time.Second,
 				},
 			},
 		},
@@ -344,18 +311,50 @@ func TestKMSPluginHealthz(t *testing.T) {
 			desc:    "Invalid API version",
 			config:  "testdata/invalid-configs/kms/invalid-apiversion.yaml",
 			want:    nil,
-			wantErr: true,
+			wantErr: `resources[0].providers[0].kms.apiVersion: Invalid value: "v3": unsupported apiVersion apiVersion for KMS provider, only v1 and v2 are supported`,
 		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
-			got, err := getKMSPluginProbes(mustConfigReader(t, tt.config), ctx.Done())
-			if err != nil && !tt.wantErr {
-				t.Fatalf("got %v, want nil for error", err)
+			config, err := loadConfig(tt.config)
+			if errStr := errString(err); errStr != tt.wantErr {
+				t.Fatalf("unexpected error state got=%s want=%s", errStr, tt.wantErr)
+			}
+			if len(tt.wantErr) > 0 {
+				return
 			}
 
-			if d := cmp.Diff(tt.want, got, cmp.Comparer(serviceComparer), cmp.Comparer(serviceKMSv2Comparer)); d != "" {
+			_, got, err := getTransformerOverridesAndKMSPluginProbes(config, testContext(t).Done())
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// unset fields that are not relevant to the test
+			for i := range got {
+				checker := got[i]
+				switch p := checker.(type) {
+				case *kmsPluginProbe:
+					p.service = nil
+					p.l = nil
+					p.lastResponse = nil
+				case *kmsv2PluginProbe:
+					p.service = nil
+					p.l = nil
+					p.lastResponse = nil
+				default:
+					t.Fatalf("unexpected probe type %T", p)
+				}
+			}
+
+			if d := cmp.Diff(tt.want, got,
+				cmp.Comparer(func(a, b *kmsPluginProbe) bool {
+					return *a == *b
+				}),
+				cmp.Comparer(func(a, b *kmsv2PluginProbe) bool {
+					return *a == *b
+				}),
+			); d != "" {
 				t.Fatalf("HealthzConfig mismatch (-want +got):\n%s", d)
 			}
 		})
@@ -378,7 +377,7 @@ func TestKMSPluginHealthzTTL(t *testing.T) {
 			probe: &kmsPluginProbe{
 				name:         "test",
 				ttl:          kmsPluginHealthzNegativeTTL,
-				Service:      service,
+				service:      service,
 				l:            &sync.Mutex{},
 				lastResponse: &kmsPluginHealthzResponse{},
 			},
@@ -389,7 +388,7 @@ func TestKMSPluginHealthzTTL(t *testing.T) {
 			probe: &kmsPluginProbe{
 				name:         "test",
 				ttl:          kmsPluginHealthzPositiveTTL,
-				Service:      errService,
+				service:      errService,
 				l:            &sync.Mutex{},
 				lastResponse: &kmsPluginHealthzResponse{},
 			},
@@ -399,7 +398,7 @@ func TestKMSPluginHealthzTTL(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
-			tt.probe.Check()
+			_ = tt.probe.check()
 			if tt.probe.ttl != tt.wantTTL {
 				t.Fatalf("want ttl %v, got ttl %v", tt.wantTTL, tt.probe.ttl)
 			}
@@ -423,7 +422,7 @@ func TestKMSv2PluginHealthzTTL(t *testing.T) {
 			probe: &kmsv2PluginProbe{
 				name:         "test",
 				ttl:          kmsPluginHealthzNegativeTTL,
-				Service:      service,
+				service:      service,
 				l:            &sync.Mutex{},
 				lastResponse: &kmsPluginHealthzResponse{},
 			},
@@ -434,7 +433,7 @@ func TestKMSv2PluginHealthzTTL(t *testing.T) {
 			probe: &kmsv2PluginProbe{
 				name:         "test",
 				ttl:          kmsPluginHealthzPositiveTTL,
-				Service:      errService,
+				service:      errService,
 				l:            &sync.Mutex{},
 				lastResponse: &kmsPluginHealthzResponse{},
 			},
@@ -444,22 +443,12 @@ func TestKMSv2PluginHealthzTTL(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
-			tt.probe.Check()
+			_ = tt.probe.check(ctx)
 			if tt.probe.ttl != tt.wantTTL {
 				t.Fatalf("want ttl %v, got ttl %v", tt.wantTTL, tt.probe.ttl)
 			}
 		})
 	}
-}
-
-// As long as got and want contain envelope.Service we will return true.
-// If got has an envelope.Service and want does note (or vice versa) this will return false.
-func serviceComparer(_, _ envelope.Service) bool {
-	return true
-}
-
-func serviceKMSv2Comparer(_, _ envelopekmsv2.Service) bool {
-	return true
 }
 
 func TestCBCKeyRotationWithOverlappingProviders(t *testing.T) {
@@ -539,7 +528,7 @@ func getTransformerFromEncryptionConfig(t *testing.T, encryptionConfigPath strin
 	ctx := testContext(t)
 
 	t.Helper()
-	transformers, err := parseEncryptionConfiguration(mustConfigReader(t, encryptionConfigPath), ctx.Done())
+	transformers, _, err := LoadEncryptionConfig(encryptionConfigPath, ctx.Done())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -591,4 +580,12 @@ func testContext(t *testing.T) context.Context {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	return ctx
+}
+
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	return err.Error()
 }

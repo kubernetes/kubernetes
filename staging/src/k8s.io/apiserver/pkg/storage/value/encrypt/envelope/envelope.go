@@ -63,7 +63,7 @@ type envelopeTransformer struct {
 // It uses envelopeService to encrypt and decrypt DEKs. Respective DEKs (in encrypted form) are prepended to
 // the data items they encrypt. A cache (of size cacheSize) is maintained to store the most recently
 // used decrypted DEKs in memory.
-func NewEnvelopeTransformer(envelopeService Service, cacheSize int, baseTransformerFunc func(cipher.Block) value.Transformer) (value.Transformer, error) {
+func NewEnvelopeTransformer(envelopeService Service, cacheSize int, baseTransformerFunc func(cipher.Block) value.Transformer) value.Transformer {
 	var (
 		cache *lru.Cache
 	)
@@ -77,7 +77,7 @@ func NewEnvelopeTransformer(envelopeService Service, cacheSize int, baseTransfor
 		baseTransformerFunc: baseTransformerFunc,
 		cacheEnabled:        cacheSize > 0,
 		cacheSize:           cacheSize,
-	}, nil
+	}
 }
 
 // TransformFromStorage decrypts data encrypted by this transformer using envelope encryption.
