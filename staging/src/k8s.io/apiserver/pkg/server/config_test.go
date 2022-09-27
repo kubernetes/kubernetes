@@ -169,6 +169,7 @@ func TestNewWithDelegate(t *testing.T) {
 		"/livez/poststarthook/storage-object-count-tracker-hook",
 		"/livez/poststarthook/wrapping-post-start-hook",
 		"/metrics",
+		"/metrics/slis",
 		"/readyz",
 		"/readyz/delegate-health",
 		"/readyz/informer-sync",
