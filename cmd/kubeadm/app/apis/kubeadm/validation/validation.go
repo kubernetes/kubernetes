@@ -512,21 +512,21 @@ func ValidateDNS(dns *kubeadm.DNS, fldPath *field.Path) field.ErrorList {
 // ValidateNetworking validates networking configuration
 func ValidateNetworking(c *kubeadm.ClusterConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	dnsDomainFldPath := field.NewPath("dnsDomain")
+	dnsDomainFldPath := fldPath.Child("dnsDomain")
 	for _, err := range validation.IsDNS1123Subdomain(c.Networking.DNSDomain) {
 		allErrs = append(allErrs, field.Invalid(dnsDomainFldPath, c.Networking.DNSDomain, err))
 	}
 
 	if len(c.Networking.ServiceSubnet) != 0 {
-		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.ServiceSubnet, constants.MinimumAddressesInServiceSubnet, field.NewPath("serviceSubnet"))...)
+		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.ServiceSubnet, constants.MinimumAddressesInServiceSubnet, fldPath.Child("serviceSubnet"))...)
 		// Service subnet was already validated, we need to validate now the subnet size
-		allErrs = append(allErrs, ValidateServiceSubnetSize(c.Networking.ServiceSubnet, field.NewPath("serviceSubnet"))...)
+		allErrs = append(allErrs, ValidateServiceSubnetSize(c.Networking.ServiceSubnet, fldPath.Child("serviceSubnet"))...)
 	}
 	if len(c.Networking.PodSubnet) != 0 {
-		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.PodSubnet, constants.MinimumAddressesInPodSubnet, field.NewPath("podSubnet"))...)
+		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.PodSubnet, constants.MinimumAddressesInPodSubnet, fldPath.Child("podSubnet"))...)
 		if c.ControllerManager.ExtraArgs["allocate-node-cidrs"] != "false" {
 			// Pod subnet was already validated, we need to validate now against the node-mask
-			allErrs = append(allErrs, ValidatePodSubnetNodeMask(c.Networking.PodSubnet, c, field.NewPath("podSubnet"))...)
+			allErrs = append(allErrs, ValidatePodSubnetNodeMask(c.Networking.PodSubnet, c, fldPath.Child("podSubnet"))...)
 		}
 	}
 	return allErrs
