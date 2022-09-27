@@ -17,6 +17,7 @@ limitations under the License.
 package templates
 
 import (
+	"fmt"
 	"io"
 	"strings"
 
@@ -32,9 +33,10 @@ var _ blackfriday.Renderer = &ASCIIRenderer{}
 // documents as plain text, well suited for human reading on terminals.
 type ASCIIRenderer struct {
 	Indentation string
-}
 
-func (r *ASCIIRenderer) GetFlags() int { return 0 }
+	listItemCount uint
+	listLevel     uint
+}
 
 // render markdown to text
 func (r *ASCIIRenderer) RenderNode(w io.Writer, node *blackfriday.Node, entering bool) blackfriday.WalkStatus {
@@ -51,13 +53,12 @@ func (r *ASCIIRenderer) RenderNode(w io.Writer, node *blackfriday.Node, entering
 		}
 	case blackfriday.HorizontalRule, blackfriday.Hardbreak:
 		w.Write([]byte(linebreak + "----------" + linebreak))
-	case blackfriday.Softbreak:
-		w.Write([]byte(linebreak))
-	case blackfriday.Code:
+	case blackfriday.Code, blackfriday.CodeBlock:
 		w.Write([]byte(linebreak))
 		lines := []string{}
 		for _, line := range strings.Split(string(node.Literal), linebreak) {
-			indented := r.Indentation + line
+			trimmed := strings.Trim(line, " \t")
+			indented := r.Indentation + trimmed
 			lines = append(lines, indented)
 		}
 		w.Write([]byte(strings.Join(lines, linebreak)))
@@ -66,16 +67,40 @@ func (r *ASCIIRenderer) RenderNode(w io.Writer, node *blackfriday.Node, entering
 	case blackfriday.Link:
 		w.Write([]byte(" "))
 		w.Write(node.LinkData.Destination)
-	case blackfriday.List:
-		w.Write([]byte(linebreak))
-		w.Write(node.Literal)
 	case blackfriday.Paragraph:
-		w.Write(node.Literal)
-		w.Write([]byte(linebreak))
+		if r.listLevel == 0 {
+			w.Write([]byte(linebreak))
+		}
+	case blackfriday.List:
+		if entering {
+			w.Write([]byte(linebreak))
+			r.listLevel++
+		} else {
+			r.listLevel--
+			r.listItemCount = 0
+		}
+	case blackfriday.Item:
+		if entering {
+			r.listItemCount++
+			for i := 0; uint(i) < r.listLevel; i++ {
+				w.Write([]byte(r.Indentation))
+			}
+			if node.ListFlags&blackfriday.ListTypeOrdered != 0 {
+				w.Write([]byte(fmt.Sprintf("%d. ", r.listItemCount)))
+			} else {
+				w.Write([]byte("* "))
+			}
+		} else {
+			w.Write([]byte(linebreak))
+		}
 	default:
-		w.Write(node.Literal)
+		normalText(w, node.Literal)
 	}
 	return blackfriday.GoToNext
+}
+
+func normalText(w io.Writer, text []byte) {
+	w.Write([]byte(strings.Trim(string(text), " \n\t")))
 }
 
 // RenderHeader writes document preamble and TOC if requested.

@@ -70,7 +70,7 @@ type normalizer struct {
 
 func (s normalizer) markdown() normalizer {
 	bytes := []byte(s.string)
-	formatted := blackfriday.Run(bytes, blackfriday.WithNoExtensions(), blackfriday.WithRenderer(&ASCIIRenderer{Indentation: Indentation}))
+	formatted := blackfriday.Run(bytes, blackfriday.WithExtensions(blackfriday.NoIntraEmphasis), blackfriday.WithRenderer(&ASCIIRenderer{Indentation: Indentation}))
 	s.string = string(formatted)
 	return s
 }
