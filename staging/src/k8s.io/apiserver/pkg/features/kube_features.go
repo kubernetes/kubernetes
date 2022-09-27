@@ -231,7 +231,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	RemoveSelfLink: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
-	ServerSideApply: {Default: true, PreRelease: featuregate.GA},
+	ServerSideApply: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	ServerSideFieldValidation: {Default: true, PreRelease: featuregate.Beta},
 

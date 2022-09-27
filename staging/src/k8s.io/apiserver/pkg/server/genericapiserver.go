@@ -666,7 +666,7 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 		}
 		apiGroupVersion.OpenAPIModels = openAPIModels
 
-		if openAPIModels != nil && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		if openAPIModels != nil {
 			typeConverter, err := fieldmanager.NewTypeConverter(openAPIModels, false)
 			if err != nil {
 				return err
