@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/distribution/reference"
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 
@@ -66,6 +67,7 @@ func ValidateClusterConfiguration(c *kubeadm.ClusterConfiguration) field.ErrorLi
 	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificatesDir"))...)
 	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, field.NewPath("featureGates"))...)
 	allErrs = append(allErrs, ValidateHostPort(c.ControlPlaneEndpoint, field.NewPath("controlPlaneEndpoint"))...)
+	allErrs = append(allErrs, ValidateImageRepository(c.ImageRepository, field.NewPath("imageRepository"))...)
 	allErrs = append(allErrs, ValidateEtcd(&c.Etcd, field.NewPath("etcd"))...)
 	allErrs = append(allErrs, componentconfigs.Validate(c)...)
 	return allErrs
@@ -282,6 +284,9 @@ func ValidateEtcd(e *kubeadm.Etcd, fldPath *field.Path) field.ErrorList {
 		allErrs = append(allErrs, ValidateAbsolutePath(e.Local.DataDir, localPath.Child("dataDir"))...)
 		allErrs = append(allErrs, ValidateCertSANs(e.Local.ServerCertSANs, localPath.Child("serverCertSANs"))...)
 		allErrs = append(allErrs, ValidateCertSANs(e.Local.PeerCertSANs, localPath.Child("peerCertSANs"))...)
+		if len(e.Local.ImageRepository) > 0 {
+			allErrs = append(allErrs, ValidateImageRepository(e.Local.ImageRepository, localPath.Child("imageRepository"))...)
+		}
 	}
 	if e.External != nil {
 		requireHTTPS := true
@@ -488,13 +493,19 @@ func getClusterNodeMask(c *kubeadm.ClusterConfiguration, isIPv6 bool) (int, erro
 }
 
 // ValidateDNS validates the DNS object and collects all encountered errors
-// TODO: Remove with v1beta2 https://github.com/kubernetes/kubeadm/issues/2459
 func ValidateDNS(dns *kubeadm.DNS, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+
+	// TODO: Remove with v1beta2 https://github.com/kubernetes/kubeadm/issues/2459
 	const kubeDNSType = "kube-dns"
 	if dns.Type == kubeDNSType {
 		allErrs = append(allErrs, field.Invalid(fldPath, dns.Type, fmt.Sprintf("DNS type %q is no longer supported", kubeDNSType)))
 	}
+
+	if len(dns.ImageRepository) > 0 {
+		allErrs = append(allErrs, ValidateImageRepository(dns.ImageRepository, fldPath.Child("imageRepository"))...)
+	}
+
 	return allErrs
 }
 
@@ -634,6 +645,18 @@ func ValidateSocketPath(socket string, fldPath *field.Path) field.ErrorList {
 	// static and dynamic defaulting should have ensured that an URL scheme is used
 	if u.Scheme != kubeadmapiv1.DefaultContainerRuntimeURLScheme {
 		return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("only URL scheme %q is supported, got %q", kubeadmapiv1.DefaultContainerRuntimeURLScheme, u.Scheme)))
+	}
+
+	return allErrs
+}
+
+// ValidateImageRepository validates the image repository format
+func ValidateImageRepository(imageRepository string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	image := fmt.Sprintf("%s/%s:%s", imageRepository, "name", "tag")
+	if !reference.ReferenceRegexp.MatchString(image) {
+		return append(allErrs, field.Invalid(fldPath, imageRepository, "invalid image repository format"))
 	}
 
 	return allErrs
