@@ -340,11 +340,8 @@ func (b *builder) buildRoute(root, path, httpMethod, actionVerb, operationVerb s
 		supportedTypes := []string{
 			string(types.JSONPatchType),
 			string(types.MergePatchType),
+			string(types.ApplyPatchType),
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-			supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
-		}
-
 		route.Consumes(supportedTypes...)
 	} else {
 		route.Consumes(runtime.ContentTypeJSON, runtime.ContentTypeYAML)

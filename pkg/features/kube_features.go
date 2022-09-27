@@ -1034,7 +1034,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.OpenAPIV3: {Default: true, PreRelease: featuregate.Beta},
 
-	genericfeatures.ServerSideApply: {Default: true, PreRelease: featuregate.GA},
+	genericfeatures.ServerSideApply: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 
 	genericfeatures.ServerSideFieldValidation: {Default: true, PreRelease: featuregate.Beta},
 
