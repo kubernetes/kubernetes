@@ -352,6 +352,15 @@ func (StatefulSetList) SwaggerDoc() map[string]string {
 	return map_StatefulSetList
 }
 
+var map_StatefulSetOrdinals = map[string]string{
+	"":      "StatefulSetOrdinals describes the policy used for replica ordinal assignment in this StatefulSet.",
+	"start": "Start is the number representing the first index that is used to represent replica ordinals. Defaults to 0. If set, replica ordinals will be numbered [.spec.ordinals.start, .spec.ordinals.start - .spec.replicas).",
+}
+
+func (StatefulSetOrdinals) SwaggerDoc() map[string]string {
+	return map_StatefulSetOrdinals
+}
+
 var map_StatefulSetPersistentVolumeClaimRetentionPolicy = map[string]string{
 	"":            "StatefulSetPersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from the StatefulSet VolumeClaimTemplates.",
 	"whenDeleted": "WhenDeleted specifies what happens to PVCs created from StatefulSet VolumeClaimTemplates when the StatefulSet is deleted. The default policy of `Retain` causes PVCs to not be affected by StatefulSet deletion. The `Delete` policy causes those PVCs to be deleted.",
@@ -374,6 +383,7 @@ var map_StatefulSetSpec = map[string]string{
 	"revisionHistoryLimit":                 "revisionHistoryLimit is the maximum number of revisions that will be maintained in the StatefulSet's revision history. The revision history consists of all revisions not represented by a currently applied StatefulSetSpec version. The default value is 10.",
 	"minReadySeconds":                      "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
 	"persistentVolumeClaimRetentionPolicy": "PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from the StatefulSet VolumeClaimTemplates. This requires the StatefulSetAutoDeletePVC feature gate to be enabled, which is alpha.",
+	"ordinals":                             "Ordinals controls how the stateful set creates pod and persistent volume claim names. The default behavior assigns a number starting with zero and incremented by one for each additional replica requested. This requires the StatefulSetSlice feature gate to be enabled, which is alpha.",
 }
 
 func (StatefulSetSpec) SwaggerDoc() map[string]string {

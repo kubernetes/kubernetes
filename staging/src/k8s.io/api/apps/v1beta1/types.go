@@ -204,6 +204,17 @@ type StatefulSetPersistentVolumeClaimRetentionPolicy struct {
 	WhenScaled PersistentVolumeClaimRetentionPolicyType `json:"whenScaled,omitempty" protobuf:"bytes,2,opt,name=whenScaled,casttype=PersistentVolumeClaimRetentionPolicyType"`
 }
 
+// StatefulSetOrdinals describes the policy used for replica ordinal assignment
+// in this StatefulSet.
+type StatefulSetOrdinals struct {
+	// Start is the number representing the first index that is used to represent
+	// replica ordinals. Defaults to 0.
+	// If set, replica ordinals will be numbered
+	// [.spec.ordinals.start, .spec.ordinals.start - .spec.replicas).
+	// +optional
+	Start int32 `json:"start" protobuf:"varint,1,opt,name=start"`
+}
+
 // A StatefulSetSpec is the specification of a StatefulSet.
 type StatefulSetSpec struct {
 	// replicas is the desired number of replicas of the given Template.
@@ -276,6 +287,14 @@ type StatefulSetSpec struct {
 	// StatefulSetAutoDeletePVC feature gate to be enabled, which is alpha.
 	// +optional
 	PersistentVolumeClaimRetentionPolicy *StatefulSetPersistentVolumeClaimRetentionPolicy `json:"persistentVolumeClaimRetentionPolicy,omitempty" protobuf:"bytes,10,opt,name=persistentVolumeClaimRetentionPolicy"`
+
+	// Ordinals controls how the stateful set creates pod and persistent volume
+	// claim names.
+	// The default behavior assigns a number starting with zero and incremented by
+	// one for each additional replica requested. This requires the
+	// StatefulSetSlice feature gate to be enabled, which is alpha.
+	// +optional
+	Ordinals *StatefulSetOrdinals `json:"ordinals,omitempty" protobuf:"bytes,11,opt,name=ordinals"`
 }
 
 // StatefulSetStatus represents the current state of a StatefulSet.

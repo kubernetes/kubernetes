@@ -622,6 +622,17 @@ message StatefulSetList {
   repeated StatefulSet items = 2;
 }
 
+// StatefulSetOrdinals describes the policy used for replica ordinal assignment
+// in this StatefulSet.
+message StatefulSetOrdinals {
+  // Start is the number representing the first index that is used to represent
+  // replica ordinals. Defaults to 0.
+  // If set, replica ordinals will be numbered
+  // [.spec.ordinals.start, .spec.ordinals.start - .spec.replicas).
+  // +optional
+  optional int32 replicaStartOrdinal = 1;
+}
+
 // StatefulSetPersistentVolumeClaimRetentionPolicy describes the policy used for PVCs
 // created from the StatefulSet VolumeClaimTemplates.
 message StatefulSetPersistentVolumeClaimRetentionPolicy {
@@ -713,6 +724,14 @@ message StatefulSetSpec {
   // down. This requires the StatefulSetAutoDeletePVC feature gate to be enabled,
   // which is alpha.  +optional
   optional StatefulSetPersistentVolumeClaimRetentionPolicy persistentVolumeClaimRetentionPolicy = 10;
+
+  // Ordinals controls how the stateful set creates pod and persistent volume
+  // claim names.
+  // The default behavior assigns a number starting with zero and incremented by
+  // one for each additional replica requested. This requires the
+  // StatefulSetSlice feature gate to be enabled, which is alpha.
+  // +optional
+  optional StatefulSetOrdinals ordinals = 11;
 }
 
 // StatefulSetStatus represents the current state of a StatefulSet.

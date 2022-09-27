@@ -1044,6 +1044,18 @@
           }
         ]
       },
+      "io.k8s.api.apps.v1.StatefulSetOrdinals": {
+        "description": "StatefulSetOrdinals describes the policy used for replica ordinal assignment in this StatefulSet.",
+        "properties": {
+          "start": {
+            "default": 0,
+            "description": "Start is the number representing the first index that is used to represent replica ordinals. Defaults to 0. If set, replica ordinals will be numbered [.spec.ordinals.start, .spec.ordinals.start - .spec.replicas).",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "io.k8s.api.apps.v1.StatefulSetPersistentVolumeClaimRetentionPolicy": {
         "description": "StatefulSetPersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from the StatefulSet VolumeClaimTemplates.",
         "properties": {
@@ -1065,6 +1077,14 @@
             "description": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
             "format": "int32",
             "type": "integer"
+          },
+          "ordinals": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.apps.v1.StatefulSetOrdinals"
+              }
+            ],
+            "description": "Ordinals controls how the stateful set creates pod and persistent volume claim names. The default behavior assigns a number starting with zero and incremented by one for each additional replica requested. This requires the StatefulSetSlice feature gate to be enabled, which is alpha."
           },
           "persistentVolumeClaimRetentionPolicy": {
             "allOf": [
