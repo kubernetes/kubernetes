@@ -966,6 +966,13 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 			if err != nil {
 				return nil, err
 			}
+
+			// the following annotation key indicates that the request is from the cache server
+			// in that case we've decided not to require finalization, the object will be deleted immediately
+			if _, hasShardAnnotation := existingAccessor.GetAnnotations()[genericapirequest.AnnotationKey]; hasShardAnnotation {
+				return existing, nil
+			}
+
 			needsUpdate, newFinalizers := deletionFinalizersForGarbageCollection(ctx, e, existingAccessor, options)
 			if needsUpdate {
 				existingAccessor.SetFinalizers(newFinalizers)
