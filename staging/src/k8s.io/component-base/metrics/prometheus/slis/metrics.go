@@ -18,8 +18,6 @@ package slis
 
 import (
 	"context"
-	"errors"
-
 	k8smetrics "k8s.io/component-base/metrics"
 )
 
@@ -28,16 +26,9 @@ type HealthcheckStatus string
 const (
 	Success HealthcheckStatus = "success"
 	Error   HealthcheckStatus = "error"
-	Pending HealthcheckStatus = "pending"
 )
 
 type HealthcheckType string
-
-const (
-	Livez   HealthcheckType = "livez"
-	Readyz  HealthcheckType = "readyz"
-	Healthz HealthcheckType = "healthz"
-)
 
 var (
 	// healthcheck is a Prometheus Gauge metrics used for recording the results of a k8s healthcheck.
@@ -48,7 +39,7 @@ var (
 			Help:           "This metric records the result of a single healthcheck.",
 			StabilityLevel: k8smetrics.ALPHA,
 		},
-		[]string{"name", "type", "status"},
+		[]string{"name", "type"},
 	)
 
 	// healthchecksTotal is a Prometheus Counter metrics used for counting the results of a k8s healthcheck.
@@ -61,8 +52,6 @@ var (
 		},
 		[]string{"name", "type", "status"},
 	)
-	statuses  = []HealthcheckStatus{Success, Error, Pending}
-	statusSet = map[HealthcheckStatus]struct{}{Success: {}, Error: {}, Pending: {}}
 )
 
 func Register(registry k8smetrics.KubeRegistry) {
@@ -76,15 +65,12 @@ func ResetHealthMetrics() {
 }
 
 func ObserveHealthcheck(ctx context.Context, name string, healthcheckType string, status HealthcheckStatus) error {
-	if _, ok := statusSet[status]; !ok {
-		return errors.New("not a valid healthcheck status")
+	if status == Success {
+		healthcheck.WithContext(ctx).WithLabelValues(name, healthcheckType).Set(1)
+	} else {
+		healthcheck.WithContext(ctx).WithLabelValues(name, healthcheckType).Set(0)
 	}
-	for _, s := range statuses {
-		if status != s {
-			healthcheck.WithContext(ctx).WithLabelValues(name, healthcheckType, string(s)).Set(0)
-		}
-	}
+
 	healthchecksTotal.WithContext(ctx).WithLabelValues(name, healthcheckType, string(status)).Inc()
-	healthcheck.WithContext(ctx).WithLabelValues(name, healthcheckType, string(status)).Set(1)
 	return nil
 }
