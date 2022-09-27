@@ -394,6 +394,9 @@ type preparedGenericAPIServer struct {
 func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	s.delegationTarget.PrepareRun()
 
+	if s.openAPIConfig == nil {
+		panic("OpenAPI must be initialized")
+	}
 	if s.openAPIConfig != nil && !s.skipOpenAPIInstallation {
 		s.OpenAPIVersionedService, s.StaticOpenAPISpec = routes.OpenAPI{
 			Config: s.openAPIConfig,
