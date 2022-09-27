@@ -19,6 +19,7 @@ package cache
 import (
 	"errors"
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"sync"
 	"time"
 
@@ -367,14 +368,14 @@ func (f *DeltaFIFO) addIfNotPresent(id string, deltas Deltas) {
 
 // re-listing and watching can deliver the same update multiple times in any
 // order. This will combine the most recent two deltas if they are the same.
-func dedupDeltas(deltas Deltas) Deltas {
+func dedupDeltas(deltas Deltas, emitDeltaTypeReplaced bool) Deltas {
 	n := len(deltas)
 	if n < 2 {
 		return deltas
 	}
 	a := &deltas[n-1]
 	b := &deltas[n-2]
-	if out := isDup(a, b); out != nil {
+	if out := isDup(a, b, emitDeltaTypeReplaced); out != nil {
 		deltas[n-2] = *out
 		return deltas[:n-1]
 	}
@@ -383,9 +384,14 @@ func dedupDeltas(deltas Deltas) Deltas {
 
 // If a & b represent the same event, returns the delta that ought to be kept.
 // Otherwise, returns nil.
-// TODO: is there anything other than deletions that need deduping?
-func isDup(a, b *Delta) *Delta {
+func isDup(a, b *Delta, emitDeltaTypeReplaced bool) *Delta {
 	if out := isDeletionDup(a, b); out != nil {
+		return out
+	}
+	if out := isSyncDup(a, b, emitDeltaTypeReplaced); out != nil {
+		return out
+	}
+	if out := isReplacedDup(a, b); out != nil {
 		return out
 	}
 	// TODO: Detect other duplicate situations? Are there any?
@@ -404,6 +410,81 @@ func isDeletionDup(a, b *Delta) *Delta {
 	return b
 }
 
+// isSyncDup 1) keeps the newer Delta with newer Delta.Object & more explicit Delta.Type,
+// if gate emitDeltaTypeReplaced is opened. 2) keeps the newest one Delta while both Delta are
+// exactly identical (with same Sync Type & same Delta.Object) if gate emitDeltaTypeReplaced
+// is closed. 3) keeps both in other cases.
+func isSyncDup(a, b *Delta, emitDeltaTypeReplaced bool) *Delta {
+	if b.Type != Sync {
+		return nil
+	}
+
+	if emitDeltaTypeReplaced {
+		// while the gate emitDeltaTypeReplaced is opened, it's clearly that Sync Delta definitely
+		// comes from Resync(), since Replace() can only emit Replaced Delta. Then the following
+		// cases will dedup Deltas:
+		// case1 : <Sync, ObjA>, <Deleted, ObjA'>  ->  <Deleted, ObjA'>
+		// case2 : <Sync, ObjA>, <Updated, ObjA'>  ->  <Updated, ObjA'>
+		// case3 : <Sync, ObjA>, <Added, ObjA'>    ->  <Added, ObjA'>
+		// case4 : <Sync, ObjA>, <Replaced, ObjA'> ->  <Replaced, ObjA'>
+		// case5 : <Sync, ObjA>, <Replaced, ObjA>  ->  <Replaced, ObjA>
+		// (NOTE: ObjA' is newer than ObjA, which means ResourceVersion of ObjA' is larger than ObjA)
+		//
+		// The Reason why it could conduct deduplication in above cases is: 1) the purpose of Resync is helping
+		// listener to reconcile the whole object in knownObjects periodically, thus the most important thing is
+		// guaranteeing the whole objects appear in DeltaFIFO periodically, no matter how many Deltas for one object
+		// in DeltaFIFO.items. 2) it should guarantee that `Delta.Object`s with new ResourceVersion should not be
+		// deduplicated, in other words, all the new `Delta.Object`s that not observed by the listeners should be
+		// processed. In the above cases, the object of Sync Delta <Sync, ObjA> must be already processed before,
+		// since the ObjA comes from knownObjects(Indexer).
+		if a.Type == Sync {
+			// should never happen while the gate emitDeltaTypeReplaced is opened. Once there are already
+			// Deltas in DeltaFIFO.items with ObjA, the Sync Delta about ObjA will never enqueue, thus
+			// the case <Sync, ObjA>, <Sync, ObjA> should never happen
+			klog.Errorf("Two Sync Deltas from Resync process are unexpected adjacency. Sync Delta=%#+v, Added Delta=%#+v", b, a)
+			return nil
+		}
+		return a
+	}
+
+	// here we only care about <sync,A>,<Sync A>
+	if isSameDelta(a, b) {
+		return a
+	}
+
+	return nil
+}
+
+// isReplacedDup keeps the newest one Replaced Delta if 1) both are Replaced Delta
+// 2) and both `Delta.Object`s are exactly identical (with same RV)
+func isReplacedDup(a, b *Delta) *Delta {
+	if b.Type != Replaced || a.Type != Replaced {
+		return nil
+	}
+
+	if isSameDelta(a, b) {
+		return a
+	}
+
+	return nil
+}
+
+// isSameDelta returns true if Delta a & b are exactly same. returns false if 1) Delta a & b are not same
+// 2) or encountering unexpected errors in compare process, which leads it is not known whether a & b are same.
+func isSameDelta(a, b *Delta) bool {
+	if a.Type != b.Type {
+		return false
+	}
+
+	if accessorOfA, err := meta.Accessor(a.Object); err == nil {
+		if accessorOfB, err := meta.Accessor(b.Object); err == nil {
+			return accessorOfA.GetResourceVersion() == accessorOfB.GetResourceVersion()
+		}
+	}
+
+	return false
+}
+
 // queueActionLocked appends to the delta list for the object.
 // Caller must lock first.
 func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) error {
@@ -413,7 +494,7 @@ func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) err
 	}
 	oldDeltas := f.items[id]
 	newDeltas := append(oldDeltas, Delta{actionType, obj})
-	newDeltas = dedupDeltas(newDeltas)
+	newDeltas = dedupDeltas(newDeltas, f.emitDeltaTypeReplaced)
 
 	if len(newDeltas) > 0 {
 		if _, exists := f.items[id]; !exists {

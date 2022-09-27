@@ -19,10 +19,14 @@ package cache
 import (
 	"errors"
 	"fmt"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // helper function to reduce stuttering
@@ -713,4 +717,197 @@ func BenchmarkDeltaFIFOListKeys(b *testing.B) {
 		}
 	})
 	b.StopTimer()
+}
+
+func makeDelta(deltaType DeltaType, obj interface{}) Delta {
+	return Delta{
+		Type:   deltaType,
+		Object: obj,
+	}
+}
+
+func TestDeltaFIFO_dedupDeltas(t *testing.T) {
+	cases := []struct {
+		name                  string
+		deltas                Deltas
+		emitDeltaTypeReplaced bool
+		expectDeltas          Deltas
+	}{
+		{
+			name: "deduplicate nothing with Updated Delta",
+			deltas: []Delta{
+				makeDelta(Added, 1),
+				makeDelta(Updated, 2),
+			},
+			expectDeltas: []Delta{
+				makeDelta(Added, 1),
+				makeDelta(Updated, 2),
+			},
+		},
+		{
+			name: "deduplicate nothing with Deleted Delta",
+			deltas: []Delta{
+				makeDelta(Added, 1),
+				makeDelta(Deleted, 1),
+			},
+			expectDeltas: []Delta{
+				makeDelta(Added, 1),
+				makeDelta(Deleted, 1),
+			},
+		},
+		{
+			name: "deduplicate deletions with DeletedFinalStateUnknown comes later",
+			deltas: []Delta{
+				makeDelta(Deleted, 1),
+				makeDelta(Deleted, DeletedFinalStateUnknown{Key: "key", Obj: 1}),
+			},
+			expectDeltas: []Delta{
+				makeDelta(Deleted, 1),
+			},
+		},
+		{
+			name: "deduplicate deletions with DeletedFinalStateUnknown comes before",
+			deltas: []Delta{
+				makeDelta(Deleted, DeletedFinalStateUnknown{Key: "key", Obj: 1}),
+				makeDelta(Deleted, 1),
+			},
+			expectDeltas: []Delta{
+				makeDelta(Deleted, 1),
+			},
+		},
+		{
+			name:                  "deduplicate sync with Updated delta, while opening emitDeltaTypeReplaced",
+			emitDeltaTypeReplaced: true,
+			deltas: []Delta{
+				makeDelta(Sync, 1),
+				makeDelta(Updated, 2),
+			},
+			expectDeltas: []Delta{
+				makeDelta(Updated, 2),
+			},
+		},
+		{
+			name:                  "deduplicate sync with Deleted delta, while opening emitDeltaTypeReplaced",
+			emitDeltaTypeReplaced: true,
+			deltas: []Delta{
+				makeDelta(Sync, 1),
+				makeDelta(Deleted, 2),
+			},
+			expectDeltas: []Delta{
+				makeDelta(Deleted, 2),
+			},
+		},
+		{
+			name:                  "deduplicate sync with Replaced delta, while opening emitDeltaTypeReplaced",
+			emitDeltaTypeReplaced: true,
+			deltas: []Delta{
+				makeDelta(Sync, 1),
+				makeDelta(Replaced, 2),
+			},
+			expectDeltas: []Delta{
+				makeDelta(Replaced, 2),
+			},
+		},
+		{
+			name:                  "deduplicate sync with Added delta, while opening emitDeltaTypeReplaced",
+			emitDeltaTypeReplaced: true,
+			deltas: []Delta{
+				makeDelta(Sync, 1),
+				makeDelta(Added, 2),
+			},
+			expectDeltas: []Delta{
+				makeDelta(Added, 2),
+			},
+		},
+		{
+			name:                  "deduplicate nothing with Updated delta, while closing emitDeltaTypeReplaced",
+			emitDeltaTypeReplaced: false,
+			deltas: []Delta{
+				makeDelta(Sync, 1),
+				makeDelta(Updated, 2),
+			},
+			expectDeltas: []Delta{
+				makeDelta(Sync, 1),
+				makeDelta(Updated, 2),
+			},
+		},
+		{
+			name:                  "deduplicate nothing with Deleted delta, while closing emitDeltaTypeReplaced",
+			emitDeltaTypeReplaced: false,
+			deltas: []Delta{
+				makeDelta(Sync, 1),
+				makeDelta(Deleted, 2),
+			},
+			expectDeltas: []Delta{
+				makeDelta(Sync, 1),
+				makeDelta(Deleted, 2),
+			},
+		},
+		{
+			name:                  "deduplicate nothing with Replaced delta, while closing emitDeltaTypeReplaced",
+			emitDeltaTypeReplaced: false,
+			deltas: []Delta{
+				makeDelta(Sync, 1),
+				makeDelta(Replaced, 2),
+			},
+			expectDeltas: []Delta{
+				makeDelta(Sync, 1),
+				makeDelta(Replaced, 2),
+			},
+		},
+		{
+			name:                  "deduplicate nothing with Added delta, while closing emitDeltaTypeReplaced",
+			emitDeltaTypeReplaced: false,
+			deltas: []Delta{
+				makeDelta(Sync, 1),
+				makeDelta(Added, 2),
+			},
+			expectDeltas: []Delta{
+				makeDelta(Sync, 1),
+				makeDelta(Added, 2),
+			},
+		},
+		{
+			name:                  "deduplicate exactly same Sync delta, while closing emitDeltaTypeReplaced",
+			emitDeltaTypeReplaced: false,
+			deltas: []Delta{
+				makeDelta(Sync, &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}),
+				makeDelta(Sync, &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}),
+			},
+			expectDeltas: []Delta{
+				makeDelta(Sync, &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}),
+			},
+		},
+		{
+			name:                  "deduplicate nothing with different Sync delta object, while closing emitDeltaTypeReplaced",
+			emitDeltaTypeReplaced: false,
+			deltas: []Delta{
+				makeDelta(Sync, &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}),
+				makeDelta(Sync, &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}}),
+			},
+			expectDeltas: []Delta{
+				makeDelta(Sync, &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}),
+				makeDelta(Sync, &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}}),
+			},
+		},
+		{
+			name:                  "deduplicate nothing with different Replaced delta object",
+			emitDeltaTypeReplaced: true,
+			deltas: []Delta{
+				makeDelta(Replaced, &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}),
+				makeDelta(Replaced, &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}}),
+			},
+			expectDeltas: []Delta{
+				makeDelta(Replaced, &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}),
+				makeDelta(Replaced, &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}}),
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			d := dedupDeltas(c.deltas, c.emitDeltaTypeReplaced)
+			assert.Equal(t, c.expectDeltas, d)
+		})
+	}
 }
