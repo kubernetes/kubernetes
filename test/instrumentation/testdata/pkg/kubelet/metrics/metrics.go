@@ -65,6 +65,8 @@ const (
 
 var (
 	defObjectives = map[float64]float64{0.5: 0.5, 0.75: 0.75}
+	testBuckets   = []float64{0, 0.5, 1.0}
+	testLabels    = []string{"a", "b", "c"}
 	// NodeName is a Gauge that tracks the ode's name. The count is always 1.
 	NodeName = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
@@ -81,7 +83,7 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           "containers_per_pod_count",
 			Help:           "The number of containers per pod.",
-			Buckets:        metrics.ExponentialBuckets(1, 2, 5),
+			Buckets:        testBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -95,7 +97,7 @@ var (
 			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"operation_type"},
+		testLabels,
 	)
 	// PodStartDuration is a Histogram that tracks the duration (in seconds) it takes for a single pod to go from pending to running.
 	PodStartDuration = metrics.NewHistogram(
@@ -190,7 +192,7 @@ var (
 			Name:           RuntimeOperationsDurationKey,
 			Help:           "Duration in seconds of runtime operations. Broken down by operation type.",
 			Buckets:        metrics.ExponentialBuckets(.005, 2.5, 14),
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"operation_type"},
 	)
@@ -240,6 +242,18 @@ var (
 		},
 		[]string{"preemption_signal"},
 	)
+	// MultiLineHelp tests that we can parse multi-line strings
+	MultiLineHelp = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem: KubeletSubsystem,
+			Name:      "multiline",
+			Help: "Cumulative number of pod preemptions by preemption resource " +
+				"asdf asdf asdf " +
+				"asdfas dfasdf",
+			StabilityLevel: metrics.STABLE,
+		},
+		[]string{"preemption_signal"},
+	)
 	// DevicePluginRegistrationCount is a Counter that tracks the cumulative number of device plugin registrations.
 	// Broken down by resource name.
 	DevicePluginRegistrationCount = metrics.NewCounterVec(
@@ -259,7 +273,7 @@ var (
 			Name:           DevicePluginAllocationDurationKey,
 			Help:           "Duration in seconds to serve a device plugin Allocation request. Broken down by resource name.",
 			Buckets:        metrics.DefBuckets,
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"resource_name"},
 	)
@@ -444,4 +458,8 @@ func SinceInSeconds(start time.Time) float64 {
 // SetNodeName sets the NodeName Gauge to 1.
 func SetNodeName(name types.NodeName) {
 	NodeName.WithLabelValues(string(name)).Set(1)
+}
+
+func Blah() metrics.ObserverMetric {
+	return EvictionStatsAge.With(metrics.Labels{"plugins": "ASDf"})
 }
