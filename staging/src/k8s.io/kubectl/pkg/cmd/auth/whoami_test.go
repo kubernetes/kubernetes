@@ -18,12 +18,15 @@ package auth
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"strings"
 	"testing"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authenticationv1alpha1 "k8s.io/api/authentication/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/printers"
 	authfake "k8s.io/client-go/kubernetes/fake"
@@ -37,9 +40,9 @@ func TestWhoAmIRun(t *testing.T) {
 		name      string
 		o         *WhoAmIOptions
 		args      []string
-		allowed   bool
 		serverErr error
 
+		expectedError       error
 		expectedBodyStrings []string
 	}{
 		{
@@ -95,6 +98,38 @@ func TestWhoAmIRun(t *testing.T) {
 `,
 			},
 		},
+		{
+			name: "Forbidden error",
+			o: &WhoAmIOptions{
+				resourcePrinterFunc: printTableSelfSubjectAccessReview,
+			},
+			args: []string{},
+			serverErr: errors.NewForbidden(
+				corev1.Resource("selfsubjectreviews"), "foo", fmt.Errorf("error"),
+			),
+			expectedError:       notEnabledErr,
+			expectedBodyStrings: []string{},
+		},
+		{
+			name: "NotFound error",
+			o: &WhoAmIOptions{
+				resourcePrinterFunc: printTableSelfSubjectAccessReview,
+			},
+			args:                []string{},
+			serverErr:           errors.NewNotFound(corev1.Resource("selfsubjectreviews"), "foo"),
+			expectedError:       notEnabledErr,
+			expectedBodyStrings: []string{},
+		},
+		{
+			name: "Server error",
+			o: &WhoAmIOptions{
+				resourcePrinterFunc: printTableSelfSubjectAccessReview,
+			},
+			args:                []string{},
+			serverErr:           fmt.Errorf("a random server-side error"),
+			expectedError:       fmt.Errorf("a random server-side error"),
+			expectedBodyStrings: []string{},
+		},
 	}
 
 	for _, test := range tests {
@@ -111,6 +146,10 @@ func TestWhoAmIRun(t *testing.T) {
 
 			fakeAuthClientSet.AddReactor("create", "selfsubjectreviews",
 				func(action core.Action) (handled bool, ret runtime.Object, err error) {
+					if test.serverErr != nil {
+						return true, nil, test.serverErr
+					}
+
 					res := &authenticationv1alpha1.SelfSubjectReview{
 						Status: authenticationv1alpha1.SelfSubjectReviewStatus{
 							UserInfo: authenticationv1.UserInfo{
@@ -130,12 +169,12 @@ func TestWhoAmIRun(t *testing.T) {
 
 			err := test.o.Run()
 			switch {
-			case test.serverErr == nil && err == nil:
+			case test.expectedError == nil && err == nil:
 				// pass
-			case err != nil && test.serverErr != nil && strings.Contains(err.Error(), test.serverErr.Error()):
+			case err != nil && test.expectedError != nil && strings.Contains(err.Error(), test.expectedError.Error()):
 				// pass
 			default:
-				t.Errorf("%s: expected %v, got %v", test.name, test.serverErr, err)
+				t.Errorf("%s: expected %v, got %v", test.name, test.expectedError, err)
 				return
 			}
 

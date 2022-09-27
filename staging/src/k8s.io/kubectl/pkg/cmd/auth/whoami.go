@@ -139,16 +139,21 @@ func NewCmdWhoAmI(restClientGetter genericclioptions.RESTClientGetter, streams g
 	return cmd
 }
 
+var notEnabledErr = fmt.Errorf(
+	"the selfsubjectreviews API is not enabled in the cluster or you do not have permission to call: " +
+		"enable APISelfSubjectReview feature gate and authentication.k8s.io/v1alpha1 API")
+
 // Run prints all user attributes.
 func (o WhoAmIOptions) Run() error {
 	sar := &authenticationv1alpha1.SelfSubjectReview{}
 	response, err := o.authClient.SelfSubjectReviews().Create(context.TODO(), sar, metav1.CreateOptions{})
 	if err != nil {
-		if errors.IsNotFound(err) {
-			return fmt.Errorf("the selfsubjectreviews API is not enabled in the cluster.\n" +
-				"enable APISelfSubjectReview feature gate and authentication.k8s.io/v1alpha1 API.")
+		switch {
+		case errors.IsForbidden(err), errors.IsNotFound(err):
+			return notEnabledErr
+		default:
+			return err
 		}
-		return err
 	}
 
 	return o.resourcePrinterFunc(response, o.Out)
