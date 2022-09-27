@@ -87,6 +87,14 @@ func (t *MutableTransformer) Set(transformer Transformer) {
 	t.lock.Unlock()
 }
 
+// Get returns the nested transformer.  Exported for tests.
+func (t *MutableTransformer) Get() Transformer {
+	t.lock.Lock()
+	transformer := t.transformer
+	t.lock.Unlock()
+	return transformer
+}
+
 func (t *MutableTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx Context) (out []byte, stale bool, err error) {
 	t.lock.RLock()
 	transformer := t.transformer
@@ -106,12 +114,13 @@ type PrefixTransformer struct {
 	Transformer Transformer
 }
 
-type prefixTransformers struct {
-	transformers []PrefixTransformer
+// PrefixTransformers is exported for tests.
+type PrefixTransformers struct {
+	Transformers []PrefixTransformer
 	err          error
 }
 
-var _ Transformer = &prefixTransformers{}
+var _ Transformer = &PrefixTransformers{}
 
 // NewPrefixTransformers supports the Transformer interface by checking the incoming data against the provided
 // prefixes in order. The first matching prefix will be used to transform the value (the prefix is stripped
@@ -121,8 +130,8 @@ func NewPrefixTransformers(err error, transformers ...PrefixTransformer) Transfo
 	if err == nil {
 		err = fmt.Errorf("the provided value does not match any of the supported transformers")
 	}
-	return &prefixTransformers{
-		transformers: transformers,
+	return &PrefixTransformers{
+		Transformers: transformers,
 		err:          err,
 	}
 }
@@ -130,10 +139,10 @@ func NewPrefixTransformers(err error, transformers ...PrefixTransformer) Transfo
 // TransformFromStorage finds the first transformer with a prefix matching the provided data and returns
 // the result of transforming the value. It will always mark any transformation as stale that is not using
 // the first transformer.
-func (t *prefixTransformers) TransformFromStorage(ctx context.Context, data []byte, dataCtx Context) ([]byte, bool, error) {
+func (t *PrefixTransformers) TransformFromStorage(ctx context.Context, data []byte, dataCtx Context) ([]byte, bool, error) {
 	start := time.Now()
 	var errs []error
-	for i, transformer := range t.transformers {
+	for i, transformer := range t.Transformers {
 		if bytes.HasPrefix(data, transformer.Prefix) {
 			result, stale, err := transformer.Transformer.TransformFromStorage(ctx, data[len(transformer.Prefix):], dataCtx)
 			// To migrate away from encryption, user can specify an identity transformer higher up
@@ -195,9 +204,9 @@ func (t *prefixTransformers) TransformFromStorage(ctx context.Context, data []by
 }
 
 // TransformToStorage uses the first transformer and adds its prefix to the data.
-func (t *prefixTransformers) TransformToStorage(ctx context.Context, data []byte, dataCtx Context) ([]byte, error) {
+func (t *PrefixTransformers) TransformToStorage(ctx context.Context, data []byte, dataCtx Context) ([]byte, error) {
 	start := time.Now()
-	transformer := t.transformers[0]
+	transformer := t.Transformers[0]
 	prefixedData := make([]byte, len(transformer.Prefix), len(data)+len(transformer.Prefix))
 	copy(prefixedData, transformer.Prefix)
 	result, err := transformer.Transformer.TransformToStorage(ctx, data, dataCtx)

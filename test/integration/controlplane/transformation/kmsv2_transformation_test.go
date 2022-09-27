@@ -30,16 +30,20 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
+	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2"
 	kmstypes "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2/v2alpha1"
 	kmsv2mock "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing/v2alpha1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kmsv2api "k8s.io/kms/apis/v2alpha1"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app"
+	"k8s.io/kubernetes/pkg/controlplane"
 )
 
 type envelopekmsv2 struct {
@@ -272,4 +276,84 @@ resources:
 	pluginMock2.EnterFailedState()
 	mustBeHealthy(t, "kms-provider-0", test.kubeAPIServer.ClientConfig)
 	mustBeUnHealthy(t, "kms-provider-1", test.kubeAPIServer.ClientConfig)
+}
+
+func TestKMSv2SingleService(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
+
+	encryptionConfig := `
+kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - pods
+    - configmaps
+    providers:
+    - kms:
+       apiVersion: v2
+       name: kms-provider
+       cachesize: 1000
+       endpoint: unix:///@kms-provider.sock
+`
+
+	pluginMock, err := kmsv2mock.NewBase64Plugin("@kms-provider.sock")
+	if err != nil {
+		t.Fatalf("failed to create mock of KMSv2 Plugin: %v", err)
+	}
+
+	go pluginMock.Start()
+	if err := kmsv2mock.WaitForBase64PluginToBeUp(pluginMock); err != nil {
+		t.Fatalf("Failed start plugin, err: %v", err)
+	}
+	t.Cleanup(pluginMock.CleanUp)
+
+	test, err := newTransformTest(t, encryptionConfig)
+	if err != nil {
+		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
+	}
+	t.Cleanup(test.cleanUp)
+
+	kasConfig := app.LastKubeAPIServerConfigSeenInTest
+
+	healthzChecks := kasConfig.GenericConfig.HealthzChecks
+
+	var serviceForHealthz kmsv2.Service
+	for _, check := range healthzChecks {
+		serviceGetter, ok := check.(kmsv2.ServiceGetter)
+		if !ok {
+			continue
+		}
+		if serviceForHealthz != nil {
+			t.Fatalf("expected only a single kms healthz: %v", healthzChecks)
+		}
+		serviceForHealthz = serviceGetter.Service()
+	}
+	if serviceForHealthz == nil {
+		t.Fatalf("could not find kms healthz: %v", healthzChecks)
+	}
+
+	podServiceForREST := serviceForREST(t, kasConfig, schema.GroupResource{Resource: "pods"})
+	cmServiceForREST := serviceForREST(t, kasConfig, schema.GroupResource{Resource: "configmaps"})
+	if podServiceForREST != serviceForHealthz {
+		t.Fatalf("pod rest service %v is not equal to healthz service %v", podServiceForREST, serviceForHealthz)
+	}
+	if cmServiceForREST != serviceForHealthz {
+		t.Fatalf("config map rest service %v is not equal to healthz service %v", cmServiceForREST, serviceForHealthz)
+	}
+}
+
+func serviceForREST(t *testing.T, kasConfig *controlplane.Config, resource schema.GroupResource) kmsv2.Service {
+	t.Helper()
+
+	opts, err := kasConfig.GenericConfig.RESTOptionsGetter.GetRESTOptions(resource)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	transformers := opts.StorageConfig.Transformer.(*value.MutableTransformer).Get().(*value.PrefixTransformers).Transformers
+	if len(transformers) != 1 {
+		t.Fatalf("expected only a single transformer: %v", transformers)
+	}
+
+	return transformers[0].Transformer.(kmsv2.ServiceGetter).Service()
 }

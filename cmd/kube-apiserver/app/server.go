@@ -176,6 +176,11 @@ func Run(completeOptions completedServerRunOptions, stopCh <-chan struct{}) erro
 	return prepared.Run(stopCh)
 }
 
+// LastKubeAPIServerConfigSeenInTest allows tests to make assertions about the Kubernetes API server config.
+// Tests using this variable must run serially as this variable is not safe to read concurrently with server start.
+// Tests must never mutate this variable.
+var LastKubeAPIServerConfigSeenInTest *controlplane.Config
+
 // CreateServerChain creates the apiservers connected via delegation.
 func CreateServerChain(completedOptions completedServerRunOptions) (*aggregatorapiserver.APIAggregator, error) {
 	kubeAPIServerConfig, serviceResolver, pluginInitializer, err := CreateKubeAPIServerConfig(completedOptions)
@@ -211,6 +216,9 @@ func CreateServerChain(completedOptions completedServerRunOptions) (*aggregatora
 		// we don't need special handling for innerStopCh because the aggregator server doesn't create any go routines
 		return nil, err
 	}
+
+	// export the config so that it can be observed in tests
+	LastKubeAPIServerConfigSeenInTest = kubeAPIServerConfig
 
 	return aggregatorServer, nil
 }
