@@ -192,6 +192,7 @@ func NewCmdLabel(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 			cmdutil.CheckErr(o.RunLabel())
 		},
 	}
+	flags.AddFlags(cmd)
 
 	return cmd
 }
