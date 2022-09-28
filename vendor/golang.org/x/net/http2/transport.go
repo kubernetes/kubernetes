@@ -67,13 +67,23 @@ const (
 // A Transport internally caches connections to servers. It is safe
 // for concurrent use by multiple goroutines.
 type Transport struct {
-	// DialTLS specifies an optional dial function for creating
-	// TLS connections for requests.
+	// DialTLSContext specifies an optional dial function with context for
+	// creating TLS connections for requests.
 	//
-	// If DialTLS is nil, tls.Dial is used.
+	// If DialTLSContext and DialTLS is nil, tls.Dial is used.
 	//
 	// If the returned net.Conn has a ConnectionState method like tls.Conn,
 	// it will be used to set http.Response.TLS.
+	DialTLSContext func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error)
+
+	// DialTLS specifies an optional dial function for creating
+	// TLS connections for requests.
+	//
+	// If DialTLSContext and DialTLS is nil, tls.Dial is used.
+	//
+	// Deprecated: Use DialTLSContext instead, which allows the transport
+	// to cancel dials as soon as they are no longer needed.
+	// If both are set, DialTLSContext takes priority.
 	DialTLS func(network, addr string, cfg *tls.Config) (net.Conn, error)
 
 	// TLSClientConfig specifies the TLS configuration to use with
@@ -592,7 +602,7 @@ func (t *Transport) dialClientConn(ctx context.Context, addr string, singleUse b
 	if err != nil {
 		return nil, err
 	}
-	tconn, err := t.dialTLS(ctx)("tcp", addr, t.newTLSConfig(host))
+	tconn, err := t.dialTLS(ctx, "tcp", addr, t.newTLSConfig(host))
 	if err != nil {
 		return nil, err
 	}
@@ -613,24 +623,25 @@ func (t *Transport) newTLSConfig(host string) *tls.Config {
 	return cfg
 }
 
-func (t *Transport) dialTLS(ctx context.Context) func(string, string, *tls.Config) (net.Conn, error) {
-	if t.DialTLS != nil {
-		return t.DialTLS
+func (t *Transport) dialTLS(ctx context.Context, network, addr string, tlsCfg *tls.Config) (net.Conn, error) {
+	if t.DialTLSContext != nil {
+		return t.DialTLSContext(ctx, network, addr, tlsCfg)
+	} else if t.DialTLS != nil {
+		return t.DialTLS(network, addr, tlsCfg)
 	}
-	return func(network, addr string, cfg *tls.Config) (net.Conn, error) {
-		tlsCn, err := t.dialTLSWithContext(ctx, network, addr, cfg)
-		if err != nil {
-			return nil, err
-		}
-		state := tlsCn.ConnectionState()
-		if p := state.NegotiatedProtocol; p != NextProtoTLS {
-			return nil, fmt.Errorf("http2: unexpected ALPN protocol %q; want %q", p, NextProtoTLS)
-		}
-		if !state.NegotiatedProtocolIsMutual {
-			return nil, errors.New("http2: could not negotiate protocol mutually")
-		}
-		return tlsCn, nil
+
+	tlsCn, err := t.dialTLSWithContext(ctx, network, addr, tlsCfg)
+	if err != nil {
+		return nil, err
 	}
+	state := tlsCn.ConnectionState()
+	if p := state.NegotiatedProtocol; p != NextProtoTLS {
+		return nil, fmt.Errorf("http2: unexpected ALPN protocol %q; want %q", p, NextProtoTLS)
+	}
+	if !state.NegotiatedProtocolIsMutual {
+		return nil, errors.New("http2: could not negotiate protocol mutually")
+	}
+	return tlsCn, nil
 }
 
 // disableKeepAlives reports whether connections should be closed as

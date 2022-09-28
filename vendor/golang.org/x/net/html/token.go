@@ -110,9 +110,9 @@ func (t Token) String() string {
 	case SelfClosingTagToken:
 		return "<" + t.tagString() + "/>"
 	case CommentToken:
-		return "<!--" + t.Data + "-->"
+		return "<!--" + EscapeString(t.Data) + "-->"
 	case DoctypeToken:
-		return "<!DOCTYPE " + t.Data + ">"
+		return "<!DOCTYPE " + EscapeString(t.Data) + ">"
 	}
 	return "Invalid(" + strconv.Itoa(int(t.Type)) + ")"
 }

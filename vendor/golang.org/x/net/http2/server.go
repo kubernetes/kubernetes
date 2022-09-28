@@ -1747,6 +1747,12 @@ func (sc *serverConn) processData(f *DataFrame) error {
 
 	// Sender sending more than they'd declared?
 	if st.declBodyBytes != -1 && st.bodyBytes+int64(len(data)) > st.declBodyBytes {
+		if sc.inflow.available() < int32(f.Length) {
+			return sc.countError("data_flow", streamError(id, ErrCodeFlowControl))
+		}
+		sc.inflow.take(int32(f.Length))
+		sc.sendWindowUpdate(nil, int(f.Length)) // conn-level
+
 		st.body.CloseWithError(fmt.Errorf("sender tried to send more than declared Content-Length of %d bytes", st.declBodyBytes))
 		// RFC 7540, sec 8.1.2.6: A request or response is also malformed if the
 		// value of a content-length header field does not equal the sum of the
@@ -2223,6 +2229,9 @@ func (sc *serverConn) runHandler(rw *responseWriter, req *http.Request, handler 
 	didPanic := true
 	defer func() {
 		rw.rws.stream.cancelCtx()
+		if req.MultipartForm != nil {
+			req.MultipartForm.RemoveAll()
+		}
 		if didPanic {
 			e := recover()
 			sc.writeFrameFromHandler(FrameWriteRequest{
