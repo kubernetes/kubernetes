@@ -28,18 +28,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -63,11 +61,6 @@ const (
 	KRestart     KubeletOpt = "restart"
 	minValidSize string     = "1Ki"
 	maxValidSize string     = "10Ei"
-)
-
-const (
-	// ClusterRole name for e2e test Priveledged Pod Security Policy User
-	podSecurityPolicyPrivilegedClusterRoleName = "e2e-test-privileged-psp"
 )
 
 // VerifyFSGroupInPod verifies that the passed in filePath contains the expectedFSGroup
@@ -415,54 +408,6 @@ func StartExternalProvisioner(c clientset.Interface, ns string, externalPluginNa
 	framework.ExpectNoError(err, "Cannot locate the provisioner pod %v: %v", provisionerPod.Name, err)
 
 	return pod
-}
-
-// PrivilegedTestPSPClusterRoleBinding test Pod Security Policy Role bindings
-func PrivilegedTestPSPClusterRoleBinding(client clientset.Interface,
-	namespace string,
-	teardown bool,
-	saNames []string) {
-	bindingString := "Binding"
-	if teardown {
-		bindingString = "Unbinding"
-	}
-	roleBindingClient := client.RbacV1().RoleBindings(namespace)
-	for _, saName := range saNames {
-		ginkgo.By(fmt.Sprintf("%v priviledged Pod Security Policy to the service account %s", bindingString, saName))
-		binding := &rbacv1.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "psp-" + saName,
-				Namespace: namespace,
-			},
-			Subjects: []rbacv1.Subject{
-				{
-					Kind:      rbacv1.ServiceAccountKind,
-					Name:      saName,
-					Namespace: namespace,
-				},
-			},
-			RoleRef: rbacv1.RoleRef{
-				Kind:     "ClusterRole",
-				Name:     podSecurityPolicyPrivilegedClusterRoleName,
-				APIGroup: "rbac.authorization.k8s.io",
-			},
-		}
-
-		roleBindingClient.Delete(context.TODO(), binding.GetName(), metav1.DeleteOptions{})
-		err := wait.Poll(2*time.Second, 2*time.Minute, func() (bool, error) {
-			_, err := roleBindingClient.Get(context.TODO(), binding.GetName(), metav1.GetOptions{})
-			return apierrors.IsNotFound(err), nil
-		})
-		framework.ExpectNoError(err, "Timed out waiting for RBAC binding %s deletion: %v", binding.GetName(), err)
-
-		if teardown {
-			continue
-		}
-
-		_, err = roleBindingClient.Create(context.TODO(), binding, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "Failed to create %s role binding: %v", binding.GetName(), err)
-
-	}
 }
 
 func isSudoPresent(nodeIP string, provider string) bool {

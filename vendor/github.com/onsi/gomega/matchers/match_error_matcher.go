@@ -1,11 +1,11 @@
 package matchers
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 
 	"github.com/onsi/gomega/format"
-	"golang.org/x/xerrors"
 )
 
 type MatchErrorMatcher struct {
@@ -25,7 +25,7 @@ func (matcher *MatchErrorMatcher) Match(actual interface{}) (success bool, err e
 	expected := matcher.Expected
 
 	if isError(expected) {
-		return reflect.DeepEqual(actualErr, expected) || xerrors.Is(actualErr, expected.(error)), nil
+		return reflect.DeepEqual(actualErr, expected) || errors.Is(actualErr, expected.(error)), nil
 	}
 
 	if isString(expected) {

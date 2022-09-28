@@ -4,8 +4,11 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	configv1 "github.com/openshift/api/config/v1"
+	applyconfigurationsconfigv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -110,6 +113,49 @@ func (c *FakeNetworks) DeleteCollection(ctx context.Context, opts v1.DeleteOptio
 func (c *FakeNetworks) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *configv1.Network, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(networksResource, name, pt, data, subresources...), &configv1.Network{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*configv1.Network), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied network.
+func (c *FakeNetworks) Apply(ctx context.Context, network *applyconfigurationsconfigv1.NetworkApplyConfiguration, opts v1.ApplyOptions) (result *configv1.Network, err error) {
+	if network == nil {
+		return nil, fmt.Errorf("network provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(network)
+	if err != nil {
+		return nil, err
+	}
+	name := network.Name
+	if name == nil {
+		return nil, fmt.Errorf("network.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(networksResource, *name, types.ApplyPatchType, data), &configv1.Network{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*configv1.Network), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeNetworks) ApplyStatus(ctx context.Context, network *applyconfigurationsconfigv1.NetworkApplyConfiguration, opts v1.ApplyOptions) (result *configv1.Network, err error) {
+	if network == nil {
+		return nil, fmt.Errorf("network provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(network)
+	if err != nil {
+		return nil, err
+	}
+	name := network.Name
+	if name == nil {
+		return nil, fmt.Errorf("network.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(networksResource, *name, types.ApplyPatchType, data, "status"), &configv1.Network{})
 	if obj == nil {
 		return nil, err
 	}

@@ -38,17 +38,17 @@ import (
 )
 
 // NodeAuthorizer authorizes requests from kubelets, with the following logic:
-// 1. If a request is not from a node (NodeIdentity() returns isNode=false), reject
-// 2. If a specific node cannot be identified (NodeIdentity() returns nodeName=""), reject
-// 3. If a request is for a secret, configmap, persistent volume or persistent volume claim, reject unless the verb is get, and the requested object is related to the requesting node:
-//    node <- configmap
-//    node <- pod
-//    node <- pod <- secret
-//    node <- pod <- configmap
-//    node <- pod <- pvc
-//    node <- pod <- pvc <- pv
-//    node <- pod <- pvc <- pv <- secret
-// 4. For other resources, authorize all nodes uniformly using statically defined rules
+//  1. If a request is not from a node (NodeIdentity() returns isNode=false), reject
+//  2. If a specific node cannot be identified (NodeIdentity() returns nodeName=""), reject
+//  3. If a request is for a secret, configmap, persistent volume or persistent volume claim, reject unless the verb is get, and the requested object is related to the requesting node:
+//     node <- configmap
+//     node <- pod
+//     node <- pod <- secret
+//     node <- pod <- configmap
+//     node <- pod <- pvc
+//     node <- pod <- pvc <- pv
+//     node <- pod <- pvc <- pv <- secret
+//  4. For other resources, authorize all nodes uniformly using statically defined rules
 type NodeAuthorizer struct {
 	graph      *Graph
 	identifier nodeidentifier.NodeIdentifier

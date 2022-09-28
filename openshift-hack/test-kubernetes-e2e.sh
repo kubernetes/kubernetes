@@ -55,7 +55,7 @@ KUBE_E2E_TEST_ARGS="${KUBE_E2E_TEST_ARGS:-${DEFAULT_TEST_ARGS}}"
 # CI. Outside of CI, ensure k8s-e2e.test and ginkgo are built and
 # available in PATH.
 if ! which k8s-e2e.test &> /dev/null; then
-  make WHAT=vendor/github.com/onsi/ginkgo/ginkgo
+  make WHAT=vendor/github.com/onsi/ginkgo/v2/ginkgo
   make WHAT=openshift-hack/e2e/k8s-e2e.test
   ROOT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd -P)"
   PATH="${ROOT_PATH}/_output/local/bin/$(go env GOHOSTOS)/$(go env GOARCH):${PATH}"
@@ -77,8 +77,10 @@ SERVER="$( kubectl config view | grep server | head -n 1 | awk '{print $2}' )"
 
 # shellcheck disable=SC2086
 ginkgo \
-  --flakeAttempts=3 \
-  -nodes "${NODES}" -noColor ${KUBE_E2E_TEST_ARGS} \
+  --flake-attempts=3 \
+  --timeout="24h" \
+  --output-interceptor-mode=none \
+  -nodes "${NODES}" -no-color ${KUBE_E2E_TEST_ARGS} \
   "$( which k8s-e2e.test )" -- \
   -report-dir "${test_report_dir}" \
   -host "${SERVER}" \

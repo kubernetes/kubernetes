@@ -30,18 +30,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func TestEndpointUpdates(t *testing.T) {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	config := restclient.Config{Host: server.URL}
-	client, err := clientset.NewForConfig(&config)
+	client, err := clientset.NewForConfig(server.ClientConfig)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
@@ -62,8 +61,8 @@ func TestEndpointUpdates(t *testing.T) {
 	go epController.Run(ctx, 1)
 
 	// Create namespace
-	ns := framework.CreateTestingNamespace("test-endpoints-updates", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateNamespaceOrDie(client, "test-endpoints-updates", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
 	// Create a pod with labels
 	pod := &v1.Pod{
@@ -165,12 +164,11 @@ func TestEndpointUpdates(t *testing.T) {
 // terminating endpoints in Endpoints, but in the mean time this test ensures we do not change
 // this behavior accidentally.
 func TestEndpointWithTerminatingPod(t *testing.T) {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	config := restclient.Config{Host: server.URL}
-	client, err := clientset.NewForConfig(&config)
+	client, err := clientset.NewForConfig(server.ClientConfig)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
@@ -191,8 +189,8 @@ func TestEndpointWithTerminatingPod(t *testing.T) {
 	go epController.Run(ctx, 1)
 
 	// Create namespace
-	ns := framework.CreateTestingNamespace("test-endpoints-terminating", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateNamespaceOrDie(client, "test-endpoints-terminating", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
 	// Create a pod with labels
 	pod := &v1.Pod{

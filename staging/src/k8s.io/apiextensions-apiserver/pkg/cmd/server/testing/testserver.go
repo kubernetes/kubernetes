@@ -30,11 +30,12 @@ import (
 
 	"k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/registry/generic/registry"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+
+	"k8s.io/klog/v2"
 )
 
 // TearDownFunc is to be called to tear down a test server.
@@ -42,8 +43,6 @@ type TearDownFunc func()
 
 // TestServerInstanceOptions Instance options the TestServer
 type TestServerInstanceOptions struct {
-	// DisableStorageCleanup Disable the automatic storage cleanup
-	DisableStorageCleanup bool
 }
 
 // TestServer return values supplied by kube-test-ApiServer
@@ -63,35 +62,34 @@ type Logger interface {
 
 // NewDefaultTestServerOptions Default options for TestServer instances
 func NewDefaultTestServerOptions() *TestServerInstanceOptions {
-	return &TestServerInstanceOptions{
-		DisableStorageCleanup: false,
-	}
+	return &TestServerInstanceOptions{}
 }
 
 // StartTestServer starts a apiextensions-apiserver. A rest client config and a tear-down func,
 // and location of the tmpdir are returned.
 //
 // Note: we return a tear-down func instead of a stop channel because the later will leak temporary
-// 		 files that because Golang testing's call to os.Exit will not give a stop channel go routine
-// 		 enough time to remove temporary files.
-func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
-	if instanceOptions == nil {
-		instanceOptions = NewDefaultTestServerOptions()
-	}
-
-	// TODO : Remove TrackStorageCleanup below when PR
-	// https://github.com/kubernetes/kubernetes/pull/50690
-	// merges as that shuts down storage properly
-	if !instanceOptions.DisableStorageCleanup {
-		registry.TrackStorageCleanup()
-	}
-
+//
+//	files that because Golang testing's call to os.Exit will not give a stop channel go routine
+//	enough time to remove temporary files.
+func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
 	stopCh := make(chan struct{})
+	var errCh chan error
 	tearDown := func() {
-		if !instanceOptions.DisableStorageCleanup {
-			registry.CleanupStorage()
-		}
+		// Closing stopCh is stopping apiextensions apiserver and its
+		// delegates, which itself is cleaning up after itself,
+		// including shutting down its storage layer.
 		close(stopCh)
+
+		// If the apiextensions apiserver was started, let's wait for
+		// it to shutdown clearly.
+		if errCh != nil {
+			err, ok := <-errCh
+			if ok && err != nil {
+				klog.Errorf("Failed to shutdown test server clearly: %v", err)
+			}
+		}
+
 		if len(result.TmpDir) != 0 {
 			os.RemoveAll(result.TmpDir)
 		}
@@ -151,8 +149,10 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		return result, fmt.Errorf("failed to create server: %v", err)
 	}
 
-	errCh := make(chan error)
+	errCh = make(chan error)
 	go func(stopCh <-chan struct{}) {
+		defer close(errCh)
+
 		if err := server.GenericAPIServer.PrepareRun().Run(stopCh); err != nil {
 			errCh <- err
 		}

@@ -4,9 +4,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/openshift/api/template/v1"
+	templatev1 "github.com/openshift/client-go/template/applyconfigurations/template/v1"
 	scheme "github.com/openshift/client-go/template/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -30,6 +33,7 @@ type BrokerTemplateInstanceInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.BrokerTemplateInstanceList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.BrokerTemplateInstance, err error)
+	Apply(ctx context.Context, brokerTemplateInstance *templatev1.BrokerTemplateInstanceApplyConfiguration, opts metav1.ApplyOptions) (result *v1.BrokerTemplateInstance, err error)
 	BrokerTemplateInstanceExpansion
 }
 
@@ -145,6 +149,31 @@ func (c *brokerTemplateInstances) Patch(ctx context.Context, name string, pt typ
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied brokerTemplateInstance.
+func (c *brokerTemplateInstances) Apply(ctx context.Context, brokerTemplateInstance *templatev1.BrokerTemplateInstanceApplyConfiguration, opts metav1.ApplyOptions) (result *v1.BrokerTemplateInstance, err error) {
+	if brokerTemplateInstance == nil {
+		return nil, fmt.Errorf("brokerTemplateInstance provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(brokerTemplateInstance)
+	if err != nil {
+		return nil, err
+	}
+	name := brokerTemplateInstance.Name
+	if name == nil {
+		return nil, fmt.Errorf("brokerTemplateInstance.Name must be provided to Apply")
+	}
+	result = &v1.BrokerTemplateInstance{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("brokertemplateinstances").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

@@ -17,12 +17,14 @@ limitations under the License.
 package disk
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 
 	"github.com/gregjones/httpcache"
-	"github.com/gregjones/httpcache/diskcache"
 	"github.com/peterbourgon/diskv"
 	"k8s.io/klog/v2"
 )
@@ -41,7 +43,7 @@ func newCacheRoundTripper(cacheDir string, rt http.RoundTripper) http.RoundTripp
 		BasePath: cacheDir,
 		TempDir:  filepath.Join(cacheDir, ".diskv-temp"),
 	})
-	t := httpcache.NewTransport(diskcache.NewWithDiskv(d))
+	t := httpcache.NewTransport(&sumDiskCache{disk: d})
 	t.Transport = rt
 
 	return &cacheRoundTripper{rt: t}
@@ -63,3 +65,56 @@ func (rt *cacheRoundTripper) CancelRequest(req *http.Request) {
 }
 
 func (rt *cacheRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt.rt.Transport }
+
+// A sumDiskCache is a cache backend for github.com/gregjones/httpcache. It is
+// similar to httpcache's diskcache package, but uses SHA256 sums to ensure
+// cache integrity at read time rather than fsyncing each cache entry to
+// increase the likelihood they will be persisted at write time. This avoids
+// significant performance degradation on MacOS.
+//
+// See https://github.com/kubernetes/kubernetes/issues/110753 for more.
+type sumDiskCache struct {
+	disk *diskv.Diskv
+}
+
+// Get the requested key from the cache on disk. If Get encounters an error, or
+// the returned value is not a SHA256 sum followed by bytes with a matching
+// checksum it will return false to indicate a cache miss.
+func (c *sumDiskCache) Get(key string) ([]byte, bool) {
+	b, err := c.disk.Read(sanitize(key))
+	if err != nil || len(b) < sha256.Size {
+		return []byte{}, false
+	}
+
+	response := b[sha256.Size:]
+	want := b[:sha256.Size] // The first 32 bytes of the file should be the SHA256 sum.
+	got := sha256.Sum256(response)
+	if !bytes.Equal(want, got[:]) {
+		return []byte{}, false
+	}
+
+	return response, true
+}
+
+// Set writes the response to a file on disk. The filename will be the SHA256
+// sum of the key. The file will contain a SHA256 sum of the response bytes,
+// followed by said response bytes.
+func (c *sumDiskCache) Set(key string, response []byte) {
+	s := sha256.Sum256(response)
+	_ = c.disk.Write(sanitize(key), append(s[:], response...)) // Nothing we can do with this error.
+}
+
+func (c *sumDiskCache) Delete(key string) {
+	_ = c.disk.Erase(sanitize(key)) // Nothing we can do with this error.
+}
+
+// Sanitize an httpcache key such that it can be used as a diskv key, which must
+// be a valid filename. The httpcache key will either be the requested URL (if
+// the request method was GET) or "<method> <url>" for other methods, per the
+// httpcache.cacheKey function.
+func sanitize(key string) string {
+	// These keys are not sensitive. We use sha256 to avoid a (potentially
+	// malicious) collision causing the wrong cache data to be written or
+	// accessed.
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(key)))
+}

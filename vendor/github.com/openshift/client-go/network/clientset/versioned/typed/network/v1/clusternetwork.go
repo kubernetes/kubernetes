@@ -4,9 +4,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/openshift/api/network/v1"
+	networkv1 "github.com/openshift/client-go/network/applyconfigurations/network/v1"
 	scheme "github.com/openshift/client-go/network/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -30,6 +33,7 @@ type ClusterNetworkInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ClusterNetworkList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterNetwork, err error)
+	Apply(ctx context.Context, clusterNetwork *networkv1.ClusterNetworkApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterNetwork, err error)
 	ClusterNetworkExpansion
 }
 
@@ -145,6 +149,31 @@ func (c *clusterNetworks) Patch(ctx context.Context, name string, pt types.Patch
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied clusterNetwork.
+func (c *clusterNetworks) Apply(ctx context.Context, clusterNetwork *networkv1.ClusterNetworkApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterNetwork, err error) {
+	if clusterNetwork == nil {
+		return nil, fmt.Errorf("clusterNetwork provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(clusterNetwork)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterNetwork.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterNetwork.Name must be provided to Apply")
+	}
+	result = &v1.ClusterNetwork{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("clusternetworks").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

@@ -18,11 +18,13 @@ package cel
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	"k8s.io/apiextensions-apiserver/third_party/forked/celopenapi/model"
 )
 
 const (
@@ -641,7 +643,7 @@ func TestCelCompilation(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			compilationResults, err := Compile(&tt.input, false, PerCallLimit)
+			compilationResults, err := Compile(&tt.input, model.SchemaDeclType(&tt.input, false), PerCallLimit)
 			if err != nil {
 				t.Errorf("Expected no error, but got: %v", err)
 			}
@@ -1077,7 +1079,7 @@ func genMapWithCustomItemRule(item *schema.Structural, rule string) func(maxProp
 // if expectedCostExceedsLimit is non-zero. Typically, only expectedCost or expectedCostExceedsLimit is non-zero, not both.
 func schemaChecker(schema *schema.Structural, expectedCost uint64, expectedCostExceedsLimit uint64, t *testing.T) func(t *testing.T) {
 	return func(t *testing.T) {
-		compilationResults, err := Compile(schema, false, PerCallLimit)
+		compilationResults, err := Compile(schema, model.SchemaDeclType(schema, false), PerCallLimit)
 		if err != nil {
 			t.Errorf("Expected no error, got: %v", err)
 		}
@@ -1601,5 +1603,21 @@ func TestCostEstimation(t *testing.T) {
 			setSchema := testCase.schemaGenerator(&testCase.setMaxElements)
 			t.Run("set maxLength", schemaChecker(setSchema, testCase.expectedSetCost, testCase.expectedSetCostExceedsLimit, t))
 		})
+	}
+}
+
+func BenchmarkCompile(b *testing.B) {
+	_, err := getBaseEnv() // prime the baseEnv
+	if err != nil {
+		b.Fatal(err)
+	}
+	s := genArrayWithRule("number", "true")(nil)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := Compile(s, model.SchemaDeclType(s, false), uint64(math.MaxInt64))
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }

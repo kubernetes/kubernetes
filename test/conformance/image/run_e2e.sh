@@ -52,6 +52,10 @@ if [[ -n ${E2E_DRYRUN:-} ]]; then
     ginkgo_args+=("--dryRun=true")
 fi
 
+# NOTE: Ginkgo's default timeout has been reduced from 24h to 1h in V2, set it manually here as "24h"
+# for backward compatibility purpose.
+ginkgo_args+=("--timeout=24h")
+
 case ${E2E_PARALLEL} in
     'y'|'Y'|'true')
         # The flag '--p' will automatically detect the optimal number of ginkgo nodes.

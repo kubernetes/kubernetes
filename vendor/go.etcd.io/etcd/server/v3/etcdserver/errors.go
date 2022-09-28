@@ -27,6 +27,7 @@ var (
 	ErrTimeoutDueToLeaderFail        = errors.New("etcdserver: request timed out, possibly due to previous leader failure")
 	ErrTimeoutDueToConnectionLost    = errors.New("etcdserver: request timed out, possibly due to connection lost")
 	ErrTimeoutLeaderTransfer         = errors.New("etcdserver: request timed out, leader transfer took too long")
+	ErrTimeoutWaitAppliedIndex       = errors.New("etcdserver: request timed out, waiting for the applied index took too long")
 	ErrLeaderChanged                 = errors.New("etcdserver: leader changed")
 	ErrNotEnoughStartedMembers       = errors.New("etcdserver: re-configuration failed due to not enough started members")
 	ErrLearnerNotReady               = errors.New("etcdserver: can only promote a learner member which is in sync with leader")

@@ -18,6 +18,7 @@ package cacher
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"sort"
 	"sync"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
@@ -220,7 +222,7 @@ func newWatchCache(
 		objectType:          objectType,
 	}
 	objType := objectType.String()
-	watchCacheCapacity.WithLabelValues(objType).Set(float64(wc.capacity))
+	metrics.WatchCacheCapacity.WithLabelValues(objType).Set(float64(wc.capacity))
 	wc.cond = sync.NewCond(wc.RLocker())
 	wc.indexValidator = wc.isIndexValidLocked
 
@@ -385,7 +387,7 @@ func (w *watchCache) doCacheResizeLocked(capacity int) {
 		newCache[i%capacity] = w.cache[i%w.capacity]
 	}
 	w.cache = newCache
-	recordsWatchCacheCapacityChange(w.objectType.String(), w.capacity, capacity)
+	metrics.RecordsWatchCacheCapacityChange(w.objectType.String(), w.capacity, capacity)
 	w.capacity = capacity
 }
 
@@ -576,6 +578,59 @@ func (w *watchCache) SetOnReplace(onReplace func()) {
 func (w *watchCache) Resync() error {
 	// Nothing to do
 	return nil
+}
+
+func (w *watchCache) currentCapacity() int {
+	w.Lock()
+	defer w.Unlock()
+	return w.capacity
+}
+
+const (
+	// minWatchChanSize is the min size of channels used by the watch.
+	// We keep that set to 10 for "backward compatibility" until we
+	// convince ourselves based on some metrics that decreasing is safe.
+	minWatchChanSize = 10
+	// maxWatchChanSizeWithIndexAndTriger is the max size of the channel
+	// used by the watch using the index and trigger selector.
+	maxWatchChanSizeWithIndexAndTrigger = 10
+	// maxWatchChanSizeWithIndexWithoutTrigger is the max size of the channel
+	// used by the watch using the index but without triggering selector.
+	// We keep that set to 1000 for "backward compatibility", until we
+	// convinced ourselves based on some metrics that decreasing is safe.
+	maxWatchChanSizeWithIndexWithoutTrigger = 1000
+	// maxWatchChanSizeWithoutIndex is the max size of the channel
+	// used by the watch not using the index.
+	// TODO(wojtek-t): Figure out if the value shouldn't be higher.
+	maxWatchChanSizeWithoutIndex = 100
+)
+
+func (w *watchCache) suggestedWatchChannelSize(indexExists, triggerUsed bool) int {
+	// To estimate the channel size we use a heuristic that a channel
+	// should roughly be able to keep one second of history.
+	// We don't have an exact data, but given we store updates from
+	// the last <eventFreshDuration>, we approach it by dividing the
+	// capacity by the length of the history window.
+	chanSize := int(math.Ceil(float64(w.currentCapacity()) / eventFreshDuration.Seconds()))
+
+	// Finally we adjust the size to avoid ending with too low or
+	// to large values.
+	if chanSize < minWatchChanSize {
+		chanSize = minWatchChanSize
+	}
+	var maxChanSize int
+	switch {
+	case indexExists && triggerUsed:
+		maxChanSize = maxWatchChanSizeWithIndexAndTrigger
+	case indexExists && !triggerUsed:
+		maxChanSize = maxWatchChanSizeWithIndexWithoutTrigger
+	case !indexExists:
+		maxChanSize = maxWatchChanSizeWithoutIndex
+	}
+	if chanSize > maxChanSize {
+		chanSize = maxChanSize
+	}
+	return chanSize
 }
 
 // isIndexValidLocked checks if a given index is still valid.

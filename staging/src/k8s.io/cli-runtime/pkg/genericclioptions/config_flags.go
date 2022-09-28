@@ -57,10 +57,6 @@ const (
 	flagCacheDir         = "cache-dir"
 )
 
-var (
-	defaultCacheDir = filepath.Join(homedir.HomeDir(), ".kube", "cache")
-)
-
 // RESTClientGetter is an interface that the ConfigFlags describe to provide an easier way to mock for commands
 // and eliminate the direct coupling to a struct type.  Users may wish to duplicate this type in their own packages
 // as per the golang type overlapping.
@@ -275,17 +271,31 @@ func (f *ConfigFlags) toDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 	config.Burst = f.discoveryBurst
 	config.QPS = f.discoveryQPS
 
-	cacheDir := defaultCacheDir
+	cacheDir := getDefaultCacheDir()
 
 	// retrieve a user-provided value for the "cache-dir"
 	// override httpCacheDir and discoveryCacheDir if user-value is given.
-	if f.CacheDir != nil {
+	// user-provided value has higher precedence than default
+	// and KUBECACHEDIR environment variable.
+	if f.CacheDir != nil && *f.CacheDir != "" && *f.CacheDir != getDefaultCacheDir() {
 		cacheDir = *f.CacheDir
 	}
+
 	httpCacheDir := filepath.Join(cacheDir, "http")
 	discoveryCacheDir := computeDiscoverCacheDir(filepath.Join(cacheDir, "discovery"), config.Host)
 
 	return diskcached.NewCachedDiscoveryClientForConfig(config, discoveryCacheDir, httpCacheDir, time.Duration(6*time.Hour))
+}
+
+// getDefaultCacheDir returns default caching directory path.
+// it first looks at KUBECACHEDIR env var if it is set, otherwise
+// it returns standard kube cache dir.
+func getDefaultCacheDir() string {
+	if kcd := os.Getenv("KUBECACHEDIR"); kcd != "" {
+		return kcd
+	}
+
+	return filepath.Join(homedir.HomeDir(), ".kube", "cache")
 }
 
 // ToRESTMapper returns a mapper.
@@ -420,7 +430,7 @@ func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 		Timeout:    utilpointer.String("0"),
 		KubeConfig: utilpointer.String(""),
 
-		CacheDir:         utilpointer.String(defaultCacheDir),
+		CacheDir:         utilpointer.String(getDefaultCacheDir()),
 		ClusterName:      utilpointer.String(""),
 		AuthInfoName:     utilpointer.String(""),
 		Context:          utilpointer.String(""),
@@ -437,9 +447,9 @@ func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 
 		usePersistentConfig: usePersistentConfig,
 		// The more groups you have, the more discovery requests you need to make.
-		// given 25 groups (our groups + a few custom resources) with one-ish version each, discovery needs to make 50 requests
-		// double it just so we don't end up here again for a while.  This config is only used for discovery.
-		discoveryBurst: 100,
+		// with a burst of 300, we will not be rate-limiting for most clusters but
+		// the safeguard will still be here. This config is only used for discovery.
+		discoveryBurst: 300,
 	}
 }
 

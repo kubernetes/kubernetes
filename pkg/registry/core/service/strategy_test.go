@@ -31,38 +31,26 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
-	netutils "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 )
-
-func newStrategy(cidr string, hasSecondary bool) (testStrategy Strategy, testStatusStrategy Strategy) {
-	_, testCIDR, err := netutils.ParseCIDRSloppy(cidr)
-	if err != nil {
-		panic("invalid CIDR")
-	}
-	testStrategy, _ = StrategyForServiceCIDRs(*testCIDR, hasSecondary)
-	testStatusStrategy = NewServiceStatusStrategy(testStrategy)
-	return
-}
 
 func TestCheckGeneratedNameError(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
 		Resource: "foos",
 	})
 
-	testStrategy, _ := newStrategy("10.0.0.0/16", false)
 	expect := errors.NewNotFound(api.Resource("foos"), "bar")
-	if err := rest.CheckGeneratedNameError(ctx, testStrategy, expect, &api.Service{}); err != expect {
+	if err := rest.CheckGeneratedNameError(ctx, Strategy, expect, &api.Service{}); err != expect {
 		t.Errorf("NotFoundError should be ignored: %v", err)
 	}
 
 	expect = errors.NewAlreadyExists(api.Resource("foos"), "bar")
-	if err := rest.CheckGeneratedNameError(ctx, testStrategy, expect, &api.Service{}); err != expect {
+	if err := rest.CheckGeneratedNameError(ctx, Strategy, expect, &api.Service{}); err != expect {
 		t.Errorf("AlreadyExists should be returned when no GenerateName field: %v", err)
 	}
 
 	expect = errors.NewAlreadyExists(api.Resource("foos"), "bar")
-	if err := rest.CheckGeneratedNameError(ctx, testStrategy, expect, &api.Service{ObjectMeta: metav1.ObjectMeta{GenerateName: "foo"}}); err == nil || !errors.IsAlreadyExists(err) {
+	if err := rest.CheckGeneratedNameError(ctx, Strategy, expect, &api.Service{ObjectMeta: metav1.ObjectMeta{GenerateName: "foo"}}); err == nil || !errors.IsAlreadyExists(err) {
 		t.Errorf("expected try again later error: %v", err)
 	}
 }
@@ -114,9 +102,8 @@ func makeValidServiceCustom(tweaks ...func(svc *api.Service)) *api.Service {
 }
 
 func TestServiceStatusStrategy(t *testing.T) {
-	_, testStatusStrategy := newStrategy("10.0.0.0/16", false)
 	ctx := genericapirequest.NewDefaultContext()
-	if !testStatusStrategy.NamespaceScoped() {
+	if !StatusStrategy.NamespaceScoped() {
 		t.Errorf("Service must be namespace scoped")
 	}
 	oldService := makeValidService()
@@ -131,14 +118,14 @@ func TestServiceStatusStrategy(t *testing.T) {
 			},
 		},
 	}
-	testStatusStrategy.PrepareForUpdate(ctx, newService, oldService)
+	StatusStrategy.PrepareForUpdate(ctx, newService, oldService)
 	if newService.Status.LoadBalancer.Ingress[0].IP != "127.0.0.2" {
 		t.Errorf("Service status updates should allow change of status fields")
 	}
 	if newService.Spec.SessionAffinity != "None" {
 		t.Errorf("PrepareForUpdate should have preserved old spec")
 	}
-	errs := testStatusStrategy.ValidateUpdate(ctx, newService, oldService)
+	errs := StatusStrategy.ValidateUpdate(ctx, newService, oldService)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error %v", errs)
 	}

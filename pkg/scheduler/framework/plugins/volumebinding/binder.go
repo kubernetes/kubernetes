@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/storage/etcd3"
+	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
@@ -123,26 +123,26 @@ type InTreeToCSITranslator interface {
 // also considered along with the pod's other scheduling requirements.
 //
 // This integrates into the existing scheduler workflow as follows:
-// 1. The scheduler takes a Pod off the scheduler queue and processes it serially:
-//    a. Invokes all pre-filter plugins for the pod. GetPodVolumes() is invoked
-//    here, pod volume information will be saved in current scheduling cycle state for later use.
-//    b. Invokes all filter plugins, parallelized across nodes.  FindPodVolumes() is invoked here.
-//    c. Invokes all score plugins.  Future/TBD
-//    d. Selects the best node for the Pod.
-//    e. Invokes all reserve plugins. AssumePodVolumes() is invoked here.
-//       i.  If PVC binding is required, cache in-memory only:
-//           * For manual binding: update PV objects for prebinding to the corresponding PVCs.
-//           * For dynamic provisioning: update PVC object with a selected node from c)
-//           * For the pod, which PVCs and PVs need API updates.
-//       ii. Afterwards, the main scheduler caches the Pod->Node binding in the scheduler's pod cache,
-//           This is handled in the scheduler and not here.
-//    f. Asynchronously bind volumes and pod in a separate goroutine
-//        i.  BindPodVolumes() is called first in PreBind phase. It makes all the necessary API updates and waits for
-//            PV controller to fully bind and provision the PVCs. If binding fails, the Pod is sent
-//            back through the scheduler.
-//        ii. After BindPodVolumes() is complete, then the scheduler does the final Pod->Node binding.
-// 2. Once all the assume operations are done in e), the scheduler processes the next Pod in the scheduler queue
-//    while the actual binding operation occurs in the background.
+//  1. The scheduler takes a Pod off the scheduler queue and processes it serially:
+//     a. Invokes all pre-filter plugins for the pod. GetPodVolumes() is invoked
+//     here, pod volume information will be saved in current scheduling cycle state for later use.
+//     b. Invokes all filter plugins, parallelized across nodes.  FindPodVolumes() is invoked here.
+//     c. Invokes all score plugins.  Future/TBD
+//     d. Selects the best node for the Pod.
+//     e. Invokes all reserve plugins. AssumePodVolumes() is invoked here.
+//     i.  If PVC binding is required, cache in-memory only:
+//     * For manual binding: update PV objects for prebinding to the corresponding PVCs.
+//     * For dynamic provisioning: update PVC object with a selected node from c)
+//     * For the pod, which PVCs and PVs need API updates.
+//     ii. Afterwards, the main scheduler caches the Pod->Node binding in the scheduler's pod cache,
+//     This is handled in the scheduler and not here.
+//     f. Asynchronously bind volumes and pod in a separate goroutine
+//     i.  BindPodVolumes() is called first in PreBind phase. It makes all the necessary API updates and waits for
+//     PV controller to fully bind and provision the PVCs. If binding fails, the Pod is sent
+//     back through the scheduler.
+//     ii. After BindPodVolumes() is complete, then the scheduler does the final Pod->Node binding.
+//  2. Once all the assume operations are done in e), the scheduler processes the next Pod in the scheduler queue
+//     while the actual binding operation occurs in the background.
 type SchedulerVolumeBinder interface {
 	// GetPodVolumes returns a pod's PVCs separated into bound, unbound with delayed binding (including provisioning)
 	// and unbound with immediate binding (including prebound)
@@ -185,7 +185,7 @@ type SchedulerVolumeBinder interface {
 	// 3. Wait for PVCs to be completely bound by the PV controller
 	//
 	// This function can be called in parallel.
-	BindPodVolumes(assumedPod *v1.Pod, podVolumes *PodVolumes) error
+	BindPodVolumes(ctx context.Context, assumedPod *v1.Pod, podVolumes *PodVolumes) error
 }
 
 type volumeBinder struct {
@@ -432,7 +432,7 @@ func (b *volumeBinder) RevertAssumedPodVolumes(podVolumes *PodVolumes) {
 // BindPodVolumes gets the cached bindings and PVCs to provision in pod's volumes information,
 // makes the API update for those PVs/PVCs, and waits for the PVCs to be completely bound
 // by the PV controller.
-func (b *volumeBinder) BindPodVolumes(assumedPod *v1.Pod, podVolumes *PodVolumes) (err error) {
+func (b *volumeBinder) BindPodVolumes(ctx context.Context, assumedPod *v1.Pod, podVolumes *PodVolumes) (err error) {
 	klog.V(4).InfoS("BindPodVolumes", "pod", klog.KObj(assumedPod), "node", klog.KRef("", assumedPod.Spec.NodeName))
 
 	defer func() {
@@ -445,7 +445,7 @@ func (b *volumeBinder) BindPodVolumes(assumedPod *v1.Pod, podVolumes *PodVolumes
 	claimsToProvision := podVolumes.DynamicProvisions
 
 	// Start API operations
-	err = b.bindAPIUpdate(assumedPod, bindings, claimsToProvision)
+	err = b.bindAPIUpdate(ctx, assumedPod, bindings, claimsToProvision)
 	if err != nil {
 		return err
 	}
@@ -469,7 +469,7 @@ func getPVCName(pvc *v1.PersistentVolumeClaim) string {
 }
 
 // bindAPIUpdate makes the API update for those PVs/PVCs.
-func (b *volumeBinder) bindAPIUpdate(pod *v1.Pod, bindings []*BindingInfo, claimsToProvision []*v1.PersistentVolumeClaim) error {
+func (b *volumeBinder) bindAPIUpdate(ctx context.Context, pod *v1.Pod, bindings []*BindingInfo, claimsToProvision []*v1.PersistentVolumeClaim) error {
 	podName := getPodName(pod)
 	if bindings == nil {
 		return fmt.Errorf("failed to get cached bindings for pod %q", podName)
@@ -503,7 +503,7 @@ func (b *volumeBinder) bindAPIUpdate(pod *v1.Pod, bindings []*BindingInfo, claim
 		klog.V(5).InfoS("bindAPIUpdate: binding PV to PVC", "pod", klog.KObj(pod), "PV", klog.KObj(binding.pv), "PVC", klog.KObj(binding.pvc))
 		// TODO: does it hurt if we make an api call and nothing needs to be updated?
 		klog.V(2).InfoS("Claim bound to volume", "PVC", klog.KObj(binding.pvc), "PV", klog.KObj(binding.pv))
-		newPV, err := b.kubeClient.CoreV1().PersistentVolumes().Update(context.TODO(), binding.pv, metav1.UpdateOptions{})
+		newPV, err := b.kubeClient.CoreV1().PersistentVolumes().Update(ctx, binding.pv, metav1.UpdateOptions{})
 		if err != nil {
 			klog.V(4).InfoS("Updating PersistentVolume: binding to claim failed", "PV", klog.KObj(binding.pv), "PVC", klog.KObj(binding.pvc), "err", err)
 			return err
@@ -518,7 +518,7 @@ func (b *volumeBinder) bindAPIUpdate(pod *v1.Pod, bindings []*BindingInfo, claim
 	// PV controller is expected to signal back by removing related annotations if actual provisioning fails
 	for i, claim = range claimsToProvision {
 		klog.V(5).InfoS("Updating claims objects to trigger volume provisioning", "pod", klog.KObj(pod), "PVC", klog.KObj(claim))
-		newClaim, err := b.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claim, metav1.UpdateOptions{})
+		newClaim, err := b.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
@@ -531,7 +531,7 @@ func (b *volumeBinder) bindAPIUpdate(pod *v1.Pod, bindings []*BindingInfo, claim
 }
 
 var (
-	versioner = etcd3.APIObjectVersioner{}
+	versioner = storage.APIObjectVersioner{}
 )
 
 // checkBindings runs through all the PVCs in the Pod and checks:
@@ -1043,10 +1043,6 @@ func isPluginMigratedToCSIOnNode(pluginName string, csiNode *storagev1.CSINode) 
 // tryTranslatePVToCSI will translate the in-tree PV to CSI if it meets the criteria. If not, it returns the unmodified in-tree PV.
 func (b *volumeBinder) tryTranslatePVToCSI(pv *v1.PersistentVolume, csiNode *storagev1.CSINode) (*v1.PersistentVolume, error) {
 	if !b.translator.IsPVMigratable(pv) {
-		return pv, nil
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
 		return pv, nil
 	}
 

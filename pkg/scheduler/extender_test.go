@@ -23,7 +23,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -284,8 +283,10 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			for _, name := range test.nodes {
 				cache.AddNode(createNode(name))
 			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			fwk, err := st.NewFramework(
-				test.registerPlugins, "",
+				test.registerPlugins, "", ctx.Done(),
 				runtime.WithClientSet(client),
 				runtime.WithInformerFactory(informerFactory),
 				runtime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
@@ -302,11 +303,10 @@ func TestSchedulerWithExtenders(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				nil,
 				emptySnapshot,
 				schedulerapi.DefaultPercentageOfNodesToScore)
 			podIgnored := &v1.Pod{}
-			result, err := scheduler.SchedulePod(context.Background(), fwk, framework.NewCycleState(), podIgnored)
+			result, err := scheduler.SchedulePod(ctx, fwk, framework.NewCycleState(), podIgnored)
 			if test.expectsErr {
 				if err == nil {
 					t.Errorf("Unexpected non-error, result %+v", result)
@@ -352,56 +352,23 @@ func TestIsInterested(t *testing.T) {
 		{
 			label:    "Managed memory, empty resources",
 			extender: mem,
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name: "app",
-						},
-					},
-				},
-			},
-			want: false,
+			pod:      st.MakePod().Container("app").Obj(),
+			want:     false,
 		},
 		{
 			label:    "Managed memory, container memory",
 			extender: mem,
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name: "app",
-							Resources: v1.ResourceRequirements{
-								Requests: v1.ResourceList{"memory": resource.Quantity{}},
-								Limits:   v1.ResourceList{"memory": resource.Quantity{}},
-							},
-						},
-					},
-				},
-			},
+			pod: st.MakePod().Req(map[v1.ResourceName]string{
+				"memory": "0",
+			}).Obj(),
 			want: true,
 		},
 		{
 			label:    "Managed memory, init container memory",
 			extender: mem,
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name: "app",
-						},
-					},
-					InitContainers: []v1.Container{
-						{
-							Name: "init",
-							Resources: v1.ResourceRequirements{
-								Requests: v1.ResourceList{"memory": resource.Quantity{}},
-								Limits:   v1.ResourceList{"memory": resource.Quantity{}},
-							},
-						},
-					},
-				},
-			},
+			pod: st.MakePod().Container("app").InitReq(map[v1.ResourceName]string{
+				"memory": "0",
+			}).Obj(),
 			want: true,
 		},
 	} {
@@ -424,15 +391,15 @@ func TestConvertToMetaVictims(t *testing.T) {
 			nodeNameToVictims: map[string]*extenderv1.Victims{
 				"node1": {
 					Pods: []*v1.Pod{
-						{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: "uid1"}},
-						{ObjectMeta: metav1.ObjectMeta{Name: "pod3", UID: "uid3"}},
+						st.MakePod().Name("pod1").UID("uid1").Obj(),
+						st.MakePod().Name("pod3").UID("uid3").Obj(),
 					},
 					NumPDBViolations: 1,
 				},
 				"node2": {
 					Pods: []*v1.Pod{
-						{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: "uid2"}},
-						{ObjectMeta: metav1.ObjectMeta{Name: "pod4", UID: "uid4"}},
+						st.MakePod().Name("pod2").UID("uid2").Obj(),
+						st.MakePod().Name("pod4").UID("uid4").Obj(),
 					},
 					NumPDBViolations: 2,
 				},
@@ -496,24 +463,24 @@ func TestConvertToVictims(t *testing.T) {
 			},
 			nodeNames: []string{"node1", "node2"},
 			podsInNodeList: []*v1.Pod{
-				{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: "uid1"}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: "uid2"}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pod3", UID: "uid3"}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pod4", UID: "uid4"}},
+				st.MakePod().Name("pod1").UID("uid1").Obj(),
+				st.MakePod().Name("pod2").UID("uid2").Obj(),
+				st.MakePod().Name("pod3").UID("uid3").Obj(),
+				st.MakePod().Name("pod4").UID("uid4").Obj(),
 			},
 			nodeInfos: nil,
 			want: map[string]*extenderv1.Victims{
 				"node1": {
 					Pods: []*v1.Pod{
-						{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: "uid1"}},
-						{ObjectMeta: metav1.ObjectMeta{Name: "pod3", UID: "uid3"}},
+						st.MakePod().Name("pod1").UID("uid1").Obj(),
+						st.MakePod().Name("pod3").UID("uid3").Obj(),
 					},
 					NumPDBViolations: 1,
 				},
 				"node2": {
 					Pods: []*v1.Pod{
-						{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: "uid2"}},
-						{ObjectMeta: metav1.ObjectMeta{Name: "pod4", UID: "uid4"}},
+						st.MakePod().Name("pod2").UID("uid2").Obj(),
+						st.MakePod().Name("pod4").UID("uid4").Obj(),
 					},
 					NumPDBViolations: 2,
 				},

@@ -217,6 +217,16 @@ spec:
                     description: loadBalancer holds parameters for the load balancer.
                       Present only if type is LoadBalancerService.
                     properties:
+                      dnsManagementPolicy:
+                        default: Managed
+                        description: 'dnsManagementPolicy indicates if the lifecycle
+                          of the wildcard DNS record associated with the load balancer
+                          service will be managed by the ingress operator. It defaults
+                          to Managed. Valid values are: Managed and Unmanaged.'
+                        enum:
+                        - Managed
+                        - Unmanaged
+                        type: string
                       providerParameters:
                         description: "providerParameters holds desired load balancer
                           information specific to the underlying infrastructure provider.
@@ -350,6 +360,30 @@ spec:
                   private:
                     description: private holds parameters for the Private endpoint
                       publishing strategy. Present only if type is Private.
+                    properties:
+                      protocol:
+                        description: "protocol specifies whether the IngressController
+                          expects incoming connections to use plain TCP or whether
+                          the IngressController expects PROXY protocol. \n PROXY protocol
+                          can be used with load balancers that support it to communicate
+                          the source addresses of client connections when forwarding
+                          those connections to the IngressController.  Using PROXY
+                          protocol enables the IngressController to report those source
+                          addresses instead of reporting the load balancer's address
+                          in HTTP headers and logs.  Note that enabling PROXY protocol
+                          on the IngressController will cause connections to fail
+                          if you are not using a load balancer that uses PROXY protocol
+                          to forward connections to the IngressController.  See http://www.haproxy.org/download/2.2/doc/proxy-protocol.txt
+                          for information about PROXY protocol. \n The following values
+                          are valid for this field: \n * The empty string. * \"TCP\".
+                          * \"PROXY\". \n The empty string specifies the default,
+                          which is TCP without PROXY protocol.  Note that the default
+                          is subject to change."
+                        enum:
+                        - ""
+                        - TCP
+                        - PROXY
+                        type: string
                     type: object
                   type:
                     description: "type is the publishing strategy to use. Valid values
@@ -1229,7 +1263,7 @@ spec:
                       value is 5s. \n Currently the minimum allowed value is 1s and
                       the maximum allowed value is 2147483647ms (24.85 days).  Both
                       are subject to change over time."
-                    pattern: ^0|([0-9]+(\.[0-9]+)?(ns|us|µs|μs|ms|s|m|h))+$
+                    pattern: ^(0|([0-9]+(\.[0-9]+)?(ns|us|µs|μs|ms|s|m|h))+)$
                     type: string
                   maxConnections:
                     description: "maxConnections defines the maximum number of simultaneous
@@ -1260,6 +1294,34 @@ spec:
                       in router containers with the following metric: 'container_memory_working_set_bytes{container=\"router\",namespace=\"openshift-ingress\"}/container_processes{container=\"router\",namespace=\"openshift-ingress\"}'."
                     format: int32
                     type: integer
+                  reloadInterval:
+                    description: "reloadInterval defines the minimum interval at which
+                      the router is allowed to reload to accept new changes. Increasing
+                      this value can prevent the accumulation of HAProxy processes,
+                      depending on the scenario. Increasing this interval can also
+                      lessen load imbalance on a backend's servers when using the
+                      roundrobin balancing algorithm. Alternatively, decreasing this
+                      value may decrease latency since updates to HAProxy's configuration
+                      can take effect more quickly. \n The value must be a time duration
+                      value; see <https://pkg.go.dev/time#ParseDuration>. Currently,
+                      the minimum value allowed is 1s, and the maximum allowed value
+                      is 120s. Minimum and maximum allowed values may change in future
+                      versions of OpenShift. Note that if a duration outside of these
+                      bounds is provided, the value of reloadInterval will be capped/floored
+                      and not rejected (e.g. a duration of over 120s will be capped
+                      to 120s; the IngressController will not reject and replace this
+                      disallowed value with the default). \n A zero value for reloadInterval
+                      tells the IngressController to choose the default, which is
+                      currently 5s and subject to change without notice. \n This field
+                      expects an unsigned duration string of decimal numbers, each
+                      with optional fraction and a unit suffix, e.g. \"100s\", \"1m30s\".
+                      Valid time units are \"s\" and \"m\". \n Note: Setting a value
+                      significantly larger than the default of 5s can cause latency
+                      in observing updates to routes and their endpoints. HAProxy's
+                      configuration will be reloaded less frequently, and newly created
+                      routes will not be served until the subsequent reload."
+                    pattern: ^(0|([0-9]+(\.[0-9]+)?(s|m))+)$
+                    type: string
                   serverFinTimeout:
                     description: "serverFinTimeout defines how long a connection will
                       be held open while waiting for the server/backend response to
@@ -1440,6 +1502,16 @@ spec:
                     description: loadBalancer holds parameters for the load balancer.
                       Present only if type is LoadBalancerService.
                     properties:
+                      dnsManagementPolicy:
+                        default: Managed
+                        description: 'dnsManagementPolicy indicates if the lifecycle
+                          of the wildcard DNS record associated with the load balancer
+                          service will be managed by the ingress operator. It defaults
+                          to Managed. Valid values are: Managed and Unmanaged.'
+                        enum:
+                        - Managed
+                        - Unmanaged
+                        type: string
                       providerParameters:
                         description: "providerParameters holds desired load balancer
                           information specific to the underlying infrastructure provider.
@@ -1573,6 +1645,30 @@ spec:
                   private:
                     description: private holds parameters for the Private endpoint
                       publishing strategy. Present only if type is Private.
+                    properties:
+                      protocol:
+                        description: "protocol specifies whether the IngressController
+                          expects incoming connections to use plain TCP or whether
+                          the IngressController expects PROXY protocol. \n PROXY protocol
+                          can be used with load balancers that support it to communicate
+                          the source addresses of client connections when forwarding
+                          those connections to the IngressController.  Using PROXY
+                          protocol enables the IngressController to report those source
+                          addresses instead of reporting the load balancer's address
+                          in HTTP headers and logs.  Note that enabling PROXY protocol
+                          on the IngressController will cause connections to fail
+                          if you are not using a load balancer that uses PROXY protocol
+                          to forward connections to the IngressController.  See http://www.haproxy.org/download/2.2/doc/proxy-protocol.txt
+                          for information about PROXY protocol. \n The following values
+                          are valid for this field: \n * The empty string. * \"TCP\".
+                          * \"PROXY\". \n The empty string specifies the default,
+                          which is TCP without PROXY protocol.  Note that the default
+                          is subject to change."
+                        enum:
+                        - ""
+                        - TCP
+                        - PROXY
+                        type: string
                     type: object
                   type:
                     description: "type is the publishing strategy to use. Valid values

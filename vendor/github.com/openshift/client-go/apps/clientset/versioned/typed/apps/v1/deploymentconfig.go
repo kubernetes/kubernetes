@@ -4,9 +4,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/openshift/api/apps/v1"
+	appsv1 "github.com/openshift/client-go/apps/applyconfigurations/apps/v1"
 	scheme "github.com/openshift/client-go/apps/clientset/versioned/scheme"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +35,8 @@ type DeploymentConfigInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.DeploymentConfigList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.DeploymentConfig, err error)
+	Apply(ctx context.Context, deploymentConfig *appsv1.DeploymentConfigApplyConfiguration, opts metav1.ApplyOptions) (result *v1.DeploymentConfig, err error)
+	ApplyStatus(ctx context.Context, deploymentConfig *appsv1.DeploymentConfigApplyConfiguration, opts metav1.ApplyOptions) (result *v1.DeploymentConfig, err error)
 	Instantiate(ctx context.Context, deploymentConfigName string, deploymentRequest *v1.DeploymentRequest, opts metav1.CreateOptions) (*v1.DeploymentConfig, error)
 	Rollback(ctx context.Context, deploymentConfigName string, deploymentConfigRollback *v1.DeploymentConfigRollback, opts metav1.CreateOptions) (*v1.DeploymentConfig, error)
 	GetScale(ctx context.Context, deploymentConfigName string, options metav1.GetOptions) (*v1beta1.Scale, error)
@@ -178,6 +183,62 @@ func (c *deploymentConfigs) Patch(ctx context.Context, name string, pt types.Pat
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied deploymentConfig.
+func (c *deploymentConfigs) Apply(ctx context.Context, deploymentConfig *appsv1.DeploymentConfigApplyConfiguration, opts metav1.ApplyOptions) (result *v1.DeploymentConfig, err error) {
+	if deploymentConfig == nil {
+		return nil, fmt.Errorf("deploymentConfig provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(deploymentConfig)
+	if err != nil {
+		return nil, err
+	}
+	name := deploymentConfig.Name
+	if name == nil {
+		return nil, fmt.Errorf("deploymentConfig.Name must be provided to Apply")
+	}
+	result = &v1.DeploymentConfig{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("deploymentconfigs").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *deploymentConfigs) ApplyStatus(ctx context.Context, deploymentConfig *appsv1.DeploymentConfigApplyConfiguration, opts metav1.ApplyOptions) (result *v1.DeploymentConfig, err error) {
+	if deploymentConfig == nil {
+		return nil, fmt.Errorf("deploymentConfig provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(deploymentConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	name := deploymentConfig.Name
+	if name == nil {
+		return nil, fmt.Errorf("deploymentConfig.Name must be provided to Apply")
+	}
+
+	result = &v1.DeploymentConfig{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("deploymentconfigs").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

@@ -75,8 +75,6 @@ func NewController(endpointsInformer coreinformers.EndpointsInformer,
 	endpointUpdatesBatchPeriod time.Duration,
 ) *Controller {
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartLogging(klog.Infof)
-	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-slice-mirroring-controller"})
 
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
@@ -207,6 +205,12 @@ type Controller struct {
 // Run will not return until stopCh is closed.
 func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+
+	// Start events processing pipeline.
+	c.eventBroadcaster.StartLogging(klog.Infof)
+	c.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.client.CoreV1().Events("")})
+	defer c.eventBroadcaster.Shutdown()
+
 	defer c.queue.ShutDown()
 
 	klog.Infof("Starting EndpointSliceMirroring controller")

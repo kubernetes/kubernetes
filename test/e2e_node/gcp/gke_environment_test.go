@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 )
@@ -81,7 +81,7 @@ func checkIPTables() (err error) {
 // checkPublicGCR checks the access to the public Google Container Registry by
 // pulling the busybox image.
 func checkPublicGCR() error {
-	const image = "k8s.gcr.io/busybox"
+	const image = "registry.k8s.io/busybox"
 	output, err := runCommand("docker", "images", "-q", image)
 	if err != nil {
 		return err

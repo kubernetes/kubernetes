@@ -55,7 +55,6 @@ var knownFeatureSets = sets.NewString(
 	"",
 	string(configv1.TechPreviewNoUpgrade),
 	string(configv1.CustomNoUpgrade),
-	string(configv1.IPv6DualStackNoUpgrade),
 	string(configv1.LatencySensitive),
 )
 

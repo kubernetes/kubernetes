@@ -19,7 +19,7 @@ package routes
 import (
 	"strings"
 
-	restful "github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful/v3"
 	"k8s.io/klog/v2"
 
 	"k8s.io/apiserver/pkg/server/mux"

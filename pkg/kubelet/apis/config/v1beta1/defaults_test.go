@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -111,16 +111,17 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				ConfigMapAndSecretChangeDetectionStrategy: v1beta1.WatchChangeDetectionStrategy,
 				EnforceNodeAllocatable:                    DefaultNodeAllocatableEnforcement,
 				VolumePluginDir:                           DefaultVolumePluginDir,
-				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
+				Logging: logsapi.LoggingConfiguration{
 					Format:         "text",
 					FlushFrequency: 5 * time.Second,
 				},
-				EnableSystemLogHandler:  utilpointer.BoolPtr(true),
-				EnableProfilingHandler:  utilpointer.BoolPtr(true),
-				EnableDebugFlagsHandler: utilpointer.BoolPtr(true),
-				SeccompDefault:          utilpointer.BoolPtr(false),
-				MemoryThrottlingFactor:  utilpointer.Float64Ptr(DefaultMemoryThrottlingFactor),
-				RegisterNode:            utilpointer.BoolPtr(true),
+				EnableSystemLogHandler:        utilpointer.BoolPtr(true),
+				EnableProfilingHandler:        utilpointer.BoolPtr(true),
+				EnableDebugFlagsHandler:       utilpointer.BoolPtr(true),
+				SeccompDefault:                utilpointer.BoolPtr(false),
+				MemoryThrottlingFactor:        utilpointer.Float64Ptr(DefaultMemoryThrottlingFactor),
+				RegisterNode:                  utilpointer.BoolPtr(true),
+				LocalStorageCapacityIsolation: utilpointer.BoolPtr(true),
 			},
 		},
 		{
@@ -232,7 +233,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumePluginDir:             "",
 				ProviderID:                  "",
 				KernelMemcgNotification:     false,
-				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
+				Logging: logsapi.LoggingConfiguration{
 					Format:         "",
 					FlushFrequency: 5 * time.Second,
 				},
@@ -245,6 +246,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				SeccompDefault:                  utilpointer.Bool(false),
 				MemoryThrottlingFactor:          utilpointer.Float64(0),
 				RegisterNode:                    utilpointer.BoolPtr(false),
+				LocalStorageCapacityIsolation:   utilpointer.BoolPtr(false),
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       utilpointer.BoolPtr(false),
@@ -329,17 +331,18 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				EnforceNodeAllocatable: []string{},
 				AllowedUnsafeSysctls:   []string{},
 				VolumePluginDir:        DefaultVolumePluginDir,
-				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
+				Logging: logsapi.LoggingConfiguration{
 					Format:         "text",
 					FlushFrequency: 5 * time.Second,
 				},
-				EnableSystemLogHandler:  utilpointer.Bool(false),
-				ReservedMemory:          []v1beta1.MemoryReservation{},
-				EnableProfilingHandler:  utilpointer.Bool(false),
-				EnableDebugFlagsHandler: utilpointer.Bool(false),
-				SeccompDefault:          utilpointer.Bool(false),
-				MemoryThrottlingFactor:  utilpointer.Float64(0),
-				RegisterNode:            utilpointer.BoolPtr(false),
+				EnableSystemLogHandler:        utilpointer.Bool(false),
+				ReservedMemory:                []v1beta1.MemoryReservation{},
+				EnableProfilingHandler:        utilpointer.Bool(false),
+				EnableDebugFlagsHandler:       utilpointer.Bool(false),
+				SeccompDefault:                utilpointer.Bool(false),
+				MemoryThrottlingFactor:        utilpointer.Float64(0),
+				RegisterNode:                  utilpointer.BoolPtr(false),
+				LocalStorageCapacityIsolation: utilpointer.BoolPtr(false),
 			},
 		},
 		{
@@ -468,7 +471,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumePluginDir:             "volume-plugin-dir",
 				ProviderID:                  "provider-id",
 				KernelMemcgNotification:     true,
-				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
+				Logging: logsapi.LoggingConfiguration{
 					Format:         "json",
 					FlushFrequency: 5 * time.Second,
 				},
@@ -481,11 +484,12 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
 					},
 				},
-				EnableProfilingHandler:  utilpointer.Bool(true),
-				EnableDebugFlagsHandler: utilpointer.Bool(true),
-				SeccompDefault:          utilpointer.Bool(true),
-				MemoryThrottlingFactor:  utilpointer.Float64(1),
-				RegisterNode:            utilpointer.BoolPtr(true),
+				EnableProfilingHandler:        utilpointer.Bool(true),
+				EnableDebugFlagsHandler:       utilpointer.Bool(true),
+				SeccompDefault:                utilpointer.Bool(true),
+				MemoryThrottlingFactor:        utilpointer.Float64(1),
+				RegisterNode:                  utilpointer.BoolPtr(true),
+				LocalStorageCapacityIsolation: utilpointer.BoolPtr(true),
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       utilpointer.BoolPtr(true),
@@ -611,7 +615,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumePluginDir:             "volume-plugin-dir",
 				ProviderID:                  "provider-id",
 				KernelMemcgNotification:     true,
-				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
+				Logging: logsapi.LoggingConfiguration{
 					Format:         "json",
 					FlushFrequency: 5 * time.Second,
 				},
@@ -624,11 +628,12 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
 					},
 				},
-				EnableProfilingHandler:  utilpointer.Bool(true),
-				EnableDebugFlagsHandler: utilpointer.Bool(true),
-				SeccompDefault:          utilpointer.Bool(true),
-				MemoryThrottlingFactor:  utilpointer.Float64(1),
-				RegisterNode:            utilpointer.BoolPtr(true),
+				EnableProfilingHandler:        utilpointer.Bool(true),
+				EnableDebugFlagsHandler:       utilpointer.Bool(true),
+				SeccompDefault:                utilpointer.Bool(true),
+				MemoryThrottlingFactor:        utilpointer.Float64(1),
+				RegisterNode:                  utilpointer.BoolPtr(true),
+				LocalStorageCapacityIsolation: utilpointer.BoolPtr(true),
 			},
 		},
 		{
@@ -705,16 +710,17 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				ConfigMapAndSecretChangeDetectionStrategy: v1beta1.WatchChangeDetectionStrategy,
 				EnforceNodeAllocatable:                    DefaultNodeAllocatableEnforcement,
 				VolumePluginDir:                           DefaultVolumePluginDir,
-				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
+				Logging: logsapi.LoggingConfiguration{
 					Format:         "text",
 					FlushFrequency: 5 * time.Second,
 				},
-				EnableSystemLogHandler:  utilpointer.BoolPtr(true),
-				EnableProfilingHandler:  utilpointer.BoolPtr(true),
-				EnableDebugFlagsHandler: utilpointer.BoolPtr(true),
-				SeccompDefault:          utilpointer.BoolPtr(false),
-				MemoryThrottlingFactor:  utilpointer.Float64Ptr(DefaultMemoryThrottlingFactor),
-				RegisterNode:            utilpointer.BoolPtr(true),
+				EnableSystemLogHandler:        utilpointer.BoolPtr(true),
+				EnableProfilingHandler:        utilpointer.BoolPtr(true),
+				EnableDebugFlagsHandler:       utilpointer.BoolPtr(true),
+				SeccompDefault:                utilpointer.BoolPtr(false),
+				MemoryThrottlingFactor:        utilpointer.Float64Ptr(DefaultMemoryThrottlingFactor),
+				RegisterNode:                  utilpointer.BoolPtr(true),
+				LocalStorageCapacityIsolation: utilpointer.BoolPtr(true),
 			},
 		},
 	}

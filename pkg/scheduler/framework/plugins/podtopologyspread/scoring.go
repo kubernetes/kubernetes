@@ -59,7 +59,11 @@ func (s *preScoreState) Clone() framework.StateData {
 func (pl *PodTopologySpread) initPreScoreState(s *preScoreState, pod *v1.Pod, filteredNodes []*v1.Node, requireAllTopologies bool) error {
 	var err error
 	if len(pod.Spec.TopologySpreadConstraints) > 0 {
-		s.Constraints, err = filterTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints, v1.ScheduleAnyway, pl.enableMinDomainsInPodTopologySpread)
+		s.Constraints, err = pl.filterTopologySpreadConstraints(
+			pod.Spec.TopologySpreadConstraints,
+			pod.Labels,
+			v1.ScheduleAnyway,
+		)
 		if err != nil {
 			return fmt.Errorf("obtaining pod's soft topology spread constraints: %w", err)
 		}
@@ -148,14 +152,25 @@ func (pl *PodTopologySpread) PreScore(
 		if node == nil {
 			return
 		}
-		// (1) `node` should satisfy incoming pod's NodeSelector/NodeAffinity
-		// (2) All topologyKeys need to be present in `node`
-		match, _ := requiredNodeAffinity.Match(node)
-		if !match || (requireAllTopologies && !nodeLabelsMatchSpreadConstraints(node.Labels, state.Constraints)) {
+
+		if !pl.enableNodeInclusionPolicyInPodTopologySpread {
+			// `node` should satisfy incoming pod's NodeSelector/NodeAffinity
+			if match, _ := requiredNodeAffinity.Match(node); !match {
+				return
+			}
+		}
+
+		// All topologyKeys need to be present in `node`
+		if requireAllTopologies && !nodeLabelsMatchSpreadConstraints(node.Labels, state.Constraints) {
 			return
 		}
 
 		for _, c := range state.Constraints {
+			if pl.enableNodeInclusionPolicyInPodTopologySpread &&
+				!c.matchNodeInclusionPolicies(pod, node, requiredNodeAffinity) {
+				continue
+			}
+
 			pair := topologyPair{key: c.TopologyKey, value: node.Labels[c.TopologyKey]}
 			// If current topology pair is not associated with any candidate node,
 			// continue to avoid unnecessary calculation.

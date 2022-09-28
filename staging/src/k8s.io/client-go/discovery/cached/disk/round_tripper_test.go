@@ -18,6 +18,7 @@ package disk
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -25,6 +26,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/peterbourgon/diskv"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -38,6 +40,35 @@ type testRoundTripper struct {
 func (rt *testRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	rt.Request = req
 	return rt.Response, rt.Err
+}
+
+func BenchmarkDiskCache(b *testing.B) {
+	cacheDir, err := ioutil.TempDir("", "cache-rt")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(cacheDir)
+
+	d := diskv.New(diskv.Options{
+		PathPerm: os.FileMode(0750),
+		FilePerm: os.FileMode(0660),
+		BasePath: cacheDir,
+		TempDir:  filepath.Join(cacheDir, ".diskv-temp"),
+	})
+
+	k := "localhost:8080/apis/batch/v1.json"
+	v, err := ioutil.ReadFile("../../testdata/apis/batch/v1.json")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	c := sumDiskCache{disk: d}
+
+	for n := 0; n < b.N; n++ {
+		c.Set(k, v)
+		c.Get(k)
+		c.Delete(k)
+	}
 }
 
 func TestCacheRoundTripper(t *testing.T) {
@@ -144,4 +175,147 @@ func TestCacheRoundTripperPathPerm(t *testing.T) {
 		return nil
 	})
 	assert.NoError(err)
+}
+
+func TestSumDiskCache(t *testing.T) {
+	assert := assert.New(t)
+
+	// Ensure that we'll return a cache miss if the backing file doesn't exist.
+	t.Run("NoSuchKey", func(t *testing.T) {
+		cacheDir, err := ioutil.TempDir("", "cache-test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.RemoveAll(cacheDir)
+		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
+		c := &sumDiskCache{disk: d}
+
+		key := "testing"
+
+		got, ok := c.Get(key)
+		assert.False(ok)
+		assert.Equal([]byte{}, got)
+	})
+
+	// Ensure that we'll return a cache miss if the backing file is empty.
+	t.Run("EmptyFile", func(t *testing.T) {
+		cacheDir, err := ioutil.TempDir("", "cache-test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.RemoveAll(cacheDir)
+		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
+		c := &sumDiskCache{disk: d}
+
+		key := "testing"
+
+		f, err := os.Create(filepath.Join(cacheDir, sanitize(key)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.Close()
+
+		got, ok := c.Get(key)
+		assert.False(ok)
+		assert.Equal([]byte{}, got)
+	})
+
+	// Ensure that we'll return a cache miss if the backing has an invalid
+	// checksum.
+	t.Run("InvalidChecksum", func(t *testing.T) {
+		cacheDir, err := ioutil.TempDir("", "cache-test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.RemoveAll(cacheDir)
+		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
+		c := &sumDiskCache{disk: d}
+
+		key := "testing"
+		value := []byte("testing")
+		mismatchedValue := []byte("testink")
+		sum := sha256.Sum256(value)
+
+		// Create a file with the sum of 'value' followed by the bytes of
+		// 'mismatchedValue'.
+		f, err := os.Create(filepath.Join(cacheDir, sanitize(key)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.Write(sum[:])
+		f.Write(mismatchedValue)
+		f.Close()
+
+		// The mismatched checksum should result in a cache miss.
+		got, ok := c.Get(key)
+		assert.False(ok)
+		assert.Equal([]byte{}, got)
+	})
+
+	// Ensure that our disk cache will happily cache over the top of an existing
+	// value. We depend on this behaviour to recover from corrupted cache
+	// entries. When Get detects a bad checksum it will return a cache miss.
+	// This should cause httpcache to fall back to its underlying transport and
+	// to subsequently cache the new value, overwriting the corrupt one.
+	t.Run("OverwriteExistingKey", func(t *testing.T) {
+		cacheDir, err := ioutil.TempDir("", "cache-test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.RemoveAll(cacheDir)
+		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
+		c := &sumDiskCache{disk: d}
+
+		key := "testing"
+		value := []byte("cool value!")
+
+		// Write a value.
+		c.Set(key, value)
+		got, ok := c.Get(key)
+
+		// Ensure we can read back what we wrote.
+		assert.True(ok)
+		assert.Equal(value, got)
+
+		differentValue := []byte("I'm different!")
+
+		// Write a different value.
+		c.Set(key, differentValue)
+		got, ok = c.Get(key)
+
+		// Ensure we can read back the different value.
+		assert.True(ok)
+		assert.Equal(differentValue, got)
+	})
+
+	// Ensure that deleting a key does in fact delete it.
+	t.Run("DeleteKey", func(t *testing.T) {
+		cacheDir, err := ioutil.TempDir("", "cache-test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.RemoveAll(cacheDir)
+		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
+		c := &sumDiskCache{disk: d}
+
+		key := "testing"
+		value := []byte("coolValue")
+
+		c.Set(key, value)
+
+		// Ensure we successfully set the value.
+		got, ok := c.Get(key)
+		assert.True(ok)
+		assert.Equal(value, got)
+
+		c.Delete(key)
+
+		// Ensure the value is gone.
+		got, ok = c.Get(key)
+		assert.False(ok)
+		assert.Equal([]byte{}, got)
+
+		// Ensure that deleting a non-existent value is a no-op.
+		c.Delete(key)
+	})
 }

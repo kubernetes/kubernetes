@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	restful "github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful/v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/types"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
@@ -82,16 +82,7 @@ var (
 		&compbasemetrics.GaugeOpts{
 			Name:           "apiserver_longrunning_requests",
 			Help:           "Gauge of all active long-running apiserver requests broken out by verb, group, version, resource, scope and component. Not all requests are tracked this way.",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
-	)
-	longRunningRequestGauge = compbasemetrics.NewGaugeVec(
-		&compbasemetrics.GaugeOpts{
-			Name:              "apiserver_longrunning_gauge",
-			Help:              "Gauge of all active long-running apiserver requests broken out by verb, group, version, resource, scope and component. Not all requests are tracked this way.",
-			StabilityLevel:    compbasemetrics.ALPHA,
-			DeprecatedVersion: "1.23.0",
+			StabilityLevel: compbasemetrics.STABLE,
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
 	)
@@ -102,7 +93,7 @@ var (
 			// This metric is used for verifying api call latencies SLO,
 			// as well as tracking regressions in this aspects.
 			// Thus we customize buckets significantly, to empower both usecases.
-			Buckets: []float64{0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3,
+			Buckets: []float64{0.005, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3,
 				4, 5, 6, 8, 10, 15, 20, 30, 45, 60},
 			StabilityLevel: compbasemetrics.STABLE,
 		},
@@ -144,16 +135,6 @@ var (
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
 	)
-	// droppedRequests is a number of requests dropped with 'Try again later' response"
-	droppedRequests = compbasemetrics.NewCounterVec(
-		&compbasemetrics.CounterOpts{
-			Name:              "apiserver_dropped_requests_total",
-			Help:              "Number of requests dropped with 'Try again later' response. Use apiserver_request_total and/or apiserver_request_terminations_total metrics instead.",
-			StabilityLevel:    compbasemetrics.ALPHA,
-			DeprecatedVersion: "1.24.0",
-		},
-		[]string{"request_kind"},
-	)
 	// TLSHandshakeErrors is a number of requests dropped with 'TLS handshake error from' error
 	TLSHandshakeErrors = compbasemetrics.NewCounter(
 		&compbasemetrics.CounterOpts{
@@ -161,16 +142,6 @@ var (
 			Help:           "Number of requests dropped with 'TLS handshake error from' error",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-	)
-	// RegisteredWatchers is a number of currently registered watchers splitted by resource.
-	RegisteredWatchers = compbasemetrics.NewGaugeVec(
-		&compbasemetrics.GaugeOpts{
-			Name:              "apiserver_registered_watchers",
-			Help:              "Number of currently registered watchers for a given resources",
-			StabilityLevel:    compbasemetrics.ALPHA,
-			DeprecatedVersion: "1.23.0",
-		},
-		[]string{"group", "version", "kind"},
 	)
 	WatchEvents = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
@@ -266,18 +237,27 @@ var (
 		[]string{"source", "status"},
 	)
 
+	requestTimestampComparisonDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name:           "apiserver_request_timestamp_comparison_time",
+			Help:           "Time taken for comparison of old vs new objects in UPDATE or PATCH requests",
+			Buckets:        []float64{0.0001, 0.0003, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 5.0},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		// Path the code takes to reach a conclusion:
+		// i.e. unequalObjectsFast, unequalObjectsSlow, equalObjectsSlow
+		[]string{"code_path"},
+	)
+
 	metrics = []resettableCollector{
 		deprecatedRequestGauge,
 		requestCounter,
 		longRunningRequestsGauge,
-		longRunningRequestGauge,
 		requestLatencies,
 		requestSloLatencies,
 		fieldValidationRequestLatencies,
 		responseSizes,
-		droppedRequests,
 		TLSHandshakeErrors,
-		RegisteredWatchers,
 		WatchEvents,
 		WatchEventsSizes,
 		currentInflightRequests,
@@ -287,6 +267,7 @@ var (
 		requestFilterDuration,
 		requestAbortsTotal,
 		requestPostTimeoutTotal,
+		requestTimestampComparisonDuration,
 	}
 
 	// these are the valid request methods which we report in our metrics. Any other request methods
@@ -397,6 +378,10 @@ func RecordFilterLatency(ctx context.Context, name string, elapsed time.Duration
 	requestFilterDuration.WithContext(ctx).WithLabelValues(name).Observe(elapsed.Seconds())
 }
 
+func RecordTimestampComparisonLatency(codePath string, elapsed time.Duration) {
+	requestTimestampComparisonDuration.WithLabelValues(codePath).Observe(elapsed.Seconds())
+}
+
 func RecordRequestPostTimeout(source string, status string) {
 	requestPostTimeoutTotal.WithLabelValues(source, status).Inc()
 }
@@ -436,12 +421,6 @@ func RecordDroppedRequest(req *http.Request, requestInfo *request.RequestInfo, c
 	} else {
 		requestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, "", "", "", requestInfo.Subresource, scope, component, codeToString(http.StatusTooManyRequests), "").Inc()
 	}
-
-	if isMutatingRequest {
-		droppedRequests.WithContext(req.Context()).WithLabelValues(MutatingKind).Inc()
-	} else {
-		droppedRequests.WithContext(req.Context()).WithLabelValues(ReadOnlyKind).Inc()
-	}
 }
 
 // RecordRequestTermination records that the request was terminated early as part of a resource
@@ -473,7 +452,7 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 	if requestInfo == nil {
 		requestInfo = &request.RequestInfo{Verb: req.Method, Path: req.URL.Path}
 	}
-	var g, e compbasemetrics.GaugeMetric
+	var g compbasemetrics.GaugeMetric
 	scope := CleanScope(requestInfo)
 
 	// We don't use verb from <requestInfo>, as this may be propagated from
@@ -483,18 +462,12 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), getVerbIfWatch(req), req)
 
 	if requestInfo.IsResourceRequest {
-		e = longRunningRequestsGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component)
-		g = longRunningRequestGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component)
+		g = longRunningRequestsGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component)
 	} else {
-		e = longRunningRequestsGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, "", "", "", requestInfo.Path, scope, component)
-		g = longRunningRequestGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, "", "", "", requestInfo.Path, scope, component)
+		g = longRunningRequestsGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, "", "", "", requestInfo.Path, scope, component)
 	}
-	e.Inc()
 	g.Inc()
-	defer func() {
-		e.Dec()
-		g.Dec()
-	}()
+	defer g.Dec()
 	fn()
 }
 
@@ -583,7 +556,7 @@ func InstrumentHandlerFunc(verb, group, version, resource, subresource, scope, c
 
 // CleanScope returns the scope of the request.
 func CleanScope(requestInfo *request.RequestInfo) string {
-	if requestInfo.Name != "" {
+	if requestInfo.Name != "" || requestInfo.Verb == "create" {
 		return "resource"
 	}
 	if requestInfo.Namespace != "" {

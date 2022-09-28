@@ -108,4 +108,11 @@ func TestUIDTrackingExpectations(t *testing.T) {
 			t.Errorf("Unexpected keys for job %s (-want,+got):\n%s", track.job, diff)
 		}
 	}
+	for _, track := range tracks {
+		expectations.deleteExpectations(track.job)
+		uids := expectations.getSet(track.job)
+		if uids != nil {
+			t.Errorf("Wanted expectations for job %s to be cleared, but they were not", track.job)
+		}
+	}
 }

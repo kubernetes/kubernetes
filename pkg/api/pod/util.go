@@ -46,11 +46,7 @@ const AllContainers ContainerType = (InitContainers | Containers | EphemeralCont
 // AllFeatureEnabledContainers returns a ContainerType mask which includes all container
 // types except for the ones guarded by feature gate.
 func AllFeatureEnabledContainers() ContainerType {
-	containerType := AllContainers
-	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
-		containerType &= ^EphemeralContainers
-	}
-	return containerType
+	return AllContainers
 }
 
 // ContainerVisitor is called with each container spec, and returns true
@@ -329,20 +325,6 @@ func usesHugePagesInProjectedEnv(item api.Container) bool {
 	return false
 }
 
-// hasSysctlsWithSlashNames returns true if the sysctl name contains a slash, otherwise it returns false
-func hasSysctlsWithSlashNames(podSpec *api.PodSpec) bool {
-	if podSpec.SecurityContext == nil {
-		return false
-	}
-	securityContext := podSpec.SecurityContext
-	for _, s := range securityContext.Sysctls {
-		if strings.Contains(s.Name, "/") {
-			return true
-		}
-	}
-	return false
-}
-
 func checkContainerUseIndivisibleHugePagesValues(container api.Container) bool {
 	for resourceName, quantity := range container.Resources.Limits {
 		if helper.IsHugePageResourceName(resourceName) {
@@ -432,10 +414,6 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowWindowsHostProcessField:    utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostProcessContainers),
 		// Allow pod spec with expanded DNS configuration
 		AllowExpandedDNSConfig: utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) || haveSameExpandedDNSConfig(podSpec, oldPodSpec),
-		// Allow pod spec to use OS field
-		AllowOSField: utilfeature.DefaultFeatureGate.Enabled(features.IdentifyPodOS),
-		// The default sysctl value does not contain a forward slash, and in 1.24 we intend to relax this to be true by default
-		AllowSysctlRegexContainSlash: false,
 	}
 
 	if oldPodSpec != nil {
@@ -451,14 +429,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		// if old spec has Windows Host Process fields set, we must allow it
 		opts.AllowWindowsHostProcessField = opts.AllowWindowsHostProcessField || setsWindowsHostProcess(oldPodSpec)
 
-		// if old spec has OS field set, we must allow it
-		opts.AllowOSField = opts.AllowOSField || oldPodSpec.OS != nil
-
 		// if old spec used non-integer multiple of huge page unit size, we must allow it
 		opts.AllowIndivisibleHugePagesValues = usesIndivisibleHugePagesValues(oldPodSpec)
-
-		// if old spec used use relaxed validation for Update requests where the existing object's sysctl contains a slash, we must allow it.
-		opts.AllowSysctlRegexContainSlash = hasSysctlsWithSlashNames(oldPodSpec)
 
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
@@ -545,18 +517,6 @@ func dropDisabledFields(
 		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) && !emptyDirSizeLimitInUse(oldPodSpec) {
-		for i := range podSpec.Volumes {
-			if podSpec.Volumes[i].EmptyDir != nil {
-				podSpec.Volumes[i].EmptyDir.SizeLimit = nil
-			}
-		}
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) && !ephemeralContainersInUse(oldPodSpec) {
-		podSpec.EphemeralContainers = nil
-	}
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ProbeTerminationGracePeriod) && !probeGracePeriodInUse(oldPodSpec) {
 		// Set pod-level terminationGracePeriodSeconds to nil if the feature is disabled and it is not used
 		VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
@@ -571,15 +531,20 @@ func dropDisabledFields(
 		})
 	}
 
-	dropDisabledProcMountField(podSpec, oldPodSpec)
-
-	dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec)
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IdentifyPodOS) && !podOSInUse(oldPodSpec) {
-		podSpec.OS = nil
+	// If the feature is disabled and not in use, drop the hostUsers field.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesStatelessPodsSupport) && !hostUsersInUse(oldPodSpec) {
+		// Drop the field in podSpec only if SecurityContext is not nil.
+		// If it is nil, there is no need to set hostUsers=nil (it will be nil too).
+		if podSpec.SecurityContext != nil {
+			podSpec.SecurityContext.HostUsers = nil
+		}
 	}
 
+	dropDisabledProcMountField(podSpec, oldPodSpec)
+
 	dropDisabledTopologySpreadConstraintsFields(podSpec, oldPodSpec)
+	dropDisabledNodeInclusionPolicyFields(podSpec, oldPodSpec)
+	dropDisabledMatchLabelKeysField(podSpec, oldPodSpec)
 }
 
 // dropDisabledTopologySpreadConstraintsFields removes disabled fields from PodSpec related
@@ -609,17 +574,6 @@ func minDomainsInUse(podSpec *api.PodSpec) bool {
 	return false
 }
 
-// podOSInUse returns true if the pod spec is non-nil and has OS field set
-func podOSInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	if podSpec.OS != nil {
-		return true
-	}
-	return false
-}
-
 // dropDisabledProcMountField removes disabled fields from PodSpec related
 // to ProcMount only if it is not already used by the old spec
 func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
@@ -637,21 +591,83 @@ func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
 	}
 }
 
-// dropDisabledCSIVolumeSourceAlphaFields removes disabled alpha fields from []CSIVolumeSource.
-// This should be called from PrepareForCreate/PrepareForUpdate for all pod specs resources containing a CSIVolumeSource
-func dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) && !csiInUse(oldPodSpec) {
-		for i := range podSpec.Volumes {
-			podSpec.Volumes[i].CSI = nil
+// dropDisabledNodeInclusionPolicyFields removes disabled fields from PodSpec related
+// to NodeInclusionPolicy only if it is not used by the old spec.
+func dropDisabledNodeInclusionPolicyFields(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.NodeInclusionPolicyInPodTopologySpread) && podSpec != nil {
+		if !nodeTaintsPolicyInUse(oldPodSpec) {
+			for i := range podSpec.TopologySpreadConstraints {
+				podSpec.TopologySpreadConstraints[i].NodeTaintsPolicy = nil
+			}
+		}
+		if !nodeAffinityPolicyInUse(oldPodSpec) {
+			for i := range podSpec.TopologySpreadConstraints {
+				podSpec.TopologySpreadConstraints[i].NodeAffinityPolicy = nil
+			}
 		}
 	}
 }
 
-func ephemeralContainersInUse(podSpec *api.PodSpec) bool {
+// dropDisabledMatchLabelKeysField removes disabled fields from PodSpec related
+// to MatchLabelKeys only if it is not already used by the old spec.
+func dropDisabledMatchLabelKeysField(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread) && !matchLabelKeysInUse(oldPodSpec) {
+		for i := range podSpec.TopologySpreadConstraints {
+			podSpec.TopologySpreadConstraints[i].MatchLabelKeys = nil
+		}
+	}
+}
+
+// matchLabelKeysInUse returns true if the pod spec is non-nil
+// and has MatchLabelKeys field set in TopologySpreadConstraints.
+func matchLabelKeysInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
 		return false
 	}
-	return len(podSpec.EphemeralContainers) > 0
+
+	for _, c := range podSpec.TopologySpreadConstraints {
+		if len(c.MatchLabelKeys) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// nodeAffinityPolicyInUse returns true if the pod spec is non-nil and has NodeAffinityPolicy field set
+// in TopologySpreadConstraints
+func nodeAffinityPolicyInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for _, c := range podSpec.TopologySpreadConstraints {
+		if c.NodeAffinityPolicy != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// nodeTaintsPolicyInUse returns true if the pod spec is non-nil and has NodeTaintsPolicy field set
+// in TopologySpreadConstraints
+func nodeTaintsPolicyInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for _, c := range podSpec.TopologySpreadConstraints {
+		if c.NodeTaintsPolicy != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// hostUsersInUse returns true if the pod spec has spec.hostUsers field set.
+func hostUsersInUse(podSpec *api.PodSpec) bool {
+	if podSpec != nil && podSpec.SecurityContext != nil && podSpec.SecurityContext.HostUsers != nil {
+		return true
+	}
+
+	return false
 }
 
 // procMountInUse returns true if the pod spec is non-nil and has a SecurityContext's ProcMount field set to a non-default value
@@ -685,21 +701,6 @@ func appArmorInUse(podAnnotations map[string]string) bool {
 	return false
 }
 
-// emptyDirSizeLimitInUse returns true if any pod's EmptyDir volumes use SizeLimit.
-func emptyDirSizeLimitInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	for i := range podSpec.Volumes {
-		if podSpec.Volumes[i].EmptyDir != nil {
-			if podSpec.Volumes[i].EmptyDir.SizeLimit != nil {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 // probeGracePeriodInUse returns true if the pod spec is non-nil and has a probe that makes use
 // of the probe-level terminationGracePeriodSeconds feature
 func probeGracePeriodInUse(podSpec *api.PodSpec) bool {
@@ -719,19 +720,6 @@ func probeGracePeriodInUse(podSpec *api.PodSpec) bool {
 	})
 
 	return inUse
-}
-
-// csiInUse returns true if any pod's spec include inline CSI volumes.
-func csiInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	for i := range podSpec.Volumes {
-		if podSpec.Volumes[i].CSI != nil {
-			return true
-		}
-	}
-	return false
 }
 
 // SeccompAnnotationForField takes a pod seccomp profile field and returns the
@@ -757,36 +745,6 @@ func SeccompAnnotationForField(field *api.SeccompProfile) string {
 	// provided field type is SeccompProfileTypeLocalhost or if an unrecognized
 	// type is specified
 	return ""
-}
-
-// SeccompFieldForAnnotation takes a pod annotation and returns the converted
-// seccomp profile field.
-func SeccompFieldForAnnotation(annotation string) *api.SeccompProfile {
-	// If only seccomp annotations are specified, copy the values into the
-	// corresponding fields. This ensures that existing applications continue
-	// to enforce seccomp, and prevents the kubelet from needing to resolve
-	// annotations & fields.
-	if annotation == v1.SeccompProfileNameUnconfined {
-		return &api.SeccompProfile{Type: api.SeccompProfileTypeUnconfined}
-	}
-
-	if annotation == api.SeccompProfileRuntimeDefault || annotation == api.DeprecatedSeccompProfileDockerDefault {
-		return &api.SeccompProfile{Type: api.SeccompProfileTypeRuntimeDefault}
-	}
-
-	if strings.HasPrefix(annotation, v1.SeccompLocalhostProfileNamePrefix) {
-		localhostProfile := strings.TrimPrefix(annotation, v1.SeccompLocalhostProfileNamePrefix)
-		if localhostProfile != "" {
-			return &api.SeccompProfile{
-				Type:             api.SeccompProfileTypeLocalhost,
-				LocalhostProfile: &localhostProfile,
-			}
-		}
-	}
-
-	// we can only reach this code path if the localhostProfile name has a zero
-	// length or if the annotation has an unrecognized value
-	return nil
 }
 
 // setsWindowsHostProcess returns true if WindowsOptions.HostProcess is set (true or false)

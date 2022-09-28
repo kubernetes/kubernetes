@@ -154,8 +154,6 @@ type NetworkPolicyPort struct {
 	// should be allowed by the policy. This field cannot be defined if the port field
 	// is not defined or if the port field is defined as a named (string) port.
 	// The endPort must be equal or greater than port.
-	// This feature is in Beta state and is enabled by default.
-	// It can be disabled using the Feature Gate "NetworkPolicyEndPort".
 	// +optional
 	EndPort *int32
 }
@@ -361,7 +359,7 @@ const (
 	// IngressClassParametersReferenceScopeNamespace indicates that the
 	// referenced Parameters resource is namespace-scoped.
 	IngressClassParametersReferenceScopeNamespace = "Namespace"
-	// IngressClassParametersReferenceScopeNamespace indicates that the
+	// IngressClassParametersReferenceScopeCluster indicates that the
 	// referenced Parameters resource is cluster-scoped.
 	IngressClassParametersReferenceScopeCluster = "Cluster"
 )
@@ -584,4 +582,68 @@ type ServiceBackendPort struct {
 	// This is a mutually exclusive setting with "Name".
 	// +optional
 	Number int32
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterCIDR represents a single configuration for per-Node Pod CIDR
+// allocations when the MultiCIDRRangeAllocator is enabled (see the config for
+// kube-controller-manager).  A cluster may have any number of ClusterCIDR
+// resources, all of which will be considered when allocating a CIDR for a
+// Node.  A ClusterCIDR is eligible to be used for a given Node when the node
+// selector matches the node in question and has free CIDRs to allocate.  In
+// case of multiple matching ClusterCIDR resources, the allocator will attempt
+// to break ties using internal heuristics, but any ClusterCIDR whose node
+// selector matches the Node may be used.
+type ClusterCIDR struct {
+	metav1.TypeMeta
+	metav1.ObjectMeta
+
+	Spec ClusterCIDRSpec
+}
+
+// ClusterCIDRSpec defines the desired state of ClusterCIDR.
+type ClusterCIDRSpec struct {
+	// NodeSelector defines which nodes the config is applicable to.
+	// An empty or nil NodeSelector selects all nodes.
+	// This field is immutable.
+	// +optional
+	NodeSelector *api.NodeSelector
+
+	// PerNodeHostBits defines the number of host bits to be configured per node.
+	// A subnet mask determines how much of the address is used for network bits
+	// and host bits. For example an IPv4 address of 192.168.0.0/24, splits the
+	// address into 24 bits for the network portion and 8 bits for the host portion.
+	// To allocate 256 IPs, set this field to 8 (a /24 mask for IPv4 or a /120 for IPv6).
+	// Minimum value is 4 (16 IPs).
+	// This field is immutable.
+	// +required
+	PerNodeHostBits int32
+
+	// IPv4 defines an IPv4 IP block in CIDR notation(e.g. "10.0.0.0/8").
+	// At least one of IPv4 and IPv6 must be specified.
+	// This field is immutable.
+	// +optional
+	IPv4 string
+
+	// IPv6 defines an IPv6 IP block in CIDR notation(e.g. "fd12:3456:789a:1::/64").
+	// At least one of IPv4 and IPv6 must be specified.
+	// This field is immutable.
+	// +optional
+	IPv6 string
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterCIDRList contains a list of ClusterCIDRs.
+type ClusterCIDRList struct {
+	metav1.TypeMeta
+
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of ClusterCIDRs.
+	Items []ClusterCIDR
 }

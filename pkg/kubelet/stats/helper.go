@@ -94,6 +94,9 @@ func cadvisorInfoToContainerStats(name string, info *cadvisorapiv2.ContainerInfo
 	result.CPU = cpu
 	result.Memory = memory
 
+	// NOTE: if they can be found, log stats will be overwritten
+	// by the caller, as it knows more information about the pod,
+	// which is needed to determine log size.
 	if rootFs != nil {
 		// The container logs live on the node rootfs device
 		result.Logs = buildLogsStats(cstat, rootFs)
@@ -150,27 +153,6 @@ func cadvisorInfoToContainerCPUAndMemoryStats(name string, info *cadvisorapiv2.C
 	result.CPU = cpu
 	result.Memory = memory
 
-	return result
-}
-
-// cadvisorInfoToAcceleratorStats returns the statsapi.AcceleratorStats converted from
-// the container info from cadvisor.
-func cadvisorInfoToAcceleratorStats(info *cadvisorapiv2.ContainerInfo) []statsapi.AcceleratorStats {
-	cstat, found := latestContainerStats(info)
-	if !found || cstat.Accelerators == nil {
-		return nil
-	}
-	var result []statsapi.AcceleratorStats
-	for _, acc := range cstat.Accelerators {
-		result = append(result, statsapi.AcceleratorStats{
-			Make:        acc.Make,
-			Model:       acc.Model,
-			ID:          acc.ID,
-			MemoryTotal: acc.MemoryTotal,
-			MemoryUsed:  acc.MemoryUsed,
-			DutyCycle:   acc.DutyCycle,
-		})
-	}
 	return result
 }
 

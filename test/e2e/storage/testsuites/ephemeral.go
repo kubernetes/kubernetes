@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
@@ -211,6 +211,67 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 			return nil
 		}
 		l.testCase.TestEphemeral()
+	})
+
+	ginkgo.It("should support expansion of pvcs created for ephemeral pvcs", func() {
+		if pattern.VolType != storageframework.GenericEphemeralVolume {
+			e2eskipper.Skipf("Skipping %s test for expansion", pattern.VolType)
+		}
+
+		init()
+		defer cleanup()
+
+		if !driver.GetDriverInfo().Capabilities[storageframework.CapOnlineExpansion] {
+			e2eskipper.Skipf("Driver %q does not support online volume expansion - skipping", driver.GetDriverInfo().Name)
+		}
+
+		l.testCase.ReadOnly = false
+		l.testCase.RunningPodCheck = func(pod *v1.Pod) interface{} {
+			podName := pod.Name
+			framework.Logf("Running volume expansion checks %s", podName)
+
+			outerPodVolumeSpecName := ""
+			for i := range pod.Spec.Volumes {
+				volume := pod.Spec.Volumes[i]
+				if volume.Ephemeral != nil {
+					outerPodVolumeSpecName = volume.Name
+					break
+				}
+			}
+			pvcName := fmt.Sprintf("%s-%s", podName, outerPodVolumeSpecName)
+			pvc, err := f.ClientSet.CoreV1().PersistentVolumeClaims(pod.Namespace).Get(context.TODO(), pvcName, metav1.GetOptions{})
+			framework.ExpectNoError(err, "error getting ephemeral pvc")
+
+			ginkgo.By("Expanding current pvc")
+			currentPvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
+			newSize := currentPvcSize.DeepCopy()
+			newSize.Add(resource.MustParse("1Gi"))
+			framework.Logf("currentPvcSize %s, requested new size %s", currentPvcSize.String(), newSize.String())
+
+			newPVC, err := ExpandPVCSize(pvc, newSize, f.ClientSet)
+			framework.ExpectNoError(err, "While updating pvc for more size")
+			pvc = newPVC
+			gomega.Expect(pvc).NotTo(gomega.BeNil())
+
+			pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
+			if pvcSize.Cmp(newSize) != 0 {
+				framework.Failf("error updating pvc %s from %s to %s size", pvc.Name, currentPvcSize.String(), newSize.String())
+			}
+
+			ginkgo.By("Waiting for cloudprovider resize to finish")
+			err = WaitForControllerVolumeResize(pvc, f.ClientSet, totalResizeWaitPeriod)
+			framework.ExpectNoError(err, "While waiting for pvc resize to finish")
+
+			ginkgo.By("Waiting for file system resize to finish")
+			pvc, err = WaitForFSResize(pvc, f.ClientSet)
+			framework.ExpectNoError(err, "while waiting for fs resize to finish")
+
+			pvcConditions := pvc.Status.Conditions
+			framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
+			return nil
+		}
+		l.testCase.TestEphemeral()
+
 	})
 
 	ginkgo.It("should support two pods which have the same volume definition", func() {

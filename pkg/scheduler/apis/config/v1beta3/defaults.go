@@ -153,25 +153,21 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta3.KubeSchedulerConfigurat
 	componentbaseconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection)
 
 	if obj.PodInitialBackoffSeconds == nil {
-		val := int64(1)
-		obj.PodInitialBackoffSeconds = &val
+		obj.PodInitialBackoffSeconds = pointer.Int64(1)
 	}
 
 	if obj.PodMaxBackoffSeconds == nil {
-		val := int64(10)
-		obj.PodMaxBackoffSeconds = &val
+		obj.PodMaxBackoffSeconds = pointer.Int64(10)
 	}
 
 	// Enable profiling by default in the scheduler
 	if obj.EnableProfiling == nil {
-		enableProfiling := true
-		obj.EnableProfiling = &enableProfiling
+		obj.EnableProfiling = pointer.BoolPtr(true)
 	}
 
 	// Enable contention profiling by default if profiling is enabled
 	if *obj.EnableProfiling && obj.EnableContentionProfiling == nil {
-		enableContentionProfiling := true
-		obj.EnableContentionProfiling = &enableContentionProfiling
+		obj.EnableContentionProfiling = pointer.BoolPtr(true)
 	}
 }
 
@@ -185,9 +181,6 @@ func SetDefaults_DefaultPreemptionArgs(obj *v1beta3.DefaultPreemptionArgs) {
 }
 
 func SetDefaults_InterPodAffinityArgs(obj *v1beta3.InterPodAffinityArgs) {
-	// Note that an object is created manually in cmd/kube-scheduler/app/options/deprecated.go
-	// DeprecatedOptions#ApplyTo.
-	// Update that object if a new default field is added here.
 	if obj.HardPodAffinityWeight == nil {
 		obj.HardPodAffinityWeight = pointer.Int32Ptr(1)
 	}
@@ -213,10 +206,8 @@ func SetDefaults_VolumeBindingArgs(obj *v1beta3.VolumeBindingArgs) {
 
 func SetDefaults_NodeResourcesBalancedAllocationArgs(obj *v1beta3.NodeResourcesBalancedAllocationArgs) {
 	if len(obj.Resources) == 0 {
-		obj.Resources = append(obj.Resources,
-			v1beta3.ResourceSpec{Name: string(v1.ResourceCPU), Weight: 1},
-			v1beta3.ResourceSpec{Name: string(v1.ResourceMemory), Weight: 1},
-		)
+		obj.Resources = defaultResourceSpec
+		return
 	}
 	// If the weight is not set or it is explicitly set to 0, then apply the default weight(1) instead.
 	for i := range obj.Resources {

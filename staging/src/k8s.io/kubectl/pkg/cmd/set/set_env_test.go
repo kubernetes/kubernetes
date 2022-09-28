@@ -720,9 +720,9 @@ func TestSetEnvFromResource(t *testing.T) {
 			assert.NoError(t, err)
 			err = opts.RunEnv()
 			if input.warning {
-				assert.Contains(t, errOut.String(), "warning")
+				assert.Contains(t, errOut.String(), "Warning")
 			} else {
-				assert.NotContains(t, errOut.String(), "warning")
+				assert.NotContains(t, errOut.String(), "Warning")
 			}
 			assert.NoError(t, err)
 		})

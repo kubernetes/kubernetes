@@ -21,7 +21,6 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	"k8s.io/utils/clock"
 )
 
@@ -30,7 +29,8 @@ import (
 // Integrator is created, and ends at the latest operation on the
 // Integrator.
 type Integrator interface {
-	metrics.ChangeObserver
+	Set(float64)
+	Add(float64)
 
 	GetResults() IntegratorResults
 
@@ -69,7 +69,7 @@ func NewIntegrator(clock clock.PassiveClock) Integrator {
 	}
 }
 
-func (igr *integrator) Observe(x float64) {
+func (igr *integrator) Set(x float64) {
 	igr.Lock()
 	igr.setLocked(x)
 	igr.Unlock()

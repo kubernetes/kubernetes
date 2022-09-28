@@ -31,7 +31,6 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
-	"path"
 	"syscall"
 	"testing"
 	"time"
@@ -39,6 +38,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
@@ -46,15 +46,14 @@ import (
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 	"k8s.io/kubernetes/test/e2e_node/services"
 	e2enodetestingmanifests "k8s.io/kubernetes/test/e2e_node/testing-manifests"
 	system "k8s.io/system-validators/validators"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/config"
-	morereporters "github.com/onsi/ginkgo/reporters"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
@@ -62,6 +61,8 @@ import (
 
 var (
 	e2es *services.E2EServices
+	// featureGates is a map of feature names to bools that enable or disable alpha/experimental features.
+	featureGates map[string]bool
 
 	// TODO(random-liu): Change the following modes to sub-command.
 	runServicesMode    = flag.Bool("run-services-mode", false, "If true, only run services (etcd, apiserver) in current process, and not run test.")
@@ -92,6 +93,7 @@ func registerNodeFlags(flags *flag.FlagSet) {
 	flag.StringVar(&framework.TestContext.ClusterDNSDomain, "dns-domain", "", "The DNS Domain of the cluster.")
 	flag.Var(cliflag.NewMapStringString(&framework.TestContext.RuntimeConfig), "runtime-config", "The runtime configuration used on node e2e tests.")
 	flags.BoolVar(&framework.TestContext.RequireDevices, "require-devices", false, "If true, require device plugins to be installed in the running environment.")
+	flags.Var(cliflag.NewMapStringBool(&featureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
 }
 
 func init() {
@@ -118,6 +120,10 @@ func TestMain(m *testing.M) {
 	rand.Seed(time.Now().UnixNano())
 	pflag.Parse()
 	framework.AfterReadingAllFlags(&framework.TestContext)
+	if err := e2eskipper.InitFeatureGates(utilfeature.DefaultFeatureGate, featureGates); err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR: initialize feature gates: %v", err)
+		os.Exit(1)
+	}
 	setExtraEnvs()
 	os.Exit(m.Run())
 }
@@ -140,7 +146,7 @@ func TestE2eNode(t *testing.T) {
 	}
 	if *runKubeletMode {
 		// If run-kubelet-mode is specified, only start kubelet.
-		services.RunKubelet()
+		services.RunKubelet(featureGates)
 		return
 	}
 	if *systemValidateMode {
@@ -170,20 +176,16 @@ func TestE2eNode(t *testing.T) {
 
 	// We're not running in a special mode so lets run tests.
 	gomega.RegisterFailHandler(ginkgo.Fail)
-	reporters := []ginkgo.Reporter{}
 	reportDir := framework.TestContext.ReportDir
 	if reportDir != "" {
 		// Create the directory if it doesn't already exist
+		// NOTE: junit report can be simply created by executing your tests with the new --junit-report flags instead.
 		if err := os.MkdirAll(reportDir, 0755); err != nil {
 			klog.Errorf("Failed creating report directory: %v", err)
-		} else {
-			// Configure a junit reporter to write to the directory
-			junitFile := fmt.Sprintf("junit_%s_%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode)
-			junitPath := path.Join(reportDir, junitFile)
-			reporters = append(reporters, morereporters.NewJUnitReporter(junitPath))
 		}
 	}
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "E2eNode Suite", reporters)
+	suiteConfig, reporterConfig := framework.CreateGinkgoConfig()
+	ginkgo.RunSpecs(t, "E2eNode Suite", suiteConfig, reporterConfig)
 }
 
 // Setup the kubelet on the node
@@ -209,7 +211,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		// If the services are expected to stop after test, they should monitor the test process.
 		// If the services are expected to keep running after test, they should not monitor the test process.
 		e2es = services.NewE2EServices(*stopServices)
-		gomega.Expect(e2es.Start()).To(gomega.Succeed(), "should be able to start node services.")
+		gomega.Expect(e2es.Start(featureGates)).To(gomega.Succeed(), "should be able to start node services.")
 	} else {
 		klog.Infof("Running tests without starting services.")
 	}

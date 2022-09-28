@@ -35,7 +35,7 @@ type KubeAPIServerConfig struct {
 	// servicesNodePortRange is the range to use for assigning service public ports on a host.
 	ServicesNodePortRange string `json:"servicesNodePortRange"`
 
-	// consolePublicURL is an optional URL to provide a redirect from the kube-apiserver to the webconsole
+	// DEPRECATED: consolePublicURL has been deprecated and setting it has no effect.
 	ConsolePublicURL string `json:"consolePublicURL"`
 
 	// UserAgentMatchingConfig controls how API calls from *voluntarily* identifying clients will be handled.  THIS DOES NOT DEFEND AGAINST MALICIOUS CLIENTS!

@@ -262,12 +262,16 @@ func TestCertOrKeyExist(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpdir)
 
-	caCert := &x509.Certificate{}
-	actual := WriteCertAndKey(tmpdir, "foo", caCert, rootCAKey)
-	if actual != nil {
+	if err = WriteCertAndKey(tmpdir, "foo-0", rootCACert, rootCAKey); err != nil {
 		t.Errorf(
 			"failed WriteCertAndKey with an error: %v",
-			actual,
+			err,
+		)
+	}
+	if err = WriteCert(tmpdir, "foo-1", rootCACert); err != nil {
+		t.Errorf(
+			"failed WriteCert with an error: %v",
+			err,
 		)
 	}
 
@@ -284,9 +288,15 @@ func TestCertOrKeyExist(t *testing.T) {
 			expected: false,
 		},
 		{
-			desc:     "valid path and name",
+			desc:     "valid path and name, both cert and key exist",
 			path:     tmpdir,
-			name:     "foo",
+			name:     "foo-0",
+			expected: true,
+		},
+		{
+			desc:     "valid path and name, only cert exist",
+			path:     tmpdir,
+			name:     "foo-1",
 			expected: true,
 		},
 	}

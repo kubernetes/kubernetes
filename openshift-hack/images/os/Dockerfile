@@ -1,3 +1,14 @@
+# this should match whatever we have in https://github.com/openshift/release/blob/master/ci-operator/config/openshift/kubernetes/openshift-kubernetes-master.yaml
+# - context_dir: openshift-hack/images/os/
+#   from: base
+#   inputs:
+#     base-machine-with-rpms:
+#       as:
+#       - centos:stream9 <-- here
+#     machine-os-content-base:
+#       as:
+#       - registry.svc.ci.openshift.org/openshift/origin-v4.0:machine-os-content
+#   to: machine-os-content
 FROM centos:stream9 As build
 
 # the registry is defined here:

@@ -217,40 +217,38 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 
 	var migratedPlugins = map[string](func() bool){
 		csitranslationplugins.GCEPDInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
 		},
 		csitranslationplugins.AWSEBSInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWS)
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWS)
 		},
 		csitranslationplugins.CinderInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration)
+			return true
 		},
 		csitranslationplugins.AzureDiskInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk)
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk)
 		},
 		csitranslationplugins.AzureFileInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureFile)
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureFile)
 		},
 		csitranslationplugins.VSphereInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationvSphere)
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationvSphere)
 		},
 		csitranslationplugins.PortworxVolumePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx)
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx)
 		},
 		csitranslationplugins.RBDVolumePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationRBD)
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationRBD)
 		},
 	}
 
 	// Initializing the label management channels
 	nim = nodeinfomanager.NewNodeInfoManager(host.GetNodeName(), host, migratedPlugins)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
-		// This function prevents Kubelet from posting Ready status until CSINode
-		// is both installed and initialized
-		if err := initializeCSINode(host); err != nil {
-			return errors.New(log("failed to initialize CSINode: %v", err))
-		}
+	// This function prevents Kubelet from posting Ready status until CSINode
+	// is both installed and initialized
+	if err := initializeCSINode(host); err != nil {
+		return errors.New(log("failed to initialize CSINode: %v", err))
 	}
 
 	return nil
@@ -336,12 +334,8 @@ func (p *csiPlugin) CanSupport(spec *volume.Spec) bool {
 	if spec == nil {
 		return false
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
-		return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CSI != nil) ||
-			(spec.Volume != nil && spec.Volume.CSI != nil)
-	}
-
-	return spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CSI != nil
+	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CSI != nil) ||
+		(spec.Volume != nil && spec.Volume.CSI != nil)
 }
 
 func (p *csiPlugin) RequiresRemount(spec *volume.Spec) bool {
@@ -353,7 +347,7 @@ func (p *csiPlugin) RequiresRemount(spec *volume.Spec) bool {
 		klog.V(5).Info(log("Failed to mark %q as republish required, err: %v", spec.Name(), err))
 		return false
 	}
-	csiDriver, err := p.csiDriverLister.Get(driverName)
+	csiDriver, err := p.getCSIDriver(driverName)
 	if err != nil {
 		klog.V(5).Info(log("Failed to mark %q as republish required, err: %v", spec.Name(), err))
 		return false
@@ -378,7 +372,7 @@ func (p *csiPlugin) NewMounter(
 	)
 
 	switch {
-	case volSrc != nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume):
+	case volSrc != nil:
 		volumeHandle = makeVolumeHandle(string(pod.UID), spec.Name())
 		driverName = volSrc.Driver
 		if volSrc.ReadOnly != nil {
@@ -522,13 +516,10 @@ func (p *csiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.S
 	klog.V(4).Info(log("plugin.ConstructVolumeSpec extracted [%#v]", volData))
 
 	var spec *volume.Spec
-	inlineEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume)
-
-	// If inlineEnabled is true and mode is VolumeLifecycleEphemeral,
-	// use constructVolSourceSpec to construct volume source spec.
-	// If inlineEnabled is false or mode is VolumeLifecyclePersistent,
+	// If mode is VolumeLifecycleEphemeral, use constructVolSourceSpec
+	// to construct volume source spec. If mode is VolumeLifecyclePersistent,
 	// use constructPVSourceSpec to construct volume construct pv source spec.
-	if inlineEnabled && storage.VolumeLifecycleMode(volData[volDataKey.volumeLifecycleMode]) == storage.VolumeLifecycleEphemeral {
+	if storage.VolumeLifecycleMode(volData[volDataKey.volumeLifecycleMode]) == storage.VolumeLifecycleEphemeral {
 		spec = p.constructVolSourceSpec(volData[volDataKey.specVolID], volData[volDataKey.driverName])
 		return spec, nil
 	}
@@ -550,7 +541,7 @@ func (p *csiPlugin) constructVolSourceSpec(volSpecName, driverName string) *volu
 	return volume.NewSpecFromVolume(vol)
 }
 
-//constructPVSourceSpec constructs volume.Spec with CSIPersistentVolumeSource
+// constructPVSourceSpec constructs volume.Spec with CSIPersistentVolumeSource
 func (p *csiPlugin) constructPVSourceSpec(volSpecName, driverName, volumeHandle string) *volume.Spec {
 	fsMode := api.PersistentVolumeFilesystem
 	pv := &api.PersistentVolume{
@@ -583,6 +574,24 @@ func (p *csiPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (p *csiPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		driver, err := GetCSIDriverName(spec)
+		if err != nil {
+			return false, err
+		}
+		csiDriver, err := p.getCSIDriver(driver)
+		if err != nil {
+			return false, err
+		}
+		if csiDriver.Spec.SELinuxMount != nil {
+			return *csiDriver.Spec.SELinuxMount, nil
+		}
+		return false, nil
+	}
+	return false, nil
+}
+
 // volume.AttachableVolumePlugin methods
 var _ volume.AttachableVolumePlugin = &csiPlugin{}
 
@@ -601,17 +610,14 @@ func (p *csiPlugin) NewDetacher() (volume.Detacher, error) {
 }
 
 func (p *csiPlugin) CanAttach(spec *volume.Spec) (bool, error) {
-	inlineEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume)
-	if inlineEnabled {
-		volumeLifecycleMode, err := p.getVolumeLifecycleMode(spec)
-		if err != nil {
-			return false, err
-		}
+	volumeLifecycleMode, err := p.getVolumeLifecycleMode(spec)
+	if err != nil {
+		return false, err
+	}
 
-		if volumeLifecycleMode == storage.VolumeLifecycleEphemeral {
-			klog.V(5).Info(log("plugin.CanAttach = false, ephemeral mode detected for spec %v", spec.Name()))
-			return false, nil
-		}
+	if volumeLifecycleMode == storage.VolumeLifecycleEphemeral {
+		klog.V(5).Info(log("plugin.CanAttach = false, ephemeral mode detected for spec %v", spec.Name()))
+		return false, nil
 	}
 
 	pvSrc, err := getCSISourceFromSpec(spec)
@@ -631,12 +637,6 @@ func (p *csiPlugin) CanAttach(spec *volume.Spec) (bool, error) {
 
 // CanDeviceMount returns true if the spec supports device mount
 func (p *csiPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
-	inlineEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume)
-	if !inlineEnabled {
-		// No need to check anything, we assume it is a persistent volume.
-		return true, nil
-	}
-
 	volumeLifecycleMode, err := p.getVolumeLifecycleMode(spec)
 	if err != nil {
 		return false, err
@@ -793,17 +793,7 @@ func (p *csiPlugin) ConstructBlockVolumeSpec(podUID types.UID, specVolName, mapP
 // skipAttach looks up CSIDriver object associated with driver name
 // to determine if driver requires attachment volume operation
 func (p *csiPlugin) skipAttach(driver string) (bool, error) {
-	kletHost, ok := p.host.(volume.KubeletVolumeHost)
-	if ok {
-		if err := kletHost.WaitForCacheSync(); err != nil {
-			return false, err
-		}
-	}
-
-	if p.csiDriverLister == nil {
-		return false, errors.New("CSIDriver lister does not exist")
-	}
-	csiDriver, err := p.csiDriverLister.Get(driver)
+	csiDriver, err := p.getCSIDriver(driver)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// Don't skip attach if CSIDriver does not exist
@@ -817,31 +807,31 @@ func (p *csiPlugin) skipAttach(driver string) (bool, error) {
 	return false, nil
 }
 
+func (p *csiPlugin) getCSIDriver(driver string) (*storage.CSIDriver, error) {
+	kletHost, ok := p.host.(volume.KubeletVolumeHost)
+	if ok {
+		if err := kletHost.WaitForCacheSync(); err != nil {
+			return nil, err
+		}
+	}
+
+	if p.csiDriverLister == nil {
+		return nil, errors.New("CSIDriver lister does not exist")
+	}
+	csiDriver, err := p.csiDriverLister.Get(driver)
+	return csiDriver, err
+}
+
 // supportsVolumeMode checks whether the CSI driver supports a volume in the given mode.
 // An error indicates that it isn't supported and explains why.
 func (p *csiPlugin) supportsVolumeLifecycleMode(driver string, volumeMode storage.VolumeLifecycleMode) error {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
-		// Feature disabled, therefore only "persistent" volumes are supported.
-		if volumeMode != storage.VolumeLifecyclePersistent {
-			return fmt.Errorf("CSIInlineVolume feature not enabled, %q volumes not supported", volumeMode)
-		}
-		return nil
-	}
-
 	// Retrieve CSIDriver. It's not an error if that isn't
 	// possible (we don't have the lister if CSIDriverRegistry is
 	// disabled) or the driver isn't found (CSIDriver is
 	// optional), but then only persistent volumes are supported.
 	var csiDriver *storage.CSIDriver
 	if p.csiDriverLister != nil {
-		kletHost, ok := p.host.(volume.KubeletVolumeHost)
-		if ok {
-			if err := kletHost.WaitForCacheSync(); err != nil {
-				return err
-			}
-		}
-
-		c, err := p.csiDriverLister.Get(driver)
+		c, err := p.getCSIDriver(driver)
 		if err != nil && !apierrors.IsNotFound(err) {
 			// Some internal error.
 			return err
@@ -887,7 +877,7 @@ func (p *csiPlugin) getVolumeLifecycleMode(spec *volume.Spec) (storage.VolumeLif
 		return "", err
 	}
 
-	if volSrc != nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+	if volSrc != nil {
 		return storage.VolumeLifecycleEphemeral, nil
 	}
 	return storage.VolumeLifecyclePersistent, nil
@@ -896,25 +886,13 @@ func (p *csiPlugin) getVolumeLifecycleMode(spec *volume.Spec) (storage.VolumeLif
 // getFSGroupPolicy returns if the CSI driver supports a volume in the given mode.
 // An error indicates that it isn't supported and explains why.
 func (p *csiPlugin) getFSGroupPolicy(driver string) (storage.FSGroupPolicy, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeFSGroupPolicy) {
-		// feature is disabled, default to ReadWriteOnceWithFSTypeFSGroupPolicy
-		return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, nil
-	}
-
 	// Retrieve CSIDriver. It's not an error if that isn't
 	// possible (we don't have the lister if CSIDriverRegistry is
 	// disabled) or the driver isn't found (CSIDriver is
 	// optional)
 	var csiDriver *storage.CSIDriver
 	if p.csiDriverLister != nil {
-		kletHost, ok := p.host.(volume.KubeletVolumeHost)
-		if ok {
-			if err := kletHost.WaitForCacheSync(); err != nil {
-				return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, err
-			}
-		}
-
-		c, err := p.csiDriverLister.Get(driver)
+		c, err := p.getCSIDriver(driver)
 		if err != nil && !apierrors.IsNotFound(err) {
 			// Some internal error.
 			return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, err
@@ -972,16 +950,7 @@ func (p *csiPlugin) newAttacherDetacher() (*csiAttacher, error) {
 
 // podInfoEnabled  check CSIDriver enabled pod info flag
 func (p *csiPlugin) podInfoEnabled(driverName string) (bool, error) {
-	kletHost, ok := p.host.(volume.KubeletVolumeHost)
-	if ok {
-		kletHost.WaitForCacheSync()
-	}
-
-	if p.csiDriverLister == nil {
-		return false, fmt.Errorf("CSIDriverLister not found")
-	}
-
-	csiDriver, err := p.csiDriverLister.Get(driverName)
+	csiDriver, err := p.getCSIDriver(driverName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			klog.V(4).Infof(log("CSIDriver %q not found, not adding pod information", driverName))

@@ -43,7 +43,7 @@ To recreate these results
 Nightly conformance tests are run against release branches and reported https://openshift-gce-devel.appspot.com/builds/origin-ci-test/logs/periodic-ci-origin-conformance-k8s/
 END
 
-version="$(grep k8s.io/kubernetes go.sum | awk '{print $2}' | sed s+/go.mod++ )"
+version="$(sed -rn 's/.*io.openshift.build.versions="kubernetes=(1.[0-9]+.[0-9]+(-rc.[0-9])?)"/v\1/p' openshift-hack/images/hyperkube/Dockerfile.rhel)"
 os::log::info "Running Kubernetes conformance suite for ${version}"
 
 # Execute OpenShift prerequisites
@@ -56,7 +56,7 @@ unschedulable="$( ( oc get nodes -o name -l 'node-role.kubernetes.io/master'; ) 
 # Execute Kubernetes prerequisites
 make WHAT=cmd/kubectl
 make WHAT=test/e2e/e2e.test
-make WHAT=vendor/github.com/onsi/ginkgo/ginkgo
+make WHAT=vendor/github.com/onsi/ginkgo/v2/ginkgo
 PATH="${OS_ROOT}/_output/local/bin/$( os::build::host_platform ):${PATH}"
 export PATH
 
@@ -85,11 +85,12 @@ rename -v junit_ junit_serial_ "${test_report_dir}"/junit*.xml
 # on a cluster using OVNKubernetes which is the default CNI in 4.12+.
 # The same is done for the more extensive suite of tests run in
 # test-kubernetes-e2e.sh.
-TEST_SKIPS="\[Serial\]| session affinity timeout "
 
 # shellcheck disable=SC2086
 ginkgo \
-  -nodes 4 -noColor "-skip=${TEST_SKIPS}" '-focus=\[Conformance\]' \
+  --timeout="24h" \
+  --output-interceptor-mode=none \
+  -nodes 4 -no-color '-skip=(\[Serial\]| session affinity timeout )' '-focus=\[Conformance\]' \
   ${e2e_test} -- \
   -report-dir "${test_report_dir}" \
   -allowed-not-ready-nodes ${unschedulable} \

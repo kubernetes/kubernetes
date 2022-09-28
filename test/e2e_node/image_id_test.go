@@ -25,13 +25,13 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("ImageID [NodeFeature: ImageID]", func() {
 
-	busyBoxImage := "k8s.gcr.io/busybox@sha256:4bdd623e848417d96127e16037743f0cd8b528c026e9175e22a84f639eca58ff"
+	busyBoxImage := "registry.k8s.io/busybox@sha256:4bdd623e848417d96127e16037743f0cd8b528c026e9175e22a84f639eca58ff"
 
 	f := framework.NewDefaultFramework("image-id-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged

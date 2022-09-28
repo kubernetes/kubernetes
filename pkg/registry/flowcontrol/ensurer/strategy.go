@@ -37,13 +37,14 @@ const (
 
 // ensureStrategy provides a strategy for ensuring apf bootstrap configurationWrapper.
 // We have two types of configurationWrapper objects:
-// - mandatory: the mandatory configurationWrapper objects are about ensuring that the P&F
-//   system itself won't crash; we have to be sure there's 'catch-all' place for
-//   everything to go. Any changes made by the cluster operators to these
-//   configurationWrapper objects will be stomped by the apiserver.
 //
-// - suggested: additional configurationWrapper objects for initial behavior.
-//   the cluster operators have an option to edit or delete these configurationWrapper objects.
+//   - mandatory: the mandatory configurationWrapper objects are about ensuring that the P&F
+//     system itself won't crash; we have to be sure there's 'catch-all' place for
+//     everything to go. Any changes made by the cluster operators to these
+//     configurationWrapper objects will be stomped by the apiserver.
+//
+//   - suggested: additional configurationWrapper objects for initial behavior.
+//     the cluster operators have an option to edit or delete these configurationWrapper objects.
 type ensureStrategy interface {
 	// Name of the strategy, for now we have two: 'mandatory' and 'suggested'.
 	// This comes handy in logging.
@@ -310,11 +311,14 @@ func removeAutoUpdateEnabledConfiguration(wrapper configurationWrapper, name str
 // getDanglingBootstrapObjectNames returns a list of names of bootstrap
 // configuration objects that are potentially candidates for deletion from
 // the cluster, given a set of bootstrap and current configuration.
-//  - bootstrap: a set of hard coded configuration kube-apiserver maintains in-memory.
-//  - current: a set of configuration objects that exist on the cluster
+//   - bootstrap: a set of hard coded configuration kube-apiserver maintains in-memory.
+//   - current: a set of configuration objects that exist on the cluster
+//
 // Any object present in current is added to the list if both a and b are true:
-//  a. the object in current is missing from the bootstrap configuration
-//  b. the object has the designated auto-update annotation key
+//
+//	a. the object in current is missing from the bootstrap configuration
+//	b. the object has the designated auto-update annotation key
+//
 // This function shares the common logic for both FlowSchema and
 // PriorityLevelConfiguration type and hence it accepts metav1.Object only.
 func getDanglingBootstrapObjectNames(bootstrap sets.String, current []metav1.Object) []string {

@@ -4,9 +4,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
 	scheme "github.com/openshift/client-go/config/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -31,6 +34,8 @@ type ImageInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ImageList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Image, err error)
+	Apply(ctx context.Context, image *configv1.ImageApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Image, err error)
+	ApplyStatus(ctx context.Context, image *configv1.ImageApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Image, err error)
 	ImageExpansion
 }
 
@@ -161,6 +166,60 @@ func (c *images) Patch(ctx context.Context, name string, pt types.PatchType, dat
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied image.
+func (c *images) Apply(ctx context.Context, image *configv1.ImageApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Image, err error) {
+	if image == nil {
+		return nil, fmt.Errorf("image provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(image)
+	if err != nil {
+		return nil, err
+	}
+	name := image.Name
+	if name == nil {
+		return nil, fmt.Errorf("image.Name must be provided to Apply")
+	}
+	result = &v1.Image{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("images").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *images) ApplyStatus(ctx context.Context, image *configv1.ImageApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Image, err error) {
+	if image == nil {
+		return nil, fmt.Errorf("image provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(image)
+	if err != nil {
+		return nil, err
+	}
+
+	name := image.Name
+	if name == nil {
+		return nil, fmt.Errorf("image.Name must be provided to Apply")
+	}
+
+	result = &v1.Image{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("images").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

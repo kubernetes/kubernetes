@@ -25,7 +25,7 @@ import (
 	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 // HPAUpgradeTest tests that HPA rescales target resource correctly before and after a cluster upgrade.

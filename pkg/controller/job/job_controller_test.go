@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -58,11 +59,11 @@ import (
 
 var alwaysReady = func() bool { return true }
 
-func newJob(parallelism, completions, backoffLimit int32, completionMode batch.CompletionMode) *batch.Job {
+func newJobWithName(name string, parallelism, completions, backoffLimit int32, completionMode batch.CompletionMode) *batch.Job {
 	j := &batch.Job{
 		TypeMeta: metav1.TypeMeta{Kind: "Job"},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "foobar",
+			Name:      name,
 			UID:       uuid.NewUUID(),
 			Namespace: metav1.NamespaceDefault,
 		},
@@ -102,6 +103,10 @@ func newJob(parallelism, completions, backoffLimit int32, completionMode batch.C
 	j.Spec.BackoffLimit = &backoffLimit
 
 	return j
+}
+
+func newJob(parallelism, completions, backoffLimit int32, completionMode batch.CompletionMode) *batch.Job {
+	return newJobWithName("foobar", parallelism, completions, backoffLimit, completionMode)
 }
 
 func newControllerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) (*Controller, informers.SharedInformerFactory) {
@@ -195,6 +200,9 @@ func TestControllerSyncJob(t *testing.T) {
 		completionMode batch.CompletionMode
 		wasSuspended   bool
 		suspend        bool
+
+		// If set, it means that the case is exclusive to tracking with/without finalizers.
+		wFinalizersExclusive *bool
 
 		// pod setup
 		podControllerError        error
@@ -480,6 +488,16 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedConditionReason: "BackoffLimitExceeded",
 			expectedPodPatches:      1,
 		},
+		"job failures, unsatisfied expectations": {
+			wFinalizersExclusive:      pointer.Bool(true),
+			parallelism:               2,
+			completions:               5,
+			deleting:                  true,
+			failedPods:                1,
+			fakeExpectationAtCreation: 1,
+			expectedFailed:            1,
+			expectedPodPatches:        1,
+		},
 		"indexed job start": {
 			parallelism:            2,
 			completions:            5,
@@ -705,6 +723,9 @@ func TestControllerSyncJob(t *testing.T) {
 			t.Run(fmt.Sprintf("%s, finalizers=%t", name, wFinalizers), func(t *testing.T) {
 				if wFinalizers && tc.podControllerError != nil {
 					t.Skip("Can't track status if finalizers can't be removed")
+				}
+				if tc.wFinalizersExclusive != nil && *tc.wFinalizersExclusive != wFinalizers {
+					t.Skipf("Test is exclusive for wFinalizers=%t", *tc.wFinalizersExclusive)
 				}
 				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobReadyPods, tc.jobReadyPodsEnabled)()
 				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, wFinalizers)()
@@ -1592,6 +1613,32 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 				},
 			},
 		},
+		"pod flips from failed to succeeded": {
+			job: batch.Job{
+				Spec: batch.JobSpec{
+					Completions: pointer.Int32(2),
+					Parallelism: pointer.Int32(2),
+				},
+				Status: batch.JobStatus{
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
+						Failed: []types.UID{"a", "b"},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				buildPod().uid("a").phase(v1.PodFailed).trackingFinalizer().Pod,
+				buildPod().uid("b").phase(v1.PodSucceeded).trackingFinalizer().Pod,
+			},
+			finishedCond:     failedCond,
+			wantRmFinalizers: 2,
+			wantStatusUpdates: []batch.JobStatus{
+				{
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
+					Failed:                  2,
+					Conditions:              []batch.JobCondition{*failedCond},
+				},
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -1615,7 +1662,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			if !errors.Is(err, tc.wantErr) {
 				t.Errorf("Got error %v, want %v", err, tc.wantErr)
 			}
-			if diff := cmp.Diff(tc.wantStatusUpdates, statusUpdates); diff != "" {
+			if diff := cmp.Diff(tc.wantStatusUpdates, statusUpdates, cmpopts.IgnoreFields(batch.JobCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
 				t.Errorf("Unexpected status updates (-want,+got):\n%s", diff)
 			}
 			rmFinalizers := len(fakePodControl.Patches)
@@ -1811,6 +1858,71 @@ func hasTrueCondition(job *batch.Job) *batch.JobConditionType {
 }
 
 func TestSyncPastDeadlineJobFinished(t *testing.T) {
+	clientset := fake.NewSimpleClientset()
+	manager, sharedInformerFactory := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	manager.podStoreSynced = alwaysReady
+	manager.jobStoreSynced = alwaysReady
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sharedInformerFactory.Start(ctx.Done())
+	sharedInformerFactory.WaitForCacheSync(ctx.Done())
+
+	go manager.Run(ctx, 1)
+
+	tests := []struct {
+		name         string
+		setStartTime bool
+		jobName      string
+	}{
+		{
+			name:         "New job created without start time being set",
+			setStartTime: false,
+			jobName:      "job1",
+		},
+		{
+			name:         "New job created with start time being set",
+			setStartTime: true,
+			jobName:      "job2",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			job := newJobWithName(tc.jobName, 1, 1, 6, batch.NonIndexedCompletion)
+			activeDeadlineSeconds := int64(1)
+			job.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
+			if tc.setStartTime {
+				start := metav1.Unix(metav1.Now().Time.Unix()-1, 0)
+				job.Status.StartTime = &start
+			}
+
+			_, err := clientset.BatchV1().Jobs(job.GetNamespace()).Create(ctx, job, metav1.CreateOptions{})
+			if err != nil {
+				t.Errorf("Could not create Job: %v", err)
+			}
+
+			if err := sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job); err != nil {
+				t.Fatalf("Failed to insert job in index: %v", err)
+			}
+			var j *batch.Job
+			err = wait.Poll(200*time.Millisecond, 3*time.Second, func() (done bool, err error) {
+				j, err = clientset.BatchV1().Jobs(metav1.NamespaceDefault).Get(ctx, job.GetName(), metav1.GetOptions{})
+				if err != nil {
+					return false, nil
+				}
+				if len(j.Status.Conditions) == 1 && j.Status.Conditions[0].Reason == "DeadlineExceeded" {
+					return true, nil
+				}
+				return false, nil
+			})
+			if err != nil {
+				t.Errorf("Job failed to enforce activeDeadlineSeconds configuration. Expected condition with Reason 'DeadlineExceeded' was not found in %v", j.Status)
+			}
+		})
+	}
+}
+
+func TestSingleJobFailedCondition(t *testing.T) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	manager, sharedInformerFactory := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	fakePodControl := controller.FakePodControl{}
@@ -1828,7 +1940,7 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	job.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
 	start := metav1.Unix(metav1.Now().Time.Unix()-15, 0)
 	job.Status.StartTime = &start
-	job.Status.Conditions = append(job.Status.Conditions, *newCondition(batch.JobFailed, v1.ConditionTrue, "DeadlineExceeded", "Job was active longer than specified deadline"))
+	job.Status.Conditions = append(job.Status.Conditions, *newCondition(batch.JobFailed, v1.ConditionFalse, "DeadlineExceeded", "Job was active longer than specified deadline"))
 	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 	forget, err := manager.syncJob(context.TODO(), testutil.GetKey(job, t))
 	if err != nil {
@@ -1837,15 +1949,20 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	if !forget {
 		t.Errorf("Unexpected forget value. Expected %v, saw %v\n", true, forget)
 	}
-	if len(fakePodControl.Templates) != 0 {
-		t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", 0, len(fakePodControl.Templates))
-	}
 	if len(fakePodControl.DeletePodName) != 0 {
 		t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", 0, len(fakePodControl.DeletePodName))
 	}
-	if actual != nil {
-		t.Error("Unexpected job modification")
+	if actual == nil {
+		t.Error("Expected job modification\n")
 	}
+	failedConditions := getConditionsByType(actual.Status.Conditions, batch.JobFailed)
+	if len(failedConditions) != 1 {
+		t.Error("Unexpected number of failed conditions\n")
+	}
+	if failedConditions[0].Status != v1.ConditionTrue {
+		t.Errorf("Unexpected status for the failed condition. Expected: %v, saw %v\n", v1.ConditionTrue, failedConditions[0].Status)
+	}
+
 }
 
 func TestSyncJobComplete(t *testing.T) {
@@ -1902,6 +2019,962 @@ func TestSyncJobDeleted(t *testing.T) {
 	}
 }
 
+func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
+	indexedCompletionMode := batch.IndexedCompletion
+	validObjectMeta := metav1.ObjectMeta{
+		Name:      "foobar",
+		UID:       uuid.NewUUID(),
+		Namespace: metav1.NamespaceDefault,
+	}
+	validSelector := &metav1.LabelSelector{
+		MatchLabels: map[string]string{"foo": "bar"},
+	}
+	validTemplate := v1.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				"foo": "bar",
+			},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Image: "foo/bar"},
+			},
+		},
+	}
+
+	onExitCodeRules := []batch.PodFailurePolicyRule{
+		{
+			Action: batch.PodFailurePolicyActionIgnore,
+			OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+				Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+				Values:   []int32{1, 2, 3},
+			},
+		},
+		{
+			Action: batch.PodFailurePolicyActionFailJob,
+			OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+				Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+				Values:   []int32{5, 6, 7},
+			},
+		},
+	}
+
+	testCases := map[string]struct {
+		enableJobPodFailurePolicy bool
+		job                       batch.Job
+		pods                      []v1.PodStatus
+		wantConditions            *[]batch.JobCondition
+		wantStatusFailed          int32
+		wantStatusActive          int32
+		wantStatusSucceeded       int32
+	}{
+		"default handling for pod failure if the container matching the exit codes does not match the containerName restriction": {
+			enableJobPodFailurePolicy: true,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:     validSelector,
+					Template:     validTemplate,
+					Parallelism:  pointer.Int32(1),
+					Completions:  pointer.Int32(1),
+					BackoffLimit: pointer.Int32(6),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: []batch.PodFailurePolicyRule{
+							{
+								Action: batch.PodFailurePolicyActionIgnore,
+								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+									ContainerName: pointer.String("main-container"),
+									Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
+									Values:        []int32{1, 2, 3},
+								},
+							},
+							{
+								Action: batch.PodFailurePolicyActionFailJob,
+								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+									ContainerName: pointer.String("main-container"),
+									Operator:      batch.PodFailurePolicyOnExitCodesOpIn,
+									Values:        []int32{5, 6, 7},
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []v1.PodStatus{
+				{
+					Phase: v1.PodFailed,
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "monitoring-container",
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									ExitCode: 5,
+								},
+							},
+						},
+						{
+							Name: "main-container",
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									ExitCode: 42,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantConditions:      nil,
+			wantStatusActive:    1,
+			wantStatusSucceeded: 0,
+			wantStatusFailed:    1,
+		},
+		"running pod should not result in job fail based on OnExitCodes": {
+			enableJobPodFailurePolicy: true,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:     validSelector,
+					Template:     validTemplate,
+					Parallelism:  pointer.Int32(1),
+					Completions:  pointer.Int32(1),
+					BackoffLimit: pointer.Int32(6),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: onExitCodeRules,
+					},
+				},
+			},
+			pods: []v1.PodStatus{
+				{
+					Phase: v1.PodRunning,
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "main-container",
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									ExitCode: 5,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantConditions:      nil,
+			wantStatusActive:    1,
+			wantStatusFailed:    0,
+			wantStatusSucceeded: 0,
+		},
+		"fail job based on OnExitCodes": {
+			enableJobPodFailurePolicy: true,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:     validSelector,
+					Template:     validTemplate,
+					Parallelism:  pointer.Int32(1),
+					Completions:  pointer.Int32(1),
+					BackoffLimit: pointer.Int32(6),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: onExitCodeRules,
+					},
+				},
+			},
+			pods: []v1.PodStatus{
+				{
+					Phase: v1.PodFailed,
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "main-container",
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									ExitCode: 5,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantConditions: &[]batch.JobCondition{
+				{
+					Type:    batch.JobFailed,
+					Status:  v1.ConditionTrue,
+					Reason:  "PodFailurePolicy",
+					Message: "Container main-container for pod default/mypod-0 failed with exit code 5 matching FailJob rule at index 1",
+				},
+			},
+			wantStatusActive:    0,
+			wantStatusFailed:    1,
+			wantStatusSucceeded: 0,
+		},
+		"job marked already as failure target with failed pod": {
+			enableJobPodFailurePolicy: true,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:     validSelector,
+					Template:     validTemplate,
+					Parallelism:  pointer.Int32(1),
+					Completions:  pointer.Int32(1),
+					BackoffLimit: pointer.Int32(6),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: onExitCodeRules,
+					},
+				},
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{
+						{
+							Type:    batch.AlphaNoCompatGuaranteeJobFailureTarget,
+							Status:  v1.ConditionTrue,
+							Reason:  "PodFailurePolicy",
+							Message: "Container main-container for pod default/mypod-0 failed with exit code 5 matching FailJob rule at index 1",
+						},
+					},
+				},
+			},
+			pods: []v1.PodStatus{
+				{
+					Phase: v1.PodFailed,
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "main-container",
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									ExitCode: 5,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantConditions: &[]batch.JobCondition{
+				{
+					Type:    batch.JobFailed,
+					Status:  v1.ConditionTrue,
+					Reason:  "PodFailurePolicy",
+					Message: "Container main-container for pod default/mypod-0 failed with exit code 5 matching FailJob rule at index 1",
+				},
+			},
+			wantStatusActive:    0,
+			wantStatusFailed:    1,
+			wantStatusSucceeded: 0,
+		},
+		"job marked already as failure target with failed pod, message based on already deleted pod": {
+			enableJobPodFailurePolicy: true,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:     validSelector,
+					Template:     validTemplate,
+					Parallelism:  pointer.Int32(1),
+					Completions:  pointer.Int32(1),
+					BackoffLimit: pointer.Int32(6),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: onExitCodeRules,
+					},
+				},
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{
+						{
+							Type:    batch.AlphaNoCompatGuaranteeJobFailureTarget,
+							Status:  v1.ConditionTrue,
+							Reason:  "PodFailurePolicy",
+							Message: "Container main-container for pod default/already-deleted-pod failed with exit code 5 matching FailJob rule at index 1",
+						},
+					},
+				},
+			},
+			pods: []v1.PodStatus{
+				{
+					Phase: v1.PodFailed,
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "main-container",
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									ExitCode: 5,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantConditions: &[]batch.JobCondition{
+				{
+					Type:    batch.JobFailed,
+					Status:  v1.ConditionTrue,
+					Reason:  "PodFailurePolicy",
+					Message: "Container main-container for pod default/already-deleted-pod failed with exit code 5 matching FailJob rule at index 1",
+				},
+			},
+			wantStatusActive:    0,
+			wantStatusFailed:    1,
+			wantStatusSucceeded: 0,
+		},
+		"default handling for a failed pod when the feature is disabled even, despite matching rule": {
+			enableJobPodFailurePolicy: false,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:     validSelector,
+					Template:     validTemplate,
+					Parallelism:  pointer.Int32(1),
+					Completions:  pointer.Int32(1),
+					BackoffLimit: pointer.Int32(6),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: onExitCodeRules,
+					},
+				},
+			},
+			pods: []v1.PodStatus{
+				{
+					Phase: v1.PodFailed,
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "main-container",
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									ExitCode: 5,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantConditions:      nil,
+			wantStatusActive:    1,
+			wantStatusFailed:    1,
+			wantStatusSucceeded: 0,
+		},
+		"fail job with multiple pods": {
+			enableJobPodFailurePolicy: true,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:     validSelector,
+					Template:     validTemplate,
+					Parallelism:  pointer.Int32(2),
+					Completions:  pointer.Int32(2),
+					BackoffLimit: pointer.Int32(6),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: onExitCodeRules,
+					},
+				},
+			},
+			pods: []v1.PodStatus{
+				{
+					Phase: v1.PodRunning,
+				},
+				{
+					Phase: v1.PodFailed,
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "main-container",
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									ExitCode: 5,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantConditions: &[]batch.JobCondition{
+				{
+					Type:    batch.JobFailed,
+					Status:  v1.ConditionTrue,
+					Reason:  "PodFailurePolicy",
+					Message: "Container main-container for pod default/mypod-1 failed with exit code 5 matching FailJob rule at index 1",
+				},
+			},
+			wantStatusActive:    0,
+			wantStatusFailed:    2,
+			wantStatusSucceeded: 0,
+		},
+		"fail indexed job based on OnExitCodes": {
+			enableJobPodFailurePolicy: true,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validTemplate,
+					CompletionMode: &indexedCompletionMode,
+					Parallelism:    pointer.Int32(1),
+					Completions:    pointer.Int32(1),
+					BackoffLimit:   pointer.Int32(6),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: onExitCodeRules,
+					},
+				},
+			},
+			pods: []v1.PodStatus{
+				{
+					Phase: v1.PodFailed,
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "main-container",
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									ExitCode: 5,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantConditions: &[]batch.JobCondition{
+				{
+					Type:    batch.JobFailed,
+					Status:  v1.ConditionTrue,
+					Reason:  "PodFailurePolicy",
+					Message: "Container main-container for pod default/mypod-0 failed with exit code 5 matching FailJob rule at index 1",
+				},
+			},
+			wantStatusActive:    0,
+			wantStatusFailed:    1,
+			wantStatusSucceeded: 0,
+		},
+		"fail job based on OnExitCodes with NotIn operator": {
+			enableJobPodFailurePolicy: true,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:     validSelector,
+					Template:     validTemplate,
+					Parallelism:  pointer.Int32(1),
+					Completions:  pointer.Int32(1),
+					BackoffLimit: pointer.Int32(6),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: []batch.PodFailurePolicyRule{
+							{
+								Action: batch.PodFailurePolicyActionFailJob,
+								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+									Operator: batch.PodFailurePolicyOnExitCodesOpNotIn,
+									Values:   []int32{5, 6, 7},
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []v1.PodStatus{
+				{
+					Phase: v1.PodFailed,
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "main-container",
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									ExitCode: 42,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantConditions: &[]batch.JobCondition{
+				{
+					Type:    batch.JobFailed,
+					Status:  v1.ConditionTrue,
+					Reason:  "PodFailurePolicy",
+					Message: "Container main-container for pod default/mypod-0 failed with exit code 42 matching FailJob rule at index 0",
+				},
+			},
+			wantStatusActive:    0,
+			wantStatusFailed:    1,
+			wantStatusSucceeded: 0,
+		},
+		"default handling job based on OnExitCodes with NotIn operator": {
+			enableJobPodFailurePolicy: true,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:     validSelector,
+					Template:     validTemplate,
+					Parallelism:  pointer.Int32(1),
+					Completions:  pointer.Int32(1),
+					BackoffLimit: pointer.Int32(6),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: []batch.PodFailurePolicyRule{
+							{
+								Action: batch.PodFailurePolicyActionFailJob,
+								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+									Operator: batch.PodFailurePolicyOnExitCodesOpNotIn,
+									Values:   []int32{5, 6, 7},
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []v1.PodStatus{
+				{
+					Phase: v1.PodFailed,
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "main-container",
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									ExitCode: 5,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantConditions:      nil,
+			wantStatusActive:    1,
+			wantStatusFailed:    1,
+			wantStatusSucceeded: 0,
+		},
+		"fail job based on OnExitCodes for InitContainer": {
+			enableJobPodFailurePolicy: true,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:     validSelector,
+					Template:     validTemplate,
+					Parallelism:  pointer.Int32(1),
+					Completions:  pointer.Int32(1),
+					BackoffLimit: pointer.Int32(6),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: onExitCodeRules,
+					},
+				},
+			},
+			pods: []v1.PodStatus{
+				{
+					Phase: v1.PodFailed,
+					InitContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "init-container",
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									ExitCode: 5,
+								},
+							},
+						},
+					},
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "main-container",
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									ExitCode: 143,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantConditions: &[]batch.JobCondition{
+				{
+					Type:    batch.JobFailed,
+					Status:  v1.ConditionTrue,
+					Reason:  "PodFailurePolicy",
+					Message: "Container init-container for pod default/mypod-0 failed with exit code 5 matching FailJob rule at index 1",
+				},
+			},
+			wantStatusActive:    0,
+			wantStatusFailed:    1,
+			wantStatusSucceeded: 0,
+		},
+		"ignore pod failure; both rules are matching, the first is executed only": {
+			enableJobPodFailurePolicy: true,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:     validSelector,
+					Template:     validTemplate,
+					Parallelism:  pointer.Int32(1),
+					Completions:  pointer.Int32(1),
+					BackoffLimit: pointer.Int32(0),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: onExitCodeRules,
+					},
+				},
+			},
+			pods: []v1.PodStatus{
+				{
+					Phase: v1.PodFailed,
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "container1",
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									ExitCode: 2,
+								},
+							},
+						},
+						{
+							Name: "container2",
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									ExitCode: 6,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantConditions:      nil,
+			wantStatusActive:    1,
+			wantStatusFailed:    0,
+			wantStatusSucceeded: 0,
+		},
+		"ignore pod failure based on OnExitCodes": {
+			enableJobPodFailurePolicy: true,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:     validSelector,
+					Template:     validTemplate,
+					Parallelism:  pointer.Int32(1),
+					Completions:  pointer.Int32(1),
+					BackoffLimit: pointer.Int32(0),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: onExitCodeRules,
+					},
+				},
+			},
+			pods: []v1.PodStatus{
+				{
+					Phase: v1.PodFailed,
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									ExitCode: 1,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantConditions:      nil,
+			wantStatusActive:    1,
+			wantStatusFailed:    0,
+			wantStatusSucceeded: 0,
+		},
+		"default job based on OnExitCodes": {
+			enableJobPodFailurePolicy: true,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:     validSelector,
+					Template:     validTemplate,
+					Parallelism:  pointer.Int32(1),
+					Completions:  pointer.Int32(1),
+					BackoffLimit: pointer.Int32(0),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: onExitCodeRules,
+					},
+				},
+			},
+			pods: []v1.PodStatus{
+				{
+					Phase: v1.PodFailed,
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									ExitCode: 10,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantConditions: &[]batch.JobCondition{
+				{
+					Type:    batch.JobFailed,
+					Status:  v1.ConditionTrue,
+					Reason:  "BackoffLimitExceeded",
+					Message: "Job has reached the specified backoff limit",
+				},
+			},
+			wantStatusActive:    0,
+			wantStatusFailed:    1,
+			wantStatusSucceeded: 0,
+		},
+		"count pod failure based on OnExitCodes; both rules are matching, the first is executed only": {
+			enableJobPodFailurePolicy: true,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:     validSelector,
+					Template:     validTemplate,
+					Parallelism:  pointer.Int32(1),
+					Completions:  pointer.Int32(1),
+					BackoffLimit: pointer.Int32(6),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: []batch.PodFailurePolicyRule{
+							{
+								Action: batch.PodFailurePolicyActionCount,
+								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+									Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+									Values:   []int32{1, 2},
+								},
+							},
+							{
+								Action: batch.PodFailurePolicyActionIgnore,
+								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+									Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+									Values:   []int32{2, 3},
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []v1.PodStatus{
+				{
+					Phase: v1.PodFailed,
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							State: v1.ContainerState{
+								Terminated: &v1.ContainerStateTerminated{
+									ExitCode: 2,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantConditions:      nil,
+			wantStatusActive:    1,
+			wantStatusFailed:    1,
+			wantStatusSucceeded: 0,
+		},
+		"count pod failure based on OnPodConditions; both rules are matching, the first is executed only": {
+			enableJobPodFailurePolicy: true,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:     validSelector,
+					Template:     validTemplate,
+					Parallelism:  pointer.Int32(1),
+					Completions:  pointer.Int32(1),
+					BackoffLimit: pointer.Int32(6),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: []batch.PodFailurePolicyRule{
+							{
+								Action: batch.PodFailurePolicyActionCount,
+								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+									{
+										Type:   v1.PodConditionType("ResourceLimitExceeded"),
+										Status: v1.ConditionTrue,
+									},
+								},
+							},
+							{
+								Action: batch.PodFailurePolicyActionIgnore,
+								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+									{
+										Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+										Status: v1.ConditionTrue,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []v1.PodStatus{
+				{
+					Phase: v1.PodFailed,
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodConditionType("ResourceLimitExceeded"),
+							Status: v1.ConditionTrue,
+						},
+						{
+							Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantConditions:      nil,
+			wantStatusActive:    1,
+			wantStatusFailed:    1,
+			wantStatusSucceeded: 0,
+		},
+		"ignore pod failure based on OnPodConditions": {
+			enableJobPodFailurePolicy: true,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:     validSelector,
+					Template:     validTemplate,
+					Parallelism:  pointer.Int32(1),
+					Completions:  pointer.Int32(1),
+					BackoffLimit: pointer.Int32(0),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: []batch.PodFailurePolicyRule{
+							{
+								Action: batch.PodFailurePolicyActionIgnore,
+								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+									{
+										Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+										Status: v1.ConditionTrue,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []v1.PodStatus{
+				{
+					Phase: v1.PodFailed,
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantConditions:      nil,
+			wantStatusActive:    1,
+			wantStatusFailed:    0,
+			wantStatusSucceeded: 0,
+		},
+		"fail job based on OnPodConditions": {
+			enableJobPodFailurePolicy: true,
+			job: batch.Job{
+				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:     validSelector,
+					Template:     validTemplate,
+					Parallelism:  pointer.Int32(1),
+					Completions:  pointer.Int32(1),
+					BackoffLimit: pointer.Int32(6),
+					PodFailurePolicy: &batch.PodFailurePolicy{
+						Rules: []batch.PodFailurePolicyRule{
+							{
+								Action: batch.PodFailurePolicyActionFailJob,
+								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
+									{
+										Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+										Status: v1.ConditionTrue,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			pods: []v1.PodStatus{
+				{
+					Phase: v1.PodFailed,
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantConditions: &[]batch.JobCondition{
+				{
+					Type:    batch.JobFailed,
+					Status:  v1.ConditionTrue,
+					Reason:  "PodFailurePolicy",
+					Message: "Pod default/mypod-0 has condition DisruptionTarget matching FailJob rule at index 0",
+				},
+			},
+			wantStatusActive:    0,
+			wantStatusFailed:    1,
+			wantStatusSucceeded: 0,
+		},
+	}
+	for _, wFinalizers := range []bool{false, true} {
+		for name, tc := range testCases {
+			t.Run(fmt.Sprintf("%s; finalizers=%t", name, wFinalizers), func(t *testing.T) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, wFinalizers)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
+				clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+				manager, sharedInformerFactory := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+				fakePodControl := controller.FakePodControl{}
+				manager.podControl = &fakePodControl
+				manager.podStoreSynced = alwaysReady
+				manager.jobStoreSynced = alwaysReady
+				job := &tc.job
+
+				if wFinalizers {
+					job.Annotations = map[string]string{
+						batch.JobTrackingFinalizer: "",
+					}
+				}
+
+				actual := job
+				manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
+					actual = job
+					return job, nil
+				}
+				sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+				for i, podStatus := range tc.pods {
+					pb := buildPod().name(fmt.Sprintf("mypod-%d", i)).job(job).status(podStatus)
+					if job.Spec.CompletionMode != nil && *job.Spec.CompletionMode == batch.IndexedCompletion {
+						pb.index(fmt.Sprintf("%v", i))
+					}
+					if wFinalizers {
+						pb.trackingFinalizer()
+					}
+					sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer().Add(pb.Pod)
+				}
+
+				manager.syncJob(context.TODO(), testutil.GetKey(job, t))
+
+				if tc.wantConditions != nil {
+					for _, wantCondition := range *tc.wantConditions {
+						conditions := getConditionsByType(actual.Status.Conditions, wantCondition.Type)
+						if len(conditions) != 1 {
+							t.Fatalf("Expected a single completion condition. Got %#v for type: %q", conditions, wantCondition.Type)
+						}
+						condition := *conditions[0]
+						if diff := cmp.Diff(wantCondition, condition, cmpopts.IgnoreFields(batch.JobCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
+							t.Errorf("Unexpected job condition (-want,+got):\n%s", diff)
+						}
+					}
+				} else {
+					if cond := hasTrueCondition(actual); cond != nil {
+						t.Errorf("Got condition %s, want none", *cond)
+					}
+				}
+				// validate status
+				if actual.Status.Active != tc.wantStatusActive {
+					t.Errorf("unexpected number of active pods. Expected %d, saw %d\n", tc.wantStatusActive, actual.Status.Active)
+				}
+				if actual.Status.Succeeded != tc.wantStatusSucceeded {
+					t.Errorf("unexpected number of succeeded pods. Expected %d, saw %d\n", tc.wantStatusSucceeded, actual.Status.Succeeded)
+				}
+				if actual.Status.Failed != tc.wantStatusFailed {
+					t.Errorf("unexpected number of failed pods. Expected %d, saw %d\n", tc.wantStatusFailed, actual.Status.Failed)
+				}
+			})
+		}
+	}
+}
+
 func TestSyncJobUpdateRequeue(t *testing.T) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	DefaultJobBackOff = time.Duration(0) // overwrite the default value for testing
@@ -1916,11 +2989,13 @@ func TestSyncJobUpdateRequeue(t *testing.T) {
 			wantRequeue: true,
 		},
 		"conflict error": {
-			updateErr: apierrors.NewConflict(schema.GroupResource{}, "", nil),
+			updateErr:   apierrors.NewConflict(schema.GroupResource{}, "", nil),
+			wantRequeue: true,
 		},
 		"conflict error, with finalizers": {
 			withFinalizers: true,
 			updateErr:      apierrors.NewConflict(schema.GroupResource{}, "", nil),
+			wantRequeue:    true,
 		},
 	}
 	for name, tc := range cases {
@@ -2575,37 +3650,65 @@ func TestWatchOrphanPods(t *testing.T) {
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
 
-	jobSynced := false
-	manager.syncHandler = func(ctx context.Context, jobKey string) (bool, error) {
-		jobSynced = true
-		return true, nil
-	}
-
-	// Create job but don't add it to the store.
-	testJob := newJob(2, 2, 6, batch.NonIndexedCompletion)
-
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	go sharedInformers.Core().V1().Pods().Informer().Run(stopCh)
+	podInformer := sharedInformers.Core().V1().Pods().Informer()
+	go podInformer.Run(stopCh)
+	cache.WaitForCacheSync(stopCh, podInformer.HasSynced)
 	go manager.Run(context.TODO(), 1)
 
-	orphanPod := buildPod().name("a").job(testJob).deletionTimestamp().trackingFinalizer().Pod
-	orphanPod, err := clientset.CoreV1().Pods("default").Create(context.Background(), orphanPod, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("Creating orphan pod: %v", err)
+	// Create job but don't add it to the store.
+	cases := map[string]struct {
+		job     *batch.Job
+		inCache bool
+	}{
+		"job_does_not_exist": {
+			job: newJob(2, 2, 6, batch.NonIndexedCompletion),
+		},
+		"orphan": {},
+		"job_finished": {
+			job: func() *batch.Job {
+				j := newJob(2, 2, 6, batch.NonIndexedCompletion)
+				j.Status.Conditions = append(j.Status.Conditions, batch.JobCondition{
+					Type:   batch.JobComplete,
+					Status: v1.ConditionTrue,
+				})
+				return j
+			}(),
+			inCache: true,
+		},
 	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if tc.inCache {
+				if err := sharedInformers.Batch().V1().Jobs().Informer().GetIndexer().Add(tc.job); err != nil {
+					t.Fatalf("Failed to insert job in index: %v", err)
+				}
+				t.Cleanup(func() {
+					sharedInformers.Batch().V1().Jobs().Informer().GetIndexer().Delete(tc.job)
+				})
+			}
 
-	if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		p, err := clientset.CoreV1().Pods(orphanPod.Namespace).Get(context.Background(), orphanPod.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		return !hasJobTrackingFinalizer(p), nil
-	}); err != nil {
-		t.Errorf("Waiting for Pod to get the finalizer removed: %v", err)
-	}
-	if jobSynced {
-		t.Error("Tried to sync deleted job")
+			podBuilder := buildPod().name(name).deletionTimestamp().trackingFinalizer()
+			if tc.job != nil {
+				podBuilder = podBuilder.job(tc.job)
+			}
+			orphanPod := podBuilder.Pod
+			orphanPod, err := clientset.CoreV1().Pods("default").Create(context.Background(), orphanPod, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Creating orphan pod: %v", err)
+			}
+
+			if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+				p, err := clientset.CoreV1().Pods(orphanPod.Namespace).Get(context.Background(), orphanPod.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				return !hasJobTrackingFinalizer(p), nil
+			}); err != nil {
+				t.Errorf("Waiting for Pod to get the finalizer removed: %v", err)
+			}
+		})
 	}
 }
 
@@ -3093,12 +4196,7 @@ func TestEnsureJobConditions(t *testing.T) {
 			if len(gotList) != len(tc.expectList) {
 				t.Errorf("got a list of length %d, want %d", len(gotList), len(tc.expectList))
 			}
-			for i := range gotList {
-				// Make timestamps the same before comparing the two lists.
-				gotList[i].LastProbeTime = tc.expectList[i].LastProbeTime
-				gotList[i].LastTransitionTime = tc.expectList[i].LastTransitionTime
-			}
-			if diff := cmp.Diff(tc.expectList, gotList); diff != "" {
+			if diff := cmp.Diff(tc.expectList, gotList, cmpopts.IgnoreFields(batch.JobCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
 				t.Errorf("Unexpected JobCondition list: (-want,+got):\n%s", diff)
 			}
 		})
@@ -3257,6 +4355,16 @@ func buildPod() podBuilder {
 	}}
 }
 
+func getConditionsByType(list []batch.JobCondition, cType batch.JobConditionType) []*batch.JobCondition {
+	var result []*batch.JobCondition
+	for i := range list {
+		if list[i].Type == cType {
+			result = append(result, &list[i])
+		}
+	}
+	return result
+}
+
 func (pb podBuilder) name(n string) podBuilder {
 	pb.Name = n
 	return pb
@@ -3294,6 +4402,11 @@ func (pb podBuilder) index(ix string) podBuilder {
 		pb.Annotations = make(map[string]string)
 	}
 	pb.Annotations[batch.JobCompletionIndexAnnotation] = ix
+	return pb
+}
+
+func (pb podBuilder) status(s v1.PodStatus) podBuilder {
+	pb.Status = s
 	return pb
 }
 

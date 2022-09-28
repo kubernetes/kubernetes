@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -55,7 +55,7 @@ const (
 	testSlowMultiplier = 10
 
 	// How long to wait until CSINode gets attach limit from installed CSI driver.
-	csiNodeInfoTimeout = 1 * time.Minute
+	csiNodeInfoTimeout = 2 * time.Minute
 )
 
 var _ storageframework.TestSuite = &volumeLimitsTestSuite{}

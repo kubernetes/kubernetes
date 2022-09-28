@@ -6,6 +6,7 @@
 package internaloption
 
 import (
+	"golang.org/x/oauth2/google"
 	"google.golang.org/api/internal"
 	"google.golang.org/api/option"
 )
@@ -66,6 +67,21 @@ func (e enableDirectPath) Apply(o *internal.DialSettings) {
 	o.EnableDirectPath = bool(e)
 }
 
+// AllowNonDefaultServiceAccount returns a ClientOption that overrides the default
+// requirement for using the default service account for DirectPath.
+//
+// It should only be used internally by generated clients.
+// This is an EXPERIMENTAL API and may be changed or removed in the future.
+func AllowNonDefaultServiceAccount(nd bool) option.ClientOption {
+	return allowNonDefaultServiceAccount(nd)
+}
+
+type allowNonDefaultServiceAccount bool
+
+func (a allowNonDefaultServiceAccount) Apply(o *internal.DialSettings) {
+	o.AllowNonDefaultServiceAccount = bool(a)
+}
+
 // WithDefaultAudience returns a ClientOption that specifies a default audience
 // to be used as the audience field ("aud") for the JWT token authentication.
 //
@@ -93,4 +109,28 @@ type withDefaultScopes []string
 func (w withDefaultScopes) Apply(o *internal.DialSettings) {
 	o.DefaultScopes = make([]string, len(w))
 	copy(o.DefaultScopes, w)
+}
+
+// EnableJwtWithScope returns a ClientOption that specifies if scope can be used
+// with self-signed JWT.
+func EnableJwtWithScope() option.ClientOption {
+	return enableJwtWithScope(true)
+}
+
+type enableJwtWithScope bool
+
+func (w enableJwtWithScope) Apply(o *internal.DialSettings) {
+	o.EnableJwtWithScope = bool(w)
+}
+
+// WithCredentials returns a client option to specify credentials which will be used to authenticate API calls.
+// This credential takes precedence over all other credential options.
+func WithCredentials(creds *google.Credentials) option.ClientOption {
+	return (*withCreds)(creds)
+}
+
+type withCreds google.Credentials
+
+func (w *withCreds) Apply(o *internal.DialSettings) {
+	o.InternalCredentials = (*google.Credentials)(w)
 }

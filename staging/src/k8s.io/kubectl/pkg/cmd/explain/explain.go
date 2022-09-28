@@ -58,6 +58,8 @@ type ExplainOptions struct {
 	APIVersion string
 	Recursive  bool
 
+	args []string
+
 	Mapper meta.RESTMapper
 	Schema openapi.Resources
 }
@@ -80,9 +82,9 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericclioptions.I
 		Long:                  explainLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
 		Example:               explainExamples,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd))
-			cmdutil.CheckErr(o.Validate(args))
-			cmdutil.CheckErr(o.Run(args))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 	cmd.Flags().BoolVar(&o.Recursive, "recursive", o.Recursive, "Print the fields of fields (Currently only 1 level deep)")
@@ -90,7 +92,7 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericclioptions.I
 	return cmd
 }
 
-func (o *ExplainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *ExplainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
 	o.Mapper, err = f.ToRESTMapper()
 	if err != nil {
@@ -101,14 +103,16 @@ func (o *ExplainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
+
+	o.args = args
 	return nil
 }
 
-func (o *ExplainOptions) Validate(args []string) error {
-	if len(args) == 0 {
+func (o *ExplainOptions) Validate() error {
+	if len(o.args) == 0 {
 		return fmt.Errorf("You must specify the type of resource to explain. %s\n", cmdutil.SuggestAPIResources(o.CmdParent))
 	}
-	if len(args) > 1 {
+	if len(o.args) > 1 {
 		return fmt.Errorf("We accept only this format: explain RESOURCE\n")
 	}
 
@@ -116,7 +120,7 @@ func (o *ExplainOptions) Validate(args []string) error {
 }
 
 // Run executes the appropriate steps to print a model's documentation
-func (o *ExplainOptions) Run(args []string) error {
+func (o *ExplainOptions) Run() error {
 	recursive := o.Recursive
 	apiVersionString := o.APIVersion
 
@@ -124,7 +128,7 @@ func (o *ExplainOptions) Run(args []string) error {
 	var fieldsPath []string
 	var err error
 	if len(apiVersionString) == 0 {
-		fullySpecifiedGVR, fieldsPath, err = explain.SplitAndParseResourceRequestWithMatchingPrefix(args[0], o.Mapper)
+		fullySpecifiedGVR, fieldsPath, err = explain.SplitAndParseResourceRequestWithMatchingPrefix(o.args[0], o.Mapper)
 		if err != nil {
 			return err
 		}
@@ -132,7 +136,7 @@ func (o *ExplainOptions) Run(args []string) error {
 		// TODO: After we figured out the new syntax to separate group and resource, allow
 		// the users to use it in explain (kubectl explain <group><syntax><resource>).
 		// Refer to issue #16039 for why we do this. Refer to PR #15808 that used "/" syntax.
-		fullySpecifiedGVR, fieldsPath, err = explain.SplitAndParseResourceRequest(args[0], o.Mapper)
+		fullySpecifiedGVR, fieldsPath, err = explain.SplitAndParseResourceRequest(o.args[0], o.Mapper)
 		if err != nil {
 			return err
 		}

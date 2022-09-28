@@ -51,7 +51,7 @@ var (
 		kubectl create role pod-reader --verb=get --resource=pods --resource-name=readablepod --resource-name=anotherpod
 
 		# Create a role named "foo" with API Group specified
-		kubectl create role foo --verb=get,list,watch --resource=rs.extensions
+		kubectl create role foo --verb=get,list,watch --resource=rs.apps
 
 		# Create a role named "foo" with SubResource specified
 		kubectl create role foo --verb=get,list,watch --resource=pods,pods/status`))

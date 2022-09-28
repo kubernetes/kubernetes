@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"sort"
+	"math/bits"
 	"strconv"
 	"strings"
 )
@@ -47,35 +47,6 @@ func (s *IntStack) Push(e int) {
 	*s = append(*s, e)
 }
 
-type Set struct {
-	data             map[int][]interface{}
-	hashcodeFunction func(interface{}) int
-	equalsFunction   func(interface{}, interface{}) bool
-}
-
-func NewSet(
-	hashcodeFunction func(interface{}) int,
-	equalsFunction func(interface{}, interface{}) bool) *Set {
-
-	s := new(Set)
-
-	s.data = make(map[int][]interface{})
-
-	if hashcodeFunction != nil {
-		s.hashcodeFunction = hashcodeFunction
-	} else {
-		s.hashcodeFunction = standardHashFunction
-	}
-
-	if equalsFunction == nil {
-		s.equalsFunction = standardEqualsFunction
-	} else {
-		s.equalsFunction = equalsFunction
-	}
-
-	return s
-}
-
 func standardEqualsFunction(a interface{}, b interface{}) bool {
 
 	ac, oka := a.(comparable)
@@ -100,125 +71,92 @@ type hasher interface {
 	hash() int
 }
 
-func (s *Set) length() int {
-	return len(s.data)
+const bitsPerWord = 64
+
+func indexForBit(bit int) int {
+	return bit / bitsPerWord
 }
 
-func (s *Set) add(value interface{}) interface{} {
-
-	key := s.hashcodeFunction(value)
-
-	values := s.data[key]
-
-	if s.data[key] != nil {
-		for i := 0; i < len(values); i++ {
-			if s.equalsFunction(value, values[i]) {
-				return values[i]
-			}
-		}
-
-		s.data[key] = append(s.data[key], value)
-		return value
+func wordForBit(data []uint64, bit int) uint64 {
+	idx := indexForBit(bit)
+	if idx >= len(data) {
+		return 0
 	}
-
-	v := make([]interface{}, 1, 10)
-	v[0] = value
-	s.data[key] = v
-
-	return value
+	return data[idx]
 }
 
-func (s *Set) contains(value interface{}) bool {
-
-	key := s.hashcodeFunction(value)
-
-	values := s.data[key]
-
-	if s.data[key] != nil {
-		for i := 0; i < len(values); i++ {
-			if s.equalsFunction(value, values[i]) {
-				return true
-			}
-		}
-	}
-	return false
+func maskForBit(bit int) uint64 {
+	return uint64(1) << (bit % bitsPerWord)
 }
 
-func (s *Set) values() []interface{} {
-	var l []interface{}
-
-	for _, v := range s.data {
-		l = append(l, v...)
-	}
-
-	return l
-}
-
-func (s *Set) String() string {
-	r := ""
-
-	for _, av := range s.data {
-		for _, v := range av {
-			r += fmt.Sprint(v)
-		}
-	}
-
-	return r
+func wordsNeeded(bit int) int {
+	return indexForBit(bit) + 1
 }
 
 type BitSet struct {
-	data map[int]bool
+	data []uint64
 }
 
 func NewBitSet() *BitSet {
-	b := new(BitSet)
-	b.data = make(map[int]bool)
-	return b
+	return &BitSet{}
 }
 
 func (b *BitSet) add(value int) {
-	b.data[value] = true
+	idx := indexForBit(value)
+	if idx >= len(b.data) {
+		size := wordsNeeded(value)
+		data := make([]uint64, size)
+		copy(data, b.data)
+		b.data = data
+	}
+	b.data[idx] |= maskForBit(value)
 }
 
 func (b *BitSet) clear(index int) {
-	delete(b.data, index)
+	idx := indexForBit(index)
+	if idx >= len(b.data) {
+		return
+	}
+	b.data[idx] &= ^maskForBit(index)
 }
 
 func (b *BitSet) or(set *BitSet) {
-	for k := range set.data {
-		b.add(k)
+	// Get min size necessary to represent the bits in both sets.
+	bLen := b.minLen()
+	setLen := set.minLen()
+	maxLen := intMax(bLen, setLen)
+	if maxLen > len(b.data) {
+		// Increase the size of len(b.data) to repesent the bits in both sets.
+		data := make([]uint64, maxLen)
+		copy(data, b.data)
+		b.data = data
+	}
+	// len(b.data) is at least setLen.
+	for i := 0; i < setLen; i++ {
+		b.data[i] |= set.data[i]
 	}
 }
 
 func (b *BitSet) remove(value int) {
-	delete(b.data, value)
+	b.clear(value)
 }
 
 func (b *BitSet) contains(value int) bool {
-	return b.data[value]
-}
-
-func (b *BitSet) values() []int {
-	ks := make([]int, len(b.data))
-	i := 0
-	for k := range b.data {
-		ks[i] = k
-		i++
+	idx := indexForBit(value)
+	if idx >= len(b.data) {
+		return false
 	}
-	sort.Ints(ks)
-	return ks
+	return (b.data[idx] & maskForBit(value)) != 0
 }
 
 func (b *BitSet) minValue() int {
-	min := 2147483647
-
-	for k := range b.data {
-		if k < min {
-			min = k
+	for i, v := range b.data {
+		if v == 0 {
+			continue
 		}
+		return i*bitsPerWord + bits.TrailingZeros64(v)
 	}
-
-	return min
+	return 2147483647
 }
 
 func (b *BitSet) equals(other interface{}) bool {
@@ -227,12 +165,22 @@ func (b *BitSet) equals(other interface{}) bool {
 		return false
 	}
 
-	if len(b.data) != len(otherBitSet.data) {
+	if b == otherBitSet {
+		return true
+	}
+
+	// We only compare set bits, so we cannot rely on the two slices having the same size. Its
+	// possible for two BitSets to have different slice lengths but the same set bits. So we only
+	// compare the relavent words and ignore the trailing zeros.
+	bLen := b.minLen()
+	otherLen := otherBitSet.minLen()
+
+	if bLen != otherLen {
 		return false
 	}
 
-	for k, v := range b.data {
-		if otherBitSet.data[k] != v {
+	for i := 0; i < bLen; i++ {
+		if b.data[i] != otherBitSet.data[i] {
 			return false
 		}
 	}
@@ -240,18 +188,35 @@ func (b *BitSet) equals(other interface{}) bool {
 	return true
 }
 
+func (b *BitSet) minLen() int {
+	for i := len(b.data); i > 0; i-- {
+		if b.data[i-1] != 0 {
+			return i
+		}
+	}
+	return 0
+}
+
 func (b *BitSet) length() int {
-	return len(b.data)
+	cnt := 0
+	for _, val := range b.data {
+		cnt += bits.OnesCount64(val)
+	}
+	return cnt
 }
 
 func (b *BitSet) String() string {
-	vals := b.values()
-	valsS := make([]string, len(vals))
+	vals := make([]string, 0, b.length())
 
-	for i, val := range vals {
-		valsS[i] = strconv.Itoa(val)
+	for i, v := range b.data {
+		for v != 0 {
+			n := bits.TrailingZeros64(v)
+			vals = append(vals, strconv.Itoa(i*bitsPerWord+n))
+			v &= ^(uint64(1) << n)
+		}
 	}
-	return "{" + strings.Join(valsS, ", ") + "}"
+
+	return "{" + strings.Join(vals, ", ") + "}"
 }
 
 type AltDict struct {
@@ -353,65 +318,38 @@ func PrintArrayJavaStyle(sa []string) string {
 	return buffer.String()
 }
 
-// The following routines were lifted from bits.rotate* available in Go 1.9.
-
-const uintSize = 32 << (^uint(0) >> 32 & 1) // 32 or 64
-
-// rotateLeft returns the value of x rotated left by (k mod UintSize) bits.
-// To rotate x right by k bits, call RotateLeft(x, -k).
-func rotateLeft(x uint, k int) uint {
-	if uintSize == 32 {
-		return uint(rotateLeft32(uint32(x), k))
-	}
-	return uint(rotateLeft64(uint64(x), k))
-}
-
-// rotateLeft32 returns the value of x rotated left by (k mod 32) bits.
-func rotateLeft32(x uint32, k int) uint32 {
-	const n = 32
-	s := uint(k) & (n - 1)
-	return x<<s | x>>(n-s)
-}
-
-// rotateLeft64 returns the value of x rotated left by (k mod 64) bits.
-func rotateLeft64(x uint64, k int) uint64 {
-	const n = 64
-	s := uint(k) & (n - 1)
-	return x<<s | x>>(n-s)
-}
-
-
 // murmur hash
-const (
-	c1_32 uint = 0xCC9E2D51
-	c2_32 uint = 0x1B873593
-	n1_32 uint = 0xE6546B64
-)
-
 func murmurInit(seed int) int {
 	return seed
 }
 
-func murmurUpdate(h1 int, k1 int) int {
-	var k1u uint
-	k1u = uint(k1) * c1_32
-	k1u = rotateLeft(k1u, 15)
-	k1u *= c2_32
+func murmurUpdate(h int, value int) int {
+	const c1 uint32 = 0xCC9E2D51
+	const c2 uint32 = 0x1B873593
+	const r1 uint32 = 15
+	const r2 uint32 = 13
+	const m uint32 = 5
+	const n uint32 = 0xE6546B64
 
-	var h1u = uint(h1) ^ k1u
-	k1u = rotateLeft(k1u, 13)
-	h1u = h1u*5 + 0xe6546b64
-	return int(h1u)
+	k := uint32(value)
+	k *= c1
+	k = (k << r1) | (k >> (32 - r1))
+	k *= c2
+
+	hash := uint32(h) ^ k
+	hash = (hash << r2) | (hash >> (32 - r2))
+	hash = hash*m + n
+	return int(hash)
 }
 
-func murmurFinish(h1 int, numberOfWords int) int {
-	var h1u uint = uint(h1)
-	h1u ^= uint(numberOfWords * 4)
-	h1u ^= h1u >> 16
-	h1u *= uint(0x85ebca6b)
-	h1u ^= h1u >> 13
-	h1u *= 0xc2b2ae35
-	h1u ^= h1u >> 16
+func murmurFinish(h int, numberOfWords int) int {
+	var hash = uint32(h)
+	hash ^= uint32(numberOfWords) << 2
+	hash ^= hash >> 16
+	hash *= 0x85ebca6b
+	hash ^= hash >> 13
+	hash *= 0xc2b2ae35
+	hash ^= hash >> 16
 
-	return int(h1u)
+	return int(hash)
 }

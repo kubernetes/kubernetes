@@ -23,6 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -43,7 +44,7 @@ func SetupPluginWithInformers(
 ) framework.Plugin {
 	objs = append([]runtime.Object{&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ""}}}, objs...)
 	informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(objs...), 0)
-	fh, err := frameworkruntime.NewFramework(nil, nil,
+	fh, err := frameworkruntime.NewFramework(nil, nil, wait.NeverStop,
 		frameworkruntime.WithSnapshotSharedLister(sharedLister),
 		frameworkruntime.WithInformerFactory(informerFactory))
 	if err != nil {
@@ -66,7 +67,7 @@ func SetupPlugin(
 	config runtime.Object,
 	sharedLister framework.SharedLister,
 ) framework.Plugin {
-	fh, err := frameworkruntime.NewFramework(nil, nil,
+	fh, err := frameworkruntime.NewFramework(nil, nil, wait.NeverStop,
 		frameworkruntime.WithSnapshotSharedLister(sharedLister))
 	if err != nil {
 		tb.Fatalf("Failed creating framework runtime: %v", err)

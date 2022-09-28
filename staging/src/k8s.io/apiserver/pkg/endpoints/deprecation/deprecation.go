@@ -43,8 +43,9 @@ var leadingDigits = regexp.MustCompile(`^(\d+)`)
 
 // MajorMinor parses a numeric major/minor version from the provided version info.
 // The minor version drops all characters after the first non-digit character:
-//   version.Info{Major:"1", Minor:"2+"} -> 1,2
-//   version.Info{Major:"1", Minor:"2.3-build4"} -> 1,2
+//
+//	version.Info{Major:"1", Minor:"2+"} -> 1,2
+//	version.Info{Major:"1", Minor:"2.3-build4"} -> 1,2
 func MajorMinor(v version.Info) (int, int, error) {
 	major, err := strconv.Atoi(v.Major)
 	if err != nil {

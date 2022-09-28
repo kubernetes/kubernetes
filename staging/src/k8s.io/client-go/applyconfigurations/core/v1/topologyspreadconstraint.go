@@ -26,11 +26,14 @@ import (
 // TopologySpreadConstraintApplyConfiguration represents an declarative configuration of the TopologySpreadConstraint type for use
 // with apply.
 type TopologySpreadConstraintApplyConfiguration struct {
-	MaxSkew           *int32                                  `json:"maxSkew,omitempty"`
-	TopologyKey       *string                                 `json:"topologyKey,omitempty"`
-	WhenUnsatisfiable *v1.UnsatisfiableConstraintAction       `json:"whenUnsatisfiable,omitempty"`
-	LabelSelector     *metav1.LabelSelectorApplyConfiguration `json:"labelSelector,omitempty"`
-	MinDomains        *int32                                  `json:"minDomains,omitempty"`
+	MaxSkew            *int32                                  `json:"maxSkew,omitempty"`
+	TopologyKey        *string                                 `json:"topologyKey,omitempty"`
+	WhenUnsatisfiable  *v1.UnsatisfiableConstraintAction       `json:"whenUnsatisfiable,omitempty"`
+	LabelSelector      *metav1.LabelSelectorApplyConfiguration `json:"labelSelector,omitempty"`
+	MinDomains         *int32                                  `json:"minDomains,omitempty"`
+	NodeAffinityPolicy *v1.NodeInclusionPolicy                 `json:"nodeAffinityPolicy,omitempty"`
+	NodeTaintsPolicy   *v1.NodeInclusionPolicy                 `json:"nodeTaintsPolicy,omitempty"`
+	MatchLabelKeys     []string                                `json:"matchLabelKeys,omitempty"`
 }
 
 // TopologySpreadConstraintApplyConfiguration constructs an declarative configuration of the TopologySpreadConstraint type for use with
@@ -76,5 +79,31 @@ func (b *TopologySpreadConstraintApplyConfiguration) WithLabelSelector(value *me
 // If called multiple times, the MinDomains field is set to the value of the last call.
 func (b *TopologySpreadConstraintApplyConfiguration) WithMinDomains(value int32) *TopologySpreadConstraintApplyConfiguration {
 	b.MinDomains = &value
+	return b
+}
+
+// WithNodeAffinityPolicy sets the NodeAffinityPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the NodeAffinityPolicy field is set to the value of the last call.
+func (b *TopologySpreadConstraintApplyConfiguration) WithNodeAffinityPolicy(value v1.NodeInclusionPolicy) *TopologySpreadConstraintApplyConfiguration {
+	b.NodeAffinityPolicy = &value
+	return b
+}
+
+// WithNodeTaintsPolicy sets the NodeTaintsPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the NodeTaintsPolicy field is set to the value of the last call.
+func (b *TopologySpreadConstraintApplyConfiguration) WithNodeTaintsPolicy(value v1.NodeInclusionPolicy) *TopologySpreadConstraintApplyConfiguration {
+	b.NodeTaintsPolicy = &value
+	return b
+}
+
+// WithMatchLabelKeys adds the given value to the MatchLabelKeys field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the MatchLabelKeys field.
+func (b *TopologySpreadConstraintApplyConfiguration) WithMatchLabelKeys(values ...string) *TopologySpreadConstraintApplyConfiguration {
+	for i := range values {
+		b.MatchLabelKeys = append(b.MatchLabelKeys, values[i])
+	}
 	return b
 }

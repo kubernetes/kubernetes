@@ -45,7 +45,7 @@ const (
 	ReasonRequestMethodTRACE
 
 	// The request method was not recognized by cachecontrol, and should not be cached.
-	ReasonRequestMethodUnkown
+	ReasonRequestMethodUnknown
 
 	// The request included an Cache-Control: no-store header
 	ReasonRequestNoStore
@@ -77,7 +77,7 @@ func (r Reason) String() string {
 		return "ReasonRequestMethodOPTIONS"
 	case ReasonRequestMethodTRACE:
 		return "ReasonRequestMethodTRACE"
-	case ReasonRequestMethodUnkown:
+	case ReasonRequestMethodUnknown:
 		return "ReasonRequestMethodUnkown"
 	case ReasonRequestNoStore:
 		return "ReasonRequestNoStore"

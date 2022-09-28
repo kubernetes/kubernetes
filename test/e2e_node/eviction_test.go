@@ -42,12 +42,12 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
 // Eviction Policy is described here:
-// https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/kubelet-eviction.md
+// https://github.com/kubernetes/design-proposals-archive/blob/main/node/kubelet-eviction.md
 
 const (
 	postTestConditionMonitoringPeriod = 1 * time.Minute
@@ -511,10 +511,12 @@ type podEvictSpec struct {
 }
 
 // runEvictionTest sets up a testing environment given the provided pods, and checks a few things:
-//		It ensures that the desired expectedNodeCondition is actually triggered.
-//		It ensures that evictionPriority 0 pods are not evicted
-//		It ensures that lower evictionPriority pods are always evicted before higher evictionPriority pods (2 evicted before 1, etc.)
-//		It ensures that all pods with non-zero evictionPriority are eventually evicted.
+//
+//	It ensures that the desired expectedNodeCondition is actually triggered.
+//	It ensures that evictionPriority 0 pods are not evicted
+//	It ensures that lower evictionPriority pods are always evicted before higher evictionPriority pods (2 evicted before 1, etc.)
+//	It ensures that all pods with non-zero evictionPriority are eventually evicted.
+//
 // runEvictionTest then cleans up the testing environment by deleting provided pods, and ensures that expectedNodeCondition no longer exists
 func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expectedNodeCondition v1.NodeConditionType, expectedStarvedResource v1.ResourceName, logFunc func(), testSpecs []podEvictSpec) {
 	// Place the remainder of the test within a context so that the kubelet config is set before and after the test.
@@ -644,7 +646,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 				},
 			})
 
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				if framework.TestContext.DumpLogsOnFailure {
 					logPodEvents(f)
 					logNodeEvents(f)
@@ -1000,7 +1002,7 @@ func getMemhogPod(podName string, ctnName string, res v1.ResourceRequirements) *
 			Containers: []v1.Container{
 				{
 					Name:            ctnName,
-					Image:           "k8s.gcr.io/stress:v1",
+					Image:           "registry.k8s.io/stress:v1",
 					ImagePullPolicy: "Always",
 					Env:             env,
 					// 60 min timeout * 60s / tick per 10s = 360 ticks before timeout => ~11.11Mi/tick

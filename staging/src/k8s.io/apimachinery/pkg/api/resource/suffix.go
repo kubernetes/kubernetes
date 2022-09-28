@@ -165,7 +165,7 @@ func (sh *suffixHandler) constructBytes(base, exponent int32, format Format) (s 
 		if exponent == 0 {
 			return nil, true
 		}
-		result := make([]byte, 8, 8)
+		result := make([]byte, 8)
 		result[0] = 'e'
 		number := strconv.AppendInt(result[1:1], int64(exponent), 10)
 		if &result[1] == &number[0] {

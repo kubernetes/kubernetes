@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/pod-security-admission/admission/api"
 	"k8s.io/pod-security-admission/admission/api/scheme"
-	apiv1beta1 "k8s.io/pod-security-admission/admission/api/v1beta1"
+	apiv1 "k8s.io/pod-security-admission/admission/api/v1"
 )
 
 func LoadFromFile(file string) (*api.PodSecurityConfiguration, error) {
@@ -57,7 +57,7 @@ func LoadFromReader(reader io.Reader) (*api.PodSecurityConfiguration, error) {
 func LoadFromData(data []byte) (*api.PodSecurityConfiguration, error) {
 	if len(data) == 0 {
 		// no config provided, return default
-		externalConfig := &apiv1beta1.PodSecurityConfiguration{}
+		externalConfig := &apiv1.PodSecurityConfiguration{}
 		scheme.Scheme.Default(externalConfig)
 		internalConfig := &api.PodSecurityConfiguration{}
 		if err := scheme.Scheme.Convert(externalConfig, internalConfig, nil); err != nil {

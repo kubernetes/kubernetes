@@ -56,6 +56,9 @@ type IngressSpec struct {
 	// .status.componentRoutes list, where participating operators write the status of
 	// configurable routes.
 	// +optional
+	// +listType=map
+	// +listMapKey=namespace
+	// +listMapKey=name
 	ComponentRoutes []ComponentRouteSpec `json:"componentRoutes,omitempty"`
 
 	// requiredHSTSPolicies specifies HSTS policies that are required to be set on newly created  or updated routes
@@ -82,7 +85,75 @@ type IngressSpec struct {
 	// Note that if there are no RequiredHSTSPolicies, any HSTS Policy annotation on the route is valid.
 	// +optional
 	RequiredHSTSPolicies []RequiredHSTSPolicy `json:"requiredHSTSPolicies,omitempty"`
+
+	// loadBalancer contains the load balancer details in general which are not only specific to the underlying infrastructure
+	// provider of the current cluster and are required for Ingress Controller to work on OpenShift.
+	// +optional
+	LoadBalancer LoadBalancer `json:"loadbalancer,omitempty"`
 }
+
+// IngressPlatformSpec holds the desired state of Ingress specific to the underlying infrastructure provider
+// of the current cluster. Since these are used at spec-level for the underlying cluster, it
+// is supposed that only one of the spec structs is set.
+// +union
+type IngressPlatformSpec struct {
+	// type is the underlying infrastructure provider for the cluster.
+	// Allowed values are "AWS", "Azure", "BareMetal", "GCP", "Libvirt",
+	// "OpenStack", "VSphere", "oVirt", "KubeVirt", "EquinixMetal", "PowerVS",
+	// "AlibabaCloud", "Nutanix" and "None". Individual components may not support all platforms,
+	// and must handle unrecognized platforms as None if they do not support that platform.
+	//
+	// +unionDiscriminator
+	Type PlatformType `json:"type"`
+
+	// aws contains settings specific to the Amazon Web Services infrastructure provider.
+	// +optional
+	AWS *AWSIngressSpec `json:"aws,omitempty"`
+}
+
+type LoadBalancer struct {
+	// platform holds configuration specific to the underlying
+	// infrastructure provider for the ingress load balancers.
+	// When omitted, this means the user has no opinion and the platform is left
+	// to choose reasonable defaults. These defaults are subject to change over time.
+	// +optional
+	Platform IngressPlatformSpec `json:"platform,omitempty"`
+}
+
+// AWSIngressSpec holds the desired state of the Ingress for Amazon Web Services infrastructure provider.
+// This only includes fields that can be modified in the cluster.
+// +union
+type AWSIngressSpec struct {
+	// type allows user to set a load balancer type.
+	// When this field is set the default ingresscontroller will get created using the specified LBType.
+	// If this field is not set then the default ingress controller of LBType Classic will be created.
+	// Valid values are:
+	//
+	// * "Classic": A Classic Load Balancer that makes routing decisions at either
+	//   the transport layer (TCP/SSL) or the application layer (HTTP/HTTPS). See
+	//   the following for additional details:
+	//
+	//     https://docs.aws.amazon.com/AmazonECS/latest/developerguide/load-balancer-types.html#clb
+	//
+	// * "NLB": A Network Load Balancer that makes routing decisions at the
+	//   transport layer (TCP/SSL). See the following for additional details:
+	//
+	//     https://docs.aws.amazon.com/AmazonECS/latest/developerguide/load-balancer-types.html#nlb
+	// +unionDiscriminator
+	// +kubebuilder:validation:Enum:=NLB;Classic
+	// +kubebuilder:validation:Required
+	Type AWSLBType `json:"type,omitempty"`
+}
+
+type AWSLBType string
+
+const (
+	// NLB is the Network Load Balancer Type of AWS. Using NLB one can set NLB load balancer type for the default ingress controller.
+	NLB AWSLBType = "NLB"
+
+	// Classic is the Classic Load Balancer Type of AWS. Using CLassic one can set Classic load balancer type for the default ingress controller.
+	Classic AWSLBType = "Classic"
+)
 
 // ConsumingUser is an alias for string which we add validation to. Currently only service accounts are supported.
 // +kubebuilder:validation:Pattern="^system:serviceaccount:[a-z0-9]([-a-z0-9]*[a-z0-9])?:[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
@@ -111,6 +182,9 @@ type IngressStatus struct {
 	// componentRoutes is where participating operators place the current route status for routes whose
 	// hostnames and serving certificates can be customized by the cluster-admin.
 	// +optional
+	// +listType=map
+	// +listMapKey=namespace
+	// +listMapKey=name
 	ComponentRoutes []ComponentRouteStatus `json:"componentRoutes,omitempty"`
 
 	// defaultPlacement is set at installation time to control which
@@ -221,6 +295,8 @@ type ComponentRouteStatus struct {
 	//
 	// If Progressing is true, that means the component is taking some action related to the componentRoutes entry.
 	// +optional
+	// +listType=map
+	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// relatedObjects is a list of resources which are useful when debugging or inspecting how spec.componentRoutes is applied.

@@ -224,7 +224,7 @@ func (k *kubeManager) createPod(pod *v1.Pod) (*v1.Pod, error) {
 
 	createdPod, err := k.clientSet.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("unable to update pod %s/%s: %w", ns, pod.Name, err)
+		return nil, fmt.Errorf("unable to create pod %s/%s: %w", ns, pod.Name, err)
 	}
 	return createdPod, nil
 }

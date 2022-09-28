@@ -20,10 +20,10 @@ spec:
       - name: wardle-server
         # build from staging/src/k8s.io/sample-apiserver/artifacts/simple-image/Dockerfile
         # or
-        # docker pull k8s.gcr.io/e2e-test-images/sample-apiserver:1.17.4
-        # docker tag k8s.gcr.io/e2e-test-images/sample-apiserver:1.17.4 kube-sample-apiserver:latest
+        # docker pull registry.k8s.io/e2e-test-images/sample-apiserver:1.17.4
+        # docker tag registry.k8s.io/e2e-test-images/sample-apiserver:1.17.4 kube-sample-apiserver:latest
         image: kube-sample-apiserver:latest
         imagePullPolicy: Never
         args: [ "--etcd-servers=http://localhost:2379" ]
       - name: etcd
-        image: gcr.io/etcd-development/etcd:v3.5.3
+        image: gcr.io/etcd-development/etcd:v3.5.4

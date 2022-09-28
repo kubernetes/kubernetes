@@ -46,7 +46,7 @@
                 "containers": [
                     {
                         "name": "elasticsearch-logging",
-                        "image": "k8s.gcr.io/elasticsearch:1.0",
+                        "image": "registry.k8s.io/elasticsearch:1.0",
                         "ports": [
                             {
                                 "name": "db",

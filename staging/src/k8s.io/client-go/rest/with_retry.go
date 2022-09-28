@@ -204,7 +204,9 @@ func (r *withRetry) Before(ctx context.Context, request *Request) error {
 	if r.retryAfter == nil {
 		// we do a backoff sleep before the first attempt is made,
 		// (preserving current behavior).
-		request.backoff.Sleep(request.backoff.CalculateBackoff(url))
+		if request.backoff != nil {
+			request.backoff.Sleep(request.backoff.CalculateBackoff(url))
+		}
 		return nil
 	}
 
@@ -220,14 +222,13 @@ func (r *withRetry) Before(ctx context.Context, request *Request) error {
 		}
 	}
 
-	// if we are here, we have made attempt(s) al least once before.
+	// if we are here, we have made attempt(s) at least once before.
 	if request.backoff != nil {
-		// TODO(tkashem) with default set to use exponential backoff
-		//  we can merge these two sleeps:
-		//  BackOffManager.Sleep(max(backoffManager.CalculateBackoff(), retryAfter))
-		//  see https://github.com/kubernetes/kubernetes/issues/108302
-		request.backoff.Sleep(r.retryAfter.Wait)
-		request.backoff.Sleep(request.backoff.CalculateBackoff(url))
+		delay := request.backoff.CalculateBackoff(url)
+		if r.retryAfter.Wait > delay {
+			delay = r.retryAfter.Wait
+		}
+		request.backoff.Sleep(delay)
 	}
 
 	// We are retrying the request that we already send to
@@ -349,8 +350,12 @@ func readAndCloseResponseBody(resp *http.Response) {
 }
 
 func retryAfterResponse() *http.Response {
+	return retryAfterResponseWithDelay("1")
+}
+
+func retryAfterResponseWithDelay(delay string) *http.Response {
 	return &http.Response{
 		StatusCode: http.StatusInternalServerError,
-		Header:     http.Header{"Retry-After": []string{"1"}},
+		Header:     http.Header{"Retry-After": []string{delay}},
 	}
 }

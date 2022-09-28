@@ -36,12 +36,10 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
-// TODO: cleanup after UnversionedKubeletConfigMap goes GA:
-// https://github.com/kubernetes/kubeadm/issues/1582
-func testKubeletConfigMap(contents string, legacyKubeletConfigMap bool) *v1.ConfigMap {
+func testKubeletConfigMap(contents string) *v1.ConfigMap {
 	return &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.GetKubeletConfigMapName(constants.CurrentKubernetesVersion, legacyKubeletConfigMap),
+			Name:      constants.KubeletBaseConfigurationConfigMap,
 			Namespace: metav1.NamespaceSystem,
 		},
 		Data: map[string]string{
@@ -285,16 +283,8 @@ func TestKubeletFromDocumentMap(t *testing.T) {
 func TestKubeletFromCluster(t *testing.T) {
 	runKubeletFromTest(t, func(_ schema.GroupVersionKind, yaml string) (kubeadmapi.ComponentConfig, error) {
 		client := clientsetfake.NewSimpleClientset(
-			testKubeletConfigMap(yaml, true),
+			testKubeletConfigMap(yaml),
 		)
-		legacyKubeletConfigMap := true
-		return kubeletHandler.FromCluster(client, testClusterCfg(legacyKubeletConfigMap))
-	})
-	runKubeletFromTest(t, func(_ schema.GroupVersionKind, yaml string) (kubeadmapi.ComponentConfig, error) {
-		client := clientsetfake.NewSimpleClientset(
-			testKubeletConfigMap(yaml, false),
-		)
-		legacyKubeletConfigMap := false
-		return kubeletHandler.FromCluster(client, testClusterCfg(legacyKubeletConfigMap))
+		return kubeletHandler.FromCluster(client, testClusterCfg())
 	})
 }

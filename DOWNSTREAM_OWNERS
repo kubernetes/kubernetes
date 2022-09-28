@@ -8,7 +8,6 @@ filters:
     - sttts
     - soltysh
     - mfojtik
-    - marun
 
     # Approvers are limited to the team that manages rebases and pays the price for carries that are introduced
     approvers:
@@ -16,7 +15,6 @@ filters:
     - sttts
     - soltysh
     - mfojtik
-    - marun
 
   "^\\.go.(mod|sum)$":
     labels:

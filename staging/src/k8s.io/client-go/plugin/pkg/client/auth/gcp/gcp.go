@@ -59,55 +59,54 @@ var (
 // tokens for kubectl to authenticate itself to the apiserver. A sample json config
 // is provided below with all recognized options described.
 //
-// {
-//   'auth-provider': {
-//     # Required
-//     "name": "gcp",
+//	{
+//	  'auth-provider': {
+//	    # Required
+//	    "name": "gcp",
 //
-//     'config': {
-//       # Authentication options
-//       # These options are used while getting a token.
+//	    'config': {
+//	      # Authentication options
+//	      # These options are used while getting a token.
 //
-//       # comma-separated list of GCP API scopes. default value of this field
-//       # is "https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/userinfo.email".
-// 		 # to override the API scopes, specify this field explicitly.
-//       "scopes": "https://www.googleapis.com/auth/cloud-platform"
+//	      # comma-separated list of GCP API scopes. default value of this field
+//	      # is "https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/userinfo.email".
+//			 # to override the API scopes, specify this field explicitly.
+//	      "scopes": "https://www.googleapis.com/auth/cloud-platform"
 //
-//       # Caching options
+//	      # Caching options
 //
-//       # Raw string data representing cached access token.
-//       "access-token": "ya29.CjWdA4GiBPTt",
-//       # RFC3339Nano expiration timestamp for cached access token.
-//       "expiry": "2016-10-31 22:31:9.123",
+//	      # Raw string data representing cached access token.
+//	      "access-token": "ya29.CjWdA4GiBPTt",
+//	      # RFC3339Nano expiration timestamp for cached access token.
+//	      "expiry": "2016-10-31 22:31:9.123",
 //
-//       # Command execution options
-//       # These options direct the plugin to execute a specified command and parse
-//       # token and expiry time from the output of the command.
+//	      # Command execution options
+//	      # These options direct the plugin to execute a specified command and parse
+//	      # token and expiry time from the output of the command.
 //
-//       # Command to execute for access token. Command output will be parsed as JSON.
-//       # If "cmd-args" is not present, this value will be split on whitespace, with
-//       # the first element interpreted as the command, remaining elements as args.
-//       "cmd-path": "/usr/bin/gcloud",
+//	      # Command to execute for access token. Command output will be parsed as JSON.
+//	      # If "cmd-args" is not present, this value will be split on whitespace, with
+//	      # the first element interpreted as the command, remaining elements as args.
+//	      "cmd-path": "/usr/bin/gcloud",
 //
-//       # Arguments to pass to command to execute for access token.
-//       "cmd-args": "config config-helper --output=json"
+//	      # Arguments to pass to command to execute for access token.
+//	      "cmd-args": "config config-helper --output=json"
 //
-//       # JSONPath to the string field that represents the access token in
-//       # command output. If omitted, defaults to "{.access_token}".
-//       "token-key": "{.credential.access_token}",
+//	      # JSONPath to the string field that represents the access token in
+//	      # command output. If omitted, defaults to "{.access_token}".
+//	      "token-key": "{.credential.access_token}",
 //
-//       # JSONPath to the string field that represents expiration timestamp
-//       # of the access token in the command output. If omitted, defaults to
-//       # "{.token_expiry}"
-//       "expiry-key": ""{.credential.token_expiry}",
+//	      # JSONPath to the string field that represents expiration timestamp
+//	      # of the access token in the command output. If omitted, defaults to
+//	      # "{.token_expiry}"
+//	      "expiry-key": ""{.credential.token_expiry}",
 //
-//       # golang reference time in the format that the expiration timestamp uses.
-//       # If omitted, defaults to time.RFC3339Nano
-//       "time-fmt": "2006-01-02 15:04:05.999999999"
-//     }
-//   }
-// }
-//
+//	      # golang reference time in the format that the expiration timestamp uses.
+//	      # If omitted, defaults to time.RFC3339Nano
+//	      "time-fmt": "2006-01-02 15:04:05.999999999"
+//	    }
+//	  }
+//	}
 type gcpAuthProvider struct {
 	tokenSource oauth2.TokenSource
 	persister   restclient.AuthProviderConfigPersister
@@ -117,7 +116,7 @@ var warnOnce sync.Once
 
 func newGCPAuthProvider(_ string, gcpConfig map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
 	warnOnce.Do(func() {
-		klog.Warningf(`WARNING: the gcp auth plugin is deprecated in v1.22+, unavailable in v1.25+; use gcloud instead.
+		klog.Warningf(`WARNING: the gcp auth plugin is deprecated in v1.22+, unavailable in v1.26+; use gcloud instead.
 To learn more, consult https://cloud.google.com/blog/products/containers-kubernetes/kubectl-auth-changes-in-gke`)
 	})
 

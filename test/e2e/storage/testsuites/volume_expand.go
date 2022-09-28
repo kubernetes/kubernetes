@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
@@ -176,6 +176,10 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 		ginkgo.It("Verify if offline PVC expansion works", func() {
 			init()
 			defer cleanup()
+
+			if !driver.GetDriverInfo().Capabilities[storageframework.CapOfflineExpansion] {
+				e2eskipper.Skipf("Driver %q does not support offline volume expansion - skipping", driver.GetDriverInfo().Name)
+			}
 
 			var err error
 			ginkgo.By("Creating a pod with dynamically provisioned volume")

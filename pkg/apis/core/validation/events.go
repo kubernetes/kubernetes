@@ -40,7 +40,7 @@ const (
 
 func ValidateEventCreate(event *core.Event, requestVersion schema.GroupVersion) field.ErrorList {
 	// Make sure events always pass legacy validation.
-	allErrs := legacyValidateEvent(event)
+	allErrs := legacyValidateEvent(event, requestVersion)
 	if requestVersion == v1.SchemeGroupVersion || requestVersion == eventsv1beta1.SchemeGroupVersion {
 		// No further validation for backwards compatibility.
 		return allErrs
@@ -73,7 +73,7 @@ func ValidateEventCreate(event *core.Event, requestVersion schema.GroupVersion) 
 
 func ValidateEventUpdate(newEvent, oldEvent *core.Event, requestVersion schema.GroupVersion) field.ErrorList {
 	// Make sure the new event always passes legacy validation.
-	allErrs := legacyValidateEvent(newEvent)
+	allErrs := legacyValidateEvent(newEvent, requestVersion)
 	if requestVersion == v1.SchemeGroupVersion || requestVersion == eventsv1beta1.SchemeGroupVersion {
 		// No further validation for backwards compatibility.
 		return allErrs
@@ -119,10 +119,15 @@ func validateV1EventSeries(event *core.Event) field.ErrorList {
 }
 
 // legacyValidateEvent makes sure that the event makes sense.
-func legacyValidateEvent(event *core.Event) field.ErrorList {
+func legacyValidateEvent(event *core.Event, requestVersion schema.GroupVersion) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// Because go
 	zeroTime := time.Time{}
+
+	reportingControllerFieldName := "reportingController"
+	if requestVersion == v1.SchemeGroupVersion {
+		reportingControllerFieldName = "reportingComponent"
+	}
 
 	// "New" Events need to have EventTime set, so it's validating old object.
 	if event.EventTime.Time == zeroTime {
@@ -144,11 +149,9 @@ func legacyValidateEvent(event *core.Event) field.ErrorList {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("involvedObject", "namespace"), event.InvolvedObject.Namespace, "does not match event.namespace"))
 		}
 		if len(event.ReportingController) == 0 {
-			allErrs = append(allErrs, field.Required(field.NewPath("reportingController"), ""))
+			allErrs = append(allErrs, field.Required(field.NewPath(reportingControllerFieldName), ""))
 		}
-		for _, msg := range validation.IsQualifiedName(event.ReportingController) {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("reportingController"), event.ReportingController, msg))
-		}
+		allErrs = append(allErrs, ValidateQualifiedName(event.ReportingController, field.NewPath(reportingControllerFieldName))...)
 		if len(event.ReportingInstance) == 0 {
 			allErrs = append(allErrs, field.Required(field.NewPath("reportingInstance"), ""))
 		}

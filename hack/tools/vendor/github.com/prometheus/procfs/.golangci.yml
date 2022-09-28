@@ -1,4 +1,0 @@
----
-linters:
-  enable:
-  - golint

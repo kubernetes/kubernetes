@@ -59,8 +59,6 @@ type Object interface {
 	SetFinalizers(finalizers []string)
 	GetOwnerReferences() []OwnerReference
 	SetOwnerReferences([]OwnerReference)
-	GetZZZ_DeprecatedClusterName() string
-	SetZZZ_DeprecatedClusterName(clusterName string)
 	GetManagedFields() []ManagedFieldsEntry
 	SetManagedFields(managedFields []ManagedFieldsEntry)
 }
@@ -171,10 +169,6 @@ func (meta *ObjectMeta) SetFinalizers(finalizers []string)            { meta.Fin
 func (meta *ObjectMeta) GetOwnerReferences() []OwnerReference         { return meta.OwnerReferences }
 func (meta *ObjectMeta) SetOwnerReferences(references []OwnerReference) {
 	meta.OwnerReferences = references
-}
-func (meta *ObjectMeta) GetZZZ_DeprecatedClusterName() string { return meta.ZZZ_DeprecatedClusterName }
-func (meta *ObjectMeta) SetZZZ_DeprecatedClusterName(clusterName string) {
-	meta.ZZZ_DeprecatedClusterName = clusterName
 }
 func (meta *ObjectMeta) GetManagedFields() []ManagedFieldsEntry { return meta.ManagedFields }
 func (meta *ObjectMeta) SetManagedFields(managedFields []ManagedFieldsEntry) {

@@ -102,7 +102,7 @@ func (RouteTargetReference) SwaggerDoc() map[string]string {
 }
 
 var map_RouterShard = map[string]string{
-	"":          "RouterShard has information of a routing shard and is used to generate host names and routing table entries when a routing shard is allocated for a specific route. Caveat: This is WIP and will likely undergo modifications when sharding\n        support is added.",
+	"":          "RouterShard has information of a routing shard and is used to generate host names and routing table entries when a routing shard is allocated for a specific route. Caveat: This is WIP and will likely undergo modifications when sharding support is added.",
 	"shardName": "shardName uniquely identifies a router shard in the \"set\" of routers used for routing traffic to the services.",
 	"dnsSuffix": "dnsSuffix for the shard ala: shard-1.v3.openshift.com",
 }

@@ -29,6 +29,7 @@ import (
 	"k8s.io/component-base/cli"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 
 	_ "k8s.io/component-base/logs/json/register"
@@ -37,7 +38,7 @@ import (
 var featureGate = featuregate.NewFeatureGate()
 
 func main() {
-	runtime.Must(logs.AddFeatureGates(featureGate))
+	runtime.Must(logsapi.AddFeatureGates(featureGate))
 	command := NewLoggerCommand()
 
 	// Intentionally broken: logging is not initialized yet.
@@ -48,25 +49,25 @@ func main() {
 }
 
 func NewLoggerCommand() *cobra.Command {
-	o := logs.NewOptions()
+	c := logsapi.NewLoggingConfiguration()
 	cmd := &cobra.Command{
 		Run: func(cmd *cobra.Command, args []string) {
 			logs.InitLogs()
-			if err := o.ValidateAndApply(featureGate); err != nil {
+			if err := logsapi.ValidateAndApply(c, featureGate); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
 
 			// Initialize contextual logging.
-			logger := klog.Background().WithName("example").WithValues("foo", "bar")
+			logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "example"), "foo", "bar")
 			ctx := klog.NewContext(context.Background(), logger)
 
 			runLogger(ctx)
 		},
 	}
-	logs.AddFeatureGates(featureGate)
+	logsapi.AddFeatureGates(featureGate)
 	featureGate.AddFlag(cmd.Flags())
-	o.AddFlags(cmd.Flags())
+	logsapi.AddFlags(c, cmd.Flags())
 	return cmd
 }
 

@@ -3,7 +3,6 @@ kind: CronJob
 metadata:
   annotations:
     annotationsKey: annotationsValue
-  clusterName: clusterNameValue
   creationTimestamp: "2008-01-01T01:01:01Z"
   deletionGracePeriodSeconds: 10
   deletionTimestamp: "2009-01-01T01:01:01Z"
@@ -40,7 +39,6 @@ spec:
     metadata:
       annotations:
         annotationsKey: annotationsValue
-      clusterName: clusterNameValue
       creationTimestamp: "2008-01-01T01:01:01Z"
       deletionGracePeriodSeconds: 10
       deletionTimestamp: "2009-01-01T01:01:01Z"
@@ -77,6 +75,17 @@ spec:
       completions: 2
       manualSelector: true
       parallelism: 1
+      podFailurePolicy:
+        rules:
+        - action: actionValue
+          onExitCodes:
+            containerName: containerNameValue
+            operator: operatorValue
+            values:
+            - 3
+          onPodConditions:
+          - status: statusValue
+            type: typeValue
       selector:
         matchExpressions:
         - key: keyValue
@@ -90,7 +99,6 @@ spec:
         metadata:
           annotations:
             annotationsKey: annotationsValue
-          clusterName: clusterNameValue
           creationTimestamp: "2008-01-01T01:01:01Z"
           deletionGracePeriodSeconds: 10
           deletionTimestamp: "2009-01-01T01:01:01Z"
@@ -636,6 +644,7 @@ spec:
           hostIPC: true
           hostNetwork: true
           hostPID: true
+          hostUsers: true
           hostname: hostnameValue
           imagePullSecrets:
           - name: nameValue
@@ -890,8 +899,12 @@ spec:
                 - valuesValue
               matchLabels:
                 matchLabelsKey: matchLabelsValue
+            matchLabelKeys:
+            - matchLabelKeysValue
             maxSkew: 1
             minDomains: 5
+            nodeAffinityPolicy: nodeAffinityPolicyValue
+            nodeTaintsPolicy: nodeTaintsPolicyValue
             topologyKey: topologyKeyValue
             whenUnsatisfiable: whenUnsatisfiableValue
           volumes:
@@ -962,7 +975,6 @@ spec:
                 metadata:
                   annotations:
                     annotationsKey: annotationsValue
-                  clusterName: clusterNameValue
                   creationTimestamp: "2008-01-01T01:01:01Z"
                   deletionGracePeriodSeconds: 10
                   deletionTimestamp: "2009-01-01T01:01:01Z"

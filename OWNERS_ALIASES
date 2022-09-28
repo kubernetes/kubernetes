@@ -168,12 +168,10 @@ aliases:
   # - ravisantoshgudimetla
   # - wojtek-t
   sig-scheduling:
-    - Huang-Wei
-    - ahg-g
-    - alculquicondor
-    - damemi
     - chendave
     - denkensk
+    - sanposhiho
+    - kerthcet
   # emeritus:
   # - adtac
   # - liu-cong
@@ -263,6 +261,7 @@ aliases:
     - freehan
     - khenidak
     - mrhohn
+    - robscott
     - thockin
   sig-network-reviewers:
     - andrewsykim
@@ -274,6 +273,7 @@ aliases:
     - freehan
     - khenidak
     - mrhohn
+    - robscott
     - thockin
   sig-apps-approvers:
     - kow3ns
@@ -296,7 +296,6 @@ aliases:
     - MaciekPytel
     - mwielgus
   sig-instrumentation-approvers:
-    - brancz
     - logicalhan
     - dashpole
     - ehashman
@@ -304,19 +303,17 @@ aliases:
     - serathius
     - dgrisonnet
   sig-instrumentation-reviewers:
-    - brancz
     - dashpole
     - ehashman
     - s-urbaniak
-    - andyxning
     - coffeepac
     - logicalhan
     - RainbowMango
     - serathius
-    - lilic
     - dgrisonnet
     - pohly
   # sig-instrumentation-emeritus
+  # - brancz
   # - DirectXMan12
 
   api-approvers:
@@ -508,3 +505,4 @@ aliases:
     - smarterclayton
     - johnbelamaric
     - spiffxp
+    - dims

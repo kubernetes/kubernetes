@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	v1 "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota/v1"
+	"k8s.io/apiserver/pkg/quota/v1/generic"
 )
 
 func TestPrettyPrint(t *testing.T) {
@@ -159,5 +160,16 @@ func TestExcludedOperations(t *testing.T) {
 		if err := a.Validate(context.TODO(), test.attr, nil); err != nil {
 			t.Errorf("Test case: %q. Expected no error but got: %v", test.desc, err)
 		}
+	}
+}
+
+func TestInitializationOrder(t *testing.T) {
+	a := &QuotaAdmission{}
+
+	qca := generic.NewConfiguration(nil, nil)
+	a.SetQuotaConfiguration(qca)
+
+	if err := a.ValidateInitialization(); err != stopChUnconfiguredErr {
+		t.Errorf("unexpected error: %v", err)
 	}
 }

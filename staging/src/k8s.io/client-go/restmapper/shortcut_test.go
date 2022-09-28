@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	openapi_v2 "github.com/google/gnostic/openapiv2"
+	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -195,6 +196,65 @@ func TestKindFor(t *testing.T) {
 	}
 }
 
+func TestKindForWithNewCRDs(t *testing.T) {
+	tests := map[string]struct {
+		in       schema.GroupVersionResource
+		expected schema.GroupVersionKind
+		srvRes   []*metav1.APIResourceList
+	}{
+		"": {
+			in:       schema.GroupVersionResource{Group: "a", Version: "", Resource: "sc"},
+			expected: schema.GroupVersionKind{Group: "a", Version: "v1", Kind: "StorageClass"},
+			srvRes: []*metav1.APIResourceList{
+				{
+					GroupVersion: "a/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "storageclasses",
+							ShortNames: []string{"sc"},
+							Kind:       "StorageClass",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			invalidateCalled := false
+			fakeDiscovery := &fakeDiscoveryClient{}
+			fakeDiscovery.serverResourcesHandler = func() ([]*metav1.APIResourceList, error) {
+				if invalidateCalled {
+					return test.srvRes, nil
+				}
+				return []*metav1.APIResourceList{}, nil
+			}
+			fakeCachedDiscovery := &fakeCachedDiscoveryClient{DiscoveryInterface: fakeDiscovery}
+			fakeCachedDiscovery.invalidateHandler = func() {
+				invalidateCalled = true
+			}
+			fakeCachedDiscovery.freshHandler = func() bool {
+				return invalidateCalled
+			}
+
+			// in real world the discovery client is fronted with a cache which
+			// will answer the initial request, only failure to match will trigger
+			// the cache invalidation and live discovery call
+			delegate := NewDeferredDiscoveryRESTMapper(fakeCachedDiscovery)
+			mapper := NewShortcutExpander(delegate, fakeCachedDiscovery)
+
+			gvk, err := mapper.KindFor(test.in)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if diff := cmp.Equal(gvk, test.expected); !diff {
+				t.Errorf("unexpected data returned %#v, expected %#v", gvk, test.expected)
+			}
+		})
+	}
+}
+
 type fakeRESTMapper struct {
 	kindForInput schema.GroupVersionResource
 }
@@ -300,4 +360,25 @@ func (c *fakeDiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {
 
 func (c *fakeDiscoveryClient) OpenAPIV3() openapi.Client {
 	panic("implement me")
+}
+
+type fakeCachedDiscoveryClient struct {
+	discovery.DiscoveryInterface
+	freshHandler      func() bool
+	invalidateHandler func()
+}
+
+var _ discovery.CachedDiscoveryInterface = &fakeCachedDiscoveryClient{}
+
+func (c *fakeCachedDiscoveryClient) Fresh() bool {
+	if c.freshHandler != nil {
+		return c.freshHandler()
+	}
+	return true
+}
+
+func (c *fakeCachedDiscoveryClient) Invalidate() {
+	if c.invalidateHandler != nil {
+		c.invalidateHandler()
+	}
 }

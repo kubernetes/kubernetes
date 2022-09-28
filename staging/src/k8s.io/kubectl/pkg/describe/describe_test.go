@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
@@ -34,6 +35,7 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
+	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
@@ -98,6 +100,30 @@ func TestDescribePod(t *testing.T) {
 		t.Errorf("unexpected out: %s", out)
 	}
 	if !strings.Contains(out, "Terminating (lasts 10y)") || !strings.Contains(out, "1234s") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribePodServiceAccount(t *testing.T) {
+	fake := fake.NewSimpleClientset(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: corev1.PodSpec{
+			ServiceAccountName: "fooaccount",
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := PodDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "Service Account:") {
+		t.Errorf("unexpected out: %s", out)
+	}
+	if !strings.Contains(out, "fooaccount") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
@@ -207,6 +233,40 @@ func TestDescribePodTolerations(t *testing.T) {
 		!strings.Contains(out, "key3=value3:NoExecute for 300s\n") ||
 		!strings.Contains(out, "key4:NoExecute for 60s\n") ||
 		!strings.Contains(out, "Tolerations:") {
+		t.Errorf("unexpected out:\n%s", out)
+	}
+}
+
+func TestDescribeTopologySpreadConstraints(t *testing.T) {
+	fake := fake.NewSimpleClientset(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: corev1.PodSpec{
+			TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+				{
+					MaxSkew:           3,
+					TopologyKey:       "topology.kubernetes.io/test1",
+					WhenUnsatisfiable: "DoNotSchedule",
+					LabelSelector:     &metav1.LabelSelector{MatchLabels: map[string]string{"key1": "val1", "key2": "val2"}},
+				},
+				{
+					MaxSkew:           1,
+					TopologyKey:       "topology.kubernetes.io/test2",
+					WhenUnsatisfiable: "ScheduleAnyway",
+				},
+			},
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := PodDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "topology.kubernetes.io/test1:DoNotSchedule when max skew 3 is exceeded for selector key1=val1,key2=val2\n") ||
+		!strings.Contains(out, "topology.kubernetes.io/test2:ScheduleAnyway when max skew 1 is exceeded\n") {
 		t.Errorf("unexpected out:\n%s", out)
 	}
 }
@@ -341,6 +401,86 @@ func TestDescribePodPriority(t *testing.T) {
 	}
 	if !strings.Contains(out, "high-priority") || !strings.Contains(out, "1000") {
 		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribePodRuntimeClass(t *testing.T) {
+	runtimeClassNames := []string{"test1", ""}
+	testCases := []struct {
+		name     string
+		pod      *corev1.Pod
+		expect   []string
+		unexpect []string
+	}{
+		{
+			name: "test1",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: corev1.PodSpec{
+					RuntimeClassName: &runtimeClassNames[0],
+				},
+			},
+			expect: []string{
+				"Name", "bar",
+				"Runtime Class Name", "test1",
+			},
+			unexpect: []string{},
+		},
+		{
+			name: "test2",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: corev1.PodSpec{
+					RuntimeClassName: &runtimeClassNames[1],
+				},
+			},
+			expect: []string{
+				"Name", "bar",
+			},
+			unexpect: []string{
+				"Runtime Class Name",
+			},
+		},
+		{
+			name: "test3",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: corev1.PodSpec{},
+			},
+			expect: []string{
+				"Name", "bar",
+			},
+			unexpect: []string{
+				"Runtime Class Name",
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			fake := fake.NewSimpleClientset(testCase.pod)
+			c := &describeClient{T: t, Interface: fake}
+			d := PodDescriber{c}
+			out, err := d.Describe("", "bar", DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			for _, expected := range testCase.expect {
+				if !strings.Contains(out, expected) {
+					t.Errorf("expected to find %q in output: %q", expected, out)
+				}
+			}
+			for _, unexpected := range testCase.unexpect {
+				if strings.Contains(out, unexpected) {
+					t.Errorf("unexpected to find %q in output: %q", unexpected, out)
+				}
+			}
+		})
 	}
 }
 
@@ -5228,6 +5368,64 @@ Events:         <none>` + "\n",
 			if out != tc.output {
 				t.Logf(out)
 				t.Errorf("expected :\n%s\nbut got output:\n%s", tc.output, out)
+			}
+		})
+	}
+}
+
+func TestDescribeClusterCIDR(t *testing.T) {
+
+	testcases := map[string]struct {
+		input  *fake.Clientset
+		output string
+	}{
+		"ClusterCIDR v1alpha1": {
+			input: fake.NewSimpleClientset(&networkingv1alpha1.ClusterCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo.123",
+				},
+				Spec: networkingv1alpha1.ClusterCIDRSpec{
+					PerNodeHostBits: int32(8),
+					IPv4:            "10.1.0.0/16",
+					IPv6:            "fd00:1:1::/64",
+					NodeSelector: &corev1.NodeSelector{
+						NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: "In",
+										Values:   []string{"bar"}},
+								},
+							},
+						},
+					},
+				},
+			}),
+
+			output: `Name:         foo.123
+Labels:       <none>
+Annotations:  <none>
+NodeSelector:
+  NodeSelector Terms:
+    Term 0:       foo in [bar]
+PerNodeHostBits:  8
+IPv4:             10.1.0.0/16
+IPv6:             fd00:1:1::/64
+Events:           <none>` + "\n",
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			c := &describeClient{T: t, Namespace: "foo", Interface: tc.input}
+			d := ClusterCIDRDescriber{c}
+			out, err := d.Describe("bar", "foo.123", DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if out != tc.output {
+				t.Errorf("expected :\n%s\nbut got output:\n%s diff:\n%s", tc.output, out, cmp.Diff(tc.output, out))
 			}
 		})
 	}

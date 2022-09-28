@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	mock "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing"
+	mock "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing/v1beta1"
 
 	"k8s.io/apimachinery/pkg/util/uuid"
 )

@@ -40,6 +40,10 @@ type EndpointReconciler interface {
 	RemoveEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort) error
 	// StopReconciling turns any later ReconcileEndpoints call into a noop.
 	StopReconciling()
+	// Destroy shuts down all internal structures.
+	// Destroy needs to be implemented in thread-safe way and be prepared for being
+	// called more than once.
+	Destroy()
 }
 
 // Type the reconciler type

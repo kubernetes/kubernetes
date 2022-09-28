@@ -53,7 +53,7 @@ ssh_options=${SSH_OPTIONS:-}
 kubelet_config_file=${KUBELET_CONFIG_FILE:-"test/e2e_node/jenkins/default-kubelet-config.yaml"}
 
 # Parse the flags to pass to ginkgo
-ginkgoflags=""
+ginkgoflags="-timeout=24h"
 if [[ ${parallelism} -gt 1 ]]; then
   ginkgoflags="${ginkgoflags} -nodes=${parallelism} "
 fi
@@ -89,19 +89,13 @@ if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
   # The following options are only valid in remote GCE run.
   images=${IMAGES:-""}
   hosts=${HOSTS:-""}
-  image_project=${IMAGE_PROJECT:-"kubernetes-node-e2e-images"}
+  image_project=${IMAGE_PROJECT:-"cos-cloud"}
   metadata=${INSTANCE_METADATA:-""}
-  list_images=${LIST_IMAGES:-false}
-  if  [[ ${list_images} == "true" ]]; then
-    gcloud compute images list --project="${image_project}" | grep "e2e-node"
-    exit 0
-  fi
   gubernator=${GUBERNATOR:-"false"}
   image_config_file=${IMAGE_CONFIG_FILE:-""}
   image_config_dir=${IMAGE_CONFIG_DIR:-""}
   runtime_config=${RUNTIME_CONFIG:-""}
   if [[ ${hosts} == "" && ${images} == "" && ${image_config_file} == "" ]]; then
-    image_project="${IMAGE_PROJECT:-"cos-cloud"}"
     gci_image=$(gcloud compute images list --project "${image_project}" \
     --no-standard-images --filter="name ~ 'cos-beta.*'" --format="table[no-heading](name)")
     images=${gci_image}
@@ -117,9 +111,9 @@ if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
   fi
 
   # Get the compute zone
-  zone=${ZONE:-"$(gcloud info --format='value(config.properties.compute.zone)')"}
+  zone=${ZONE:-"$(gcloud info --format='value(config.properties.compute.zone.value)')"}
   if [[ ${zone} == "" ]]; then
-    echo "Could not find gcloud compute/zone when running: \`gcloud info --format='value(config.properties.compute.zone)'\`"
+    echo "Could not find gcloud compute/zone when running: \`gcloud info --format='value(config.properties.compute.zone.value)'\`"
     exit 1
   fi
 

@@ -4,9 +4,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
 	scheme "github.com/openshift/client-go/config/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -31,6 +34,8 @@ type InfrastructureInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.InfrastructureList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Infrastructure, err error)
+	Apply(ctx context.Context, infrastructure *configv1.InfrastructureApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Infrastructure, err error)
+	ApplyStatus(ctx context.Context, infrastructure *configv1.InfrastructureApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Infrastructure, err error)
 	InfrastructureExpansion
 }
 
@@ -161,6 +166,60 @@ func (c *infrastructures) Patch(ctx context.Context, name string, pt types.Patch
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied infrastructure.
+func (c *infrastructures) Apply(ctx context.Context, infrastructure *configv1.InfrastructureApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Infrastructure, err error) {
+	if infrastructure == nil {
+		return nil, fmt.Errorf("infrastructure provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(infrastructure)
+	if err != nil {
+		return nil, err
+	}
+	name := infrastructure.Name
+	if name == nil {
+		return nil, fmt.Errorf("infrastructure.Name must be provided to Apply")
+	}
+	result = &v1.Infrastructure{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("infrastructures").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *infrastructures) ApplyStatus(ctx context.Context, infrastructure *configv1.InfrastructureApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Infrastructure, err error) {
+	if infrastructure == nil {
+		return nil, fmt.Errorf("infrastructure provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(infrastructure)
+	if err != nil {
+		return nil, err
+	}
+
+	name := infrastructure.Name
+	if name == nil {
+		return nil, fmt.Errorf("infrastructure.Name must be provided to Apply")
+	}
+
+	result = &v1.Infrastructure{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("infrastructures").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

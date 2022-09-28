@@ -1469,3 +1469,44 @@ func TestContainsIPv4Loopback(t *testing.T) {
 		})
 	}
 }
+
+func TestIsZeroCIDR(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{
+			name:     "invalide cidr",
+			input:    "",
+			expected: false,
+		},
+		{
+			name:     "ipv4 cidr",
+			input:    "172.10.0.0/16",
+			expected: false,
+		},
+		{
+			name:     "ipv4 zero cidr",
+			input:    IPv4ZeroCIDR,
+			expected: true,
+		},
+		{
+			name:     "ipv6 cidr",
+			input:    "::/128",
+			expected: false,
+		},
+		{
+			name:     "ipv6 zero cidr",
+			input:    IPv6ZeroCIDR,
+			expected: true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsZeroCIDR(tc.input); tc.expected != got {
+				t.Errorf("IsZeroCIDR() = %t, want %t", got, tc.expected)
+			}
+		})
+	}
+}

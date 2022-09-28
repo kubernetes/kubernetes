@@ -43,7 +43,7 @@ import (
 type ActivePodsFunc func() []*v1.Pod
 
 type runtimeService interface {
-	UpdateContainerResources(id string, resources *runtimeapi.LinuxContainerResources) error
+	UpdateContainerResources(id string, resources *runtimeapi.ContainerResources) error
 }
 
 type policyName string
@@ -521,8 +521,10 @@ func (m *manager) updateContainerCPUSet(containerID string, cpus cpuset.CPUSet) 
 	// this patch-like partial resources.
 	return m.containerRuntime.UpdateContainerResources(
 		containerID,
-		&runtimeapi.LinuxContainerResources{
-			CpusetCpus: cpus.String(),
+		&runtimeapi.ContainerResources{
+			Linux: &runtimeapi.LinuxContainerResources{
+				CpusetCpus: cpus.String(),
+			},
 		})
 }
 

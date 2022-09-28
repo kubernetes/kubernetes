@@ -89,6 +89,12 @@ func (r *StatusREST) New() runtime.Object {
 	return &certificates.CertificateSigningRequest{}
 }
 
+// Destroy cleans up resources on shutdown.
+func (r *StatusREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
+}
+
 // Get retrieves the object from the storage. It is required to support Patch.
 func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	return r.store.Get(ctx, name, options)
@@ -120,6 +126,12 @@ type ApprovalREST struct {
 // New creates a new CertificateSigningRequest object.
 func (r *ApprovalREST) New() runtime.Object {
 	return &certificates.CertificateSigningRequest{}
+}
+
+// Destroy cleans up resources on shutdown.
+func (r *ApprovalREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.

@@ -4,9 +4,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
 	scheme "github.com/openshift/client-go/config/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -31,6 +34,8 @@ type ClusterOperatorInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ClusterOperatorList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterOperator, err error)
+	Apply(ctx context.Context, clusterOperator *configv1.ClusterOperatorApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterOperator, err error)
+	ApplyStatus(ctx context.Context, clusterOperator *configv1.ClusterOperatorApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterOperator, err error)
 	ClusterOperatorExpansion
 }
 
@@ -161,6 +166,60 @@ func (c *clusterOperators) Patch(ctx context.Context, name string, pt types.Patc
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied clusterOperator.
+func (c *clusterOperators) Apply(ctx context.Context, clusterOperator *configv1.ClusterOperatorApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterOperator, err error) {
+	if clusterOperator == nil {
+		return nil, fmt.Errorf("clusterOperator provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(clusterOperator)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterOperator.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterOperator.Name must be provided to Apply")
+	}
+	result = &v1.ClusterOperator{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("clusteroperators").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *clusterOperators) ApplyStatus(ctx context.Context, clusterOperator *configv1.ClusterOperatorApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterOperator, err error) {
+	if clusterOperator == nil {
+		return nil, fmt.Errorf("clusterOperator provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(clusterOperator)
+	if err != nil {
+		return nil, err
+	}
+
+	name := clusterOperator.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterOperator.Name must be provided to Apply")
+	}
+
+	result = &v1.ClusterOperator{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("clusteroperators").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

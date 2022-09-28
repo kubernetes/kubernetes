@@ -4,8 +4,11 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	configv1 "github.com/openshift/api/config/v1"
+	applyconfigurationsconfigv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -80,6 +83,17 @@ func (c *FakeImageDigestMirrorSets) Update(ctx context.Context, imageDigestMirro
 	return obj.(*configv1.ImageDigestMirrorSet), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakeImageDigestMirrorSets) UpdateStatus(ctx context.Context, imageDigestMirrorSet *configv1.ImageDigestMirrorSet, opts v1.UpdateOptions) (*configv1.ImageDigestMirrorSet, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootUpdateSubresourceAction(imagedigestmirrorsetsResource, "status", imageDigestMirrorSet), &configv1.ImageDigestMirrorSet{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*configv1.ImageDigestMirrorSet), err
+}
+
 // Delete takes name of the imageDigestMirrorSet and deletes it. Returns an error if one occurs.
 func (c *FakeImageDigestMirrorSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
@@ -99,6 +113,49 @@ func (c *FakeImageDigestMirrorSets) DeleteCollection(ctx context.Context, opts v
 func (c *FakeImageDigestMirrorSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *configv1.ImageDigestMirrorSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(imagedigestmirrorsetsResource, name, pt, data, subresources...), &configv1.ImageDigestMirrorSet{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*configv1.ImageDigestMirrorSet), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied imageDigestMirrorSet.
+func (c *FakeImageDigestMirrorSets) Apply(ctx context.Context, imageDigestMirrorSet *applyconfigurationsconfigv1.ImageDigestMirrorSetApplyConfiguration, opts v1.ApplyOptions) (result *configv1.ImageDigestMirrorSet, err error) {
+	if imageDigestMirrorSet == nil {
+		return nil, fmt.Errorf("imageDigestMirrorSet provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(imageDigestMirrorSet)
+	if err != nil {
+		return nil, err
+	}
+	name := imageDigestMirrorSet.Name
+	if name == nil {
+		return nil, fmt.Errorf("imageDigestMirrorSet.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(imagedigestmirrorsetsResource, *name, types.ApplyPatchType, data), &configv1.ImageDigestMirrorSet{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*configv1.ImageDigestMirrorSet), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeImageDigestMirrorSets) ApplyStatus(ctx context.Context, imageDigestMirrorSet *applyconfigurationsconfigv1.ImageDigestMirrorSetApplyConfiguration, opts v1.ApplyOptions) (result *configv1.ImageDigestMirrorSet, err error) {
+	if imageDigestMirrorSet == nil {
+		return nil, fmt.Errorf("imageDigestMirrorSet provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(imageDigestMirrorSet)
+	if err != nil {
+		return nil, err
+	}
+	name := imageDigestMirrorSet.Name
+	if name == nil {
+		return nil, fmt.Errorf("imageDigestMirrorSet.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(imagedigestmirrorsetsResource, *name, types.ApplyPatchType, data, "status"), &configv1.ImageDigestMirrorSet{})
 	if obj == nil {
 		return nil, err
 	}

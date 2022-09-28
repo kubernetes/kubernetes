@@ -22,7 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -187,7 +187,9 @@ var _ = SIGDescribe("Secrets", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(foundCreatedSecret, true, "unable to find secret by its value")
+		if !foundCreatedSecret {
+			framework.Failf("unable to find secret %s/%s by name", f.Namespace.Name, secretTestName)
+		}
 
 		ginkgo.By("patching the secret")
 		// patch the secret in the test namespace
@@ -230,7 +232,9 @@ var _ = SIGDescribe("Secrets", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(foundCreatedSecret, false, "secret was not deleted successfully")
+		if foundCreatedSecret {
+			framework.Failf("secret %s/%s was not deleted successfully", f.Namespace.Name, secretTestName)
+		}
 	})
 })
 

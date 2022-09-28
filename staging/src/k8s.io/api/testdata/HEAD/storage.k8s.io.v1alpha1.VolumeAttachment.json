@@ -31,7 +31,6 @@
     "finalizers": [
       "finalizersValue"
     ],
-    "clusterName": "clusterNameValue",
     "managedFields": [
       {
         "manager": "managerValue",
@@ -253,6 +252,10 @@
             "namespace": "namespaceValue"
           },
           "controllerExpandSecretRef": {
+            "name": "nameValue",
+            "namespace": "namespaceValue"
+          },
+          "nodeExpandSecretRef": {
             "name": "nameValue",
             "namespace": "namespaceValue"
           }

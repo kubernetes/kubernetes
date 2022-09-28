@@ -29,12 +29,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	compute "google.golang.org/api/compute/v1"
+	v1 "k8s.io/api/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/mock"
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -585,35 +585,54 @@ func TestEnsureExternalLoadBalancerRBSAnnotation(t *testing.T) {
 
 	for desc, tc := range map[string]struct {
 		annotations map[string]string
-		expectError *error
+		wantError   *error
 	}{
 		"When RBS enabled": {
 			annotations: map[string]string{RBSAnnotationKey: RBSEnabled},
-			expectError: &cloudprovider.ImplementedElsewhere,
+			wantError:   &cloudprovider.ImplementedElsewhere,
 		},
 		"When RBS not enabled": {
 			annotations: map[string]string{},
-			expectError: nil,
+			wantError:   nil,
 		},
 		"When RBS annotation has wrong value": {
 			annotations: map[string]string{RBSAnnotationKey: "WrongValue"},
-			expectError: nil,
+			wantError:   nil,
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			vals := DefaultTestClusterValues()
-			gce, err := fakeGCECloud(DefaultTestClusterValues())
-			require.NoError(t, err)
-			nodeNames := []string{"test-node-1"}
+			gce, err := fakeGCECloud(vals)
+			if err != nil {
+				t.Fatalf("fakeGCECloud(%v) returned error %v, want nil", vals, err)
+			}
 
+			nodeNames := []string{"test-node-1"}
 			nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
-			require.NoError(t, err)
+			if err != nil {
+				t.Fatalf("createAndInsertNodes(_, %v, %v) returned error %v, want nil", nodeNames, vals.ZoneName, err)
+			}
 
 			svc := fakeLoadbalancerService("")
 			svc.Annotations = tc.annotations
+
 			_, err = gce.ensureExternalLoadBalancer(vals.ClusterName, vals.ClusterID, svc, nil, nodes)
-			if tc.expectError != nil {
-				assert.EqualError(t, err, (*tc.expectError).Error())
+			if tc.wantError != nil {
+				assert.EqualError(t, err, (*tc.wantError).Error())
+			} else {
+				assert.NoError(t, err, "Should not return an error "+desc)
+			}
+
+			err = gce.updateExternalLoadBalancer(vals.ClusterName, svc, nodes)
+			if tc.wantError != nil {
+				assert.EqualError(t, err, (*tc.wantError).Error())
+			} else {
+				assert.NoError(t, err, "Should not return an error "+desc)
+			}
+
+			err = gce.ensureExternalLoadBalancerDeleted(vals.ClusterName, vals.ClusterID, svc)
+			if tc.wantError != nil {
+				assert.EqualError(t, err, (*tc.wantError).Error())
 			} else {
 				assert.NoError(t, err, "Should not return an error "+desc)
 			}
@@ -625,32 +644,52 @@ func TestEnsureExternalLoadBalancerRBSFinalizer(t *testing.T) {
 	t.Parallel()
 
 	for desc, tc := range map[string]struct {
-		finalizers  []string
-		expectError *error
+		finalizers []string
+		wantError  *error
 	}{
 		"When has ELBRbsFinalizer": {
-			finalizers:  []string{ELBRbsFinalizer},
-			expectError: &cloudprovider.ImplementedElsewhere,
+			finalizers: []string{NetLBFinalizerV2},
+			wantError:  &cloudprovider.ImplementedElsewhere,
 		},
 		"When has no finalizer": {
-			finalizers:  []string{},
-			expectError: nil,
+			finalizers: []string{},
+			wantError:  nil,
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			vals := DefaultTestClusterValues()
-			gce, err := fakeGCECloud(DefaultTestClusterValues())
-			require.NoError(t, err)
-			nodeNames := []string{"test-node-1"}
 
+			gce, err := fakeGCECloud(vals)
+			if err != nil {
+				t.Fatalf("fakeGCECloud(%v) returned error %v, want nil", vals, err)
+			}
+
+			nodeNames := []string{"test-node-1"}
 			nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
-			require.NoError(t, err)
+			if err != nil {
+				t.Fatalf("createAndInsertNodes(_, %v, %v) returned error %v, want nil", nodeNames, vals.ZoneName, err)
+			}
 
 			svc := fakeLoadbalancerService("")
 			svc.Finalizers = tc.finalizers
+
 			_, err = gce.ensureExternalLoadBalancer(vals.ClusterName, vals.ClusterID, svc, nil, nodes)
-			if tc.expectError != nil {
-				assert.EqualError(t, err, (*tc.expectError).Error())
+			if tc.wantError != nil {
+				assert.EqualError(t, err, (*tc.wantError).Error())
+			} else {
+				assert.NoError(t, err, "Should not return an error "+desc)
+			}
+
+			err = gce.updateExternalLoadBalancer(vals.ClusterName, svc, nodes)
+			if tc.wantError != nil {
+				assert.EqualError(t, err, (*tc.wantError).Error())
+			} else {
+				assert.NoError(t, err, "Should not return an error "+desc)
+			}
+
+			err = gce.ensureExternalLoadBalancerDeleted(vals.ClusterName, vals.ClusterID, svc)
+			if tc.wantError != nil {
+				assert.EqualError(t, err, (*tc.wantError).Error())
 			} else {
 				assert.NoError(t, err, "Should not return an error "+desc)
 			}
@@ -663,38 +702,43 @@ func TestEnsureExternalLoadBalancerExistingFwdRule(t *testing.T) {
 
 	for desc, tc := range map[string]struct {
 		existingForwardingRule *compute.ForwardingRule
-		expectError            *error
+		wantError              *error
 	}{
 		"When has existingForwardingRule with backend service": {
 			existingForwardingRule: &compute.ForwardingRule{
 				BackendService: "exists",
 			},
-			expectError: &cloudprovider.ImplementedElsewhere,
+			wantError: &cloudprovider.ImplementedElsewhere,
 		},
 		"When has existingForwardingRule with empty backend service": {
 			existingForwardingRule: &compute.ForwardingRule{
 				BackendService: "",
 			},
-			expectError: nil,
+			wantError: nil,
 		},
 		"When has no existingForwardingRule": {
 			existingForwardingRule: nil,
-			expectError:            nil,
+			wantError:              nil,
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			vals := DefaultTestClusterValues()
-			gce, err := fakeGCECloud(DefaultTestClusterValues())
-			require.NoError(t, err)
-			nodeNames := []string{"test-node-1"}
 
+			gce, err := fakeGCECloud(vals)
+			if err != nil {
+				t.Fatalf("fakeGCECloud(%v) returned error %v, want nil", vals, err)
+			}
+
+			nodeNames := []string{"test-node-1"}
 			nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
-			require.NoError(t, err)
+			if err != nil {
+				t.Fatalf("createAndInsertNodes(_, %v, %v) returned error %v, want nil", nodeNames, vals.ZoneName, err)
+			}
 
 			svc := fakeLoadbalancerService("")
 			_, err = gce.ensureExternalLoadBalancer(vals.ClusterName, vals.ClusterID, svc, tc.existingForwardingRule, nodes)
-			if tc.expectError != nil {
-				assert.EqualError(t, err, (*tc.expectError).Error())
+			if tc.wantError != nil {
+				assert.EqualError(t, err, (*tc.wantError).Error())
 			} else {
 				assert.NoError(t, err, "Should not return an error "+desc)
 			}
@@ -1000,6 +1044,18 @@ func TestFirewallNeedsUpdate(t *testing.T) {
 			needsUpdate:  true,
 			hasErr:       false,
 		},
+		"When the destination ranges are not equal.": {
+			lbName:       lbName,
+			ipAddr:       "8.8.8.8",
+			ports:        svc.Spec.Ports,
+			ipnet:        ipnet,
+			fwIPProtocol: "tcp",
+			getHook:      nil,
+			sourceRange:  fw.SourceRanges[0],
+			exists:       true,
+			needsUpdate:  true,
+			hasErr:       false,
+		},
 		"When basic flow without exceptions.": {
 			lbName:       lbName,
 			ipAddr:       ipAddr,
@@ -1095,6 +1151,7 @@ func TestFirewallNeedsUpdate(t *testing.T) {
 			fw.SourceRanges[0] = tc.sourceRange
 			fw, err = gce.GetFirewall(MakeFirewallName(lbName))
 			require.Equal(t, fw.SourceRanges[0], tc.sourceRange)
+			require.Equal(t, fw.DestinationRanges[0], status.Ingress[0].IP)
 
 			c := gce.c.(*cloud.MockGCE)
 			c.MockFirewalls.GetHook = tc.getHook
@@ -1216,7 +1273,7 @@ func TestCreateAndUpdateFirewallSucceedsOnXPN(t *testing.T) {
 
 	c := gce.c.(*cloud.MockGCE)
 	c.MockFirewalls.InsertHook = mock.InsertFirewallsUnauthorizedErrHook
-	c.MockFirewalls.UpdateHook = mock.UpdateFirewallsUnauthorizedErrHook
+	c.MockFirewalls.PatchHook = mock.UpdateFirewallsUnauthorizedErrHook
 	gce.onXPN = true
 	require.True(t, gce.OnXPN())
 
@@ -1234,6 +1291,7 @@ func TestCreateAndUpdateFirewallSucceedsOnXPN(t *testing.T) {
 	gce.createFirewall(
 		svc,
 		gce.GetLoadBalancerName(context.TODO(), "", svc),
+		"10.0.0.1",
 		"A sad little firewall",
 		ipnet,
 		svc.Spec.Ports,
@@ -1247,6 +1305,7 @@ func TestCreateAndUpdateFirewallSucceedsOnXPN(t *testing.T) {
 		svc,
 		gce.GetLoadBalancerName(context.TODO(), "", svc),
 		"A sad little firewall",
+		"10.0.0.1",
 		ipnet,
 		svc.Spec.Ports,
 		hosts)
@@ -1554,6 +1613,7 @@ func TestFirewallObject(t *testing.T) {
 	gce, err := fakeGCECloud(vals)
 	gce.nodeTags = []string{"node-tags"}
 	require.NoError(t, err)
+	dstIP := "10.0.0.1"
 	srcRanges := []string{"10.10.0.0/24", "10.20.0.0/24"}
 	sourceRanges, _ := utilnet.ParseIPNets(srcRanges...)
 	fwName := "test-fw"
@@ -1575,6 +1635,7 @@ func TestFirewallObject(t *testing.T) {
 	for _, tc := range []struct {
 		desc             string
 		sourceRanges     utilnet.IPNetSet
+		destinationIP    string
 		svcPorts         []v1.ServicePort
 		expectedFirewall func(fw compute.Firewall) compute.Firewall
 	}{
@@ -1596,6 +1657,18 @@ func TestFirewallObject(t *testing.T) {
 			},
 			expectedFirewall: func(fw compute.Firewall) compute.Firewall {
 				fw.SourceRanges = srcRanges
+				return fw
+			},
+		},
+		{
+			desc:          "has destination IP",
+			sourceRanges:  utilnet.IPNetSet{},
+			destinationIP: dstIP,
+			svcPorts: []v1.ServicePort{
+				{Name: "port1", Protocol: v1.ProtocolTCP, Port: int32(80), TargetPort: intstr.FromInt(80)},
+			},
+			expectedFirewall: func(fw compute.Firewall) compute.Firewall {
+				fw.DestinationRanges = []string{dstIP}
 				return fw
 			},
 		},
@@ -1643,7 +1716,7 @@ func TestFirewallObject(t *testing.T) {
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			ret, err := gce.firewallObject(fwName, fwDesc, tc.sourceRanges, tc.svcPorts, nil)
+			ret, err := gce.firewallObject(fwName, fwDesc, tc.destinationIP, tc.sourceRanges, tc.svcPorts, nil)
 			require.NoError(t, err)
 			expectedFirewall := tc.expectedFirewall(baseFw)
 			retSrcRanges := sets.NewString(ret.SourceRanges...)

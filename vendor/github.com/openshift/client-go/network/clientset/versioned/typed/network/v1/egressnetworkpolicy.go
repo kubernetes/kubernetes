@@ -4,9 +4,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/openshift/api/network/v1"
+	networkv1 "github.com/openshift/client-go/network/applyconfigurations/network/v1"
 	scheme "github.com/openshift/client-go/network/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -30,6 +33,7 @@ type EgressNetworkPolicyInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.EgressNetworkPolicyList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.EgressNetworkPolicy, err error)
+	Apply(ctx context.Context, egressNetworkPolicy *networkv1.EgressNetworkPolicyApplyConfiguration, opts metav1.ApplyOptions) (result *v1.EgressNetworkPolicy, err error)
 	EgressNetworkPolicyExpansion
 }
 
@@ -155,6 +159,32 @@ func (c *egressNetworkPolicies) Patch(ctx context.Context, name string, pt types
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied egressNetworkPolicy.
+func (c *egressNetworkPolicies) Apply(ctx context.Context, egressNetworkPolicy *networkv1.EgressNetworkPolicyApplyConfiguration, opts metav1.ApplyOptions) (result *v1.EgressNetworkPolicy, err error) {
+	if egressNetworkPolicy == nil {
+		return nil, fmt.Errorf("egressNetworkPolicy provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(egressNetworkPolicy)
+	if err != nil {
+		return nil, err
+	}
+	name := egressNetworkPolicy.Name
+	if name == nil {
+		return nil, fmt.Errorf("egressNetworkPolicy.Name must be provided to Apply")
+	}
+	result = &v1.EgressNetworkPolicy{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("egressnetworkpolicies").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

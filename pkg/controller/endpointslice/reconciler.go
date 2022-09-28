@@ -152,7 +152,6 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 	// Build data structures for desired state.
 	desiredMetaByPortMap := map[endpointutil.PortMapKey]*endpointMeta{}
 	desiredEndpointsByPortMap := map[endpointutil.PortMapKey]endpointsliceutil.EndpointSet{}
-	numDesiredEndpoints := 0
 
 	for _, pod := range pods {
 		includeTerminating := service.Spec.PublishNotReadyAddresses || utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceTerminatingCondition)
@@ -196,7 +195,6 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 		endpoint := podToEndpoint(pod, node, service, addressType)
 		if len(endpoint.Addresses) > 0 {
 			desiredEndpointsByPortMap[epHash].Insert(&endpoint)
-			numDesiredEndpoints++
 		}
 	}
 
@@ -227,9 +225,7 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 	// the corresponding endpoint slices for deletion.
 	for portMap, existingSlices := range existingSlicesByPortMap {
 		if _, ok := desiredEndpointsByPortMap[portMap]; !ok {
-			for _, existingSlice := range existingSlices {
-				slicesToDelete = append(slicesToDelete, existingSlice)
-			}
+			slicesToDelete = append(slicesToDelete, existingSlices...)
 		}
 	}
 
@@ -393,13 +389,13 @@ func (r *reconciler) finalize(
 // the list of desired endpoints and returns lists of slices to create, update,
 // and delete. It also checks that the slices mirror the parent services labels.
 // The logic is split up into several main steps:
-// 1. Iterate through existing slices, delete endpoints that are no longer
-//    desired and update matching endpoints that have changed. It also checks
-//    if the slices have the labels of the parent services, and updates them if not.
-// 2. Iterate through slices that have been modified in 1 and fill them up with
-//    any remaining desired endpoints.
-// 3. If there still desired endpoints left, try to fit them into a previously
-//    unchanged slice and/or create new ones.
+//  1. Iterate through existing slices, delete endpoints that are no longer
+//     desired and update matching endpoints that have changed. It also checks
+//     if the slices have the labels of the parent services, and updates them if not.
+//  2. Iterate through slices that have been modified in 1 and fill them up with
+//     any remaining desired endpoints.
+//  3. If there still desired endpoints left, try to fit them into a previously
+//     unchanged slice and/or create new ones.
 func (r *reconciler) reconcileByPortMapping(
 	service *corev1.Service,
 	existingSlices []*discovery.EndpointSlice,

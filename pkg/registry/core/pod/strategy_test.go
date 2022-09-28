@@ -35,12 +35,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	utilpointer "k8s.io/utils/pointer"
 
@@ -355,7 +352,6 @@ func (g mockPodGetter) Get(context.Context, string, *metav1.GetOptions) (runtime
 }
 
 func TestCheckLogLocation(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 	ctx := genericapirequest.NewDefaultContext()
 	fakePodName := "test"
 	tcs := []struct {
@@ -753,61 +749,12 @@ func TestApplySeccompVersionSkew(t *testing.T) {
 			},
 		},
 		{
-			description: "Field type unconfined and no annotation present",
+			description: "Field set and no annotation present",
 			pod: &api.Pod{
 				Spec: api.PodSpec{
 					SecurityContext: &api.PodSecurityContext{
 						SeccompProfile: &api.SeccompProfile{
 							Type: api.SeccompProfileTypeUnconfined,
-						},
-					},
-				},
-			},
-			validation: func(t *testing.T, pod *api.Pod) {
-				require.Len(t, pod.Annotations, 1)
-				require.Equal(t, v1.SeccompProfileNameUnconfined, pod.Annotations[api.SeccompPodAnnotationKey])
-			},
-		},
-		{
-			description: "Field type default and no annotation present",
-			pod: &api.Pod{
-				Spec: api.PodSpec{
-					SecurityContext: &api.PodSecurityContext{
-						SeccompProfile: &api.SeccompProfile{
-							Type: api.SeccompProfileTypeRuntimeDefault,
-						},
-					},
-				},
-			},
-			validation: func(t *testing.T, pod *api.Pod) {
-				require.Len(t, pod.Annotations, 1)
-				require.Equal(t, v1.SeccompProfileRuntimeDefault, pod.Annotations[v1.SeccompPodAnnotationKey])
-			},
-		},
-		{
-			description: "Field type localhost and no annotation present",
-			pod: &api.Pod{
-				Spec: api.PodSpec{
-					SecurityContext: &api.PodSecurityContext{
-						SeccompProfile: &api.SeccompProfile{
-							Type:             api.SeccompProfileTypeLocalhost,
-							LocalhostProfile: &testProfile,
-						},
-					},
-				},
-			},
-			validation: func(t *testing.T, pod *api.Pod) {
-				require.Len(t, pod.Annotations, 1)
-				require.Equal(t, "localhost/test", pod.Annotations[v1.SeccompPodAnnotationKey])
-			},
-		},
-		{
-			description: "Field type localhost but profile is nil",
-			pod: &api.Pod{
-				Spec: api.PodSpec{
-					SecurityContext: &api.PodSecurityContext{
-						SeccompProfile: &api.SeccompProfile{
-							Type: api.SeccompProfileTypeLocalhost,
 						},
 					},
 				},
@@ -915,7 +862,7 @@ func TestApplySeccompVersionSkew(t *testing.T) {
 			},
 		},
 		{
-			description: "Field type unconfined and no annotation present (container)",
+			description: "Field set and no annotation present (container)",
 			pod: &api.Pod{
 				Spec: api.PodSpec{
 					Containers: []api.Container{
@@ -931,51 +878,7 @@ func TestApplySeccompVersionSkew(t *testing.T) {
 				},
 			},
 			validation: func(t *testing.T, pod *api.Pod) {
-				require.Len(t, pod.Annotations, 1)
-				require.Equal(t, v1.SeccompProfileNameUnconfined, pod.Annotations[v1.SeccompContainerAnnotationKeyPrefix+containerName])
-			},
-		},
-		{
-			description: "Field type runtime/default and no annotation present (container)",
-			pod: &api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name: containerName,
-							SecurityContext: &api.SecurityContext{
-								SeccompProfile: &api.SeccompProfile{
-									Type: api.SeccompProfileTypeRuntimeDefault,
-								},
-							},
-						},
-					},
-				},
-			},
-			validation: func(t *testing.T, pod *api.Pod) {
-				require.Len(t, pod.Annotations, 1)
-				require.Equal(t, v1.SeccompProfileRuntimeDefault, pod.Annotations[v1.SeccompContainerAnnotationKeyPrefix+containerName])
-			},
-		},
-		{
-			description: "Field type localhost and no annotation present (container)",
-			pod: &api.Pod{
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name: containerName,
-							SecurityContext: &api.SecurityContext{
-								SeccompProfile: &api.SeccompProfile{
-									Type:             api.SeccompProfileTypeLocalhost,
-									LocalhostProfile: &testProfile,
-								},
-							},
-						},
-					},
-				},
-			},
-			validation: func(t *testing.T, pod *api.Pod) {
-				require.Len(t, pod.Annotations, 1)
-				require.Equal(t, "localhost/test", pod.Annotations[v1.SeccompContainerAnnotationKeyPrefix+containerName])
+				require.Len(t, pod.Annotations, 0)
 			},
 		},
 		{
@@ -1006,9 +909,7 @@ func TestApplySeccompVersionSkew(t *testing.T) {
 				},
 			},
 			validation: func(t *testing.T, pod *api.Pod) {
-				require.Len(t, pod.Annotations, 2)
-				require.Equal(t, v1.SeccompProfileNameUnconfined, pod.Annotations[v1.SeccompContainerAnnotationKeyPrefix+containerName+"1"])
-				require.Equal(t, v1.SeccompProfileRuntimeDefault, pod.Annotations[v1.SeccompContainerAnnotationKeyPrefix+containerName+"3"])
+				require.Len(t, pod.Annotations, 0)
 			},
 		},
 		{
@@ -1460,11 +1361,11 @@ func TestDropNonEphemeralContainerUpdates(t *testing.T) {
 			},
 			newPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:                      "test-pod",
-					Namespace:                 "test-ns",
-					ResourceVersion:           "1",
-					Annotations:               map[string]string{"foo": "bar", "whiz": "pop"},
-					ZZZ_DeprecatedClusterName: "milo",
+					Name:            "test-pod",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+					Annotations:     map[string]string{"foo": "bar", "whiz": "pop"},
+					Finalizers:      []string{"milo"},
 				},
 				Spec: api.PodSpec{
 					Containers: []api.Container{

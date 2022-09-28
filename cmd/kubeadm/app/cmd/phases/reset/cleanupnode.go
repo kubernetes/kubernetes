@@ -17,10 +17,11 @@ limitations under the License.
 package phases
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/pkg/errors"
 
 	"k8s.io/klog/v2"
 	utilsexec "k8s.io/utils/exec"
@@ -95,10 +96,6 @@ func runCleanupNode(c workflow.RunData) error {
 	} else {
 		fmt.Println("[reset] Would remove Kubernetes-managed containers")
 	}
-
-	// TODO: remove the dockershim directory cleanup in 1.25
-	// https://github.com/kubernetes/kubeadm/issues/2626
-	r.AddDirsToClean("/var/lib/dockershim", "/var/run/kubernetes", "/var/lib/cni")
 
 	// Remove contents from the config and pki directories
 	if certsDir != kubeadmapiv1.DefaultCertificatesDir {

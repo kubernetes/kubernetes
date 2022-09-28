@@ -48,11 +48,11 @@ import (
 // or be built into the binary.
 //
 // LoadFromManifests has some limitations:
-// - aliases are not supported (i.e. use serviceAccountName instead of the deprecated serviceAccount,
-//   https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.11/#podspec-v1-core)
-//   and silently ignored
-// - the latest stable API version for each item is used, regardless of what
-//   is specified in the manifest files
+//   - aliases are not supported (i.e. use serviceAccountName instead of the deprecated serviceAccount,
+//     https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.11/#podspec-v1-core)
+//     and silently ignored
+//   - the latest stable API version for each item is used, regardless of what
+//     is specified in the manifest files
 func LoadFromManifests(files ...string) ([]interface{}, error) {
 	var items []interface{}
 	err := visitManifests(func(data []byte) error {
@@ -115,11 +115,11 @@ func visitManifests(cb func([]byte) error, files ...string) error {
 // PatchItems has some limitations:
 // - only some common items are supported, unknown ones trigger an error
 // - only the latest stable API version for each item is supported
-func PatchItems(f *framework.Framework, driverNamspace *v1.Namespace, items ...interface{}) error {
+func PatchItems(f *framework.Framework, driverNamespace *v1.Namespace, items ...interface{}) error {
 	for _, item := range items {
 		// Uncomment when debugging the loading and patching of items.
 		// Logf("patching original content of %T:\n%s", item, PrettyPrint(item))
-		if err := patchItemRecursively(f, driverNamspace, item); err != nil {
+		if err := patchItemRecursively(f, driverNamespace, item); err != nil {
 			return err
 		}
 	}
@@ -132,10 +132,10 @@ func PatchItems(f *framework.Framework, driverNamspace *v1.Namespace, items ...i
 // It returns either a cleanup function or an error, but never both.
 //
 // Cleaning up after a test can be triggered in two ways:
-// - the test invokes the returned cleanup function,
-//   usually in an AfterEach
-// - the test suite terminates, potentially after
-//   skipping the test's AfterEach (https://github.com/onsi/ginkgo/issues/222)
+//   - the test invokes the returned cleanup function,
+//     usually in an AfterEach
+//   - the test suite terminates, potentially after
+//     skipping the test's AfterEach (https://github.com/onsi/ginkgo/issues/222)
 //
 // PatchItems has the some limitations as LoadFromManifests:
 // - only some common items are supported, unknown ones trigger an error

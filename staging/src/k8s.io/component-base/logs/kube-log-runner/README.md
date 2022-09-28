@@ -56,7 +56,7 @@ kube-log-runner -log-file=/tmp/log -redirect-stderr=false echo "hello world"
 # Container base image
 
 The Kubernetes
-[`k8s.gcr.io/build-image/go-runner`](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/build-image/go-runner)
+[`registry.k8s.io/build-image/go-runner`](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/build-image/go-runner)
 image wraps the `gcr.io/distroless/static` image and provides `kube-log-runner`
 under its traditional name as `/go-runner`. It gets maintained in
 https://github.com/kubernetes/release/tree/master/images/build/go-runner.

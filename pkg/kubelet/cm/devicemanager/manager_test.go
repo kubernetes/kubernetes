@@ -40,6 +40,7 @@ import (
 	watcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
+	plugin "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -51,6 +52,30 @@ import (
 const (
 	testResourceName = "fake-domain/resource"
 )
+
+func newWrappedManagerImpl(socketPath string, manager *ManagerImpl) *wrappedManagerImpl {
+	w := &wrappedManagerImpl{
+		ManagerImpl: manager,
+		callback:    manager.genericDeviceUpdateCallback,
+	}
+	w.socketdir, _ = filepath.Split(socketPath)
+	w.server, _ = plugin.NewServer(socketPath, w, w)
+	return w
+}
+
+type wrappedManagerImpl struct {
+	*ManagerImpl
+	socketdir string
+	callback  func(string, []pluginapi.Device)
+}
+
+func (m *wrappedManagerImpl) PluginListAndWatchReceiver(r string, resp *pluginapi.ListAndWatchResponse) {
+	var devices []pluginapi.Device
+	for _, d := range resp.Devices {
+		devices = append(devices, *d)
+	}
+	m.callback(r, devices)
+}
 
 func tmpSocketDir() (socketDir, socketName, pluginSocketName string, err error) {
 	socketDir, err = ioutil.TempDir("", "device_plugin")
@@ -121,7 +146,7 @@ func TestDevicePluginReRegistration(t *testing.T) {
 			require.Equal(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
 			require.Equal(t, int64(2), resourceAllocatable.Value(), "Devices are not updated.")
 
-			p2 := NewDevicePluginStub(devs, pluginSocketName+".new", testResourceName, preStartContainerFlag, getPreferredAllocationFlag)
+			p2 := plugin.NewDevicePluginStub(devs, pluginSocketName+".new", testResourceName, preStartContainerFlag, getPreferredAllocationFlag)
 			err = p2.Start()
 			require.NoError(t, err)
 			p2.Register(socketName, testResourceName, "")
@@ -138,7 +163,7 @@ func TestDevicePluginReRegistration(t *testing.T) {
 			require.Equal(t, int64(2), resourceAllocatable.Value(), "Devices shouldn't change.")
 
 			// Test the scenario that a plugin re-registers with different devices.
-			p3 := NewDevicePluginStub(devsForRegistration, pluginSocketName+".third", testResourceName, preStartContainerFlag, getPreferredAllocationFlag)
+			p3 := plugin.NewDevicePluginStub(devsForRegistration, pluginSocketName+".third", testResourceName, preStartContainerFlag, getPreferredAllocationFlag)
 			err = p3.Start()
 			require.NoError(t, err)
 			p3.Register(socketName, testResourceName, "")
@@ -191,7 +216,7 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 	require.Equal(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
 	require.Equal(t, int64(2), resourceAllocatable.Value(), "Devices are not updated.")
 
-	p2 := NewDevicePluginStub(devs, pluginSocketName+".new", testResourceName, false, false)
+	p2 := plugin.NewDevicePluginStub(devs, pluginSocketName+".new", testResourceName, false, false)
 	err = p2.Start()
 	require.NoError(t, err)
 	// Wait for the second callback to be issued.
@@ -208,7 +233,7 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 	require.Equal(t, int64(2), resourceAllocatable.Value(), "Devices are not updated.")
 
 	// Test the scenario that a plugin re-registers with different devices.
-	p3 := NewDevicePluginStub(devsForRegistration, pluginSocketName+".third", testResourceName, false, false)
+	p3 := plugin.NewDevicePluginStub(devsForRegistration, pluginSocketName+".third", testResourceName, false, false)
 	err = p3.Start()
 	require.NoError(t, err)
 	// Wait for the third callback to be issued.
@@ -234,12 +259,13 @@ func setupDeviceManager(t *testing.T, devs []*pluginapi.Device, callback monitor
 	require.NoError(t, err)
 	updateChan := make(chan interface{})
 
+	w := newWrappedManagerImpl(socketName, m)
 	if callback != nil {
-		m.callback = callback
+		w.callback = callback
 	}
 
-	originalCallback := m.callback
-	m.callback = func(resourceName string, devices []pluginapi.Device) {
+	originalCallback := w.callback
+	w.callback = func(resourceName string, devices []pluginapi.Device) {
 		originalCallback(resourceName, devices)
 		updateChan <- new(interface{})
 	}
@@ -247,14 +273,14 @@ func setupDeviceManager(t *testing.T, devs []*pluginapi.Device, callback monitor
 		return []*v1.Pod{}
 	}
 
-	err = m.Start(activePods, &sourcesReadyStub{})
+	err = w.Start(activePods, &sourcesReadyStub{})
 	require.NoError(t, err)
 
-	return m, updateChan
+	return w, updateChan
 }
 
-func setupDevicePlugin(t *testing.T, devs []*pluginapi.Device, pluginSocketName string) *Stub {
-	p := NewDevicePluginStub(devs, pluginSocketName, testResourceName, false, false)
+func setupDevicePlugin(t *testing.T, devs []*pluginapi.Device, pluginSocketName string) *plugin.Stub {
+	p := plugin.NewDevicePluginStub(devs, pluginSocketName, testResourceName, false, false)
 	err := p.Start()
 	require.NoError(t, err)
 	return p
@@ -276,20 +302,20 @@ func runPluginManager(pluginManager pluginmanager.PluginManager) {
 	go pluginManager.Run(sourcesReady, wait.NeverStop)
 }
 
-func setup(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string, pluginSocketName string) (Manager, <-chan interface{}, *Stub) {
+func setup(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string, pluginSocketName string) (Manager, <-chan interface{}, *plugin.Stub) {
 	m, updateChan := setupDeviceManager(t, devs, callback, socketName)
 	p := setupDevicePlugin(t, devs, pluginSocketName)
 	return m, updateChan, p
 }
 
-func setupInProbeMode(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string, pluginSocketName string) (Manager, <-chan interface{}, *Stub, pluginmanager.PluginManager) {
+func setupInProbeMode(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string, pluginSocketName string) (Manager, <-chan interface{}, *plugin.Stub, pluginmanager.PluginManager) {
 	m, updateChan := setupDeviceManager(t, devs, callback, socketName)
 	p := setupDevicePlugin(t, devs, pluginSocketName)
 	pm := setupPluginManager(t, pluginSocketName, m)
 	return m, updateChan, p, pm
 }
 
-func cleanup(t *testing.T, m Manager, p *Stub) {
+func cleanup(t *testing.T, m Manager, p *plugin.Stub) {
 	p.Stop()
 	m.Stop()
 }
@@ -365,6 +391,7 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	// Tests adding another resource.
 	resourceName2 := "resource2"
 	e2 := &endpointImpl{}
+	e2.client = plugin.NewPluginClient(resourceName2, socketName, testManager)
 	testManager.endpoints[resourceName2] = endpointInfo{e: e2, opts: nil}
 	callback(resourceName2, devs)
 	capacity, allocatable, removedResources = testManager.GetCapacity()
@@ -394,7 +421,7 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 
 	// Stops resourceName2 endpoint. Verifies its stopTime is set, allocate and
 	// preStartContainer calls return errors.
-	e2.stop()
+	e2.client.Disconnect()
 	as.False(e2.stopTime.IsZero())
 	_, err = e2.allocate([]string{"Device1"})
 	reflect.DeepEqual(err, fmt.Errorf(errEndpointStopped, e2))
@@ -661,11 +688,6 @@ type MockEndpoint struct {
 	initChan                   chan []string
 }
 
-func (m *MockEndpoint) stop() {}
-func (m *MockEndpoint) run()  {}
-
-func (m *MockEndpoint) callback(resourceName string, devices []pluginapi.Device) {}
-
 func (m *MockEndpoint) preStartContainer(devs []string) (*pluginapi.PreStartContainerResponse, error) {
 	m.initChan <- devs
 	return &pluginapi.PreStartContainerResponse{}, nil
@@ -684,6 +706,8 @@ func (m *MockEndpoint) allocate(devs []string) (*pluginapi.AllocateResponse, err
 	}
 	return nil, nil
 }
+
+func (m *MockEndpoint) setStopTime(t time.Time) {}
 
 func (m *MockEndpoint) isStopped() bool { return false }
 
@@ -706,15 +730,13 @@ func makePod(limits v1.ResourceList) *v1.Pod {
 	}
 }
 
-func getTestManager(tmpDir string, activePods ActivePodsFunc, testRes []TestResource) (*ManagerImpl, error) {
+func getTestManager(tmpDir string, activePods ActivePodsFunc, testRes []TestResource) (*wrappedManagerImpl, error) {
 	monitorCallback := func(resourceName string, devices []pluginapi.Device) {}
 	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
 	if err != nil {
 		return nil, err
 	}
-	testManager := &ManagerImpl{
-		socketdir:             tmpDir,
-		callback:              monitorCallback,
+	m := &ManagerImpl{
 		healthyDevices:        make(map[string]sets.String),
 		unhealthyDevices:      make(map[string]sets.String),
 		allocatedDevices:      make(map[string]sets.String),
@@ -726,6 +748,11 @@ func getTestManager(tmpDir string, activePods ActivePodsFunc, testRes []TestReso
 		sourcesReady:          &sourcesReadyStub{},
 		checkpointManager:     ckm,
 		allDevices:            NewResourceDeviceInstances(),
+	}
+	testManager := &wrappedManagerImpl{
+		ManagerImpl: m,
+		socketdir:   tmpDir,
+		callback:    monitorCallback,
 	}
 
 	for _, res := range testRes {
@@ -1141,12 +1168,15 @@ func TestUpdatePluginResources(t *testing.T) {
 
 	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
 	as.Nil(err)
-	testManager := &ManagerImpl{
-		callback:          monitorCallback,
+	m := &ManagerImpl{
 		allocatedDevices:  make(map[string]sets.String),
 		healthyDevices:    make(map[string]sets.String),
 		podDevices:        newPodDevices(),
 		checkpointManager: ckm,
+	}
+	testManager := wrappedManagerImpl{
+		ManagerImpl: m,
+		callback:    monitorCallback,
 	}
 	testManager.podDevices.devs[string(pod.UID)] = make(containerDevices)
 

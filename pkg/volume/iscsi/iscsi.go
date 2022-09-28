@@ -24,7 +24,9 @@ import (
 	"strconv"
 	"strings"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/io"
@@ -35,12 +37,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
 	ioutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
-//  ProbeVolumePlugins is the primary entrypoint for volume plugins.
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&iscsiPlugin{}}
 }
@@ -91,6 +92,10 @@ func (plugin *iscsiPlugin) SupportsMountOption() bool {
 
 func (plugin *iscsiPlugin) SupportsBulkVolumeVerification() bool {
 	return false
+}
+
+func (plugin *iscsiPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return true, nil
 }
 
 func (plugin *iscsiPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
@@ -224,7 +229,7 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 	// leave the global mount still mounted, while marking the volume as unused.
 	// The volume can then be mounted on several nodes, resulting in volume
 	// corruption.
-	paths, err := util.GetReliableMountRefs(mounter, mountPath)
+	paths, err := ioutil.GetReliableMountRefs(mounter, mountPath)
 	if io.IsInconsistentReadError(err) {
 		klog.Errorf("Failed to read mount refs from /proc/mounts for %s: %s", mountPath, err)
 		klog.Errorf("Kubelet cannot unmount volume at %s, please unmount it and all mounts of the same device manually.", mountPath)
@@ -333,13 +338,14 @@ func (iscsi *iscsiDisk) iscsiPodDeviceMapPath() (string, string) {
 
 type iscsiDiskMounter struct {
 	*iscsiDisk
-	readOnly     bool
-	fsType       string
-	volumeMode   v1.PersistentVolumeMode
-	mounter      *mount.SafeFormatAndMount
-	exec         utilexec.Interface
-	deviceUtil   ioutil.DeviceUtil
-	mountOptions []string
+	readOnly                  bool
+	fsType                    string
+	volumeMode                v1.PersistentVolumeMode
+	mounter                   *mount.SafeFormatAndMount
+	exec                      utilexec.Interface
+	deviceUtil                ioutil.DeviceUtil
+	mountOptions              []string
+	mountedWithSELinuxContext bool
 }
 
 var _ volume.Mounter = &iscsiDiskMounter{}
@@ -348,7 +354,7 @@ func (b *iscsiDiskMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
 		ReadOnly:       b.readOnly,
 		Managed:        !b.readOnly,
-		SELinuxRelabel: true,
+		SELinuxRelabel: !b.mountedWithSELinuxContext,
 	}
 }
 
@@ -361,6 +367,12 @@ func (b *iscsiDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
 	if err != nil {
 		klog.Errorf("iscsi: failed to setup")
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		// The volume must have been mounted in MountDevice with -o context.
+		// TODO: extract from mount table in GetAttributes() to be sure?
+		b.mountedWithSELinuxContext = mounterArgs.SELinuxLabel != ""
 	}
 	return err
 }

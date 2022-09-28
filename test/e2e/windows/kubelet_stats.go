@@ -33,7 +33,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
@@ -126,7 +126,9 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats", func() {
 				framework.Logf("Using node: %v", targetNode.Name)
 
 				ginkgo.By("Getting bootid")
-				framework.ExpectEqual(len(targetNode.Status.NodeInfo.BootID) != 0, true, "Should find bootId in kubelet stats")
+				if len(targetNode.Status.NodeInfo.BootID) == 0 {
+					framework.Failf("expected bootId in kubelet stats, got none")
+				}
 			})
 		})
 

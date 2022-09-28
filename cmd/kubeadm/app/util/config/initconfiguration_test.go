@@ -122,7 +122,7 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 					Kind:       constants.InitConfigurationKind,
 				},
 			},
-			expectedTaintCnt: 2,
+			expectedTaintCnt: 1,
 		},
 		{
 			desc: "Uninitialized taints field produces expected taints",
@@ -133,7 +133,7 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 				},
 				NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{},
 			},
-			expectedTaintCnt: 2,
+			expectedTaintCnt: 1,
 		},
 		{
 			desc: "Forsing taints to an empty slice produces no taints",

@@ -44,6 +44,7 @@ import (
 
 var (
 	supportedFeatures = sets.NewString("layering")
+	pathSeparator     = string(os.PathSeparator)
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -80,8 +81,7 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 }
 
 func (plugin *rbdPlugin) IsMigratedToCSI() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationRBD)
+	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationRBD)
 }
 
 func (plugin *rbdPlugin) Init(host volume.VolumeHost) error {
@@ -123,6 +123,10 @@ func (plugin *rbdPlugin) SupportsMountOption() bool {
 
 func (plugin *rbdPlugin) SupportsBulkVolumeVerification() bool {
 	return false
+}
+
+func (plugin *rbdPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
 }
 
 func (plugin *rbdPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
@@ -847,6 +851,7 @@ func (b *rbdMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
 	if err != nil {
 		klog.Errorf("rbd: failed to setup at %s %v", dir, err)
+		return err
 	}
 	klog.V(3).Infof("rbd: successfully setup at %s", dir)
 	return err
@@ -949,7 +954,7 @@ type rbdDiskUnmapper struct {
 
 func getPoolAndImageFromMapPath(mapPath string) (string, string, error) {
 
-	pathParts := dstrings.Split(mapPath, "/")
+	pathParts := dstrings.Split(mapPath, pathSeparator)
 	if len(pathParts) < 2 {
 		return "", "", fmt.Errorf("corrupted mapPath")
 	}

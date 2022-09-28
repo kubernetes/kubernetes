@@ -45,7 +45,7 @@ func (m *Matcher) Validate() error {
 		errs = append(errs, fmt.Errorf("the namespace matcher requires a namespaceLister"))
 	}
 	if m.Client == nil {
-		errs = append(errs, fmt.Errorf("the namespace matcher requires a namespaceLister"))
+		errs = append(errs, fmt.Errorf("the namespace matcher requires a client"))
 	}
 	return utilerrors.NewAggregate(errs)
 }

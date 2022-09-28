@@ -19,8 +19,8 @@ package kubelet
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
 	"path/filepath"
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
@@ -75,6 +75,12 @@ func (kl *Kubelet) getPluginsRegistrationDir() string {
 // For per-pod plugin data, see getPodPluginDir.
 func (kl *Kubelet) getPluginDir(pluginName string) string {
 	return filepath.Join(kl.getPluginsDir(), pluginName)
+}
+
+// getCheckpointsDir returns a data directory name for checkpoints.
+// Checkpoints can be stored in this directory for further use.
+func (kl *Kubelet) getCheckpointsDir() string {
+	return filepath.Join(kl.getRootDir(), config.DefaultKubeletCheckpointsDirName)
 }
 
 // getVolumeDevicePluginsDir returns the full path to the directory under which plugin
@@ -301,7 +307,7 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 		return volumes, nil
 	}
 
-	volumePluginDirs, err := ioutil.ReadDir(podVolDir)
+	volumePluginDirs, err := os.ReadDir(podVolDir)
 	if err != nil {
 		klog.ErrorS(err, "Could not read directory", "path", podVolDir)
 		return volumes, err
@@ -370,7 +376,7 @@ func (kl *Kubelet) getPodVolumeSubpathListFromDisk(podUID types.UID) ([]string, 
 	}
 
 	// Explicitly walks /<volume>/<container name>/<subPathIndex>
-	volumePluginDirs, err := ioutil.ReadDir(podSubpathsDir)
+	volumePluginDirs, err := os.ReadDir(podSubpathsDir)
 	if err != nil {
 		klog.ErrorS(err, "Could not read directory", "path", podSubpathsDir)
 		return volumes, err
@@ -378,7 +384,7 @@ func (kl *Kubelet) getPodVolumeSubpathListFromDisk(podUID types.UID) ([]string, 
 	for _, volumePluginDir := range volumePluginDirs {
 		volumePluginName := volumePluginDir.Name()
 		volumePluginPath := filepath.Join(podSubpathsDir, volumePluginName)
-		containerDirs, err := ioutil.ReadDir(volumePluginPath)
+		containerDirs, err := os.ReadDir(volumePluginPath)
 		if err != nil {
 			return volumes, fmt.Errorf("could not read directory %s: %v", volumePluginPath, err)
 		}

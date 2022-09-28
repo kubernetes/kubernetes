@@ -111,6 +111,10 @@ func (plugin *gcePersistentDiskPlugin) SupportsBulkVolumeVerification() bool {
 	return true
 }
 
+func (plugin *gcePersistentDiskPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+
 func (plugin *gcePersistentDiskPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,

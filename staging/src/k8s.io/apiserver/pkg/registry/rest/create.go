@@ -100,6 +100,11 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 		return kerr
 	}
 
+	// ensure that system-critical metadata has been populated
+	if !metav1.HasObjectMetaSystemFieldValues(objectMeta) {
+		return errors.NewInternalError(fmt.Errorf("system metadata was not initialized"))
+	}
+
 	// ensure namespace on the object is correct, or error if a conflicting namespace was set in the object
 	requestNamespace, ok := genericapirequest.NamespaceFrom(ctx)
 	if !ok {
@@ -109,10 +114,7 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 		return err
 	}
 
-	objectMeta.SetDeletionTimestamp(nil)
-	objectMeta.SetDeletionGracePeriodSeconds(nil)
 	strategy.PrepareForCreate(ctx, obj)
-	FillObjectMetaSystemFields(objectMeta)
 
 	if len(objectMeta.GetGenerateName()) > 0 && len(objectMeta.GetName()) == 0 {
 		objectMeta.SetName(strategy.GenerateName(objectMeta.GetGenerateName()))
@@ -121,12 +123,6 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 	// Ensure managedFields is not set unless the feature is enabled
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 		objectMeta.SetManagedFields(nil)
-	}
-
-	// ZZZ_DeprecatedClusterName is ignored and should not be saved
-	if len(objectMeta.GetZZZ_DeprecatedClusterName()) > 0 {
-		objectMeta.SetZZZ_DeprecatedClusterName("")
-		warning.AddWarning(ctx, "", "metadata.clusterName was specified. This field is not preserved and will be removed from the schema in 1.25")
 	}
 
 	if errs := strategy.Validate(ctx, obj); len(errs) > 0 {

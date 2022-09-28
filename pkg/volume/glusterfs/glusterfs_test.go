@@ -19,6 +19,7 @@ package glusterfs
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -115,7 +116,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if mounter == nil {
 		t.Error("Got a nil Mounter")
 	}
-	expectedPath := fmt.Sprintf("%s/pods/poduid/volumes/kubernetes.io~glusterfs/vol1", tmpDir)
+	expectedPath := filepath.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~glusterfs/vol1")
 	if volumePath != expectedPath {
 		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, volumePath)
 	}

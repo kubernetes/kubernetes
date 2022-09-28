@@ -72,6 +72,11 @@ import "C"
 
 var retErrnoEnosys = uint32(C.C_ACT_ERRNO_ENOSYS)
 
+// This syscall is used for multiplexing "large" syscalls on s390(x). Unknown
+// syscalls will end up with this syscall number, so we need to explcitly
+// return -ENOSYS for this syscall on those architectures.
+const s390xMultiplexSyscall libseccomp.ScmpSyscall = 0
+
 func isAllowAction(action configs.Action) bool {
 	switch action {
 	// Trace is considered an "allow" action because a good tracer should
@@ -305,7 +310,7 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 		// directly from the arch code so we need to do it here. Sadly we can't
 		// share this code between architecture branches.
 		section := []bpf.Instruction{
-			// load [0]
+			// load [0] (syscall number)
 			bpf.LoadAbsolute{Off: 0, Size: 4}, // NOTE: We assume sizeof(int) == 4.
 		}
 
@@ -314,10 +319,37 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 			// No syscalls found for this arch -- skip it and move on.
 			continue
 		case 1:
-			// Get the only syscall in the map.
-			var sysno libseccomp.ScmpSyscall
-			for _, no := range maxSyscalls {
+			// Get the only syscall and scmpArch in the map.
+			var (
+				scmpArch libseccomp.ScmpArch
+				sysno    libseccomp.ScmpSyscall
+			)
+			for arch, no := range maxSyscalls {
 				sysno = no
+				scmpArch = arch
+			}
+
+			switch scmpArch {
+			// Return -ENOSYS for setup(2) on s390(x). This syscall is used for
+			// multiplexing "large syscall number" syscalls, but if the syscall
+			// number is not known to the kernel then the syscall number is
+			// left unchanged (and because it is sysno=0, you'll end up with
+			// EPERM for syscalls the kernel doesn't know about).
+			//
+			// The actual setup(2) syscall is never used by userspace anymore
+			// (and hasn't existed for decades) outside of this multiplexing
+			// scheme so returning -ENOSYS is fine.
+			case libseccomp.ArchS390, libseccomp.ArchS390X:
+				section = append(section, []bpf.Instruction{
+					// jne [setup=0],1
+					bpf.JumpIf{
+						Cond:     bpf.JumpNotEqual,
+						Val:      uint32(s390xMultiplexSyscall),
+						SkipTrue: 1,
+					},
+					// ret [ENOSYS]
+					bpf.RetConstant{Val: retErrnoEnosys},
+				}...)
 			}
 
 			// The simplest case just boils down to a single jgt instruction,
@@ -349,12 +381,6 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 			// If we're on x86 we need to add a check for x32 and if we're in
 			// the wrong mode we jump over the section.
 			if uint32(nativeArch) == uint32(C.C_AUDIT_ARCH_X86_64) {
-				// Grab the only architecture in the map.
-				var scmpArch libseccomp.ScmpArch
-				for arch := range maxSyscalls {
-					scmpArch = arch
-				}
-
 				// Generate a prefix to check the mode.
 				switch scmpArch {
 				case libseccomp.ArchAMD64:
@@ -512,7 +538,7 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 
 	// Prepend the load instruction for the architecture.
 	programTail = append([]bpf.Instruction{
-		// load [4]
+		// load [4] (architecture)
 		bpf.LoadAbsolute{Off: 4, Size: 4}, // NOTE: We assume sizeof(int) == 4.
 	}, programTail...)
 

@@ -29,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
@@ -42,7 +41,6 @@ import (
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/image"
-	"sigs.k8s.io/yaml"
 )
 
 // namespace used for all tests, do not change this
@@ -228,16 +226,12 @@ func TestApplyResetFields(t *testing.T) {
 				obj1.SetAPIVersion(mapping.GroupVersionKind.GroupVersion().String())
 				obj1.SetKind(mapping.GroupVersionKind.Kind)
 				obj1.SetName(name)
-				obj1YAML, err := yaml.Marshal(obj1.Object)
-				if err != nil {
-					t.Fatal(err)
-				}
 
 				// apply the spec of the first object
 				_, err = dynamicClient.
 					Resource(mapping.Resource).
 					Namespace(namespace).
-					Patch(context.TODO(), name, types.ApplyPatchType, obj1YAML, metav1.PatchOptions{FieldManager: "fieldmanager1"}, "")
+					Apply(context.TODO(), name, &obj1, metav1.ApplyOptions{FieldManager: "fieldmanager1"})
 				if err != nil {
 					t.Fatalf("Failed to apply obj1: %v", err)
 				}
@@ -260,18 +254,13 @@ func TestApplyResetFields(t *testing.T) {
 					t.Fatalf("obj1 and obj2 should not be equal %v", obj2)
 				}
 
-				obj2YAML, err := yaml.Marshal(obj2.Object)
-				if err != nil {
-					t.Fatal(err)
-				}
-
 				// apply the status of the second object
 				// this won't conflict if resetfields are set correctly
 				// and will conflict if they are not
 				_, err = dynamicClient.
 					Resource(mapping.Resource).
 					Namespace(namespace).
-					Patch(context.TODO(), name, types.ApplyPatchType, obj2YAML, metav1.PatchOptions{FieldManager: "fieldmanager2"}, "status")
+					ApplyStatus(context.TODO(), name, obj2, metav1.ApplyOptions{FieldManager: "fieldmanager2"})
 				if err != nil {
 					t.Fatalf("Failed to apply obj2: %v", err)
 				}
@@ -284,7 +273,7 @@ func TestApplyResetFields(t *testing.T) {
 					_, err = dynamicClient.
 						Resource(mapping.Resource).
 						Namespace(namespace).
-						Patch(context.TODO(), name, types.ApplyPatchType, obj2YAML, metav1.PatchOptions{FieldManager: "fieldmanager2"}, "")
+						Apply(context.TODO(), name, obj2, metav1.ApplyOptions{FieldManager: "fieldmanager2"})
 					if err == nil || !strings.Contains(err.Error(), "conflict") {
 						t.Fatalf("expected conflict, got error %v", err)
 					}
@@ -294,7 +283,7 @@ func TestApplyResetFields(t *testing.T) {
 					_, err = dynamicClient.
 						Resource(mapping.Resource).
 						Namespace(namespace).
-						Patch(context.TODO(), name, types.ApplyPatchType, obj1YAML, metav1.PatchOptions{FieldManager: "fieldmanager1"}, "status")
+						ApplyStatus(context.TODO(), name, &obj1, metav1.ApplyOptions{FieldManager: "fieldmanager1"})
 					if err == nil || !strings.Contains(err.Error(), "conflict") {
 						t.Fatalf("expected conflict, got error %v", err)
 					}

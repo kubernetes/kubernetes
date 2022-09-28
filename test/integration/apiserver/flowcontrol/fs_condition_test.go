@@ -38,10 +38,10 @@ import (
 func TestConditionIsolation(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIPriorityAndFairness, true)()
 	// NOTE: disabling the feature should fail the test
-	_, loopbackConfig, closeFn := setup(t, 10, 10)
+	kubeConfig, closeFn := setup(t, 10, 10)
 	defer closeFn()
 
-	loopbackClient := clientset.NewForConfigOrDie(loopbackConfig)
+	loopbackClient := clientset.NewForConfigOrDie(kubeConfig)
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)

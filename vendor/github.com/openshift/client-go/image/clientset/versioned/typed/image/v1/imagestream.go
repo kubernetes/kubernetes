@@ -4,9 +4,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/openshift/api/image/v1"
+	imagev1 "github.com/openshift/client-go/image/applyconfigurations/image/v1"
 	scheme "github.com/openshift/client-go/image/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -31,6 +34,8 @@ type ImageStreamInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ImageStreamList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ImageStream, err error)
+	Apply(ctx context.Context, imageStream *imagev1.ImageStreamApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ImageStream, err error)
+	ApplyStatus(ctx context.Context, imageStream *imagev1.ImageStreamApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ImageStream, err error)
 	Secrets(ctx context.Context, imageStreamName string, options metav1.GetOptions) (*v1.SecretList, error)
 	Layers(ctx context.Context, imageStreamName string, options metav1.GetOptions) (*v1.ImageStreamLayers, error)
 
@@ -175,6 +180,62 @@ func (c *imageStreams) Patch(ctx context.Context, name string, pt types.PatchTyp
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied imageStream.
+func (c *imageStreams) Apply(ctx context.Context, imageStream *imagev1.ImageStreamApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ImageStream, err error) {
+	if imageStream == nil {
+		return nil, fmt.Errorf("imageStream provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(imageStream)
+	if err != nil {
+		return nil, err
+	}
+	name := imageStream.Name
+	if name == nil {
+		return nil, fmt.Errorf("imageStream.Name must be provided to Apply")
+	}
+	result = &v1.ImageStream{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("imagestreams").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *imageStreams) ApplyStatus(ctx context.Context, imageStream *imagev1.ImageStreamApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ImageStream, err error) {
+	if imageStream == nil {
+		return nil, fmt.Errorf("imageStream provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(imageStream)
+	if err != nil {
+		return nil, err
+	}
+
+	name := imageStream.Name
+	if name == nil {
+		return nil, fmt.Errorf("imageStream.Name must be provided to Apply")
+	}
+
+	result = &v1.ImageStream{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("imagestreams").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

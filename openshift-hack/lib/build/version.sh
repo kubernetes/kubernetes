@@ -38,7 +38,7 @@ function os::build::version::git_vars() {
 			fi
 		fi
 		# Use git describe to find the version based on annotated tags.
-		if [[ -n ${OS_GIT_VERSION-} ]] || OS_GIT_VERSION=$(sed -rn 's/.*io.openshift.build.versions="kubernetes=(1.[0-9]+.[0-9]+)"/v\1/p' openshift-hack/images/hyperkube/Dockerfile.rhel); then
+		if [[ -n ${OS_GIT_VERSION-} ]] || OS_GIT_VERSION=$(sed -rn 's/.*io.openshift.build.versions="kubernetes=(1.[0-9]+.[0-9]+(-rc.[0-9])?)"/v\1/p' openshift-hack/images/hyperkube/Dockerfile.rhel); then
 			# combine GIT_COMMIT with GIT_VERSION which is being read from the above Dockerfile
 			OS_GIT_VERSION+="+${OS_GIT_COMMIT:0:7}"
 			# Try to match the "git describe" output to a regex to try to extract

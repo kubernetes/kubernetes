@@ -22,13 +22,15 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/instrumentation/common"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -42,13 +44,20 @@ var _ = common.SIGDescribe("Events", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	/*
-			   Release: v1.20
-			   Testname: Event resource lifecycle
-			   Description: Create an event, the event MUST exist.
-		           The event is patched with a new message, the check MUST have the update message.
-		           The event is deleted and MUST NOT show up when listing all events.
+		Release: v1.25
+		Testname: Event, manage lifecycle of an Event
+		Description: Attempt to create an event which MUST succeed.
+		Attempt to list all namespaces with a label selector which MUST
+		succeed. One list MUST be found. The event is patched with a
+		new message, the check MUST have the update message. The event
+		is updated with a new series of events, the check MUST confirm
+		this update. The event is deleted and MUST NOT show up when
+		listing all events.
 	*/
-	framework.ConformanceIt("should ensure that an event can be fetched, patched, deleted, and listed", func() {
+	framework.ConformanceIt("should manage the lifecycle of an event", func() {
+		// As per SIG-Arch meeting 14 July 2022 this e2e test now supersede
+		// e2e test "Event resource lifecycle", which has been removed.
+
 		eventTestName := "event-test"
 
 		ginkgo.By("creating a test event")
@@ -106,6 +115,33 @@ var _ = common.SIGDescribe("Events", func() {
 		event, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).Get(context.TODO(), eventCreatedName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to fetch the test event")
 		framework.ExpectEqual(event.Message, eventPatchMessage, "test event message does not match patch message")
+
+		ginkgo.By("updating the test event")
+
+		testEvent, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).Get(context.TODO(), event.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to get test event")
+
+		testEvent.Series = &v1.EventSeries{
+			Count:            100,
+			LastObservedTime: metav1.MicroTime{Time: time.Unix(1505828956, 0)},
+		}
+
+		// clear ResourceVersion and ManagedFields which are set by control-plane
+		testEvent.ObjectMeta.ResourceVersion = ""
+		testEvent.ObjectMeta.ManagedFields = nil
+
+		_, err = f.ClientSet.CoreV1().Events(f.Namespace.Name).Update(context.TODO(), testEvent, metav1.UpdateOptions{})
+		framework.ExpectNoError(err, "failed to update the test event")
+
+		ginkgo.By("getting the test event")
+		event, err = f.ClientSet.CoreV1().Events(f.Namespace.Name).Get(context.TODO(), testEvent.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to get test event")
+		// clear ResourceVersion and ManagedFields which are set by control-plane
+		event.ObjectMeta.ResourceVersion = ""
+		event.ObjectMeta.ManagedFields = nil
+		if !apiequality.Semantic.DeepEqual(testEvent, event) {
+			framework.Failf("test event wasn't properly updated: %v", diff.ObjectReflectDiff(testEvent, event))
+		}
 
 		ginkgo.By("deleting the test event")
 		// delete original event

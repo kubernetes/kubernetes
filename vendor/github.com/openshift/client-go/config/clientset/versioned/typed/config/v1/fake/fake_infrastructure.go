@@ -4,8 +4,11 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	configv1 "github.com/openshift/api/config/v1"
+	applyconfigurationsconfigv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -110,6 +113,49 @@ func (c *FakeInfrastructures) DeleteCollection(ctx context.Context, opts v1.Dele
 func (c *FakeInfrastructures) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *configv1.Infrastructure, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(infrastructuresResource, name, pt, data, subresources...), &configv1.Infrastructure{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*configv1.Infrastructure), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied infrastructure.
+func (c *FakeInfrastructures) Apply(ctx context.Context, infrastructure *applyconfigurationsconfigv1.InfrastructureApplyConfiguration, opts v1.ApplyOptions) (result *configv1.Infrastructure, err error) {
+	if infrastructure == nil {
+		return nil, fmt.Errorf("infrastructure provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(infrastructure)
+	if err != nil {
+		return nil, err
+	}
+	name := infrastructure.Name
+	if name == nil {
+		return nil, fmt.Errorf("infrastructure.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(infrastructuresResource, *name, types.ApplyPatchType, data), &configv1.Infrastructure{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*configv1.Infrastructure), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeInfrastructures) ApplyStatus(ctx context.Context, infrastructure *applyconfigurationsconfigv1.InfrastructureApplyConfiguration, opts v1.ApplyOptions) (result *configv1.Infrastructure, err error) {
+	if infrastructure == nil {
+		return nil, fmt.Errorf("infrastructure provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(infrastructure)
+	if err != nil {
+		return nil, err
+	}
+	name := infrastructure.Name
+	if name == nil {
+		return nil, fmt.Errorf("infrastructure.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(infrastructuresResource, *name, types.ApplyPatchType, data, "status"), &configv1.Infrastructure{})
 	if obj == nil {
 		return nil, err
 	}

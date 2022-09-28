@@ -129,81 +129,80 @@ func TestForwardPorts(t *testing.T) {
 	}
 
 	for testName, test := range tests {
-		server := httptest.NewServer(fakePortForwardServer(t, testName, test.serverSends, test.clientSends))
+		t.Run(testName, func(t *testing.T) {
+			server := httptest.NewServer(fakePortForwardServer(t, testName, test.serverSends, test.clientSends))
+			defer server.Close()
 
-		transport, upgrader, err := spdy.RoundTripperFor(&restclient.Config{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		url, _ := url.Parse(server.URL)
-		dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", url)
-
-		stopChan := make(chan struct{}, 1)
-		readyChan := make(chan struct{})
-
-		pf, err := New(dialer, test.ports, stopChan, readyChan, os.Stdout, os.Stderr)
-		if err != nil {
-			t.Fatalf("%s: unexpected error calling New: %v", testName, err)
-		}
-
-		doneChan := make(chan error)
-		go func() {
-			doneChan <- pf.ForwardPorts()
-		}()
-		<-pf.Ready
-
-		forwardedPorts, err := pf.GetPorts()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		remoteToLocalMap := map[int32]int32{}
-		for _, forwardedPort := range forwardedPorts {
-			remoteToLocalMap[int32(forwardedPort.Remote)] = int32(forwardedPort.Local)
-		}
-
-		for port, data := range test.clientSends {
-			clientConn, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", remoteToLocalMap[port]))
+			transport, upgrader, err := spdy.RoundTripperFor(&restclient.Config{})
 			if err != nil {
-				t.Errorf("%s: error dialing %d: %s", testName, port, err)
-				server.Close()
-				continue
+				t.Fatal(err)
 			}
-			defer clientConn.Close()
+			url, _ := url.Parse(server.URL)
+			dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", url)
 
-			n, err := clientConn.Write([]byte(data))
-			if err != nil && err != io.EOF {
-				t.Errorf("%s: Error sending data '%s': %s", testName, data, err)
-				server.Close()
-				continue
-			}
-			if n == 0 {
-				t.Errorf("%s: unexpected write of 0 bytes", testName)
-				server.Close()
-				continue
-			}
-			b := make([]byte, 4)
-			_, err = clientConn.Read(b)
-			if err != nil && err != io.EOF {
-				t.Errorf("%s: Error reading data: %s", testName, err)
-				server.Close()
-				continue
-			}
-			if !bytes.Equal([]byte(test.serverSends[port]), b) {
-				t.Errorf("%s: expected to read '%s', got '%s'", testName, test.serverSends[port], b)
-				server.Close()
-				continue
-			}
-		}
-		// tell r.ForwardPorts to stop
-		close(stopChan)
+			stopChan := make(chan struct{}, 1)
+			readyChan := make(chan struct{})
 
-		// wait for r.ForwardPorts to actually return
-		err = <-doneChan
-		if err != nil {
-			t.Errorf("%s: unexpected error: %s", testName, err)
-		}
-		server.Close()
+			pf, err := New(dialer, test.ports, stopChan, readyChan, os.Stdout, os.Stderr)
+			if err != nil {
+				t.Fatalf("%s: unexpected error calling New: %v", testName, err)
+			}
+
+			doneChan := make(chan error)
+			go func() {
+				doneChan <- pf.ForwardPorts()
+			}()
+			<-pf.Ready
+
+			forwardedPorts, err := pf.GetPorts()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			remoteToLocalMap := map[int32]int32{}
+			for _, forwardedPort := range forwardedPorts {
+				remoteToLocalMap[int32(forwardedPort.Remote)] = int32(forwardedPort.Local)
+			}
+
+			clientSend := func(port int32, data string) error {
+				clientConn, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", remoteToLocalMap[port]))
+				if err != nil {
+					return fmt.Errorf("%s: error dialing %d: %s", testName, port, err)
+
+				}
+				defer clientConn.Close()
+
+				n, err := clientConn.Write([]byte(data))
+				if err != nil && err != io.EOF {
+					return fmt.Errorf("%s: Error sending data '%s': %s", testName, data, err)
+				}
+				if n == 0 {
+					return fmt.Errorf("%s: unexpected write of 0 bytes", testName)
+				}
+				b := make([]byte, 4)
+				_, err = clientConn.Read(b)
+				if err != nil && err != io.EOF {
+					return fmt.Errorf("%s: Error reading data: %s", testName, err)
+				}
+				if !bytes.Equal([]byte(test.serverSends[port]), b) {
+					return fmt.Errorf("%s: expected to read '%s', got '%s'", testName, test.serverSends[port], b)
+				}
+				return nil
+			}
+			for port, data := range test.clientSends {
+				if err := clientSend(port, data); err != nil {
+					t.Error(err)
+				}
+			}
+			// tell r.ForwardPorts to stop
+			close(stopChan)
+
+			// wait for r.ForwardPorts to actually return
+			err = <-doneChan
+			if err != nil {
+				t.Errorf("%s: unexpected error: %s", testName, err)
+			}
+		})
 	}
 
 }

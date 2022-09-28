@@ -4,8 +4,11 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	configv1 "github.com/openshift/api/config/v1"
+	applyconfigurationsconfigv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -110,6 +113,49 @@ func (c *FakeProxies) DeleteCollection(ctx context.Context, opts v1.DeleteOption
 func (c *FakeProxies) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *configv1.Proxy, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(proxiesResource, name, pt, data, subresources...), &configv1.Proxy{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*configv1.Proxy), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied proxy.
+func (c *FakeProxies) Apply(ctx context.Context, proxy *applyconfigurationsconfigv1.ProxyApplyConfiguration, opts v1.ApplyOptions) (result *configv1.Proxy, err error) {
+	if proxy == nil {
+		return nil, fmt.Errorf("proxy provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(proxy)
+	if err != nil {
+		return nil, err
+	}
+	name := proxy.Name
+	if name == nil {
+		return nil, fmt.Errorf("proxy.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(proxiesResource, *name, types.ApplyPatchType, data), &configv1.Proxy{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*configv1.Proxy), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeProxies) ApplyStatus(ctx context.Context, proxy *applyconfigurationsconfigv1.ProxyApplyConfiguration, opts v1.ApplyOptions) (result *configv1.Proxy, err error) {
+	if proxy == nil {
+		return nil, fmt.Errorf("proxy provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(proxy)
+	if err != nil {
+		return nil, err
+	}
+	name := proxy.Name
+	if name == nil {
+		return nil, fmt.Errorf("proxy.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(proxiesResource, *name, types.ApplyPatchType, data, "status"), &configv1.Proxy{})
 	if obj == nil {
 		return nil, err
 	}

@@ -168,11 +168,9 @@ func (c *checker) checkSelect(e *exprpb.Expr) {
 	if found {
 		ident := c.env.LookupIdent(qname)
 		if ident != nil {
-			if sel.TestOnly {
-				c.errors.expressionDoesNotSelectField(c.location(e))
-				c.setType(e, decls.Bool)
-				return
-			}
+			// We don't check for a TestOnly expression here since the `found` result is
+			// always going to be false for TestOnly expressions.
+
 			// Rewrite the node to be a variable reference to the resolved fully-qualified
 			// variable name.
 			c.setType(e, ident.GetIdent().Type)
@@ -189,7 +187,7 @@ func (c *checker) checkSelect(e *exprpb.Expr) {
 
 	// Interpret as field selection, first traversing down the operand.
 	c.check(sel.Operand)
-	targetType := c.getType(sel.Operand)
+	targetType := substitute(c.mappings, c.getType(sel.Operand), false)
 	// Assume error type by default as most types do not support field selection.
 	resultType := decls.Error
 	switch kindOf(targetType) {
@@ -208,7 +206,7 @@ func (c *checker) checkSelect(e *exprpb.Expr) {
 			resultType = fieldType.Type
 		}
 	case kindTypeParam:
-		// Set the operand type to DYN to prevent assignment to a potentionally incorrect type
+		// Set the operand type to DYN to prevent assignment to a potentially incorrect type
 		// at a later point in type-checking. The isAssignable call will update the type
 		// substitutions for the type param under the covers.
 		c.isAssignable(decls.Dyn, targetType)
@@ -226,7 +224,7 @@ func (c *checker) checkSelect(e *exprpb.Expr) {
 	if sel.TestOnly {
 		resultType = decls.Bool
 	}
-	c.setType(e, resultType)
+	c.setType(e, substitute(c.mappings, resultType, false))
 }
 
 func (c *checker) checkCall(e *exprpb.Expr) {
@@ -323,6 +321,12 @@ func (c *checker) resolveOverload(
 	var resultType *exprpb.Type
 	var checkedRef *exprpb.Reference
 	for _, overload := range fn.GetFunction().Overloads {
+		// Determine whether the overload is currently considered.
+		if c.env.isOverloadDisabled(overload.GetOverloadId()) {
+			continue
+		}
+
+		// Ensure the call style for the overload matches.
 		if (target == nil && overload.IsInstanceFunction) ||
 			(target != nil && !overload.IsInstanceFunction) {
 			// not a compatible call style.
@@ -330,26 +334,26 @@ func (c *checker) resolveOverload(
 		}
 
 		overloadType := decls.NewFunctionType(overload.ResultType, overload.Params...)
-		if len(overload.TypeParams) > 0 {
+		if len(overload.GetTypeParams()) > 0 {
 			// Instantiate overload's type with fresh type variables.
 			substitutions := newMapping()
-			for _, typePar := range overload.TypeParams {
+			for _, typePar := range overload.GetTypeParams() {
 				substitutions.add(decls.NewTypeParamType(typePar), c.newTypeVar())
 			}
 			overloadType = substitute(substitutions, overloadType, false)
 		}
 
-		candidateArgTypes := overloadType.GetFunction().ArgTypes
+		candidateArgTypes := overloadType.GetFunction().GetArgTypes()
 		if c.isAssignableList(argTypes, candidateArgTypes) {
 			if checkedRef == nil {
-				checkedRef = newFunctionReference(overload.OverloadId)
+				checkedRef = newFunctionReference(overload.GetOverloadId())
 			} else {
-				checkedRef.OverloadId = append(checkedRef.OverloadId, overload.OverloadId)
+				checkedRef.OverloadId = append(checkedRef.OverloadId, overload.GetOverloadId())
 			}
 
 			// First matching overload, determines result type.
 			fnResultType := substitute(c.mappings,
-				overloadType.GetFunction().ResultType,
+				overloadType.GetFunction().GetResultType(),
 				false)
 			if resultType == nil {
 				resultType = fnResultType
@@ -465,48 +469,48 @@ func (c *checker) checkCreateMessage(e *exprpb.Expr) {
 
 func (c *checker) checkComprehension(e *exprpb.Expr) {
 	comp := e.GetComprehensionExpr()
-	c.check(comp.IterRange)
-	c.check(comp.AccuInit)
-	accuType := c.getType(comp.AccuInit)
-	rangeType := c.getType(comp.IterRange)
+	c.check(comp.GetIterRange())
+	c.check(comp.GetAccuInit())
+	accuType := c.getType(comp.GetAccuInit())
+	rangeType := substitute(c.mappings, c.getType(comp.GetIterRange()), false)
 	var varType *exprpb.Type
 
 	switch kindOf(rangeType) {
 	case kindList:
-		varType = rangeType.GetListType().ElemType
+		varType = rangeType.GetListType().GetElemType()
 	case kindMap:
 		// Ranges over the keys.
-		varType = rangeType.GetMapType().KeyType
+		varType = rangeType.GetMapType().GetKeyType()
 	case kindDyn, kindError, kindTypeParam:
-		// Set the range type to DYN to prevent assignment to a potentionally incorrect type
+		// Set the range type to DYN to prevent assignment to a potentially incorrect type
 		// at a later point in type-checking. The isAssignable call will update the type
 		// substitutions for the type param under the covers.
 		c.isAssignable(decls.Dyn, rangeType)
 		// Set the range iteration variable to type DYN as well.
 		varType = decls.Dyn
 	default:
-		c.errors.notAComprehensionRange(c.location(comp.IterRange), rangeType)
+		c.errors.notAComprehensionRange(c.location(comp.GetIterRange()), rangeType)
 		varType = decls.Error
 	}
 
 	// Create a scope for the comprehension since it has a local accumulation variable.
 	// This scope will contain the accumulation variable used to compute the result.
 	c.env = c.env.enterScope()
-	c.env.Add(decls.NewVar(comp.AccuVar, accuType))
+	c.env.Add(decls.NewVar(comp.GetAccuVar(), accuType))
 	// Create a block scope for the loop.
 	c.env = c.env.enterScope()
-	c.env.Add(decls.NewVar(comp.IterVar, varType))
+	c.env.Add(decls.NewVar(comp.GetIterVar(), varType))
 	// Check the variable references in the condition and step.
-	c.check(comp.LoopCondition)
-	c.assertType(comp.LoopCondition, decls.Bool)
-	c.check(comp.LoopStep)
-	c.assertType(comp.LoopStep, accuType)
+	c.check(comp.GetLoopCondition())
+	c.assertType(comp.GetLoopCondition(), decls.Bool)
+	c.check(comp.GetLoopStep())
+	c.assertType(comp.GetLoopStep(), accuType)
 	// Exit the loop's block scope before checking the result.
 	c.env = c.env.exitScope()
-	c.check(comp.Result)
+	c.check(comp.GetResult())
 	// Exit the comprehension scope.
 	c.env = c.env.exitScope()
-	c.setType(e, c.getType(comp.Result))
+	c.setType(e, substitute(c.mappings, c.getType(comp.GetResult()), false))
 }
 
 // Checks compatibility of joined types, and returns the most general common type.

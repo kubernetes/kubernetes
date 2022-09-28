@@ -433,3 +433,13 @@
 - endpoint: replaceNetworkingV1NamespacedNetworkPolicyStatus
   reason: endpoints is currently feature gated and and will only receive e2e & conformance test in 1.25
   link: https://github.com/kubernetes/kubernetes/pull/107963
+- endpoint: readCoreV1NodeStatus
+  reason: Kubernetes distribution would reasonably not allow this action via the API
+  link: https://github.com/kubernetes/kubernetes/issues/109379
+- endpoint: replaceCoreV1NodeStatus
+  reason: Kubernetes distribution would reasonably not allow this action via the API
+  link: https://github.com/kubernetes/kubernetes/issues/109379
+- endpoint: deleteCoreV1CollectionNode
+  reason: Kubernetes distribution would reasonably not allow this action via the API
+  link: https://github.com/kubernetes/kubernetes/issues/109379 
+  

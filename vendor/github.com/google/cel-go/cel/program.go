@@ -49,7 +49,7 @@ type Program interface {
 	// to support cancellation and timeouts. This method must be used in conjunction with the
 	// InterruptCheckFrequency() option for cancellation interrupts to be impact evaluation.
 	//
-	// The vars value may eitehr be an `interpreter.Activation` or `map[string]interface{}`.
+	// The vars value may either be an `interpreter.Activation` or `map[string]interface{}`.
 	//
 	// The output contract for `ContextEval` is otherwise identical to the `Eval` method.
 	ContextEval(context.Context, interface{}) (ref.Val, *EvalDetails, error)
@@ -163,6 +163,18 @@ func newProgram(e *Env, ast *Ast, opts []ProgramOption) (Program, error) {
 	var err error
 	for _, opt := range opts {
 		p, err = opt(p)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Add the function bindings created via Function() options.
+	for _, fn := range e.functions {
+		bindings, err := fn.bindings()
+		if err != nil {
+			return nil, err
+		}
+		err = disp.Add(bindings...)
 		if err != nil {
 			return nil, err
 		}

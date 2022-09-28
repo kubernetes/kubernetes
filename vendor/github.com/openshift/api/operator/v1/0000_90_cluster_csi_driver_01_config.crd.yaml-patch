@@ -8,6 +8,7 @@
       - efs.csi.aws.com
       - disk.csi.azure.com
       - file.csi.azure.com
+      - filestore.csi.storage.gke.io
       - pd.csi.storage.gke.io
       - cinder.csi.openstack.org
       - csi.vsphere.vmware.com

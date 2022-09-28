@@ -136,6 +136,56 @@ func (s *LabelSelectorWrapper) Obj() *metav1.LabelSelector {
 	return &s.LabelSelector
 }
 
+// ContainerWrapper wraps a Container inside.
+type ContainerWrapper struct{ v1.Container }
+
+// MakeContainer creates a Container wrapper.
+func MakeContainer() *ContainerWrapper {
+	return &ContainerWrapper{v1.Container{}}
+}
+
+// Obj returns the inner Container.
+func (c *ContainerWrapper) Obj() v1.Container {
+	return c.Container
+}
+
+// Name sets `n` as the name of the inner Container.
+func (c *ContainerWrapper) Name(n string) *ContainerWrapper {
+	c.Container.Name = n
+	return c
+}
+
+// Image sets `image` as the image of the inner Container.
+func (c *ContainerWrapper) Image(image string) *ContainerWrapper {
+	c.Container.Image = image
+	return c
+}
+
+// HostPort sets `hostPort` as the host port of the inner Container.
+func (c *ContainerWrapper) HostPort(hostPort int32) *ContainerWrapper {
+	c.Container.Ports = []v1.ContainerPort{{HostPort: hostPort}}
+	return c
+}
+
+// ContainerPort sets `ports` as the ports of the inner Container.
+func (c *ContainerWrapper) ContainerPort(ports []v1.ContainerPort) *ContainerWrapper {
+	c.Container.Ports = ports
+	return c
+}
+
+// Resources sets the container resources to the given resource map.
+func (c *ContainerWrapper) Resources(resMap map[v1.ResourceName]string) *ContainerWrapper {
+	res := v1.ResourceList{}
+	for k, v := range resMap {
+		res[k] = resource.MustParse(v)
+	}
+	c.Container.Resources = v1.ResourceRequirements{
+		Requests: res,
+		Limits:   res,
+	}
+	return c
+}
+
 // PodWrapper wraps a Pod inside.
 type PodWrapper struct{ v1.Pod }
 
@@ -188,16 +238,26 @@ func (p *PodWrapper) OwnerReference(name string, gvk schema.GroupVersionKind) *P
 
 // Container appends a container into PodSpec of the inner pod.
 func (p *PodWrapper) Container(s string) *PodWrapper {
-	p.Spec.Containers = append(p.Spec.Containers, v1.Container{
-		Name:  fmt.Sprintf("con%d", len(p.Spec.Containers)),
-		Image: s,
-	})
+	name := fmt.Sprintf("con%d", len(p.Spec.Containers))
+	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name(name).Image(s).Obj())
+	return p
+}
+
+// Containers sets `containers` to the PodSpec of the inner pod.
+func (p *PodWrapper) Containers(containers []v1.Container) *PodWrapper {
+	p.Spec.Containers = containers
 	return p
 }
 
 // Priority sets a priority value into PodSpec of the inner pod.
 func (p *PodWrapper) Priority(val int32) *PodWrapper {
 	p.Spec.Priority = &val
+	return p
+}
+
+// CreationTimestamp sets the inner pod's CreationTimestamp.
+func (p *PodWrapper) CreationTimestamp(t metav1.Time) *PodWrapper {
+	p.ObjectMeta.CreationTimestamp = t
 	return p
 }
 
@@ -266,6 +326,24 @@ func (p *PodWrapper) NominatedNodeName(n string) *PodWrapper {
 	return p
 }
 
+// Phase sets `phase` as .status.Phase of the inner pod.
+func (p *PodWrapper) Phase(phase v1.PodPhase) *PodWrapper {
+	p.Status.Phase = phase
+	return p
+}
+
+// Condition adds a `condition(Type, Status, Reason)` to .Status.Conditions.
+func (p *PodWrapper) Condition(t v1.PodConditionType, s v1.ConditionStatus, r string) *PodWrapper {
+	p.Status.Conditions = append(p.Status.Conditions, v1.PodCondition{Type: t, Status: s, Reason: r})
+	return p
+}
+
+// Conditions sets `conditions` as .status.Conditions of the inner pod.
+func (p *PodWrapper) Conditions(conditions []v1.PodCondition) *PodWrapper {
+	p.Status.Conditions = append(p.Status.Conditions, conditions...)
+	return p
+}
+
 // Toleration creates a toleration (with the operator Exists)
 // and injects into the inner pod.
 func (p *PodWrapper) Toleration(key string) *PodWrapper {
@@ -279,9 +357,14 @@ func (p *PodWrapper) Toleration(key string) *PodWrapper {
 // HostPort creates a container with a hostPort valued `hostPort`,
 // and injects into the inner pod.
 func (p *PodWrapper) HostPort(port int32) *PodWrapper {
-	p.Spec.Containers = append(p.Spec.Containers, v1.Container{
-		Ports: []v1.ContainerPort{{HostPort: port}},
-	})
+	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name("container").Image("pause").HostPort(port).Obj())
+	return p
+}
+
+// ContainerPort creates a container with ports valued `ports`,
+// and injects into the inner pod.
+func (p *PodWrapper) ContainerPort(ports []v1.ContainerPort) *PodWrapper {
+	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name("container").Image("pause").ContainerPort(ports).Obj())
 	return p
 }
 
@@ -293,6 +376,12 @@ func (p *PodWrapper) PVC(name string) *PodWrapper {
 			PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: name},
 		},
 	})
+	return p
+}
+
+// Volume creates volume and injects into the inner pod.
+func (p *PodWrapper) Volume(volume v1.Volume) *PodWrapper {
+	p.Spec.Volumes = append(p.Spec.Volumes, volume)
 	return p
 }
 
@@ -316,9 +405,9 @@ const (
 	PodAntiAffinityWithRequiredPreferredReq
 )
 
-// PodAffinityExists creates an PodAffinity with the operator "Exists"
+// PodAffinity creates a PodAffinity with topology key and label selector
 // and injects into the inner pod.
-func (p *PodWrapper) PodAffinityExists(labelKey, topologyKey string, kind PodAffinityKind) *PodWrapper {
+func (p *PodWrapper) PodAffinity(topologyKey string, labelSelector *metav1.LabelSelector, kind PodAffinityKind) *PodWrapper {
 	if kind == NilPodAffinity {
 		return p
 	}
@@ -329,7 +418,6 @@ func (p *PodWrapper) PodAffinityExists(labelKey, topologyKey string, kind PodAff
 	if p.Spec.Affinity.PodAffinity == nil {
 		p.Spec.Affinity.PodAffinity = &v1.PodAffinity{}
 	}
-	labelSelector := MakeLabelSelector().Exists(labelKey).Obj()
 	term := v1.PodAffinityTerm{LabelSelector: labelSelector, TopologyKey: topologyKey}
 	switch kind {
 	case PodAffinityWithRequiredReq:
@@ -355,9 +443,9 @@ func (p *PodWrapper) PodAffinityExists(labelKey, topologyKey string, kind PodAff
 	return p
 }
 
-// PodAntiAffinityExists creates an PodAntiAffinity with the operator "Exists"
+// PodAntiAffinity creates a PodAntiAffinity with topology key and label selector
 // and injects into the inner pod.
-func (p *PodWrapper) PodAntiAffinityExists(labelKey, topologyKey string, kind PodAffinityKind) *PodWrapper {
+func (p *PodWrapper) PodAntiAffinity(topologyKey string, labelSelector *metav1.LabelSelector, kind PodAffinityKind) *PodWrapper {
 	if kind == NilPodAffinity {
 		return p
 	}
@@ -368,7 +456,6 @@ func (p *PodWrapper) PodAntiAffinityExists(labelKey, topologyKey string, kind Po
 	if p.Spec.Affinity.PodAntiAffinity == nil {
 		p.Spec.Affinity.PodAntiAffinity = &v1.PodAntiAffinity{}
 	}
-	labelSelector := MakeLabelSelector().Exists(labelKey).Obj()
 	term := v1.PodAffinityTerm{LabelSelector: labelSelector, TopologyKey: topologyKey}
 	switch kind {
 	case PodAntiAffinityWithRequiredReq:
@@ -394,26 +481,118 @@ func (p *PodWrapper) PodAntiAffinityExists(labelKey, topologyKey string, kind Po
 	return p
 }
 
+// PodAffinityExists creates a PodAffinity with the operator "Exists"
+// and injects into the inner pod.
+func (p *PodWrapper) PodAffinityExists(labelKey, topologyKey string, kind PodAffinityKind) *PodWrapper {
+	labelSelector := MakeLabelSelector().Exists(labelKey).Obj()
+	p.PodAffinity(topologyKey, labelSelector, kind)
+	return p
+}
+
+// PodAntiAffinityExists creates a PodAntiAffinity with the operator "Exists"
+// and injects into the inner pod.
+func (p *PodWrapper) PodAntiAffinityExists(labelKey, topologyKey string, kind PodAffinityKind) *PodWrapper {
+	labelSelector := MakeLabelSelector().Exists(labelKey).Obj()
+	p.PodAntiAffinity(topologyKey, labelSelector, kind)
+	return p
+}
+
+// PodAffinityNotExists creates a PodAffinity with the operator "NotExists"
+// and injects into the inner pod.
+func (p *PodWrapper) PodAffinityNotExists(labelKey, topologyKey string, kind PodAffinityKind) *PodWrapper {
+	labelSelector := MakeLabelSelector().NotExist(labelKey).Obj()
+	p.PodAffinity(topologyKey, labelSelector, kind)
+	return p
+}
+
+// PodAntiAffinityNotExists creates a PodAntiAffinity with the operator "NotExists"
+// and injects into the inner pod.
+func (p *PodWrapper) PodAntiAffinityNotExists(labelKey, topologyKey string, kind PodAffinityKind) *PodWrapper {
+	labelSelector := MakeLabelSelector().NotExist(labelKey).Obj()
+	p.PodAntiAffinity(topologyKey, labelSelector, kind)
+	return p
+}
+
+// PodAffinityIn creates a PodAffinity with the operator "In"
+// and injects into the inner pod.
+func (p *PodWrapper) PodAffinityIn(labelKey, topologyKey string, vals []string, kind PodAffinityKind) *PodWrapper {
+	labelSelector := MakeLabelSelector().In(labelKey, vals).Obj()
+	p.PodAffinity(topologyKey, labelSelector, kind)
+	return p
+}
+
+// PodAntiAffinityIn creates a PodAntiAffinity with the operator "In"
+// and injects into the inner pod.
+func (p *PodWrapper) PodAntiAffinityIn(labelKey, topologyKey string, vals []string, kind PodAffinityKind) *PodWrapper {
+	labelSelector := MakeLabelSelector().In(labelKey, vals).Obj()
+	p.PodAntiAffinity(topologyKey, labelSelector, kind)
+	return p
+}
+
+// PodAffinityNotIn creates a PodAffinity with the operator "NotIn"
+// and injects into the inner pod.
+func (p *PodWrapper) PodAffinityNotIn(labelKey, topologyKey string, vals []string, kind PodAffinityKind) *PodWrapper {
+	labelSelector := MakeLabelSelector().NotIn(labelKey, vals).Obj()
+	p.PodAffinity(topologyKey, labelSelector, kind)
+	return p
+}
+
+// PodAntiAffinityNotIn creates a PodAntiAffinity with the operator "NotIn"
+// and injects into the inner pod.
+func (p *PodWrapper) PodAntiAffinityNotIn(labelKey, topologyKey string, vals []string, kind PodAffinityKind) *PodWrapper {
+	labelSelector := MakeLabelSelector().NotIn(labelKey, vals).Obj()
+	p.PodAntiAffinity(topologyKey, labelSelector, kind)
+	return p
+}
+
 // SpreadConstraint constructs a TopologySpreadConstraint object and injects
 // into the inner pod.
-func (p *PodWrapper) SpreadConstraint(maxSkew int, tpKey string, mode v1.UnsatisfiableConstraintAction, selector *metav1.LabelSelector, minDomains *int32) *PodWrapper {
+func (p *PodWrapper) SpreadConstraint(maxSkew int, tpKey string, mode v1.UnsatisfiableConstraintAction, selector *metav1.LabelSelector, minDomains *int32, nodeAffinityPolicy, nodeTaintsPolicy *v1.NodeInclusionPolicy, matchLabelKeys []string) *PodWrapper {
 	c := v1.TopologySpreadConstraint{
-		MaxSkew:           int32(maxSkew),
-		TopologyKey:       tpKey,
-		WhenUnsatisfiable: mode,
-		LabelSelector:     selector,
-		MinDomains:        minDomains,
+		MaxSkew:            int32(maxSkew),
+		TopologyKey:        tpKey,
+		WhenUnsatisfiable:  mode,
+		LabelSelector:      selector,
+		MinDomains:         minDomains,
+		NodeAffinityPolicy: nodeAffinityPolicy,
+		NodeTaintsPolicy:   nodeTaintsPolicy,
+		MatchLabelKeys:     matchLabelKeys,
 	}
 	p.Spec.TopologySpreadConstraints = append(p.Spec.TopologySpreadConstraints, c)
 	return p
 }
 
-// Label sets a {k,v} pair to the inner pod.
+// Label sets a {k,v} pair to the inner pod label.
 func (p *PodWrapper) Label(k, v string) *PodWrapper {
-	if p.Labels == nil {
-		p.Labels = make(map[string]string)
+	if p.ObjectMeta.Labels == nil {
+		p.ObjectMeta.Labels = make(map[string]string)
 	}
-	p.Labels[k] = v
+	p.ObjectMeta.Labels[k] = v
+	return p
+}
+
+// Labels sets all {k,v} pair provided by `labels` to the inner pod labels.
+func (p *PodWrapper) Labels(labels map[string]string) *PodWrapper {
+	for k, v := range labels {
+		p.Label(k, v)
+	}
+	return p
+}
+
+// Annotation sets a {k,v} pair to the inner pod annotation.
+func (p *PodWrapper) Annotation(key, value string) *PodWrapper {
+	if p.ObjectMeta.Annotations == nil {
+		p.ObjectMeta.Annotations = make(map[string]string)
+	}
+	p.ObjectMeta.Annotations[key] = value
+	return p
+}
+
+// Annotations sets all {k,v} pair provided by `annotations` to the inner pod annotations.
+func (p *PodWrapper) Annotations(annotations map[string]string) *PodWrapper {
+	for k, v := range annotations {
+		p.Annotation(k, v)
+	}
 	return p
 }
 
@@ -423,18 +602,19 @@ func (p *PodWrapper) Req(resMap map[v1.ResourceName]string) *PodWrapper {
 		return p
 	}
 
-	res := v1.ResourceList{}
-	for k, v := range resMap {
-		res[k] = resource.MustParse(v)
+	name := fmt.Sprintf("con%d", len(p.Spec.Containers))
+	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name(name).Image(imageutils.GetPauseImageName()).Resources(resMap).Obj())
+	return p
+}
+
+// InitReq adds a new init container to the inner pod with given resource map.
+func (p *PodWrapper) InitReq(resMap map[v1.ResourceName]string) *PodWrapper {
+	if len(resMap) == 0 {
+		return p
 	}
-	p.Spec.Containers = append(p.Spec.Containers, v1.Container{
-		Name:  fmt.Sprintf("con%d", len(p.Spec.Containers)),
-		Image: imageutils.GetPauseImageName(),
-		Resources: v1.ResourceRequirements{
-			Requests: res,
-			Limits:   res,
-		},
-	})
+
+	name := fmt.Sprintf("init-con%d", len(p.Spec.InitContainers))
+	p.Spec.InitContainers = append(p.Spec.InitContainers, MakeContainer().Name(name).Image(imageutils.GetPauseImageName()).Resources(resMap).Obj())
 	return p
 }
 
@@ -444,7 +624,7 @@ func (p *PodWrapper) PreemptionPolicy(policy v1.PreemptionPolicy) *PodWrapper {
 	return p
 }
 
-// Overhead sets the give resourcelist to the inner pod
+// Overhead sets the give ResourceList to the inner pod
 func (p *PodWrapper) Overhead(rl v1.ResourceList) *PodWrapper {
 	p.Spec.Overhead = rl
 	return p

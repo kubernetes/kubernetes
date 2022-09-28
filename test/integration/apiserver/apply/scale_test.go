@@ -51,7 +51,7 @@ type scaleTest struct {
 func TestScaleAllResources(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	tests := []scaleTest{
@@ -241,7 +241,7 @@ func TestScaleAllResources(t *testing.T) {
 func TestScaleUpdateOnlyStatus(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	resource := "deployments"

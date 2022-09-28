@@ -4,9 +4,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/openshift/api/build/v1"
+	buildv1 "github.com/openshift/client-go/build/applyconfigurations/build/v1"
 	scheme "github.com/openshift/client-go/build/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -31,6 +34,8 @@ type BuildInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.BuildList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Build, err error)
+	Apply(ctx context.Context, build *buildv1.BuildApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Build, err error)
+	ApplyStatus(ctx context.Context, build *buildv1.BuildApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Build, err error)
 	UpdateDetails(ctx context.Context, buildName string, build *v1.Build, opts metav1.UpdateOptions) (*v1.Build, error)
 	Clone(ctx context.Context, buildName string, buildRequest *v1.BuildRequest, opts metav1.CreateOptions) (*v1.Build, error)
 
@@ -175,6 +180,62 @@ func (c *builds) Patch(ctx context.Context, name string, pt types.PatchType, dat
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied build.
+func (c *builds) Apply(ctx context.Context, build *buildv1.BuildApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Build, err error) {
+	if build == nil {
+		return nil, fmt.Errorf("build provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(build)
+	if err != nil {
+		return nil, err
+	}
+	name := build.Name
+	if name == nil {
+		return nil, fmt.Errorf("build.Name must be provided to Apply")
+	}
+	result = &v1.Build{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("builds").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *builds) ApplyStatus(ctx context.Context, build *buildv1.BuildApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Build, err error) {
+	if build == nil {
+		return nil, fmt.Errorf("build provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(build)
+	if err != nil {
+		return nil, err
+	}
+
+	name := build.Name
+	if name == nil {
+		return nil, fmt.Errorf("build.Name must be provided to Apply")
+	}
+
+	result = &v1.Build{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("builds").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

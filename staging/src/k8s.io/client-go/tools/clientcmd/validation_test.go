@@ -65,6 +65,42 @@ func TestConfirmUsableBadInfoButOkConfig(t *testing.T) {
 	badValidation.testConfig(t)
 }
 
+func TestConfirmUsableMissingObjects(t *testing.T) {
+	config := clientcmdapi.NewConfig()
+	config.Clusters["kind-cluster"] = &clientcmdapi.Cluster{
+		Server: "anything",
+	}
+	config.AuthInfos["kind-user"] = &clientcmdapi.AuthInfo{
+		Token: "any-value",
+	}
+	config.Contexts["missing-user"] = &clientcmdapi.Context{
+		Cluster:  "kind-cluster",
+		AuthInfo: "garbage",
+	}
+	config.Contexts["missing-cluster"] = &clientcmdapi.Context{
+		Cluster:  "garbage",
+		AuthInfo: "kind-user",
+	}
+
+	missingUser := configValidationTest{
+		config: config,
+		expectedErrorSubstring: []string{
+			`user "garbage" was not found for context "missing-user"`,
+		},
+	}
+	missingUser.testConfirmUsable("missing-user", t)
+	missingUser.testConfig(t)
+
+	missingCluster := configValidationTest{
+		config: config,
+		expectedErrorSubstring: []string{
+			`cluster "garbage" was not found for context "missing-cluster"`,
+		},
+	}
+	missingCluster.testConfirmUsable("missing-cluster", t)
+	missingCluster.testConfig(t)
+}
+
 func TestConfirmUsableBadInfoConfig(t *testing.T) {
 	config := clientcmdapi.NewConfig()
 	config.Clusters["missing ca"] = &clientcmdapi.Cluster{

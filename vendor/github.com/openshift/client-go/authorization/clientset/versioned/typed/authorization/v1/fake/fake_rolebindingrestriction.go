@@ -4,8 +4,11 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	authorizationv1 "github.com/openshift/api/authorization/v1"
+	applyconfigurationsauthorizationv1 "github.com/openshift/client-go/authorization/applyconfigurations/authorization/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -106,6 +109,28 @@ func (c *FakeRoleBindingRestrictions) DeleteCollection(ctx context.Context, opts
 func (c *FakeRoleBindingRestrictions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *authorizationv1.RoleBindingRestriction, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(rolebindingrestrictionsResource, c.ns, name, pt, data, subresources...), &authorizationv1.RoleBindingRestriction{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*authorizationv1.RoleBindingRestriction), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied roleBindingRestriction.
+func (c *FakeRoleBindingRestrictions) Apply(ctx context.Context, roleBindingRestriction *applyconfigurationsauthorizationv1.RoleBindingRestrictionApplyConfiguration, opts v1.ApplyOptions) (result *authorizationv1.RoleBindingRestriction, err error) {
+	if roleBindingRestriction == nil {
+		return nil, fmt.Errorf("roleBindingRestriction provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(roleBindingRestriction)
+	if err != nil {
+		return nil, err
+	}
+	name := roleBindingRestriction.Name
+	if name == nil {
+		return nil, fmt.Errorf("roleBindingRestriction.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(rolebindingrestrictionsResource, c.ns, *name, types.ApplyPatchType, data), &authorizationv1.RoleBindingRestriction{})
 
 	if obj == nil {
 		return nil, err

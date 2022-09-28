@@ -23,7 +23,7 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -119,7 +119,7 @@ var _ = common.SIGDescribe("HostPort", func() {
 		// IPv6 doesn't NAT from localhost -> localhost, it doesn't have the route_localnet kernel hack, so we need to specify the source IP
 		cmdPod1 := []string{"/bin/sh", "-c", fmt.Sprintf("curl -g --connect-timeout %v --interface %s http://%s/hostname", timeout, hostIP, net.JoinHostPort(localhost, strconv.Itoa(int(port))))}
 		cmdPod2 := []string{"/bin/sh", "-c", fmt.Sprintf("curl -g --connect-timeout %v http://%s/hostname", timeout, net.JoinHostPort(hostIP, strconv.Itoa(int(port))))}
-		cmdPod3 := []string{"/bin/sh", "-c", fmt.Sprintf("nc -vuz -w %v %s %d", timeout, hostIP, port)}
+		cmdPod3 := []string{"/bin/sh", "-c", fmt.Sprintf("echo hostname | nc -u -w %v %s %d", timeout, hostIP, port)}
 		// try 5 times to connect to the exposed ports
 		for i := 0; i < 5; i++ {
 			// check pod1
@@ -143,9 +143,17 @@ var _ = common.SIGDescribe("HostPort", func() {
 			}
 			// check pod3
 			ginkgo.By(fmt.Sprintf("checking connectivity from pod %s to serverIP: %s, port: %d UDP", hostExecPod.Name, hostIP, port))
-			_, _, err = f.ExecCommandInContainerWithFullOutput(hostExecPod.Name, "e2e-host-exec", cmdPod3...)
+			hostname3, _, err := f.ExecCommandInContainerWithFullOutput(hostExecPod.Name, "e2e-host-exec", cmdPod3...)
 			if err != nil {
 				framework.Logf("Can not connect from %s to pod(pod2) to serverIP: %s, port: %d", hostExecPod.Name, hostIP, port)
+				continue
+			}
+			if hostname1 == hostname3 {
+				framework.Logf("pods must have different hostname: pod1 has hostname %s, pod3 has hostname %s", hostname1, hostname3)
+				continue
+			}
+			if hostname2 == hostname3 {
+				framework.Logf("pods must have different hostname: pod2 has hostname %s, pod3 has hostname %s", hostname2, hostname3)
 				continue
 			}
 			return
@@ -157,6 +165,18 @@ var _ = common.SIGDescribe("HostPort", func() {
 // create pod which using hostport on the specified node according to the nodeSelector
 // it starts an http server on the exposed port
 func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string, port int32, protocol v1.Protocol, nodeName string) {
+
+	var netexecArgs []string
+	var readinessProbePort int32
+
+	if protocol == v1.ProtocolTCP {
+		readinessProbePort = 8080
+		netexecArgs = []string{"--http-port=8080", "--udp-port=-1"}
+	} else {
+		readinessProbePort = 8008
+		netexecArgs = []string{"--http-port=8008", "--udp-port=8080"}
+	}
+
 	hostPortPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
@@ -166,7 +186,7 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 				{
 					Name:  "agnhost",
 					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Args:  []string{"netexec", "--http-port=8080", "--udp-port=8080"},
+					Args:  append([]string{"netexec"}, netexecArgs...),
 					Ports: []v1.ContainerPort{
 						{
 							HostPort:      port,
@@ -180,7 +200,7 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 							HTTPGet: &v1.HTTPGetAction{
 								Path: "/hostname",
 								Port: intstr.IntOrString{
-									IntVal: int32(8080),
+									IntVal: readinessProbePort,
 								},
 								Scheme: v1.URISchemeHTTP,
 							},

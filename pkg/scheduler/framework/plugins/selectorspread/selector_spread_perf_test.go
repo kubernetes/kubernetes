@@ -69,7 +69,7 @@ func BenchmarkTestSelectorSpreadPriority(b *testing.B) {
 					b.Errorf("error waiting for informer cache sync")
 				}
 			}
-			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(snapshot), runtime.WithInformerFactory(informerFactory))
+			fh, _ := runtime.NewFramework(nil, nil, ctx.Done(), runtime.WithSnapshotSharedLister(snapshot), runtime.WithInformerFactory(informerFactory))
 			pl, err := New(nil, fh)
 			if err != nil {
 				b.Fatal(err)

@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -29,6 +30,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -455,4 +457,30 @@ func TestPodUpdateLabels(t *testing.T) {
 	channel <- podUpdate
 	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.UPDATE, TestSource, pod))
 
+}
+
+func TestPodConfigRace(t *testing.T) {
+	eventBroadcaster := record.NewBroadcaster()
+	config := NewPodConfig(PodConfigNotificationIncremental, eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "kubelet"}))
+	seenSources := sets.NewString(TestSource)
+	var wg sync.WaitGroup
+	const iterations = 100
+	wg.Add(2)
+
+	go func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			config.Channel(ctx, strconv.Itoa(i))
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < iterations; i++ {
+			config.SeenAllSources(seenSources)
+		}
+	}()
+
+	wg.Wait()
 }

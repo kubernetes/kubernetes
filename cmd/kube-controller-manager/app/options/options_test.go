@@ -268,10 +268,7 @@ func TestAddFlags(t *testing.T) {
 			},
 		},
 		DeprecatedFlags: &DeprecatedControllerOptions{
-			&kubectrlmgrconfig.DeprecatedControllerConfiguration{
-				DeletingPodsQPS:    0.1,
-				RegisterRetryCount: 10,
-			},
+			&kubectrlmgrconfig.DeprecatedControllerConfiguration{},
 		},
 		EndpointController: &EndpointControllerOptions{
 			&endpointconfig.EndpointControllerConfiguration{
@@ -537,10 +534,7 @@ func TestApplyTo(t *testing.T) {
 			StatefulSetController: statefulsetconfig.StatefulSetControllerConfiguration{
 				ConcurrentStatefulSetSyncs: 15,
 			},
-			DeprecatedController: kubectrlmgrconfig.DeprecatedControllerConfiguration{
-				DeletingPodsQPS:    0.1,
-				RegisterRetryCount: 10,
-			},
+			DeprecatedController: kubectrlmgrconfig.DeprecatedControllerConfiguration{},
 			EndpointController: endpointconfig.EndpointControllerConfiguration{
 				ConcurrentEndpointSyncs: 10,
 			},

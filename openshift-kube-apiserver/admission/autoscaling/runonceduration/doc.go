@@ -4,19 +4,18 @@ The plugin allows overriding the ActiveDeadlineSeconds for pods that have a
 RestartPolicy of RestartPolicyNever (run once). If configured to allow a project
 annotation override, and an annotation exists in the pod's namespace of:
 
- openshift.io/active-deadline-seconds-override
+	openshift.io/active-deadline-seconds-override
 
 the value of the annotation will take precedence over the globally configured
 value in the plugin's configuration.
 
-
-Configuration
+# Configuration
 
 The plugin is configured via a RunOnceDurationConfig object:
 
- apiVersion: v1
- kind: RunOnceDurationConfig
- enabled: true
- activeDeadlineSecondsOverride: 3600
+	apiVersion: v1
+	kind: RunOnceDurationConfig
+	enabled: true
+	activeDeadlineSecondsOverride: 3600
 */
 package runonceduration

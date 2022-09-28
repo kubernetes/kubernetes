@@ -38,7 +38,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
@@ -539,7 +539,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 			Resource("deployments").
 			Name("deployment").
 			Param("fieldManager", "apply_test").
-			Body([]byte(obj)).Do(context.TODO()).Get()
+			Body(obj).Do(context.TODO()).Get()
 		if err == nil {
 			framework.Failf("Expecting to get conflicts when applying object")
 		}
@@ -558,7 +558,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 			Name("deployment").
 			Param("force", "true").
 			Param("fieldManager", "apply_test").
-			Body([]byte(obj)).Do(context.TODO()).Get()
+			Body(obj).Do(context.TODO()).Get()
 		if err != nil {
 			framework.Failf("Failed to apply object with force: %v", err)
 		}

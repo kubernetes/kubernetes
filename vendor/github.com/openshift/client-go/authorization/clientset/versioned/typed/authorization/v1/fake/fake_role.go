@@ -4,8 +4,11 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	authorizationv1 "github.com/openshift/api/authorization/v1"
+	applyconfigurationsauthorizationv1 "github.com/openshift/client-go/authorization/applyconfigurations/authorization/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -106,6 +109,28 @@ func (c *FakeRoles) DeleteCollection(ctx context.Context, opts v1.DeleteOptions,
 func (c *FakeRoles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *authorizationv1.Role, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(rolesResource, c.ns, name, pt, data, subresources...), &authorizationv1.Role{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*authorizationv1.Role), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied role.
+func (c *FakeRoles) Apply(ctx context.Context, role *applyconfigurationsauthorizationv1.RoleApplyConfiguration, opts v1.ApplyOptions) (result *authorizationv1.Role, err error) {
+	if role == nil {
+		return nil, fmt.Errorf("role provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(role)
+	if err != nil {
+		return nil, err
+	}
+	name := role.Name
+	if name == nil {
+		return nil, fmt.Errorf("role.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(rolesResource, c.ns, *name, types.ApplyPatchType, data), &authorizationv1.Role{})
 
 	if obj == nil {
 		return nil, err

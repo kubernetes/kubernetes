@@ -420,16 +420,73 @@ run_deprecated_api_tests() {
   set -o nounset
   set -o errexit
 
-  create_and_use_new_namespace
   kube::log::status "Testing deprecated APIs"
 
+  # Create deprecated CRD
+  kubectl "${kube_flags_with_token[@]:?}" create -f - << __EOF__
+{
+  "kind": "CustomResourceDefinition",
+  "apiVersion": "apiextensions.k8s.io/v1",
+  "metadata": {
+    "name": "deprecated.example.com"
+  },
+  "spec": {
+    "group": "example.com",
+    "scope": "Namespaced",
+    "names": {
+      "plural": "deprecated",
+      "kind": "DeprecatedKind"
+    },
+    "versions": [
+      {
+        "name": "v1",
+        "served": true,
+        "storage": true,
+        "schema": {
+          "openAPIV3Schema": {
+            "x-kubernetes-preserve-unknown-fields": true,
+            "type": "object"
+          }
+        }
+      },
+      {
+        "name": "v1beta1",
+        "deprecated": true,
+        "served": true,
+        "storage": false,
+        "schema": {
+          "openAPIV3Schema": {
+            "x-kubernetes-preserve-unknown-fields": true,
+            "type": "object"
+          }
+        }
+      }
+    ]
+  }
+}
+__EOF__
+
+  # Ensure the API server has recognized and started serving the associated CR API
+  local tries=5
+  for i in $(seq 1 $tries); do
+      local output
+      output=$(kubectl "${kube_flags[@]:?}" api-resources --api-group example.com -oname)
+      if kube::test::if_has_string "$output" deprecated.example.com; then
+          break
+      fi
+      echo "${i}: Waiting for CR API to be available"
+      sleep "$i"
+  done
+
   # Test deprecated API request output
-  # TODO(liggitt): switch this to a custom deprecated resource once CRDs support marking versions as deprecated
-  output_message=$(kubectl get podsecuritypolicies.v1beta1.policy 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" 'PodSecurityPolicy is deprecated'
-  output_message=$(! kubectl get podsecuritypolicies.v1beta1.policy --warnings-as-errors 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" 'PodSecurityPolicy is deprecated'
+  output_message=$(kubectl get deprecated.v1beta1.example.com 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'example.com/v1beta1 DeprecatedKind is deprecated'
+  output_message=$(! kubectl get deprecated.v1beta1.example.com --warnings-as-errors 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'example.com/v1beta1 DeprecatedKind is deprecated'
   kube::test::if_has_string "${output_message}" 'error: 1 warning received'
+
+  # Delete deprecated CRD
+  kubectl delete "${kube_flags[@]}" crd deprecated.example.com
 
   set +o nounset
   set +o errexit

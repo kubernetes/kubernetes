@@ -112,16 +112,11 @@ func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 // dropStatefulSetDisabledFields drops fields that are not used if their associated feature gates
 // are not enabled.
 // The typical pattern is:
-//     if !utilfeature.DefaultFeatureGate.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
-//         newSvc.Spec.MyFeature = nil
-//     }
+//
+//	if !utilfeature.DefaultFeatureGate.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
+//	    newSvc.Spec.MyFeature = nil
+//	}
 func dropStatefulSetDisabledFields(newSS *apps.StatefulSet, oldSS *apps.StatefulSet) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) {
-		if !minReadySecondsFieldsInUse(oldSS) {
-			newSS.Spec.MinReadySeconds = int32(0)
-		}
-	}
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
 		if oldSS == nil || oldSS.Spec.PersistentVolumeClaimRetentionPolicy == nil {
 			newSS.Spec.PersistentVolumeClaimRetentionPolicy = nil
@@ -132,17 +127,6 @@ func dropStatefulSetDisabledFields(newSS *apps.StatefulSet, oldSS *apps.Stateful
 			newSS.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = nil
 		}
 	}
-}
-
-// minReadySecondsFieldsInUse returns true if fields related to StatefulSet minReadySeconds are set and
-// are greater than 0
-func minReadySecondsFieldsInUse(ss *apps.StatefulSet) bool {
-	if ss == nil {
-		return false
-	} else if ss.Spec.MinReadySeconds >= 0 {
-		return true
-	}
-	return false
 }
 
 // Validate validates a new StatefulSet.
@@ -173,9 +157,7 @@ func (statefulSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.
 	oldStatefulSet := old.(*apps.StatefulSet)
 
 	opts := pod.GetValidationOptionsFromPodTemplate(&newStatefulSet.Spec.Template, &oldStatefulSet.Spec.Template)
-	validationErrorList := validation.ValidateStatefulSet(newStatefulSet, opts)
-	updateErrorList := validation.ValidateStatefulSetUpdate(newStatefulSet, oldStatefulSet)
-	return append(validationErrorList, updateErrorList...)
+	return validation.ValidateStatefulSetUpdate(newStatefulSet, oldStatefulSet, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

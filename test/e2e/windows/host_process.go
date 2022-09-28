@@ -22,7 +22,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
+
+	semver "github.com/blang/semver/v4"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -65,7 +68,7 @@ const (
 		throw "Contents of /etc/secret/foo.txt are not as expected"
 	}
 	if ($env:NODE_NAME_TEST -ne $env:COMPUTERNAME) {
-		throw "NODE_NAME_TEST env var does not equal COMPUTERNAME"
+		throw "NODE_NAME_TEST env var ($env:NODE_NAME_TEST) does not equal COMPUTERNAME ($env:COMPUTERNAME)"
 	}
 	Write-Output "SUCCESS"`
 )
@@ -195,6 +198,29 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 	})
 
 	ginkgo.It("container command path validation", func() {
+
+		// The way hostprocess containers are created is being updated in container
+		// v1.7 to better support volume mounts and part of these changes include
+		// updates how the container's starting process is invoked.
+		// These test cases are only valid for containerd v1.6.
+		// See https://github.com/kubernetes/enhancements/blob/master/keps/sig-windows/1981-windows-privileged-container-support/README.md
+		// for more details.
+		ginkgo.By("Ensuring Windows nodes are running containerd v1.6.x")
+		windowsNode, err := findWindowsNode(f)
+		framework.ExpectNoError(err, "error finding Windows node")
+		r, v, err := getNodeContainerRuntimeAndVersion(windowsNode)
+		framework.ExpectNoError(err, "error getting node container runtime and version")
+		framework.Logf("Got runtime: %s, version %v, node: %s", r, v, windowsNode.Name)
+
+		if !strings.EqualFold(r, "containerd") {
+			e2eskipper.Skipf("container runtime is not containerd")
+		}
+
+		v1dot7 := semver.MustParse("1.7.0")
+		if v.GTE(v1dot7) {
+			e2eskipper.Skipf("container runtime is >= 1.7.0")
+		}
+
 		// The following test cases are broken into batches to speed up the test.
 		// Each batch will be scheduled as a single pod with a container for each test case.
 		// Pods will be scheduled sequentially since the start-up cost of containers is high
@@ -568,10 +594,10 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		// Note: This test performs relative comparisons to ensure metrics values were logged and does not validate specific values.
 		// This done so the test can be run in parallel with other tests which may start HostProcess containers on the same node.
 		ginkgo.By("Ensuring metrics were updated")
-		framework.ExpectEqual(beforeMetrics.StartedContainersCount < afterMetrics.StartedContainersCount, true, "Count of started HostProcess containers should increase")
-		framework.ExpectEqual(beforeMetrics.StartedContainersErrorCount < afterMetrics.StartedContainersErrorCount, true, "Count of started HostProcess errors containers should increase")
-		framework.ExpectEqual(beforeMetrics.StartedInitContainersCount < afterMetrics.StartedInitContainersCount, true, "Count of started HostProcess init containers should increase")
-		framework.ExpectEqual(beforeMetrics.StartedInitContainersErrorCount < afterMetrics.StartedInitContainersErrorCount, true, "Count of started HostProcess errors init containers should increase")
+		gomega.Expect(beforeMetrics.StartedContainersCount).To(gomega.BeNumerically("<", afterMetrics.StartedContainersCount), "Count of started HostProcess containers should increase")
+		gomega.Expect(beforeMetrics.StartedContainersErrorCount).To(gomega.BeNumerically("<", afterMetrics.StartedContainersErrorCount), "Count of started HostProcess errors containers should increase")
+		gomega.Expect(beforeMetrics.StartedInitContainersCount).To(gomega.BeNumerically("<", afterMetrics.StartedInitContainersCount), "Count of started HostProcess init containers should increase")
+		gomega.Expect(beforeMetrics.StartedInitContainersErrorCount).To(gomega.BeNumerically("<", afterMetrics.StartedInitContainersErrorCount), "Count of started HostProcess errors init containers should increase")
 	})
 
 })

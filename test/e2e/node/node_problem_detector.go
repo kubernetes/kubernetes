@@ -36,7 +36,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -60,8 +60,6 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 	})
 
 	ginkgo.It("should run without error", func() {
-		e2eskipper.SkipUnlessSSHKeyPresent()
-
 		ginkgo.By("Getting all nodes and their SSH-able IP addresses")
 		readyNodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 		framework.ExpectNoError(err)
@@ -98,6 +96,13 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 		rssStats := make(map[string][]float64)
 		workingSetStats := make(map[string][]float64)
 
+		// Some tests suites running for days.
+		// This test is not marked as Disruptive or Serial so we do not want to
+		// restart the kubelet during the test to check for KubeletStart event
+		// detection. We use heuristic here to check if we need to validate for the
+		// KubeletStart event since there is no easy way to check when test has actually started.
+		checkForKubeletStart := false
+
 		for _, host := range hosts {
 			cpuUsageStats[host] = []float64{}
 			uptimeStats[host] = []float64{}
@@ -108,33 +113,73 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 			result, err := e2essh.SSH(cmd, host, framework.TestContext.Provider)
 			isStandaloneMode[host] = (err == nil && result.Code == 0)
 
-			ginkgo.By(fmt.Sprintf("Check node %q has node-problem-detector process", host))
-			// Using brackets "[n]" is a trick to prevent grep command itself from
-			// showing up, because string text "[n]ode-problem-detector" does not
-			// match regular expression "[n]ode-problem-detector".
-			psCmd := "ps aux | grep [n]ode-problem-detector"
-			result, err = e2essh.SSH(psCmd, host, framework.TestContext.Provider)
-			framework.ExpectNoError(err)
-			framework.ExpectEqual(result.Code, 0)
-			gomega.Expect(result.Stdout).To(gomega.ContainSubstring("node-problem-detector"))
-
-			ginkgo.By(fmt.Sprintf("Check node-problem-detector is running fine on node %q", host))
-			journalctlCmd := "sudo journalctl -u node-problem-detector"
-			result, err = e2essh.SSH(journalctlCmd, host, framework.TestContext.Provider)
-			framework.ExpectNoError(err)
-			framework.ExpectEqual(result.Code, 0)
-			gomega.Expect(result.Stdout).NotTo(gomega.ContainSubstring("node-problem-detector.service: Failed"))
-
 			if isStandaloneMode[host] {
+				ginkgo.By(fmt.Sprintf("Check node %q has node-problem-detector process", host))
+				// Using brackets "[n]" is a trick to prevent grep command itself from
+				// showing up, because string text "[n]ode-problem-detector" does not
+				// match regular expression "[n]ode-problem-detector".
+				psCmd := "ps aux | grep [n]ode-problem-detector"
+				result, err = e2essh.SSH(psCmd, host, framework.TestContext.Provider)
+				framework.ExpectNoError(err)
+				framework.ExpectEqual(result.Code, 0)
+				gomega.Expect(result.Stdout).To(gomega.ContainSubstring("node-problem-detector"))
+
+				ginkgo.By(fmt.Sprintf("Check node-problem-detector is running fine on node %q", host))
+				journalctlCmd := "sudo journalctl -r -u node-problem-detector"
+				result, err = e2essh.SSH(journalctlCmd, host, framework.TestContext.Provider)
+				framework.ExpectNoError(err)
+				framework.ExpectEqual(result.Code, 0)
+				gomega.Expect(result.Stdout).NotTo(gomega.ContainSubstring("node-problem-detector.service: Failed"))
+
+				// Let's assume that node problem detector has started the same time as kubelet
+				// We only will check for the KubeletStart if parsing of date here succeed
+				// This is an optimization to not ssh one more time to get kubelet's start time.
+				// Also we assume specific datetime format to simplify the logic
+				output := result.Stdout
+
+				// searching for the line "Apr 14 04:47:42 gke-cluster-1-default-pool-b1565719-eqht systemd[1]: Started Kubernetes node problem detector." and fallback to
+				idx := strings.Index(output, "Started Kubernetes node problem detector")
+				if idx != -1 {
+					output = output[:idx]
+					idx = strings.LastIndex(output, "\n")
+
+					if idx != -1 {
+						output = output[0:15]
+					}
+
+					st, err := time.Parse("Jan 02 15:04:05", output)
+					st = st.AddDate(time.Now().Year(), 0, 0)
+
+					if err == nil {
+						checkForKubeletStart = time.Since(st) < time.Hour
+					}
+				} else {
+					// fallback to searching the line:
+					// -- Logs begin at Thu 2022-04-28 17:32:39 UTC, end at Thu 2022-04-28 17:40:05 UTC. --
+					idx := strings.Index(output, ", end at ")
+
+					output = output[:idx]
+					idx = strings.LastIndex(output, "-- Logs begin at ")
+					if idx != -1 {
+						output = output[17:]
+					}
+
+					st, err := time.Parse("Mon 2006-01-02 15:04:05 MST", output)
+
+					if err == nil {
+						checkForKubeletStart = time.Since(st) < time.Hour
+					}
+				}
+
 				cpuUsage, uptime := getCPUStat(f, host)
 				cpuUsageStats[host] = append(cpuUsageStats[host], cpuUsage)
 				uptimeStats[host] = append(uptimeStats[host], uptime)
-			}
 
+			}
 			ginkgo.By(fmt.Sprintf("Inject log to trigger DockerHung on node %q", host))
 			log := "INFO: task docker:12345 blocked for more than 120 seconds."
 			injectLogCmd := "sudo sh -c \"echo 'kernel: " + log + "' >> /dev/kmsg\""
-			_, err = e2essh.SSH(injectLogCmd, host, framework.TestContext.Provider)
+			result, err = e2essh.SSH(injectLogCmd, host, framework.TestContext.Provider)
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(result.Code, 0)
 		}
@@ -152,13 +197,19 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 				return verifyEvents(f, eventListOptions, 1, "DockerHung", node.Name)
 			}, pollTimeout, pollInterval).Should(gomega.Succeed())
 
-			// Node problem detector reports kubelet start events automatically starting from NPD v0.7.0+.
-			// Since Kubelet may be restarted for a few times after node is booted. We just check the event
-			// is detected, but do not check how many times Kubelet is started.
-			ginkgo.By(fmt.Sprintf("Check node-problem-detector posted KubeletStart event on node %q", node.Name))
-			gomega.Eventually(func() error {
-				return verifyEventExists(f, eventListOptions, "KubeletStart", node.Name)
-			}, pollTimeout, pollInterval).Should(gomega.Succeed())
+			if checkForKubeletStart {
+				// Node problem detector reports kubelet start events automatically starting from NPD v0.7.0+.
+				// Since Kubelet may be restarted for a few times after node is booted. We just check the event
+				// is detected, but do not check how many times Kubelet is started.
+				//
+				// Some test suites run for hours and KubeletStart event will already be cleaned up
+				ginkgo.By(fmt.Sprintf("Check node-problem-detector posted KubeletStart event on node %q", node.Name))
+				gomega.Eventually(func() error {
+					return verifyEventExists(f, eventListOptions, "KubeletStart", node.Name)
+				}, pollTimeout, pollInterval).Should(gomega.Succeed())
+			} else {
+				ginkgo.By("KubeletStart event will NOT be checked")
+			}
 		}
 
 		ginkgo.By("Gather node-problem-detector cpu and memory stats")

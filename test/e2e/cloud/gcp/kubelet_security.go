@@ -29,7 +29,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
@@ -67,6 +67,7 @@ var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
 	// make sure kubelet readonly (10255) and cadvisor (4194) ports are closed on the public IP address
 	disabledPorts := []int{ports.KubeletReadOnlyPort, 4194}
 	for _, port := range disabledPorts {
+		port := port
 		ginkgo.It(fmt.Sprintf("should not have port %d open on its all public IP addresses", port), func() {
 			portClosedTest(f, node, port)
 		})

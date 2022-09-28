@@ -4,8 +4,11 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	userv1 "github.com/openshift/api/user/v1"
+	applyconfigurationsuserv1 "github.com/openshift/client-go/user/applyconfigurations/user/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -99,6 +102,27 @@ func (c *FakeUsers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions,
 func (c *FakeUsers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *userv1.User, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(usersResource, name, pt, data, subresources...), &userv1.User{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*userv1.User), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied user.
+func (c *FakeUsers) Apply(ctx context.Context, user *applyconfigurationsuserv1.UserApplyConfiguration, opts v1.ApplyOptions) (result *userv1.User, err error) {
+	if user == nil {
+		return nil, fmt.Errorf("user provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(user)
+	if err != nil {
+		return nil, err
+	}
+	name := user.Name
+	if name == nil {
+		return nil, fmt.Errorf("user.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(usersResource, *name, types.ApplyPatchType, data), &userv1.User{})
 	if obj == nil {
 		return nil, err
 	}

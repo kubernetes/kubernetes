@@ -4,9 +4,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/openshift/api/user/v1"
+	userv1 "github.com/openshift/client-go/user/applyconfigurations/user/v1"
 	scheme "github.com/openshift/client-go/user/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -30,6 +33,7 @@ type GroupInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.GroupList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Group, err error)
+	Apply(ctx context.Context, group *userv1.GroupApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Group, err error)
 	GroupExpansion
 }
 
@@ -145,6 +149,31 @@ func (c *groups) Patch(ctx context.Context, name string, pt types.PatchType, dat
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied group.
+func (c *groups) Apply(ctx context.Context, group *userv1.GroupApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Group, err error) {
+	if group == nil {
+		return nil, fmt.Errorf("group provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(group)
+	if err != nil {
+		return nil, err
+	}
+	name := group.Name
+	if name == nil {
+		return nil, fmt.Errorf("group.Name must be provided to Apply")
+	}
+	result = &v1.Group{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("groups").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

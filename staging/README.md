@@ -16,9 +16,9 @@ Repositories currently staged here:
 - [`k8s.io/cluster-bootstrap`](https://github.com/kubernetes/cluster-bootstrap)
 - [`k8s.io/code-generator`](https://github.com/kubernetes/code-generator)
 - [`k8s.io/component-base`](https://github.com/kubernetes/component-base)
+- [`k8s.io/component-helpers`](https://github.com/kubernetes/component-helpers)
 - [`k8s.io/controller-manager`](https://github.com/kubernetes/controller-manager)
 - [`k8s.io/cri-api`](https://github.com/kubernetes/cri-api)
-- [`k8s.io/csi-api`](https://github.com/kubernetes/csi-api)
 - [`k8s.io/csi-translation-lib`](https://github.com/kubernetes/csi-translation-lib)
 - [`k8s.io/kube-aggregator`](https://github.com/kubernetes/kube-aggregator)
 - [`k8s.io/kube-controller-manager`](https://github.com/kubernetes/kube-controller-manager)
@@ -79,6 +79,13 @@ https://github.com/kubernetes/kubernetes-template-project.
 6. Make sure that the `.github/PULL_REQUEST_TEMPLATE.md` and
 `CONTRIBUTING.md` files mention that PRs are not directly accepted to the repo.
 
+7. Ensure that `docs.go` file is added. Refer to [#kubernetes/kubernetes#91354](https://github.com/kubernetes/kubernetes/blob/release-1.24/staging/src/k8s.io/client-go/doc.go) for reference.
+
+8. NOTE: Do not edit go.mod or go.sum in the new repo (staging/src/k8s.io/<newrepo>/) manually. Run the following instead:
+
+```
+  ./hack/update-vendor.sh
+```
 ### Creating the published repository
 
 1. Create an [issue](https://github.com/kubernetes/org/issues/new?template=repo-create.md)

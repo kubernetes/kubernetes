@@ -23,7 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -32,18 +32,16 @@ import (
 // the internalTrafficPolicy field was being defaulted in older versions. New versions stop defauting the
 // field and drop on read, but for compatibility reasons we still accept the field.
 func Test_ExternalNameServiceStopsDefaultingInternalTrafficPolicy(t *testing.T) {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	config := restclient.Config{Host: server.URL}
-	client, err := clientset.NewForConfig(&config)
+	client, err := clientset.NewForConfig(server.ClientConfig)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
-	ns := framework.CreateTestingNamespace("test-external-name-drops-internal-traffic-policy", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateNamespaceOrDie(client, "test-external-name-drops-internal-traffic-policy", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -78,18 +76,16 @@ func Test_ExternalNameServiceStopsDefaultingInternalTrafficPolicy(t *testing.T) 
 // but drops the field on read. This test exists due to historic reasons where the internalTrafficPolicy field was being defaulted
 // in older versions. New versions stop defauting the field and drop on read, but for compatibility reasons we still accept the field.
 func Test_ExternalNameServiceDropsInternalTrafficPolicy(t *testing.T) {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	config := restclient.Config{Host: server.URL}
-	client, err := clientset.NewForConfig(&config)
+	client, err := clientset.NewForConfig(server.ClientConfig)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
-	ns := framework.CreateTestingNamespace("test-external-name-drops-internal-traffic-policy", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateNamespaceOrDie(client, "test-external-name-drops-internal-traffic-policy", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
 	internalTrafficPolicy := corev1.ServiceInternalTrafficPolicyCluster
 	service := &corev1.Service{
@@ -127,18 +123,16 @@ func Test_ExternalNameServiceDropsInternalTrafficPolicy(t *testing.T) {
 // field was being defaulted in older versions. New versions stop defauting the field and drop on read, but for compatibility reasons
 // we still accept the field.
 func Test_ConvertingToExternalNameServiceDropsInternalTrafficPolicy(t *testing.T) {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	config := restclient.Config{Host: server.URL}
-	client, err := clientset.NewForConfig(&config)
+	client, err := clientset.NewForConfig(server.ClientConfig)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 
-	ns := framework.CreateTestingNamespace("test-external-name-drops-internal-traffic-policy", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateNamespaceOrDie(client, "test-external-name-drops-internal-traffic-policy", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{

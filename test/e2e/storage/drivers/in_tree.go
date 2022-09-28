@@ -43,7 +43,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -1251,6 +1251,7 @@ func InitGcePdDriver() storageframework.TestDriver {
 				storageframework.CapExec:                true,
 				storageframework.CapMultiPODs:           true,
 				storageframework.CapControllerExpansion: true,
+				storageframework.CapOfflineExpansion:    true,
 				storageframework.CapOnlineExpansion:     true,
 				storageframework.CapNodeExpansion:       true,
 				// GCE supports volume limits, but the test creates large
@@ -1536,6 +1537,7 @@ var _ storageframework.PreprovisionedVolumeTestDriver = &azureDiskDriver{}
 var _ storageframework.InlineVolumeTestDriver = &azureDiskDriver{}
 var _ storageframework.PreprovisionedPVTestDriver = &azureDiskDriver{}
 var _ storageframework.DynamicPVTestDriver = &azureDiskDriver{}
+var _ storageframework.CustomTimeoutsTestDriver = &azureDiskDriver{}
 
 // InitAzureDiskDriver returns azureDiskDriver that implements TestDriver interface
 func InitAzureDiskDriver() storageframework.TestDriver {
@@ -1702,6 +1704,7 @@ func InitAwsDriver() storageframework.TestDriver {
 				storageframework.CapMultiPODs:           true,
 				storageframework.CapControllerExpansion: true,
 				storageframework.CapNodeExpansion:       true,
+				storageframework.CapOfflineExpansion:    true,
 				storageframework.CapOnlineExpansion:     true,
 				// AWS supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
@@ -1781,7 +1784,7 @@ func (a *awsDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTe
 
 func (a *awsDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
 	zone := getInlineVolumeZone(config.Framework)
-	if volType == storageframework.InlineVolume {
+	if volType == storageframework.InlineVolume || volType == storageframework.PreprovisionedPV {
 		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
@@ -2152,4 +2155,12 @@ func (a *azureFileDriver) CreateVolume(config *storageframework.PerTestConfig, v
 func (v *azureFileVolume) DeleteVolume() {
 	err := e2epv.DeleteShare(v.accountName, v.shareName)
 	framework.ExpectNoError(err)
+}
+
+func (a *azureDiskDriver) GetTimeouts() *framework.TimeoutContext {
+	return &framework.TimeoutContext{
+		PodStart:  time.Minute * 15,
+		PodDelete: time.Minute * 15,
+		PVDelete:  time.Minute * 20,
+	}
 }

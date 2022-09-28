@@ -30,8 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
-	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/utils/pointer"
 )
 
@@ -373,15 +371,15 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 
 	invalidSeccompDefault := validPSP()
 	invalidSeccompDefault.Annotations = map[string]string{
-		seccomp.DefaultProfileAnnotationKey: "not-good",
+		seccompDefaultProfileAnnotationKey: "not-good",
 	}
 	invalidSeccompAllowAnyDefault := validPSP()
 	invalidSeccompAllowAnyDefault.Annotations = map[string]string{
-		seccomp.DefaultProfileAnnotationKey: "*",
+		seccompDefaultProfileAnnotationKey: "*",
 	}
 	invalidSeccompAllowed := validPSP()
 	invalidSeccompAllowed.Annotations = map[string]string{
-		seccomp.AllowedProfilesAnnotationKey: api.SeccompProfileRuntimeDefault + ",not-good",
+		seccompAllowedProfilesAnnotationKey: api.SeccompProfileRuntimeDefault + ",not-good",
 	}
 
 	invalidAllowedHostPathMissingPath := validPSP()
@@ -526,12 +524,12 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		"invalid allowed unsafe sysctl pattern": {
 			psp:         invalidAllowedUnsafeSysctlPattern,
 			errorType:   field.ErrorTypeInvalid,
-			errorDetail: fmt.Sprintf("must have at most 253 characters and match regex %s", SysctlPatternFmt),
+			errorDetail: fmt.Sprintf("must have at most 253 characters and match regex %s", SysctlContainSlashPatternFmt),
 		},
 		"invalid forbidden sysctl pattern": {
 			psp:         invalidForbiddenSysctlPattern,
 			errorType:   field.ErrorTypeInvalid,
-			errorDetail: fmt.Sprintf("must have at most 253 characters and match regex %s", SysctlPatternFmt),
+			errorDetail: fmt.Sprintf("must have at most 253 characters and match regex %s", SysctlContainSlashPatternFmt),
 		},
 		"invalid overlapping sysctl pattern": {
 			psp:         invalidOverlappingSysctls,
@@ -660,8 +658,8 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 
 	validSeccomp := validPSP()
 	validSeccomp.Annotations = map[string]string{
-		seccomp.DefaultProfileAnnotationKey:  api.SeccompProfileRuntimeDefault,
-		seccomp.AllowedProfilesAnnotationKey: api.SeccompProfileRuntimeDefault + ",unconfined,localhost/foo,*",
+		seccompDefaultProfileAnnotationKey:  api.SeccompProfileRuntimeDefault,
+		seccompAllowedProfilesAnnotationKey: api.SeccompProfileRuntimeDefault + ",unconfined,localhost/foo,*",
 	}
 
 	validDefaultAllowPrivilegeEscalation := validPSP()
@@ -779,7 +777,7 @@ func TestValidatePSPVolumes(t *testing.T) {
 		}
 	}
 
-	volumes := psputil.GetAllFSTypesAsSet()
+	volumes := getAllFSTypesAsSet()
 	// add in the * value since that is a pseudo type that is not included by default
 	volumes.Insert(string(policy.All))
 
@@ -807,6 +805,12 @@ func TestIsValidSysctlPattern(t *testing.T) {
 		"abc*",
 		"a.abc*",
 		"a.b.*",
+		"a/b/c/d",
+		"a/*",
+		"a/b/*",
+		"a.b/c*",
+		"a.b/c.d",
+		"a/b.c/d",
 	}
 	invalid := []string{
 		"",
@@ -825,6 +829,10 @@ func TestIsValidSysctlPattern(t *testing.T) {
 		"a*b",
 		"*a",
 		"Abc",
+		"/",
+		"a/",
+		"/a",
+		"a*/b",
 		func(n int) string {
 			x := make([]byte, n)
 			for i := range x {
@@ -834,12 +842,12 @@ func TestIsValidSysctlPattern(t *testing.T) {
 		}(256),
 	}
 	for _, s := range valid {
-		if !IsValidSysctlPattern(s, false) {
+		if !IsValidSysctlPattern(s) {
 			t.Errorf("%q expected to be a valid sysctl pattern", s)
 		}
 	}
 	for _, s := range invalid {
-		if IsValidSysctlPattern(s, false) {
+		if IsValidSysctlPattern(s) {
 			t.Errorf("%q expected to be an invalid sysctl pattern", s)
 		}
 	}

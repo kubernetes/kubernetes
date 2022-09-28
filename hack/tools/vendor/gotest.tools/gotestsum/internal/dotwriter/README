@@ -1,3 +1,0 @@
-This package contains a striped down and modified version of
-https://github.com/gosuri/uilive. The original package did not work with
-terminal colors, and had some bits that were unnecessary for gotestsum.

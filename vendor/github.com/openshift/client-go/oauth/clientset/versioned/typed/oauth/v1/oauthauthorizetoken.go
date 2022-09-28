@@ -4,9 +4,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/openshift/api/oauth/v1"
+	oauthv1 "github.com/openshift/client-go/oauth/applyconfigurations/oauth/v1"
 	scheme "github.com/openshift/client-go/oauth/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -30,6 +33,7 @@ type OAuthAuthorizeTokenInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.OAuthAuthorizeTokenList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.OAuthAuthorizeToken, err error)
+	Apply(ctx context.Context, oAuthAuthorizeToken *oauthv1.OAuthAuthorizeTokenApplyConfiguration, opts metav1.ApplyOptions) (result *v1.OAuthAuthorizeToken, err error)
 	OAuthAuthorizeTokenExpansion
 }
 
@@ -145,6 +149,31 @@ func (c *oAuthAuthorizeTokens) Patch(ctx context.Context, name string, pt types.
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied oAuthAuthorizeToken.
+func (c *oAuthAuthorizeTokens) Apply(ctx context.Context, oAuthAuthorizeToken *oauthv1.OAuthAuthorizeTokenApplyConfiguration, opts metav1.ApplyOptions) (result *v1.OAuthAuthorizeToken, err error) {
+	if oAuthAuthorizeToken == nil {
+		return nil, fmt.Errorf("oAuthAuthorizeToken provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(oAuthAuthorizeToken)
+	if err != nil {
+		return nil, err
+	}
+	name := oAuthAuthorizeToken.Name
+	if name == nil {
+		return nil, fmt.Errorf("oAuthAuthorizeToken.Name must be provided to Apply")
+	}
+	result = &v1.OAuthAuthorizeToken{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("oauthauthorizetokens").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

@@ -4,7 +4,6 @@
 package loader
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -15,6 +14,7 @@ import (
 
 	"sigs.k8s.io/kustomize/api/ifc"
 	"sigs.k8s.io/kustomize/api/internal/git"
+	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
@@ -123,7 +123,7 @@ func (fl *fileLoader) Root() string {
 func newLoaderOrDie(
 	lr LoadRestrictorFunc,
 	fSys filesys.FileSystem, path string) *fileLoader {
-	root, err := demandDirectoryRoot(fSys, path)
+	root, err := filesys.ConfirmDir(fSys, path)
 	if err != nil {
 		log.Fatalf("unable to make loader at '%s'; %v", path, err)
 	}
@@ -146,33 +146,14 @@ func newLoaderAtConfirmedDir(
 	}
 }
 
-// Assure that the given path is in fact a directory.
-func demandDirectoryRoot(
-	fSys filesys.FileSystem, path string) (filesys.ConfirmedDir, error) {
-	if path == "" {
-		return "", fmt.Errorf(
-			"loader root cannot be empty")
-	}
-	d, f, err := fSys.CleanedAbs(path)
-	if err != nil {
-		return "", err
-	}
-	if f != "" {
-		return "", fmt.Errorf(
-			"'%s' must be a directory so that it can used as a build root",
-			path)
-	}
-	return d, nil
-}
-
 // New returns a new Loader, rooted relative to current loader,
 // or rooted in a temp directory holding a git repo clone.
 func (fl *fileLoader) New(path string) (ifc.Loader, error) {
 	if path == "" {
-		return nil, fmt.Errorf("new root cannot be empty")
+		return nil, errors.Errorf("new root cannot be empty")
 	}
 
-	repoSpec, err := git.NewRepoSpecFromUrl(path)
+	repoSpec, err := git.NewRepoSpecFromURL(path)
 	if err == nil {
 		// Treat this as git repo clone request.
 		if err = fl.errIfRepoCycle(repoSpec); err != nil {
@@ -185,9 +166,9 @@ func (fl *fileLoader) New(path string) (ifc.Loader, error) {
 	if filepath.IsAbs(path) {
 		return nil, fmt.Errorf("new root '%s' cannot be absolute", path)
 	}
-	root, err := demandDirectoryRoot(fl.fSys, fl.root.Join(path))
+	root, err := filesys.ConfirmDir(fl.fSys, fl.root.Join(path))
 	if err != nil {
-		return nil, err
+		return nil, errors.WrapPrefixf(err, ErrRtNotDir.Error())
 	}
 	if err = fl.errIfGitContainmentViolation(root); err != nil {
 		return nil, err
@@ -315,11 +296,11 @@ func (fl *fileLoader) Load(path string) ([]byte, error) {
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode < 200 || resp.StatusCode > 299 {
-			_, err := git.NewRepoSpecFromUrl(path)
+			_, err := git.NewRepoSpecFromURL(path)
 			if err == nil {
-				return nil, errors.New("URL is a git repository")
+				return nil, errors.Errorf("URL is a git repository")
 			}
-			return nil, fmt.Errorf("%w: status code %d (%s)", ErrorHTTP, resp.StatusCode, http.StatusText(resp.StatusCode))
+			return nil, fmt.Errorf("%w: status code %d (%s)", ErrHTTP, resp.StatusCode, http.StatusText(resp.StatusCode))
 		}
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {

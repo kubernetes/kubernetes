@@ -49,16 +49,11 @@ const maxProbeRetries = 3
 
 // Prober helps to check the liveness/readiness/startup of a container.
 type prober struct {
-	exec execprobe.Prober
-	// probe types needs different httpprobe instances so they don't
-	// share a connection pool which can cause collisions to the
-	// same host:port and transient failures. See #49740.
-	readinessHTTP httpprobe.Prober
-	livenessHTTP  httpprobe.Prober
-	startupHTTP   httpprobe.Prober
-	tcp           tcpprobe.Prober
-	grpc          grpcprobe.Prober
-	runner        kubecontainer.CommandRunner
+	exec   execprobe.Prober
+	http   httpprobe.Prober
+	tcp    tcpprobe.Prober
+	grpc   grpcprobe.Prober
+	runner kubecontainer.CommandRunner
 
 	recorder record.EventRecorder
 }
@@ -71,14 +66,12 @@ func newProber(
 
 	const followNonLocalRedirects = false
 	return &prober{
-		exec:          execprobe.New(),
-		readinessHTTP: httpprobe.New(followNonLocalRedirects),
-		livenessHTTP:  httpprobe.New(followNonLocalRedirects),
-		startupHTTP:   httpprobe.New(followNonLocalRedirects),
-		tcp:           tcpprobe.New(),
-		grpc:          grpcprobe.New(),
-		runner:        runner,
-		recorder:      recorder,
+		exec:     execprobe.New(),
+		http:     httpprobe.New(followNonLocalRedirects),
+		tcp:      tcpprobe.New(),
+		grpc:     grpcprobe.New(),
+		runner:   runner,
+		recorder: recorder,
 	}
 }
 
@@ -179,14 +172,7 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 		url := formatURL(scheme, host, port, path)
 		headers := buildHeader(p.HTTPGet.HTTPHeaders)
 		klog.V(4).InfoS("HTTP-Probe Headers", "headers", headers)
-		switch probeType {
-		case liveness:
-			return pb.maybeProbeForBody(pb.livenessHTTP, url, headers, timeout, pod, container, probeType)
-		case startup:
-			return pb.maybeProbeForBody(pb.startupHTTP, url, headers, timeout, pod, container, probeType)
-		default:
-			return pb.maybeProbeForBody(pb.readinessHTTP, url, headers, timeout, pod, container, probeType)
-		}
+		return pb.maybeProbeForBody(pb.http, url, headers, timeout, pod, container, probeType)
 	}
 	if p.TCPSocket != nil {
 		port, err := extractPort(p.TCPSocket.Port, container)
@@ -310,7 +296,10 @@ func (eic *execInContainer) Stop() {
 func (eic *execInContainer) Start() error {
 	data, err := eic.run()
 	if eic.writer != nil {
-		eic.writer.Write(data)
+		// only record the write error, do not cover the command run error
+		if p, err := eic.writer.Write(data); err != nil {
+			klog.ErrorS(err, "Unable to write all bytes from execInContainer", "expectedBytes", len(data), "actualBytes", p)
+		}
 	}
 	return err
 }

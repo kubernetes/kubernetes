@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"testing"
 	"time"
@@ -116,12 +115,13 @@ func TestSaveVolumeData(t *testing.T) {
 	for i, tc := range testCases {
 		t.Logf("test case: %s", tc.name)
 		specVolID := fmt.Sprintf("spec-volid-%d", i)
-		mountDir := filepath.Join(getTargetPath(testPodUID, specVolID, plug.host), "/mount")
+		targetPath := getTargetPath(testPodUID, specVolID, plug.host)
+		mountDir := filepath.Join(targetPath, "mount")
 		if err := os.MkdirAll(mountDir, 0755); err != nil && !os.IsNotExist(err) {
 			t.Errorf("failed to create dir [%s]: %v", mountDir, err)
 		}
 
-		err := saveVolumeData(path.Dir(mountDir), volDataFileName, tc.data)
+		err := saveVolumeData(targetPath, volDataFileName, tc.data)
 
 		if !tc.shouldFail && err != nil {
 			t.Errorf("unexpected failure: %v", err)

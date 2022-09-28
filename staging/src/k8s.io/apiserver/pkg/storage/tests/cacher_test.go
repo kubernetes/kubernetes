@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
+	"k8s.io/apimachinery/pkg/api/apitesting"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -117,7 +117,7 @@ func newTestCacher(s storage.Interface) (*cacherstorage.Cacher, storage.Versione
 
 func newTestCacherWithClock(s storage.Interface, clock clock.Clock) (*cacherstorage.Cacher, storage.Versioner, error) {
 	prefix := "pods"
-	v := etcd3.APIObjectVersioner{}
+	v := storage.APIObjectVersioner{}
 	config := cacherstorage.Config{
 		Storage:        s,
 		Versioner:      v,

@@ -24,7 +24,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/http/httptest"
 	"path"
 	"reflect"
 	"strconv"
@@ -55,6 +54,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -64,52 +64,38 @@ import (
 	"k8s.io/client-go/tools/pager"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func setup(t testing.TB, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
+func setup(t *testing.T, groupVersions ...schema.GroupVersion) (clientset.Interface, *restclient.Config, framework.TearDownFunc) {
 	return setupWithResources(t, groupVersions, nil)
 }
 
-func setupWithOptions(t testing.TB, opts *framework.ControlPlaneConfigOptions, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
-	return setupWithResourcesWithOptions(t, opts, groupVersions, nil)
+func setupWithResources(t *testing.T, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (clientset.Interface, *restclient.Config, framework.TearDownFunc) {
+	return framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerConfig: func(config *controlplane.Config) {
+			if len(groupVersions) > 0 || len(resources) > 0 {
+				resourceConfig := controlplane.DefaultAPIResourceConfigSource()
+				resourceConfig.EnableVersions(groupVersions...)
+				resourceConfig.EnableResources(resources...)
+				config.ExtraConfig.APIResourceConfigSource = resourceConfig
+			}
+		},
+	})
 }
 
-func setupWithResources(t testing.TB, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
-	return setupWithResourcesWithOptions(t, &framework.ControlPlaneConfigOptions{}, groupVersions, resources)
-}
-
-func setupWithResourcesWithOptions(t testing.TB, opts *framework.ControlPlaneConfigOptions, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(opts)
-	if len(groupVersions) > 0 || len(resources) > 0 {
-		resourceConfig := controlplane.DefaultAPIResourceConfigSource()
-		resourceConfig.EnableVersions(groupVersions...)
-		resourceConfig.EnableResources(resources...)
-		controlPlaneConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
-	}
-	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-
-	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL, QPS: -1})
-	if err != nil {
-		t.Fatalf("Error in create clientset: %v", err)
-	}
-	return s, clientSet, closeFn
-}
-
-func verifyStatusCode(t *testing.T, verb, URL, body string, expectedStatusCode int) {
+func verifyStatusCode(t *testing.T, transport http.RoundTripper, verb, URL, body string, expectedStatusCode int) {
 	// We don't use the typed Go client to send this request to be able to verify the response status code.
 	bodyBytes := bytes.NewReader([]byte(body))
 	req, err := http.NewRequest(verb, URL, bodyBytes)
 	if err != nil {
 		t.Fatalf("unexpected error: %v in sending req with verb: %s, URL: %s and body: %s", err, verb, URL, body)
 	}
-	transport := http.DefaultTransport
 	klog.Infof("Sending request: %v", req)
 	resp, err := transport.RoundTrip(req)
 	if err != nil {
@@ -161,8 +147,8 @@ var cascDel = `
 `
 
 func Test4xxStatusCodeInvalidPatch(t *testing.T) {
-	_, client, closeFn := setup(t)
-	defer closeFn()
+	client, _, tearDownFn := setup(t)
+	defer tearDownFn()
 
 	obj := []byte(`{
 		"apiVersion": "apps/v1",
@@ -225,12 +211,10 @@ func Test4xxStatusCodeInvalidPatch(t *testing.T) {
 }
 
 func TestCacheControl(t *testing.T) {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.ControlPlaneConfigOptions{})
-	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-	instanceConfig, _, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	rt, err := restclient.TransportFor(instanceConfig.GenericAPIServer.LoopbackClientConfig)
+	rt, err := restclient.TransportFor(server.ClientConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,7 +238,7 @@ func TestCacheControl(t *testing.T) {
 	}
 	for _, path := range paths {
 		t.Run(path, func(t *testing.T) {
-			req, err := http.NewRequest("GET", instanceConfig.GenericAPIServer.LoopbackClientConfig.Host+path, nil)
+			req, err := http.NewRequest("GET", server.ClientConfig.Host+path, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -272,13 +256,10 @@ func TestCacheControl(t *testing.T) {
 
 // Tests that the apiserver returns HSTS headers as expected.
 func TestHSTS(t *testing.T) {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.ControlPlaneConfigOptions{})
-	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-	controlPlaneConfig.GenericConfig.HSTSDirectives = []string{"max-age=31536000", "includeSubDomains"}
-	instanceConfig, _, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--strict-transport-security-directives=max-age=31536000,includeSubDomains"}, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	rt, err := restclient.TransportFor(instanceConfig.GenericAPIServer.LoopbackClientConfig)
+	rt, err := restclient.TransportFor(server.ClientConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -302,7 +283,7 @@ func TestHSTS(t *testing.T) {
 	}
 	for _, path := range paths {
 		t.Run(path, func(t *testing.T) {
-			req, err := http.NewRequest("GET", instanceConfig.GenericAPIServer.LoopbackClientConfig.Host+path, nil)
+			req, err := http.NewRequest("GET", server.ClientConfig.Host+path, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -320,11 +301,16 @@ func TestHSTS(t *testing.T) {
 
 // Tests that the apiserver returns 202 status code as expected.
 func Test202StatusCode(t *testing.T) {
-	s, clientSet, closeFn := setup(t)
-	defer closeFn()
+	clientSet, kubeConfig, tearDownFn := setup(t)
+	defer tearDownFn()
 
-	ns := framework.CreateTestingNamespace("status-code", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	transport, err := restclient.TransportFor(kubeConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ns := framework.CreateNamespaceOrDie(clientSet, "status-code", t)
+	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
 
 	rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
 
@@ -334,7 +320,7 @@ func Test202StatusCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
-	verifyStatusCode(t, "DELETE", s.URL+path.Join("/apis/apps/v1/namespaces", ns.Name, "replicasets", rs.Name), "", 200)
+	verifyStatusCode(t, transport, "DELETE", kubeConfig.Host+path.Join("/apis/apps/v1/namespaces", ns.Name, "replicasets", rs.Name), "", 200)
 
 	// 2. Create the resource with a finalizer so that the resource is not immediately deleted and then delete it without setting DeleteOptions.
 	// Verify that the apiserver still returns 200 since DeleteOptions.OrphanDependents is not set.
@@ -344,7 +330,7 @@ func Test202StatusCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
-	verifyStatusCode(t, "DELETE", s.URL+path.Join("/apis/apps/v1/namespaces", ns.Name, "replicasets", rs.Name), "", 200)
+	verifyStatusCode(t, transport, "DELETE", kubeConfig.Host+path.Join("/apis/apps/v1/namespaces", ns.Name, "replicasets", rs.Name), "", 200)
 
 	// 3. Create the resource and then delete it with DeleteOptions.OrphanDependents=false.
 	// Verify that the server still returns 200 since the resource is immediately deleted.
@@ -353,7 +339,7 @@ func Test202StatusCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
-	verifyStatusCode(t, "DELETE", s.URL+path.Join("/apis/apps/v1/namespaces", ns.Name, "replicasets", rs.Name), cascDel, 200)
+	verifyStatusCode(t, transport, "DELETE", kubeConfig.Host+path.Join("/apis/apps/v1/namespaces", ns.Name, "replicasets", rs.Name), cascDel, 200)
 
 	// 4. Create the resource with a finalizer so that the resource is not immediately deleted and then delete it with DeleteOptions.OrphanDependents=false.
 	// Verify that the server returns 202 in this case.
@@ -363,7 +349,7 @@ func Test202StatusCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
-	verifyStatusCode(t, "DELETE", s.URL+path.Join("/apis/apps/v1/namespaces", ns.Name, "replicasets", rs.Name), cascDel, 202)
+	verifyStatusCode(t, transport, "DELETE", kubeConfig.Host+path.Join("/apis/apps/v1/namespaces", ns.Name, "replicasets", rs.Name), cascDel, 202)
 }
 
 var (
@@ -378,13 +364,18 @@ func TestListOptions(t *testing.T) {
 	for _, watchCacheEnabled := range []bool{true, false} {
 		t.Run(fmt.Sprintf("watchCacheEnabled=%t", watchCacheEnabled), func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
-			etcdOptions := framework.DefaultEtcdOptions()
-			etcdOptions.EnableWatchCache = watchCacheEnabled
-			s, clientSet, closeFn := setupWithOptions(t, &framework.ControlPlaneConfigOptions{EtcdOptions: etcdOptions})
-			defer closeFn()
 
-			ns := framework.CreateTestingNamespace("list-options", s, t)
-			defer framework.DeleteTestingNamespace(ns, s, t)
+			var storageTransport *storagebackend.TransportConfig
+			clientSet, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+					opts.Etcd.EnableWatchCache = watchCacheEnabled
+					storageTransport = &opts.Etcd.StorageConfig.Transport
+				},
+			})
+			defer tearDownFn()
+
+			ns := framework.CreateNamespaceOrDie(clientSet, "list-options", t)
+			defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
 
 			rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
 
@@ -410,10 +401,14 @@ func TestListOptions(t *testing.T) {
 			}
 
 			// compact some of the revision history in etcd so we can test "too old" resource versions
-			_, kvClient, err := integration.GetEtcdClients(etcdOptions.StorageConfig.Transport)
+			rawClient, kvClient, err := integration.GetEtcdClients(*storageTransport)
 			if err != nil {
 				t.Fatal(err)
 			}
+			// kvClient is a wrapper around rawClient and to avoid leaking goroutines we need to
+			// close the client (which we can do by closing rawClient).
+			defer rawClient.Close()
+
 			revision, err := strconv.Atoi(oldestUncompactedRv)
 			if err != nil {
 				t.Fatal(err)
@@ -610,13 +605,16 @@ func TestListResourceVersion0(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
-			etcdOptions := framework.DefaultEtcdOptions()
-			etcdOptions.EnableWatchCache = tc.watchCacheEnabled
-			s, clientSet, closeFn := setupWithOptions(t, &framework.ControlPlaneConfigOptions{EtcdOptions: etcdOptions})
-			defer closeFn()
 
-			ns := framework.CreateTestingNamespace("list-paging", s, t)
-			defer framework.DeleteTestingNamespace(ns, s, t)
+			clientSet, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+					opts.Etcd.EnableWatchCache = tc.watchCacheEnabled
+				},
+			})
+			defer tearDownFn()
+
+			ns := framework.CreateNamespaceOrDie(clientSet, "list-paging", t)
+			defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
 
 			rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
 
@@ -665,11 +663,11 @@ func TestListResourceVersion0(t *testing.T) {
 
 func TestAPIListChunking(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
-	s, clientSet, closeFn := setup(t)
-	defer closeFn()
+	clientSet, _, tearDownFn := setup(t)
+	defer tearDownFn()
 
-	ns := framework.CreateTestingNamespace("list-paging", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateNamespaceOrDie(clientSet, "list-paging", t)
+	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
 
 	rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
 
@@ -733,11 +731,11 @@ func TestAPIListChunking(t *testing.T) {
 
 func TestAPIListChunkingWithLabelSelector(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
-	s, clientSet, closeFn := setup(t)
-	defer closeFn()
+	clientSet, _, tearDownFn := setup(t)
+	defer tearDownFn()
 
-	ns := framework.CreateTestingNamespace("list-paging-with-label-selector", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateNamespaceOrDie(clientSet, "list-paging-with-label-selector", t)
+	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
 
 	rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
 
@@ -806,13 +804,13 @@ func makeSecret(name string) *v1.Secret {
 }
 
 func TestNameInFieldSelector(t *testing.T) {
-	s, clientSet, closeFn := setup(t)
-	defer closeFn()
+	clientSet, _, tearDownFn := setup(t)
+	defer tearDownFn()
 
 	numNamespaces := 3
 	for i := 0; i < 3; i++ {
-		ns := framework.CreateTestingNamespace(fmt.Sprintf("ns%d", i), s, t)
-		defer framework.DeleteTestingNamespace(ns, s, t)
+		ns := framework.CreateNamespaceOrDie(clientSet, fmt.Sprintf("ns%d", i), t)
+		defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
 
 		_, err := clientSet.CoreV1().Secrets(ns.Name).Create(context.TODO(), makeSecret("foo"), metav1.CreateOptions{})
 		if err != nil {
@@ -897,8 +895,8 @@ func TestMetadataClient(t *testing.T) {
 	}
 	defer tearDown()
 
-	s, clientset, closeFn := setup(t)
-	defer closeFn()
+	clientset, kubeConfig, tearDownFn := setup(t)
+	defer tearDownFn()
 
 	apiExtensionClient, err := apiextensionsclient.NewForConfig(config)
 	if err != nil {
@@ -948,12 +946,15 @@ func TestMetadataClient(t *testing.T) {
 			name: "list, get, patch, and delete via metadata client",
 			want: func(t *testing.T) {
 				ns := "metadata-builtin"
+				namespace := framework.CreateNamespaceOrDie(clientset, ns, t)
+				defer framework.DeleteNamespaceOrDie(clientset, namespace, t)
+
 				svc, err := clientset.CoreV1().Services(ns).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-1", Annotations: map[string]string{"foo": "bar"}}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create service: %v", err)
 				}
 
-				cfg := metadata.ConfigFor(&restclient.Config{Host: s.URL})
+				cfg := metadata.ConfigFor(kubeConfig)
 				wrapper := &callWrapper{}
 				cfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
 					wrapper.nested = rt
@@ -1088,6 +1089,9 @@ func TestMetadataClient(t *testing.T) {
 			name: "watch via metadata client",
 			want: func(t *testing.T) {
 				ns := "metadata-watch"
+				namespace := framework.CreateNamespaceOrDie(clientset, ns, t)
+				defer framework.DeleteNamespaceOrDie(clientset, namespace, t)
+
 				svc, err := clientset.CoreV1().Services(ns).Create(context.TODO(), &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-2", Annotations: map[string]string{"foo": "bar"}}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}}, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("unable to create service: %v", err)
@@ -1096,7 +1100,7 @@ func TestMetadataClient(t *testing.T) {
 					t.Fatalf("unable to patch cr: %v", err)
 				}
 
-				cfg := metadata.ConfigFor(&restclient.Config{Host: s.URL})
+				cfg := metadata.ConfigFor(kubeConfig)
 				wrapper := &callWrapper{}
 				cfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
 					wrapper.nested = rt
@@ -1225,8 +1229,8 @@ func TestAPICRDProtobuf(t *testing.T) {
 	}
 	defer tearDown()
 
-	s, _, closeFn := setup(t)
-	defer closeFn()
+	_, kubeConfig, tearDownFn := setup(t)
+	defer tearDownFn()
 
 	apiExtensionClient, err := apiextensionsclient.NewForConfig(config)
 	if err != nil {
@@ -1400,7 +1404,7 @@ func TestAPICRDProtobuf(t *testing.T) {
 
 			cfg := dynamic.ConfigFor(config)
 			if len(group) == 0 {
-				cfg = dynamic.ConfigFor(&restclient.Config{Host: s.URL})
+				cfg = dynamic.ConfigFor(kubeConfig)
 				cfg.APIPath = "/api"
 			} else {
 				cfg.APIPath = "/apis"
@@ -1439,9 +1443,11 @@ func TestGetSubresourcesAsTables(t *testing.T) {
 	}
 	defer tearDown()
 
-	s, clientset, closeFn := setup(t)
-	defer closeFn()
-	fmt.Printf("%#v\n", clientset)
+	clientset, kubeConfig, tearDownFn := setup(t)
+	defer tearDownFn()
+
+	ns := framework.CreateNamespaceOrDie(clientset, testNamespace, t)
+	defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
 	apiExtensionClient, err := apiextensionsclient.NewForConfig(config)
 	if err != nil {
@@ -1620,7 +1626,7 @@ func TestGetSubresourcesAsTables(t *testing.T) {
 
 			cfg := dynamic.ConfigFor(config)
 			if len(group) == 0 {
-				cfg = dynamic.ConfigFor(&restclient.Config{Host: s.URL})
+				cfg = dynamic.ConfigFor(kubeConfig)
 				cfg.APIPath = "/api"
 			} else {
 				cfg.APIPath = "/apis"
@@ -1659,8 +1665,11 @@ func TestTransform(t *testing.T) {
 	}
 	defer tearDown()
 
-	s, clientset, closeFn := setup(t)
-	defer closeFn()
+	clientset, kubeConfig, tearDownFn := setup(t)
+	defer tearDownFn()
+
+	ns := framework.CreateNamespaceOrDie(clientset, testNamespace, t)
+	defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
 	apiExtensionClient, err := apiextensionsclient.NewForConfig(config)
 	if err != nil {
@@ -2234,7 +2243,7 @@ func TestTransform(t *testing.T) {
 
 			cfg := dynamic.ConfigFor(config)
 			if len(group) == 0 {
-				cfg = dynamic.ConfigFor(&restclient.Config{Host: s.URL})
+				cfg = dynamic.ConfigFor(kubeConfig)
 				cfg.APIPath = "/api"
 			} else {
 				cfg.APIPath = "/apis"

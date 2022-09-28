@@ -7,7 +7,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/util/maps"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/group"
 	"github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/seccomp"
 	"github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/selinux"
+	"github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/sysctl"
 	"github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/user"
 	sccutil "github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/util"
 )

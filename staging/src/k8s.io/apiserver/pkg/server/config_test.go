@@ -156,6 +156,7 @@ func TestNewWithDelegate(t *testing.T) {
 		"/healthz/poststarthook/delegate-post-start-hook",
 		"/healthz/poststarthook/generic-apiserver-start-informers",
 		"/healthz/poststarthook/max-in-flight-filter",
+		"/healthz/poststarthook/storage-object-count-tracker-hook",
 		"/healthz/poststarthook/wrapping-post-start-hook",
 		"/healthz/wrapping-health",
 		"/livez",
@@ -165,6 +166,7 @@ func TestNewWithDelegate(t *testing.T) {
 		"/livez/poststarthook/delegate-post-start-hook",
 		"/livez/poststarthook/generic-apiserver-start-informers",
 		"/livez/poststarthook/max-in-flight-filter",
+		"/livez/poststarthook/storage-object-count-tracker-hook",
 		"/livez/poststarthook/wrapping-post-start-hook",
 		"/metrics",
 		"/readyz",
@@ -175,6 +177,7 @@ func TestNewWithDelegate(t *testing.T) {
 		"/readyz/poststarthook/delegate-post-start-hook",
 		"/readyz/poststarthook/generic-apiserver-start-informers",
 		"/readyz/poststarthook/max-in-flight-filter",
+		"/readyz/poststarthook/storage-object-count-tracker-hook",
 		"/readyz/poststarthook/wrapping-post-start-hook",
 		"/readyz/shutdown",
 	}
@@ -203,6 +206,7 @@ func TestNewWithDelegate(t *testing.T) {
 [-]delegate-health failed: reason withheld
 [+]poststarthook/generic-apiserver-start-informers ok
 [+]poststarthook/max-in-flight-filter ok
+[+]poststarthook/storage-object-count-tracker-hook ok
 [+]poststarthook/delegate-post-start-hook ok
 [+]poststarthook/wrapping-post-start-hook ok
 healthz check failed
@@ -287,7 +291,6 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		return &authenticator.Response{User: &user.DefaultInfo{}}, true, nil
 	})
 	backend := &testBackend{}
-	lifecycleSignals := newLifecycleSignals()
 	c := &Config{
 		Authentication:           AuthenticationInfo{Authenticator: authn},
 		AuditBackend:             backend,
@@ -298,11 +301,8 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		RequestInfoResolver:   &request.RequestInfoFactory{},
 		RequestTimeout:        10 * time.Second,
 		LongRunningFunc:       func(_ *http.Request, _ *request.RequestInfo) bool { return false },
-		lifecycleSignals:      lifecycleSignals,
+		lifecycleSignals:      newLifecycleSignals(),
 	}
-
-	// set the server as initialized
-	lifecycleSignals.HasBeenReady.Signal()
 
 	h := DefaultBuildHandlerChain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// confirm this is a no-op

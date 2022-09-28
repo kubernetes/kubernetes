@@ -44,7 +44,7 @@ kube::test::find_dirs() {
           -o -path './output/*' \
           -o -path './release/*' \
           -o -path './target/*' \
-          -o -path './test/e2e/*' \
+          -o -path './test/e2e/e2e_test.go' \
           -o -path './test/e2e_node/*' \
           -o -path './test/e2e_kubeadm/*' \
           -o -path './test/integration/*' \

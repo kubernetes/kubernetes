@@ -1,3 +1,144 @@
+## 1.19.0
+
+## Features
+- New [`HaveEach`](https://onsi.github.io/gomega/#haveeachelement-interface) matcher to ensure that each and every element in an `array`, `slice`, or `map` satisfies the passed in matcher. (#523) [9fc2ae2] (#524) [c8ba582]
+- Users can now wrap the `Gomega` interface to implement custom behavior on each assertion. (#521) [1f2e714]
+- [`ContainElement`](https://onsi.github.io/gomega/#containelementelement-interface) now accepts an additional pointer argument.  Elements that satisfy the matcher are stored in the pointer enabling developers to easily add subsequent, more detailed, assertions against the matching element. (#527) [1a4e27f]
+
+## Fixes
+- update RELEASING instructions to match ginkgo [0917cde]
+- Bump github.com/onsi/ginkgo/v2 from 2.0.0 to 2.1.3 (#519) [49ab4b0]
+- Fix CVE-2021-38561 (#534) [f1b4456]
+- Fix max number of samples in experiments on non-64-bit systems. (#528) [1c84497]
+- Remove dependency on ginkgo v1.16.4 (#530) [4dea8d5]
+- Fix for Go 1.18 (#532) [56d2a29]
+- Document precendence of timeouts (#533) [b607941]
+
+## 1.18.1
+
+## Fixes
+- Add pointer support to HaveField matcher (#495) [79e41a3]
+
+## 1.18.0
+
+## Features
+- Docs now live on the master branch in the docs folder which will make for easier PRs.  The docs also use Ginkgo 2.0's new docs html/css/js. [2570272]
+- New HaveValue matcher can handle actuals that are either values (in which case they are passed on unscathed) or pointers (in which case they are indirected).  [Docs here.](https://onsi.github.io/gomega/#working-with-values) (#485) [bdc087c]
+- Gmeasure has been declared GA [360db9d]
+
+## Fixes
+- Gomega now uses ioutil for Go 1.15 and lower (#492) - official support is only for the most recent two major versions of Go but this will unblock users who need to stay on older unsupported versions of Go. [c29c1c0]
+
+## Maintenace
+- Remove Travis workflow (#491) [72e6040]
+- Upgrade to Ginkgo 2.0.0 GA [f383637]
+- chore: fix description of HaveField matcher (#487) [2b4b2c0]
+- use tools.go to ensure Ginkgo cli dependencies are included [f58a52b]
+- remove dockerfile and simplify github actions to match ginkgo's actions [3f8160d]
+
+## 1.17.0
+
+### Features
+- Add HaveField matcher [3a26311]
+- add Error() assertions on the final error value of multi-return values (#480) [2f96943]
+- separate out offsets and timeouts (#478) [18a4723]
+- fix transformation error reporting (#479) [e001fab]
+- allow transform functions to report errors (#472) [bf93408]
+
+### Fixes
+Stop using deprecated ioutil package (#467) [07f405d]
+
+## 1.16.0
+
+### Features
+- feat: HaveHTTPStatus multiple expected values (#465) [aa69f1b]
+- feat: HaveHTTPHeaderWithValue() matcher (#463) [dd83a96]
+- feat: HaveHTTPBody matcher (#462) [504e1f2]
+- feat: formatter for HTTP responses (#461) [e5b3157]
+
+## 1.15.0
+
+### Fixes
+The previous version (1.14.0) introduced a change to allow `Eventually` and `Consistently` to support functions that make assertions.  This was accomplished by overriding the global fail handler when running the callbacks passed to `Eventually/Consistently` in order to capture any resulting errors.  Issue #457 uncovered a flaw with this approach: when multiple `Eventually`s are running concurrently they race when overriding the singleton global fail handler.
+
+1.15.0 resolves this by requiring users who want to make assertions in `Eventually/Consistently` call backs to explicitly pass in a function that takes a `Gomega` as an argument.  The passed-in `Gomega` instance can be used to make assertions.  Any failures will cause `Eventually` to retry the callback.  This cleaner interface avoids the issue of swapping out globals but comes at the cost of changing the contract introduced in v1.14.0.  As such 1.15.0 introduces a breaking change with respect to 1.14.0 - however we expect that adoption of this feature in 1.14.0 remains limited.
+
+In addition, 1.15.0 cleans up some of Gomega's internals.  Most users shouldn't notice any differences stemming from the refactoring that was made.
+
+## 1.14.0
+
+### Features
+- gmeasure.SamplingConfig now suppers a MinSamplingInterval [e94dbca]
+- Eventually and Consistently support functions that make assertions [2f04e6e]
+    - Eventually and Consistently now allow their passed-in functions to make assertions.
+    These assertions must pass or the function is considered to have failed and is retried.
+    - Eventually and Consistently can now take functions with no return values.  These implicitly return nil
+    if they contain no failed assertion.  Otherwise they return an error wrapping the first assertion failure.  This allows
+    these functions to be used with the Succeed() matcher.
+    - Introduce InterceptGomegaFailure - an analogue to InterceptGomegaFailures - that captures the first assertion failure
+    and halts execution in its passed-in callback.
+
+### Fixes
+- Call Verify GHTTPWithGomega receiver funcs (#454) [496e6fd]
+- Build a binary with an expected name (#446) [7356360]
+
+## 1.13.0
+
+### Features
+- gmeasure provides BETA support for benchmarking (#447) [8f2dfbf]
+- Set consistently and eventually defaults on init (#443) [12eb778]
+
+## 1.12.0
+
+### Features
+- Add Satisfy() matcher (#437) [c548f31]
+- tweak truncation message [3360b8c]
+- Add format.GomegaStringer (#427) [cc80b6f]
+- Add Clear() method to gbytes.Buffer [c3c0920]
+
+### Fixes
+- Fix error message in BeNumericallyMatcher (#432) [09c074a]
+- Bump github.com/onsi/ginkgo from 1.12.1 to 1.16.2 (#442) [e5f6ea0]
+- Bump github.com/golang/protobuf from 1.4.3 to 1.5.2 (#431) [adae3bf]
+- Bump golang.org/x/net (#441) [3275b35]
+
+## 1.11.0
+
+### Features
+- feature: add index to gstruct element func (#419) [334e00d]
+- feat(gexec) Add CompileTest functions. Close #410 (#411) [47c613f]
+
+### Fixes
+- Check more carefully for nils in WithTransform (#423) [3c60a15]
+- fix: typo in Makefile [b82522a]
+- Allow WithTransform function to accept a nil value (#422) [b75d2f2]
+- fix: print value type for interface{} containers (#409) [f08e2dc]
+- fix(BeElementOf): consistently flatten expected values [1fa9468]
+
+## 1.10.5
+
+### Fixes
+- fix: collections matchers should display type of expectation (#408) [6b4eb5a]
+- fix(ContainElements): consistently flatten expected values [073b880]
+- fix(ConsistOf): consistently flatten expected values [7266efe]
+
+## 1.10.4
+
+### Fixes
+- update golang net library to more recent version without vulnerability (#406) [817a8b9]
+- Correct spelling: alloted -> allotted (#403) [0bae715]
+- fix a panic in MessageWithDiff with long message (#402) [ea06b9b]
+
+## 1.10.3
+
+### Fixes
+- updates golang/x/net to fix vulnerability detected by snyk (#394) [c479356]
+
+## 1.10.2
+
+### Fixes
+- Add ExpectWithOffset, EventuallyWithOffset and ConsistentlyWithOffset to WithT (#391) [990941a]
+
 ## 1.10.1
 
 ### Fixes

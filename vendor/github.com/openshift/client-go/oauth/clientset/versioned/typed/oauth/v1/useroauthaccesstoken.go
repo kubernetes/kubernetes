@@ -4,9 +4,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/openshift/api/oauth/v1"
+	oauthv1 "github.com/openshift/client-go/oauth/applyconfigurations/oauth/v1"
 	scheme "github.com/openshift/client-go/oauth/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -30,6 +33,7 @@ type UserOAuthAccessTokenInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.UserOAuthAccessTokenList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.UserOAuthAccessToken, err error)
+	Apply(ctx context.Context, userOAuthAccessToken *oauthv1.UserOAuthAccessTokenApplyConfiguration, opts metav1.ApplyOptions) (result *v1.UserOAuthAccessToken, err error)
 	UserOAuthAccessTokenExpansion
 }
 
@@ -145,6 +149,31 @@ func (c *userOAuthAccessTokens) Patch(ctx context.Context, name string, pt types
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied userOAuthAccessToken.
+func (c *userOAuthAccessTokens) Apply(ctx context.Context, userOAuthAccessToken *oauthv1.UserOAuthAccessTokenApplyConfiguration, opts metav1.ApplyOptions) (result *v1.UserOAuthAccessToken, err error) {
+	if userOAuthAccessToken == nil {
+		return nil, fmt.Errorf("userOAuthAccessToken provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(userOAuthAccessToken)
+	if err != nil {
+		return nil, err
+	}
+	name := userOAuthAccessToken.Name
+	if name == nil {
+		return nil, fmt.Errorf("userOAuthAccessToken.Name must be provided to Apply")
+	}
+	result = &v1.UserOAuthAccessToken{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("useroauthaccesstokens").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

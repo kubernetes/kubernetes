@@ -12,7 +12,7 @@ spec:
     spec:
       containers:
       - name: netexec
-        image: k8s.gcr.io/e2e-test-images/agnhost:2.32
+        image: registry.k8s.io/e2e-test-images/agnhost:2.32
         command: ["/agnhost", "netexec"]
         ports:
         - containerPort: 8080

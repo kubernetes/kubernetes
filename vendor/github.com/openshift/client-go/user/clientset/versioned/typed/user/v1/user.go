@@ -4,9 +4,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/openshift/api/user/v1"
+	userv1 "github.com/openshift/client-go/user/applyconfigurations/user/v1"
 	scheme "github.com/openshift/client-go/user/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -30,6 +33,7 @@ type UserInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.UserList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.User, err error)
+	Apply(ctx context.Context, user *userv1.UserApplyConfiguration, opts metav1.ApplyOptions) (result *v1.User, err error)
 	UserExpansion
 }
 
@@ -145,6 +149,31 @@ func (c *users) Patch(ctx context.Context, name string, pt types.PatchType, data
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied user.
+func (c *users) Apply(ctx context.Context, user *userv1.UserApplyConfiguration, opts metav1.ApplyOptions) (result *v1.User, err error) {
+	if user == nil {
+		return nil, fmt.Errorf("user provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(user)
+	if err != nil {
+		return nil, err
+	}
+	name := user.Name
+	if name == nil {
+		return nil, fmt.Errorf("user.Name must be provided to Apply")
+	}
+	result = &v1.User{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("users").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

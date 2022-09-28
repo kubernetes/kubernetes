@@ -121,7 +121,7 @@ func InsertPathPart(path string, pos int, part string) string {
 	result := make([]string, len(parts)+1)
 	copy(result, parts[0:pos])
 	result[pos] = part
-	return PathJoin(append(result, parts[pos:]...))
+	return PathJoin(append(result, parts[pos:]...)) // nolint: makezero
 }
 
 func IsHiddenFilePath(pattern string) bool {

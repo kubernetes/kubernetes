@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/klog/v2"
 
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -35,8 +34,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
-	"k8s.io/utils/clock"
 )
 
 type eventType int
@@ -101,6 +98,8 @@ type QuotaMonitor struct {
 
 	// maintains list of evaluators
 	registry quota.Registry
+
+	updateFilter UpdateFilter
 }
 
 // NewMonitor creates a new instance of a QuotaMonitor
@@ -133,27 +132,13 @@ func (m *monitor) Run() {
 
 type monitors map[schema.GroupVersionResource]*monitor
 
+// UpdateFilter is a function that returns true if the update event should be added to the resourceChanges queue.
+type UpdateFilter func(resource schema.GroupVersionResource, oldObj, newObj interface{}) bool
+
 func (qm *QuotaMonitor) controllerFor(resource schema.GroupVersionResource) (cache.Controller, error) {
 	handlers := cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			// TODO: leaky abstraction!  live w/ it for now, but should pass down an update filter func.
-			// we only want to queue the updates we care about though as too much noise will overwhelm queue.
-			notifyUpdate := false
-			switch resource.GroupResource() {
-			case schema.GroupResource{Resource: "pods"}:
-				oldPod := oldObj.(*v1.Pod)
-				newPod := newObj.(*v1.Pod)
-				notifyUpdate = core.QuotaV1Pod(oldPod, clock.RealClock{}) && !core.QuotaV1Pod(newPod, clock.RealClock{})
-			case schema.GroupResource{Resource: "services"}:
-				oldService := oldObj.(*v1.Service)
-				newService := newObj.(*v1.Service)
-				notifyUpdate = core.GetQuotaServiceType(oldService) != core.GetQuotaServiceType(newService)
-			case schema.GroupResource{Resource: "persistentvolumeclaims"}:
-				oldPVC := oldObj.(*v1.PersistentVolumeClaim)
-				newPVC := newObj.(*v1.PersistentVolumeClaim)
-				notifyUpdate = core.RequiresQuotaReplenish(newPVC, oldPVC)
-			}
-			if notifyUpdate {
+			if qm.updateFilter != nil && qm.updateFilter(resource, oldObj, newObj) {
 				event := &event{
 					eventType: updateEvent,
 					obj:       newObj,
@@ -305,6 +290,8 @@ func (qm *QuotaMonitor) IsSynced() bool {
 // Run sets the stop channel and starts monitor execution until stopCh is
 // closed. Any running monitors will be stopped before Run returns.
 func (qm *QuotaMonitor) Run(stopCh <-chan struct{}) {
+	defer utilruntime.HandleCrash()
+
 	klog.Infof("QuotaMonitor running")
 	defer klog.Infof("QuotaMonitor stopping")
 
@@ -317,6 +304,15 @@ func (qm *QuotaMonitor) Run(stopCh <-chan struct{}) {
 	// Start monitors and begin change processing until the stop channel is
 	// closed.
 	qm.StartMonitors()
+
+	// The following workers are hanging forever until the queue is
+	// shutted down, so we need to shut it down in a separate goroutine.
+	go func() {
+		defer utilruntime.HandleCrash()
+		defer qm.resourceChanges.ShutDown()
+
+		<-stopCh
+	}()
 	wait.Until(qm.runProcessResourceChanges, 1*time.Second, stopCh)
 
 	// Stop any running monitors.

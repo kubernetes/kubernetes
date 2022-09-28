@@ -4,8 +4,11 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	userv1 "github.com/openshift/api/user/v1"
+	applyconfigurationsuserv1 "github.com/openshift/client-go/user/applyconfigurations/user/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -99,6 +102,27 @@ func (c *FakeGroups) DeleteCollection(ctx context.Context, opts v1.DeleteOptions
 func (c *FakeGroups) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *userv1.Group, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(groupsResource, name, pt, data, subresources...), &userv1.Group{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*userv1.Group), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied group.
+func (c *FakeGroups) Apply(ctx context.Context, group *applyconfigurationsuserv1.GroupApplyConfiguration, opts v1.ApplyOptions) (result *userv1.Group, err error) {
+	if group == nil {
+		return nil, fmt.Errorf("group provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(group)
+	if err != nil {
+		return nil, err
+	}
+	name := group.Name
+	if name == nil {
+		return nil, fmt.Errorf("group.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(groupsResource, *name, types.ApplyPatchType, data), &userv1.Group{})
 	if obj == nil {
 		return nil, err
 	}

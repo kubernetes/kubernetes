@@ -18,13 +18,12 @@ package defaultingressclass
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
@@ -89,6 +88,31 @@ func TestAdmission(t *testing.T) {
 		},
 	}
 
+	defaultClassWithCreateTime1 := &networkingv1.IngressClass{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "IngressClass",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "default1",
+			CreationTimestamp: metav1.NewTime(time.Date(2022, time.Month(1), 1, 0, 0, 0, 1, time.UTC)),
+			Annotations: map[string]string{
+				networkingv1.AnnotationIsDefaultIngressClass: "true",
+			},
+		},
+	}
+	defaultClassWithCreateTime2 := &networkingv1.IngressClass{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "IngressClass",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "default2",
+			CreationTimestamp: metav1.NewTime(time.Date(2022, time.Month(1), 1, 0, 0, 0, 0, time.UTC)),
+			Annotations: map[string]string{
+				networkingv1.AnnotationIsDefaultIngressClass: "true",
+			},
+		},
+	}
+
 	testCases := []struct {
 		name            string
 		classes         []*networkingv1.IngressClass
@@ -138,12 +162,12 @@ func TestAdmission(t *testing.T) {
 			expectedError:   nil,
 		},
 		{
-			name:            "two defaults, error with Ingress with class field=nil",
+			name:            "two defaults with the same creation time, choose the one with the lower name",
 			classes:         []*networkingv1.IngressClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			classField:      nil,
 			classAnnotation: nil,
-			expectedClass:   nil,
-			expectedError:   errors.NewForbidden(networkingv1.Resource("ingresses"), "testing", errors.NewInternalError(fmt.Errorf("2 default IngressClasses were found, only 1 allowed"))),
+			expectedClass:   utilpointer.StringPtr(defaultClass1.Name),
+			expectedError:   nil,
 		},
 		{
 			name:            "two defaults, no modification with Ingress with class field=''",
@@ -151,6 +175,14 @@ func TestAdmission(t *testing.T) {
 			classField:      utilpointer.StringPtr(""),
 			classAnnotation: nil,
 			expectedClass:   utilpointer.StringPtr(""),
+			expectedError:   nil,
+		},
+		{
+			name:            "two defaults, choose the one with the newer creation time",
+			classes:         []*networkingv1.IngressClass{defaultClassWithCreateTime1, defaultClassWithCreateTime2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			classField:      nil,
+			classAnnotation: nil,
+			expectedClass:   utilpointer.StringPtr(defaultClassWithCreateTime1.Name),
 			expectedError:   nil,
 		},
 	}

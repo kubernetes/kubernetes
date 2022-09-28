@@ -132,7 +132,10 @@ message RouteSpec {
   // If not specified a route name will typically be automatically
   // chosen.
   // Must follow DNS952 subdomain conventions.
+  //
   // +optional
+  // +kubebuilder:validation:MaxLength=253
+  // +kubebuilder:validation:Pattern=`^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$`
   optional string host = 1;
 
   // subdomain is a DNS subdomain that is requested within the ingress controller's
@@ -149,9 +152,14 @@ message RouteSpec {
   // `apps.mycluster.com` to have a full hostname `frontend.apps.mycluster.com`.
   //
   // +optional
+  // +kubebuilder:validation:MaxLength=253
+  // +kubebuilder:validation:Pattern=`^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$`
   optional string subdomain = 8;
 
   // path that the router watches for, to route traffic for to the service. Optional
+  //
+  // +optional
+  // +kubebuilder:validation:Pattern=`^/`
   optional string path = 2;
 
   // to is an object the route should use as the primary backend. Only the Service kind
@@ -162,6 +170,8 @@ message RouteSpec {
   // alternateBackends allows up to 3 additional backends to be assigned to the route.
   // Only the Service kind is allowed, and it will be defaulted to Service.
   // Use the weight field in RouteTargetReference object to specify relative preference.
+  //
+  // +kubebuilder:validation:MaxItems=3
   repeated RouteTargetReference alternateBackends = 4;
 
   // If specified, the port to be used by the router. Most routers will use all
@@ -174,6 +184,9 @@ message RouteSpec {
 
   // Wildcard policy if any for the route.
   // Currently only 'Subdomain' or 'None' is allowed.
+  //
+  // +kubebuilder:validation:Enum=None;Subdomain;""
+  // +kubebuilder:default=None
   optional string wildcardPolicy = 7;
 }
 
@@ -190,14 +203,22 @@ message RouteStatus {
 // kind is allowed. Use 'weight' field to emphasize one over others.
 message RouteTargetReference {
   // The kind of target that the route is referring to. Currently, only 'Service' is allowed
+  //
+  // +kubebuilder:validation:Enum=Service;""
+  // +kubebuilder:default=Service
   optional string kind = 1;
 
   // name of the service/target that is being referred to. e.g. name of the service
+  //
+  // +kubebuilder:validation:MinLength=1
   optional string name = 2;
 
   // weight as an integer between 0 and 256, default 100, that specifies the target's relative weight
   // against other target reference objects. 0 suppresses requests to this backend.
+  //
   // +optional
+  // +kubebuilder:validation:Minimum=0
+  // +kubebuilder:validation:Maximum=256
   optional int32 weight = 3;
 }
 
@@ -205,7 +226,7 @@ message RouteTargetReference {
 // generate host names and routing table entries when a routing shard is
 // allocated for a specific route.
 // Caveat: This is WIP and will likely undergo modifications when sharding
-//         support is added.
+// support is added.
 message RouterShard {
   // shardName uniquely identifies a router shard in the "set" of
   // routers used for routing traffic to the services.
@@ -222,6 +243,8 @@ message TLSConfig {
   // * edge - TLS termination is done by the router and http is used to communicate with the backend (default)
   // * passthrough - Traffic is sent straight to the destination without the router providing TLS termination
   // * reencrypt - TLS termination is done by the router and https is used to communicate with the backend
+  //
+  // +kubebuilder:validation:Enum=edge;reencrypt;passthrough
   optional string termination = 1;
 
   // certificate provides certificate contents. This should be a single serving certificate, not a certificate

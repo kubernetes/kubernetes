@@ -1,5 +1,0 @@
-Eugene Terentev <eugene@terentev.net>
-Kevin Burke <kevin@burke.dev>
-Mark Nevill <nev@improbable.io>
-Sergey Lukjanov <me@slukjanov.name>
-Wayne Ashley Berry <wayneashleyberry@gmail.com>

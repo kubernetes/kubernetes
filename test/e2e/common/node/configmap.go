@@ -29,7 +29,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("ConfigMap", func() {
@@ -223,7 +223,9 @@ var _ = SIGDescribe("ConfigMap", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(testConfigMapFound, true, "failed to find ConfigMap by label selector")
+		if !testConfigMapFound {
+			framework.Failf("failed to find ConfigMap %s/%s by label selector", testNamespaceName, testConfigMap.ObjectMeta.Name)
+		}
 
 		ginkgo.By("deleting the ConfigMap by collection with a label selector")
 		err = f.ClientSet.CoreV1().ConfigMaps(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{

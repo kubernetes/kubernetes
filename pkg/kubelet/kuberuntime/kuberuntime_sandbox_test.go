@@ -158,12 +158,6 @@ func newTestPod() *v1.Pod {
 
 func newSeccompPod(podFieldProfile, containerFieldProfile *v1.SeccompProfile, podAnnotationProfile, containerAnnotationProfile string) *v1.Pod {
 	pod := newTestPod()
-	if podAnnotationProfile != "" {
-		pod.Annotations = map[string]string{v1.SeccompPodAnnotationKey: podAnnotationProfile}
-	}
-	if containerAnnotationProfile != "" {
-		pod.Annotations = map[string]string{v1.SeccompContainerAnnotationKeyPrefix + "": containerAnnotationProfile}
-	}
 	if podFieldProfile != nil {
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
 			SeccompProfile: podFieldProfile,
@@ -344,6 +338,27 @@ func TestGeneratePodSandboxWindowsConfig(t *testing.T) {
 			},
 			expectedWindowsConfig: nil,
 			expectedError:         fmt.Errorf("pod must not contain any HostProcess containers if Pod's WindowsOptions.HostProcess is set to false"),
+		},
+		{
+			name:                      "Pod's security context doesn't specify HostProcess containers but Container's security context does",
+			hostProcessFeatureEnabled: true,
+			podSpec: &v1.PodSpec{
+				HostNetwork: true,
+				Containers: []v1.Container{{
+					Name: containerName,
+					SecurityContext: &v1.SecurityContext{
+						WindowsOptions: &v1.WindowsSecurityContextOptions{
+							HostProcess: &trueVar,
+						},
+					},
+				}},
+			},
+			expectedWindowsConfig: &runtimeapi.WindowsPodSandboxConfig{
+				SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{
+					HostProcess: true,
+				},
+			},
+			expectedError: nil,
 		},
 	}
 

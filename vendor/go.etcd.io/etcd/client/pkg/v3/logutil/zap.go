@@ -21,6 +21,17 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// CreateDefaultZapLogger creates a logger with default zap configuration
+func CreateDefaultZapLogger(level zapcore.Level) (*zap.Logger, error) {
+	lcfg := DefaultZapLoggerConfig
+	lcfg.Level = zap.NewAtomicLevelAt(level)
+	c, err := lcfg.Build()
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
 // DefaultZapLoggerConfig defines default zap logger configuration.
 var DefaultZapLoggerConfig = zap.Config{
 	Level: zap.NewAtomicLevelAt(ConvertToZapLevel(DefaultLogLevel)),

@@ -46,11 +46,10 @@ import (
 
 func TestOpenAPIV3SpecRoundTrip(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.OpenAPIV3, true)()
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.ControlPlaneConfigOptions{})
-	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-	controlPlaneConfig.GenericConfig.OpenAPIV3Config = framework.DefaultOpenAPIV3Config()
-	instanceConfig, _, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+
+	_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{})
+	defer tearDownFn()
+
 	paths := []string{
 		"/apis/apps/v1",
 		"/apis/authentication.k8s.io/v1",
@@ -60,12 +59,12 @@ func TestOpenAPIV3SpecRoundTrip(t *testing.T) {
 	}
 	for _, path := range paths {
 		t.Run(path, func(t *testing.T) {
-			rt, err := restclient.TransportFor(instanceConfig.GenericAPIServer.LoopbackClientConfig)
+			rt, err := restclient.TransportFor(kubeConfig)
 			if err != nil {
 				t.Fatal(err)
 			}
 			// attempt to fetch and unmarshal
-			url := instanceConfig.GenericAPIServer.LoopbackClientConfig.Host + "/openapi/v3" + path
+			url := kubeConfig.Host + "/openapi/v3" + path
 			req, err := http.NewRequest("GET", url, nil)
 			if err != nil {
 				t.Fatal(err)
@@ -191,17 +190,16 @@ func TestOpenAPIV3ProtoRoundtrip(t *testing.T) {
 	// See https://github.com/kubernetes/kubernetes/issues/106387 for more details
 	t.Skip("Skipping OpenAPI V3 Proto roundtrip test")
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.OpenAPIV3, true)()
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.ControlPlaneConfigOptions{})
-	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-	controlPlaneConfig.GenericConfig.OpenAPIV3Config = framework.DefaultOpenAPIV3Config()
-	instanceConfig, _, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
-	rt, err := restclient.TransportFor(instanceConfig.GenericAPIServer.LoopbackClientConfig)
+
+	_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{})
+	defer tearDownFn()
+
+	rt, err := restclient.TransportFor(kubeConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// attempt to fetch and unmarshal
-	req, err := http.NewRequest("GET", instanceConfig.GenericAPIServer.LoopbackClientConfig.Host+"/openapi/v3/apis/apps/v1", nil)
+	req, err := http.NewRequest("GET", kubeConfig.Host+"/openapi/v3/apis/apps/v1", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +218,7 @@ func TestOpenAPIV3ProtoRoundtrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	protoReq, err := http.NewRequest("GET", instanceConfig.GenericAPIServer.LoopbackClientConfig.Host+"/openapi/v3/apis/apps/v1", nil)
+	protoReq, err := http.NewRequest("GET", kubeConfig.Host+"/openapi/v3/apis/apps/v1", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

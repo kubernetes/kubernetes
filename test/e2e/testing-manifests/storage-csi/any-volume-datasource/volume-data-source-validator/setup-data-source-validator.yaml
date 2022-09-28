@@ -17,7 +17,7 @@ spec:
       serviceAccount: volume-data-source-validator
       containers:
         - name: volume-data-source-validator
-          image: k8s.gcr.io/sig-storage/volume-data-source-validator:v1.0.0
+          image: registry.k8s.io/sig-storage/volume-data-source-validator:v1.0.0
           args:
             - "--v=5"
             - "--leader-election=false"

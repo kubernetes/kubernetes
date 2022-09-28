@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 
-	"google.golang.org/grpc/attributes"
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/grpclog"
@@ -42,7 +41,7 @@ func (bb *baseBuilder) Build(cc balancer.ClientConn, opt balancer.BuildOptions) 
 		cc:            cc,
 		pickerBuilder: bb.pickerBuilder,
 
-		subConns: make(map[resolver.Address]subConnInfo),
+		subConns: resolver.NewAddressMap(),
 		scStates: make(map[balancer.SubConn]connectivity.State),
 		csEvltr:  &balancer.ConnectivityStateEvaluator{},
 		config:   bb.config,
@@ -58,11 +57,6 @@ func (bb *baseBuilder) Name() string {
 	return bb.name
 }
 
-type subConnInfo struct {
-	subConn balancer.SubConn
-	attrs   *attributes.Attributes
-}
-
 type baseBalancer struct {
 	cc            balancer.ClientConn
 	pickerBuilder PickerBuilder
@@ -70,7 +64,7 @@ type baseBalancer struct {
 	csEvltr *balancer.ConnectivityStateEvaluator
 	state   connectivity.State
 
-	subConns map[resolver.Address]subConnInfo // `attributes` is stripped from the keys of this map (the addresses)
+	subConns *resolver.AddressMap
 	scStates map[balancer.SubConn]connectivity.State
 	picker   balancer.Picker
 	config   Config
@@ -81,7 +75,7 @@ type baseBalancer struct {
 
 func (b *baseBalancer) ResolverError(err error) {
 	b.resolverErr = err
-	if len(b.subConns) == 0 {
+	if b.subConns.Len() == 0 {
 		b.state = connectivity.TransientFailure
 	}
 
@@ -105,52 +99,29 @@ func (b *baseBalancer) UpdateClientConnState(s balancer.ClientConnState) error {
 	// Successful resolution; clear resolver error and ensure we return nil.
 	b.resolverErr = nil
 	// addrsSet is the set converted from addrs, it's used for quick lookup of an address.
-	addrsSet := make(map[resolver.Address]struct{})
+	addrsSet := resolver.NewAddressMap()
 	for _, a := range s.ResolverState.Addresses {
-		// Strip attributes from addresses before using them as map keys. So
-		// that when two addresses only differ in attributes pointers (but with
-		// the same attribute content), they are considered the same address.
-		//
-		// Note that this doesn't handle the case where the attribute content is
-		// different. So if users want to set different attributes to create
-		// duplicate connections to the same backend, it doesn't work. This is
-		// fine for now, because duplicate is done by setting Metadata today.
-		//
-		// TODO: read attributes to handle duplicate connections.
-		aNoAttrs := a
-		aNoAttrs.Attributes = nil
-		addrsSet[aNoAttrs] = struct{}{}
-		if scInfo, ok := b.subConns[aNoAttrs]; !ok {
+		addrsSet.Set(a, nil)
+		if _, ok := b.subConns.Get(a); !ok {
 			// a is a new address (not existing in b.subConns).
-			//
-			// When creating SubConn, the original address with attributes is
-			// passed through. So that connection configurations in attributes
-			// (like creds) will be used.
 			sc, err := b.cc.NewSubConn([]resolver.Address{a}, balancer.NewSubConnOptions{HealthCheckEnabled: b.config.HealthCheck})
 			if err != nil {
 				logger.Warningf("base.baseBalancer: failed to create new SubConn: %v", err)
 				continue
 			}
-			b.subConns[aNoAttrs] = subConnInfo{subConn: sc, attrs: a.Attributes}
+			b.subConns.Set(a, sc)
 			b.scStates[sc] = connectivity.Idle
+			b.csEvltr.RecordTransition(connectivity.Shutdown, connectivity.Idle)
 			sc.Connect()
-		} else {
-			// Always update the subconn's address in case the attributes
-			// changed.
-			//
-			// The SubConn does a reflect.DeepEqual of the new and old
-			// addresses. So this is a noop if the current address is the same
-			// as the old one (including attributes).
-			scInfo.attrs = a.Attributes
-			b.subConns[aNoAttrs] = scInfo
-			b.cc.UpdateAddresses(scInfo.subConn, []resolver.Address{a})
 		}
 	}
-	for a, scInfo := range b.subConns {
+	for _, a := range b.subConns.Keys() {
+		sci, _ := b.subConns.Get(a)
+		sc := sci.(balancer.SubConn)
 		// a was removed by resolver.
-		if _, ok := addrsSet[a]; !ok {
-			b.cc.RemoveSubConn(scInfo.subConn)
-			delete(b.subConns, a)
+		if _, ok := addrsSet.Get(a); !ok {
+			b.cc.RemoveSubConn(sc)
+			b.subConns.Delete(a)
 			// Keep the state of this sc in b.scStates until sc's state becomes Shutdown.
 			// The entry will be deleted in UpdateSubConnState.
 		}
@@ -192,10 +163,11 @@ func (b *baseBalancer) regeneratePicker() {
 	readySCs := make(map[balancer.SubConn]SubConnInfo)
 
 	// Filter out all ready SCs from full subConn map.
-	for addr, scInfo := range b.subConns {
-		if st, ok := b.scStates[scInfo.subConn]; ok && st == connectivity.Ready {
-			addr.Attributes = scInfo.attrs
-			readySCs[scInfo.subConn] = SubConnInfo{Address: addr}
+	for _, addr := range b.subConns.Keys() {
+		sci, _ := b.subConns.Get(addr)
+		sc := sci.(balancer.SubConn)
+		if st, ok := b.scStates[sc]; ok && st == connectivity.Ready {
+			readySCs[sc] = SubConnInfo{Address: addr}
 		}
 	}
 	b.picker = b.pickerBuilder.Build(PickerBuildInfo{ReadySCs: readySCs})
@@ -213,10 +185,14 @@ func (b *baseBalancer) UpdateSubConnState(sc balancer.SubConn, state balancer.Su
 		}
 		return
 	}
-	if oldS == connectivity.TransientFailure && s == connectivity.Connecting {
-		// Once a subconn enters TRANSIENT_FAILURE, ignore subsequent
+	if oldS == connectivity.TransientFailure &&
+		(s == connectivity.Connecting || s == connectivity.Idle) {
+		// Once a subconn enters TRANSIENT_FAILURE, ignore subsequent IDLE or
 		// CONNECTING transitions to prevent the aggregated state from being
 		// always CONNECTING when many backends exist but are all down.
+		if s == connectivity.Idle {
+			sc.Connect()
+		}
 		return
 	}
 	b.scStates[sc] = s
@@ -242,13 +218,17 @@ func (b *baseBalancer) UpdateSubConnState(sc balancer.SubConn, state balancer.Su
 		b.state == connectivity.TransientFailure {
 		b.regeneratePicker()
 	}
-
 	b.cc.UpdateState(balancer.State{ConnectivityState: b.state, Picker: b.picker})
 }
 
 // Close is a nop because base balancer doesn't have internal state to clean up,
 // and it doesn't need to call RemoveSubConn for the SubConns.
 func (b *baseBalancer) Close() {
+}
+
+// ExitIdle is a nop because the base balancer attempts to stay connected to
+// all SubConns at all times.
+func (b *baseBalancer) ExitIdle() {
 }
 
 // NewErrPicker returns a Picker that always returns err on Pick().

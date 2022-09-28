@@ -77,6 +77,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 		}
 
 		body, err := limitedReadBody(req, scope.MaxRequestBodyBytes)
+		trace.Step("limitedReadBody done", utiltrace.Field{"len", len(body)}, utiltrace.Field{"err", err})
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -190,6 +191,15 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			})
 		}
 
+		// Ignore changes that only affect managed fields
+		// timestamps. FieldManager can't know about changes
+		// like normalized fields, defaulted fields and other
+		// mutations.
+		// Only makes sense when SSA field manager is being used
+		if scope.FieldManager != nil {
+			transformers = append(transformers, fieldmanager.IgnoreManagedFieldsTimestampsTransformer)
+		}
+
 		createAuthorizerAttributes := authorizer.AttributesRecord{
 			User:            userInfo,
 			ResourceRequest: true,
@@ -238,11 +248,11 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			}
 			return result, err
 		})
+		trace.Step("Write to database call finished", utiltrace.Field{"len", len(body)}, utiltrace.Field{"err", err})
 		if err != nil {
 			scope.err(err, w, req)
 			return
 		}
-		trace.Step("Object stored in database")
 
 		status := http.StatusOK
 		if wasCreated {

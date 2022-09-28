@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"context"
+
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -100,7 +101,10 @@ type HistogramVec struct {
 
 // NewHistogramVec returns an object which satisfies kubeCollector and wraps the
 // prometheus.HistogramVec object. However, the object returned will not measure
-// anything unless the collector is first registered, since the metric is lazily instantiated.
+// anything unless the collector is first registered, since the metric is lazily instantiated,
+// and only members extracted after
+// registration will actually measure anything.
+
 func NewHistogramVec(opts *HistogramOpts, labels []string) *HistogramVec {
 	opts.StabilityLevel.setDefaults()
 
@@ -136,13 +140,16 @@ func (v *HistogramVec) initializeDeprecatedMetric() {
 	v.initializeMetric()
 }
 
-// Default Prometheus behavior actually results in the creation of a new metric
-// if a metric with the unique label values is not found in the underlying stored metricMap.
+// Default Prometheus Vec behavior is that member extraction results in creation of a new element
+// if one with the unique label values is not found in the underlying stored metricMap.
 // This means  that if this function is called but the underlying metric is not registered
 // (which means it will never be exposed externally nor consumed), the metric will exist in memory
 // for perpetuity (i.e. throughout application lifecycle).
 //
 // For reference: https://github.com/prometheus/client_golang/blob/v0.9.2/prometheus/histogram.go#L460-L470
+//
+// In contrast, the Vec behavior in this package is that member extraction before registration
+// returns a permanent noop object.
 
 // WithLabelValues returns the ObserverMetric for the given slice of label
 // values (same order as the VariableLabels in Desc). If that combination of

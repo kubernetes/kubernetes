@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -377,7 +378,7 @@ var (
 	errInjectedFilterStatus = errors.New("injected filter status")
 )
 
-func newFrameworkWithQueueSortAndBind(r Registry, profile config.KubeSchedulerProfile, opts ...Option) (framework.Framework, error) {
+func newFrameworkWithQueueSortAndBind(r Registry, profile config.KubeSchedulerProfile, stopCh <-chan struct{}, opts ...Option) (framework.Framework, error) {
 	if _, ok := r[queueSortPlugin]; !ok {
 		r[queueSortPlugin] = newQueueSortPlugin
 	}
@@ -391,7 +392,7 @@ func newFrameworkWithQueueSortAndBind(r Registry, profile config.KubeSchedulerPr
 	if len(profile.Plugins.Bind.Enabled) == 0 {
 		profile.Plugins.Bind.Enabled = append(profile.Plugins.Bind.Enabled, config.Plugin{Name: bindPlugin})
 	}
-	return NewFramework(r, &profile, opts...)
+	return NewFramework(r, &profile, stopCh, opts...)
 }
 
 func TestInitFrameworkWithScorePlugins(t *testing.T) {
@@ -432,7 +433,9 @@ func TestInitFrameworkWithScorePlugins(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			profile := config.KubeSchedulerProfile{Plugins: tt.plugins}
-			_, err := newFrameworkWithQueueSortAndBind(registry, profile)
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+			_, err := newFrameworkWithQueueSortAndBind(registry, profile, stopCh)
 			if tt.initErr && err == nil {
 				t.Fatal("Framework initialization should fail")
 			}
@@ -488,7 +491,7 @@ func TestNewFrameworkErrors(t *testing.T) {
 				Plugins:      tc.plugins,
 				PluginConfig: tc.pluginCfg,
 			}
-			_, err := NewFramework(registry, profile)
+			_, err := NewFramework(registry, profile, wait.NeverStop)
 			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
 				t.Errorf("Unexpected error, got %v, expect: %s", err, tc.wantErr)
 			}
@@ -796,7 +799,9 @@ func TestNewFrameworkMultiPointExpansion(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			fw, err := NewFramework(registry, &config.KubeSchedulerProfile{Plugins: tc.plugins})
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+			fw, err := NewFramework(registry, &config.KubeSchedulerProfile{Plugins: tc.plugins}, stopCh)
 			if err != nil {
 				if tc.wantErr == "" || !strings.Contains(err.Error(), tc.wantErr) {
 					t.Fatalf("Unexpected error, got %v, expect: %s", err, tc.wantErr)
@@ -961,7 +966,9 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 
 			got := make(map[framework.ClusterEvent]sets.String)
 			profile := config.KubeSchedulerProfile{Plugins: cfgPls}
-			_, err := newFrameworkWithQueueSortAndBind(registry, profile, WithClusterEventMap(got))
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+			_, err := newFrameworkWithQueueSortAndBind(registry, profile, stopCh, WithClusterEventMap(got))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1166,12 +1173,14 @@ func TestRunScorePlugins(t *testing.T) {
 				Plugins:      tt.plugins,
 				PluginConfig: tt.pluginConfigs,
 			}
-			f, err := newFrameworkWithQueueSortAndBind(registry, profile)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			f, err := newFrameworkWithQueueSortAndBind(registry, profile, ctx.Done())
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
 
-			res, status := f.RunScorePlugins(context.Background(), state, pod, nodes)
+			res, status := f.RunScorePlugins(ctx, state, pod, nodes)
 
 			if tt.err {
 				if status.IsSuccess() {
@@ -1205,13 +1214,16 @@ func TestPreFilterPlugins(t *testing.T) {
 	plugins := &config.Plugins{PreFilter: config.PluginSet{Enabled: []config.Plugin{{Name: preFilterWithExtensionsPluginName}, {Name: preFilterPluginName}}}}
 	t.Run("TestPreFilterPlugin", func(t *testing.T) {
 		profile := config.KubeSchedulerProfile{Plugins: plugins}
-		f, err := newFrameworkWithQueueSortAndBind(r, profile)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		f, err := newFrameworkWithQueueSortAndBind(r, profile, ctx.Done())
 		if err != nil {
 			t.Fatalf("Failed to create framework for testing: %v", err)
 		}
-		f.RunPreFilterPlugins(context.Background(), nil, nil)
-		f.RunPreFilterExtensionAddPod(context.Background(), nil, nil, nil, nil)
-		f.RunPreFilterExtensionRemovePod(context.Background(), nil, nil, nil, nil)
+		f.RunPreFilterPlugins(ctx, nil, nil)
+		f.RunPreFilterExtensionAddPod(ctx, nil, nil, nil, nil)
+		f.RunPreFilterExtensionRemovePod(ctx, nil, nil, nil, nil)
 
 		if preFilter1.PreFilterCalled != 1 {
 			t.Errorf("preFilter1 called %v, expected: 1", preFilter1.PreFilterCalled)
@@ -1395,11 +1407,13 @@ func TestFilterPlugins(t *testing.T) {
 					config.Plugin{Name: pl.name})
 			}
 			profile := config.KubeSchedulerProfile{Plugins: cfgPls}
-			f, err := newFrameworkWithQueueSortAndBind(registry, profile)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			f, err := newFrameworkWithQueueSortAndBind(registry, profile, ctx.Done())
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
-			gotStatusMap := f.RunFilterPlugins(context.TODO(), nil, pod, nil)
+			gotStatusMap := f.RunFilterPlugins(ctx, nil, pod, nil)
 			gotStatus := gotStatusMap.Merge()
 			if !reflect.DeepEqual(gotStatus, tt.wantStatus) {
 				t.Errorf("wrong status code. got: %v, want:%v", gotStatus, tt.wantStatus)
@@ -1477,11 +1491,13 @@ func TestPostFilterPlugins(t *testing.T) {
 				)
 			}
 			profile := config.KubeSchedulerProfile{Plugins: cfgPls}
-			f, err := newFrameworkWithQueueSortAndBind(registry, profile)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			f, err := newFrameworkWithQueueSortAndBind(registry, profile, ctx.Done())
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
-			_, gotStatus := f.RunPostFilterPlugins(context.TODO(), nil, pod, nil)
+			_, gotStatus := f.RunPostFilterPlugins(ctx, nil, pod, nil)
 			if !reflect.DeepEqual(gotStatus, tt.wantStatus) {
 				t.Errorf("Unexpected status. got: %v, want: %v", gotStatus, tt.wantStatus)
 			}
@@ -1624,12 +1640,14 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 					&framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: nodeName})
 			}
 			profile := config.KubeSchedulerProfile{Plugins: cfgPls}
-			f, err := newFrameworkWithQueueSortAndBind(registry, profile, WithPodNominator(podNominator))
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			f, err := newFrameworkWithQueueSortAndBind(registry, profile, ctx.Done(), WithPodNominator(podNominator))
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
 			tt.nodeInfo.SetNode(tt.node)
-			gotStatus := f.RunFilterPluginsWithNominatedPods(context.TODO(), nil, tt.pod, tt.nodeInfo)
+			gotStatus := f.RunFilterPluginsWithNominatedPods(ctx, nil, tt.pod, tt.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, tt.wantStatus) {
 				t.Errorf("Unexpected status. got: %v, want: %v", gotStatus, tt.wantStatus)
 			}
@@ -1779,12 +1797,14 @@ func TestPreBindPlugins(t *testing.T) {
 				)
 			}
 			profile := config.KubeSchedulerProfile{Plugins: configPlugins}
-			f, err := newFrameworkWithQueueSortAndBind(registry, profile)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			f, err := newFrameworkWithQueueSortAndBind(registry, profile, ctx.Done())
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
 
-			status := f.RunPreBindPlugins(context.TODO(), nil, pod, "")
+			status := f.RunPreBindPlugins(ctx, nil, pod, "")
 
 			if !reflect.DeepEqual(status, tt.wantStatus) {
 				t.Errorf("wrong status code. got %v, want %v", status, tt.wantStatus)
@@ -1935,12 +1955,14 @@ func TestReservePlugins(t *testing.T) {
 				)
 			}
 			profile := config.KubeSchedulerProfile{Plugins: configPlugins}
-			f, err := newFrameworkWithQueueSortAndBind(registry, profile)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			f, err := newFrameworkWithQueueSortAndBind(registry, profile, ctx.Done())
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
 
-			status := f.RunReservePluginsReserve(context.TODO(), nil, pod, "")
+			status := f.RunReservePluginsReserve(ctx, nil, pod, "")
 
 			if !reflect.DeepEqual(status, tt.wantStatus) {
 				t.Errorf("wrong status code. got %v, want %v", status, tt.wantStatus)
@@ -2059,12 +2081,14 @@ func TestPermitPlugins(t *testing.T) {
 				)
 			}
 			profile := config.KubeSchedulerProfile{Plugins: configPlugins}
-			f, err := newFrameworkWithQueueSortAndBind(registry, profile)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			f, err := newFrameworkWithQueueSortAndBind(registry, profile, ctx.Done())
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
 
-			status := f.RunPermitPlugins(context.TODO(), nil, pod, "")
+			status := f.RunPermitPlugins(ctx, nil, pod, "")
 
 			if !reflect.DeepEqual(status, tt.want) {
 				t.Errorf("wrong status code. got %v, want %v", status, tt.want)
@@ -2228,20 +2252,23 @@ func TestRecordingMetrics(t *testing.T) {
 				Bind:      pluginSet,
 				PostBind:  pluginSet,
 			}
-			recorder := newMetricsRecorder(100, time.Nanosecond)
+
+			stopCh := make(chan struct{})
+			recorder := newMetricsRecorder(100, time.Nanosecond, stopCh)
 			profile := config.KubeSchedulerProfile{
 				SchedulerName: testProfileName,
 				Plugins:       plugins,
 			}
-			f, err := newFrameworkWithQueueSortAndBind(r, profile, withMetricsRecorder(recorder))
+			f, err := newFrameworkWithQueueSortAndBind(r, profile, stopCh, withMetricsRecorder(recorder))
 			if err != nil {
+				close(stopCh)
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
 
 			tt.action(f)
 
 			// Stop the goroutine which records metrics and ensure it's stopped.
-			close(recorder.stopCh)
+			close(stopCh)
 			<-recorder.isStoppedCh
 			// Try to clean up the metrics buffer again in case it's not empty.
 			recorder.flushMetrics()
@@ -2337,13 +2364,15 @@ func TestRunBindPlugins(t *testing.T) {
 				pluginSet.Enabled = append(pluginSet.Enabled, config.Plugin{Name: name})
 			}
 			plugins := &config.Plugins{Bind: pluginSet}
-			recorder := newMetricsRecorder(100, time.Nanosecond)
+			stopCh := make(chan struct{})
+			recorder := newMetricsRecorder(100, time.Nanosecond, stopCh)
 			profile := config.KubeSchedulerProfile{
 				SchedulerName: testProfileName,
 				Plugins:       plugins,
 			}
-			fwk, err := newFrameworkWithQueueSortAndBind(r, profile, withMetricsRecorder(recorder))
+			fwk, err := newFrameworkWithQueueSortAndBind(r, profile, stopCh, withMetricsRecorder(recorder))
 			if err != nil {
+				close(stopCh)
 				t.Fatal(err)
 			}
 
@@ -2353,7 +2382,7 @@ func TestRunBindPlugins(t *testing.T) {
 			}
 
 			// Stop the goroutine which records metrics and ensure it's stopped.
-			close(recorder.stopCh)
+			close(stopCh)
 			<-recorder.isStoppedCh
 			// Try to clean up the metrics buffer again in case it's not empty.
 			recorder.flushMetrics()
@@ -2396,13 +2425,15 @@ func TestPermitWaitDurationMetric(t *testing.T) {
 				Permit: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
 			}
 			profile := config.KubeSchedulerProfile{Plugins: plugins}
-			f, err := newFrameworkWithQueueSortAndBind(r, profile)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			f, err := newFrameworkWithQueueSortAndBind(r, profile, ctx.Done())
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
 
-			f.RunPermitPlugins(context.TODO(), nil, pod, "")
-			f.WaitOnPermit(context.TODO(), pod)
+			f.RunPermitPlugins(ctx, nil, pod, "")
+			f.WaitOnPermit(ctx, pod)
 
 			collectAndComparePermitWaitDuration(t, tt.wantRes)
 		})
@@ -2450,12 +2481,14 @@ func TestWaitOnPermit(t *testing.T) {
 				Permit: config.PluginSet{Enabled: []config.Plugin{{Name: permitPlugin, Weight: 1}}},
 			}
 			profile := config.KubeSchedulerProfile{Plugins: plugins}
-			f, err := newFrameworkWithQueueSortAndBind(r, profile)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			f, err := newFrameworkWithQueueSortAndBind(r, profile, ctx.Done())
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
 
-			runPermitPluginsStatus := f.RunPermitPlugins(context.Background(), nil, pod, "")
+			runPermitPluginsStatus := f.RunPermitPlugins(ctx, nil, pod, "")
 			if runPermitPluginsStatus.Code() != framework.Wait {
 				t.Fatalf("Expected RunPermitPlugins to return status %v, but got %v",
 					framework.Wait, runPermitPluginsStatus.Code())
@@ -2463,7 +2496,7 @@ func TestWaitOnPermit(t *testing.T) {
 
 			go tt.action(f)
 
-			got := f.WaitOnPermit(context.Background(), pod)
+			got := f.WaitOnPermit(ctx, pod)
 			if !reflect.DeepEqual(tt.want, got) {
 				t.Errorf("Unexpected status: want %v, but got %v", tt.want, got)
 			}
@@ -2501,7 +2534,9 @@ func TestListPlugins(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			profile := config.KubeSchedulerProfile{Plugins: tt.plugins}
-			f, err := newFrameworkWithQueueSortAndBind(registry, profile)
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+			f, err := newFrameworkWithQueueSortAndBind(registry, profile, stopCh)
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}

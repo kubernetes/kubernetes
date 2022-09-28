@@ -99,7 +99,7 @@ func assertEqualTypes(t *testing.T, path []string, a, b reflect.Type) {
 			path = path[:len(path)-1]
 		}
 
-	case reflect.Ptr, reflect.Slice:
+	case reflect.Pointer, reflect.Slice:
 		aElemType := a.Elem()
 		bElemType := b.Elem()
 		assertEqualTypes(t, path, aElemType, bElemType)
@@ -170,14 +170,14 @@ func fillField(field reflect.Value, v int) {
 		field.Set(slice)
 		first := slice.Index(0)
 
-		if first.Type().Kind() == reflect.Ptr {
+		if first.Type().Kind() == reflect.Pointer {
 			first.Set(reflect.New(first.Type().Elem()))
 			fillFieldsOffset(first.Interface(), v)
 		} else {
 			fillField(first, v)
 		}
 
-	case reflect.Ptr:
+	case reflect.Pointer:
 		val := reflect.New(field.Type().Elem())
 		field.Set(val)
 		fillFieldsOffset(field.Interface(), v)

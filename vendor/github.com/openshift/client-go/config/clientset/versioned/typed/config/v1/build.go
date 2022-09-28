@@ -4,9 +4,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
 	scheme "github.com/openshift/client-go/config/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -30,6 +33,7 @@ type BuildInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.BuildList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Build, err error)
+	Apply(ctx context.Context, build *configv1.BuildApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Build, err error)
 	BuildExpansion
 }
 
@@ -145,6 +149,31 @@ func (c *builds) Patch(ctx context.Context, name string, pt types.PatchType, dat
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied build.
+func (c *builds) Apply(ctx context.Context, build *configv1.BuildApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Build, err error) {
+	if build == nil {
+		return nil, fmt.Errorf("build provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(build)
+	if err != nil {
+		return nil, err
+	}
+	name := build.Name
+	if name == nil {
+		return nil, fmt.Errorf("build.Name must be provided to Apply")
+	}
+	result = &v1.Build{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("builds").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

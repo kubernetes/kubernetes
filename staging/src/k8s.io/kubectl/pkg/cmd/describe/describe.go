@@ -110,6 +110,7 @@ func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericclioptions.
 		ValidArgsFunction:     completion.ResourceTypeAndNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
@@ -148,7 +149,7 @@ func (o *DescribeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	return nil
 }
 
-func (o *DescribeOptions) Validate(args []string) error {
+func (o *DescribeOptions) Validate() error {
 	return nil
 }
 

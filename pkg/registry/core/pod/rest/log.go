@@ -51,6 +51,12 @@ func (r *LogREST) New() runtime.Object {
 	return &api.Pod{}
 }
 
+// Destroy cleans up resources on shutdown.
+func (r *LogREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
+}
+
 // ProducesMIMETypes returns a list of the MIME types the specified HTTP verb (GET, POST, DELETE,
 // PATCH) can respond with.
 func (r *LogREST) ProducesMIMETypes(verb string) []string {

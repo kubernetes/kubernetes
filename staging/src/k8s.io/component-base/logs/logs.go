@@ -26,10 +26,10 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 )
 
-const logFlushFreqFlagName = "log-flush-frequency"
 const deprecated = "will be removed in a future release, see https://github.com/kubernetes/enhancements/tree/master/keps/sig-instrumentation/2845-deprecate-klog-specific-flags-in-k8s-components"
 
 // TODO (https://github.com/kubernetes/kubernetes/issues/105310): once klog
@@ -43,13 +43,12 @@ var (
 
 	// Periodic flushing gets configured either via the global flag
 	// in this file or via LoggingConfiguration.
-	logFlushFreq      time.Duration
-	logFlushFreqAdded bool
+	logFlushFreq time.Duration
 )
 
 func init() {
 	klog.InitFlags(packageFlags)
-	packageFlags.DurationVar(&logFlushFreq, logFlushFreqFlagName, 5*time.Second, "Maximum number of seconds between log flushes")
+	packageFlags.DurationVar(&logFlushFreq, logsapi.LogFlushFreqFlagName, logsapi.LogFlushFreqDefault, "Maximum number of seconds between log flushes")
 }
 
 type addFlagsOptions struct {
@@ -66,6 +65,13 @@ func SkipLoggingConfigurationFlags() Option {
 		o.skipLoggingConfigurationFlags = true
 	}
 }
+
+// Options is an alias for LoggingConfiguration to comply with component-base
+// conventions.
+type Options = logsapi.LoggingConfiguration
+
+// NewOptions is an alias for NewLoggingConfiguration.
+var NewOptions = logsapi.NewLoggingConfiguration
 
 // AddFlags registers this package's flags on arbitrary FlagSets. This includes
 // the klog flags, with the original underscore as separator between. If
@@ -95,12 +101,11 @@ func AddFlags(fs *pflag.FlagSet, opts ...Option) {
 			if o.skipLoggingConfigurationFlags {
 				return
 			}
-		case logFlushFreqFlagName:
+		case logsapi.LogFlushFreqFlagName:
 			// unchanged, potentially skip it
 			if o.skipLoggingConfigurationFlags {
 				return
 			}
-			logFlushFreqAdded = true
 		case "vmodule":
 			// TODO: see above
 			// pf.Usage += vmoduleUsage
@@ -137,12 +142,11 @@ func AddGoFlags(fs *flag.FlagSet, opts ...Option) {
 			if o.skipLoggingConfigurationFlags {
 				return
 			}
-		case logFlushFreqFlagName:
+		case logsapi.LogFlushFreqFlagName:
 			// unchanged
 			if o.skipLoggingConfigurationFlags {
 				return
 			}
-			logFlushFreqAdded = true
 		case "vmodule":
 			// TODO: see above
 			// usage += vmoduleUsage
@@ -172,20 +176,20 @@ func (writer KlogWriter) Write(data []byte) (n int, err error) {
 // InitLogs disables support for contextual logging in klog while
 // that Kubernetes feature is not considered stable yet. Commands
 // which want to support contextual logging can:
-// - call klog.EnableContextualLogging after calling InitLogs,
-//   with a fixed `true` or depending on some command line flag or
-//   a feature gate check
-// - set up a FeatureGate instance, the advanced logging configuration
-//   with Options and call Options.ValidateAndApply with the FeatureGate;
-//   k8s.io/component-base/logs/example/cmd demonstrates how to do that
+//   - call klog.EnableContextualLogging after calling InitLogs,
+//     with a fixed `true` or depending on some command line flag or
+//     a feature gate check
+//   - set up a FeatureGate instance, the advanced logging configuration
+//     with Options and call Options.ValidateAndApply with the FeatureGate;
+//     k8s.io/component-base/logs/example/cmd demonstrates how to do that
 func InitLogs() {
 	log.SetOutput(KlogWriter{})
 	log.SetFlags(0)
-	if logFlushFreqAdded {
-		// The flag from this file was activated, so use it now.
-		// Otherwise LoggingConfiguration.Apply will do this.
-		klog.StartFlushDaemon(logFlushFreq)
-	}
+
+	// Start flushing now. If LoggingConfiguration.ApplyAndValidate is
+	// used, it will restart the daemon with the log flush interval defined
+	// there.
+	klog.StartFlushDaemon(logFlushFreq)
 
 	// This is the default in Kubernetes. Options.ValidateAndApply
 	// will override this with the result of a feature gate check.

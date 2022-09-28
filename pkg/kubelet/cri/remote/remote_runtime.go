@@ -23,16 +23,21 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
-	"k8s.io/klog/v2"
-
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/logs/logreduction"
+	tracing "k8s.io/component-base/tracing"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	runtimeapiV1alpha2 "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/kubernetes/pkg/kubelet/cri/remote/util"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/probe/exec"
 	utilexec "k8s.io/utils/exec"
 )
@@ -67,7 +72,7 @@ const (
 )
 
 // NewRemoteRuntimeService creates a new internalapi.RuntimeService.
-func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration) (internalapi.RuntimeService, error) {
+func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, tp trace.TracerProvider) (internalapi.RuntimeService, error) {
 	klog.V(3).InfoS("Connecting to runtime service", "endpoint", endpoint)
 	addr, dialer, err := util.GetAddressAndDialer(endpoint)
 	if err != nil {
@@ -76,7 +81,23 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration) (
 	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
 	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithContextDialer(dialer), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
+	dialOpts := []grpc.DialOption{}
+	dialOpts = append(dialOpts,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithContextDialer(dialer),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
+		tracingOpts := []otelgrpc.Option{
+			otelgrpc.WithPropagators(tracing.Propagators()),
+			otelgrpc.WithTracerProvider(tp),
+		}
+		// Even if there is no TracerProvider, the otelgrpc still handles context propagation.
+		// See https://github.com/open-telemetry/opentelemetry-go/tree/main/example/passthrough
+		dialOpts = append(dialOpts,
+			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor(tracingOpts...)),
+			grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor(tracingOpts...)))
+	}
+	conn, err := grpc.DialContext(ctx, addr, dialOpts...)
 	if err != nil {
 		klog.ErrorS(err, "Connect remote runtime failed", "address", addr)
 		return nil, err
@@ -620,7 +641,7 @@ func (r *remoteRuntimeService) containerStatusV1(ctx context.Context, containerI
 }
 
 // UpdateContainerResources updates a containers resource config
-func (r *remoteRuntimeService) UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources) (err error) {
+func (r *remoteRuntimeService) UpdateContainerResources(containerID string, resources *runtimeapi.ContainerResources) (err error) {
 	klog.V(10).InfoS("[RemoteRuntimeService] UpdateContainerResources", "containerID", containerID, "timeout", r.timeout)
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
@@ -628,12 +649,14 @@ func (r *remoteRuntimeService) UpdateContainerResources(containerID string, reso
 	if r.useV1API() {
 		_, err = r.runtimeClient.UpdateContainerResources(ctx, &runtimeapi.UpdateContainerResourcesRequest{
 			ContainerId: containerID,
-			Linux:       resources,
+			Linux:       resources.GetLinux(),
+			Windows:     resources.GetWindows(),
 		})
 	} else {
 		_, err = r.runtimeClientV1alpha2.UpdateContainerResources(ctx, &runtimeapiV1alpha2.UpdateContainerResourcesRequest{
 			ContainerId: containerID,
-			Linux:       v1alpha2LinuxContainerResources(resources),
+			Linux:       v1alpha2LinuxContainerResources(resources.GetLinux()),
+			Windows:     v1alpha2WindowsContainerResources(resources.GetWindows()),
 		})
 	}
 	if err != nil {
@@ -1147,5 +1170,64 @@ func (r *remoteRuntimeService) ReopenContainerLog(containerID string) (err error
 	}
 
 	klog.V(10).InfoS("[RemoteRuntimeService] ReopenContainerLog Response", "containerID", containerID)
+	return nil
+}
+
+// CheckpointContainer triggers a checkpoint of the given CheckpointContainerRequest
+func (r *remoteRuntimeService) CheckpointContainer(options *runtimeapi.CheckpointContainerRequest) error {
+	klog.V(10).InfoS(
+		"[RemoteRuntimeService] CheckpointContainer",
+		"options",
+		options,
+	)
+	if options == nil {
+		return errors.New("CheckpointContainer requires non-nil CheckpointRestoreOptions parameter")
+	}
+	if !r.useV1API() {
+		return errors.New("CheckpointContainer is only supported in the CRI v1 runtime API")
+	}
+
+	if options.Timeout < 0 {
+		return errors.New("CheckpointContainer requires the timeout value to be > 0")
+	}
+
+	ctx, cancel := func() (context.Context, context.CancelFunc) {
+		defaultTimeout := int64(r.timeout / time.Second)
+		if options.Timeout > defaultTimeout {
+			// The user requested a specific timeout, let's use that if it
+			// is larger than the CRI default.
+			return getContextWithTimeout(time.Duration(options.Timeout) * time.Second)
+		}
+		// If the user requested a timeout less than the
+		// CRI default, let's use the CRI default.
+		options.Timeout = defaultTimeout
+		return getContextWithTimeout(r.timeout)
+	}()
+	defer cancel()
+
+	_, err := r.runtimeClient.CheckpointContainer(
+		ctx,
+		options,
+	)
+
+	if err != nil {
+		klog.ErrorS(
+			err,
+			"CheckpointContainer from runtime service failed",
+			"containerID",
+			options.ContainerId,
+		)
+		return err
+	}
+	klog.V(10).InfoS(
+		"[RemoteRuntimeService] CheckpointContainer Response",
+		"containerID",
+		options.ContainerId,
+	)
+
+	return nil
+}
+
+func (r *remoteRuntimeService) GetContainerEvents(containerEventsCh chan *runtimeapi.ContainerEventResponse) error {
 	return nil
 }

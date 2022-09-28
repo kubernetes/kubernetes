@@ -89,9 +89,9 @@ run_create_job_tests() {
     create_and_use_new_namespace
 
     # Test kubectl create job
-    kubectl create job test-job --image=k8s.gcr.io/nginx:test-cmd
+    kubectl create job test-job --image=registry.k8s.io/nginx:test-cmd
     # Post-Condition: job nginx is created
-    kube::test::get_object_assert 'job test-job' "{{${image_field0:?}}}" 'k8s.gcr.io/nginx:test-cmd'
+    kube::test::get_object_assert 'job test-job' "{{${image_field0:?}}}" 'registry.k8s.io/nginx:test-cmd'
     # Clean up
     kubectl delete job test-job "${kube_flags[@]}"
 
@@ -169,6 +169,12 @@ run_kubectl_create_validate_tests() {
   set -o errexit
 
   create_and_use_new_namespace
+
+   ## test --validate no value expects default strict is used
+   kube::log::status "Testing kubectl create --validate"
+   # create and verify
+   output_message=$(! kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml --validate 2>&1)
+   has_one_of_error_message "${output_message}" 'strict decoding error' 'error validating data'
 
   ## test --validate=true
   kube::log::status "Testing kubectl create --validate=true"

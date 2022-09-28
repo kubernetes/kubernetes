@@ -24,18 +24,23 @@ const (
 	counterMetricType   = "Counter"
 	gaugeMetricType     = "Gauge"
 	histogramMetricType = "Histogram"
+	summaryMetricType   = "Summary"
 )
 
 type metric struct {
-	Name              string    `yaml:"name"`
-	Subsystem         string    `yaml:"subsystem,omitempty"`
-	Namespace         string    `yaml:"namespace,omitempty"`
-	Help              string    `yaml:"help,omitempty"`
-	Type              string    `yaml:"type,omitempty"`
-	DeprecatedVersion string    `yaml:"deprecatedVersion,omitempty"`
-	StabilityLevel    string    `yaml:"stabilityLevel,omitempty"`
-	Labels            []string  `yaml:"labels,omitempty"`
-	Buckets           []float64 `yaml:"buckets,omitempty"`
+	Name              string              `yaml:"name"`
+	Subsystem         string              `yaml:"subsystem,omitempty"`
+	Namespace         string              `yaml:"namespace,omitempty"`
+	Help              string              `yaml:"help,omitempty"`
+	Type              string              `yaml:"type,omitempty"`
+	DeprecatedVersion string              `yaml:"deprecatedVersion,omitempty"`
+	StabilityLevel    string              `yaml:"stabilityLevel,omitempty"`
+	Labels            []string            `yaml:"labels,omitempty"`
+	Buckets           []float64           `yaml:"buckets,omitempty"`
+	Objectives        map[float64]float64 `yaml:"objectives,omitempty"`
+	AgeBuckets        uint32              `yaml:"ageBuckets,omitempty"`
+	BufCap            uint32              `yaml:"bufCap,omitempty"`
+	MaxAge            int64               `yaml:"maxAge,omitempty"`
 }
 
 func (m metric) buildFQName() string {

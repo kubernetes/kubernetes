@@ -256,16 +256,26 @@ func BeZero() types.GomegaMatcher {
 	return &matchers.BeZeroMatcher{}
 }
 
-//ContainElement succeeds if actual contains the passed in element.
-//By default ContainElement() uses Equal() to perform the match, however a
-//matcher can be passed in instead:
+//ContainElement succeeds if actual contains the passed in element. By default
+//ContainElement() uses Equal() to perform the match, however a matcher can be
+//passed in instead:
 //    Expect([]string{"Foo", "FooBar"}).Should(ContainElement(ContainSubstring("Bar")))
 //
-//Actual must be an array, slice or map.
-//For maps, ContainElement searches through the map's values.
-func ContainElement(element interface{}) types.GomegaMatcher {
+//Actual must be an array, slice or map. For maps, ContainElement searches
+//through the map's values.
+//
+//If you want to have a copy of the matching element(s) found you can pass a
+//pointer to a variable of the appropriate type. If the variable isn't a slice
+//or map, then exactly one match will be expected and returned. If the variable
+//is a slice or map, then at least one match is expected and all matches will be
+//stored in the variable.
+//
+//    var findings []string
+//    Expect([]string{"Foo", "FooBar"}).Should(ContainElement(ContainSubString("Bar", &findings)))
+func ContainElement(element interface{}, result ...interface{}) types.GomegaMatcher {
 	return &matchers.ContainElementMatcher{
 		Element: element,
+		Result:  result,
 	}
 }
 
@@ -320,6 +330,20 @@ func ContainElements(elements ...interface{}) types.GomegaMatcher {
 	}
 }
 
+//HaveEach succeeds if actual solely contains elements that match the passed in element.
+//Please note that if actual is empty, HaveEach always will succeed.
+//By default HaveEach() uses Equal() to perform the match, however a
+//matcher can be passed in instead:
+//    Expect([]string{"Foo", "FooBar"}).Should(HaveEach(ContainSubstring("Foo")))
+//
+//Actual must be an array, slice or map.
+//For maps, HaveEach searches through the map's values.
+func HaveEach(element interface{}) types.GomegaMatcher {
+	return &matchers.HaveEachMatcher{
+		Element: element,
+	}
+}
+
 //HaveKey succeeds if actual is a map with the passed in key.
 //By default HaveKey uses Equal() to perform the match, however a
 //matcher can be passed in instead:
@@ -339,6 +363,54 @@ func HaveKeyWithValue(key interface{}, value interface{}) types.GomegaMatcher {
 	return &matchers.HaveKeyWithValueMatcher{
 		Key:   key,
 		Value: value,
+	}
+}
+
+//HaveField succeeds if actual is a struct and the value at the passed in field
+//matches the passed in matcher.  By default HaveField used Equal() to perform the match,
+//however a matcher can be passed in in stead.
+//
+//The field must be a string that resolves to the name of a field in the struct.  Structs can be traversed
+//using the '.' delimiter.  If the field ends with '()' a method named field is assumed to exist on the struct and is invoked.
+//Such methods must take no arguments and return a single value:
+//
+//    type Book struct {
+//        Title string
+//        Author Person
+//    }
+//    type Person struct {
+//        FirstName string
+//        LastName string
+//        DOB time.Time
+//    }
+//    Expect(book).To(HaveField("Title", "Les Miserables"))
+//    Expect(book).To(HaveField("Title", ContainSubstring("Les"))
+//    Expect(book).To(HaveField("Author.FirstName", Equal("Victor"))
+//    Expect(book).To(HaveField("Author.DOB.Year()", BeNumerically("<", 1900))
+func HaveField(field string, expected interface{}) types.GomegaMatcher {
+	return &matchers.HaveFieldMatcher{
+		Field:    field,
+		Expected: expected,
+	}
+}
+
+// HaveValue applies the given matcher to the value of actual, optionally and
+// repeatedly dereferencing pointers or taking the concrete value of interfaces.
+// Thus, the matcher will always be applied to non-pointer and non-interface
+// values only. HaveValue will fail with an error if a pointer or interface is
+// nil. It will also fail for more than 31 pointer or interface dereferences to
+// guard against mistakenly applying it to arbitrarily deep linked pointers.
+//
+// HaveValue differs from gstruct.PointTo in that it does not expect actual to
+// be a pointer (as gstruct.PointTo does) but instead also accepts non-pointer
+// and even interface values.
+//
+//   actual := 42
+//   Expect(actual).To(HaveValue(42))
+//   Expect(&actual).To(HaveValue(42))
+func HaveValue(matcher types.GomegaMatcher) types.GomegaMatcher {
+	return &matchers.HaveValueMatcher{
+		Matcher: matcher,
 	}
 }
 
@@ -423,8 +495,27 @@ func BeADirectory() types.GomegaMatcher {
 //Expected must be either an int or a string.
 //  Expect(resp).Should(HaveHTTPStatus(http.StatusOK))   // asserts that resp.StatusCode == 200
 //  Expect(resp).Should(HaveHTTPStatus("404 Not Found")) // asserts that resp.Status == "404 Not Found"
-func HaveHTTPStatus(expected interface{}) types.GomegaMatcher {
+//  Expect(resp).Should(HaveHTTPStatus(http.StatusOK, http.StatusNoContent))   // asserts that resp.StatusCode == 200 || resp.StatusCode == 204
+func HaveHTTPStatus(expected ...interface{}) types.GomegaMatcher {
 	return &matchers.HaveHTTPStatusMatcher{Expected: expected}
+}
+
+// HaveHTTPHeaderWithValue succeeds if the header is found and the value matches.
+// Actual must be either a *http.Response or *httptest.ResponseRecorder.
+// Expected must be a string header name, followed by a header value which
+// can be a string, or another matcher.
+func HaveHTTPHeaderWithValue(header string, value interface{}) types.GomegaMatcher {
+	return &matchers.HaveHTTPHeaderWithValueMatcher{
+		Header: header,
+		Value:  value,
+	}
+}
+
+// HaveHTTPBody matches if the body matches.
+// Actual must be either a *http.Response or *httptest.ResponseRecorder.
+// Expected must be either a string, []byte, or other matcher
+func HaveHTTPBody(expected interface{}) types.GomegaMatcher {
+	return &matchers.HaveHTTPBodyMatcher{Expected: expected}
 }
 
 //And succeeds only if all of the given matchers succeed.
@@ -466,11 +557,24 @@ func Not(matcher types.GomegaMatcher) types.GomegaMatcher {
 }
 
 //WithTransform applies the `transform` to the actual value and matches it against `matcher`.
-//The given transform must be a function of one parameter that returns one value.
+//The given transform must be either a function of one parameter that returns one value or a
+// function of one parameter that returns two values, where the second value must be of the
+// error type.
 //  var plus1 = func(i int) int { return i + 1 }
 //  Expect(1).To(WithTransform(plus1, Equal(2))
+//
+//   var failingplus1 = func(i int) (int, error) { return 42, "this does not compute" }
+//   Expect(1).To(WithTransform(failingplus1, Equal(2)))
 //
 //And(), Or(), Not() and WithTransform() allow matchers to be composed into complex expressions.
 func WithTransform(transform interface{}, matcher types.GomegaMatcher) types.GomegaMatcher {
 	return matchers.NewWithTransformMatcher(transform, matcher)
+}
+
+//Satisfy matches the actual value against the `predicate` function.
+//The given predicate must be a function of one paramter that returns bool.
+//  var isEven = func(i int) bool { return i%2 == 0 }
+//  Expect(2).To(Satisfy(isEven))
+func Satisfy(predicate interface{}) types.GomegaMatcher {
+	return matchers.NewSatisfyMatcher(predicate)
 }

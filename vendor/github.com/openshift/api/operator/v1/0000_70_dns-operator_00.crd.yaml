@@ -42,6 +42,47 @@ spec:
             description: spec is the specification of the desired behavior of the
               DNS.
             properties:
+              cache:
+                description: 'cache describes the caching configuration that applies
+                  to all server blocks listed in the Corefile. This field allows a
+                  cluster admin to optionally configure: * positiveTTL which is a
+                  duration for which positive responses should be cached. * negativeTTL
+                  which is a duration for which negative responses should be cached.
+                  If this is not configured, OpenShift will configure positive and
+                  negative caching with a default value that is subject to change.
+                  At the time of writing, the default positiveTTL is 900 seconds and
+                  the default negativeTTL is 30 seconds or as noted in the respective
+                  Corefile for your version of OpenShift.'
+                properties:
+                  negativeTTL:
+                    description: "negativeTTL is optional and specifies the amount
+                      of time that a negative response should be cached. \n If configured,
+                      it must be a value of 1s (1 second) or greater up to a theoretical
+                      maximum of several years. If not configured, the value will
+                      be 0 (zero) and OpenShift will use a default value of 30 seconds
+                      unless noted otherwise in the respective Corefile for your version
+                      of OpenShift. The default value of 30 seconds is subject to
+                      change. This field expects an unsigned duration string of decimal
+                      numbers, each with optional fraction and a unit suffix, e.g.
+                      \"100s\", \"1m30s\". Valid time units are \"s\", \"m\", and
+                      \"h\"."
+                    pattern: ^(0|([0-9]+(\.[0-9]+)?(s|m|h))+)$
+                    type: string
+                  positiveTTL:
+                    description: "positiveTTL is optional and specifies the amount
+                      of time that a positive response should be cached. \n If configured,
+                      it must be a value of 1s (1 second) or greater up to a theoretical
+                      maximum of several years. If not configured, the value will
+                      be 0 (zero) and OpenShift will use a default value of 900 seconds
+                      unless noted otherwise in the respective Corefile for your version
+                      of OpenShift. The default value of 900 seconds is subject to
+                      change. This field expects an unsigned duration string of decimal
+                      numbers, each with optional fraction and a unit suffix, e.g.
+                      \"100s\", \"1m30s\". Valid time units are \"s\", \"m\", and
+                      \"h\"."
+                    pattern: ^(0|([0-9]+(\.[0-9]+)?(s|m|h))+)$
+                    type: string
+                type: object
               logLevel:
                 default: Normal
                 description: 'logLevel describes the desired logging verbosity for

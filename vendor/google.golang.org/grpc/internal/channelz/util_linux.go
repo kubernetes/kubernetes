@@ -1,5 +1,3 @@
-// +build linux,!appengine
-
 /*
  *
  * Copyright 2018 gRPC authors.

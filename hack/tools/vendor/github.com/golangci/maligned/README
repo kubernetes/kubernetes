@@ -1,7 +1,0 @@
-Install:
-
-    go get github.com/mdempsky/maligned
-
-Usage:
-
-    maligned cmd/compile/internal/gc cmd/link/internal/ld

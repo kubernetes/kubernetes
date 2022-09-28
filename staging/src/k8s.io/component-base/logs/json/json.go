@@ -26,8 +26,8 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	"k8s.io/component-base/config"
-	"k8s.io/component-base/logs/registry"
+	"k8s.io/component-base/featuregate"
+	logsapi "k8s.io/component-base/logs/api/v1"
 )
 
 var (
@@ -38,7 +38,7 @@ var (
 // NewJSONLogger creates a new json logr.Logger and its associated
 // flush function. The separate error stream is optional and may be nil.
 // The encoder config is also optional.
-func NewJSONLogger(v config.VerbosityLevel, infoStream, errorStream zapcore.WriteSyncer, encoderConfig *zapcore.EncoderConfig) (logr.Logger, func()) {
+func NewJSONLogger(v logsapi.VerbosityLevel, infoStream, errorStream zapcore.WriteSyncer, encoderConfig *zapcore.EncoderConfig) (logr.Logger, func()) {
 	// zap levels are inverted: everything with a verbosity >= threshold gets logged.
 	zapV := -zapcore.Level(v)
 
@@ -85,9 +85,13 @@ func epochMillisTimeEncoder(_ time.Time, enc zapcore.PrimitiveArrayEncoder) {
 // Factory produces JSON logger instances.
 type Factory struct{}
 
-var _ registry.LogFormatFactory = Factory{}
+var _ logsapi.LogFormatFactory = Factory{}
 
-func (f Factory) Create(c config.LoggingConfiguration) (logr.Logger, func()) {
+func (f Factory) Feature() featuregate.Feature {
+	return logsapi.LoggingBetaOptions
+}
+
+func (f Factory) Create(c logsapi.LoggingConfiguration) (logr.Logger, func()) {
 	// We intentionally avoid all os.File.Sync calls. Output is unbuffered,
 	// therefore we don't need to flush, and calling the underlying fsync
 	// would just slow down writing.

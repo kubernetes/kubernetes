@@ -324,6 +324,48 @@ func (c *dynamicResourceClient) Patch(ctx context.Context, name string, pt types
 	return uncastObj.(*unstructured.Unstructured), nil
 }
 
+func (c *dynamicResourceClient) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, opts metav1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	if len(name) == 0 {
+		return nil, fmt.Errorf("name is required")
+	}
+	outBytes, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
+	if err != nil {
+		return nil, err
+	}
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+	managedFields := accessor.GetManagedFields()
+	if len(managedFields) > 0 {
+		return nil, fmt.Errorf(`cannot apply an object with managed fields already set.
+		Use the client-go/applyconfigurations "UnstructructuredExtractor" to obtain the unstructured ApplyConfiguration for the given field manager that you can use/modify here to apply`)
+	}
+	patchOpts := opts.ToPatchOptions()
+
+	result := c.client.client.
+		Patch(types.ApplyPatchType).
+		AbsPath(append(c.makeURLSegments(name), subresources...)...).
+		Body(outBytes).
+		SpecificallyVersionedParams(&patchOpts, dynamicParameterCodec, versionV1).
+		Do(ctx)
+	if err := result.Error(); err != nil {
+		return nil, err
+	}
+	retBytes, err := result.Raw()
+	if err != nil {
+		return nil, err
+	}
+	uncastObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, retBytes)
+	if err != nil {
+		return nil, err
+	}
+	return uncastObj.(*unstructured.Unstructured), nil
+}
+func (c *dynamicResourceClient) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, opts metav1.ApplyOptions) (*unstructured.Unstructured, error) {
+	return c.Apply(ctx, name, obj, opts, "status")
+}
+
 func (c *dynamicResourceClient) makeURLSegments(name string) []string {
 	url := []string{}
 	if len(c.resource.Group) == 0 {

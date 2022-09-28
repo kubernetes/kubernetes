@@ -31,7 +31,6 @@
     "finalizers": [
       "finalizersValue"
     ],
-    "clusterName": "clusterNameValue",
     "managedFields": [
       {
         "manager": "managerValue",
@@ -81,7 +80,6 @@
         "finalizers": [
           "finalizersValue"
         ],
-        "clusterName": "clusterNameValue",
         "managedFields": [
           {
             "manager": "managerValue",
@@ -98,6 +96,26 @@
         "parallelism": 1,
         "completions": 2,
         "activeDeadlineSeconds": 3,
+        "podFailurePolicy": {
+          "rules": [
+            {
+              "action": "actionValue",
+              "onExitCodes": {
+                "containerName": "containerNameValue",
+                "operator": "operatorValue",
+                "values": [
+                  3
+                ]
+              },
+              "onPodConditions": [
+                {
+                  "type": "typeValue",
+                  "status": "statusValue"
+                }
+              ]
+            }
+          ]
+        },
         "backoffLimit": 7,
         "selector": {
           "matchLabels": {
@@ -145,7 +163,6 @@
             "finalizers": [
               "finalizersValue"
             ],
-            "clusterName": "clusterNameValue",
             "managedFields": [
               {
                 "manager": "managerValue",
@@ -473,7 +490,6 @@
                       "finalizers": [
                         "finalizersValue"
                       ],
-                      "clusterName": "clusterNameValue",
                       "managedFields": [
                         {
                           "manager": "managerValue",
@@ -1672,13 +1688,19 @@
                     }
                   ]
                 },
-                "minDomains": 5
+                "minDomains": 5,
+                "nodeAffinityPolicy": "nodeAffinityPolicyValue",
+                "nodeTaintsPolicy": "nodeTaintsPolicyValue",
+                "matchLabelKeys": [
+                  "matchLabelKeysValue"
+                ]
               }
             ],
             "setHostnameAsFQDN": true,
             "os": {
               "name": "nameValue"
-            }
+            },
+            "hostUsers": true
           }
         },
         "ttlSecondsAfterFinished": 8,

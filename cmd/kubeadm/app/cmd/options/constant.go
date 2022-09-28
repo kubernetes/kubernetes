@@ -145,4 +145,7 @@ const (
 
 	// Patches flag sets the folder where kubeadm component patches are stored
 	Patches = "patches"
+
+	// Print the addon manifests to STDOUT instead of installing them.
+	PrintManifest = "print-manifest"
 )

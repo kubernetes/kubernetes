@@ -23,7 +23,6 @@ import (
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,43 +42,7 @@ type CustomResourceStorage struct {
 }
 
 func NewStorage(resource schema.GroupResource, kind, listKind schema.GroupVersionKind, strategy customResourceStrategy, optsGetter generic.RESTOptionsGetter, categories []string, tableConvertor rest.TableConvertor, replicasPathMapping fieldmanager.ResourcePathMappings) CustomResourceStorage {
-	customResourceREST, customResourceStatusREST := newREST(resource, kind, listKind, strategy, optsGetter, categories, tableConvertor)
-
-	s := CustomResourceStorage{
-		CustomResource: customResourceREST,
-	}
-
-	if strategy.status != nil {
-		s.Status = customResourceStatusREST
-	}
-
-	if scale := strategy.scale; scale != nil {
-		var labelSelectorPath string
-		if scale.LabelSelectorPath != nil {
-			labelSelectorPath = *scale.LabelSelectorPath
-		}
-
-		s.Scale = &ScaleREST{
-			store:               customResourceREST.Store,
-			specReplicasPath:    scale.SpecReplicasPath,
-			statusReplicasPath:  scale.StatusReplicasPath,
-			labelSelectorPath:   labelSelectorPath,
-			parentGV:            kind.GroupVersion(),
-			replicasPathMapping: replicasPathMapping,
-		}
-	}
-
-	return s
-}
-
-// REST implements a RESTStorage for API services against etcd
-type REST struct {
-	*genericregistry.Store
-	categories []string
-}
-
-// newREST returns a RESTStorage object that will work against API services.
-func newREST(resource schema.GroupResource, kind, listKind schema.GroupVersionKind, strategy customResourceStrategy, optsGetter generic.RESTOptionsGetter, categories []string, tableConvertor rest.TableConvertor) (*REST, *StatusREST) {
+	var storage CustomResourceStorage
 	store := &genericregistry.Store{
 		NewFunc: func() runtime.Object {
 			// set the expected group/version/kind in the new object as a signal to the versioning decoder
@@ -107,69 +70,43 @@ func newREST(resource schema.GroupResource, kind, listKind schema.GroupVersionKi
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}
+	storage.CustomResource = &REST{store, categories}
 
-	statusStore := *store
-	statusStrategy := NewStatusStrategy(strategy)
-	statusStore.UpdateStrategy = statusStrategy
-	statusStore.ResetFieldsStrategy = statusStrategy
-	return &REST{store, categories}, &StatusREST{store: &statusStore}
+	if strategy.status != nil {
+		statusStore := *store
+		statusStrategy := NewStatusStrategy(strategy)
+		statusStore.UpdateStrategy = statusStrategy
+		statusStore.ResetFieldsStrategy = statusStrategy
+		storage.Status = &StatusREST{store: &statusStore}
+	}
+
+	if scale := strategy.scale; scale != nil {
+		var labelSelectorPath string
+		if scale.LabelSelectorPath != nil {
+			labelSelectorPath = *scale.LabelSelectorPath
+		}
+
+		storage.Scale = &ScaleREST{
+			store:               store,
+			specReplicasPath:    scale.SpecReplicasPath,
+			statusReplicasPath:  scale.StatusReplicasPath,
+			labelSelectorPath:   labelSelectorPath,
+			parentGV:            kind.GroupVersion(),
+			replicasPathMapping: replicasPathMapping,
+		}
+	}
+
+	return storage
+}
+
+// REST implements a RESTStorage for API services against etcd
+type REST struct {
+	*genericregistry.Store
+	categories []string
 }
 
 // Implement CategoriesProvider
 var _ rest.CategoriesProvider = &REST{}
-
-// List returns a list of items matching labels and field according to the store's PredicateFunc.
-func (e *REST) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
-	l, err := e.Store.List(ctx, options)
-	if err != nil {
-		return nil, err
-	}
-
-	// Shallow copy ObjectMeta in returned list for each item. Native types have `Items []Item` fields and therefore
-	// implicitly shallow copy ObjectMeta. The generic store sets the self-link for each item. So this is necessary
-	// to avoid mutation of the objects from the cache.
-	if ul, ok := l.(*unstructured.UnstructuredList); ok {
-		for i := range ul.Items {
-			shallowCopyObjectMeta(&ul.Items[i])
-		}
-	}
-
-	return l, nil
-}
-
-func (r *REST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
-	o, err := r.Store.Get(ctx, name, options)
-	if err != nil {
-		return nil, err
-	}
-	if u, ok := o.(*unstructured.Unstructured); ok {
-		shallowCopyObjectMeta(u)
-	}
-	return o, nil
-}
-
-func shallowCopyObjectMeta(u runtime.Unstructured) {
-	obj := shallowMapDeepCopy(u.UnstructuredContent())
-	if metadata, ok := obj["metadata"]; ok {
-		if metadata, ok := metadata.(map[string]interface{}); ok {
-			obj["metadata"] = shallowMapDeepCopy(metadata)
-			u.SetUnstructuredContent(obj)
-		}
-	}
-}
-
-func shallowMapDeepCopy(in map[string]interface{}) map[string]interface{} {
-	if in == nil {
-		return nil
-	}
-
-	out := make(map[string]interface{}, len(in))
-	for k, v := range in {
-		out[k] = v
-	}
-
-	return out
-}
 
 // Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
 func (r *REST) Categories() []string {
@@ -192,9 +129,6 @@ func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOp
 	o, err := r.store.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
-	}
-	if u, ok := o.(*unstructured.Unstructured); ok {
-		shallowCopyObjectMeta(u)
 	}
 	return o, nil
 }

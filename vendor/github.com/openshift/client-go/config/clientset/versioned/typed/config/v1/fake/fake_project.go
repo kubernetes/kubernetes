@@ -4,8 +4,11 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	configv1 "github.com/openshift/api/config/v1"
+	applyconfigurationsconfigv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -110,6 +113,49 @@ func (c *FakeProjects) DeleteCollection(ctx context.Context, opts v1.DeleteOptio
 func (c *FakeProjects) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *configv1.Project, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(projectsResource, name, pt, data, subresources...), &configv1.Project{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*configv1.Project), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied project.
+func (c *FakeProjects) Apply(ctx context.Context, project *applyconfigurationsconfigv1.ProjectApplyConfiguration, opts v1.ApplyOptions) (result *configv1.Project, err error) {
+	if project == nil {
+		return nil, fmt.Errorf("project provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(project)
+	if err != nil {
+		return nil, err
+	}
+	name := project.Name
+	if name == nil {
+		return nil, fmt.Errorf("project.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(projectsResource, *name, types.ApplyPatchType, data), &configv1.Project{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*configv1.Project), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeProjects) ApplyStatus(ctx context.Context, project *applyconfigurationsconfigv1.ProjectApplyConfiguration, opts v1.ApplyOptions) (result *configv1.Project, err error) {
+	if project == nil {
+		return nil, fmt.Errorf("project provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(project)
+	if err != nil {
+		return nil, err
+	}
+	name := project.Name
+	if name == nil {
+		return nil, fmt.Errorf("project.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(projectsResource, *name, types.ApplyPatchType, data, "status"), &configv1.Project{})
 	if obj == nil {
 		return nil, err
 	}

@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net/url"
 	"os"
@@ -47,9 +46,7 @@ import (
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -121,7 +118,7 @@ func ephemeralContainerStartSpec(ec *v1.EphemeralContainer) *startSpec {
 // usually isn't a problem since ephemeral containers aren't allowed at pod creation time.
 // This always returns nil when the EphemeralContainers feature is disabled.
 func (s *startSpec) getTargetID(podStatus *kubecontainer.PodStatus) (*kubecontainer.ContainerID, error) {
-	if s.ephemeralContainer == nil || s.ephemeralContainer.TargetContainerName == "" || !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+	if s.ephemeralContainer == nil || s.ephemeralContainer.TargetContainerName == "" {
 		return nil, nil
 	}
 
@@ -139,7 +136,7 @@ func calcRestartCountByLogDir(path string) (int, error) {
 		return 0, nil
 	}
 	restartCount := int(0)
-	files, err := ioutil.ReadDir(path)
+	files, err := os.ReadDir(path)
 	if err != nil {
 		return 0, err
 	}
@@ -676,30 +673,7 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 	}
 
 	// From this point, pod and container must be non-nil.
-	gracePeriod := int64(minimumGracePeriodInSeconds)
-	switch {
-	case pod.DeletionGracePeriodSeconds != nil:
-		gracePeriod = *pod.DeletionGracePeriodSeconds
-	case pod.Spec.TerminationGracePeriodSeconds != nil:
-		gracePeriod = *pod.Spec.TerminationGracePeriodSeconds
-
-		switch reason {
-		case reasonStartupProbe:
-			if containerSpec.StartupProbe != nil && containerSpec.StartupProbe.TerminationGracePeriodSeconds != nil {
-				gracePeriod = *containerSpec.StartupProbe.TerminationGracePeriodSeconds
-			}
-		case reasonLivenessProbe:
-			if containerSpec.LivenessProbe != nil && containerSpec.LivenessProbe.TerminationGracePeriodSeconds != nil {
-				gracePeriod = *containerSpec.LivenessProbe.TerminationGracePeriodSeconds
-			}
-		}
-
-		if annotationGracePeriod, found := pod.ObjectMeta.Annotations["unsupported.do-not-use.openshift.io/override-liveness-grace-period-seconds"]; found {
-			if val, err := strconv.ParseUint(annotationGracePeriod, 10, 64); err == nil && val > 0 {
-				gracePeriod = int64(val)
-			}
-		}
-	}
+	gracePeriod := setTerminationGracePeriod(pod, containerSpec, containerName, containerID, reason)
 
 	if len(message) == 0 {
 		message = fmt.Sprintf("Stopping container %s", containerSpec.Name)
@@ -999,4 +973,41 @@ func (m *kubeGenericRuntimeManager) removeContainerLog(containerID string) error
 // DeleteContainer removes a container.
 func (m *kubeGenericRuntimeManager) DeleteContainer(containerID kubecontainer.ContainerID) error {
 	return m.removeContainer(containerID.ID)
+}
+
+// setTerminationGracePeriod determines the grace period to use when killing a container
+func setTerminationGracePeriod(pod *v1.Pod, containerSpec *v1.Container, containerName string, containerID kubecontainer.ContainerID, reason containerKillReason) int64 {
+	gracePeriod := int64(minimumGracePeriodInSeconds)
+	switch {
+	case pod.DeletionGracePeriodSeconds != nil:
+		return *pod.DeletionGracePeriodSeconds
+	case pod.Spec.TerminationGracePeriodSeconds != nil:
+		switch reason {
+		case reasonStartupProbe:
+			if isProbeTerminationGracePeriodSecondsSet(pod, containerSpec, containerSpec.StartupProbe, containerName, containerID, "StartupProbe") {
+				return *containerSpec.StartupProbe.TerminationGracePeriodSeconds
+			}
+		case reasonLivenessProbe:
+			if isProbeTerminationGracePeriodSecondsSet(pod, containerSpec, containerSpec.LivenessProbe, containerName, containerID, "LivenessProbe") {
+				return *containerSpec.LivenessProbe.TerminationGracePeriodSeconds
+			}
+		}
+		if annotationGracePeriod, found := pod.ObjectMeta.Annotations["unsupported.do-not-use.openshift.io/override-liveness-grace-period-seconds"]; found {
+			if val, err := strconv.ParseUint(annotationGracePeriod, 10, 64); err == nil && val > 0 {
+				return int64(val)
+			}
+		}
+		return *pod.Spec.TerminationGracePeriodSeconds
+	}
+	return gracePeriod
+}
+
+func isProbeTerminationGracePeriodSecondsSet(pod *v1.Pod, containerSpec *v1.Container, probe *v1.Probe, containerName string, containerID kubecontainer.ContainerID, probeType string) bool {
+	if probe != nil && probe.TerminationGracePeriodSeconds != nil {
+		if *probe.TerminationGracePeriodSeconds > *pod.Spec.TerminationGracePeriodSeconds {
+			klog.V(4).InfoS("Using probe-level grace period that is greater than the pod-level grace period", "pod", klog.KObj(pod), "pod-uid", pod.UID, "containerName", containerName, "containerID", containerID.String(), "probe-type", probeType, "probe-grace-period", *probe.TerminationGracePeriodSeconds, "pod-grace-period", *pod.Spec.TerminationGracePeriodSeconds)
+		}
+		return true
+	}
+	return false
 }

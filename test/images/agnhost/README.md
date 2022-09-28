@@ -32,7 +32,7 @@ For example, let's consider the following `pod.yaml` file:
       containers:
       - args:
         - dns-suffix
-        image: k8s.gcr.io/e2e-test-images/agnhost:2.14
+        image: registry.k8s.io/e2e-test-images/agnhost:2.40
         name: agnhost
       dnsConfig:
         nameservers:
@@ -201,7 +201,7 @@ Usage:
 
 ```console
 guestbook="test/e2e/testing-manifests/guestbook"
-sed_expr="s|{{.AgnhostImage}}|k8s.gcr.io/e2e-test-images/agnhost:2.14|"
+sed_expr="s|{{.AgnhostImage}}|registry.k8s.io/e2e-test-images/agnhost:2.40|"
 
 # create the services.
 kubectl create -f ${guestbook}/frontend-service.yaml
@@ -306,14 +306,14 @@ Examples:
 
 ```console
 docker run -i \
-  k8s.gcr.io/e2e-test-images/agnhost:2.29 \
+  registry.k8s.io/e2e-test-images/agnhost:2.40 \
   logs-generator --log-lines-total 10 --run-duration 1s
 ```
 
 ```console
 kubectl run logs-generator \
   --generator=run-pod/v1 \
-  --image=k8s.gcr.io/e2e-test-images/agnhost:2.29 \
+  --image=registry.k8s.io/e2e-test-images/agnhost:2.40 \
   --restart=Never \
   -- logs-generator -t 10 -d 1s
 ```
@@ -492,7 +492,7 @@ Usage:
 ```console
     kubectl run test-agnhost \
       --generator=run-pod/v1 \
-      --image=k8s.gcr.io/e2e-test-images/agnhost:2.14 \
+      --image=registry.k8s.io/e2e-test-images/agnhost:2.40 \
       --restart=Never \
       --env "POD_IP=<POD_IP>" \
       --env "NODE_IP=<NODE_IP>" \
@@ -547,7 +547,7 @@ Usage:
 ```console
     kubectl run test-agnhost \
       --generator=run-pod/v1 \
-      --image=k8s.gcr.io/e2e-test-images/agnhost:2.21 \
+      --image=registry.k8s.io/e2e-test-images/agnhost:2.40 \
       --restart=Never \
       --env "BIND_ADDRESS=localhost" \
       --env "BIND_PORT=8080" \
@@ -667,6 +667,6 @@ The Windows `agnhost` image includes a `nc` binary that is 100% compliant with i
 
 ## Image
 
-The image can be found at `k8s.gcr.io/e2e-test-images/agnhost:2.35` for both Linux and
+The image can be found at `registry.k8s.io/e2e-test-images/agnhost:2.40` for both Linux and
 Windows containers (based on `mcr.microsoft.com/windows/nanoserver:1809`, `mcr.microsoft.com/windows/nanoserver:20H2`, and
 `mcr.microsoft.com/windows/nanoserver:ltsc2022`).

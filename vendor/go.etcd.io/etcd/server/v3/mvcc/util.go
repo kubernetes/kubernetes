@@ -31,7 +31,7 @@ func WriteKV(be backend.Backend, kv mvccpb.KeyValue) {
 		panic(fmt.Errorf("cannot marshal event: %v", err))
 	}
 
-	be.BatchTx().Lock()
+	be.BatchTx().LockOutsideApply()
 	be.BatchTx().UnsafePut(buckets.Key, ibytes, d)
 	be.BatchTx().Unlock()
 }

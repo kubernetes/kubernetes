@@ -1,3 +1,0 @@
-- op: add
-  path: /spec/versions/name=v1/schema/openAPIV3Schema/properties/spec/properties/defaultNetwork/properties/ovnKubernetesConfig/properties/policyAuditConfig/default
-  value: {}

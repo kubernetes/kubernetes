@@ -193,16 +193,26 @@ func (s *Status) IsSuccess() bool {
 	return s.Code() == Success
 }
 
+// IsWait returns true if and only if "Status" is non-nil and its Code is "Wait".
+func (s *Status) IsWait() bool {
+	return s.Code() == Wait
+}
+
+// IsSkip returns true if and only if "Status" is non-nil and its Code is "Skip".
+func (s *Status) IsSkip() bool {
+	return s.Code() == Skip
+}
+
 // IsUnschedulable returns true if "Status" is Unschedulable (Unschedulable or UnschedulableAndUnresolvable).
 func (s *Status) IsUnschedulable() bool {
 	code := s.Code()
 	return code == Unschedulable || code == UnschedulableAndUnresolvable
 }
 
-// AsError returns nil if the status is a success; otherwise returns an "error" object
+// AsError returns nil if the status is a success, a wait or a skip; otherwise returns an "error" object
 // with a concatenated message on reasons of the Status.
 func (s *Status) AsError() error {
-	if s.IsSuccess() {
+	if s.IsSuccess() || s.IsWait() || s.IsSkip() {
 		return nil
 	}
 	if s.err != nil {
@@ -631,11 +641,11 @@ func (p *PreFilterResult) Merge(in *PreFilterResult) *PreFilterResult {
 
 	r := PreFilterResult{}
 	if p.AllNodes() {
-		r.NodeNames = sets.NewString(in.NodeNames.UnsortedList()...)
+		r.NodeNames = in.NodeNames.Clone()
 		return &r
 	}
 	if in.AllNodes() {
-		r.NodeNames = sets.NewString(p.NodeNames.UnsortedList()...)
+		r.NodeNames = p.NodeNames.Clone()
 		return &r
 	}
 

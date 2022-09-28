@@ -315,7 +315,7 @@ func (tf Transform) Option() Option { return tf.trans }
 // pops the address from the stack. Thus, when traversing into a pointer from
 // reflect.Ptr, reflect.Slice element, or reflect.Map, we can detect cycles
 // by checking whether the pointer has already been visited. The cycle detection
-// uses a seperate stack for the x and y values.
+// uses a separate stack for the x and y values.
 //
 // If a cycle is detected we need to determine whether the two pointers
 // should be considered equal. The definition of equality chosen by Equal

@@ -1,5 +1,0 @@
-test_program/test_program_bin
-fuzz/
-cmd/tomll/tomll
-cmd/tomljson/tomljson
-cmd/tomltestgen/tomltestgen

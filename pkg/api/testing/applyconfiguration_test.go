@@ -180,7 +180,6 @@ func fuzzObject(t *testing.T, gvk schema.GroupVersionKind) runtime.Object {
 				c.FuzzNoCustom(s)
 				s.ManagedFields = nil
 				s.SelfLink = ""
-				s.ZZZ_DeprecatedClusterName = ""
 			},
 		).Fuzz(internalObj)
 

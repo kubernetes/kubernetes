@@ -131,12 +131,12 @@ func (w *Watcher) traversePluginDir(dir string) error {
 			return nil
 		}
 
-		switch mode := info.Mode(); {
-		case mode.IsDir():
+		mode := info.Mode()
+		if mode.IsDir() {
 			if err := w.fsWatcher.Add(path); err != nil {
 				return fmt.Errorf("failed to watch %s, err: %v", path, err)
 			}
-		case mode&os.ModeSocket != 0:
+		} else if isSocket, _ := util.IsUnixDomainSocket(path); isSocket {
 			event := fsnotify.Event{
 				Name: path,
 				Op:   fsnotify.Create,
@@ -145,7 +145,7 @@ func (w *Watcher) traversePluginDir(dir string) error {
 			if err := w.handleCreateEvent(event); err != nil {
 				klog.ErrorS(err, "Error when handling create", "event", event)
 			}
-		default:
+		} else {
 			klog.V(5).InfoS("Ignoring file", "path", path, "mode", mode)
 		}
 

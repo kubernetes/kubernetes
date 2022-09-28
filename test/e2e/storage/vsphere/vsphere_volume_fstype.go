@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,7 +58,7 @@ const (
 	Test to verify if an invalid fstype specified in storage class fails pod creation.
 
 	Steps
-	1. Create StorageClass with inavlid.
+	1. Create StorageClass with invalid.
 	2. Create PVC which uses the StorageClass created in step 1.
 	3. Wait for PV to be provisioned.
 	4. Wait for PVC's status to become Bound.

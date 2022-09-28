@@ -30,7 +30,6 @@
     "finalizers": [
       "14"
     ],
-    "clusterName": "15",
     "managedFields": [
       {
         "manager": "16",
@@ -71,7 +70,6 @@
       "finalizers": [
         "32"
       ],
-      "clusterName": "33",
       "managedFields": [
         {
           "manager": "34",
@@ -384,7 +382,6 @@
                 "finalizers": [
                   "155"
                 ],
-                "clusterName": "156",
                 "managedFields": [
                   {
                     "manager": "157",

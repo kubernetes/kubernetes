@@ -30,13 +30,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
+	utilpod "k8s.io/kubernetes/pkg/util/pod"
 
 	"k8s.io/klog/v2"
 )
@@ -69,12 +74,6 @@ func hash(val string, max int) int {
 	return int(hasher.Sum32() % uint32(max))
 }
 
-// GetPodFunc returns the pod for the specified name/namespace, or a NotFound error if missing.
-type GetPodFunc func(name, namespace string) (*v1.Pod, error)
-
-// GetNodeFunc returns the node for the specified name, or a NotFound error if missing.
-type GetNodeFunc func(name string) (*v1.Node, error)
-
 // GetPodsByNodeNameFunc returns the list of pods assigned to the specified node.
 type GetPodsByNodeNameFunc func(nodeName string) ([]*v1.Pod, error)
 
@@ -82,9 +81,10 @@ type GetPodsByNodeNameFunc func(nodeName string) ([]*v1.Pod, error)
 // from Nodes tainted with NoExecute Taints.
 type NoExecuteTaintManager struct {
 	client                clientset.Interface
+	broadcaster           record.EventBroadcaster
 	recorder              record.EventRecorder
-	getPod                GetPodFunc
-	getNode               GetNodeFunc
+	podLister             corelisters.PodLister
+	nodeLister            corelisters.NodeLister
 	getPodsAssignedToNode GetPodsByNodeNameFunc
 
 	taintEvictionQueue *TimedWorkerQueue
@@ -103,13 +103,13 @@ func deletePodHandler(c clientset.Interface, emitEventFunc func(types.Namespaced
 	return func(ctx context.Context, args *WorkArgs) error {
 		ns := args.NamespacedName.Namespace
 		name := args.NamespacedName.Name
-		klog.V(0).InfoS("NoExecuteTaintManager is deleting pod", "pod", args.NamespacedName.String())
+		klog.InfoS("NoExecuteTaintManager is deleting pod", "pod", args.NamespacedName.String())
 		if emitEventFunc != nil {
 			emitEventFunc(args.NamespacedName)
 		}
 		var err error
 		for i := 0; i < retries; i++ {
-			err = c.CoreV1().Pods(ns).Delete(ctx, name, metav1.DeleteOptions{})
+			err = addConditionAndDeletePod(ctx, c, name, ns)
 			if err == nil {
 				break
 			}
@@ -117,6 +117,27 @@ func deletePodHandler(c clientset.Interface, emitEventFunc func(types.Namespaced
 		}
 		return err
 	}
+}
+
+func addConditionAndDeletePod(ctx context.Context, c clientset.Interface, name, ns string) (err error) {
+	if feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		pod, err := c.CoreV1().Pods(ns).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		newStatus := pod.Status.DeepCopy()
+		if apipod.UpdatePodCondition(newStatus, &v1.PodCondition{
+			Type:    v1.AlphaNoCompatGuaranteeDisruptionTarget,
+			Status:  v1.ConditionTrue,
+			Reason:  "DeletionByTaintManager",
+			Message: "Taint manager: deleting due to NoExecute taint",
+		}) {
+			if _, _, _, err = utilpod.PatchPodStatus(ctx, c, pod.Namespace, pod.Name, pod.UID, pod.Status, *newStatus); err != nil {
+				return err
+			}
+		}
+	}
+	return c.CoreV1().Pods(ns).Delete(ctx, name, metav1.DeleteOptions{})
 }
 
 func getNoExecuteTaints(taints []v1.Taint) []v1.Taint {
@@ -155,22 +176,16 @@ func getMinTolerationTime(tolerations []v1.Toleration) time.Duration {
 
 // NewNoExecuteTaintManager creates a new NoExecuteTaintManager that will use passed clientset to
 // communicate with the API server.
-func NewNoExecuteTaintManager(ctx context.Context, c clientset.Interface, getPod GetPodFunc, getNode GetNodeFunc, getPodsAssignedToNode GetPodsByNodeNameFunc) *NoExecuteTaintManager {
+func NewNoExecuteTaintManager(ctx context.Context, c clientset.Interface, podLister corelisters.PodLister, nodeLister corelisters.NodeLister, getPodsAssignedToNode GetPodsByNodeNameFunc) *NoExecuteTaintManager {
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "taint-controller"})
-	eventBroadcaster.StartStructuredLogging(0)
-	if c != nil {
-		klog.V(0).InfoS("Sending events to api server")
-		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.CoreV1().Events("")})
-	} else {
-		klog.Fatalf("kubeClient is nil when starting NodeController")
-	}
 
 	tm := &NoExecuteTaintManager{
 		client:                c,
+		broadcaster:           eventBroadcaster,
 		recorder:              recorder,
-		getPod:                getPod,
-		getNode:               getNode,
+		podLister:             podLister,
+		nodeLister:            nodeLister,
 		getPodsAssignedToNode: getPodsAssignedToNode,
 		taintedNodes:          make(map[string][]v1.Taint),
 
@@ -184,7 +199,22 @@ func NewNoExecuteTaintManager(ctx context.Context, c clientset.Interface, getPod
 
 // Run starts NoExecuteTaintManager which will run in loop until `stopCh` is closed.
 func (tc *NoExecuteTaintManager) Run(ctx context.Context) {
-	klog.V(0).InfoS("Starting NoExecuteTaintManager")
+	defer utilruntime.HandleCrash()
+
+	klog.InfoS("Starting NoExecuteTaintManager")
+
+	// Start events processing pipeline.
+	tc.broadcaster.StartStructuredLogging(0)
+	if tc.client != nil {
+		klog.InfoS("Sending events to api server")
+		tc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: tc.client.CoreV1().Events("")})
+	} else {
+		klog.Fatalf("kubeClient is nil when starting NodeController")
+	}
+	defer tc.broadcaster.Shutdown()
+
+	defer tc.nodeUpdateQueue.ShutDown()
+	defer tc.podUpdateQueue.ShutDown()
 
 	for i := 0; i < UpdateWorkerSize; i++ {
 		tc.nodeUpdateChannels = append(tc.nodeUpdateChannels, make(chan nodeUpdateItem, NodeUpdateChannelSize))
@@ -378,7 +408,7 @@ func (tc *NoExecuteTaintManager) processPodOnNode(
 }
 
 func (tc *NoExecuteTaintManager) handlePodUpdate(ctx context.Context, podUpdate podUpdateItem) {
-	pod, err := tc.getPod(podUpdate.podName, podUpdate.podNamespace)
+	pod, err := tc.podLister.Pods(podUpdate.podNamespace).Get(podUpdate.podName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// Delete
@@ -418,7 +448,7 @@ func (tc *NoExecuteTaintManager) handlePodUpdate(ctx context.Context, podUpdate 
 }
 
 func (tc *NoExecuteTaintManager) handleNodeUpdate(ctx context.Context, nodeUpdate nodeUpdateItem) {
-	node, err := tc.getNode(nodeUpdate.nodeName)
+	node, err := tc.nodeLister.Get(nodeUpdate.nodeName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// Delete

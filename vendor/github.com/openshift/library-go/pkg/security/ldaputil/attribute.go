@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"strings"
 
-	"gopkg.in/ldap.v2"
+	"github.com/go-ldap/ldap/v3"
 )
 
 // GetAttributeValue finds the first attribute of those given that the LDAP entry has, and

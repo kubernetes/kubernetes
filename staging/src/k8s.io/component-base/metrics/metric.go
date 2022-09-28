@@ -22,6 +22,7 @@ import (
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	promext "k8s.io/component-base/metrics/prometheusextension"
 
 	"k8s.io/klog/v2"
 )
@@ -90,13 +91,14 @@ func (r *lazyMetric) lazyInit(self kubeCollector, fqName string) {
 // preprocessMetric figures out whether the lazy metric should be hidden or not.
 // This method takes a Version argument which should be the version of the binary in which
 // this code is currently being executed. A metric can be hidden under two conditions:
-//      1.  if the metric is deprecated and is outside the grace period (i.e. has been
-// 			deprecated for more than one release
-//		2. if the metric is manually disabled via a CLI flag.
+//  1. if the metric is deprecated and is outside the grace period (i.e. has been
+//     deprecated for more than one release
+//  2. if the metric is manually disabled via a CLI flag.
 //
 // Disclaimer:  disabling a metric via a CLI flag has higher precedence than
-// 			  	deprecation and will override show-hidden-metrics for the explicitly
-//				disabled metric.
+//
+//	  	deprecation and will override show-hidden-metrics for the explicitly
+//		disabled metric.
 func (r *lazyMetric) preprocessMetric(version semver.Version) {
 	disabledMetricsLock.RLock()
 	defer disabledMetricsLock.RUnlock()
@@ -203,6 +205,7 @@ func (c *selfCollector) Collect(ch chan<- prometheus.Metric) {
 // no-op vecs for convenience
 var noopCounterVec = &prometheus.CounterVec{}
 var noopHistogramVec = &prometheus.HistogramVec{}
+var noopTimingHistogramVec = &promext.TimingHistogramVec{}
 var noopGaugeVec = &prometheus.GaugeVec{}
 var noopObserverVec = &noopObserverVector{}
 
@@ -211,17 +214,18 @@ var noop = &noopMetric{}
 
 type noopMetric struct{}
 
-func (noopMetric) Inc()                             {}
-func (noopMetric) Add(float64)                      {}
-func (noopMetric) Dec()                             {}
-func (noopMetric) Set(float64)                      {}
-func (noopMetric) Sub(float64)                      {}
-func (noopMetric) Observe(float64)                  {}
-func (noopMetric) SetToCurrentTime()                {}
-func (noopMetric) Desc() *prometheus.Desc           { return nil }
-func (noopMetric) Write(*dto.Metric) error          { return nil }
-func (noopMetric) Describe(chan<- *prometheus.Desc) {}
-func (noopMetric) Collect(chan<- prometheus.Metric) {}
+func (noopMetric) Inc()                              {}
+func (noopMetric) Add(float64)                       {}
+func (noopMetric) Dec()                              {}
+func (noopMetric) Set(float64)                       {}
+func (noopMetric) Sub(float64)                       {}
+func (noopMetric) Observe(float64)                   {}
+func (noopMetric) ObserveWithWeight(float64, uint64) {}
+func (noopMetric) SetToCurrentTime()                 {}
+func (noopMetric) Desc() *prometheus.Desc            { return nil }
+func (noopMetric) Write(*dto.Metric) error           { return nil }
+func (noopMetric) Describe(chan<- *prometheus.Desc)  {}
+func (noopMetric) Collect(chan<- prometheus.Metric)  {}
 
 type noopObserverVector struct{}
 

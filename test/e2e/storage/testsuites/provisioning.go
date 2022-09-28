@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -301,19 +301,26 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 					for i, container := range item.Spec.Template.Spec.Containers {
 						switch container.Name {
 						case "hello":
-							var found bool
 							args := []string{}
+							var foundNS, foundImage bool
 							for _, arg := range container.Args {
 								if strings.HasPrefix(arg, "--namespace=") {
 									args = append(args, fmt.Sprintf("--namespace=%s", popNamespace.Name))
-									found = true
+									foundNS = true
+								} else if strings.HasPrefix(arg, "--image-name=") {
+									args = append(args, fmt.Sprintf("--image-name=%s", container.Image))
+									foundImage = true
 								} else {
 									args = append(args, arg)
 								}
 							}
-							if !found {
+							if !foundNS {
 								args = append(args, fmt.Sprintf("--namespace=%s", popNamespace.Name))
 								framework.Logf("container name: %s", container.Name)
+							}
+							if !foundImage {
+								args = append(args, fmt.Sprintf("--image-name=%s", container.Image))
+								framework.Logf("container image: %s", container.Image)
 							}
 							container.Args = args
 							item.Spec.Template.Spec.Containers[i] = container
@@ -1194,7 +1201,7 @@ func MultiplePVMountSingleNodeCheck(client clientset.Interface, timeouts *framew
 
 	pv2, pvc2, err := e2epv.CreatePVCPV(client, timeouts, pv2Config, pvc2Config, claim.Namespace, true)
 	framework.ExpectNoError(err, "PVC, PV creation failed")
-	framework.Logf("Created PVC %s/%s and PV %s in namespace %s", pvc2.Namespace, pvc2.Name, pv2.Name)
+	framework.Logf("Created PVC %s/%s and PV %s", pvc2.Namespace, pvc2.Name, pv2.Name)
 
 	pod2Config := e2epod.Config{
 		NS:            pvc2.Namespace,

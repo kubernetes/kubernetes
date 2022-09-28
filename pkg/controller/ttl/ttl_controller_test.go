@@ -211,6 +211,20 @@ func TestDesiredTTL(t *testing.T) {
 			boundaryStep: 1,
 			expectedTTL:  0,
 		},
+		{
+			deleteNode:   true,
+			nodeCount:    1800,
+			desiredTTL:   300,
+			boundaryStep: 4,
+			expectedTTL:  60,
+		},
+		{
+			deleteNode:   true,
+			nodeCount:    10000,
+			desiredTTL:   300,
+			boundaryStep: 4,
+			expectedTTL:  300,
+		},
 	}
 
 	for i, testCase := range testCases {

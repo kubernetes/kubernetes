@@ -37,7 +37,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -155,7 +155,7 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 				})
 				// Log the running containers here to help debugging.
 				ginkgo.AfterEach(func() {
-					if ginkgo.CurrentGinkgoTestDescription().Failed {
+					if ginkgo.CurrentSpecReport().Failed() {
 						ginkgo.By("Dump all running containers")
 						runtime, _, err := getCRIClient()
 						framework.ExpectNoError(err)

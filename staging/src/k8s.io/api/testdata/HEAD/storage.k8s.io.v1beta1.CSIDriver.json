@@ -31,7 +31,6 @@
     "finalizers": [
       "finalizersValue"
     ],
-    "clusterName": "clusterNameValue",
     "managedFields": [
       {
         "manager": "managerValue",
@@ -58,6 +57,7 @@
         "expirationSeconds": 2
       }
     ],
-    "requiresRepublish": true
+    "requiresRepublish": true,
+    "seLinuxMount": true
   }
 }

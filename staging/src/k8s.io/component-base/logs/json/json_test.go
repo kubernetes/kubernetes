@@ -24,10 +24,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/component-base/config"
-
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	logsapi "k8s.io/component-base/logs/api/v1"
 )
 
 // TestZapLoggerInfo test ZapLogger json info format
@@ -78,6 +78,7 @@ func TestZapLoggerInfo(t *testing.T) {
 		writer := zapcore.AddSync(&buffer)
 		sampleInfoLogger, _ := NewJSONLogger(0, writer, nil, nil)
 		for _, name := range data.names {
+			// nolint:logcheck // This intentionally ignore the feature gate and always tests with a name.
 			sampleInfoLogger = sampleInfoLogger.WithName(name)
 		}
 		// nolint:logcheck // The linter cannot and doesn't need to check the key/value pairs.
@@ -111,7 +112,7 @@ func TestZapLoggerInfo(t *testing.T) {
 // TestZapLoggerEnabled test ZapLogger enabled
 func TestZapLoggerEnabled(t *testing.T) {
 	verbosityLevel := 10
-	sampleInfoLogger, _ := NewJSONLogger(config.VerbosityLevel(verbosityLevel), nil, nil, nil)
+	sampleInfoLogger, _ := NewJSONLogger(logsapi.VerbosityLevel(verbosityLevel), nil, nil, nil)
 	for v := 0; v <= verbosityLevel; v++ {
 		enabled := sampleInfoLogger.V(v).Enabled()
 		expectEnabled := v <= verbosityLevel
@@ -134,7 +135,7 @@ func TestZapLoggerV(t *testing.T) {
 	for v := 0; v <= verbosityLevel; v++ {
 		var buffer bytes.Buffer
 		writer := zapcore.AddSync(&buffer)
-		sampleInfoLogger, _ := NewJSONLogger(config.VerbosityLevel(verbosityLevel), writer, nil, nil)
+		sampleInfoLogger, _ := NewJSONLogger(logsapi.VerbosityLevel(verbosityLevel), writer, nil, nil)
 		sampleInfoLogger.V(v).Info("test", "ns", "default", "podnum", 2, "time", time.Microsecond)
 		logStr := buffer.String()
 
@@ -159,7 +160,7 @@ func TestZapLoggerV(t *testing.T) {
 			t.Errorf("V(%d).Info...) returned v=%d. expected v=%d", v, actualV, v)
 		}
 		expect := fmt.Sprintf(expectFormat, lineNo, v)
-		if !assert.Equal(t, logStr, expect) {
+		if !assert.Equal(t, expect, logStr) {
 			t.Errorf("V(%d).Info has wrong format \n expect:%s\n got:%s", v, expect, logStr)
 		}
 		buffer.Reset()

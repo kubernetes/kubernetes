@@ -431,16 +431,8 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, time.Second*1)
 	var plugins []volume.VolumePlugin
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, tc.csiMigration)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, tc.csiMigration)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InTreePluginGCEUnregister, tc.csiMigration)()
-
-	if tc.csiMigration {
-		// if InTreePluginGCEUnregister is enabled, only the CSI plugin is registered but not the in-tree one
-		plugins = append(plugins, csi.ProbeVolumePlugins()...)
-	} else {
-		plugins = controllervolumetesting.CreateTestPlugin()
-	}
+	plugins = append(plugins, controllervolumetesting.CreateTestPlugin()...)
+	plugins = append(plugins, csi.ProbeVolumePlugins()...)
 
 	// OCP Carry: disable ADCCSIMigrationGCEPD feature in this unit test when necessary.
 	// OCP forces CSI migration in ADC "on", this unit test may need it "off".
@@ -528,7 +520,14 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 		podInformer.GetIndexer().Add(newPod)
 	}
 	if tc.pvName != "" {
-		newPv := controllervolumetesting.NewPV(tc.pvName, tc.volName)
+		var newPv *v1.PersistentVolume
+		if tc.csiMigration {
+			// NewPV returns a GCEPersistentDisk volume, which is migrated.
+			newPv = controllervolumetesting.NewPV(tc.pvName, tc.volName)
+		} else {
+			// Otherwise use NFS, which is not subject to migration.
+			newPv = controllervolumetesting.NewNFSPV(tc.pvName, tc.volName)
+		}
 		_, err = adc.kubeClient.CoreV1().PersistentVolumes().Create(context.TODO(), newPv, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Run failed with error. Failed to create a new pv: <%v>", err)

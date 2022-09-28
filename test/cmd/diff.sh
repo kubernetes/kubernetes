@@ -47,7 +47,7 @@ run_kubectl_diff_tests() {
     # 1. the exit code for diff is 1 because it found a difference
     # 2. the difference contains the changed image
     output_message=$(kubectl diff -f hack/testdata/pod-changed.yaml || test $? -eq 1)
-    kube::test::if_has_string "${output_message}" 'k8s.gcr.io/pause:3.4'
+    kube::test::if_has_string "${output_message}" 'registry.k8s.io/pause:3.4'
 
     # Ensure diff only dry-runs and doesn't persist change
     resourceVersion=$(kubectl get "${kube_flags[@]:?}" -f hack/testdata/pod.yaml -o go-template='{{ .metadata.resourceVersion }}')
@@ -55,7 +55,7 @@ run_kubectl_diff_tests() {
 
     # Test found diff with server-side apply
     output_message=$(kubectl diff -f hack/testdata/pod-changed.yaml --server-side || test $? -eq 1)
-    kube::test::if_has_string "${output_message}" 'k8s.gcr.io/pause:3.4'
+    kube::test::if_has_string "${output_message}" 'registry.k8s.io/pause:3.4'
 
     # Ensure diff --server-side only dry-runs and doesn't persist change
     resourceVersion=$(kubectl get "${kube_flags[@]:?}" -f hack/testdata/pod.yaml -o go-template='{{ .metadata.resourceVersion }}')
@@ -86,7 +86,7 @@ run_kubectl_diff_tests() {
     # 1. the exit code for diff is 1 because it found a difference
     # 2. the difference contains the changed image
     output_message=$(kubectl diff --server-side -f hack/testdata/pod-changed.yaml || test $? -eq 1)
-    kube::test::if_has_string "${output_message}" 'k8s.gcr.io/pause:3.4'
+    kube::test::if_has_string "${output_message}" 'registry.k8s.io/pause:3.4'
 
     ## kubectl diff --prune
     kubectl create ns nsb

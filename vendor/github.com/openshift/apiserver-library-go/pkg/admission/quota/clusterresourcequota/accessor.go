@@ -12,7 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	utilquota "k8s.io/apiserver/pkg/quota/v1"
-	etcd "k8s.io/apiserver/pkg/storage/etcd3"
+	"k8s.io/apiserver/pkg/storage"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 
 	quotav1 "github.com/openshift/api/quota/v1"
@@ -97,7 +97,7 @@ func (e *clusterQuotaAccessor) UpdateQuotaStatus(newQuota *corev1.ResourceQuota)
 	return nil
 }
 
-var etcdVersioner = etcd.APIObjectVersioner{}
+var etcdVersioner = storage.APIObjectVersioner{}
 
 // checkCache compares the passed quota against the value in the look-aside cache and returns the newer
 // if the cache is out of date, it deletes the stale entry.  This only works because of etcd resourceVersions

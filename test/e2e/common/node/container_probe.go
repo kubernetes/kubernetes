@@ -26,23 +26,22 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -76,7 +75,9 @@ var _ = SIGDescribe("Probing container", func() {
 		framework.ExpectNoError(err)
 		isReady, err := testutils.PodRunningReady(p)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(isReady, true, "pod should be ready")
+		if !isReady {
+			framework.Failf("pod %s/%s should be ready", f.Namespace.Name, p.Name)
+		}
 
 		// We assume the pod became ready when the container became ready. This
 		// is true for a single container pod.
@@ -115,7 +116,9 @@ var _ = SIGDescribe("Probing container", func() {
 		framework.ExpectNoError(err)
 
 		isReady, _ := testutils.PodRunningReady(p)
-		framework.ExpectNotEqual(isReady, true, "pod should be not ready")
+		if isReady {
+			framework.Failf("pod %s/%s should be not ready", f.Namespace.Name, p.Name)
+		}
 
 		restartCount := getRestartCount(p)
 		framework.ExpectEqual(restartCount, 0, "pod should have a restart count of 0 but got %v", restartCount)
@@ -223,9 +226,6 @@ var _ = SIGDescribe("Probing container", func() {
 		Description: A Pod is created with liveness probe with a Exec action on the Pod. If the liveness probe call does not return within the timeout specified, liveness probe MUST restart the Pod.
 	*/
 	ginkgo.It("should be restarted with an exec liveness probe with timeout [MinimumKubeletVersion:1.20] [NodeConformance]", func() {
-		// The ExecProbeTimeout feature gate exists to allow backwards-compatibility with pre-1.20 cluster behaviors, where livenessProbe timeouts were ignored
-		// If ExecProbeTimeout feature gate is disabled, timeout enforcement for exec livenessProbes is disabled, so we should skip this test
-		e2eskipper.SkipUnlessFeatureGateEnabled(kubefeatures.ExecProbeTimeout)
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
 		livenessProbe := &v1.Probe{
 			ProbeHandler:        execHandler([]string{"/bin/sh", "-c", "sleep 10"}),
@@ -243,10 +243,6 @@ var _ = SIGDescribe("Probing container", func() {
 		Description: A Pod is created with readiness probe with a Exec action on the Pod. If the readiness probe call does not return within the timeout specified, readiness probe MUST not be Ready.
 	*/
 	ginkgo.It("should not be ready with an exec readiness probe timeout [MinimumKubeletVersion:1.20] [NodeConformance]", func() {
-		// The ExecProbeTimeout feature gate exists to allow backwards-compatibility with pre-1.20 cluster behaviors, where readiness probe timeouts were ignored
-		// If ExecProbeTimeout feature gate is disabled, timeout enforcement for exec readiness probe is disabled, so we should skip this test
-		e2eskipper.SkipUnlessFeatureGateEnabled(kubefeatures.ExecProbeTimeout)
-
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
 		readinessProbe := &v1.Probe{
 			ProbeHandler:        execHandler([]string{"/bin/sh", "-c", "sleep 10"}),
@@ -264,11 +260,6 @@ var _ = SIGDescribe("Probing container", func() {
 		Description: A Pod is created with liveness probe with a Exec action on the Pod. If the liveness probe call does not return within the timeout specified, liveness probe MUST restart the Pod. When ExecProbeTimeout feature gate is disabled and cluster is using dockershim, the timeout is ignored BUT a failing liveness probe MUST restart the Pod.
 	*/
 	ginkgo.It("should be restarted with a failing exec liveness probe that took longer than the timeout", func() {
-		// The ExecProbeTimeout feature gate exists to allow backwards-compatibility with pre-1.20 cluster behaviors using dockershim, where livenessProbe timeouts were ignored
-		// If ExecProbeTimeout feature gate is disabled on a dockershim cluster, timeout enforcement for exec livenessProbes is disabled, but a failing liveness probe MUST still trigger a restart
-		// Note ExecProbeTimeout=false is not recommended for non-dockershim clusters (e.g., containerd), and this test will fail if run against such a configuration
-		e2eskipper.SkipUnlessFeatureGateEnabled(kubefeatures.ExecProbeTimeout)
-
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
 		livenessProbe := &v1.Probe{
 			ProbeHandler:        execHandler([]string{"/bin/sh", "-c", "sleep 10 & exit 1"}),
@@ -447,7 +438,9 @@ var _ = SIGDescribe("Probing container", func() {
 
 		isReady, err := testutils.PodRunningReady(p)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(isReady, true, "pod should be ready")
+		if !isReady {
+			framework.Failf("pod %s/%s should be ready", f.Namespace.Name, p.Name)
+		}
 
 		readyIn := readyTime.Sub(startedTime)
 		framework.Logf("Container started at %v, pod became ready at %v, %v after startupProbe succeeded", startedTime, readyTime, readyIn)
@@ -620,10 +613,13 @@ done
 		err = wait.PollImmediate(framework.Poll, f.Timeouts.PodDelete, func() (bool, error) {
 			pod, err := podClient.Get(context.Background(), podName, metav1.GetOptions{})
 			if err != nil {
+				if apierrors.IsNotFound(err) {
+					return true, nil
+				}
 				return false, err
 			}
 			// verify the pod ready status has reported not ready
-			return podutil.IsPodReady(pod) == false, nil
+			return !podutil.IsPodReady(pod), nil
 		})
 		framework.ExpectNoError(err)
 	})
@@ -703,10 +699,13 @@ done
 		err = wait.PollImmediate(framework.Poll, f.Timeouts.PodDelete, func() (bool, error) {
 			pod, err := podClient.Get(context.Background(), podName, metav1.GetOptions{})
 			if err != nil {
+				if apierrors.IsNotFound(err) {
+					return true, nil
+				}
 				return false, err
 			}
 			// verify the pod ready status has reported not ready
-			return podutil.IsPodReady(pod) == false, nil
+			return !podutil.IsPodReady(pod), nil
 		})
 		framework.ExpectNoError(err)
 

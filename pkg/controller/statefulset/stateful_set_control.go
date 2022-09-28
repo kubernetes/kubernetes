@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
@@ -109,16 +108,6 @@ func (ssc *defaultStatefulSetControl) performUpdate(
 	if err != nil {
 		return currentRevision, updateRevision, currentStatus, err
 	}
-	// update the set's status
-	err = ssc.updateStatefulSetStatus(ctx, set, currentStatus)
-	if err != nil {
-		return currentRevision, updateRevision, currentStatus, err
-	}
-	klog.V(4).InfoS("StatefulSet pod status", "statefulSet", klog.KObj(set),
-		"replicas", currentStatus.Replicas,
-		"readyReplicas", currentStatus.ReadyReplicas,
-		"currentReplicas", currentStatus.CurrentReplicas,
-		"updatedReplicas", currentStatus.UpdatedReplicas)
 
 	klog.V(4).InfoS("StatefulSet revisions", "statefulSet", klog.KObj(set),
 		"currentRevision", currentStatus.CurrentRevision,
@@ -274,7 +263,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	currentRevision *apps.ControllerRevision,
 	updateRevision *apps.ControllerRevision,
 	collisionCount int32,
-	pods []*v1.Pod) (*apps.StatefulSetStatus, error) {
+	pods []*v1.Pod) (statefulSetStatus *apps.StatefulSetStatus, updateErr error) {
 	// get the current and update revisions of the set.
 	currentSet, err := ApplyRevision(set, currentRevision)
 	if err != nil {
@@ -309,14 +298,10 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		if isRunningAndReady(pods[i]) {
 			status.ReadyReplicas++
 			// count the number of running and available replicas
-			if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) {
-				if isRunningAndAvailable(pods[i], set.Spec.MinReadySeconds) {
-					status.AvailableReplicas++
-				}
-			} else {
-				// If the featuregate is not enabled, all the ready replicas should be considered as available replicas
-				status.AvailableReplicas = status.ReadyReplicas
+			if isRunningAndAvailable(pods[i], set.Spec.MinReadySeconds) {
+				status.AvailableReplicas++
 			}
+
 		}
 
 		// count the number of current and update replicas
@@ -339,6 +324,23 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		}
 		// If the ordinal could not be parsed (ord < 0), ignore the Pod.
 	}
+
+	// make sure to update the latest status even if there is an error later
+	defer func() {
+		// update the set's status
+		statusErr := ssc.updateStatefulSetStatus(ctx, set, &status)
+		if statusErr == nil {
+			klog.V(4).InfoS("Updated status", "statefulSet", klog.KObj(set),
+				"replicas", status.Replicas,
+				"readyReplicas", status.ReadyReplicas,
+				"currentReplicas", status.CurrentReplicas,
+				"updatedReplicas", status.UpdatedReplicas)
+		} else if updateErr == nil {
+			updateErr = statusErr
+		} else {
+			klog.V(4).InfoS("Could not update status", "statefulSet", klog.KObj(set), "err", statusErr)
+		}
+	}()
 
 	// for any empty indices in the sequence [0,set.Spec.Replicas) create a new Pod at the correct revision
 	for ord := 0; ord < replicaCount; ord++ {
@@ -456,9 +458,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		// If we have a Pod that has been created but is not available we can not make progress.
 		// We must ensure that all for each Pod, when we create it, all of its predecessors, with respect to its
 		// ordinal, are Available.
-		// TODO: Since available is superset of Ready, once we have this featuregate enabled by default, we can remove the
-		// isRunningAndReady block as only Available pods should be brought down.
-		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) && !isRunningAndAvailable(replicas[i], set.Spec.MinReadySeconds) && monotonic {
+		if !isRunningAndAvailable(replicas[i], set.Spec.MinReadySeconds) && monotonic {
 			klog.V(4).InfoS("StatefulSet is waiting for Pod to be Available",
 				"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[i]))
 			return &status, nil
@@ -519,9 +519,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			return &status, nil
 		}
 		// if we are in monotonic mode and the condemned target is not the first unhealthy Pod, block.
-		// TODO: Since available is superset of Ready, once we have this featuregate enabled by default, we can remove the
-		// isRunningAndReady block as only Available pods should be brought down.
-		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) && !isRunningAndAvailable(condemned[target], set.Spec.MinReadySeconds) && monotonic && condemned[target] != firstUnhealthyPod {
+		if !isRunningAndAvailable(condemned[target], set.Spec.MinReadySeconds) && monotonic && condemned[target] != firstUnhealthyPod {
 			klog.V(4).InfoS("StatefulSet is waiting for Pod to be Available prior to scale down",
 				"statefulSet", klog.KObj(set), "pod", klog.KObj(firstUnhealthyPod))
 			return &status, nil
@@ -604,14 +602,13 @@ func updateStatefulSetAfterInvariantEstablished(
 		updateMin = int(*set.Spec.UpdateStrategy.RollingUpdate.Partition)
 
 		// if the feature was enabled and then later disabled, MaxUnavailable may have a value
-		// other than 1. Ignore the passed in value and Use maxUnavailable as 1 to enforce
+		// more than 1. Ignore the passed in value and Use maxUnavailable as 1 to enforce
 		// expected behavior when feature gate is not enabled.
 		var err error
-		maxUnavailable, err = intstrutil.GetValueFromIntOrPercent(intstrutil.ValueOrDefault(set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromInt(1)), int(replicaCount), false)
+		maxUnavailable, err = getStatefulSetMaxUnavailable(set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, replicaCount)
 		if err != nil {
 			return &status, err
 		}
-
 	}
 
 	// Collect all targets in the range between the 0 and Spec.Replicas. Count any targets in that range

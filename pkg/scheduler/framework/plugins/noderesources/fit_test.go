@@ -24,9 +24,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/featuregate"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -574,7 +571,6 @@ func TestStorageRequests(t *testing.T) {
 		pod        *v1.Pod
 		nodeInfo   *framework.NodeInfo
 		name       string
-		features   map[featuregate.Feature]bool
 		wantStatus *framework.Status
 	}{
 		{
@@ -598,13 +594,10 @@ func TestStorageRequests(t *testing.T) {
 			wantStatus: framework.NewStatus(framework.Unschedulable, getErrReason(v1.ResourceEphemeralStorage)),
 		},
 		{
-			pod: newResourceInitPod(newResourcePod(framework.Resource{EphemeralStorage: 25}), framework.Resource{EphemeralStorage: 25}),
+			pod: newResourceInitPod(newResourcePod(framework.Resource{EphemeralStorage: 5})),
 			nodeInfo: framework.NewNodeInfo(
-				newResourcePod(framework.Resource{MilliCPU: 2, Memory: 2})),
-			name: "ephemeral local storage request is ignored due to disabled feature gate",
-			features: map[featuregate.Feature]bool{
-				"LocalStorageCapacityIsolation": false,
-			},
+				newResourcePod(framework.Resource{MilliCPU: 2, Memory: 2, EphemeralStorage: 10})),
+			name: "ephemeral local storage is sufficient",
 		},
 		{
 			pod: newResourcePod(framework.Resource{EphemeralStorage: 10}),
@@ -616,9 +609,6 @@ func TestStorageRequests(t *testing.T) {
 
 	for _, test := range storagePodsTests {
 		t.Run(test.name, func(t *testing.T) {
-			for k, v := range test.features {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)()
-			}
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
 
@@ -755,9 +745,12 @@ func TestFitScore(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			state := framework.NewCycleState()
 			snapshot := cache.NewSnapshot(test.existingPods, test.nodes)
-			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(snapshot))
+			fh, _ := runtime.NewFramework(nil, nil, ctx.Done(), runtime.WithSnapshotSharedLister(snapshot))
 			args := test.nodeResourcesFitArgs
 			p, err := NewFit(&args, fh, plfeature.Features{})
 			if err != nil {
@@ -766,7 +759,7 @@ func TestFitScore(t *testing.T) {
 
 			var gotPriorities framework.NodeScoreList
 			for _, n := range test.nodes {
-				score, status := p.(framework.ScorePlugin).Score(context.Background(), state, test.requestedPod, n.Name)
+				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.requestedPod, n.Name)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}

@@ -2,9 +2,8 @@ package v1
 
 import (
 	v1 "github.com/openshift/api/config/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // +genclient
@@ -101,6 +100,43 @@ type DNSSpec struct {
 	// +optional
 	// +kubebuilder:default=Normal
 	LogLevel DNSLogLevel `json:"logLevel,omitempty"`
+
+	// cache describes the caching configuration that applies to all server blocks listed in the Corefile.
+	// This field allows a cluster admin to optionally configure:
+	// * positiveTTL which is a duration for which positive responses should be cached.
+	// * negativeTTL which is a duration for which negative responses should be cached.
+	// If this is not configured, OpenShift will configure positive and negative caching with a default value that is
+	// subject to change. At the time of writing, the default positiveTTL is 900 seconds and the default negativeTTL is
+	// 30 seconds or as noted in the respective Corefile for your version of OpenShift.
+	// +optional
+	Cache DNSCache `json:"cache,omitempty"`
+}
+
+// DNSCache defines the fields for configuring DNS caching.
+type DNSCache struct {
+	// positiveTTL is optional and specifies the amount of time that a positive response should be cached.
+	//
+	// If configured, it must be a value of 1s (1 second) or greater up to a theoretical maximum of several years.
+	// If not configured, the value will be 0 (zero) and OpenShift will use a default value of 900 seconds unless noted
+	// otherwise in the respective Corefile for your version of OpenShift. The default value of 900 seconds is subject
+	// to change. This field expects an unsigned duration string of decimal numbers, each with optional fraction and a
+	// unit suffix, e.g. "100s", "1m30s". Valid time units are "s", "m", and "h".
+	// +kubebuilder:validation:Pattern=^(0|([0-9]+(\.[0-9]+)?(s|m|h))+)$
+	// +kubebuilder:validation:Type:=string
+	// +optional
+	PositiveTTL metav1.Duration `json:"positiveTTL,omitempty"`
+
+	// negativeTTL is optional and specifies the amount of time that a negative response should be cached.
+	//
+	// If configured, it must be a value of 1s (1 second) or greater up to a theoretical maximum of several years.
+	// If not configured, the value will be 0 (zero) and OpenShift will use a default value of 30 seconds unless noted
+	// otherwise in the respective Corefile for your version of OpenShift. The default value of 30 seconds is subject
+	// to change. This field expects an unsigned duration string of decimal numbers, each with optional fraction and a
+	// unit suffix, e.g. "100s", "1m30s". Valid time units are "s", "m", and "h".
+	// +kubebuilder:validation:Pattern=^(0|([0-9]+(\.[0-9]+)?(s|m|h))+)$
+	// +kubebuilder:validation:Type:=string
+	// +optional
+	NegativeTTL metav1.Duration `json:"negativeTTL,omitempty"`
 }
 
 // +kubebuilder:validation:Enum:=Normal;Debug;Trace

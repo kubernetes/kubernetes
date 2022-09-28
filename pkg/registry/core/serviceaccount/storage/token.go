@@ -43,6 +43,12 @@ func (r *TokenREST) New() runtime.Object {
 	return &authenticationapi.TokenRequest{}
 }
 
+// Destroy cleans up resources on shutdown.
+func (r *TokenREST) Destroy() {
+	// Given no underlying store, we don't destroy anything
+	// here explicitly.
+}
+
 type TokenREST struct {
 	svcaccts             getter
 	pods                 getter

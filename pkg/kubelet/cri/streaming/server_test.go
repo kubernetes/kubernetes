@@ -304,7 +304,6 @@ func TestServePortForward(t *testing.T) {
 	doClientStreams(t, "portforward", stream, stream, nil)
 }
 
-//
 // Run the remote command test.
 // commandType is either "exec" or "attach".
 func runRemoteCommandTest(t *testing.T, commandType string) {

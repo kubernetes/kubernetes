@@ -130,12 +130,13 @@ type TestResult struct {
 // specifying the `--image-config-file` flag, pointing to a json or yaml file
 // of the form:
 //
-//     images:
-//       short-name:
-//         image: gce-image-name
-//         project: gce-image-project
-//         machine: for benchmark only, the machine type (GCE instance) to run test
-//         tests: for benchmark only, a list of ginkgo focus strings to match tests
+//	images:
+//	  short-name:
+//	    image: gce-image-name
+//	    project: gce-image-project
+//	    machine: for benchmark only, the machine type (GCE instance) to run test
+//	    tests: for benchmark only, a list of ginkgo focus strings to match tests
+//
 // TODO(coufon): replace 'image' with 'node' in configurations
 // and we plan to support testing custom machines other than GCE by specifying host
 type ImageConfig struct {
@@ -705,15 +706,14 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 
 		var output string
 		output, err = remote.SSH(name, "sh", "-c",
-			"'systemctl list-units  --type=service  --state=running | grep -e docker -e containerd -e crio'")
+			"'systemctl list-units  --type=service  --state=running | grep -e containerd -e crio'")
 		if err != nil {
-			err = fmt.Errorf("instance %s not running docker/containerd/crio daemon - Command failed: %s", name, output)
+			err = fmt.Errorf("instance %s not running containerd/crio daemon - Command failed: %s", name, output)
 			continue
 		}
-		if !strings.Contains(output, "docker.service") &&
-			!strings.Contains(output, "containerd.service") &&
+		if !strings.Contains(output, "containerd.service") &&
 			!strings.Contains(output, "crio.service") {
-			err = fmt.Errorf("instance %s not running docker/containerd/crio daemon: %s", name, output)
+			err = fmt.Errorf("instance %s not running containerd/crio daemon: %s", name, output)
 			continue
 		}
 		instanceRunning = true

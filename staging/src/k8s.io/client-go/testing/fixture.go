@@ -102,10 +102,20 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 			if action.GetSubresource() == "" {
 				err = tracker.Create(gvr, action.GetObject(), ns)
 			} else {
-				// TODO: Currently we're handling subresource creation as an update
-				// on the enclosing resource. This works for some subresources but
-				// might not be generic enough.
-				err = tracker.Update(gvr, action.GetObject(), ns)
+				oldObj, getOldObjErr := tracker.Get(gvr, ns, objMeta.GetName())
+				if getOldObjErr != nil {
+					return true, nil, getOldObjErr
+				}
+				// Check whether the existing historical object type is the same as the current operation object type that needs to be updated, and if it is the same, perform the update operation.
+				if reflect.TypeOf(oldObj) == reflect.TypeOf(action.GetObject()) {
+					// TODO: Currently we're handling subresource creation as an update
+					// on the enclosing resource. This works for some subresources but
+					// might not be generic enough.
+					err = tracker.Update(gvr, action.GetObject(), ns)
+				} else {
+					// If the historical object type is different from the current object type, need to make sure we return the object submitted,don't persist the submitted object in the tracker.
+					return true, action.GetObject(), nil
+				}
 			}
 			if err != nil {
 				return true, nil, err

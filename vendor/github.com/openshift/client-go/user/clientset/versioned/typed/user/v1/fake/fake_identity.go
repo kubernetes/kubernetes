@@ -4,8 +4,11 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	userv1 "github.com/openshift/api/user/v1"
+	applyconfigurationsuserv1 "github.com/openshift/client-go/user/applyconfigurations/user/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -99,6 +102,27 @@ func (c *FakeIdentities) DeleteCollection(ctx context.Context, opts v1.DeleteOpt
 func (c *FakeIdentities) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *userv1.Identity, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(identitiesResource, name, pt, data, subresources...), &userv1.Identity{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*userv1.Identity), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied identity.
+func (c *FakeIdentities) Apply(ctx context.Context, identity *applyconfigurationsuserv1.IdentityApplyConfiguration, opts v1.ApplyOptions) (result *userv1.Identity, err error) {
+	if identity == nil {
+		return nil, fmt.Errorf("identity provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(identity)
+	if err != nil {
+		return nil, err
+	}
+	name := identity.Name
+	if name == nil {
+		return nil, fmt.Errorf("identity.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(identitiesResource, *name, types.ApplyPatchType, data), &userv1.Identity{})
 	if obj == nil {
 		return nil, err
 	}

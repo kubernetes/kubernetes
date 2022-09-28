@@ -35,10 +35,10 @@ func (matcher *ContainElementsMatcher) Match(actual interface{}) (success bool, 
 }
 
 func (matcher *ContainElementsMatcher) FailureMessage(actual interface{}) (message string) {
-	message = format.Message(actual, "to contain elements", matcher.Elements)
+	message = format.Message(actual, "to contain elements", presentable(matcher.Elements))
 	return appendMissingElements(message, matcher.missingElements)
 }
 
 func (matcher *ContainElementsMatcher) NegatedFailureMessage(actual interface{}) (message string) {
-	return format.Message(actual, "not to contain elements", matcher.Elements)
+	return format.Message(actual, "not to contain elements", presentable(matcher.Elements))
 }

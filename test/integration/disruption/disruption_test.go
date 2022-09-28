@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-
+	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/api/policy/v1beta1"
@@ -49,8 +49,12 @@ import (
 	"k8s.io/kubernetes/pkg/controller/disruption"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/integration/util"
+	"k8s.io/utils/clock"
 	"k8s.io/utils/pointer"
 )
+
+const stalePodDisruptionTimeout = 3 * time.Second
 
 func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.DisruptionController, informers.SharedInformerFactory, clientset.Interface, *apiextensionsclientset.Clientset, dynamic.Interface) {
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
@@ -83,7 +87,7 @@ func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.Disrupti
 		t.Fatalf("Error creating dynamicClient: %v", err)
 	}
 
-	pdbc := disruption.NewDisruptionController(
+	pdbc := disruption.NewDisruptionControllerInternal(
 		informers.Core().V1().Pods(),
 		informers.Policy().V1().PodDisruptionBudgets(),
 		informers.Core().V1().ReplicationControllers(),
@@ -94,6 +98,8 @@ func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.Disrupti
 		mapper,
 		scaleClient,
 		client.Discovery(),
+		clock.RealClock{},
+		stalePodDisruptionTimeout,
 	)
 	return server, pdbc, informers, clientSet, apiExtensionClient, dynamicClient
 }
@@ -101,7 +107,9 @@ func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.Disrupti
 func TestPDBWithScaleSubresource(t *testing.T) {
 	s, pdbc, informers, clientSet, apiExtensionClient, dynamicClient := setup(t)
 	defer s.TearDownFn()
-	ctx := context.TODO()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	nsName := "pdb-scale-subresource"
 	createNs(ctx, t, nsName, clientSet)
 
@@ -187,16 +195,14 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 }
 
 func TestEmptySelector(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	testcases := []struct {
 		name                   string
-		createPDBFunc          func(clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error
+		createPDBFunc          func(ctx context.Context, clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error
 		expectedCurrentHealthy int32
 	}{
 		{
 			name: "v1beta1 should not target any pods",
-			createPDBFunc: func(clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
+			createPDBFunc: func(ctx context.Context, clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
 				pdb := &v1beta1.PodDisruptionBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: name,
@@ -213,7 +219,7 @@ func TestEmptySelector(t *testing.T) {
 		},
 		{
 			name: "v1 should target all pods",
-			createPDBFunc: func(clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
+			createPDBFunc: func(ctx context.Context, clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
 				pdb := &policyv1.PodDisruptionBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: name,
@@ -235,6 +241,9 @@ func TestEmptySelector(t *testing.T) {
 			s, pdbc, informers, clientSet, _, _ := setup(t)
 			defer s.TearDownFn()
 
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			nsName := fmt.Sprintf("pdb-empty-selector-%d", i)
 			createNs(ctx, t, nsName, clientSet)
 
@@ -252,7 +261,7 @@ func TestEmptySelector(t *testing.T) {
 			waitToObservePods(t, informers.Core().V1().Pods().Informer(), 4, v1.PodRunning)
 
 			pdbName := "test-pdb"
-			if err := tc.createPDBFunc(clientSet, pdbName, nsName, minAvailable); err != nil {
+			if err := tc.createPDBFunc(ctx, clientSet, pdbName, nsName, minAvailable); err != nil {
 				t.Errorf("Error creating PodDisruptionBudget: %v", err)
 			}
 
@@ -271,16 +280,14 @@ func TestEmptySelector(t *testing.T) {
 }
 
 func TestSelectorsForPodsWithoutLabels(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	testcases := []struct {
 		name                   string
-		createPDBFunc          func(clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error
+		createPDBFunc          func(ctx context.Context, clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error
 		expectedCurrentHealthy int32
 	}{
 		{
 			name: "pods with no labels can be targeted by v1 PDBs with empty selector",
-			createPDBFunc: func(clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
+			createPDBFunc: func(ctx context.Context, clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
 				pdb := &policyv1.PodDisruptionBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: name,
@@ -297,7 +304,7 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 		},
 		{
 			name: "pods with no labels can be targeted by v1 PDBs with DoesNotExist selector",
-			createPDBFunc: func(clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
+			createPDBFunc: func(ctx context.Context, clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
 				pdb := &policyv1.PodDisruptionBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: name,
@@ -321,7 +328,7 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 		},
 		{
 			name: "pods with no labels can be targeted by v1beta1 PDBs with DoesNotExist selector",
-			createPDBFunc: func(clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
+			createPDBFunc: func(ctx context.Context, clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
 				pdb := &v1beta1.PodDisruptionBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: name,
@@ -350,6 +357,9 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 			s, pdbc, informers, clientSet, _, _ := setup(t)
 			defer s.TearDownFn()
 
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			nsName := fmt.Sprintf("pdb-selectors-%d", i)
 			createNs(ctx, t, nsName, clientSet)
 
@@ -360,7 +370,7 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 
 			// Create the PDB first and wait for it to settle.
 			pdbName := "test-pdb"
-			if err := tc.createPDBFunc(clientSet, pdbName, nsName, minAvailable); err != nil {
+			if err := tc.createPDBFunc(ctx, clientSet, pdbName, nsName, minAvailable); err != nil {
 				t.Errorf("Error creating PodDisruptionBudget: %v", err)
 			}
 			waitPDBStable(ctx, t, clientSet, 0, nsName, pdbName)
@@ -406,7 +416,7 @@ func createPod(ctx context.Context, t *testing.T, name, namespace string, labels
 		t.Error(err)
 	}
 	addPodConditionReady(pod)
-	if _, err := clientSet.CoreV1().Pods(namespace).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{}); err != nil {
+	if _, err := clientSet.CoreV1().Pods(namespace).UpdateStatus(ctx, pod, metav1.UpdateOptions{}); err != nil {
 		t.Error(err)
 	}
 }
@@ -466,7 +476,7 @@ func newCustomResourceDefinition() *apiextensionsv1.CustomResourceDefinition {
 
 func waitPDBStable(ctx context.Context, t *testing.T, clientSet clientset.Interface, podNum int32, ns, pdbName string) {
 	if err := wait.PollImmediate(2*time.Second, 60*time.Second, func() (bool, error) {
-		pdb, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns).Get(ctx, pdbName, metav1.GetOptions{})
+		pdb, err := clientSet.PolicyV1().PodDisruptionBudgets(ns).Get(ctx, pdbName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -498,8 +508,14 @@ func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podN
 }
 
 func TestPatchCompatibility(t *testing.T) {
-	s, _, _, clientSet, _, _ := setup(t)
+	s, pdbc, _, clientSet, _, _ := setup(t)
 	defer s.TearDownFn()
+
+	// Even though pdbc isn't used in this test, its creation is already
+	// spawning some goroutines. So we need to run it to ensure they won't leak.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	pdbc.Run(ctx)
 
 	testcases := []struct {
 		name             string
@@ -634,5 +650,92 @@ func TestPatchCompatibility(t *testing.T) {
 			}
 		})
 	}
+}
 
+func TestStalePodDisruption(t *testing.T) {
+	s, pdbc, informers, clientSet, _, _ := setup(t)
+	defer s.TearDownFn()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	nsName := "pdb-stale-pod-disruption"
+	createNs(ctx, t, nsName, clientSet)
+
+	informers.Start(ctx.Done())
+	informers.WaitForCacheSync(ctx.Done())
+	go pdbc.Run(ctx)
+
+	cases := map[string]struct {
+		deletePod      bool
+		wantConditions []v1.PodCondition
+	}{
+		"stale-condition": {
+			wantConditions: []v1.PodCondition{
+				{
+					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Status: v1.ConditionFalse,
+				},
+			},
+		},
+		"deleted-pod": {
+			deletePod: true,
+			wantConditions: []v1.PodCondition{
+				{
+					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			pod := util.InitPausePod(&util.PausePodConfig{
+				Name:      name,
+				Namespace: nsName,
+				NodeName:  "foo", // mock pod as scheduled so that it's not immediately deleted when calling Delete.
+			})
+			var err error
+			pod, err = util.CreatePausePod(clientSet, pod)
+			if err != nil {
+				t.Fatalf("Failed creating pod: %v", err)
+			}
+
+			pod.Status.Phase = v1.PodRunning
+			pod.Status.Conditions = append(pod.Status.Conditions, v1.PodCondition{
+				Type:               v1.AlphaNoCompatGuaranteeDisruptionTarget,
+				Status:             v1.ConditionTrue,
+				LastTransitionTime: metav1.Now(),
+			})
+			pod, err = clientSet.CoreV1().Pods(nsName).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
+			if err != nil {
+				t.Fatalf("Failed updating pod: %v", err)
+			}
+
+			if tc.deletePod {
+				if err := clientSet.CoreV1().Pods(nsName).Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
+					t.Fatalf("Failed to delete pod: %v", err)
+				}
+			}
+			time.Sleep(stalePodDisruptionTimeout)
+			diff := ""
+			if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (done bool, err error) {
+				pod, err = clientSet.CoreV1().Pods(nsName).Get(ctx, name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				if tc.deletePod && pod.DeletionTimestamp == nil {
+					return false, nil
+				}
+				diff = cmp.Diff(tc.wantConditions, pod.Status.Conditions, cmpopts.IgnoreFields(v1.PodCondition{}, "LastTransitionTime"))
+				return diff == "", nil
+			}); err != nil {
+				t.Errorf("Failed waiting for status to change: %v", err)
+				if diff != "" {
+					t.Errorf("Pod has conditions (-want,+got):\n%s", diff)
+				}
+			}
+		})
+	}
 }

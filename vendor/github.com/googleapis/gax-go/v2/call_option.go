@@ -47,7 +47,7 @@ type CallOption interface {
 
 // Retryer is used by Invoke to determine retry behavior.
 type Retryer interface {
-	// Retry reports whether a request should be retriedand how long to pause before retrying
+	// Retry reports whether a request should be retried and how long to pause before retrying
 	// if the previous attempt returned with err. Invoke never calls Retry with nil error.
 	Retry(err error) (pause time.Duration, shouldRetry bool)
 }
@@ -61,6 +61,31 @@ func (o retryerOption) Resolve(s *CallSettings) {
 // WithRetry sets CallSettings.Retry to fn.
 func WithRetry(fn func() Retryer) CallOption {
 	return retryerOption(fn)
+}
+
+// OnErrorFunc returns a Retryer that retries if and only if the previous attempt
+// returns an error that satisfies shouldRetry.
+//
+// Pause times between retries are specified by bo. bo is only used for its
+// parameters; each Retryer has its own copy.
+func OnErrorFunc(bo Backoff, shouldRetry func(err error) bool) Retryer {
+	return &errorRetryer{
+		shouldRetry: shouldRetry,
+		backoff:     bo,
+	}
+}
+
+type errorRetryer struct {
+	backoff     Backoff
+	shouldRetry func(err error) bool
+}
+
+func (r *errorRetryer) Retry(err error) (time.Duration, bool) {
+	if r.shouldRetry(err) {
+		return r.backoff.Pause(), true
+	}
+
+	return 0, false
 }
 
 // OnCodes returns a Retryer that retries if and only if
@@ -94,22 +119,25 @@ func (r *boRetryer) Retry(err error) (time.Duration, bool) {
 	return 0, false
 }
 
-// Backoff implements exponential backoff.
-// The wait time between retries is a random value between 0 and the "retry envelope".
-// The envelope starts at Initial and increases by the factor of Multiplier every retry,
-// but is capped at Max.
+// Backoff implements exponential backoff. The wait time between retries is a
+// random value between 0 and the "retry period" - the time between retries. The
+// retry period starts at Initial and increases by the factor of Multiplier
+// every retry, but is capped at Max.
+//
+// Note: MaxNumRetries / RPCDeadline is specifically not provided. These should
+// be built on top of Backoff.
 type Backoff struct {
-	// Initial is the initial value of the retry envelope, defaults to 1 second.
+	// Initial is the initial value of the retry period, defaults to 1 second.
 	Initial time.Duration
 
-	// Max is the maximum value of the retry envelope, defaults to 30 seconds.
+	// Max is the maximum value of the retry period, defaults to 30 seconds.
 	Max time.Duration
 
-	// Multiplier is the factor by which the retry envelope increases.
+	// Multiplier is the factor by which the retry period increases.
 	// It should be greater than 1 and defaults to 2.
 	Multiplier float64
 
-	// cur is the current retry envelope
+	// cur is the current retry period.
 	cur time.Duration
 }
 

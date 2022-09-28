@@ -407,6 +407,8 @@ func AddValidateFlags(cmd *cobra.Command) {
 		"warn" will warn about unknown or duplicate fields without blocking the request if server-side field validation is enabled on the API server, and behave as "ignore" otherwise.
 		"false" or "ignore" will not perform any schema validation, silently dropping any unknown or duplicate fields.`,
 	)
+
+	cmd.Flags().Lookup("validate").NoOptDefVal = "strict"
 }
 
 func AddFilenameOptionFlags(cmd *cobra.Command, options *resource.FilenameOptions, usage string) {
@@ -475,6 +477,9 @@ func AddLabelSelectorFlagVar(cmd *cobra.Command, p *string) {
 
 func AddSubresourceFlags(cmd *cobra.Command, subresource *string, usage string, allowedSubresources ...string) {
 	cmd.Flags().StringVar(subresource, "subresource", "", fmt.Sprintf("%s Must be one of %v. This flag is alpha and may change in the future.", usage, allowedSubresources))
+	CheckErr(cmd.RegisterFlagCompletionFunc("subresource", func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+		return allowedSubresources, cobra.ShellCompDirectiveNoFileComp
+	}))
 }
 
 type ValidateOptions struct {
@@ -584,8 +589,6 @@ func GetValidationDirective(cmd *cobra.Command) (string, error) {
 	b, err := strconv.ParseBool(validateFlag)
 	if err != nil {
 		switch validateFlag {
-		case cmd.Flag("validate").NoOptDefVal:
-			return metav1.FieldValidationStrict, nil
 		case "strict":
 			return metav1.FieldValidationStrict, nil
 		case "warn":
@@ -745,7 +748,8 @@ func IsSiblingCommandExists(cmd *cobra.Command, targetCmdName string) bool {
 // arguments (sub-commands) are provided, or a usage error otherwise.
 func DefaultSubCommandRun(out io.Writer) func(c *cobra.Command, args []string) {
 	return func(c *cobra.Command, args []string) {
-		c.SetOutput(out)
+		c.SetOut(out)
+		c.SetErr(out)
 		RequireNoArguments(c, args)
 		c.Help()
 		CheckErr(ErrExit)

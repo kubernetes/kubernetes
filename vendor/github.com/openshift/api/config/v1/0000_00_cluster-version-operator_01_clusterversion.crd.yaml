@@ -66,6 +66,9 @@ spec:
                           - openshift-samples
                           - baremetal
                           - marketplace
+                          - Console
+                          - Insights
+                          - Storage
                       x-kubernetes-list-type: atomic
                     baselineCapabilitySet:
                       description: baselineCapabilitySet selects an initial set of optional capabilities to enable, which can be extended via additionalEnabledCapabilities.  If unset, the cluster will choose a default, and the default may change over time. The current default is vCurrent.
@@ -73,6 +76,7 @@ spec:
                       enum:
                         - None
                         - v4.11
+                        - v4.12
                         - vCurrent
                 channel:
                   description: channel is an identifier for explicitly requesting that a non-default set of updates be applied to this cluster. The default channel will be contain stable updates that are appropriate for production clusters.
@@ -169,6 +173,9 @@ spec:
                           - openshift-samples
                           - baremetal
                           - marketplace
+                          - Console
+                          - Insights
+                          - Storage
                       x-kubernetes-list-type: atomic
                     knownCapabilities:
                       description: knownCapabilities lists all the capabilities known to the current cluster.
@@ -180,6 +187,9 @@ spec:
                           - openshift-samples
                           - baremetal
                           - marketplace
+                          - Console
+                          - Insights
+                          - Storage
                       x-kubernetes-list-type: atomic
                 conditionalUpdates:
                   description: conditionalUpdates contains the list of updates that may be recommended for this cluster if it meets specific required conditions. Consumers interested in the set of updates that are actually recommended for this cluster should use availableUpdates. This list may be empty if no updates are recommended, if the update service is unavailable, or if an empty or invalid channel has been specified.
@@ -195,7 +205,7 @@ spec:
                         description: 'conditions represents the observations of the conditional update''s current status. Known types are: * Evaluating, for whether the cluster-version operator will attempt to evaluate any risks[].matchingRules. * Recommended, for whether the update is recommended for the current cluster.'
                         type: array
                         items:
-                          description: "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, type FooStatus struct{     // Represents the observations of a foo's current state.     // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\"     // +patchMergeKey=type     // +patchStrategy=merge     // +listType=map     // +listMapKey=type     Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n     // other fields }"
+                          description: "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, \n \ttype FooStatus struct{ \t    // Represents the observations of a foo's current state. \t    // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\" \t    // +patchMergeKey=type \t    // +patchStrategy=merge \t    // +listType=map \t    // +listMapKey=type \t    Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n \t    // other fields \t}"
                           type: object
                           required:
                             - lastTransitionTime

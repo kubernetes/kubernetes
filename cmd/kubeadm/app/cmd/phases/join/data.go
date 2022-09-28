@@ -33,7 +33,7 @@ type JoinData interface {
 	Cfg() *kubeadmapi.JoinConfiguration
 	TLSBootstrapCfg() (*clientcmdapi.Config, error)
 	InitCfg() (*kubeadmapi.InitConfiguration, error)
-	ClientSet() (*clientset.Clientset, error)
+	Client() (clientset.Interface, error)
 	IgnorePreflightErrors() sets.String
 	OutputWriter() io.Writer
 	PatchesDir() string

@@ -118,7 +118,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				default:
 					isValue := true
 					switch field.Type.Kind() {
-					case reflect.Interface, reflect.Map, reflect.Slice, reflect.Ptr:
+					case reflect.Interface, reflect.Map, reflect.Slice, reflect.Pointer:
 						isValue = false
 					}
 					if isValue || c.Intn(10) == 0 {

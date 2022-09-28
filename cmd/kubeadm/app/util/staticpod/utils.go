@@ -168,14 +168,7 @@ func PatchStaticPod(pod *v1.Pod, patchesDir string, output io.Writer) (*v1.Pod, 
 		return pod, errors.Wrapf(err, "failed to marshal Pod manifest to YAML")
 	}
 
-	var knownTargets = []string{
-		kubeadmconstants.Etcd,
-		kubeadmconstants.KubeAPIServer,
-		kubeadmconstants.KubeControllerManager,
-		kubeadmconstants.KubeScheduler,
-	}
-
-	patchManager, err := patches.GetPatchManagerForPath(patchesDir, knownTargets, output)
+	patchManager, err := patches.GetPatchManagerForPath(patchesDir, patches.KnownTargets(), output)
 	if err != nil {
 		return pod, err
 	}

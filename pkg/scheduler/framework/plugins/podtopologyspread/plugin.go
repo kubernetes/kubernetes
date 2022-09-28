@@ -54,15 +54,17 @@ var systemDefaultConstraints = []v1.TopologySpreadConstraint{
 
 // PodTopologySpread is a plugin that ensures pod's topologySpreadConstraints is satisfied.
 type PodTopologySpread struct {
-	systemDefaulted                     bool
-	parallelizer                        parallelize.Parallelizer
-	defaultConstraints                  []v1.TopologySpreadConstraint
-	sharedLister                        framework.SharedLister
-	services                            corelisters.ServiceLister
-	replicationCtrls                    corelisters.ReplicationControllerLister
-	replicaSets                         appslisters.ReplicaSetLister
-	statefulSets                        appslisters.StatefulSetLister
-	enableMinDomainsInPodTopologySpread bool
+	systemDefaulted                              bool
+	parallelizer                                 parallelize.Parallelizer
+	defaultConstraints                           []v1.TopologySpreadConstraint
+	sharedLister                                 framework.SharedLister
+	services                                     corelisters.ServiceLister
+	replicationCtrls                             corelisters.ReplicationControllerLister
+	replicaSets                                  appslisters.ReplicaSetLister
+	statefulSets                                 appslisters.StatefulSetLister
+	enableMinDomainsInPodTopologySpread          bool
+	enableNodeInclusionPolicyInPodTopologySpread bool
+	enableMatchLabelKeysInPodTopologySpread      bool
 }
 
 var _ framework.PreFilterPlugin = &PodTopologySpread{}
@@ -71,10 +73,8 @@ var _ framework.PreScorePlugin = &PodTopologySpread{}
 var _ framework.ScorePlugin = &PodTopologySpread{}
 var _ framework.EnqueueExtensions = &PodTopologySpread{}
 
-const (
-	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = names.PodTopologySpread
-)
+// Name is the name of the plugin used in the plugin registry and configurations.
+const Name = names.PodTopologySpread
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *PodTopologySpread) Name() string {
@@ -98,6 +98,8 @@ func New(plArgs runtime.Object, h framework.Handle, fts feature.Features) (frame
 		sharedLister:                        h.SnapshotSharedLister(),
 		defaultConstraints:                  args.DefaultConstraints,
 		enableMinDomainsInPodTopologySpread: fts.EnableMinDomainsInPodTopologySpread,
+		enableNodeInclusionPolicyInPodTopologySpread: fts.EnableNodeInclusionPolicyInPodTopologySpread,
+		enableMatchLabelKeysInPodTopologySpread:      fts.EnableMatchLabelKeysInPodTopologySpread,
 	}
 	if args.DefaultingType == config.SystemDefaulting {
 		pl.defaultConstraints = systemDefaultConstraints

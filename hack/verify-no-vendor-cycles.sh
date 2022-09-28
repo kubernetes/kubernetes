@@ -25,7 +25,7 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-export GO111MODULE=auto
+export GO111MODULE=on
 
 staging_repos=()
 kube::util::read-array staging_repos < <(kube::util::list_staging_repos)
@@ -45,12 +45,18 @@ kube::util::ensure-temp-dir
 
 # Get vendored packages dependencies
 # Use -deps flag to include transitive dependencies
-go list -mod=vendor -test -deps -json ./vendor/... > "${KUBE_TEMP}/deps.json"
+go list -mod=vendor -test -tags other   -e -deps -json ./vendor/... > "${KUBE_TEMP}/deps_other.json"
+go list -mod=vendor -test -tags linux   -e -deps -json ./vendor/... > "${KUBE_TEMP}/deps_linux.json"
+go list -mod=vendor -test -tags windows -e -deps -json ./vendor/... > "${KUBE_TEMP}/deps_windows.json"
 
 # Check for any vendored package that imports main repo
 # Staging repos are explicitly excluded even though go list does not currently consider symlinks
-go run cmd/dependencycheck/dependencycheck.go -restrict "^k8s\.io/kubernetes/" -exclude "^k8s\.io/(${staging_repos_pattern})(/|$)" "${KUBE_TEMP}/deps.json"
+go run cmd/dependencycheck/dependencycheck.go -restrict "^k8s\.io/kubernetes/" -exclude "^k8s\.io/(${staging_repos_pattern})(/|$)" "${KUBE_TEMP}/deps_other.json"
+go run cmd/dependencycheck/dependencycheck.go -restrict "^k8s\.io/kubernetes/" -exclude "^k8s\.io/(${staging_repos_pattern})(/|$)" "${KUBE_TEMP}/deps_linux.json"
+go run cmd/dependencycheck/dependencycheck.go -restrict "^k8s\.io/kubernetes/" -exclude "^k8s\.io/(${staging_repos_pattern})(/|$)" "${KUBE_TEMP}/deps_windows.json"
 
 # Check for any vendored package that imports a staging repo
 # Staging repos are explicitly excluded even though go list does not currently consider symlinks
-go run cmd/dependencycheck/dependencycheck.go -restrict "^k8s\.io/(${staging_repos_pattern})(/|$)" -exclude "^k8s\.io/(${staging_repos_pattern})(/|$)" "${KUBE_TEMP}/deps.json"
+go run cmd/dependencycheck/dependencycheck.go -restrict "^k8s\.io/(${staging_repos_pattern})(/|$)" -exclude "^k8s\.io/(${staging_repos_pattern})(/|$)" "${KUBE_TEMP}/deps_other.json"
+go run cmd/dependencycheck/dependencycheck.go -restrict "^k8s\.io/(${staging_repos_pattern})(/|$)" -exclude "^k8s\.io/(${staging_repos_pattern})(/|$)" "${KUBE_TEMP}/deps_linux.json"
+go run cmd/dependencycheck/dependencycheck.go -restrict "^k8s\.io/(${staging_repos_pattern})(/|$)" -exclude "^k8s\.io/(${staging_repos_pattern})(/|$)" "${KUBE_TEMP}/deps_windows.json"

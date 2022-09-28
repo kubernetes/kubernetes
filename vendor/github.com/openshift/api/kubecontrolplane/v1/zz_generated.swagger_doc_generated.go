@@ -27,7 +27,7 @@ var map_KubeAPIServerConfig = map[string]string{
 	"kubeletClientInfo":            "kubeletClientInfo contains information about how to connect to kubelets",
 	"servicesSubnet":               "servicesSubnet is the subnet to use for assigning service IPs",
 	"servicesNodePortRange":        "servicesNodePortRange is the range to use for assigning service public ports on a host.",
-	"consolePublicURL":             "consolePublicURL is an optional URL to provide a redirect from the kube-apiserver to the webconsole",
+	"consolePublicURL":             "DEPRECATED: consolePublicURL has been deprecated and setting it has no effect.",
 	"userAgentMatchingConfig":      "UserAgentMatchingConfig controls how API calls from *voluntarily* identifying clients will be handled.  THIS DOES NOT DEFEND AGAINST MALICIOUS CLIENTS!",
 	"imagePolicyConfig":            "imagePolicyConfig feeds the image policy admission plugin",
 	"projectConfig":                "projectConfig feeds an admission plugin",

@@ -60,7 +60,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	uexec "k8s.io/utils/exec"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -606,15 +606,10 @@ func testVolumeClient(f *framework.Framework, config TestConfig, fsGroup *int64,
 	ec := &v1.EphemeralContainer{
 		EphemeralContainerCommon: v1.EphemeralContainerCommon(clientPod.Spec.Containers[0]),
 	}
+	ec.Resources = v1.ResourceRequirements{}
 	ec.Name = "volume-ephemeral-container"
 	err = f.PodClient().AddEphemeralContainerSync(clientPod, ec, timeouts.PodStart)
 	// The API server will return NotFound for the subresource when the feature is disabled
-	// BEGIN TODO: remove after EphemeralContainers feature gate is retired
-	if apierrors.IsNotFound(err) {
-		framework.Logf("Skipping ephemeral container re-test because feature is disabled (error: %q)", err)
-		return
-	}
-	// END TODO: remove after EphemeralContainers feature gate is retired
 	framework.ExpectNoError(err, "failed to add ephemeral container for re-test")
 	testVolumeContent(f, clientPod, ec.Name, fsGroup, fsType, tests)
 }

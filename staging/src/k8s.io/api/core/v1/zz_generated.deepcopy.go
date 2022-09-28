@@ -243,6 +243,11 @@ func (in *CSIPersistentVolumeSource) DeepCopyInto(out *CSIPersistentVolumeSource
 		*out = new(SecretReference)
 		**out = **in
 	}
+	if in.NodeExpandSecretRef != nil {
+		in, out := &in.NodeExpandSecretRef, &out.NodeExpandSecretRef
+		*out = new(SecretReference)
+		**out = **in
+	}
 	return
 }
 
@@ -3949,6 +3954,11 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 		*out = new(PodOS)
 		**out = **in
 	}
+	if in.HostUsers != nil {
+		in, out := &in.HostUsers, &out.HostUsers
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
@@ -5400,7 +5410,7 @@ func (in *ServiceSpec) DeepCopyInto(out *ServiceSpec) {
 	}
 	if in.IPFamilyPolicy != nil {
 		in, out := &in.IPFamilyPolicy, &out.IPFamilyPolicy
-		*out = new(IPFamilyPolicyType)
+		*out = new(IPFamilyPolicy)
 		**out = **in
 	}
 	if in.AllocateLoadBalancerNodePorts != nil {
@@ -5648,6 +5658,21 @@ func (in *TopologySpreadConstraint) DeepCopyInto(out *TopologySpreadConstraint) 
 		in, out := &in.MinDomains, &out.MinDomains
 		*out = new(int32)
 		**out = **in
+	}
+	if in.NodeAffinityPolicy != nil {
+		in, out := &in.NodeAffinityPolicy, &out.NodeAffinityPolicy
+		*out = new(NodeInclusionPolicy)
+		**out = **in
+	}
+	if in.NodeTaintsPolicy != nil {
+		in, out := &in.NodeTaintsPolicy, &out.NodeTaintsPolicy
+		*out = new(NodeInclusionPolicy)
+		**out = **in
+	}
+	if in.MatchLabelKeys != nil {
+		in, out := &in.MatchLabelKeys, &out.MatchLabelKeys
+		*out = make([]string, len(*in))
+		copy(*out, *in)
 	}
 	return
 }

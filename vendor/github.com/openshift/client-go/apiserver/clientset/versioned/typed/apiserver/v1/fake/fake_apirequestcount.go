@@ -4,8 +4,11 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	apiserverv1 "github.com/openshift/api/apiserver/v1"
+	applyconfigurationsapiserverv1 "github.com/openshift/client-go/apiserver/applyconfigurations/apiserver/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -110,6 +113,49 @@ func (c *FakeAPIRequestCounts) DeleteCollection(ctx context.Context, opts v1.Del
 func (c *FakeAPIRequestCounts) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *apiserverv1.APIRequestCount, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(apirequestcountsResource, name, pt, data, subresources...), &apiserverv1.APIRequestCount{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*apiserverv1.APIRequestCount), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied aPIRequestCount.
+func (c *FakeAPIRequestCounts) Apply(ctx context.Context, aPIRequestCount *applyconfigurationsapiserverv1.APIRequestCountApplyConfiguration, opts v1.ApplyOptions) (result *apiserverv1.APIRequestCount, err error) {
+	if aPIRequestCount == nil {
+		return nil, fmt.Errorf("aPIRequestCount provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(aPIRequestCount)
+	if err != nil {
+		return nil, err
+	}
+	name := aPIRequestCount.Name
+	if name == nil {
+		return nil, fmt.Errorf("aPIRequestCount.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(apirequestcountsResource, *name, types.ApplyPatchType, data), &apiserverv1.APIRequestCount{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*apiserverv1.APIRequestCount), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeAPIRequestCounts) ApplyStatus(ctx context.Context, aPIRequestCount *applyconfigurationsapiserverv1.APIRequestCountApplyConfiguration, opts v1.ApplyOptions) (result *apiserverv1.APIRequestCount, err error) {
+	if aPIRequestCount == nil {
+		return nil, fmt.Errorf("aPIRequestCount provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(aPIRequestCount)
+	if err != nil {
+		return nil, err
+	}
+	name := aPIRequestCount.Name
+	if name == nil {
+		return nil, fmt.Errorf("aPIRequestCount.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(apirequestcountsResource, *name, types.ApplyPatchType, data, "status"), &apiserverv1.APIRequestCount{})
 	if obj == nil {
 		return nil, err
 	}

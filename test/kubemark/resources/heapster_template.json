@@ -33,7 +33,7 @@
 				"containers": [
 				{
 					"name": "heapster",
-					"image": "k8s.gcr.io/heapster:v1.3.0",
+					"image": "registry.k8s.io/heapster:v1.3.0",
 					"resources": {
 						"requests": {
 							"cpu": "{{METRICS_CPU}}m",
@@ -55,7 +55,7 @@
 				},
 				{
 					"name": "eventer",
-					"image": "k8s.gcr.io/heapster:v1.3.0",
+					"image": "registry.k8s.io/heapster:v1.3.0",
 					"resources": {
 						"requests": {
 							"memory": "{{EVENTER_MEM}}Ki"

@@ -393,6 +393,8 @@ API rule violation: names_match,k8s.io/api/core/v1,RBDVolumeSource,RBDPool
 API rule violation: names_match,k8s.io/api/core/v1,RBDVolumeSource,RadosUser
 API rule violation: names_match,k8s.io/api/core/v1,VolumeSource,CephFS
 API rule violation: names_match,k8s.io/api/core/v1,VolumeSource,StorageOS
+API rule violation: names_match,k8s.io/api/networking/v1alpha1,ClusterCIDRSpec,IPv4
+API rule violation: names_match,k8s.io/api/networking/v1alpha1,ClusterCIDRSpec,IPv6
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSON,Raw
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,Ref
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,Schema
@@ -437,7 +439,6 @@ API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,Duration,Du
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,InternalEvent,Object
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,InternalEvent,Type
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,MicroTime,Time
-API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,ObjectMeta,ZZZ_DeprecatedClusterName
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,StatusCause,Type
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,Time,Time
 API rule violation: names_match,k8s.io/apimachinery/pkg/runtime,Unknown,ContentEncoding
@@ -496,9 +497,6 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,C
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CronJobControllerConfiguration,ConcurrentCronJobSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,DaemonSetControllerConfiguration,ConcurrentDaemonSetSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,DeploymentControllerConfiguration,ConcurrentDeploymentSyncs
-API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,DeprecatedControllerConfiguration,DeletingPodsBurst
-API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,DeprecatedControllerConfiguration,DeletingPodsQPS
-API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,DeprecatedControllerConfiguration,RegisterRetryCount
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,EndpointControllerConfiguration,ConcurrentEndpointSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,EndpointControllerConfiguration,EndpointUpdatesBatchPeriod
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,EndpointSliceControllerConfiguration,ConcurrentServiceEndpointSyncs

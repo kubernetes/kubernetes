@@ -20,14 +20,21 @@ limitations under the License.
 package cm
 
 import (
+	"errors"
 	"io/ioutil"
 	"os"
 	"path"
 	"testing"
 
+	gomock "github.com/golang/mock/gomock"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 
 	"k8s.io/mount-utils"
 )
@@ -165,4 +172,91 @@ func TestSoftRequirementsValidationSuccess(t *testing.T) {
 	f, err := validateSystemRequirements(mountInt)
 	assert.NoError(t, err)
 	assert.True(t, f.cpuHardcapping, "cpu hardcapping is expected to be enabled")
+}
+
+func TestGetCapacity(t *testing.T) {
+	ephemeralStorageFromCapacity := int64(2000)
+	ephemeralStorageFromCadvisor := int64(8000)
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockCtrlError := gomock.NewController(t)
+	defer mockCtrlError.Finish()
+
+	mockCadvisor := cadvisortest.NewMockInterface(mockCtrl)
+	rootfs := cadvisorapiv2.FsInfo{
+		Capacity: 8000,
+	}
+	mockCadvisor.EXPECT().RootFsInfo().Return(rootfs, nil)
+	mockCadvisorError := cadvisortest.NewMockInterface(mockCtrlError)
+	mockCadvisorError.EXPECT().RootFsInfo().Return(cadvisorapiv2.FsInfo{}, errors.New("Unable to get rootfs data from cAdvisor interface"))
+	cases := []struct {
+		name                                 string
+		cm                                   *containerManagerImpl
+		expectedResourceQuantity             *resource.Quantity
+		expectedNoEphemeralStorage           bool
+		disablelocalStorageCapacityIsolation bool
+	}{
+		{
+			name: "capacity property has ephemeral-storage",
+			cm: &containerManagerImpl{
+				cadvisorInterface: mockCadvisor,
+				capacity: v1.ResourceList{
+					v1.ResourceEphemeralStorage: *resource.NewQuantity(ephemeralStorageFromCapacity, resource.BinarySI),
+				},
+			},
+			expectedResourceQuantity:   resource.NewQuantity(ephemeralStorageFromCapacity, resource.BinarySI),
+			expectedNoEphemeralStorage: false,
+		},
+		{
+			name: "capacity property does not have ephemeral-storage",
+			cm: &containerManagerImpl{
+				cadvisorInterface: mockCadvisor,
+				capacity:          v1.ResourceList{},
+			},
+			expectedResourceQuantity:   resource.NewQuantity(ephemeralStorageFromCadvisor, resource.BinarySI),
+			expectedNoEphemeralStorage: false,
+		},
+		{
+			name: "capacity property does not have ephemeral-storage, error from rootfs",
+			cm: &containerManagerImpl{
+				cadvisorInterface: mockCadvisorError,
+				capacity:          v1.ResourceList{},
+			},
+			expectedNoEphemeralStorage: true,
+		},
+		{
+			name: "capacity property does not have ephemeral-storage, cadvisor interface is nil",
+			cm: &containerManagerImpl{
+				cadvisorInterface: nil,
+				capacity:          v1.ResourceList{},
+			},
+			expectedNoEphemeralStorage: true,
+		},
+		{
+			name: "capacity property has ephemeral-storage, but localStorageCapacityIsolation is disabled",
+			cm: &containerManagerImpl{
+				cadvisorInterface: mockCadvisor,
+				capacity: v1.ResourceList{
+					v1.ResourceEphemeralStorage: *resource.NewQuantity(ephemeralStorageFromCapacity, resource.BinarySI),
+				},
+			},
+			expectedResourceQuantity:             resource.NewQuantity(ephemeralStorageFromCapacity, resource.BinarySI),
+			expectedNoEphemeralStorage:           true,
+			disablelocalStorageCapacityIsolation: true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ret := c.cm.GetCapacity(!c.disablelocalStorageCapacityIsolation)
+			if v, exists := ret[v1.ResourceEphemeralStorage]; !exists {
+				if !c.expectedNoEphemeralStorage {
+					t.Errorf("did not get any ephemeral storage data")
+				}
+			} else {
+				if v.Value() != c.expectedResourceQuantity.Value() {
+					t.Errorf("got unexpected %s value, expected %d, got %d", v1.ResourceEphemeralStorage, c.expectedResourceQuantity.Value(), v.Value())
+				}
+			}
+		})
+	}
 }

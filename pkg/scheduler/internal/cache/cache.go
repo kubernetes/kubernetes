@@ -77,6 +77,7 @@ type cacheImpl struct {
 type podState struct {
 	pod *v1.Pod
 	// Used by assumedPod to determinate expiration.
+	// If deadline is nil, assumedPod will never expire.
 	deadline *time.Time
 	// Used to block cache from expiring assumedPod if binding still runs
 	bindingFinished bool
@@ -191,7 +192,7 @@ func (cache *cacheImpl) Dump() *Dump {
 // UpdateSnapshot takes a snapshot of cached NodeInfo map. This is called at
 // beginning of every scheduling cycle.
 // The snapshot only includes Nodes that are not deleted at the time this function is called.
-// nodeinfo.Node() is guaranteed to be not nil for all the nodes in the snapshot.
+// nodeInfo.Node() is guaranteed to be not nil for all the nodes in the snapshot.
 // This function tracks generation number of NodeInfo and updates only the
 // entries of an existing snapshot that have changed after the snapshot was taken.
 func (cache *cacheImpl) UpdateSnapshot(nodeSnapshot *Snapshot) error {
@@ -212,6 +213,9 @@ func (cache *cacheImpl) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 	// status from having pods with required anti-affinity to NOT having pods with required
 	// anti-affinity or the other way around.
 	updateNodesHavePodsWithRequiredAntiAffinity := false
+	// usedPVCSet must be re-created whenever the head node generation is greater than
+	// last snapshot generation.
+	updateUsedPVCSet := false
 
 	// Start from the head of the NodeInfo doubly linked list and update snapshot
 	// of NodeInfos updated after the last snapshot.
@@ -237,6 +241,18 @@ func (cache *cacheImpl) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 			if (len(existing.PodsWithRequiredAntiAffinity) > 0) != (len(clone.PodsWithRequiredAntiAffinity) > 0) {
 				updateNodesHavePodsWithRequiredAntiAffinity = true
 			}
+			if !updateUsedPVCSet {
+				if len(existing.PVCRefCounts) != len(clone.PVCRefCounts) {
+					updateUsedPVCSet = true
+				} else {
+					for pvcKey := range clone.PVCRefCounts {
+						if _, found := existing.PVCRefCounts[pvcKey]; !found {
+							updateUsedPVCSet = true
+							break
+						}
+					}
+				}
+			}
 			// We need to preserve the original pointer of the NodeInfo struct since it
 			// is used in the NodeInfoList, which we may not update.
 			*existing = *clone
@@ -255,7 +271,7 @@ func (cache *cacheImpl) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 		updateAllLists = true
 	}
 
-	if updateAllLists || updateNodesHavePodsWithAffinity || updateNodesHavePodsWithRequiredAntiAffinity {
+	if updateAllLists || updateNodesHavePodsWithAffinity || updateNodesHavePodsWithRequiredAntiAffinity || updateUsedPVCSet {
 		cache.updateNodeInfoSnapshotList(nodeSnapshot, updateAllLists)
 	}
 
@@ -278,6 +294,7 @@ func (cache *cacheImpl) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 func (cache *cacheImpl) updateNodeInfoSnapshotList(snapshot *Snapshot, updateAll bool) {
 	snapshot.havePodsWithAffinityNodeInfoList = make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
 	snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
+	snapshot.usedPVCSet = sets.NewString()
 	if updateAll {
 		// Take a snapshot of the nodes order in the tree
 		snapshot.nodeInfoList = make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
@@ -294,6 +311,9 @@ func (cache *cacheImpl) updateNodeInfoSnapshotList(snapshot *Snapshot, updateAll
 				if len(nodeInfo.PodsWithRequiredAntiAffinity) > 0 {
 					snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = append(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo)
 				}
+				for key := range nodeInfo.PVCRefCounts {
+					snapshot.usedPVCSet.Insert(key)
+				}
 			} else {
 				klog.ErrorS(nil, "Node exists in nodeTree but not in NodeInfoMap, this should not happen", "node", klog.KRef("", nodeName))
 			}
@@ -305,6 +325,9 @@ func (cache *cacheImpl) updateNodeInfoSnapshotList(snapshot *Snapshot, updateAll
 			}
 			if len(nodeInfo.PodsWithRequiredAntiAffinity) > 0 {
 				snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = append(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo)
+			}
+			for key := range nodeInfo.PVCRefCounts {
+				snapshot.usedPVCSet.Insert(key)
 			}
 		}
 	}
@@ -366,7 +389,7 @@ func (cache *cacheImpl) FinishBinding(pod *v1.Pod) error {
 	return cache.finishBinding(pod, time.Now())
 }
 
-// finishBinding exists to make tests determinitistic by injecting now as an argument
+// finishBinding exists to make tests deterministic by injecting now as an argument
 func (cache *cacheImpl) finishBinding(pod *v1.Pod, now time.Time) error {
 	key, err := framework.GetPodKey(pod)
 	if err != nil {
@@ -379,9 +402,13 @@ func (cache *cacheImpl) finishBinding(pod *v1.Pod, now time.Time) error {
 	klog.V(5).InfoS("Finished binding for pod, can be expired", "pod", klog.KObj(pod))
 	currState, ok := cache.podStates[key]
 	if ok && cache.assumedPods.Has(key) {
-		dl := now.Add(cache.ttl)
+		if cache.ttl == time.Duration(0) {
+			currState.deadline = nil
+		} else {
+			dl := now.Add(cache.ttl)
+			currState.deadline = &dl
+		}
 		currState.bindingFinished = true
-		currState.deadline = &dl
 	}
 	return nil
 }
@@ -728,7 +755,7 @@ func (cache *cacheImpl) cleanupAssumedPods(now time.Time) {
 				"pod", klog.KObj(ps.pod))
 			continue
 		}
-		if now.After(*ps.deadline) {
+		if cache.ttl != 0 && now.After(*ps.deadline) {
 			klog.InfoS("Pod expired", "pod", klog.KObj(ps.pod))
 			if err := cache.removePod(ps.pod); err != nil {
 				klog.ErrorS(err, "ExpirePod failed", "pod", klog.KObj(ps.pod))

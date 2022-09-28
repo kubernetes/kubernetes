@@ -64,27 +64,19 @@ type StorageObjectCountTracker interface {
 	//  - if the given resource is not being tracked then
 	//    ObjectCountNotFoundErr is returned.
 	Get(string) (int64, error)
+
+	// RunUntil starts all the necessary maintenance.
+	RunUntil(stopCh <-chan struct{})
 }
 
 // NewStorageObjectCountTracker returns an instance of
 // StorageObjectCountTracker interface that can be used to
 // keep track of the total number of objects for each resource.
-func NewStorageObjectCountTracker(stopCh <-chan struct{}) StorageObjectCountTracker {
-	tracker := &objectCountTracker{
+func NewStorageObjectCountTracker() StorageObjectCountTracker {
+	return &objectCountTracker{
 		clock:  &clock.RealClock{},
 		counts: map[string]*timestampedCount{},
 	}
-	go func() {
-		wait.PollUntil(
-			pruneInterval,
-			func() (bool, error) {
-				// always prune at every pruneInterval
-				return false, tracker.prune(pruneInterval)
-			}, stopCh)
-		klog.InfoS("StorageObjectCountTracker pruner is exiting")
-	}()
-
-	return tracker
 }
 
 // timestampedCount stores the count of a given resource with a last updated
@@ -146,6 +138,17 @@ func (t *objectCountTracker) Get(groupResource string) (int64, error) {
 		return item.count, nil
 	}
 	return 0, ObjectCountNotFoundErr
+}
+
+// RunUntil runs all the necessary maintenance.
+func (t *objectCountTracker) RunUntil(stopCh <-chan struct{}) {
+	wait.PollUntil(
+		pruneInterval,
+		func() (bool, error) {
+			// always prune at every pruneInterval
+			return false, t.prune(pruneInterval)
+		}, stopCh)
+	klog.InfoS("StorageObjectCountTracker pruner is exiting")
 }
 
 func (t *objectCountTracker) prune(threshold time.Duration) error {

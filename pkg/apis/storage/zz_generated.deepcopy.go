@@ -127,6 +127,11 @@ func (in *CSIDriverSpec) DeepCopyInto(out *CSIDriverSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.SELinuxMount != nil {
+		in, out := &in.SELinuxMount, &out.SELinuxMount
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

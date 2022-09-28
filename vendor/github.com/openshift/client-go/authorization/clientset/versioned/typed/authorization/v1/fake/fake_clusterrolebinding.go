@@ -4,8 +4,11 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	authorizationv1 "github.com/openshift/api/authorization/v1"
+	applyconfigurationsauthorizationv1 "github.com/openshift/client-go/authorization/applyconfigurations/authorization/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -99,6 +102,27 @@ func (c *FakeClusterRoleBindings) DeleteCollection(ctx context.Context, opts v1.
 func (c *FakeClusterRoleBindings) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *authorizationv1.ClusterRoleBinding, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(clusterrolebindingsResource, name, pt, data, subresources...), &authorizationv1.ClusterRoleBinding{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*authorizationv1.ClusterRoleBinding), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied clusterRoleBinding.
+func (c *FakeClusterRoleBindings) Apply(ctx context.Context, clusterRoleBinding *applyconfigurationsauthorizationv1.ClusterRoleBindingApplyConfiguration, opts v1.ApplyOptions) (result *authorizationv1.ClusterRoleBinding, err error) {
+	if clusterRoleBinding == nil {
+		return nil, fmt.Errorf("clusterRoleBinding provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(clusterRoleBinding)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterRoleBinding.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterRoleBinding.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(clusterrolebindingsResource, *name, types.ApplyPatchType, data), &authorizationv1.ClusterRoleBinding{})
 	if obj == nil {
 		return nil, err
 	}

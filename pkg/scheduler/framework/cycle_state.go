@@ -82,6 +82,7 @@ func (c *CycleState) Clone() *CycleState {
 		copy.storage.Store(k, v.(StateData).Clone())
 		return true
 	})
+	copy.recordPluginMetrics = c.recordPluginMetrics
 
 	return copy
 }

@@ -19,7 +19,8 @@ package config
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	componentbaseconfig "k8s.io/component-base/config"
+	logsapi "k8s.io/component-base/logs/api/v1"
+	tracingapi "k8s.io/component-base/tracing/api/v1"
 )
 
 // HairpinMode denotes how the kubelet should configure networking to handle
@@ -352,14 +353,14 @@ type KubeletConfiguration struct {
 
 	/* the following fields are meant for Node Allocatable */
 
-	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G,pid=100) pairs
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G,ephemeral-storage=1G,pid=100) pairs
 	// that describe resources reserved for non-kubernetes components.
-	// Currently only cpu and memory are supported.
+	// Currently only cpu, memory and local ephemeral storage for root file system are supported.
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
 	SystemReserved map[string]string
-	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G,pid=100) pairs
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G,ephemeral-storage=1G,pid=100) pairs
 	// that describe resources reserved for kubernetes system components.
-	// Currently cpu, memory and local ephemeral storage for root file system are supported.
+	// Currently only cpu, memory and local ephemeral storage for root file system are supported.
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
 	KubeReserved map[string]string
 	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `SystemReserved` compute resource reservation for OS system daemons.
@@ -370,7 +371,7 @@ type KubeletConfiguration struct {
 	KubeReservedCgroup string
 	// This flag specifies the various Node Allocatable enforcements that Kubelet needs to perform.
 	// This flag accepts a list of options. Acceptable options are `pods`, `system-reserved` & `kube-reserved`.
-	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
+	// Refer to [Node Allocatable](https://github.com/kubernetes/design-proposals-archive/blob/main/node/node-allocatable.md) doc for more information.
 	EnforceNodeAllocatable []string
 	// This option specifies the cpu list reserved for the host level system threads and kubernetes related threads.
 	// This provide a "static" CPU list rather than the "dynamic" list by system-reserved and kube-reserved.
@@ -384,7 +385,7 @@ type KubeletConfiguration struct {
 	ShowHiddenMetricsForVersion string
 	// Logging specifies the options of logging.
 	// Refer [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go) for more information.
-	Logging componentbaseconfig.LoggingConfiguration
+	Logging logsapi.LoggingConfiguration
 	// EnableSystemLogHandler enables /logs handler.
 	EnableSystemLogHandler bool
 	// ShutdownGracePeriod specifies the total duration that the node should delay the shutdown and total grace period for pod termination during a node shutdown.
@@ -441,10 +442,24 @@ type KubeletConfiguration struct {
 	// is true and upon the initial registration of the node.
 	// +optional
 	RegisterWithTaints []v1.Taint
-
 	// registerNode enables automatic registration with the apiserver.
 	// +optional
 	RegisterNode bool
+	// Tracing specifies the versioned configuration for OpenTelemetry tracing clients.
+	// See http://kep.k8s.io/2832 for more details.
+	// +featureGate=KubeletTracing
+	// +optional
+	Tracing *tracingapi.TracingConfiguration
+
+	// LocalStorageCapacityIsolation enables local ephemeral storage isolation feature. The default setting is true.
+	// This feature allows users to set request/limit for container's ephemeral storage and manage it in a similar way
+	// as cpu and memory. It also allows setting sizeLimit for emptyDir volume, which will trigger pod eviction if disk
+	// usage from the volume exceeds the limit.
+	// This feature depends on the capability of detecting correct root file system disk usage. For certain systems,
+	// such as kind rootless, if this capability cannot be supported, the feature LocalStorageCapacityIsolation should be
+	// disabled. Once disabled, user should not set request/limit for container's ephemeral storage, or sizeLimit for emptyDir.
+	// +optional
+	LocalStorageCapacityIsolation bool
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
