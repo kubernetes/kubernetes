@@ -50,11 +50,69 @@ const (
 	MsgUnLabeled  = "unlabeled"
 )
 
+// LabelFlags reflect the information that kubectl is gathering via flags. These are converted to Options later, which
+// reflect the runtime requirements for the command. This structure reduces the transformation to wiring and makes
+// the logic itself easy to unit test
+type LabelFlags struct {
+	Factory cmdutil.Factory
+
+	resource.FilenameOptions
+
+	RecordFlags *genericclioptions.RecordFlags
+	PrintFlags  *genericclioptions.PrintFlags
+
+	Recorder genericclioptions.Recorder
+
+	Overwrite       bool
+	List            bool
+	Local           bool
+	DryRunStrategy  cmdutil.DryRunStrategy
+	All             bool
+	AllNamespaces   bool
+	ResourceVersion string
+	Selector        string
+	FieldSelector   string
+	OutputFormat    string
+	FieldManager    string
+
+	genericclioptions.IOStreams
+}
+
+func NewLabelFlags(f cmdutil.Factory, streams genericclioptions.IOStreams) *LabelFlags {
+	return &LabelFlags{
+		Factory: f,
+
+		RecordFlags: genericclioptions.NewRecordFlags(),
+		Recorder:    genericclioptions.NoopRecorder{},
+
+		PrintFlags: genericclioptions.NewPrintFlags("labeled").WithTypeSetter(scheme.Scheme),
+
+		IOStreams: streams,
+	}
+}
+
+func (f *LabelFlags) AddFlags(cmd *cobra.Command) {
+	f.RecordFlags.AddFlags(cmd)
+	f.PrintFlags.AddFlags(cmd)
+
+	cmd.Flags().BoolVar(&f.Overwrite, "overwrite", f.Overwrite, "If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.")
+	cmd.Flags().BoolVar(&f.List, "list", f.List, "If true, display the labels for a given resource.")
+	cmd.Flags().BoolVar(&f.Local, "local", f.Local, "If true, label will NOT contact api-server but run locally.")
+	cmd.Flags().StringVar(&f.FieldSelector, "field-selector", f.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
+	cmd.Flags().BoolVar(&f.All, "all", f.All, "Select all resources, in the namespace of the specified resource types")
+	cmd.Flags().BoolVarP(&f.AllNamespaces, "all-namespaces", "A", f.AllNamespaces, "If true, check the specified action in all namespaces.")
+	cmd.Flags().StringVar(&f.ResourceVersion, "resource-version", f.ResourceVersion, i18n.T("If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
+	usage := "identifying the resource to update the labels"
+	cmdutil.AddFilenameOptionFlags(cmd, &f.FilenameOptions, usage)
+	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.AddFieldManagerFlagVar(cmd, &f.FieldManager, "kubectl-label")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &f.Selector)
+}
+
 // LabelOptions have the data required to perform the label operation
 type LabelOptions struct {
 	// Filename options
 	resource.FilenameOptions
-	RecordFlags *genericclioptions.RecordFlags
 
 	PrintFlags *genericclioptions.PrintFlags
 	ToPrinter  func(string) (printers.ResourcePrinter, error)
@@ -118,20 +176,8 @@ var (
 		kubectl label pods foo bar-`))
 )
 
-func NewLabelOptions(ioStreams genericclioptions.IOStreams) *LabelOptions {
-	return &LabelOptions{
-		RecordFlags: genericclioptions.NewRecordFlags(),
-		Recorder:    genericclioptions.NoopRecorder{},
-
-		PrintFlags: genericclioptions.NewPrintFlags("labeled").WithTypeSetter(scheme.Scheme),
-
-		IOStreams: ioStreams,
-	}
-}
-
 func NewCmdLabel(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := NewLabelOptions(ioStreams)
-
+	flags := NewLabelFlags(f, ioStreams)
 	cmd := &cobra.Command{
 		Use:                   "label [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
 		DisableFlagsInUseLine: true,
@@ -140,76 +186,91 @@ func NewCmdLabel(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 		Example:               labelExample,
 		ValidArgsFunction:     completion.ResourceTypeAndNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			o, err := flags.ToOptions(cmd, args)
+			cmdutil.CheckErr(err)
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunLabel())
 		},
 	}
 
-	o.RecordFlags.AddFlags(cmd)
-	o.PrintFlags.AddFlags(cmd)
-
-	cmd.Flags().BoolVar(&o.overwrite, "overwrite", o.overwrite, "If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.")
-	cmd.Flags().BoolVar(&o.list, "list", o.list, "If true, display the labels for a given resource.")
-	cmd.Flags().BoolVar(&o.local, "local", o.local, "If true, label will NOT contact api-server but run locally.")
-	cmd.Flags().StringVar(&o.fieldSelector, "field-selector", o.fieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
-	cmd.Flags().BoolVar(&o.all, "all", o.all, "Select all resources, in the namespace of the specified resource types")
-	cmd.Flags().BoolVarP(&o.allNamespaces, "all-namespaces", "A", o.allNamespaces, "If true, check the specified action in all namespaces.")
-	cmd.Flags().StringVar(&o.resourceVersion, "resource-version", o.resourceVersion, i18n.T("If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
-	usage := "identifying the resource to update the labels"
-	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
-	cmdutil.AddDryRunFlag(cmd)
-	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-label")
-	cmdutil.AddLabelSelectorFlagVar(cmd, &o.selector)
-
 	return cmd
 }
 
-// Complete adapts from the command line args and factory to the data required.
-func (o *LabelOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+// ToOptions converts from CLI inputs to runtime inputs
+func (f *LabelFlags) ToOptions(cmd *cobra.Command, args []string) (*LabelOptions, error) {
 	var err error
 
-	o.RecordFlags.Complete(cmd)
-	o.Recorder, err = o.RecordFlags.ToRecorder()
+	f.RecordFlags.Complete(cmd)
+	f.Recorder, err = f.RecordFlags.ToRecorder()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
-	o.dryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
+	f.OutputFormat = cmdutil.GetFlagString(cmd, "output")
+	f.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
-		o.PrintFlags.NamePrintFlags.Operation = operation
+	toPrinter := func(operation string) (printers.ResourcePrinter, error) {
+		f.PrintFlags.NamePrintFlags.Operation = operation
 		// PrintFlagsWithDryRunStrategy must be done after NamePrintFlags.Operation is set
-		cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.dryRunStrategy)
-		return o.PrintFlags.ToPrinter()
+		cmdutil.PrintFlagsWithDryRunStrategy(f.PrintFlags, f.DryRunStrategy)
+		return f.PrintFlags.ToPrinter()
 	}
 
 	resources, labelArgs, err := cmdutil.GetResourcesAndPairs(args, "label")
 	if err != nil {
-		return err
+		return nil, err
 	}
-	o.resources = resources
-	o.newLabels, o.removeLabels, err = parseLabels(labelArgs)
+
+	newLabels, removeLabels, err := parseLabels(labelArgs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if o.list && len(o.outputFormat) > 0 {
-		return fmt.Errorf("--list and --output may not be specified together")
+	if f.List && len(f.OutputFormat) > 0 {
+		return nil, fmt.Errorf("--list and --output may not be specified together")
 	}
 
-	o.namespace, o.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
+	namespace, enforceNamespace, err := f.Factory.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	o.builder = f.NewBuilder()
-	o.unstructuredClientForMapping = f.UnstructuredClientForMapping
+	builder := f.Factory.NewBuilder()
+	unstructuredClientForMapping := f.Factory.UnstructuredClientForMapping
 
-	return nil
+	return &LabelOptions{
+		FilenameOptions: f.FilenameOptions,
+
+		PrintFlags: f.PrintFlags,
+		ToPrinter:  toPrinter,
+
+		overwrite:       f.Overwrite,
+		list:            f.List,
+		local:           f.Local,
+		dryRunStrategy:  f.DryRunStrategy,
+		all:             f.All,
+		allNamespaces:   f.AllNamespaces,
+		resourceVersion: f.ResourceVersion,
+		selector:        f.Selector,
+		fieldSelector:   f.FieldSelector,
+		outputFormat:    f.OutputFormat,
+		fieldManager:    f.FieldManager,
+
+		resources:    resources,
+		newLabels:    newLabels,
+		removeLabels: removeLabels,
+
+		Recorder: f.Recorder,
+
+		namespace:                    namespace,
+		enforceNamespace:             enforceNamespace,
+		builder:                      builder,
+		unstructuredClientForMapping: unstructuredClientForMapping,
+
+		IOStreams: f.IOStreams,
+	}, nil
 }
 
 // Validate checks to the LabelOptions to see if there is sufficient information run the command.

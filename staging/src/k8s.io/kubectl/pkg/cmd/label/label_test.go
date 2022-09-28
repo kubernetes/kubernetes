@@ -352,8 +352,8 @@ func TestLabelErrors(t *testing.T) {
 			cmd.SetOut(buf)
 			cmd.SetErr(buf)
 
-			opts := NewLabelOptions(ioStreams)
-			err := opts.Complete(tf, cmd, testCase.args)
+			flags := NewLabelFlags(tf, ioStreams)
+			opts, err := flags.ToOptions(cmd, testCase.args)
 			if err == nil {
 				err = opts.Validate()
 			}
@@ -408,9 +408,9 @@ func TestLabelForResourceFromFile(t *testing.T) {
 
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdLabel(tf, ioStreams)
-	opts := NewLabelOptions(ioStreams)
+	flags := NewLabelFlags(tf, ioStreams)
+	opts, err := flags.ToOptions(cmd, []string{"a=b"})
 	opts.Filenames = []string{"../../../testdata/controller.yaml"}
-	err := opts.Complete(tf, cmd, []string{"a=b"})
 	if err == nil {
 		err = opts.Validate()
 	}
@@ -440,10 +440,10 @@ func TestLabelLocal(t *testing.T) {
 
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdLabel(tf, ioStreams)
-	opts := NewLabelOptions(ioStreams)
+	flags := NewLabelFlags(tf, ioStreams)
+	opts, err := flags.ToOptions(cmd, []string{"a=b"})
 	opts.Filenames = []string{"../../../testdata/controller.yaml"}
 	opts.local = true
-	err := opts.Complete(tf, cmd, []string{"a=b"})
 	if err == nil {
 		err = opts.Validate()
 	}
@@ -496,10 +496,10 @@ func TestLabelMultipleObjects(t *testing.T) {
 	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	opts := NewLabelOptions(ioStreams)
-	opts.all = true
 	cmd := NewCmdLabel(tf, ioStreams)
-	err := opts.Complete(tf, cmd, []string{"pods", "a=b"})
+	flags := NewLabelFlags(tf, ioStreams)
+	opts, err := flags.ToOptions(cmd, []string{"pods", "a=b"})
+	opts.all = true
 	if err == nil {
 		err = opts.Validate()
 	}
@@ -568,10 +568,13 @@ func TestLabelResourceVersion(t *testing.T) {
 	cmd := NewCmdLabel(tf, iostreams)
 	cmd.SetOut(bufOut)
 	cmd.SetErr(bufOut)
-	options := NewLabelOptions(iostreams)
-	options.resourceVersion = "10"
+
+	flags := NewLabelFlags(tf, iostreams)
 	args := []string{"pods/foo", "a=b"}
-	if err := options.Complete(tf, cmd, args); err != nil {
+	options, err := flags.ToOptions(cmd, args)
+	options.resourceVersion = "10"
+
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if err := options.Validate(); err != nil {
@@ -696,18 +699,20 @@ pod/foo not labeled
 			if tc.dryRun != "" {
 				cmd.Flags().Set("dry-run", tc.dryRun)
 			}
-			options := NewLabelOptions(iostreams)
+
+			flags := NewLabelFlags(tf, iostreams)
+			options, err := flags.ToOptions(cmd, tc.args)
 			if tc.overwrite {
 				options.overwrite = true
 			}
-			if err := options.Complete(tf, cmd, tc.args); err != nil {
+			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if err := options.Validate(); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			err := options.RunLabel()
+			err = options.RunLabel()
 			if tc.expectedError == nil {
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
