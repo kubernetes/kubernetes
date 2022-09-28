@@ -131,7 +131,6 @@ func (bsc *BaseStableCollector) trackRegistrableDescriptor(d *Desc) {
 	if bsc.registerable == nil {
 		bsc.registerable = make(map[string]*Desc)
 	}
-
 	bsc.registerable[d.fqName] = d
 }
 
