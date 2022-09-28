@@ -64,16 +64,6 @@ const (
 	ProbeRemove
 )
 
-var (
-	deprecatedVolumeProviders = map[string]string{
-		"kubernetes.io/cinder":    "The Cinder volume provider is deprecated and will be removed in a future release",
-		"kubernetes.io/storageos": "The StorageOS volume provider is deprecated and will be removed in a future release",
-		"kubernetes.io/quobyte":   "The Quobyte volume provider is deprecated and will be removed in a future release",
-		"kubernetes.io/flocker":   "The Flocker volume provider is deprecated and will be removed in a future release",
-		"kubernetes.io/glusterfs": "The GlusterFS volume provider is deprecated and will be removed soon after in a subsequent release",
-	}
-)
-
 // VolumeOptions contains option information about a volume.
 type VolumeOptions struct {
 	// The attributes below are required by volume.Provisioner
@@ -698,8 +688,6 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
 	}
 
-	// Issue warning if the matched provider is deprecated
-	pm.logDeprecation(match.GetPluginName())
 	return match, nil
 }
 
@@ -726,20 +714,7 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 	if match == nil {
 		return nil, fmt.Errorf("no volume plugin matched name: %s", name)
 	}
-
-	// Issue warning if the matched provider is deprecated
-	pm.logDeprecation(match.GetPluginName())
 	return match, nil
-}
-
-// logDeprecation logs warning when a deprecated plugin is used.
-func (pm *VolumePluginMgr) logDeprecation(plugin string) {
-	if detail, ok := deprecatedVolumeProviders[plugin]; ok && !pm.loggedDeprecationWarnings.Has(plugin) {
-		klog.Warningf("WARNING: %s built-in volume provider is now deprecated. %s", plugin, detail)
-		// Make sure the message is logged only once. It has Warning severity
-		// and we don't want to spam the log too much.
-		pm.loggedDeprecationWarnings.Insert(plugin)
-	}
 }
 
 // Check if probedPlugin cache update is required.
