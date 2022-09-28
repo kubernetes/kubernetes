@@ -610,18 +610,6 @@ var _ = metrics.NewCounter(
 	)
 `},
 		{
-			testName: "error for passing stability as unknown const",
-			err:      fmt.Errorf("testdata/metric.go:6:20: StabilityLevel should be passed STABLE, ALPHA or removed"),
-			src: `
-package test
-import "k8s.io/component-base/metrics"
-var _ = metrics.NewCounter(
-		&metrics.CounterOpts{
-			StabilityLevel: metrics.UNKNOWN,
-		},
-	)
-`},
-		{
 			testName: "error for passing stability as variable",
 			err:      fmt.Errorf("testdata/metric.go:7:20: StabilityLevel should be passed STABLE, ALPHA or removed"),
 			src: `
@@ -673,18 +661,6 @@ var _ = RegisterMetric(
 `},
 		{
 			testName: "error stable metric opts passed to imported function",
-			err:      fmt.Errorf("testdata/metric.go:4:9: Opts for STABLE metric was not directly passed to new metric function"),
-			src: `
-package test
-import "k8s.io/component-base/metrics"
-var _ = test.RegisterMetric(
-		&metrics.CounterOpts{
-			StabilityLevel: metrics.STABLE,
-		},
-	)
-`},
-		{
-			testName: "error stable metric opts passed to imported function",
 			err:      fmt.Errorf("testdata/metric.go:6:4: Positional arguments are not supported"),
 			src: `
 package test
@@ -726,21 +702,6 @@ var _ = metrics.NewSummary(
 	)
 `},
 		{
-			testName: "error stable histogram with unknown bucket variable",
-			err:      fmt.Errorf("testdata/metric.go:9:13: Buckets should be set to list of floats, result from function call of prometheus.LinearBuckets or prometheus.ExponentialBuckets"),
-			src: `
-package test
-import "k8s.io/component-base/metrics"
-var buckets = []float64{1, 2, 3}
-var _ = metrics.NewHistogram(
-		&metrics.HistogramOpts{
-			Name: "histogram",
-			StabilityLevel: metrics.STABLE,
-			Buckets: buckets,
-		},
-	)
-`},
-		{
 			testName: "error stable historgram with unknown bucket variable from unknown library",
 			err:      fmt.Errorf("testdata/metric.go:9:13: Buckets should be set to list of floats, result from function call of prometheus.LinearBuckets or prometheus.ExponentialBuckets"),
 			src: `
@@ -759,7 +720,7 @@ var _ = metrics.NewHistogram(
 		t.Run(test.testName, func(t *testing.T) {
 			_, errors := searchFileForStableMetrics(fakeFilename, test.src)
 			if len(errors) != 1 {
-				t.Fatalf("Unexpected number of errors, got %d, want 1", len(errors))
+				t.Errorf("Unexpected number of errors, got %d, want 1", len(errors))
 			}
 			if !reflect.DeepEqual(errors[0], test.err) {
 				t.Errorf("error:\ngot  %v\nwant %v", errors[0], test.err)

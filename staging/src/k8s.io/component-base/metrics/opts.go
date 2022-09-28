@@ -66,9 +66,15 @@ func BuildFQName(namespace, subsystem, name string) string {
 type StabilityLevel string
 
 const (
+	// INTERNAL metrics have no stability guarantees, as such, labels may
+	// be arbitrarily added/removed and the metric may be deleted at any time.
+	INTERNAL StabilityLevel = "INTERNAL"
 	// ALPHA metrics have no stability guarantees, as such, labels may
 	// be arbitrarily added/removed and the metric may be deleted at any time.
 	ALPHA StabilityLevel = "ALPHA"
+	// BETA metrics are governed by the deprecation policy outlined in by
+	// the control plane metrics stability KEP.
+	BETA StabilityLevel = "BETA"
 	// STABLE metrics are guaranteed not be mutated and removal is governed by
 	// the deprecation policy outlined in by the control plane metrics stability KEP.
 	STABLE StabilityLevel = "STABLE"
