@@ -392,7 +392,7 @@ func TestAggregatedAPIServerRejectRedirectResponse(t *testing.T) {
 		if strings.HasSuffix(r.URL.Path, "tryRedirect") {
 			http.Redirect(w, r, redirectedURL+"/redirectTarget", http.StatusMovedPermanently)
 		} else {
-			http.Redirect(w, r, redirectedURL, http.StatusMovedPermanently)
+			w.WriteHeader(http.StatusOK)
 		}
 	}))
 	defer redirectServer.Close()
