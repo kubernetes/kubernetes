@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -431,6 +432,14 @@ func TestSync(t *testing.T) {
 			}
 
 			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				wantHeader := http.Header{
+					"Accept-Encoding": {"gzip"},
+					"User-Agent":      {"Go-http-client/1.1"},
+					"X-Remote-User":   {"system:kube-aggregator"},
+				}
+				if !reflect.DeepEqual(wantHeader, r.Header) {
+					t.Errorf("unexpected headers seen: %v", r.Header)
+				}
 				if tc.backendLocation != "" {
 					w.Header().Set("Location", tc.backendLocation)
 				}

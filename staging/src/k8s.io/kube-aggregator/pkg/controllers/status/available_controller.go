@@ -387,8 +387,10 @@ func (c *AvailableConditionController) sync(key string) error {
 						return
 					}
 
-					// setting the system-masters identity ensures that we will always have access rights
-					transport.SetAuthProxyHeaders(newReq, "system:kube-aggregator", []string{"system:masters"}, nil)
+					// make an authenticated request so that this is authorized via the system:discovery
+					// cluster role binding in environments that enable RBAC and authorization delegation
+					// avoid using the system:masters identity to prevent any possibility of SSRF
+					transport.SetAuthProxyHeaders(newReq, "system:kube-aggregator", nil, nil)
 					resp, err := discoveryClient.Do(newReq)
 					if resp != nil {
 						resp.Body.Close()
