@@ -436,7 +436,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 					InterfaceNamePrefix: "",
 				},
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("InterfacePrefix"), "", "must not be empty")},
+			expectedErrs: field.ErrorList{field.Required(newPath.Child("InterfacePrefix"), "")},
 		},
 		"bridgeInterfaceName is empty": {
 			config: kubeproxyconfig.KubeProxyConfiguration{
@@ -462,7 +462,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 					InterfaceNamePrefix: "eth0", // we won't care about prefix since mode is not prefix
 				},
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("InterfaceName"), "", "must not be empty")},
+			expectedErrs: field.ErrorList{field.Required(newPath.Child("InterfaceName"), "")},
 		},
 	}
 

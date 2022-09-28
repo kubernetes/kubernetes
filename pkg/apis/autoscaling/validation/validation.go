@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -248,7 +249,7 @@ func validateMetricSpec(spec autoscaling.MetricSpec, fldPath *field.Path) field.
 	allErrs := field.ErrorList{}
 
 	if len(string(spec.Type)) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("type"), "must specify a metric source type"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("type"), ""))
 	}
 
 	if !validMetricSourceTypes.Has(string(spec.Type)) {
@@ -385,13 +386,13 @@ func validateContainerResourceSource(src *autoscaling.ContainerResourceMetricSou
 	allErrs := field.ErrorList{}
 
 	if len(src.Name) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "must specify a resource name"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	} else {
 		allErrs = append(allErrs, corevalidation.ValidateContainerResourceName(string(src.Name), fldPath.Child("name"))...)
 	}
 
 	if len(src.Container) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("container"), "must specify a container"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("container"), ""))
 	} else {
 		allErrs = append(allErrs, apivalidation.ValidateDNS1123Label(src.Container, fldPath.Child("container"))...)
 	}
@@ -413,7 +414,7 @@ func validateResourceSource(src *autoscaling.ResourceMetricSource, fldPath *fiel
 	allErrs := field.ErrorList{}
 
 	if len(src.Name) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "must specify a resource name"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	}
 
 	allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
@@ -433,7 +434,7 @@ func validateMetricTarget(mt autoscaling.MetricTarget, fldPath *field.Path) fiel
 	allErrs := field.ErrorList{}
 
 	if len(mt.Type) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("type"), "must specify a metric target type"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("type"), ""))
 	}
 
 	if mt.Type != autoscaling.UtilizationMetricType &&
@@ -461,7 +462,7 @@ func validateMetricIdentifier(id autoscaling.MetricIdentifier, fldPath *field.Pa
 	allErrs := field.ErrorList{}
 
 	if len(id.Name) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "must specify a metric name"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	} else {
 		for _, msg := range pathvalidation.IsValidPathSegmentName(id.Name) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), id.Name, msg))

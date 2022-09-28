@@ -116,7 +116,7 @@ func ValidateFlowSchemaSpec(fsName string, spec *flowcontrol.FlowSchemaSpec, fld
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("priorityLevelConfiguration").Child("name"), spec.PriorityLevelConfiguration.Name, msg))
 		}
 	} else {
-		allErrs = append(allErrs, field.Required(fldPath.Child("priorityLevelConfiguration").Child("name"), "must reference a priority level"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("priorityLevelConfiguration").Child("name"), ""))
 	}
 	for i, rule := range spec.Rules {
 		allErrs = append(allErrs, ValidateFlowSchemaPolicyRulesWithSubjects(&rule, fldPath.Child("rules").Index(i))...)
@@ -200,7 +200,7 @@ func ValidateServiceAccountSubject(subject *flowcontrol.ServiceAccountSubject, f
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), subject.Namespace, msg))
 		}
 	} else {
-		allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), "must specify namespace for service account"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), ""))
 	}
 
 	return allErrs
@@ -331,7 +331,7 @@ func ValidateFlowSchemaStatusUpdate(old, fs *flowcontrol.FlowSchema) field.Error
 func ValidateFlowSchemaCondition(condition *flowcontrol.FlowSchemaCondition, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(condition.Type) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("type"), "must not be empty"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("type"), ""))
 	}
 	return allErrs
 }
@@ -462,7 +462,7 @@ func ValidatePriorityLevelConfigurationStatusUpdate(old, pl *flowcontrol.Priorit
 func ValidatePriorityLevelConfigurationCondition(condition *flowcontrol.PriorityLevelConfigurationCondition, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(condition.Type) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("type"), "must not be empty"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("type"), ""))
 	}
 	return allErrs
 }

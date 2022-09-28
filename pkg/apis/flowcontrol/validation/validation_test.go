@@ -1213,7 +1213,7 @@ func TestValidateFlowSchemaStatus(t *testing.T) {
 				},
 			},
 			expectedErrors: field.ErrorList{
-				field.Required(field.NewPath("status").Child("conditions").Index(0).Child("type"), "must not be empty"),
+				field.Required(field.NewPath("status").Child("conditions").Index(0).Child("type"), ""),
 			},
 		},
 	}
@@ -1264,7 +1264,7 @@ func TestValidatePriorityLevelConfigurationStatus(t *testing.T) {
 				},
 			},
 			expectedErrors: field.ErrorList{
-				field.Required(field.NewPath("status").Child("conditions").Index(0).Child("type"), "must not be empty"),
+				field.Required(field.NewPath("status").Child("conditions").Index(0).Child("type"), ""),
 			},
 		},
 	}

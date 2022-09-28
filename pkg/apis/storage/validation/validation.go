@@ -104,7 +104,7 @@ func validateParameters(params map[string]string, fldPath *field.Path) field.Err
 
 	for k, v := range params {
 		if len(k) < 1 {
-			allErrs = append(allErrs, field.Invalid(fldPath, k, "field can not be empty."))
+			allErrs = append(allErrs, field.Required(fldPath, ""))
 		}
 		totalSize += (int64)(len(k)) + (int64)(len(v))
 	}

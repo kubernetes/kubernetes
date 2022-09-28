@@ -95,7 +95,7 @@ func validateCredentialProviderConfig(config *kubeletconfig.CredentialProviderCo
 		}
 
 		if provider.APIVersion == "" {
-			allErrs = append(allErrs, field.Required(fieldPath.Child("apiVersion"), "apiVersion is required"))
+			allErrs = append(allErrs, field.Required(fieldPath.Child("apiVersion"), ""))
 		} else if _, ok := apiVersions[provider.APIVersion]; !ok {
 			validAPIVersions := []string{}
 			for apiVersion := range apiVersions {
@@ -116,7 +116,7 @@ func validateCredentialProviderConfig(config *kubeletconfig.CredentialProviderCo
 		}
 
 		if provider.DefaultCacheDuration == nil {
-			allErrs = append(allErrs, field.Required(fieldPath.Child("defaultCacheDuration"), "defaultCacheDuration is required"))
+			allErrs = append(allErrs, field.Required(fieldPath.Child("defaultCacheDuration"), ""))
 		}
 
 		if provider.DefaultCacheDuration != nil && provider.DefaultCacheDuration.Duration < 0 {

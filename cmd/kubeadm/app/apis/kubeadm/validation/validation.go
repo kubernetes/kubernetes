@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
-	"k8s.io/klog/v2"
+	klog "k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
@@ -124,7 +124,7 @@ func ValidateDiscovery(d *kubeadm.Discovery, fldPath *field.Path) field.ErrorLis
 	allErrs := field.ErrorList{}
 
 	if d.BootstrapToken == nil && d.File == nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, "", "bootstrapToken or file must be set"))
+		allErrs = append(allErrs, field.Required(fldPath, ""))
 	}
 
 	if d.BootstrapToken != nil && d.File != nil {
