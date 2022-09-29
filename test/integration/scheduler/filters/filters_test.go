@@ -1068,15 +1068,15 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                       string
-		incomingPod                *v1.Pod
-		existingPods               []*v1.Pod
-		fits                       bool
-		nodes                      []*v1.Node
-		candidateNodes             []string // nodes expected to schedule onto
-		enableMinDomains           bool
-		enableNodeInclustionPolicy bool
-		enableMatchLabelKeys       bool
+		name                      string
+		incomingPod               *v1.Pod
+		existingPods              []*v1.Pod
+		fits                      bool
+		nodes                     []*v1.Node
+		candidateNodes            []string // nodes expected to schedule onto
+		enableMinDomains          bool
+		enableNodeInclusionPolicy bool
+		enableMatchLabelKeys      bool
 	}{
 		// note: naming starts at index 0
 		{
@@ -1291,8 +1291,8 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Label("foo", "").Obj(),
 			},
-			candidateNodes:             []string{"node-4"}, // node-3 is filtered out by NodeAffinity plugin
-			enableNodeInclustionPolicy: true,
+			candidateNodes:            []string{"node-4"}, // node-3 is filtered out by NodeAffinity plugin
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "NodeAffinityPolicy ignored with nodeAffinity, pods spread across zone as 1/~2~",
@@ -1312,8 +1312,8 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Label("foo", "").Obj(),
 			},
-			candidateNodes:             []string{"node-1", "node-2"},
-			enableNodeInclustionPolicy: true,
+			candidateNodes:            []string{"node-1", "node-2"},
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "NodeTaintsPolicy honored, pods spread across zone as 2/1",
@@ -1333,8 +1333,8 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Taints(taints).Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Label("foo", "").Obj(),
 			},
-			candidateNodes:             []string{"node-4"}, // node-3 is filtered out by TaintToleration plugin
-			enableNodeInclustionPolicy: true,
+			candidateNodes:            []string{"node-4"}, // node-3 is filtered out by TaintToleration plugin
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "NodeTaintsPolicy ignored, pods spread across zone as 2/2",
@@ -1354,8 +1354,8 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Taints(taints).Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Label("foo", "").Obj(),
 			},
-			candidateNodes:             []string{"node-1", "node-2", "node-4"}, // node-3 is filtered out by TaintToleration plugin
-			enableNodeInclustionPolicy: true,
+			candidateNodes:            []string{"node-1", "node-2", "node-4"}, // node-3 is filtered out by TaintToleration plugin
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			// 1. to fulfil "zone" constraint, pods spread across zones as 2/1
@@ -1380,8 +1380,8 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Label("foo", "").Obj(),
 			},
-			candidateNodes:             []string{"node-4"},
-			enableNodeInclustionPolicy: true,
+			candidateNodes:            []string{"node-4"},
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			// 1. to fulfil "zone" constraint, pods spread across zones as 2/1
@@ -1406,8 +1406,8 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Label("foo", "").Obj(),
 			},
-			candidateNodes:             []string{"node-4"},
-			enableNodeInclustionPolicy: false,
+			candidateNodes:            []string{"node-4"},
+			enableNodeInclusionPolicy: false,
 		},
 		{
 			// 1. to fulfil "zone" constraint, pods spread across zones as 2/2
@@ -1432,8 +1432,8 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 				st.MakeNode().Name("node-3").Label("node", "node-3").Label("zone", "zone-2").Obj(),
 				st.MakeNode().Name("node-4").Label("node", "node-4").Label("zone", "zone-2").Label("foo", "").Obj(),
 			},
-			candidateNodes:             []string{"node-1", "node-4"},
-			enableNodeInclustionPolicy: true,
+			candidateNodes:            []string{"node-1", "node-4"},
+			enableNodeInclusionPolicy: true,
 		},
 		{
 			name: "matchLabelKeys ignored when feature gate disabled, pods spread across zone as 2/1",
@@ -1484,7 +1484,7 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MinDomainsInPodTopologySpread, tt.enableMinDomains)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tt.enableNodeInclustionPolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tt.enableNodeInclusionPolicy)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tt.enableMatchLabelKeys)()
 
 			testCtx := initTest(t, "pts-predicate")
