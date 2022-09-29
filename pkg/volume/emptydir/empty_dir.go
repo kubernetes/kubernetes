@@ -42,7 +42,7 @@ import (
 // and the group will be set to allow containers to use emptyDir volumes
 // from the group attribute.
 //
-// http://issue.k8s.io/2630
+// https://issue.k8s.io/2630
 const perm os.FileMode = 0777
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
