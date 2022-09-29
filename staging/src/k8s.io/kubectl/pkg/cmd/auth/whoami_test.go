@@ -107,7 +107,7 @@ func TestWhoAmIRun(t *testing.T) {
 			serverErr: errors.NewForbidden(
 				corev1.Resource("selfsubjectreviews"), "foo", fmt.Errorf("error"),
 			),
-			expectedError:       notEnabledErr,
+			expectedError:       forbiddenErr,
 			expectedBodyStrings: []string{},
 		},
 		{
