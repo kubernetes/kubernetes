@@ -750,6 +750,60 @@ func TestModifyDeletionFinalizers(t *testing.T) {
 	}
 }
 
+func TestRetroactiveStorageClassFeatureEnablement(t *testing.T) {
+	// Initialize controller
+	client := &fake.Clientset{}
+	ctrl, err := newTestController(client, nil, true)
+	if err != nil {
+		t.Fatalf("Constructing persistent volume controller failed: %v", err)
+	}
+
+	// Initialize reactor
+	reactor := newVolumeReactor(client, ctrl, nil, nil, nil)
+
+	// Define storage classes for the test
+	storageClasses := []*storagev1.StorageClass{
+		makeDefaultStorageClass(classGold, &modeImmediate),
+		makeStorageClass(classSilver, &modeImmediate),
+	}
+
+	testFeatureEnabled := controllerTest{
+		name:           "pvc storage class is assigned retroactively (RetroactiveStorageClass enabled)",
+		initialClaims:  newClaimArray("claim1", "uid", "1Gi", "", v1.ClaimPending, nil),
+		expectedClaims: newClaimArray("claim1", "uid", "1Gi", "", v1.ClaimPending, &classGold),
+		test:           testSyncClaim,
+	}
+
+	testFeatureDisabled := controllerTest{
+		name:           "pvc storage class is not assigned retroactively (RetroactiveStorageClass disabled)",
+		initialClaims:  newClaimArray("claim1", "uid", "1Gi", "", v1.ClaimPending, nil),
+		expectedClaims: newClaimArray("claim1", "uid", "1Gi", "", v1.ClaimPending, nil),
+		test:           testSyncClaim,
+	}
+
+	testFeatureReEnabled := controllerTest{
+		name:           "pvc storage class is assigned retroactively again (RetroactiveStorageClass enabled)",
+		initialClaims:  newClaimArray("claim1", "uid", "1Gi", "", v1.ClaimPending, nil),
+		expectedClaims: newClaimArray("claim1", "uid", "1Gi", "", v1.ClaimPending, &classGold),
+		test:           testSyncClaim,
+	}
+
+	// Enable RetroactiveDefaultStorageClass feature gate.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RetroactiveDefaultStorageClass, true)()
+	configureSingleTest(t, ctrl, reactor, testFeatureEnabled, storageClasses)
+	evaluateTestResults(ctrl, reactor.VolumeReactor, testFeatureEnabled, t)
+
+	// Disable RetroactiveDefaultStorageClass feature gate.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RetroactiveDefaultStorageClass, false)()
+	configureSingleTest(t, ctrl, reactor, testFeatureDisabled, storageClasses)
+	evaluateTestResults(ctrl, reactor.VolumeReactor, testFeatureDisabled, t)
+
+	// Re-enable RetroactiveDefaultStorageClass feature gate.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RetroactiveDefaultStorageClass, true)()
+	configureSingleTest(t, ctrl, reactor, testFeatureReEnabled, storageClasses)
+	evaluateTestResults(ctrl, reactor.VolumeReactor, testFeatureReEnabled, t)
+}
+
 func TestRetroactiveStorageClassAssignment(t *testing.T) {
 	// Enable RetroactiveDefaultStorageClass feature gate.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RetroactiveDefaultStorageClass, true)()

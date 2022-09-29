@@ -715,6 +715,44 @@ func evaluateTestResults(ctrl *PersistentVolumeController, reactor *pvtesting.Vo
 	}
 }
 
+func configureSingleTest(t *testing.T, ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest, storageClasses []*storage.StorageClass) {
+	for _, claim := range test.initialClaims {
+		if metav1.HasAnnotation(claim.ObjectMeta, annSkipLocalStore) {
+			continue
+		}
+		ctrl.claims.Add(claim)
+	}
+	for _, volume := range test.initialVolumes {
+		if metav1.HasAnnotation(volume.ObjectMeta, annSkipLocalStore) {
+			continue
+		}
+		ctrl.volumes.store.Add(volume)
+	}
+	reactor.AddClaims(test.initialClaims)
+	reactor.AddVolumes(test.initialVolumes)
+
+	// Inject classes into controller via a custom lister.
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	for _, class := range storageClasses {
+		indexer.Add(class)
+	}
+
+	ctrl.classLister = storagelisters.NewStorageClassLister(indexer)
+
+	// Run the tested functions
+	err := test.test(ctrl, reactor.VolumeReactor, test)
+	if err != nil {
+		t.Errorf("Test %q failed: %v", test.name, err)
+	}
+
+	// Wait for the target state
+	err = reactor.waitTest(test)
+	if err != nil {
+		t.Errorf("Test %q failed: %v", test.name, err)
+	}
+
+}
+
 // Test single call to syncClaim and syncVolume methods.
 // For all tests:
 //  1. Fill in the controller with initial data
