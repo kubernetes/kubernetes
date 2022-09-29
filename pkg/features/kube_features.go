@@ -1020,7 +1020,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	JobTrackingWithFinalizers: {Default: true, PreRelease: featuregate.Beta},
 
-	KubeletCredentialProviders: {Default: true, PreRelease: featuregate.GA},
+	KubeletCredentialProviders: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	KubeletInUserNamespace: {Default: false, PreRelease: featuregate.Alpha},
 
