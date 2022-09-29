@@ -3754,12 +3754,13 @@ function kube-down() {
     # Delete all remaining firewall rules and network.
     delete-firewall-rules \
       "${CLUSTER_NAME}-default-internal-master" \
-      "${CLUSTER_NAME}-default-internal-node" \
+      "${CLUSTER_NAME}-default-internal-node"
+
+    if [[ "${KUBE_DELETE_NETWORK}" == "true" ]]; then
+      delete-firewall-rules \
       "${NETWORK}-default-ssh" \
       "${NETWORK}-default-rdp" \
       "${NETWORK}-default-internal"  # Pre-1.5 clusters
-
-    if [[ "${KUBE_DELETE_NETWORK}" == "true" ]]; then
       delete-cloud-nat-router
       # Delete all remaining firewall rules in the network.
       delete-all-firewall-rules || true
