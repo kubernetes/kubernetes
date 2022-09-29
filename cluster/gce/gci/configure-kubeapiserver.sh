@@ -333,7 +333,7 @@ function start-kube-apiserver {
     params+=" --egress-selector-config-file=/etc/srv/kubernetes/egress_selector_configuration.yaml"
   fi
 
-  local container_env="{\"name\": \"GOGC\", \"value\": \"63\"}"
+  local container_env="{\"name\": \"GOGC\", \"value\": \"87\"}"
   if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
     if [[ -n "${container_env}" ]]; then
       container_env="${container_env}, "
