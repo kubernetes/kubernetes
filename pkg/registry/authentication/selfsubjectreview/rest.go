@@ -29,6 +29,13 @@ import (
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 )
 
+var _ interface {
+	rest.Creater
+	rest.NamespaceScopedStrategy
+	rest.Scoper
+	rest.Storage
+} = &REST{}
+
 // REST implements a RESTStorage for selfsubjectreviews.
 type REST struct {
 }
