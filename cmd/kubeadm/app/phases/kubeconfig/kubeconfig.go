@@ -22,7 +22,6 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -243,7 +242,7 @@ func validateKubeConfig(outDir, filename string, config *clientcmdapi.Config) er
 		// fallback to load CA cert data from external CA file
 		clusterCAFilePath := currentConfig.Clusters[currentCluster].CertificateAuthority
 		if len(clusterCAFilePath) > 0 {
-			clusterCABytes, err := ioutil.ReadFile(clusterCAFilePath)
+			clusterCABytes, err := os.ReadFile(clusterCAFilePath)
 			if err != nil {
 				klog.Warningf("failed to load CA cert from %q for kubeconfig %q, %v", clusterCAFilePath, kubeConfigFilePath, err)
 			} else {

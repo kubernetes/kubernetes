@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -223,12 +222,12 @@ func CleanupKubeletDynamicEnvFileContainerRuntime(dryRun bool) error {
 		return nil
 	}
 	klog.V(2).Infof("Ensuring that %q does not include a --container-runtime flag", filePath)
-	bytes, err := ioutil.ReadFile(filePath)
+	bytes, err := os.ReadFile(filePath)
 	if err != nil {
 		return errors.Wrapf(err, "failed to read kubelet configuration from file %q", filePath)
 	}
 	updated := cleanupKubeletDynamicEnvFileContainerRuntime(string(bytes))
-	if err := ioutil.WriteFile(filePath, []byte(updated), 0644); err != nil {
+	if err := os.WriteFile(filePath, []byte(updated), 0644); err != nil {
 		return errors.Wrapf(err, "failed to write kubelet configuration to the file %q", filePath)
 	}
 	return nil
