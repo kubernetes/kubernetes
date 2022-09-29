@@ -70,10 +70,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
-	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
-	"k8s.io/apiserver/pkg/storage/storagebackend"
-	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/pkg/warning"
@@ -1132,33 +1129,6 @@ func (d unstructuredDefaulter) Default(in runtime.Object) {
 	}
 
 	structuraldefaulting.Default(u.UnstructuredContent(), d.structuralSchemas[u.GetObjectKind().GroupVersionKind().Version])
-}
-
-type CRDRESTOptionsGetter struct {
-	StorageConfig             storagebackend.Config
-	StoragePrefix             string
-	EnableWatchCache          bool
-	DefaultWatchCacheSize     int
-	EnableGarbageCollection   bool
-	DeleteCollectionWorkers   int
-	CountMetricPollPeriod     time.Duration
-	StorageObjectCountTracker flowcontrolrequest.StorageObjectCountTracker
-}
-
-func (t CRDRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
-	ret := generic.RESTOptions{
-		StorageConfig:             t.StorageConfig.ForResource(resource),
-		Decorator:                 generic.UndecoratedStorage,
-		EnableGarbageCollection:   t.EnableGarbageCollection,
-		DeleteCollectionWorkers:   t.DeleteCollectionWorkers,
-		ResourcePrefix:            resource.Group + "/" + resource.Resource,
-		CountMetricPollPeriod:     t.CountMetricPollPeriod,
-		StorageObjectCountTracker: t.StorageObjectCountTracker,
-	}
-	if t.EnableWatchCache {
-		ret.Decorator = genericregistry.StorageWithCacher()
-	}
-	return ret, nil
 }
 
 // clone returns a clone of the provided crdStorageMap.
