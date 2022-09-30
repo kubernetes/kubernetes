@@ -148,6 +148,7 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		storageframework.CapOfflineExpansion:    true,
 		storageframework.CapOnlineExpansion:     true,
 		storageframework.CapSingleNodeVolume:    true,
+		storageframework.CapReadWriteOncePod:    true,
 
 		// This is needed for the
 		// testsuites/volumelimits.go `should support volume limits`
@@ -805,6 +806,7 @@ func InitGcePDCSIDriver() storageframework.TestDriver {
 				storageframework.CapOnlineExpansion:     true,
 				storageframework.CapNodeExpansion:       true,
 				storageframework.CapSnapshotDataSource:  true,
+				storageframework.CapReadWriteOncePod:    true,
 			},
 			RequiredAccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			TopologyKeys:        []string{GCEPDCSIZoneTopologyKey},
