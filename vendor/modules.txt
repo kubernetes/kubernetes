@@ -998,6 +998,9 @@ golang.org/x/crypto/pkcs12/internal/rc2
 golang.org/x/crypto/salsa20/salsa
 golang.org/x/crypto/ssh
 golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
+# golang.org/x/exp v0.0.0-20220929160808-de9c53c655b9 => golang.org/x/exp v0.0.0-20220929160808-de9c53c655b9
+## explicit; go 1.18
+golang.org/x/exp/constraints
 # golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 => golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4
 ## explicit; go 1.17
 golang.org/x/mod/internal/lazyregexp
@@ -2714,6 +2717,7 @@ sigs.k8s.io/yaml
 # go.uber.org/multierr => go.uber.org/multierr v1.6.0
 # go.uber.org/zap => go.uber.org/zap v1.19.0
 # golang.org/x/crypto => golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
+# golang.org/x/exp => golang.org/x/exp v0.0.0-20220929160808-de9c53c655b9
 # golang.org/x/lint => golang.org/x/lint v0.0.0-20190930215403-16217165b5de
 # golang.org/x/mod => golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4
 # golang.org/x/net => golang.org/x/net v0.0.0-20220722155237-a158d28d115b

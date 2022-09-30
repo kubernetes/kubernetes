@@ -233,6 +233,7 @@ require (
 	go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
+	golang.org/x/exp v0.0.0-20220929160808-de9c53c655b9 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
@@ -491,6 +492,7 @@ replace (
 	go.uber.org/multierr => go.uber.org/multierr v1.6.0
 	go.uber.org/zap => go.uber.org/zap v1.19.0
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
+	golang.org/x/exp => golang.org/x/exp v0.0.0-20220929160808-de9c53c655b9
 	golang.org/x/lint => golang.org/x/lint v0.0.0-20190930215403-16217165b5de
 	golang.org/x/mod => golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4
 	golang.org/x/net => golang.org/x/net v0.0.0-20220722155237-a158d28d115b
