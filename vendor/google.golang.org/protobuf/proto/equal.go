@@ -10,7 +10,7 @@ import (
 	"reflect"
 
 	"google.golang.org/protobuf/encoding/protowire"
-	pref "google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 // Equal reports whether two messages are equal.
@@ -33,6 +33,10 @@ func Equal(x, y Message) bool {
 	if x == nil || y == nil {
 		return x == nil && y == nil
 	}
+	if reflect.TypeOf(x).Kind() == reflect.Ptr && x == y {
+		// Avoid an expensive comparison if both inputs are identical pointers.
+		return true
+	}
 	mx := x.ProtoReflect()
 	my := y.ProtoReflect()
 	if mx.IsValid() != my.IsValid() {
@@ -42,14 +46,14 @@ func Equal(x, y Message) bool {
 }
 
 // equalMessage compares two messages.
-func equalMessage(mx, my pref.Message) bool {
+func equalMessage(mx, my protoreflect.Message) bool {
 	if mx.Descriptor() != my.Descriptor() {
 		return false
 	}
 
 	nx := 0
 	equal := true
-	mx.Range(func(fd pref.FieldDescriptor, vx pref.Value) bool {
+	mx.Range(func(fd protoreflect.FieldDescriptor, vx protoreflect.Value) bool {
 		nx++
 		vy := my.Get(fd)
 		equal = my.Has(fd) && equalField(fd, vx, vy)
@@ -59,7 +63,7 @@ func equalMessage(mx, my pref.Message) bool {
 		return false
 	}
 	ny := 0
-	my.Range(func(fd pref.FieldDescriptor, vx pref.Value) bool {
+	my.Range(func(fd protoreflect.FieldDescriptor, vx protoreflect.Value) bool {
 		ny++
 		return true
 	})
@@ -71,7 +75,7 @@ func equalMessage(mx, my pref.Message) bool {
 }
 
 // equalField compares two fields.
-func equalField(fd pref.FieldDescriptor, x, y pref.Value) bool {
+func equalField(fd protoreflect.FieldDescriptor, x, y protoreflect.Value) bool {
 	switch {
 	case fd.IsList():
 		return equalList(fd, x.List(), y.List())
@@ -83,12 +87,12 @@ func equalField(fd pref.FieldDescriptor, x, y pref.Value) bool {
 }
 
 // equalMap compares two maps.
-func equalMap(fd pref.FieldDescriptor, x, y pref.Map) bool {
+func equalMap(fd protoreflect.FieldDescriptor, x, y protoreflect.Map) bool {
 	if x.Len() != y.Len() {
 		return false
 	}
 	equal := true
-	x.Range(func(k pref.MapKey, vx pref.Value) bool {
+	x.Range(func(k protoreflect.MapKey, vx protoreflect.Value) bool {
 		vy := y.Get(k)
 		equal = y.Has(k) && equalValue(fd.MapValue(), vx, vy)
 		return equal
@@ -97,7 +101,7 @@ func equalMap(fd pref.FieldDescriptor, x, y pref.Map) bool {
 }
 
 // equalList compares two lists.
-func equalList(fd pref.FieldDescriptor, x, y pref.List) bool {
+func equalList(fd protoreflect.FieldDescriptor, x, y protoreflect.List) bool {
 	if x.Len() != y.Len() {
 		return false
 	}
@@ -110,31 +114,31 @@ func equalList(fd pref.FieldDescriptor, x, y pref.List) bool {
 }
 
 // equalValue compares two singular values.
-func equalValue(fd pref.FieldDescriptor, x, y pref.Value) bool {
+func equalValue(fd protoreflect.FieldDescriptor, x, y protoreflect.Value) bool {
 	switch fd.Kind() {
-	case pref.BoolKind:
+	case protoreflect.BoolKind:
 		return x.Bool() == y.Bool()
-	case pref.EnumKind:
+	case protoreflect.EnumKind:
 		return x.Enum() == y.Enum()
-	case pref.Int32Kind, pref.Sint32Kind,
-		pref.Int64Kind, pref.Sint64Kind,
-		pref.Sfixed32Kind, pref.Sfixed64Kind:
+	case protoreflect.Int32Kind, protoreflect.Sint32Kind,
+		protoreflect.Int64Kind, protoreflect.Sint64Kind,
+		protoreflect.Sfixed32Kind, protoreflect.Sfixed64Kind:
 		return x.Int() == y.Int()
-	case pref.Uint32Kind, pref.Uint64Kind,
-		pref.Fixed32Kind, pref.Fixed64Kind:
+	case protoreflect.Uint32Kind, protoreflect.Uint64Kind,
+		protoreflect.Fixed32Kind, protoreflect.Fixed64Kind:
 		return x.Uint() == y.Uint()
-	case pref.FloatKind, pref.DoubleKind:
+	case protoreflect.FloatKind, protoreflect.DoubleKind:
 		fx := x.Float()
 		fy := y.Float()
 		if math.IsNaN(fx) || math.IsNaN(fy) {
 			return math.IsNaN(fx) && math.IsNaN(fy)
 		}
 		return fx == fy
-	case pref.StringKind:
+	case protoreflect.StringKind:
 		return x.String() == y.String()
-	case pref.BytesKind:
+	case protoreflect.BytesKind:
 		return bytes.Equal(x.Bytes(), y.Bytes())
-	case pref.MessageKind, pref.GroupKind:
+	case protoreflect.MessageKind, protoreflect.GroupKind:
 		return equalMessage(x.Message(), y.Message())
 	default:
 		return x.Interface() == y.Interface()
@@ -143,7 +147,7 @@ func equalValue(fd pref.FieldDescriptor, x, y pref.Value) bool {
 
 // equalUnknown compares unknown fields by direct comparison on the raw bytes
 // of each individual field number.
-func equalUnknown(x, y pref.RawFields) bool {
+func equalUnknown(x, y protoreflect.RawFields) bool {
 	if len(x) != len(y) {
 		return false
 	}
@@ -151,8 +155,8 @@ func equalUnknown(x, y pref.RawFields) bool {
 		return true
 	}
 
-	mx := make(map[pref.FieldNumber]pref.RawFields)
-	my := make(map[pref.FieldNumber]pref.RawFields)
+	mx := make(map[protoreflect.FieldNumber]protoreflect.RawFields)
+	my := make(map[protoreflect.FieldNumber]protoreflect.RawFields)
 	for len(x) > 0 {
 		fnum, _, n := protowire.ConsumeField(x)
 		mx[fnum] = append(mx[fnum], x[:n]...)

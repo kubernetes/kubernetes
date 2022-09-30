@@ -358,6 +358,13 @@ done
 echo "=== tidying root" >> "${LOG_FILE}"
 go mod tidy >>"${LOG_FILE}" 2>&1
 
+# prune unused pinned non-local replace directives
+comm -23 \
+  <(go mod edit -json | jq -r '.Replace[] | select(.New.Path | startswith("./") | not) | .Old.Path' | sort) \
+  <(go list -m -json all | jq -r .Path | sort) |
+while read -r X; do echo "-dropreplace=${X}"; done |
+xargs -L 100 go mod edit -fmt
+
 # disallow transitive dependencies on k8s.io/kubernetes
 loopback_deps=()
 kube::util::read-array loopback_deps < <(go mod graph | grep ' k8s.io/kubernetes' || true)

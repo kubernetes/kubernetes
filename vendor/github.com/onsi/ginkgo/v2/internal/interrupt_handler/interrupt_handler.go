@@ -4,12 +4,10 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/onsi/ginkgo/v2/formatter"
 	"github.com/onsi/ginkgo/v2/internal/parallel_support"
 )
 
@@ -50,7 +48,7 @@ type InterruptHandlerInterface interface {
 	Status() InterruptStatus
 	SetInterruptPlaceholderMessage(string)
 	ClearInterruptPlaceholderMessage()
-	InterruptMessageWithStackTraces() string
+	InterruptMessage() (string, bool)
 }
 
 type InterruptHandler struct {
@@ -190,23 +188,9 @@ func (handler *InterruptHandler) ClearInterruptPlaceholderMessage() {
 	handler.interruptPlaceholderMessage = ""
 }
 
-func (handler *InterruptHandler) InterruptMessageWithStackTraces() string {
+func (handler *InterruptHandler) InterruptMessage() (string, bool) {
 	handler.lock.Lock()
-	out := fmt.Sprintf("%s\n\n", handler.interruptCause.String())
+	out := fmt.Sprintf("%s", handler.interruptCause.String())
 	defer handler.lock.Unlock()
-	if handler.interruptCause == InterruptCauseAbortByOtherProcess {
-		return out
-	}
-	out += "Here's a stack trace of all running goroutines:\n"
-	buf := make([]byte, 8192)
-	for {
-		n := runtime.Stack(buf, true)
-		if n < len(buf) {
-			buf = buf[:n]
-			break
-		}
-		buf = make([]byte, 2*len(buf))
-	}
-	out += formatter.Fi(1, "%s", string(buf))
-	return out
+	return out, handler.interruptCause != InterruptCauseAbortByOtherProcess
 }

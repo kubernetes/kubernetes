@@ -140,13 +140,13 @@ type ClientStream interface {
 // To ensure resources are not leaked due to the stream returned, one of the following
 // actions must be performed:
 //
-//      1. Call Close on the ClientConn.
-//      2. Cancel the context provided.
-//      3. Call RecvMsg until a non-nil error is returned. A protobuf-generated
-//         client-streaming RPC, for instance, might use the helper function
-//         CloseAndRecv (note that CloseSend does not Recv, therefore is not
-//         guaranteed to release all resources).
-//      4. Receive a non-nil, non-io.EOF error from Header or SendMsg.
+//  1. Call Close on the ClientConn.
+//  2. Cancel the context provided.
+//  3. Call RecvMsg until a non-nil error is returned. A protobuf-generated
+//     client-streaming RPC, for instance, might use the helper function
+//     CloseAndRecv (note that CloseSend does not Recv, therefore is not
+//     guaranteed to release all resources).
+//  4. Receive a non-nil, non-io.EOF error from Header or SendMsg.
 //
 // If none of the above happen, a goroutine and a context will be leaked, and grpc
 // will not call the optionally-configured stats handler with a stats.End message.
@@ -303,12 +303,6 @@ func newClientStreamWithParams(ctx context.Context, desc *StreamDesc, cc *Client
 	}
 	cs.binlog = binarylog.GetMethodLogger(method)
 
-	cs.attempt, err = cs.newAttemptLocked(false /* isTransparent */)
-	if err != nil {
-		cs.finish(err)
-		return nil, err
-	}
-
 	// Pick the transport to use and create a new stream on the transport.
 	// Assign cs.attempt upon success.
 	op := func(a *csAttempt) error {
@@ -374,9 +368,9 @@ func (cs *clientStream) newAttemptLocked(isTransparent bool) (*csAttempt, error)
 
 	ctx := newContextWithRPCInfo(cs.ctx, cs.callInfo.failFast, cs.callInfo.codec, cs.cp, cs.comp)
 	method := cs.callHdr.Method
-	sh := cs.cc.dopts.copts.StatsHandler
 	var beginTime time.Time
-	if sh != nil {
+	shs := cs.cc.dopts.copts.StatsHandlers
+	for _, sh := range shs {
 		ctx = sh.TagRPC(ctx, &stats.RPCTagInfo{FullMethodName: method, FailFast: cs.callInfo.failFast})
 		beginTime = time.Now()
 		begin := &stats.Begin{
@@ -414,12 +408,12 @@ func (cs *clientStream) newAttemptLocked(isTransparent bool) (*csAttempt, error)
 	}
 
 	return &csAttempt{
-		ctx:          ctx,
-		beginTime:    beginTime,
-		cs:           cs,
-		dc:           cs.cc.dopts.dc,
-		statsHandler: sh,
-		trInfo:       trInfo,
+		ctx:           ctx,
+		beginTime:     beginTime,
+		cs:            cs,
+		dc:            cs.cc.dopts.dc,
+		statsHandlers: shs,
+		trInfo:        trInfo,
 	}, nil
 }
 
@@ -536,8 +530,8 @@ type csAttempt struct {
 	// and cleared when the finish method is called.
 	trInfo *traceInfo
 
-	statsHandler stats.Handler
-	beginTime    time.Time
+	statsHandlers []stats.Handler
+	beginTime     time.Time
 
 	// set for newStream errors that may be transparently retried
 	allowTransparentRetry bool
@@ -703,6 +697,18 @@ func (cs *clientStream) withRetry(op func(a *csAttempt) error, onSuccess func())
 			// error to allow for further inspection; all other errors should
 			// already be status errors.
 			return toRPCErr(op(cs.attempt))
+		}
+		if len(cs.buffer) == 0 {
+			// For the first op, which controls creation of the stream and
+			// assigns cs.attempt, we need to create a new attempt inline
+			// before executing the first op.  On subsequent ops, the attempt
+			// is created immediately before replaying the ops.
+			var err error
+			if cs.attempt, err = cs.newAttemptLocked(false /* isTransparent */); err != nil {
+				cs.mu.Unlock()
+				cs.finish(err)
+				return err
+			}
 		}
 		a := cs.attempt
 		cs.mu.Unlock()
@@ -960,8 +966,8 @@ func (a *csAttempt) sendMsg(m interface{}, hdr, payld, data []byte) error {
 		}
 		return io.EOF
 	}
-	if a.statsHandler != nil {
-		a.statsHandler.HandleRPC(a.ctx, outPayload(true, m, data, payld, time.Now()))
+	for _, sh := range a.statsHandlers {
+		sh.HandleRPC(a.ctx, outPayload(true, m, data, payld, time.Now()))
 	}
 	if channelz.IsOn() {
 		a.t.IncrMsgSent()
@@ -971,7 +977,7 @@ func (a *csAttempt) sendMsg(m interface{}, hdr, payld, data []byte) error {
 
 func (a *csAttempt) recvMsg(m interface{}, payInfo *payloadInfo) (err error) {
 	cs := a.cs
-	if a.statsHandler != nil && payInfo == nil {
+	if len(a.statsHandlers) != 0 && payInfo == nil {
 		payInfo = &payloadInfo{}
 	}
 
@@ -1008,8 +1014,8 @@ func (a *csAttempt) recvMsg(m interface{}, payInfo *payloadInfo) (err error) {
 		}
 		a.mu.Unlock()
 	}
-	if a.statsHandler != nil {
-		a.statsHandler.HandleRPC(a.ctx, &stats.InPayload{
+	for _, sh := range a.statsHandlers {
+		sh.HandleRPC(a.ctx, &stats.InPayload{
 			Client:   true,
 			RecvTime: time.Now(),
 			Payload:  m,
@@ -1068,7 +1074,7 @@ func (a *csAttempt) finish(err error) {
 			ServerLoad:    balancerload.Parse(tr),
 		})
 	}
-	if a.statsHandler != nil {
+	for _, sh := range a.statsHandlers {
 		end := &stats.End{
 			Client:    true,
 			BeginTime: a.beginTime,
@@ -1076,7 +1082,7 @@ func (a *csAttempt) finish(err error) {
 			Trailer:   tr,
 			Error:     err,
 		}
-		a.statsHandler.HandleRPC(a.ctx, end)
+		sh.HandleRPC(a.ctx, end)
 	}
 	if a.trInfo != nil && a.trInfo.tr != nil {
 		if err == nil {
@@ -1445,7 +1451,7 @@ type serverStream struct {
 	maxSendMessageSize    int
 	trInfo                *traceInfo
 
-	statsHandler stats.Handler
+	statsHandler []stats.Handler
 
 	binlog binarylog.MethodLogger
 	// serverHeaderBinlogged indicates whether server header has been logged. It
@@ -1555,8 +1561,10 @@ func (ss *serverStream) SendMsg(m interface{}) (err error) {
 			Message: data,
 		})
 	}
-	if ss.statsHandler != nil {
-		ss.statsHandler.HandleRPC(ss.s.Context(), outPayload(false, m, data, payload, time.Now()))
+	if len(ss.statsHandler) != 0 {
+		for _, sh := range ss.statsHandler {
+			sh.HandleRPC(ss.s.Context(), outPayload(false, m, data, payload, time.Now()))
+		}
 	}
 	return nil
 }
@@ -1590,7 +1598,7 @@ func (ss *serverStream) RecvMsg(m interface{}) (err error) {
 		}
 	}()
 	var payInfo *payloadInfo
-	if ss.statsHandler != nil || ss.binlog != nil {
+	if len(ss.statsHandler) != 0 || ss.binlog != nil {
 		payInfo = &payloadInfo{}
 	}
 	if err := recv(ss.p, ss.codec, ss.s, ss.dc, m, ss.maxReceiveMessageSize, payInfo, ss.decomp); err != nil {
@@ -1605,15 +1613,17 @@ func (ss *serverStream) RecvMsg(m interface{}) (err error) {
 		}
 		return toRPCErr(err)
 	}
-	if ss.statsHandler != nil {
-		ss.statsHandler.HandleRPC(ss.s.Context(), &stats.InPayload{
-			RecvTime: time.Now(),
-			Payload:  m,
-			// TODO truncate large payload.
-			Data:       payInfo.uncompressedBytes,
-			WireLength: payInfo.wireLength + headerLen,
-			Length:     len(payInfo.uncompressedBytes),
-		})
+	if len(ss.statsHandler) != 0 {
+		for _, sh := range ss.statsHandler {
+			sh.HandleRPC(ss.s.Context(), &stats.InPayload{
+				RecvTime: time.Now(),
+				Payload:  m,
+				// TODO truncate large payload.
+				Data:       payInfo.uncompressedBytes,
+				WireLength: payInfo.wireLength + headerLen,
+				Length:     len(payInfo.uncompressedBytes),
+			})
+		}
 	}
 	if ss.binlog != nil {
 		ss.binlog.Log(&binarylog.ClientMessage{

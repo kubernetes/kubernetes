@@ -77,9 +77,9 @@ func (e *errObjectName) Error() string {
 }
 
 // assumeCache stores two pointers to represent a single object:
-// * The pointer to the informer object.
-// * The pointer to the latest object, which could be the same as
-//   the informer object, or an in-memory object.
+//   - The pointer to the informer object.
+//   - The pointer to the latest object, which could be the same as
+//     the informer object, or an in-memory object.
 //
 // An informer update always overrides the latest object pointer.
 //
@@ -206,7 +206,7 @@ func (c *assumeCache) delete(obj interface{}) {
 		return
 	}
 
-	name, err := cache.MetaNamespaceKeyFunc(obj)
+	name, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		klog.ErrorS(&errObjectName{err}, "Failed to delete")
 		return

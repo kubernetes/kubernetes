@@ -64,15 +64,6 @@ const (
 	ProbeRemove
 )
 
-var (
-	deprecatedVolumeProviders = map[string]string{
-		"kubernetes.io/cinder":    "The Cinder volume provider is deprecated and will be removed in a future release",
-		"kubernetes.io/storageos": "The StorageOS volume provider is deprecated and will be removed in a future release",
-		"kubernetes.io/quobyte":   "The Quobyte volume provider is deprecated and will be removed in a future release",
-		"kubernetes.io/flocker":   "The Flocker volume provider is deprecated and will be removed in a future release",
-	}
-)
-
 // VolumeOptions contains option information about a volume.
 type VolumeOptions struct {
 	// The attributes below are required by volume.Provisioner
@@ -186,6 +177,10 @@ type VolumePlugin interface {
 	// of enabling bulk polling of all nodes. This can speed up verification of
 	// attached volumes by quite a bit, but underlying pluging must support it.
 	SupportsBulkVolumeVerification() bool
+
+	// SupportsSELinuxContextMount returns true if volume plugins supports
+	// mount -o context=XYZ for a given volume.
+	SupportsSELinuxContextMount(spec *Spec) (bool, error)
 }
 
 // PersistentVolumePlugin is an extended interface of VolumePlugin and is used
@@ -339,6 +334,13 @@ type KubeletVolumeHost interface {
 	WaitForCacheSync() error
 	// Returns hostutil.HostUtils
 	GetHostUtil() hostutil.HostUtils
+	// GetHostIDsForPod if the pod uses user namespaces, takes the uid and
+	// gid inside the container and returns the host UID and GID those are
+	// mapped to on the host. If containerUID/containerGID is nil, then it
+	// returns the host UID/GID for ID 0 inside the container.
+	// If the pod is not using user namespaces, as there is no mapping needed, the
+	// same containerUID and containerGID params are returned.
+	GetHostIDsForPod(pod *v1.Pod, containerUID, containerGID *int64) (hostUID, hostGID *int64, err error)
 }
 
 // AttachDetachVolumeHost is a AttachDetach Controller specific interface that plugins can use
@@ -686,8 +688,6 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
 	}
 
-	// Issue warning if the matched provider is deprecated
-	pm.logDeprecation(match.GetPluginName())
 	return match, nil
 }
 
@@ -714,20 +714,7 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 	if match == nil {
 		return nil, fmt.Errorf("no volume plugin matched name: %s", name)
 	}
-
-	// Issue warning if the matched provider is deprecated
-	pm.logDeprecation(match.GetPluginName())
 	return match, nil
-}
-
-// logDeprecation logs warning when a deprecated plugin is used.
-func (pm *VolumePluginMgr) logDeprecation(plugin string) {
-	if detail, ok := deprecatedVolumeProviders[plugin]; ok && !pm.loggedDeprecationWarnings.Has(plugin) {
-		klog.Warningf("WARNING: %s built-in volume provider is now deprecated. %s", plugin, detail)
-		// Make sure the message is logged only once. It has Warning severity
-		// and we don't want to spam the log too much.
-		pm.loggedDeprecationWarnings.Insert(plugin)
-	}
 }
 
 // Check if probedPlugin cache update is required.
@@ -1043,11 +1030,11 @@ func (pm *VolumePluginMgr) Run(stopCh <-chan struct{}) {
 // plugin implementations.  The following attributes can be overridden per
 // plugin via configuration:
 //
-// 1.  pod.Spec.Volumes[0].VolumeSource must be overridden.  Recycler
+//  1. pod.Spec.Volumes[0].VolumeSource must be overridden.  Recycler
 //     implementations without a valid VolumeSource will fail.
-// 2.  pod.GenerateName helps distinguish recycler pods by name.  Recommended.
+//  2. pod.GenerateName helps distinguish recycler pods by name.  Recommended.
 //     Default is "pv-recycler-".
-// 3.  pod.Spec.ActiveDeadlineSeconds gives the recycler pod a maximum timeout
+//  3. pod.Spec.ActiveDeadlineSeconds gives the recycler pod a maximum timeout
 //     before failing.  Recommended.  Default is 60 seconds.
 //
 // See HostPath and NFS for working recycler examples

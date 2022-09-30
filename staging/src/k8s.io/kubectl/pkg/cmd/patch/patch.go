@@ -23,9 +23,11 @@ import (
 	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -80,7 +82,9 @@ var (
 	patchLong = templates.LongDesc(i18n.T(`
 		Update fields of a resource using strategic merge patch, a JSON merge patch, or a JSON patch.
 
-		JSON and YAML formats are accepted.`))
+		JSON and YAML formats are accepted.
+
+		Note: Strategic merge patch is not supported for custom resources.`))
 
 	patchExample = templates.Examples(i18n.T(`
 		# Partially update a node using a strategic merge patch, specifying the patch as JSON
@@ -270,6 +274,9 @@ func (o *PatchOptions) RunPatch() error {
 				WithSubresource(o.Subresource)
 			patchedObj, err := helper.Patch(namespace, name, patchType, patchBytes, nil)
 			if err != nil {
+				if apierrors.IsUnsupportedMediaType(err) {
+					return errors.Wrap(err, fmt.Sprintf("%s is not supported by %s", patchType, mapping.GroupVersionKind))
+				}
 				return err
 			}
 

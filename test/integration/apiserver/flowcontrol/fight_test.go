@@ -40,22 +40,24 @@ import (
 	testclocks "k8s.io/utils/clock/testing"
 )
 
-/* fightTest configures a test of how API Priority and Fairness config
-   controllers fight when they disagree on how to set FlowSchemaStatus.
-   In particular, they set the condition that indicates integrity of
-   the reference to the PriorityLevelConfiguration.  The scenario tested is
-   two teams of controllers, where the controllers in one team set the
-   condition normally and the controllers in the other team set the condition
-   to the opposite value.
+/*
+fightTest configures a test of how API Priority and Fairness config
 
-   This is a behavioral test: it instantiates these controllers and runs them
-   almost normally.  The test aims to run the controllers for a little under
-   2 minutes.  The test takes clock readings to get upper and lower bounds on
-   how long each controller ran, and calculates consequent bounds on the number
-   of writes that should happen to each FlowSchemaStatus.  The test creates
-   an informer to observe the writes.  The calculated lower bound on the
-   number of writes is very lax, assuming only that one write can be done
-   every 10 seconds.
+	controllers fight when they disagree on how to set FlowSchemaStatus.
+	In particular, they set the condition that indicates integrity of
+	the reference to the PriorityLevelConfiguration.  The scenario tested is
+	two teams of controllers, where the controllers in one team set the
+	condition normally and the controllers in the other team set the condition
+	to the opposite value.
+
+	This is a behavioral test: it instantiates these controllers and runs them
+	almost normally.  The test aims to run the controllers for a little under
+	2 minutes.  The test takes clock readings to get upper and lower bounds on
+	how long each controller ran, and calculates consequent bounds on the number
+	of writes that should happen to each FlowSchemaStatus.  The test creates
+	an informer to observe the writes.  The calculated lower bound on the
+	number of writes is very lax, assuming only that one write can be done
+	every 10 seconds.
 */
 type fightTest struct {
 	t              *testing.T

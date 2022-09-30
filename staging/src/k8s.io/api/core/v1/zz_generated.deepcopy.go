@@ -3954,6 +3954,11 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 		*out = new(PodOS)
 		**out = **in
 	}
+	if in.HostUsers != nil {
+		in, out := &in.HostUsers, &out.HostUsers
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
@@ -5663,6 +5668,11 @@ func (in *TopologySpreadConstraint) DeepCopyInto(out *TopologySpreadConstraint) 
 		in, out := &in.NodeTaintsPolicy, &out.NodeTaintsPolicy
 		*out = new(NodeInclusionPolicy)
 		**out = **in
+	}
+	if in.MatchLabelKeys != nil {
+		in, out := &in.MatchLabelKeys, &out.MatchLabelKeys
+		*out = make([]string, len(*in))
+		copy(*out, *in)
 	}
 	return
 }

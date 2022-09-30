@@ -78,6 +78,9 @@ const (
 
 	kubeHealthCheckNodePortSetComment = "Kubernetes health check node port"
 	kubeHealthCheckNodePortSet        = "KUBE-HEALTH-CHECK-NODE-PORT"
+
+	kubeIPVSSetComment = "Addresses on the ipvs interface"
+	kubeIPVSSet        = "KUBE-IPVS-IPS"
 )
 
 // IPSetVersioner can query the current ipset version.
@@ -133,7 +136,7 @@ func (set *IPSet) validateEntry(entry *utilipset.Entry) bool {
 }
 
 func (set *IPSet) isEmpty() bool {
-	return len(set.activeEntries.UnsortedList()) == 0
+	return set.activeEntries.Len() == 0
 }
 
 func (set *IPSet) getComment() string {

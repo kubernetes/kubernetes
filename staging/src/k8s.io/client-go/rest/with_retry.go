@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"time"
@@ -222,7 +221,7 @@ func (r *withRetry) Before(ctx context.Context, request *Request) error {
 		}
 	}
 
-	// if we are here, we have made attempt(s) al least once before.
+	// if we are here, we have made attempt(s) at least once before.
 	if request.backoff != nil {
 		delay := request.backoff.CalculateBackoff(url)
 		if r.retryAfter.Wait > delay {
@@ -345,7 +344,7 @@ func readAndCloseResponseBody(resp *http.Response) {
 	defer resp.Body.Close()
 
 	if resp.ContentLength <= maxBodySlurpSize {
-		io.Copy(ioutil.Discard, &io.LimitedReader{R: resp.Body, N: maxBodySlurpSize})
+		io.Copy(io.Discard, &io.LimitedReader{R: resp.Body, N: maxBodySlurpSize})
 	}
 }
 

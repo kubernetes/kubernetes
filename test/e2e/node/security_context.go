@@ -165,27 +165,27 @@ var _ = SIGDescribe("Security Context", func() {
 		pod.Spec.Containers[0].SecurityContext = &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}}
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}}
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
-		f.TestContainerOutput(v1.SeccompPodAnnotationKey, pod, 0, []string{"0"}) // seccomp disabled
+		f.TestContainerOutput("seccomp unconfined container", pod, 0, []string{"0"}) // seccomp disabled
 	})
 
 	ginkgo.It("should support seccomp unconfined on the pod [LinuxOnly]", func() {
 		pod := scTestPod(false, false)
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}}
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
-		f.TestContainerOutput(v1.SeccompPodAnnotationKey, pod, 0, []string{"0"}) // seccomp disabled
+		f.TestContainerOutput("seccomp unconfined pod", pod, 0, []string{"0"}) // seccomp disabled
 	})
 
 	ginkgo.It("should support seccomp runtime/default [LinuxOnly]", func() {
 		pod := scTestPod(false, false)
 		pod.Spec.Containers[0].SecurityContext = &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}}
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
-		f.TestContainerOutput(v1.SeccompPodAnnotationKey, pod, 0, []string{"2"}) // seccomp filtered
+		f.TestContainerOutput("seccomp runtime/default", pod, 0, []string{"2"}) // seccomp filtered
 	})
 
 	ginkgo.It("should support seccomp default which is unconfined [LinuxOnly]", func() {
 		pod := scTestPod(false, false)
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
-		f.TestContainerOutput(v1.SeccompPodAnnotationKey, pod, 0, []string{"0"}) // seccomp disabled
+		f.TestContainerOutput("seccomp default unconfined", pod, 0, []string{"0"}) // seccomp disabled
 	})
 })
 

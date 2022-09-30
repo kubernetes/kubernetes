@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 	netutils "k8s.io/utils/net"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 // kube-proxy generates iptables rules to forward traffic from Services to Endpoints
@@ -158,8 +158,8 @@ func TestNumberIptablesRules(t *testing.T) {
 			},
 			services:            1,
 			epPerService:        1,
-			expectedFilterRules: 3,
-			expectedNatRules:    17,
+			expectedFilterRules: 4,
+			expectedNatRules:    16,
 		},
 		{
 			name: "1 Services 2 EndpointPerService - LoadBalancer",
@@ -173,8 +173,8 @@ func TestNumberIptablesRules(t *testing.T) {
 			},
 			services:            1,
 			epPerService:        2,
-			expectedFilterRules: 3,
-			expectedNatRules:    20,
+			expectedFilterRules: 4,
+			expectedNatRules:    19,
 		},
 		{
 			name: "1 Services 10 EndpointPerService - LoadBalancer",
@@ -188,8 +188,8 @@ func TestNumberIptablesRules(t *testing.T) {
 			},
 			services:            1,
 			epPerService:        10,
-			expectedFilterRules: 3,
-			expectedNatRules:    44,
+			expectedFilterRules: 4,
+			expectedNatRules:    43,
 		},
 		{
 			name: "10 Services 0 EndpointsPerService - LoadBalancer",
@@ -218,8 +218,8 @@ func TestNumberIptablesRules(t *testing.T) {
 			},
 			services:            10,
 			epPerService:        1,
-			expectedFilterRules: 3,
-			expectedNatRules:    125,
+			expectedFilterRules: 13,
+			expectedNatRules:    115,
 		},
 		{
 			name: "10 Services 2 EndpointPerService - LoadBalancer",
@@ -233,8 +233,8 @@ func TestNumberIptablesRules(t *testing.T) {
 			},
 			services:            10,
 			epPerService:        2,
-			expectedFilterRules: 3,
-			expectedNatRules:    155,
+			expectedFilterRules: 13,
+			expectedNatRules:    145,
 		},
 		{
 			name: "10 Services 10 EndpointPerService - LoadBalancer",
@@ -248,8 +248,8 @@ func TestNumberIptablesRules(t *testing.T) {
 			},
 			services:            10,
 			epPerService:        10,
-			expectedFilterRules: 3,
-			expectedNatRules:    395,
+			expectedFilterRules: 13,
+			expectedNatRules:    385,
 		},
 	}
 
@@ -371,8 +371,8 @@ func generateServiceEndpoints(nServices, nEndpoints int, epsFunc func(eps *disco
 		AddressType: discovery.AddressTypeIPv4,
 		Endpoints:   []discovery.Endpoint{},
 		Ports: []discovery.EndpointPort{{
-			Name:     utilpointer.StringPtr(fmt.Sprintf("%d", epPort)),
-			Port:     utilpointer.Int32(int32(epPort)),
+			Name:     pointer.String(fmt.Sprintf("%d", epPort)),
+			Port:     pointer.Int32(int32(epPort)),
 			Protocol: &tcpProtocol,
 		}},
 	}

@@ -32,21 +32,18 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/duration"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	runtimeresource "k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	watchtools "k8s.io/client-go/tools/watch"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/templates"
-)
-
-const (
-	eventsUsageStr = "events [--for TYPE/NAME] [--watch]"
 )
 
 var (
@@ -65,7 +62,13 @@ var (
 	kubectl alpha events --all-namespaces
 
 	# List recent events for the specified pod, then wait for more events and list them as they arrive.
-	kubectl alpha events --for pod/web-pod-13je7 --watch`))
+	kubectl alpha events --for pod/web-pod-13je7 --watch
+
+	# List recent events in given format. Supported ones, apart from default, are json and yaml.
+	kubectl alpha events -oyaml
+
+	# List recent only events in given event types
+	kubectl alpha events --types=Warning,Normal`))
 )
 
 // EventsFlags directly reflect the information that CLI is gathering via flags.  They will be converted to Options, which
@@ -73,10 +76,13 @@ var (
 // the logic itself easy to unit test.
 type EventsFlags struct {
 	RESTClientGetter genericclioptions.RESTClientGetter
+	PrintFlags       *genericclioptions.PrintFlags
 
 	AllNamespaces bool
 	Watch         bool
+	NoHeaders     bool
 	ForObject     string
+	FilterTypes   []string
 	ChunkSize     int64
 	genericclioptions.IOStreams
 }
@@ -85,6 +91,7 @@ type EventsFlags struct {
 func NewEventsFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *EventsFlags {
 	return &EventsFlags{
 		RESTClientGetter: restClientGetter,
+		PrintFlags:       genericclioptions.NewPrintFlags("events").WithTypeSetter(scheme.Scheme),
 		IOStreams:        streams,
 		ChunkSize:        cmdutil.DefaultChunkSize,
 	}
@@ -96,12 +103,14 @@ type EventsOptions struct {
 	Namespace     string
 	AllNamespaces bool
 	Watch         bool
+	FilterTypes   []string
 
 	forGVK  schema.GroupVersionKind
 	forName string
 
-	ctx    context.Context
 	client *kubernetes.Clientset
+
+	PrintObj printers.ResourcePrinterFunc
 
 	genericclioptions.IOStreams
 }
@@ -111,35 +120,39 @@ func NewCmdEvents(restClientGetter genericclioptions.RESTClientGetter, streams g
 	flags := NewEventsFlags(restClientGetter, streams)
 
 	cmd := &cobra.Command{
-		Use:                   eventsUsageStr,
+		Use:                   fmt.Sprintf("events [(-o|--output=)%s] [--for TYPE/NAME] [--watch] [--event=Normal,Warning]", strings.Join(flags.PrintFlags.AllowedFormats(), "|")),
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Experimental: List events"),
 		Long:                  eventsLong,
 		Example:               eventsExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			o, err := flags.ToOptions(cmd.Context(), args)
+			o, err := flags.ToOptions()
 			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
 	flags.AddFlags(cmd)
+	flags.PrintFlags.AddFlags(cmd)
 	return cmd
 }
 
 // AddFlags registers flags for a cli.
-func (o *EventsFlags) AddFlags(cmd *cobra.Command) {
-	cmd.Flags().BoolVarP(&o.Watch, "watch", "w", o.Watch, "After listing the requested events, watch for more events.")
-	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
-	cmd.Flags().StringVar(&o.ForObject, "for", o.ForObject, "Filter events to only those pertaining to the specified resource.")
-	cmdutil.AddChunkSizeFlag(cmd, &o.ChunkSize)
+func (flags *EventsFlags) AddFlags(cmd *cobra.Command) {
+	cmd.Flags().BoolVarP(&flags.Watch, "watch", "w", flags.Watch, "After listing the requested events, watch for more events.")
+	cmd.Flags().BoolVarP(&flags.AllNamespaces, "all-namespaces", "A", flags.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	cmd.Flags().StringVar(&flags.ForObject, "for", flags.ForObject, "Filter events to only those pertaining to the specified resource.")
+	cmd.Flags().StringSliceVar(&flags.FilterTypes, "types", flags.FilterTypes, "Output only events of given types.")
+	cmd.Flags().BoolVar(&flags.NoHeaders, "no-headers", flags.NoHeaders, "When using the default output format, don't print headers.")
+	cmdutil.AddChunkSizeFlag(cmd, &flags.ChunkSize)
 }
 
 // ToOptions converts from CLI inputs to runtime inputs.
-func (flags *EventsFlags) ToOptions(ctx context.Context, args []string) (*EventsOptions, error) {
+func (flags *EventsFlags) ToOptions() (*EventsOptions, error) {
 	o := &EventsOptions{
-		ctx:           ctx,
 		AllNamespaces: flags.AllNamespaces,
 		Watch:         flags.Watch,
+		FilterTypes:   flags.FilterTypes,
 		IOStreams:     flags.IOStreams,
 	}
 	var err error
@@ -167,16 +180,46 @@ func (flags *EventsFlags) ToOptions(ctx context.Context, args []string) (*Events
 	if err != nil {
 		return nil, err
 	}
+
 	o.client, err = kubernetes.NewForConfig(clientConfig)
 	if err != nil {
 		return nil, err
 	}
 
+	if len(o.FilterTypes) > 0 {
+		o.FilterTypes = sets.NewString(o.FilterTypes...).List()
+	}
+
+	var printer printers.ResourcePrinter
+	if flags.PrintFlags.OutputFormat != nil && len(*flags.PrintFlags.OutputFormat) > 0 {
+		printer, err = flags.PrintFlags.ToPrinter()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		printer = NewEventPrinter(flags.NoHeaders, flags.AllNamespaces)
+	}
+
+	o.PrintObj = func(object runtime.Object, writer io.Writer) error {
+		return printer.PrintObj(object, writer)
+	}
+
 	return o, nil
 }
 
+func (o *EventsOptions) Validate() error {
+	for _, val := range o.FilterTypes {
+		if !strings.EqualFold(val, "Normal") && !strings.EqualFold(val, "Warning") {
+			return fmt.Errorf("valid --types are Normal or Warning")
+		}
+	}
+
+	return nil
+}
+
 // Run retrieves events
-func (o EventsOptions) Run() error {
+func (o *EventsOptions) Run() error {
+	ctx := context.TODO()
 	namespace := o.Namespace
 	if o.AllNamespaces {
 		namespace = ""
@@ -188,14 +231,19 @@ func (o EventsOptions) Run() error {
 			fields.OneTermEqualSelector("involvedObject.name", o.forName)).String()
 	}
 	if o.Watch {
-		return o.runWatch(namespace, listOptions)
+		return o.runWatch(ctx, namespace, listOptions)
 	}
 
 	e := o.client.CoreV1().Events(namespace)
-	el := &corev1.EventList{}
+	el := &corev1.EventList{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "EventList",
+			APIVersion: "v1",
+		},
+	}
 	err := runtimeresource.FollowContinue(&listOptions,
 		func(options metav1.ListOptions) (runtime.Object, error) {
-			newEvents, err := e.List(o.ctx, options)
+			newEvents, err := e.List(ctx, options)
 			if err != nil {
 				return nil, runtimeresource.EnhanceListError(err, options, "events")
 			}
@@ -206,6 +254,22 @@ func (o EventsOptions) Run() error {
 	if err != nil {
 		return err
 	}
+
+	var filteredEvents []corev1.Event
+	for _, e := range el.Items {
+		if !o.filteredEventType(e.Type) {
+			continue
+		}
+		if e.GetObjectKind().GroupVersionKind().Empty() {
+			e.SetGroupVersionKind(schema.GroupVersionKind{
+				Version: "v1",
+				Kind:    "Event",
+			})
+		}
+		filteredEvents = append(filteredEvents, e)
+	}
+
+	el.Items = filteredEvents
 
 	if len(el.Items) == 0 {
 		if o.AllNamespaces {
@@ -220,36 +284,39 @@ func (o EventsOptions) Run() error {
 
 	sort.Sort(SortableEvents(el.Items))
 
-	printHeadings(w, o.AllNamespaces)
-	for _, e := range el.Items {
-		printOneEvent(w, e, o.AllNamespaces)
-	}
+	o.PrintObj(el, w)
 	w.Flush()
 	return nil
 }
 
-func (o EventsOptions) runWatch(namespace string, listOptions metav1.ListOptions) error {
-	eventWatch, err := o.client.CoreV1().Events(namespace).Watch(o.ctx, listOptions)
+func (o *EventsOptions) runWatch(ctx context.Context, namespace string, listOptions metav1.ListOptions) error {
+	eventWatch, err := o.client.CoreV1().Events(namespace).Watch(ctx, listOptions)
 	if err != nil {
 		return err
 	}
 	w := printers.GetNewTabWriter(o.Out)
-	headingsPrinted := false
 
-	ctx, cancel := context.WithCancel(o.ctx)
+	cctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	intr := interrupt.New(nil, cancel)
 	intr.Run(func() error {
-		_, err := watchtools.UntilWithoutRetry(ctx, eventWatch, func(e watch.Event) (bool, error) {
+		_, err := watchtools.UntilWithoutRetry(cctx, eventWatch, func(e watch.Event) (bool, error) {
 			if e.Type == watch.Deleted { // events are deleted after 1 hour; don't print that
 				return false, nil
 			}
-			event := e.Object.(*corev1.Event)
-			if !headingsPrinted {
-				printHeadings(w, o.AllNamespaces)
-				headingsPrinted = true
+
+			if ev, ok := e.Object.(*corev1.Event); !ok || !o.filteredEventType(ev.Type) {
+				return false, nil
 			}
-			printOneEvent(w, *event, o.AllNamespaces)
+
+			if e.Object.GetObjectKind().GroupVersionKind().Empty() {
+				e.Object.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{
+					Version: "v1",
+					Kind:    "Event",
+				})
+			}
+
+			o.PrintObj(e.Object, w)
 			w.Flush()
 			return false, nil
 		})
@@ -259,36 +326,22 @@ func (o EventsOptions) runWatch(namespace string, listOptions metav1.ListOptions
 	return nil
 }
 
-func printHeadings(w io.Writer, allNamespaces bool) {
-	if allNamespaces {
-		fmt.Fprintf(w, "NAMESPACE\t")
+// filteredEventType checks given event can be printed
+// by comparing it in filtered event flag.
+// If --event flag is not set by user, this function allows
+// all events to be printed.
+func (o *EventsOptions) filteredEventType(et string) bool {
+	if len(o.FilterTypes) == 0 {
+		return true
 	}
-	fmt.Fprintf(w, "LAST SEEN\tTYPE\tREASON\tOBJECT\tMESSAGE\n")
-}
 
-func printOneEvent(w io.Writer, e corev1.Event, allNamespaces bool) {
-	var interval string
-	firstTimestampSince := translateMicroTimestampSince(e.EventTime)
-	if e.EventTime.IsZero() {
-		firstTimestampSince = translateTimestampSince(e.FirstTimestamp)
+	for _, t := range o.FilterTypes {
+		if strings.EqualFold(t, et) {
+			return true
+		}
 	}
-	if e.Series != nil {
-		interval = fmt.Sprintf("%s (x%d over %s)", translateMicroTimestampSince(e.Series.LastObservedTime), e.Series.Count, firstTimestampSince)
-	} else if e.Count > 1 {
-		interval = fmt.Sprintf("%s (x%d over %s)", translateTimestampSince(e.LastTimestamp), e.Count, firstTimestampSince)
-	} else {
-		interval = firstTimestampSince
-	}
-	if allNamespaces {
-		fmt.Fprintf(w, "%v\t", e.Namespace)
-	}
-	fmt.Fprintf(w, "%s\t%s\t%s\t%s/%s\t%v\n",
-		interval,
-		e.Type,
-		e.Reason,
-		e.InvolvedObject.Kind, e.InvolvedObject.Name,
-		strings.TrimSpace(e.Message),
-	)
+
+	return false
 }
 
 // SortableEvents implements sort.Interface for []api.Event by time
@@ -316,26 +369,6 @@ func eventTime(event corev1.Event) time.Time {
 		return event.LastTimestamp.Time
 	}
 	return event.EventTime.Time
-}
-
-// translateMicroTimestampSince returns the elapsed time since timestamp in
-// human-readable approximation.
-func translateMicroTimestampSince(timestamp metav1.MicroTime) string {
-	if timestamp.IsZero() {
-		return "<unknown>"
-	}
-
-	return duration.HumanDuration(time.Since(timestamp.Time))
-}
-
-// translateTimestampSince returns the elapsed time since timestamp in
-// human-readable approximation.
-func translateTimestampSince(timestamp metav1.Time) string {
-	if timestamp.IsZero() {
-		return "<unknown>"
-	}
-
-	return duration.HumanDuration(time.Since(timestamp.Time))
 }
 
 // Inspired by k8s.io/cli-runtime/pkg/resource splitResourceTypeName()

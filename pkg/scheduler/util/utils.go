@@ -23,11 +23,14 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -90,6 +93,12 @@ func MoreImportantPod(pod1, pod2 *v1.Pod) bool {
 	return GetPodStartTime(pod1).Before(GetPodStartTime(pod2))
 }
 
+// Retriable defines the retriable errors during a scheduling cycle.
+func Retriable(err error) bool {
+	return apierrors.IsInternalError(err) || apierrors.IsServiceUnavailable(err) ||
+		net.IsConnectionRefused(err)
+}
+
 // PatchPodStatus calculates the delta bytes change from <old.Status> to <newStatus>,
 // and then submit a request to API server to patch the pod changes.
 func PatchPodStatus(ctx context.Context, cs kubernetes.Interface, old *v1.Pod, newStatus *v1.PodStatus) error {
@@ -115,8 +124,12 @@ func PatchPodStatus(ctx context.Context, cs kubernetes.Interface, old *v1.Pod, n
 		return nil
 	}
 
-	_, err = cs.CoreV1().Pods(old.Namespace).Patch(ctx, old.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
-	return err
+	patchFn := func() error {
+		_, err := cs.CoreV1().Pods(old.Namespace).Patch(ctx, old.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+		return err
+	}
+
+	return retry.OnError(retry.DefaultBackoff, Retriable, patchFn)
 }
 
 // DeletePod deletes the given <pod> from API server

@@ -324,7 +324,7 @@ func (s *DefaultStorageFactory) Backends() []Backend {
 		backends = append(backends, Backend{
 			Server: server,
 			// We can't share TLSConfig across different backends to avoid races.
-			// For more details see: http://pr.k8s.io/59338
+			// For more details see: https://pr.k8s.io/59338
 			TLSConfig: tlsConfig.Clone(),
 		})
 	}

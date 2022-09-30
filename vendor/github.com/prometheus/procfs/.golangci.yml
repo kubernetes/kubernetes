@@ -1,4 +1,12 @@
 ---
 linters:
   enable:
-  - golint
+  - godot
+  - revive
+
+linter-settings:
+  godot:
+    capital: true
+    exclude:
+    # Ignore "See: URL"
+    - 'See:'

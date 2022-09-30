@@ -15,9 +15,9 @@ limitations under the License.
 */
 
 // To run the node e2e tests remotely against one or more hosts on gce:
-// $ go run run_remote.go --logtostderr --v 2 --ssh-env gce --hosts <comma separated hosts>
+// $ go run run_remote.go --v 2 --ssh-env gce --hosts <comma separated hosts>
 // To run the node e2e tests remotely against one or more images on gce and provision them:
-// $ go run run_remote.go --logtostderr --v 2 --project <project> --zone <zone> --ssh-env gce --images <comma separated images>
+// $ go run run_remote.go --v 2 --project <project> --zone <zone> --ssh-env gce --images <comma separated images>
 package main
 
 import (
@@ -130,12 +130,13 @@ type TestResult struct {
 // specifying the `--image-config-file` flag, pointing to a json or yaml file
 // of the form:
 //
-//     images:
-//       short-name:
-//         image: gce-image-name
-//         project: gce-image-project
-//         machine: for benchmark only, the machine type (GCE instance) to run test
-//         tests: for benchmark only, a list of ginkgo focus strings to match tests
+//	images:
+//	  short-name:
+//	    image: gce-image-name
+//	    project: gce-image-project
+//	    machine: for benchmark only, the machine type (GCE instance) to run test
+//	    tests: for benchmark only, a list of ginkgo focus strings to match tests
+//
 // TODO(coufon): replace 'image' with 'node' in configurations
 // and we plan to support testing custom machines other than GCE by specifying host
 type ImageConfig struct {

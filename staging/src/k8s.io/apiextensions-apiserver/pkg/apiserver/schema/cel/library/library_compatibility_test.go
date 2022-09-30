@@ -20,13 +20,12 @@ import (
 	"testing"
 
 	"github.com/google/cel-go/cel"
-	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 func TestLibraryCompatibility(t *testing.T) {
 	functionNames := map[string]struct{}{}
 
-	decls := map[cel.Library][]*exprpb.Decl{
+	decls := map[cel.Library]map[string][]cel.FunctionOpt{
 		urlsLib:  urlLibraryDecls,
 		listsLib: listsLibraryDecls,
 		regexLib: regexLibraryDecls,
@@ -34,9 +33,9 @@ func TestLibraryCompatibility(t *testing.T) {
 	if len(k8sExtensionLibs) != len(decls) {
 		t.Errorf("Expected the same number of libraries in the ExtensionLibs as are tested for compatibility")
 	}
-	for _, l := range decls {
-		for _, d := range l {
-			functionNames[d.GetName()] = struct{}{}
+	for _, decl := range decls {
+		for name := range decl {
+			functionNames[name] = struct{}{}
 		}
 	}
 

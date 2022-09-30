@@ -24,10 +24,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	eventsv1client "k8s.io/client-go/kubernetes/typed/events/v1"
-	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
@@ -73,7 +71,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 	for _, test := range createTests {
 		master := Controller{}
 		fakeClient := fake.NewSimpleClientset()
-		master.ServiceClient = fakeClient.CoreV1()
+		master.client = fakeClient
 		master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
 		creates := []core.CreateAction{}
 		for _, action := range fakeClient.Actions() {
@@ -355,7 +353,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 	for _, test := range reconcileTests {
 		master := Controller{}
 		fakeClient := fake.NewSimpleClientset(test.service)
-		master.ServiceClient = fakeClient.CoreV1()
+		master.client = fakeClient
 		err := master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, true)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
@@ -414,7 +412,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 	for _, test := range nonReconcileTests {
 		master := Controller{}
 		fakeClient := fake.NewSimpleClientset(test.service)
-		master.ServiceClient = fakeClient.CoreV1()
+		master.client = fakeClient
 		err := master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
@@ -458,10 +456,7 @@ func Test_completedConfig_NewBootstrapController(t *testing.T) {
 
 	type args struct {
 		legacyRESTStorage corerest.LegacyRESTStorage
-		serviceClient     corev1client.ServicesGetter
-		nsClient          corev1client.NamespacesGetter
-		eventClient       eventsv1client.EventsV1Interface
-		readyzClient      rest.Interface
+		client            kubernetes.Interface
 	}
 	tests := []struct {
 		name        string
@@ -585,7 +580,7 @@ func Test_completedConfig_NewBootstrapController(t *testing.T) {
 				GenericConfig: tt.config.Complete(nil),
 				ExtraConfig:   tt.extraConfig,
 			}
-			_, err := c.NewBootstrapController(tt.args.legacyRESTStorage, tt.args.serviceClient, tt.args.nsClient, tt.args.eventClient, tt.args.readyzClient)
+			_, err := c.NewBootstrapController(tt.args.legacyRESTStorage, tt.args.client)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("completedConfig.NewBootstrapController() error = %v, wantErr %v", err, tt.wantErr)
 				return

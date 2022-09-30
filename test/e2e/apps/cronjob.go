@@ -298,6 +298,17 @@ var _ = SIGDescribe("CronJob", func() {
 		ensureHistoryLimits(f.ClientSet, f.Namespace.Name, cronJob)
 	})
 
+	ginkgo.It("should support timezone", func() {
+		ginkgo.By("Creating a cronjob with TimeZone")
+		cronJob := newTestCronJob("cronjob-with-timezone", "*/1 * * * ?", batchv1.AllowConcurrent,
+			failureCommand, nil, nil)
+		badTimeZone := "bad-time-zone"
+		cronJob.Spec.TimeZone = &badTimeZone
+		_, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
+		framework.ExpectError(err, "CronJob creation should fail with invalid time zone error")
+		framework.ExpectEqual(apierrors.IsInvalid(err), true, "CronJob creation should fail with invalid time zone error")
+	})
+
 	/*
 	   Release: v1.21
 	   Testname: CronJob API Operations

@@ -442,4 +442,6 @@
 - endpoint: deleteCoreV1CollectionNode
   reason: Kubernetes distribution would reasonably not allow this action via the API
   link: https://github.com/kubernetes/kubernetes/issues/109379 
-  
+- endpoint: createCoreV1NamespacedBinding
+  reason: Endpoint was deprecated in 1.7
+  link: https://github.com/kubernetes/kubernetes/pull/47041  

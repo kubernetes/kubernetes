@@ -25,7 +25,6 @@ import (
 	"go/parser"
 	"go/printer"
 	"go/token"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
@@ -35,7 +34,7 @@ import (
 
 func rewriteFile(name string, header []byte, rewriteFn func(*token.FileSet, *ast.File) error) error {
 	fset := token.NewFileSet()
-	src, err := ioutil.ReadFile(name)
+	src, err := os.ReadFile(name)
 	if err != nil {
 		return err
 	}
@@ -110,7 +109,8 @@ func RewriteGeneratedGogoProtobufFile(name string, extractFn ExtractFunc, option
 // as being "optional" (they may be nil on the wire). This allows protobuf to serialize a map or slice and
 // properly discriminate between empty and nil (which is not possible in protobuf).
 // TODO: move into upstream gogo-protobuf once https://github.com/gogo/protobuf/issues/181
-//   has agreement
+//
+//	has agreement
 func rewriteOptionalMethods(decl ast.Decl, isOptional OptionalFunc) {
 	switch t := decl.(type) {
 	case *ast.FuncDecl:

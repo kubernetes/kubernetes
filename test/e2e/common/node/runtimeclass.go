@@ -80,7 +80,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		framework.ExpectEqual(p.Status.Phase, v1.PodPending, "Pod phase isn't pending")
 	})
 
-	// This test requires that the PreconfiguredRuntimeHandler has already been set up on nodes.
+	// This test requires that the PreconfiguredRuntimeClassHandler has already been set up on nodes.
 	// The test CANNOT be made a Conformance as it depends on a container runtime to have a specific handler installed and working.
 	ginkgo.It("should run a Pod requesting a RuntimeClass with a configured handler [NodeFeature:RuntimeHandler]", func() {
 		// Requires special setup of test-handler which is only done in GCE kube-up environment

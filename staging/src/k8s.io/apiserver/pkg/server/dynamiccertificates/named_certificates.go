@@ -83,9 +83,7 @@ func getCertificateNames(cert *x509.Certificate) []string {
 	if !cnIsIP && cnIsValidDomain {
 		names = append(names, cn)
 	}
-	for _, san := range cert.DNSNames {
-		names = append(names, san)
-	}
+	names = append(names, cert.DNSNames...)
 	// intentionally all IPs in the cert are ignored as SNI forbids passing IPs
 	// to select a cert. Before go 1.6 the tls happily passed IPs as SNI values.
 

@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/features"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
@@ -87,6 +86,8 @@ type ExtraConfig struct {
 
 	// Mechanism by which the Aggregator will resolve services. Required.
 	ServiceResolver ServiceResolver
+
+	RejectForwardingRedirects bool
 }
 
 // Config represents the configuration needed to create an APIAggregator.
@@ -156,6 +157,9 @@ type APIAggregator struct {
 	// egressSelector selects the proper egress dialer to communicate with the custom apiserver
 	// overwrites proxyTransport dialer if not nil
 	egressSelector *egressselector.EgressSelector
+
+	// rejectForwardingRedirects is whether to allow to forward redirect response
+	rejectForwardingRedirects bool
 }
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
@@ -213,6 +217,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		openAPIV3Config:            c.GenericConfig.OpenAPIV3Config,
 		egressSelector:             c.GenericConfig.EgressSelector,
 		proxyCurrentCertKeyContent: func() (bytes []byte, bytes2 []byte) { return nil, nil },
+		rejectForwardingRedirects:  c.ExtraConfig.RejectForwardingRedirects,
 	}
 
 	// used later  to filter the served resource by those that have expired.
@@ -371,7 +376,7 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 		})
 	}
 
-	if s.openAPIV3Config != nil && utilfeature.DefaultFeatureGate.Enabled(features.OpenAPIV3) {
+	if s.openAPIV3Config != nil && utilfeature.DefaultFeatureGate.Enabled(genericfeatures.OpenAPIV3) {
 		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-openapiv3-controller", func(context genericapiserver.PostStartHookContext) error {
 			go s.openAPIV3AggregationController.Run(context.StopCh)
 			return nil
@@ -395,7 +400,7 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 		s.openAPIAggregationController = openapicontroller.NewAggregationController(&specDownloader, openAPIAggregator)
 	}
 
-	if s.openAPIV3Config != nil && utilfeature.DefaultFeatureGate.Enabled(features.OpenAPIV3) {
+	if s.openAPIV3Config != nil && utilfeature.DefaultFeatureGate.Enabled(genericfeatures.OpenAPIV3) {
 		specDownloaderV3 := openapiv3aggregator.NewDownloader()
 		openAPIV3Aggregator, err := openapiv3aggregator.BuildAndRegisterAggregator(
 			specDownloaderV3,
@@ -443,6 +448,7 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 		proxyTransport:             s.proxyTransport,
 		serviceResolver:            s.serviceResolver,
 		egressSelector:             s.egressSelector,
+		rejectForwardingRedirects:  s.rejectForwardingRedirects,
 	}
 	proxyHandler.updateAPIService(apiService)
 	if s.openAPIAggregationController != nil {

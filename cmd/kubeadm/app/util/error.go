@@ -23,6 +23,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 )
 
@@ -33,6 +35,11 @@ const (
 	PreFlightExitCode = 2
 	// ValidationExitCode defines the exit code validation checks
 	ValidationExitCode = 3
+)
+
+var (
+	ErrInvalidSubCommandMsg = "invalid subcommand"
+	ErrExit                 = errors.New("exit")
 )
 
 // fatal prints the message if set and then exits.
@@ -85,16 +92,24 @@ func checkErr(err error, handleErr func(string, int)) {
 		}
 	}
 
-	switch err.(type) {
-	case nil:
+	if err == nil {
 		return
-	case preflightError:
-		handleErr(msg, PreFlightExitCode)
-	case errorsutil.Aggregate:
-		handleErr(msg, ValidationExitCode)
-
+	}
+	switch {
+	case err == ErrExit:
+		handleErr("", DefaultErrorExitCode)
+	case strings.Contains(err.Error(), ErrInvalidSubCommandMsg):
+		handleErr(err.Error(), DefaultErrorExitCode)
 	default:
-		handleErr(msg, DefaultErrorExitCode)
+		switch err.(type) {
+		case preflightError:
+			handleErr(msg, PreFlightExitCode)
+		case errorsutil.Aggregate:
+			handleErr(msg, ValidationExitCode)
+
+		default:
+			handleErr(msg, DefaultErrorExitCode)
+		}
 	}
 }
 

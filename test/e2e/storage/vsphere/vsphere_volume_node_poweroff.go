@@ -41,9 +41,9 @@ import (
 )
 
 /*
-	Test to verify volume status after node power off:
-	1. Verify the pod got provisioned on a different node with volume attached to it
-	2. Verify the volume is detached from the powered off node
+Test to verify volume status after node power off:
+1. Verify the pod got provisioned on a different node with volume attached to it
+2. Verify the volume is detached from the powered off node
 */
 var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("node-poweroff")
@@ -61,7 +61,9 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
 		nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(nodeList.Items) > 1, true, "At least 2 nodes are required for this test")
+		if len(nodeList.Items) < 2 {
+			framework.Failf("At least 2 nodes are required for this test, got instead: %v", len(nodeList.Items))
+		}
 	})
 
 	/*
@@ -113,7 +115,9 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		ginkgo.By(fmt.Sprintf("Verify disk is attached to the node: %v", node1))
 		isAttached, err := diskIsAttached(volumePath, node1)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(isAttached, true, "Disk is not attached to the node")
+		if !isAttached {
+			framework.Failf("Volume: %s is not attached to the node: %v", volumePath, node1)
+		}
 
 		ginkgo.By(fmt.Sprintf("Power off the node: %v", node1))
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"time"
 
 	"sync"
 
@@ -40,13 +41,16 @@ type Node struct {
 	ReportEachBody       func(types.SpecReport)
 	ReportAfterSuiteBody func(types.Report)
 
-	MarkedFocus          bool
-	MarkedPending        bool
-	MarkedSerial         bool
-	MarkedOrdered        bool
-	MarkedOncePerOrdered bool
-	FlakeAttempts        int
-	Labels               Labels
+	MarkedFocus                     bool
+	MarkedPending                   bool
+	MarkedSerial                    bool
+	MarkedOrdered                   bool
+	MarkedOncePerOrdered            bool
+	MarkedSuppressProgressReporting bool
+	FlakeAttempts                   int
+	Labels                          Labels
+	PollProgressAfter               time.Duration
+	PollProgressInterval            time.Duration
 
 	NodeIDWhereCleanupWasGenerated uint
 }
@@ -57,17 +61,21 @@ type pendingType bool
 type serialType bool
 type orderedType bool
 type honorsOrderedType bool
+type suppressProgressReporting bool
 
 const Focus = focusType(true)
 const Pending = pendingType(true)
 const Serial = serialType(true)
 const Ordered = orderedType(true)
 const OncePerOrdered = honorsOrderedType(true)
+const SuppressProgressReporting = suppressProgressReporting(true)
 
 type FlakeAttempts uint
 type Offset uint
 type Done chan<- interface{} // Deprecated Done Channel for asynchronous testing
 type Labels []string
+type PollProgressInterval time.Duration
+type PollProgressAfter time.Duration
 
 func UnionOfLabels(labels ...Labels) Labels {
 	out := Labels{}
@@ -114,9 +122,15 @@ func isDecoration(arg interface{}) bool {
 		return true
 	case t == reflect.TypeOf(OncePerOrdered):
 		return true
+	case t == reflect.TypeOf(SuppressProgressReporting):
+		return true
 	case t == reflect.TypeOf(FlakeAttempts(0)):
 		return true
 	case t == reflect.TypeOf(Labels{}):
+		return true
+	case t == reflect.TypeOf(PollProgressInterval(0)):
+		return true
+	case t == reflect.TypeOf(PollProgressAfter(0)):
 		return true
 	case t.Kind() == reflect.Slice && isSliceOfDecorations(arg):
 		return true
@@ -141,13 +155,16 @@ func isSliceOfDecorations(slice interface{}) bool {
 func NewNode(deprecationTracker *types.DeprecationTracker, nodeType types.NodeType, text string, args ...interface{}) (Node, []error) {
 	baseOffset := 2
 	node := Node{
-		ID:           UniqueNodeID(),
-		NodeType:     nodeType,
-		Text:         text,
-		Labels:       Labels{},
-		CodeLocation: types.NewCodeLocation(baseOffset),
-		NestingLevel: -1,
+		ID:                   UniqueNodeID(),
+		NodeType:             nodeType,
+		Text:                 text,
+		Labels:               Labels{},
+		CodeLocation:         types.NewCodeLocation(baseOffset),
+		NestingLevel:         -1,
+		PollProgressAfter:    -1,
+		PollProgressInterval: -1,
 	}
+	
 	errors := []error{}
 	appendError := func(err error) {
 		if err != nil {
@@ -176,7 +193,6 @@ func NewNode(deprecationTracker *types.DeprecationTracker, nodeType types.NodeTy
 	remainingArgs = []interface{}{}
 	//now process the rest of the args
 	for _, arg := range args {
-
 		switch t := reflect.TypeOf(arg); {
 		case t == reflect.TypeOf(float64(0)):
 			break //ignore deprecated timeouts
@@ -205,10 +221,25 @@ func NewNode(deprecationTracker *types.DeprecationTracker, nodeType types.NodeTy
 			if !nodeType.Is(types.NodeTypeBeforeEach | types.NodeTypeJustBeforeEach | types.NodeTypeAfterEach | types.NodeTypeJustAfterEach) {
 				appendError(types.GinkgoErrors.InvalidDecoratorForNodeType(node.CodeLocation, nodeType, "OncePerOrdered"))
 			}
+		case t == reflect.TypeOf(SuppressProgressReporting):
+			node.MarkedSuppressProgressReporting = bool(arg.(suppressProgressReporting))
+			if nodeType.Is(types.NodeTypeContainer) {
+				appendError(types.GinkgoErrors.InvalidDecoratorForNodeType(node.CodeLocation, nodeType, "SuppressProgressReporting"))
+			}
 		case t == reflect.TypeOf(FlakeAttempts(0)):
 			node.FlakeAttempts = int(arg.(FlakeAttempts))
 			if !nodeType.Is(types.NodeTypesForContainerAndIt) {
 				appendError(types.GinkgoErrors.InvalidDecoratorForNodeType(node.CodeLocation, nodeType, "FlakeAttempts"))
+			}
+		case t == reflect.TypeOf(PollProgressAfter(0)):
+			node.PollProgressAfter = time.Duration(arg.(PollProgressAfter))
+			if nodeType.Is(types.NodeTypeContainer) {
+				appendError(types.GinkgoErrors.InvalidDecoratorForNodeType(node.CodeLocation, nodeType, "PollProgressAfter"))
+			}
+		case t == reflect.TypeOf(PollProgressInterval(0)):
+			node.PollProgressInterval = time.Duration(arg.(PollProgressInterval))
+			if nodeType.Is(types.NodeTypeContainer) {
+				appendError(types.GinkgoErrors.InvalidDecoratorForNodeType(node.CodeLocation, nodeType, "PollProgressInterval"))
 			}
 		case t == reflect.TypeOf(Labels{}):
 			if !nodeType.Is(types.NodeTypesForContainerAndIt) {
@@ -223,23 +254,61 @@ func NewNode(deprecationTracker *types.DeprecationTracker, nodeType types.NodeTy
 				}
 			}
 		case t.Kind() == reflect.Func:
-			if node.Body != nil {
-				appendError(types.GinkgoErrors.MultipleBodyFunctions(node.CodeLocation, nodeType))
-				trackedFunctionError = true
-				break
-			}
-			isValid := (t.NumOut() == 0) && (t.NumIn() <= 1) && (t.NumIn() == 0 || t.In(0) == reflect.TypeOf(make(Done)))
-			if !isValid {
-				appendError(types.GinkgoErrors.InvalidBodyType(t, node.CodeLocation, nodeType))
-				trackedFunctionError = true
-				break
-			}
-			if t.NumIn() == 0 {
-				node.Body = arg.(func())
+			if nodeType.Is(types.NodeTypeReportBeforeEach | types.NodeTypeReportAfterEach) {
+				if node.ReportEachBody == nil {
+					node.ReportEachBody = arg.(func(types.SpecReport))
+				} else {
+					appendError(types.GinkgoErrors.MultipleBodyFunctions(node.CodeLocation, nodeType))
+					trackedFunctionError = true
+					break
+				}
+			} else if nodeType.Is(types.NodeTypeSynchronizedBeforeSuite) {
+				if node.SynchronizedBeforeSuiteProc1Body == nil {
+					node.SynchronizedBeforeSuiteProc1Body = arg.(func() []byte)
+				} else if node.SynchronizedBeforeSuiteAllProcsBody == nil {
+					node.SynchronizedBeforeSuiteAllProcsBody = arg.(func([]byte))
+				} else {
+					appendError(types.GinkgoErrors.MultipleBodyFunctions(node.CodeLocation, nodeType))
+					trackedFunctionError = true
+					break
+				}
+			} else if nodeType.Is(types.NodeTypeSynchronizedAfterSuite) {
+				if node.SynchronizedAfterSuiteAllProcsBody == nil {
+					node.SynchronizedAfterSuiteAllProcsBody = arg.(func())
+				} else if node.SynchronizedAfterSuiteProc1Body == nil {
+					node.SynchronizedAfterSuiteProc1Body = arg.(func())
+				} else {
+					appendError(types.GinkgoErrors.MultipleBodyFunctions(node.CodeLocation, nodeType))
+					trackedFunctionError = true
+					break
+				}
+			} else if nodeType.Is(types.NodeTypeReportAfterSuite) {
+				if node.ReportAfterSuiteBody == nil {
+					node.ReportAfterSuiteBody = arg.(func(types.Report))
+				} else {
+					appendError(types.GinkgoErrors.MultipleBodyFunctions(node.CodeLocation, nodeType))
+					trackedFunctionError = true
+					break
+				}
 			} else {
-				deprecationTracker.TrackDeprecation(types.Deprecations.Async(), node.CodeLocation)
-				deprecatedAsyncBody := arg.(func(Done))
-				node.Body = func() { deprecatedAsyncBody(make(Done)) }
+				if node.Body != nil {
+					appendError(types.GinkgoErrors.MultipleBodyFunctions(node.CodeLocation, nodeType))
+					trackedFunctionError = true
+					break
+				}
+				isValid := (t.NumOut() == 0) && (t.NumIn() <= 1) && (t.NumIn() == 0 || t.In(0) == reflect.TypeOf(make(Done)))
+				if !isValid {
+					appendError(types.GinkgoErrors.InvalidBodyType(t, node.CodeLocation, nodeType))
+					trackedFunctionError = true
+					break
+				}
+				if t.NumIn() == 0 {
+					node.Body = arg.(func())
+				} else {
+					deprecationTracker.TrackDeprecation(types.Deprecations.Async(), node.CodeLocation)
+					deprecatedAsyncBody := arg.(func(Done))
+					node.Body = func() { deprecatedAsyncBody(make(Done)) }
+				}
 			}
 		default:
 			remainingArgs = append(remainingArgs, arg)
@@ -251,7 +320,7 @@ func NewNode(deprecationTracker *types.DeprecationTracker, nodeType types.NodeTy
 		appendError(types.GinkgoErrors.InvalidDeclarationOfFocusedAndPending(node.CodeLocation, nodeType))
 	}
 
-	if node.Body == nil && !node.MarkedPending && !trackedFunctionError {
+	if !node.NodeType.Is(types.NodeTypeReportBeforeEach|types.NodeTypeReportAfterEach|types.NodeTypeSynchronizedBeforeSuite|types.NodeTypeSynchronizedAfterSuite|types.NodeTypeReportAfterSuite) && node.Body == nil && !node.MarkedPending && !trackedFunctionError {
 		appendError(types.GinkgoErrors.MissingBodyFunction(node.CodeLocation, nodeType))
 	}
 	for _, arg := range remainingArgs {
@@ -265,63 +334,15 @@ func NewNode(deprecationTracker *types.DeprecationTracker, nodeType types.NodeTy
 	return node, errors
 }
 
-func NewSynchronizedBeforeSuiteNode(proc1Body func() []byte, allProcsBody func([]byte), codeLocation types.CodeLocation) (Node, []error) {
-	return Node{
-		ID:                                  UniqueNodeID(),
-		NodeType:                            types.NodeTypeSynchronizedBeforeSuite,
-		SynchronizedBeforeSuiteProc1Body:    proc1Body,
-		SynchronizedBeforeSuiteAllProcsBody: allProcsBody,
-		CodeLocation:                        codeLocation,
-	}, nil
-}
-
-func NewSynchronizedAfterSuiteNode(allProcsBody func(), proc1Body func(), codeLocation types.CodeLocation) (Node, []error) {
-	return Node{
-		ID:                                 UniqueNodeID(),
-		NodeType:                           types.NodeTypeSynchronizedAfterSuite,
-		SynchronizedAfterSuiteAllProcsBody: allProcsBody,
-		SynchronizedAfterSuiteProc1Body:    proc1Body,
-		CodeLocation:                       codeLocation,
-	}, nil
-}
-
-func NewReportBeforeEachNode(body func(types.SpecReport), codeLocation types.CodeLocation) (Node, []error) {
-	return Node{
-		ID:             UniqueNodeID(),
-		NodeType:       types.NodeTypeReportBeforeEach,
-		ReportEachBody: body,
-		CodeLocation:   codeLocation,
-		NestingLevel:   -1,
-	}, nil
-}
-
-func NewReportAfterEachNode(body func(types.SpecReport), codeLocation types.CodeLocation) (Node, []error) {
-	return Node{
-		ID:             UniqueNodeID(),
-		NodeType:       types.NodeTypeReportAfterEach,
-		ReportEachBody: body,
-		CodeLocation:   codeLocation,
-		NestingLevel:   -1,
-	}, nil
-}
-
-func NewReportAfterSuiteNode(text string, body func(types.Report), codeLocation types.CodeLocation) (Node, []error) {
-	return Node{
-		ID:                   UniqueNodeID(),
-		Text:                 text,
-		NodeType:             types.NodeTypeReportAfterSuite,
-		ReportAfterSuiteBody: body,
-		CodeLocation:         codeLocation,
-	}, nil
-}
-
 func NewCleanupNode(fail func(string, types.CodeLocation), args ...interface{}) (Node, []error) {
 	baseOffset := 2
 	node := Node{
-		ID:           UniqueNodeID(),
-		NodeType:     types.NodeTypeCleanupInvalid,
-		CodeLocation: types.NewCodeLocation(baseOffset),
-		NestingLevel: -1,
+		ID:                   UniqueNodeID(),
+		NodeType:             types.NodeTypeCleanupInvalid,
+		CodeLocation:         types.NewCodeLocation(baseOffset),
+		NestingLevel:         -1,
+		PollProgressAfter:    -1,
+		PollProgressInterval: -1,
 	}
 	remainingArgs := []interface{}{}
 	for _, arg := range args {
@@ -330,6 +351,10 @@ func NewCleanupNode(fail func(string, types.CodeLocation), args ...interface{}) 
 			node.CodeLocation = types.NewCodeLocation(baseOffset + int(arg.(Offset)))
 		case t == reflect.TypeOf(types.CodeLocation{}):
 			node.CodeLocation = arg.(types.CodeLocation)
+		case t == reflect.TypeOf(PollProgressAfter(0)):
+			node.PollProgressAfter = time.Duration(arg.(PollProgressAfter))
+		case t == reflect.TypeOf(PollProgressInterval(0)):
+			node.PollProgressInterval = time.Duration(arg.(PollProgressInterval))
 		default:
 			remainingArgs = append(remainingArgs, arg)
 		}

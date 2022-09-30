@@ -149,7 +149,9 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 			isFound = true
 		}
 	}
-	framework.ExpectEqual(isFound, true, "Unable to verify MountVolume.MountDevice failure")
+	if !isFound {
+		framework.Failf("Unable to verify MountVolume.MountDevice failure for volume %s", persistentvolumes[0].Name)
+	}
 }
 
 func createVolume(client clientset.Interface, timeouts *framework.TimeoutContext, namespace string, scParameters map[string]string) (*v1.PersistentVolumeClaim, []*v1.PersistentVolume) {

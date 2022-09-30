@@ -25,7 +25,7 @@ import (
 )
 
 // A ConntrackStatEntry represents one line from net/stat/nf_conntrack
-// and contains netfilter conntrack statistics at one CPU core
+// and contains netfilter conntrack statistics at one CPU core.
 type ConntrackStatEntry struct {
 	Entries       uint64
 	Found         uint64
@@ -38,12 +38,12 @@ type ConntrackStatEntry struct {
 	SearchRestart uint64
 }
 
-// ConntrackStat retrieves netfilter's conntrack statistics, split by CPU cores
+// ConntrackStat retrieves netfilter's conntrack statistics, split by CPU cores.
 func (fs FS) ConntrackStat() ([]ConntrackStatEntry, error) {
 	return readConntrackStat(fs.proc.Path("net", "stat", "nf_conntrack"))
 }
 
-// Parses a slice of ConntrackStatEntries from the given filepath
+// Parses a slice of ConntrackStatEntries from the given filepath.
 func readConntrackStat(path string) ([]ConntrackStatEntry, error) {
 	// This file is small and can be read with one syscall.
 	b, err := util.ReadFileNoStat(path)
@@ -61,7 +61,7 @@ func readConntrackStat(path string) ([]ConntrackStatEntry, error) {
 	return stat, nil
 }
 
-// Reads the contents of a conntrack statistics file and parses a slice of ConntrackStatEntries
+// Reads the contents of a conntrack statistics file and parses a slice of ConntrackStatEntries.
 func parseConntrackStat(r io.Reader) ([]ConntrackStatEntry, error) {
 	var entries []ConntrackStatEntry
 
@@ -79,7 +79,7 @@ func parseConntrackStat(r io.Reader) ([]ConntrackStatEntry, error) {
 	return entries, nil
 }
 
-// Parses a ConntrackStatEntry from given array of fields
+// Parses a ConntrackStatEntry from given array of fields.
 func parseConntrackStatEntry(fields []string) (*ConntrackStatEntry, error) {
 	if len(fields) != 17 {
 		return nil, fmt.Errorf("invalid conntrackstat entry, missing fields")
@@ -143,7 +143,7 @@ func parseConntrackStatEntry(fields []string) (*ConntrackStatEntry, error) {
 	return entry, nil
 }
 
-// Parses a uint64 from given hex in string
+// Parses a uint64 from given hex in string.
 func parseConntrackStatField(field string) (uint64, error) {
 	val, err := strconv.ParseUint(field, 16, 64)
 	if err != nil {

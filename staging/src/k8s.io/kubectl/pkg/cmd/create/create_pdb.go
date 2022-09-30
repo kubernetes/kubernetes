@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
-	resourcecli "k8s.io/cli-runtime/pkg/resource"
 	policyv1client "k8s.io/client-go/kubernetes/typed/policy/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -72,7 +71,7 @@ type PodDisruptionBudgetOpts struct {
 
 	Client              *policyv1client.PolicyV1Client
 	DryRunStrategy      cmdutil.DryRunStrategy
-	DryRunVerifier      *resourcecli.QueryParamVerifier
+	DryRunVerifier      *resource.QueryParamVerifier
 	ValidationDirective string
 
 	genericclioptions.IOStreams

@@ -210,15 +210,15 @@ func (a *Plugin) admitPod(ctx context.Context, pod *api.Pod, attributes admissio
 // The config file is specified by --admission-control-config-file and has the
 // following format for a webhook:
 //
-//   {
-//     "imagePolicy": {
-//        "kubeConfigFile": "path/to/kubeconfig/for/backend",
-//        "allowTTL": 30,           # time in s to cache approval
-//        "denyTTL": 30,            # time in s to cache denial
-//        "retryBackoff": 500,      # time in ms to wait between retries
-//        "defaultAllow": true      # determines behavior if the webhook backend fails
-//     }
-//   }
+//	{
+//	  "imagePolicy": {
+//	     "kubeConfigFile": "path/to/kubeconfig/for/backend",
+//	     "allowTTL": 30,           # time in s to cache approval
+//	     "denyTTL": 30,            # time in s to cache denial
+//	     "retryBackoff": 500,      # time in ms to wait between retries
+//	     "defaultAllow": true      # determines behavior if the webhook backend fails
+//	  }
+//	}
 //
 // The config file may be json or yaml.
 //
@@ -227,19 +227,19 @@ func (a *Plugin) admitPod(ctx context.Context, pod *api.Pod, attributes admissio
 //
 // The kubeconfig's cluster field is used to refer to the remote service, user refers to the returned authorizer.
 //
-//     # clusters refers to the remote service.
-//     clusters:
-//     - name: name-of-remote-imagepolicy-service
-//       cluster:
-//         certificate-authority: /path/to/ca.pem      # CA for verifying the remote service.
-//         server: https://images.example.com/policy # URL of remote service to query. Must use 'https'.
+//	# clusters refers to the remote service.
+//	clusters:
+//	- name: name-of-remote-imagepolicy-service
+//	  cluster:
+//	    certificate-authority: /path/to/ca.pem      # CA for verifying the remote service.
+//	    server: https://images.example.com/policy # URL of remote service to query. Must use 'https'.
 //
-//     # users refers to the API server's webhook configuration.
-//     users:
-//     - name: name-of-api-server
-//       user:
-//         client-certificate: /path/to/cert.pem # cert for the webhook plugin to use
-//         client-key: /path/to/key.pem          # key matching the cert
+//	# users refers to the API server's webhook configuration.
+//	users:
+//	- name: name-of-api-server
+//	  user:
+//	    client-certificate: /path/to/cert.pem # cert for the webhook plugin to use
+//	    client-key: /path/to/key.pem          # key matching the cert
 //
 // For additional HTTP configuration, refer to the kubeconfig documentation
 // http://kubernetes.io/v1.1/docs/user-guide/kubeconfig-file.html.

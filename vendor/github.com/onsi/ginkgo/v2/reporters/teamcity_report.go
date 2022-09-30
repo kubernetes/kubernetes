@@ -17,12 +17,12 @@ import (
 )
 
 func tcEscape(s string) string {
-	s = strings.Replace(s, "|", "||", -1)
-	s = strings.Replace(s, "'", "|'", -1)
-	s = strings.Replace(s, "\n", "|n", -1)
-	s = strings.Replace(s, "\r", "|r", -1)
-	s = strings.Replace(s, "[", "|[", -1)
-	s = strings.Replace(s, "]", "|]", -1)
+	s = strings.ReplaceAll(s, "|", "||")
+	s = strings.ReplaceAll(s, "'", "|'")
+	s = strings.ReplaceAll(s, "\n", "|n")
+	s = strings.ReplaceAll(s, "\r", "|r")
+	s = strings.ReplaceAll(s, "[", "|[")
+	s = strings.ReplaceAll(s, "]", "|]")
 	return s
 }
 
@@ -66,14 +66,14 @@ func GenerateTeamcityReport(report types.Report, dst string) error {
 			details := fmt.Sprintf("%s\n%s", spec.Failure.Location.String(), spec.Failure.Location.FullStackTrace)
 			fmt.Fprintf(f, "##teamcity[testFailed name='%s' message='panicked - %s' details='%s']\n", name, tcEscape(spec.Failure.ForwardedPanic), tcEscape(details))
 		case types.SpecStateInterrupted:
-			fmt.Fprintf(f, "##teamcity[testFailed name='%s' message='interrupted' details='%s']\n", name, tcEscape(spec.Failure.Message))
+			fmt.Fprintf(f, "##teamcity[testFailed name='%s' message='interrupted' details='%s']\n", name, tcEscape(interruptDescriptionForUnstructuredReporters(spec.Failure)))
 		case types.SpecStateAborted:
 			details := fmt.Sprintf("%s\n%s", spec.Failure.Location.String(), spec.Failure.Location.FullStackTrace)
 			fmt.Fprintf(f, "##teamcity[testFailed name='%s' message='aborted - %s' details='%s']\n", name, tcEscape(spec.Failure.Message), tcEscape(details))
 		}
 
-		fmt.Fprintf(f, "##teamcity[testStdOut name='%s' out='%s']\n", name, tcEscape(systemOutForUnstructureReporters(spec)))
-		fmt.Fprintf(f, "##teamcity[testStdErr name='%s' out='%s']\n", name, tcEscape(spec.CapturedGinkgoWriterOutput))
+		fmt.Fprintf(f, "##teamcity[testStdOut name='%s' out='%s']\n", name, tcEscape(systemOutForUnstructuredReporters(spec)))
+		fmt.Fprintf(f, "##teamcity[testStdErr name='%s' out='%s']\n", name, tcEscape(systemErrForUnstructuredReporters(spec)))
 		fmt.Fprintf(f, "##teamcity[testFinished name='%s' duration='%d']\n", name, int(spec.RunTime.Seconds()*1000.0))
 	}
 	fmt.Fprintf(f, "##teamcity[testSuiteFinished name='%s']\n", tcEscape(report.SuiteDescription))

@@ -260,7 +260,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 
 	var resetFields map[fieldpath.APIVersion]*fieldpath.Set
-	if a.group.OpenAPIModels != nil && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+	if a.group.OpenAPIModels != nil {
 		if resetFieldsStrategy, isResetFieldsStrategy := storage.(rest.ResetFieldsStrategy); isResetFieldsStrategy {
 			resetFields = resetFieldsStrategy.GetResetFields()
 		}
@@ -599,7 +599,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if a.group.MetaGroupVersion != nil {
 		reqScope.MetaGroupVersion = *a.group.MetaGroupVersion
 	}
-	if a.group.OpenAPIModels != nil && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+	if a.group.OpenAPIModels != nil {
 		reqScope.FieldManager, err = fieldmanager.NewDefaultFieldManager(
 			a.group.TypeConverter,
 			a.group.UnsafeConvertor,
@@ -785,9 +785,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				string(types.JSONPatchType),
 				string(types.MergePatchType),
 				string(types.StrategicMergePatchType),
-			}
-			if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-				supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
+				string(types.ApplyPatchType),
 			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulPatchResource(patcher, reqScope, admit, supportedTypes))
 			handler = utilwarning.AddWarningsHandler(handler, warnings)

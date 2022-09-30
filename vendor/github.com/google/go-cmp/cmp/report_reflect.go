@@ -16,6 +16,13 @@ import (
 	"github.com/google/go-cmp/cmp/internal/value"
 )
 
+var (
+	anyType    = reflect.TypeOf((*interface{})(nil)).Elem()
+	stringType = reflect.TypeOf((*string)(nil)).Elem()
+	bytesType  = reflect.TypeOf((*[]byte)(nil)).Elem()
+	byteType   = reflect.TypeOf((*byte)(nil)).Elem()
+)
+
 type formatValueOptions struct {
 	// AvoidStringer controls whether to avoid calling custom stringer
 	// methods like error.Error or fmt.Stringer.String.
@@ -184,7 +191,7 @@ func (opts formatOptions) FormatValue(v reflect.Value, parentKind reflect.Kind, 
 		}
 		for i := 0; i < v.NumField(); i++ {
 			vv := v.Field(i)
-			if value.IsZero(vv) {
+			if vv.IsZero() {
 				continue // Elide fields with zero values
 			}
 			if len(list) == maxLen {
@@ -205,12 +212,13 @@ func (opts formatOptions) FormatValue(v reflect.Value, parentKind reflect.Kind, 
 		}
 
 		// Check whether this is a []byte of text data.
-		if t.Elem() == reflect.TypeOf(byte(0)) {
+		if t.Elem() == byteType {
 			b := v.Bytes()
-			isPrintSpace := func(r rune) bool { return unicode.IsPrint(r) && unicode.IsSpace(r) }
+			isPrintSpace := func(r rune) bool { return unicode.IsPrint(r) || unicode.IsSpace(r) }
 			if len(b) > 0 && utf8.Valid(b) && len(bytes.TrimFunc(b, isPrintSpace)) == 0 {
 				out = opts.formatString("", string(b))
-				return opts.WithTypeMode(emitType).FormatType(t, out)
+				skipType = true
+				return opts.FormatType(t, out)
 			}
 		}
 
@@ -281,7 +289,12 @@ func (opts formatOptions) FormatValue(v reflect.Value, parentKind reflect.Kind, 
 		}
 		defer ptrs.Pop()
 
-		skipType = true // Let the underlying value print the type instead
+		// Skip the name only if this is an unnamed pointer type.
+		// Otherwise taking the address of a value does not reproduce
+		// the named pointer type.
+		if v.Type().Name() == "" {
+			skipType = true // Let the underlying value print the type instead
+		}
 		out = opts.FormatValue(v.Elem(), t.Kind(), ptrs)
 		out = wrapTrunkReference(ptrRef, opts.PrintAddresses, out)
 		out = &textWrap{Prefix: "&", Value: out}
@@ -292,7 +305,6 @@ func (opts formatOptions) FormatValue(v reflect.Value, parentKind reflect.Kind, 
 		}
 		// Interfaces accept different concrete types,
 		// so configure the underlying value to explicitly print the type.
-		skipType = true // Print the concrete type instead
 		return opts.WithTypeMode(emitType).FormatValue(v.Elem(), t.Kind(), ptrs)
 	default:
 		panic(fmt.Sprintf("%v kind not handled", v.Kind()))

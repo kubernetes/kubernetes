@@ -27,8 +27,9 @@ import (
 
 // StatefulSet represents a set of pods with consistent identities.
 // Identities are defined as:
-//  - Network: A single stable DNS and hostname.
-//  - Storage: As many VolumeClaims as requested.
+//   - Network: A single stable DNS and hostname.
+//   - Storage: As many VolumeClaims as requested.
+//
 // The StatefulSet guarantees that a given network identity will always
 // map to the same storage identity.
 type StatefulSet struct {
@@ -341,9 +342,7 @@ type Deployment struct {
 
 // DeploymentSpec specifies the state of a Deployment.
 type DeploymentSpec struct {
-	// Number of desired pods. This is a pointer to distinguish between explicit
-	// zero and not specified. Defaults to 1.
-	// +optional
+	// Number of desired pods.
 	Replicas int32
 
 	// Label selector for pods. Existing ReplicaSets whose pods are
@@ -625,7 +624,6 @@ type RollingUpdateDaemonSet struct {
 	// daemonset on any given node can double if the readiness check fails, and
 	// so resource intensive daemonsets should take into account that they may
 	// cause evictions during disruption.
-	// This is beta field and enabled/disabled by DaemonSetUpdateSurge feature gate.
 	// +optional
 	MaxSurge intstr.IntOrString
 }

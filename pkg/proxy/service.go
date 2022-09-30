@@ -289,18 +289,21 @@ func NewServiceChangeTracker(makeServiceInfo makeServicePortFunc, ipFamily v1.IP
 // otherwise return false.  Update can be used to add/update/delete items of ServiceChangeMap.  For example,
 // Add item
 //   - pass <nil, service> as the <previous, current> pair.
+//
 // Update item
 //   - pass <oldService, service> as the <previous, current> pair.
+//
 // Delete item
 //   - pass <service, nil> as the <previous, current> pair.
 func (sct *ServiceChangeTracker) Update(previous, current *v1.Service) bool {
+	// This is unexpected, we should return false directly.
+	if previous == nil && current == nil {
+		return false
+	}
+
 	svc := current
 	if svc == nil {
 		svc = previous
-	}
-	// previous == nil && current == nil is unexpected, we should return false directly.
-	if svc == nil {
-		return false
 	}
 	metrics.ServiceChangesTotal.Inc()
 	namespacedName := types.NamespacedName{Namespace: svc.Namespace, Name: svc.Name}
@@ -319,7 +322,7 @@ func (sct *ServiceChangeTracker) Update(previous, current *v1.Service) bool {
 	if reflect.DeepEqual(change.previous, change.current) {
 		delete(sct.items, namespacedName)
 	} else {
-		klog.V(2).InfoS("Service updated ports", "service", klog.KObj(svc), "portCount", len(change.current))
+		klog.V(4).InfoS("Service updated ports", "service", klog.KObj(svc), "portCount", len(change.current))
 	}
 	metrics.ServiceChangesPending.Set(float64(len(sct.items)))
 	return len(sct.items) > 0
@@ -415,17 +418,18 @@ func (sm *ServiceMap) apply(changes *ServiceChangeTracker, UDPStaleClusterIP set
 // tell if a service is deleted or updated.
 // The returned value is one of the arguments of ServiceMap.unmerge().
 // ServiceMap A Merge ServiceMap B will do following 2 things:
-//   * update ServiceMap A.
-//   * produce a string set which stores all other ServiceMap's ServicePortName.String().
+//   - update ServiceMap A.
+//   - produce a string set which stores all other ServiceMap's ServicePortName.String().
+//
 // For example,
 //   - A{}
 //   - B{{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
-//     - A updated to be {{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
-//     - produce string set {"ns/cluster-ip:http"}
+//   - A updated to be {{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
+//   - produce string set {"ns/cluster-ip:http"}
 //   - A{{"ns", "cluster-ip", "http"}: {"172.16.55.10", 345, "UDP"}}
 //   - B{{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
-//     - A updated to be {{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
-//     - produce string set {"ns/cluster-ip:http"}
+//   - A updated to be {{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
+//   - produce string set {"ns/cluster-ip:http"}
 func (sm *ServiceMap) merge(other ServiceMap) sets.String {
 	// existingPorts is going to store all identifiers of all services in `other` ServiceMap.
 	existingPorts := sets.NewString()
@@ -434,9 +438,9 @@ func (sm *ServiceMap) merge(other ServiceMap) sets.String {
 		existingPorts.Insert(svcPortName.String())
 		_, exists := (*sm)[svcPortName]
 		if !exists {
-			klog.V(1).InfoS("Adding new service port", "portName", svcPortName, "servicePort", info)
+			klog.V(4).InfoS("Adding new service port", "portName", svcPortName, "servicePort", info)
 		} else {
-			klog.V(1).InfoS("Updating existing service port", "portName", svcPortName, "servicePort", info)
+			klog.V(4).InfoS("Updating existing service port", "portName", svcPortName, "servicePort", info)
 		}
 		(*sm)[svcPortName] = info
 	}
@@ -459,7 +463,7 @@ func (sm *ServiceMap) unmerge(other ServiceMap, UDPStaleClusterIP sets.String) {
 	for svcPortName := range other {
 		info, exists := (*sm)[svcPortName]
 		if exists {
-			klog.V(1).InfoS("Removing service port", "portName", svcPortName)
+			klog.V(4).InfoS("Removing service port", "portName", svcPortName)
 			if info.Protocol() == v1.ProtocolUDP {
 				UDPStaleClusterIP.Insert(info.ClusterIP().String())
 			}

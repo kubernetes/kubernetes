@@ -113,6 +113,10 @@ func v1alpha2LinuxContainerResources(from *runtimeapi.LinuxContainerResources) *
 	return (*v1alpha2.LinuxContainerResources)(unsafe.Pointer(from))
 }
 
+func v1alpha2WindowsContainerResources(from *runtimeapi.WindowsContainerResources) *v1alpha2.WindowsContainerResources {
+	return (*v1alpha2.WindowsContainerResources)(unsafe.Pointer(from))
+}
+
 func v1alpha2ExecRequest(from *runtimeapi.ExecRequest) *v1alpha2.ExecRequest {
 	// If this function changes, also adapt the corresponding Exec code in
 	// pkg/kubelet/cri/remote/remote_runtime.go

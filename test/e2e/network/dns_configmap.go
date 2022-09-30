@@ -298,7 +298,7 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 		t.checkDNSRecordFrom(
 			fmt.Sprintf("%s.%s.svc.%s", serviceNameLocal, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
 			func(actual []string) bool {
-				return len(actual) >= 1 && actual[0] == fooHostname+"." && actual[1] == "2001:db8::29"
+				return len(actual) >= 2 && actual[0] == fooHostname+"." && actual[1] == "2001:db8::29"
 			},
 			"cluster-dns-ipv6",
 			moreForeverTestTimeout)

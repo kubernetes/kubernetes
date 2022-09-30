@@ -125,8 +125,8 @@ func NormalizeKubernetesVersion(cfg *kubeadmapi.ClusterConfiguration) error {
 	mcpVersion := constants.MinimumControlPlaneVersion
 	versionInfo := componentversion.Get()
 	if isKubeadmPrereleaseVersion(&versionInfo, k8sVersion, mcpVersion) {
-		klog.V(1).Infof("WARNING: tolerating control plane version %s, assuming that k8s version %s is not released yet",
-			cfg.KubernetesVersion, mcpVersion)
+		klog.V(1).Infof("WARNING: tolerating control plane version %s as a pre-release version", cfg.KubernetesVersion)
+
 		return nil
 	}
 	// If not a pre-release version, handle the validation normally.

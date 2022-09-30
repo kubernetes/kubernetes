@@ -50,11 +50,14 @@ const (
 )
 
 // 1.2 code gets:
-// 	quota_test.go:95: Took 4.218619579s to scale up without quota
-// 	quota_test.go:199: unexpected error: timed out waiting for the condition, ended with 342 pods (1 minute)
+//
+//	quota_test.go:95: Took 4.218619579s to scale up without quota
+//	quota_test.go:199: unexpected error: timed out waiting for the condition, ended with 342 pods (1 minute)
+//
 // 1.3+ code gets:
-// 	quota_test.go:100: Took 4.196205966s to scale up without quota
-// 	quota_test.go:115: Took 12.021640372s to scale up with quota
+//
+//	quota_test.go:100: Took 4.196205966s to scale up without quota
+//	quota_test.go:115: Took 12.021640372s to scale up with quota
 func TestQuota(t *testing.T) {
 	// Set up a API server
 	_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{

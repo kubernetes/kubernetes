@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-
+	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/api/policy/v1beta1"
@@ -49,8 +49,12 @@ import (
 	"k8s.io/kubernetes/pkg/controller/disruption"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/integration/util"
+	"k8s.io/utils/clock"
 	"k8s.io/utils/pointer"
 )
+
+const stalePodDisruptionTimeout = 3 * time.Second
 
 func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.DisruptionController, informers.SharedInformerFactory, clientset.Interface, *apiextensionsclientset.Clientset, dynamic.Interface) {
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
@@ -83,7 +87,7 @@ func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.Disrupti
 		t.Fatalf("Error creating dynamicClient: %v", err)
 	}
 
-	pdbc := disruption.NewDisruptionController(
+	pdbc := disruption.NewDisruptionControllerInternal(
 		informers.Core().V1().Pods(),
 		informers.Policy().V1().PodDisruptionBudgets(),
 		informers.Core().V1().ReplicationControllers(),
@@ -94,6 +98,8 @@ func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.Disrupti
 		mapper,
 		scaleClient,
 		client.Discovery(),
+		clock.RealClock{},
+		stalePodDisruptionTimeout,
 	)
 	return server, pdbc, informers, clientSet, apiExtensionClient, dynamicClient
 }
@@ -410,7 +416,7 @@ func createPod(ctx context.Context, t *testing.T, name, namespace string, labels
 		t.Error(err)
 	}
 	addPodConditionReady(pod)
-	if _, err := clientSet.CoreV1().Pods(namespace).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{}); err != nil {
+	if _, err := clientSet.CoreV1().Pods(namespace).UpdateStatus(ctx, pod, metav1.UpdateOptions{}); err != nil {
 		t.Error(err)
 	}
 }
@@ -641,6 +647,94 @@ func TestPatchCompatibility(t *testing.T) {
 
 			if !reflect.DeepEqual(resultSelector, tc.expectSelector) {
 				t.Fatalf("unexpected selector:\n%s", cmp.Diff(tc.expectSelector, resultSelector))
+			}
+		})
+	}
+}
+
+func TestStalePodDisruption(t *testing.T) {
+	s, pdbc, informers, clientSet, _, _ := setup(t)
+	defer s.TearDownFn()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	nsName := "pdb-stale-pod-disruption"
+	createNs(ctx, t, nsName, clientSet)
+
+	informers.Start(ctx.Done())
+	informers.WaitForCacheSync(ctx.Done())
+	go pdbc.Run(ctx)
+
+	cases := map[string]struct {
+		deletePod      bool
+		wantConditions []v1.PodCondition
+	}{
+		"stale-condition": {
+			wantConditions: []v1.PodCondition{
+				{
+					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Status: v1.ConditionFalse,
+				},
+			},
+		},
+		"deleted-pod": {
+			deletePod: true,
+			wantConditions: []v1.PodCondition{
+				{
+					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			pod := util.InitPausePod(&util.PausePodConfig{
+				Name:      name,
+				Namespace: nsName,
+				NodeName:  "foo", // mock pod as scheduled so that it's not immediately deleted when calling Delete.
+			})
+			var err error
+			pod, err = util.CreatePausePod(clientSet, pod)
+			if err != nil {
+				t.Fatalf("Failed creating pod: %v", err)
+			}
+
+			pod.Status.Phase = v1.PodRunning
+			pod.Status.Conditions = append(pod.Status.Conditions, v1.PodCondition{
+				Type:               v1.AlphaNoCompatGuaranteeDisruptionTarget,
+				Status:             v1.ConditionTrue,
+				LastTransitionTime: metav1.Now(),
+			})
+			pod, err = clientSet.CoreV1().Pods(nsName).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
+			if err != nil {
+				t.Fatalf("Failed updating pod: %v", err)
+			}
+
+			if tc.deletePod {
+				if err := clientSet.CoreV1().Pods(nsName).Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
+					t.Fatalf("Failed to delete pod: %v", err)
+				}
+			}
+			time.Sleep(stalePodDisruptionTimeout)
+			diff := ""
+			if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (done bool, err error) {
+				pod, err = clientSet.CoreV1().Pods(nsName).Get(ctx, name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				if tc.deletePod && pod.DeletionTimestamp == nil {
+					return false, nil
+				}
+				diff = cmp.Diff(tc.wantConditions, pod.Status.Conditions, cmpopts.IgnoreFields(v1.PodCondition{}, "LastTransitionTime"))
+				return diff == "", nil
+			}); err != nil {
+				t.Errorf("Failed waiting for status to change: %v", err)
+				if diff != "" {
+					t.Errorf("Pod has conditions (-want,+got):\n%s", diff)
+				}
 			}
 		})
 	}

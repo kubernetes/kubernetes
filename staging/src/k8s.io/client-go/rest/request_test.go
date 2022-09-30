@@ -23,7 +23,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -88,7 +87,7 @@ func TestRequestSetsHeaders(t *testing.T) {
 		}
 		return &http.Response{
 			StatusCode: http.StatusForbidden,
-			Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
+			Body:       io.NopCloser(bytes.NewReader([]byte{})),
 		}, nil
 	})
 	config := defaultContentConfig()
@@ -303,7 +302,7 @@ func TestRequestBody(t *testing.T) {
 	}
 
 	// test error set when failing to read file
-	f, err := ioutil.TempFile("", "test")
+	f, err := os.CreateTemp("", "test")
 	if err != nil {
 		t.Fatalf("unable to create temp file")
 	}
@@ -338,6 +337,206 @@ func TestResultIntoWithNoBodyReturnsErr(t *testing.T) {
 	}
 }
 
+func TestURLTemplate(t *testing.T) {
+	uri, _ := url.Parse("http://localhost/some/base/url/path")
+	uriSingleSlash, _ := url.Parse("http://localhost/")
+	testCases := []struct {
+		Request          *Request
+		ExpectedFullURL  string
+		ExpectedFinalURL string
+	}{
+		{
+			// non dynamic client
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("POST").
+				Prefix("api", "v1").Resource("r1").Namespace("ns").Name("nm").Param("p0", "v0"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/api/v1/namespaces/ns/r1/nm?p0=v0",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/api/v1/namespaces/%7Bnamespace%7D/r1/%7Bname%7D?p0=%7Bvalue%7D",
+		},
+		{
+			// non dynamic client with wrong api group
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("POST").
+				Prefix("pre1", "v1").Resource("r1").Namespace("ns").Name("nm").Param("p0", "v0"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/pre1/v1/namespaces/ns/r1/nm?p0=v0",
+			ExpectedFinalURL: "http://localhost/%7Bprefix%7D",
+		},
+		{
+			// dynamic client with core group + namespace + resourceResource (with name)
+			// /api/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/api/v1/namespaces/ns/r1/name1"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/api/v1/namespaces/ns/r1/name1",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/api/v1/namespaces/%7Bnamespace%7D/r1/%7Bname%7D",
+		},
+		{
+			// dynamic client with named group + namespace + resourceResource (with name)
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/apis/g1/v1/namespaces/ns/r1/name1"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/g1/v1/namespaces/ns/r1/name1",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/g1/v1/namespaces/%7Bnamespace%7D/r1/%7Bname%7D",
+		},
+		{
+			// dynamic client with core group + namespace + resourceResource (with NO name)
+			// /api/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/api/v1/namespaces/ns/r1"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/api/v1/namespaces/ns/r1",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/api/v1/namespaces/%7Bnamespace%7D/r1",
+		},
+		{
+			// dynamic client with named group + namespace + resourceResource (with NO name)
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/apis/g1/v1/namespaces/ns/r1"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/g1/v1/namespaces/ns/r1",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/g1/v1/namespaces/%7Bnamespace%7D/r1",
+		},
+		{
+			// dynamic client with core group + resourceResource (with name)
+			// /api/$RESOURCEVERSION/$RESOURCE/%NAME
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/api/v1/r1/name1"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/api/v1/r1/name1",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/api/v1/r1/%7Bname%7D",
+		},
+		{
+			// dynamic client with named group + resourceResource (with name)
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/$RESOURCE/%NAME
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/apis/g1/v1/r1/name1"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/g1/v1/r1/name1",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/g1/v1/r1/%7Bname%7D",
+		},
+		{
+			// dynamic client with named group + namespace + resourceResource (with name) + subresource
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME/$SUBRESOURCE
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/apis/namespaces/namespaces/namespaces/namespaces/namespaces/namespaces/finalize"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces/namespaces/namespaces/finalize",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bnamespace%7D/namespaces/%7Bname%7D/finalize",
+		},
+		{
+			// dynamic client with named group + namespace + resourceResource (with name)
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/apis/namespaces/namespaces/namespaces/namespaces/namespaces/namespaces"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces/namespaces/namespaces",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bnamespace%7D/namespaces/%7Bname%7D",
+		},
+		{
+			// dynamic client with named group + namespace + resourceResource (with NO name) + subresource
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%SUBRESOURCE
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/apis/namespaces/namespaces/namespaces/namespaces/namespaces/finalize"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces/namespaces/finalize",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bnamespace%7D/namespaces/finalize",
+		},
+		{
+			// dynamic client with named group + namespace + resourceResource (with NO name) + subresource
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%SUBRESOURCE
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/apis/namespaces/namespaces/namespaces/namespaces/namespaces/status"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces/namespaces/status",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bnamespace%7D/namespaces/status",
+		},
+		{
+			// dynamic client with named group + namespace + resourceResource (with no name)
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/apis/namespaces/namespaces/namespaces/namespaces/namespaces"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces/namespaces",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bnamespace%7D/namespaces",
+		},
+		{
+			// dynamic client with named group + resourceResource (with name) + subresource
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/apis/namespaces/namespaces/namespaces/namespaces/finalize"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces/finalize",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bname%7D/finalize",
+		},
+		{
+			// dynamic client with named group + resourceResource (with name) + subresource
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/apis/namespaces/namespaces/namespaces/namespaces/status"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces/status",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bname%7D/status",
+		},
+		{
+			// dynamic client with named group + resourceResource (with name)
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/$RESOURCE/%NAME
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/apis/namespaces/namespaces/namespaces/namespaces"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bname%7D",
+		},
+		{
+			// dynamic client with named group + resourceResource (with no name)
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/$RESOURCE/%NAME
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/apis/namespaces/namespaces/namespaces"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces",
+		},
+		{
+			// dynamic client with wrong api group + namespace + resourceResource (with name) + subresource
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME/$SUBRESOURCE
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/pre1/namespaces/namespaces/namespaces/namespaces/namespaces/namespaces/finalize"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/pre1/namespaces/namespaces/namespaces/namespaces/namespaces/namespaces/finalize",
+			ExpectedFinalURL: "http://localhost/%7Bprefix%7D",
+		},
+		{
+			// dynamic client with core group + namespace + resourceResource (with name) where baseURL is a single /
+			// /api/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
+			Request: NewRequestWithClient(uriSingleSlash, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/api/v1/namespaces/ns/r2/name1"),
+			ExpectedFullURL:  "http://localhost/api/v1/namespaces/ns/r2/name1",
+			ExpectedFinalURL: "http://localhost/api/v1/namespaces/%7Bnamespace%7D/r2/%7Bname%7D",
+		},
+		{
+			// dynamic client with core group + namespace + resourceResource (with name) where baseURL is 'some/base/url/path'
+			// /api/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/api/v1/namespaces/ns/r3/name1"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/api/v1/namespaces/ns/r3/name1",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/api/v1/namespaces/%7Bnamespace%7D/r3/%7Bname%7D",
+		},
+		{
+			// dynamic client where baseURL is a single /
+			// /
+			Request: NewRequestWithClient(uriSingleSlash, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/"),
+			ExpectedFullURL:  "http://localhost/",
+			ExpectedFinalURL: "http://localhost/",
+		},
+		{
+			// dynamic client where baseURL is a single /
+			// /version
+			Request: NewRequestWithClient(uriSingleSlash, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/version"),
+			ExpectedFullURL:  "http://localhost/version",
+			ExpectedFinalURL: "http://localhost/version",
+		},
+	}
+	for i, testCase := range testCases {
+		r := testCase.Request
+		full := r.URL()
+		if full.String() != testCase.ExpectedFullURL {
+			t.Errorf("%d: unexpected initial URL: %s %s", i, full, testCase.ExpectedFullURL)
+		}
+		actualURL := r.finalURLTemplate()
+		actual := actualURL.String()
+		if actual != testCase.ExpectedFinalURL {
+			t.Errorf("%d: unexpected URL template: %s %s", i, actual, testCase.ExpectedFinalURL)
+		}
+		if r.URL().String() != full.String() {
+			t.Errorf("%d, creating URL template changed request: %s -> %s", i, full.String(), r.URL().String())
+		}
+	}
+}
+
 func TestTransformResponse(t *testing.T) {
 	invalid := []byte("aaaaa")
 	uri, _ := url.Parse("http://localhost")
@@ -360,7 +559,7 @@ func TestTransformResponse(t *testing.T) {
 			Response: &http.Response{
 				StatusCode: http.StatusUnauthorized,
 				Header:     http.Header{"Content-Type": []string{"application/json"}},
-				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
+				Body:       io.NopCloser(bytes.NewReader(invalid)),
 			},
 			Error: true,
 			ErrFn: func(err error) bool {
@@ -371,7 +570,7 @@ func TestTransformResponse(t *testing.T) {
 			Response: &http.Response{
 				StatusCode: http.StatusUnauthorized,
 				Header:     http.Header{"Content-Type": []string{"text/any"}},
-				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
+				Body:       io.NopCloser(bytes.NewReader(invalid)),
 			},
 			Error: true,
 			ErrFn: func(err error) bool {
@@ -379,13 +578,13 @@ func TestTransformResponse(t *testing.T) {
 			},
 		},
 		{Response: &http.Response{StatusCode: http.StatusForbidden}, Error: true},
-		{Response: &http.Response{StatusCode: http.StatusOK, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
-		{Response: &http.Response{StatusCode: http.StatusOK, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
+		{Response: &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
+		{Response: &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
 	}
 	for i, test := range testCases {
 		r := NewRequestWithClient(uri, "", defaultContentConfig(), nil)
 		if test.Response.Body == nil {
-			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
+			test.Response.Body = io.NopCloser(bytes.NewReader([]byte{}))
 		}
 		result := r.transformResponse(test.Response, &http.Request{})
 		response, created, err := result.body, result.statusCode == http.StatusCreated, result.err
@@ -458,7 +657,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 			Response: &http.Response{
 				StatusCode: http.StatusUnauthorized,
 				Header:     http.Header{"Content-Type": []string{"application/json"}},
-				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
+				Body:       io.NopCloser(bytes.NewReader(invalid)),
 			},
 			Called:            true,
 			ExpectContentType: "application/json",
@@ -472,7 +671,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 			Response: &http.Response{
 				StatusCode: http.StatusUnauthorized,
 				Header:     http.Header{"Content-Type": []string{"application/protobuf"}},
-				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
+				Body:       io.NopCloser(bytes.NewReader(invalid)),
 			},
 			Decoder: scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
 
@@ -502,7 +701,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 			Response: &http.Response{
 				StatusCode: http.StatusOK,
 				Header:     http.Header{"Content-Type": []string{"text/any"}},
-				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
+				Body:       io.NopCloser(bytes.NewReader(invalid)),
 			},
 			Decoder:           scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
 			Called:            true,
@@ -513,7 +712,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 			ContentType: "text/any",
 			Response: &http.Response{
 				StatusCode: http.StatusOK,
-				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
+				Body:       io.NopCloser(bytes.NewReader(invalid)),
 			},
 			Decoder:           scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
 			Called:            true,
@@ -525,7 +724,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 			Response: &http.Response{
 				StatusCode: http.StatusNotFound,
 				Header:     http.Header{"Content-Type": []string{"application/unrecognized"}},
-				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
+				Body:       io.NopCloser(bytes.NewReader(invalid)),
 			},
 			Decoder: scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
 
@@ -549,7 +748,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 		contentConfig.Negotiator = negotiator
 		r := NewRequestWithClient(uri, "", contentConfig, nil)
 		if test.Response.Body == nil {
-			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
+			test.Response.Body = io.NopCloser(bytes.NewReader([]byte{}))
 		}
 		result := r.transformResponse(test.Response, &http.Request{})
 		_, err := result.body, result.err
@@ -601,7 +800,7 @@ func TestTransformUnstructuredError(t *testing.T) {
 			},
 			Res: &http.Response{
 				StatusCode: http.StatusConflict,
-				Body:       ioutil.NopCloser(bytes.NewReader(nil)),
+				Body:       io.NopCloser(bytes.NewReader(nil)),
 			},
 			ErrFn: apierrors.IsAlreadyExists,
 		},
@@ -613,7 +812,7 @@ func TestTransformUnstructuredError(t *testing.T) {
 			},
 			Res: &http.Response{
 				StatusCode: http.StatusConflict,
-				Body:       ioutil.NopCloser(bytes.NewReader(nil)),
+				Body:       io.NopCloser(bytes.NewReader(nil)),
 			},
 			ErrFn: apierrors.IsConflict,
 		},
@@ -623,7 +822,7 @@ func TestTransformUnstructuredError(t *testing.T) {
 			Req:      &http.Request{},
 			Res: &http.Response{
 				StatusCode: http.StatusNotFound,
-				Body:       ioutil.NopCloser(bytes.NewReader(nil)),
+				Body:       io.NopCloser(bytes.NewReader(nil)),
 			},
 			ErrFn: apierrors.IsNotFound,
 		},
@@ -631,14 +830,14 @@ func TestTransformUnstructuredError(t *testing.T) {
 			Req: &http.Request{},
 			Res: &http.Response{
 				StatusCode: http.StatusBadRequest,
-				Body:       ioutil.NopCloser(bytes.NewReader(nil)),
+				Body:       io.NopCloser(bytes.NewReader(nil)),
 			},
 			ErrFn: apierrors.IsBadRequest,
 		},
 		{
 			// status in response overrides transformed result
 			Req:   &http.Request{},
-			Res:   &http.Response{StatusCode: http.StatusBadRequest, Body: ioutil.NopCloser(bytes.NewReader([]byte(`{"kind":"Status","apiVersion":"v1","status":"Failure","code":404}`)))},
+			Res:   &http.Response{StatusCode: http.StatusBadRequest, Body: io.NopCloser(bytes.NewReader([]byte(`{"kind":"Status","apiVersion":"v1","status":"Failure","code":404}`)))},
 			ErrFn: apierrors.IsBadRequest,
 			Transformed: &apierrors.StatusError{
 				ErrStatus: metav1.Status{Status: metav1.StatusFailure, Code: http.StatusNotFound},
@@ -647,20 +846,20 @@ func TestTransformUnstructuredError(t *testing.T) {
 		{
 			// successful status is ignored
 			Req:   &http.Request{},
-			Res:   &http.Response{StatusCode: http.StatusBadRequest, Body: ioutil.NopCloser(bytes.NewReader([]byte(`{"kind":"Status","apiVersion":"v1","status":"Success","code":404}`)))},
+			Res:   &http.Response{StatusCode: http.StatusBadRequest, Body: io.NopCloser(bytes.NewReader([]byte(`{"kind":"Status","apiVersion":"v1","status":"Success","code":404}`)))},
 			ErrFn: apierrors.IsBadRequest,
 		},
 		{
 			// empty object does not change result
 			Req:   &http.Request{},
-			Res:   &http.Response{StatusCode: http.StatusBadRequest, Body: ioutil.NopCloser(bytes.NewReader([]byte(`{}`)))},
+			Res:   &http.Response{StatusCode: http.StatusBadRequest, Body: io.NopCloser(bytes.NewReader([]byte(`{}`)))},
 			ErrFn: apierrors.IsBadRequest,
 		},
 		{
 			// we default apiVersion for backwards compatibility with old clients
 			// TODO: potentially remove in 1.7
 			Req:   &http.Request{},
-			Res:   &http.Response{StatusCode: http.StatusBadRequest, Body: ioutil.NopCloser(bytes.NewReader([]byte(`{"kind":"Status","status":"Failure","code":404}`)))},
+			Res:   &http.Response{StatusCode: http.StatusBadRequest, Body: io.NopCloser(bytes.NewReader([]byte(`{"kind":"Status","status":"Failure","code":404}`)))},
 			ErrFn: apierrors.IsBadRequest,
 			Transformed: &apierrors.StatusError{
 				ErrStatus: metav1.Status{Status: metav1.StatusFailure, Code: http.StatusNotFound},
@@ -669,7 +868,7 @@ func TestTransformUnstructuredError(t *testing.T) {
 		{
 			// we do not default kind
 			Req:   &http.Request{},
-			Res:   &http.Response{StatusCode: http.StatusBadRequest, Body: ioutil.NopCloser(bytes.NewReader([]byte(`{"status":"Failure","code":404}`)))},
+			Res:   &http.Response{StatusCode: http.StatusBadRequest, Body: io.NopCloser(bytes.NewReader([]byte(`{"status":"Failure","code":404}`)))},
 			ErrFn: apierrors.IsBadRequest,
 		},
 	}
@@ -773,7 +972,7 @@ func TestRequestWatch(t *testing.T) {
 			serverReturns: []responseErr{
 				{response: &http.Response{
 					StatusCode: http.StatusForbidden,
-					Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
+					Body:       io.NopCloser(bytes.NewReader([]byte{})),
 				}, err: nil},
 			},
 			attemptsExpected: 1,
@@ -816,7 +1015,7 @@ func TestRequestWatch(t *testing.T) {
 			serverReturns: []responseErr{
 				{response: &http.Response{
 					StatusCode: http.StatusForbidden,
-					Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
+					Body:       io.NopCloser(bytes.NewReader([]byte{})),
 				}, err: nil},
 			},
 			attemptsExpected: 1,
@@ -836,7 +1035,7 @@ func TestRequestWatch(t *testing.T) {
 			serverReturns: []responseErr{
 				{response: &http.Response{
 					StatusCode: http.StatusUnauthorized,
-					Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
+					Body:       io.NopCloser(bytes.NewReader([]byte{})),
 				}, err: nil},
 			},
 			attemptsExpected: 1,
@@ -856,7 +1055,7 @@ func TestRequestWatch(t *testing.T) {
 			serverReturns: []responseErr{
 				{response: &http.Response{
 					StatusCode: http.StatusUnauthorized,
-					Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &metav1.Status{
+					Body: io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &metav1.Status{
 						Status: metav1.StatusFailure,
 						Reason: metav1.StatusReasonUnauthorized,
 					})))),
@@ -1088,7 +1287,7 @@ func TestRequestStream(t *testing.T) {
 			serverReturns: []responseErr{
 				{response: &http.Response{
 					StatusCode: http.StatusUnauthorized,
-					Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &metav1.Status{
+					Body: io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &metav1.Status{
 						Status: metav1.StatusFailure,
 						Reason: metav1.StatusReasonUnauthorized,
 					})))),
@@ -1107,7 +1306,7 @@ func TestRequestStream(t *testing.T) {
 			serverReturns: []responseErr{
 				{response: &http.Response{
 					StatusCode: http.StatusBadRequest,
-					Body:       ioutil.NopCloser(bytes.NewReader([]byte(`{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"a container name must be specified for pod kube-dns-v20-mz5cv, choose one of: [kubedns dnsmasq healthz]","reason":"BadRequest","code":400}`))),
+					Body:       io.NopCloser(bytes.NewReader([]byte(`{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"a container name must be specified for pod kube-dns-v20-mz5cv, choose one of: [kubedns dnsmasq healthz]","reason":"BadRequest","code":400}`))),
 				}, err: nil},
 			},
 			attemptsExpected: 1,
@@ -1188,7 +1387,7 @@ func TestRequestStream(t *testing.T) {
 				{response: retryAfterResponse(), err: nil},
 				{response: &http.Response{
 					StatusCode: http.StatusOK,
-					Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
+					Body:       io.NopCloser(bytes.NewReader([]byte{})),
 				}, err: nil},
 			},
 		},
@@ -1427,7 +1626,7 @@ func TestConnectionResetByPeerIsRetried(t *testing.T) {
 				if count >= 3 {
 					return &http.Response{
 						StatusCode: http.StatusOK,
-						Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
+						Body:       io.NopCloser(bytes.NewReader([]byte{})),
 					}, nil
 				}
 				return nil, &net.OpError{Err: syscall.ECONNRESET}
@@ -1455,7 +1654,7 @@ func TestCheckRetryHandles429And5xx(t *testing.T) {
 	count := 0
 	ch := make(chan struct{})
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		data, err := ioutil.ReadAll(req.Body)
+		data, err := io.ReadAll(req.Body)
 		if err != nil {
 			t.Fatalf("unable to read request body: %v", err)
 		}
@@ -1607,7 +1806,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	file, err := ioutil.TempFile("", "foo")
+	file, err := os.CreateTemp("", "foo")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1779,7 +1978,7 @@ func TestBody(t *testing.T) {
 	obj := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	bodyExpected, _ := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), obj)
 
-	f, err := ioutil.TempFile("", "test_body")
+	f, err := os.CreateTemp("", "test_body")
 	if err != nil {
 		t.Fatalf("TempFile error: %v", err)
 	}
@@ -2449,7 +2648,7 @@ func TestRequestWithRetry(t *testing.T) {
 	}{
 		{
 			name:                         "server returns retry-after response, request body is not io.Seeker, retry goes ahead",
-			body:                         ioutil.NopCloser(bytes.NewReader([]byte{})),
+			body:                         io.NopCloser(bytes.NewReader([]byte{})),
 			serverReturns:                responseErr{response: retryAfterResponse(), err: nil},
 			errExpected:                  nil,
 			transformFuncInvokedExpected: 1,
@@ -2473,7 +2672,7 @@ func TestRequestWithRetry(t *testing.T) {
 		},
 		{
 			name:                         "server returns retryable err, request body is not io.Seek, retry goes ahead",
-			body:                         ioutil.NopCloser(bytes.NewReader([]byte{})),
+			body:                         io.NopCloser(bytes.NewReader([]byte{})),
 			serverReturns:                responseErr{response: nil, err: io.ErrUnexpectedEOF},
 			errExpected:                  io.ErrUnexpectedEOF,
 			transformFuncInvokedExpected: 0,
@@ -2773,7 +2972,7 @@ func testRequestWithRetry(t *testing.T, key string, doFunc func(ctx context.Cont
 
 				resp := test.serverReturns[attempts].response
 				if resp != nil {
-					responseRecorder.delegated = ioutil.NopCloser(bytes.NewReader([]byte{}))
+					responseRecorder.delegated = io.NopCloser(bytes.NewReader([]byte{}))
 					resp.Body = responseRecorder
 				}
 				return resp, test.serverReturns[attempts].err
@@ -3054,7 +3253,7 @@ func testRetryWithRateLimiterBackoffAndMetrics(t *testing.T, key string, doFunc 
 				interceptor.Do()
 				resp := test.serverReturns[attempts].response
 				if resp != nil {
-					resp.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
+					resp.Body = io.NopCloser(bytes.NewReader([]byte{}))
 				}
 				return resp, test.serverReturns[attempts].err
 			})
@@ -3190,7 +3389,7 @@ func testWithRetryInvokeOrder(t *testing.T, key string, doFunc func(ctx context.
 				interceptor.Do()
 				resp := test.serverReturns[attempts].response
 				if resp != nil {
-					resp.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
+					resp.Body = io.NopCloser(bytes.NewReader([]byte{}))
 				}
 				return resp, test.serverReturns[attempts].err
 			})
@@ -3365,7 +3564,7 @@ func testWithWrapPreviousError(t *testing.T, doFunc func(ctx context.Context, r 
 
 				resp := test.serverReturns[attempts].response
 				if resp != nil {
-					resp.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
+					resp.Body = io.NopCloser(bytes.NewReader([]byte{}))
 				}
 				return resp, test.serverReturns[attempts].err
 			})
@@ -3665,12 +3864,12 @@ func TestRequestBodyResetOrder(t *testing.T) {
 		}()
 
 		// read the request body.
-		ioutil.ReadAll(req.Body)
+		io.ReadAll(req.Body)
 
 		// first attempt, we send a retry-after
 		if attempts == 0 {
 			resp := retryAfterResponse()
-			respBodyTracker.ReadCloser = ioutil.NopCloser(bytes.NewReader([]byte{}))
+			respBodyTracker.ReadCloser = io.NopCloser(bytes.NewReader([]byte{}))
 			resp.Body = respBodyTracker
 			return resp, nil
 		}

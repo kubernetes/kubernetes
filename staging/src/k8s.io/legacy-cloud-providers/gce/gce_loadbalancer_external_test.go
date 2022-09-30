@@ -1044,6 +1044,18 @@ func TestFirewallNeedsUpdate(t *testing.T) {
 			needsUpdate:  true,
 			hasErr:       false,
 		},
+		"When the destination ranges are not equal.": {
+			lbName:       lbName,
+			ipAddr:       "8.8.8.8",
+			ports:        svc.Spec.Ports,
+			ipnet:        ipnet,
+			fwIPProtocol: "tcp",
+			getHook:      nil,
+			sourceRange:  fw.SourceRanges[0],
+			exists:       true,
+			needsUpdate:  true,
+			hasErr:       false,
+		},
 		"When basic flow without exceptions.": {
 			lbName:       lbName,
 			ipAddr:       ipAddr,
@@ -1139,6 +1151,7 @@ func TestFirewallNeedsUpdate(t *testing.T) {
 			fw.SourceRanges[0] = tc.sourceRange
 			fw, err = gce.GetFirewall(MakeFirewallName(lbName))
 			require.Equal(t, fw.SourceRanges[0], tc.sourceRange)
+			require.Equal(t, fw.DestinationRanges[0], status.Ingress[0].IP)
 
 			c := gce.c.(*cloud.MockGCE)
 			c.MockFirewalls.GetHook = tc.getHook

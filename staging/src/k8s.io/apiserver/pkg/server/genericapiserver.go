@@ -418,41 +418,44 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 // or the secure port cannot be listened on initially.
 // This is the diagram of what channels/signals are dependent on each other:
 //
-//                                  stopCh
-//                                    |
-//           ---------------------------------------------------------
-//           |                                                       |
-//    ShutdownInitiated (shutdownInitiatedCh)                        |
-//           |                                                       |
-// (ShutdownDelayDuration)                                    (PreShutdownHooks)
-//           |                                                       |
-//  AfterShutdownDelayDuration (delayedStopCh)   PreShutdownHooksStopped (preShutdownHooksHasStoppedCh)
-//           |                                                       |
-//           |-------------------------------------------------------|
-//                                    |
-//                                    |
-//               NotAcceptingNewRequest (notAcceptingNewRequestCh)
-//                                    |
-//                                    |
-//           |---------------------------------------------------------|
-//           |                        |              |                 |
-//        [without                 [with             |                 |
-// ShutdownSendRetryAfter]  ShutdownSendRetryAfter]  |                 |
-//           |                        |              |                 |
-//           |                        ---------------|                 |
-//           |                                       |                 |
-//           |                         (HandlerChainWaitGroup::Wait)   |
-//           |                                       |                 |
-//           |                    InFlightRequestsDrained (drainedCh)  |
-//           |                                       |                 |
-//           ----------------------------------------|-----------------|
-//                                 |                 |
-//                       stopHttpServerCh     (AuditBackend::Shutdown())
-//                                 |
-//                       listenerStoppedCh
-//                                 |
-//      HTTPServerStoppedListening (httpServerStoppedListeningCh)
+//	                              stopCh
+//	                                |
+//	       ---------------------------------------------------------
+//	       |                                                       |
+//	ShutdownInitiated (shutdownInitiatedCh)                        |
+//	       |                                                       |
 //
+// (ShutdownDelayDuration)                                    (PreShutdownHooks)
+//
+//	         |                                                       |
+//	AfterShutdownDelayDuration (delayedStopCh)   PreShutdownHooksStopped (preShutdownHooksHasStoppedCh)
+//	         |                                                       |
+//	         |-------------------------------------------------------|
+//	                                  |
+//	                                  |
+//	             NotAcceptingNewRequest (notAcceptingNewRequestCh)
+//	                                  |
+//	                                  |
+//	         |---------------------------------------------------------|
+//	         |                        |              |                 |
+//	      [without                 [with             |                 |
+//
+// ShutdownSendRetryAfter]  ShutdownSendRetryAfter]  |                 |
+//
+//	     |                        |              |                 |
+//	     |                        ---------------|                 |
+//	     |                                       |                 |
+//	     |                         (HandlerChainWaitGroup::Wait)   |
+//	     |                                       |                 |
+//	     |                    InFlightRequestsDrained (drainedCh)  |
+//	     |                                       |                 |
+//	     ----------------------------------------|-----------------|
+//	                           |                 |
+//	                 stopHttpServerCh     (AuditBackend::Shutdown())
+//	                           |
+//	                 listenerStoppedCh
+//	                           |
+//	HTTPServerStoppedListening (httpServerStoppedListeningCh)
 func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	delayedStopCh := s.lifecycleSignals.AfterShutdownDelayDuration
 	shutdownInitiatedCh := s.lifecycleSignals.ShutdownInitiated
@@ -663,7 +666,7 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 		}
 		apiGroupVersion.OpenAPIModels = openAPIModels
 
-		if openAPIModels != nil && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		if openAPIModels != nil {
 			typeConverter, err := fieldmanager.NewTypeConverter(openAPIModels, false)
 			if err != nil {
 				return err

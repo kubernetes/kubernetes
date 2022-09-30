@@ -31,13 +31,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	cloudprovidernodeutil "k8s.io/cloud-provider/node/helpers"
 	"k8s.io/component-base/version"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -244,10 +242,11 @@ func MachineInfo(nodeName string,
 	maxPods int,
 	podsPerCore int,
 	machineInfoFunc func() (*cadvisorapiv1.MachineInfo, error), // typically Kubelet.GetCachedMachineInfo
-	capacityFunc func() v1.ResourceList, // typically Kubelet.containerManager.GetCapacity
+	capacityFunc func(localStorageCapacityIsolation bool) v1.ResourceList, // typically Kubelet.containerManager.GetCapacity
 	devicePluginResourceCapacityFunc func() (v1.ResourceList, v1.ResourceList, []string), // typically Kubelet.containerManager.GetDevicePluginResourceCapacity
 	nodeAllocatableReservationFunc func() v1.ResourceList, // typically Kubelet.containerManager.GetNodeAllocatableReservation
 	recordEventFunc func(eventType, event, message string), // typically Kubelet.recordEvent
+	localStorageCapacityIsolation bool,
 ) Setter {
 	return func(node *v1.Node) error {
 		// Note: avoid blindly overwriting the capacity in case opaque
@@ -295,16 +294,15 @@ func MachineInfo(nodeName string,
 			}
 			node.Status.NodeInfo.BootID = info.BootID
 
-			if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-				// TODO: all the node resources should use ContainerManager.GetCapacity instead of deriving the
-				// capacity for every node status request
-				initialCapacity := capacityFunc()
-				if initialCapacity != nil {
-					if v, exists := initialCapacity[v1.ResourceEphemeralStorage]; exists {
-						node.Status.Capacity[v1.ResourceEphemeralStorage] = v
-					}
+			// TODO: all the node resources should use ContainerManager.GetCapacity instead of deriving the
+			// capacity for every node status request
+			initialCapacity := capacityFunc(localStorageCapacityIsolation)
+			if initialCapacity != nil {
+				if v, exists := initialCapacity[v1.ResourceEphemeralStorage]; exists {
+					node.Status.Capacity[v1.ResourceEphemeralStorage] = v
 				}
 			}
+			//}
 
 			devicePluginCapacity, devicePluginAllocatable, removedDevicePlugins = devicePluginResourceCapacityFunc()
 			for k, v := range devicePluginCapacity {
@@ -469,6 +467,7 @@ func ReadyCondition(
 	cmStatusFunc func() cm.Status, // typically Kubelet.containerManager.Status
 	nodeShutdownManagerErrorsFunc func() error, // typically kubelet.shutdownManager.errors.
 	recordEventFunc func(eventType, event string), // typically Kubelet.recordNodeStatusEvent
+	localStorageCapacityIsolation bool,
 ) Setter {
 	return func(node *v1.Node) error {
 		// NOTE(aaronlevy): NodeReady condition needs to be the last in the list of node conditions.
@@ -484,7 +483,7 @@ func ReadyCondition(
 		}
 		errs := []error{runtimeErrorsFunc(), networkErrorsFunc(), storageErrorsFunc(), nodeShutdownManagerErrorsFunc()}
 		requiredCapacities := []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourcePods}
-		if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+		if localStorageCapacityIsolation {
 			requiredCapacities = append(requiredCapacities, v1.ResourceEphemeralStorage)
 		}
 		missingCapacities := []string{}

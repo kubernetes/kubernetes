@@ -246,6 +246,7 @@ func TestCacheControl(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			defer resp.Body.Close()
 			cc := resp.Header.Get("Cache-Control")
 			if !strings.Contains(cc, "private") {
 				t.Errorf("expected private cache-control, got %q", cc)
@@ -291,6 +292,7 @@ func TestHSTS(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			defer resp.Body.Close()
 			cc := resp.Header.Get("Strict-Transport-Security")
 			if !strings.Contains(cc, "max-age=31536000; includeSubDomains") {
 				t.Errorf("expected max-age=31536000; includeSubDomains, got %q", cc)
@@ -401,10 +403,14 @@ func TestListOptions(t *testing.T) {
 			}
 
 			// compact some of the revision history in etcd so we can test "too old" resource versions
-			_, kvClient, err := integration.GetEtcdClients(*storageTransport)
+			rawClient, kvClient, err := integration.GetEtcdClients(*storageTransport)
 			if err != nil {
 				t.Fatal(err)
 			}
+			// kvClient is a wrapper around rawClient and to avoid leaking goroutines we need to
+			// close the client (which we can do by closing rawClient).
+			defer rawClient.Close()
+
 			revision, err := strconv.Atoi(oldestUncompactedRv)
 			if err != nil {
 				t.Fatal(err)

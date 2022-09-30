@@ -35,17 +35,16 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
+	unionauthn "k8s.io/apiserver/pkg/authentication/request/union"
 	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	genericfeatures "k8s.io/apiserver/pkg/features"
+	unionauthz "k8s.io/apiserver/pkg/authorization/union"
 	"k8s.io/apiserver/pkg/registry/generic"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/transport"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
@@ -89,7 +88,7 @@ func (getter *testRESTOptionsGetter) GetRESTOptions(resource schema.GroupResourc
 	return generic.RESTOptions{StorageConfig: storageConfig, Decorator: generic.UndecoratedStorage, ResourcePrefix: resource.Resource}, nil
 }
 
-func newRBACAuthorizer(t *testing.T, config *controlplane.Config) authorizer.Authorizer {
+func newRBACAuthorizer(t *testing.T, config *controlplane.Config) (authorizer.Authorizer, func()) {
 	optsGetter := &testRESTOptionsGetter{config}
 	roleRest, err := rolestore.NewREST(optsGetter)
 	if err != nil {
@@ -111,7 +110,14 @@ func newRBACAuthorizer(t *testing.T, config *controlplane.Config) authorizer.Aut
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
 	clusterRoleBindingRegistry := clusterrolebinding.AuthorizerAdapter{Registry: clusterrolebinding.NewRegistry(clusterrolebindingRest)}
-	return rbac.New(roleRegistry, roleBindingRegistry, clusterRoleRegistry, clusterRoleBindingRegistry)
+
+	tearDownFn := func() {
+		roleRest.Destroy()
+		rolebindingRest.Destroy()
+		clusterroleRest.Destroy()
+		clusterrolebindingRest.Destroy()
+	}
+	return rbac.New(roleRegistry, roleBindingRegistry, clusterRoleRegistry, clusterRoleBindingRegistry), tearDownFn
 }
 
 // bootstrapRoles are a set of RBAC roles which will be populated before the test.
@@ -293,8 +299,6 @@ var (
 )
 
 func TestRBAC(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
-
 	superUser := "admin/system:masters"
 
 	tests := []struct {
@@ -533,16 +537,28 @@ func TestRBAC(t *testing.T) {
 				"user-with-no-permissions":         {Name: "user-with-no-permissions"},
 			})))
 
+			var tearDownAuthorizerFn func()
+			defer func() {
+				if tearDownAuthorizerFn != nil {
+					tearDownAuthorizerFn()
+				}
+			}()
 			_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
 				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 					// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 					// Also disable namespace lifecycle to workaroung the test limitation that first creates
 					// roles/rolebindings and only then creates corresponding namespaces.
 					opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "NamespaceLifecycle"}
+					// Disable built-in authorizers
+					opts.Authorization.Modes = []string{"AlwaysDeny"}
 				},
 				ModifyServerConfig: func(config *controlplane.Config) {
-					config.GenericConfig.Authentication.Authenticator = authenticator
-					config.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(t, config)
+					// Append our custom test authenticator
+					config.GenericConfig.Authentication.Authenticator = unionauthn.New(config.GenericConfig.Authentication.Authenticator, authenticator)
+					// Append our custom test authorizer
+					var rbacAuthz authorizer.Authorizer
+					rbacAuthz, tearDownAuthorizerFn = newRBACAuthorizer(t, config)
+					config.GenericConfig.Authorization.Authorizer = unionauthz.New(config.GenericConfig.Authorization.Authorizer, rbacAuthz)
 				},
 			})
 			defer tearDownFn()
@@ -653,14 +669,9 @@ func TestRBAC(t *testing.T) {
 }
 
 func TestBootstrapping(t *testing.T) {
-	superUser := "admin/system:masters"
-
 	clientset, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
-		ModifyServerConfig: func(config *controlplane.Config) {
-			config.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
-				superUser: {Name: "admin", Groups: []string{"system:masters"}},
-			}))
-			config.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(t, config)
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			opts.Authorization.Modes = []string{"RBAC"}
 		},
 	})
 	defer tearDownFn()
@@ -714,19 +725,13 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 		}
 	}()
 
-	superUser := "admin/system:masters"
-
 	etcdConfig := framework.SharedEtcd()
+
 	client, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Ensure we're using the same etcd across apiserver restarts.
 			opts.Etcd.StorageConfig = *etcdConfig
-		},
-		ModifyServerConfig: func(config *controlplane.Config) {
-			config.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
-				superUser: {Name: "admin", Groups: []string{"system:masters"}},
-			}))
-			config.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(t, config)
+			opts.Authorization.Modes = []string{"RBAC"}
 		},
 	})
 
@@ -774,12 +779,7 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Ensure we're using the same etcd across apiserver restarts.
 			opts.Etcd.StorageConfig = *etcdConfig
-		},
-		ModifyServerConfig: func(config *controlplane.Config) {
-			config.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
-				superUser: {Name: "admin", Groups: []string{"system:masters"}},
-			}))
-			config.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(t, config)
+			opts.Authorization.Modes = []string{"RBAC"}
 		},
 	})
 

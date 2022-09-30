@@ -20,19 +20,18 @@ import (
 	"net"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	networkinginformers "k8s.io/client-go/informers/networking/v1alpha1"
+	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-
-	coreinformers "k8s.io/client-go/informers/core/v1"
-	clientset "k8s.io/client-go/kubernetes"
-	corelisters "k8s.io/client-go/listers/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
+	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 )
 
@@ -73,6 +72,7 @@ type Controller struct {
 // currently, this should be handled as a fatal error.
 func NewNodeIpamController(
 	nodeInformer coreinformers.NodeInformer,
+	clusterCIDRInformer networkinginformers.ClusterCIDRInformer,
 	cloud cloudprovider.Interface,
 	kubeClient clientset.Interface,
 	clusterCIDRs []*net.IPNet,
@@ -135,7 +135,7 @@ func NewNodeIpamController(
 			NodeCIDRMaskSizes:    nodeCIDRMaskSizes,
 		}
 
-		ic.cidrAllocator, err = ipam.New(kubeClient, cloud, nodeInformer, ic.allocatorType, allocatorParams)
+		ic.cidrAllocator, err = ipam.New(kubeClient, cloud, nodeInformer, clusterCIDRInformer, ic.allocatorType, allocatorParams)
 		if err != nil {
 			return nil, err
 		}
@@ -163,4 +163,11 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 	}
 
 	<-stopCh
+}
+
+// RunWithMetrics is a wrapper for Run that also tracks starting and stopping of the nodeipam controller with additional metric
+func (nc *Controller) RunWithMetrics(stopCh <-chan struct{}, controllerManagerMetrics *controllersmetrics.ControllerManagerMetrics) {
+	controllerManagerMetrics.ControllerStarted("nodeipam")
+	defer controllerManagerMetrics.ControllerStopped("nodeipam")
+	nc.Run(stopCh)
 }

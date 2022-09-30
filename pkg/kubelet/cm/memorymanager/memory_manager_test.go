@@ -18,7 +18,6 @@ package memorymanager
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
@@ -122,7 +121,7 @@ type mockRuntimeService struct {
 	err error
 }
 
-func (rt mockRuntimeService) UpdateContainerResources(id string, resources *runtimeapi.LinuxContainerResources) error {
+func (rt mockRuntimeService) UpdateContainerResources(id string, resources *runtimeapi.ContainerResources) error {
 	return rt.err
 }
 
@@ -1982,7 +1981,7 @@ func TestNewManager(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			stateFileDirectory, err := ioutil.TempDir("/tmp/", "memory_manager_tests")
+			stateFileDirectory, err := os.MkdirTemp("/tmp/", "memory_manager_tests")
 			if err != nil {
 				t.Errorf("Cannot create state file: %s", err.Error())
 			}

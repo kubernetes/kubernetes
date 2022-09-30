@@ -72,8 +72,12 @@ var DefaultSysSpec = SysSpec{
 		// Containerd and cri-o will use blkio to track disk I/O and throttling in both cgroup v1 and v2.
 		"blkio",
 	},
-	CgroupsV2:         []string{"cpu", "cpuset", "devices", "freezer", "memory", "pids"},
-	CgroupsV2Optional: []string{"hugetlb", "blkio"},
+	CgroupsV2: []string{"cpu", "cpuset", "devices", "freezer", "memory", "pids"},
+	CgroupsV2Optional: []string{
+		"hugetlb",
+		// The cgroups v2 io controller is the successor of the v1 blkio controller.
+		"io",
+	},
 	RuntimeSpec: RuntimeSpec{
 		DockerSpec: &DockerSpec{
 			Version:     []string{`1\.1[1-3]\..*`, `17\.0[3,6,9]\..*`, `18\.0[6,9]\..*`, `19\.03\..*`, `20\.10\..*`},

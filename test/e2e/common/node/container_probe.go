@@ -25,12 +25,16 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/apimachinery/pkg/util/wait"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -190,7 +194,7 @@ var _ = SIGDescribe("Probing container", func() {
 	/*
 		Release: v1.9
 		Testname: Pod liveness probe, using http endpoint, multiple restarts (slow)
-		Description: A Pod is created with liveness probe on http endpoint /healthz. The http handler on the /healthz will return a http error after 10 seconds since the Pod is started. This MUST result in liveness check failure. The Pod MUST now be killed and restarted incrementing restart count to 1. The liveness probe must fail again after restart once the http handler for /healthz enpoind on the Pod returns an http error after 10 seconds from the start. Restart counts MUST increment everytime health check fails, measure upto 5 restart.
+		Description: A Pod is created with liveness probe on http endpoint /healthz. The http handler on the /healthz will return a http error after 10 seconds since the Pod is started. This MUST result in liveness check failure. The Pod MUST now be killed and restarted incrementing restart count to 1. The liveness probe must fail again after restart once the http handler for /healthz enpoind on the Pod returns an http error after 10 seconds from the start. Restart counts MUST increment every time health check fails, measure up to 5 restart.
 	*/
 	framework.ConformanceIt("should have monotonically increasing restart count [NodeConformance]", func() {
 		livenessProbe := &v1.Probe{
@@ -609,13 +613,12 @@ done
 
 		// Shutdown pod. Readiness should change to false
 		podClient.Delete(context.Background(), podName, metav1.DeleteOptions{})
-		err = wait.PollImmediate(framework.Poll, f.Timeouts.PodDelete, func() (bool, error) {
-			pod, err := podClient.Get(context.Background(), podName, metav1.GetOptions{})
-			if err != nil {
-				return false, err
+		err = waitForPodStatusByInformer(f.ClientSet, f.Namespace.Name, podName, f.Timeouts.PodDelete, func(pod *v1.Pod) (bool, error) {
+			if !podutil.IsPodReady(pod) {
+				return true, nil
 			}
-			// verify the pod ready status has reported not ready
-			return podutil.IsPodReady(pod) == false, nil
+			framework.Logf("pod %s/%s is still ready, waiting until is not ready", pod.Namespace, pod.Name)
+			return false, nil
 		})
 		framework.ExpectNoError(err)
 	})
@@ -692,13 +695,12 @@ done
 		podClient.Delete(context.Background(), podName, metav1.DeleteOptions{})
 
 		// Wait for pod to go unready
-		err = wait.PollImmediate(framework.Poll, f.Timeouts.PodDelete, func() (bool, error) {
-			pod, err := podClient.Get(context.Background(), podName, metav1.GetOptions{})
-			if err != nil {
-				return false, err
+		err = waitForPodStatusByInformer(f.ClientSet, f.Namespace.Name, podName, f.Timeouts.PodDelete, func(pod *v1.Pod) (bool, error) {
+			if !podutil.IsPodReady(pod) {
+				return true, nil
 			}
-			// verify the pod ready status has reported not ready
-			return podutil.IsPodReady(pod) == false, nil
+			framework.Logf("pod %s/%s is still ready, waiting until is not ready", pod.Namespace, pod.Name)
+			return false, nil
 		})
 		framework.ExpectNoError(err)
 
@@ -720,6 +722,66 @@ done
 		}, 1*time.Minute, framework.Poll).ShouldNot(gomega.BeTrue(), "should not see liveness probes")
 	})
 })
+
+// waitForPodStatusByInformer waits pod status change by informer
+func waitForPodStatusByInformer(c clientset.Interface, podNamespace, podName string, timeout time.Duration, condition func(pod *v1.Pod) (bool, error)) error {
+	stopCh := make(chan struct{})
+	checkPodStatusFunc := func(pod *v1.Pod) {
+		if ok, _ := condition(pod); ok {
+			close(stopCh)
+		}
+	}
+	controller := newInformerWatchPod(c, podNamespace, podName, checkPodStatusFunc)
+	go controller.Run(stopCh)
+	after := time.After(timeout)
+	select {
+	case <-stopCh:
+		return nil
+	case <-after:
+		defer close(stopCh)
+		return fmt.Errorf("timeout to wait pod status ready")
+	}
+}
+
+// newInformerWatchPod creates a informer for given pod
+func newInformerWatchPod(c clientset.Interface, podNamespace, podName string, checkPodStatusFunc func(p *v1.Pod)) cache.Controller {
+	_, controller := cache.NewInformer(
+		&cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				options.FieldSelector = fields.SelectorFromSet(fields.Set{"metadata.name": podName}).String()
+				obj, err := c.CoreV1().Pods(podNamespace).List(context.TODO(), options)
+				return runtime.Object(obj), err
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				options.FieldSelector = fields.SelectorFromSet(fields.Set{"metadata.name": podName}).String()
+				return c.CoreV1().Pods(podNamespace).Watch(context.TODO(), options)
+			},
+		},
+		&v1.Pod{},
+		0,
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				p, ok := obj.(*v1.Pod)
+				if ok {
+					checkPodStatusFunc(p)
+				}
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				p, ok := newObj.(*v1.Pod)
+				if ok {
+					checkPodStatusFunc(p)
+				}
+			},
+			DeleteFunc: func(obj interface{}) {
+				p, ok := obj.(*v1.Pod)
+				if ok {
+					checkPodStatusFunc(p)
+				}
+			},
+		},
+	)
+	return controller
+}
 
 // GetContainerStartedTime returns the time when the given container started and error if any
 func GetContainerStartedTime(p *v1.Pod, containerName string) (time.Time, error) {

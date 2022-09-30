@@ -605,7 +605,7 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 			if s.IsUnschedulable() {
 				return nil, s
 			}
-			return nil, framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", pl.Name(), status.AsError())).WithFailedPlugin(pl.Name())
+			return nil, framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", pl.Name(), s.AsError())).WithFailedPlugin(pl.Name())
 		}
 		if !r.AllNodes() {
 			pluginsWithNodes = append(pluginsWithNodes, pl.Name())
@@ -907,6 +907,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 		pluginToNodeScores[pl.Name()] = make(framework.NodeScoreList, len(nodes))
 	}
 	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	errCh := parallelize.NewErrorChannel()
 
 	// Run Score method for each node in parallel.
@@ -924,7 +925,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 				Score: s,
 			}
 		}
-	})
+	}, score)
 	if err := errCh.ReceiveError(); err != nil {
 		return nil, framework.AsStatus(fmt.Errorf("running Score plugins: %w", err))
 	}
@@ -942,7 +943,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 			errCh.SendErrorWithCancel(err, cancel)
 			return
 		}
-	})
+	}, score)
 	if err := errCh.ReceiveError(); err != nil {
 		return nil, framework.AsStatus(fmt.Errorf("running Normalize on Score plugins: %w", err))
 	}
@@ -963,7 +964,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 			}
 			nodeScoreList[i].Score = nodeScore.Score * int64(weight)
 		}
-	})
+	}, score)
 	if err := errCh.ReceiveError(); err != nil {
 		return nil, framework.AsStatus(fmt.Errorf("applying score defaultWeights on Score plugins: %w", err))
 	}
@@ -1002,8 +1003,13 @@ func (f *frameworkImpl) RunPreBindPlugins(ctx context.Context, state *framework.
 	for _, pl := range f.preBindPlugins {
 		status = f.runPreBindPlugin(ctx, pl, state, pod, nodeName)
 		if !status.IsSuccess() {
+			if status.IsUnschedulable() {
+				klog.V(4).InfoS("Pod rejected by PreBind plugin", "pod", klog.KObj(pod), "node", nodeName, "plugin", pl.Name(), "status", status.Message())
+				status.SetFailedPlugin(pl.Name())
+				return status
+			}
 			err := status.AsError()
-			klog.ErrorS(err, "Failed running PreBind plugin", "plugin", pl.Name(), "pod", klog.KObj(pod))
+			klog.ErrorS(err, "Failed running PreBind plugin", "plugin", pl.Name(), "pod", klog.KObj(pod), "node", nodeName)
 			return framework.AsStatus(fmt.Errorf("running PreBind plugin %q: %w", pl.Name(), err))
 		}
 	}
@@ -1029,15 +1035,20 @@ func (f *frameworkImpl) RunBindPlugins(ctx context.Context, state *framework.Cyc
 	if len(f.bindPlugins) == 0 {
 		return framework.NewStatus(framework.Skip, "")
 	}
-	for _, bp := range f.bindPlugins {
-		status = f.runBindPlugin(ctx, bp, state, pod, nodeName)
+	for _, pl := range f.bindPlugins {
+		status = f.runBindPlugin(ctx, pl, state, pod, nodeName)
 		if status.IsSkip() {
 			continue
 		}
 		if !status.IsSuccess() {
+			if status.IsUnschedulable() {
+				klog.V(4).InfoS("Pod rejected by Bind plugin", "pod", klog.KObj(pod), "node", nodeName, "plugin", pl.Name(), "status", status.Message())
+				status.SetFailedPlugin(pl.Name())
+				return status
+			}
 			err := status.AsError()
-			klog.ErrorS(err, "Failed running Bind plugin", "plugin", bp.Name(), "pod", klog.KObj(pod))
-			return framework.AsStatus(fmt.Errorf("running Bind plugin %q: %w", bp.Name(), err))
+			klog.ErrorS(err, "Failed running Bind plugin", "plugin", pl.Name(), "pod", klog.KObj(pod), "node", nodeName)
+			return framework.AsStatus(fmt.Errorf("running Bind plugin %q: %w", pl.Name(), err))
 		}
 		return status
 	}

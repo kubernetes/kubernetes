@@ -22,18 +22,16 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
-	"path"
 	"path/filepath"
+	"reflect"
+	goruntime "runtime"
 	"testing"
 	"time"
-
-	"reflect"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	api "k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -91,7 +89,7 @@ func TestMounterGetPath(t *testing.T) {
 		spec := volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
 		mounter, err := plug.NewMounter(
 			spec,
-			&api.Pod{ObjectMeta: meta.ObjectMeta{UID: testPodUID, Namespace: testns}},
+			&corev1.Pod{ObjectMeta: meta.ObjectMeta{UID: testPodUID, Namespace: testns}},
 			volume.VolumeOptions{},
 		)
 		if err != nil {
@@ -109,11 +107,13 @@ func TestMounterGetPath(t *testing.T) {
 
 func TestMounterSetUp(t *testing.T) {
 	tests := []struct {
-		name                  string
-		driver                string
-		volumeContext         map[string]string
-		expectedVolumeContext map[string]string
-		csiInlineVolume       bool
+		name                     string
+		driver                   string
+		volumeContext            map[string]string
+		seLinuxLabel             string
+		enableSELinuxFeatureGate bool
+		expectedSELinuxContext   string
+		expectedVolumeContext    map[string]string
 	}{
 		{
 			name:                  "no pod info",
@@ -143,20 +143,44 @@ func TestMounterSetUp(t *testing.T) {
 			name:                  "add pod info",
 			driver:                "info",
 			volumeContext:         nil,
-			expectedVolumeContext: map[string]string{"csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns"},
+			expectedVolumeContext: map[string]string{"csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns", "csi.storage.k8s.io/ephemeral": "false"},
 		},
 		{
 			name:                  "add pod info -> keep existing volumeContext",
 			driver:                "info",
 			volumeContext:         map[string]string{"foo": "bar"},
-			expectedVolumeContext: map[string]string{"foo": "bar", "csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns"},
+			expectedVolumeContext: map[string]string{"foo": "bar", "csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns", "csi.storage.k8s.io/ephemeral": "false"},
 		},
 		{
 			name:                  "CSIInlineVolume pod info",
 			driver:                "info",
 			volumeContext:         nil,
 			expectedVolumeContext: map[string]string{"csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns", "csi.storage.k8s.io/ephemeral": "false"},
-			csiInlineVolume:       true,
+		},
+		{
+			name:                     "should include SELinux mount options, if feature-gate is enabled and driver supports it",
+			driver:                   "supports_selinux",
+			volumeContext:            nil,
+			seLinuxLabel:             "s0,c0",
+			expectedSELinuxContext:   "context=\"s0,c0\"",
+			enableSELinuxFeatureGate: true,
+			expectedVolumeContext:    nil,
+		},
+		{
+			name:                     "should not include selinux mount options, if feature gate is enabled but driver does not support it",
+			driver:                   "no_selinux",
+			seLinuxLabel:             "s0,c0",
+			volumeContext:            nil,
+			enableSELinuxFeatureGate: true,
+			expectedVolumeContext:    nil,
+		},
+		{
+			name:                     "should not include selinux mount option, if feature gate is enabled but CSIDriver does not exist",
+			driver:                   "not_found_selinux",
+			seLinuxLabel:             "s0,c0",
+			volumeContext:            nil,
+			enableSELinuxFeatureGate: true,
+			expectedVolumeContext:    nil,
 		},
 	}
 
@@ -164,16 +188,17 @@ func TestMounterSetUp(t *testing.T) {
 	currentPodInfoMount := true
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			// Modes must be set if (and only if) CSIInlineVolume is enabled.
-			var modes []storage.VolumeLifecycleMode
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, test.csiInlineVolume)()
-			if test.csiInlineVolume {
-				modes = append(modes, storage.VolumeLifecyclePersistent)
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, test.enableSELinuxFeatureGate)()
+
+			modes := []storage.VolumeLifecycleMode{
+				storage.VolumeLifecyclePersistent,
 			}
 			fakeClient := fakeclient.NewSimpleClientset(
 				getTestCSIDriver("no-info", &noPodMountInfo, nil, modes),
 				getTestCSIDriver("info", &currentPodInfoMount, nil, modes),
 				getTestCSIDriver("nil", nil, nil, modes),
+				getTestCSIDriver("supports_selinux", &noPodMountInfo, nil, modes),
+				getTestCSIDriver("no_selinux", &noPodMountInfo, nil, modes),
 			)
 			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
@@ -186,9 +211,9 @@ func TestMounterSetUp(t *testing.T) {
 
 			mounter, err := plug.NewMounter(
 				volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly),
-				&api.Pod{
+				&corev1.Pod{
 					ObjectMeta: meta.ObjectMeta{UID: testPodUID, Namespace: testns, Name: testPod},
-					Spec: api.PodSpec{
+					Spec: corev1.PodSpec{
 						ServiceAccountName: testAccount,
 					},
 				},
@@ -233,10 +258,20 @@ func TestMounterSetUp(t *testing.T) {
 			var mounterArgs volume.MounterArgs
 			fsGroup := int64(2000)
 			mounterArgs.FsGroup = &fsGroup
+
+			if test.seLinuxLabel != "" {
+				mounterArgs.SELinuxLabel = test.seLinuxLabel
+			}
+
+			expectedMountOptions := pv.Spec.MountOptions
+
+			if test.expectedSELinuxContext != "" {
+				expectedMountOptions = append(expectedMountOptions, test.expectedSELinuxContext)
+			}
+
 			if err := csiMounter.SetUp(mounterArgs); err != nil {
 				t.Fatalf("mounter.Setup failed: %v", err)
 			}
-
 			//Test the default value of file system type is not overridden
 			if len(csiMounter.spec.PersistentVolume.Spec.CSI.FSType) != 0 {
 				t.Errorf("default value of file system type was overridden by type %s", csiMounter.spec.PersistentVolume.Spec.CSI.FSType)
@@ -260,8 +295,8 @@ func TestMounterSetUp(t *testing.T) {
 			if vol.Path != csiMounter.GetPath() {
 				t.Errorf("csi server expected path %s, got %s", csiMounter.GetPath(), vol.Path)
 			}
-			if !reflect.DeepEqual(vol.MountFlags, pv.Spec.MountOptions) {
-				t.Errorf("csi server expected mount options %v, got %v", pv.Spec.MountOptions, vol.MountFlags)
+			if !reflect.DeepEqual(vol.MountFlags, expectedMountOptions) {
+				t.Errorf("csi server expected mount options %v, got %v", expectedMountOptions, vol.MountFlags)
 			}
 			if !reflect.DeepEqual(vol.VolumeContext, test.expectedVolumeContext) {
 				t.Errorf("csi server expected volumeContext %+v, got %+v", test.expectedVolumeContext, vol.VolumeContext)
@@ -328,7 +363,7 @@ func TestMounterSetUpSimple(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mounter, err := plug.NewMounter(
 				tc.spec(tc.fsType, tc.options),
-				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
+				&corev1.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
 				volume.VolumeOptions{},
 			)
 			if tc.shouldFail && err != nil {
@@ -445,7 +480,7 @@ func TestMounterSetupWithStatusTracking(t *testing.T) {
 			podUID: types.UID(fmt.Sprintf("%08X", rand.Uint64())),
 			spec: func(fsType string, options []string) *volume.Spec {
 				pv := makeTestPV("pv5", 20, testDriver, "vol6")
-				pv.Spec.PersistentVolumeSource.CSI.NodePublishSecretRef = &api.SecretReference{
+				pv.Spec.PersistentVolumeSource.CSI.NodePublishSecretRef = &corev1.SecretReference{
 					Name:      "foo",
 					Namespace: "default",
 				}
@@ -462,7 +497,7 @@ func TestMounterSetupWithStatusTracking(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mounter, err := plug.NewMounter(
 				tc.spec("ext4", []string{}),
-				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
+				&corev1.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
 				volume.VolumeOptions{},
 			)
 			if err != nil {
@@ -502,8 +537,6 @@ func TestMounterSetupWithStatusTracking(t *testing.T) {
 }
 
 func TestMounterSetUpWithInline(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
-
 	testCases := []struct {
 		name       string
 		podUID     types.UID
@@ -565,7 +598,7 @@ func TestMounterSetUpWithInline(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mounter, err := plug.NewMounter(
 				tc.spec(tc.fsType, tc.options),
-				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
+				&corev1.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
 				volume.VolumeOptions{},
 			)
 			if tc.shouldFail && err != nil {
@@ -650,7 +683,7 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 
 	testCases := []struct {
 		name                           string
-		accessModes                    []api.PersistentVolumeAccessMode
+		accessModes                    []corev1.PersistentVolumeAccessMode
 		readOnly                       bool
 		fsType                         string
 		setFsGroup                     bool
@@ -663,16 +696,16 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 	}{
 		{
 			name: "default fstype, with no fsgroup (should not apply fsgroup)",
-			accessModes: []api.PersistentVolumeAccessMode{
-				api.ReadWriteOnce,
+			accessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce,
 			},
 			readOnly: false,
 			fsType:   "",
 		},
 		{
 			name: "default fstype  with fsgroup (should not apply fsgroup)",
-			accessModes: []api.PersistentVolumeAccessMode{
-				api.ReadWriteOnce,
+			accessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce,
 			},
 			readOnly:   false,
 			fsType:     "",
@@ -681,9 +714,9 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		},
 		{
 			name: "fstype, fsgroup, RWM, ROM provided (should not apply fsgroup)",
-			accessModes: []api.PersistentVolumeAccessMode{
-				api.ReadWriteMany,
-				api.ReadOnlyMany,
+			accessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteMany,
+				corev1.ReadOnlyMany,
 			},
 			fsType:     "ext4",
 			setFsGroup: true,
@@ -691,8 +724,8 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		},
 		{
 			name: "fstype, fsgroup, RWO, but readOnly (should not apply fsgroup)",
-			accessModes: []api.PersistentVolumeAccessMode{
-				api.ReadWriteOnce,
+			accessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce,
 			},
 			readOnly:   true,
 			fsType:     "ext4",
@@ -701,8 +734,8 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		},
 		{
 			name: "fstype, fsgroup, RWO provided (should apply fsgroup)",
-			accessModes: []api.PersistentVolumeAccessMode{
-				api.ReadWriteOnce,
+			accessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce,
 			},
 			fsType:     "ext4",
 			setFsGroup: true,
@@ -710,8 +743,8 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		},
 		{
 			name: "fstype, fsgroup, RWO provided, FSGroupPolicy ReadWriteOnceWithFSType (should apply fsgroup)",
-			accessModes: []api.PersistentVolumeAccessMode{
-				api.ReadWriteOnce,
+			accessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce,
 			},
 			fsType:              "ext4",
 			setFsGroup:          true,
@@ -721,8 +754,8 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		},
 		{
 			name: "default fstype with no fsgroup, FSGroupPolicy ReadWriteOnceWithFSType (should not apply fsgroup)",
-			accessModes: []api.PersistentVolumeAccessMode{
-				api.ReadWriteOnce,
+			accessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce,
 			},
 			readOnly:            false,
 			fsType:              "",
@@ -731,8 +764,8 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		},
 		{
 			name: "default fstype with fsgroup, FSGroupPolicy ReadWriteOnceWithFSType (should not apply fsgroup)",
-			accessModes: []api.PersistentVolumeAccessMode{
-				api.ReadWriteOnce,
+			accessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce,
 			},
 			readOnly:            false,
 			fsType:              "",
@@ -743,8 +776,8 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		},
 		{
 			name: "fstype, fsgroup, RWO provided, readonly, FSGroupPolicy ReadWriteOnceWithFSType (should not apply fsgroup)",
-			accessModes: []api.PersistentVolumeAccessMode{
-				api.ReadWriteOnce,
+			accessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce,
 			},
 			readOnly:            true,
 			fsType:              "ext4",
@@ -755,8 +788,8 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		},
 		{
 			name: "fstype, fsgroup, RWX provided, FSGroupPolicy ReadWriteOnceWithFSType (should not apply fsgroup)",
-			accessModes: []api.PersistentVolumeAccessMode{
-				api.ReadWriteMany,
+			accessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteMany,
 			},
 			readOnly:            false,
 			fsType:              "ext4",
@@ -767,8 +800,8 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		},
 		{
 			name: "fstype, fsgroup, RWO provided, FSGroupPolicy None (should not apply fsgroup)",
-			accessModes: []api.PersistentVolumeAccessMode{
-				api.ReadWriteOnce,
+			accessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce,
 			},
 			fsType:              "ext4",
 			setFsGroup:          true,
@@ -778,8 +811,8 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		},
 		{
 			name: "fstype, fsgroup, RWO provided, readOnly, FSGroupPolicy File (should apply fsgroup)",
-			accessModes: []api.PersistentVolumeAccessMode{
-				api.ReadWriteOnce,
+			accessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce,
 			},
 			readOnly:            true,
 			fsType:              "ext4",
@@ -844,7 +877,7 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 
 		mounter, err := plug.NewMounter(
 			spec,
-			&api.Pod{ObjectMeta: meta.ObjectMeta{UID: testPodUID, Namespace: testns}},
+			&corev1.Pod{ObjectMeta: meta.ObjectMeta{UID: testPodUID, Namespace: testns}},
 			volume.VolumeOptions{},
 		)
 		if err != nil {
@@ -905,19 +938,25 @@ func TestUnmounterTeardown(t *testing.T) {
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 
 	// save the data file prior to unmount
-	dir := filepath.Join(getTargetPath(testPodUID, pv.ObjectMeta.Name, plug.host), "/mount")
+	targetDir := getTargetPath(testPodUID, pv.ObjectMeta.Name, plug.host)
+	dir := filepath.Join(targetDir, "mount")
 	if err := os.MkdirAll(dir, 0755); err != nil && !os.IsNotExist(err) {
 		t.Errorf("failed to create dir [%s]: %v", dir, err)
 	}
 
 	// do a fake local mount
 	diskMounter := util.NewSafeFormatAndMountFromHost(plug.GetPluginName(), plug.host)
-	if err := diskMounter.FormatAndMount("/fake/device", dir, "testfs", nil); err != nil {
+	device := "/fake/device"
+	if goruntime.GOOS == "windows" {
+		// We need disk numbers on Windows.
+		device = "1"
+	}
+	if err := diskMounter.FormatAndMount(device, dir, "testfs", nil); err != nil {
 		t.Errorf("failed to mount dir [%s]: %v", dir, err)
 	}
 
 	if err := saveVolumeData(
-		path.Dir(dir),
+		targetDir,
 		volDataFileName,
 		map[string]string{
 			volDataKey.specVolID:  pv.ObjectMeta.Name,
@@ -979,7 +1018,6 @@ func TestIsCorruptedDir(t *testing.T) {
 }
 
 func TestPodServiceAccountTokenAttrs(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 	scheme := runtime.NewScheme()
 	utilruntime.Must(pkgauthenticationv1.RegisterDefaults(scheme))
 	utilruntime.Must(pkgstoragev1.RegisterDefaults(scheme))
@@ -1063,9 +1101,9 @@ func TestPodServiceAccountTokenAttrs(t *testing.T) {
 			defer os.RemoveAll(tmpDir)
 			mounter, err := plug.NewMounter(
 				volume.NewSpecFromVolume(makeTestVol("test", testDriver)),
-				&api.Pod{
+				&corev1.Pod{
 					ObjectMeta: meta.ObjectMeta{UID: testPodUID, Namespace: testns, Name: testPod},
-					Spec: api.PodSpec{
+					Spec: corev1.PodSpec{
 						ServiceAccountName: testAccount,
 					},
 				},
@@ -1107,7 +1145,7 @@ func Test_csiMountMgr_supportsFSGroup(t *testing.T) {
 		readOnly            bool
 		supportsSELinux     bool
 		spec                *volume.Spec
-		pod                 *api.Pod
+		pod                 *corev1.Pod
 		podUID              types.UID
 		publishContext      map[string]string
 		kubeVolHost         volume.KubeletVolumeHost
@@ -1177,9 +1215,9 @@ func Test_csiMountMgr_supportsFSGroup(t *testing.T) {
 				driverPolicy: storage.ReadWriteOnceWithFSTypeFSGroupPolicy,
 			},
 			fields: fields{
-				spec: volume.NewSpecFromPersistentVolume(&api.PersistentVolume{
-					Spec: api.PersistentVolumeSpec{
-						AccessModes: []api.PersistentVolumeAccessMode{},
+				spec: volume.NewSpecFromPersistentVolume(&corev1.PersistentVolume{
+					Spec: corev1.PersistentVolumeSpec{
+						AccessModes: []corev1.PersistentVolumeAccessMode{},
 					},
 				}, true),
 			},
@@ -1193,9 +1231,9 @@ func Test_csiMountMgr_supportsFSGroup(t *testing.T) {
 				driverPolicy: storage.ReadWriteOnceWithFSTypeFSGroupPolicy,
 			},
 			fields: fields{
-				spec: volume.NewSpecFromPersistentVolume(&api.PersistentVolume{
-					Spec: api.PersistentVolumeSpec{
-						AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				spec: volume.NewSpecFromPersistentVolume(&corev1.PersistentVolume{
+					Spec: corev1.PersistentVolumeSpec{
+						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 					},
 				}, true),
 			},
@@ -1209,9 +1247,9 @@ func Test_csiMountMgr_supportsFSGroup(t *testing.T) {
 				driverPolicy: storage.ReadWriteOnceWithFSTypeFSGroupPolicy,
 			},
 			fields: fields{
-				spec: volume.NewSpecFromVolume(&api.Volume{
-					VolumeSource: api.VolumeSource{
-						CSI: &api.CSIVolumeSource{
+				spec: volume.NewSpecFromVolume(&corev1.Volume{
+					VolumeSource: corev1.VolumeSource{
+						CSI: &corev1.CSIVolumeSource{
 							Driver: testDriver,
 						},
 					},
@@ -1231,7 +1269,7 @@ func Test_csiMountMgr_supportsFSGroup(t *testing.T) {
 				volumeID:            tt.fields.volumeID,
 				specVolumeID:        tt.fields.specVolumeID,
 				readOnly:            tt.fields.readOnly,
-				supportsSELinux:     tt.fields.supportsSELinux,
+				needSELinuxRelabel:  tt.fields.supportsSELinux,
 				spec:                tt.fields.spec,
 				pod:                 tt.fields.pod,
 				podUID:              tt.fields.podUID,

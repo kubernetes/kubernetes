@@ -46,6 +46,7 @@ func TestCertRotation(t *testing.T) {
 	defer close(stopCh)
 
 	transport.CertCallbackRefreshDuration = 1 * time.Second
+	transport.DialerStopCh = stopCh
 
 	certDir := os.TempDir()
 	clientCAFilename, clientSigningCert, clientSigningKey := writeCACertFiles(t, certDir)
@@ -103,6 +104,7 @@ func TestCertRotationContinuousRequests(t *testing.T) {
 	defer close(stopCh)
 
 	transport.CertCallbackRefreshDuration = 1 * time.Second
+	transport.DialerStopCh = stopCh
 
 	certDir := os.TempDir()
 	clientCAFilename, clientSigningCert, clientSigningKey := writeCACertFiles(t, certDir)

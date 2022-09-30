@@ -29,6 +29,7 @@ import (
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
+	authenticationv1alpha1 "k8s.io/api/authentication/v1alpha1"
 	authorizationapiv1 "k8s.io/api/authorization/v1"
 	autoscalingapiv1 "k8s.io/api/autoscaling/v1"
 	autoscalingapiv2 "k8s.io/api/autoscaling/v2"
@@ -45,6 +46,7 @@ import (
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	networkingapiv1 "k8s.io/api/networking/v1"
+	networkingapiv1alpha1 "k8s.io/api/networking/v1alpha1"
 	nodev1 "k8s.io/api/node/v1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
 	policyapiv1 "k8s.io/api/policy/v1"
@@ -69,7 +71,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1"
-	eventsv1client "k8s.io/client-go/kubernetes/typed/events/v1"
 	"k8s.io/component-helpers/apimachinery/lease"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -82,7 +83,6 @@ import (
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/utils/clock"
 
 	// RESTStorage installers
@@ -327,7 +327,8 @@ func (c *Config) Complete() CompletedConfig {
 // New returns a new instance of Master from the given config.
 // Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
-//   KubeletClientConfig
+//
+//	KubeletClientConfig
 func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget) (*Instance, error) {
 	if reflect.DeepEqual(c.ExtraConfig.KubeletClientConfig, kubeletclient.KubeletClientConfig{}) {
 		return nil, fmt.Errorf("Master.New() called with empty config.KubeletClientConfig")
@@ -531,9 +532,8 @@ func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generi
 	}
 
 	controllerName := "bootstrap-controller"
-	coreClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	eventsClient := eventsv1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	bootstrapController, err := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient, eventsClient, coreClient.RESTClient())
+	client := kubernetes.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	bootstrapController, err := c.NewBootstrapController(legacyRESTStorage, client)
 	if err != nil {
 		return fmt.Errorf("error creating bootstrap controller: %v", err)
 	}
@@ -603,41 +603,6 @@ func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResource
 	return nil
 }
 
-type nodeAddressProvider struct {
-	nodeClient corev1client.NodeInterface
-}
-
-func (n nodeAddressProvider) externalAddresses() ([]string, error) {
-	preferredAddressTypes := []apiv1.NodeAddressType{
-		apiv1.NodeExternalIP,
-	}
-	nodes, err := n.nodeClient.List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	var matchErr error
-	addrs := []string{}
-	for ix := range nodes.Items {
-		node := &nodes.Items[ix]
-		addr, err := nodeutil.GetPreferredNodeAddress(node, preferredAddressTypes)
-		if err != nil {
-			if _, ok := err.(*nodeutil.NoMatchError); ok {
-				matchErr = err
-				continue
-			}
-			return nil, err
-		}
-		addrs = append(addrs, addr)
-	}
-	if len(addrs) == 0 && matchErr != nil {
-		// We only return an error if we have items.
-		// Currently we return empty list/no error if Items is empty.
-		// We do this for backward compatibility reasons.
-		return nil, matchErr
-	}
-	return addrs, nil
-}
-
 var (
 	// stableAPIGroupVersionsEnabledByDefault is a list of our stable versions.
 	stableAPIGroupVersionsEnabledByDefault = []schema.GroupVersion{
@@ -690,6 +655,8 @@ var (
 	// alphaAPIGroupVersionsDisabledByDefault holds the alpha APIs we have.  They are always disabled by default.
 	alphaAPIGroupVersionsDisabledByDefault = []schema.GroupVersion{
 		apiserverinternalv1alpha1.SchemeGroupVersion,
+		authenticationv1alpha1.SchemeGroupVersion,
+		networkingapiv1alpha1.SchemeGroupVersion,
 		storageapiv1alpha1.SchemeGroupVersion,
 		flowcontrolv1alpha1.SchemeGroupVersion,
 	}

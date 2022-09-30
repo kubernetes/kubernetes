@@ -29,9 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -215,7 +213,9 @@ type WeightedAffinityTerm struct {
 type Diagnosis struct {
 	NodeToStatusMap      NodeToStatusMap
 	UnschedulablePlugins sets.String
-	// PostFilterMsg records the messages returned from PostFilterPlugins.
+	// PreFilterMsg records the messages returned from PreFilter plugins.
+	PreFilterMsg string
+	// PostFilterMsg records the messages returned from PostFilter plugins.
 	PostFilterMsg string
 }
 
@@ -226,10 +226,15 @@ type FitError struct {
 	Diagnosis   Diagnosis
 }
 
-// NoNodeAvailableMsg is used to format message when no nodes available.
-const NoNodeAvailableMsg = "0/%v nodes are available"
+const (
+	// NoNodeAvailableMsg is used to format message when no nodes available.
+	NoNodeAvailableMsg = "0/%v nodes are available"
+	// SeparatorFormat is used to separate PreFilterMsg, FilterMsg and PostFilterMsg.
+	SeparatorFormat = " %v."
+)
 
-// Error returns detailed information of why the pod failed to fit on each node
+// Error returns detailed information of why the pod failed to fit on each node.
+// A message format is "0/X nodes are available: <PreFilterMsg>. <FilterMsg>. <PostFilterMsg>."
 func (f *FitError) Error() string {
 	reasons := make(map[string]int)
 	for _, status := range f.Diagnosis.NodeToStatusMap {
@@ -238,6 +243,12 @@ func (f *FitError) Error() string {
 		}
 	}
 
+	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+":", f.NumAllNodes)
+	// Add the messages from PreFilter plugins to reasonMsg.
+	preFilterMsg := f.Diagnosis.PreFilterMsg
+	if preFilterMsg != "" {
+		reasonMsg += fmt.Sprintf(SeparatorFormat, preFilterMsg)
+	}
 	sortReasonsHistogram := func() []string {
 		var reasonStrings []string
 		for k, v := range reasons {
@@ -246,10 +257,14 @@ func (f *FitError) Error() string {
 		sort.Strings(reasonStrings)
 		return reasonStrings
 	}
-	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+": %v.", f.NumAllNodes, strings.Join(sortReasonsHistogram(), ", "))
+	sortedFilterMsg := sortReasonsHistogram()
+	if len(sortedFilterMsg) != 0 {
+		reasonMsg += fmt.Sprintf(SeparatorFormat, strings.Join(sortedFilterMsg, ", "))
+	}
+	// Add the messages from PostFilter plugins to reasonMsg.
 	postFilterMsg := f.Diagnosis.PostFilterMsg
 	if postFilterMsg != "" {
-		reasonMsg += " " + postFilterMsg
+		reasonMsg += fmt.Sprintf(SeparatorFormat, postFilterMsg)
 	}
 	return reasonMsg
 }
@@ -444,10 +459,7 @@ func (r *Resource) Add(rl v1.ResourceList) {
 		case v1.ResourcePods:
 			r.AllowedPodNumber += int(rQuant.Value())
 		case v1.ResourceEphemeralStorage:
-			if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-				// if the local storage capacity isolation feature gate is disabled, pods request 0 disk.
-				r.EphemeralStorage += rQuant.Value()
-			}
+			r.EphemeralStorage += rQuant.Value()
 		default:
 			if schedutil.IsScalarResourceName(rName) {
 				r.AddScalar(rName, rQuant.Value())
@@ -500,9 +512,7 @@ func (r *Resource) SetMaxResource(rl v1.ResourceList) {
 		case v1.ResourceCPU:
 			r.MilliCPU = max(r.MilliCPU, rQuantity.MilliValue())
 		case v1.ResourceEphemeralStorage:
-			if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-				r.EphemeralStorage = max(r.EphemeralStorage, rQuantity.Value())
-			}
+			r.EphemeralStorage = max(r.EphemeralStorage, rQuantity.Value())
 		default:
 			if schedutil.IsScalarResourceName(rName) {
 				r.SetScalar(rName, max(r.ScalarResources[rName], rQuantity.Value()))

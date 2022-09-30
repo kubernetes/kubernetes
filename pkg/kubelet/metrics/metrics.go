@@ -37,6 +37,7 @@ const (
 	PodStartDurationKey                = "pod_start_duration_seconds"
 	CgroupManagerOperationsKey         = "cgroup_manager_duration_seconds"
 	PodWorkerStartDurationKey          = "pod_worker_start_duration_seconds"
+	PodStatusSyncDurationKey           = "pod_status_sync_duration_seconds"
 	PLEGRelistDurationKey              = "pleg_relist_duration_seconds"
 	PLEGDiscardEventsKey               = "pleg_discard_events"
 	PLEGRelistIntervalKey              = "pleg_relist_interval_seconds"
@@ -53,6 +54,7 @@ const (
 	VolumeStatsHealthStatusAbnormalKey = "volume_stats_health_status_abnormal"
 	RunningPodsKey                     = "running_pods"
 	RunningContainersKey               = "running_containers"
+
 	// Metrics keys of remote runtime operations
 	RuntimeOperationsKey         = "runtime_operations_total"
 	RuntimeOperationsDurationKey = "runtime_operations_duration_seconds"
@@ -153,6 +155,18 @@ var (
 			Name:           PodWorkerStartDurationKey,
 			Help:           "Duration in seconds from kubelet seeing a pod to starting a worker.",
 			Buckets:        metrics.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	// PodStatusSyncDuration is a Histogram that tracks the duration (in seconds) in takes from the time a pod
+	// status is generated to the time it is synced with the apiserver. If multiple status changes are generated
+	// on a pod before it is written to the API, the latency is from the first update to the last event.
+	PodStatusSyncDuration = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodStatusSyncDurationKey,
+			Help:           "Duration in seconds to sync a pod status update. Measures time from detection of a change to pod status until the API is successfully updated for that pod, even if multiple intevening changes to pod status occur.",
+			Buckets:        []float64{0.010, 0.050, 0.100, 0.500, 1, 5, 10, 20, 30, 45, 60},
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -496,6 +510,7 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(PodStartDuration)
 		legacyregistry.MustRegister(CgroupManagerDuration)
 		legacyregistry.MustRegister(PodWorkerStartDuration)
+		legacyregistry.MustRegister(PodStatusSyncDuration)
 		legacyregistry.MustRegister(ContainersPerPodCount)
 		legacyregistry.MustRegister(PLEGRelistDuration)
 		legacyregistry.MustRegister(PLEGDiscardEvents)

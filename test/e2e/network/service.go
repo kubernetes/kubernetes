@@ -33,6 +33,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -930,6 +931,93 @@ var _ = common.SIGDescribe("Services", func() {
 		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{})
 	})
 
+	ginkgo.It("should be updated after adding or deleting ports ", func() {
+		serviceName := "edit-port-test"
+		ns := f.Namespace.Name
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
+
+		svc1port := "svc1"
+		ginkgo.By("creating service " + serviceName + " in namespace " + ns)
+		svc, err := jig.CreateTCPService(func(service *v1.Service) {
+			service.Spec.Ports = []v1.ServicePort{
+				{
+					Name:       "portname1",
+					Port:       80,
+					TargetPort: intstr.FromString(svc1port),
+				},
+			}
+		})
+		framework.ExpectNoError(err)
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{})
+
+		podname1 := "pod1"
+		port1 := 100
+		containerPorts1 := []v1.ContainerPort{
+			{
+				Name:          svc1port,
+				ContainerPort: int32(port1),
+			},
+		}
+		createPodOrFail(f, ns, podname1, jig.Labels, containerPorts1, "netexec", "--http-port", strconv.Itoa(port1))
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podname1: {port1}})
+
+		ginkgo.By("Checking if the Service " + serviceName + " forwards traffic to " + podname1)
+		execPod := e2epod.CreateExecPodOrFail(cs, ns, "execpod", nil)
+		err = jig.CheckServiceReachability(svc, execPod)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Adding a new port to service " + serviceName)
+		svc2port := "svc2"
+		svc, err = jig.UpdateService(func(s *v1.Service) {
+			s.Spec.Ports = []v1.ServicePort{
+				{
+					Name:       "portname1",
+					Port:       80,
+					TargetPort: intstr.FromString(svc1port),
+				},
+				{
+					Name:       "portname2",
+					Port:       81,
+					TargetPort: intstr.FromString(svc2port),
+				},
+			}
+		})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Adding a new endpoint to the new port ")
+		podname2 := "pod2"
+		port2 := 101
+		containerPorts2 := []v1.ContainerPort{
+			{
+				Name:          svc2port,
+				ContainerPort: int32(port2),
+			},
+		}
+		createPodOrFail(f, ns, podname2, jig.Labels, containerPorts2, "netexec", "--http-port", strconv.Itoa(port2))
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podname1: {port1}, podname2: {port2}})
+
+		ginkgo.By("Checking if the Service forwards traffic to " + podname1 + " and " + podname2)
+		err = jig.CheckServiceReachability(svc, execPod)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Deleting a port from service " + serviceName)
+		svc, err = jig.UpdateService(func(s *v1.Service) {
+			s.Spec.Ports = []v1.ServicePort{
+				{
+					Name:       "portname1",
+					Port:       80,
+					TargetPort: intstr.FromString(svc1port),
+				},
+			}
+		})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Checking if the Service forwards traffic to " + podname1 + " and not forwards to " + podname2)
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podname1: {port1}})
+		err = jig.CheckServiceReachability(svc, execPod)
+		framework.ExpectNoError(err)
+	})
+
 	ginkgo.It("should preserve source pod IP for traffic thru service cluster IP [LinuxOnly]", func() {
 		// this test is creating a pod with HostNetwork=true, which is not supported on Windows.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
@@ -1086,6 +1174,44 @@ var _ = common.SIGDescribe("Services", func() {
 
 		ginkgo.By("verifying service " + svc3 + " is up")
 		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames3, svc3IP, servicePort))
+	})
+
+	ginkgo.It("should work after the service has been recreated", func() {
+		serviceName := "service-deletion"
+		ns := f.Namespace.Name
+		numPods, servicePort := 1, defaultServeHostnameServicePort
+
+		ginkgo.By("creating the service " + serviceName + " in namespace " + ns)
+		defer func() {
+			framework.ExpectNoError(StopServeHostnameService(f.ClientSet, ns, serviceName))
+		}()
+		podNames, svcIP, _ := StartServeHostnameService(cs, getServeHostnameService(serviceName), ns, numPods)
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames, svcIP, servicePort))
+
+		ginkgo.By("deleting the service " + serviceName + " in namespace " + ns)
+		err := cs.CoreV1().Services(ns).Delete(context.TODO(), serviceName, metav1.DeleteOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Waiting for the service " + serviceName + " in namespace " + ns + " to disappear")
+		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.RespondingTimeout, func() (bool, error) {
+			_, err := cs.CoreV1().Services(ns).Get(context.TODO(), serviceName, metav1.GetOptions{})
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					framework.Logf("Service %s/%s is gone.", ns, serviceName)
+					return true, nil
+				}
+				return false, err
+			}
+			framework.Logf("Service %s/%s still exists", ns, serviceName)
+			return false, nil
+		}); pollErr != nil {
+			framework.Failf("Failed to wait for service to disappear: %v", pollErr)
+		}
+
+		ginkgo.By("recreating the service " + serviceName + " in namespace " + ns)
+		svc, err := cs.CoreV1().Services(ns).Create(context.TODO(), getServeHostnameService(serviceName), metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames, svc.Spec.ClusterIP, servicePort))
 	})
 
 	ginkgo.It("should work after restarting kube-proxy [Disruptive]", func() {
@@ -2321,7 +2447,7 @@ var _ = common.SIGDescribe("Services", func() {
 		// Create a pod in one node to get evicted
 		ginkgo.By("creating a client pod that is going to be evicted for the service " + serviceName)
 		evictedPod := e2epod.NewAgnhostPod(namespace, "evicted-pod", nil, nil, nil)
-		evictedPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "sleep 10; fallocate -l 10M file; sleep 10000"}
+		evictedPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "sleep 10; dd if=/dev/zero of=file bs=1M count=10; sleep 10000"}
 		evictedPod.Spec.Containers[0].Name = "evicted-pod"
 		evictedPod.Spec.Containers[0].Resources = v1.ResourceRequirements{
 			Limits: v1.ResourceList{"ephemeral-storage": resource.MustParse("5Mi")},
@@ -3628,7 +3754,7 @@ var _ = common.SIGDescribe("Services", func() {
 })
 
 // execAffinityTestForSessionAffinityTimeout is a helper function that wrap the logic of
-// affinity test for non-load-balancer services. Session afinity will be
+// affinity test for non-load-balancer services. Session affinity will be
 // enabled when the service is created and a short timeout will be configured so
 // session affinity must change after the timeout expirese.
 func execAffinityTestForSessionAffinityTimeout(f *framework.Framework, cs clientset.Interface, svc *v1.Service) {
@@ -3727,7 +3853,7 @@ func execAffinityTestForNonLBService(f *framework.Framework, cs clientset.Interf
 }
 
 // execAffinityTestForNonLBServiceWithOptionalTransition is a helper function that wrap the logic of
-// affinity test for non-load-balancer services. Session afinity will be
+// affinity test for non-load-balancer services. Session affinity will be
 // enabled when the service is created. If parameter isTransitionTest is true,
 // session affinity will be switched off/on and test if the service converges
 // to a stable affinity state.

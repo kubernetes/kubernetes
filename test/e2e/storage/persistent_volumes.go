@@ -60,7 +60,8 @@ func completeTest(f *framework.Framework, c clientset.Interface, ns string, pv *
 // PV. Ensure each step succeeds.
 // Note: the PV is deleted in the AfterEach, not here.
 // Note: this func is serialized, we wait for each pod to be deleted before creating the
-//   next pod. Adding concurrency is a TODO item.
+//
+//	next pod. Adding concurrency is a TODO item.
 func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string, pvols e2epv.PVMap, claims e2epv.PVCMap, expectPhase v1.PersistentVolumePhase) error {
 	var err error
 
@@ -442,7 +443,8 @@ func makeStatefulSetWithPVCs(ns, cmd string, mounts []v1.VolumeMount, claims []v
 
 // createWaitAndDeletePod creates the test pod, wait for (hopefully) success, and then delete the pod.
 // Note: need named return value so that the err assignment in the defer sets the returned error.
-//       Has been shown to be necessary using Go 1.7.
+//
+//	Has been shown to be necessary using Go 1.7.
 func createWaitAndDeletePod(c clientset.Interface, t *framework.TimeoutContext, ns string, pvc *v1.PersistentVolumeClaim, command string) (err error) {
 	framework.Logf("Creating nfs test pod")
 	pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, command)

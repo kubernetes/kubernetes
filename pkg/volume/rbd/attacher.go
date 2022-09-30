@@ -199,11 +199,12 @@ var _ volume.DeviceUnmounter = &rbdDetacher{}
 // mount of the RBD image. This is called once all bind mounts have been
 // unmounted.
 // Internally, it does four things:
-//  - Unmount device from deviceMountPath.
-//  - Detach device from the node.
-//  - Remove lock if found. (No need to check volume readonly or not, because
-//  device is not on the node anymore, it's safe to remove lock.)
-//  - Remove the deviceMountPath at last.
+//   - Unmount device from deviceMountPath.
+//   - Detach device from the node.
+//   - Remove lock if found. (No need to check volume readonly or not, because
+//     device is not on the node anymore, it's safe to remove lock.)
+//   - Remove the deviceMountPath at last.
+//
 // This method is idempotent, callers are responsible for retrying on failure.
 func (detacher *rbdDetacher) UnmountDevice(deviceMountPath string) error {
 	if pathExists, pathErr := mount.PathExists(deviceMountPath); pathErr != nil {

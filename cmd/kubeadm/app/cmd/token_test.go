@@ -35,6 +35,7 @@ import (
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	outputapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha2"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
@@ -264,7 +265,7 @@ func TestNewCmdToken(t *testing.T) {
 	}
 }
 
-func TestGetClientset(t *testing.T) {
+func TestGetClientSet(t *testing.T) {
 	testConfigTokenFile := "test-config-file"
 
 	tmpDir, err := os.MkdirTemp("", "kubeadm-token-test")
@@ -275,13 +276,13 @@ func TestGetClientset(t *testing.T) {
 	fullPath := filepath.Join(tmpDir, testConfigTokenFile)
 
 	// test dryRun = false on a non-exisiting file
-	if _, err = getClientset(fullPath, false); err == nil {
-		t.Errorf("getClientset(); dry-run: false; did no fail for test file %q: %v", fullPath, err)
+	if _, err = cmdutil.GetClientSet(fullPath, false); err == nil {
+		t.Errorf("GetClientSet(); dry-run: false; did no fail for test file %q: %v", fullPath, err)
 	}
 
 	// test dryRun = true on a non-exisiting file
-	if _, err = getClientset(fullPath, true); err == nil {
-		t.Errorf("getClientset(); dry-run: true; did no fail for test file %q: %v", fullPath, err)
+	if _, err = cmdutil.GetClientSet(fullPath, true); err == nil {
+		t.Errorf("GetClientSet(); dry-run: true; did no fail for test file %q: %v", fullPath, err)
 	}
 
 	f, err := os.Create(fullPath)
@@ -295,8 +296,8 @@ func TestGetClientset(t *testing.T) {
 	}
 
 	// test dryRun = true on an exisiting file
-	if _, err = getClientset(fullPath, true); err != nil {
-		t.Errorf("getClientset(); dry-run: true; failed for test file %q: %v", fullPath, err)
+	if _, err = cmdutil.GetClientSet(fullPath, true); err != nil {
+		t.Errorf("GetClientSet(); dry-run: true; failed for test file %q: %v", fullPath, err)
 	}
 }
 
@@ -320,9 +321,9 @@ func TestRunDeleteTokens(t *testing.T) {
 		t.Errorf("Unable to write test file %q: %v", fullPath, err)
 	}
 
-	client, err := getClientset(fullPath, true)
+	client, err := cmdutil.GetClientSet(fullPath, true)
 	if err != nil {
-		t.Errorf("Unable to run getClientset() for test file %q: %v", fullPath, err)
+		t.Errorf("Unable to run GetClientSet() for test file %q: %v", fullPath, err)
 	}
 
 	// test valid; should not fail

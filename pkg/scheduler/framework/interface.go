@@ -250,6 +250,9 @@ func NewStatus(code Code, reasons ...string) *Status {
 
 // AsStatus wraps an error in a Status.
 func AsStatus(err error) *Status {
+	if err == nil {
+		return nil
+	}
 	return &Status{
 		code:    Error,
 		reasons: []string{err.Error()},
@@ -641,11 +644,11 @@ func (p *PreFilterResult) Merge(in *PreFilterResult) *PreFilterResult {
 
 	r := PreFilterResult{}
 	if p.AllNodes() {
-		r.NodeNames = sets.NewString(in.NodeNames.UnsortedList()...)
+		r.NodeNames = in.NodeNames.Clone()
 		return &r
 	}
 	if in.AllNodes() {
-		r.NodeNames = sets.NewString(p.NodeNames.UnsortedList()...)
+		r.NodeNames = p.NodeNames.Clone()
 		return &r
 	}
 

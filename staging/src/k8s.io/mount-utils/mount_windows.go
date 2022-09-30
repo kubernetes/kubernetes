@@ -249,6 +249,15 @@ func (mounter *Mounter) canSafelySkipMountPointCheck() bool {
 	return false
 }
 
+// IsMountPoint: determines if a directory is a mountpoint.
+func (mounter *Mounter) IsMountPoint(file string) (bool, error) {
+	isNotMnt, err := mounter.IsLikelyNotMountPoint(file)
+	if err != nil {
+		return false, err
+	}
+	return !isNotMnt, nil
+}
+
 // GetMountRefs : empty implementation here since there is no place to query all mount points on Windows
 func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
 	windowsPath := NormalizeWindowsPath(pathname)

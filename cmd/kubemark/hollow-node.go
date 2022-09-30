@@ -26,6 +26,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/klog/v2"
 
@@ -246,7 +247,7 @@ func run(cmd *cobra.Command, config *hollowNodeConfig) error {
 			return fmt.Errorf("Failed to start fake runtime, error: %w", err)
 		}
 		defer fakeRemoteRuntime.Stop()
-		runtimeService, err := remote.NewRemoteRuntimeService(endpoint, 15*time.Second)
+		runtimeService, err := remote.NewRemoteRuntimeService(endpoint, 15*time.Second, oteltrace.NewNoopTracerProvider())
 		if err != nil {
 			return fmt.Errorf("Failed to init runtime service, error: %w", err)
 		}

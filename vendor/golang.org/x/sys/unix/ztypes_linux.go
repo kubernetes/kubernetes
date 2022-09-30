@@ -754,6 +754,25 @@ const (
 	AT_SYMLINK_NOFOLLOW = 0x100
 
 	AT_EACCESS = 0x200
+
+	OPEN_TREE_CLONE = 0x1
+
+	MOVE_MOUNT_F_SYMLINKS   = 0x1
+	MOVE_MOUNT_F_AUTOMOUNTS = 0x2
+	MOVE_MOUNT_F_EMPTY_PATH = 0x4
+	MOVE_MOUNT_T_SYMLINKS   = 0x10
+	MOVE_MOUNT_T_AUTOMOUNTS = 0x20
+	MOVE_MOUNT_T_EMPTY_PATH = 0x40
+	MOVE_MOUNT_SET_GROUP    = 0x100
+
+	FSOPEN_CLOEXEC = 0x1
+
+	FSPICK_CLOEXEC          = 0x1
+	FSPICK_SYMLINK_NOFOLLOW = 0x2
+	FSPICK_NO_AUTOMOUNT     = 0x4
+	FSPICK_EMPTY_PATH       = 0x8
+
+	FSMOUNT_CLOEXEC = 0x1
 )
 
 type OpenHow struct {
@@ -1108,7 +1127,9 @@ const (
 	PERF_BR_SYSRET                        = 0x8
 	PERF_BR_COND_CALL                     = 0x9
 	PERF_BR_COND_RET                      = 0xa
-	PERF_BR_MAX                           = 0xb
+	PERF_BR_ERET                          = 0xb
+	PERF_BR_IRQ                           = 0xc
+	PERF_BR_MAX                           = 0xd
 	PERF_SAMPLE_REGS_ABI_NONE             = 0x0
 	PERF_SAMPLE_REGS_ABI_32               = 0x1
 	PERF_SAMPLE_REGS_ABI_64               = 0x2
@@ -2950,7 +2971,7 @@ const (
 	DEVLINK_CMD_TRAP_POLICER_NEW                       = 0x47
 	DEVLINK_CMD_TRAP_POLICER_DEL                       = 0x48
 	DEVLINK_CMD_HEALTH_REPORTER_TEST                   = 0x49
-	DEVLINK_CMD_MAX                                    = 0x4d
+	DEVLINK_CMD_MAX                                    = 0x51
 	DEVLINK_PORT_TYPE_NOTSET                           = 0x0
 	DEVLINK_PORT_TYPE_AUTO                             = 0x1
 	DEVLINK_PORT_TYPE_ETH                              = 0x2
@@ -3179,7 +3200,7 @@ const (
 	DEVLINK_ATTR_RATE_NODE_NAME                        = 0xa8
 	DEVLINK_ATTR_RATE_PARENT_NODE_NAME                 = 0xa9
 	DEVLINK_ATTR_REGION_MAX_SNAPSHOTS                  = 0xaa
-	DEVLINK_ATTR_MAX                                   = 0xaa
+	DEVLINK_ATTR_MAX                                   = 0xae
 	DEVLINK_DPIPE_FIELD_MAPPING_TYPE_NONE              = 0x0
 	DEVLINK_DPIPE_FIELD_MAPPING_TYPE_IFINDEX           = 0x1
 	DEVLINK_DPIPE_MATCH_TYPE_FIELD_EXACT               = 0x0
@@ -3619,7 +3640,11 @@ const (
 	ETHTOOL_A_RINGS_RX_MINI                   = 0x7
 	ETHTOOL_A_RINGS_RX_JUMBO                  = 0x8
 	ETHTOOL_A_RINGS_TX                        = 0x9
-	ETHTOOL_A_RINGS_MAX                       = 0x9
+	ETHTOOL_A_RINGS_RX_BUF_LEN                = 0xa
+	ETHTOOL_A_RINGS_TCP_DATA_SPLIT            = 0xb
+	ETHTOOL_A_RINGS_CQE_SIZE                  = 0xc
+	ETHTOOL_A_RINGS_TX_PUSH                   = 0xd
+	ETHTOOL_A_RINGS_MAX                       = 0xd
 	ETHTOOL_A_CHANNELS_UNSPEC                 = 0x0
 	ETHTOOL_A_CHANNELS_HEADER                 = 0x1
 	ETHTOOL_A_CHANNELS_RX_MAX                 = 0x2
@@ -4304,7 +4329,7 @@ const (
 	NL80211_ATTR_MAC_HINT                                   = 0xc8
 	NL80211_ATTR_MAC_MASK                                   = 0xd7
 	NL80211_ATTR_MAX_AP_ASSOC_STA                           = 0xca
-	NL80211_ATTR_MAX                                        = 0x133
+	NL80211_ATTR_MAX                                        = 0x137
 	NL80211_ATTR_MAX_CRIT_PROT_DURATION                     = 0xb4
 	NL80211_ATTR_MAX_CSA_COUNTERS                           = 0xce
 	NL80211_ATTR_MAX_MATCH_SETS                             = 0x85
@@ -4530,7 +4555,7 @@ const (
 	NL80211_BAND_IFTYPE_ATTR_HE_CAP_PHY                     = 0x3
 	NL80211_BAND_IFTYPE_ATTR_HE_CAP_PPE                     = 0x5
 	NL80211_BAND_IFTYPE_ATTR_IFTYPES                        = 0x1
-	NL80211_BAND_IFTYPE_ATTR_MAX                            = 0x7
+	NL80211_BAND_IFTYPE_ATTR_MAX                            = 0xb
 	NL80211_BAND_S1GHZ                                      = 0x4
 	NL80211_BITRATE_ATTR_2GHZ_SHORTPREAMBLE                 = 0x2
 	NL80211_BITRATE_ATTR_MAX                                = 0x2
@@ -4645,7 +4670,7 @@ const (
 	NL80211_CMD_LEAVE_IBSS                                  = 0x2c
 	NL80211_CMD_LEAVE_MESH                                  = 0x45
 	NL80211_CMD_LEAVE_OCB                                   = 0x6d
-	NL80211_CMD_MAX                                         = 0x92
+	NL80211_CMD_MAX                                         = 0x93
 	NL80211_CMD_MICHAEL_MIC_FAILURE                         = 0x29
 	NL80211_CMD_NAN_MATCH                                   = 0x78
 	NL80211_CMD_NEW_BEACON                                  = 0xf
@@ -4868,7 +4893,7 @@ const (
 	NL80211_FREQUENCY_ATTR_GO_CONCURRENT                    = 0xf
 	NL80211_FREQUENCY_ATTR_INDOOR_ONLY                      = 0xe
 	NL80211_FREQUENCY_ATTR_IR_CONCURRENT                    = 0xf
-	NL80211_FREQUENCY_ATTR_MAX                              = 0x19
+	NL80211_FREQUENCY_ATTR_MAX                              = 0x1b
 	NL80211_FREQUENCY_ATTR_MAX_TX_POWER                     = 0x6
 	NL80211_FREQUENCY_ATTR_NO_10MHZ                         = 0x11
 	NL80211_FREQUENCY_ATTR_NO_160MHZ                        = 0xc
@@ -5235,7 +5260,7 @@ const (
 	NL80211_RATE_INFO_HE_RU_ALLOC_52                        = 0x1
 	NL80211_RATE_INFO_HE_RU_ALLOC_996                       = 0x5
 	NL80211_RATE_INFO_HE_RU_ALLOC                           = 0x11
-	NL80211_RATE_INFO_MAX                                   = 0x11
+	NL80211_RATE_INFO_MAX                                   = 0x16
 	NL80211_RATE_INFO_MCS                                   = 0x2
 	NL80211_RATE_INFO_SHORT_GI                              = 0x4
 	NL80211_RATE_INFO_VHT_MCS                               = 0x6
@@ -5531,4 +5556,46 @@ const (
 	NL80211_WPA_VERSION_1                                   = 0x1
 	NL80211_WPA_VERSION_2                                   = 0x2
 	NL80211_WPA_VERSION_3                                   = 0x4
+)
+
+const (
+	FRA_UNSPEC             = 0x0
+	FRA_DST                = 0x1
+	FRA_SRC                = 0x2
+	FRA_IIFNAME            = 0x3
+	FRA_GOTO               = 0x4
+	FRA_UNUSED2            = 0x5
+	FRA_PRIORITY           = 0x6
+	FRA_UNUSED3            = 0x7
+	FRA_UNUSED4            = 0x8
+	FRA_UNUSED5            = 0x9
+	FRA_FWMARK             = 0xa
+	FRA_FLOW               = 0xb
+	FRA_TUN_ID             = 0xc
+	FRA_SUPPRESS_IFGROUP   = 0xd
+	FRA_SUPPRESS_PREFIXLEN = 0xe
+	FRA_TABLE              = 0xf
+	FRA_FWMASK             = 0x10
+	FRA_OIFNAME            = 0x11
+	FRA_PAD                = 0x12
+	FRA_L3MDEV             = 0x13
+	FRA_UID_RANGE          = 0x14
+	FRA_PROTOCOL           = 0x15
+	FRA_IP_PROTO           = 0x16
+	FRA_SPORT_RANGE        = 0x17
+	FRA_DPORT_RANGE        = 0x18
+	FR_ACT_UNSPEC          = 0x0
+	FR_ACT_TO_TBL          = 0x1
+	FR_ACT_GOTO            = 0x2
+	FR_ACT_NOP             = 0x3
+	FR_ACT_RES3            = 0x4
+	FR_ACT_RES4            = 0x5
+	FR_ACT_BLACKHOLE       = 0x6
+	FR_ACT_UNREACHABLE     = 0x7
+	FR_ACT_PROHIBIT        = 0x8
+)
+
+const (
+	AUDIT_NLGRP_NONE    = 0x0
+	AUDIT_NLGRP_READLOG = 0x1
 )

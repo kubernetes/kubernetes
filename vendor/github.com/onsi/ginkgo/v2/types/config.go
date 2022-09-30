@@ -28,8 +28,11 @@ type SuiteConfig struct {
 	FlakeAttempts         int
 	EmitSpecProgress      bool
 	DryRun                bool
+	PollProgressAfter     time.Duration
+	PollProgressInterval  time.Duration
 	Timeout               time.Duration
 	OutputInterceptorMode string
+	SourceRoots           []string
 
 	ParallelProcess int
 	ParallelTotal   int
@@ -272,6 +275,12 @@ var SuiteConfigFlags = GinkgoFlags{
 		Usage: "If set, ginkgo will walk the test hierarchy without actually running anything.  Best paired with -v."},
 	{KeyPath: "S.EmitSpecProgress", Name: "progress", SectionKey: "debug",
 		Usage: "If set, ginkgo will emit progress information as each spec runs to the GinkgoWriter."},
+	{KeyPath: "S.PollProgressAfter", Name: "poll-progress-after", SectionKey: "debug", UsageDefaultValue: "0",
+		Usage: "Emit node progress reports periodically if node hasn't completed after this duration."},
+	{KeyPath: "S.PollProgressInterval", Name: "poll-progress-interval", SectionKey: "debug", UsageDefaultValue: "10s",
+		Usage: "The rate at which to emit node progress reports after poll-progress-after has elapsed."},
+	{KeyPath: "S.SourceRoots", Name: "source-root", SectionKey: "debug",
+		Usage: "The location to look for source code when generating progress reports.  You can pass multiple --source-root flags."},
 	{KeyPath: "S.Timeout", Name: "timeout", SectionKey: "debug", UsageDefaultValue: "1h",
 		Usage: "Test suite fails if it does not complete within the specified timeout."},
 	{KeyPath: "S.OutputInterceptorMode", Name: "output-interceptor-mode", SectionKey: "debug", UsageArgument: "dup, swap, or none",

@@ -37,9 +37,9 @@ import (
 	"testing"
 	"time"
 
-	restful "github.com/emicklei/go-restful/v3"
+	"github.com/emicklei/go-restful/v3"
 
-	fuzzer "k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
+	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -2839,7 +2839,7 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if res.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected response: %s %#v", request.URL, res)
+		t.Errorf("unexpected response: %s %#v", request.URL, res)
 		s, err := ioutil.ReadAll(res.Body)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -3223,7 +3223,7 @@ func TestCreateNotFound(t *testing.T) {
 	handler := handle(map[string]rest.Storage{
 		"simple": &SimpleRESTStorage{
 			// storage.Create can fail with not found error in theory.
-			// See http://pr.k8s.io/486#discussion_r15037092.
+			// See https://pr.k8s.io/486#discussion_r15037092.
 			errors: map[string]error{"create": apierrors.NewNotFound(schema.GroupResource{Resource: "simples"}, "id")},
 		},
 	})
@@ -4001,16 +4001,6 @@ func runRequest(t testing.TB, path, verb string, data []byte, contentType string
 	return response
 }
 
-// encodeOrFatal is used by TestDryRun to parse an object and stop right
-// away if it fails.
-func encodeOrFatal(t *testing.T, obj runtime.Object) []byte {
-	data, err := runtime.Encode(testCodec, obj)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	return data
-}
-
 type SimpleRESTStorageWithDeleteCollection struct {
 	SimpleRESTStorage
 }
@@ -4269,57 +4259,6 @@ other: bar`)
 				}
 			}
 		})
-	}
-}
-
-func TestDryRunDisabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DryRun, false)()
-
-	tests := []struct {
-		path        string
-		verb        string
-		data        []byte
-		contentType string
-	}{
-		{path: "/namespaces/default/simples", verb: "POST", data: encodeOrFatal(t, &genericapitesting.Simple{Other: "bar"})},
-		{path: "/namespaces/default/simples/id", verb: "PUT", data: encodeOrFatal(t, &genericapitesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: "id"}, Other: "bar"})},
-		{path: "/namespaces/default/simples/id", verb: "PATCH", data: []byte(`{"labels":{"foo":"bar"}}`), contentType: "application/merge-patch+json; charset=UTF-8"},
-		{path: "/namespaces/default/simples/id", verb: "DELETE"},
-		{path: "/namespaces/default/simples", verb: "DELETE"},
-		{path: "/namespaces/default/simples/id/subsimple", verb: "DELETE"},
-	}
-
-	server := httptest.NewServer(handle(map[string]rest.Storage{
-		"simples": &SimpleRESTStorageWithDeleteCollection{
-			SimpleRESTStorage{
-				item: genericapitesting.Simple{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "id",
-						Namespace: "",
-						UID:       "uid",
-					},
-					Other: "bar",
-				},
-			},
-		},
-		"simples/subsimple": &SimpleXGSubresourceRESTStorage{
-			item: genericapitesting.SimpleXGSubresource{
-				SubresourceInfo: "foo",
-			},
-			itemGVK: testGroup2Version.WithKind("SimpleXGSubresource"),
-		},
-	}))
-	defer server.Close()
-	for _, test := range tests {
-		baseURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
-		response := runRequest(t, baseURL+test.path, test.verb, test.data, test.contentType)
-		if response.StatusCode == http.StatusBadRequest {
-			t.Fatalf("unexpected BadRequest: %#v", response)
-		}
-		response = runRequest(t, baseURL+test.path+"?dryRun", test.verb, test.data, test.contentType)
-		if response.StatusCode != http.StatusBadRequest {
-			t.Fatalf("unexpected non BadRequest: %#v", response)
-		}
 	}
 }
 

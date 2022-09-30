@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -51,29 +52,6 @@ func NewFromClient(kubeClient clientset.Interface, terminatedPodThreshold int) (
 	return controller, podInformer, nodeInformer
 }
 
-func compareStringSetToList(set sets.String, list []string) bool {
-	for _, item := range list {
-		if !set.Has(item) {
-			return false
-		}
-	}
-	if len(list) != len(set) {
-		return false
-	}
-	return true
-}
-
-func getDeletedPodNames(client *fake.Clientset) []string {
-	deletedPodNames := make([]string, 0)
-	for _, action := range client.Actions() {
-		if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
-			deleteAction := action.(clienttesting.DeleteAction)
-			deletedPodNames = append(deletedPodNames, deleteAction.GetName())
-		}
-	}
-	return deletedPodNames
-}
-
 func TestGCTerminated(t *testing.T) {
 	type nameToPhase struct {
 		name  string
@@ -81,11 +59,25 @@ func TestGCTerminated(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name            string
-		pods            []nameToPhase
-		threshold       int
-		deletedPodNames sets.String
+		name                          string
+		pods                          []nameToPhase
+		threshold                     int
+		deletedPodNames               sets.String
+		patchedPodNames               sets.String
+		enablePodDisruptionConditions bool
 	}{
+		{
+			name: "delete pod a which is PodFailed and pod b which is PodSucceeded; PodDisruptionConditions enabled",
+			pods: []nameToPhase{
+				{name: "a", phase: v1.PodFailed},
+				{name: "b", phase: v1.PodSucceeded},
+				{name: "c", phase: v1.PodFailed},
+			},
+			threshold:                     1,
+			patchedPodNames:               sets.NewString(),
+			deletedPodNames:               sets.NewString("a", "b"),
+			enablePodDisruptionConditions: true,
+		},
 		{
 			name: "threshold = 0, disables terminated pod deletion",
 			pods: []nameToPhase{
@@ -136,29 +128,30 @@ func TestGCTerminated(t *testing.T) {
 		},
 	}
 
-	for i, test := range testCases {
+	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			client := fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*testutil.NewNode("node")}})
-			gcc, podInformer, _ := NewFromClient(client, test.threshold)
-
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
 			creationTime := time.Unix(0, 0)
+			nodes := []*v1.Node{testutil.NewNode("node")}
+
+			pods := make([]*v1.Pod, 0, len(test.pods))
 			for _, pod := range test.pods {
 				creationTime = creationTime.Add(1 * time.Hour)
-				podInformer.Informer().GetStore().Add(&v1.Pod{
+				pods = append(pods, &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime}},
 					Status:     v1.PodStatus{Phase: pod.phase},
 					Spec:       v1.PodSpec{NodeName: "node"},
 				})
 			}
+			client := setupNewSimpleClient(nodes, pods)
+			gcc, podInformer, _ := NewFromClient(client, test.threshold)
+			for _, pod := range pods {
+				podInformer.Informer().GetStore().Add(pod)
+			}
 
 			gcc.gc(context.TODO())
 
-			deletedPodNames := getDeletedPodNames(client)
-
-			if pass := compareStringSetToList(test.deletedPodNames, deletedPodNames); !pass {
-				t.Errorf("[%v]pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v",
-					i, test.deletedPodNames.List(), deletedPodNames)
-			}
+			verifyDeletedAndPatchedPods(t, client, test.deletedPodNames, test.patchedPodNames)
 		})
 	}
 }
@@ -185,17 +178,19 @@ func waitForAdded(q workqueue.DelayingInterface, depth int) error {
 
 func TestGCOrphaned(t *testing.T) {
 	testCases := []struct {
-		name                 string
-		initialClientNodes   []*v1.Node
-		initialInformerNodes []*v1.Node
-		delay                time.Duration
-		addedClientNodes     []*v1.Node
-		deletedClientNodes   []*v1.Node
-		addedInformerNodes   []*v1.Node
-		deletedInformerNodes []*v1.Node
-		pods                 []*v1.Pod
-		itemsInQueue         int
-		deletedPodNames      sets.String
+		name                          string
+		initialClientNodes            []*v1.Node
+		initialInformerNodes          []*v1.Node
+		delay                         time.Duration
+		addedClientNodes              []*v1.Node
+		deletedClientNodes            []*v1.Node
+		addedInformerNodes            []*v1.Node
+		deletedInformerNodes          []*v1.Node
+		pods                          []*v1.Pod
+		itemsInQueue                  int
+		deletedPodNames               sets.String
+		patchedPodNames               sets.String
+		enablePodDisruptionConditions bool
 	}{
 		{
 			name: "nodes present in lister",
@@ -236,6 +231,18 @@ func TestGCOrphaned(t *testing.T) {
 			},
 			itemsInQueue:    1,
 			deletedPodNames: sets.NewString("a", "b"),
+		},
+		{
+			name:  "no nodes with PodDisruptionConditions enabled",
+			delay: 2 * quarantineTime,
+			pods: []*v1.Pod{
+				makePod("a", "deleted", v1.PodFailed),
+				makePod("b", "deleted", v1.PodSucceeded),
+			},
+			itemsInQueue:                  1,
+			deletedPodNames:               sets.NewString("a", "b"),
+			patchedPodNames:               sets.NewString("a", "b"),
+			enablePodDisruptionConditions: true,
 		},
 		{
 			name:  "quarantine not finished",
@@ -317,11 +324,16 @@ func TestGCOrphaned(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			nodeList := &v1.NodeList{}
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
+			nodes := make([]*v1.Node, 0, len(test.initialClientNodes))
 			for _, node := range test.initialClientNodes {
-				nodeList.Items = append(nodeList.Items, *node)
+				nodes = append(nodes, node)
 			}
-			client := fake.NewSimpleClientset(nodeList)
+			pods := make([]*v1.Pod, 0, len(test.pods))
+			for _, pod := range test.pods {
+				pods = append(pods, pod)
+			}
+			client := setupNewSimpleClient(nodes, pods)
 			gcc, podInformer, nodeInformer := NewFromClient(client, -1)
 			for _, node := range test.initialInformerNodes {
 				nodeInformer.Informer().GetStore().Add(node)
@@ -369,12 +381,7 @@ func TestGCOrphaned(t *testing.T) {
 
 			// Actual pod deletion
 			gcc.gc(context.TODO())
-			deletedPodNames = getDeletedPodNames(client)
-
-			if pass := compareStringSetToList(test.deletedPodNames, deletedPodNames); !pass {
-				t.Errorf("pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v",
-					test.deletedPodNames.List(), deletedPodNames)
-			}
+			verifyDeletedAndPatchedPods(t, client, test.deletedPodNames, test.patchedPodNames)
 		})
 	}
 }
@@ -388,10 +395,23 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name            string
-		pods            []nameToPhase
-		deletedPodNames sets.String
+		name                          string
+		pods                          []nameToPhase
+		deletedPodNames               sets.String
+		patchedPodNames               sets.String
+		enablePodDisruptionConditions bool
 	}{
+		{
+			name: "Unscheduled pod in any phase must be deleted, the phase of the running pod is changed to Failed; PodDisruptionConditions enabled",
+			pods: []nameToPhase{
+				{name: "a", phase: v1.PodFailed, deletionTimeStamp: &metav1.Time{}, nodeName: ""},
+				{name: "b", phase: v1.PodSucceeded, deletionTimeStamp: &metav1.Time{}, nodeName: ""},
+				{name: "c", phase: v1.PodRunning, deletionTimeStamp: &metav1.Time{}, nodeName: ""},
+			},
+			deletedPodNames:               sets.NewString("a", "b", "c"),
+			patchedPodNames:               sets.NewString("c"),
+			enablePodDisruptionConditions: true,
+		},
 		{
 			name: "Unscheduled pod in any phase must be deleted",
 			pods: []nameToPhase{
@@ -412,20 +432,27 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 		},
 	}
 
-	for i, test := range testCases {
+	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			client := fake.NewSimpleClientset()
-			gcc, podInformer, _ := NewFromClient(client, -1)
-
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
 			creationTime := time.Unix(0, 0)
+
+			pods := make([]*v1.Pod, 0, len(test.pods))
 			for _, pod := range test.pods {
 				creationTime = creationTime.Add(1 * time.Hour)
-				podInformer.Informer().GetStore().Add(&v1.Pod{
+				pods = append(pods, &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime},
 						DeletionTimestamp: pod.deletionTimeStamp},
 					Status: v1.PodStatus{Phase: pod.phase},
 					Spec:   v1.PodSpec{NodeName: pod.nodeName},
 				})
+			}
+			nodes := []*v1.Node{}
+			client := setupNewSimpleClient(nodes, pods)
+			gcc, podInformer, _ := NewFromClient(client, -1)
+
+			for _, pod := range pods {
+				podInformer.Informer().GetStore().Add(pod)
 			}
 
 			pods, err := podInformer.Lister().List(labels.Everything())
@@ -434,12 +461,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 				return
 			}
 			gcc.gcUnscheduledTerminating(context.TODO(), pods)
-			deletedPodNames := getDeletedPodNames(client)
-
-			if pass := compareStringSetToList(test.deletedPodNames, deletedPodNames); !pass {
-				t.Errorf("[%v]pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v, test: %v",
-					i, test.deletedPodNames.List(), deletedPodNames, test.name)
-			}
+			verifyDeletedAndPatchedPods(t, client, test.deletedPodNames, test.patchedPodNames)
 		})
 	}
 }
@@ -460,10 +482,12 @@ func TestGCTerminating(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name            string
-		pods            []nameToPodConfig
-		nodes           []node
-		deletedPodNames sets.String
+		name                          string
+		pods                          []nameToPodConfig
+		nodes                         []node
+		deletedPodNames               sets.String
+		patchedPodNames               sets.String
+		enablePodDisruptionConditions bool
 	}{
 		{
 			name: "pods have deletion timestamp set and the corresponding nodes are not ready",
@@ -544,16 +568,31 @@ func TestGCTerminating(t *testing.T) {
 			},
 			deletedPodNames: sets.NewString("b1", "b4", "b5", "b6"),
 		},
+		{
+			name: "pods deleted from node tained out-of-service; PodDisruptionConditions enabled",
+			nodes: []node{
+				{name: "worker", readyCondition: v1.ConditionFalse, taints: []v1.Taint{{Key: v1.TaintNodeOutOfService,
+					Effect: v1.TaintEffectNoExecute}}},
+			},
+			pods: []nameToPodConfig{
+				{name: "a", phase: v1.PodRunning, deletionTimeStamp: &metav1.Time{}, nodeName: "worker"},
+				{name: "b", phase: v1.PodFailed, deletionTimeStamp: &metav1.Time{}, nodeName: "worker"},
+				{name: "c", phase: v1.PodSucceeded, deletionTimeStamp: &metav1.Time{}, nodeName: "worker"},
+			},
+			deletedPodNames:               sets.NewString("a", "b", "c"),
+			patchedPodNames:               sets.NewString("a"),
+			enablePodDisruptionConditions: true,
+		},
 	}
-	for i, test := range testCases {
+	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			client := fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*testutil.NewNode("node-a")}})
-			gcc, podInformer, nodeInformer := NewFromClient(client, -1)
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
 
 			creationTime := time.Unix(0, 0)
+			nodes := make([]*v1.Node, 0, len(test.nodes))
 			for _, node := range test.nodes {
 				creationTime = creationTime.Add(2 * time.Hour)
-				nodeInformer.Informer().GetStore().Add(&v1.Node{
+				nodes = append(nodes, &v1.Node{
 					ObjectMeta: metav1.ObjectMeta{Name: node.name, CreationTimestamp: metav1.Time{Time: creationTime}},
 					Spec: v1.NodeSpec{
 						Taints: node.taints,
@@ -568,24 +607,74 @@ func TestGCTerminating(t *testing.T) {
 					},
 				})
 			}
-
+			pods := make([]*v1.Pod, 0, len(test.pods))
 			for _, pod := range test.pods {
 				creationTime = creationTime.Add(1 * time.Hour)
-				podInformer.Informer().GetStore().Add(&v1.Pod{
+				pods = append(pods, &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime},
 						DeletionTimestamp: pod.deletionTimeStamp},
 					Status: v1.PodStatus{Phase: pod.phase},
 					Spec:   v1.PodSpec{NodeName: pod.nodeName},
 				})
 			}
+			client := setupNewSimpleClient(nodes, pods)
+			gcc, podInformer, nodeInformer := NewFromClient(client, -1)
+
+			for _, pod := range pods {
+				podInformer.Informer().GetStore().Add(pod)
+			}
+			for _, node := range nodes {
+				nodeInformer.Informer().GetStore().Add(node)
+			}
 
 			gcc.gc(context.TODO())
-			deletedPodNames := getDeletedPodNames(client)
-
-			if pass := compareStringSetToList(test.deletedPodNames, deletedPodNames); !pass {
-				t.Errorf("[%v]pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v",
-					i, test.deletedPodNames.List(), deletedPodNames)
-			}
+			verifyDeletedAndPatchedPods(t, client, test.deletedPodNames, test.patchedPodNames)
 		})
 	}
+}
+
+func verifyDeletedAndPatchedPods(t *testing.T, client *fake.Clientset, wantDeletedPodNames, wantPatchedPodNames sets.String) {
+	t.Helper()
+	deletedPodNames := getDeletedPodNames(client)
+	if diff := cmp.Diff(wantDeletedPodNames, deletedPodNames); diff != "" {
+		t.Errorf("Deleted pod names (-want,+got):\n%s", diff)
+	}
+	patchedPodNames := getPatchedPodNames(client)
+	if diff := cmp.Diff(wantPatchedPodNames, patchedPodNames); diff != "" {
+		t.Errorf("Patched pod names (-want,+got):\n%s", diff)
+	}
+}
+
+func setupNewSimpleClient(nodes []*v1.Node, pods []*v1.Pod) *fake.Clientset {
+	podList := &v1.PodList{}
+	for _, podItem := range pods {
+		podList.Items = append(podList.Items, *podItem)
+	}
+	nodeList := &v1.NodeList{}
+	for _, nodeItem := range nodes {
+		nodeList.Items = append(nodeList.Items, *nodeItem)
+	}
+	return fake.NewSimpleClientset(nodeList, podList)
+}
+
+func getDeletedPodNames(client *fake.Clientset) sets.String {
+	deletedPodNames := sets.NewString()
+	for _, action := range client.Actions() {
+		if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
+			deleteAction := action.(clienttesting.DeleteAction)
+			deletedPodNames.Insert(deleteAction.GetName())
+		}
+	}
+	return deletedPodNames
+}
+
+func getPatchedPodNames(client *fake.Clientset) sets.String {
+	patchedPodNames := sets.NewString()
+	for _, action := range client.Actions() {
+		if action.GetVerb() == "patch" && action.GetResource().Resource == "pods" {
+			patchAction := action.(clienttesting.PatchAction)
+			patchedPodNames.Insert(patchAction.GetName())
+		}
+	}
+	return patchedPodNames
 }

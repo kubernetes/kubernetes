@@ -86,7 +86,7 @@ fi
 # you are updating the os image versions, update this variable.
 # Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
-GCI_VERSION=${KUBE_GCI_VERSION:-cos-85-13310-1308-1}
+GCI_VERSION=${KUBE_GCI_VERSION:-cos-97-16919-103-16}
 export MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 export MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
 export NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
@@ -549,3 +549,11 @@ export TLS_CIPHER_SUITES=""
 # CLOUD_PROVIDER_FLAG defines the cloud-provider value presented to KCM, apiserver,
 # and kubelet
 export CLOUD_PROVIDER_FLAG="${CLOUD_PROVIDER_FLAG:-gce}"
+
+# When ENABLE_AUTH_PROVIDER_GCP is set, following flags for out-of-tree credential provider for GCP
+# are presented to kubelet:
+# --image-credential-provider-config=${path-to-config}
+# --image-credential-provider-bin-dir=${path-to-auth-provider-binary}
+# Also, it is required that DisableKubeletCloudCredentialProviders and KubeletCredentialProviders
+# feature gates are set to true for kubelet to use external credential provider.
+ENABLE_AUTH_PROVIDER_GCP="${ENABLE_AUTH_PROVIDER_GCP:-false}"

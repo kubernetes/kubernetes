@@ -31,6 +31,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	oteltrace "go.opentelemetry.io/otel/trace"
+
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -125,7 +127,8 @@ cluster's shared state through which all other components interact.`,
 			if errs := completedOptions.Validate(); len(errs) != 0 {
 				return utilerrors.NewAggregate(errs)
 			}
-
+			// add feature enablement metrics
+			utilfeature.DefaultMutableFeatureGate.AddMetrics()
 			return Run(completedOptions, genericapiserver.SetupSignalHandler())
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
@@ -248,16 +251,7 @@ func CreateKubeAPIServerConfig(s completedServerRunOptions) (
 		return nil, nil, nil, err
 	}
 
-	capabilities.Initialize(capabilities.Capabilities{
-		AllowPrivileged: s.AllowPrivileged,
-		// TODO(vmarmol): Implement support for HostNetworkSources.
-		PrivilegedSources: capabilities.PrivilegedSources{
-			HostNetworkSources: []string{},
-			HostPIDSources:     []string{},
-			HostIPCSources:     []string{},
-		},
-		PerConnectionBandwidthLimitBytesPerSec: s.MaxConnectionBytesPerSec,
-	})
+	capabilities.Setup(s.AllowPrivileged, s.MaxConnectionBytesPerSec)
 
 	s.Metrics.Apply()
 	serviceaccount.RegisterMetrics()
@@ -410,15 +404,17 @@ func buildGenericConfig(
 		lastErr = err
 		return
 	}
-	storageFactory, lastErr = completedStorageFactoryConfig.New()
+	storageFactory, lastErr = completedStorageFactoryConfig.New(genericConfig.DrainedNotify())
 	if lastErr != nil {
 		return
 	}
 	if genericConfig.EgressSelector != nil {
 		storageFactory.StorageConfig.Transport.EgressLookup = genericConfig.EgressSelector.Lookup
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) && genericConfig.TracerProvider != nil {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
 		storageFactory.StorageConfig.Transport.TracerProvider = genericConfig.TracerProvider
+	} else {
+		storageFactory.StorageConfig.Transport.TracerProvider = oteltrace.NewNoopTracerProvider()
 	}
 	if lastErr = s.Etcd.ApplyWithStorageFactoryTo(storageFactory, genericConfig); lastErr != nil {
 		return
@@ -637,7 +633,27 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 	return options, nil
 }
 
+var testServiceResolver webhook.ServiceResolver
+
+// SetServiceResolverForTests allows the service resolver to be overridden during tests.
+// Tests using this function must run serially as this function is not safe to call concurrently with server start.
+func SetServiceResolverForTests(resolver webhook.ServiceResolver) func() {
+	if testServiceResolver != nil {
+		panic("test service resolver is set: tests are either running concurrently or clean up was skipped")
+	}
+
+	testServiceResolver = resolver
+
+	return func() {
+		testServiceResolver = nil
+	}
+}
+
 func buildServiceResolver(enabledAggregatorRouting bool, hostname string, informer clientgoinformers.SharedInformerFactory) webhook.ServiceResolver {
+	if testServiceResolver != nil {
+		return testServiceResolver
+	}
+
 	var serviceResolver webhook.ServiceResolver
 	if enabledAggregatorRouting {
 		serviceResolver = aggregatorapiserver.NewEndpointServiceResolver(

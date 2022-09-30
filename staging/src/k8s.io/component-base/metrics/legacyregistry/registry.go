@@ -20,6 +20,7 @@ import (
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"k8s.io/component-base/metrics"
@@ -44,10 +45,8 @@ var (
 )
 
 func init() {
-	//nolint:staticcheck // SA1019 - replacement function still calls prometheus.NewProcessCollector().
-	RawMustRegister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
-	//nolint:staticcheck // SA1019 - replacement function still calls prometheus.NewGoCollector().
-	RawMustRegister(prometheus.NewGoCollector())
+	RawMustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+	RawMustRegister(collectors.NewGoCollector(collectors.WithGoCollectorRuntimeMetrics(collectors.MetricsAll)))
 }
 
 // Handler returns an HTTP handler for the DefaultGatherer. It is

@@ -160,7 +160,7 @@ func TestZapLoggerV(t *testing.T) {
 			t.Errorf("V(%d).Info...) returned v=%d. expected v=%d", v, actualV, v)
 		}
 		expect := fmt.Sprintf(expectFormat, lineNo, v)
-		if !assert.Equal(t, logStr, expect) {
+		if !assert.Equal(t, expect, logStr) {
 			t.Errorf("V(%d).Info has wrong format \n expect:%s\n got:%s", v, expect, logStr)
 		}
 		buffer.Reset()

@@ -65,18 +65,6 @@ import (
 // ShutdownFunc represents the function handle to be called, typically in a defer handler, to shutdown a running module
 type ShutdownFunc func()
 
-// StartApiserver starts a local API server for testing and returns the handle to the URL and the shutdown function to stop it.
-func StartApiserver() (string, ShutdownFunc) {
-	_, s, closeFn := framework.RunAnAPIServer(framework.NewIntegrationTestControlPlaneConfig())
-
-	shutdownFunc := func() {
-		klog.Infof("destroying API server")
-		closeFn()
-		klog.Infof("destroyed API server")
-	}
-	return s.URL, shutdownFunc
-}
-
 // StartScheduler configures and starts a scheduler given a handle to the clientSet interface
 // and event broadcaster. It returns the running scheduler, podInformer and the shutdown function to stop it.
 func StartScheduler(clientSet clientset.Interface, kubeConfig *restclient.Config, cfg *kubeschedulerconfig.KubeSchedulerConfiguration) (*scheduler.Scheduler, coreinformers.PodInformer, ShutdownFunc) {
@@ -213,8 +201,24 @@ func CleanupTest(t *testing.T, testCtx *TestContext) {
 	testCtx.CancelFn()
 	// Cleanup nodes.
 	testCtx.ClientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
-	framework.DeleteTestingNamespace(testCtx.NS, t)
+	framework.DeleteNamespaceOrDie(testCtx.ClientSet, testCtx.NS, t)
 	testCtx.CloseFn()
+}
+
+// RemovePodFinalizers removes pod finalizers for the pods
+func RemovePodFinalizers(cs clientset.Interface, t *testing.T, pods []*v1.Pod) {
+	for _, p := range pods {
+		pod, err := cs.CoreV1().Pods(p.Namespace).Get(context.TODO(), p.Name, metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			t.Errorf("error while removing pod finalizers for %v: %v", klog.KObj(p), err)
+		} else if pod != nil {
+			pod.ObjectMeta.Finalizers = nil
+			_, err = cs.CoreV1().Pods(pod.Namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
+			if err != nil {
+				t.Errorf("error while updating pod status for %v: %v", klog.KObj(p), err)
+			}
+		}
+	}
 }
 
 // CleanupPods deletes the given pods and waits for them to be actually deleted.

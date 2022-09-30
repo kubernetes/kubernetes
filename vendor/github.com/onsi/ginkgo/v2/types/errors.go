@@ -532,3 +532,12 @@ func (g ginkgoErrors) BothRepeatAndUntilItFails() error {
 		Message: "--until-it-fails directs Ginkgo to rerun specs indefinitely until they fail.  --repeat directs Ginkgo to rerun specs a set number of times.  You can't set both... which would you like?",
 	}
 }
+
+/* Stack-Trace parsing errors */
+
+func (g ginkgoErrors) FailedToParseStackTrace(message string) error {
+	return GinkgoError{
+		Heading: "Failed to Parse Stack Trace",
+		Message: message,
+	}
+}

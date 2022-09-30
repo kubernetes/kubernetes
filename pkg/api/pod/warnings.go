@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	nodeapi "k8s.io/kubernetes/pkg/api/node"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/pods"
 )
@@ -60,14 +61,6 @@ func GetWarningsForPodTemplate(ctx context.Context, fieldPath *field.Path, podTe
 	return warningsForPodSpecAndMeta(fieldPath, &podTemplate.Spec, &podTemplate.ObjectMeta, oldSpec, oldMeta)
 }
 
-var deprecatedNodeLabels = map[string]string{
-	`beta.kubernetes.io/arch`:                  `deprecated since v1.14; use "kubernetes.io/arch" instead`,
-	`beta.kubernetes.io/os`:                    `deprecated since v1.14; use "kubernetes.io/os" instead`,
-	`failure-domain.beta.kubernetes.io/region`: `deprecated since v1.17; use "topology.kubernetes.io/region" instead`,
-	`failure-domain.beta.kubernetes.io/zone`:   `deprecated since v1.17; use "topology.kubernetes.io/zone" instead`,
-	`beta.kubernetes.io/instance-type`:         `deprecated since v1.17; use "node.kubernetes.io/instance-type" instead`,
-}
-
 var deprecatedAnnotations = []struct {
 	key     string
 	prefix  string
@@ -92,52 +85,25 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 
 	// use of deprecated node labels in selectors/affinity/topology
 	for k := range podSpec.NodeSelector {
-		if msg, deprecated := deprecatedNodeLabels[k]; deprecated {
+		if msg, deprecated := nodeapi.GetNodeLabelDeprecatedMessage(k); deprecated {
 			warnings = append(warnings, fmt.Sprintf("%s: %s", fieldPath.Child("spec", "nodeSelector").Key(k), msg))
 		}
 	}
 	if podSpec.Affinity != nil && podSpec.Affinity.NodeAffinity != nil {
 		n := podSpec.Affinity.NodeAffinity
 		if n.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-			for i, t := range n.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
-				for j, e := range t.MatchExpressions {
-					if msg, deprecated := deprecatedNodeLabels[e.Key]; deprecated {
-						warnings = append(
-							warnings,
-							fmt.Sprintf(
-								"%s: %s is %s",
-								fieldPath.Child("spec", "affinity", "nodeAffinity", "requiredDuringSchedulingIgnoredDuringExecution", "nodeSelectorTerms").Index(i).
-									Child("matchExpressions").Index(j).
-									Child("key"),
-								e.Key,
-								msg,
-							),
-						)
-					}
-				}
+			termFldPath := fieldPath.Child("spec", "affinity", "nodeAffinity", "requiredDuringSchedulingIgnoredDuringExecution", "nodeSelectorTerms")
+			for i, term := range n.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+				warnings = append(warnings, nodeapi.GetWarningsForNodeSelectorTerm(term, termFldPath.Index(i))...)
 			}
 		}
-		for i, t := range n.PreferredDuringSchedulingIgnoredDuringExecution {
-			for j, e := range t.Preference.MatchExpressions {
-				if msg, deprecated := deprecatedNodeLabels[e.Key]; deprecated {
-					warnings = append(
-						warnings,
-						fmt.Sprintf(
-							"%s: %s is %s",
-							fieldPath.Child("spec", "affinity", "nodeAffinity", "preferredDuringSchedulingIgnoredDuringExecution").Index(i).
-								Child("preference").
-								Child("matchExpressions").Index(j).
-								Child("key"),
-							e.Key,
-							msg,
-						),
-					)
-				}
-			}
+		preferredFldPath := fieldPath.Child("spec", "affinity", "nodeAffinity", "preferredDuringSchedulingIgnoredDuringExecution")
+		for i, term := range n.PreferredDuringSchedulingIgnoredDuringExecution {
+			warnings = append(warnings, nodeapi.GetWarningsForNodeSelectorTerm(term.Preference, preferredFldPath.Index(i).Child("preference"))...)
 		}
 	}
 	for i, t := range podSpec.TopologySpreadConstraints {
-		if msg, deprecated := deprecatedNodeLabels[t.TopologyKey]; deprecated {
+		if msg, deprecated := nodeapi.GetNodeLabelDeprecatedMessage(t.TopologyKey); deprecated {
 			warnings = append(warnings, fmt.Sprintf(
 				"%s: %s is %s",
 				fieldPath.Child("spec", "topologySpreadConstraints").Index(i).Child("topologyKey"),
@@ -181,6 +147,9 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		}
 		if v.Quobyte != nil {
 			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.22, support removal is planned in v1.26", fieldPath.Child("spec", "volumes").Index(i).Child("quobyte")))
+		}
+		if v.Glusterfs != nil {
+			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.25, this feature will be removed soon after in a subsequent release", fieldPath.Child("spec", "volumes").Index(i).Child("glusterfs")))
 		}
 	}
 
@@ -237,7 +206,7 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 	// use of pod seccomp annotation without accompanying field
 	if podSpec.SecurityContext == nil || podSpec.SecurityContext.SeccompProfile == nil {
 		if _, exists := meta.Annotations[api.SeccompPodAnnotationKey]; exists {
-			warnings = append(warnings, fmt.Sprintf(`%s: deprecated since v1.19, non-functional in v1.25+; use the "seccompProfile" field instead`, fieldPath.Child("metadata", "annotations").Key(api.SeccompPodAnnotationKey)))
+			warnings = append(warnings, fmt.Sprintf(`%s: deprecated since v1.19, non-functional in a future release; use the "seccompProfile" field instead`, fieldPath.Child("metadata", "annotations").Key(api.SeccompPodAnnotationKey)))
 		}
 	}
 
@@ -245,7 +214,7 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		// use of container seccomp annotation without accompanying field
 		if c.SecurityContext == nil || c.SecurityContext.SeccompProfile == nil {
 			if _, exists := meta.Annotations[api.SeccompContainerAnnotationKeyPrefix+c.Name]; exists {
-				warnings = append(warnings, fmt.Sprintf(`%s: deprecated since v1.19, non-functional in v1.25+; use the "seccompProfile" field instead`, fieldPath.Child("metadata", "annotations").Key(api.SeccompContainerAnnotationKeyPrefix+c.Name)))
+				warnings = append(warnings, fmt.Sprintf(`%s: deprecated since v1.19, non-functional in a future release; use the "seccompProfile" field instead`, fieldPath.Child("metadata", "annotations").Key(api.SeccompContainerAnnotationKeyPrefix+c.Name)))
 			}
 		}
 

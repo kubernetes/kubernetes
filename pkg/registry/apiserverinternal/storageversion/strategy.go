@@ -82,7 +82,7 @@ func (storageVersionStrategy) WarningsOnCreate(ctx context.Context, obj runtime.
 func (storageVersionStrategy) Canonicalize(obj runtime.Object) {
 }
 
-//  Does not allow creating a StorageVersion object with a PUT request.
+// Does not allow creating a StorageVersion object with a PUT request.
 func (storageVersionStrategy) AllowCreateOnUpdate() bool {
 	return false
 }

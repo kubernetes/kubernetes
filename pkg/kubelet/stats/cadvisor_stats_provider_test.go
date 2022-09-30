@@ -30,7 +30,6 @@ import (
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -579,7 +578,7 @@ func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
 		kuberuntime.BuildContainerLogsDirectory(prf0.Namespace, prf0.Name, types.UID(prf0.UID), cName01): containerLogStats1,
 	}
 	fakeStatsSlice := []*volume.Metrics{containerLogStats0, containerLogStats1}
-	fakeOS := &kubecontainertest.FakeOS{}
+	fakeOS := &containertest.FakeOS{}
 
 	freeRootfsInodes := rootfsInodesFree
 	totalRootfsInodes := rootfsInodes

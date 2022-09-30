@@ -99,7 +99,6 @@ func (p *PathMatcher) filter(rn *RNode) (*RNode, error) {
 }
 
 func (p *PathMatcher) doMatchEvery(rn *RNode) (*RNode, error) {
-
 	if err := rn.VisitElements(p.visitEveryElem); err != nil {
 		return nil, err
 	}
@@ -108,7 +107,6 @@ func (p *PathMatcher) doMatchEvery(rn *RNode) (*RNode, error) {
 }
 
 func (p *PathMatcher) visitEveryElem(elem *RNode) error {
-
 	fieldName := p.Path[0]
 	// recurse on the matching element
 	pm := &PathMatcher{Path: p.Path[1:]}

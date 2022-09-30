@@ -97,7 +97,7 @@ var _ = SIGDescribe("Job", func() {
 				successes++
 			}
 		}
-		framework.ExpectEqual(successes, completions, "epected %d successful job pods, but got  %d", completions, successes)
+		framework.ExpectEqual(successes, completions, "expected %d successful job pods, but got  %d", completions, successes)
 	})
 
 	ginkgo.It("should not create pods when created in suspend state", func() {
@@ -145,7 +145,7 @@ var _ = SIGDescribe("Job", func() {
 		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
-		ginkgo.By("Ensure pods equal to paralellism count is attached to the job")
+		ginkgo.By("Ensure pods equal to parallelism count is attached to the job")
 		err = e2ejob.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
 		framework.ExpectNoError(err, "failed to ensure number of pods associated with job %s is equal to parallelism count in namespace: %s", job.Name, f.Namespace.Name)
 
@@ -223,7 +223,7 @@ var _ = SIGDescribe("Job", func() {
 
 	/*
 		Testcase: Ensure that the pods associated with the job are removed once the job is deleted
-		Description: Create a job and ensure the associated pod count is equal to paralellism count. Delete the
+		Description: Create a job and ensure the associated pod count is equal to parallelism count. Delete the
 		job and ensure if the pods associated with the job have been removed
 	*/
 	ginkgo.It("should remove pods when job is deleted", func() {
@@ -232,7 +232,7 @@ var _ = SIGDescribe("Job", func() {
 		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
-		ginkgo.By("Ensure pods equal to paralellism count is attached to the job")
+		ginkgo.By("Ensure pods equal to parallelism count is attached to the job")
 		err = e2ejob.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
 		framework.ExpectNoError(err, "failed to ensure number of pods associated with job %s is equal to parallelism count in namespace: %s", job.Name, f.Namespace.Name)
 
@@ -304,7 +304,7 @@ var _ = SIGDescribe("Job", func() {
 	/*
 		Release: v1.15
 		Testname: Jobs, active pods, graceful termination
-		Description: Create a job. Ensure the active pods reflect paralellism in the namespace and delete the job. Job MUST be deleted successfully.
+		Description: Create a job. Ensure the active pods reflect parallelism in the namespace and delete the job. Job MUST be deleted successfully.
 	*/
 	framework.ConformanceIt("should delete a job", func() {
 		ginkgo.By("Creating a job")
@@ -432,7 +432,7 @@ var _ = SIGDescribe("Job", func() {
 			job.Spec.Template.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": testNodeName}
 		}
 
-		framework.Logf("Creating job %q with a node hostname selector %q wth cpu request %q", job.Name, testNodeName, cpuRequest)
+		framework.Logf("Creating job %q with a node hostname selector %q with cpu request %q", job.Name, testNodeName, cpuRequest)
 		job, err = e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
@@ -471,7 +471,7 @@ var _ = SIGDescribe("Job", func() {
 		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
-		ginkgo.By("Ensure pods equal to paralellism count is attached to the job")
+		ginkgo.By("Ensure pods equal to parallelism count is attached to the job")
 		err = e2ejob.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, parallelism)
 		framework.ExpectNoError(err, "failed to ensure number of pods associated with job %s is equal to parallelism count in namespace: %s", job.Name, f.Namespace.Name)
 

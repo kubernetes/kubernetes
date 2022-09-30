@@ -23,8 +23,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // FindPort locates the container port for the given pod and portName.  If the
@@ -63,16 +61,12 @@ const (
 )
 
 // AllContainers specifies that all containers be visited
-const AllContainers ContainerType = (InitContainers | Containers | EphemeralContainers)
+const AllContainers ContainerType = InitContainers | Containers | EphemeralContainers
 
 // AllFeatureEnabledContainers returns a ContainerType mask which includes all container
 // types except for the ones guarded by feature gate.
 func AllFeatureEnabledContainers() ContainerType {
-	containerType := AllContainers
-	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
-		containerType &= ^EphemeralContainers
-	}
-	return containerType
+	return AllContainers
 }
 
 // ContainerVisitor is called with each container spec, and returns true
@@ -194,6 +188,7 @@ func VisitPodSecretNames(pod *v1.Pod, visitor Visitor) bool {
 	return true
 }
 
+// visitContainerSecretNames returns true unless the visitor returned false when invoked with a secret reference
 func visitContainerSecretNames(container *v1.Container, visitor Visitor) bool {
 	for _, env := range container.EnvFrom {
 		if env.SecretRef != nil {
@@ -242,6 +237,7 @@ func VisitPodConfigmapNames(pod *v1.Pod, visitor Visitor) bool {
 	return true
 }
 
+// visitContainerConfigmapNames returns true unless the visitor returned false when invoked with a configmap reference
 func visitContainerConfigmapNames(container *v1.Container, visitor Visitor) bool {
 	for _, env := range container.EnvFrom {
 		if env.ConfigMapRef != nil {
@@ -306,7 +302,7 @@ func IsPodTerminal(pod *v1.Pod) bool {
 	return IsPodPhaseTerminal(pod.Status.Phase)
 }
 
-// IsPhaseTerminal returns true if the pod's phase is terminal.
+// IsPodPhaseTerminal returns true if the pod's phase is terminal.
 func IsPodPhaseTerminal(phase v1.PodPhase) bool {
 	return phase == v1.PodFailed || phase == v1.PodSucceeded
 }

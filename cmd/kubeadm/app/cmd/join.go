@@ -157,7 +157,8 @@ type joinData struct {
 
 // newCmdJoin returns "kubeadm join" command.
 // NB. joinOptions is exposed as parameter for allowing unit testing of
-//     the newJoinData method, that implements all the command options validation logic
+//
+//	the newJoinData method, that implements all the command options validation logic
 func newCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 	if joinOptions == nil {
 		joinOptions = newJoinOptions()
@@ -285,10 +286,7 @@ func addJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1.JoinConfigurati
 
 // addJoinOtherFlags adds join flags that are not bound to a configuration file to the given flagset
 func addJoinOtherFlags(flagSet *flag.FlagSet, joinOptions *joinOptions) {
-	flagSet.StringVar(
-		&joinOptions.cfgPath, options.CfgPath, joinOptions.cfgPath,
-		"Path to kubeadm config file.",
-	)
+	options.AddConfigFlag(flagSet, &joinOptions.cfgPath)
 	flagSet.StringSliceVar(
 		&joinOptions.ignorePreflightErrors, options.IgnorePreflightErrors, joinOptions.ignorePreflightErrors,
 		"A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.",

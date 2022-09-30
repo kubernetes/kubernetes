@@ -670,7 +670,7 @@ func getBoundPV(client clientset.Interface, pvc *v1.PersistentVolumeClaim) (*v1.
 	return pv, err
 }
 
-// checkProvisioning verifies that the claim is bound and has the correct properities
+// checkProvisioning verifies that the claim is bound and has the correct properties
 func (t StorageClassTest) checkProvisioning(client clientset.Interface, claim *v1.PersistentVolumeClaim, class *storagev1.StorageClass) *v1.PersistentVolume {
 	err := e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, t.Timeouts.ClaimProvision)
 	framework.ExpectNoError(err)
@@ -701,7 +701,9 @@ func (t StorageClassTest) checkProvisioning(client clientset.Interface, claim *v
 				break
 			}
 		}
-		framework.ExpectEqual(found, true)
+		if !found {
+			framework.Failf("Actual access modes %v are not in claim's access mode", pv.Spec.AccessModes)
+		}
 	}
 
 	framework.ExpectEqual(pv.Spec.ClaimRef.Name, claim.ObjectMeta.Name)
@@ -1201,7 +1203,7 @@ func MultiplePVMountSingleNodeCheck(client clientset.Interface, timeouts *framew
 
 	pv2, pvc2, err := e2epv.CreatePVCPV(client, timeouts, pv2Config, pvc2Config, claim.Namespace, true)
 	framework.ExpectNoError(err, "PVC, PV creation failed")
-	framework.Logf("Created PVC %s/%s and PV %s in namespace %s", pvc2.Namespace, pvc2.Name, pv2.Name)
+	framework.Logf("Created PVC %s/%s and PV %s", pvc2.Namespace, pvc2.Name, pv2.Name)
 
 	pod2Config := e2epod.Config{
 		NS:            pvc2.Namespace,

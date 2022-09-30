@@ -106,7 +106,7 @@ type ReplaceOptions struct {
 func NewReplaceOptions(streams genericclioptions.IOStreams) *ReplaceOptions {
 	return &ReplaceOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("replaced"),
-		DeleteFlags: delete.NewDeleteFlags("to use to replace the resource."),
+		DeleteFlags: delete.NewDeleteFlags("The files that contain the configurations to replace."),
 
 		IOStreams: streams,
 	}

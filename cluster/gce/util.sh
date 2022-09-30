@@ -754,6 +754,17 @@ function construct-linux-kubelet-flags {
   # Keep in sync with the mkdir command in configure-helper.sh (until the TODO is resolved)
   flags+=" --cert-dir=/var/lib/kubelet/pki/"
 
+  # If ENABLE_AUTH_PROVIDER_GCP is set to true, kubelet is enabled to use out-of-tree auth 
+  # credential provider instead of in-tree auth credential provider.
+  # https://kubernetes.io/docs/tasks/kubelet-credential-provider/kubelet-credential-provider
+  if [[ "${ENABLE_AUTH_PROVIDER_GCP:-false}" == "true" ]]; then
+    # Keep the values of --image-credential-provider-config and --image-credential-provider-bin-dir
+    # in sync with value of auth_config_file and auth_provider_dir set in install-auth-provider-gcp function
+    # in gci/configure.sh.
+    flags+="  --image-credential-provider-config=/home/kubernetes/cri_auth_config.yaml"
+    flags+="  --image-credential-provider-bin-dir=/home/kubernetes/bin"
+  fi
+
   if [[ "${node_type}" == "master" ]]; then
     flags+=" ${MASTER_KUBELET_TEST_ARGS:-}"
     if [[ "${REGISTER_MASTER_KUBELET:-false}" == "true" ]]; then
@@ -1100,6 +1111,7 @@ METADATA_AGENT_CLUSTER_LEVEL_MEMORY_REQUEST: $(yaml-quote "${METADATA_AGENT_CLUS
 DOCKER_REGISTRY_MIRROR_URL: $(yaml-quote "${DOCKER_REGISTRY_MIRROR_URL:-}")
 ENABLE_L7_LOADBALANCING: $(yaml-quote "${ENABLE_L7_LOADBALANCING:-none}")
 ENABLE_CLUSTER_LOGGING: $(yaml-quote "${ENABLE_CLUSTER_LOGGING:-false}")
+ENABLE_AUTH_PROVIDER_GCP: $(yaml-quote "${ENABLE_AUTH_PROVIDER_GCP:-false}")
 ENABLE_NODE_PROBLEM_DETECTOR: $(yaml-quote "${ENABLE_NODE_PROBLEM_DETECTOR:-none}")
 NODE_PROBLEM_DETECTOR_VERSION: $(yaml-quote "${NODE_PROBLEM_DETECTOR_VERSION:-}")
 NODE_PROBLEM_DETECTOR_TAR_HASH: $(yaml-quote "${NODE_PROBLEM_DETECTOR_TAR_HASH:-}")
@@ -1253,6 +1265,11 @@ EOF
 DOCKER_LOG_MAX_FILE: $(yaml-quote "${DOCKER_LOG_MAX_FILE}")
 EOF
   fi
+  if [ -n "${CLOUD_PROVIDER_FLAG:-}" ]; then
+    cat >>"$file" <<EOF
+CLOUD_PROVIDER_FLAG: $(yaml-quote "${CLOUD_PROVIDER_FLAG}")
+EOF
+  fi
   if [ -n "${FEATURE_GATES:-}" ]; then
     cat >>"$file" <<EOF
 FEATURE_GATES: $(yaml-quote "${FEATURE_GATES}")
@@ -1320,6 +1337,12 @@ EOF
     if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT_SEC:-}" ]; then
       cat >>"$file" <<EOF
 KUBE_APISERVER_REQUEST_TIMEOUT_SEC: $(yaml-quote "${KUBE_APISERVER_REQUEST_TIMEOUT_SEC}")
+EOF
+    fi
+    # KUBE_APISERVER_GODEBUG (if set) controls the value of GODEBUG env var for kube-apiserver.
+    if [ -n "${KUBE_APISERVER_GODEBUG:-}" ]; then
+      cat >>"$file" <<EOF
+KUBE_APISERVER_GODEBUG: $(yaml-quote "${KUBE_APISERVER_GODEBUG}")
 EOF
     fi
     # ETCD_IMAGE (if set) allows to use a custom etcd image.
@@ -1552,6 +1575,7 @@ KUBEPROXY_KUBECONFIG_FILE: $(yaml-quote "${WINDOWS_KUBEPROXY_KUBECONFIG_FILE}")
 WINDOWS_INFRA_CONTAINER: $(yaml-quote "${WINDOWS_INFRA_CONTAINER}")
 WINDOWS_ENABLE_PIGZ: $(yaml-quote "${WINDOWS_ENABLE_PIGZ}")
 WINDOWS_ENABLE_HYPERV: $(yaml-quote "${WINDOWS_ENABLE_HYPERV}")
+ENABLE_AUTH_PROVIDER_GCP: $(yaml-quote "${ENABLE_AUTH_PROVIDER_GCP}")
 ENABLE_NODE_PROBLEM_DETECTOR: $(yaml-quote "${WINDOWS_ENABLE_NODE_PROBLEM_DETECTOR}")
 NODE_PROBLEM_DETECTOR_VERSION: $(yaml-quote "${NODE_PROBLEM_DETECTOR_VERSION}")
 NODE_PROBLEM_DETECTOR_TAR_HASH: $(yaml-quote "${NODE_PROBLEM_DETECTOR_TAR_HASH}")
@@ -2429,6 +2453,12 @@ function create-network() {
         --allow "tcp:3389" &
     fi
   fi
+
+  kube::util::wait-for-jobs || {
+    code=$?
+    echo -e "${color_red}Failed to create firewall rules.${color_norm}" >&2
+    exit $code
+  }
 }
 
 function expand-default-subnetwork() {
@@ -2551,11 +2581,13 @@ function create-cloud-nat-router() {
 }
 
 function delete-all-firewall-rules() {
-  if fws=$(gcloud compute firewall-rules list --project "${NETWORK_PROJECT}" --filter="network=${NETWORK}" --format="value(name)"); then
-    echo "Deleting firewall rules remaining in network ${NETWORK}: ${fws}"
-    delete-firewall-rules "$fws"
+  local -a fws
+  kube::util::read-array fws < <(gcloud compute firewall-rules list --project "${NETWORK_PROJECT}" --filter="network=${NETWORK}" --format="value(name)")
+  if (( "${#fws[@]}" > 0 )); then
+    echo "Deleting firewall rules remaining in network ${NETWORK}: ${fws[*]}"
+    delete-firewall-rules "${fws[@]}"
   else
-    echo "Failed to list firewall rules from the network ${NETWORK}"
+    echo "No firewall rules in network ${NETWORK}"
   fi
 }
 
@@ -3099,7 +3131,9 @@ function create-nodes-firewall() {
 
   # Wait for last batch of jobs
   kube::util::wait-for-jobs || {
-    echo -e "${color_red}Some commands failed.${color_norm}" >&2
+    code=$?
+    echo -e "${color_red}Failed to create firewall rule.${color_norm}" >&2
+    exit $code
   }
 }
 
@@ -3720,12 +3754,13 @@ function kube-down() {
     # Delete all remaining firewall rules and network.
     delete-firewall-rules \
       "${CLUSTER_NAME}-default-internal-master" \
-      "${CLUSTER_NAME}-default-internal-node" \
+      "${CLUSTER_NAME}-default-internal-node"
+
+    if [[ "${KUBE_DELETE_NETWORK}" == "true" ]]; then
+      delete-firewall-rules \
       "${NETWORK}-default-ssh" \
       "${NETWORK}-default-rdp" \
       "${NETWORK}-default-internal"  # Pre-1.5 clusters
-
-    if [[ "${KUBE_DELETE_NETWORK}" == "true" ]]; then
       delete-cloud-nat-router
       # Delete all remaining firewall rules in the network.
       delete-all-firewall-rules || true

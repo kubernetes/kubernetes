@@ -39,7 +39,7 @@ import (
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
 const (
@@ -238,6 +238,18 @@ func validateKubeConfig(outDir, filename string, config *clientcmdapi.Config) er
 	// the base64 CA and places it raw in the v1.Config object. In case the user has extra whitespace
 	// in the CA they used to create a kubeconfig this comparison to a generated v1.Config will otherwise fail.
 	caCurrent := bytes.TrimSpace(currentConfig.Clusters[currentCluster].CertificateAuthorityData)
+	if len(caCurrent) == 0 {
+		// fallback to load CA cert data from external CA file
+		clusterCAFilePath := currentConfig.Clusters[currentCluster].CertificateAuthority
+		if len(clusterCAFilePath) > 0 {
+			clusterCABytes, err := os.ReadFile(clusterCAFilePath)
+			if err != nil {
+				klog.Warningf("failed to load CA cert from %q for kubeconfig %q, %v", clusterCAFilePath, kubeConfigFilePath, err)
+			} else {
+				caCurrent = bytes.TrimSpace(clusterCABytes)
+			}
+		}
+	}
 	caExpected := bytes.TrimSpace(config.Clusters[expectedCluster].CertificateAuthorityData)
 
 	// If the current CA cert on disk doesn't match the expected CA cert, error out because we have a file, but it's stale
@@ -268,10 +280,7 @@ func createKubeConfigFileIfNotExists(outDir, filename string, config *clientcmda
 		}
 		fmt.Printf("[kubeconfig] Writing %q kubeconfig file\n", filename)
 		err = kubeconfigutil.WriteToDisk(kubeConfigFilePath, config)
-		if err != nil {
-			return errors.Wrapf(err, "failed to save kubeconfig file %q on disk", kubeConfigFilePath)
-		}
-		return nil
+		return errors.Wrapf(err, "failed to save kubeconfig file %q on disk", kubeConfigFilePath)
 	}
 	// kubeadm doesn't validate the existing kubeconfig file more than this (kubeadm trusts the client certs to be valid)
 	// Basically, if we find a kubeconfig file with the same path; the same CA cert and the same server URL;

@@ -234,15 +234,6 @@ func fieldProfile(scmp *v1.SeccompProfile, profileRootPath string, fallbackToRun
 	return ""
 }
 
-func annotationProfile(profile, profileRootPath string) string {
-	if strings.HasPrefix(profile, v1.SeccompLocalhostProfileNamePrefix) {
-		name := strings.TrimPrefix(profile, v1.SeccompLocalhostProfileNamePrefix)
-		fname := filepath.Join(profileRootPath, filepath.FromSlash(name))
-		return v1.SeccompLocalhostProfileNamePrefix + fname
-	}
-	return profile
-}
-
 func (m *kubeGenericRuntimeManager) getSeccompProfilePath(annotations map[string]string, containerName string,
 	podSecContext *v1.PodSecurityContext, containerSecContext *v1.SecurityContext, fallbackToRuntimeDefault bool) string {
 	// container fields are applied first
@@ -250,21 +241,9 @@ func (m *kubeGenericRuntimeManager) getSeccompProfilePath(annotations map[string
 		return fieldProfile(containerSecContext.SeccompProfile, m.seccompProfileRoot, fallbackToRuntimeDefault)
 	}
 
-	// if container field does not exist, try container annotation (deprecated)
-	if containerName != "" {
-		if profile, ok := annotations[v1.SeccompContainerAnnotationKeyPrefix+containerName]; ok {
-			return annotationProfile(profile, m.seccompProfileRoot)
-		}
-	}
-
 	// when container seccomp is not defined, try to apply from pod field
 	if podSecContext != nil && podSecContext.SeccompProfile != nil {
 		return fieldProfile(podSecContext.SeccompProfile, m.seccompProfileRoot, fallbackToRuntimeDefault)
-	}
-
-	// as last resort, try to apply pod annotation (deprecated)
-	if profile, ok := annotations[v1.SeccompPodAnnotationKey]; ok {
-		return annotationProfile(profile, m.seccompProfileRoot)
 	}
 
 	if fallbackToRuntimeDefault {
@@ -322,42 +301,5 @@ func (m *kubeGenericRuntimeManager) getSeccompProfile(annotations map[string]str
 
 	return &runtimeapi.SecurityProfile{
 		ProfileType: runtimeapi.SecurityProfile_Unconfined,
-	}
-}
-
-func ipcNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
-	if pod != nil && pod.Spec.HostIPC {
-		return runtimeapi.NamespaceMode_NODE
-	}
-	return runtimeapi.NamespaceMode_POD
-}
-
-func networkNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
-	if pod != nil && pod.Spec.HostNetwork {
-		return runtimeapi.NamespaceMode_NODE
-	}
-	return runtimeapi.NamespaceMode_POD
-}
-
-func pidNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
-	if pod != nil {
-		if pod.Spec.HostPID {
-			return runtimeapi.NamespaceMode_NODE
-		}
-		if pod.Spec.ShareProcessNamespace != nil && *pod.Spec.ShareProcessNamespace {
-			return runtimeapi.NamespaceMode_POD
-		}
-	}
-	// Note that PID does not default to the zero value for v1.Pod
-	return runtimeapi.NamespaceMode_CONTAINER
-}
-
-// namespacesForPod returns the runtimeapi.NamespaceOption for a given pod.
-// An empty or nil pod can be used to get the namespace defaults for v1.Pod.
-func namespacesForPod(pod *v1.Pod) *runtimeapi.NamespaceOption {
-	return &runtimeapi.NamespaceOption{
-		Ipc:     ipcNamespaceForPod(pod),
-		Network: networkNamespaceForPod(pod),
-		Pid:     pidNamespaceForPod(pod),
 	}
 }

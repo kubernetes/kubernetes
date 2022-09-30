@@ -52,7 +52,7 @@ func (VolumeModeDowngradeTest) Name() string {
 
 // Skip returns true when this test can be skipped.
 func (t *VolumeModeDowngradeTest) Skip(upgCtx upgrades.UpgradeContext) bool {
-	if !framework.ProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure") {
+	if !framework.ProviderIs("gce", "aws", "gke", "vsphere", "azure") {
 		return true
 	}
 

@@ -35,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
-	clientset "k8s.io/client-go/kubernetes"
+	clientset "k8s.io/client-go/kubernetes" // import known versions
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/tools/cache"
@@ -47,9 +47,6 @@ import (
 	c "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metrics"
-
-	// import known versions
-	_ "k8s.io/client-go/kubernetes"
 )
 
 // ResourceResyncTime defines the resync period of the garbage collector's informers.

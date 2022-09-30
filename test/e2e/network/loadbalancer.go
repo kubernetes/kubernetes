@@ -512,7 +512,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		// See kubernetes/contrib/ingress/echoheaders/nginx.conf for content of response
 		_, err := jig.Run(nil)
 		framework.ExpectNoError(err)
-		// Make sure acceptPod is running. There are certain chances that pod might be teminated due to unexpected reasons.
+		// Make sure acceptPod is running. There are certain chances that pod might be terminated due to unexpected reasons.
 		acceptPod, err = cs.CoreV1().Pods(namespace).Get(context.TODO(), acceptPod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Unable to get pod %s", acceptPod.Name)
 		framework.ExpectEqual(acceptPod.Status.Phase, v1.PodRunning)
@@ -542,7 +542,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		checkReachabilityFromPod(true, loadBalancerCreateTimeout, namespace, acceptPod.Name, svcIP)
 		checkReachabilityFromPod(false, loadBalancerCreateTimeout, namespace, dropPod.Name, svcIP)
 
-		// Make sure dropPod is running. There are certain chances that the pod might be teminated due to unexpected reasons.
+		// Make sure dropPod is running. There are certain chances that the pod might be terminated due to unexpected reasons.
 		dropPod, err = cs.CoreV1().Pods(namespace).Get(context.TODO(), dropPod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Unable to get pod %s", dropPod.Name)
 		framework.ExpectEqual(acceptPod.Status.Phase, v1.PodRunning)
@@ -772,9 +772,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		}
 	})
 
-	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
 	// [LinuxOnly]: Windows does not support session affinity.
-	ginkgo.It("should have session affinity work for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters] [LinuxOnly]", func() {
+	ginkgo.It("should have session affinity work for LoadBalancer service with ESIPP on [Slow] [LinuxOnly]", func() {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
 		e2eskipper.SkipIfProviderIs("aws")
 
@@ -784,9 +783,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		execAffinityTestForLBService(f, cs, svc)
 	})
 
-	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
 	// [LinuxOnly]: Windows does not support session affinity.
-	ginkgo.It("should be able to switch session affinity for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters] [LinuxOnly]", func() {
+	ginkgo.It("should be able to switch session affinity for LoadBalancer service with ESIPP on [Slow] [LinuxOnly]", func() {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
 		e2eskipper.SkipIfProviderIs("aws")
 
@@ -796,9 +794,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		execAffinityTestForLBServiceWithTransition(f, cs, svc)
 	})
 
-	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
 	// [LinuxOnly]: Windows does not support session affinity.
-	ginkgo.It("should have session affinity work for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters] [LinuxOnly]", func() {
+	ginkgo.It("should have session affinity work for LoadBalancer service with ESIPP off [Slow] [LinuxOnly]", func() {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
 		e2eskipper.SkipIfProviderIs("aws")
 
@@ -808,9 +805,8 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		execAffinityTestForLBService(f, cs, svc)
 	})
 
-	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
 	// [LinuxOnly]: Windows does not support session affinity.
-	ginkgo.It("should be able to switch session affinity for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters] [LinuxOnly]", func() {
+	ginkgo.It("should be able to switch session affinity for LoadBalancer service with ESIPP off [Slow] [LinuxOnly]", func() {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
 		e2eskipper.SkipIfProviderIs("aws")
 

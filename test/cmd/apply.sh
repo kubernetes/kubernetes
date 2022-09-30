@@ -306,7 +306,7 @@ __EOF__
   kubectl delete --kustomize hack/testdata/kustomize
 
   ## kubectl apply multiple resources with one failure during apply phase.
-  # Pre-Condition: namepace does not exist and no POD exists
+  # Pre-Condition: namespace does not exist and no POD exists
   output_message=$(! kubectl get namespace multi-resource-ns 2>&1 "${kube_flags[@]:?}")
   kube::test::if_has_string "${output_message}" 'namespaces "multi-resource-ns" not found'
   kube::test::wait_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''

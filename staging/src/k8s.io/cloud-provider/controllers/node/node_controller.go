@@ -41,6 +41,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
+	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
@@ -49,9 +50,9 @@ import (
 // labelReconcileInfo lists Node labels to reconcile, and how to reconcile them.
 // primaryKey and secondaryKey are keys of labels to reconcile.
 //   - If both keys exist, but their values don't match. Use the value from the
-//   primaryKey as the source of truth to reconcile.
+//     primaryKey as the source of truth to reconcile.
 //   - If ensureSecondaryExists is true, and the secondaryKey does not
-//   exist, secondaryKey will be added with the value of the primaryKey.
+//     exist, secondaryKey will be added with the value of the primaryKey.
 var labelReconcileInfo = []struct {
 	primaryKey            string
 	secondaryKey          string
@@ -93,7 +94,9 @@ var UpdateNodeSpecBackoff = wait.Backoff{
 type CloudNodeController struct {
 	nodeInformer coreinformers.NodeInformer
 	kubeClient   clientset.Interface
-	recorder     record.EventRecorder
+
+	broadcaster record.EventBroadcaster
+	recorder    record.EventRecorder
 
 	cloud cloudprovider.Interface
 
@@ -113,10 +116,6 @@ func NewCloudNodeController(
 
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"})
-	eventBroadcaster.StartStructuredLogging(0)
-
-	klog.Infof("Sending events to api server.")
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 
 	_, instancesSupported := cloud.Instances()
 	_, instancesV2Supported := cloud.InstancesV2()
@@ -127,6 +126,7 @@ func NewCloudNodeController(
 	cnc := &CloudNodeController{
 		nodeInformer:              nodeInformer,
 		kubeClient:                kubeClient,
+		broadcaster:               eventBroadcaster,
 		recorder:                  recorder,
 		cloud:                     cloud,
 		nodeStatusUpdateFrequency: nodeStatusUpdateFrequency,
@@ -149,9 +149,18 @@ func NewCloudNodeController(
 // This controller updates newly registered nodes with information
 // from the cloud provider. This call is blocking so should be called
 // via a goroutine
-func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
+func (cnc *CloudNodeController) Run(stopCh <-chan struct{}, controllerManagerMetrics *controllersmetrics.ControllerManagerMetrics) {
 	defer utilruntime.HandleCrash()
 	defer cnc.workqueue.ShutDown()
+
+	// Start event processing pipeline.
+	klog.Infof("Sending events to api server.")
+	controllerManagerMetrics.ControllerStarted("cloud-node")
+	defer controllerManagerMetrics.ControllerStopped("cloud-node")
+
+	cnc.broadcaster.StartStructuredLogging(0)
+	cnc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: cnc.kubeClient.CoreV1().Events("")})
+	defer cnc.broadcaster.Shutdown()
 
 	// Wait for the caches to be synced before starting workers
 	klog.Info("Waiting for informer caches to sync")
@@ -414,6 +423,11 @@ func (cnc *CloudNodeController) syncNode(ctx context.Context, nodeName string) e
 	instanceMetadata, err := cnc.getInstanceMetadata(ctx, providerID, copyNode)
 	if err != nil {
 		return fmt.Errorf("failed to get instance metadata for node %s: %v", nodeName, err)
+	}
+	if instanceMetadata == nil {
+		// do nothing when external cloud providers provide nil instanceMetadata
+		klog.Infof("Skip sync node %s because cloud provided nil metadata", nodeName)
+		return nil
 	}
 
 	nodeModifiers, err := cnc.getNodeModifiersFromCloudProvider(ctx, providerID, copyNode, instanceMetadata)

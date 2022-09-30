@@ -91,7 +91,7 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:               recorder,
 		cpuCFSQuota:            false,
-		cpuCFSQuotaPeriod:      metav1.Duration{Duration: time.Microsecond * 100},
+		cpuCFSQuotaPeriod:      metav1.Duration{Duration: time.Millisecond * 100},
 		livenessManager:        proberesults.NewManager(),
 		startupManager:         proberesults.NewManager(),
 		machineInfo:            machineInfo,

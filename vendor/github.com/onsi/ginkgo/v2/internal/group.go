@@ -279,7 +279,10 @@ func (g *group) run(specs Specs) {
 	}
 
 	for _, spec := range g.specs {
+		g.suite.selectiveLock.Lock()
 		g.suite.currentSpecReport = g.initialReportForSpec(spec)
+		g.suite.selectiveLock.Unlock()
+
 		g.suite.currentSpecReport.State, g.suite.currentSpecReport.Failure = g.evaluateSkipStatus(spec)
 		g.suite.reporter.WillRun(g.suite.currentSpecReport)
 		g.suite.reportEach(spec, types.NodeTypeReportBeforeEach)
@@ -318,7 +321,9 @@ func (g *group) run(specs Specs) {
 		if g.suite.currentSpecReport.State.Is(types.SpecStateFailureStates) {
 			g.succeeded = false
 		}
+		g.suite.selectiveLock.Lock()
 		g.suite.currentSpecReport = types.SpecReport{}
+		g.suite.selectiveLock.Unlock()
 	}
 }
 

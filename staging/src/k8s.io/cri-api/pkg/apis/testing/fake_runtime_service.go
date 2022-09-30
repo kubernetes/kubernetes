@@ -509,7 +509,7 @@ func (r *FakeRuntimeService) ContainerStatus(containerID string, verbose bool) (
 }
 
 // UpdateContainerResources returns the container resource in the FakeRuntimeService.
-func (r *FakeRuntimeService) UpdateContainerResources(string, *runtimeapi.LinuxContainerResources) error {
+func (r *FakeRuntimeService) UpdateContainerResources(string, *runtimeapi.ContainerResources) error {
 	r.Lock()
 	defer r.Unlock()
 
@@ -706,5 +706,9 @@ func (r *FakeRuntimeService) CheckpointContainer(options *runtimeapi.CheckpointC
 		return err
 	}
 
+	return nil
+}
+
+func (f *FakeRuntimeService) GetContainerEvents(containerEventsCh chan *runtimeapi.ContainerEventResponse) error {
 	return nil
 }

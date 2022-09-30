@@ -88,26 +88,26 @@ func GetEtcdImage(cfg *kubeadmapi.ClusterConfiguration) string {
 
 // GetControlPlaneImages returns a list of container images kubeadm expects to use on a control plane node
 func GetControlPlaneImages(cfg *kubeadmapi.ClusterConfiguration) []string {
-	imgs := []string{}
+	images := make([]string, 0)
 
 	// start with core kubernetes images
-	imgs = append(imgs, GetKubernetesImage(constants.KubeAPIServer, cfg))
-	imgs = append(imgs, GetKubernetesImage(constants.KubeControllerManager, cfg))
-	imgs = append(imgs, GetKubernetesImage(constants.KubeScheduler, cfg))
-	imgs = append(imgs, GetKubernetesImage(constants.KubeProxy, cfg))
+	images = append(images, GetKubernetesImage(constants.KubeAPIServer, cfg))
+	images = append(images, GetKubernetesImage(constants.KubeControllerManager, cfg))
+	images = append(images, GetKubernetesImage(constants.KubeScheduler, cfg))
+	images = append(images, GetKubernetesImage(constants.KubeProxy, cfg))
 
 	// pause is not available on the ci image repository so use the default image repository.
-	imgs = append(imgs, GetPauseImage(cfg))
+	images = append(images, GetPauseImage(cfg))
 
 	// if etcd is not external then add the image as it will be required
 	if cfg.Etcd.Local != nil {
-		imgs = append(imgs, GetEtcdImage(cfg))
+		images = append(images, GetEtcdImage(cfg))
 	}
 
 	// Append the appropriate DNS images
-	imgs = append(imgs, GetDNSImage(cfg))
+	images = append(images, GetDNSImage(cfg))
 
-	return imgs
+	return images
 }
 
 // GetPauseImage returns the image for the "pause" container

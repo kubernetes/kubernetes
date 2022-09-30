@@ -153,6 +153,42 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, windowsPodWithSELinux.Name,
 			f.Namespace.Name), "failed to wait for pod %s to be running", windowsPodWithSELinux.Name)
 	})
+
+	ginkgo.It("should not be able to create pods with containers running as ContainerAdministrator when runAsNonRoot is true", func() {
+		ginkgo.By("Creating a pod")
+
+		p := runAsUserNamePod(toPtr("ContainerAdministrator"))
+		p.Spec.SecurityContext.RunAsNonRoot = &trueVar
+
+		podInvalid, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), p, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "Error creating pod")
+
+		ginkgo.By("Waiting for pod to finish")
+		event, err := f.PodClient().WaitForErrorEventOrSuccess(podInvalid)
+		framework.ExpectNoError(err)
+		framework.ExpectNotEqual(event, nil, "event should not be empty")
+		framework.Logf("Got event: %v", event)
+		expectedEventError := "container's runAsUserName (ContainerAdministrator) which will be regarded as root identity and will break non-root policy"
+		framework.ExpectEqual(true, strings.Contains(event.Message, expectedEventError), "Event error should indicate non-root policy caused container to not start")
+	})
+
+	ginkgo.It("should not be able to create pods with containers running as CONTAINERADMINISTRATOR when runAsNonRoot is true", func() {
+		ginkgo.By("Creating a pod")
+
+		p := runAsUserNamePod(toPtr("CONTAINERADMINISTRATOR"))
+		p.Spec.SecurityContext.RunAsNonRoot = &trueVar
+
+		podInvalid, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), p, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "Error creating pod")
+
+		ginkgo.By("Waiting for pod to finish")
+		event, err := f.PodClient().WaitForErrorEventOrSuccess(podInvalid)
+		framework.ExpectNoError(err)
+		framework.ExpectNotEqual(event, nil, "event should not be empty")
+		framework.Logf("Got event: %v", event)
+		expectedEventError := "container's runAsUserName (CONTAINERADMINISTRATOR) which will be regarded as root identity and will break non-root policy"
+		framework.ExpectEqual(true, strings.Contains(event.Message, expectedEventError), "Event error should indicate non-root policy caused container to not start")
+	})
 })
 
 func runAsUserNamePod(username *string) *v1.Pod {

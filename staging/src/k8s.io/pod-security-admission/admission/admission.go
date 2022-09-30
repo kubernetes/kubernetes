@@ -626,13 +626,10 @@ func (a *Admission) PolicyToEvaluate(labels map[string]string) (api.Policy, fiel
 }
 
 // isSignificantPodUpdate determines whether a pod update should trigger a policy evaluation.
-// Relevant mutable pod fields as of 1.21 are image and seccomp annotations:
+// Relevant mutable pod fields as of 1.21 are image annotations:
 // * https://github.com/kubernetes/kubernetes/blob/release-1.21/pkg/apis/core/validation/validation.go#L3947-L3949
 func isSignificantPodUpdate(pod, oldPod *corev1.Pod) bool {
 	// TODO: invert this logic to only allow specific update types.
-	if pod.Annotations[corev1.SeccompPodAnnotationKey] != oldPod.Annotations[corev1.SeccompPodAnnotationKey] {
-		return true
-	}
 	if len(pod.Spec.Containers) != len(oldPod.Spec.Containers) {
 		return true
 	}
@@ -672,6 +669,7 @@ func isSignificantContainerUpdate(container, oldContainer *corev1.Container, ann
 	if container.Image != oldContainer.Image {
 		return true
 	}
+	// TODO(saschagrunert): Remove this logic in 1.27.
 	seccompKey := corev1.SeccompContainerAnnotationKeyPrefix + container.Name
 	return annotations[seccompKey] != oldAnnotations[seccompKey]
 }

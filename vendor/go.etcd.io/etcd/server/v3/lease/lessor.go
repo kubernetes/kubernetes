@@ -654,10 +654,9 @@ func (le *lessor) revokeExpiredLeases() {
 // checkpointScheduledLeases finds all scheduled lease checkpoints that are due and
 // submits them to the checkpointer to persist them to the consensus log.
 func (le *lessor) checkpointScheduledLeases() {
-	var cps []*pb.LeaseCheckpoint
-
 	// rate limit
 	for i := 0; i < leaseCheckpointRate/2; i++ {
+		var cps []*pb.LeaseCheckpoint
 		le.mu.Lock()
 		if le.isPrimary() {
 			cps = le.findDueScheduledCheckpoints(maxLeaseCheckpointBatchSize)

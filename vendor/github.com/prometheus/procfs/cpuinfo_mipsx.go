@@ -11,6 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build linux && (mips || mipsle || mips64 || mips64le)
 // +build linux
 // +build mips mipsle mips64 mips64le
 

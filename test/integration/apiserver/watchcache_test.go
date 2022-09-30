@@ -34,7 +34,7 @@ import (
 
 // setup create kube-apiserver backed up by two separate etcds,
 // with one of them containing events and the other all other objects.
-func multiEtcdSetup(t *testing.T) (clientset.Interface, framework.CloseFunc) {
+func multiEtcdSetup(t *testing.T) (clientset.Interface, framework.TearDownFunc) {
 	etcdArgs := []string{"--experimental-watch-progress-notify-interval", "1s"}
 	etcd0URL, stopEtcd0, err := framework.RunCustomEtcd("etcd_watchcache0", etcdArgs)
 	if err != nil {

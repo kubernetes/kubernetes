@@ -41,10 +41,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -52,8 +49,6 @@ import (
 // TestApplyCRDStructuralSchema tests that when a CRD has a structural schema in its validation field,
 // it will be used to construct the CR schema used by apply.
 func TestApplyCRDStructuralSchema(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
-
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
@@ -418,8 +413,6 @@ func findCRDCondition(crd *apiextensionsv1.CustomResourceDefinition, conditionTy
 // TestApplyCRDUnhandledSchema tests that when a CRD has a schema that kube-openapi ToProtoModels cannot handle correctly,
 // apply falls back to non-schema behavior
 func TestApplyCRDUnhandledSchema(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
-
 	storageConfig := framework.SharedEtcd()
 	tlsInfo := transport.TLSInfo{
 		CertFile:      storageConfig.Transport.CertFile,
@@ -608,8 +601,6 @@ func getManagedFields(rawResponse []byte) ([]metav1.ManagedFieldsEntry, error) {
 }
 
 func TestDefaultMissingKeyCRD(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
-
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)

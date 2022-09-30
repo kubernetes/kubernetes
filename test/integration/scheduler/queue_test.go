@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/kube-scheduler/config/v1beta3"
+	configv1 "k8s.io/kube-scheduler/config/v1"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
@@ -88,7 +88,8 @@ func TestCoreResourceEnqueue(t *testing.T) {
 
 	// Wait for the three pods to be present in the scheduling queue.
 	if err := wait.Poll(time.Millisecond*200, wait.ForeverTestTimeout, func() (bool, error) {
-		return len(testCtx.Scheduler.SchedulingQueue.PendingPods()) == 3, nil
+		pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
+		return len(pendingPods) == 3, nil
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -211,12 +212,12 @@ func TestCustomResourceEnqueue(t *testing.T) {
 			return &fakeCRPlugin{}, nil
 		},
 	}
-	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
-		Profiles: []v1beta3.KubeSchedulerProfile{{
+	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+		Profiles: []configv1.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			Plugins: &v1beta3.Plugins{
-				Filter: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
+			Plugins: &configv1.Plugins{
+				Filter: configv1.PluginSet{
+					Enabled: []configv1.Plugin{
 						{Name: "fakeCRPlugin"},
 					},
 				},
@@ -263,7 +264,8 @@ func TestCustomResourceEnqueue(t *testing.T) {
 
 	// Wait for the testing Pod to be present in the scheduling queue.
 	if err := wait.Poll(time.Millisecond*200, wait.ForeverTestTimeout, func() (bool, error) {
-		return len(testCtx.Scheduler.SchedulingQueue.PendingPods()) == 1, nil
+		pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
+		return len(pendingPods) == 1, nil
 	}); err != nil {
 		t.Fatal(err)
 	}

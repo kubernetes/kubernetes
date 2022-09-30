@@ -124,17 +124,18 @@ func iperf2ClientDaemonSet(client clientset.Interface, namespace string) (*appsv
 }
 
 // Test summary:
-//   This test uses iperf2 to obtain bandwidth data between nodes in the cluster, providing a coarse measure
-//   of the health of the cluster network.  The test runs two sets of pods:
-//     1. an iperf2 server on a single node
-//     2. a daemonset of iperf2 clients
-//   The test then iterates through the clients, one by one, running iperf2 from each of them to transfer
-//   data to the server and back for ten seconds, after which the results are collected and parsed.
-//   Thus, if your cluster has 10 nodes, then 10 test runs are performed.
-//     Note: a more complete test could run this scenario with a daemonset of servers as well; however, this
-//     would require n^2 tests, n^2 time, and n^2 network resources which quickly become prohibitively large
-//     as the cluster size increases.
-//   Finally, after collecting all data, the results are analyzed and tabulated.
+//
+//	This test uses iperf2 to obtain bandwidth data between nodes in the cluster, providing a coarse measure
+//	of the health of the cluster network.  The test runs two sets of pods:
+//	  1. an iperf2 server on a single node
+//	  2. a daemonset of iperf2 clients
+//	The test then iterates through the clients, one by one, running iperf2 from each of them to transfer
+//	data to the server and back for ten seconds, after which the results are collected and parsed.
+//	Thus, if your cluster has 10 nodes, then 10 test runs are performed.
+//	  Note: a more complete test could run this scenario with a daemonset of servers as well; however, this
+//	  would require n^2 tests, n^2 time, and n^2 network resources which quickly become prohibitively large
+//	  as the cluster size increases.
+//	Finally, after collecting all data, the results are analyzed and tabulated.
 var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]", func() {
 	// this test runs iperf2: one pod as a server, and a daemonset of clients
 	f := framework.NewDefaultFramework("network-perf")

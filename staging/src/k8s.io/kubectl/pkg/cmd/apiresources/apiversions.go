@@ -74,10 +74,7 @@ func (o *APIVersionsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	}
 	var err error
 	o.discoveryClient, err = f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // RunAPIVersions does the work

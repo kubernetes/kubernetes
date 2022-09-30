@@ -74,10 +74,9 @@ type criStatsProvider struct {
 	clock clock.Clock
 
 	// cpuUsageCache caches the cpu usage for containers.
-	cpuUsageCache                  map[string]*cpuUsageRecord
-	mutex                          sync.RWMutex
-	disableAcceleratorUsageMetrics bool
-	podAndContainerStatsFromCRI    bool
+	cpuUsageCache               map[string]*cpuUsageRecord
+	mutex                       sync.RWMutex
+	podAndContainerStatsFromCRI bool
 }
 
 // newCRIStatsProvider returns a containerStatsProvider implementation that
@@ -88,19 +87,17 @@ func newCRIStatsProvider(
 	runtimeService internalapi.RuntimeService,
 	imageService internalapi.ImageManagerService,
 	hostStatsProvider HostStatsProvider,
-	disableAcceleratorUsageMetrics,
 	podAndContainerStatsFromCRI bool,
 ) containerStatsProvider {
 	return &criStatsProvider{
-		cadvisor:                       cadvisor,
-		resourceAnalyzer:               resourceAnalyzer,
-		runtimeService:                 runtimeService,
-		imageService:                   imageService,
-		hostStatsProvider:              hostStatsProvider,
-		cpuUsageCache:                  make(map[string]*cpuUsageRecord),
-		disableAcceleratorUsageMetrics: disableAcceleratorUsageMetrics,
-		podAndContainerStatsFromCRI:    podAndContainerStatsFromCRI,
-		clock:                          clock.RealClock{},
+		cadvisor:                    cadvisor,
+		resourceAnalyzer:            resourceAnalyzer,
+		runtimeService:              runtimeService,
+		imageService:                imageService,
+		hostStatsProvider:           hostStatsProvider,
+		cpuUsageCache:               make(map[string]*cpuUsageRecord),
+		podAndContainerStatsFromCRI: podAndContainerStatsFromCRI,
+		clock:                       clock.RealClock{},
 	}
 }
 
@@ -223,7 +220,7 @@ func (p *criStatsProvider) listPodStatsPartiallyFromCRI(updateCPUNanoCoreUsage b
 
 	result := make([]statsapi.PodStats, 0, len(sandboxIDToPodStats))
 	for _, s := range sandboxIDToPodStats {
-		p.makePodStorageStats(s, rootFsInfo)
+		makePodStorageStats(s, rootFsInfo, p.resourceAnalyzer, p.hostStatsProvider, true)
 		result = append(result, *s)
 	}
 	return result, nil
@@ -260,7 +257,7 @@ func (p *criStatsProvider) listPodStatsStrictlyFromCRI(updateCPUNanoCoreUsage bo
 		addCRIPodCPUStats(ps, criSandboxStat)
 		addCRIPodMemoryStats(ps, criSandboxStat)
 		addCRIPodProcessStats(ps, criSandboxStat)
-		p.makePodStorageStats(ps, rootFsInfo)
+		makePodStorageStats(ps, rootFsInfo, p.resourceAnalyzer, p.hostStatsProvider, true)
 		summarySandboxStats = append(summarySandboxStats, *ps)
 	}
 	return summarySandboxStats, nil
@@ -470,32 +467,6 @@ func buildPodStats(podSandbox *runtimeapi.PodSandbox) *statsapi.PodStats {
 		// The StartTime in the summary API is the pod creation time.
 		StartTime: metav1.NewTime(time.Unix(0, podSandbox.CreatedAt)),
 	}
-}
-
-func (p *criStatsProvider) makePodStorageStats(s *statsapi.PodStats, rootFsInfo *cadvisorapiv2.FsInfo) {
-	podNs := s.PodRef.Namespace
-	podName := s.PodRef.Name
-	podUID := types.UID(s.PodRef.UID)
-	vstats, found := p.resourceAnalyzer.GetPodVolumeStats(podUID)
-	if !found {
-		return
-	}
-	logStats, err := p.hostStatsProvider.getPodLogStats(podNs, podName, podUID, rootFsInfo)
-	if err != nil {
-		klog.ErrorS(err, "Unable to fetch pod log stats", "pod", klog.KRef(podNs, podName))
-		// If people do in-place upgrade, there might be pods still using
-		// the old log path. For those pods, no pod log stats is returned.
-		// We should continue generating other stats in that case.
-		// calcEphemeralStorage tolerants logStats == nil.
-	}
-	etcHostsStats, err := p.hostStatsProvider.getPodEtcHostsStats(podUID, rootFsInfo)
-	if err != nil {
-		klog.ErrorS(err, "Unable to fetch pod etc hosts stats", "pod", klog.KRef(podNs, podName))
-	}
-	ephemeralStats := make([]statsapi.VolumeStats, len(vstats.EphemeralVolumes))
-	copy(ephemeralStats, vstats.EphemeralVolumes)
-	s.VolumeStats = append(append([]statsapi.VolumeStats{}, vstats.EphemeralVolumes...), vstats.PersistentVolumes...)
-	s.EphemeralStorage = calcEphemeralStorage(s.Containers, ephemeralStats, rootFsInfo, logStats, etcHostsStats, true)
 }
 
 func (p *criStatsProvider) addPodNetworkStats(
@@ -883,11 +854,6 @@ func (p *criStatsProvider) addCadvisorContainerStats(
 	}
 	if memory != nil {
 		cs.Memory = memory
-	}
-
-	if !p.disableAcceleratorUsageMetrics {
-		accelerators := cadvisorInfoToAcceleratorStats(caPodStats)
-		cs.Accelerators = accelerators
 	}
 }
 

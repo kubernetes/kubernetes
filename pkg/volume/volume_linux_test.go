@@ -342,7 +342,7 @@ func verifyDirectoryPermission(path string, readonly bool) bool {
 
 func TestSetVolumeOwnershipOwner(t *testing.T) {
 	fsGroup := int64(3000)
-	currentUid := os.Getuid()
+	currentUid := os.Geteuid()
 	if currentUid != 0 {
 		t.Skip("running as non-root")
 	}

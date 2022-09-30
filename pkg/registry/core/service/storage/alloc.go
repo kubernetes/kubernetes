@@ -324,7 +324,7 @@ func (al *Allocators) txnAllocClusterIPs(service *api.Service, dryRun bool) (tra
 		commit: func() {
 			if !dryRun {
 				if len(allocated) > 0 {
-					klog.V(0).InfoS("allocated clusterIPs",
+					klog.InfoS("allocated clusterIPs",
 						"service", klog.KObj(service),
 						"clusterIPs", allocated)
 				}
@@ -431,7 +431,7 @@ func (al *Allocators) releaseIPs(toRelease map[api.IPFamily]string) (map[api.IPF
 		if !ok {
 			// Maybe the cluster was previously configured for dual-stack,
 			// then switched to single-stack?
-			klog.V(0).Infof("not releasing ClusterIP %q because %s is not enabled", ip, family)
+			klog.InfoS("Not releasing ClusterIP because related family is not enabled", "clusterIP", ip, "family", family)
 			continue
 		}
 
@@ -614,7 +614,7 @@ func (al *Allocators) txnUpdateClusterIPs(after After, before Before, dryRun boo
 				return
 			}
 			if len(allocated) > 0 {
-				klog.V(0).InfoS("allocated clusterIPs",
+				klog.InfoS("allocated clusterIPs",
 					"service", klog.KObj(service),
 					"clusterIPs", allocated)
 			}

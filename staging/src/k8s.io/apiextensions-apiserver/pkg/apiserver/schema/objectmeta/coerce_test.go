@@ -161,6 +161,194 @@ func TestMalformedObjectMetaFields(t *testing.T) {
 	}
 }
 
+func TestGetObjectMetaWithOptions(t *testing.T) {
+	unknownAndMalformed := map[string]interface{}{
+		"kind":       "Pod",
+		"apiVersion": "v1",
+		"metadata": map[string]interface{}{
+			"name":         "my-meta",
+			"unknownField": "foo",
+			"generateName": nil,
+			"generation":   nil,
+			"labels": map[string]string{
+				"foo": "bar",
+			},
+			"annotations": 11,
+		},
+	}
+
+	unknownOnly := map[string]interface{}{
+		"kind":       "Pod",
+		"apiVersion": "v1",
+		"metadata": map[string]interface{}{
+			"name":         "my-meta",
+			"unknownField": "foo",
+			"generateName": nil,
+			"generation":   nil,
+			"labels": map[string]string{
+				"foo": "bar",
+			},
+		},
+	}
+
+	malformedOnly := map[string]interface{}{
+		"kind":       "Pod",
+		"apiVersion": "v1",
+		"metadata": map[string]interface{}{
+			"name":         "my-meta",
+			"generateName": nil,
+			"generation":   nil,
+			"labels": map[string]string{
+				"foo": "bar",
+			},
+			"annotations": 11,
+		},
+	}
+
+	var testcases = []struct {
+		obj                     map[string]interface{}
+		dropMalformedFields     bool
+		returnUnknownFieldPaths bool
+		expectedObject          *metav1.ObjectMeta
+		expectedUnknownPaths    []string
+		expectedErr             string
+	}{
+		{
+			obj:                     unknownAndMalformed,
+			dropMalformedFields:     false,
+			returnUnknownFieldPaths: false,
+			expectedErr:             "json: cannot unmarshal number into Go struct field ObjectMeta.annotations of type map[string]string",
+		},
+		{
+			obj:                     unknownAndMalformed,
+			dropMalformedFields:     true,
+			returnUnknownFieldPaths: false,
+			expectedObject: &metav1.ObjectMeta{
+				Name: "my-meta",
+				Labels: map[string]string{
+					"foo": "bar",
+				},
+			},
+		},
+		{
+			obj:                     unknownAndMalformed,
+			dropMalformedFields:     false,
+			returnUnknownFieldPaths: true,
+			expectedErr:             "json: cannot unmarshal number into Go struct field ObjectMeta.annotations of type map[string]string",
+		},
+		{
+			obj:                     unknownAndMalformed,
+			dropMalformedFields:     true,
+			returnUnknownFieldPaths: true,
+			expectedObject: &metav1.ObjectMeta{
+				Name: "my-meta",
+				Labels: map[string]string{
+					"foo": "bar",
+				},
+			},
+			expectedUnknownPaths: []string{"metadata.unknownField"},
+		},
+
+		{
+			obj:                     unknownOnly,
+			dropMalformedFields:     false,
+			returnUnknownFieldPaths: false,
+			expectedObject: &metav1.ObjectMeta{
+				Name: "my-meta",
+				Labels: map[string]string{
+					"foo": "bar",
+				},
+			},
+		},
+		{
+			obj:                     unknownOnly,
+			dropMalformedFields:     true,
+			returnUnknownFieldPaths: false,
+			expectedObject: &metav1.ObjectMeta{
+				Name: "my-meta",
+				Labels: map[string]string{
+					"foo": "bar",
+				},
+			},
+		},
+		{
+			obj:                     unknownOnly,
+			dropMalformedFields:     false,
+			returnUnknownFieldPaths: true,
+			expectedObject: &metav1.ObjectMeta{
+				Name: "my-meta",
+				Labels: map[string]string{
+					"foo": "bar",
+				},
+			},
+			expectedUnknownPaths: []string{"metadata.unknownField"},
+		},
+		{
+			obj:                     unknownOnly,
+			dropMalformedFields:     true,
+			returnUnknownFieldPaths: true,
+			expectedObject: &metav1.ObjectMeta{
+				Name: "my-meta",
+				Labels: map[string]string{
+					"foo": "bar",
+				},
+			},
+			expectedUnknownPaths: []string{"metadata.unknownField"},
+		},
+
+		{
+			obj:                     malformedOnly,
+			dropMalformedFields:     false,
+			returnUnknownFieldPaths: false,
+			expectedErr:             "json: cannot unmarshal number into Go struct field ObjectMeta.annotations of type map[string]string",
+		},
+		{
+			obj:                     malformedOnly,
+			dropMalformedFields:     true,
+			returnUnknownFieldPaths: false,
+			expectedObject: &metav1.ObjectMeta{
+				Name: "my-meta",
+				Labels: map[string]string{
+					"foo": "bar",
+				},
+			},
+		},
+		{
+			obj:                     malformedOnly,
+			dropMalformedFields:     false,
+			returnUnknownFieldPaths: true,
+			expectedErr:             "json: cannot unmarshal number into Go struct field ObjectMeta.annotations of type map[string]string",
+		},
+		{
+			obj:                     malformedOnly,
+			dropMalformedFields:     true,
+			returnUnknownFieldPaths: true,
+			expectedObject: &metav1.ObjectMeta{
+				Name: "my-meta",
+				Labels: map[string]string{
+					"foo": "bar",
+				},
+			},
+		},
+	}
+	for _, tc := range testcases {
+		opts := ObjectMetaOptions{
+			ReturnUnknownFieldPaths: tc.returnUnknownFieldPaths,
+			DropMalformedFields:     tc.dropMalformedFields,
+		}
+		obj, _, unknownPaths, err := GetObjectMetaWithOptions(tc.obj, opts)
+		if !reflect.DeepEqual(tc.expectedObject, obj) {
+			t.Errorf("expected: %v, got: %v", tc.expectedObject, obj)
+		}
+		if (err == nil && tc.expectedErr != "") || err != nil && (err.Error() != tc.expectedErr) {
+			t.Errorf("expected: %v, got: %v", tc.expectedErr, err)
+		}
+		if !reflect.DeepEqual(tc.expectedUnknownPaths, unknownPaths) {
+			t.Errorf("expected: %v, got: %v", tc.expectedUnknownPaths, unknownPaths)
+		}
+	}
+}
+
 func TestGetObjectMetaNils(t *testing.T) {
 	u := &unstructured.Unstructured{
 		Object: map[string]interface{}{

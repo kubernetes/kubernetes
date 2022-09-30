@@ -19,6 +19,7 @@ import (
 	"net/url"
 	"reflect"
 
+	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
@@ -32,6 +33,7 @@ type URL struct {
 var (
 	URLObject = decls.NewObjectType("kubernetes.URL")
 	typeValue = types.NewTypeValue("kubernetes.URL")
+	URLType   = cel.ObjectType("kubernetes.URL")
 )
 
 // ConvertToNative implements ref.Val.ConvertToNative.

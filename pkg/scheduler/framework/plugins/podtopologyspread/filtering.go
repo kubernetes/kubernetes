@@ -206,15 +206,15 @@ func (pl *PodTopologySpread) updateWithPod(s *preFilterState, updatedPod, preemp
 		if !constraint.Selector.Matches(podLabelSet) {
 			continue
 		}
+
 		if pl.enableNodeInclusionPolicyInPodTopologySpread &&
-			!constraint.matchNodeInclusionPolicies(updatedPod, node, requiredSchedulingTerm) {
+			!constraint.matchNodeInclusionPolicies(preemptorPod, node, requiredSchedulingTerm) {
 			continue
 		}
 
 		k, v := constraint.TopologyKey, node.Labels[constraint.TopologyKey]
 		pair := topologyPair{key: k, value: v}
 		s.TpPairToMatchNum[pair] += delta
-
 		s.TpKeyToCriticalPaths[k].update(v, s.TpPairToMatchNum[pair])
 	}
 }
@@ -244,11 +244,10 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 	if len(pod.Spec.TopologySpreadConstraints) > 0 {
 		// We have feature gating in APIServer to strip the spec
 		// so don't need to re-check feature gate, just check length of Constraints.
-		constraints, err = filterTopologySpreadConstraints(
+		constraints, err = pl.filterTopologySpreadConstraints(
 			pod.Spec.TopologySpreadConstraints,
+			pod.Labels,
 			v1.DoNotSchedule,
-			pl.enableMinDomainsInPodTopologySpread,
-			pl.enableNodeInclusionPolicyInPodTopologySpread,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("obtaining pod's hard topology spread constraints: %w", err)
@@ -305,7 +304,7 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 		}
 		tpCountsByNode[i] = tpCounts
 	}
-	pl.parallelizer.Until(ctx, len(allNodes), processNode)
+	pl.parallelizer.Until(ctx, len(allNodes), processNode, pl.Name())
 
 	for _, tpCounts := range tpCountsByNode {
 		for tp, count := range tpCounts {

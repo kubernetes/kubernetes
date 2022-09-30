@@ -34,8 +34,8 @@ type AccessorFunc func(obj map[string]interface{}) (x interface{}, found bool, e
 //
 // With obj, acc, _ := someSurroundingObjectFunc(x) we get:
 //
-//   acc(obj) == x
-//   reflect.DeepEqual(acc(DeepCopy(obj), x) == x
+//	acc(obj) == x
+//	reflect.DeepEqual(acc(DeepCopy(obj), x) == x
 //
 // where x is the original instance for slices and maps.
 //
@@ -44,19 +44,19 @@ type AccessorFunc func(obj map[string]interface{}) (x interface{}, found bool, e
 //
 // Example (ignoring the last two return values):
 //
-//   NewRootObjectFunc()(x) == x
-//   NewRootObjectFunc().Index()(x) == [x]
-//   NewRootObjectFunc().Index().Child("foo") == [{"foo": x}]
-//   NewRootObjectFunc().Index().Child("foo").Child("bar") == [{"foo": {"bar":x}}]
-//   NewRootObjectFunc().Index().Child("foo").Child("bar").Index() == [{"foo": {"bar":[x]}}]
+//	NewRootObjectFunc()(x) == x
+//	NewRootObjectFunc().Index()(x) == [x]
+//	NewRootObjectFunc().Index().Child("foo") == [{"foo": x}]
+//	NewRootObjectFunc().Index().Child("foo").Child("bar") == [{"foo": {"bar":x}}]
+//	NewRootObjectFunc().Index().Child("foo").Child("bar").Index() == [{"foo": {"bar":[x]}}]
 //
 // and:
 //
-//   NewRootObjectFunc(), then acc(x) == x
-//   NewRootObjectFunc().Index(), then acc([x]) == x
-//   NewRootObjectFunc().Index().Child("foo"), then acc([{"foo": x}]) == x
-//   NewRootObjectFunc().Index().Child("foo").Child("bar"), then acc([{"foo": {"bar":x}}]) == x
-//   NewRootObjectFunc().Index().Child("foo").Child("bar").Index(), then acc([{"foo": {"bar":[x]}}]) == x
+//	NewRootObjectFunc(), then acc(x) == x
+//	NewRootObjectFunc().Index(), then acc([x]) == x
+//	NewRootObjectFunc().Index().Child("foo"), then acc([{"foo": x}]) == x
+//	NewRootObjectFunc().Index().Child("foo").Child("bar"), then acc([{"foo": {"bar":x}}]) == x
+//	NewRootObjectFunc().Index().Child("foo").Child("bar").Index(), then acc([{"foo": {"bar":[x]}}]) == x
 type SurroundingObjectFunc func(focus interface{}) (map[string]interface{}, AccessorFunc, error)
 
 // NewRootObjectFunc returns the identity function. The passed focus value

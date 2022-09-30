@@ -438,14 +438,14 @@ func TestPodLogDirectoryGC(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	fakeOS.ReadDirFn = func(string) ([]os.FileInfo, error) {
-		var fileInfos []os.FileInfo
+	fakeOS.ReadDirFn = func(string) ([]os.DirEntry, error) {
+		var dirEntries []os.DirEntry
 		for _, file := range files {
-			mockFI := containertest.NewMockFileInfo(ctrl)
-			mockFI.EXPECT().Name().Return(file)
-			fileInfos = append(fileInfos, mockFI)
+			mockDE := containertest.NewMockDirEntry(ctrl)
+			mockDE.EXPECT().Name().Return(file)
+			dirEntries = append(dirEntries, mockDE)
 		}
-		return fileInfos, nil
+		return dirEntries, nil
 	}
 
 	// allSourcesReady == true, pod log directories without corresponding pod should be removed.

@@ -100,6 +100,10 @@ func (plugin *awsElasticBlockStorePlugin) SupportsBulkVolumeVerification() bool 
 	return true
 }
 
+func (plugin *awsElasticBlockStorePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+
 func (plugin *awsElasticBlockStorePlugin) GetVolumeLimits() (map[string]int64, error) {
 	volumeLimits := map[string]int64{
 		util.EBSVolumeLimitKey: util.DefaultMaxEBSVolumes,
@@ -530,10 +534,10 @@ func (c *awsElasticBlockStoreProvisioner) Provision(selectedNode *v1.Node, allow
 		pv.Spec.AccessModes = c.plugin.GetAccessModes()
 	}
 
-	requirements := make([]v1.NodeSelectorRequirement, 0)
+	requirements := make([]v1.NodeSelectorRequirement, 0, len(labels))
 	if len(labels) != 0 {
 		if pv.Labels == nil {
-			pv.Labels = make(map[string]string)
+			pv.Labels = make(map[string]string, len(labels))
 		}
 		for k, v := range labels {
 			pv.Labels[k] = v

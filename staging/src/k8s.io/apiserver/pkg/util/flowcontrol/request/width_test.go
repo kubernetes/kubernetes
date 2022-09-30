@@ -26,6 +26,10 @@ import (
 )
 
 func TestWorkEstimator(t *testing.T) {
+	defaultCfg := DefaultWorkEstimatorConfig()
+	minimumSeats := defaultCfg.MinimumSeats
+	maximumSeats := defaultCfg.MaximumSeats
+
 	tests := []struct {
 		name                      string
 		requestURI                string
@@ -33,8 +37,8 @@ func TestWorkEstimator(t *testing.T) {
 		counts                    map[string]int64
 		countErr                  error
 		watchCount                int
-		initialSeatsExpected      uint
-		finalSeatsExpected        uint
+		initialSeatsExpected      uint64
+		finalSeatsExpected        uint64
 		additionalLatencyExpected time.Duration
 	}{
 		{
@@ -253,6 +257,34 @@ func TestWorkEstimator(t *testing.T) {
 			initialSeatsExpected: maximumSeats,
 		},
 		{
+			name:       "request verb is list, metadata.name specified",
+			requestURI: "http://server/apis/foo.bar/v1/events?fieldSelector=metadata.name%3Dtest",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				Name:     "test",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			counts: map[string]int64{
+				"events.foo.bar": 799,
+			},
+			initialSeatsExpected: minimumSeats,
+		},
+		{
+			name:       "request verb is list, metadata.name, resourceVersion and limit specified",
+			requestURI: "http://server/apis/foo.bar/v1/events?fieldSelector=metadata.name%3Dtest&limit=500&resourceVersion=0",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				Name:     "test",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			counts: map[string]int64{
+				"events.foo.bar": 799,
+			},
+			initialSeatsExpected: minimumSeats,
+		},
+		{
 			name:       "request verb is create, no watches",
 			requestURI: "http://server/apis/foo.bar/v1/foos",
 			requestInfo: &apirequest.RequestInfo{
@@ -393,13 +425,7 @@ func TestWorkEstimator(t *testing.T) {
 				return test.watchCount
 			}
 
-			// TODO(wojtek-t): Simplify it once we enable mutating work estimator
-			// by default.
-			testEstimator := &workEstimator{
-				listWorkEstimator:     newListWorkEstimator(countsFn),
-				mutatingWorkEstimator: newTestMutatingWorkEstimator(watchCountsFn, true),
-			}
-			estimator := WorkEstimatorFunc(testEstimator.estimate)
+			estimator := NewWorkEstimator(countsFn, watchCountsFn, defaultCfg)
 
 			req, err := http.NewRequest("GET", test.requestURI, nil)
 			if err != nil {

@@ -112,9 +112,10 @@ func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 // dropStatefulSetDisabledFields drops fields that are not used if their associated feature gates
 // are not enabled.
 // The typical pattern is:
-//     if !utilfeature.DefaultFeatureGate.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
-//         newSvc.Spec.MyFeature = nil
-//     }
+//
+//	if !utilfeature.DefaultFeatureGate.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
+//	    newSvc.Spec.MyFeature = nil
+//	}
 func dropStatefulSetDisabledFields(newSS *apps.StatefulSet, oldSS *apps.StatefulSet) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
 		if oldSS == nil || oldSS.Spec.PersistentVolumeClaimRetentionPolicy == nil {

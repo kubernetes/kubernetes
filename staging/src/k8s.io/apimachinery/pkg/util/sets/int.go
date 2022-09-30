@@ -28,7 +28,7 @@ type Int map[int]Empty
 
 // NewInt creates a Int from a list of values.
 func NewInt(items ...int) Int {
-	ss := Int{}
+	ss := make(Int, len(items))
 	ss.Insert(items...)
 	return ss
 }
@@ -87,20 +87,39 @@ func (s Int) HasAny(items ...int) bool {
 	return false
 }
 
-// Difference returns a set of objects that are not in s2
+// Clone returns a new set which is a copy of the current set.
+func (s Int) Clone() Int {
+	result := make(Int, len(s))
+	for key := range s {
+		result.Insert(key)
+	}
+	return result
+}
+
+// Difference returns a set of objects that are not in s2.
 // For example:
 // s1 = {a1, a2, a3}
 // s2 = {a1, a2, a4, a5}
 // s1.Difference(s2) = {a3}
 // s2.Difference(s1) = {a4, a5}
-func (s Int) Difference(s2 Int) Int {
+func (s1 Int) Difference(s2 Int) Int {
 	result := NewInt()
-	for key := range s {
+	for key := range s1 {
 		if !s2.Has(key) {
 			result.Insert(key)
 		}
 	}
 	return result
+}
+
+// SymmetricDifference returns a set of elements which are in either of the sets, but not in their intersection.
+// For example:
+// s1 = {a1, a2, a3}
+// s2 = {a1, a2, a4, a5}
+// s1.SymmetricDifference(s2) = {a3, a4, a5}
+// s2.SymmetricDifference(s1) = {a3, a4, a5}
+func (s1 Int) SymmetricDifference(s2 Int) Int {
+	return s1.Difference(s2).Union(s2.Difference(s1))
 }
 
 // Union returns a new set which includes items in either s1 or s2.
@@ -110,10 +129,7 @@ func (s Int) Difference(s2 Int) Int {
 // s1.Union(s2) = {a1, a2, a3, a4}
 // s2.Union(s1) = {a1, a2, a3, a4}
 func (s1 Int) Union(s2 Int) Int {
-	result := NewInt()
-	for key := range s1 {
-		result.Insert(key)
-	}
+	result := s1.Clone()
 	for key := range s2 {
 		result.Insert(key)
 	}

@@ -776,6 +776,7 @@ func firewallRuleEqual(a, b *compute.Firewall) bool {
 		a.Allowed[0].IPProtocol == b.Allowed[0].IPProtocol &&
 		equalStringSets(a.Allowed[0].Ports, b.Allowed[0].Ports) &&
 		equalStringSets(a.SourceRanges, b.SourceRanges) &&
+		equalStringSets(a.DestinationRanges, b.DestinationRanges) &&
 		equalStringSets(a.TargetTags, b.TargetTags)
 }
 

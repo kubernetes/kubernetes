@@ -17,7 +17,6 @@ limitations under the License.
 package disk
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -42,7 +41,7 @@ import (
 func TestCachedDiscoveryClient_Fresh(t *testing.T) {
 	assert := assert.New(t)
 
-	d, err := ioutil.TempDir("", "")
+	d, err := os.MkdirTemp("", "")
 	assert.NoError(err)
 	defer os.RemoveAll(d)
 
@@ -86,7 +85,7 @@ func TestCachedDiscoveryClient_Fresh(t *testing.T) {
 func TestNewCachedDiscoveryClient_TTL(t *testing.T) {
 	assert := assert.New(t)
 
-	d, err := ioutil.TempDir("", "")
+	d, err := os.MkdirTemp("", "")
 	assert.NoError(err)
 	defer os.RemoveAll(d)
 
@@ -104,7 +103,7 @@ func TestNewCachedDiscoveryClient_TTL(t *testing.T) {
 func TestNewCachedDiscoveryClient_PathPerm(t *testing.T) {
 	assert := assert.New(t)
 
-	d, err := ioutil.TempDir("", "")
+	d, err := os.MkdirTemp("", "")
 	assert.NoError(err)
 	os.RemoveAll(d)
 	defer os.RemoveAll(d)
@@ -131,13 +130,13 @@ func TestNewCachedDiscoveryClient_PathPerm(t *testing.T) {
 // successive calls
 func TestOpenAPIDiskCache(t *testing.T) {
 	// Create discovery cache dir (unused)
-	discoCache, err := ioutil.TempDir("", "")
+	discoCache, err := os.MkdirTemp("", "")
 	require.NoError(t, err)
 	os.RemoveAll(discoCache)
 	defer os.RemoveAll(discoCache)
 
 	// Create http cache dir
-	httpCache, err := ioutil.TempDir("", "")
+	httpCache, err := os.MkdirTemp("", "")
 	require.NoError(t, err)
 	os.RemoveAll(httpCache)
 	defer os.RemoveAll(httpCache)

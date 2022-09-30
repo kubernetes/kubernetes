@@ -57,7 +57,7 @@ import (
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 	netutils "k8s.io/utils/net"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 func TestDeleteEndpointConnectionsIPv4(t *testing.T) {
@@ -736,7 +736,6 @@ func checkIPTablesRuleJumps(ruleData string) error {
 		// Ignore jumps to chains that we expect to exist even if kube-proxy
 		// didn't create them itself.
 		jumpedChains.Delete("ACCEPT", "REJECT", "DROP", "MARK", "RETURN", "DNAT", "SNAT", "MASQUERADE")
-		jumpedChains.Delete(string(kubeMarkDropChain))
 
 		// Find cases where we have "-A FOO ... -j BAR" but no ":BAR", meaning
 		// that we are jumping to a chain that was not created.
@@ -759,7 +758,7 @@ func checkIPTablesRuleJumps(ruleData string) error {
 		// Find cases where we have ":BAR" but no "-A FOO ... -j BAR", meaning
 		// that we are creating an empty chain but not using it for anything.
 		extraChains := createdChains.Difference(jumpedChains)
-		extraChains.Delete(string(kubeServicesChain), string(kubeExternalServicesChain), string(kubeNodePortsChain), string(kubePostroutingChain), string(kubeForwardChain), string(kubeMarkMasqChain))
+		extraChains.Delete(string(kubeServicesChain), string(kubeExternalServicesChain), string(kubeNodePortsChain), string(kubePostroutingChain), string(kubeForwardChain), string(kubeMarkMasqChain), string(kubeProxyFirewallChain))
 		if len(extraChains) > 0 {
 			return fmt.Errorf("some chains in %s are created but not used: %v", tableName, extraChains.List())
 		}
@@ -1018,6 +1017,7 @@ func TestSortIPTablesRules(t *testing.T) {
 				:KUBE-EXTERNAL-SERVICES - [0:0]
 				:KUBE-FORWARD - [0:0]
 				:KUBE-NODEPORTS - [0:0]
+				:KUBE-PROXY-FIREWALL - [0:0]
 				-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 				-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m tcp -p tcp -d 192.168.99.22 --dport 80 -j DROP
 				-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j DROP
@@ -1025,6 +1025,7 @@ func TestSortIPTablesRules(t *testing.T) {
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+				-A KUBE-PROXY-FIREWALL -m comment --comment "ns5/svc5:p80 traffic not accepted by KUBE-FW-NUKIZ6OKUXPJNT4C" -m tcp -p tcp -d 5.6.7.8 --dport 80 -j DROP
 				COMMIT
 				*nat
 				:KUBE-SERVICES - [0:0]
@@ -1060,7 +1061,6 @@ func TestSortIPTablesRules(t *testing.T) {
 				-A KUBE-SEP-RS4RBKLTHTF2IUXJ -m comment --comment ns2/svc2:p80 -s 10.180.0.2 -j KUBE-MARK-MASQ
 				-A KUBE-SEP-RS4RBKLTHTF2IUXJ -m comment --comment ns2/svc2:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.2:80
 				-A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -s 203.0.113.0/25 -j KUBE-EXT-GNZBNJ2PO5MGZ6GT
-				-A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -j KUBE-MARK-DROP
 				-A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp --dport 3001 -j KUBE-EXT-GNZBNJ2PO5MGZ6GT
 				-A KUBE-EXT-GNZBNJ2PO5MGZ6GT -m comment --comment "Redirect pods trying to reach external loadbalancer VIP to clusterIP" -s 10.0.0.0/8 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
 				-A KUBE-EXT-GNZBNJ2PO5MGZ6GT -m comment --comment "masquerade LOCAL traffic for ns2/svc2:p80 LB IP" -m addrtype --src-type LOCAL -j KUBE-MARK-MASQ
@@ -1093,6 +1093,7 @@ func TestSortIPTablesRules(t *testing.T) {
 				:KUBE-SERVICES - [0:0]
 				:KUBE-EXTERNAL-SERVICES - [0:0]
 				:KUBE-FORWARD - [0:0]
+				:KUBE-PROXY-FIREWALL - [0:0]
 				-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 				-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m tcp -p tcp -d 192.168.99.22 --dport 80 -j DROP
 				-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j DROP
@@ -1100,6 +1101,7 @@ func TestSortIPTablesRules(t *testing.T) {
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+				-A KUBE-PROXY-FIREWALL -m comment --comment "ns5/svc5:p80 traffic not accepted by KUBE-FW-NUKIZ6OKUXPJNT4C" -m tcp -p tcp -d 5.6.7.8 --dport 80 -j DROP
 				COMMIT
 				*nat
 				:KUBE-NODEPORTS - [0:0]
@@ -1133,7 +1135,6 @@ func TestSortIPTablesRules(t *testing.T) {
 				-A KUBE-EXT-GNZBNJ2PO5MGZ6GT -m comment --comment "route LOCAL traffic for ns2/svc2:p80 LB IP to service chain" -m addrtype --src-type LOCAL -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
 				-A KUBE-EXT-GNZBNJ2PO5MGZ6GT -j KUBE-SVL-GNZBNJ2PO5MGZ6GT
 				-A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -s 203.0.113.0/25 -j KUBE-EXT-GNZBNJ2PO5MGZ6GT
-				-A KUBE-FW-GNZBNJ2PO5MGZ6GT -m comment --comment "ns2/svc2:p80 loadbalancer IP" -j KUBE-MARK-DROP
 				-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 				-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 				-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
@@ -1434,10 +1435,8 @@ type iptablesTracer struct {
 	// the return value of tracePacket.
 	outputs []string
 
-	// markMasq and markDrop track whether the packet has been marked for masquerading
-	// or dropping.
+	// markMasq tracks whether the packet has been marked for masquerading
 	markMasq bool
-	markDrop bool
 }
 
 // newIPTablesTracer creates an iptablesTracer. nodeIP is the IP to treat as the local
@@ -1523,10 +1522,6 @@ func (tracer *iptablesTracer) runChain(table utiliptables.Table, chain utiliptab
 			tracer.markMasq = true
 			continue
 
-		case "KUBE-MARK-DROP":
-			tracer.markDrop = true
-			continue
-
 		case "ACCEPT", "REJECT", "DROP":
 			// (only valid in filter)
 			tracer.outputs = append(tracer.outputs, rule.Jump.Value)
@@ -1578,14 +1573,10 @@ func tracePacket(t *testing.T, ipt *iptablestest.FakeIPTables, sourceIP, destIP,
 	// inbound, outbound, or intra-host packet, which we don't know. So we just run
 	// the interesting tables manually. (Theoretically this could cause conflicts in
 	// the future in which case we'd have to do something more complicated.)
-
-	// The DROP rule is created by kubelet, not us, so we have to simulate that manually.
-	if tracer.markDrop {
-		return tracer.matches, "DROP", false
-	}
 	tracer.runChain(utiliptables.TableFilter, kubeServicesChain, sourceIP, destIP, destPort)
 	tracer.runChain(utiliptables.TableFilter, kubeExternalServicesChain, sourceIP, destIP, destPort)
 	tracer.runChain(utiliptables.TableFilter, kubeNodePortsChain, sourceIP, destIP, destPort)
+	tracer.runChain(utiliptables.TableFilter, kubeProxyFirewallChain, sourceIP, destIP, destPort)
 
 	// Finally, the nat:POSTROUTING rules run, but the only interesting thing that
 	// happens there is that the masquerade mark gets turned into actual masquerading.
@@ -1637,6 +1628,7 @@ func TestTracePackets(t *testing.T) {
 		:KUBE-FORWARD - [0:0]
 		:KUBE-NODEPORTS - [0:0]
 		:KUBE-SERVICES - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A INPUT -m comment --comment kubernetes health check service ports -j KUBE-NODEPORTS
 		-A INPUT -m conntrack --ctstate NEW -m comment --comment kubernetes externally-visible service portals -j KUBE-EXTERNAL-SERVICES
 		-A FORWARD -m comment --comment kubernetes forwarding rules -j KUBE-FORWARD
@@ -1651,6 +1643,7 @@ func TestTracePackets(t *testing.T) {
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+		-A KUBE-PROXY-FIREWALL -m comment --comment "ns5/svc5:p80 traffic not accepted by KUBE-FW-NUKIZ6OKUXPJNT4C" -m tcp -p tcp -d 5.6.7.8 --dport 80 -j DROP
 		COMMIT
 		*nat
 		:PREROUTING - [0:0]
@@ -1707,7 +1700,6 @@ func TestTracePackets(t *testing.T) {
 		-A KUBE-EXT-X27LE4BHSL4DOUIK -m comment --comment "masquerade traffic for ns3/svc3:p80 external destinations" -j KUBE-MARK-MASQ
 		-A KUBE-EXT-X27LE4BHSL4DOUIK -j KUBE-SVC-X27LE4BHSL4DOUIK
 		-A KUBE-FW-NUKIZ6OKUXPJNT4C -m comment --comment "ns5/svc5:p80 loadbalancer IP" -s 203.0.113.0/25 -j KUBE-EXT-NUKIZ6OKUXPJNT4C
-		-A KUBE-FW-NUKIZ6OKUXPJNT4C -m comment --comment "ns5/svc5:p80 loadbalancer IP" -j KUBE-MARK-DROP
 		-A KUBE-SEP-C6EBXVWJJZMIWKLZ -m comment --comment ns4/svc4:p80 -s 10.180.0.5 -j KUBE-MARK-MASQ
 		-A KUBE-SEP-C6EBXVWJJZMIWKLZ -m comment --comment ns4/svc4:p80 -m tcp -p tcp -j DNAT --to-destination 10.180.0.5:80
 		-A KUBE-SEP-I77PXRDZVX7PMWMN -m comment --comment ns5/svc5:p80 -s 10.180.0.3 -j KUBE-MARK-MASQ
@@ -1771,16 +1763,9 @@ func TestTracePackets(t *testing.T) {
 			masq:     true,
 		},
 		{
-			name:     "DROP (via filter table)",
+			name:     "DROP",
 			sourceIP: testExternalClient,
 			destIP:   "192.168.99.22",
-			destPort: 80,
-			output:   "DROP",
-		},
-		{
-			name:     "DROP (via KUBE-MARK-DROP)",
-			sourceIP: testExternalClientBlocked,
-			destIP:   "5.6.7.8",
 			destPort: 80,
 			output:   "DROP",
 		},
@@ -1900,8 +1885,8 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 				Addresses: []string{"10.180.0.1"},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr("p80"),
-				Port:     utilpointer.Int32(80),
+				Name:     pointer.String("p80"),
+				Port:     pointer.Int32(80),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -1913,8 +1898,8 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 				Addresses: []string{"10.180.0.2"},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr("p80"),
-				Port:     utilpointer.Int32(80),
+				Name:     pointer.String("p80"),
+				Port:     pointer.Int32(80),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -1925,8 +1910,8 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 				Addresses: []string{"10.180.0.3"},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr("p80"),
-				Port:     utilpointer.Int32(80),
+				Name:     pointer.String("p80"),
+				Port:     pointer.Int32(80),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -1937,11 +1922,11 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 				Addresses: []string{"10.180.0.4"},
 			}, {
 				Addresses: []string{"10.180.0.5"},
-				NodeName:  utilpointer.StringPtr(testHostname),
+				NodeName:  pointer.String(testHostname),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr("p80"),
-				Port:     utilpointer.Int32(80),
+				Name:     pointer.String("p80"),
+				Port:     pointer.Int32(80),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -1952,8 +1937,8 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 				Addresses: []string{"10.180.0.3"},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr("p80"),
-				Port:     utilpointer.Int32(80),
+				Name:     pointer.String("p80"),
+				Port:     pointer.Int32(80),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -1967,6 +1952,7 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-NODEPORTS -m comment --comment "ns2/svc2:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 		-A KUBE-SERVICES -m comment --comment "ns6/svc6:p80 has no endpoints" -m tcp -p tcp -d 172.30.0.46 --dport 80 -j REJECT
 		-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m tcp -p tcp -d 192.168.99.22 --dport 80 -j DROP
@@ -1975,6 +1961,7 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+		-A KUBE-PROXY-FIREWALL -m comment --comment "ns5/svc5:p80 traffic not accepted by KUBE-FW-NUKIZ6OKUXPJNT4C" -m tcp -p tcp -d 5.6.7.8 --dport 80 -j DROP
 		COMMIT
 		*nat
 		:KUBE-NODEPORTS - [0:0]
@@ -2020,7 +2007,6 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 		-A KUBE-EXT-X27LE4BHSL4DOUIK -m comment --comment "masquerade traffic for ns3/svc3:p80 external destinations" -j KUBE-MARK-MASQ
 		-A KUBE-EXT-X27LE4BHSL4DOUIK -j KUBE-SVC-X27LE4BHSL4DOUIK
 		-A KUBE-FW-NUKIZ6OKUXPJNT4C -m comment --comment "ns5/svc5:p80 loadbalancer IP" -s 203.0.113.0/25 -j KUBE-EXT-NUKIZ6OKUXPJNT4C
-		-A KUBE-FW-NUKIZ6OKUXPJNT4C -m comment --comment "ns5/svc5:p80 loadbalancer IP" -j KUBE-MARK-DROP
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
@@ -2094,6 +2080,7 @@ func TestClusterIPReject(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j REJECT
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
@@ -2156,8 +2143,8 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 				Addresses: []string{epIP},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName.Port),
-				Port:     utilpointer.Int32(int32(svcPort)),
+				Name:     pointer.String(svcPortName.Port),
+				Port:     pointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -2171,6 +2158,7 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -2262,8 +2250,8 @@ func TestLoadBalancer(t *testing.T) {
 				Addresses: []string{epIP},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName.Port),
-				Port:     utilpointer.Int32(int32(svcPort)),
+				Name:     pointer.String(svcPortName.Port),
+				Port:     pointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -2277,9 +2265,12 @@ func TestLoadBalancer(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+		-A KUBE-PROXY-FIREWALL -m comment --comment "ns1/svc1:p80 traffic not accepted by KUBE-FW-XPGD46QRK7WJZT7O" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j DROP
+		-A KUBE-PROXY-FIREWALL -m comment --comment "ns1/svc1:p80 traffic not accepted by KUBE-FW-XPGD46QRK7WJZT7O" -m tcp -p tcp -d 5.6.7.8 --dport 80 -j DROP
 		COMMIT
 		*nat
 		:KUBE-NODEPORTS - [0:0]
@@ -2301,7 +2292,6 @@ func TestLoadBalancer(t *testing.T) {
 		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -s 203.0.113.0/25 -j KUBE-EXT-XPGD46QRK7WJZT7O
 		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -s 1.2.3.4 -j KUBE-EXT-XPGD46QRK7WJZT7O
 		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -s 5.6.7.8 -j KUBE-EXT-XPGD46QRK7WJZT7O
-		-A KUBE-FW-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 loadbalancer IP" -j KUBE-MARK-DROP
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
@@ -2458,8 +2448,8 @@ func TestNodePort(t *testing.T) {
 				Addresses: []string{epIP},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName.Port),
-				Port:     utilpointer.Int32(int32(svcPort)),
+				Name:     pointer.String(svcPortName.Port),
+				Port:     pointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -2473,6 +2463,7 @@ func TestNodePort(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -2574,6 +2565,7 @@ func TestHealthCheckNodePort(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-NODEPORTS -m comment --comment "ns1/svc1:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 172.30.0.42 --dport 80 -j REJECT
 		-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m addrtype --dst-type LOCAL -m tcp -p tcp --dport 3001 -j REJECT
@@ -2633,6 +2625,7 @@ func TestMasqueradeRule(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -2692,6 +2685,7 @@ func TestExternalIPsReject(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j REJECT
 		-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 192.168.99.11 --dport 80 -j REJECT
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
@@ -2765,11 +2759,11 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 				Addresses: []string{epIP1},
 			}, {
 				Addresses: []string{epIP2},
-				NodeName:  utilpointer.StringPtr(testHostname),
+				NodeName:  pointer.String(testHostname),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName.Port),
-				Port:     utilpointer.Int32(int32(svcPort)),
+				Name:     pointer.String(svcPortName.Port),
+				Port:     pointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -2783,6 +2777,7 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -2876,11 +2871,11 @@ func TestNonLocalExternalIPs(t *testing.T) {
 				NodeName:  nil,
 			}, {
 				Addresses: []string{epIP2},
-				NodeName:  utilpointer.StringPtr(testHostname),
+				NodeName:  pointer.String(testHostname),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName.Port),
-				Port:     utilpointer.Int32(int32(svcPort)),
+				Name:     pointer.String(svcPortName.Port),
+				Port:     pointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -2894,6 +2889,7 @@ func TestNonLocalExternalIPs(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -2979,6 +2975,7 @@ func TestNodePortReject(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j REJECT
 		-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m addrtype --dst-type LOCAL -m tcp -p tcp --dport 3001 -j REJECT
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
@@ -3068,6 +3065,7 @@ func TestLoadBalancerReject(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-NODEPORTS -m comment --comment "ns1/svc1:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j REJECT
 		-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1:p80 has no endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j REJECT
@@ -3162,11 +3160,11 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 				Addresses: []string{epIP1},
 			}, {
 				Addresses: []string{epIP2},
-				NodeName:  utilpointer.StringPtr(testHostname),
+				NodeName:  pointer.String(testHostname),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName.Port),
-				Port:     utilpointer.Int32(int32(svcPort)),
+				Name:     pointer.String(svcPortName.Port),
+				Port:     pointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -3180,6 +3178,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-NODEPORTS -m comment --comment "ns1/svc1:p80 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
@@ -3262,6 +3261,7 @@ func TestOnlyLocalNodePortsNoClusterCIDR(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -3309,6 +3309,7 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -3382,11 +3383,11 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 				NodeName:  nil,
 			}, {
 				Addresses: []string{epIP2},
-				NodeName:  utilpointer.StringPtr(testHostname),
+				NodeName:  pointer.String(testHostname),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName.Port),
-				Port:     utilpointer.Int32(int32(svcPort)),
+				Name:     pointer.String(svcPortName.Port),
+				Port:     pointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -3828,8 +3829,8 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"10.1.1.1"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     utilpointer.String("p11"),
-			Port:     utilpointer.Int32(11),
+			Name:     pointer.String("p11"),
+			Port:     pointer.Int32(11),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -3839,8 +3840,8 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"10.1.1.2"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     utilpointer.String("p12"),
-			Port:     utilpointer.Int32(12),
+			Name:     pointer.String("p12"),
+			Port:     pointer.Int32(12),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -3853,8 +3854,8 @@ func TestUpdateEndpointsMap(t *testing.T) {
 					NodeName:  &nodeName,
 				}}
 				eps.Ports = []discovery.EndpointPort{{
-					Name:     utilpointer.String("p11"),
-					Port:     utilpointer.Int32(11),
+					Name:     pointer.String("p11"),
+					Port:     pointer.Int32(11),
 					Protocol: &udpProtocol,
 				}}
 			}),
@@ -3870,8 +3871,8 @@ func TestUpdateEndpointsMap(t *testing.T) {
 					Addresses: []string{"10.1.1.1"},
 				}}
 				eps.Ports = []discovery.EndpointPort{{
-					Name:     utilpointer.String("p11-2"),
-					Port:     utilpointer.Int32(11),
+					Name:     pointer.String("p11-2"),
+					Port:     pointer.Int32(11),
 					Protocol: &udpProtocol,
 				}}
 			}),
@@ -3884,8 +3885,8 @@ func TestUpdateEndpointsMap(t *testing.T) {
 					Addresses: []string{"10.1.1.1"},
 				}}
 				eps.Ports = []discovery.EndpointPort{{
-					Name:     utilpointer.String("p11"),
-					Port:     utilpointer.Int32(22),
+					Name:     pointer.String("p11"),
+					Port:     pointer.Int32(22),
 					Protocol: &udpProtocol,
 				}}
 			}),
@@ -3901,12 +3902,12 @@ func TestUpdateEndpointsMap(t *testing.T) {
 					NodeName:  &nodeName,
 				}}
 				eps.Ports = []discovery.EndpointPort{{
-					Name:     utilpointer.String("p11"),
-					Port:     utilpointer.Int32(11),
+					Name:     pointer.String("p11"),
+					Port:     pointer.Int32(11),
 					Protocol: &udpProtocol,
 				}, {
-					Name:     utilpointer.String("p12"),
-					Port:     utilpointer.Int32(12),
+					Name:     pointer.String("p12"),
+					Port:     pointer.Int32(12),
 					Protocol: &udpProtocol,
 				}}
 			}),
@@ -3922,8 +3923,8 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     utilpointer.String("p12"),
-			Port:     utilpointer.Int32(12),
+			Name:     pointer.String("p12"),
+			Port:     pointer.Int32(12),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -3938,12 +3939,12 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     utilpointer.String("p11"),
-			Port:     utilpointer.Int32(11),
+			Name:     pointer.String("p11"),
+			Port:     pointer.Int32(11),
 			Protocol: &udpProtocol,
 		}, {
-			Name:     utilpointer.String("p12"),
-			Port:     utilpointer.Int32(12),
+			Name:     pointer.String("p12"),
+			Port:     pointer.Int32(12),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -3953,8 +3954,8 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"10.1.1.3"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     utilpointer.String("p13"),
-			Port:     utilpointer.Int32(13),
+			Name:     pointer.String("p13"),
+			Port:     pointer.Int32(13),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -3971,12 +3972,12 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     utilpointer.String("p11"),
-			Port:     utilpointer.Int32(11),
+			Name:     pointer.String("p11"),
+			Port:     pointer.Int32(11),
 			Protocol: &udpProtocol,
 		}, {
-			Name:     utilpointer.String("p12"),
-			Port:     utilpointer.Int32(12),
+			Name:     pointer.String("p12"),
+			Port:     pointer.Int32(12),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -3989,12 +3990,12 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     utilpointer.String("p13"),
-			Port:     utilpointer.Int32(13),
+			Name:     pointer.String("p13"),
+			Port:     pointer.Int32(13),
 			Protocol: &udpProtocol,
 		}, {
-			Name:     utilpointer.String("p14"),
-			Port:     utilpointer.Int32(14),
+			Name:     pointer.String("p14"),
+			Port:     pointer.Int32(14),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -4007,12 +4008,12 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     utilpointer.String("p21"),
-			Port:     utilpointer.Int32(21),
+			Name:     pointer.String("p21"),
+			Port:     pointer.Int32(21),
 			Protocol: &udpProtocol,
 		}, {
-			Name:     utilpointer.String("p22"),
-			Port:     utilpointer.Int32(22),
+			Name:     pointer.String("p22"),
+			Port:     pointer.Int32(22),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -4031,8 +4032,8 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     utilpointer.String("p22"),
-			Port:     utilpointer.Int32(22),
+			Name:     pointer.String("p22"),
+			Port:     pointer.Int32(22),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -4043,8 +4044,8 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     utilpointer.String("p23"),
-			Port:     utilpointer.Int32(23),
+			Name:     pointer.String("p23"),
+			Port:     pointer.Int32(23),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -4058,8 +4059,8 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     utilpointer.String("p44"),
-			Port:     utilpointer.Int32(44),
+			Name:     pointer.String("p44"),
+			Port:     pointer.Int32(44),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -4070,8 +4071,8 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     utilpointer.String("p45"),
-			Port:     utilpointer.Int32(45),
+			Name:     pointer.String("p45"),
+			Port:     pointer.Int32(45),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -4083,8 +4084,8 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"10.1.1.11"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     utilpointer.String("p11"),
-			Port:     utilpointer.Int32(11),
+			Name:     pointer.String("p11"),
+			Port:     pointer.Int32(11),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -4094,12 +4095,12 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"10.1.1.2"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     utilpointer.String("p12"),
-			Port:     utilpointer.Int32(12),
+			Name:     pointer.String("p12"),
+			Port:     pointer.Int32(12),
 			Protocol: &udpProtocol,
 		}, {
-			Name:     utilpointer.String("p122"),
-			Port:     utilpointer.Int32(122),
+			Name:     pointer.String("p122"),
+			Port:     pointer.Int32(122),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -4109,8 +4110,8 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"10.3.3.3"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     utilpointer.String("p33"),
-			Port:     utilpointer.Int32(33),
+			Name:     pointer.String("p33"),
+			Port:     pointer.Int32(33),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -4121,8 +4122,8 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			NodeName:  &nodeName,
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     utilpointer.String("p44"),
-			Port:     utilpointer.Int32(44),
+			Name:     pointer.String("p44"),
+			Port:     pointer.Int32(44),
 			Protocol: &udpProtocol,
 		}}
 	}
@@ -4657,6 +4658,7 @@ func TestEndpointSliceE2E(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -4714,27 +4716,27 @@ func TestEndpointSliceE2E(t *testing.T) {
 			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
 		},
 		Ports: []discovery.EndpointPort{{
-			Name:     utilpointer.StringPtr(""),
-			Port:     utilpointer.Int32Ptr(80),
+			Name:     pointer.String(""),
+			Port:     pointer.Int32(80),
 			Protocol: &tcpProtocol,
 		}},
 		AddressType: discovery.AddressTypeIPv4,
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"10.0.1.1"},
-			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			NodeName:   utilpointer.StringPtr(testHostname),
+			Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+			NodeName:   pointer.String(testHostname),
 		}, {
 			Addresses:  []string{"10.0.1.2"},
-			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			NodeName:   utilpointer.StringPtr("node2"),
+			Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+			NodeName:   pointer.String("node2"),
 		}, {
 			Addresses:  []string{"10.0.1.3"},
-			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			NodeName:   utilpointer.StringPtr("node3"),
+			Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+			NodeName:   pointer.String("node3"),
 		}, {
 			Addresses:  []string{"10.0.1.4"},
-			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
-			NodeName:   utilpointer.StringPtr("node4"),
+			Conditions: discovery.EndpointConditions{Ready: pointer.Bool(false)},
+			NodeName:   pointer.String("node4"),
 		}},
 	}
 
@@ -4774,27 +4776,27 @@ func TestHealthCheckNodePortWhenTerminating(t *testing.T) {
 			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
 		},
 		Ports: []discovery.EndpointPort{{
-			Name:     utilpointer.StringPtr(""),
-			Port:     utilpointer.Int32Ptr(80),
+			Name:     pointer.String(""),
+			Port:     pointer.Int32(80),
 			Protocol: &tcpProtocol,
 		}},
 		AddressType: discovery.AddressTypeIPv4,
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"10.0.1.1"},
-			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			NodeName:   utilpointer.StringPtr(testHostname),
+			Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+			NodeName:   pointer.String(testHostname),
 		}, {
 			Addresses:  []string{"10.0.1.2"},
-			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			NodeName:   utilpointer.StringPtr(testHostname),
+			Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+			NodeName:   pointer.String(testHostname),
 		}, {
 			Addresses:  []string{"10.0.1.3"},
-			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			NodeName:   utilpointer.StringPtr(testHostname),
+			Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+			NodeName:   pointer.String(testHostname),
 		}, { // not ready endpoints should be ignored
 			Addresses:  []string{"10.0.1.4"},
-			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
-			NodeName:   utilpointer.StringPtr(testHostname),
+			Conditions: discovery.EndpointConditions{Ready: pointer.Bool(false)},
+			NodeName:   pointer.String(testHostname),
 		}},
 	}
 
@@ -4812,43 +4814,43 @@ func TestHealthCheckNodePortWhenTerminating(t *testing.T) {
 			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
 		},
 		Ports: []discovery.EndpointPort{{
-			Name:     utilpointer.StringPtr(""),
-			Port:     utilpointer.Int32Ptr(80),
+			Name:     pointer.String(""),
+			Port:     pointer.Int32(80),
 			Protocol: &tcpProtocol,
 		}},
 		AddressType: discovery.AddressTypeIPv4,
 		Endpoints: []discovery.Endpoint{{
 			Addresses: []string{"10.0.1.1"},
 			Conditions: discovery.EndpointConditions{
-				Ready:       utilpointer.BoolPtr(false),
-				Serving:     utilpointer.BoolPtr(true),
-				Terminating: utilpointer.BoolPtr(false),
+				Ready:       pointer.Bool(false),
+				Serving:     pointer.Bool(true),
+				Terminating: pointer.Bool(false),
 			},
-			NodeName: utilpointer.StringPtr(testHostname),
+			NodeName: pointer.String(testHostname),
 		}, {
 			Addresses: []string{"10.0.1.2"},
 			Conditions: discovery.EndpointConditions{
-				Ready:       utilpointer.BoolPtr(false),
-				Serving:     utilpointer.BoolPtr(true),
-				Terminating: utilpointer.BoolPtr(true),
+				Ready:       pointer.Bool(false),
+				Serving:     pointer.Bool(true),
+				Terminating: pointer.Bool(true),
 			},
-			NodeName: utilpointer.StringPtr(testHostname),
+			NodeName: pointer.String(testHostname),
 		}, {
 			Addresses: []string{"10.0.1.3"},
 			Conditions: discovery.EndpointConditions{
-				Ready:       utilpointer.BoolPtr(false),
-				Serving:     utilpointer.BoolPtr(true),
-				Terminating: utilpointer.BoolPtr(true),
+				Ready:       pointer.Bool(false),
+				Serving:     pointer.Bool(true),
+				Terminating: pointer.Bool(true),
 			},
-			NodeName: utilpointer.StringPtr(testHostname),
+			NodeName: pointer.String(testHostname),
 		}, { // not ready endpoints should be ignored
 			Addresses: []string{"10.0.1.4"},
 			Conditions: discovery.EndpointConditions{
-				Ready:       utilpointer.BoolPtr(false),
-				Serving:     utilpointer.BoolPtr(false),
-				Terminating: utilpointer.BoolPtr(true),
+				Ready:       pointer.Bool(false),
+				Serving:     pointer.Bool(false),
+				Terminating: pointer.Bool(true),
 			},
-			NodeName: utilpointer.StringPtr(testHostname),
+			NodeName: pointer.String(testHostname),
 		}},
 	}
 
@@ -4928,12 +4930,12 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{epIP},
 				Conditions: discovery.EndpointConditions{
-					Ready: utilpointer.Bool(false),
+					Ready: pointer.Bool(false),
 				},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName.Port),
-				Port:     utilpointer.Int32(int32(svcPort)),
+				Name:     pointer.String(svcPortName.Port),
+				Port:     pointer.Int32(int32(svcPort)),
 				Protocol: &udpProtocol,
 			}}
 		}),
@@ -4951,12 +4953,12 @@ func TestProxierDeleteNodePortStaleUDP(t *testing.T) {
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{epIP},
 				Conditions: discovery.EndpointConditions{
-					Ready: utilpointer.Bool(true),
+					Ready: pointer.Bool(true),
 				},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName.Port),
-				Port:     utilpointer.Int32(int32(svcPort)),
+				Name:     pointer.String(svcPortName.Port),
+				Port:     pointer.Int32(int32(svcPort)),
 				Protocol: &udpProtocol,
 			}}
 		}),
@@ -5054,8 +5056,8 @@ func TestProxierMetricsIptablesTotalRules(t *testing.T) {
 				Addresses: []string{"10.0.0.5"},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName.Port),
-				Port:     utilpointer.Int32(int32(svcPort)),
+				Name:     pointer.String(svcPortName.Port),
+				Port:     pointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -5106,6 +5108,7 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -5188,6 +5191,7 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 				:KUBE-SERVICES - [0:0]
 				:KUBE-EXTERNAL-SERVICES - [0:0]
 				:KUBE-FORWARD - [0:0]
+				:KUBE-PROXY-FIREWALL - [0:0]
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -5239,6 +5243,7 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 				:KUBE-SERVICES - [0:0]
 				:KUBE-EXTERNAL-SERVICES - [0:0]
 				:KUBE-FORWARD - [0:0]
+				:KUBE-PROXY-FIREWALL - [0:0]
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 has no local endpoints" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j DROP
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
@@ -5324,8 +5329,8 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 					Labels:    map[string]string{discovery.LabelServiceName: serviceName},
 				},
 				Ports: []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr(""),
-					Port:     utilpointer.Int32Ptr(80),
+					Name:     pointer.String(""),
+					Port:     pointer.Int32(80),
 					Protocol: &tcpProtocol,
 				}},
 				AddressType: discovery.AddressTypeIPv4,
@@ -5333,8 +5338,8 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 			for _, ep := range tc.endpoints {
 				endpointSlice.Endpoints = append(endpointSlice.Endpoints, discovery.Endpoint{
 					Addresses:  []string{ep.ip},
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-					NodeName:   utilpointer.StringPtr(ep.hostname),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					NodeName:   pointer.String(ep.hostname),
 				})
 			}
 
@@ -5420,8 +5425,8 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 					Labels:    map[string]string{discovery.LabelServiceName: "svc1"},
 				},
 				Ports: []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr(""),
-					Port:     utilpointer.Int32Ptr(80),
+					Name:     pointer.String(""),
+					Port:     pointer.Int32(80),
 					Protocol: &tcpProtocol,
 				}},
 				AddressType: discovery.AddressTypeIPv4,
@@ -5429,50 +5434,50 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 					{
 						Addresses: []string{"10.0.1.1"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(true),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(false),
+							Ready:       pointer.Bool(true),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(false),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						Addresses: []string{"10.0.1.2"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(true),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(false),
+							Ready:       pointer.Bool(true),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(false),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						// this endpoint should be ignored for external since there are ready non-terminating endpoints
 						Addresses: []string{"10.0.1.3"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						// this endpoint should be ignored for external since there are ready non-terminating endpoints
 						Addresses: []string{"10.0.1.4"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(false),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(false),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						// this endpoint should be ignored for external since it's not local
 						Addresses: []string{"10.0.1.5"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(true),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(false),
+							Ready:       pointer.Bool(true),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(false),
 						},
-						NodeName: utilpointer.StringPtr("host-1"),
+						NodeName: pointer.String("host-1"),
 					},
 				},
 			},
@@ -5482,6 +5487,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 				:KUBE-SERVICES - [0:0]
 				:KUBE-EXTERNAL-SERVICES - [0:0]
 				:KUBE-FORWARD - [0:0]
+				:KUBE-PROXY-FIREWALL - [0:0]
 				-A KUBE-NODEPORTS -m comment --comment "ns1/svc1 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
@@ -5558,8 +5564,8 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 					Labels:    map[string]string{discovery.LabelServiceName: "svc1"},
 				},
 				Ports: []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr(""),
-					Port:     utilpointer.Int32Ptr(80),
+					Name:     pointer.String(""),
+					Port:     pointer.Int32(80),
 					Protocol: &tcpProtocol,
 				}},
 				AddressType: discovery.AddressTypeIPv4,
@@ -5567,50 +5573,50 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 					{
 						Addresses: []string{"10.0.1.1"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(true),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(false),
+							Ready:       pointer.Bool(true),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(false),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						Addresses: []string{"10.0.1.2"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(true),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(false),
+							Ready:       pointer.Bool(true),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(false),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						// this endpoint should be ignored since it is not ready and the feature gate is off
 						Addresses: []string{"10.0.1.3"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						// this endpoint should be ignored since it is not ready and the feature gate is off
 						Addresses: []string{"10.0.1.4"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(false),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(false),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						// this endpoint should be ignored for external since it's not local
 						Addresses: []string{"10.0.1.5"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(true),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(false),
+							Ready:       pointer.Bool(true),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(false),
 						},
-						NodeName: utilpointer.StringPtr("host-1"),
+						NodeName: pointer.String("host-1"),
 					},
 				},
 			},
@@ -5620,6 +5626,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 				:KUBE-SERVICES - [0:0]
 				:KUBE-EXTERNAL-SERVICES - [0:0]
 				:KUBE-FORWARD - [0:0]
+				:KUBE-PROXY-FIREWALL - [0:0]
 				-A KUBE-NODEPORTS -m comment --comment "ns1/svc1 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
@@ -5696,8 +5703,8 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 					Labels:    map[string]string{discovery.LabelServiceName: "svc1"},
 				},
 				Ports: []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr(""),
-					Port:     utilpointer.Int32Ptr(80),
+					Name:     pointer.String(""),
+					Port:     pointer.Int32(80),
 					Protocol: &tcpProtocol,
 				}},
 				AddressType: discovery.AddressTypeIPv4,
@@ -5706,41 +5713,41 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 						// this endpoint should be used since there are only ready terminating endpoints
 						Addresses: []string{"10.0.1.2"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						// this endpoint should be used since there are only ready terminating endpoints
 						Addresses: []string{"10.0.1.3"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						// this endpoint should not be used since it is both terminating and not ready.
 						Addresses: []string{"10.0.1.4"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(false),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(false),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						// this endpoint should be ignored for external since it's not local
 						Addresses: []string{"10.0.1.5"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(true),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(false),
+							Ready:       pointer.Bool(true),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(false),
 						},
-						NodeName: utilpointer.StringPtr("host-1"),
+						NodeName: pointer.String("host-1"),
 					},
 				},
 			},
@@ -5750,6 +5757,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 				:KUBE-SERVICES - [0:0]
 				:KUBE-EXTERNAL-SERVICES - [0:0]
 				:KUBE-FORWARD - [0:0]
+				:KUBE-PROXY-FIREWALL - [0:0]
 				-A KUBE-NODEPORTS -m comment --comment "ns1/svc1 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
@@ -5822,8 +5830,8 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 					Labels:    map[string]string{discovery.LabelServiceName: "svc1"},
 				},
 				Ports: []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr(""),
-					Port:     utilpointer.Int32Ptr(80),
+					Name:     pointer.String(""),
+					Port:     pointer.Int32(80),
 					Protocol: &tcpProtocol,
 				}},
 				AddressType: discovery.AddressTypeIPv4,
@@ -5831,47 +5839,47 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 					{
 						Addresses: []string{"10.0.1.1"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						Addresses: []string{"10.0.1.2"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						Addresses: []string{"10.0.1.3"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(false),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(false),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						Addresses: []string{"10.0.1.4"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(false),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(false),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						Addresses: []string{"10.0.1.5"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(true),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(false),
+							Ready:       pointer.Bool(true),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(false),
 						},
-						NodeName: utilpointer.StringPtr("host-1"),
+						NodeName: pointer.String("host-1"),
 					},
 				},
 			},
@@ -5881,6 +5889,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 				:KUBE-SERVICES - [0:0]
 				:KUBE-EXTERNAL-SERVICES - [0:0]
 				:KUBE-FORWARD - [0:0]
+				:KUBE-PROXY-FIREWALL - [0:0]
 				-A KUBE-NODEPORTS -m comment --comment "ns1/svc1 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 				-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1 has no local endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j DROP
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
@@ -5941,8 +5950,8 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 					Labels:    map[string]string{discovery.LabelServiceName: "svc1"},
 				},
 				Ports: []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr(""),
-					Port:     utilpointer.Int32Ptr(80),
+					Name:     pointer.String(""),
+					Port:     pointer.Int32(80),
 					Protocol: &tcpProtocol,
 				}},
 				AddressType: discovery.AddressTypeIPv4,
@@ -5952,11 +5961,11 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 						// but it will prevent a REJECT rule from being created
 						Addresses: []string{"10.0.1.5"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr("host-1"),
+						NodeName: pointer.String("host-1"),
 					},
 				},
 			},
@@ -5966,6 +5975,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 				:KUBE-SERVICES - [0:0]
 				:KUBE-EXTERNAL-SERVICES - [0:0]
 				:KUBE-FORWARD - [0:0]
+				:KUBE-PROXY-FIREWALL - [0:0]
 				-A KUBE-NODEPORTS -m comment --comment "ns1/svc1 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 				-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1 has no local endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j DROP
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
@@ -6025,8 +6035,8 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 					Labels:    map[string]string{discovery.LabelServiceName: "svc1"},
 				},
 				Ports: []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr(""),
-					Port:     utilpointer.Int32Ptr(80),
+					Name:     pointer.String(""),
+					Port:     pointer.Int32(80),
 					Protocol: &tcpProtocol,
 				}},
 				AddressType: discovery.AddressTypeIPv4,
@@ -6035,21 +6045,21 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 						// Local but not ready or serving
 						Addresses: []string{"10.0.1.5"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(false),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(false),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						// Remote and not ready or serving
 						Addresses: []string{"10.0.1.5"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(false),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(false),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr("host-1"),
+						NodeName: pointer.String("host-1"),
 					},
 				},
 			},
@@ -6060,6 +6070,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 				:KUBE-SERVICES - [0:0]
 				:KUBE-EXTERNAL-SERVICES - [0:0]
 				:KUBE-FORWARD - [0:0]
+				:KUBE-PROXY-FIREWALL - [0:0]
 				-A KUBE-NODEPORTS -m comment --comment "ns1/svc1 health check node port" -m tcp -p tcp --dport 30000 -j ACCEPT
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 has no endpoints" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j REJECT
 				-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1 has no endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j REJECT
@@ -6199,8 +6210,8 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 					Labels:    map[string]string{discovery.LabelServiceName: "svc1"},
 				},
 				Ports: []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr(""),
-					Port:     utilpointer.Int32Ptr(80),
+					Name:     pointer.String(""),
+					Port:     pointer.Int32(80),
 					Protocol: &tcpProtocol,
 				}},
 				AddressType: discovery.AddressTypeIPv4,
@@ -6208,49 +6219,49 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 					{
 						Addresses: []string{"10.0.1.1"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(true),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(false),
+							Ready:       pointer.Bool(true),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(false),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						Addresses: []string{"10.0.1.2"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(true),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(false),
+							Ready:       pointer.Bool(true),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(false),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						// this endpoint should be ignored since there are ready non-terminating endpoints
 						Addresses: []string{"10.0.1.3"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr("another-host"),
+						NodeName: pointer.String("another-host"),
 					},
 					{
 						// this endpoint should be ignored since it is not "serving"
 						Addresses: []string{"10.0.1.4"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(false),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(false),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr("another-host"),
+						NodeName: pointer.String("another-host"),
 					},
 					{
 						Addresses: []string{"10.0.1.5"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(true),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(false),
+							Ready:       pointer.Bool(true),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(false),
 						},
-						NodeName: utilpointer.StringPtr("another-host"),
+						NodeName: pointer.String("another-host"),
 					},
 				},
 			},
@@ -6260,6 +6271,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 				:KUBE-SERVICES - [0:0]
 				:KUBE-EXTERNAL-SERVICES - [0:0]
 				:KUBE-FORWARD - [0:0]
+				:KUBE-PROXY-FIREWALL - [0:0]
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -6328,8 +6340,8 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 					Labels:    map[string]string{discovery.LabelServiceName: "svc1"},
 				},
 				Ports: []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr(""),
-					Port:     utilpointer.Int32Ptr(80),
+					Name:     pointer.String(""),
+					Port:     pointer.Int32(80),
 					Protocol: &tcpProtocol,
 				}},
 				AddressType: discovery.AddressTypeIPv4,
@@ -6337,49 +6349,49 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 					{
 						Addresses: []string{"10.0.1.1"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(true),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(false),
+							Ready:       pointer.Bool(true),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(false),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						Addresses: []string{"10.0.1.2"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(true),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(false),
+							Ready:       pointer.Bool(true),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(false),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						// always ignored since feature gate is disabled
 						Addresses: []string{"10.0.1.3"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr("another-host"),
+						NodeName: pointer.String("another-host"),
 					},
 					{
 						// always ignored since serving=false
 						Addresses: []string{"10.0.1.4"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(false),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(false),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr("another-host"),
+						NodeName: pointer.String("another-host"),
 					},
 					{
 						Addresses: []string{"10.0.1.5"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(true),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(false),
+							Ready:       pointer.Bool(true),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(false),
 						},
-						NodeName: utilpointer.StringPtr("another-host"),
+						NodeName: pointer.String("another-host"),
 					},
 				},
 			},
@@ -6389,6 +6401,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 				:KUBE-SERVICES - [0:0]
 				:KUBE-EXTERNAL-SERVICES - [0:0]
 				:KUBE-FORWARD - [0:0]
+				:KUBE-PROXY-FIREWALL - [0:0]
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -6457,8 +6470,8 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 					Labels:    map[string]string{discovery.LabelServiceName: "svc1"},
 				},
 				Ports: []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr(""),
-					Port:     utilpointer.Int32Ptr(80),
+					Name:     pointer.String(""),
+					Port:     pointer.Int32(80),
 					Protocol: &tcpProtocol,
 				}},
 				AddressType: discovery.AddressTypeIPv4,
@@ -6467,41 +6480,41 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 						// this endpoint should be used since there are only ready terminating endpoints
 						Addresses: []string{"10.0.1.2"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						// this endpoint should be used since there are only ready terminating endpoints
 						Addresses: []string{"10.0.1.3"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						// this endpoint should not be used since it is both terminating and not ready.
 						Addresses: []string{"10.0.1.4"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(false),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(false),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr("another-host"),
+						NodeName: pointer.String("another-host"),
 					},
 					{
 						// this endpoint should be used since there are only ready terminating endpoints
 						Addresses: []string{"10.0.1.5"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr("another-host"),
+						NodeName: pointer.String("another-host"),
 					},
 				},
 			},
@@ -6511,6 +6524,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 				:KUBE-SERVICES - [0:0]
 				:KUBE-EXTERNAL-SERVICES - [0:0]
 				:KUBE-FORWARD - [0:0]
+				:KUBE-PROXY-FIREWALL - [0:0]
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -6579,8 +6593,8 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 					Labels:    map[string]string{discovery.LabelServiceName: "svc1"},
 				},
 				Ports: []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr(""),
-					Port:     utilpointer.Int32Ptr(80),
+					Name:     pointer.String(""),
+					Port:     pointer.Int32(80),
 					Protocol: &tcpProtocol,
 				}},
 				AddressType: discovery.AddressTypeIPv4,
@@ -6588,47 +6602,47 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 					{
 						Addresses: []string{"10.0.1.1"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						Addresses: []string{"10.0.1.2"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						Addresses: []string{"10.0.1.3"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(false),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(false),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr("another-host"),
+						NodeName: pointer.String("another-host"),
 					},
 					{
 						Addresses: []string{"10.0.1.4"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(false),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(false),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr("another-host"),
+						NodeName: pointer.String("another-host"),
 					},
 					{
 						Addresses: []string{"10.0.1.5"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr("another-host"),
+						NodeName: pointer.String("another-host"),
 					},
 				},
 			},
@@ -6639,6 +6653,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 				:KUBE-SERVICES - [0:0]
 				:KUBE-EXTERNAL-SERVICES - [0:0]
 				:KUBE-FORWARD - [0:0]
+				:KUBE-PROXY-FIREWALL - [0:0]
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 has no endpoints" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j REJECT
 				-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1 has no endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j REJECT
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
@@ -6685,8 +6700,8 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 					Labels:    map[string]string{discovery.LabelServiceName: "svc1"},
 				},
 				Ports: []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr(""),
-					Port:     utilpointer.Int32Ptr(80),
+					Name:     pointer.String(""),
+					Port:     pointer.Int32(80),
 					Protocol: &tcpProtocol,
 				}},
 				AddressType: discovery.AddressTypeIPv4,
@@ -6694,11 +6709,11 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 					{
 						Addresses: []string{"10.0.1.5"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(true),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(true),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr("host-1"),
+						NodeName: pointer.String("host-1"),
 					},
 				},
 			},
@@ -6708,6 +6723,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 				:KUBE-SERVICES - [0:0]
 				:KUBE-EXTERNAL-SERVICES - [0:0]
 				:KUBE-FORWARD - [0:0]
+				:KUBE-PROXY-FIREWALL - [0:0]
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -6766,8 +6782,8 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 					Labels:    map[string]string{discovery.LabelServiceName: "svc1"},
 				},
 				Ports: []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr(""),
-					Port:     utilpointer.Int32Ptr(80),
+					Name:     pointer.String(""),
+					Port:     pointer.Int32(80),
 					Protocol: &tcpProtocol,
 				}},
 				AddressType: discovery.AddressTypeIPv4,
@@ -6776,21 +6792,21 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 						// Local, not ready or serving
 						Addresses: []string{"10.0.1.5"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(false),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(false),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr(testHostname),
+						NodeName: pointer.String(testHostname),
 					},
 					{
 						// Remote, not ready or serving
 						Addresses: []string{"10.0.1.5"},
 						Conditions: discovery.EndpointConditions{
-							Ready:       utilpointer.BoolPtr(false),
-							Serving:     utilpointer.BoolPtr(false),
-							Terminating: utilpointer.BoolPtr(true),
+							Ready:       pointer.Bool(false),
+							Serving:     pointer.Bool(false),
+							Terminating: pointer.Bool(true),
 						},
-						NodeName: utilpointer.StringPtr("host-1"),
+						NodeName: pointer.String("host-1"),
 					},
 				},
 			},
@@ -6801,6 +6817,7 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 				:KUBE-SERVICES - [0:0]
 				:KUBE-EXTERNAL-SERVICES - [0:0]
 				:KUBE-FORWARD - [0:0]
+				:KUBE-PROXY-FIREWALL - [0:0]
 				-A KUBE-SERVICES -m comment --comment "ns1/svc1 has no endpoints" -m tcp -p tcp -d 172.30.1.1 --dport 80 -j REJECT
 				-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns1/svc1 has no endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j REJECT
 				-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
@@ -6942,16 +6959,16 @@ func TestInternalExternalMasquerade(t *testing.T) {
 				eps.Endpoints = []discovery.Endpoint{
 					{
 						Addresses: []string{"10.180.0.1"},
-						NodeName:  utilpointer.StringPtr(testHostname),
+						NodeName:  pointer.String(testHostname),
 					},
 					{
 						Addresses: []string{"10.180.1.1"},
-						NodeName:  utilpointer.StringPtr("remote"),
+						NodeName:  pointer.String("remote"),
 					},
 				}
 				eps.Ports = []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr("p80"),
-					Port:     utilpointer.Int32(80),
+					Name:     pointer.String("p80"),
+					Port:     pointer.Int32(80),
 					Protocol: &tcpProtocol,
 				}}
 			}),
@@ -6960,16 +6977,16 @@ func TestInternalExternalMasquerade(t *testing.T) {
 				eps.Endpoints = []discovery.Endpoint{
 					{
 						Addresses: []string{"10.180.0.2"},
-						NodeName:  utilpointer.StringPtr(testHostname),
+						NodeName:  pointer.String(testHostname),
 					},
 					{
 						Addresses: []string{"10.180.1.2"},
-						NodeName:  utilpointer.StringPtr("remote"),
+						NodeName:  pointer.String("remote"),
 					},
 				}
 				eps.Ports = []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr("p80"),
-					Port:     utilpointer.Int32(80),
+					Name:     pointer.String("p80"),
+					Port:     pointer.Int32(80),
 					Protocol: &tcpProtocol,
 				}}
 			}),
@@ -6978,16 +6995,16 @@ func TestInternalExternalMasquerade(t *testing.T) {
 				eps.Endpoints = []discovery.Endpoint{
 					{
 						Addresses: []string{"10.180.0.3"},
-						NodeName:  utilpointer.StringPtr(testHostname),
+						NodeName:  pointer.String(testHostname),
 					},
 					{
 						Addresses: []string{"10.180.1.3"},
-						NodeName:  utilpointer.StringPtr("remote"),
+						NodeName:  pointer.String("remote"),
 					},
 				}
 				eps.Ports = []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr("p80"),
-					Port:     utilpointer.Int32(80),
+					Name:     pointer.String("p80"),
+					Port:     pointer.Int32(80),
 					Protocol: &tcpProtocol,
 				}}
 			}),
@@ -7336,31 +7353,31 @@ func TestInternalExternalMasquerade(t *testing.T) {
 				// ClusterIP is assumed to be from a pod, and thus to not
 				// require masquerading.
 				"node to ClusterIP": {
-					masq: utilpointer.Bool(false),
+					masq: pointer.Bool(false),
 				},
 				"node to ClusterIP with eTP:Local": {
-					masq: utilpointer.Bool(false),
+					masq: pointer.Bool(false),
 				},
 				"node to ClusterIP with iTP:Local": {
-					masq: utilpointer.Bool(false),
+					masq: pointer.Bool(false),
 				},
 				"external to ClusterIP": {
-					masq: utilpointer.Bool(false),
+					masq: pointer.Bool(false),
 				},
 				"external to ClusterIP with eTP:Local": {
-					masq: utilpointer.Bool(false),
+					masq: pointer.Bool(false),
 				},
 				"external to ClusterIP with iTP:Local": {
-					masq: utilpointer.Bool(false),
+					masq: pointer.Bool(false),
 				},
 
 				// And there's no eTP:Local short-circuit for pod traffic,
 				// so pods get only the local endpoints.
 				"pod to NodePort with eTP:Local": {
-					output: utilpointer.String("10.180.0.2:80"),
+					output: pointer.String("10.180.0.2:80"),
 				},
 				"pod to LB with eTP:Local": {
-					output: utilpointer.String("10.180.0.2:80"),
+					output: pointer.String("10.180.0.2:80"),
 				},
 			},
 		},
@@ -7373,13 +7390,13 @@ func TestInternalExternalMasquerade(t *testing.T) {
 				// All "to ClusterIP" traffic gets masqueraded when using
 				// --masquerade-all.
 				"pod to ClusterIP": {
-					masq: utilpointer.Bool(true),
+					masq: pointer.Bool(true),
 				},
 				"pod to ClusterIP with eTP:Local": {
-					masq: utilpointer.Bool(true),
+					masq: pointer.Bool(true),
 				},
 				"pod to ClusterIP with iTP:Local": {
-					masq: utilpointer.Bool(true),
+					masq: pointer.Bool(true),
 				},
 			},
 		},
@@ -7391,21 +7408,21 @@ func TestInternalExternalMasquerade(t *testing.T) {
 			overrides: map[string]packetFlowTestOverride{
 				// As in "masqueradeAll"
 				"pod to ClusterIP": {
-					masq: utilpointer.Bool(true),
+					masq: pointer.Bool(true),
 				},
 				"pod to ClusterIP with eTP:Local": {
-					masq: utilpointer.Bool(true),
+					masq: pointer.Bool(true),
 				},
 				"pod to ClusterIP with iTP:Local": {
-					masq: utilpointer.Bool(true),
+					masq: pointer.Bool(true),
 				},
 
 				// As in "no LocalTrafficDetector"
 				"pod to NodePort with eTP:Local": {
-					output: utilpointer.String("10.180.0.2:80"),
+					output: pointer.String("10.180.0.2:80"),
 				},
 				"pod to LB with eTP:Local": {
-					output: utilpointer.String("10.180.0.2:80"),
+					output: pointer.String("10.180.0.2:80"),
 				},
 			},
 		},
@@ -7514,8 +7531,8 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 				eps.Endpoints[i].Addresses = []string{fmt.Sprintf("10.0.%d.%d", i%256, i/256)}
 			}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr("p80"),
-				Port:     utilpointer.Int32(80),
+				Name:     pointer.String("p80"),
+				Port:     pointer.Int32(80),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -7526,8 +7543,8 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 				eps.Endpoints[i].Addresses = []string{fmt.Sprintf("10.1.%d.%d", i%256, i/256)}
 			}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr("p8080"),
-				Port:     utilpointer.Int32(8080),
+				Name:     pointer.String("p8080"),
+				Port:     pointer.Int32(8080),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -7555,8 +7572,8 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 			Addresses: []string{"203.0.113.12"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     utilpointer.StringPtr("p8081"),
-			Port:     utilpointer.Int32(8081),
+			Name:     pointer.String("p8081"),
+			Port:     pointer.Int32(8081),
 			Protocol: &tcpProtocol,
 		}}
 	}))
@@ -7591,8 +7608,8 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 			Addresses: []string{"10.4.0.1"},
 		}}
 		eps.Ports = []discovery.EndpointPort{{
-			Name:     utilpointer.StringPtr("p8082"),
-			Port:     utilpointer.Int32(8082),
+			Name:     pointer.String("p8082"),
+			Port:     pointer.Int32(8082),
 			Protocol: &tcpProtocol,
 		}}
 	}))
@@ -7670,8 +7687,8 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 				Addresses: []string{"10.0.1.1"},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr("p80"),
-				Port:     utilpointer.Int32(80),
+				Name:     pointer.String("p80"),
+				Port:     pointer.Int32(80),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -7681,8 +7698,8 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 				Addresses: []string{"10.0.2.1"},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr("p8080"),
-				Port:     utilpointer.Int32(8080),
+				Name:     pointer.String("p8080"),
+				Port:     pointer.Int32(8080),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -7696,6 +7713,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -7749,8 +7767,8 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 				Addresses: []string{"10.0.3.1"},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr("p80"),
-				Port:     utilpointer.Int32(80),
+				Name:     pointer.String("p80"),
+				Port:     pointer.Int32(80),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -7763,6 +7781,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -7812,6 +7831,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -7867,6 +7887,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 has no endpoints" -m tcp -p tcp -d 172.30.0.44 --dport 80 -j REJECT
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
@@ -7907,8 +7928,8 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 				Addresses: []string{"10.0.4.1"},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr("p80"),
-				Port:     utilpointer.Int32(80),
+				Name:     pointer.String("p80"),
+				Port:     pointer.Int32(80),
 				Protocol: &tcpProtocol,
 			}}
 		}),
@@ -7920,6 +7941,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -7971,6 +7993,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -8024,6 +8047,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -8076,6 +8100,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-EXTERNAL-SERVICES - [0:0]
 		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -8245,8 +8270,8 @@ func TestNoEndpointsMetric(t *testing.T) {
 					Labels:    map[string]string{discovery.LabelServiceName: serviceName},
 				},
 				Ports: []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr(""),
-					Port:     utilpointer.Int32Ptr(80),
+					Name:     pointer.String(""),
+					Port:     pointer.Int32(80),
 					Protocol: &tcpProtocol,
 				}},
 				AddressType: discovery.AddressTypeIPv4,
@@ -8254,8 +8279,8 @@ func TestNoEndpointsMetric(t *testing.T) {
 			for _, ep := range tc.endpoints {
 				endpointSlice.Endpoints = append(endpointSlice.Endpoints, discovery.Endpoint{
 					Addresses:  []string{ep.ip},
-					Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-					NodeName:   utilpointer.StringPtr(ep.hostname),
+					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					NodeName:   pointer.String(ep.hostname),
 				})
 			}
 

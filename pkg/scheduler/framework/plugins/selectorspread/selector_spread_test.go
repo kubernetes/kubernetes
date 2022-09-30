@@ -50,7 +50,7 @@ func controllerRef(name string, gvk schema.GroupVersionKind) []metav1.OwnerRefer
 			APIVersion: gvk.GroupVersion().String(),
 			Kind:       gvk.Kind,
 			Name:       name,
-			Controller: pointer.BoolPtr(true),
+			Controller: pointer.Bool(true),
 		},
 	}
 }
@@ -403,7 +403,7 @@ func TestSelectorSpreadScore(t *testing.T) {
 			if err != nil {
 				t.Errorf("error creating informerFactory: %+v", err)
 			}
-			fh, err := frameworkruntime.NewFramework(nil, nil, wait.NeverStop, frameworkruntime.WithSnapshotSharedLister(snapshot), frameworkruntime.WithInformerFactory(informerFactory))
+			fh, err := frameworkruntime.NewFramework(nil, nil, ctx.Done(), frameworkruntime.WithSnapshotSharedLister(snapshot), frameworkruntime.WithInformerFactory(informerFactory))
 			if err != nil {
 				t.Errorf("error creating new framework handle: %+v", err)
 			}

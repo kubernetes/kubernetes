@@ -19,10 +19,12 @@ package windows
 import (
 	"context"
 	"fmt"
-	"github.com/onsi/gomega"
 	"strings"
 	"time"
 
+	"github.com/onsi/gomega"
+
+	semver "github.com/blang/semver/v4"
 	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -196,6 +198,29 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 	})
 
 	ginkgo.It("container command path validation", func() {
+
+		// The way hostprocess containers are created is being updated in container
+		// v1.7 to better support volume mounts and part of these changes include
+		// updates how the container's starting process is invoked.
+		// These test cases are only valid for containerd v1.6.
+		// See https://github.com/kubernetes/enhancements/blob/master/keps/sig-windows/1981-windows-privileged-container-support/README.md
+		// for more details.
+		ginkgo.By("Ensuring Windows nodes are running containerd v1.6.x")
+		windowsNode, err := findWindowsNode(f)
+		framework.ExpectNoError(err, "error finding Windows node")
+		r, v, err := getNodeContainerRuntimeAndVersion(windowsNode)
+		framework.ExpectNoError(err, "error getting node container runtime and version")
+		framework.Logf("Got runtime: %s, version %v, node: %s", r, v, windowsNode.Name)
+
+		if !strings.EqualFold(r, "containerd") {
+			e2eskipper.Skipf("container runtime is not containerd")
+		}
+
+		v1dot7 := semver.MustParse("1.7.0")
+		if v.GTE(v1dot7) {
+			e2eskipper.Skipf("container runtime is >= 1.7.0")
+		}
+
 		// The following test cases are broken into batches to speed up the test.
 		// Each batch will be scheduled as a single pod with a container for each test case.
 		// Pods will be scheduled sequentially since the start-up cost of containers is high

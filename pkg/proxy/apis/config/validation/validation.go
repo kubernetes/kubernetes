@@ -85,9 +85,6 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 			if err != nil || !isDual {
 				allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "must be a valid DualStack CIDR (e.g. 10.100.0.0/16,fde4:8dba:82e1::/48)"))
 			}
-		// if not DualStack only one CIDR allowed
-		case len(cidrs) > 1:
-			allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "only one CIDR allowed (e.g. 10.100.0.0/16 or fde4:8dba:82e1::/48)"))
 		// if we are here means that len(cidrs) == 1, we need to validate it
 		default:
 			if _, _, err := netutils.ParseCIDRSloppy(config.ClusterCIDR); err != nil {
@@ -211,7 +208,7 @@ func validateProxyModeWindows(mode kubeproxyconfig.ProxyMode, fldPath *field.Pat
 		return nil
 	}
 
-	errMsg := fmt.Sprintf("must be %s or blank (blank means the most-available proxy [currently userspace])", strings.Join(validModes.List(), ","))
+	errMsg := fmt.Sprintf("must be %s or blank (blank means the most-available proxy [currently userspace(will be 'kernelspace' in a future release)])", strings.Join(validModes.List(), ","))
 	return field.ErrorList{field.Invalid(fldPath.Child("ProxyMode"), string(mode), errMsg)}
 }
 

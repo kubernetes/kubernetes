@@ -807,13 +807,13 @@ func (p *parser) extractQualifiedName(e *exprpb.Expr) (string, bool) {
 	if e == nil {
 		return "", false
 	}
-	switch e.ExprKind.(type) {
+	switch e.GetExprKind().(type) {
 	case *exprpb.Expr_IdentExpr:
 		return e.GetIdentExpr().GetName(), true
 	case *exprpb.Expr_SelectExpr:
 		s := e.GetSelectExpr()
-		if prefix, found := p.extractQualifiedName(s.Operand); found {
-			return prefix + "." + s.Field, true
+		if prefix, found := p.extractQualifiedName(s.GetOperand()); found {
+			return prefix + "." + s.GetField(), true
 		}
 	}
 	// TODO: Add a method to Source to get location from character offset.

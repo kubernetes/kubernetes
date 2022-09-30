@@ -18,14 +18,12 @@ package cpumanager
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
-
-	"io/ioutil"
-	"os"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
@@ -128,7 +126,7 @@ type mockRuntimeService struct {
 	err error
 }
 
-func (rt mockRuntimeService) UpdateContainerResources(id string, resources *runtimeapi.LinuxContainerResources) error {
+func (rt mockRuntimeService) UpdateContainerResources(id string, resources *runtimeapi.ContainerResources) error {
 	return rt.err
 }
 
@@ -629,7 +627,7 @@ func TestCPUManagerGenerate(t *testing.T) {
 			if testCase.isTopologyBroken {
 				machineInfo = &cadvisorapi.MachineInfo{}
 			}
-			sDir, err := ioutil.TempDir("/tmp/", "cpu_manager_test")
+			sDir, err := os.MkdirTemp("/tmp/", "cpu_manager_test")
 			if err != nil {
 				t.Errorf("cannot create state file: %s", err.Error())
 			}
@@ -1349,7 +1347,7 @@ func TestCPUManagerHandlePolicyOptions(t *testing.T) {
 		t.Run(testCase.description, func(t *testing.T) {
 			machineInfo := &mockedMachineInfo
 			nodeAllocatableReservation := v1.ResourceList{}
-			sDir, err := ioutil.TempDir("/tmp/", "cpu_manager_test")
+			sDir, err := os.MkdirTemp("/tmp/", "cpu_manager_test")
 			if err != nil {
 				t.Errorf("cannot create state file: %s", err.Error())
 			}

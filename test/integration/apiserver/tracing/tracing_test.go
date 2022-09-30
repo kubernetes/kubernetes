@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,7 +35,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	client "k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/component-base/traces"
+	"k8s.io/component-base/tracing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -84,7 +85,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 
 	// Create a client that creates sampled traces.
 	tp := trace.TracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSampler(sdktrace.AlwaysSample())))
-	clientConfig.Wrap(traces.WrapperFor(&tp))
+	clientConfig.Wrap(tracing.WrapperFor(tp))
 	clientSet, err := client.NewForConfig(clientConfig)
 	if err != nil {
 		t.Fatal(err)
@@ -107,15 +108,18 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 
 func containsNodeListSpan(req *traceservice.ExportTraceServiceRequest) bool {
 	for _, resourceSpans := range req.GetResourceSpans() {
-		for _, instrumentationSpans := range resourceSpans.GetInstrumentationLibrarySpans() {
+		for _, instrumentationSpans := range resourceSpans.GetScopeSpans() {
 			for _, span := range instrumentationSpans.GetSpans() {
-				if span.Name != "KubernetesAPI" {
+				if span.Name != "HTTP GET" {
 					continue
 				}
 				for _, attr := range span.GetAttributes() {
-					if attr.GetKey() == "http.target" && attr.GetValue().GetStringValue() == "/api/v1/nodes" {
-						// We found our request!
-						return true
+					if attr.GetKey() == "http.url" {
+						value := attr.GetValue().GetStringValue()
+						if strings.HasSuffix(value, "/api/v1/nodes") {
+							// We found our request!
+							return true
+						}
 					}
 				}
 			}

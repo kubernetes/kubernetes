@@ -163,7 +163,7 @@ func TestNodeExpand(t *testing.T) {
 				}
 			}
 
-			// verify device staging targer path
+			// verify device staging target path
 			stagingTargetPath := fakeNodeClient.FakeNodeExpansionRequest.GetStagingTargetPath()
 			if tc.deviceStagePath != "" && tc.deviceStagePath != stagingTargetPath {
 				t.Errorf("For %s: expected staging path %s got %s", tc.name, tc.deviceStagePath, stagingTargetPath)

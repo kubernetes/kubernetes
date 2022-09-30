@@ -50,3 +50,14 @@ func CreateHealthCheck(c storagebackend.Config, stopCh <-chan struct{}) (func() 
 		return nil, fmt.Errorf("unknown storage type: %s", c.Type)
 	}
 }
+
+func CreateReadyCheck(c storagebackend.Config, stopCh <-chan struct{}) (func() error, error) {
+	switch c.Type {
+	case storagebackend.StorageTypeETCD2:
+		return nil, fmt.Errorf("%s is no longer a supported storage backend", c.Type)
+	case storagebackend.StorageTypeUnset, storagebackend.StorageTypeETCD3:
+		return newETCD3ReadyCheck(c, stopCh)
+	default:
+		return nil, fmt.Errorf("unknown storage type: %s", c.Type)
+	}
+}

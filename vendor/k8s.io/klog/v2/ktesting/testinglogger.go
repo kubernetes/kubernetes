@@ -25,17 +25,17 @@ limitations under the License.
 // access to that data, cast the LogSink into the Underlier type and retrieve
 // it:
 //
-//    logger := ktesting.NewLogger(...)
-//    if testingLogger, ok := logger.GetSink().(ktesting.Underlier); ok {
-//        t := testingLogger.GetUnderlying()
-//        buffer := testingLogger.GetBuffer()
-//        text := buffer.String()
-//        log := buffer.Data()
+//	logger := ktesting.NewLogger(...)
+//	if testingLogger, ok := logger.GetSink().(ktesting.Underlier); ok {
+//	    t := testingLogger.GetUnderlying()
+//	    buffer := testingLogger.GetBuffer()
+//	    text := buffer.String()
+//	    log := buffer.Data()
 //
 // Serialization of the structured log parameters is done in the same way
 // as for klog.InfoS.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This package is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -57,7 +57,7 @@ import (
 
 // TL is the relevant subset of testing.TB.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -69,7 +69,7 @@ type TL interface {
 // NopTL implements TL with empty stubs. It can be used when only capturing
 // output in memory is relevant.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -88,7 +88,7 @@ var _ TL = NopTL{}
 // that output will be printed via the global klog logger with
 // `<test name> leaked goroutine` as prefix.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -117,7 +117,7 @@ func NewLogger(t TL, c *Config) logr.Logger {
 // Buffer stores log entries as formatted text and structured data.
 // It is safe to use this concurrently.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This interface is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -132,7 +132,7 @@ type Buffer interface {
 
 // Log contains log entries in the order in which they were generated.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -141,7 +141,7 @@ type Log []LogEntry
 // DeepCopy returns a copy of the log. The error instance and key/value
 // pairs remain shared.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This function is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -153,7 +153,7 @@ func (l Log) DeepCopy() Log {
 
 // LogEntry represents all information captured for a log entry.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -190,7 +190,7 @@ type LogEntry struct {
 // LogType determines whether a log entry was created with an Error or Info
 // call.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.
@@ -217,7 +217,7 @@ const (
 // Underlier is implemented by the LogSink of this logger. It provides access
 // to additional APIs that are normally hidden behind the Logger API.
 //
-// Experimental
+// # Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.

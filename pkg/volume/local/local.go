@@ -96,6 +96,10 @@ func (plugin *localVolumePlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (plugin *localVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+
 func (plugin *localVolumePlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	// The current meaning of AccessMode is how many nodes can attach to it, not how many pods can mount it
 	return []v1.PersistentVolumeAccessMode{

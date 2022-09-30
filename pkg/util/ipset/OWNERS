@@ -1,9 +1,9 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-  - thockin
+  - sig-network-reviewers
 approvers:
-  - thockin
+  - sig-network-approvers
 labels:
   - sig/network
 emeritus_approvers:

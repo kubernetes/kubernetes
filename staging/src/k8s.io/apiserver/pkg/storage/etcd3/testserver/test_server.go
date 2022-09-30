@@ -49,11 +49,11 @@ func getAvailablePorts(count int) ([]int, error) {
 
 // NewTestConfig returns a configuration for an embedded etcd server.
 // The configuration is based on embed.NewConfig(), with the following adjustments:
-// * sets UnsafeNoFsync = true to improve test performance (only reasonable in a test-only
-//   single-member server we never intend to restart or keep data from)
-// * uses free ports for client and peer listeners
-// * cleans up the data directory on test termination
-// * silences server logs other than errors
+//   - sets UnsafeNoFsync = true to improve test performance (only reasonable in a test-only
+//     single-member server we never intend to restart or keep data from)
+//   - uses free ports for client and peer listeners
+//   - cleans up the data directory on test termination
+//   - silences server logs other than errors
 func NewTestConfig(t *testing.T) *embed.Config {
 	cfg := embed.NewConfig()
 

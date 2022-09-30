@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -152,7 +151,7 @@ const (
 	timeout  = 5 * time.Second
 )
 
-func waitForCertificateRequestApproved(client kubernetes.Interface, name string) error {
+func waitForCertificateRequestApproved(client clientset.Interface, name string) error {
 	if err := wait.Poll(interval, timeout, func() (bool, error) {
 		csr, err := client.CertificatesV1().CertificateSigningRequests().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
@@ -168,7 +167,7 @@ func waitForCertificateRequestApproved(client kubernetes.Interface, name string)
 	return nil
 }
 
-func ensureCertificateRequestNotApproved(client kubernetes.Interface, name string) error {
+func ensureCertificateRequestNotApproved(client clientset.Interface, name string) error {
 	// If waiting for the CSR to be approved times out, we class this as 'not auto approved'.
 	// There is currently no way to explicitly check if the CSR has been rejected for auto-approval.
 	err := waitForCertificateRequestApproved(client, name)

@@ -874,7 +874,7 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 }
 
 func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.VolumeHost) {
-	tempDir, err := ioutil.TempDir("/tmp", "projected_volume_test.")
+	tempDir, err := ioutil.TempDir("", "projected_volume_test.")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
@@ -934,7 +934,7 @@ func TestPlugin(t *testing.T) {
 	}
 
 	volumePath := mounter.GetPath()
-	if !strings.HasSuffix(volumePath, fmt.Sprintf("pods/test_pod_uid/volumes/kubernetes.io~projected/%s", testVolumeName)) {
+	if !strings.HasSuffix(volumePath, filepath.Join("pods/test_pod_uid/volumes/kubernetes.io~projected", testVolumeName)) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
@@ -999,7 +999,7 @@ func TestInvalidPathProjected(t *testing.T) {
 	}
 
 	volumePath := mounter.GetPath()
-	if !strings.HasSuffix(volumePath, fmt.Sprintf("pods/test_pod_uid/volumes/kubernetes.io~projected/%s", testVolumeName)) {
+	if !strings.HasSuffix(volumePath, filepath.Join("pods/test_pod_uid/volumes/kubernetes.io~projected", testVolumeName)) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
@@ -1051,7 +1051,7 @@ func TestPluginReboot(t *testing.T) {
 	podMetadataDir := fmt.Sprintf("%v/pods/test_pod_uid3/plugins/kubernetes.io~projected/test_volume_name", rootDir)
 	util.SetReady(podMetadataDir)
 	volumePath := mounter.GetPath()
-	if !strings.HasSuffix(volumePath, fmt.Sprintf("pods/test_pod_uid3/volumes/kubernetes.io~projected/test_volume_name")) {
+	if !strings.HasSuffix(volumePath, filepath.FromSlash("pods/test_pod_uid3/volumes/kubernetes.io~projected/test_volume_name")) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
@@ -1103,7 +1103,7 @@ func TestPluginOptional(t *testing.T) {
 	}
 
 	volumePath := mounter.GetPath()
-	if !strings.HasSuffix(volumePath, fmt.Sprintf("pods/test_pod_uid/volumes/kubernetes.io~projected/test_volume_name")) {
+	if !strings.HasSuffix(volumePath, filepath.FromSlash("pods/test_pod_uid/volumes/kubernetes.io~projected/test_volume_name")) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
@@ -1201,7 +1201,7 @@ func TestPluginOptionalKeys(t *testing.T) {
 	}
 
 	volumePath := mounter.GetPath()
-	if !strings.HasSuffix(volumePath, fmt.Sprintf("pods/test_pod_uid/volumes/kubernetes.io~projected/test_volume_name")) {
+	if !strings.HasSuffix(volumePath, filepath.FromSlash("pods/test_pod_uid/volumes/kubernetes.io~projected/test_volume_name")) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
