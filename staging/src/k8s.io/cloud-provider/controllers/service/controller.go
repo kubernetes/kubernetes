@@ -98,9 +98,6 @@ type Controller struct {
 	nodeSyncCh chan interface{}
 	// needFullSync indicates if the nodeSyncInternal will do a full node sync on all LB services.
 	needFullSync bool
-	// lastSyncedNodes is used when reconciling node state and keeps track of the last synced set of
-	// nodes. Access to this attribute by multiple go-routines is protected by nodeSyncLock
-	lastSyncedNodes []*v1.Node
 }
 
 // New returns a new service controller to keep cloud provider service resources
@@ -135,8 +132,7 @@ func New(
 		nodeListerSynced: nodeInformer.Informer().HasSynced,
 		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "service"),
 		// nodeSyncCh has a size 1 buffer. Only one pending sync signal would be cached.
-		nodeSyncCh:      make(chan interface{}, 1),
-		lastSyncedNodes: []*v1.Node{},
+		nodeSyncCh: make(chan interface{}, 1),
 	}
 
 	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -457,7 +453,7 @@ func (c *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.S
 }
 
 func (c *Controller) ensureLoadBalancer(ctx context.Context, service *v1.Service) (*v1.LoadBalancerStatus, error) {
-	nodes, err := listWithPredicates(c.nodeLister, getNodePredicatesForService(service)...)
+	nodes, err := listWithPredicates(c.nodeLister, allNodePredicates...)
 	if err != nil {
 		return nil, err
 	}
@@ -671,15 +667,6 @@ func portEqualForLB(x, y *v1.ServicePort) bool {
 	return true
 }
 
-func serviceKeys(services []*v1.Service) sets.String {
-	ret := sets.NewString()
-	for _, service := range services {
-		key, _ := cache.MetaNamespaceKeyFunc(service)
-		ret.Insert(key)
-	}
-	return ret
-}
-
 func nodeNames(nodes []*v1.Node) sets.String {
 	ret := sets.NewString()
 	for _, node := range nodes {
@@ -696,19 +683,6 @@ func nodeSlicesEqualForLB(x, y []*v1.Node) bool {
 }
 
 func shouldSyncUpdatedNode(oldNode, newNode *v1.Node) bool {
-	// Evaluate the individual node exclusion predicate before evaluating the
-	// compounded result of all predicates. We don't sync ETP=local services
-	// for changes on the readiness condition, hence if a node remains NotReady
-	// and a user adds the exclusion label we will need to sync as to make sure
-	// this change is reflected correctly on ETP=local services. The sync
-	// function compares lastSyncedNodes with the new (existing) set of nodes
-	// for each service, so services which are synced with the same set of nodes
-	// should be skipped internally in the sync function. This is needed as to
-	// trigger a global sync for all services and make sure no service gets
-	// skipped due to a changing node predicate.
-	if respectsPredicates(oldNode, nodeIncludedPredicate) != respectsPredicates(newNode, nodeIncludedPredicate) {
-		return true
-	}
 	return respectsPredicates(oldNode, allNodePredicates...) != respectsPredicates(newNode, allNodePredicates...)
 }
 
@@ -751,29 +725,24 @@ func (c *Controller) nodeSyncInternal(ctx context.Context, workers int) {
 		numServices-len(c.servicesToUpdate), numServices)
 }
 
-// nodeSyncService syncs the nodes for one load balancer type service. The return value
-// indicates if we should retry. Hence, this functions returns false if we've updated
-// load balancers and finished doing it successfully, or didn't try to at all because
-// there's no need. This function returns true if we tried to update load balancers and
-// failed, indicating to the caller that we should try again.
-func (c *Controller) nodeSyncService(svc *v1.Service, oldNodes, newNodes []*v1.Node) bool {
-	retSuccess := false
-	retNeedRetry := true
+// nodeSyncService syncs the nodes for one load balancer type service
+func (c *Controller) nodeSyncService(svc *v1.Service) bool {
 	if svc == nil || !wantsLoadBalancer(svc) {
-		return retSuccess
-	}
-	newNodes = filterWithPredicates(newNodes, getNodePredicatesForService(svc)...)
-	oldNodes = filterWithPredicates(oldNodes, getNodePredicatesForService(svc)...)
-	if nodeNames(newNodes).Equal(nodeNames(oldNodes)) {
-		return retSuccess
+		return false
 	}
 	klog.V(4).Infof("nodeSyncService started for service %s/%s", svc.Namespace, svc.Name)
-	if err := c.lockedUpdateLoadBalancerHosts(svc, newNodes); err != nil {
+	hosts, err := listWithPredicates(c.nodeLister, allNodePredicates...)
+	if err != nil {
+		runtime.HandleError(fmt.Errorf("failed to retrieve node list: %v", err))
+		return true
+	}
+
+	if err := c.lockedUpdateLoadBalancerHosts(svc, hosts); err != nil {
 		runtime.HandleError(fmt.Errorf("failed to update load balancer hosts for service %s/%s: %v", svc.Namespace, svc.Name, err))
-		return retNeedRetry
+		return true
 	}
 	klog.V(4).Infof("nodeSyncService finished successfully for service %s/%s", svc.Namespace, svc.Name)
-	return retSuccess
+	return false
 }
 
 // updateLoadBalancerHosts updates all existing load balancers so that
@@ -782,20 +751,11 @@ func (c *Controller) nodeSyncService(svc *v1.Service, oldNodes, newNodes []*v1.N
 func (c *Controller) updateLoadBalancerHosts(ctx context.Context, services []*v1.Service, workers int) (servicesToRetry sets.String) {
 	klog.V(4).Infof("Running updateLoadBalancerHosts(len(services)==%d, workers==%d)", len(services), workers)
 
-	// Include all nodes and let nodeSyncService filter and figure out if
-	// the update is relevant for the service in question.
-	nodes, err := listWithPredicates(c.nodeLister)
-	if err != nil {
-		runtime.HandleError(fmt.Errorf("failed to retrieve node list: %v", err))
-		return serviceKeys(services)
-	}
-
 	// lock for servicesToRetry
 	servicesToRetry = sets.NewString()
 	lock := sync.Mutex{}
-
 	doWork := func(piece int) {
-		if shouldRetry := c.nodeSyncService(services[piece], c.lastSyncedNodes, nodes); !shouldRetry {
+		if shouldRetry := c.nodeSyncService(services[piece]); !shouldRetry {
 			return
 		}
 		lock.Lock()
@@ -805,7 +765,6 @@ func (c *Controller) updateLoadBalancerHosts(ctx context.Context, services []*v1
 	}
 
 	workqueue.ParallelizeUntil(ctx, workers, len(services), doWork)
-	c.lastSyncedNodes = nodes
 	klog.V(4).Infof("Finished updateLoadBalancerHosts")
 	return servicesToRetry
 }
@@ -988,19 +947,7 @@ var (
 		nodeUnTaintedPredicate,
 		nodeReadyPredicate,
 	}
-	etpLocalNodePredicates []NodeConditionPredicate = []NodeConditionPredicate{
-		nodeIncludedPredicate,
-		nodeSchedulablePredicate,
-		nodeUnTaintedPredicate,
-	}
 )
-
-func getNodePredicatesForService(service *v1.Service) []NodeConditionPredicate {
-	if service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal {
-		return etpLocalNodePredicates
-	}
-	return allNodePredicates
-}
 
 // We consider the node for load balancing only when the node is not labelled for exclusion.
 func nodeIncludedPredicate(node *v1.Node) bool {
