@@ -2199,17 +2199,7 @@ var _ = common.SIGDescribe("Services", func() {
 		execAffinityTestForNonLBService(f, cs, svc)
 	})
 
-	/*
-		Release: v1.19
-		Testname: Service, ClusterIP type, session affinity to ClientIP with timeout
-		Description: Create a service of type "ClusterIP". Service's sessionAffinity is set to "ClientIP" and session affinity timeout is set. Service creation MUST be successful by assigning "ClusterIP" to the service.
-		Create a Replication Controller to ensure that 3 pods are running and are targeted by the service to serve hostname of the pod when requests are sent to the service.
-		Create another pod to make requests to the service. Service MUST serve the hostname from the same pod of the replica for all consecutive requests until timeout expires.
-		After timeout, requests MUST be served from different pods of the replica.
-		Service MUST be reachable over serviceName and the ClusterIP on servicePort.
-		[LinuxOnly]: Windows does not support session affinity.
-	*/
-	framework.ConformanceIt("should have session affinity timeout work for service with type clusterIP [LinuxOnly]", func() {
+	ginkgo.It("should have session affinity timeout work for service with type clusterIP [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-clusterip-timeout")
 		svc.Spec.Type = v1.ServiceTypeClusterIP
 		execAffinityTestForSessionAffinityTimeout(f, cs, svc)
@@ -2246,18 +2236,7 @@ var _ = common.SIGDescribe("Services", func() {
 		execAffinityTestForNonLBService(f, cs, svc)
 	})
 
-	/*
-		Release: v1.19
-		Testname: Service, NodePort type, session affinity to ClientIP with timeout
-		Description: Create a service of type "NodePort" and provide service port and protocol. Service's sessionAffinity is set to "ClientIP" and session affinity timeout is set.
-		Service creation MUST be successful by assigning a "ClusterIP" to service and allocating NodePort on all nodes.
-		Create a Replication Controller to ensure that 3 pods are running and are targeted by the service to serve hostname of the pod when requests are sent to the service.
-		Create another pod to make requests to the service on node's IP and NodePort. Service MUST serve the hostname from the same pod of the replica for all consecutive requests until timeout.
-		After timeout, requests MUST be served from different pods of the replica.
-		Service MUST be reachable over serviceName and the ClusterIP on servicePort. Service MUST also be reachable over node's IP on NodePort.
-		[LinuxOnly]: Windows does not support session affinity.
-	*/
-	framework.ConformanceIt("should have session affinity timeout work for NodePort service [LinuxOnly]", func() {
+	ginkgo.It("should have session affinity timeout work for NodePort service [LinuxOnly]", func() {
 		svc := getServeHostnameService("affinity-nodeport-timeout")
 		svc.Spec.Type = v1.ServiceTypeNodePort
 		execAffinityTestForSessionAffinityTimeout(f, cs, svc)
