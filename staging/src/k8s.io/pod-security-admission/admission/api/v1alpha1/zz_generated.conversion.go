@@ -24,9 +24,9 @@ package v1alpha1
 import (
 	"unsafe"
 
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/pod-security-admission/admission/api"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	podsecurityadmissionadmissionapi "k8s.io/pod-security-admission/admission/api"
 )
 
 func init() {
@@ -35,41 +35,41 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*PodSecurityConfiguration)(nil), (*api.PodSecurityConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_PodSecurityConfiguration_To_api_PodSecurityConfiguration(a.(*PodSecurityConfiguration), b.(*api.PodSecurityConfiguration), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*PodSecurityConfiguration)(nil), (*podsecurityadmissionadmissionapi.PodSecurityConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_PodSecurityConfiguration_To_api_PodSecurityConfiguration(a.(*PodSecurityConfiguration), b.(*podsecurityadmissionadmissionapi.PodSecurityConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*api.PodSecurityConfiguration)(nil), (*PodSecurityConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_api_PodSecurityConfiguration_To_v1alpha1_PodSecurityConfiguration(a.(*api.PodSecurityConfiguration), b.(*PodSecurityConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*podsecurityadmissionadmissionapi.PodSecurityConfiguration)(nil), (*PodSecurityConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_api_PodSecurityConfiguration_To_v1alpha1_PodSecurityConfiguration(a.(*podsecurityadmissionadmissionapi.PodSecurityConfiguration), b.(*PodSecurityConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*PodSecurityDefaults)(nil), (*api.PodSecurityDefaults)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_PodSecurityDefaults_To_api_PodSecurityDefaults(a.(*PodSecurityDefaults), b.(*api.PodSecurityDefaults), scope)
+	if err := s.AddGeneratedConversionFunc((*PodSecurityDefaults)(nil), (*podsecurityadmissionadmissionapi.PodSecurityDefaults)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_PodSecurityDefaults_To_api_PodSecurityDefaults(a.(*PodSecurityDefaults), b.(*podsecurityadmissionadmissionapi.PodSecurityDefaults), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*api.PodSecurityDefaults)(nil), (*PodSecurityDefaults)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_api_PodSecurityDefaults_To_v1alpha1_PodSecurityDefaults(a.(*api.PodSecurityDefaults), b.(*PodSecurityDefaults), scope)
+	if err := s.AddGeneratedConversionFunc((*podsecurityadmissionadmissionapi.PodSecurityDefaults)(nil), (*PodSecurityDefaults)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_api_PodSecurityDefaults_To_v1alpha1_PodSecurityDefaults(a.(*podsecurityadmissionadmissionapi.PodSecurityDefaults), b.(*PodSecurityDefaults), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*PodSecurityExemptions)(nil), (*api.PodSecurityExemptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_PodSecurityExemptions_To_api_PodSecurityExemptions(a.(*PodSecurityExemptions), b.(*api.PodSecurityExemptions), scope)
+	if err := s.AddGeneratedConversionFunc((*PodSecurityExemptions)(nil), (*podsecurityadmissionadmissionapi.PodSecurityExemptions)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_PodSecurityExemptions_To_api_PodSecurityExemptions(a.(*PodSecurityExemptions), b.(*podsecurityadmissionadmissionapi.PodSecurityExemptions), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*api.PodSecurityExemptions)(nil), (*PodSecurityExemptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_api_PodSecurityExemptions_To_v1alpha1_PodSecurityExemptions(a.(*api.PodSecurityExemptions), b.(*PodSecurityExemptions), scope)
+	if err := s.AddGeneratedConversionFunc((*podsecurityadmissionadmissionapi.PodSecurityExemptions)(nil), (*PodSecurityExemptions)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_api_PodSecurityExemptions_To_v1alpha1_PodSecurityExemptions(a.(*podsecurityadmissionadmissionapi.PodSecurityExemptions), b.(*PodSecurityExemptions), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1alpha1_PodSecurityConfiguration_To_api_PodSecurityConfiguration(in *PodSecurityConfiguration, out *api.PodSecurityConfiguration, s conversion.Scope) error {
+func autoConvert_v1alpha1_PodSecurityConfiguration_To_api_PodSecurityConfiguration(in *PodSecurityConfiguration, out *podsecurityadmissionadmissionapi.PodSecurityConfiguration, s apimachinerypkgconversion.Scope) error {
 	if err := Convert_v1alpha1_PodSecurityDefaults_To_api_PodSecurityDefaults(&in.Defaults, &out.Defaults, s); err != nil {
 		return err
 	}
@@ -80,11 +80,11 @@ func autoConvert_v1alpha1_PodSecurityConfiguration_To_api_PodSecurityConfigurati
 }
 
 // Convert_v1alpha1_PodSecurityConfiguration_To_api_PodSecurityConfiguration is an autogenerated conversion function.
-func Convert_v1alpha1_PodSecurityConfiguration_To_api_PodSecurityConfiguration(in *PodSecurityConfiguration, out *api.PodSecurityConfiguration, s conversion.Scope) error {
+func Convert_v1alpha1_PodSecurityConfiguration_To_api_PodSecurityConfiguration(in *PodSecurityConfiguration, out *podsecurityadmissionadmissionapi.PodSecurityConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha1_PodSecurityConfiguration_To_api_PodSecurityConfiguration(in, out, s)
 }
 
-func autoConvert_api_PodSecurityConfiguration_To_v1alpha1_PodSecurityConfiguration(in *api.PodSecurityConfiguration, out *PodSecurityConfiguration, s conversion.Scope) error {
+func autoConvert_api_PodSecurityConfiguration_To_v1alpha1_PodSecurityConfiguration(in *podsecurityadmissionadmissionapi.PodSecurityConfiguration, out *PodSecurityConfiguration, s apimachinerypkgconversion.Scope) error {
 	if err := Convert_api_PodSecurityDefaults_To_v1alpha1_PodSecurityDefaults(&in.Defaults, &out.Defaults, s); err != nil {
 		return err
 	}
@@ -95,11 +95,11 @@ func autoConvert_api_PodSecurityConfiguration_To_v1alpha1_PodSecurityConfigurati
 }
 
 // Convert_api_PodSecurityConfiguration_To_v1alpha1_PodSecurityConfiguration is an autogenerated conversion function.
-func Convert_api_PodSecurityConfiguration_To_v1alpha1_PodSecurityConfiguration(in *api.PodSecurityConfiguration, out *PodSecurityConfiguration, s conversion.Scope) error {
+func Convert_api_PodSecurityConfiguration_To_v1alpha1_PodSecurityConfiguration(in *podsecurityadmissionadmissionapi.PodSecurityConfiguration, out *PodSecurityConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_api_PodSecurityConfiguration_To_v1alpha1_PodSecurityConfiguration(in, out, s)
 }
 
-func autoConvert_v1alpha1_PodSecurityDefaults_To_api_PodSecurityDefaults(in *PodSecurityDefaults, out *api.PodSecurityDefaults, s conversion.Scope) error {
+func autoConvert_v1alpha1_PodSecurityDefaults_To_api_PodSecurityDefaults(in *PodSecurityDefaults, out *podsecurityadmissionadmissionapi.PodSecurityDefaults, s apimachinerypkgconversion.Scope) error {
 	out.Enforce = in.Enforce
 	out.EnforceVersion = in.EnforceVersion
 	out.Audit = in.Audit
@@ -110,11 +110,11 @@ func autoConvert_v1alpha1_PodSecurityDefaults_To_api_PodSecurityDefaults(in *Pod
 }
 
 // Convert_v1alpha1_PodSecurityDefaults_To_api_PodSecurityDefaults is an autogenerated conversion function.
-func Convert_v1alpha1_PodSecurityDefaults_To_api_PodSecurityDefaults(in *PodSecurityDefaults, out *api.PodSecurityDefaults, s conversion.Scope) error {
+func Convert_v1alpha1_PodSecurityDefaults_To_api_PodSecurityDefaults(in *PodSecurityDefaults, out *podsecurityadmissionadmissionapi.PodSecurityDefaults, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha1_PodSecurityDefaults_To_api_PodSecurityDefaults(in, out, s)
 }
 
-func autoConvert_api_PodSecurityDefaults_To_v1alpha1_PodSecurityDefaults(in *api.PodSecurityDefaults, out *PodSecurityDefaults, s conversion.Scope) error {
+func autoConvert_api_PodSecurityDefaults_To_v1alpha1_PodSecurityDefaults(in *podsecurityadmissionadmissionapi.PodSecurityDefaults, out *PodSecurityDefaults, s apimachinerypkgconversion.Scope) error {
 	out.Enforce = in.Enforce
 	out.EnforceVersion = in.EnforceVersion
 	out.Audit = in.Audit
@@ -125,11 +125,11 @@ func autoConvert_api_PodSecurityDefaults_To_v1alpha1_PodSecurityDefaults(in *api
 }
 
 // Convert_api_PodSecurityDefaults_To_v1alpha1_PodSecurityDefaults is an autogenerated conversion function.
-func Convert_api_PodSecurityDefaults_To_v1alpha1_PodSecurityDefaults(in *api.PodSecurityDefaults, out *PodSecurityDefaults, s conversion.Scope) error {
+func Convert_api_PodSecurityDefaults_To_v1alpha1_PodSecurityDefaults(in *podsecurityadmissionadmissionapi.PodSecurityDefaults, out *PodSecurityDefaults, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_api_PodSecurityDefaults_To_v1alpha1_PodSecurityDefaults(in, out, s)
 }
 
-func autoConvert_v1alpha1_PodSecurityExemptions_To_api_PodSecurityExemptions(in *PodSecurityExemptions, out *api.PodSecurityExemptions, s conversion.Scope) error {
+func autoConvert_v1alpha1_PodSecurityExemptions_To_api_PodSecurityExemptions(in *PodSecurityExemptions, out *podsecurityadmissionadmissionapi.PodSecurityExemptions, s apimachinerypkgconversion.Scope) error {
 	out.Usernames = *(*[]string)(unsafe.Pointer(&in.Usernames))
 	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
 	out.RuntimeClasses = *(*[]string)(unsafe.Pointer(&in.RuntimeClasses))
@@ -137,11 +137,11 @@ func autoConvert_v1alpha1_PodSecurityExemptions_To_api_PodSecurityExemptions(in 
 }
 
 // Convert_v1alpha1_PodSecurityExemptions_To_api_PodSecurityExemptions is an autogenerated conversion function.
-func Convert_v1alpha1_PodSecurityExemptions_To_api_PodSecurityExemptions(in *PodSecurityExemptions, out *api.PodSecurityExemptions, s conversion.Scope) error {
+func Convert_v1alpha1_PodSecurityExemptions_To_api_PodSecurityExemptions(in *PodSecurityExemptions, out *podsecurityadmissionadmissionapi.PodSecurityExemptions, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha1_PodSecurityExemptions_To_api_PodSecurityExemptions(in, out, s)
 }
 
-func autoConvert_api_PodSecurityExemptions_To_v1alpha1_PodSecurityExemptions(in *api.PodSecurityExemptions, out *PodSecurityExemptions, s conversion.Scope) error {
+func autoConvert_api_PodSecurityExemptions_To_v1alpha1_PodSecurityExemptions(in *podsecurityadmissionadmissionapi.PodSecurityExemptions, out *PodSecurityExemptions, s apimachinerypkgconversion.Scope) error {
 	out.Usernames = *(*[]string)(unsafe.Pointer(&in.Usernames))
 	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
 	out.RuntimeClasses = *(*[]string)(unsafe.Pointer(&in.RuntimeClasses))
@@ -149,6 +149,6 @@ func autoConvert_api_PodSecurityExemptions_To_v1alpha1_PodSecurityExemptions(in 
 }
 
 // Convert_api_PodSecurityExemptions_To_v1alpha1_PodSecurityExemptions is an autogenerated conversion function.
-func Convert_api_PodSecurityExemptions_To_v1alpha1_PodSecurityExemptions(in *api.PodSecurityExemptions, out *PodSecurityExemptions, s conversion.Scope) error {
+func Convert_api_PodSecurityExemptions_To_v1alpha1_PodSecurityExemptions(in *podsecurityadmissionadmissionapi.PodSecurityExemptions, out *PodSecurityExemptions, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_api_PodSecurityExemptions_To_v1alpha1_PodSecurityExemptions(in, out, s)
 }

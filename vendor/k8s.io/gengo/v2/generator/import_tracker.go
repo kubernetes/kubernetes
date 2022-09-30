@@ -54,7 +54,23 @@ func golangTrackerLocalName(tracker namer.ImportTracker, t types.Name) string {
 	}
 
 	dirs := strings.Split(path, namer.GoSeperator)
-	for n := len(dirs) - 1; n >= 0; n-- {
+
+	// By default we will try to construct a local name with as few as 1
+	// directories (e.g. "net/http" -> "http").
+	min := 1
+	// If it seems like "example.com/some/pkg" then we try for longer names.
+	if strings.Contains(dirs[0], ".") {
+		if len(dirs) >= 4 {
+			// e.g. [ "example.com", "some", "long", "pkg" ]
+			min = 3
+		} else if len(dirs) == 3 {
+			// e.g. [ "example.com", "short", "pkg" ]
+			min = 2
+		}
+	}
+
+	// Build up a potential local-name from directories, and see if it works.
+	for n := len(dirs) - min; n >= 0; n-- {
 		// follow kube convention of not having anything between directory names
 		name := strings.Join(dirs[n:], "")
 		name = strings.Replace(name, "_", "", -1)

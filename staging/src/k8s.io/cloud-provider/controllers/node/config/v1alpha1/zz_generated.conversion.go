@@ -22,9 +22,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cloud-provider/controllers/node/config"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	controllersnodeconfig "k8s.io/cloud-provider/controllers/node/config"
 )
 
 func init() {
@@ -33,26 +33,26 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddConversionFunc((*config.NodeControllerConfiguration)(nil), (*NodeControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_NodeControllerConfiguration_To_v1alpha1_NodeControllerConfiguration(a.(*config.NodeControllerConfiguration), b.(*NodeControllerConfiguration), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddConversionFunc((*controllersnodeconfig.NodeControllerConfiguration)(nil), (*NodeControllerConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_NodeControllerConfiguration_To_v1alpha1_NodeControllerConfiguration(a.(*controllersnodeconfig.NodeControllerConfiguration), b.(*NodeControllerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*NodeControllerConfiguration)(nil), (*config.NodeControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_NodeControllerConfiguration_To_config_NodeControllerConfiguration(a.(*NodeControllerConfiguration), b.(*config.NodeControllerConfiguration), scope)
+	if err := s.AddConversionFunc((*NodeControllerConfiguration)(nil), (*controllersnodeconfig.NodeControllerConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_NodeControllerConfiguration_To_config_NodeControllerConfiguration(a.(*NodeControllerConfiguration), b.(*controllersnodeconfig.NodeControllerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1alpha1_NodeControllerConfiguration_To_config_NodeControllerConfiguration(in *NodeControllerConfiguration, out *config.NodeControllerConfiguration, s conversion.Scope) error {
+func autoConvert_v1alpha1_NodeControllerConfiguration_To_config_NodeControllerConfiguration(in *NodeControllerConfiguration, out *controllersnodeconfig.NodeControllerConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.ConcurrentNodeSyncs = in.ConcurrentNodeSyncs
 	return nil
 }
 
-func autoConvert_config_NodeControllerConfiguration_To_v1alpha1_NodeControllerConfiguration(in *config.NodeControllerConfiguration, out *NodeControllerConfiguration, s conversion.Scope) error {
+func autoConvert_config_NodeControllerConfiguration_To_v1alpha1_NodeControllerConfiguration(in *controllersnodeconfig.NodeControllerConfiguration, out *NodeControllerConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.ConcurrentNodeSyncs = in.ConcurrentNodeSyncs
 	return nil
 }

@@ -24,10 +24,10 @@ package v1
 import (
 	"unsafe"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/apis/config"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	pkgapisconfig "k8s.io/apiserver/pkg/apis/config"
 )
 
 func init() {
@@ -36,213 +36,213 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*AESConfiguration)(nil), (*config.AESConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_AESConfiguration_To_config_AESConfiguration(a.(*AESConfiguration), b.(*config.AESConfiguration), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*AESConfiguration)(nil), (*pkgapisconfig.AESConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_AESConfiguration_To_config_AESConfiguration(a.(*AESConfiguration), b.(*pkgapisconfig.AESConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.AESConfiguration)(nil), (*AESConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_AESConfiguration_To_v1_AESConfiguration(a.(*config.AESConfiguration), b.(*AESConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisconfig.AESConfiguration)(nil), (*AESConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_AESConfiguration_To_v1_AESConfiguration(a.(*pkgapisconfig.AESConfiguration), b.(*AESConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*EncryptionConfiguration)(nil), (*config.EncryptionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_EncryptionConfiguration_To_config_EncryptionConfiguration(a.(*EncryptionConfiguration), b.(*config.EncryptionConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*EncryptionConfiguration)(nil), (*pkgapisconfig.EncryptionConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_EncryptionConfiguration_To_config_EncryptionConfiguration(a.(*EncryptionConfiguration), b.(*pkgapisconfig.EncryptionConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.EncryptionConfiguration)(nil), (*EncryptionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_EncryptionConfiguration_To_v1_EncryptionConfiguration(a.(*config.EncryptionConfiguration), b.(*EncryptionConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisconfig.EncryptionConfiguration)(nil), (*EncryptionConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_EncryptionConfiguration_To_v1_EncryptionConfiguration(a.(*pkgapisconfig.EncryptionConfiguration), b.(*EncryptionConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*IdentityConfiguration)(nil), (*config.IdentityConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_IdentityConfiguration_To_config_IdentityConfiguration(a.(*IdentityConfiguration), b.(*config.IdentityConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*IdentityConfiguration)(nil), (*pkgapisconfig.IdentityConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_IdentityConfiguration_To_config_IdentityConfiguration(a.(*IdentityConfiguration), b.(*pkgapisconfig.IdentityConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.IdentityConfiguration)(nil), (*IdentityConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_IdentityConfiguration_To_v1_IdentityConfiguration(a.(*config.IdentityConfiguration), b.(*IdentityConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisconfig.IdentityConfiguration)(nil), (*IdentityConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_IdentityConfiguration_To_v1_IdentityConfiguration(a.(*pkgapisconfig.IdentityConfiguration), b.(*IdentityConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*KMSConfiguration)(nil), (*config.KMSConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_KMSConfiguration_To_config_KMSConfiguration(a.(*KMSConfiguration), b.(*config.KMSConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*KMSConfiguration)(nil), (*pkgapisconfig.KMSConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_KMSConfiguration_To_config_KMSConfiguration(a.(*KMSConfiguration), b.(*pkgapisconfig.KMSConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.KMSConfiguration)(nil), (*KMSConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_KMSConfiguration_To_v1_KMSConfiguration(a.(*config.KMSConfiguration), b.(*KMSConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisconfig.KMSConfiguration)(nil), (*KMSConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_KMSConfiguration_To_v1_KMSConfiguration(a.(*pkgapisconfig.KMSConfiguration), b.(*KMSConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*Key)(nil), (*config.Key)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_Key_To_config_Key(a.(*Key), b.(*config.Key), scope)
+	if err := s.AddGeneratedConversionFunc((*Key)(nil), (*pkgapisconfig.Key)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_Key_To_config_Key(a.(*Key), b.(*pkgapisconfig.Key), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.Key)(nil), (*Key)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_Key_To_v1_Key(a.(*config.Key), b.(*Key), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisconfig.Key)(nil), (*Key)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_Key_To_v1_Key(a.(*pkgapisconfig.Key), b.(*Key), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*ProviderConfiguration)(nil), (*config.ProviderConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ProviderConfiguration_To_config_ProviderConfiguration(a.(*ProviderConfiguration), b.(*config.ProviderConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*ProviderConfiguration)(nil), (*pkgapisconfig.ProviderConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_ProviderConfiguration_To_config_ProviderConfiguration(a.(*ProviderConfiguration), b.(*pkgapisconfig.ProviderConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.ProviderConfiguration)(nil), (*ProviderConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_ProviderConfiguration_To_v1_ProviderConfiguration(a.(*config.ProviderConfiguration), b.(*ProviderConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisconfig.ProviderConfiguration)(nil), (*ProviderConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_ProviderConfiguration_To_v1_ProviderConfiguration(a.(*pkgapisconfig.ProviderConfiguration), b.(*ProviderConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*ResourceConfiguration)(nil), (*config.ResourceConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ResourceConfiguration_To_config_ResourceConfiguration(a.(*ResourceConfiguration), b.(*config.ResourceConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*ResourceConfiguration)(nil), (*pkgapisconfig.ResourceConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_ResourceConfiguration_To_config_ResourceConfiguration(a.(*ResourceConfiguration), b.(*pkgapisconfig.ResourceConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.ResourceConfiguration)(nil), (*ResourceConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_ResourceConfiguration_To_v1_ResourceConfiguration(a.(*config.ResourceConfiguration), b.(*ResourceConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisconfig.ResourceConfiguration)(nil), (*ResourceConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_ResourceConfiguration_To_v1_ResourceConfiguration(a.(*pkgapisconfig.ResourceConfiguration), b.(*ResourceConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*SecretboxConfiguration)(nil), (*config.SecretboxConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_SecretboxConfiguration_To_config_SecretboxConfiguration(a.(*SecretboxConfiguration), b.(*config.SecretboxConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*SecretboxConfiguration)(nil), (*pkgapisconfig.SecretboxConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_SecretboxConfiguration_To_config_SecretboxConfiguration(a.(*SecretboxConfiguration), b.(*pkgapisconfig.SecretboxConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.SecretboxConfiguration)(nil), (*SecretboxConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_SecretboxConfiguration_To_v1_SecretboxConfiguration(a.(*config.SecretboxConfiguration), b.(*SecretboxConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisconfig.SecretboxConfiguration)(nil), (*SecretboxConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_SecretboxConfiguration_To_v1_SecretboxConfiguration(a.(*pkgapisconfig.SecretboxConfiguration), b.(*SecretboxConfiguration), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1_AESConfiguration_To_config_AESConfiguration(in *AESConfiguration, out *config.AESConfiguration, s conversion.Scope) error {
-	out.Keys = *(*[]config.Key)(unsafe.Pointer(&in.Keys))
+func autoConvert_v1_AESConfiguration_To_config_AESConfiguration(in *AESConfiguration, out *pkgapisconfig.AESConfiguration, s apimachinerypkgconversion.Scope) error {
+	out.Keys = *(*[]pkgapisconfig.Key)(unsafe.Pointer(&in.Keys))
 	return nil
 }
 
 // Convert_v1_AESConfiguration_To_config_AESConfiguration is an autogenerated conversion function.
-func Convert_v1_AESConfiguration_To_config_AESConfiguration(in *AESConfiguration, out *config.AESConfiguration, s conversion.Scope) error {
+func Convert_v1_AESConfiguration_To_config_AESConfiguration(in *AESConfiguration, out *pkgapisconfig.AESConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_AESConfiguration_To_config_AESConfiguration(in, out, s)
 }
 
-func autoConvert_config_AESConfiguration_To_v1_AESConfiguration(in *config.AESConfiguration, out *AESConfiguration, s conversion.Scope) error {
+func autoConvert_config_AESConfiguration_To_v1_AESConfiguration(in *pkgapisconfig.AESConfiguration, out *AESConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.Keys = *(*[]Key)(unsafe.Pointer(&in.Keys))
 	return nil
 }
 
 // Convert_config_AESConfiguration_To_v1_AESConfiguration is an autogenerated conversion function.
-func Convert_config_AESConfiguration_To_v1_AESConfiguration(in *config.AESConfiguration, out *AESConfiguration, s conversion.Scope) error {
+func Convert_config_AESConfiguration_To_v1_AESConfiguration(in *pkgapisconfig.AESConfiguration, out *AESConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_AESConfiguration_To_v1_AESConfiguration(in, out, s)
 }
 
-func autoConvert_v1_EncryptionConfiguration_To_config_EncryptionConfiguration(in *EncryptionConfiguration, out *config.EncryptionConfiguration, s conversion.Scope) error {
-	out.Resources = *(*[]config.ResourceConfiguration)(unsafe.Pointer(&in.Resources))
+func autoConvert_v1_EncryptionConfiguration_To_config_EncryptionConfiguration(in *EncryptionConfiguration, out *pkgapisconfig.EncryptionConfiguration, s apimachinerypkgconversion.Scope) error {
+	out.Resources = *(*[]pkgapisconfig.ResourceConfiguration)(unsafe.Pointer(&in.Resources))
 	return nil
 }
 
 // Convert_v1_EncryptionConfiguration_To_config_EncryptionConfiguration is an autogenerated conversion function.
-func Convert_v1_EncryptionConfiguration_To_config_EncryptionConfiguration(in *EncryptionConfiguration, out *config.EncryptionConfiguration, s conversion.Scope) error {
+func Convert_v1_EncryptionConfiguration_To_config_EncryptionConfiguration(in *EncryptionConfiguration, out *pkgapisconfig.EncryptionConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_EncryptionConfiguration_To_config_EncryptionConfiguration(in, out, s)
 }
 
-func autoConvert_config_EncryptionConfiguration_To_v1_EncryptionConfiguration(in *config.EncryptionConfiguration, out *EncryptionConfiguration, s conversion.Scope) error {
+func autoConvert_config_EncryptionConfiguration_To_v1_EncryptionConfiguration(in *pkgapisconfig.EncryptionConfiguration, out *EncryptionConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.Resources = *(*[]ResourceConfiguration)(unsafe.Pointer(&in.Resources))
 	return nil
 }
 
 // Convert_config_EncryptionConfiguration_To_v1_EncryptionConfiguration is an autogenerated conversion function.
-func Convert_config_EncryptionConfiguration_To_v1_EncryptionConfiguration(in *config.EncryptionConfiguration, out *EncryptionConfiguration, s conversion.Scope) error {
+func Convert_config_EncryptionConfiguration_To_v1_EncryptionConfiguration(in *pkgapisconfig.EncryptionConfiguration, out *EncryptionConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_EncryptionConfiguration_To_v1_EncryptionConfiguration(in, out, s)
 }
 
-func autoConvert_v1_IdentityConfiguration_To_config_IdentityConfiguration(in *IdentityConfiguration, out *config.IdentityConfiguration, s conversion.Scope) error {
+func autoConvert_v1_IdentityConfiguration_To_config_IdentityConfiguration(in *IdentityConfiguration, out *pkgapisconfig.IdentityConfiguration, s apimachinerypkgconversion.Scope) error {
 	return nil
 }
 
 // Convert_v1_IdentityConfiguration_To_config_IdentityConfiguration is an autogenerated conversion function.
-func Convert_v1_IdentityConfiguration_To_config_IdentityConfiguration(in *IdentityConfiguration, out *config.IdentityConfiguration, s conversion.Scope) error {
+func Convert_v1_IdentityConfiguration_To_config_IdentityConfiguration(in *IdentityConfiguration, out *pkgapisconfig.IdentityConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_IdentityConfiguration_To_config_IdentityConfiguration(in, out, s)
 }
 
-func autoConvert_config_IdentityConfiguration_To_v1_IdentityConfiguration(in *config.IdentityConfiguration, out *IdentityConfiguration, s conversion.Scope) error {
+func autoConvert_config_IdentityConfiguration_To_v1_IdentityConfiguration(in *pkgapisconfig.IdentityConfiguration, out *IdentityConfiguration, s apimachinerypkgconversion.Scope) error {
 	return nil
 }
 
 // Convert_config_IdentityConfiguration_To_v1_IdentityConfiguration is an autogenerated conversion function.
-func Convert_config_IdentityConfiguration_To_v1_IdentityConfiguration(in *config.IdentityConfiguration, out *IdentityConfiguration, s conversion.Scope) error {
+func Convert_config_IdentityConfiguration_To_v1_IdentityConfiguration(in *pkgapisconfig.IdentityConfiguration, out *IdentityConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_IdentityConfiguration_To_v1_IdentityConfiguration(in, out, s)
 }
 
-func autoConvert_v1_KMSConfiguration_To_config_KMSConfiguration(in *KMSConfiguration, out *config.KMSConfiguration, s conversion.Scope) error {
+func autoConvert_v1_KMSConfiguration_To_config_KMSConfiguration(in *KMSConfiguration, out *pkgapisconfig.KMSConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.APIVersion = in.APIVersion
 	out.Name = in.Name
 	out.CacheSize = (*int32)(unsafe.Pointer(in.CacheSize))
 	out.Endpoint = in.Endpoint
-	out.Timeout = (*metav1.Duration)(unsafe.Pointer(in.Timeout))
+	out.Timeout = (*apismetav1.Duration)(unsafe.Pointer(in.Timeout))
 	return nil
 }
 
 // Convert_v1_KMSConfiguration_To_config_KMSConfiguration is an autogenerated conversion function.
-func Convert_v1_KMSConfiguration_To_config_KMSConfiguration(in *KMSConfiguration, out *config.KMSConfiguration, s conversion.Scope) error {
+func Convert_v1_KMSConfiguration_To_config_KMSConfiguration(in *KMSConfiguration, out *pkgapisconfig.KMSConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_KMSConfiguration_To_config_KMSConfiguration(in, out, s)
 }
 
-func autoConvert_config_KMSConfiguration_To_v1_KMSConfiguration(in *config.KMSConfiguration, out *KMSConfiguration, s conversion.Scope) error {
+func autoConvert_config_KMSConfiguration_To_v1_KMSConfiguration(in *pkgapisconfig.KMSConfiguration, out *KMSConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.APIVersion = in.APIVersion
 	out.Name = in.Name
 	out.CacheSize = (*int32)(unsafe.Pointer(in.CacheSize))
 	out.Endpoint = in.Endpoint
-	out.Timeout = (*metav1.Duration)(unsafe.Pointer(in.Timeout))
+	out.Timeout = (*apismetav1.Duration)(unsafe.Pointer(in.Timeout))
 	return nil
 }
 
 // Convert_config_KMSConfiguration_To_v1_KMSConfiguration is an autogenerated conversion function.
-func Convert_config_KMSConfiguration_To_v1_KMSConfiguration(in *config.KMSConfiguration, out *KMSConfiguration, s conversion.Scope) error {
+func Convert_config_KMSConfiguration_To_v1_KMSConfiguration(in *pkgapisconfig.KMSConfiguration, out *KMSConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_KMSConfiguration_To_v1_KMSConfiguration(in, out, s)
 }
 
-func autoConvert_v1_Key_To_config_Key(in *Key, out *config.Key, s conversion.Scope) error {
+func autoConvert_v1_Key_To_config_Key(in *Key, out *pkgapisconfig.Key, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
 	out.Secret = in.Secret
 	return nil
 }
 
 // Convert_v1_Key_To_config_Key is an autogenerated conversion function.
-func Convert_v1_Key_To_config_Key(in *Key, out *config.Key, s conversion.Scope) error {
+func Convert_v1_Key_To_config_Key(in *Key, out *pkgapisconfig.Key, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_Key_To_config_Key(in, out, s)
 }
 
-func autoConvert_config_Key_To_v1_Key(in *config.Key, out *Key, s conversion.Scope) error {
+func autoConvert_config_Key_To_v1_Key(in *pkgapisconfig.Key, out *Key, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
 	out.Secret = in.Secret
 	return nil
 }
 
 // Convert_config_Key_To_v1_Key is an autogenerated conversion function.
-func Convert_config_Key_To_v1_Key(in *config.Key, out *Key, s conversion.Scope) error {
+func Convert_config_Key_To_v1_Key(in *pkgapisconfig.Key, out *Key, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_Key_To_v1_Key(in, out, s)
 }
 
-func autoConvert_v1_ProviderConfiguration_To_config_ProviderConfiguration(in *ProviderConfiguration, out *config.ProviderConfiguration, s conversion.Scope) error {
-	out.AESGCM = (*config.AESConfiguration)(unsafe.Pointer(in.AESGCM))
-	out.AESCBC = (*config.AESConfiguration)(unsafe.Pointer(in.AESCBC))
-	out.Secretbox = (*config.SecretboxConfiguration)(unsafe.Pointer(in.Secretbox))
-	out.Identity = (*config.IdentityConfiguration)(unsafe.Pointer(in.Identity))
-	out.KMS = (*config.KMSConfiguration)(unsafe.Pointer(in.KMS))
+func autoConvert_v1_ProviderConfiguration_To_config_ProviderConfiguration(in *ProviderConfiguration, out *pkgapisconfig.ProviderConfiguration, s apimachinerypkgconversion.Scope) error {
+	out.AESGCM = (*pkgapisconfig.AESConfiguration)(unsafe.Pointer(in.AESGCM))
+	out.AESCBC = (*pkgapisconfig.AESConfiguration)(unsafe.Pointer(in.AESCBC))
+	out.Secretbox = (*pkgapisconfig.SecretboxConfiguration)(unsafe.Pointer(in.Secretbox))
+	out.Identity = (*pkgapisconfig.IdentityConfiguration)(unsafe.Pointer(in.Identity))
+	out.KMS = (*pkgapisconfig.KMSConfiguration)(unsafe.Pointer(in.KMS))
 	return nil
 }
 
 // Convert_v1_ProviderConfiguration_To_config_ProviderConfiguration is an autogenerated conversion function.
-func Convert_v1_ProviderConfiguration_To_config_ProviderConfiguration(in *ProviderConfiguration, out *config.ProviderConfiguration, s conversion.Scope) error {
+func Convert_v1_ProviderConfiguration_To_config_ProviderConfiguration(in *ProviderConfiguration, out *pkgapisconfig.ProviderConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_ProviderConfiguration_To_config_ProviderConfiguration(in, out, s)
 }
 
-func autoConvert_config_ProviderConfiguration_To_v1_ProviderConfiguration(in *config.ProviderConfiguration, out *ProviderConfiguration, s conversion.Scope) error {
+func autoConvert_config_ProviderConfiguration_To_v1_ProviderConfiguration(in *pkgapisconfig.ProviderConfiguration, out *ProviderConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.AESGCM = (*AESConfiguration)(unsafe.Pointer(in.AESGCM))
 	out.AESCBC = (*AESConfiguration)(unsafe.Pointer(in.AESCBC))
 	out.Secretbox = (*SecretboxConfiguration)(unsafe.Pointer(in.Secretbox))
@@ -252,48 +252,48 @@ func autoConvert_config_ProviderConfiguration_To_v1_ProviderConfiguration(in *co
 }
 
 // Convert_config_ProviderConfiguration_To_v1_ProviderConfiguration is an autogenerated conversion function.
-func Convert_config_ProviderConfiguration_To_v1_ProviderConfiguration(in *config.ProviderConfiguration, out *ProviderConfiguration, s conversion.Scope) error {
+func Convert_config_ProviderConfiguration_To_v1_ProviderConfiguration(in *pkgapisconfig.ProviderConfiguration, out *ProviderConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_ProviderConfiguration_To_v1_ProviderConfiguration(in, out, s)
 }
 
-func autoConvert_v1_ResourceConfiguration_To_config_ResourceConfiguration(in *ResourceConfiguration, out *config.ResourceConfiguration, s conversion.Scope) error {
+func autoConvert_v1_ResourceConfiguration_To_config_ResourceConfiguration(in *ResourceConfiguration, out *pkgapisconfig.ResourceConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
-	out.Providers = *(*[]config.ProviderConfiguration)(unsafe.Pointer(&in.Providers))
+	out.Providers = *(*[]pkgapisconfig.ProviderConfiguration)(unsafe.Pointer(&in.Providers))
 	return nil
 }
 
 // Convert_v1_ResourceConfiguration_To_config_ResourceConfiguration is an autogenerated conversion function.
-func Convert_v1_ResourceConfiguration_To_config_ResourceConfiguration(in *ResourceConfiguration, out *config.ResourceConfiguration, s conversion.Scope) error {
+func Convert_v1_ResourceConfiguration_To_config_ResourceConfiguration(in *ResourceConfiguration, out *pkgapisconfig.ResourceConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_ResourceConfiguration_To_config_ResourceConfiguration(in, out, s)
 }
 
-func autoConvert_config_ResourceConfiguration_To_v1_ResourceConfiguration(in *config.ResourceConfiguration, out *ResourceConfiguration, s conversion.Scope) error {
+func autoConvert_config_ResourceConfiguration_To_v1_ResourceConfiguration(in *pkgapisconfig.ResourceConfiguration, out *ResourceConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
 	out.Providers = *(*[]ProviderConfiguration)(unsafe.Pointer(&in.Providers))
 	return nil
 }
 
 // Convert_config_ResourceConfiguration_To_v1_ResourceConfiguration is an autogenerated conversion function.
-func Convert_config_ResourceConfiguration_To_v1_ResourceConfiguration(in *config.ResourceConfiguration, out *ResourceConfiguration, s conversion.Scope) error {
+func Convert_config_ResourceConfiguration_To_v1_ResourceConfiguration(in *pkgapisconfig.ResourceConfiguration, out *ResourceConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_ResourceConfiguration_To_v1_ResourceConfiguration(in, out, s)
 }
 
-func autoConvert_v1_SecretboxConfiguration_To_config_SecretboxConfiguration(in *SecretboxConfiguration, out *config.SecretboxConfiguration, s conversion.Scope) error {
-	out.Keys = *(*[]config.Key)(unsafe.Pointer(&in.Keys))
+func autoConvert_v1_SecretboxConfiguration_To_config_SecretboxConfiguration(in *SecretboxConfiguration, out *pkgapisconfig.SecretboxConfiguration, s apimachinerypkgconversion.Scope) error {
+	out.Keys = *(*[]pkgapisconfig.Key)(unsafe.Pointer(&in.Keys))
 	return nil
 }
 
 // Convert_v1_SecretboxConfiguration_To_config_SecretboxConfiguration is an autogenerated conversion function.
-func Convert_v1_SecretboxConfiguration_To_config_SecretboxConfiguration(in *SecretboxConfiguration, out *config.SecretboxConfiguration, s conversion.Scope) error {
+func Convert_v1_SecretboxConfiguration_To_config_SecretboxConfiguration(in *SecretboxConfiguration, out *pkgapisconfig.SecretboxConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_SecretboxConfiguration_To_config_SecretboxConfiguration(in, out, s)
 }
 
-func autoConvert_config_SecretboxConfiguration_To_v1_SecretboxConfiguration(in *config.SecretboxConfiguration, out *SecretboxConfiguration, s conversion.Scope) error {
+func autoConvert_config_SecretboxConfiguration_To_v1_SecretboxConfiguration(in *pkgapisconfig.SecretboxConfiguration, out *SecretboxConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.Keys = *(*[]Key)(unsafe.Pointer(&in.Keys))
 	return nil
 }
 
 // Convert_config_SecretboxConfiguration_To_v1_SecretboxConfiguration is an autogenerated conversion function.
-func Convert_config_SecretboxConfiguration_To_v1_SecretboxConfiguration(in *config.SecretboxConfiguration, out *SecretboxConfiguration, s conversion.Scope) error {
+func Convert_config_SecretboxConfiguration_To_v1_SecretboxConfiguration(in *pkgapisconfig.SecretboxConfiguration, out *SecretboxConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_SecretboxConfiguration_To_v1_SecretboxConfiguration(in, out, s)
 }

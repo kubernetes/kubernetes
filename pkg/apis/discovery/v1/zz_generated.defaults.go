@@ -22,27 +22,27 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/api/discovery/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	apidiscoveryv1 "k8s.io/api/discovery/v1"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
-func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1.EndpointSlice{}, func(obj interface{}) { SetObjectDefaults_EndpointSlice(obj.(*v1.EndpointSlice)) })
-	scheme.AddTypeDefaultingFunc(&v1.EndpointSliceList{}, func(obj interface{}) { SetObjectDefaults_EndpointSliceList(obj.(*v1.EndpointSliceList)) })
+func RegisterDefaults(scheme *apimachinerypkgruntime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&apidiscoveryv1.EndpointSlice{}, func(obj interface{}) { SetObjectDefaults_EndpointSlice(obj.(*apidiscoveryv1.EndpointSlice)) })
+	scheme.AddTypeDefaultingFunc(&apidiscoveryv1.EndpointSliceList{}, func(obj interface{}) { SetObjectDefaults_EndpointSliceList(obj.(*apidiscoveryv1.EndpointSliceList)) })
 	return nil
 }
 
-func SetObjectDefaults_EndpointSlice(in *v1.EndpointSlice) {
+func SetObjectDefaults_EndpointSlice(in *apidiscoveryv1.EndpointSlice) {
 	for i := range in.Ports {
 		a := &in.Ports[i]
 		SetDefaults_EndpointPort(a)
 	}
 }
 
-func SetObjectDefaults_EndpointSliceList(in *v1.EndpointSliceList) {
+func SetObjectDefaults_EndpointSliceList(in *apidiscoveryv1.EndpointSliceList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_EndpointSlice(a)

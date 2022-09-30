@@ -299,7 +299,7 @@ func (g *genPreleaseLifecycle) Namers(c *generator.Context) namer.NameSystems {
 	return namer.NameSystems{
 		"public":       namer.NewPublicNamer(1),
 		"intrapackage": namer.NewPublicNamer(0),
-		"raw":          namer.NewRawNamer("", nil),
+		"raw":          namer.NewRawNamer("", g.imports),
 	}
 }
 

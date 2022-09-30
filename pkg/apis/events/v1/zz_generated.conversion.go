@@ -24,11 +24,11 @@ package v1
 import (
 	"unsafe"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/api/events/v1"
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/core"
+	apicorev1 "k8s.io/api/core/v1"
+	apieventsv1 "k8s.io/api/events/v1"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	pkgapiscore "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func init() {
@@ -37,50 +37,50 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1.EventList)(nil), (*core.EventList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_EventList_To_core_EventList(a.(*v1.EventList), b.(*core.EventList), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*apieventsv1.EventList)(nil), (*pkgapiscore.EventList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_EventList_To_core_EventList(a.(*apieventsv1.EventList), b.(*pkgapiscore.EventList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*core.EventList)(nil), (*v1.EventList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_EventList_To_v1_EventList(a.(*core.EventList), b.(*v1.EventList), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapiscore.EventList)(nil), (*apieventsv1.EventList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_core_EventList_To_v1_EventList(a.(*pkgapiscore.EventList), b.(*apieventsv1.EventList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.EventSeries)(nil), (*core.EventSeries)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_EventSeries_To_core_EventSeries(a.(*v1.EventSeries), b.(*core.EventSeries), scope)
+	if err := s.AddGeneratedConversionFunc((*apieventsv1.EventSeries)(nil), (*pkgapiscore.EventSeries)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_EventSeries_To_core_EventSeries(a.(*apieventsv1.EventSeries), b.(*pkgapiscore.EventSeries), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*core.EventSeries)(nil), (*v1.EventSeries)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_EventSeries_To_v1_EventSeries(a.(*core.EventSeries), b.(*v1.EventSeries), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapiscore.EventSeries)(nil), (*apieventsv1.EventSeries)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_core_EventSeries_To_v1_EventSeries(a.(*pkgapiscore.EventSeries), b.(*apieventsv1.EventSeries), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*core.Event)(nil), (*v1.Event)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_Event_To_v1_Event(a.(*core.Event), b.(*v1.Event), scope)
+	if err := s.AddConversionFunc((*pkgapiscore.Event)(nil), (*apieventsv1.Event)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_core_Event_To_v1_Event(a.(*pkgapiscore.Event), b.(*apieventsv1.Event), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1.Event)(nil), (*core.Event)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_Event_To_core_Event(a.(*v1.Event), b.(*core.Event), scope)
+	if err := s.AddConversionFunc((*apieventsv1.Event)(nil), (*pkgapiscore.Event)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_Event_To_core_Event(a.(*apieventsv1.Event), b.(*pkgapiscore.Event), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1_Event_To_core_Event(in *v1.Event, out *core.Event, s conversion.Scope) error {
+func autoConvert_v1_Event_To_core_Event(in *apieventsv1.Event, out *pkgapiscore.Event, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.EventTime = in.EventTime
-	out.Series = (*core.EventSeries)(unsafe.Pointer(in.Series))
+	out.Series = (*pkgapiscore.EventSeries)(unsafe.Pointer(in.Series))
 	out.ReportingController = in.ReportingController
 	out.ReportingInstance = in.ReportingInstance
 	out.Action = in.Action
 	out.Reason = in.Reason
 	// WARNING: in.Regarding requires manual conversion: does not exist in peer-type
-	out.Related = (*core.ObjectReference)(unsafe.Pointer(in.Related))
+	out.Related = (*pkgapiscore.ObjectReference)(unsafe.Pointer(in.Related))
 	// WARNING: in.Note requires manual conversion: does not exist in peer-type
 	out.Type = in.Type
 	// WARNING: in.DeprecatedSource requires manual conversion: does not exist in peer-type
@@ -90,7 +90,7 @@ func autoConvert_v1_Event_To_core_Event(in *v1.Event, out *core.Event, s convers
 	return nil
 }
 
-func autoConvert_core_Event_To_v1_Event(in *core.Event, out *v1.Event, s conversion.Scope) error {
+func autoConvert_core_Event_To_v1_Event(in *pkgapiscore.Event, out *apieventsv1.Event, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	// WARNING: in.InvolvedObject requires manual conversion: does not exist in peer-type
 	out.Reason = in.Reason
@@ -101,19 +101,19 @@ func autoConvert_core_Event_To_v1_Event(in *core.Event, out *v1.Event, s convers
 	// WARNING: in.Count requires manual conversion: does not exist in peer-type
 	out.Type = in.Type
 	out.EventTime = in.EventTime
-	out.Series = (*v1.EventSeries)(unsafe.Pointer(in.Series))
+	out.Series = (*apieventsv1.EventSeries)(unsafe.Pointer(in.Series))
 	out.Action = in.Action
-	out.Related = (*corev1.ObjectReference)(unsafe.Pointer(in.Related))
+	out.Related = (*apicorev1.ObjectReference)(unsafe.Pointer(in.Related))
 	out.ReportingController = in.ReportingController
 	out.ReportingInstance = in.ReportingInstance
 	return nil
 }
 
-func autoConvert_v1_EventList_To_core_EventList(in *v1.EventList, out *core.EventList, s conversion.Scope) error {
+func autoConvert_v1_EventList_To_core_EventList(in *apieventsv1.EventList, out *pkgapiscore.EventList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]core.Event, len(*in))
+		*out = make([]pkgapiscore.Event, len(*in))
 		for i := range *in {
 			if err := Convert_v1_Event_To_core_Event(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -126,15 +126,15 @@ func autoConvert_v1_EventList_To_core_EventList(in *v1.EventList, out *core.Even
 }
 
 // Convert_v1_EventList_To_core_EventList is an autogenerated conversion function.
-func Convert_v1_EventList_To_core_EventList(in *v1.EventList, out *core.EventList, s conversion.Scope) error {
+func Convert_v1_EventList_To_core_EventList(in *apieventsv1.EventList, out *pkgapiscore.EventList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_EventList_To_core_EventList(in, out, s)
 }
 
-func autoConvert_core_EventList_To_v1_EventList(in *core.EventList, out *v1.EventList, s conversion.Scope) error {
+func autoConvert_core_EventList_To_v1_EventList(in *pkgapiscore.EventList, out *apieventsv1.EventList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]v1.Event, len(*in))
+		*out = make([]apieventsv1.Event, len(*in))
 		for i := range *in {
 			if err := Convert_core_Event_To_v1_Event(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -147,28 +147,28 @@ func autoConvert_core_EventList_To_v1_EventList(in *core.EventList, out *v1.Even
 }
 
 // Convert_core_EventList_To_v1_EventList is an autogenerated conversion function.
-func Convert_core_EventList_To_v1_EventList(in *core.EventList, out *v1.EventList, s conversion.Scope) error {
+func Convert_core_EventList_To_v1_EventList(in *pkgapiscore.EventList, out *apieventsv1.EventList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_core_EventList_To_v1_EventList(in, out, s)
 }
 
-func autoConvert_v1_EventSeries_To_core_EventSeries(in *v1.EventSeries, out *core.EventSeries, s conversion.Scope) error {
+func autoConvert_v1_EventSeries_To_core_EventSeries(in *apieventsv1.EventSeries, out *pkgapiscore.EventSeries, s apimachinerypkgconversion.Scope) error {
 	out.Count = in.Count
 	out.LastObservedTime = in.LastObservedTime
 	return nil
 }
 
 // Convert_v1_EventSeries_To_core_EventSeries is an autogenerated conversion function.
-func Convert_v1_EventSeries_To_core_EventSeries(in *v1.EventSeries, out *core.EventSeries, s conversion.Scope) error {
+func Convert_v1_EventSeries_To_core_EventSeries(in *apieventsv1.EventSeries, out *pkgapiscore.EventSeries, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_EventSeries_To_core_EventSeries(in, out, s)
 }
 
-func autoConvert_core_EventSeries_To_v1_EventSeries(in *core.EventSeries, out *v1.EventSeries, s conversion.Scope) error {
+func autoConvert_core_EventSeries_To_v1_EventSeries(in *pkgapiscore.EventSeries, out *apieventsv1.EventSeries, s apimachinerypkgconversion.Scope) error {
 	out.Count = in.Count
 	out.LastObservedTime = in.LastObservedTime
 	return nil
 }
 
 // Convert_core_EventSeries_To_v1_EventSeries is an autogenerated conversion function.
-func Convert_core_EventSeries_To_v1_EventSeries(in *core.EventSeries, out *v1.EventSeries, s conversion.Scope) error {
+func Convert_core_EventSeries_To_v1_EventSeries(in *pkgapiscore.EventSeries, out *apieventsv1.EventSeries, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_core_EventSeries_To_v1_EventSeries(in, out, s)
 }

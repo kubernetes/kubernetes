@@ -24,13 +24,13 @@ package v1beta1
 import (
 	"unsafe"
 
-	"k8s.io/api/certificates/v1beta1"
-	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/certificates"
-	"k8s.io/kubernetes/pkg/apis/core"
+	apicertificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	apicorev1 "k8s.io/api/core/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	pkgapiscertificates "k8s.io/kubernetes/pkg/apis/certificates"
+	pkgapiscore "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func init() {
@@ -39,61 +39,61 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1beta1.CertificateSigningRequest)(nil), (*certificates.CertificateSigningRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_CertificateSigningRequest_To_certificates_CertificateSigningRequest(a.(*v1beta1.CertificateSigningRequest), b.(*certificates.CertificateSigningRequest), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*apicertificatesv1beta1.CertificateSigningRequest)(nil), (*pkgapiscertificates.CertificateSigningRequest)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_CertificateSigningRequest_To_certificates_CertificateSigningRequest(a.(*apicertificatesv1beta1.CertificateSigningRequest), b.(*pkgapiscertificates.CertificateSigningRequest), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*certificates.CertificateSigningRequest)(nil), (*v1beta1.CertificateSigningRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_certificates_CertificateSigningRequest_To_v1beta1_CertificateSigningRequest(a.(*certificates.CertificateSigningRequest), b.(*v1beta1.CertificateSigningRequest), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapiscertificates.CertificateSigningRequest)(nil), (*apicertificatesv1beta1.CertificateSigningRequest)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_certificates_CertificateSigningRequest_To_v1beta1_CertificateSigningRequest(a.(*pkgapiscertificates.CertificateSigningRequest), b.(*apicertificatesv1beta1.CertificateSigningRequest), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.CertificateSigningRequestCondition)(nil), (*certificates.CertificateSigningRequestCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_CertificateSigningRequestCondition_To_certificates_CertificateSigningRequestCondition(a.(*v1beta1.CertificateSigningRequestCondition), b.(*certificates.CertificateSigningRequestCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*apicertificatesv1beta1.CertificateSigningRequestCondition)(nil), (*pkgapiscertificates.CertificateSigningRequestCondition)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_CertificateSigningRequestCondition_To_certificates_CertificateSigningRequestCondition(a.(*apicertificatesv1beta1.CertificateSigningRequestCondition), b.(*pkgapiscertificates.CertificateSigningRequestCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*certificates.CertificateSigningRequestCondition)(nil), (*v1beta1.CertificateSigningRequestCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_certificates_CertificateSigningRequestCondition_To_v1beta1_CertificateSigningRequestCondition(a.(*certificates.CertificateSigningRequestCondition), b.(*v1beta1.CertificateSigningRequestCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapiscertificates.CertificateSigningRequestCondition)(nil), (*apicertificatesv1beta1.CertificateSigningRequestCondition)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_certificates_CertificateSigningRequestCondition_To_v1beta1_CertificateSigningRequestCondition(a.(*pkgapiscertificates.CertificateSigningRequestCondition), b.(*apicertificatesv1beta1.CertificateSigningRequestCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.CertificateSigningRequestList)(nil), (*certificates.CertificateSigningRequestList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_CertificateSigningRequestList_To_certificates_CertificateSigningRequestList(a.(*v1beta1.CertificateSigningRequestList), b.(*certificates.CertificateSigningRequestList), scope)
+	if err := s.AddGeneratedConversionFunc((*apicertificatesv1beta1.CertificateSigningRequestList)(nil), (*pkgapiscertificates.CertificateSigningRequestList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_CertificateSigningRequestList_To_certificates_CertificateSigningRequestList(a.(*apicertificatesv1beta1.CertificateSigningRequestList), b.(*pkgapiscertificates.CertificateSigningRequestList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*certificates.CertificateSigningRequestList)(nil), (*v1beta1.CertificateSigningRequestList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_certificates_CertificateSigningRequestList_To_v1beta1_CertificateSigningRequestList(a.(*certificates.CertificateSigningRequestList), b.(*v1beta1.CertificateSigningRequestList), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapiscertificates.CertificateSigningRequestList)(nil), (*apicertificatesv1beta1.CertificateSigningRequestList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_certificates_CertificateSigningRequestList_To_v1beta1_CertificateSigningRequestList(a.(*pkgapiscertificates.CertificateSigningRequestList), b.(*apicertificatesv1beta1.CertificateSigningRequestList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.CertificateSigningRequestSpec)(nil), (*certificates.CertificateSigningRequestSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_CertificateSigningRequestSpec_To_certificates_CertificateSigningRequestSpec(a.(*v1beta1.CertificateSigningRequestSpec), b.(*certificates.CertificateSigningRequestSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*apicertificatesv1beta1.CertificateSigningRequestSpec)(nil), (*pkgapiscertificates.CertificateSigningRequestSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_CertificateSigningRequestSpec_To_certificates_CertificateSigningRequestSpec(a.(*apicertificatesv1beta1.CertificateSigningRequestSpec), b.(*pkgapiscertificates.CertificateSigningRequestSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*certificates.CertificateSigningRequestSpec)(nil), (*v1beta1.CertificateSigningRequestSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_certificates_CertificateSigningRequestSpec_To_v1beta1_CertificateSigningRequestSpec(a.(*certificates.CertificateSigningRequestSpec), b.(*v1beta1.CertificateSigningRequestSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapiscertificates.CertificateSigningRequestSpec)(nil), (*apicertificatesv1beta1.CertificateSigningRequestSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_certificates_CertificateSigningRequestSpec_To_v1beta1_CertificateSigningRequestSpec(a.(*pkgapiscertificates.CertificateSigningRequestSpec), b.(*apicertificatesv1beta1.CertificateSigningRequestSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.CertificateSigningRequestStatus)(nil), (*certificates.CertificateSigningRequestStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_CertificateSigningRequestStatus_To_certificates_CertificateSigningRequestStatus(a.(*v1beta1.CertificateSigningRequestStatus), b.(*certificates.CertificateSigningRequestStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apicertificatesv1beta1.CertificateSigningRequestStatus)(nil), (*pkgapiscertificates.CertificateSigningRequestStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_CertificateSigningRequestStatus_To_certificates_CertificateSigningRequestStatus(a.(*apicertificatesv1beta1.CertificateSigningRequestStatus), b.(*pkgapiscertificates.CertificateSigningRequestStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*certificates.CertificateSigningRequestStatus)(nil), (*v1beta1.CertificateSigningRequestStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_certificates_CertificateSigningRequestStatus_To_v1beta1_CertificateSigningRequestStatus(a.(*certificates.CertificateSigningRequestStatus), b.(*v1beta1.CertificateSigningRequestStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapiscertificates.CertificateSigningRequestStatus)(nil), (*apicertificatesv1beta1.CertificateSigningRequestStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_certificates_CertificateSigningRequestStatus_To_v1beta1_CertificateSigningRequestStatus(a.(*pkgapiscertificates.CertificateSigningRequestStatus), b.(*apicertificatesv1beta1.CertificateSigningRequestStatus), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1beta1_CertificateSigningRequest_To_certificates_CertificateSigningRequest(in *v1beta1.CertificateSigningRequest, out *certificates.CertificateSigningRequest, s conversion.Scope) error {
+func autoConvert_v1beta1_CertificateSigningRequest_To_certificates_CertificateSigningRequest(in *apicertificatesv1beta1.CertificateSigningRequest, out *pkgapiscertificates.CertificateSigningRequest, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_CertificateSigningRequestSpec_To_certificates_CertificateSigningRequestSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -105,11 +105,11 @@ func autoConvert_v1beta1_CertificateSigningRequest_To_certificates_CertificateSi
 }
 
 // Convert_v1beta1_CertificateSigningRequest_To_certificates_CertificateSigningRequest is an autogenerated conversion function.
-func Convert_v1beta1_CertificateSigningRequest_To_certificates_CertificateSigningRequest(in *v1beta1.CertificateSigningRequest, out *certificates.CertificateSigningRequest, s conversion.Scope) error {
+func Convert_v1beta1_CertificateSigningRequest_To_certificates_CertificateSigningRequest(in *apicertificatesv1beta1.CertificateSigningRequest, out *pkgapiscertificates.CertificateSigningRequest, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_CertificateSigningRequest_To_certificates_CertificateSigningRequest(in, out, s)
 }
 
-func autoConvert_certificates_CertificateSigningRequest_To_v1beta1_CertificateSigningRequest(in *certificates.CertificateSigningRequest, out *v1beta1.CertificateSigningRequest, s conversion.Scope) error {
+func autoConvert_certificates_CertificateSigningRequest_To_v1beta1_CertificateSigningRequest(in *pkgapiscertificates.CertificateSigningRequest, out *apicertificatesv1beta1.CertificateSigningRequest, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_certificates_CertificateSigningRequestSpec_To_v1beta1_CertificateSigningRequestSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -121,13 +121,13 @@ func autoConvert_certificates_CertificateSigningRequest_To_v1beta1_CertificateSi
 }
 
 // Convert_certificates_CertificateSigningRequest_To_v1beta1_CertificateSigningRequest is an autogenerated conversion function.
-func Convert_certificates_CertificateSigningRequest_To_v1beta1_CertificateSigningRequest(in *certificates.CertificateSigningRequest, out *v1beta1.CertificateSigningRequest, s conversion.Scope) error {
+func Convert_certificates_CertificateSigningRequest_To_v1beta1_CertificateSigningRequest(in *pkgapiscertificates.CertificateSigningRequest, out *apicertificatesv1beta1.CertificateSigningRequest, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_certificates_CertificateSigningRequest_To_v1beta1_CertificateSigningRequest(in, out, s)
 }
 
-func autoConvert_v1beta1_CertificateSigningRequestCondition_To_certificates_CertificateSigningRequestCondition(in *v1beta1.CertificateSigningRequestCondition, out *certificates.CertificateSigningRequestCondition, s conversion.Scope) error {
-	out.Type = certificates.RequestConditionType(in.Type)
-	out.Status = core.ConditionStatus(in.Status)
+func autoConvert_v1beta1_CertificateSigningRequestCondition_To_certificates_CertificateSigningRequestCondition(in *apicertificatesv1beta1.CertificateSigningRequestCondition, out *pkgapiscertificates.CertificateSigningRequestCondition, s apimachinerypkgconversion.Scope) error {
+	out.Type = pkgapiscertificates.RequestConditionType(in.Type)
+	out.Status = pkgapiscore.ConditionStatus(in.Status)
 	out.Reason = in.Reason
 	out.Message = in.Message
 	out.LastUpdateTime = in.LastUpdateTime
@@ -136,13 +136,13 @@ func autoConvert_v1beta1_CertificateSigningRequestCondition_To_certificates_Cert
 }
 
 // Convert_v1beta1_CertificateSigningRequestCondition_To_certificates_CertificateSigningRequestCondition is an autogenerated conversion function.
-func Convert_v1beta1_CertificateSigningRequestCondition_To_certificates_CertificateSigningRequestCondition(in *v1beta1.CertificateSigningRequestCondition, out *certificates.CertificateSigningRequestCondition, s conversion.Scope) error {
+func Convert_v1beta1_CertificateSigningRequestCondition_To_certificates_CertificateSigningRequestCondition(in *apicertificatesv1beta1.CertificateSigningRequestCondition, out *pkgapiscertificates.CertificateSigningRequestCondition, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_CertificateSigningRequestCondition_To_certificates_CertificateSigningRequestCondition(in, out, s)
 }
 
-func autoConvert_certificates_CertificateSigningRequestCondition_To_v1beta1_CertificateSigningRequestCondition(in *certificates.CertificateSigningRequestCondition, out *v1beta1.CertificateSigningRequestCondition, s conversion.Scope) error {
-	out.Type = v1beta1.RequestConditionType(in.Type)
-	out.Status = v1.ConditionStatus(in.Status)
+func autoConvert_certificates_CertificateSigningRequestCondition_To_v1beta1_CertificateSigningRequestCondition(in *pkgapiscertificates.CertificateSigningRequestCondition, out *apicertificatesv1beta1.CertificateSigningRequestCondition, s apimachinerypkgconversion.Scope) error {
+	out.Type = apicertificatesv1beta1.RequestConditionType(in.Type)
+	out.Status = apicorev1.ConditionStatus(in.Status)
 	out.Reason = in.Reason
 	out.Message = in.Message
 	out.LastUpdateTime = in.LastUpdateTime
@@ -151,15 +151,15 @@ func autoConvert_certificates_CertificateSigningRequestCondition_To_v1beta1_Cert
 }
 
 // Convert_certificates_CertificateSigningRequestCondition_To_v1beta1_CertificateSigningRequestCondition is an autogenerated conversion function.
-func Convert_certificates_CertificateSigningRequestCondition_To_v1beta1_CertificateSigningRequestCondition(in *certificates.CertificateSigningRequestCondition, out *v1beta1.CertificateSigningRequestCondition, s conversion.Scope) error {
+func Convert_certificates_CertificateSigningRequestCondition_To_v1beta1_CertificateSigningRequestCondition(in *pkgapiscertificates.CertificateSigningRequestCondition, out *apicertificatesv1beta1.CertificateSigningRequestCondition, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_certificates_CertificateSigningRequestCondition_To_v1beta1_CertificateSigningRequestCondition(in, out, s)
 }
 
-func autoConvert_v1beta1_CertificateSigningRequestList_To_certificates_CertificateSigningRequestList(in *v1beta1.CertificateSigningRequestList, out *certificates.CertificateSigningRequestList, s conversion.Scope) error {
+func autoConvert_v1beta1_CertificateSigningRequestList_To_certificates_CertificateSigningRequestList(in *apicertificatesv1beta1.CertificateSigningRequestList, out *pkgapiscertificates.CertificateSigningRequestList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]certificates.CertificateSigningRequest, len(*in))
+		*out = make([]pkgapiscertificates.CertificateSigningRequest, len(*in))
 		for i := range *in {
 			if err := Convert_v1beta1_CertificateSigningRequest_To_certificates_CertificateSigningRequest(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -172,15 +172,15 @@ func autoConvert_v1beta1_CertificateSigningRequestList_To_certificates_Certifica
 }
 
 // Convert_v1beta1_CertificateSigningRequestList_To_certificates_CertificateSigningRequestList is an autogenerated conversion function.
-func Convert_v1beta1_CertificateSigningRequestList_To_certificates_CertificateSigningRequestList(in *v1beta1.CertificateSigningRequestList, out *certificates.CertificateSigningRequestList, s conversion.Scope) error {
+func Convert_v1beta1_CertificateSigningRequestList_To_certificates_CertificateSigningRequestList(in *apicertificatesv1beta1.CertificateSigningRequestList, out *pkgapiscertificates.CertificateSigningRequestList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_CertificateSigningRequestList_To_certificates_CertificateSigningRequestList(in, out, s)
 }
 
-func autoConvert_certificates_CertificateSigningRequestList_To_v1beta1_CertificateSigningRequestList(in *certificates.CertificateSigningRequestList, out *v1beta1.CertificateSigningRequestList, s conversion.Scope) error {
+func autoConvert_certificates_CertificateSigningRequestList_To_v1beta1_CertificateSigningRequestList(in *pkgapiscertificates.CertificateSigningRequestList, out *apicertificatesv1beta1.CertificateSigningRequestList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]v1beta1.CertificateSigningRequest, len(*in))
+		*out = make([]apicertificatesv1beta1.CertificateSigningRequest, len(*in))
 		for i := range *in {
 			if err := Convert_certificates_CertificateSigningRequest_To_v1beta1_CertificateSigningRequest(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -193,66 +193,66 @@ func autoConvert_certificates_CertificateSigningRequestList_To_v1beta1_Certifica
 }
 
 // Convert_certificates_CertificateSigningRequestList_To_v1beta1_CertificateSigningRequestList is an autogenerated conversion function.
-func Convert_certificates_CertificateSigningRequestList_To_v1beta1_CertificateSigningRequestList(in *certificates.CertificateSigningRequestList, out *v1beta1.CertificateSigningRequestList, s conversion.Scope) error {
+func Convert_certificates_CertificateSigningRequestList_To_v1beta1_CertificateSigningRequestList(in *pkgapiscertificates.CertificateSigningRequestList, out *apicertificatesv1beta1.CertificateSigningRequestList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_certificates_CertificateSigningRequestList_To_v1beta1_CertificateSigningRequestList(in, out, s)
 }
 
-func autoConvert_v1beta1_CertificateSigningRequestSpec_To_certificates_CertificateSigningRequestSpec(in *v1beta1.CertificateSigningRequestSpec, out *certificates.CertificateSigningRequestSpec, s conversion.Scope) error {
+func autoConvert_v1beta1_CertificateSigningRequestSpec_To_certificates_CertificateSigningRequestSpec(in *apicertificatesv1beta1.CertificateSigningRequestSpec, out *pkgapiscertificates.CertificateSigningRequestSpec, s apimachinerypkgconversion.Scope) error {
 	out.Request = *(*[]byte)(unsafe.Pointer(&in.Request))
-	if err := metav1.Convert_Pointer_string_To_string(&in.SignerName, &out.SignerName, s); err != nil {
+	if err := apismetav1.Convert_Pointer_string_To_string(&in.SignerName, &out.SignerName, s); err != nil {
 		return err
 	}
 	out.ExpirationSeconds = (*int32)(unsafe.Pointer(in.ExpirationSeconds))
-	out.Usages = *(*[]certificates.KeyUsage)(unsafe.Pointer(&in.Usages))
+	out.Usages = *(*[]pkgapiscertificates.KeyUsage)(unsafe.Pointer(&in.Usages))
 	out.Username = in.Username
 	out.UID = in.UID
 	out.Groups = *(*[]string)(unsafe.Pointer(&in.Groups))
-	out.Extra = *(*map[string]certificates.ExtraValue)(unsafe.Pointer(&in.Extra))
+	out.Extra = *(*map[string]pkgapiscertificates.ExtraValue)(unsafe.Pointer(&in.Extra))
 	return nil
 }
 
 // Convert_v1beta1_CertificateSigningRequestSpec_To_certificates_CertificateSigningRequestSpec is an autogenerated conversion function.
-func Convert_v1beta1_CertificateSigningRequestSpec_To_certificates_CertificateSigningRequestSpec(in *v1beta1.CertificateSigningRequestSpec, out *certificates.CertificateSigningRequestSpec, s conversion.Scope) error {
+func Convert_v1beta1_CertificateSigningRequestSpec_To_certificates_CertificateSigningRequestSpec(in *apicertificatesv1beta1.CertificateSigningRequestSpec, out *pkgapiscertificates.CertificateSigningRequestSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_CertificateSigningRequestSpec_To_certificates_CertificateSigningRequestSpec(in, out, s)
 }
 
-func autoConvert_certificates_CertificateSigningRequestSpec_To_v1beta1_CertificateSigningRequestSpec(in *certificates.CertificateSigningRequestSpec, out *v1beta1.CertificateSigningRequestSpec, s conversion.Scope) error {
+func autoConvert_certificates_CertificateSigningRequestSpec_To_v1beta1_CertificateSigningRequestSpec(in *pkgapiscertificates.CertificateSigningRequestSpec, out *apicertificatesv1beta1.CertificateSigningRequestSpec, s apimachinerypkgconversion.Scope) error {
 	out.Request = *(*[]byte)(unsafe.Pointer(&in.Request))
-	if err := metav1.Convert_string_To_Pointer_string(&in.SignerName, &out.SignerName, s); err != nil {
+	if err := apismetav1.Convert_string_To_Pointer_string(&in.SignerName, &out.SignerName, s); err != nil {
 		return err
 	}
 	out.ExpirationSeconds = (*int32)(unsafe.Pointer(in.ExpirationSeconds))
-	out.Usages = *(*[]v1beta1.KeyUsage)(unsafe.Pointer(&in.Usages))
+	out.Usages = *(*[]apicertificatesv1beta1.KeyUsage)(unsafe.Pointer(&in.Usages))
 	out.Username = in.Username
 	out.UID = in.UID
 	out.Groups = *(*[]string)(unsafe.Pointer(&in.Groups))
-	out.Extra = *(*map[string]v1beta1.ExtraValue)(unsafe.Pointer(&in.Extra))
+	out.Extra = *(*map[string]apicertificatesv1beta1.ExtraValue)(unsafe.Pointer(&in.Extra))
 	return nil
 }
 
 // Convert_certificates_CertificateSigningRequestSpec_To_v1beta1_CertificateSigningRequestSpec is an autogenerated conversion function.
-func Convert_certificates_CertificateSigningRequestSpec_To_v1beta1_CertificateSigningRequestSpec(in *certificates.CertificateSigningRequestSpec, out *v1beta1.CertificateSigningRequestSpec, s conversion.Scope) error {
+func Convert_certificates_CertificateSigningRequestSpec_To_v1beta1_CertificateSigningRequestSpec(in *pkgapiscertificates.CertificateSigningRequestSpec, out *apicertificatesv1beta1.CertificateSigningRequestSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_certificates_CertificateSigningRequestSpec_To_v1beta1_CertificateSigningRequestSpec(in, out, s)
 }
 
-func autoConvert_v1beta1_CertificateSigningRequestStatus_To_certificates_CertificateSigningRequestStatus(in *v1beta1.CertificateSigningRequestStatus, out *certificates.CertificateSigningRequestStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]certificates.CertificateSigningRequestCondition)(unsafe.Pointer(&in.Conditions))
+func autoConvert_v1beta1_CertificateSigningRequestStatus_To_certificates_CertificateSigningRequestStatus(in *apicertificatesv1beta1.CertificateSigningRequestStatus, out *pkgapiscertificates.CertificateSigningRequestStatus, s apimachinerypkgconversion.Scope) error {
+	out.Conditions = *(*[]pkgapiscertificates.CertificateSigningRequestCondition)(unsafe.Pointer(&in.Conditions))
 	out.Certificate = *(*[]byte)(unsafe.Pointer(&in.Certificate))
 	return nil
 }
 
 // Convert_v1beta1_CertificateSigningRequestStatus_To_certificates_CertificateSigningRequestStatus is an autogenerated conversion function.
-func Convert_v1beta1_CertificateSigningRequestStatus_To_certificates_CertificateSigningRequestStatus(in *v1beta1.CertificateSigningRequestStatus, out *certificates.CertificateSigningRequestStatus, s conversion.Scope) error {
+func Convert_v1beta1_CertificateSigningRequestStatus_To_certificates_CertificateSigningRequestStatus(in *apicertificatesv1beta1.CertificateSigningRequestStatus, out *pkgapiscertificates.CertificateSigningRequestStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_CertificateSigningRequestStatus_To_certificates_CertificateSigningRequestStatus(in, out, s)
 }
 
-func autoConvert_certificates_CertificateSigningRequestStatus_To_v1beta1_CertificateSigningRequestStatus(in *certificates.CertificateSigningRequestStatus, out *v1beta1.CertificateSigningRequestStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]v1beta1.CertificateSigningRequestCondition)(unsafe.Pointer(&in.Conditions))
+func autoConvert_certificates_CertificateSigningRequestStatus_To_v1beta1_CertificateSigningRequestStatus(in *pkgapiscertificates.CertificateSigningRequestStatus, out *apicertificatesv1beta1.CertificateSigningRequestStatus, s apimachinerypkgconversion.Scope) error {
+	out.Conditions = *(*[]apicertificatesv1beta1.CertificateSigningRequestCondition)(unsafe.Pointer(&in.Conditions))
 	out.Certificate = *(*[]byte)(unsafe.Pointer(&in.Certificate))
 	return nil
 }
 
 // Convert_certificates_CertificateSigningRequestStatus_To_v1beta1_CertificateSigningRequestStatus is an autogenerated conversion function.
-func Convert_certificates_CertificateSigningRequestStatus_To_v1beta1_CertificateSigningRequestStatus(in *certificates.CertificateSigningRequestStatus, out *v1beta1.CertificateSigningRequestStatus, s conversion.Scope) error {
+func Convert_certificates_CertificateSigningRequestStatus_To_v1beta1_CertificateSigningRequestStatus(in *pkgapiscertificates.CertificateSigningRequestStatus, out *apicertificatesv1beta1.CertificateSigningRequestStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_certificates_CertificateSigningRequestStatus_To_v1beta1_CertificateSigningRequestStatus(in, out, s)
 }

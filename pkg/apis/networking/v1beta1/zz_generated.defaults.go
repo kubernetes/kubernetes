@@ -22,20 +22,20 @@ limitations under the License.
 package v1beta1
 
 import (
-	"k8s.io/api/networking/v1beta1"
-	"k8s.io/apimachinery/pkg/runtime"
+	apinetworkingv1beta1 "k8s.io/api/networking/v1beta1"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
-func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1beta1.Ingress{}, func(obj interface{}) { SetObjectDefaults_Ingress(obj.(*v1beta1.Ingress)) })
-	scheme.AddTypeDefaultingFunc(&v1beta1.IngressList{}, func(obj interface{}) { SetObjectDefaults_IngressList(obj.(*v1beta1.IngressList)) })
+func RegisterDefaults(scheme *apimachinerypkgruntime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&apinetworkingv1beta1.Ingress{}, func(obj interface{}) { SetObjectDefaults_Ingress(obj.(*apinetworkingv1beta1.Ingress)) })
+	scheme.AddTypeDefaultingFunc(&apinetworkingv1beta1.IngressList{}, func(obj interface{}) { SetObjectDefaults_IngressList(obj.(*apinetworkingv1beta1.IngressList)) })
 	return nil
 }
 
-func SetObjectDefaults_Ingress(in *v1beta1.Ingress) {
+func SetObjectDefaults_Ingress(in *apinetworkingv1beta1.Ingress) {
 	for i := range in.Spec.Rules {
 		a := &in.Spec.Rules[i]
 		if a.IngressRuleValue.HTTP != nil {
@@ -47,7 +47,7 @@ func SetObjectDefaults_Ingress(in *v1beta1.Ingress) {
 	}
 }
 
-func SetObjectDefaults_IngressList(in *v1beta1.IngressList) {
+func SetObjectDefaults_IngressList(in *apinetworkingv1beta1.IngressList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Ingress(a)

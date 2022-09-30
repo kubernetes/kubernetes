@@ -22,10 +22,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/component-base/config"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	componentbaseconfig "k8s.io/component-base/config"
 )
 
 func init() {
@@ -34,41 +34,41 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddConversionFunc((*config.ClientConnectionConfiguration)(nil), (*ClientConnectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(a.(*config.ClientConnectionConfiguration), b.(*ClientConnectionConfiguration), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddConversionFunc((*componentbaseconfig.ClientConnectionConfiguration)(nil), (*ClientConnectionConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(a.(*componentbaseconfig.ClientConnectionConfiguration), b.(*ClientConnectionConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*config.DebuggingConfiguration)(nil), (*DebuggingConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(a.(*config.DebuggingConfiguration), b.(*DebuggingConfiguration), scope)
+	if err := s.AddConversionFunc((*componentbaseconfig.DebuggingConfiguration)(nil), (*DebuggingConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(a.(*componentbaseconfig.DebuggingConfiguration), b.(*DebuggingConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*config.LeaderElectionConfiguration)(nil), (*LeaderElectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(a.(*config.LeaderElectionConfiguration), b.(*LeaderElectionConfiguration), scope)
+	if err := s.AddConversionFunc((*componentbaseconfig.LeaderElectionConfiguration)(nil), (*LeaderElectionConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(a.(*componentbaseconfig.LeaderElectionConfiguration), b.(*LeaderElectionConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*ClientConnectionConfiguration)(nil), (*config.ClientConnectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(a.(*ClientConnectionConfiguration), b.(*config.ClientConnectionConfiguration), scope)
+	if err := s.AddConversionFunc((*ClientConnectionConfiguration)(nil), (*componentbaseconfig.ClientConnectionConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(a.(*ClientConnectionConfiguration), b.(*componentbaseconfig.ClientConnectionConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*DebuggingConfiguration)(nil), (*config.DebuggingConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(a.(*DebuggingConfiguration), b.(*config.DebuggingConfiguration), scope)
+	if err := s.AddConversionFunc((*DebuggingConfiguration)(nil), (*componentbaseconfig.DebuggingConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(a.(*DebuggingConfiguration), b.(*componentbaseconfig.DebuggingConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*LeaderElectionConfiguration)(nil), (*config.LeaderElectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionConfiguration(a.(*LeaderElectionConfiguration), b.(*config.LeaderElectionConfiguration), scope)
+	if err := s.AddConversionFunc((*LeaderElectionConfiguration)(nil), (*componentbaseconfig.LeaderElectionConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionConfiguration(a.(*LeaderElectionConfiguration), b.(*componentbaseconfig.LeaderElectionConfiguration), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(in *ClientConnectionConfiguration, out *config.ClientConnectionConfiguration, s conversion.Scope) error {
+func autoConvert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(in *ClientConnectionConfiguration, out *componentbaseconfig.ClientConnectionConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.Kubeconfig = in.Kubeconfig
 	out.AcceptContentTypes = in.AcceptContentTypes
 	out.ContentType = in.ContentType
@@ -77,7 +77,7 @@ func autoConvert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnecti
 	return nil
 }
 
-func autoConvert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(in *config.ClientConnectionConfiguration, out *ClientConnectionConfiguration, s conversion.Scope) error {
+func autoConvert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(in *componentbaseconfig.ClientConnectionConfiguration, out *ClientConnectionConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.Kubeconfig = in.Kubeconfig
 	out.AcceptContentTypes = in.AcceptContentTypes
 	out.ContentType = in.ContentType
@@ -86,28 +86,28 @@ func autoConvert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnecti
 	return nil
 }
 
-func autoConvert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(in *DebuggingConfiguration, out *config.DebuggingConfiguration, s conversion.Scope) error {
-	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableProfiling, &out.EnableProfiling, s); err != nil {
+func autoConvert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(in *DebuggingConfiguration, out *componentbaseconfig.DebuggingConfiguration, s apimachinerypkgconversion.Scope) error {
+	if err := apismetav1.Convert_Pointer_bool_To_bool(&in.EnableProfiling, &out.EnableProfiling, s); err != nil {
 		return err
 	}
-	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableContentionProfiling, &out.EnableContentionProfiling, s); err != nil {
-		return err
-	}
-	return nil
-}
-
-func autoConvert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(in *config.DebuggingConfiguration, out *DebuggingConfiguration, s conversion.Scope) error {
-	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableProfiling, &out.EnableProfiling, s); err != nil {
-		return err
-	}
-	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableContentionProfiling, &out.EnableContentionProfiling, s); err != nil {
+	if err := apismetav1.Convert_Pointer_bool_To_bool(&in.EnableContentionProfiling, &out.EnableContentionProfiling, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionConfiguration(in *LeaderElectionConfiguration, out *config.LeaderElectionConfiguration, s conversion.Scope) error {
-	if err := v1.Convert_Pointer_bool_To_bool(&in.LeaderElect, &out.LeaderElect, s); err != nil {
+func autoConvert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(in *componentbaseconfig.DebuggingConfiguration, out *DebuggingConfiguration, s apimachinerypkgconversion.Scope) error {
+	if err := apismetav1.Convert_bool_To_Pointer_bool(&in.EnableProfiling, &out.EnableProfiling, s); err != nil {
+		return err
+	}
+	if err := apismetav1.Convert_bool_To_Pointer_bool(&in.EnableContentionProfiling, &out.EnableContentionProfiling, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func autoConvert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionConfiguration(in *LeaderElectionConfiguration, out *componentbaseconfig.LeaderElectionConfiguration, s apimachinerypkgconversion.Scope) error {
+	if err := apismetav1.Convert_Pointer_bool_To_bool(&in.LeaderElect, &out.LeaderElect, s); err != nil {
 		return err
 	}
 	out.LeaseDuration = in.LeaseDuration
@@ -119,8 +119,8 @@ func autoConvert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionCo
 	return nil
 }
 
-func autoConvert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(in *config.LeaderElectionConfiguration, out *LeaderElectionConfiguration, s conversion.Scope) error {
-	if err := v1.Convert_bool_To_Pointer_bool(&in.LeaderElect, &out.LeaderElect, s); err != nil {
+func autoConvert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(in *componentbaseconfig.LeaderElectionConfiguration, out *LeaderElectionConfiguration, s apimachinerypkgconversion.Scope) error {
+	if err := apismetav1.Convert_bool_To_Pointer_bool(&in.LeaderElect, &out.LeaderElect, s); err != nil {
 		return err
 	}
 	out.LeaseDuration = in.LeaseDuration

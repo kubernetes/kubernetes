@@ -24,12 +24,12 @@ package v1alpha1
 import (
 	"unsafe"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	configv1alpha1 "k8s.io/component-base/config/v1alpha1"
-	"k8s.io/kube-proxy/config/v1alpha1"
-	"k8s.io/kubernetes/pkg/proxy/apis/config"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
+	proxyapisconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 )
 
 func init() {
@@ -38,93 +38,93 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.DetectLocalConfiguration)(nil), (*config.DetectLocalConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_DetectLocalConfiguration_To_config_DetectLocalConfiguration(a.(*v1alpha1.DetectLocalConfiguration), b.(*config.DetectLocalConfiguration), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*kubeproxyconfigv1alpha1.DetectLocalConfiguration)(nil), (*proxyapisconfig.DetectLocalConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_DetectLocalConfiguration_To_config_DetectLocalConfiguration(a.(*kubeproxyconfigv1alpha1.DetectLocalConfiguration), b.(*proxyapisconfig.DetectLocalConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.DetectLocalConfiguration)(nil), (*v1alpha1.DetectLocalConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_DetectLocalConfiguration_To_v1alpha1_DetectLocalConfiguration(a.(*config.DetectLocalConfiguration), b.(*v1alpha1.DetectLocalConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*proxyapisconfig.DetectLocalConfiguration)(nil), (*kubeproxyconfigv1alpha1.DetectLocalConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_DetectLocalConfiguration_To_v1alpha1_DetectLocalConfiguration(a.(*proxyapisconfig.DetectLocalConfiguration), b.(*kubeproxyconfigv1alpha1.DetectLocalConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.KubeProxyConfiguration)(nil), (*config.KubeProxyConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration(a.(*v1alpha1.KubeProxyConfiguration), b.(*config.KubeProxyConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*kubeproxyconfigv1alpha1.KubeProxyConfiguration)(nil), (*proxyapisconfig.KubeProxyConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration(a.(*kubeproxyconfigv1alpha1.KubeProxyConfiguration), b.(*proxyapisconfig.KubeProxyConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.KubeProxyConfiguration)(nil), (*v1alpha1.KubeProxyConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(a.(*config.KubeProxyConfiguration), b.(*v1alpha1.KubeProxyConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*proxyapisconfig.KubeProxyConfiguration)(nil), (*kubeproxyconfigv1alpha1.KubeProxyConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(a.(*proxyapisconfig.KubeProxyConfiguration), b.(*kubeproxyconfigv1alpha1.KubeProxyConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.KubeProxyConntrackConfiguration)(nil), (*config.KubeProxyConntrackConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_KubeProxyConntrackConfiguration_To_config_KubeProxyConntrackConfiguration(a.(*v1alpha1.KubeProxyConntrackConfiguration), b.(*config.KubeProxyConntrackConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration)(nil), (*proxyapisconfig.KubeProxyConntrackConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_KubeProxyConntrackConfiguration_To_config_KubeProxyConntrackConfiguration(a.(*kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration), b.(*proxyapisconfig.KubeProxyConntrackConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.KubeProxyConntrackConfiguration)(nil), (*v1alpha1.KubeProxyConntrackConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyConntrackConfiguration(a.(*config.KubeProxyConntrackConfiguration), b.(*v1alpha1.KubeProxyConntrackConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*proxyapisconfig.KubeProxyConntrackConfiguration)(nil), (*kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyConntrackConfiguration(a.(*proxyapisconfig.KubeProxyConntrackConfiguration), b.(*kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.KubeProxyIPTablesConfiguration)(nil), (*config.KubeProxyIPTablesConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration(a.(*v1alpha1.KubeProxyIPTablesConfiguration), b.(*config.KubeProxyIPTablesConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration)(nil), (*proxyapisconfig.KubeProxyIPTablesConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration(a.(*kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration), b.(*proxyapisconfig.KubeProxyIPTablesConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.KubeProxyIPTablesConfiguration)(nil), (*v1alpha1.KubeProxyIPTablesConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_KubeProxyIPTablesConfiguration_To_v1alpha1_KubeProxyIPTablesConfiguration(a.(*config.KubeProxyIPTablesConfiguration), b.(*v1alpha1.KubeProxyIPTablesConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*proxyapisconfig.KubeProxyIPTablesConfiguration)(nil), (*kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_KubeProxyIPTablesConfiguration_To_v1alpha1_KubeProxyIPTablesConfiguration(a.(*proxyapisconfig.KubeProxyIPTablesConfiguration), b.(*kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.KubeProxyIPVSConfiguration)(nil), (*config.KubeProxyIPVSConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_KubeProxyIPVSConfiguration_To_config_KubeProxyIPVSConfiguration(a.(*v1alpha1.KubeProxyIPVSConfiguration), b.(*config.KubeProxyIPVSConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration)(nil), (*proxyapisconfig.KubeProxyIPVSConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_KubeProxyIPVSConfiguration_To_config_KubeProxyIPVSConfiguration(a.(*kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration), b.(*proxyapisconfig.KubeProxyIPVSConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.KubeProxyIPVSConfiguration)(nil), (*v1alpha1.KubeProxyIPVSConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_KubeProxyIPVSConfiguration_To_v1alpha1_KubeProxyIPVSConfiguration(a.(*config.KubeProxyIPVSConfiguration), b.(*v1alpha1.KubeProxyIPVSConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*proxyapisconfig.KubeProxyIPVSConfiguration)(nil), (*kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_KubeProxyIPVSConfiguration_To_v1alpha1_KubeProxyIPVSConfiguration(a.(*proxyapisconfig.KubeProxyIPVSConfiguration), b.(*kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.KubeProxyWinkernelConfiguration)(nil), (*config.KubeProxyWinkernelConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_KubeProxyWinkernelConfiguration_To_config_KubeProxyWinkernelConfiguration(a.(*v1alpha1.KubeProxyWinkernelConfiguration), b.(*config.KubeProxyWinkernelConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*kubeproxyconfigv1alpha1.KubeProxyWinkernelConfiguration)(nil), (*proxyapisconfig.KubeProxyWinkernelConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_KubeProxyWinkernelConfiguration_To_config_KubeProxyWinkernelConfiguration(a.(*kubeproxyconfigv1alpha1.KubeProxyWinkernelConfiguration), b.(*proxyapisconfig.KubeProxyWinkernelConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.KubeProxyWinkernelConfiguration)(nil), (*v1alpha1.KubeProxyWinkernelConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_KubeProxyWinkernelConfiguration_To_v1alpha1_KubeProxyWinkernelConfiguration(a.(*config.KubeProxyWinkernelConfiguration), b.(*v1alpha1.KubeProxyWinkernelConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*proxyapisconfig.KubeProxyWinkernelConfiguration)(nil), (*kubeproxyconfigv1alpha1.KubeProxyWinkernelConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_KubeProxyWinkernelConfiguration_To_v1alpha1_KubeProxyWinkernelConfiguration(a.(*proxyapisconfig.KubeProxyWinkernelConfiguration), b.(*kubeproxyconfigv1alpha1.KubeProxyWinkernelConfiguration), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1alpha1_DetectLocalConfiguration_To_config_DetectLocalConfiguration(in *v1alpha1.DetectLocalConfiguration, out *config.DetectLocalConfiguration, s conversion.Scope) error {
+func autoConvert_v1alpha1_DetectLocalConfiguration_To_config_DetectLocalConfiguration(in *kubeproxyconfigv1alpha1.DetectLocalConfiguration, out *proxyapisconfig.DetectLocalConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.BridgeInterface = in.BridgeInterface
 	out.InterfaceNamePrefix = in.InterfaceNamePrefix
 	return nil
 }
 
 // Convert_v1alpha1_DetectLocalConfiguration_To_config_DetectLocalConfiguration is an autogenerated conversion function.
-func Convert_v1alpha1_DetectLocalConfiguration_To_config_DetectLocalConfiguration(in *v1alpha1.DetectLocalConfiguration, out *config.DetectLocalConfiguration, s conversion.Scope) error {
+func Convert_v1alpha1_DetectLocalConfiguration_To_config_DetectLocalConfiguration(in *kubeproxyconfigv1alpha1.DetectLocalConfiguration, out *proxyapisconfig.DetectLocalConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha1_DetectLocalConfiguration_To_config_DetectLocalConfiguration(in, out, s)
 }
 
-func autoConvert_config_DetectLocalConfiguration_To_v1alpha1_DetectLocalConfiguration(in *config.DetectLocalConfiguration, out *v1alpha1.DetectLocalConfiguration, s conversion.Scope) error {
+func autoConvert_config_DetectLocalConfiguration_To_v1alpha1_DetectLocalConfiguration(in *proxyapisconfig.DetectLocalConfiguration, out *kubeproxyconfigv1alpha1.DetectLocalConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.BridgeInterface = in.BridgeInterface
 	out.InterfaceNamePrefix = in.InterfaceNamePrefix
 	return nil
 }
 
 // Convert_config_DetectLocalConfiguration_To_v1alpha1_DetectLocalConfiguration is an autogenerated conversion function.
-func Convert_config_DetectLocalConfiguration_To_v1alpha1_DetectLocalConfiguration(in *config.DetectLocalConfiguration, out *v1alpha1.DetectLocalConfiguration, s conversion.Scope) error {
+func Convert_config_DetectLocalConfiguration_To_v1alpha1_DetectLocalConfiguration(in *proxyapisconfig.DetectLocalConfiguration, out *kubeproxyconfigv1alpha1.DetectLocalConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_DetectLocalConfiguration_To_v1alpha1_DetectLocalConfiguration(in, out, s)
 }
 
-func autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration(in *v1alpha1.KubeProxyConfiguration, out *config.KubeProxyConfiguration, s conversion.Scope) error {
+func autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration(in *kubeproxyconfigv1alpha1.KubeProxyConfiguration, out *proxyapisconfig.KubeProxyConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.BindAddress = in.BindAddress
 	out.HealthzBindAddress = in.HealthzBindAddress
@@ -133,7 +133,7 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguratio
 	out.EnableProfiling = in.EnableProfiling
 	out.ClusterCIDR = in.ClusterCIDR
 	out.HostnameOverride = in.HostnameOverride
-	if err := configv1alpha1.Convert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
+	if err := componentbaseconfigv1alpha1.Convert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
 		return err
 	}
 	if err := Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration(&in.IPTables, &out.IPTables, s); err != nil {
@@ -143,7 +143,7 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguratio
 		return err
 	}
 	out.OOMScoreAdj = (*int32)(unsafe.Pointer(in.OOMScoreAdj))
-	out.Mode = config.ProxyMode(in.Mode)
+	out.Mode = proxyapisconfig.ProxyMode(in.Mode)
 	out.PortRange = in.PortRange
 	if err := Convert_v1alpha1_KubeProxyConntrackConfiguration_To_config_KubeProxyConntrackConfiguration(&in.Conntrack, &out.Conntrack, s); err != nil {
 		return err
@@ -154,7 +154,7 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguratio
 		return err
 	}
 	out.ShowHiddenMetricsForVersion = in.ShowHiddenMetricsForVersion
-	out.DetectLocalMode = config.LocalMode(in.DetectLocalMode)
+	out.DetectLocalMode = proxyapisconfig.LocalMode(in.DetectLocalMode)
 	if err := Convert_v1alpha1_DetectLocalConfiguration_To_config_DetectLocalConfiguration(&in.DetectLocal, &out.DetectLocal, s); err != nil {
 		return err
 	}
@@ -162,11 +162,11 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguratio
 }
 
 // Convert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration is an autogenerated conversion function.
-func Convert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration(in *v1alpha1.KubeProxyConfiguration, out *config.KubeProxyConfiguration, s conversion.Scope) error {
+func Convert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration(in *kubeproxyconfigv1alpha1.KubeProxyConfiguration, out *proxyapisconfig.KubeProxyConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration(in, out, s)
 }
 
-func autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in *config.KubeProxyConfiguration, out *v1alpha1.KubeProxyConfiguration, s conversion.Scope) error {
+func autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in *proxyapisconfig.KubeProxyConfiguration, out *kubeproxyconfigv1alpha1.KubeProxyConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.BindAddress = in.BindAddress
 	out.HealthzBindAddress = in.HealthzBindAddress
@@ -175,7 +175,7 @@ func autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguratio
 	out.EnableProfiling = in.EnableProfiling
 	out.ClusterCIDR = in.ClusterCIDR
 	out.HostnameOverride = in.HostnameOverride
-	if err := configv1alpha1.Convert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
+	if err := componentbaseconfigv1alpha1.Convert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
 		return err
 	}
 	if err := Convert_config_KubeProxyIPTablesConfiguration_To_v1alpha1_KubeProxyIPTablesConfiguration(&in.IPTables, &out.IPTables, s); err != nil {
@@ -185,7 +185,7 @@ func autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguratio
 		return err
 	}
 	out.OOMScoreAdj = (*int32)(unsafe.Pointer(in.OOMScoreAdj))
-	out.Mode = v1alpha1.ProxyMode(in.Mode)
+	out.Mode = kubeproxyconfigv1alpha1.ProxyMode(in.Mode)
 	out.PortRange = in.PortRange
 	if err := Convert_config_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyConntrackConfiguration(&in.Conntrack, &out.Conntrack, s); err != nil {
 		return err
@@ -196,7 +196,7 @@ func autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguratio
 		return err
 	}
 	out.ShowHiddenMetricsForVersion = in.ShowHiddenMetricsForVersion
-	out.DetectLocalMode = v1alpha1.LocalMode(in.DetectLocalMode)
+	out.DetectLocalMode = kubeproxyconfigv1alpha1.LocalMode(in.DetectLocalMode)
 	if err := Convert_config_DetectLocalConfiguration_To_v1alpha1_DetectLocalConfiguration(&in.DetectLocal, &out.DetectLocal, s); err != nil {
 		return err
 	}
@@ -204,37 +204,37 @@ func autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguratio
 }
 
 // Convert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration is an autogenerated conversion function.
-func Convert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in *config.KubeProxyConfiguration, out *v1alpha1.KubeProxyConfiguration, s conversion.Scope) error {
+func Convert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in *proxyapisconfig.KubeProxyConfiguration, out *kubeproxyconfigv1alpha1.KubeProxyConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in, out, s)
 }
 
-func autoConvert_v1alpha1_KubeProxyConntrackConfiguration_To_config_KubeProxyConntrackConfiguration(in *v1alpha1.KubeProxyConntrackConfiguration, out *config.KubeProxyConntrackConfiguration, s conversion.Scope) error {
+func autoConvert_v1alpha1_KubeProxyConntrackConfiguration_To_config_KubeProxyConntrackConfiguration(in *kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration, out *proxyapisconfig.KubeProxyConntrackConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.MaxPerCore = (*int32)(unsafe.Pointer(in.MaxPerCore))
 	out.Min = (*int32)(unsafe.Pointer(in.Min))
-	out.TCPEstablishedTimeout = (*v1.Duration)(unsafe.Pointer(in.TCPEstablishedTimeout))
-	out.TCPCloseWaitTimeout = (*v1.Duration)(unsafe.Pointer(in.TCPCloseWaitTimeout))
+	out.TCPEstablishedTimeout = (*apismetav1.Duration)(unsafe.Pointer(in.TCPEstablishedTimeout))
+	out.TCPCloseWaitTimeout = (*apismetav1.Duration)(unsafe.Pointer(in.TCPCloseWaitTimeout))
 	return nil
 }
 
 // Convert_v1alpha1_KubeProxyConntrackConfiguration_To_config_KubeProxyConntrackConfiguration is an autogenerated conversion function.
-func Convert_v1alpha1_KubeProxyConntrackConfiguration_To_config_KubeProxyConntrackConfiguration(in *v1alpha1.KubeProxyConntrackConfiguration, out *config.KubeProxyConntrackConfiguration, s conversion.Scope) error {
+func Convert_v1alpha1_KubeProxyConntrackConfiguration_To_config_KubeProxyConntrackConfiguration(in *kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration, out *proxyapisconfig.KubeProxyConntrackConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha1_KubeProxyConntrackConfiguration_To_config_KubeProxyConntrackConfiguration(in, out, s)
 }
 
-func autoConvert_config_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyConntrackConfiguration(in *config.KubeProxyConntrackConfiguration, out *v1alpha1.KubeProxyConntrackConfiguration, s conversion.Scope) error {
+func autoConvert_config_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyConntrackConfiguration(in *proxyapisconfig.KubeProxyConntrackConfiguration, out *kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.MaxPerCore = (*int32)(unsafe.Pointer(in.MaxPerCore))
 	out.Min = (*int32)(unsafe.Pointer(in.Min))
-	out.TCPEstablishedTimeout = (*v1.Duration)(unsafe.Pointer(in.TCPEstablishedTimeout))
-	out.TCPCloseWaitTimeout = (*v1.Duration)(unsafe.Pointer(in.TCPCloseWaitTimeout))
+	out.TCPEstablishedTimeout = (*apismetav1.Duration)(unsafe.Pointer(in.TCPEstablishedTimeout))
+	out.TCPCloseWaitTimeout = (*apismetav1.Duration)(unsafe.Pointer(in.TCPCloseWaitTimeout))
 	return nil
 }
 
 // Convert_config_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyConntrackConfiguration is an autogenerated conversion function.
-func Convert_config_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyConntrackConfiguration(in *config.KubeProxyConntrackConfiguration, out *v1alpha1.KubeProxyConntrackConfiguration, s conversion.Scope) error {
+func Convert_config_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyConntrackConfiguration(in *proxyapisconfig.KubeProxyConntrackConfiguration, out *kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyConntrackConfiguration(in, out, s)
 }
 
-func autoConvert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration(in *v1alpha1.KubeProxyIPTablesConfiguration, out *config.KubeProxyIPTablesConfiguration, s conversion.Scope) error {
+func autoConvert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration(in *kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration, out *proxyapisconfig.KubeProxyIPTablesConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.MasqueradeBit = (*int32)(unsafe.Pointer(in.MasqueradeBit))
 	out.MasqueradeAll = in.MasqueradeAll
 	out.LocalhostNodePorts = (*bool)(unsafe.Pointer(in.LocalhostNodePorts))
@@ -244,11 +244,11 @@ func autoConvert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTa
 }
 
 // Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration is an autogenerated conversion function.
-func Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration(in *v1alpha1.KubeProxyIPTablesConfiguration, out *config.KubeProxyIPTablesConfiguration, s conversion.Scope) error {
+func Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration(in *kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration, out *proxyapisconfig.KubeProxyIPTablesConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration(in, out, s)
 }
 
-func autoConvert_config_KubeProxyIPTablesConfiguration_To_v1alpha1_KubeProxyIPTablesConfiguration(in *config.KubeProxyIPTablesConfiguration, out *v1alpha1.KubeProxyIPTablesConfiguration, s conversion.Scope) error {
+func autoConvert_config_KubeProxyIPTablesConfiguration_To_v1alpha1_KubeProxyIPTablesConfiguration(in *proxyapisconfig.KubeProxyIPTablesConfiguration, out *kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.MasqueradeBit = (*int32)(unsafe.Pointer(in.MasqueradeBit))
 	out.MasqueradeAll = in.MasqueradeAll
 	out.LocalhostNodePorts = (*bool)(unsafe.Pointer(in.LocalhostNodePorts))
@@ -258,11 +258,11 @@ func autoConvert_config_KubeProxyIPTablesConfiguration_To_v1alpha1_KubeProxyIPTa
 }
 
 // Convert_config_KubeProxyIPTablesConfiguration_To_v1alpha1_KubeProxyIPTablesConfiguration is an autogenerated conversion function.
-func Convert_config_KubeProxyIPTablesConfiguration_To_v1alpha1_KubeProxyIPTablesConfiguration(in *config.KubeProxyIPTablesConfiguration, out *v1alpha1.KubeProxyIPTablesConfiguration, s conversion.Scope) error {
+func Convert_config_KubeProxyIPTablesConfiguration_To_v1alpha1_KubeProxyIPTablesConfiguration(in *proxyapisconfig.KubeProxyIPTablesConfiguration, out *kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_KubeProxyIPTablesConfiguration_To_v1alpha1_KubeProxyIPTablesConfiguration(in, out, s)
 }
 
-func autoConvert_v1alpha1_KubeProxyIPVSConfiguration_To_config_KubeProxyIPVSConfiguration(in *v1alpha1.KubeProxyIPVSConfiguration, out *config.KubeProxyIPVSConfiguration, s conversion.Scope) error {
+func autoConvert_v1alpha1_KubeProxyIPVSConfiguration_To_config_KubeProxyIPVSConfiguration(in *kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration, out *proxyapisconfig.KubeProxyIPVSConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.SyncPeriod = in.SyncPeriod
 	out.MinSyncPeriod = in.MinSyncPeriod
 	out.Scheduler = in.Scheduler
@@ -275,11 +275,11 @@ func autoConvert_v1alpha1_KubeProxyIPVSConfiguration_To_config_KubeProxyIPVSConf
 }
 
 // Convert_v1alpha1_KubeProxyIPVSConfiguration_To_config_KubeProxyIPVSConfiguration is an autogenerated conversion function.
-func Convert_v1alpha1_KubeProxyIPVSConfiguration_To_config_KubeProxyIPVSConfiguration(in *v1alpha1.KubeProxyIPVSConfiguration, out *config.KubeProxyIPVSConfiguration, s conversion.Scope) error {
+func Convert_v1alpha1_KubeProxyIPVSConfiguration_To_config_KubeProxyIPVSConfiguration(in *kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration, out *proxyapisconfig.KubeProxyIPVSConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha1_KubeProxyIPVSConfiguration_To_config_KubeProxyIPVSConfiguration(in, out, s)
 }
 
-func autoConvert_config_KubeProxyIPVSConfiguration_To_v1alpha1_KubeProxyIPVSConfiguration(in *config.KubeProxyIPVSConfiguration, out *v1alpha1.KubeProxyIPVSConfiguration, s conversion.Scope) error {
+func autoConvert_config_KubeProxyIPVSConfiguration_To_v1alpha1_KubeProxyIPVSConfiguration(in *proxyapisconfig.KubeProxyIPVSConfiguration, out *kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.SyncPeriod = in.SyncPeriod
 	out.MinSyncPeriod = in.MinSyncPeriod
 	out.Scheduler = in.Scheduler
@@ -292,11 +292,11 @@ func autoConvert_config_KubeProxyIPVSConfiguration_To_v1alpha1_KubeProxyIPVSConf
 }
 
 // Convert_config_KubeProxyIPVSConfiguration_To_v1alpha1_KubeProxyIPVSConfiguration is an autogenerated conversion function.
-func Convert_config_KubeProxyIPVSConfiguration_To_v1alpha1_KubeProxyIPVSConfiguration(in *config.KubeProxyIPVSConfiguration, out *v1alpha1.KubeProxyIPVSConfiguration, s conversion.Scope) error {
+func Convert_config_KubeProxyIPVSConfiguration_To_v1alpha1_KubeProxyIPVSConfiguration(in *proxyapisconfig.KubeProxyIPVSConfiguration, out *kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_KubeProxyIPVSConfiguration_To_v1alpha1_KubeProxyIPVSConfiguration(in, out, s)
 }
 
-func autoConvert_v1alpha1_KubeProxyWinkernelConfiguration_To_config_KubeProxyWinkernelConfiguration(in *v1alpha1.KubeProxyWinkernelConfiguration, out *config.KubeProxyWinkernelConfiguration, s conversion.Scope) error {
+func autoConvert_v1alpha1_KubeProxyWinkernelConfiguration_To_config_KubeProxyWinkernelConfiguration(in *kubeproxyconfigv1alpha1.KubeProxyWinkernelConfiguration, out *proxyapisconfig.KubeProxyWinkernelConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.NetworkName = in.NetworkName
 	out.SourceVip = in.SourceVip
 	out.EnableDSR = in.EnableDSR
@@ -306,11 +306,11 @@ func autoConvert_v1alpha1_KubeProxyWinkernelConfiguration_To_config_KubeProxyWin
 }
 
 // Convert_v1alpha1_KubeProxyWinkernelConfiguration_To_config_KubeProxyWinkernelConfiguration is an autogenerated conversion function.
-func Convert_v1alpha1_KubeProxyWinkernelConfiguration_To_config_KubeProxyWinkernelConfiguration(in *v1alpha1.KubeProxyWinkernelConfiguration, out *config.KubeProxyWinkernelConfiguration, s conversion.Scope) error {
+func Convert_v1alpha1_KubeProxyWinkernelConfiguration_To_config_KubeProxyWinkernelConfiguration(in *kubeproxyconfigv1alpha1.KubeProxyWinkernelConfiguration, out *proxyapisconfig.KubeProxyWinkernelConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha1_KubeProxyWinkernelConfiguration_To_config_KubeProxyWinkernelConfiguration(in, out, s)
 }
 
-func autoConvert_config_KubeProxyWinkernelConfiguration_To_v1alpha1_KubeProxyWinkernelConfiguration(in *config.KubeProxyWinkernelConfiguration, out *v1alpha1.KubeProxyWinkernelConfiguration, s conversion.Scope) error {
+func autoConvert_config_KubeProxyWinkernelConfiguration_To_v1alpha1_KubeProxyWinkernelConfiguration(in *proxyapisconfig.KubeProxyWinkernelConfiguration, out *kubeproxyconfigv1alpha1.KubeProxyWinkernelConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.NetworkName = in.NetworkName
 	out.SourceVip = in.SourceVip
 	out.EnableDSR = in.EnableDSR
@@ -320,6 +320,6 @@ func autoConvert_config_KubeProxyWinkernelConfiguration_To_v1alpha1_KubeProxyWin
 }
 
 // Convert_config_KubeProxyWinkernelConfiguration_To_v1alpha1_KubeProxyWinkernelConfiguration is an autogenerated conversion function.
-func Convert_config_KubeProxyWinkernelConfiguration_To_v1alpha1_KubeProxyWinkernelConfiguration(in *config.KubeProxyWinkernelConfiguration, out *v1alpha1.KubeProxyWinkernelConfiguration, s conversion.Scope) error {
+func Convert_config_KubeProxyWinkernelConfiguration_To_v1alpha1_KubeProxyWinkernelConfiguration(in *proxyapisconfig.KubeProxyWinkernelConfiguration, out *kubeproxyconfigv1alpha1.KubeProxyWinkernelConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_KubeProxyWinkernelConfiguration_To_v1alpha1_KubeProxyWinkernelConfiguration(in, out, s)
 }

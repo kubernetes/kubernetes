@@ -24,12 +24,12 @@ package v1beta1
 import (
 	"unsafe"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/api/networking/v1beta1"
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/networking"
+	apicorev1 "k8s.io/api/core/v1"
+	apinetworkingv1beta1 "k8s.io/api/networking/v1beta1"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	pkgapiscore "k8s.io/kubernetes/pkg/apis/core"
+	pkgapisnetworking "k8s.io/kubernetes/pkg/apis/networking"
 )
 
 func init() {
@@ -38,183 +38,183 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1beta1.HTTPIngressPath)(nil), (*networking.HTTPIngressPath)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(a.(*v1beta1.HTTPIngressPath), b.(*networking.HTTPIngressPath), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*apinetworkingv1beta1.HTTPIngressPath)(nil), (*pkgapisnetworking.HTTPIngressPath)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(a.(*apinetworkingv1beta1.HTTPIngressPath), b.(*pkgapisnetworking.HTTPIngressPath), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.HTTPIngressPath)(nil), (*v1beta1.HTTPIngressPath)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(a.(*networking.HTTPIngressPath), b.(*v1beta1.HTTPIngressPath), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisnetworking.HTTPIngressPath)(nil), (*apinetworkingv1beta1.HTTPIngressPath)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(a.(*pkgapisnetworking.HTTPIngressPath), b.(*apinetworkingv1beta1.HTTPIngressPath), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.HTTPIngressRuleValue)(nil), (*networking.HTTPIngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(a.(*v1beta1.HTTPIngressRuleValue), b.(*networking.HTTPIngressRuleValue), scope)
+	if err := s.AddGeneratedConversionFunc((*apinetworkingv1beta1.HTTPIngressRuleValue)(nil), (*pkgapisnetworking.HTTPIngressRuleValue)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(a.(*apinetworkingv1beta1.HTTPIngressRuleValue), b.(*pkgapisnetworking.HTTPIngressRuleValue), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.HTTPIngressRuleValue)(nil), (*v1beta1.HTTPIngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(a.(*networking.HTTPIngressRuleValue), b.(*v1beta1.HTTPIngressRuleValue), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisnetworking.HTTPIngressRuleValue)(nil), (*apinetworkingv1beta1.HTTPIngressRuleValue)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(a.(*pkgapisnetworking.HTTPIngressRuleValue), b.(*apinetworkingv1beta1.HTTPIngressRuleValue), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.Ingress)(nil), (*networking.Ingress)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_Ingress_To_networking_Ingress(a.(*v1beta1.Ingress), b.(*networking.Ingress), scope)
+	if err := s.AddGeneratedConversionFunc((*apinetworkingv1beta1.Ingress)(nil), (*pkgapisnetworking.Ingress)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_Ingress_To_networking_Ingress(a.(*apinetworkingv1beta1.Ingress), b.(*pkgapisnetworking.Ingress), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.Ingress)(nil), (*v1beta1.Ingress)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_Ingress_To_v1beta1_Ingress(a.(*networking.Ingress), b.(*v1beta1.Ingress), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisnetworking.Ingress)(nil), (*apinetworkingv1beta1.Ingress)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_networking_Ingress_To_v1beta1_Ingress(a.(*pkgapisnetworking.Ingress), b.(*apinetworkingv1beta1.Ingress), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressClass)(nil), (*networking.IngressClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressClass_To_networking_IngressClass(a.(*v1beta1.IngressClass), b.(*networking.IngressClass), scope)
+	if err := s.AddGeneratedConversionFunc((*apinetworkingv1beta1.IngressClass)(nil), (*pkgapisnetworking.IngressClass)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_IngressClass_To_networking_IngressClass(a.(*apinetworkingv1beta1.IngressClass), b.(*pkgapisnetworking.IngressClass), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressClass)(nil), (*v1beta1.IngressClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressClass_To_v1beta1_IngressClass(a.(*networking.IngressClass), b.(*v1beta1.IngressClass), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisnetworking.IngressClass)(nil), (*apinetworkingv1beta1.IngressClass)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_networking_IngressClass_To_v1beta1_IngressClass(a.(*pkgapisnetworking.IngressClass), b.(*apinetworkingv1beta1.IngressClass), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressClassList)(nil), (*networking.IngressClassList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressClassList_To_networking_IngressClassList(a.(*v1beta1.IngressClassList), b.(*networking.IngressClassList), scope)
+	if err := s.AddGeneratedConversionFunc((*apinetworkingv1beta1.IngressClassList)(nil), (*pkgapisnetworking.IngressClassList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_IngressClassList_To_networking_IngressClassList(a.(*apinetworkingv1beta1.IngressClassList), b.(*pkgapisnetworking.IngressClassList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressClassList)(nil), (*v1beta1.IngressClassList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressClassList_To_v1beta1_IngressClassList(a.(*networking.IngressClassList), b.(*v1beta1.IngressClassList), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisnetworking.IngressClassList)(nil), (*apinetworkingv1beta1.IngressClassList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_networking_IngressClassList_To_v1beta1_IngressClassList(a.(*pkgapisnetworking.IngressClassList), b.(*apinetworkingv1beta1.IngressClassList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressClassParametersReference)(nil), (*networking.IngressClassParametersReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressClassParametersReference_To_networking_IngressClassParametersReference(a.(*v1beta1.IngressClassParametersReference), b.(*networking.IngressClassParametersReference), scope)
+	if err := s.AddGeneratedConversionFunc((*apinetworkingv1beta1.IngressClassParametersReference)(nil), (*pkgapisnetworking.IngressClassParametersReference)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_IngressClassParametersReference_To_networking_IngressClassParametersReference(a.(*apinetworkingv1beta1.IngressClassParametersReference), b.(*pkgapisnetworking.IngressClassParametersReference), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressClassParametersReference)(nil), (*v1beta1.IngressClassParametersReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressClassParametersReference_To_v1beta1_IngressClassParametersReference(a.(*networking.IngressClassParametersReference), b.(*v1beta1.IngressClassParametersReference), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisnetworking.IngressClassParametersReference)(nil), (*apinetworkingv1beta1.IngressClassParametersReference)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_networking_IngressClassParametersReference_To_v1beta1_IngressClassParametersReference(a.(*pkgapisnetworking.IngressClassParametersReference), b.(*apinetworkingv1beta1.IngressClassParametersReference), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressClassSpec)(nil), (*networking.IngressClassSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressClassSpec_To_networking_IngressClassSpec(a.(*v1beta1.IngressClassSpec), b.(*networking.IngressClassSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*apinetworkingv1beta1.IngressClassSpec)(nil), (*pkgapisnetworking.IngressClassSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_IngressClassSpec_To_networking_IngressClassSpec(a.(*apinetworkingv1beta1.IngressClassSpec), b.(*pkgapisnetworking.IngressClassSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressClassSpec)(nil), (*v1beta1.IngressClassSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressClassSpec_To_v1beta1_IngressClassSpec(a.(*networking.IngressClassSpec), b.(*v1beta1.IngressClassSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisnetworking.IngressClassSpec)(nil), (*apinetworkingv1beta1.IngressClassSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_networking_IngressClassSpec_To_v1beta1_IngressClassSpec(a.(*pkgapisnetworking.IngressClassSpec), b.(*apinetworkingv1beta1.IngressClassSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressList)(nil), (*networking.IngressList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressList_To_networking_IngressList(a.(*v1beta1.IngressList), b.(*networking.IngressList), scope)
+	if err := s.AddGeneratedConversionFunc((*apinetworkingv1beta1.IngressList)(nil), (*pkgapisnetworking.IngressList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_IngressList_To_networking_IngressList(a.(*apinetworkingv1beta1.IngressList), b.(*pkgapisnetworking.IngressList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressList)(nil), (*v1beta1.IngressList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressList_To_v1beta1_IngressList(a.(*networking.IngressList), b.(*v1beta1.IngressList), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisnetworking.IngressList)(nil), (*apinetworkingv1beta1.IngressList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_networking_IngressList_To_v1beta1_IngressList(a.(*pkgapisnetworking.IngressList), b.(*apinetworkingv1beta1.IngressList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressLoadBalancerIngress)(nil), (*networking.IngressLoadBalancerIngress)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress(a.(*v1beta1.IngressLoadBalancerIngress), b.(*networking.IngressLoadBalancerIngress), scope)
+	if err := s.AddGeneratedConversionFunc((*apinetworkingv1beta1.IngressLoadBalancerIngress)(nil), (*pkgapisnetworking.IngressLoadBalancerIngress)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress(a.(*apinetworkingv1beta1.IngressLoadBalancerIngress), b.(*pkgapisnetworking.IngressLoadBalancerIngress), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressLoadBalancerIngress)(nil), (*v1beta1.IngressLoadBalancerIngress)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressLoadBalancerIngress_To_v1beta1_IngressLoadBalancerIngress(a.(*networking.IngressLoadBalancerIngress), b.(*v1beta1.IngressLoadBalancerIngress), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisnetworking.IngressLoadBalancerIngress)(nil), (*apinetworkingv1beta1.IngressLoadBalancerIngress)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_networking_IngressLoadBalancerIngress_To_v1beta1_IngressLoadBalancerIngress(a.(*pkgapisnetworking.IngressLoadBalancerIngress), b.(*apinetworkingv1beta1.IngressLoadBalancerIngress), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressLoadBalancerStatus)(nil), (*networking.IngressLoadBalancerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(a.(*v1beta1.IngressLoadBalancerStatus), b.(*networking.IngressLoadBalancerStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apinetworkingv1beta1.IngressLoadBalancerStatus)(nil), (*pkgapisnetworking.IngressLoadBalancerStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(a.(*apinetworkingv1beta1.IngressLoadBalancerStatus), b.(*pkgapisnetworking.IngressLoadBalancerStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressLoadBalancerStatus)(nil), (*v1beta1.IngressLoadBalancerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressLoadBalancerStatus_To_v1beta1_IngressLoadBalancerStatus(a.(*networking.IngressLoadBalancerStatus), b.(*v1beta1.IngressLoadBalancerStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisnetworking.IngressLoadBalancerStatus)(nil), (*apinetworkingv1beta1.IngressLoadBalancerStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_networking_IngressLoadBalancerStatus_To_v1beta1_IngressLoadBalancerStatus(a.(*pkgapisnetworking.IngressLoadBalancerStatus), b.(*apinetworkingv1beta1.IngressLoadBalancerStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressPortStatus)(nil), (*networking.IngressPortStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressPortStatus_To_networking_IngressPortStatus(a.(*v1beta1.IngressPortStatus), b.(*networking.IngressPortStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apinetworkingv1beta1.IngressPortStatus)(nil), (*pkgapisnetworking.IngressPortStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_IngressPortStatus_To_networking_IngressPortStatus(a.(*apinetworkingv1beta1.IngressPortStatus), b.(*pkgapisnetworking.IngressPortStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressPortStatus)(nil), (*v1beta1.IngressPortStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressPortStatus_To_v1beta1_IngressPortStatus(a.(*networking.IngressPortStatus), b.(*v1beta1.IngressPortStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisnetworking.IngressPortStatus)(nil), (*apinetworkingv1beta1.IngressPortStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_networking_IngressPortStatus_To_v1beta1_IngressPortStatus(a.(*pkgapisnetworking.IngressPortStatus), b.(*apinetworkingv1beta1.IngressPortStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressRule)(nil), (*networking.IngressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressRule_To_networking_IngressRule(a.(*v1beta1.IngressRule), b.(*networking.IngressRule), scope)
+	if err := s.AddGeneratedConversionFunc((*apinetworkingv1beta1.IngressRule)(nil), (*pkgapisnetworking.IngressRule)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_IngressRule_To_networking_IngressRule(a.(*apinetworkingv1beta1.IngressRule), b.(*pkgapisnetworking.IngressRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressRule)(nil), (*v1beta1.IngressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressRule_To_v1beta1_IngressRule(a.(*networking.IngressRule), b.(*v1beta1.IngressRule), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisnetworking.IngressRule)(nil), (*apinetworkingv1beta1.IngressRule)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_networking_IngressRule_To_v1beta1_IngressRule(a.(*pkgapisnetworking.IngressRule), b.(*apinetworkingv1beta1.IngressRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressRuleValue)(nil), (*networking.IngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue(a.(*v1beta1.IngressRuleValue), b.(*networking.IngressRuleValue), scope)
+	if err := s.AddGeneratedConversionFunc((*apinetworkingv1beta1.IngressRuleValue)(nil), (*pkgapisnetworking.IngressRuleValue)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue(a.(*apinetworkingv1beta1.IngressRuleValue), b.(*pkgapisnetworking.IngressRuleValue), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressRuleValue)(nil), (*v1beta1.IngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(a.(*networking.IngressRuleValue), b.(*v1beta1.IngressRuleValue), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisnetworking.IngressRuleValue)(nil), (*apinetworkingv1beta1.IngressRuleValue)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(a.(*pkgapisnetworking.IngressRuleValue), b.(*apinetworkingv1beta1.IngressRuleValue), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressStatus)(nil), (*networking.IngressStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressStatus_To_networking_IngressStatus(a.(*v1beta1.IngressStatus), b.(*networking.IngressStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apinetworkingv1beta1.IngressStatus)(nil), (*pkgapisnetworking.IngressStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_IngressStatus_To_networking_IngressStatus(a.(*apinetworkingv1beta1.IngressStatus), b.(*pkgapisnetworking.IngressStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressStatus)(nil), (*v1beta1.IngressStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressStatus_To_v1beta1_IngressStatus(a.(*networking.IngressStatus), b.(*v1beta1.IngressStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisnetworking.IngressStatus)(nil), (*apinetworkingv1beta1.IngressStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_networking_IngressStatus_To_v1beta1_IngressStatus(a.(*pkgapisnetworking.IngressStatus), b.(*apinetworkingv1beta1.IngressStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressTLS)(nil), (*networking.IngressTLS)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressTLS_To_networking_IngressTLS(a.(*v1beta1.IngressTLS), b.(*networking.IngressTLS), scope)
+	if err := s.AddGeneratedConversionFunc((*apinetworkingv1beta1.IngressTLS)(nil), (*pkgapisnetworking.IngressTLS)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_IngressTLS_To_networking_IngressTLS(a.(*apinetworkingv1beta1.IngressTLS), b.(*pkgapisnetworking.IngressTLS), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*networking.IngressTLS)(nil), (*v1beta1.IngressTLS)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressTLS_To_v1beta1_IngressTLS(a.(*networking.IngressTLS), b.(*v1beta1.IngressTLS), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisnetworking.IngressTLS)(nil), (*apinetworkingv1beta1.IngressTLS)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_networking_IngressTLS_To_v1beta1_IngressTLS(a.(*pkgapisnetworking.IngressTLS), b.(*apinetworkingv1beta1.IngressTLS), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*networking.IngressBackend)(nil), (*v1beta1.IngressBackend)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressBackend_To_v1beta1_IngressBackend(a.(*networking.IngressBackend), b.(*v1beta1.IngressBackend), scope)
+	if err := s.AddConversionFunc((*pkgapisnetworking.IngressBackend)(nil), (*apinetworkingv1beta1.IngressBackend)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_networking_IngressBackend_To_v1beta1_IngressBackend(a.(*pkgapisnetworking.IngressBackend), b.(*apinetworkingv1beta1.IngressBackend), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*networking.IngressSpec)(nil), (*v1beta1.IngressSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_networking_IngressSpec_To_v1beta1_IngressSpec(a.(*networking.IngressSpec), b.(*v1beta1.IngressSpec), scope)
+	if err := s.AddConversionFunc((*pkgapisnetworking.IngressSpec)(nil), (*apinetworkingv1beta1.IngressSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_networking_IngressSpec_To_v1beta1_IngressSpec(a.(*pkgapisnetworking.IngressSpec), b.(*apinetworkingv1beta1.IngressSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1beta1.IngressBackend)(nil), (*networking.IngressBackend)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressBackend_To_networking_IngressBackend(a.(*v1beta1.IngressBackend), b.(*networking.IngressBackend), scope)
+	if err := s.AddConversionFunc((*apinetworkingv1beta1.IngressBackend)(nil), (*pkgapisnetworking.IngressBackend)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_IngressBackend_To_networking_IngressBackend(a.(*apinetworkingv1beta1.IngressBackend), b.(*pkgapisnetworking.IngressBackend), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1beta1.IngressSpec)(nil), (*networking.IngressSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IngressSpec_To_networking_IngressSpec(a.(*v1beta1.IngressSpec), b.(*networking.IngressSpec), scope)
+	if err := s.AddConversionFunc((*apinetworkingv1beta1.IngressSpec)(nil), (*pkgapisnetworking.IngressSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_IngressSpec_To_networking_IngressSpec(a.(*apinetworkingv1beta1.IngressSpec), b.(*pkgapisnetworking.IngressSpec), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(in *v1beta1.HTTPIngressPath, out *networking.HTTPIngressPath, s conversion.Scope) error {
+func autoConvert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(in *apinetworkingv1beta1.HTTPIngressPath, out *pkgapisnetworking.HTTPIngressPath, s apimachinerypkgconversion.Scope) error {
 	out.Path = in.Path
-	out.PathType = (*networking.PathType)(unsafe.Pointer(in.PathType))
+	out.PathType = (*pkgapisnetworking.PathType)(unsafe.Pointer(in.PathType))
 	if err := Convert_v1beta1_IngressBackend_To_networking_IngressBackend(&in.Backend, &out.Backend, s); err != nil {
 		return err
 	}
@@ -222,13 +222,13 @@ func autoConvert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(in *v1bet
 }
 
 // Convert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath is an autogenerated conversion function.
-func Convert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(in *v1beta1.HTTPIngressPath, out *networking.HTTPIngressPath, s conversion.Scope) error {
+func Convert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(in *apinetworkingv1beta1.HTTPIngressPath, out *pkgapisnetworking.HTTPIngressPath, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(in, out, s)
 }
 
-func autoConvert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in *networking.HTTPIngressPath, out *v1beta1.HTTPIngressPath, s conversion.Scope) error {
+func autoConvert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in *pkgapisnetworking.HTTPIngressPath, out *apinetworkingv1beta1.HTTPIngressPath, s apimachinerypkgconversion.Scope) error {
 	out.Path = in.Path
-	out.PathType = (*v1beta1.PathType)(unsafe.Pointer(in.PathType))
+	out.PathType = (*apinetworkingv1beta1.PathType)(unsafe.Pointer(in.PathType))
 	if err := Convert_networking_IngressBackend_To_v1beta1_IngressBackend(&in.Backend, &out.Backend, s); err != nil {
 		return err
 	}
@@ -236,14 +236,14 @@ func autoConvert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in *netwo
 }
 
 // Convert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath is an autogenerated conversion function.
-func Convert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in *networking.HTTPIngressPath, out *v1beta1.HTTPIngressPath, s conversion.Scope) error {
+func Convert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in *pkgapisnetworking.HTTPIngressPath, out *apinetworkingv1beta1.HTTPIngressPath, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in, out, s)
 }
 
-func autoConvert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(in *v1beta1.HTTPIngressRuleValue, out *networking.HTTPIngressRuleValue, s conversion.Scope) error {
+func autoConvert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(in *apinetworkingv1beta1.HTTPIngressRuleValue, out *pkgapisnetworking.HTTPIngressRuleValue, s apimachinerypkgconversion.Scope) error {
 	if in.Paths != nil {
 		in, out := &in.Paths, &out.Paths
-		*out = make([]networking.HTTPIngressPath, len(*in))
+		*out = make([]pkgapisnetworking.HTTPIngressPath, len(*in))
 		for i := range *in {
 			if err := Convert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -256,14 +256,14 @@ func autoConvert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue
 }
 
 // Convert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue is an autogenerated conversion function.
-func Convert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(in *v1beta1.HTTPIngressRuleValue, out *networking.HTTPIngressRuleValue, s conversion.Scope) error {
+func Convert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(in *apinetworkingv1beta1.HTTPIngressRuleValue, out *pkgapisnetworking.HTTPIngressRuleValue, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(in, out, s)
 }
 
-func autoConvert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in *networking.HTTPIngressRuleValue, out *v1beta1.HTTPIngressRuleValue, s conversion.Scope) error {
+func autoConvert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in *pkgapisnetworking.HTTPIngressRuleValue, out *apinetworkingv1beta1.HTTPIngressRuleValue, s apimachinerypkgconversion.Scope) error {
 	if in.Paths != nil {
 		in, out := &in.Paths, &out.Paths
-		*out = make([]v1beta1.HTTPIngressPath, len(*in))
+		*out = make([]apinetworkingv1beta1.HTTPIngressPath, len(*in))
 		for i := range *in {
 			if err := Convert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -276,11 +276,11 @@ func autoConvert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue
 }
 
 // Convert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue is an autogenerated conversion function.
-func Convert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in *networking.HTTPIngressRuleValue, out *v1beta1.HTTPIngressRuleValue, s conversion.Scope) error {
+func Convert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in *pkgapisnetworking.HTTPIngressRuleValue, out *apinetworkingv1beta1.HTTPIngressRuleValue, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(in, out, s)
 }
 
-func autoConvert_v1beta1_Ingress_To_networking_Ingress(in *v1beta1.Ingress, out *networking.Ingress, s conversion.Scope) error {
+func autoConvert_v1beta1_Ingress_To_networking_Ingress(in *apinetworkingv1beta1.Ingress, out *pkgapisnetworking.Ingress, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_IngressSpec_To_networking_IngressSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -292,11 +292,11 @@ func autoConvert_v1beta1_Ingress_To_networking_Ingress(in *v1beta1.Ingress, out 
 }
 
 // Convert_v1beta1_Ingress_To_networking_Ingress is an autogenerated conversion function.
-func Convert_v1beta1_Ingress_To_networking_Ingress(in *v1beta1.Ingress, out *networking.Ingress, s conversion.Scope) error {
+func Convert_v1beta1_Ingress_To_networking_Ingress(in *apinetworkingv1beta1.Ingress, out *pkgapisnetworking.Ingress, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_Ingress_To_networking_Ingress(in, out, s)
 }
 
-func autoConvert_networking_Ingress_To_v1beta1_Ingress(in *networking.Ingress, out *v1beta1.Ingress, s conversion.Scope) error {
+func autoConvert_networking_Ingress_To_v1beta1_Ingress(in *pkgapisnetworking.Ingress, out *apinetworkingv1beta1.Ingress, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_networking_IngressSpec_To_v1beta1_IngressSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -308,24 +308,24 @@ func autoConvert_networking_Ingress_To_v1beta1_Ingress(in *networking.Ingress, o
 }
 
 // Convert_networking_Ingress_To_v1beta1_Ingress is an autogenerated conversion function.
-func Convert_networking_Ingress_To_v1beta1_Ingress(in *networking.Ingress, out *v1beta1.Ingress, s conversion.Scope) error {
+func Convert_networking_Ingress_To_v1beta1_Ingress(in *pkgapisnetworking.Ingress, out *apinetworkingv1beta1.Ingress, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_networking_Ingress_To_v1beta1_Ingress(in, out, s)
 }
 
-func autoConvert_v1beta1_IngressBackend_To_networking_IngressBackend(in *v1beta1.IngressBackend, out *networking.IngressBackend, s conversion.Scope) error {
+func autoConvert_v1beta1_IngressBackend_To_networking_IngressBackend(in *apinetworkingv1beta1.IngressBackend, out *pkgapisnetworking.IngressBackend, s apimachinerypkgconversion.Scope) error {
 	// WARNING: in.ServiceName requires manual conversion: does not exist in peer-type
 	// WARNING: in.ServicePort requires manual conversion: does not exist in peer-type
-	out.Resource = (*core.TypedLocalObjectReference)(unsafe.Pointer(in.Resource))
+	out.Resource = (*pkgapiscore.TypedLocalObjectReference)(unsafe.Pointer(in.Resource))
 	return nil
 }
 
-func autoConvert_networking_IngressBackend_To_v1beta1_IngressBackend(in *networking.IngressBackend, out *v1beta1.IngressBackend, s conversion.Scope) error {
+func autoConvert_networking_IngressBackend_To_v1beta1_IngressBackend(in *pkgapisnetworking.IngressBackend, out *apinetworkingv1beta1.IngressBackend, s apimachinerypkgconversion.Scope) error {
 	// WARNING: in.Service requires manual conversion: does not exist in peer-type
-	out.Resource = (*v1.TypedLocalObjectReference)(unsafe.Pointer(in.Resource))
+	out.Resource = (*apicorev1.TypedLocalObjectReference)(unsafe.Pointer(in.Resource))
 	return nil
 }
 
-func autoConvert_v1beta1_IngressClass_To_networking_IngressClass(in *v1beta1.IngressClass, out *networking.IngressClass, s conversion.Scope) error {
+func autoConvert_v1beta1_IngressClass_To_networking_IngressClass(in *apinetworkingv1beta1.IngressClass, out *pkgapisnetworking.IngressClass, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_IngressClassSpec_To_networking_IngressClassSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -334,11 +334,11 @@ func autoConvert_v1beta1_IngressClass_To_networking_IngressClass(in *v1beta1.Ing
 }
 
 // Convert_v1beta1_IngressClass_To_networking_IngressClass is an autogenerated conversion function.
-func Convert_v1beta1_IngressClass_To_networking_IngressClass(in *v1beta1.IngressClass, out *networking.IngressClass, s conversion.Scope) error {
+func Convert_v1beta1_IngressClass_To_networking_IngressClass(in *apinetworkingv1beta1.IngressClass, out *pkgapisnetworking.IngressClass, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_IngressClass_To_networking_IngressClass(in, out, s)
 }
 
-func autoConvert_networking_IngressClass_To_v1beta1_IngressClass(in *networking.IngressClass, out *v1beta1.IngressClass, s conversion.Scope) error {
+func autoConvert_networking_IngressClass_To_v1beta1_IngressClass(in *pkgapisnetworking.IngressClass, out *apinetworkingv1beta1.IngressClass, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_networking_IngressClassSpec_To_v1beta1_IngressClassSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -347,33 +347,33 @@ func autoConvert_networking_IngressClass_To_v1beta1_IngressClass(in *networking.
 }
 
 // Convert_networking_IngressClass_To_v1beta1_IngressClass is an autogenerated conversion function.
-func Convert_networking_IngressClass_To_v1beta1_IngressClass(in *networking.IngressClass, out *v1beta1.IngressClass, s conversion.Scope) error {
+func Convert_networking_IngressClass_To_v1beta1_IngressClass(in *pkgapisnetworking.IngressClass, out *apinetworkingv1beta1.IngressClass, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_networking_IngressClass_To_v1beta1_IngressClass(in, out, s)
 }
 
-func autoConvert_v1beta1_IngressClassList_To_networking_IngressClassList(in *v1beta1.IngressClassList, out *networking.IngressClassList, s conversion.Scope) error {
+func autoConvert_v1beta1_IngressClassList_To_networking_IngressClassList(in *apinetworkingv1beta1.IngressClassList, out *pkgapisnetworking.IngressClassList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]networking.IngressClass)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]pkgapisnetworking.IngressClass)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_v1beta1_IngressClassList_To_networking_IngressClassList is an autogenerated conversion function.
-func Convert_v1beta1_IngressClassList_To_networking_IngressClassList(in *v1beta1.IngressClassList, out *networking.IngressClassList, s conversion.Scope) error {
+func Convert_v1beta1_IngressClassList_To_networking_IngressClassList(in *apinetworkingv1beta1.IngressClassList, out *pkgapisnetworking.IngressClassList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_IngressClassList_To_networking_IngressClassList(in, out, s)
 }
 
-func autoConvert_networking_IngressClassList_To_v1beta1_IngressClassList(in *networking.IngressClassList, out *v1beta1.IngressClassList, s conversion.Scope) error {
+func autoConvert_networking_IngressClassList_To_v1beta1_IngressClassList(in *pkgapisnetworking.IngressClassList, out *apinetworkingv1beta1.IngressClassList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1beta1.IngressClass)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]apinetworkingv1beta1.IngressClass)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_networking_IngressClassList_To_v1beta1_IngressClassList is an autogenerated conversion function.
-func Convert_networking_IngressClassList_To_v1beta1_IngressClassList(in *networking.IngressClassList, out *v1beta1.IngressClassList, s conversion.Scope) error {
+func Convert_networking_IngressClassList_To_v1beta1_IngressClassList(in *pkgapisnetworking.IngressClassList, out *apinetworkingv1beta1.IngressClassList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_networking_IngressClassList_To_v1beta1_IngressClassList(in, out, s)
 }
 
-func autoConvert_v1beta1_IngressClassParametersReference_To_networking_IngressClassParametersReference(in *v1beta1.IngressClassParametersReference, out *networking.IngressClassParametersReference, s conversion.Scope) error {
+func autoConvert_v1beta1_IngressClassParametersReference_To_networking_IngressClassParametersReference(in *apinetworkingv1beta1.IngressClassParametersReference, out *pkgapisnetworking.IngressClassParametersReference, s apimachinerypkgconversion.Scope) error {
 	out.APIGroup = (*string)(unsafe.Pointer(in.APIGroup))
 	out.Kind = in.Kind
 	out.Name = in.Name
@@ -383,11 +383,11 @@ func autoConvert_v1beta1_IngressClassParametersReference_To_networking_IngressCl
 }
 
 // Convert_v1beta1_IngressClassParametersReference_To_networking_IngressClassParametersReference is an autogenerated conversion function.
-func Convert_v1beta1_IngressClassParametersReference_To_networking_IngressClassParametersReference(in *v1beta1.IngressClassParametersReference, out *networking.IngressClassParametersReference, s conversion.Scope) error {
+func Convert_v1beta1_IngressClassParametersReference_To_networking_IngressClassParametersReference(in *apinetworkingv1beta1.IngressClassParametersReference, out *pkgapisnetworking.IngressClassParametersReference, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_IngressClassParametersReference_To_networking_IngressClassParametersReference(in, out, s)
 }
 
-func autoConvert_networking_IngressClassParametersReference_To_v1beta1_IngressClassParametersReference(in *networking.IngressClassParametersReference, out *v1beta1.IngressClassParametersReference, s conversion.Scope) error {
+func autoConvert_networking_IngressClassParametersReference_To_v1beta1_IngressClassParametersReference(in *pkgapisnetworking.IngressClassParametersReference, out *apinetworkingv1beta1.IngressClassParametersReference, s apimachinerypkgconversion.Scope) error {
 	out.APIGroup = (*string)(unsafe.Pointer(in.APIGroup))
 	out.Kind = in.Kind
 	out.Name = in.Name
@@ -397,37 +397,37 @@ func autoConvert_networking_IngressClassParametersReference_To_v1beta1_IngressCl
 }
 
 // Convert_networking_IngressClassParametersReference_To_v1beta1_IngressClassParametersReference is an autogenerated conversion function.
-func Convert_networking_IngressClassParametersReference_To_v1beta1_IngressClassParametersReference(in *networking.IngressClassParametersReference, out *v1beta1.IngressClassParametersReference, s conversion.Scope) error {
+func Convert_networking_IngressClassParametersReference_To_v1beta1_IngressClassParametersReference(in *pkgapisnetworking.IngressClassParametersReference, out *apinetworkingv1beta1.IngressClassParametersReference, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_networking_IngressClassParametersReference_To_v1beta1_IngressClassParametersReference(in, out, s)
 }
 
-func autoConvert_v1beta1_IngressClassSpec_To_networking_IngressClassSpec(in *v1beta1.IngressClassSpec, out *networking.IngressClassSpec, s conversion.Scope) error {
+func autoConvert_v1beta1_IngressClassSpec_To_networking_IngressClassSpec(in *apinetworkingv1beta1.IngressClassSpec, out *pkgapisnetworking.IngressClassSpec, s apimachinerypkgconversion.Scope) error {
 	out.Controller = in.Controller
-	out.Parameters = (*networking.IngressClassParametersReference)(unsafe.Pointer(in.Parameters))
+	out.Parameters = (*pkgapisnetworking.IngressClassParametersReference)(unsafe.Pointer(in.Parameters))
 	return nil
 }
 
 // Convert_v1beta1_IngressClassSpec_To_networking_IngressClassSpec is an autogenerated conversion function.
-func Convert_v1beta1_IngressClassSpec_To_networking_IngressClassSpec(in *v1beta1.IngressClassSpec, out *networking.IngressClassSpec, s conversion.Scope) error {
+func Convert_v1beta1_IngressClassSpec_To_networking_IngressClassSpec(in *apinetworkingv1beta1.IngressClassSpec, out *pkgapisnetworking.IngressClassSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_IngressClassSpec_To_networking_IngressClassSpec(in, out, s)
 }
 
-func autoConvert_networking_IngressClassSpec_To_v1beta1_IngressClassSpec(in *networking.IngressClassSpec, out *v1beta1.IngressClassSpec, s conversion.Scope) error {
+func autoConvert_networking_IngressClassSpec_To_v1beta1_IngressClassSpec(in *pkgapisnetworking.IngressClassSpec, out *apinetworkingv1beta1.IngressClassSpec, s apimachinerypkgconversion.Scope) error {
 	out.Controller = in.Controller
-	out.Parameters = (*v1beta1.IngressClassParametersReference)(unsafe.Pointer(in.Parameters))
+	out.Parameters = (*apinetworkingv1beta1.IngressClassParametersReference)(unsafe.Pointer(in.Parameters))
 	return nil
 }
 
 // Convert_networking_IngressClassSpec_To_v1beta1_IngressClassSpec is an autogenerated conversion function.
-func Convert_networking_IngressClassSpec_To_v1beta1_IngressClassSpec(in *networking.IngressClassSpec, out *v1beta1.IngressClassSpec, s conversion.Scope) error {
+func Convert_networking_IngressClassSpec_To_v1beta1_IngressClassSpec(in *pkgapisnetworking.IngressClassSpec, out *apinetworkingv1beta1.IngressClassSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_networking_IngressClassSpec_To_v1beta1_IngressClassSpec(in, out, s)
 }
 
-func autoConvert_v1beta1_IngressList_To_networking_IngressList(in *v1beta1.IngressList, out *networking.IngressList, s conversion.Scope) error {
+func autoConvert_v1beta1_IngressList_To_networking_IngressList(in *apinetworkingv1beta1.IngressList, out *pkgapisnetworking.IngressList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]networking.Ingress, len(*in))
+		*out = make([]pkgapisnetworking.Ingress, len(*in))
 		for i := range *in {
 			if err := Convert_v1beta1_Ingress_To_networking_Ingress(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -440,15 +440,15 @@ func autoConvert_v1beta1_IngressList_To_networking_IngressList(in *v1beta1.Ingre
 }
 
 // Convert_v1beta1_IngressList_To_networking_IngressList is an autogenerated conversion function.
-func Convert_v1beta1_IngressList_To_networking_IngressList(in *v1beta1.IngressList, out *networking.IngressList, s conversion.Scope) error {
+func Convert_v1beta1_IngressList_To_networking_IngressList(in *apinetworkingv1beta1.IngressList, out *pkgapisnetworking.IngressList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_IngressList_To_networking_IngressList(in, out, s)
 }
 
-func autoConvert_networking_IngressList_To_v1beta1_IngressList(in *networking.IngressList, out *v1beta1.IngressList, s conversion.Scope) error {
+func autoConvert_networking_IngressList_To_v1beta1_IngressList(in *pkgapisnetworking.IngressList, out *apinetworkingv1beta1.IngressList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]v1beta1.Ingress, len(*in))
+		*out = make([]apinetworkingv1beta1.Ingress, len(*in))
 		for i := range *in {
 			if err := Convert_networking_Ingress_To_v1beta1_Ingress(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -461,79 +461,79 @@ func autoConvert_networking_IngressList_To_v1beta1_IngressList(in *networking.In
 }
 
 // Convert_networking_IngressList_To_v1beta1_IngressList is an autogenerated conversion function.
-func Convert_networking_IngressList_To_v1beta1_IngressList(in *networking.IngressList, out *v1beta1.IngressList, s conversion.Scope) error {
+func Convert_networking_IngressList_To_v1beta1_IngressList(in *pkgapisnetworking.IngressList, out *apinetworkingv1beta1.IngressList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_networking_IngressList_To_v1beta1_IngressList(in, out, s)
 }
 
-func autoConvert_v1beta1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress(in *v1beta1.IngressLoadBalancerIngress, out *networking.IngressLoadBalancerIngress, s conversion.Scope) error {
+func autoConvert_v1beta1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress(in *apinetworkingv1beta1.IngressLoadBalancerIngress, out *pkgapisnetworking.IngressLoadBalancerIngress, s apimachinerypkgconversion.Scope) error {
 	out.IP = in.IP
 	out.Hostname = in.Hostname
-	out.Ports = *(*[]networking.IngressPortStatus)(unsafe.Pointer(&in.Ports))
+	out.Ports = *(*[]pkgapisnetworking.IngressPortStatus)(unsafe.Pointer(&in.Ports))
 	return nil
 }
 
 // Convert_v1beta1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress is an autogenerated conversion function.
-func Convert_v1beta1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress(in *v1beta1.IngressLoadBalancerIngress, out *networking.IngressLoadBalancerIngress, s conversion.Scope) error {
+func Convert_v1beta1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress(in *apinetworkingv1beta1.IngressLoadBalancerIngress, out *pkgapisnetworking.IngressLoadBalancerIngress, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_IngressLoadBalancerIngress_To_networking_IngressLoadBalancerIngress(in, out, s)
 }
 
-func autoConvert_networking_IngressLoadBalancerIngress_To_v1beta1_IngressLoadBalancerIngress(in *networking.IngressLoadBalancerIngress, out *v1beta1.IngressLoadBalancerIngress, s conversion.Scope) error {
+func autoConvert_networking_IngressLoadBalancerIngress_To_v1beta1_IngressLoadBalancerIngress(in *pkgapisnetworking.IngressLoadBalancerIngress, out *apinetworkingv1beta1.IngressLoadBalancerIngress, s apimachinerypkgconversion.Scope) error {
 	out.IP = in.IP
 	out.Hostname = in.Hostname
-	out.Ports = *(*[]v1beta1.IngressPortStatus)(unsafe.Pointer(&in.Ports))
+	out.Ports = *(*[]apinetworkingv1beta1.IngressPortStatus)(unsafe.Pointer(&in.Ports))
 	return nil
 }
 
 // Convert_networking_IngressLoadBalancerIngress_To_v1beta1_IngressLoadBalancerIngress is an autogenerated conversion function.
-func Convert_networking_IngressLoadBalancerIngress_To_v1beta1_IngressLoadBalancerIngress(in *networking.IngressLoadBalancerIngress, out *v1beta1.IngressLoadBalancerIngress, s conversion.Scope) error {
+func Convert_networking_IngressLoadBalancerIngress_To_v1beta1_IngressLoadBalancerIngress(in *pkgapisnetworking.IngressLoadBalancerIngress, out *apinetworkingv1beta1.IngressLoadBalancerIngress, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_networking_IngressLoadBalancerIngress_To_v1beta1_IngressLoadBalancerIngress(in, out, s)
 }
 
-func autoConvert_v1beta1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(in *v1beta1.IngressLoadBalancerStatus, out *networking.IngressLoadBalancerStatus, s conversion.Scope) error {
-	out.Ingress = *(*[]networking.IngressLoadBalancerIngress)(unsafe.Pointer(&in.Ingress))
+func autoConvert_v1beta1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(in *apinetworkingv1beta1.IngressLoadBalancerStatus, out *pkgapisnetworking.IngressLoadBalancerStatus, s apimachinerypkgconversion.Scope) error {
+	out.Ingress = *(*[]pkgapisnetworking.IngressLoadBalancerIngress)(unsafe.Pointer(&in.Ingress))
 	return nil
 }
 
 // Convert_v1beta1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus is an autogenerated conversion function.
-func Convert_v1beta1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(in *v1beta1.IngressLoadBalancerStatus, out *networking.IngressLoadBalancerStatus, s conversion.Scope) error {
+func Convert_v1beta1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(in *apinetworkingv1beta1.IngressLoadBalancerStatus, out *pkgapisnetworking.IngressLoadBalancerStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(in, out, s)
 }
 
-func autoConvert_networking_IngressLoadBalancerStatus_To_v1beta1_IngressLoadBalancerStatus(in *networking.IngressLoadBalancerStatus, out *v1beta1.IngressLoadBalancerStatus, s conversion.Scope) error {
-	out.Ingress = *(*[]v1beta1.IngressLoadBalancerIngress)(unsafe.Pointer(&in.Ingress))
+func autoConvert_networking_IngressLoadBalancerStatus_To_v1beta1_IngressLoadBalancerStatus(in *pkgapisnetworking.IngressLoadBalancerStatus, out *apinetworkingv1beta1.IngressLoadBalancerStatus, s apimachinerypkgconversion.Scope) error {
+	out.Ingress = *(*[]apinetworkingv1beta1.IngressLoadBalancerIngress)(unsafe.Pointer(&in.Ingress))
 	return nil
 }
 
 // Convert_networking_IngressLoadBalancerStatus_To_v1beta1_IngressLoadBalancerStatus is an autogenerated conversion function.
-func Convert_networking_IngressLoadBalancerStatus_To_v1beta1_IngressLoadBalancerStatus(in *networking.IngressLoadBalancerStatus, out *v1beta1.IngressLoadBalancerStatus, s conversion.Scope) error {
+func Convert_networking_IngressLoadBalancerStatus_To_v1beta1_IngressLoadBalancerStatus(in *pkgapisnetworking.IngressLoadBalancerStatus, out *apinetworkingv1beta1.IngressLoadBalancerStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_networking_IngressLoadBalancerStatus_To_v1beta1_IngressLoadBalancerStatus(in, out, s)
 }
 
-func autoConvert_v1beta1_IngressPortStatus_To_networking_IngressPortStatus(in *v1beta1.IngressPortStatus, out *networking.IngressPortStatus, s conversion.Scope) error {
+func autoConvert_v1beta1_IngressPortStatus_To_networking_IngressPortStatus(in *apinetworkingv1beta1.IngressPortStatus, out *pkgapisnetworking.IngressPortStatus, s apimachinerypkgconversion.Scope) error {
 	out.Port = in.Port
-	out.Protocol = core.Protocol(in.Protocol)
+	out.Protocol = pkgapiscore.Protocol(in.Protocol)
 	out.Error = (*string)(unsafe.Pointer(in.Error))
 	return nil
 }
 
 // Convert_v1beta1_IngressPortStatus_To_networking_IngressPortStatus is an autogenerated conversion function.
-func Convert_v1beta1_IngressPortStatus_To_networking_IngressPortStatus(in *v1beta1.IngressPortStatus, out *networking.IngressPortStatus, s conversion.Scope) error {
+func Convert_v1beta1_IngressPortStatus_To_networking_IngressPortStatus(in *apinetworkingv1beta1.IngressPortStatus, out *pkgapisnetworking.IngressPortStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_IngressPortStatus_To_networking_IngressPortStatus(in, out, s)
 }
 
-func autoConvert_networking_IngressPortStatus_To_v1beta1_IngressPortStatus(in *networking.IngressPortStatus, out *v1beta1.IngressPortStatus, s conversion.Scope) error {
+func autoConvert_networking_IngressPortStatus_To_v1beta1_IngressPortStatus(in *pkgapisnetworking.IngressPortStatus, out *apinetworkingv1beta1.IngressPortStatus, s apimachinerypkgconversion.Scope) error {
 	out.Port = in.Port
-	out.Protocol = v1.Protocol(in.Protocol)
+	out.Protocol = apicorev1.Protocol(in.Protocol)
 	out.Error = (*string)(unsafe.Pointer(in.Error))
 	return nil
 }
 
 // Convert_networking_IngressPortStatus_To_v1beta1_IngressPortStatus is an autogenerated conversion function.
-func Convert_networking_IngressPortStatus_To_v1beta1_IngressPortStatus(in *networking.IngressPortStatus, out *v1beta1.IngressPortStatus, s conversion.Scope) error {
+func Convert_networking_IngressPortStatus_To_v1beta1_IngressPortStatus(in *pkgapisnetworking.IngressPortStatus, out *apinetworkingv1beta1.IngressPortStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_networking_IngressPortStatus_To_v1beta1_IngressPortStatus(in, out, s)
 }
 
-func autoConvert_v1beta1_IngressRule_To_networking_IngressRule(in *v1beta1.IngressRule, out *networking.IngressRule, s conversion.Scope) error {
+func autoConvert_v1beta1_IngressRule_To_networking_IngressRule(in *apinetworkingv1beta1.IngressRule, out *pkgapisnetworking.IngressRule, s apimachinerypkgconversion.Scope) error {
 	out.Host = in.Host
 	if err := Convert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue(&in.IngressRuleValue, &out.IngressRuleValue, s); err != nil {
 		return err
@@ -542,11 +542,11 @@ func autoConvert_v1beta1_IngressRule_To_networking_IngressRule(in *v1beta1.Ingre
 }
 
 // Convert_v1beta1_IngressRule_To_networking_IngressRule is an autogenerated conversion function.
-func Convert_v1beta1_IngressRule_To_networking_IngressRule(in *v1beta1.IngressRule, out *networking.IngressRule, s conversion.Scope) error {
+func Convert_v1beta1_IngressRule_To_networking_IngressRule(in *apinetworkingv1beta1.IngressRule, out *pkgapisnetworking.IngressRule, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_IngressRule_To_networking_IngressRule(in, out, s)
 }
 
-func autoConvert_networking_IngressRule_To_v1beta1_IngressRule(in *networking.IngressRule, out *v1beta1.IngressRule, s conversion.Scope) error {
+func autoConvert_networking_IngressRule_To_v1beta1_IngressRule(in *pkgapisnetworking.IngressRule, out *apinetworkingv1beta1.IngressRule, s apimachinerypkgconversion.Scope) error {
 	out.Host = in.Host
 	if err := Convert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(&in.IngressRuleValue, &out.IngressRuleValue, s); err != nil {
 		return err
@@ -555,14 +555,14 @@ func autoConvert_networking_IngressRule_To_v1beta1_IngressRule(in *networking.In
 }
 
 // Convert_networking_IngressRule_To_v1beta1_IngressRule is an autogenerated conversion function.
-func Convert_networking_IngressRule_To_v1beta1_IngressRule(in *networking.IngressRule, out *v1beta1.IngressRule, s conversion.Scope) error {
+func Convert_networking_IngressRule_To_v1beta1_IngressRule(in *pkgapisnetworking.IngressRule, out *apinetworkingv1beta1.IngressRule, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_networking_IngressRule_To_v1beta1_IngressRule(in, out, s)
 }
 
-func autoConvert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue(in *v1beta1.IngressRuleValue, out *networking.IngressRuleValue, s conversion.Scope) error {
+func autoConvert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue(in *apinetworkingv1beta1.IngressRuleValue, out *pkgapisnetworking.IngressRuleValue, s apimachinerypkgconversion.Scope) error {
 	if in.HTTP != nil {
 		in, out := &in.HTTP, &out.HTTP
-		*out = new(networking.HTTPIngressRuleValue)
+		*out = new(pkgapisnetworking.HTTPIngressRuleValue)
 		if err := Convert_v1beta1_HTTPIngressRuleValue_To_networking_HTTPIngressRuleValue(*in, *out, s); err != nil {
 			return err
 		}
@@ -573,14 +573,14 @@ func autoConvert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue(in *v1b
 }
 
 // Convert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue is an autogenerated conversion function.
-func Convert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue(in *v1beta1.IngressRuleValue, out *networking.IngressRuleValue, s conversion.Scope) error {
+func Convert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue(in *apinetworkingv1beta1.IngressRuleValue, out *pkgapisnetworking.IngressRuleValue, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_IngressRuleValue_To_networking_IngressRuleValue(in, out, s)
 }
 
-func autoConvert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(in *networking.IngressRuleValue, out *v1beta1.IngressRuleValue, s conversion.Scope) error {
+func autoConvert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(in *pkgapisnetworking.IngressRuleValue, out *apinetworkingv1beta1.IngressRuleValue, s apimachinerypkgconversion.Scope) error {
 	if in.HTTP != nil {
 		in, out := &in.HTTP, &out.HTTP
-		*out = new(v1beta1.HTTPIngressRuleValue)
+		*out = new(apinetworkingv1beta1.HTTPIngressRuleValue)
 		if err := Convert_networking_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(*in, *out, s); err != nil {
 			return err
 		}
@@ -591,17 +591,17 @@ func autoConvert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(in *net
 }
 
 // Convert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue is an autogenerated conversion function.
-func Convert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(in *networking.IngressRuleValue, out *v1beta1.IngressRuleValue, s conversion.Scope) error {
+func Convert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(in *pkgapisnetworking.IngressRuleValue, out *apinetworkingv1beta1.IngressRuleValue, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_networking_IngressRuleValue_To_v1beta1_IngressRuleValue(in, out, s)
 }
 
-func autoConvert_v1beta1_IngressSpec_To_networking_IngressSpec(in *v1beta1.IngressSpec, out *networking.IngressSpec, s conversion.Scope) error {
+func autoConvert_v1beta1_IngressSpec_To_networking_IngressSpec(in *apinetworkingv1beta1.IngressSpec, out *pkgapisnetworking.IngressSpec, s apimachinerypkgconversion.Scope) error {
 	out.IngressClassName = (*string)(unsafe.Pointer(in.IngressClassName))
 	// WARNING: in.Backend requires manual conversion: does not exist in peer-type
-	out.TLS = *(*[]networking.IngressTLS)(unsafe.Pointer(&in.TLS))
+	out.TLS = *(*[]pkgapisnetworking.IngressTLS)(unsafe.Pointer(&in.TLS))
 	if in.Rules != nil {
 		in, out := &in.Rules, &out.Rules
-		*out = make([]networking.IngressRule, len(*in))
+		*out = make([]pkgapisnetworking.IngressRule, len(*in))
 		for i := range *in {
 			if err := Convert_v1beta1_IngressRule_To_networking_IngressRule(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -613,13 +613,13 @@ func autoConvert_v1beta1_IngressSpec_To_networking_IngressSpec(in *v1beta1.Ingre
 	return nil
 }
 
-func autoConvert_networking_IngressSpec_To_v1beta1_IngressSpec(in *networking.IngressSpec, out *v1beta1.IngressSpec, s conversion.Scope) error {
+func autoConvert_networking_IngressSpec_To_v1beta1_IngressSpec(in *pkgapisnetworking.IngressSpec, out *apinetworkingv1beta1.IngressSpec, s apimachinerypkgconversion.Scope) error {
 	out.IngressClassName = (*string)(unsafe.Pointer(in.IngressClassName))
 	// WARNING: in.DefaultBackend requires manual conversion: does not exist in peer-type
-	out.TLS = *(*[]v1beta1.IngressTLS)(unsafe.Pointer(&in.TLS))
+	out.TLS = *(*[]apinetworkingv1beta1.IngressTLS)(unsafe.Pointer(&in.TLS))
 	if in.Rules != nil {
 		in, out := &in.Rules, &out.Rules
-		*out = make([]v1beta1.IngressRule, len(*in))
+		*out = make([]apinetworkingv1beta1.IngressRule, len(*in))
 		for i := range *in {
 			if err := Convert_networking_IngressRule_To_v1beta1_IngressRule(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -631,7 +631,7 @@ func autoConvert_networking_IngressSpec_To_v1beta1_IngressSpec(in *networking.In
 	return nil
 }
 
-func autoConvert_v1beta1_IngressStatus_To_networking_IngressStatus(in *v1beta1.IngressStatus, out *networking.IngressStatus, s conversion.Scope) error {
+func autoConvert_v1beta1_IngressStatus_To_networking_IngressStatus(in *apinetworkingv1beta1.IngressStatus, out *pkgapisnetworking.IngressStatus, s apimachinerypkgconversion.Scope) error {
 	if err := Convert_v1beta1_IngressLoadBalancerStatus_To_networking_IngressLoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
 		return err
 	}
@@ -639,11 +639,11 @@ func autoConvert_v1beta1_IngressStatus_To_networking_IngressStatus(in *v1beta1.I
 }
 
 // Convert_v1beta1_IngressStatus_To_networking_IngressStatus is an autogenerated conversion function.
-func Convert_v1beta1_IngressStatus_To_networking_IngressStatus(in *v1beta1.IngressStatus, out *networking.IngressStatus, s conversion.Scope) error {
+func Convert_v1beta1_IngressStatus_To_networking_IngressStatus(in *apinetworkingv1beta1.IngressStatus, out *pkgapisnetworking.IngressStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_IngressStatus_To_networking_IngressStatus(in, out, s)
 }
 
-func autoConvert_networking_IngressStatus_To_v1beta1_IngressStatus(in *networking.IngressStatus, out *v1beta1.IngressStatus, s conversion.Scope) error {
+func autoConvert_networking_IngressStatus_To_v1beta1_IngressStatus(in *pkgapisnetworking.IngressStatus, out *apinetworkingv1beta1.IngressStatus, s apimachinerypkgconversion.Scope) error {
 	if err := Convert_networking_IngressLoadBalancerStatus_To_v1beta1_IngressLoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
 		return err
 	}
@@ -651,28 +651,28 @@ func autoConvert_networking_IngressStatus_To_v1beta1_IngressStatus(in *networkin
 }
 
 // Convert_networking_IngressStatus_To_v1beta1_IngressStatus is an autogenerated conversion function.
-func Convert_networking_IngressStatus_To_v1beta1_IngressStatus(in *networking.IngressStatus, out *v1beta1.IngressStatus, s conversion.Scope) error {
+func Convert_networking_IngressStatus_To_v1beta1_IngressStatus(in *pkgapisnetworking.IngressStatus, out *apinetworkingv1beta1.IngressStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_networking_IngressStatus_To_v1beta1_IngressStatus(in, out, s)
 }
 
-func autoConvert_v1beta1_IngressTLS_To_networking_IngressTLS(in *v1beta1.IngressTLS, out *networking.IngressTLS, s conversion.Scope) error {
+func autoConvert_v1beta1_IngressTLS_To_networking_IngressTLS(in *apinetworkingv1beta1.IngressTLS, out *pkgapisnetworking.IngressTLS, s apimachinerypkgconversion.Scope) error {
 	out.Hosts = *(*[]string)(unsafe.Pointer(&in.Hosts))
 	out.SecretName = in.SecretName
 	return nil
 }
 
 // Convert_v1beta1_IngressTLS_To_networking_IngressTLS is an autogenerated conversion function.
-func Convert_v1beta1_IngressTLS_To_networking_IngressTLS(in *v1beta1.IngressTLS, out *networking.IngressTLS, s conversion.Scope) error {
+func Convert_v1beta1_IngressTLS_To_networking_IngressTLS(in *apinetworkingv1beta1.IngressTLS, out *pkgapisnetworking.IngressTLS, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_IngressTLS_To_networking_IngressTLS(in, out, s)
 }
 
-func autoConvert_networking_IngressTLS_To_v1beta1_IngressTLS(in *networking.IngressTLS, out *v1beta1.IngressTLS, s conversion.Scope) error {
+func autoConvert_networking_IngressTLS_To_v1beta1_IngressTLS(in *pkgapisnetworking.IngressTLS, out *apinetworkingv1beta1.IngressTLS, s apimachinerypkgconversion.Scope) error {
 	out.Hosts = *(*[]string)(unsafe.Pointer(&in.Hosts))
 	out.SecretName = in.SecretName
 	return nil
 }
 
 // Convert_networking_IngressTLS_To_v1beta1_IngressTLS is an autogenerated conversion function.
-func Convert_networking_IngressTLS_To_v1beta1_IngressTLS(in *networking.IngressTLS, out *v1beta1.IngressTLS, s conversion.Scope) error {
+func Convert_networking_IngressTLS_To_v1beta1_IngressTLS(in *pkgapisnetworking.IngressTLS, out *apinetworkingv1beta1.IngressTLS, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_networking_IngressTLS_To_v1beta1_IngressTLS(in, out, s)
 }

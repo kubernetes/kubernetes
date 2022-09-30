@@ -24,10 +24,10 @@ package v1alpha1
 import (
 	"unsafe"
 
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	configv1alpha1 "k8s.io/component-base/config/v1alpha1"
-	"k8s.io/controller-manager/config"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	controllermanagerconfig "k8s.io/controller-manager/config"
 )
 
 func init() {
@@ -36,75 +36,75 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*ControllerLeaderConfiguration)(nil), (*config.ControllerLeaderConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_ControllerLeaderConfiguration_To_config_ControllerLeaderConfiguration(a.(*ControllerLeaderConfiguration), b.(*config.ControllerLeaderConfiguration), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*ControllerLeaderConfiguration)(nil), (*controllermanagerconfig.ControllerLeaderConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_ControllerLeaderConfiguration_To_config_ControllerLeaderConfiguration(a.(*ControllerLeaderConfiguration), b.(*controllermanagerconfig.ControllerLeaderConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.ControllerLeaderConfiguration)(nil), (*ControllerLeaderConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_ControllerLeaderConfiguration_To_v1alpha1_ControllerLeaderConfiguration(a.(*config.ControllerLeaderConfiguration), b.(*ControllerLeaderConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*controllermanagerconfig.ControllerLeaderConfiguration)(nil), (*ControllerLeaderConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_ControllerLeaderConfiguration_To_v1alpha1_ControllerLeaderConfiguration(a.(*controllermanagerconfig.ControllerLeaderConfiguration), b.(*ControllerLeaderConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*LeaderMigrationConfiguration)(nil), (*config.LeaderMigrationConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_LeaderMigrationConfiguration_To_config_LeaderMigrationConfiguration(a.(*LeaderMigrationConfiguration), b.(*config.LeaderMigrationConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*LeaderMigrationConfiguration)(nil), (*controllermanagerconfig.LeaderMigrationConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_LeaderMigrationConfiguration_To_config_LeaderMigrationConfiguration(a.(*LeaderMigrationConfiguration), b.(*controllermanagerconfig.LeaderMigrationConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.LeaderMigrationConfiguration)(nil), (*LeaderMigrationConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_LeaderMigrationConfiguration_To_v1alpha1_LeaderMigrationConfiguration(a.(*config.LeaderMigrationConfiguration), b.(*LeaderMigrationConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*controllermanagerconfig.LeaderMigrationConfiguration)(nil), (*LeaderMigrationConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_LeaderMigrationConfiguration_To_v1alpha1_LeaderMigrationConfiguration(a.(*controllermanagerconfig.LeaderMigrationConfiguration), b.(*LeaderMigrationConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*config.GenericControllerManagerConfiguration)(nil), (*GenericControllerManagerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_GenericControllerManagerConfiguration_To_v1alpha1_GenericControllerManagerConfiguration(a.(*config.GenericControllerManagerConfiguration), b.(*GenericControllerManagerConfiguration), scope)
+	if err := s.AddConversionFunc((*controllermanagerconfig.GenericControllerManagerConfiguration)(nil), (*GenericControllerManagerConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_GenericControllerManagerConfiguration_To_v1alpha1_GenericControllerManagerConfiguration(a.(*controllermanagerconfig.GenericControllerManagerConfiguration), b.(*GenericControllerManagerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*GenericControllerManagerConfiguration)(nil), (*config.GenericControllerManagerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_GenericControllerManagerConfiguration_To_config_GenericControllerManagerConfiguration(a.(*GenericControllerManagerConfiguration), b.(*config.GenericControllerManagerConfiguration), scope)
+	if err := s.AddConversionFunc((*GenericControllerManagerConfiguration)(nil), (*controllermanagerconfig.GenericControllerManagerConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_GenericControllerManagerConfiguration_To_config_GenericControllerManagerConfiguration(a.(*GenericControllerManagerConfiguration), b.(*controllermanagerconfig.GenericControllerManagerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1alpha1_ControllerLeaderConfiguration_To_config_ControllerLeaderConfiguration(in *ControllerLeaderConfiguration, out *config.ControllerLeaderConfiguration, s conversion.Scope) error {
+func autoConvert_v1alpha1_ControllerLeaderConfiguration_To_config_ControllerLeaderConfiguration(in *ControllerLeaderConfiguration, out *controllermanagerconfig.ControllerLeaderConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
 	out.Component = in.Component
 	return nil
 }
 
 // Convert_v1alpha1_ControllerLeaderConfiguration_To_config_ControllerLeaderConfiguration is an autogenerated conversion function.
-func Convert_v1alpha1_ControllerLeaderConfiguration_To_config_ControllerLeaderConfiguration(in *ControllerLeaderConfiguration, out *config.ControllerLeaderConfiguration, s conversion.Scope) error {
+func Convert_v1alpha1_ControllerLeaderConfiguration_To_config_ControllerLeaderConfiguration(in *ControllerLeaderConfiguration, out *controllermanagerconfig.ControllerLeaderConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha1_ControllerLeaderConfiguration_To_config_ControllerLeaderConfiguration(in, out, s)
 }
 
-func autoConvert_config_ControllerLeaderConfiguration_To_v1alpha1_ControllerLeaderConfiguration(in *config.ControllerLeaderConfiguration, out *ControllerLeaderConfiguration, s conversion.Scope) error {
+func autoConvert_config_ControllerLeaderConfiguration_To_v1alpha1_ControllerLeaderConfiguration(in *controllermanagerconfig.ControllerLeaderConfiguration, out *ControllerLeaderConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
 	out.Component = in.Component
 	return nil
 }
 
 // Convert_config_ControllerLeaderConfiguration_To_v1alpha1_ControllerLeaderConfiguration is an autogenerated conversion function.
-func Convert_config_ControllerLeaderConfiguration_To_v1alpha1_ControllerLeaderConfiguration(in *config.ControllerLeaderConfiguration, out *ControllerLeaderConfiguration, s conversion.Scope) error {
+func Convert_config_ControllerLeaderConfiguration_To_v1alpha1_ControllerLeaderConfiguration(in *controllermanagerconfig.ControllerLeaderConfiguration, out *ControllerLeaderConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_ControllerLeaderConfiguration_To_v1alpha1_ControllerLeaderConfiguration(in, out, s)
 }
 
-func autoConvert_v1alpha1_GenericControllerManagerConfiguration_To_config_GenericControllerManagerConfiguration(in *GenericControllerManagerConfiguration, out *config.GenericControllerManagerConfiguration, s conversion.Scope) error {
+func autoConvert_v1alpha1_GenericControllerManagerConfiguration_To_config_GenericControllerManagerConfiguration(in *GenericControllerManagerConfiguration, out *controllermanagerconfig.GenericControllerManagerConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.Port = in.Port
 	out.Address = in.Address
 	out.MinResyncPeriod = in.MinResyncPeriod
-	if err := configv1alpha1.Convert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
+	if err := componentbaseconfigv1alpha1.Convert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
 		return err
 	}
 	out.ControllerStartInterval = in.ControllerStartInterval
-	if err := configv1alpha1.Convert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
+	if err := componentbaseconfigv1alpha1.Convert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
 	out.Controllers = *(*[]string)(unsafe.Pointer(&in.Controllers))
-	if err := configv1alpha1.Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
+	if err := componentbaseconfigv1alpha1.Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
 		return err
 	}
 	out.LeaderMigrationEnabled = in.LeaderMigrationEnabled
@@ -114,19 +114,19 @@ func autoConvert_v1alpha1_GenericControllerManagerConfiguration_To_config_Generi
 	return nil
 }
 
-func autoConvert_config_GenericControllerManagerConfiguration_To_v1alpha1_GenericControllerManagerConfiguration(in *config.GenericControllerManagerConfiguration, out *GenericControllerManagerConfiguration, s conversion.Scope) error {
+func autoConvert_config_GenericControllerManagerConfiguration_To_v1alpha1_GenericControllerManagerConfiguration(in *controllermanagerconfig.GenericControllerManagerConfiguration, out *GenericControllerManagerConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.Port = in.Port
 	out.Address = in.Address
 	out.MinResyncPeriod = in.MinResyncPeriod
-	if err := configv1alpha1.Convert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
+	if err := componentbaseconfigv1alpha1.Convert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
 		return err
 	}
 	out.ControllerStartInterval = in.ControllerStartInterval
-	if err := configv1alpha1.Convert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
+	if err := componentbaseconfigv1alpha1.Convert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
 	out.Controllers = *(*[]string)(unsafe.Pointer(&in.Controllers))
-	if err := configv1alpha1.Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
+	if err := componentbaseconfigv1alpha1.Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
 		return err
 	}
 	out.LeaderMigrationEnabled = in.LeaderMigrationEnabled
@@ -136,19 +136,19 @@ func autoConvert_config_GenericControllerManagerConfiguration_To_v1alpha1_Generi
 	return nil
 }
 
-func autoConvert_v1alpha1_LeaderMigrationConfiguration_To_config_LeaderMigrationConfiguration(in *LeaderMigrationConfiguration, out *config.LeaderMigrationConfiguration, s conversion.Scope) error {
+func autoConvert_v1alpha1_LeaderMigrationConfiguration_To_config_LeaderMigrationConfiguration(in *LeaderMigrationConfiguration, out *controllermanagerconfig.LeaderMigrationConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.LeaderName = in.LeaderName
 	out.ResourceLock = in.ResourceLock
-	out.ControllerLeaders = *(*[]config.ControllerLeaderConfiguration)(unsafe.Pointer(&in.ControllerLeaders))
+	out.ControllerLeaders = *(*[]controllermanagerconfig.ControllerLeaderConfiguration)(unsafe.Pointer(&in.ControllerLeaders))
 	return nil
 }
 
 // Convert_v1alpha1_LeaderMigrationConfiguration_To_config_LeaderMigrationConfiguration is an autogenerated conversion function.
-func Convert_v1alpha1_LeaderMigrationConfiguration_To_config_LeaderMigrationConfiguration(in *LeaderMigrationConfiguration, out *config.LeaderMigrationConfiguration, s conversion.Scope) error {
+func Convert_v1alpha1_LeaderMigrationConfiguration_To_config_LeaderMigrationConfiguration(in *LeaderMigrationConfiguration, out *controllermanagerconfig.LeaderMigrationConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha1_LeaderMigrationConfiguration_To_config_LeaderMigrationConfiguration(in, out, s)
 }
 
-func autoConvert_config_LeaderMigrationConfiguration_To_v1alpha1_LeaderMigrationConfiguration(in *config.LeaderMigrationConfiguration, out *LeaderMigrationConfiguration, s conversion.Scope) error {
+func autoConvert_config_LeaderMigrationConfiguration_To_v1alpha1_LeaderMigrationConfiguration(in *controllermanagerconfig.LeaderMigrationConfiguration, out *LeaderMigrationConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.LeaderName = in.LeaderName
 	out.ResourceLock = in.ResourceLock
 	out.ControllerLeaders = *(*[]ControllerLeaderConfiguration)(unsafe.Pointer(&in.ControllerLeaders))
@@ -156,6 +156,6 @@ func autoConvert_config_LeaderMigrationConfiguration_To_v1alpha1_LeaderMigration
 }
 
 // Convert_config_LeaderMigrationConfiguration_To_v1alpha1_LeaderMigrationConfiguration is an autogenerated conversion function.
-func Convert_config_LeaderMigrationConfiguration_To_v1alpha1_LeaderMigrationConfiguration(in *config.LeaderMigrationConfiguration, out *LeaderMigrationConfiguration, s conversion.Scope) error {
+func Convert_config_LeaderMigrationConfiguration_To_v1alpha1_LeaderMigrationConfiguration(in *controllermanagerconfig.LeaderMigrationConfiguration, out *LeaderMigrationConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_LeaderMigrationConfiguration_To_v1alpha1_LeaderMigrationConfiguration(in, out, s)
 }

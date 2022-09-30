@@ -22,31 +22,31 @@ limitations under the License.
 package v1beta1
 
 import (
-	"k8s.io/api/admissionregistration/v1beta1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
+	apiadmissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	apisadmissionregistrationv1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
-func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1beta1.MutatingWebhookConfiguration{}, func(obj interface{}) {
-		SetObjectDefaults_MutatingWebhookConfiguration(obj.(*v1beta1.MutatingWebhookConfiguration))
+func RegisterDefaults(scheme *apimachinerypkgruntime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&apiadmissionregistrationv1beta1.MutatingWebhookConfiguration{}, func(obj interface{}) {
+		SetObjectDefaults_MutatingWebhookConfiguration(obj.(*apiadmissionregistrationv1beta1.MutatingWebhookConfiguration))
 	})
-	scheme.AddTypeDefaultingFunc(&v1beta1.MutatingWebhookConfigurationList{}, func(obj interface{}) {
-		SetObjectDefaults_MutatingWebhookConfigurationList(obj.(*v1beta1.MutatingWebhookConfigurationList))
+	scheme.AddTypeDefaultingFunc(&apiadmissionregistrationv1beta1.MutatingWebhookConfigurationList{}, func(obj interface{}) {
+		SetObjectDefaults_MutatingWebhookConfigurationList(obj.(*apiadmissionregistrationv1beta1.MutatingWebhookConfigurationList))
 	})
-	scheme.AddTypeDefaultingFunc(&v1beta1.ValidatingWebhookConfiguration{}, func(obj interface{}) {
-		SetObjectDefaults_ValidatingWebhookConfiguration(obj.(*v1beta1.ValidatingWebhookConfiguration))
+	scheme.AddTypeDefaultingFunc(&apiadmissionregistrationv1beta1.ValidatingWebhookConfiguration{}, func(obj interface{}) {
+		SetObjectDefaults_ValidatingWebhookConfiguration(obj.(*apiadmissionregistrationv1beta1.ValidatingWebhookConfiguration))
 	})
-	scheme.AddTypeDefaultingFunc(&v1beta1.ValidatingWebhookConfigurationList{}, func(obj interface{}) {
-		SetObjectDefaults_ValidatingWebhookConfigurationList(obj.(*v1beta1.ValidatingWebhookConfigurationList))
+	scheme.AddTypeDefaultingFunc(&apiadmissionregistrationv1beta1.ValidatingWebhookConfigurationList{}, func(obj interface{}) {
+		SetObjectDefaults_ValidatingWebhookConfigurationList(obj.(*apiadmissionregistrationv1beta1.ValidatingWebhookConfigurationList))
 	})
 	return nil
 }
 
-func SetObjectDefaults_MutatingWebhookConfiguration(in *v1beta1.MutatingWebhookConfiguration) {
+func SetObjectDefaults_MutatingWebhookConfiguration(in *apiadmissionregistrationv1beta1.MutatingWebhookConfiguration) {
 	for i := range in.Webhooks {
 		a := &in.Webhooks[i]
 		SetDefaults_MutatingWebhook(a)
@@ -55,19 +55,19 @@ func SetObjectDefaults_MutatingWebhookConfiguration(in *v1beta1.MutatingWebhookC
 		}
 		for j := range a.Rules {
 			b := &a.Rules[j]
-			v1.SetDefaults_Rule(&b.Rule)
+			apisadmissionregistrationv1.SetDefaults_Rule(&b.Rule)
 		}
 	}
 }
 
-func SetObjectDefaults_MutatingWebhookConfigurationList(in *v1beta1.MutatingWebhookConfigurationList) {
+func SetObjectDefaults_MutatingWebhookConfigurationList(in *apiadmissionregistrationv1beta1.MutatingWebhookConfigurationList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_MutatingWebhookConfiguration(a)
 	}
 }
 
-func SetObjectDefaults_ValidatingWebhookConfiguration(in *v1beta1.ValidatingWebhookConfiguration) {
+func SetObjectDefaults_ValidatingWebhookConfiguration(in *apiadmissionregistrationv1beta1.ValidatingWebhookConfiguration) {
 	for i := range in.Webhooks {
 		a := &in.Webhooks[i]
 		SetDefaults_ValidatingWebhook(a)
@@ -76,12 +76,12 @@ func SetObjectDefaults_ValidatingWebhookConfiguration(in *v1beta1.ValidatingWebh
 		}
 		for j := range a.Rules {
 			b := &a.Rules[j]
-			v1.SetDefaults_Rule(&b.Rule)
+			apisadmissionregistrationv1.SetDefaults_Rule(&b.Rule)
 		}
 	}
 }
 
-func SetObjectDefaults_ValidatingWebhookConfigurationList(in *v1beta1.ValidatingWebhookConfigurationList) {
+func SetObjectDefaults_ValidatingWebhookConfigurationList(in *apiadmissionregistrationv1beta1.ValidatingWebhookConfigurationList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ValidatingWebhookConfiguration(a)

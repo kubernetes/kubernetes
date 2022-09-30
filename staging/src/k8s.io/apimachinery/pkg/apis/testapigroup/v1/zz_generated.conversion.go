@@ -24,10 +24,10 @@ package v1
 import (
 	"unsafe"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/testapigroup"
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	pkgapistestapigroup "k8s.io/apimachinery/pkg/apis/testapigroup"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
 )
 
 func init() {
@@ -36,61 +36,61 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*Carp)(nil), (*testapigroup.Carp)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_Carp_To_testapigroup_Carp(a.(*Carp), b.(*testapigroup.Carp), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*Carp)(nil), (*pkgapistestapigroup.Carp)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_Carp_To_testapigroup_Carp(a.(*Carp), b.(*pkgapistestapigroup.Carp), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*testapigroup.Carp)(nil), (*Carp)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_testapigroup_Carp_To_v1_Carp(a.(*testapigroup.Carp), b.(*Carp), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapistestapigroup.Carp)(nil), (*Carp)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_testapigroup_Carp_To_v1_Carp(a.(*pkgapistestapigroup.Carp), b.(*Carp), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*CarpCondition)(nil), (*testapigroup.CarpCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_CarpCondition_To_testapigroup_CarpCondition(a.(*CarpCondition), b.(*testapigroup.CarpCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*CarpCondition)(nil), (*pkgapistestapigroup.CarpCondition)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_CarpCondition_To_testapigroup_CarpCondition(a.(*CarpCondition), b.(*pkgapistestapigroup.CarpCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*testapigroup.CarpCondition)(nil), (*CarpCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_testapigroup_CarpCondition_To_v1_CarpCondition(a.(*testapigroup.CarpCondition), b.(*CarpCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapistestapigroup.CarpCondition)(nil), (*CarpCondition)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_testapigroup_CarpCondition_To_v1_CarpCondition(a.(*pkgapistestapigroup.CarpCondition), b.(*CarpCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*CarpList)(nil), (*testapigroup.CarpList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_CarpList_To_testapigroup_CarpList(a.(*CarpList), b.(*testapigroup.CarpList), scope)
+	if err := s.AddGeneratedConversionFunc((*CarpList)(nil), (*pkgapistestapigroup.CarpList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_CarpList_To_testapigroup_CarpList(a.(*CarpList), b.(*pkgapistestapigroup.CarpList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*testapigroup.CarpList)(nil), (*CarpList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_testapigroup_CarpList_To_v1_CarpList(a.(*testapigroup.CarpList), b.(*CarpList), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapistestapigroup.CarpList)(nil), (*CarpList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_testapigroup_CarpList_To_v1_CarpList(a.(*pkgapistestapigroup.CarpList), b.(*CarpList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*CarpSpec)(nil), (*testapigroup.CarpSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_CarpSpec_To_testapigroup_CarpSpec(a.(*CarpSpec), b.(*testapigroup.CarpSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*CarpSpec)(nil), (*pkgapistestapigroup.CarpSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_CarpSpec_To_testapigroup_CarpSpec(a.(*CarpSpec), b.(*pkgapistestapigroup.CarpSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*testapigroup.CarpSpec)(nil), (*CarpSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_testapigroup_CarpSpec_To_v1_CarpSpec(a.(*testapigroup.CarpSpec), b.(*CarpSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapistestapigroup.CarpSpec)(nil), (*CarpSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_testapigroup_CarpSpec_To_v1_CarpSpec(a.(*pkgapistestapigroup.CarpSpec), b.(*CarpSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*CarpStatus)(nil), (*testapigroup.CarpStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_CarpStatus_To_testapigroup_CarpStatus(a.(*CarpStatus), b.(*testapigroup.CarpStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*CarpStatus)(nil), (*pkgapistestapigroup.CarpStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_CarpStatus_To_testapigroup_CarpStatus(a.(*CarpStatus), b.(*pkgapistestapigroup.CarpStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*testapigroup.CarpStatus)(nil), (*CarpStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_testapigroup_CarpStatus_To_v1_CarpStatus(a.(*testapigroup.CarpStatus), b.(*CarpStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapistestapigroup.CarpStatus)(nil), (*CarpStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_testapigroup_CarpStatus_To_v1_CarpStatus(a.(*pkgapistestapigroup.CarpStatus), b.(*CarpStatus), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1_Carp_To_testapigroup_Carp(in *Carp, out *testapigroup.Carp, s conversion.Scope) error {
+func autoConvert_v1_Carp_To_testapigroup_Carp(in *Carp, out *pkgapistestapigroup.Carp, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_CarpSpec_To_testapigroup_CarpSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -102,11 +102,11 @@ func autoConvert_v1_Carp_To_testapigroup_Carp(in *Carp, out *testapigroup.Carp, 
 }
 
 // Convert_v1_Carp_To_testapigroup_Carp is an autogenerated conversion function.
-func Convert_v1_Carp_To_testapigroup_Carp(in *Carp, out *testapigroup.Carp, s conversion.Scope) error {
+func Convert_v1_Carp_To_testapigroup_Carp(in *Carp, out *pkgapistestapigroup.Carp, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_Carp_To_testapigroup_Carp(in, out, s)
 }
 
-func autoConvert_testapigroup_Carp_To_v1_Carp(in *testapigroup.Carp, out *Carp, s conversion.Scope) error {
+func autoConvert_testapigroup_Carp_To_v1_Carp(in *pkgapistestapigroup.Carp, out *Carp, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_testapigroup_CarpSpec_To_v1_CarpSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -118,13 +118,13 @@ func autoConvert_testapigroup_Carp_To_v1_Carp(in *testapigroup.Carp, out *Carp, 
 }
 
 // Convert_testapigroup_Carp_To_v1_Carp is an autogenerated conversion function.
-func Convert_testapigroup_Carp_To_v1_Carp(in *testapigroup.Carp, out *Carp, s conversion.Scope) error {
+func Convert_testapigroup_Carp_To_v1_Carp(in *pkgapistestapigroup.Carp, out *Carp, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_testapigroup_Carp_To_v1_Carp(in, out, s)
 }
 
-func autoConvert_v1_CarpCondition_To_testapigroup_CarpCondition(in *CarpCondition, out *testapigroup.CarpCondition, s conversion.Scope) error {
-	out.Type = testapigroup.CarpConditionType(in.Type)
-	out.Status = testapigroup.ConditionStatus(in.Status)
+func autoConvert_v1_CarpCondition_To_testapigroup_CarpCondition(in *CarpCondition, out *pkgapistestapigroup.CarpCondition, s apimachinerypkgconversion.Scope) error {
+	out.Type = pkgapistestapigroup.CarpConditionType(in.Type)
+	out.Status = pkgapistestapigroup.ConditionStatus(in.Status)
 	out.LastProbeTime = in.LastProbeTime
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
@@ -133,11 +133,11 @@ func autoConvert_v1_CarpCondition_To_testapigroup_CarpCondition(in *CarpConditio
 }
 
 // Convert_v1_CarpCondition_To_testapigroup_CarpCondition is an autogenerated conversion function.
-func Convert_v1_CarpCondition_To_testapigroup_CarpCondition(in *CarpCondition, out *testapigroup.CarpCondition, s conversion.Scope) error {
+func Convert_v1_CarpCondition_To_testapigroup_CarpCondition(in *CarpCondition, out *pkgapistestapigroup.CarpCondition, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_CarpCondition_To_testapigroup_CarpCondition(in, out, s)
 }
 
-func autoConvert_testapigroup_CarpCondition_To_v1_CarpCondition(in *testapigroup.CarpCondition, out *CarpCondition, s conversion.Scope) error {
+func autoConvert_testapigroup_CarpCondition_To_v1_CarpCondition(in *pkgapistestapigroup.CarpCondition, out *CarpCondition, s apimachinerypkgconversion.Scope) error {
 	out.Type = CarpConditionType(in.Type)
 	out.Status = ConditionStatus(in.Status)
 	out.LastProbeTime = in.LastProbeTime
@@ -148,15 +148,15 @@ func autoConvert_testapigroup_CarpCondition_To_v1_CarpCondition(in *testapigroup
 }
 
 // Convert_testapigroup_CarpCondition_To_v1_CarpCondition is an autogenerated conversion function.
-func Convert_testapigroup_CarpCondition_To_v1_CarpCondition(in *testapigroup.CarpCondition, out *CarpCondition, s conversion.Scope) error {
+func Convert_testapigroup_CarpCondition_To_v1_CarpCondition(in *pkgapistestapigroup.CarpCondition, out *CarpCondition, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_testapigroup_CarpCondition_To_v1_CarpCondition(in, out, s)
 }
 
-func autoConvert_v1_CarpList_To_testapigroup_CarpList(in *CarpList, out *testapigroup.CarpList, s conversion.Scope) error {
+func autoConvert_v1_CarpList_To_testapigroup_CarpList(in *CarpList, out *pkgapistestapigroup.CarpList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]testapigroup.Carp, len(*in))
+		*out = make([]pkgapistestapigroup.Carp, len(*in))
 		for i := range *in {
 			if err := Convert_v1_Carp_To_testapigroup_Carp(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -169,11 +169,11 @@ func autoConvert_v1_CarpList_To_testapigroup_CarpList(in *CarpList, out *testapi
 }
 
 // Convert_v1_CarpList_To_testapigroup_CarpList is an autogenerated conversion function.
-func Convert_v1_CarpList_To_testapigroup_CarpList(in *CarpList, out *testapigroup.CarpList, s conversion.Scope) error {
+func Convert_v1_CarpList_To_testapigroup_CarpList(in *CarpList, out *pkgapistestapigroup.CarpList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_CarpList_To_testapigroup_CarpList(in, out, s)
 }
 
-func autoConvert_testapigroup_CarpList_To_v1_CarpList(in *testapigroup.CarpList, out *CarpList, s conversion.Scope) error {
+func autoConvert_testapigroup_CarpList_To_v1_CarpList(in *pkgapistestapigroup.CarpList, out *CarpList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -190,12 +190,12 @@ func autoConvert_testapigroup_CarpList_To_v1_CarpList(in *testapigroup.CarpList,
 }
 
 // Convert_testapigroup_CarpList_To_v1_CarpList is an autogenerated conversion function.
-func Convert_testapigroup_CarpList_To_v1_CarpList(in *testapigroup.CarpList, out *CarpList, s conversion.Scope) error {
+func Convert_testapigroup_CarpList_To_v1_CarpList(in *pkgapistestapigroup.CarpList, out *CarpList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_testapigroup_CarpList_To_v1_CarpList(in, out, s)
 }
 
-func autoConvert_v1_CarpSpec_To_testapigroup_CarpSpec(in *CarpSpec, out *testapigroup.CarpSpec, s conversion.Scope) error {
-	out.RestartPolicy = testapigroup.RestartPolicy(in.RestartPolicy)
+func autoConvert_v1_CarpSpec_To_testapigroup_CarpSpec(in *CarpSpec, out *pkgapistestapigroup.CarpSpec, s apimachinerypkgconversion.Scope) error {
+	out.RestartPolicy = pkgapistestapigroup.RestartPolicy(in.RestartPolicy)
 	out.TerminationGracePeriodSeconds = (*int64)(unsafe.Pointer(in.TerminationGracePeriodSeconds))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
 	out.NodeSelector = *(*map[string]string)(unsafe.Pointer(&in.NodeSelector))
@@ -212,11 +212,11 @@ func autoConvert_v1_CarpSpec_To_testapigroup_CarpSpec(in *CarpSpec, out *testapi
 }
 
 // Convert_v1_CarpSpec_To_testapigroup_CarpSpec is an autogenerated conversion function.
-func Convert_v1_CarpSpec_To_testapigroup_CarpSpec(in *CarpSpec, out *testapigroup.CarpSpec, s conversion.Scope) error {
+func Convert_v1_CarpSpec_To_testapigroup_CarpSpec(in *CarpSpec, out *pkgapistestapigroup.CarpSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_CarpSpec_To_testapigroup_CarpSpec(in, out, s)
 }
 
-func autoConvert_testapigroup_CarpSpec_To_v1_CarpSpec(in *testapigroup.CarpSpec, out *CarpSpec, s conversion.Scope) error {
+func autoConvert_testapigroup_CarpSpec_To_v1_CarpSpec(in *pkgapistestapigroup.CarpSpec, out *CarpSpec, s apimachinerypkgconversion.Scope) error {
 	out.RestartPolicy = RestartPolicy(in.RestartPolicy)
 	out.TerminationGracePeriodSeconds = (*int64)(unsafe.Pointer(in.TerminationGracePeriodSeconds))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
@@ -230,38 +230,38 @@ func autoConvert_testapigroup_CarpSpec_To_v1_CarpSpec(in *testapigroup.CarpSpec,
 }
 
 // Convert_testapigroup_CarpSpec_To_v1_CarpSpec is an autogenerated conversion function.
-func Convert_testapigroup_CarpSpec_To_v1_CarpSpec(in *testapigroup.CarpSpec, out *CarpSpec, s conversion.Scope) error {
+func Convert_testapigroup_CarpSpec_To_v1_CarpSpec(in *pkgapistestapigroup.CarpSpec, out *CarpSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_testapigroup_CarpSpec_To_v1_CarpSpec(in, out, s)
 }
 
-func autoConvert_v1_CarpStatus_To_testapigroup_CarpStatus(in *CarpStatus, out *testapigroup.CarpStatus, s conversion.Scope) error {
-	out.Phase = testapigroup.CarpPhase(in.Phase)
-	out.Conditions = *(*[]testapigroup.CarpCondition)(unsafe.Pointer(&in.Conditions))
+func autoConvert_v1_CarpStatus_To_testapigroup_CarpStatus(in *CarpStatus, out *pkgapistestapigroup.CarpStatus, s apimachinerypkgconversion.Scope) error {
+	out.Phase = pkgapistestapigroup.CarpPhase(in.Phase)
+	out.Conditions = *(*[]pkgapistestapigroup.CarpCondition)(unsafe.Pointer(&in.Conditions))
 	out.Message = in.Message
 	out.Reason = in.Reason
 	out.HostIP = in.HostIP
 	out.CarpIP = in.CarpIP
-	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
+	out.StartTime = (*apismetav1.Time)(unsafe.Pointer(in.StartTime))
 	return nil
 }
 
 // Convert_v1_CarpStatus_To_testapigroup_CarpStatus is an autogenerated conversion function.
-func Convert_v1_CarpStatus_To_testapigroup_CarpStatus(in *CarpStatus, out *testapigroup.CarpStatus, s conversion.Scope) error {
+func Convert_v1_CarpStatus_To_testapigroup_CarpStatus(in *CarpStatus, out *pkgapistestapigroup.CarpStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_CarpStatus_To_testapigroup_CarpStatus(in, out, s)
 }
 
-func autoConvert_testapigroup_CarpStatus_To_v1_CarpStatus(in *testapigroup.CarpStatus, out *CarpStatus, s conversion.Scope) error {
+func autoConvert_testapigroup_CarpStatus_To_v1_CarpStatus(in *pkgapistestapigroup.CarpStatus, out *CarpStatus, s apimachinerypkgconversion.Scope) error {
 	out.Phase = CarpPhase(in.Phase)
 	out.Conditions = *(*[]CarpCondition)(unsafe.Pointer(&in.Conditions))
 	out.Message = in.Message
 	out.Reason = in.Reason
 	out.HostIP = in.HostIP
 	out.CarpIP = in.CarpIP
-	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
+	out.StartTime = (*apismetav1.Time)(unsafe.Pointer(in.StartTime))
 	return nil
 }
 
 // Convert_testapigroup_CarpStatus_To_v1_CarpStatus is an autogenerated conversion function.
-func Convert_testapigroup_CarpStatus_To_v1_CarpStatus(in *testapigroup.CarpStatus, out *CarpStatus, s conversion.Scope) error {
+func Convert_testapigroup_CarpStatus_To_v1_CarpStatus(in *pkgapistestapigroup.CarpStatus, out *CarpStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_testapigroup_CarpStatus_To_v1_CarpStatus(in, out, s)
 }

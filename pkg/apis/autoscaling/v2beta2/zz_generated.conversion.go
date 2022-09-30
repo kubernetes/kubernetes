@@ -24,14 +24,14 @@ package v2beta2
 import (
 	"unsafe"
 
-	"k8s.io/api/autoscaling/v2beta2"
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	"k8s.io/kubernetes/pkg/apis/core"
+	apiautoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	apicorev1 "k8s.io/api/core/v1"
+	pkgapiresource "k8s.io/apimachinery/pkg/api/resource"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	pkgapisautoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
+	pkgapiscore "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func init() {
@@ -40,252 +40,252 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v2beta2.ContainerResourceMetricSource)(nil), (*autoscaling.ContainerResourceMetricSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_ContainerResourceMetricSource_To_autoscaling_ContainerResourceMetricSource(a.(*v2beta2.ContainerResourceMetricSource), b.(*autoscaling.ContainerResourceMetricSource), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*apiautoscalingv2beta2.ContainerResourceMetricSource)(nil), (*pkgapisautoscaling.ContainerResourceMetricSource)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_ContainerResourceMetricSource_To_autoscaling_ContainerResourceMetricSource(a.(*apiautoscalingv2beta2.ContainerResourceMetricSource), b.(*pkgapisautoscaling.ContainerResourceMetricSource), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.ContainerResourceMetricSource)(nil), (*v2beta2.ContainerResourceMetricSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_ContainerResourceMetricSource_To_v2beta2_ContainerResourceMetricSource(a.(*autoscaling.ContainerResourceMetricSource), b.(*v2beta2.ContainerResourceMetricSource), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisautoscaling.ContainerResourceMetricSource)(nil), (*apiautoscalingv2beta2.ContainerResourceMetricSource)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_ContainerResourceMetricSource_To_v2beta2_ContainerResourceMetricSource(a.(*pkgapisautoscaling.ContainerResourceMetricSource), b.(*apiautoscalingv2beta2.ContainerResourceMetricSource), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2beta2.ContainerResourceMetricStatus)(nil), (*autoscaling.ContainerResourceMetricStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_ContainerResourceMetricStatus_To_autoscaling_ContainerResourceMetricStatus(a.(*v2beta2.ContainerResourceMetricStatus), b.(*autoscaling.ContainerResourceMetricStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apiautoscalingv2beta2.ContainerResourceMetricStatus)(nil), (*pkgapisautoscaling.ContainerResourceMetricStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_ContainerResourceMetricStatus_To_autoscaling_ContainerResourceMetricStatus(a.(*apiautoscalingv2beta2.ContainerResourceMetricStatus), b.(*pkgapisautoscaling.ContainerResourceMetricStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.ContainerResourceMetricStatus)(nil), (*v2beta2.ContainerResourceMetricStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_ContainerResourceMetricStatus_To_v2beta2_ContainerResourceMetricStatus(a.(*autoscaling.ContainerResourceMetricStatus), b.(*v2beta2.ContainerResourceMetricStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisautoscaling.ContainerResourceMetricStatus)(nil), (*apiautoscalingv2beta2.ContainerResourceMetricStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_ContainerResourceMetricStatus_To_v2beta2_ContainerResourceMetricStatus(a.(*pkgapisautoscaling.ContainerResourceMetricStatus), b.(*apiautoscalingv2beta2.ContainerResourceMetricStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2beta2.CrossVersionObjectReference)(nil), (*autoscaling.CrossVersionObjectReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectReference(a.(*v2beta2.CrossVersionObjectReference), b.(*autoscaling.CrossVersionObjectReference), scope)
+	if err := s.AddGeneratedConversionFunc((*apiautoscalingv2beta2.CrossVersionObjectReference)(nil), (*pkgapisautoscaling.CrossVersionObjectReference)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectReference(a.(*apiautoscalingv2beta2.CrossVersionObjectReference), b.(*pkgapisautoscaling.CrossVersionObjectReference), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.CrossVersionObjectReference)(nil), (*v2beta2.CrossVersionObjectReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_CrossVersionObjectReference_To_v2beta2_CrossVersionObjectReference(a.(*autoscaling.CrossVersionObjectReference), b.(*v2beta2.CrossVersionObjectReference), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisautoscaling.CrossVersionObjectReference)(nil), (*apiautoscalingv2beta2.CrossVersionObjectReference)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_CrossVersionObjectReference_To_v2beta2_CrossVersionObjectReference(a.(*pkgapisautoscaling.CrossVersionObjectReference), b.(*apiautoscalingv2beta2.CrossVersionObjectReference), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2beta2.ExternalMetricSource)(nil), (*autoscaling.ExternalMetricSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_ExternalMetricSource_To_autoscaling_ExternalMetricSource(a.(*v2beta2.ExternalMetricSource), b.(*autoscaling.ExternalMetricSource), scope)
+	if err := s.AddGeneratedConversionFunc((*apiautoscalingv2beta2.ExternalMetricSource)(nil), (*pkgapisautoscaling.ExternalMetricSource)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_ExternalMetricSource_To_autoscaling_ExternalMetricSource(a.(*apiautoscalingv2beta2.ExternalMetricSource), b.(*pkgapisautoscaling.ExternalMetricSource), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.ExternalMetricSource)(nil), (*v2beta2.ExternalMetricSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_ExternalMetricSource_To_v2beta2_ExternalMetricSource(a.(*autoscaling.ExternalMetricSource), b.(*v2beta2.ExternalMetricSource), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisautoscaling.ExternalMetricSource)(nil), (*apiautoscalingv2beta2.ExternalMetricSource)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_ExternalMetricSource_To_v2beta2_ExternalMetricSource(a.(*pkgapisautoscaling.ExternalMetricSource), b.(*apiautoscalingv2beta2.ExternalMetricSource), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2beta2.ExternalMetricStatus)(nil), (*autoscaling.ExternalMetricStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_ExternalMetricStatus_To_autoscaling_ExternalMetricStatus(a.(*v2beta2.ExternalMetricStatus), b.(*autoscaling.ExternalMetricStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apiautoscalingv2beta2.ExternalMetricStatus)(nil), (*pkgapisautoscaling.ExternalMetricStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_ExternalMetricStatus_To_autoscaling_ExternalMetricStatus(a.(*apiautoscalingv2beta2.ExternalMetricStatus), b.(*pkgapisautoscaling.ExternalMetricStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.ExternalMetricStatus)(nil), (*v2beta2.ExternalMetricStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_ExternalMetricStatus_To_v2beta2_ExternalMetricStatus(a.(*autoscaling.ExternalMetricStatus), b.(*v2beta2.ExternalMetricStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisautoscaling.ExternalMetricStatus)(nil), (*apiautoscalingv2beta2.ExternalMetricStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_ExternalMetricStatus_To_v2beta2_ExternalMetricStatus(a.(*pkgapisautoscaling.ExternalMetricStatus), b.(*apiautoscalingv2beta2.ExternalMetricStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2beta2.HPAScalingPolicy)(nil), (*autoscaling.HPAScalingPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_HPAScalingPolicy_To_autoscaling_HPAScalingPolicy(a.(*v2beta2.HPAScalingPolicy), b.(*autoscaling.HPAScalingPolicy), scope)
+	if err := s.AddGeneratedConversionFunc((*apiautoscalingv2beta2.HPAScalingPolicy)(nil), (*pkgapisautoscaling.HPAScalingPolicy)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_HPAScalingPolicy_To_autoscaling_HPAScalingPolicy(a.(*apiautoscalingv2beta2.HPAScalingPolicy), b.(*pkgapisautoscaling.HPAScalingPolicy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.HPAScalingPolicy)(nil), (*v2beta2.HPAScalingPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_HPAScalingPolicy_To_v2beta2_HPAScalingPolicy(a.(*autoscaling.HPAScalingPolicy), b.(*v2beta2.HPAScalingPolicy), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisautoscaling.HPAScalingPolicy)(nil), (*apiautoscalingv2beta2.HPAScalingPolicy)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_HPAScalingPolicy_To_v2beta2_HPAScalingPolicy(a.(*pkgapisautoscaling.HPAScalingPolicy), b.(*apiautoscalingv2beta2.HPAScalingPolicy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2beta2.HPAScalingRules)(nil), (*autoscaling.HPAScalingRules)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_HPAScalingRules_To_autoscaling_HPAScalingRules(a.(*v2beta2.HPAScalingRules), b.(*autoscaling.HPAScalingRules), scope)
+	if err := s.AddGeneratedConversionFunc((*apiautoscalingv2beta2.HPAScalingRules)(nil), (*pkgapisautoscaling.HPAScalingRules)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_HPAScalingRules_To_autoscaling_HPAScalingRules(a.(*apiautoscalingv2beta2.HPAScalingRules), b.(*pkgapisautoscaling.HPAScalingRules), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.HPAScalingRules)(nil), (*v2beta2.HPAScalingRules)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_HPAScalingRules_To_v2beta2_HPAScalingRules(a.(*autoscaling.HPAScalingRules), b.(*v2beta2.HPAScalingRules), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisautoscaling.HPAScalingRules)(nil), (*apiautoscalingv2beta2.HPAScalingRules)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_HPAScalingRules_To_v2beta2_HPAScalingRules(a.(*pkgapisautoscaling.HPAScalingRules), b.(*apiautoscalingv2beta2.HPAScalingRules), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2beta2.HorizontalPodAutoscalerBehavior)(nil), (*autoscaling.HorizontalPodAutoscalerBehavior)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_HorizontalPodAutoscalerBehavior_To_autoscaling_HorizontalPodAutoscalerBehavior(a.(*v2beta2.HorizontalPodAutoscalerBehavior), b.(*autoscaling.HorizontalPodAutoscalerBehavior), scope)
+	if err := s.AddGeneratedConversionFunc((*apiautoscalingv2beta2.HorizontalPodAutoscalerBehavior)(nil), (*pkgapisautoscaling.HorizontalPodAutoscalerBehavior)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_HorizontalPodAutoscalerBehavior_To_autoscaling_HorizontalPodAutoscalerBehavior(a.(*apiautoscalingv2beta2.HorizontalPodAutoscalerBehavior), b.(*pkgapisautoscaling.HorizontalPodAutoscalerBehavior), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.HorizontalPodAutoscalerBehavior)(nil), (*v2beta2.HorizontalPodAutoscalerBehavior)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_HorizontalPodAutoscalerBehavior_To_v2beta2_HorizontalPodAutoscalerBehavior(a.(*autoscaling.HorizontalPodAutoscalerBehavior), b.(*v2beta2.HorizontalPodAutoscalerBehavior), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisautoscaling.HorizontalPodAutoscalerBehavior)(nil), (*apiautoscalingv2beta2.HorizontalPodAutoscalerBehavior)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_HorizontalPodAutoscalerBehavior_To_v2beta2_HorizontalPodAutoscalerBehavior(a.(*pkgapisautoscaling.HorizontalPodAutoscalerBehavior), b.(*apiautoscalingv2beta2.HorizontalPodAutoscalerBehavior), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2beta2.HorizontalPodAutoscalerCondition)(nil), (*autoscaling.HorizontalPodAutoscalerCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_HorizontalPodAutoscalerCondition_To_autoscaling_HorizontalPodAutoscalerCondition(a.(*v2beta2.HorizontalPodAutoscalerCondition), b.(*autoscaling.HorizontalPodAutoscalerCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*apiautoscalingv2beta2.HorizontalPodAutoscalerCondition)(nil), (*pkgapisautoscaling.HorizontalPodAutoscalerCondition)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_HorizontalPodAutoscalerCondition_To_autoscaling_HorizontalPodAutoscalerCondition(a.(*apiautoscalingv2beta2.HorizontalPodAutoscalerCondition), b.(*pkgapisautoscaling.HorizontalPodAutoscalerCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.HorizontalPodAutoscalerCondition)(nil), (*v2beta2.HorizontalPodAutoscalerCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_HorizontalPodAutoscalerCondition_To_v2beta2_HorizontalPodAutoscalerCondition(a.(*autoscaling.HorizontalPodAutoscalerCondition), b.(*v2beta2.HorizontalPodAutoscalerCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisautoscaling.HorizontalPodAutoscalerCondition)(nil), (*apiautoscalingv2beta2.HorizontalPodAutoscalerCondition)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_HorizontalPodAutoscalerCondition_To_v2beta2_HorizontalPodAutoscalerCondition(a.(*pkgapisautoscaling.HorizontalPodAutoscalerCondition), b.(*apiautoscalingv2beta2.HorizontalPodAutoscalerCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2beta2.HorizontalPodAutoscalerList)(nil), (*autoscaling.HorizontalPodAutoscalerList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_HorizontalPodAutoscalerList_To_autoscaling_HorizontalPodAutoscalerList(a.(*v2beta2.HorizontalPodAutoscalerList), b.(*autoscaling.HorizontalPodAutoscalerList), scope)
+	if err := s.AddGeneratedConversionFunc((*apiautoscalingv2beta2.HorizontalPodAutoscalerList)(nil), (*pkgapisautoscaling.HorizontalPodAutoscalerList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_HorizontalPodAutoscalerList_To_autoscaling_HorizontalPodAutoscalerList(a.(*apiautoscalingv2beta2.HorizontalPodAutoscalerList), b.(*pkgapisautoscaling.HorizontalPodAutoscalerList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.HorizontalPodAutoscalerList)(nil), (*v2beta2.HorizontalPodAutoscalerList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_HorizontalPodAutoscalerList_To_v2beta2_HorizontalPodAutoscalerList(a.(*autoscaling.HorizontalPodAutoscalerList), b.(*v2beta2.HorizontalPodAutoscalerList), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisautoscaling.HorizontalPodAutoscalerList)(nil), (*apiautoscalingv2beta2.HorizontalPodAutoscalerList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_HorizontalPodAutoscalerList_To_v2beta2_HorizontalPodAutoscalerList(a.(*pkgapisautoscaling.HorizontalPodAutoscalerList), b.(*apiautoscalingv2beta2.HorizontalPodAutoscalerList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2beta2.HorizontalPodAutoscalerSpec)(nil), (*autoscaling.HorizontalPodAutoscalerSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec(a.(*v2beta2.HorizontalPodAutoscalerSpec), b.(*autoscaling.HorizontalPodAutoscalerSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*apiautoscalingv2beta2.HorizontalPodAutoscalerSpec)(nil), (*pkgapisautoscaling.HorizontalPodAutoscalerSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec(a.(*apiautoscalingv2beta2.HorizontalPodAutoscalerSpec), b.(*pkgapisautoscaling.HorizontalPodAutoscalerSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.HorizontalPodAutoscalerSpec)(nil), (*v2beta2.HorizontalPodAutoscalerSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v2beta2_HorizontalPodAutoscalerSpec(a.(*autoscaling.HorizontalPodAutoscalerSpec), b.(*v2beta2.HorizontalPodAutoscalerSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisautoscaling.HorizontalPodAutoscalerSpec)(nil), (*apiautoscalingv2beta2.HorizontalPodAutoscalerSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v2beta2_HorizontalPodAutoscalerSpec(a.(*pkgapisautoscaling.HorizontalPodAutoscalerSpec), b.(*apiautoscalingv2beta2.HorizontalPodAutoscalerSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2beta2.HorizontalPodAutoscalerStatus)(nil), (*autoscaling.HorizontalPodAutoscalerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus(a.(*v2beta2.HorizontalPodAutoscalerStatus), b.(*autoscaling.HorizontalPodAutoscalerStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apiautoscalingv2beta2.HorizontalPodAutoscalerStatus)(nil), (*pkgapisautoscaling.HorizontalPodAutoscalerStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus(a.(*apiautoscalingv2beta2.HorizontalPodAutoscalerStatus), b.(*pkgapisautoscaling.HorizontalPodAutoscalerStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.HorizontalPodAutoscalerStatus)(nil), (*v2beta2.HorizontalPodAutoscalerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_HorizontalPodAutoscalerStatus_To_v2beta2_HorizontalPodAutoscalerStatus(a.(*autoscaling.HorizontalPodAutoscalerStatus), b.(*v2beta2.HorizontalPodAutoscalerStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisautoscaling.HorizontalPodAutoscalerStatus)(nil), (*apiautoscalingv2beta2.HorizontalPodAutoscalerStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_HorizontalPodAutoscalerStatus_To_v2beta2_HorizontalPodAutoscalerStatus(a.(*pkgapisautoscaling.HorizontalPodAutoscalerStatus), b.(*apiautoscalingv2beta2.HorizontalPodAutoscalerStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2beta2.MetricIdentifier)(nil), (*autoscaling.MetricIdentifier)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_MetricIdentifier_To_autoscaling_MetricIdentifier(a.(*v2beta2.MetricIdentifier), b.(*autoscaling.MetricIdentifier), scope)
+	if err := s.AddGeneratedConversionFunc((*apiautoscalingv2beta2.MetricIdentifier)(nil), (*pkgapisautoscaling.MetricIdentifier)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_MetricIdentifier_To_autoscaling_MetricIdentifier(a.(*apiautoscalingv2beta2.MetricIdentifier), b.(*pkgapisautoscaling.MetricIdentifier), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.MetricIdentifier)(nil), (*v2beta2.MetricIdentifier)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_MetricIdentifier_To_v2beta2_MetricIdentifier(a.(*autoscaling.MetricIdentifier), b.(*v2beta2.MetricIdentifier), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisautoscaling.MetricIdentifier)(nil), (*apiautoscalingv2beta2.MetricIdentifier)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_MetricIdentifier_To_v2beta2_MetricIdentifier(a.(*pkgapisautoscaling.MetricIdentifier), b.(*apiautoscalingv2beta2.MetricIdentifier), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2beta2.MetricSpec)(nil), (*autoscaling.MetricSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_MetricSpec_To_autoscaling_MetricSpec(a.(*v2beta2.MetricSpec), b.(*autoscaling.MetricSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*apiautoscalingv2beta2.MetricSpec)(nil), (*pkgapisautoscaling.MetricSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_MetricSpec_To_autoscaling_MetricSpec(a.(*apiautoscalingv2beta2.MetricSpec), b.(*pkgapisautoscaling.MetricSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.MetricSpec)(nil), (*v2beta2.MetricSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_MetricSpec_To_v2beta2_MetricSpec(a.(*autoscaling.MetricSpec), b.(*v2beta2.MetricSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisautoscaling.MetricSpec)(nil), (*apiautoscalingv2beta2.MetricSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_MetricSpec_To_v2beta2_MetricSpec(a.(*pkgapisautoscaling.MetricSpec), b.(*apiautoscalingv2beta2.MetricSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2beta2.MetricStatus)(nil), (*autoscaling.MetricStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_MetricStatus_To_autoscaling_MetricStatus(a.(*v2beta2.MetricStatus), b.(*autoscaling.MetricStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apiautoscalingv2beta2.MetricStatus)(nil), (*pkgapisautoscaling.MetricStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_MetricStatus_To_autoscaling_MetricStatus(a.(*apiautoscalingv2beta2.MetricStatus), b.(*pkgapisautoscaling.MetricStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.MetricStatus)(nil), (*v2beta2.MetricStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_MetricStatus_To_v2beta2_MetricStatus(a.(*autoscaling.MetricStatus), b.(*v2beta2.MetricStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisautoscaling.MetricStatus)(nil), (*apiautoscalingv2beta2.MetricStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_MetricStatus_To_v2beta2_MetricStatus(a.(*pkgapisautoscaling.MetricStatus), b.(*apiautoscalingv2beta2.MetricStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2beta2.MetricTarget)(nil), (*autoscaling.MetricTarget)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_MetricTarget_To_autoscaling_MetricTarget(a.(*v2beta2.MetricTarget), b.(*autoscaling.MetricTarget), scope)
+	if err := s.AddGeneratedConversionFunc((*apiautoscalingv2beta2.MetricTarget)(nil), (*pkgapisautoscaling.MetricTarget)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_MetricTarget_To_autoscaling_MetricTarget(a.(*apiautoscalingv2beta2.MetricTarget), b.(*pkgapisautoscaling.MetricTarget), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.MetricTarget)(nil), (*v2beta2.MetricTarget)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_MetricTarget_To_v2beta2_MetricTarget(a.(*autoscaling.MetricTarget), b.(*v2beta2.MetricTarget), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisautoscaling.MetricTarget)(nil), (*apiautoscalingv2beta2.MetricTarget)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_MetricTarget_To_v2beta2_MetricTarget(a.(*pkgapisautoscaling.MetricTarget), b.(*apiautoscalingv2beta2.MetricTarget), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2beta2.MetricValueStatus)(nil), (*autoscaling.MetricValueStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_MetricValueStatus_To_autoscaling_MetricValueStatus(a.(*v2beta2.MetricValueStatus), b.(*autoscaling.MetricValueStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apiautoscalingv2beta2.MetricValueStatus)(nil), (*pkgapisautoscaling.MetricValueStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_MetricValueStatus_To_autoscaling_MetricValueStatus(a.(*apiautoscalingv2beta2.MetricValueStatus), b.(*pkgapisautoscaling.MetricValueStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.MetricValueStatus)(nil), (*v2beta2.MetricValueStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_MetricValueStatus_To_v2beta2_MetricValueStatus(a.(*autoscaling.MetricValueStatus), b.(*v2beta2.MetricValueStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisautoscaling.MetricValueStatus)(nil), (*apiautoscalingv2beta2.MetricValueStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_MetricValueStatus_To_v2beta2_MetricValueStatus(a.(*pkgapisautoscaling.MetricValueStatus), b.(*apiautoscalingv2beta2.MetricValueStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2beta2.ObjectMetricSource)(nil), (*autoscaling.ObjectMetricSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_ObjectMetricSource_To_autoscaling_ObjectMetricSource(a.(*v2beta2.ObjectMetricSource), b.(*autoscaling.ObjectMetricSource), scope)
+	if err := s.AddGeneratedConversionFunc((*apiautoscalingv2beta2.ObjectMetricSource)(nil), (*pkgapisautoscaling.ObjectMetricSource)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_ObjectMetricSource_To_autoscaling_ObjectMetricSource(a.(*apiautoscalingv2beta2.ObjectMetricSource), b.(*pkgapisautoscaling.ObjectMetricSource), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.ObjectMetricSource)(nil), (*v2beta2.ObjectMetricSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_ObjectMetricSource_To_v2beta2_ObjectMetricSource(a.(*autoscaling.ObjectMetricSource), b.(*v2beta2.ObjectMetricSource), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisautoscaling.ObjectMetricSource)(nil), (*apiautoscalingv2beta2.ObjectMetricSource)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_ObjectMetricSource_To_v2beta2_ObjectMetricSource(a.(*pkgapisautoscaling.ObjectMetricSource), b.(*apiautoscalingv2beta2.ObjectMetricSource), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2beta2.ObjectMetricStatus)(nil), (*autoscaling.ObjectMetricStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_ObjectMetricStatus_To_autoscaling_ObjectMetricStatus(a.(*v2beta2.ObjectMetricStatus), b.(*autoscaling.ObjectMetricStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apiautoscalingv2beta2.ObjectMetricStatus)(nil), (*pkgapisautoscaling.ObjectMetricStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_ObjectMetricStatus_To_autoscaling_ObjectMetricStatus(a.(*apiautoscalingv2beta2.ObjectMetricStatus), b.(*pkgapisautoscaling.ObjectMetricStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.ObjectMetricStatus)(nil), (*v2beta2.ObjectMetricStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_ObjectMetricStatus_To_v2beta2_ObjectMetricStatus(a.(*autoscaling.ObjectMetricStatus), b.(*v2beta2.ObjectMetricStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisautoscaling.ObjectMetricStatus)(nil), (*apiautoscalingv2beta2.ObjectMetricStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_ObjectMetricStatus_To_v2beta2_ObjectMetricStatus(a.(*pkgapisautoscaling.ObjectMetricStatus), b.(*apiautoscalingv2beta2.ObjectMetricStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2beta2.PodsMetricSource)(nil), (*autoscaling.PodsMetricSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_PodsMetricSource_To_autoscaling_PodsMetricSource(a.(*v2beta2.PodsMetricSource), b.(*autoscaling.PodsMetricSource), scope)
+	if err := s.AddGeneratedConversionFunc((*apiautoscalingv2beta2.PodsMetricSource)(nil), (*pkgapisautoscaling.PodsMetricSource)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_PodsMetricSource_To_autoscaling_PodsMetricSource(a.(*apiautoscalingv2beta2.PodsMetricSource), b.(*pkgapisautoscaling.PodsMetricSource), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.PodsMetricSource)(nil), (*v2beta2.PodsMetricSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_PodsMetricSource_To_v2beta2_PodsMetricSource(a.(*autoscaling.PodsMetricSource), b.(*v2beta2.PodsMetricSource), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisautoscaling.PodsMetricSource)(nil), (*apiautoscalingv2beta2.PodsMetricSource)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_PodsMetricSource_To_v2beta2_PodsMetricSource(a.(*pkgapisautoscaling.PodsMetricSource), b.(*apiautoscalingv2beta2.PodsMetricSource), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2beta2.PodsMetricStatus)(nil), (*autoscaling.PodsMetricStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_PodsMetricStatus_To_autoscaling_PodsMetricStatus(a.(*v2beta2.PodsMetricStatus), b.(*autoscaling.PodsMetricStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apiautoscalingv2beta2.PodsMetricStatus)(nil), (*pkgapisautoscaling.PodsMetricStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_PodsMetricStatus_To_autoscaling_PodsMetricStatus(a.(*apiautoscalingv2beta2.PodsMetricStatus), b.(*pkgapisautoscaling.PodsMetricStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.PodsMetricStatus)(nil), (*v2beta2.PodsMetricStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_PodsMetricStatus_To_v2beta2_PodsMetricStatus(a.(*autoscaling.PodsMetricStatus), b.(*v2beta2.PodsMetricStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisautoscaling.PodsMetricStatus)(nil), (*apiautoscalingv2beta2.PodsMetricStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_PodsMetricStatus_To_v2beta2_PodsMetricStatus(a.(*pkgapisautoscaling.PodsMetricStatus), b.(*apiautoscalingv2beta2.PodsMetricStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2beta2.ResourceMetricSource)(nil), (*autoscaling.ResourceMetricSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_ResourceMetricSource_To_autoscaling_ResourceMetricSource(a.(*v2beta2.ResourceMetricSource), b.(*autoscaling.ResourceMetricSource), scope)
+	if err := s.AddGeneratedConversionFunc((*apiautoscalingv2beta2.ResourceMetricSource)(nil), (*pkgapisautoscaling.ResourceMetricSource)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_ResourceMetricSource_To_autoscaling_ResourceMetricSource(a.(*apiautoscalingv2beta2.ResourceMetricSource), b.(*pkgapisautoscaling.ResourceMetricSource), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.ResourceMetricSource)(nil), (*v2beta2.ResourceMetricSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_ResourceMetricSource_To_v2beta2_ResourceMetricSource(a.(*autoscaling.ResourceMetricSource), b.(*v2beta2.ResourceMetricSource), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisautoscaling.ResourceMetricSource)(nil), (*apiautoscalingv2beta2.ResourceMetricSource)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_ResourceMetricSource_To_v2beta2_ResourceMetricSource(a.(*pkgapisautoscaling.ResourceMetricSource), b.(*apiautoscalingv2beta2.ResourceMetricSource), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v2beta2.ResourceMetricStatus)(nil), (*autoscaling.ResourceMetricStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_ResourceMetricStatus_To_autoscaling_ResourceMetricStatus(a.(*v2beta2.ResourceMetricStatus), b.(*autoscaling.ResourceMetricStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apiautoscalingv2beta2.ResourceMetricStatus)(nil), (*pkgapisautoscaling.ResourceMetricStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_ResourceMetricStatus_To_autoscaling_ResourceMetricStatus(a.(*apiautoscalingv2beta2.ResourceMetricStatus), b.(*pkgapisautoscaling.ResourceMetricStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.ResourceMetricStatus)(nil), (*v2beta2.ResourceMetricStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_ResourceMetricStatus_To_v2beta2_ResourceMetricStatus(a.(*autoscaling.ResourceMetricStatus), b.(*v2beta2.ResourceMetricStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisautoscaling.ResourceMetricStatus)(nil), (*apiautoscalingv2beta2.ResourceMetricStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_ResourceMetricStatus_To_v2beta2_ResourceMetricStatus(a.(*pkgapisautoscaling.ResourceMetricStatus), b.(*apiautoscalingv2beta2.ResourceMetricStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*autoscaling.HorizontalPodAutoscaler)(nil), (*v2beta2.HorizontalPodAutoscaler)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_HorizontalPodAutoscaler_To_v2beta2_HorizontalPodAutoscaler(a.(*autoscaling.HorizontalPodAutoscaler), b.(*v2beta2.HorizontalPodAutoscaler), scope)
+	if err := s.AddConversionFunc((*pkgapisautoscaling.HorizontalPodAutoscaler)(nil), (*apiautoscalingv2beta2.HorizontalPodAutoscaler)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_autoscaling_HorizontalPodAutoscaler_To_v2beta2_HorizontalPodAutoscaler(a.(*pkgapisautoscaling.HorizontalPodAutoscaler), b.(*apiautoscalingv2beta2.HorizontalPodAutoscaler), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v2beta2.HorizontalPodAutoscaler)(nil), (*autoscaling.HorizontalPodAutoscaler)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v2beta2_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(a.(*v2beta2.HorizontalPodAutoscaler), b.(*autoscaling.HorizontalPodAutoscaler), scope)
+	if err := s.AddConversionFunc((*apiautoscalingv2beta2.HorizontalPodAutoscaler)(nil), (*pkgapisautoscaling.HorizontalPodAutoscaler)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v2beta2_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(a.(*apiautoscalingv2beta2.HorizontalPodAutoscaler), b.(*pkgapisautoscaling.HorizontalPodAutoscaler), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v2beta2_ContainerResourceMetricSource_To_autoscaling_ContainerResourceMetricSource(in *v2beta2.ContainerResourceMetricSource, out *autoscaling.ContainerResourceMetricSource, s conversion.Scope) error {
-	out.Name = core.ResourceName(in.Name)
+func autoConvert_v2beta2_ContainerResourceMetricSource_To_autoscaling_ContainerResourceMetricSource(in *apiautoscalingv2beta2.ContainerResourceMetricSource, out *pkgapisautoscaling.ContainerResourceMetricSource, s apimachinerypkgconversion.Scope) error {
+	out.Name = pkgapiscore.ResourceName(in.Name)
 	if err := Convert_v2beta2_MetricTarget_To_autoscaling_MetricTarget(&in.Target, &out.Target, s); err != nil {
 		return err
 	}
@@ -294,12 +294,12 @@ func autoConvert_v2beta2_ContainerResourceMetricSource_To_autoscaling_ContainerR
 }
 
 // Convert_v2beta2_ContainerResourceMetricSource_To_autoscaling_ContainerResourceMetricSource is an autogenerated conversion function.
-func Convert_v2beta2_ContainerResourceMetricSource_To_autoscaling_ContainerResourceMetricSource(in *v2beta2.ContainerResourceMetricSource, out *autoscaling.ContainerResourceMetricSource, s conversion.Scope) error {
+func Convert_v2beta2_ContainerResourceMetricSource_To_autoscaling_ContainerResourceMetricSource(in *apiautoscalingv2beta2.ContainerResourceMetricSource, out *pkgapisautoscaling.ContainerResourceMetricSource, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v2beta2_ContainerResourceMetricSource_To_autoscaling_ContainerResourceMetricSource(in, out, s)
 }
 
-func autoConvert_autoscaling_ContainerResourceMetricSource_To_v2beta2_ContainerResourceMetricSource(in *autoscaling.ContainerResourceMetricSource, out *v2beta2.ContainerResourceMetricSource, s conversion.Scope) error {
-	out.Name = v1.ResourceName(in.Name)
+func autoConvert_autoscaling_ContainerResourceMetricSource_To_v2beta2_ContainerResourceMetricSource(in *pkgapisautoscaling.ContainerResourceMetricSource, out *apiautoscalingv2beta2.ContainerResourceMetricSource, s apimachinerypkgconversion.Scope) error {
+	out.Name = apicorev1.ResourceName(in.Name)
 	out.Container = in.Container
 	if err := Convert_autoscaling_MetricTarget_To_v2beta2_MetricTarget(&in.Target, &out.Target, s); err != nil {
 		return err
@@ -308,12 +308,12 @@ func autoConvert_autoscaling_ContainerResourceMetricSource_To_v2beta2_ContainerR
 }
 
 // Convert_autoscaling_ContainerResourceMetricSource_To_v2beta2_ContainerResourceMetricSource is an autogenerated conversion function.
-func Convert_autoscaling_ContainerResourceMetricSource_To_v2beta2_ContainerResourceMetricSource(in *autoscaling.ContainerResourceMetricSource, out *v2beta2.ContainerResourceMetricSource, s conversion.Scope) error {
+func Convert_autoscaling_ContainerResourceMetricSource_To_v2beta2_ContainerResourceMetricSource(in *pkgapisautoscaling.ContainerResourceMetricSource, out *apiautoscalingv2beta2.ContainerResourceMetricSource, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_autoscaling_ContainerResourceMetricSource_To_v2beta2_ContainerResourceMetricSource(in, out, s)
 }
 
-func autoConvert_v2beta2_ContainerResourceMetricStatus_To_autoscaling_ContainerResourceMetricStatus(in *v2beta2.ContainerResourceMetricStatus, out *autoscaling.ContainerResourceMetricStatus, s conversion.Scope) error {
-	out.Name = core.ResourceName(in.Name)
+func autoConvert_v2beta2_ContainerResourceMetricStatus_To_autoscaling_ContainerResourceMetricStatus(in *apiautoscalingv2beta2.ContainerResourceMetricStatus, out *pkgapisautoscaling.ContainerResourceMetricStatus, s apimachinerypkgconversion.Scope) error {
+	out.Name = pkgapiscore.ResourceName(in.Name)
 	if err := Convert_v2beta2_MetricValueStatus_To_autoscaling_MetricValueStatus(&in.Current, &out.Current, s); err != nil {
 		return err
 	}
@@ -322,12 +322,12 @@ func autoConvert_v2beta2_ContainerResourceMetricStatus_To_autoscaling_ContainerR
 }
 
 // Convert_v2beta2_ContainerResourceMetricStatus_To_autoscaling_ContainerResourceMetricStatus is an autogenerated conversion function.
-func Convert_v2beta2_ContainerResourceMetricStatus_To_autoscaling_ContainerResourceMetricStatus(in *v2beta2.ContainerResourceMetricStatus, out *autoscaling.ContainerResourceMetricStatus, s conversion.Scope) error {
+func Convert_v2beta2_ContainerResourceMetricStatus_To_autoscaling_ContainerResourceMetricStatus(in *apiautoscalingv2beta2.ContainerResourceMetricStatus, out *pkgapisautoscaling.ContainerResourceMetricStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v2beta2_ContainerResourceMetricStatus_To_autoscaling_ContainerResourceMetricStatus(in, out, s)
 }
 
-func autoConvert_autoscaling_ContainerResourceMetricStatus_To_v2beta2_ContainerResourceMetricStatus(in *autoscaling.ContainerResourceMetricStatus, out *v2beta2.ContainerResourceMetricStatus, s conversion.Scope) error {
-	out.Name = v1.ResourceName(in.Name)
+func autoConvert_autoscaling_ContainerResourceMetricStatus_To_v2beta2_ContainerResourceMetricStatus(in *pkgapisautoscaling.ContainerResourceMetricStatus, out *apiautoscalingv2beta2.ContainerResourceMetricStatus, s apimachinerypkgconversion.Scope) error {
+	out.Name = apicorev1.ResourceName(in.Name)
 	out.Container = in.Container
 	if err := Convert_autoscaling_MetricValueStatus_To_v2beta2_MetricValueStatus(&in.Current, &out.Current, s); err != nil {
 		return err
@@ -336,11 +336,11 @@ func autoConvert_autoscaling_ContainerResourceMetricStatus_To_v2beta2_ContainerR
 }
 
 // Convert_autoscaling_ContainerResourceMetricStatus_To_v2beta2_ContainerResourceMetricStatus is an autogenerated conversion function.
-func Convert_autoscaling_ContainerResourceMetricStatus_To_v2beta2_ContainerResourceMetricStatus(in *autoscaling.ContainerResourceMetricStatus, out *v2beta2.ContainerResourceMetricStatus, s conversion.Scope) error {
+func Convert_autoscaling_ContainerResourceMetricStatus_To_v2beta2_ContainerResourceMetricStatus(in *pkgapisautoscaling.ContainerResourceMetricStatus, out *apiautoscalingv2beta2.ContainerResourceMetricStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_autoscaling_ContainerResourceMetricStatus_To_v2beta2_ContainerResourceMetricStatus(in, out, s)
 }
 
-func autoConvert_v2beta2_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectReference(in *v2beta2.CrossVersionObjectReference, out *autoscaling.CrossVersionObjectReference, s conversion.Scope) error {
+func autoConvert_v2beta2_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectReference(in *apiautoscalingv2beta2.CrossVersionObjectReference, out *pkgapisautoscaling.CrossVersionObjectReference, s apimachinerypkgconversion.Scope) error {
 	out.Kind = in.Kind
 	out.Name = in.Name
 	out.APIVersion = in.APIVersion
@@ -348,11 +348,11 @@ func autoConvert_v2beta2_CrossVersionObjectReference_To_autoscaling_CrossVersion
 }
 
 // Convert_v2beta2_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectReference is an autogenerated conversion function.
-func Convert_v2beta2_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectReference(in *v2beta2.CrossVersionObjectReference, out *autoscaling.CrossVersionObjectReference, s conversion.Scope) error {
+func Convert_v2beta2_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectReference(in *apiautoscalingv2beta2.CrossVersionObjectReference, out *pkgapisautoscaling.CrossVersionObjectReference, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v2beta2_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectReference(in, out, s)
 }
 
-func autoConvert_autoscaling_CrossVersionObjectReference_To_v2beta2_CrossVersionObjectReference(in *autoscaling.CrossVersionObjectReference, out *v2beta2.CrossVersionObjectReference, s conversion.Scope) error {
+func autoConvert_autoscaling_CrossVersionObjectReference_To_v2beta2_CrossVersionObjectReference(in *pkgapisautoscaling.CrossVersionObjectReference, out *apiautoscalingv2beta2.CrossVersionObjectReference, s apimachinerypkgconversion.Scope) error {
 	out.Kind = in.Kind
 	out.Name = in.Name
 	out.APIVersion = in.APIVersion
@@ -360,11 +360,11 @@ func autoConvert_autoscaling_CrossVersionObjectReference_To_v2beta2_CrossVersion
 }
 
 // Convert_autoscaling_CrossVersionObjectReference_To_v2beta2_CrossVersionObjectReference is an autogenerated conversion function.
-func Convert_autoscaling_CrossVersionObjectReference_To_v2beta2_CrossVersionObjectReference(in *autoscaling.CrossVersionObjectReference, out *v2beta2.CrossVersionObjectReference, s conversion.Scope) error {
+func Convert_autoscaling_CrossVersionObjectReference_To_v2beta2_CrossVersionObjectReference(in *pkgapisautoscaling.CrossVersionObjectReference, out *apiautoscalingv2beta2.CrossVersionObjectReference, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_autoscaling_CrossVersionObjectReference_To_v2beta2_CrossVersionObjectReference(in, out, s)
 }
 
-func autoConvert_v2beta2_ExternalMetricSource_To_autoscaling_ExternalMetricSource(in *v2beta2.ExternalMetricSource, out *autoscaling.ExternalMetricSource, s conversion.Scope) error {
+func autoConvert_v2beta2_ExternalMetricSource_To_autoscaling_ExternalMetricSource(in *apiautoscalingv2beta2.ExternalMetricSource, out *pkgapisautoscaling.ExternalMetricSource, s apimachinerypkgconversion.Scope) error {
 	if err := Convert_v2beta2_MetricIdentifier_To_autoscaling_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
 		return err
 	}
@@ -375,11 +375,11 @@ func autoConvert_v2beta2_ExternalMetricSource_To_autoscaling_ExternalMetricSourc
 }
 
 // Convert_v2beta2_ExternalMetricSource_To_autoscaling_ExternalMetricSource is an autogenerated conversion function.
-func Convert_v2beta2_ExternalMetricSource_To_autoscaling_ExternalMetricSource(in *v2beta2.ExternalMetricSource, out *autoscaling.ExternalMetricSource, s conversion.Scope) error {
+func Convert_v2beta2_ExternalMetricSource_To_autoscaling_ExternalMetricSource(in *apiautoscalingv2beta2.ExternalMetricSource, out *pkgapisautoscaling.ExternalMetricSource, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v2beta2_ExternalMetricSource_To_autoscaling_ExternalMetricSource(in, out, s)
 }
 
-func autoConvert_autoscaling_ExternalMetricSource_To_v2beta2_ExternalMetricSource(in *autoscaling.ExternalMetricSource, out *v2beta2.ExternalMetricSource, s conversion.Scope) error {
+func autoConvert_autoscaling_ExternalMetricSource_To_v2beta2_ExternalMetricSource(in *pkgapisautoscaling.ExternalMetricSource, out *apiautoscalingv2beta2.ExternalMetricSource, s apimachinerypkgconversion.Scope) error {
 	if err := Convert_autoscaling_MetricIdentifier_To_v2beta2_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
 		return err
 	}
@@ -390,11 +390,11 @@ func autoConvert_autoscaling_ExternalMetricSource_To_v2beta2_ExternalMetricSourc
 }
 
 // Convert_autoscaling_ExternalMetricSource_To_v2beta2_ExternalMetricSource is an autogenerated conversion function.
-func Convert_autoscaling_ExternalMetricSource_To_v2beta2_ExternalMetricSource(in *autoscaling.ExternalMetricSource, out *v2beta2.ExternalMetricSource, s conversion.Scope) error {
+func Convert_autoscaling_ExternalMetricSource_To_v2beta2_ExternalMetricSource(in *pkgapisautoscaling.ExternalMetricSource, out *apiautoscalingv2beta2.ExternalMetricSource, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_autoscaling_ExternalMetricSource_To_v2beta2_ExternalMetricSource(in, out, s)
 }
 
-func autoConvert_v2beta2_ExternalMetricStatus_To_autoscaling_ExternalMetricStatus(in *v2beta2.ExternalMetricStatus, out *autoscaling.ExternalMetricStatus, s conversion.Scope) error {
+func autoConvert_v2beta2_ExternalMetricStatus_To_autoscaling_ExternalMetricStatus(in *apiautoscalingv2beta2.ExternalMetricStatus, out *pkgapisautoscaling.ExternalMetricStatus, s apimachinerypkgconversion.Scope) error {
 	if err := Convert_v2beta2_MetricIdentifier_To_autoscaling_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
 		return err
 	}
@@ -405,11 +405,11 @@ func autoConvert_v2beta2_ExternalMetricStatus_To_autoscaling_ExternalMetricStatu
 }
 
 // Convert_v2beta2_ExternalMetricStatus_To_autoscaling_ExternalMetricStatus is an autogenerated conversion function.
-func Convert_v2beta2_ExternalMetricStatus_To_autoscaling_ExternalMetricStatus(in *v2beta2.ExternalMetricStatus, out *autoscaling.ExternalMetricStatus, s conversion.Scope) error {
+func Convert_v2beta2_ExternalMetricStatus_To_autoscaling_ExternalMetricStatus(in *apiautoscalingv2beta2.ExternalMetricStatus, out *pkgapisautoscaling.ExternalMetricStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v2beta2_ExternalMetricStatus_To_autoscaling_ExternalMetricStatus(in, out, s)
 }
 
-func autoConvert_autoscaling_ExternalMetricStatus_To_v2beta2_ExternalMetricStatus(in *autoscaling.ExternalMetricStatus, out *v2beta2.ExternalMetricStatus, s conversion.Scope) error {
+func autoConvert_autoscaling_ExternalMetricStatus_To_v2beta2_ExternalMetricStatus(in *pkgapisautoscaling.ExternalMetricStatus, out *apiautoscalingv2beta2.ExternalMetricStatus, s apimachinerypkgconversion.Scope) error {
 	if err := Convert_autoscaling_MetricIdentifier_To_v2beta2_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
 		return err
 	}
@@ -420,59 +420,59 @@ func autoConvert_autoscaling_ExternalMetricStatus_To_v2beta2_ExternalMetricStatu
 }
 
 // Convert_autoscaling_ExternalMetricStatus_To_v2beta2_ExternalMetricStatus is an autogenerated conversion function.
-func Convert_autoscaling_ExternalMetricStatus_To_v2beta2_ExternalMetricStatus(in *autoscaling.ExternalMetricStatus, out *v2beta2.ExternalMetricStatus, s conversion.Scope) error {
+func Convert_autoscaling_ExternalMetricStatus_To_v2beta2_ExternalMetricStatus(in *pkgapisautoscaling.ExternalMetricStatus, out *apiautoscalingv2beta2.ExternalMetricStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_autoscaling_ExternalMetricStatus_To_v2beta2_ExternalMetricStatus(in, out, s)
 }
 
-func autoConvert_v2beta2_HPAScalingPolicy_To_autoscaling_HPAScalingPolicy(in *v2beta2.HPAScalingPolicy, out *autoscaling.HPAScalingPolicy, s conversion.Scope) error {
-	out.Type = autoscaling.HPAScalingPolicyType(in.Type)
+func autoConvert_v2beta2_HPAScalingPolicy_To_autoscaling_HPAScalingPolicy(in *apiautoscalingv2beta2.HPAScalingPolicy, out *pkgapisautoscaling.HPAScalingPolicy, s apimachinerypkgconversion.Scope) error {
+	out.Type = pkgapisautoscaling.HPAScalingPolicyType(in.Type)
 	out.Value = in.Value
 	out.PeriodSeconds = in.PeriodSeconds
 	return nil
 }
 
 // Convert_v2beta2_HPAScalingPolicy_To_autoscaling_HPAScalingPolicy is an autogenerated conversion function.
-func Convert_v2beta2_HPAScalingPolicy_To_autoscaling_HPAScalingPolicy(in *v2beta2.HPAScalingPolicy, out *autoscaling.HPAScalingPolicy, s conversion.Scope) error {
+func Convert_v2beta2_HPAScalingPolicy_To_autoscaling_HPAScalingPolicy(in *apiautoscalingv2beta2.HPAScalingPolicy, out *pkgapisautoscaling.HPAScalingPolicy, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v2beta2_HPAScalingPolicy_To_autoscaling_HPAScalingPolicy(in, out, s)
 }
 
-func autoConvert_autoscaling_HPAScalingPolicy_To_v2beta2_HPAScalingPolicy(in *autoscaling.HPAScalingPolicy, out *v2beta2.HPAScalingPolicy, s conversion.Scope) error {
-	out.Type = v2beta2.HPAScalingPolicyType(in.Type)
+func autoConvert_autoscaling_HPAScalingPolicy_To_v2beta2_HPAScalingPolicy(in *pkgapisautoscaling.HPAScalingPolicy, out *apiautoscalingv2beta2.HPAScalingPolicy, s apimachinerypkgconversion.Scope) error {
+	out.Type = apiautoscalingv2beta2.HPAScalingPolicyType(in.Type)
 	out.Value = in.Value
 	out.PeriodSeconds = in.PeriodSeconds
 	return nil
 }
 
 // Convert_autoscaling_HPAScalingPolicy_To_v2beta2_HPAScalingPolicy is an autogenerated conversion function.
-func Convert_autoscaling_HPAScalingPolicy_To_v2beta2_HPAScalingPolicy(in *autoscaling.HPAScalingPolicy, out *v2beta2.HPAScalingPolicy, s conversion.Scope) error {
+func Convert_autoscaling_HPAScalingPolicy_To_v2beta2_HPAScalingPolicy(in *pkgapisautoscaling.HPAScalingPolicy, out *apiautoscalingv2beta2.HPAScalingPolicy, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_autoscaling_HPAScalingPolicy_To_v2beta2_HPAScalingPolicy(in, out, s)
 }
 
-func autoConvert_v2beta2_HPAScalingRules_To_autoscaling_HPAScalingRules(in *v2beta2.HPAScalingRules, out *autoscaling.HPAScalingRules, s conversion.Scope) error {
+func autoConvert_v2beta2_HPAScalingRules_To_autoscaling_HPAScalingRules(in *apiautoscalingv2beta2.HPAScalingRules, out *pkgapisautoscaling.HPAScalingRules, s apimachinerypkgconversion.Scope) error {
 	out.StabilizationWindowSeconds = (*int32)(unsafe.Pointer(in.StabilizationWindowSeconds))
-	out.SelectPolicy = (*autoscaling.ScalingPolicySelect)(unsafe.Pointer(in.SelectPolicy))
-	out.Policies = *(*[]autoscaling.HPAScalingPolicy)(unsafe.Pointer(&in.Policies))
+	out.SelectPolicy = (*pkgapisautoscaling.ScalingPolicySelect)(unsafe.Pointer(in.SelectPolicy))
+	out.Policies = *(*[]pkgapisautoscaling.HPAScalingPolicy)(unsafe.Pointer(&in.Policies))
 	return nil
 }
 
 // Convert_v2beta2_HPAScalingRules_To_autoscaling_HPAScalingRules is an autogenerated conversion function.
-func Convert_v2beta2_HPAScalingRules_To_autoscaling_HPAScalingRules(in *v2beta2.HPAScalingRules, out *autoscaling.HPAScalingRules, s conversion.Scope) error {
+func Convert_v2beta2_HPAScalingRules_To_autoscaling_HPAScalingRules(in *apiautoscalingv2beta2.HPAScalingRules, out *pkgapisautoscaling.HPAScalingRules, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v2beta2_HPAScalingRules_To_autoscaling_HPAScalingRules(in, out, s)
 }
 
-func autoConvert_autoscaling_HPAScalingRules_To_v2beta2_HPAScalingRules(in *autoscaling.HPAScalingRules, out *v2beta2.HPAScalingRules, s conversion.Scope) error {
+func autoConvert_autoscaling_HPAScalingRules_To_v2beta2_HPAScalingRules(in *pkgapisautoscaling.HPAScalingRules, out *apiautoscalingv2beta2.HPAScalingRules, s apimachinerypkgconversion.Scope) error {
 	out.StabilizationWindowSeconds = (*int32)(unsafe.Pointer(in.StabilizationWindowSeconds))
-	out.SelectPolicy = (*v2beta2.ScalingPolicySelect)(unsafe.Pointer(in.SelectPolicy))
-	out.Policies = *(*[]v2beta2.HPAScalingPolicy)(unsafe.Pointer(&in.Policies))
+	out.SelectPolicy = (*apiautoscalingv2beta2.ScalingPolicySelect)(unsafe.Pointer(in.SelectPolicy))
+	out.Policies = *(*[]apiautoscalingv2beta2.HPAScalingPolicy)(unsafe.Pointer(&in.Policies))
 	return nil
 }
 
 // Convert_autoscaling_HPAScalingRules_To_v2beta2_HPAScalingRules is an autogenerated conversion function.
-func Convert_autoscaling_HPAScalingRules_To_v2beta2_HPAScalingRules(in *autoscaling.HPAScalingRules, out *v2beta2.HPAScalingRules, s conversion.Scope) error {
+func Convert_autoscaling_HPAScalingRules_To_v2beta2_HPAScalingRules(in *pkgapisautoscaling.HPAScalingRules, out *apiautoscalingv2beta2.HPAScalingRules, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_autoscaling_HPAScalingRules_To_v2beta2_HPAScalingRules(in, out, s)
 }
 
-func autoConvert_v2beta2_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(in *v2beta2.HorizontalPodAutoscaler, out *autoscaling.HorizontalPodAutoscaler, s conversion.Scope) error {
+func autoConvert_v2beta2_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(in *apiautoscalingv2beta2.HorizontalPodAutoscaler, out *pkgapisautoscaling.HorizontalPodAutoscaler, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v2beta2_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -483,7 +483,7 @@ func autoConvert_v2beta2_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAut
 	return nil
 }
 
-func autoConvert_autoscaling_HorizontalPodAutoscaler_To_v2beta2_HorizontalPodAutoscaler(in *autoscaling.HorizontalPodAutoscaler, out *v2beta2.HorizontalPodAutoscaler, s conversion.Scope) error {
+func autoConvert_autoscaling_HorizontalPodAutoscaler_To_v2beta2_HorizontalPodAutoscaler(in *pkgapisautoscaling.HorizontalPodAutoscaler, out *apiautoscalingv2beta2.HorizontalPodAutoscaler, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v2beta2_HorizontalPodAutoscalerSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -494,31 +494,31 @@ func autoConvert_autoscaling_HorizontalPodAutoscaler_To_v2beta2_HorizontalPodAut
 	return nil
 }
 
-func autoConvert_v2beta2_HorizontalPodAutoscalerBehavior_To_autoscaling_HorizontalPodAutoscalerBehavior(in *v2beta2.HorizontalPodAutoscalerBehavior, out *autoscaling.HorizontalPodAutoscalerBehavior, s conversion.Scope) error {
-	out.ScaleUp = (*autoscaling.HPAScalingRules)(unsafe.Pointer(in.ScaleUp))
-	out.ScaleDown = (*autoscaling.HPAScalingRules)(unsafe.Pointer(in.ScaleDown))
+func autoConvert_v2beta2_HorizontalPodAutoscalerBehavior_To_autoscaling_HorizontalPodAutoscalerBehavior(in *apiautoscalingv2beta2.HorizontalPodAutoscalerBehavior, out *pkgapisautoscaling.HorizontalPodAutoscalerBehavior, s apimachinerypkgconversion.Scope) error {
+	out.ScaleUp = (*pkgapisautoscaling.HPAScalingRules)(unsafe.Pointer(in.ScaleUp))
+	out.ScaleDown = (*pkgapisautoscaling.HPAScalingRules)(unsafe.Pointer(in.ScaleDown))
 	return nil
 }
 
 // Convert_v2beta2_HorizontalPodAutoscalerBehavior_To_autoscaling_HorizontalPodAutoscalerBehavior is an autogenerated conversion function.
-func Convert_v2beta2_HorizontalPodAutoscalerBehavior_To_autoscaling_HorizontalPodAutoscalerBehavior(in *v2beta2.HorizontalPodAutoscalerBehavior, out *autoscaling.HorizontalPodAutoscalerBehavior, s conversion.Scope) error {
+func Convert_v2beta2_HorizontalPodAutoscalerBehavior_To_autoscaling_HorizontalPodAutoscalerBehavior(in *apiautoscalingv2beta2.HorizontalPodAutoscalerBehavior, out *pkgapisautoscaling.HorizontalPodAutoscalerBehavior, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v2beta2_HorizontalPodAutoscalerBehavior_To_autoscaling_HorizontalPodAutoscalerBehavior(in, out, s)
 }
 
-func autoConvert_autoscaling_HorizontalPodAutoscalerBehavior_To_v2beta2_HorizontalPodAutoscalerBehavior(in *autoscaling.HorizontalPodAutoscalerBehavior, out *v2beta2.HorizontalPodAutoscalerBehavior, s conversion.Scope) error {
-	out.ScaleUp = (*v2beta2.HPAScalingRules)(unsafe.Pointer(in.ScaleUp))
-	out.ScaleDown = (*v2beta2.HPAScalingRules)(unsafe.Pointer(in.ScaleDown))
+func autoConvert_autoscaling_HorizontalPodAutoscalerBehavior_To_v2beta2_HorizontalPodAutoscalerBehavior(in *pkgapisautoscaling.HorizontalPodAutoscalerBehavior, out *apiautoscalingv2beta2.HorizontalPodAutoscalerBehavior, s apimachinerypkgconversion.Scope) error {
+	out.ScaleUp = (*apiautoscalingv2beta2.HPAScalingRules)(unsafe.Pointer(in.ScaleUp))
+	out.ScaleDown = (*apiautoscalingv2beta2.HPAScalingRules)(unsafe.Pointer(in.ScaleDown))
 	return nil
 }
 
 // Convert_autoscaling_HorizontalPodAutoscalerBehavior_To_v2beta2_HorizontalPodAutoscalerBehavior is an autogenerated conversion function.
-func Convert_autoscaling_HorizontalPodAutoscalerBehavior_To_v2beta2_HorizontalPodAutoscalerBehavior(in *autoscaling.HorizontalPodAutoscalerBehavior, out *v2beta2.HorizontalPodAutoscalerBehavior, s conversion.Scope) error {
+func Convert_autoscaling_HorizontalPodAutoscalerBehavior_To_v2beta2_HorizontalPodAutoscalerBehavior(in *pkgapisautoscaling.HorizontalPodAutoscalerBehavior, out *apiautoscalingv2beta2.HorizontalPodAutoscalerBehavior, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_autoscaling_HorizontalPodAutoscalerBehavior_To_v2beta2_HorizontalPodAutoscalerBehavior(in, out, s)
 }
 
-func autoConvert_v2beta2_HorizontalPodAutoscalerCondition_To_autoscaling_HorizontalPodAutoscalerCondition(in *v2beta2.HorizontalPodAutoscalerCondition, out *autoscaling.HorizontalPodAutoscalerCondition, s conversion.Scope) error {
-	out.Type = autoscaling.HorizontalPodAutoscalerConditionType(in.Type)
-	out.Status = autoscaling.ConditionStatus(in.Status)
+func autoConvert_v2beta2_HorizontalPodAutoscalerCondition_To_autoscaling_HorizontalPodAutoscalerCondition(in *apiautoscalingv2beta2.HorizontalPodAutoscalerCondition, out *pkgapisautoscaling.HorizontalPodAutoscalerCondition, s apimachinerypkgconversion.Scope) error {
+	out.Type = pkgapisautoscaling.HorizontalPodAutoscalerConditionType(in.Type)
+	out.Status = pkgapisautoscaling.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
@@ -526,13 +526,13 @@ func autoConvert_v2beta2_HorizontalPodAutoscalerCondition_To_autoscaling_Horizon
 }
 
 // Convert_v2beta2_HorizontalPodAutoscalerCondition_To_autoscaling_HorizontalPodAutoscalerCondition is an autogenerated conversion function.
-func Convert_v2beta2_HorizontalPodAutoscalerCondition_To_autoscaling_HorizontalPodAutoscalerCondition(in *v2beta2.HorizontalPodAutoscalerCondition, out *autoscaling.HorizontalPodAutoscalerCondition, s conversion.Scope) error {
+func Convert_v2beta2_HorizontalPodAutoscalerCondition_To_autoscaling_HorizontalPodAutoscalerCondition(in *apiautoscalingv2beta2.HorizontalPodAutoscalerCondition, out *pkgapisautoscaling.HorizontalPodAutoscalerCondition, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v2beta2_HorizontalPodAutoscalerCondition_To_autoscaling_HorizontalPodAutoscalerCondition(in, out, s)
 }
 
-func autoConvert_autoscaling_HorizontalPodAutoscalerCondition_To_v2beta2_HorizontalPodAutoscalerCondition(in *autoscaling.HorizontalPodAutoscalerCondition, out *v2beta2.HorizontalPodAutoscalerCondition, s conversion.Scope) error {
-	out.Type = v2beta2.HorizontalPodAutoscalerConditionType(in.Type)
-	out.Status = v1.ConditionStatus(in.Status)
+func autoConvert_autoscaling_HorizontalPodAutoscalerCondition_To_v2beta2_HorizontalPodAutoscalerCondition(in *pkgapisautoscaling.HorizontalPodAutoscalerCondition, out *apiautoscalingv2beta2.HorizontalPodAutoscalerCondition, s apimachinerypkgconversion.Scope) error {
+	out.Type = apiautoscalingv2beta2.HorizontalPodAutoscalerConditionType(in.Type)
+	out.Status = apicorev1.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
@@ -540,15 +540,15 @@ func autoConvert_autoscaling_HorizontalPodAutoscalerCondition_To_v2beta2_Horizon
 }
 
 // Convert_autoscaling_HorizontalPodAutoscalerCondition_To_v2beta2_HorizontalPodAutoscalerCondition is an autogenerated conversion function.
-func Convert_autoscaling_HorizontalPodAutoscalerCondition_To_v2beta2_HorizontalPodAutoscalerCondition(in *autoscaling.HorizontalPodAutoscalerCondition, out *v2beta2.HorizontalPodAutoscalerCondition, s conversion.Scope) error {
+func Convert_autoscaling_HorizontalPodAutoscalerCondition_To_v2beta2_HorizontalPodAutoscalerCondition(in *pkgapisautoscaling.HorizontalPodAutoscalerCondition, out *apiautoscalingv2beta2.HorizontalPodAutoscalerCondition, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_autoscaling_HorizontalPodAutoscalerCondition_To_v2beta2_HorizontalPodAutoscalerCondition(in, out, s)
 }
 
-func autoConvert_v2beta2_HorizontalPodAutoscalerList_To_autoscaling_HorizontalPodAutoscalerList(in *v2beta2.HorizontalPodAutoscalerList, out *autoscaling.HorizontalPodAutoscalerList, s conversion.Scope) error {
+func autoConvert_v2beta2_HorizontalPodAutoscalerList_To_autoscaling_HorizontalPodAutoscalerList(in *apiautoscalingv2beta2.HorizontalPodAutoscalerList, out *pkgapisautoscaling.HorizontalPodAutoscalerList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]autoscaling.HorizontalPodAutoscaler, len(*in))
+		*out = make([]pkgapisautoscaling.HorizontalPodAutoscaler, len(*in))
 		for i := range *in {
 			if err := Convert_v2beta2_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -561,15 +561,15 @@ func autoConvert_v2beta2_HorizontalPodAutoscalerList_To_autoscaling_HorizontalPo
 }
 
 // Convert_v2beta2_HorizontalPodAutoscalerList_To_autoscaling_HorizontalPodAutoscalerList is an autogenerated conversion function.
-func Convert_v2beta2_HorizontalPodAutoscalerList_To_autoscaling_HorizontalPodAutoscalerList(in *v2beta2.HorizontalPodAutoscalerList, out *autoscaling.HorizontalPodAutoscalerList, s conversion.Scope) error {
+func Convert_v2beta2_HorizontalPodAutoscalerList_To_autoscaling_HorizontalPodAutoscalerList(in *apiautoscalingv2beta2.HorizontalPodAutoscalerList, out *pkgapisautoscaling.HorizontalPodAutoscalerList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v2beta2_HorizontalPodAutoscalerList_To_autoscaling_HorizontalPodAutoscalerList(in, out, s)
 }
 
-func autoConvert_autoscaling_HorizontalPodAutoscalerList_To_v2beta2_HorizontalPodAutoscalerList(in *autoscaling.HorizontalPodAutoscalerList, out *v2beta2.HorizontalPodAutoscalerList, s conversion.Scope) error {
+func autoConvert_autoscaling_HorizontalPodAutoscalerList_To_v2beta2_HorizontalPodAutoscalerList(in *pkgapisautoscaling.HorizontalPodAutoscalerList, out *apiautoscalingv2beta2.HorizontalPodAutoscalerList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]v2beta2.HorizontalPodAutoscaler, len(*in))
+		*out = make([]apiautoscalingv2beta2.HorizontalPodAutoscaler, len(*in))
 		for i := range *in {
 			if err := Convert_autoscaling_HorizontalPodAutoscaler_To_v2beta2_HorizontalPodAutoscaler(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -582,11 +582,11 @@ func autoConvert_autoscaling_HorizontalPodAutoscalerList_To_v2beta2_HorizontalPo
 }
 
 // Convert_autoscaling_HorizontalPodAutoscalerList_To_v2beta2_HorizontalPodAutoscalerList is an autogenerated conversion function.
-func Convert_autoscaling_HorizontalPodAutoscalerList_To_v2beta2_HorizontalPodAutoscalerList(in *autoscaling.HorizontalPodAutoscalerList, out *v2beta2.HorizontalPodAutoscalerList, s conversion.Scope) error {
+func Convert_autoscaling_HorizontalPodAutoscalerList_To_v2beta2_HorizontalPodAutoscalerList(in *pkgapisautoscaling.HorizontalPodAutoscalerList, out *apiautoscalingv2beta2.HorizontalPodAutoscalerList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_autoscaling_HorizontalPodAutoscalerList_To_v2beta2_HorizontalPodAutoscalerList(in, out, s)
 }
 
-func autoConvert_v2beta2_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec(in *v2beta2.HorizontalPodAutoscalerSpec, out *autoscaling.HorizontalPodAutoscalerSpec, s conversion.Scope) error {
+func autoConvert_v2beta2_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec(in *apiautoscalingv2beta2.HorizontalPodAutoscalerSpec, out *pkgapisautoscaling.HorizontalPodAutoscalerSpec, s apimachinerypkgconversion.Scope) error {
 	if err := Convert_v2beta2_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectReference(&in.ScaleTargetRef, &out.ScaleTargetRef, s); err != nil {
 		return err
 	}
@@ -594,7 +594,7 @@ func autoConvert_v2beta2_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPo
 	out.MaxReplicas = in.MaxReplicas
 	if in.Metrics != nil {
 		in, out := &in.Metrics, &out.Metrics
-		*out = make([]autoscaling.MetricSpec, len(*in))
+		*out = make([]pkgapisautoscaling.MetricSpec, len(*in))
 		for i := range *in {
 			if err := Convert_v2beta2_MetricSpec_To_autoscaling_MetricSpec(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -603,16 +603,16 @@ func autoConvert_v2beta2_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPo
 	} else {
 		out.Metrics = nil
 	}
-	out.Behavior = (*autoscaling.HorizontalPodAutoscalerBehavior)(unsafe.Pointer(in.Behavior))
+	out.Behavior = (*pkgapisautoscaling.HorizontalPodAutoscalerBehavior)(unsafe.Pointer(in.Behavior))
 	return nil
 }
 
 // Convert_v2beta2_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec is an autogenerated conversion function.
-func Convert_v2beta2_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec(in *v2beta2.HorizontalPodAutoscalerSpec, out *autoscaling.HorizontalPodAutoscalerSpec, s conversion.Scope) error {
+func Convert_v2beta2_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec(in *apiautoscalingv2beta2.HorizontalPodAutoscalerSpec, out *pkgapisautoscaling.HorizontalPodAutoscalerSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v2beta2_HorizontalPodAutoscalerSpec_To_autoscaling_HorizontalPodAutoscalerSpec(in, out, s)
 }
 
-func autoConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v2beta2_HorizontalPodAutoscalerSpec(in *autoscaling.HorizontalPodAutoscalerSpec, out *v2beta2.HorizontalPodAutoscalerSpec, s conversion.Scope) error {
+func autoConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v2beta2_HorizontalPodAutoscalerSpec(in *pkgapisautoscaling.HorizontalPodAutoscalerSpec, out *apiautoscalingv2beta2.HorizontalPodAutoscalerSpec, s apimachinerypkgconversion.Scope) error {
 	if err := Convert_autoscaling_CrossVersionObjectReference_To_v2beta2_CrossVersionObjectReference(&in.ScaleTargetRef, &out.ScaleTargetRef, s); err != nil {
 		return err
 	}
@@ -620,7 +620,7 @@ func autoConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v2beta2_HorizontalPo
 	out.MaxReplicas = in.MaxReplicas
 	if in.Metrics != nil {
 		in, out := &in.Metrics, &out.Metrics
-		*out = make([]v2beta2.MetricSpec, len(*in))
+		*out = make([]apiautoscalingv2beta2.MetricSpec, len(*in))
 		for i := range *in {
 			if err := Convert_autoscaling_MetricSpec_To_v2beta2_MetricSpec(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -629,23 +629,23 @@ func autoConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v2beta2_HorizontalPo
 	} else {
 		out.Metrics = nil
 	}
-	out.Behavior = (*v2beta2.HorizontalPodAutoscalerBehavior)(unsafe.Pointer(in.Behavior))
+	out.Behavior = (*apiautoscalingv2beta2.HorizontalPodAutoscalerBehavior)(unsafe.Pointer(in.Behavior))
 	return nil
 }
 
 // Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v2beta2_HorizontalPodAutoscalerSpec is an autogenerated conversion function.
-func Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v2beta2_HorizontalPodAutoscalerSpec(in *autoscaling.HorizontalPodAutoscalerSpec, out *v2beta2.HorizontalPodAutoscalerSpec, s conversion.Scope) error {
+func Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v2beta2_HorizontalPodAutoscalerSpec(in *pkgapisautoscaling.HorizontalPodAutoscalerSpec, out *apiautoscalingv2beta2.HorizontalPodAutoscalerSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v2beta2_HorizontalPodAutoscalerSpec(in, out, s)
 }
 
-func autoConvert_v2beta2_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus(in *v2beta2.HorizontalPodAutoscalerStatus, out *autoscaling.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
+func autoConvert_v2beta2_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus(in *apiautoscalingv2beta2.HorizontalPodAutoscalerStatus, out *pkgapisautoscaling.HorizontalPodAutoscalerStatus, s apimachinerypkgconversion.Scope) error {
 	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
-	out.LastScaleTime = (*metav1.Time)(unsafe.Pointer(in.LastScaleTime))
+	out.LastScaleTime = (*apismetav1.Time)(unsafe.Pointer(in.LastScaleTime))
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
 	if in.CurrentMetrics != nil {
 		in, out := &in.CurrentMetrics, &out.CurrentMetrics
-		*out = make([]autoscaling.MetricStatus, len(*in))
+		*out = make([]pkgapisautoscaling.MetricStatus, len(*in))
 		for i := range *in {
 			if err := Convert_v2beta2_MetricStatus_To_autoscaling_MetricStatus(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -654,23 +654,23 @@ func autoConvert_v2beta2_HorizontalPodAutoscalerStatus_To_autoscaling_Horizontal
 	} else {
 		out.CurrentMetrics = nil
 	}
-	out.Conditions = *(*[]autoscaling.HorizontalPodAutoscalerCondition)(unsafe.Pointer(&in.Conditions))
+	out.Conditions = *(*[]pkgapisautoscaling.HorizontalPodAutoscalerCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 
 // Convert_v2beta2_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus is an autogenerated conversion function.
-func Convert_v2beta2_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus(in *v2beta2.HorizontalPodAutoscalerStatus, out *autoscaling.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
+func Convert_v2beta2_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus(in *apiautoscalingv2beta2.HorizontalPodAutoscalerStatus, out *pkgapisautoscaling.HorizontalPodAutoscalerStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v2beta2_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus(in, out, s)
 }
 
-func autoConvert_autoscaling_HorizontalPodAutoscalerStatus_To_v2beta2_HorizontalPodAutoscalerStatus(in *autoscaling.HorizontalPodAutoscalerStatus, out *v2beta2.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
+func autoConvert_autoscaling_HorizontalPodAutoscalerStatus_To_v2beta2_HorizontalPodAutoscalerStatus(in *pkgapisautoscaling.HorizontalPodAutoscalerStatus, out *apiautoscalingv2beta2.HorizontalPodAutoscalerStatus, s apimachinerypkgconversion.Scope) error {
 	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
-	out.LastScaleTime = (*metav1.Time)(unsafe.Pointer(in.LastScaleTime))
+	out.LastScaleTime = (*apismetav1.Time)(unsafe.Pointer(in.LastScaleTime))
 	out.CurrentReplicas = in.CurrentReplicas
 	out.DesiredReplicas = in.DesiredReplicas
 	if in.CurrentMetrics != nil {
 		in, out := &in.CurrentMetrics, &out.CurrentMetrics
-		*out = make([]v2beta2.MetricStatus, len(*in))
+		*out = make([]apiautoscalingv2beta2.MetricStatus, len(*in))
 		for i := range *in {
 			if err := Convert_autoscaling_MetricStatus_To_v2beta2_MetricStatus(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -679,180 +679,180 @@ func autoConvert_autoscaling_HorizontalPodAutoscalerStatus_To_v2beta2_Horizontal
 	} else {
 		out.CurrentMetrics = nil
 	}
-	out.Conditions = *(*[]v2beta2.HorizontalPodAutoscalerCondition)(unsafe.Pointer(&in.Conditions))
+	out.Conditions = *(*[]apiautoscalingv2beta2.HorizontalPodAutoscalerCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 
 // Convert_autoscaling_HorizontalPodAutoscalerStatus_To_v2beta2_HorizontalPodAutoscalerStatus is an autogenerated conversion function.
-func Convert_autoscaling_HorizontalPodAutoscalerStatus_To_v2beta2_HorizontalPodAutoscalerStatus(in *autoscaling.HorizontalPodAutoscalerStatus, out *v2beta2.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
+func Convert_autoscaling_HorizontalPodAutoscalerStatus_To_v2beta2_HorizontalPodAutoscalerStatus(in *pkgapisautoscaling.HorizontalPodAutoscalerStatus, out *apiautoscalingv2beta2.HorizontalPodAutoscalerStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_autoscaling_HorizontalPodAutoscalerStatus_To_v2beta2_HorizontalPodAutoscalerStatus(in, out, s)
 }
 
-func autoConvert_v2beta2_MetricIdentifier_To_autoscaling_MetricIdentifier(in *v2beta2.MetricIdentifier, out *autoscaling.MetricIdentifier, s conversion.Scope) error {
+func autoConvert_v2beta2_MetricIdentifier_To_autoscaling_MetricIdentifier(in *apiautoscalingv2beta2.MetricIdentifier, out *pkgapisautoscaling.MetricIdentifier, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
-	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*apismetav1.LabelSelector)(unsafe.Pointer(in.Selector))
 	return nil
 }
 
 // Convert_v2beta2_MetricIdentifier_To_autoscaling_MetricIdentifier is an autogenerated conversion function.
-func Convert_v2beta2_MetricIdentifier_To_autoscaling_MetricIdentifier(in *v2beta2.MetricIdentifier, out *autoscaling.MetricIdentifier, s conversion.Scope) error {
+func Convert_v2beta2_MetricIdentifier_To_autoscaling_MetricIdentifier(in *apiautoscalingv2beta2.MetricIdentifier, out *pkgapisautoscaling.MetricIdentifier, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v2beta2_MetricIdentifier_To_autoscaling_MetricIdentifier(in, out, s)
 }
 
-func autoConvert_autoscaling_MetricIdentifier_To_v2beta2_MetricIdentifier(in *autoscaling.MetricIdentifier, out *v2beta2.MetricIdentifier, s conversion.Scope) error {
+func autoConvert_autoscaling_MetricIdentifier_To_v2beta2_MetricIdentifier(in *pkgapisautoscaling.MetricIdentifier, out *apiautoscalingv2beta2.MetricIdentifier, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
-	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*apismetav1.LabelSelector)(unsafe.Pointer(in.Selector))
 	return nil
 }
 
 // Convert_autoscaling_MetricIdentifier_To_v2beta2_MetricIdentifier is an autogenerated conversion function.
-func Convert_autoscaling_MetricIdentifier_To_v2beta2_MetricIdentifier(in *autoscaling.MetricIdentifier, out *v2beta2.MetricIdentifier, s conversion.Scope) error {
+func Convert_autoscaling_MetricIdentifier_To_v2beta2_MetricIdentifier(in *pkgapisautoscaling.MetricIdentifier, out *apiautoscalingv2beta2.MetricIdentifier, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_autoscaling_MetricIdentifier_To_v2beta2_MetricIdentifier(in, out, s)
 }
 
-func autoConvert_v2beta2_MetricSpec_To_autoscaling_MetricSpec(in *v2beta2.MetricSpec, out *autoscaling.MetricSpec, s conversion.Scope) error {
-	out.Type = autoscaling.MetricSourceType(in.Type)
-	out.Object = (*autoscaling.ObjectMetricSource)(unsafe.Pointer(in.Object))
-	out.Pods = (*autoscaling.PodsMetricSource)(unsafe.Pointer(in.Pods))
-	out.Resource = (*autoscaling.ResourceMetricSource)(unsafe.Pointer(in.Resource))
+func autoConvert_v2beta2_MetricSpec_To_autoscaling_MetricSpec(in *apiautoscalingv2beta2.MetricSpec, out *pkgapisautoscaling.MetricSpec, s apimachinerypkgconversion.Scope) error {
+	out.Type = pkgapisautoscaling.MetricSourceType(in.Type)
+	out.Object = (*pkgapisautoscaling.ObjectMetricSource)(unsafe.Pointer(in.Object))
+	out.Pods = (*pkgapisautoscaling.PodsMetricSource)(unsafe.Pointer(in.Pods))
+	out.Resource = (*pkgapisautoscaling.ResourceMetricSource)(unsafe.Pointer(in.Resource))
 	if in.ContainerResource != nil {
 		in, out := &in.ContainerResource, &out.ContainerResource
-		*out = new(autoscaling.ContainerResourceMetricSource)
+		*out = new(pkgapisautoscaling.ContainerResourceMetricSource)
 		if err := Convert_v2beta2_ContainerResourceMetricSource_To_autoscaling_ContainerResourceMetricSource(*in, *out, s); err != nil {
 			return err
 		}
 	} else {
 		out.ContainerResource = nil
 	}
-	out.External = (*autoscaling.ExternalMetricSource)(unsafe.Pointer(in.External))
+	out.External = (*pkgapisautoscaling.ExternalMetricSource)(unsafe.Pointer(in.External))
 	return nil
 }
 
 // Convert_v2beta2_MetricSpec_To_autoscaling_MetricSpec is an autogenerated conversion function.
-func Convert_v2beta2_MetricSpec_To_autoscaling_MetricSpec(in *v2beta2.MetricSpec, out *autoscaling.MetricSpec, s conversion.Scope) error {
+func Convert_v2beta2_MetricSpec_To_autoscaling_MetricSpec(in *apiautoscalingv2beta2.MetricSpec, out *pkgapisautoscaling.MetricSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v2beta2_MetricSpec_To_autoscaling_MetricSpec(in, out, s)
 }
 
-func autoConvert_autoscaling_MetricSpec_To_v2beta2_MetricSpec(in *autoscaling.MetricSpec, out *v2beta2.MetricSpec, s conversion.Scope) error {
-	out.Type = v2beta2.MetricSourceType(in.Type)
-	out.Object = (*v2beta2.ObjectMetricSource)(unsafe.Pointer(in.Object))
-	out.Pods = (*v2beta2.PodsMetricSource)(unsafe.Pointer(in.Pods))
-	out.Resource = (*v2beta2.ResourceMetricSource)(unsafe.Pointer(in.Resource))
+func autoConvert_autoscaling_MetricSpec_To_v2beta2_MetricSpec(in *pkgapisautoscaling.MetricSpec, out *apiautoscalingv2beta2.MetricSpec, s apimachinerypkgconversion.Scope) error {
+	out.Type = apiautoscalingv2beta2.MetricSourceType(in.Type)
+	out.Object = (*apiautoscalingv2beta2.ObjectMetricSource)(unsafe.Pointer(in.Object))
+	out.Pods = (*apiautoscalingv2beta2.PodsMetricSource)(unsafe.Pointer(in.Pods))
+	out.Resource = (*apiautoscalingv2beta2.ResourceMetricSource)(unsafe.Pointer(in.Resource))
 	if in.ContainerResource != nil {
 		in, out := &in.ContainerResource, &out.ContainerResource
-		*out = new(v2beta2.ContainerResourceMetricSource)
+		*out = new(apiautoscalingv2beta2.ContainerResourceMetricSource)
 		if err := Convert_autoscaling_ContainerResourceMetricSource_To_v2beta2_ContainerResourceMetricSource(*in, *out, s); err != nil {
 			return err
 		}
 	} else {
 		out.ContainerResource = nil
 	}
-	out.External = (*v2beta2.ExternalMetricSource)(unsafe.Pointer(in.External))
+	out.External = (*apiautoscalingv2beta2.ExternalMetricSource)(unsafe.Pointer(in.External))
 	return nil
 }
 
 // Convert_autoscaling_MetricSpec_To_v2beta2_MetricSpec is an autogenerated conversion function.
-func Convert_autoscaling_MetricSpec_To_v2beta2_MetricSpec(in *autoscaling.MetricSpec, out *v2beta2.MetricSpec, s conversion.Scope) error {
+func Convert_autoscaling_MetricSpec_To_v2beta2_MetricSpec(in *pkgapisautoscaling.MetricSpec, out *apiautoscalingv2beta2.MetricSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_autoscaling_MetricSpec_To_v2beta2_MetricSpec(in, out, s)
 }
 
-func autoConvert_v2beta2_MetricStatus_To_autoscaling_MetricStatus(in *v2beta2.MetricStatus, out *autoscaling.MetricStatus, s conversion.Scope) error {
-	out.Type = autoscaling.MetricSourceType(in.Type)
-	out.Object = (*autoscaling.ObjectMetricStatus)(unsafe.Pointer(in.Object))
-	out.Pods = (*autoscaling.PodsMetricStatus)(unsafe.Pointer(in.Pods))
-	out.Resource = (*autoscaling.ResourceMetricStatus)(unsafe.Pointer(in.Resource))
+func autoConvert_v2beta2_MetricStatus_To_autoscaling_MetricStatus(in *apiautoscalingv2beta2.MetricStatus, out *pkgapisautoscaling.MetricStatus, s apimachinerypkgconversion.Scope) error {
+	out.Type = pkgapisautoscaling.MetricSourceType(in.Type)
+	out.Object = (*pkgapisautoscaling.ObjectMetricStatus)(unsafe.Pointer(in.Object))
+	out.Pods = (*pkgapisautoscaling.PodsMetricStatus)(unsafe.Pointer(in.Pods))
+	out.Resource = (*pkgapisautoscaling.ResourceMetricStatus)(unsafe.Pointer(in.Resource))
 	if in.ContainerResource != nil {
 		in, out := &in.ContainerResource, &out.ContainerResource
-		*out = new(autoscaling.ContainerResourceMetricStatus)
+		*out = new(pkgapisautoscaling.ContainerResourceMetricStatus)
 		if err := Convert_v2beta2_ContainerResourceMetricStatus_To_autoscaling_ContainerResourceMetricStatus(*in, *out, s); err != nil {
 			return err
 		}
 	} else {
 		out.ContainerResource = nil
 	}
-	out.External = (*autoscaling.ExternalMetricStatus)(unsafe.Pointer(in.External))
+	out.External = (*pkgapisautoscaling.ExternalMetricStatus)(unsafe.Pointer(in.External))
 	return nil
 }
 
 // Convert_v2beta2_MetricStatus_To_autoscaling_MetricStatus is an autogenerated conversion function.
-func Convert_v2beta2_MetricStatus_To_autoscaling_MetricStatus(in *v2beta2.MetricStatus, out *autoscaling.MetricStatus, s conversion.Scope) error {
+func Convert_v2beta2_MetricStatus_To_autoscaling_MetricStatus(in *apiautoscalingv2beta2.MetricStatus, out *pkgapisautoscaling.MetricStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v2beta2_MetricStatus_To_autoscaling_MetricStatus(in, out, s)
 }
 
-func autoConvert_autoscaling_MetricStatus_To_v2beta2_MetricStatus(in *autoscaling.MetricStatus, out *v2beta2.MetricStatus, s conversion.Scope) error {
-	out.Type = v2beta2.MetricSourceType(in.Type)
-	out.Object = (*v2beta2.ObjectMetricStatus)(unsafe.Pointer(in.Object))
-	out.Pods = (*v2beta2.PodsMetricStatus)(unsafe.Pointer(in.Pods))
-	out.Resource = (*v2beta2.ResourceMetricStatus)(unsafe.Pointer(in.Resource))
+func autoConvert_autoscaling_MetricStatus_To_v2beta2_MetricStatus(in *pkgapisautoscaling.MetricStatus, out *apiautoscalingv2beta2.MetricStatus, s apimachinerypkgconversion.Scope) error {
+	out.Type = apiautoscalingv2beta2.MetricSourceType(in.Type)
+	out.Object = (*apiautoscalingv2beta2.ObjectMetricStatus)(unsafe.Pointer(in.Object))
+	out.Pods = (*apiautoscalingv2beta2.PodsMetricStatus)(unsafe.Pointer(in.Pods))
+	out.Resource = (*apiautoscalingv2beta2.ResourceMetricStatus)(unsafe.Pointer(in.Resource))
 	if in.ContainerResource != nil {
 		in, out := &in.ContainerResource, &out.ContainerResource
-		*out = new(v2beta2.ContainerResourceMetricStatus)
+		*out = new(apiautoscalingv2beta2.ContainerResourceMetricStatus)
 		if err := Convert_autoscaling_ContainerResourceMetricStatus_To_v2beta2_ContainerResourceMetricStatus(*in, *out, s); err != nil {
 			return err
 		}
 	} else {
 		out.ContainerResource = nil
 	}
-	out.External = (*v2beta2.ExternalMetricStatus)(unsafe.Pointer(in.External))
+	out.External = (*apiautoscalingv2beta2.ExternalMetricStatus)(unsafe.Pointer(in.External))
 	return nil
 }
 
 // Convert_autoscaling_MetricStatus_To_v2beta2_MetricStatus is an autogenerated conversion function.
-func Convert_autoscaling_MetricStatus_To_v2beta2_MetricStatus(in *autoscaling.MetricStatus, out *v2beta2.MetricStatus, s conversion.Scope) error {
+func Convert_autoscaling_MetricStatus_To_v2beta2_MetricStatus(in *pkgapisautoscaling.MetricStatus, out *apiautoscalingv2beta2.MetricStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_autoscaling_MetricStatus_To_v2beta2_MetricStatus(in, out, s)
 }
 
-func autoConvert_v2beta2_MetricTarget_To_autoscaling_MetricTarget(in *v2beta2.MetricTarget, out *autoscaling.MetricTarget, s conversion.Scope) error {
-	out.Type = autoscaling.MetricTargetType(in.Type)
-	out.Value = (*resource.Quantity)(unsafe.Pointer(in.Value))
-	out.AverageValue = (*resource.Quantity)(unsafe.Pointer(in.AverageValue))
+func autoConvert_v2beta2_MetricTarget_To_autoscaling_MetricTarget(in *apiautoscalingv2beta2.MetricTarget, out *pkgapisautoscaling.MetricTarget, s apimachinerypkgconversion.Scope) error {
+	out.Type = pkgapisautoscaling.MetricTargetType(in.Type)
+	out.Value = (*pkgapiresource.Quantity)(unsafe.Pointer(in.Value))
+	out.AverageValue = (*pkgapiresource.Quantity)(unsafe.Pointer(in.AverageValue))
 	out.AverageUtilization = (*int32)(unsafe.Pointer(in.AverageUtilization))
 	return nil
 }
 
 // Convert_v2beta2_MetricTarget_To_autoscaling_MetricTarget is an autogenerated conversion function.
-func Convert_v2beta2_MetricTarget_To_autoscaling_MetricTarget(in *v2beta2.MetricTarget, out *autoscaling.MetricTarget, s conversion.Scope) error {
+func Convert_v2beta2_MetricTarget_To_autoscaling_MetricTarget(in *apiautoscalingv2beta2.MetricTarget, out *pkgapisautoscaling.MetricTarget, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v2beta2_MetricTarget_To_autoscaling_MetricTarget(in, out, s)
 }
 
-func autoConvert_autoscaling_MetricTarget_To_v2beta2_MetricTarget(in *autoscaling.MetricTarget, out *v2beta2.MetricTarget, s conversion.Scope) error {
-	out.Type = v2beta2.MetricTargetType(in.Type)
-	out.Value = (*resource.Quantity)(unsafe.Pointer(in.Value))
-	out.AverageValue = (*resource.Quantity)(unsafe.Pointer(in.AverageValue))
+func autoConvert_autoscaling_MetricTarget_To_v2beta2_MetricTarget(in *pkgapisautoscaling.MetricTarget, out *apiautoscalingv2beta2.MetricTarget, s apimachinerypkgconversion.Scope) error {
+	out.Type = apiautoscalingv2beta2.MetricTargetType(in.Type)
+	out.Value = (*pkgapiresource.Quantity)(unsafe.Pointer(in.Value))
+	out.AverageValue = (*pkgapiresource.Quantity)(unsafe.Pointer(in.AverageValue))
 	out.AverageUtilization = (*int32)(unsafe.Pointer(in.AverageUtilization))
 	return nil
 }
 
 // Convert_autoscaling_MetricTarget_To_v2beta2_MetricTarget is an autogenerated conversion function.
-func Convert_autoscaling_MetricTarget_To_v2beta2_MetricTarget(in *autoscaling.MetricTarget, out *v2beta2.MetricTarget, s conversion.Scope) error {
+func Convert_autoscaling_MetricTarget_To_v2beta2_MetricTarget(in *pkgapisautoscaling.MetricTarget, out *apiautoscalingv2beta2.MetricTarget, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_autoscaling_MetricTarget_To_v2beta2_MetricTarget(in, out, s)
 }
 
-func autoConvert_v2beta2_MetricValueStatus_To_autoscaling_MetricValueStatus(in *v2beta2.MetricValueStatus, out *autoscaling.MetricValueStatus, s conversion.Scope) error {
-	out.Value = (*resource.Quantity)(unsafe.Pointer(in.Value))
-	out.AverageValue = (*resource.Quantity)(unsafe.Pointer(in.AverageValue))
+func autoConvert_v2beta2_MetricValueStatus_To_autoscaling_MetricValueStatus(in *apiautoscalingv2beta2.MetricValueStatus, out *pkgapisautoscaling.MetricValueStatus, s apimachinerypkgconversion.Scope) error {
+	out.Value = (*pkgapiresource.Quantity)(unsafe.Pointer(in.Value))
+	out.AverageValue = (*pkgapiresource.Quantity)(unsafe.Pointer(in.AverageValue))
 	out.AverageUtilization = (*int32)(unsafe.Pointer(in.AverageUtilization))
 	return nil
 }
 
 // Convert_v2beta2_MetricValueStatus_To_autoscaling_MetricValueStatus is an autogenerated conversion function.
-func Convert_v2beta2_MetricValueStatus_To_autoscaling_MetricValueStatus(in *v2beta2.MetricValueStatus, out *autoscaling.MetricValueStatus, s conversion.Scope) error {
+func Convert_v2beta2_MetricValueStatus_To_autoscaling_MetricValueStatus(in *apiautoscalingv2beta2.MetricValueStatus, out *pkgapisautoscaling.MetricValueStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v2beta2_MetricValueStatus_To_autoscaling_MetricValueStatus(in, out, s)
 }
 
-func autoConvert_autoscaling_MetricValueStatus_To_v2beta2_MetricValueStatus(in *autoscaling.MetricValueStatus, out *v2beta2.MetricValueStatus, s conversion.Scope) error {
-	out.Value = (*resource.Quantity)(unsafe.Pointer(in.Value))
-	out.AverageValue = (*resource.Quantity)(unsafe.Pointer(in.AverageValue))
+func autoConvert_autoscaling_MetricValueStatus_To_v2beta2_MetricValueStatus(in *pkgapisautoscaling.MetricValueStatus, out *apiautoscalingv2beta2.MetricValueStatus, s apimachinerypkgconversion.Scope) error {
+	out.Value = (*pkgapiresource.Quantity)(unsafe.Pointer(in.Value))
+	out.AverageValue = (*pkgapiresource.Quantity)(unsafe.Pointer(in.AverageValue))
 	out.AverageUtilization = (*int32)(unsafe.Pointer(in.AverageUtilization))
 	return nil
 }
 
 // Convert_autoscaling_MetricValueStatus_To_v2beta2_MetricValueStatus is an autogenerated conversion function.
-func Convert_autoscaling_MetricValueStatus_To_v2beta2_MetricValueStatus(in *autoscaling.MetricValueStatus, out *v2beta2.MetricValueStatus, s conversion.Scope) error {
+func Convert_autoscaling_MetricValueStatus_To_v2beta2_MetricValueStatus(in *pkgapisautoscaling.MetricValueStatus, out *apiautoscalingv2beta2.MetricValueStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_autoscaling_MetricValueStatus_To_v2beta2_MetricValueStatus(in, out, s)
 }
 
-func autoConvert_v2beta2_ObjectMetricSource_To_autoscaling_ObjectMetricSource(in *v2beta2.ObjectMetricSource, out *autoscaling.ObjectMetricSource, s conversion.Scope) error {
+func autoConvert_v2beta2_ObjectMetricSource_To_autoscaling_ObjectMetricSource(in *apiautoscalingv2beta2.ObjectMetricSource, out *pkgapisautoscaling.ObjectMetricSource, s apimachinerypkgconversion.Scope) error {
 	if err := Convert_v2beta2_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectReference(&in.DescribedObject, &out.DescribedObject, s); err != nil {
 		return err
 	}
@@ -866,11 +866,11 @@ func autoConvert_v2beta2_ObjectMetricSource_To_autoscaling_ObjectMetricSource(in
 }
 
 // Convert_v2beta2_ObjectMetricSource_To_autoscaling_ObjectMetricSource is an autogenerated conversion function.
-func Convert_v2beta2_ObjectMetricSource_To_autoscaling_ObjectMetricSource(in *v2beta2.ObjectMetricSource, out *autoscaling.ObjectMetricSource, s conversion.Scope) error {
+func Convert_v2beta2_ObjectMetricSource_To_autoscaling_ObjectMetricSource(in *apiautoscalingv2beta2.ObjectMetricSource, out *pkgapisautoscaling.ObjectMetricSource, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v2beta2_ObjectMetricSource_To_autoscaling_ObjectMetricSource(in, out, s)
 }
 
-func autoConvert_autoscaling_ObjectMetricSource_To_v2beta2_ObjectMetricSource(in *autoscaling.ObjectMetricSource, out *v2beta2.ObjectMetricSource, s conversion.Scope) error {
+func autoConvert_autoscaling_ObjectMetricSource_To_v2beta2_ObjectMetricSource(in *pkgapisautoscaling.ObjectMetricSource, out *apiautoscalingv2beta2.ObjectMetricSource, s apimachinerypkgconversion.Scope) error {
 	if err := Convert_autoscaling_CrossVersionObjectReference_To_v2beta2_CrossVersionObjectReference(&in.DescribedObject, &out.DescribedObject, s); err != nil {
 		return err
 	}
@@ -884,11 +884,11 @@ func autoConvert_autoscaling_ObjectMetricSource_To_v2beta2_ObjectMetricSource(in
 }
 
 // Convert_autoscaling_ObjectMetricSource_To_v2beta2_ObjectMetricSource is an autogenerated conversion function.
-func Convert_autoscaling_ObjectMetricSource_To_v2beta2_ObjectMetricSource(in *autoscaling.ObjectMetricSource, out *v2beta2.ObjectMetricSource, s conversion.Scope) error {
+func Convert_autoscaling_ObjectMetricSource_To_v2beta2_ObjectMetricSource(in *pkgapisautoscaling.ObjectMetricSource, out *apiautoscalingv2beta2.ObjectMetricSource, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_autoscaling_ObjectMetricSource_To_v2beta2_ObjectMetricSource(in, out, s)
 }
 
-func autoConvert_v2beta2_ObjectMetricStatus_To_autoscaling_ObjectMetricStatus(in *v2beta2.ObjectMetricStatus, out *autoscaling.ObjectMetricStatus, s conversion.Scope) error {
+func autoConvert_v2beta2_ObjectMetricStatus_To_autoscaling_ObjectMetricStatus(in *apiautoscalingv2beta2.ObjectMetricStatus, out *pkgapisautoscaling.ObjectMetricStatus, s apimachinerypkgconversion.Scope) error {
 	if err := Convert_v2beta2_MetricIdentifier_To_autoscaling_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
 		return err
 	}
@@ -902,11 +902,11 @@ func autoConvert_v2beta2_ObjectMetricStatus_To_autoscaling_ObjectMetricStatus(in
 }
 
 // Convert_v2beta2_ObjectMetricStatus_To_autoscaling_ObjectMetricStatus is an autogenerated conversion function.
-func Convert_v2beta2_ObjectMetricStatus_To_autoscaling_ObjectMetricStatus(in *v2beta2.ObjectMetricStatus, out *autoscaling.ObjectMetricStatus, s conversion.Scope) error {
+func Convert_v2beta2_ObjectMetricStatus_To_autoscaling_ObjectMetricStatus(in *apiautoscalingv2beta2.ObjectMetricStatus, out *pkgapisautoscaling.ObjectMetricStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v2beta2_ObjectMetricStatus_To_autoscaling_ObjectMetricStatus(in, out, s)
 }
 
-func autoConvert_autoscaling_ObjectMetricStatus_To_v2beta2_ObjectMetricStatus(in *autoscaling.ObjectMetricStatus, out *v2beta2.ObjectMetricStatus, s conversion.Scope) error {
+func autoConvert_autoscaling_ObjectMetricStatus_To_v2beta2_ObjectMetricStatus(in *pkgapisautoscaling.ObjectMetricStatus, out *apiautoscalingv2beta2.ObjectMetricStatus, s apimachinerypkgconversion.Scope) error {
 	if err := Convert_autoscaling_MetricIdentifier_To_v2beta2_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
 		return err
 	}
@@ -920,11 +920,11 @@ func autoConvert_autoscaling_ObjectMetricStatus_To_v2beta2_ObjectMetricStatus(in
 }
 
 // Convert_autoscaling_ObjectMetricStatus_To_v2beta2_ObjectMetricStatus is an autogenerated conversion function.
-func Convert_autoscaling_ObjectMetricStatus_To_v2beta2_ObjectMetricStatus(in *autoscaling.ObjectMetricStatus, out *v2beta2.ObjectMetricStatus, s conversion.Scope) error {
+func Convert_autoscaling_ObjectMetricStatus_To_v2beta2_ObjectMetricStatus(in *pkgapisautoscaling.ObjectMetricStatus, out *apiautoscalingv2beta2.ObjectMetricStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_autoscaling_ObjectMetricStatus_To_v2beta2_ObjectMetricStatus(in, out, s)
 }
 
-func autoConvert_v2beta2_PodsMetricSource_To_autoscaling_PodsMetricSource(in *v2beta2.PodsMetricSource, out *autoscaling.PodsMetricSource, s conversion.Scope) error {
+func autoConvert_v2beta2_PodsMetricSource_To_autoscaling_PodsMetricSource(in *apiautoscalingv2beta2.PodsMetricSource, out *pkgapisautoscaling.PodsMetricSource, s apimachinerypkgconversion.Scope) error {
 	if err := Convert_v2beta2_MetricIdentifier_To_autoscaling_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
 		return err
 	}
@@ -935,11 +935,11 @@ func autoConvert_v2beta2_PodsMetricSource_To_autoscaling_PodsMetricSource(in *v2
 }
 
 // Convert_v2beta2_PodsMetricSource_To_autoscaling_PodsMetricSource is an autogenerated conversion function.
-func Convert_v2beta2_PodsMetricSource_To_autoscaling_PodsMetricSource(in *v2beta2.PodsMetricSource, out *autoscaling.PodsMetricSource, s conversion.Scope) error {
+func Convert_v2beta2_PodsMetricSource_To_autoscaling_PodsMetricSource(in *apiautoscalingv2beta2.PodsMetricSource, out *pkgapisautoscaling.PodsMetricSource, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v2beta2_PodsMetricSource_To_autoscaling_PodsMetricSource(in, out, s)
 }
 
-func autoConvert_autoscaling_PodsMetricSource_To_v2beta2_PodsMetricSource(in *autoscaling.PodsMetricSource, out *v2beta2.PodsMetricSource, s conversion.Scope) error {
+func autoConvert_autoscaling_PodsMetricSource_To_v2beta2_PodsMetricSource(in *pkgapisautoscaling.PodsMetricSource, out *apiautoscalingv2beta2.PodsMetricSource, s apimachinerypkgconversion.Scope) error {
 	if err := Convert_autoscaling_MetricIdentifier_To_v2beta2_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
 		return err
 	}
@@ -950,11 +950,11 @@ func autoConvert_autoscaling_PodsMetricSource_To_v2beta2_PodsMetricSource(in *au
 }
 
 // Convert_autoscaling_PodsMetricSource_To_v2beta2_PodsMetricSource is an autogenerated conversion function.
-func Convert_autoscaling_PodsMetricSource_To_v2beta2_PodsMetricSource(in *autoscaling.PodsMetricSource, out *v2beta2.PodsMetricSource, s conversion.Scope) error {
+func Convert_autoscaling_PodsMetricSource_To_v2beta2_PodsMetricSource(in *pkgapisautoscaling.PodsMetricSource, out *apiautoscalingv2beta2.PodsMetricSource, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_autoscaling_PodsMetricSource_To_v2beta2_PodsMetricSource(in, out, s)
 }
 
-func autoConvert_v2beta2_PodsMetricStatus_To_autoscaling_PodsMetricStatus(in *v2beta2.PodsMetricStatus, out *autoscaling.PodsMetricStatus, s conversion.Scope) error {
+func autoConvert_v2beta2_PodsMetricStatus_To_autoscaling_PodsMetricStatus(in *apiautoscalingv2beta2.PodsMetricStatus, out *pkgapisautoscaling.PodsMetricStatus, s apimachinerypkgconversion.Scope) error {
 	if err := Convert_v2beta2_MetricIdentifier_To_autoscaling_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
 		return err
 	}
@@ -965,11 +965,11 @@ func autoConvert_v2beta2_PodsMetricStatus_To_autoscaling_PodsMetricStatus(in *v2
 }
 
 // Convert_v2beta2_PodsMetricStatus_To_autoscaling_PodsMetricStatus is an autogenerated conversion function.
-func Convert_v2beta2_PodsMetricStatus_To_autoscaling_PodsMetricStatus(in *v2beta2.PodsMetricStatus, out *autoscaling.PodsMetricStatus, s conversion.Scope) error {
+func Convert_v2beta2_PodsMetricStatus_To_autoscaling_PodsMetricStatus(in *apiautoscalingv2beta2.PodsMetricStatus, out *pkgapisautoscaling.PodsMetricStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v2beta2_PodsMetricStatus_To_autoscaling_PodsMetricStatus(in, out, s)
 }
 
-func autoConvert_autoscaling_PodsMetricStatus_To_v2beta2_PodsMetricStatus(in *autoscaling.PodsMetricStatus, out *v2beta2.PodsMetricStatus, s conversion.Scope) error {
+func autoConvert_autoscaling_PodsMetricStatus_To_v2beta2_PodsMetricStatus(in *pkgapisautoscaling.PodsMetricStatus, out *apiautoscalingv2beta2.PodsMetricStatus, s apimachinerypkgconversion.Scope) error {
 	if err := Convert_autoscaling_MetricIdentifier_To_v2beta2_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
 		return err
 	}
@@ -980,12 +980,12 @@ func autoConvert_autoscaling_PodsMetricStatus_To_v2beta2_PodsMetricStatus(in *au
 }
 
 // Convert_autoscaling_PodsMetricStatus_To_v2beta2_PodsMetricStatus is an autogenerated conversion function.
-func Convert_autoscaling_PodsMetricStatus_To_v2beta2_PodsMetricStatus(in *autoscaling.PodsMetricStatus, out *v2beta2.PodsMetricStatus, s conversion.Scope) error {
+func Convert_autoscaling_PodsMetricStatus_To_v2beta2_PodsMetricStatus(in *pkgapisautoscaling.PodsMetricStatus, out *apiautoscalingv2beta2.PodsMetricStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_autoscaling_PodsMetricStatus_To_v2beta2_PodsMetricStatus(in, out, s)
 }
 
-func autoConvert_v2beta2_ResourceMetricSource_To_autoscaling_ResourceMetricSource(in *v2beta2.ResourceMetricSource, out *autoscaling.ResourceMetricSource, s conversion.Scope) error {
-	out.Name = core.ResourceName(in.Name)
+func autoConvert_v2beta2_ResourceMetricSource_To_autoscaling_ResourceMetricSource(in *apiautoscalingv2beta2.ResourceMetricSource, out *pkgapisautoscaling.ResourceMetricSource, s apimachinerypkgconversion.Scope) error {
+	out.Name = pkgapiscore.ResourceName(in.Name)
 	if err := Convert_v2beta2_MetricTarget_To_autoscaling_MetricTarget(&in.Target, &out.Target, s); err != nil {
 		return err
 	}
@@ -993,12 +993,12 @@ func autoConvert_v2beta2_ResourceMetricSource_To_autoscaling_ResourceMetricSourc
 }
 
 // Convert_v2beta2_ResourceMetricSource_To_autoscaling_ResourceMetricSource is an autogenerated conversion function.
-func Convert_v2beta2_ResourceMetricSource_To_autoscaling_ResourceMetricSource(in *v2beta2.ResourceMetricSource, out *autoscaling.ResourceMetricSource, s conversion.Scope) error {
+func Convert_v2beta2_ResourceMetricSource_To_autoscaling_ResourceMetricSource(in *apiautoscalingv2beta2.ResourceMetricSource, out *pkgapisautoscaling.ResourceMetricSource, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v2beta2_ResourceMetricSource_To_autoscaling_ResourceMetricSource(in, out, s)
 }
 
-func autoConvert_autoscaling_ResourceMetricSource_To_v2beta2_ResourceMetricSource(in *autoscaling.ResourceMetricSource, out *v2beta2.ResourceMetricSource, s conversion.Scope) error {
-	out.Name = v1.ResourceName(in.Name)
+func autoConvert_autoscaling_ResourceMetricSource_To_v2beta2_ResourceMetricSource(in *pkgapisautoscaling.ResourceMetricSource, out *apiautoscalingv2beta2.ResourceMetricSource, s apimachinerypkgconversion.Scope) error {
+	out.Name = apicorev1.ResourceName(in.Name)
 	if err := Convert_autoscaling_MetricTarget_To_v2beta2_MetricTarget(&in.Target, &out.Target, s); err != nil {
 		return err
 	}
@@ -1006,12 +1006,12 @@ func autoConvert_autoscaling_ResourceMetricSource_To_v2beta2_ResourceMetricSourc
 }
 
 // Convert_autoscaling_ResourceMetricSource_To_v2beta2_ResourceMetricSource is an autogenerated conversion function.
-func Convert_autoscaling_ResourceMetricSource_To_v2beta2_ResourceMetricSource(in *autoscaling.ResourceMetricSource, out *v2beta2.ResourceMetricSource, s conversion.Scope) error {
+func Convert_autoscaling_ResourceMetricSource_To_v2beta2_ResourceMetricSource(in *pkgapisautoscaling.ResourceMetricSource, out *apiautoscalingv2beta2.ResourceMetricSource, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_autoscaling_ResourceMetricSource_To_v2beta2_ResourceMetricSource(in, out, s)
 }
 
-func autoConvert_v2beta2_ResourceMetricStatus_To_autoscaling_ResourceMetricStatus(in *v2beta2.ResourceMetricStatus, out *autoscaling.ResourceMetricStatus, s conversion.Scope) error {
-	out.Name = core.ResourceName(in.Name)
+func autoConvert_v2beta2_ResourceMetricStatus_To_autoscaling_ResourceMetricStatus(in *apiautoscalingv2beta2.ResourceMetricStatus, out *pkgapisautoscaling.ResourceMetricStatus, s apimachinerypkgconversion.Scope) error {
+	out.Name = pkgapiscore.ResourceName(in.Name)
 	if err := Convert_v2beta2_MetricValueStatus_To_autoscaling_MetricValueStatus(&in.Current, &out.Current, s); err != nil {
 		return err
 	}
@@ -1019,12 +1019,12 @@ func autoConvert_v2beta2_ResourceMetricStatus_To_autoscaling_ResourceMetricStatu
 }
 
 // Convert_v2beta2_ResourceMetricStatus_To_autoscaling_ResourceMetricStatus is an autogenerated conversion function.
-func Convert_v2beta2_ResourceMetricStatus_To_autoscaling_ResourceMetricStatus(in *v2beta2.ResourceMetricStatus, out *autoscaling.ResourceMetricStatus, s conversion.Scope) error {
+func Convert_v2beta2_ResourceMetricStatus_To_autoscaling_ResourceMetricStatus(in *apiautoscalingv2beta2.ResourceMetricStatus, out *pkgapisautoscaling.ResourceMetricStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v2beta2_ResourceMetricStatus_To_autoscaling_ResourceMetricStatus(in, out, s)
 }
 
-func autoConvert_autoscaling_ResourceMetricStatus_To_v2beta2_ResourceMetricStatus(in *autoscaling.ResourceMetricStatus, out *v2beta2.ResourceMetricStatus, s conversion.Scope) error {
-	out.Name = v1.ResourceName(in.Name)
+func autoConvert_autoscaling_ResourceMetricStatus_To_v2beta2_ResourceMetricStatus(in *pkgapisautoscaling.ResourceMetricStatus, out *apiautoscalingv2beta2.ResourceMetricStatus, s apimachinerypkgconversion.Scope) error {
+	out.Name = apicorev1.ResourceName(in.Name)
 	if err := Convert_autoscaling_MetricValueStatus_To_v2beta2_MetricValueStatus(&in.Current, &out.Current, s); err != nil {
 		return err
 	}
@@ -1032,6 +1032,6 @@ func autoConvert_autoscaling_ResourceMetricStatus_To_v2beta2_ResourceMetricStatu
 }
 
 // Convert_autoscaling_ResourceMetricStatus_To_v2beta2_ResourceMetricStatus is an autogenerated conversion function.
-func Convert_autoscaling_ResourceMetricStatus_To_v2beta2_ResourceMetricStatus(in *autoscaling.ResourceMetricStatus, out *v2beta2.ResourceMetricStatus, s conversion.Scope) error {
+func Convert_autoscaling_ResourceMetricStatus_To_v2beta2_ResourceMetricStatus(in *pkgapisautoscaling.ResourceMetricStatus, out *apiautoscalingv2beta2.ResourceMetricStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_autoscaling_ResourceMetricStatus_To_v2beta2_ResourceMetricStatus(in, out, s)
 }

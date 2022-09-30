@@ -24,10 +24,10 @@ package v1beta1
 import (
 	"unsafe"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	pkgapisapiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration"
 )
 
 func init() {
@@ -36,71 +36,71 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*APIService)(nil), (*apiregistration.APIService)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_APIService_To_apiregistration_APIService(a.(*APIService), b.(*apiregistration.APIService), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*APIService)(nil), (*pkgapisapiregistration.APIService)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_APIService_To_apiregistration_APIService(a.(*APIService), b.(*pkgapisapiregistration.APIService), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiregistration.APIService)(nil), (*APIService)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiregistration_APIService_To_v1beta1_APIService(a.(*apiregistration.APIService), b.(*APIService), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiregistration.APIService)(nil), (*APIService)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiregistration_APIService_To_v1beta1_APIService(a.(*pkgapisapiregistration.APIService), b.(*APIService), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*APIServiceCondition)(nil), (*apiregistration.APIServiceCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_APIServiceCondition_To_apiregistration_APIServiceCondition(a.(*APIServiceCondition), b.(*apiregistration.APIServiceCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*APIServiceCondition)(nil), (*pkgapisapiregistration.APIServiceCondition)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_APIServiceCondition_To_apiregistration_APIServiceCondition(a.(*APIServiceCondition), b.(*pkgapisapiregistration.APIServiceCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiregistration.APIServiceCondition)(nil), (*APIServiceCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiregistration_APIServiceCondition_To_v1beta1_APIServiceCondition(a.(*apiregistration.APIServiceCondition), b.(*APIServiceCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiregistration.APIServiceCondition)(nil), (*APIServiceCondition)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiregistration_APIServiceCondition_To_v1beta1_APIServiceCondition(a.(*pkgapisapiregistration.APIServiceCondition), b.(*APIServiceCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*APIServiceList)(nil), (*apiregistration.APIServiceList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_APIServiceList_To_apiregistration_APIServiceList(a.(*APIServiceList), b.(*apiregistration.APIServiceList), scope)
+	if err := s.AddGeneratedConversionFunc((*APIServiceList)(nil), (*pkgapisapiregistration.APIServiceList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_APIServiceList_To_apiregistration_APIServiceList(a.(*APIServiceList), b.(*pkgapisapiregistration.APIServiceList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiregistration.APIServiceList)(nil), (*APIServiceList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiregistration_APIServiceList_To_v1beta1_APIServiceList(a.(*apiregistration.APIServiceList), b.(*APIServiceList), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiregistration.APIServiceList)(nil), (*APIServiceList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiregistration_APIServiceList_To_v1beta1_APIServiceList(a.(*pkgapisapiregistration.APIServiceList), b.(*APIServiceList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*APIServiceSpec)(nil), (*apiregistration.APIServiceSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_APIServiceSpec_To_apiregistration_APIServiceSpec(a.(*APIServiceSpec), b.(*apiregistration.APIServiceSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*APIServiceSpec)(nil), (*pkgapisapiregistration.APIServiceSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_APIServiceSpec_To_apiregistration_APIServiceSpec(a.(*APIServiceSpec), b.(*pkgapisapiregistration.APIServiceSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiregistration.APIServiceSpec)(nil), (*APIServiceSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiregistration_APIServiceSpec_To_v1beta1_APIServiceSpec(a.(*apiregistration.APIServiceSpec), b.(*APIServiceSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiregistration.APIServiceSpec)(nil), (*APIServiceSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiregistration_APIServiceSpec_To_v1beta1_APIServiceSpec(a.(*pkgapisapiregistration.APIServiceSpec), b.(*APIServiceSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*APIServiceStatus)(nil), (*apiregistration.APIServiceStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_APIServiceStatus_To_apiregistration_APIServiceStatus(a.(*APIServiceStatus), b.(*apiregistration.APIServiceStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*APIServiceStatus)(nil), (*pkgapisapiregistration.APIServiceStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_APIServiceStatus_To_apiregistration_APIServiceStatus(a.(*APIServiceStatus), b.(*pkgapisapiregistration.APIServiceStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiregistration.APIServiceStatus)(nil), (*APIServiceStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiregistration_APIServiceStatus_To_v1beta1_APIServiceStatus(a.(*apiregistration.APIServiceStatus), b.(*APIServiceStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiregistration.APIServiceStatus)(nil), (*APIServiceStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiregistration_APIServiceStatus_To_v1beta1_APIServiceStatus(a.(*pkgapisapiregistration.APIServiceStatus), b.(*APIServiceStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*ServiceReference)(nil), (*apiregistration.ServiceReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_ServiceReference_To_apiregistration_ServiceReference(a.(*ServiceReference), b.(*apiregistration.ServiceReference), scope)
+	if err := s.AddGeneratedConversionFunc((*ServiceReference)(nil), (*pkgapisapiregistration.ServiceReference)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_ServiceReference_To_apiregistration_ServiceReference(a.(*ServiceReference), b.(*pkgapisapiregistration.ServiceReference), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiregistration.ServiceReference)(nil), (*ServiceReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiregistration_ServiceReference_To_v1beta1_ServiceReference(a.(*apiregistration.ServiceReference), b.(*ServiceReference), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiregistration.ServiceReference)(nil), (*ServiceReference)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiregistration_ServiceReference_To_v1beta1_ServiceReference(a.(*pkgapisapiregistration.ServiceReference), b.(*ServiceReference), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1beta1_APIService_To_apiregistration_APIService(in *APIService, out *apiregistration.APIService, s conversion.Scope) error {
+func autoConvert_v1beta1_APIService_To_apiregistration_APIService(in *APIService, out *pkgapisapiregistration.APIService, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_APIServiceSpec_To_apiregistration_APIServiceSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -112,11 +112,11 @@ func autoConvert_v1beta1_APIService_To_apiregistration_APIService(in *APIService
 }
 
 // Convert_v1beta1_APIService_To_apiregistration_APIService is an autogenerated conversion function.
-func Convert_v1beta1_APIService_To_apiregistration_APIService(in *APIService, out *apiregistration.APIService, s conversion.Scope) error {
+func Convert_v1beta1_APIService_To_apiregistration_APIService(in *APIService, out *pkgapisapiregistration.APIService, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_APIService_To_apiregistration_APIService(in, out, s)
 }
 
-func autoConvert_apiregistration_APIService_To_v1beta1_APIService(in *apiregistration.APIService, out *APIService, s conversion.Scope) error {
+func autoConvert_apiregistration_APIService_To_v1beta1_APIService(in *pkgapisapiregistration.APIService, out *APIService, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apiregistration_APIServiceSpec_To_v1beta1_APIServiceSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -128,13 +128,13 @@ func autoConvert_apiregistration_APIService_To_v1beta1_APIService(in *apiregistr
 }
 
 // Convert_apiregistration_APIService_To_v1beta1_APIService is an autogenerated conversion function.
-func Convert_apiregistration_APIService_To_v1beta1_APIService(in *apiregistration.APIService, out *APIService, s conversion.Scope) error {
+func Convert_apiregistration_APIService_To_v1beta1_APIService(in *pkgapisapiregistration.APIService, out *APIService, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiregistration_APIService_To_v1beta1_APIService(in, out, s)
 }
 
-func autoConvert_v1beta1_APIServiceCondition_To_apiregistration_APIServiceCondition(in *APIServiceCondition, out *apiregistration.APIServiceCondition, s conversion.Scope) error {
-	out.Type = apiregistration.APIServiceConditionType(in.Type)
-	out.Status = apiregistration.ConditionStatus(in.Status)
+func autoConvert_v1beta1_APIServiceCondition_To_apiregistration_APIServiceCondition(in *APIServiceCondition, out *pkgapisapiregistration.APIServiceCondition, s apimachinerypkgconversion.Scope) error {
+	out.Type = pkgapisapiregistration.APIServiceConditionType(in.Type)
+	out.Status = pkgapisapiregistration.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
@@ -142,11 +142,11 @@ func autoConvert_v1beta1_APIServiceCondition_To_apiregistration_APIServiceCondit
 }
 
 // Convert_v1beta1_APIServiceCondition_To_apiregistration_APIServiceCondition is an autogenerated conversion function.
-func Convert_v1beta1_APIServiceCondition_To_apiregistration_APIServiceCondition(in *APIServiceCondition, out *apiregistration.APIServiceCondition, s conversion.Scope) error {
+func Convert_v1beta1_APIServiceCondition_To_apiregistration_APIServiceCondition(in *APIServiceCondition, out *pkgapisapiregistration.APIServiceCondition, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_APIServiceCondition_To_apiregistration_APIServiceCondition(in, out, s)
 }
 
-func autoConvert_apiregistration_APIServiceCondition_To_v1beta1_APIServiceCondition(in *apiregistration.APIServiceCondition, out *APIServiceCondition, s conversion.Scope) error {
+func autoConvert_apiregistration_APIServiceCondition_To_v1beta1_APIServiceCondition(in *pkgapisapiregistration.APIServiceCondition, out *APIServiceCondition, s apimachinerypkgconversion.Scope) error {
 	out.Type = APIServiceConditionType(in.Type)
 	out.Status = ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
@@ -156,15 +156,15 @@ func autoConvert_apiregistration_APIServiceCondition_To_v1beta1_APIServiceCondit
 }
 
 // Convert_apiregistration_APIServiceCondition_To_v1beta1_APIServiceCondition is an autogenerated conversion function.
-func Convert_apiregistration_APIServiceCondition_To_v1beta1_APIServiceCondition(in *apiregistration.APIServiceCondition, out *APIServiceCondition, s conversion.Scope) error {
+func Convert_apiregistration_APIServiceCondition_To_v1beta1_APIServiceCondition(in *pkgapisapiregistration.APIServiceCondition, out *APIServiceCondition, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiregistration_APIServiceCondition_To_v1beta1_APIServiceCondition(in, out, s)
 }
 
-func autoConvert_v1beta1_APIServiceList_To_apiregistration_APIServiceList(in *APIServiceList, out *apiregistration.APIServiceList, s conversion.Scope) error {
+func autoConvert_v1beta1_APIServiceList_To_apiregistration_APIServiceList(in *APIServiceList, out *pkgapisapiregistration.APIServiceList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]apiregistration.APIService, len(*in))
+		*out = make([]pkgapisapiregistration.APIService, len(*in))
 		for i := range *in {
 			if err := Convert_v1beta1_APIService_To_apiregistration_APIService(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -177,11 +177,11 @@ func autoConvert_v1beta1_APIServiceList_To_apiregistration_APIServiceList(in *AP
 }
 
 // Convert_v1beta1_APIServiceList_To_apiregistration_APIServiceList is an autogenerated conversion function.
-func Convert_v1beta1_APIServiceList_To_apiregistration_APIServiceList(in *APIServiceList, out *apiregistration.APIServiceList, s conversion.Scope) error {
+func Convert_v1beta1_APIServiceList_To_apiregistration_APIServiceList(in *APIServiceList, out *pkgapisapiregistration.APIServiceList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_APIServiceList_To_apiregistration_APIServiceList(in, out, s)
 }
 
-func autoConvert_apiregistration_APIServiceList_To_v1beta1_APIServiceList(in *apiregistration.APIServiceList, out *APIServiceList, s conversion.Scope) error {
+func autoConvert_apiregistration_APIServiceList_To_v1beta1_APIServiceList(in *pkgapisapiregistration.APIServiceList, out *APIServiceList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -198,14 +198,14 @@ func autoConvert_apiregistration_APIServiceList_To_v1beta1_APIServiceList(in *ap
 }
 
 // Convert_apiregistration_APIServiceList_To_v1beta1_APIServiceList is an autogenerated conversion function.
-func Convert_apiregistration_APIServiceList_To_v1beta1_APIServiceList(in *apiregistration.APIServiceList, out *APIServiceList, s conversion.Scope) error {
+func Convert_apiregistration_APIServiceList_To_v1beta1_APIServiceList(in *pkgapisapiregistration.APIServiceList, out *APIServiceList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiregistration_APIServiceList_To_v1beta1_APIServiceList(in, out, s)
 }
 
-func autoConvert_v1beta1_APIServiceSpec_To_apiregistration_APIServiceSpec(in *APIServiceSpec, out *apiregistration.APIServiceSpec, s conversion.Scope) error {
+func autoConvert_v1beta1_APIServiceSpec_To_apiregistration_APIServiceSpec(in *APIServiceSpec, out *pkgapisapiregistration.APIServiceSpec, s apimachinerypkgconversion.Scope) error {
 	if in.Service != nil {
 		in, out := &in.Service, &out.Service
-		*out = new(apiregistration.ServiceReference)
+		*out = new(pkgapisapiregistration.ServiceReference)
 		if err := Convert_v1beta1_ServiceReference_To_apiregistration_ServiceReference(*in, *out, s); err != nil {
 			return err
 		}
@@ -222,11 +222,11 @@ func autoConvert_v1beta1_APIServiceSpec_To_apiregistration_APIServiceSpec(in *AP
 }
 
 // Convert_v1beta1_APIServiceSpec_To_apiregistration_APIServiceSpec is an autogenerated conversion function.
-func Convert_v1beta1_APIServiceSpec_To_apiregistration_APIServiceSpec(in *APIServiceSpec, out *apiregistration.APIServiceSpec, s conversion.Scope) error {
+func Convert_v1beta1_APIServiceSpec_To_apiregistration_APIServiceSpec(in *APIServiceSpec, out *pkgapisapiregistration.APIServiceSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_APIServiceSpec_To_apiregistration_APIServiceSpec(in, out, s)
 }
 
-func autoConvert_apiregistration_APIServiceSpec_To_v1beta1_APIServiceSpec(in *apiregistration.APIServiceSpec, out *APIServiceSpec, s conversion.Scope) error {
+func autoConvert_apiregistration_APIServiceSpec_To_v1beta1_APIServiceSpec(in *pkgapisapiregistration.APIServiceSpec, out *APIServiceSpec, s apimachinerypkgconversion.Scope) error {
 	if in.Service != nil {
 		in, out := &in.Service, &out.Service
 		*out = new(ServiceReference)
@@ -246,54 +246,54 @@ func autoConvert_apiregistration_APIServiceSpec_To_v1beta1_APIServiceSpec(in *ap
 }
 
 // Convert_apiregistration_APIServiceSpec_To_v1beta1_APIServiceSpec is an autogenerated conversion function.
-func Convert_apiregistration_APIServiceSpec_To_v1beta1_APIServiceSpec(in *apiregistration.APIServiceSpec, out *APIServiceSpec, s conversion.Scope) error {
+func Convert_apiregistration_APIServiceSpec_To_v1beta1_APIServiceSpec(in *pkgapisapiregistration.APIServiceSpec, out *APIServiceSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiregistration_APIServiceSpec_To_v1beta1_APIServiceSpec(in, out, s)
 }
 
-func autoConvert_v1beta1_APIServiceStatus_To_apiregistration_APIServiceStatus(in *APIServiceStatus, out *apiregistration.APIServiceStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]apiregistration.APIServiceCondition)(unsafe.Pointer(&in.Conditions))
+func autoConvert_v1beta1_APIServiceStatus_To_apiregistration_APIServiceStatus(in *APIServiceStatus, out *pkgapisapiregistration.APIServiceStatus, s apimachinerypkgconversion.Scope) error {
+	out.Conditions = *(*[]pkgapisapiregistration.APIServiceCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 
 // Convert_v1beta1_APIServiceStatus_To_apiregistration_APIServiceStatus is an autogenerated conversion function.
-func Convert_v1beta1_APIServiceStatus_To_apiregistration_APIServiceStatus(in *APIServiceStatus, out *apiregistration.APIServiceStatus, s conversion.Scope) error {
+func Convert_v1beta1_APIServiceStatus_To_apiregistration_APIServiceStatus(in *APIServiceStatus, out *pkgapisapiregistration.APIServiceStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_APIServiceStatus_To_apiregistration_APIServiceStatus(in, out, s)
 }
 
-func autoConvert_apiregistration_APIServiceStatus_To_v1beta1_APIServiceStatus(in *apiregistration.APIServiceStatus, out *APIServiceStatus, s conversion.Scope) error {
+func autoConvert_apiregistration_APIServiceStatus_To_v1beta1_APIServiceStatus(in *pkgapisapiregistration.APIServiceStatus, out *APIServiceStatus, s apimachinerypkgconversion.Scope) error {
 	out.Conditions = *(*[]APIServiceCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 
 // Convert_apiregistration_APIServiceStatus_To_v1beta1_APIServiceStatus is an autogenerated conversion function.
-func Convert_apiregistration_APIServiceStatus_To_v1beta1_APIServiceStatus(in *apiregistration.APIServiceStatus, out *APIServiceStatus, s conversion.Scope) error {
+func Convert_apiregistration_APIServiceStatus_To_v1beta1_APIServiceStatus(in *pkgapisapiregistration.APIServiceStatus, out *APIServiceStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiregistration_APIServiceStatus_To_v1beta1_APIServiceStatus(in, out, s)
 }
 
-func autoConvert_v1beta1_ServiceReference_To_apiregistration_ServiceReference(in *ServiceReference, out *apiregistration.ServiceReference, s conversion.Scope) error {
+func autoConvert_v1beta1_ServiceReference_To_apiregistration_ServiceReference(in *ServiceReference, out *pkgapisapiregistration.ServiceReference, s apimachinerypkgconversion.Scope) error {
 	out.Namespace = in.Namespace
 	out.Name = in.Name
-	if err := v1.Convert_Pointer_int32_To_int32(&in.Port, &out.Port, s); err != nil {
+	if err := apismetav1.Convert_Pointer_int32_To_int32(&in.Port, &out.Port, s); err != nil {
 		return err
 	}
 	return nil
 }
 
 // Convert_v1beta1_ServiceReference_To_apiregistration_ServiceReference is an autogenerated conversion function.
-func Convert_v1beta1_ServiceReference_To_apiregistration_ServiceReference(in *ServiceReference, out *apiregistration.ServiceReference, s conversion.Scope) error {
+func Convert_v1beta1_ServiceReference_To_apiregistration_ServiceReference(in *ServiceReference, out *pkgapisapiregistration.ServiceReference, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_ServiceReference_To_apiregistration_ServiceReference(in, out, s)
 }
 
-func autoConvert_apiregistration_ServiceReference_To_v1beta1_ServiceReference(in *apiregistration.ServiceReference, out *ServiceReference, s conversion.Scope) error {
+func autoConvert_apiregistration_ServiceReference_To_v1beta1_ServiceReference(in *pkgapisapiregistration.ServiceReference, out *ServiceReference, s apimachinerypkgconversion.Scope) error {
 	out.Namespace = in.Namespace
 	out.Name = in.Name
-	if err := v1.Convert_int32_To_Pointer_int32(&in.Port, &out.Port, s); err != nil {
+	if err := apismetav1.Convert_int32_To_Pointer_int32(&in.Port, &out.Port, s); err != nil {
 		return err
 	}
 	return nil
 }
 
 // Convert_apiregistration_ServiceReference_To_v1beta1_ServiceReference is an autogenerated conversion function.
-func Convert_apiregistration_ServiceReference_To_v1beta1_ServiceReference(in *apiregistration.ServiceReference, out *ServiceReference, s conversion.Scope) error {
+func Convert_apiregistration_ServiceReference_To_v1beta1_ServiceReference(in *pkgapisapiregistration.ServiceReference, out *ServiceReference, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiregistration_ServiceReference_To_v1beta1_ServiceReference(in, out, s)
 }

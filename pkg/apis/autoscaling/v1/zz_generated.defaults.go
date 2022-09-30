@@ -22,26 +22,28 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/api/autoscaling/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	apiautoscalingv1 "k8s.io/api/autoscaling/v1"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
-func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1.HorizontalPodAutoscaler{}, func(obj interface{}) { SetObjectDefaults_HorizontalPodAutoscaler(obj.(*v1.HorizontalPodAutoscaler)) })
-	scheme.AddTypeDefaultingFunc(&v1.HorizontalPodAutoscalerList{}, func(obj interface{}) {
-		SetObjectDefaults_HorizontalPodAutoscalerList(obj.(*v1.HorizontalPodAutoscalerList))
+func RegisterDefaults(scheme *apimachinerypkgruntime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&apiautoscalingv1.HorizontalPodAutoscaler{}, func(obj interface{}) {
+		SetObjectDefaults_HorizontalPodAutoscaler(obj.(*apiautoscalingv1.HorizontalPodAutoscaler))
+	})
+	scheme.AddTypeDefaultingFunc(&apiautoscalingv1.HorizontalPodAutoscalerList{}, func(obj interface{}) {
+		SetObjectDefaults_HorizontalPodAutoscalerList(obj.(*apiautoscalingv1.HorizontalPodAutoscalerList))
 	})
 	return nil
 }
 
-func SetObjectDefaults_HorizontalPodAutoscaler(in *v1.HorizontalPodAutoscaler) {
+func SetObjectDefaults_HorizontalPodAutoscaler(in *apiautoscalingv1.HorizontalPodAutoscaler) {
 	SetDefaults_HorizontalPodAutoscaler(in)
 }
 
-func SetObjectDefaults_HorizontalPodAutoscalerList(in *v1.HorizontalPodAutoscalerList) {
+func SetObjectDefaults_HorizontalPodAutoscalerList(in *apiautoscalingv1.HorizontalPodAutoscalerList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_HorizontalPodAutoscaler(a)

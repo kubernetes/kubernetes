@@ -22,68 +22,70 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	apistoragev1 "k8s.io/api/storage/v1"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	apiscorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
-func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1.CSIDriver{}, func(obj interface{}) { SetObjectDefaults_CSIDriver(obj.(*v1.CSIDriver)) })
-	scheme.AddTypeDefaultingFunc(&v1.CSIDriverList{}, func(obj interface{}) { SetObjectDefaults_CSIDriverList(obj.(*v1.CSIDriverList)) })
-	scheme.AddTypeDefaultingFunc(&v1.StorageClass{}, func(obj interface{}) { SetObjectDefaults_StorageClass(obj.(*v1.StorageClass)) })
-	scheme.AddTypeDefaultingFunc(&v1.StorageClassList{}, func(obj interface{}) { SetObjectDefaults_StorageClassList(obj.(*v1.StorageClassList)) })
-	scheme.AddTypeDefaultingFunc(&v1.VolumeAttachment{}, func(obj interface{}) { SetObjectDefaults_VolumeAttachment(obj.(*v1.VolumeAttachment)) })
-	scheme.AddTypeDefaultingFunc(&v1.VolumeAttachmentList{}, func(obj interface{}) { SetObjectDefaults_VolumeAttachmentList(obj.(*v1.VolumeAttachmentList)) })
+func RegisterDefaults(scheme *apimachinerypkgruntime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&apistoragev1.CSIDriver{}, func(obj interface{}) { SetObjectDefaults_CSIDriver(obj.(*apistoragev1.CSIDriver)) })
+	scheme.AddTypeDefaultingFunc(&apistoragev1.CSIDriverList{}, func(obj interface{}) { SetObjectDefaults_CSIDriverList(obj.(*apistoragev1.CSIDriverList)) })
+	scheme.AddTypeDefaultingFunc(&apistoragev1.StorageClass{}, func(obj interface{}) { SetObjectDefaults_StorageClass(obj.(*apistoragev1.StorageClass)) })
+	scheme.AddTypeDefaultingFunc(&apistoragev1.StorageClassList{}, func(obj interface{}) { SetObjectDefaults_StorageClassList(obj.(*apistoragev1.StorageClassList)) })
+	scheme.AddTypeDefaultingFunc(&apistoragev1.VolumeAttachment{}, func(obj interface{}) { SetObjectDefaults_VolumeAttachment(obj.(*apistoragev1.VolumeAttachment)) })
+	scheme.AddTypeDefaultingFunc(&apistoragev1.VolumeAttachmentList{}, func(obj interface{}) {
+		SetObjectDefaults_VolumeAttachmentList(obj.(*apistoragev1.VolumeAttachmentList))
+	})
 	return nil
 }
 
-func SetObjectDefaults_CSIDriver(in *v1.CSIDriver) {
+func SetObjectDefaults_CSIDriver(in *apistoragev1.CSIDriver) {
 	SetDefaults_CSIDriver(in)
 }
 
-func SetObjectDefaults_CSIDriverList(in *v1.CSIDriverList) {
+func SetObjectDefaults_CSIDriverList(in *apistoragev1.CSIDriverList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_CSIDriver(a)
 	}
 }
 
-func SetObjectDefaults_StorageClass(in *v1.StorageClass) {
+func SetObjectDefaults_StorageClass(in *apistoragev1.StorageClass) {
 	SetDefaults_StorageClass(in)
 }
 
-func SetObjectDefaults_StorageClassList(in *v1.StorageClassList) {
+func SetObjectDefaults_StorageClassList(in *apistoragev1.StorageClassList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_StorageClass(a)
 	}
 }
 
-func SetObjectDefaults_VolumeAttachment(in *v1.VolumeAttachment) {
+func SetObjectDefaults_VolumeAttachment(in *apistoragev1.VolumeAttachment) {
 	if in.Spec.Source.InlineVolumeSpec != nil {
-		corev1.SetDefaults_ResourceList(&in.Spec.Source.InlineVolumeSpec.Capacity)
+		apiscorev1.SetDefaults_ResourceList(&in.Spec.Source.InlineVolumeSpec.Capacity)
 		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.HostPath != nil {
-			corev1.SetDefaults_HostPathVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.HostPath)
+			apiscorev1.SetDefaults_HostPathVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.HostPath)
 		}
 		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD != nil {
-			corev1.SetDefaults_RBDPersistentVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD)
+			apiscorev1.SetDefaults_RBDPersistentVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD)
 		}
 		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ISCSI != nil {
-			corev1.SetDefaults_ISCSIPersistentVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ISCSI)
+			apiscorev1.SetDefaults_ISCSIPersistentVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ISCSI)
 		}
 		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk != nil {
-			corev1.SetDefaults_AzureDiskVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk)
+			apiscorev1.SetDefaults_AzureDiskVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk)
 		}
 		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO != nil {
-			corev1.SetDefaults_ScaleIOPersistentVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO)
+			apiscorev1.SetDefaults_ScaleIOPersistentVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO)
 		}
 	}
 }
 
-func SetObjectDefaults_VolumeAttachmentList(in *v1.VolumeAttachmentList) {
+func SetObjectDefaults_VolumeAttachmentList(in *apistoragev1.VolumeAttachmentList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_VolumeAttachment(a)

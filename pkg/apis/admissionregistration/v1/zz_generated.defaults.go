@@ -22,30 +22,30 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/api/admissionregistration/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	apiadmissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
-func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1.MutatingWebhookConfiguration{}, func(obj interface{}) {
-		SetObjectDefaults_MutatingWebhookConfiguration(obj.(*v1.MutatingWebhookConfiguration))
+func RegisterDefaults(scheme *apimachinerypkgruntime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&apiadmissionregistrationv1.MutatingWebhookConfiguration{}, func(obj interface{}) {
+		SetObjectDefaults_MutatingWebhookConfiguration(obj.(*apiadmissionregistrationv1.MutatingWebhookConfiguration))
 	})
-	scheme.AddTypeDefaultingFunc(&v1.MutatingWebhookConfigurationList{}, func(obj interface{}) {
-		SetObjectDefaults_MutatingWebhookConfigurationList(obj.(*v1.MutatingWebhookConfigurationList))
+	scheme.AddTypeDefaultingFunc(&apiadmissionregistrationv1.MutatingWebhookConfigurationList{}, func(obj interface{}) {
+		SetObjectDefaults_MutatingWebhookConfigurationList(obj.(*apiadmissionregistrationv1.MutatingWebhookConfigurationList))
 	})
-	scheme.AddTypeDefaultingFunc(&v1.ValidatingWebhookConfiguration{}, func(obj interface{}) {
-		SetObjectDefaults_ValidatingWebhookConfiguration(obj.(*v1.ValidatingWebhookConfiguration))
+	scheme.AddTypeDefaultingFunc(&apiadmissionregistrationv1.ValidatingWebhookConfiguration{}, func(obj interface{}) {
+		SetObjectDefaults_ValidatingWebhookConfiguration(obj.(*apiadmissionregistrationv1.ValidatingWebhookConfiguration))
 	})
-	scheme.AddTypeDefaultingFunc(&v1.ValidatingWebhookConfigurationList{}, func(obj interface{}) {
-		SetObjectDefaults_ValidatingWebhookConfigurationList(obj.(*v1.ValidatingWebhookConfigurationList))
+	scheme.AddTypeDefaultingFunc(&apiadmissionregistrationv1.ValidatingWebhookConfigurationList{}, func(obj interface{}) {
+		SetObjectDefaults_ValidatingWebhookConfigurationList(obj.(*apiadmissionregistrationv1.ValidatingWebhookConfigurationList))
 	})
 	return nil
 }
 
-func SetObjectDefaults_MutatingWebhookConfiguration(in *v1.MutatingWebhookConfiguration) {
+func SetObjectDefaults_MutatingWebhookConfiguration(in *apiadmissionregistrationv1.MutatingWebhookConfiguration) {
 	for i := range in.Webhooks {
 		a := &in.Webhooks[i]
 		SetDefaults_MutatingWebhook(a)
@@ -59,14 +59,14 @@ func SetObjectDefaults_MutatingWebhookConfiguration(in *v1.MutatingWebhookConfig
 	}
 }
 
-func SetObjectDefaults_MutatingWebhookConfigurationList(in *v1.MutatingWebhookConfigurationList) {
+func SetObjectDefaults_MutatingWebhookConfigurationList(in *apiadmissionregistrationv1.MutatingWebhookConfigurationList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_MutatingWebhookConfiguration(a)
 	}
 }
 
-func SetObjectDefaults_ValidatingWebhookConfiguration(in *v1.ValidatingWebhookConfiguration) {
+func SetObjectDefaults_ValidatingWebhookConfiguration(in *apiadmissionregistrationv1.ValidatingWebhookConfiguration) {
 	for i := range in.Webhooks {
 		a := &in.Webhooks[i]
 		SetDefaults_ValidatingWebhook(a)
@@ -80,7 +80,7 @@ func SetObjectDefaults_ValidatingWebhookConfiguration(in *v1.ValidatingWebhookCo
 	}
 }
 
-func SetObjectDefaults_ValidatingWebhookConfigurationList(in *v1.ValidatingWebhookConfigurationList) {
+func SetObjectDefaults_ValidatingWebhookConfigurationList(in *apiadmissionregistrationv1.ValidatingWebhookConfigurationList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ValidatingWebhookConfiguration(a)

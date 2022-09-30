@@ -22,11 +22,11 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kube-controller-manager/config/v1alpha1"
-	"k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	kubecontrollermanagerconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
+	controllerendpointslicemirroringconfig "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config"
 )
 
 func init() {
@@ -35,62 +35,62 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.GroupResource)(nil), (*v1.GroupResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_GroupResource_To_v1_GroupResource(a.(*v1alpha1.GroupResource), b.(*v1.GroupResource), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*kubecontrollermanagerconfigv1alpha1.GroupResource)(nil), (*apismetav1.GroupResource)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_GroupResource_To_v1_GroupResource(a.(*kubecontrollermanagerconfigv1alpha1.GroupResource), b.(*apismetav1.GroupResource), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.GroupResource)(nil), (*v1alpha1.GroupResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_GroupResource_To_v1alpha1_GroupResource(a.(*v1.GroupResource), b.(*v1alpha1.GroupResource), scope)
+	if err := s.AddGeneratedConversionFunc((*apismetav1.GroupResource)(nil), (*kubecontrollermanagerconfigv1alpha1.GroupResource)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_GroupResource_To_v1alpha1_GroupResource(a.(*apismetav1.GroupResource), b.(*kubecontrollermanagerconfigv1alpha1.GroupResource), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*config.EndpointSliceMirroringControllerConfiguration)(nil), (*v1alpha1.EndpointSliceMirroringControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_EndpointSliceMirroringControllerConfiguration_To_v1alpha1_EndpointSliceMirroringControllerConfiguration(a.(*config.EndpointSliceMirroringControllerConfiguration), b.(*v1alpha1.EndpointSliceMirroringControllerConfiguration), scope)
+	if err := s.AddConversionFunc((*controllerendpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration)(nil), (*kubecontrollermanagerconfigv1alpha1.EndpointSliceMirroringControllerConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_EndpointSliceMirroringControllerConfiguration_To_v1alpha1_EndpointSliceMirroringControllerConfiguration(a.(*controllerendpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration), b.(*kubecontrollermanagerconfigv1alpha1.EndpointSliceMirroringControllerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1alpha1.EndpointSliceMirroringControllerConfiguration)(nil), (*config.EndpointSliceMirroringControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_EndpointSliceMirroringControllerConfiguration_To_config_EndpointSliceMirroringControllerConfiguration(a.(*v1alpha1.EndpointSliceMirroringControllerConfiguration), b.(*config.EndpointSliceMirroringControllerConfiguration), scope)
+	if err := s.AddConversionFunc((*kubecontrollermanagerconfigv1alpha1.EndpointSliceMirroringControllerConfiguration)(nil), (*controllerendpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_EndpointSliceMirroringControllerConfiguration_To_config_EndpointSliceMirroringControllerConfiguration(a.(*kubecontrollermanagerconfigv1alpha1.EndpointSliceMirroringControllerConfiguration), b.(*controllerendpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1alpha1_EndpointSliceMirroringControllerConfiguration_To_config_EndpointSliceMirroringControllerConfiguration(in *v1alpha1.EndpointSliceMirroringControllerConfiguration, out *config.EndpointSliceMirroringControllerConfiguration, s conversion.Scope) error {
+func autoConvert_v1alpha1_EndpointSliceMirroringControllerConfiguration_To_config_EndpointSliceMirroringControllerConfiguration(in *kubecontrollermanagerconfigv1alpha1.EndpointSliceMirroringControllerConfiguration, out *controllerendpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.MirroringConcurrentServiceEndpointSyncs = in.MirroringConcurrentServiceEndpointSyncs
 	out.MirroringMaxEndpointsPerSubset = in.MirroringMaxEndpointsPerSubset
 	out.MirroringEndpointUpdatesBatchPeriod = in.MirroringEndpointUpdatesBatchPeriod
 	return nil
 }
 
-func autoConvert_config_EndpointSliceMirroringControllerConfiguration_To_v1alpha1_EndpointSliceMirroringControllerConfiguration(in *config.EndpointSliceMirroringControllerConfiguration, out *v1alpha1.EndpointSliceMirroringControllerConfiguration, s conversion.Scope) error {
+func autoConvert_config_EndpointSliceMirroringControllerConfiguration_To_v1alpha1_EndpointSliceMirroringControllerConfiguration(in *controllerendpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration, out *kubecontrollermanagerconfigv1alpha1.EndpointSliceMirroringControllerConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.MirroringConcurrentServiceEndpointSyncs = in.MirroringConcurrentServiceEndpointSyncs
 	out.MirroringMaxEndpointsPerSubset = in.MirroringMaxEndpointsPerSubset
 	out.MirroringEndpointUpdatesBatchPeriod = in.MirroringEndpointUpdatesBatchPeriod
 	return nil
 }
 
-func autoConvert_v1alpha1_GroupResource_To_v1_GroupResource(in *v1alpha1.GroupResource, out *v1.GroupResource, s conversion.Scope) error {
+func autoConvert_v1alpha1_GroupResource_To_v1_GroupResource(in *kubecontrollermanagerconfigv1alpha1.GroupResource, out *apismetav1.GroupResource, s apimachinerypkgconversion.Scope) error {
 	out.Group = in.Group
 	out.Resource = in.Resource
 	return nil
 }
 
 // Convert_v1alpha1_GroupResource_To_v1_GroupResource is an autogenerated conversion function.
-func Convert_v1alpha1_GroupResource_To_v1_GroupResource(in *v1alpha1.GroupResource, out *v1.GroupResource, s conversion.Scope) error {
+func Convert_v1alpha1_GroupResource_To_v1_GroupResource(in *kubecontrollermanagerconfigv1alpha1.GroupResource, out *apismetav1.GroupResource, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha1_GroupResource_To_v1_GroupResource(in, out, s)
 }
 
-func autoConvert_v1_GroupResource_To_v1alpha1_GroupResource(in *v1.GroupResource, out *v1alpha1.GroupResource, s conversion.Scope) error {
+func autoConvert_v1_GroupResource_To_v1alpha1_GroupResource(in *apismetav1.GroupResource, out *kubecontrollermanagerconfigv1alpha1.GroupResource, s apimachinerypkgconversion.Scope) error {
 	out.Group = in.Group
 	out.Resource = in.Resource
 	return nil
 }
 
 // Convert_v1_GroupResource_To_v1alpha1_GroupResource is an autogenerated conversion function.
-func Convert_v1_GroupResource_To_v1alpha1_GroupResource(in *v1.GroupResource, out *v1alpha1.GroupResource, s conversion.Scope) error {
+func Convert_v1_GroupResource_To_v1alpha1_GroupResource(in *apismetav1.GroupResource, out *kubecontrollermanagerconfigv1alpha1.GroupResource, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_GroupResource_To_v1alpha1_GroupResource(in, out, s)
 }

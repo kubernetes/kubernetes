@@ -24,10 +24,10 @@ package v1
 import (
 	"unsafe"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/apis/example"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	pkgapisexample "k8s.io/apiserver/pkg/apis/example"
 )
 
 func init() {
@@ -36,61 +36,61 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*Pod)(nil), (*example.Pod)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_Pod_To_example_Pod(a.(*Pod), b.(*example.Pod), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*Pod)(nil), (*pkgapisexample.Pod)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_Pod_To_example_Pod(a.(*Pod), b.(*pkgapisexample.Pod), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*example.Pod)(nil), (*Pod)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_example_Pod_To_v1_Pod(a.(*example.Pod), b.(*Pod), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisexample.Pod)(nil), (*Pod)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_example_Pod_To_v1_Pod(a.(*pkgapisexample.Pod), b.(*Pod), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*PodCondition)(nil), (*example.PodCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_PodCondition_To_example_PodCondition(a.(*PodCondition), b.(*example.PodCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*PodCondition)(nil), (*pkgapisexample.PodCondition)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_PodCondition_To_example_PodCondition(a.(*PodCondition), b.(*pkgapisexample.PodCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*example.PodCondition)(nil), (*PodCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_example_PodCondition_To_v1_PodCondition(a.(*example.PodCondition), b.(*PodCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisexample.PodCondition)(nil), (*PodCondition)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_example_PodCondition_To_v1_PodCondition(a.(*pkgapisexample.PodCondition), b.(*PodCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*PodList)(nil), (*example.PodList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_PodList_To_example_PodList(a.(*PodList), b.(*example.PodList), scope)
+	if err := s.AddGeneratedConversionFunc((*PodList)(nil), (*pkgapisexample.PodList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_PodList_To_example_PodList(a.(*PodList), b.(*pkgapisexample.PodList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*example.PodList)(nil), (*PodList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_example_PodList_To_v1_PodList(a.(*example.PodList), b.(*PodList), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisexample.PodList)(nil), (*PodList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_example_PodList_To_v1_PodList(a.(*pkgapisexample.PodList), b.(*PodList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*PodSpec)(nil), (*example.PodSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_PodSpec_To_example_PodSpec(a.(*PodSpec), b.(*example.PodSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*PodSpec)(nil), (*pkgapisexample.PodSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_PodSpec_To_example_PodSpec(a.(*PodSpec), b.(*pkgapisexample.PodSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*example.PodSpec)(nil), (*PodSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_example_PodSpec_To_v1_PodSpec(a.(*example.PodSpec), b.(*PodSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisexample.PodSpec)(nil), (*PodSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_example_PodSpec_To_v1_PodSpec(a.(*pkgapisexample.PodSpec), b.(*PodSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*PodStatus)(nil), (*example.PodStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_PodStatus_To_example_PodStatus(a.(*PodStatus), b.(*example.PodStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*PodStatus)(nil), (*pkgapisexample.PodStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_PodStatus_To_example_PodStatus(a.(*PodStatus), b.(*pkgapisexample.PodStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*example.PodStatus)(nil), (*PodStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_example_PodStatus_To_v1_PodStatus(a.(*example.PodStatus), b.(*PodStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisexample.PodStatus)(nil), (*PodStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_example_PodStatus_To_v1_PodStatus(a.(*pkgapisexample.PodStatus), b.(*PodStatus), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1_Pod_To_example_Pod(in *Pod, out *example.Pod, s conversion.Scope) error {
+func autoConvert_v1_Pod_To_example_Pod(in *Pod, out *pkgapisexample.Pod, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_PodSpec_To_example_PodSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -102,11 +102,11 @@ func autoConvert_v1_Pod_To_example_Pod(in *Pod, out *example.Pod, s conversion.S
 }
 
 // Convert_v1_Pod_To_example_Pod is an autogenerated conversion function.
-func Convert_v1_Pod_To_example_Pod(in *Pod, out *example.Pod, s conversion.Scope) error {
+func Convert_v1_Pod_To_example_Pod(in *Pod, out *pkgapisexample.Pod, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_Pod_To_example_Pod(in, out, s)
 }
 
-func autoConvert_example_Pod_To_v1_Pod(in *example.Pod, out *Pod, s conversion.Scope) error {
+func autoConvert_example_Pod_To_v1_Pod(in *pkgapisexample.Pod, out *Pod, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_example_PodSpec_To_v1_PodSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -118,13 +118,13 @@ func autoConvert_example_Pod_To_v1_Pod(in *example.Pod, out *Pod, s conversion.S
 }
 
 // Convert_example_Pod_To_v1_Pod is an autogenerated conversion function.
-func Convert_example_Pod_To_v1_Pod(in *example.Pod, out *Pod, s conversion.Scope) error {
+func Convert_example_Pod_To_v1_Pod(in *pkgapisexample.Pod, out *Pod, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_example_Pod_To_v1_Pod(in, out, s)
 }
 
-func autoConvert_v1_PodCondition_To_example_PodCondition(in *PodCondition, out *example.PodCondition, s conversion.Scope) error {
-	out.Type = example.PodConditionType(in.Type)
-	out.Status = example.ConditionStatus(in.Status)
+func autoConvert_v1_PodCondition_To_example_PodCondition(in *PodCondition, out *pkgapisexample.PodCondition, s apimachinerypkgconversion.Scope) error {
+	out.Type = pkgapisexample.PodConditionType(in.Type)
+	out.Status = pkgapisexample.ConditionStatus(in.Status)
 	out.LastProbeTime = in.LastProbeTime
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
@@ -133,11 +133,11 @@ func autoConvert_v1_PodCondition_To_example_PodCondition(in *PodCondition, out *
 }
 
 // Convert_v1_PodCondition_To_example_PodCondition is an autogenerated conversion function.
-func Convert_v1_PodCondition_To_example_PodCondition(in *PodCondition, out *example.PodCondition, s conversion.Scope) error {
+func Convert_v1_PodCondition_To_example_PodCondition(in *PodCondition, out *pkgapisexample.PodCondition, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_PodCondition_To_example_PodCondition(in, out, s)
 }
 
-func autoConvert_example_PodCondition_To_v1_PodCondition(in *example.PodCondition, out *PodCondition, s conversion.Scope) error {
+func autoConvert_example_PodCondition_To_v1_PodCondition(in *pkgapisexample.PodCondition, out *PodCondition, s apimachinerypkgconversion.Scope) error {
 	out.Type = PodConditionType(in.Type)
 	out.Status = ConditionStatus(in.Status)
 	out.LastProbeTime = in.LastProbeTime
@@ -148,15 +148,15 @@ func autoConvert_example_PodCondition_To_v1_PodCondition(in *example.PodConditio
 }
 
 // Convert_example_PodCondition_To_v1_PodCondition is an autogenerated conversion function.
-func Convert_example_PodCondition_To_v1_PodCondition(in *example.PodCondition, out *PodCondition, s conversion.Scope) error {
+func Convert_example_PodCondition_To_v1_PodCondition(in *pkgapisexample.PodCondition, out *PodCondition, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_example_PodCondition_To_v1_PodCondition(in, out, s)
 }
 
-func autoConvert_v1_PodList_To_example_PodList(in *PodList, out *example.PodList, s conversion.Scope) error {
+func autoConvert_v1_PodList_To_example_PodList(in *PodList, out *pkgapisexample.PodList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]example.Pod, len(*in))
+		*out = make([]pkgapisexample.Pod, len(*in))
 		for i := range *in {
 			if err := Convert_v1_Pod_To_example_Pod(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -169,11 +169,11 @@ func autoConvert_v1_PodList_To_example_PodList(in *PodList, out *example.PodList
 }
 
 // Convert_v1_PodList_To_example_PodList is an autogenerated conversion function.
-func Convert_v1_PodList_To_example_PodList(in *PodList, out *example.PodList, s conversion.Scope) error {
+func Convert_v1_PodList_To_example_PodList(in *PodList, out *pkgapisexample.PodList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_PodList_To_example_PodList(in, out, s)
 }
 
-func autoConvert_example_PodList_To_v1_PodList(in *example.PodList, out *PodList, s conversion.Scope) error {
+func autoConvert_example_PodList_To_v1_PodList(in *pkgapisexample.PodList, out *PodList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -190,12 +190,12 @@ func autoConvert_example_PodList_To_v1_PodList(in *example.PodList, out *PodList
 }
 
 // Convert_example_PodList_To_v1_PodList is an autogenerated conversion function.
-func Convert_example_PodList_To_v1_PodList(in *example.PodList, out *PodList, s conversion.Scope) error {
+func Convert_example_PodList_To_v1_PodList(in *pkgapisexample.PodList, out *PodList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_example_PodList_To_v1_PodList(in, out, s)
 }
 
-func autoConvert_v1_PodSpec_To_example_PodSpec(in *PodSpec, out *example.PodSpec, s conversion.Scope) error {
-	out.RestartPolicy = example.RestartPolicy(in.RestartPolicy)
+func autoConvert_v1_PodSpec_To_example_PodSpec(in *PodSpec, out *pkgapisexample.PodSpec, s apimachinerypkgconversion.Scope) error {
+	out.RestartPolicy = pkgapisexample.RestartPolicy(in.RestartPolicy)
 	out.TerminationGracePeriodSeconds = (*int64)(unsafe.Pointer(in.TerminationGracePeriodSeconds))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
 	out.NodeSelector = *(*map[string]string)(unsafe.Pointer(&in.NodeSelector))
@@ -212,11 +212,11 @@ func autoConvert_v1_PodSpec_To_example_PodSpec(in *PodSpec, out *example.PodSpec
 }
 
 // Convert_v1_PodSpec_To_example_PodSpec is an autogenerated conversion function.
-func Convert_v1_PodSpec_To_example_PodSpec(in *PodSpec, out *example.PodSpec, s conversion.Scope) error {
+func Convert_v1_PodSpec_To_example_PodSpec(in *PodSpec, out *pkgapisexample.PodSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_PodSpec_To_example_PodSpec(in, out, s)
 }
 
-func autoConvert_example_PodSpec_To_v1_PodSpec(in *example.PodSpec, out *PodSpec, s conversion.Scope) error {
+func autoConvert_example_PodSpec_To_v1_PodSpec(in *pkgapisexample.PodSpec, out *PodSpec, s apimachinerypkgconversion.Scope) error {
 	out.RestartPolicy = RestartPolicy(in.RestartPolicy)
 	out.TerminationGracePeriodSeconds = (*int64)(unsafe.Pointer(in.TerminationGracePeriodSeconds))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
@@ -230,38 +230,38 @@ func autoConvert_example_PodSpec_To_v1_PodSpec(in *example.PodSpec, out *PodSpec
 }
 
 // Convert_example_PodSpec_To_v1_PodSpec is an autogenerated conversion function.
-func Convert_example_PodSpec_To_v1_PodSpec(in *example.PodSpec, out *PodSpec, s conversion.Scope) error {
+func Convert_example_PodSpec_To_v1_PodSpec(in *pkgapisexample.PodSpec, out *PodSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_example_PodSpec_To_v1_PodSpec(in, out, s)
 }
 
-func autoConvert_v1_PodStatus_To_example_PodStatus(in *PodStatus, out *example.PodStatus, s conversion.Scope) error {
-	out.Phase = example.PodPhase(in.Phase)
-	out.Conditions = *(*[]example.PodCondition)(unsafe.Pointer(&in.Conditions))
+func autoConvert_v1_PodStatus_To_example_PodStatus(in *PodStatus, out *pkgapisexample.PodStatus, s apimachinerypkgconversion.Scope) error {
+	out.Phase = pkgapisexample.PodPhase(in.Phase)
+	out.Conditions = *(*[]pkgapisexample.PodCondition)(unsafe.Pointer(&in.Conditions))
 	out.Message = in.Message
 	out.Reason = in.Reason
 	out.HostIP = in.HostIP
 	out.PodIP = in.PodIP
-	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
+	out.StartTime = (*apismetav1.Time)(unsafe.Pointer(in.StartTime))
 	return nil
 }
 
 // Convert_v1_PodStatus_To_example_PodStatus is an autogenerated conversion function.
-func Convert_v1_PodStatus_To_example_PodStatus(in *PodStatus, out *example.PodStatus, s conversion.Scope) error {
+func Convert_v1_PodStatus_To_example_PodStatus(in *PodStatus, out *pkgapisexample.PodStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_PodStatus_To_example_PodStatus(in, out, s)
 }
 
-func autoConvert_example_PodStatus_To_v1_PodStatus(in *example.PodStatus, out *PodStatus, s conversion.Scope) error {
+func autoConvert_example_PodStatus_To_v1_PodStatus(in *pkgapisexample.PodStatus, out *PodStatus, s apimachinerypkgconversion.Scope) error {
 	out.Phase = PodPhase(in.Phase)
 	out.Conditions = *(*[]PodCondition)(unsafe.Pointer(&in.Conditions))
 	out.Message = in.Message
 	out.Reason = in.Reason
 	out.HostIP = in.HostIP
 	out.PodIP = in.PodIP
-	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
+	out.StartTime = (*apismetav1.Time)(unsafe.Pointer(in.StartTime))
 	return nil
 }
 
 // Convert_example_PodStatus_To_v1_PodStatus is an autogenerated conversion function.
-func Convert_example_PodStatus_To_v1_PodStatus(in *example.PodStatus, out *PodStatus, s conversion.Scope) error {
+func Convert_example_PodStatus_To_v1_PodStatus(in *pkgapisexample.PodStatus, out *PodStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_example_PodStatus_To_v1_PodStatus(in, out, s)
 }

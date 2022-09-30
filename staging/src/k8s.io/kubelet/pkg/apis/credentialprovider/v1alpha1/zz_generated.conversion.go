@@ -24,10 +24,10 @@ package v1alpha1
 import (
 	"unsafe"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubelet/pkg/apis/credentialprovider"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	pkgapiscredentialprovider "k8s.io/kubelet/pkg/apis/credentialprovider"
 )
 
 func init() {
@@ -36,102 +36,102 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*AuthConfig)(nil), (*credentialprovider.AuthConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_AuthConfig_To_credentialprovider_AuthConfig(a.(*AuthConfig), b.(*credentialprovider.AuthConfig), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*AuthConfig)(nil), (*pkgapiscredentialprovider.AuthConfig)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_AuthConfig_To_credentialprovider_AuthConfig(a.(*AuthConfig), b.(*pkgapiscredentialprovider.AuthConfig), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*credentialprovider.AuthConfig)(nil), (*AuthConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_credentialprovider_AuthConfig_To_v1alpha1_AuthConfig(a.(*credentialprovider.AuthConfig), b.(*AuthConfig), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapiscredentialprovider.AuthConfig)(nil), (*AuthConfig)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_credentialprovider_AuthConfig_To_v1alpha1_AuthConfig(a.(*pkgapiscredentialprovider.AuthConfig), b.(*AuthConfig), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*CredentialProviderRequest)(nil), (*credentialprovider.CredentialProviderRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_CredentialProviderRequest_To_credentialprovider_CredentialProviderRequest(a.(*CredentialProviderRequest), b.(*credentialprovider.CredentialProviderRequest), scope)
+	if err := s.AddGeneratedConversionFunc((*CredentialProviderRequest)(nil), (*pkgapiscredentialprovider.CredentialProviderRequest)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_CredentialProviderRequest_To_credentialprovider_CredentialProviderRequest(a.(*CredentialProviderRequest), b.(*pkgapiscredentialprovider.CredentialProviderRequest), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*credentialprovider.CredentialProviderRequest)(nil), (*CredentialProviderRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_credentialprovider_CredentialProviderRequest_To_v1alpha1_CredentialProviderRequest(a.(*credentialprovider.CredentialProviderRequest), b.(*CredentialProviderRequest), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapiscredentialprovider.CredentialProviderRequest)(nil), (*CredentialProviderRequest)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_credentialprovider_CredentialProviderRequest_To_v1alpha1_CredentialProviderRequest(a.(*pkgapiscredentialprovider.CredentialProviderRequest), b.(*CredentialProviderRequest), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*CredentialProviderResponse)(nil), (*credentialprovider.CredentialProviderResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_CredentialProviderResponse_To_credentialprovider_CredentialProviderResponse(a.(*CredentialProviderResponse), b.(*credentialprovider.CredentialProviderResponse), scope)
+	if err := s.AddGeneratedConversionFunc((*CredentialProviderResponse)(nil), (*pkgapiscredentialprovider.CredentialProviderResponse)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_CredentialProviderResponse_To_credentialprovider_CredentialProviderResponse(a.(*CredentialProviderResponse), b.(*pkgapiscredentialprovider.CredentialProviderResponse), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*credentialprovider.CredentialProviderResponse)(nil), (*CredentialProviderResponse)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_credentialprovider_CredentialProviderResponse_To_v1alpha1_CredentialProviderResponse(a.(*credentialprovider.CredentialProviderResponse), b.(*CredentialProviderResponse), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapiscredentialprovider.CredentialProviderResponse)(nil), (*CredentialProviderResponse)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_credentialprovider_CredentialProviderResponse_To_v1alpha1_CredentialProviderResponse(a.(*pkgapiscredentialprovider.CredentialProviderResponse), b.(*CredentialProviderResponse), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1alpha1_AuthConfig_To_credentialprovider_AuthConfig(in *AuthConfig, out *credentialprovider.AuthConfig, s conversion.Scope) error {
+func autoConvert_v1alpha1_AuthConfig_To_credentialprovider_AuthConfig(in *AuthConfig, out *pkgapiscredentialprovider.AuthConfig, s apimachinerypkgconversion.Scope) error {
 	out.Username = in.Username
 	out.Password = in.Password
 	return nil
 }
 
 // Convert_v1alpha1_AuthConfig_To_credentialprovider_AuthConfig is an autogenerated conversion function.
-func Convert_v1alpha1_AuthConfig_To_credentialprovider_AuthConfig(in *AuthConfig, out *credentialprovider.AuthConfig, s conversion.Scope) error {
+func Convert_v1alpha1_AuthConfig_To_credentialprovider_AuthConfig(in *AuthConfig, out *pkgapiscredentialprovider.AuthConfig, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha1_AuthConfig_To_credentialprovider_AuthConfig(in, out, s)
 }
 
-func autoConvert_credentialprovider_AuthConfig_To_v1alpha1_AuthConfig(in *credentialprovider.AuthConfig, out *AuthConfig, s conversion.Scope) error {
+func autoConvert_credentialprovider_AuthConfig_To_v1alpha1_AuthConfig(in *pkgapiscredentialprovider.AuthConfig, out *AuthConfig, s apimachinerypkgconversion.Scope) error {
 	out.Username = in.Username
 	out.Password = in.Password
 	return nil
 }
 
 // Convert_credentialprovider_AuthConfig_To_v1alpha1_AuthConfig is an autogenerated conversion function.
-func Convert_credentialprovider_AuthConfig_To_v1alpha1_AuthConfig(in *credentialprovider.AuthConfig, out *AuthConfig, s conversion.Scope) error {
+func Convert_credentialprovider_AuthConfig_To_v1alpha1_AuthConfig(in *pkgapiscredentialprovider.AuthConfig, out *AuthConfig, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_credentialprovider_AuthConfig_To_v1alpha1_AuthConfig(in, out, s)
 }
 
-func autoConvert_v1alpha1_CredentialProviderRequest_To_credentialprovider_CredentialProviderRequest(in *CredentialProviderRequest, out *credentialprovider.CredentialProviderRequest, s conversion.Scope) error {
+func autoConvert_v1alpha1_CredentialProviderRequest_To_credentialprovider_CredentialProviderRequest(in *CredentialProviderRequest, out *pkgapiscredentialprovider.CredentialProviderRequest, s apimachinerypkgconversion.Scope) error {
 	out.Image = in.Image
 	return nil
 }
 
 // Convert_v1alpha1_CredentialProviderRequest_To_credentialprovider_CredentialProviderRequest is an autogenerated conversion function.
-func Convert_v1alpha1_CredentialProviderRequest_To_credentialprovider_CredentialProviderRequest(in *CredentialProviderRequest, out *credentialprovider.CredentialProviderRequest, s conversion.Scope) error {
+func Convert_v1alpha1_CredentialProviderRequest_To_credentialprovider_CredentialProviderRequest(in *CredentialProviderRequest, out *pkgapiscredentialprovider.CredentialProviderRequest, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha1_CredentialProviderRequest_To_credentialprovider_CredentialProviderRequest(in, out, s)
 }
 
-func autoConvert_credentialprovider_CredentialProviderRequest_To_v1alpha1_CredentialProviderRequest(in *credentialprovider.CredentialProviderRequest, out *CredentialProviderRequest, s conversion.Scope) error {
+func autoConvert_credentialprovider_CredentialProviderRequest_To_v1alpha1_CredentialProviderRequest(in *pkgapiscredentialprovider.CredentialProviderRequest, out *CredentialProviderRequest, s apimachinerypkgconversion.Scope) error {
 	out.Image = in.Image
 	return nil
 }
 
 // Convert_credentialprovider_CredentialProviderRequest_To_v1alpha1_CredentialProviderRequest is an autogenerated conversion function.
-func Convert_credentialprovider_CredentialProviderRequest_To_v1alpha1_CredentialProviderRequest(in *credentialprovider.CredentialProviderRequest, out *CredentialProviderRequest, s conversion.Scope) error {
+func Convert_credentialprovider_CredentialProviderRequest_To_v1alpha1_CredentialProviderRequest(in *pkgapiscredentialprovider.CredentialProviderRequest, out *CredentialProviderRequest, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_credentialprovider_CredentialProviderRequest_To_v1alpha1_CredentialProviderRequest(in, out, s)
 }
 
-func autoConvert_v1alpha1_CredentialProviderResponse_To_credentialprovider_CredentialProviderResponse(in *CredentialProviderResponse, out *credentialprovider.CredentialProviderResponse, s conversion.Scope) error {
-	out.CacheKeyType = credentialprovider.PluginCacheKeyType(in.CacheKeyType)
-	out.CacheDuration = (*v1.Duration)(unsafe.Pointer(in.CacheDuration))
-	out.Auth = *(*map[string]credentialprovider.AuthConfig)(unsafe.Pointer(&in.Auth))
+func autoConvert_v1alpha1_CredentialProviderResponse_To_credentialprovider_CredentialProviderResponse(in *CredentialProviderResponse, out *pkgapiscredentialprovider.CredentialProviderResponse, s apimachinerypkgconversion.Scope) error {
+	out.CacheKeyType = pkgapiscredentialprovider.PluginCacheKeyType(in.CacheKeyType)
+	out.CacheDuration = (*apismetav1.Duration)(unsafe.Pointer(in.CacheDuration))
+	out.Auth = *(*map[string]pkgapiscredentialprovider.AuthConfig)(unsafe.Pointer(&in.Auth))
 	return nil
 }
 
 // Convert_v1alpha1_CredentialProviderResponse_To_credentialprovider_CredentialProviderResponse is an autogenerated conversion function.
-func Convert_v1alpha1_CredentialProviderResponse_To_credentialprovider_CredentialProviderResponse(in *CredentialProviderResponse, out *credentialprovider.CredentialProviderResponse, s conversion.Scope) error {
+func Convert_v1alpha1_CredentialProviderResponse_To_credentialprovider_CredentialProviderResponse(in *CredentialProviderResponse, out *pkgapiscredentialprovider.CredentialProviderResponse, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha1_CredentialProviderResponse_To_credentialprovider_CredentialProviderResponse(in, out, s)
 }
 
-func autoConvert_credentialprovider_CredentialProviderResponse_To_v1alpha1_CredentialProviderResponse(in *credentialprovider.CredentialProviderResponse, out *CredentialProviderResponse, s conversion.Scope) error {
+func autoConvert_credentialprovider_CredentialProviderResponse_To_v1alpha1_CredentialProviderResponse(in *pkgapiscredentialprovider.CredentialProviderResponse, out *CredentialProviderResponse, s apimachinerypkgconversion.Scope) error {
 	out.CacheKeyType = PluginCacheKeyType(in.CacheKeyType)
-	out.CacheDuration = (*v1.Duration)(unsafe.Pointer(in.CacheDuration))
+	out.CacheDuration = (*apismetav1.Duration)(unsafe.Pointer(in.CacheDuration))
 	out.Auth = *(*map[string]AuthConfig)(unsafe.Pointer(&in.Auth))
 	return nil
 }
 
 // Convert_credentialprovider_CredentialProviderResponse_To_v1alpha1_CredentialProviderResponse is an autogenerated conversion function.
-func Convert_credentialprovider_CredentialProviderResponse_To_v1alpha1_CredentialProviderResponse(in *credentialprovider.CredentialProviderResponse, out *CredentialProviderResponse, s conversion.Scope) error {
+func Convert_credentialprovider_CredentialProviderResponse_To_v1alpha1_CredentialProviderResponse(in *pkgapiscredentialprovider.CredentialProviderResponse, out *CredentialProviderResponse, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_credentialprovider_CredentialProviderResponse_To_v1alpha1_CredentialProviderResponse(in, out, s)
 }

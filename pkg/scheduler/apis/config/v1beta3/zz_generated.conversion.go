@@ -24,13 +24,14 @@ package v1beta3
 import (
 	"unsafe"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/component-base/config/v1alpha1"
+	apicorev1 "k8s.io/api/core/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	"k8s.io/kube-scheduler/config/v1beta3"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	kubeschedulerconfigv1beta3 "k8s.io/kube-scheduler/config/v1beta3"
+	schedulerapisconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
 func init() {
@@ -39,241 +40,241 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1beta3.DefaultPreemptionArgs)(nil), (*config.DefaultPreemptionArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta3_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(a.(*v1beta3.DefaultPreemptionArgs), b.(*config.DefaultPreemptionArgs), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*kubeschedulerconfigv1beta3.DefaultPreemptionArgs)(nil), (*schedulerapisconfig.DefaultPreemptionArgs)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta3_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(a.(*kubeschedulerconfigv1beta3.DefaultPreemptionArgs), b.(*schedulerapisconfig.DefaultPreemptionArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.DefaultPreemptionArgs)(nil), (*v1beta3.DefaultPreemptionArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_DefaultPreemptionArgs_To_v1beta3_DefaultPreemptionArgs(a.(*config.DefaultPreemptionArgs), b.(*v1beta3.DefaultPreemptionArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*schedulerapisconfig.DefaultPreemptionArgs)(nil), (*kubeschedulerconfigv1beta3.DefaultPreemptionArgs)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_DefaultPreemptionArgs_To_v1beta3_DefaultPreemptionArgs(a.(*schedulerapisconfig.DefaultPreemptionArgs), b.(*kubeschedulerconfigv1beta3.DefaultPreemptionArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta3.Extender)(nil), (*config.Extender)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta3_Extender_To_config_Extender(a.(*v1beta3.Extender), b.(*config.Extender), scope)
+	if err := s.AddGeneratedConversionFunc((*kubeschedulerconfigv1beta3.Extender)(nil), (*schedulerapisconfig.Extender)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta3_Extender_To_config_Extender(a.(*kubeschedulerconfigv1beta3.Extender), b.(*schedulerapisconfig.Extender), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.Extender)(nil), (*v1beta3.Extender)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_Extender_To_v1beta3_Extender(a.(*config.Extender), b.(*v1beta3.Extender), scope)
+	if err := s.AddGeneratedConversionFunc((*schedulerapisconfig.Extender)(nil), (*kubeschedulerconfigv1beta3.Extender)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_Extender_To_v1beta3_Extender(a.(*schedulerapisconfig.Extender), b.(*kubeschedulerconfigv1beta3.Extender), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta3.ExtenderManagedResource)(nil), (*config.ExtenderManagedResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta3_ExtenderManagedResource_To_config_ExtenderManagedResource(a.(*v1beta3.ExtenderManagedResource), b.(*config.ExtenderManagedResource), scope)
+	if err := s.AddGeneratedConversionFunc((*kubeschedulerconfigv1beta3.ExtenderManagedResource)(nil), (*schedulerapisconfig.ExtenderManagedResource)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta3_ExtenderManagedResource_To_config_ExtenderManagedResource(a.(*kubeschedulerconfigv1beta3.ExtenderManagedResource), b.(*schedulerapisconfig.ExtenderManagedResource), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.ExtenderManagedResource)(nil), (*v1beta3.ExtenderManagedResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_ExtenderManagedResource_To_v1beta3_ExtenderManagedResource(a.(*config.ExtenderManagedResource), b.(*v1beta3.ExtenderManagedResource), scope)
+	if err := s.AddGeneratedConversionFunc((*schedulerapisconfig.ExtenderManagedResource)(nil), (*kubeschedulerconfigv1beta3.ExtenderManagedResource)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_ExtenderManagedResource_To_v1beta3_ExtenderManagedResource(a.(*schedulerapisconfig.ExtenderManagedResource), b.(*kubeschedulerconfigv1beta3.ExtenderManagedResource), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta3.ExtenderTLSConfig)(nil), (*config.ExtenderTLSConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta3_ExtenderTLSConfig_To_config_ExtenderTLSConfig(a.(*v1beta3.ExtenderTLSConfig), b.(*config.ExtenderTLSConfig), scope)
+	if err := s.AddGeneratedConversionFunc((*kubeschedulerconfigv1beta3.ExtenderTLSConfig)(nil), (*schedulerapisconfig.ExtenderTLSConfig)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta3_ExtenderTLSConfig_To_config_ExtenderTLSConfig(a.(*kubeschedulerconfigv1beta3.ExtenderTLSConfig), b.(*schedulerapisconfig.ExtenderTLSConfig), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.ExtenderTLSConfig)(nil), (*v1beta3.ExtenderTLSConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_ExtenderTLSConfig_To_v1beta3_ExtenderTLSConfig(a.(*config.ExtenderTLSConfig), b.(*v1beta3.ExtenderTLSConfig), scope)
+	if err := s.AddGeneratedConversionFunc((*schedulerapisconfig.ExtenderTLSConfig)(nil), (*kubeschedulerconfigv1beta3.ExtenderTLSConfig)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_ExtenderTLSConfig_To_v1beta3_ExtenderTLSConfig(a.(*schedulerapisconfig.ExtenderTLSConfig), b.(*kubeschedulerconfigv1beta3.ExtenderTLSConfig), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta3.InterPodAffinityArgs)(nil), (*config.InterPodAffinityArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta3_InterPodAffinityArgs_To_config_InterPodAffinityArgs(a.(*v1beta3.InterPodAffinityArgs), b.(*config.InterPodAffinityArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*kubeschedulerconfigv1beta3.InterPodAffinityArgs)(nil), (*schedulerapisconfig.InterPodAffinityArgs)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta3_InterPodAffinityArgs_To_config_InterPodAffinityArgs(a.(*kubeschedulerconfigv1beta3.InterPodAffinityArgs), b.(*schedulerapisconfig.InterPodAffinityArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.InterPodAffinityArgs)(nil), (*v1beta3.InterPodAffinityArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_InterPodAffinityArgs_To_v1beta3_InterPodAffinityArgs(a.(*config.InterPodAffinityArgs), b.(*v1beta3.InterPodAffinityArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*schedulerapisconfig.InterPodAffinityArgs)(nil), (*kubeschedulerconfigv1beta3.InterPodAffinityArgs)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_InterPodAffinityArgs_To_v1beta3_InterPodAffinityArgs(a.(*schedulerapisconfig.InterPodAffinityArgs), b.(*kubeschedulerconfigv1beta3.InterPodAffinityArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta3.KubeSchedulerProfile)(nil), (*config.KubeSchedulerProfile)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta3_KubeSchedulerProfile_To_config_KubeSchedulerProfile(a.(*v1beta3.KubeSchedulerProfile), b.(*config.KubeSchedulerProfile), scope)
+	if err := s.AddGeneratedConversionFunc((*kubeschedulerconfigv1beta3.KubeSchedulerProfile)(nil), (*schedulerapisconfig.KubeSchedulerProfile)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta3_KubeSchedulerProfile_To_config_KubeSchedulerProfile(a.(*kubeschedulerconfigv1beta3.KubeSchedulerProfile), b.(*schedulerapisconfig.KubeSchedulerProfile), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta3.NodeAffinityArgs)(nil), (*config.NodeAffinityArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta3_NodeAffinityArgs_To_config_NodeAffinityArgs(a.(*v1beta3.NodeAffinityArgs), b.(*config.NodeAffinityArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*kubeschedulerconfigv1beta3.NodeAffinityArgs)(nil), (*schedulerapisconfig.NodeAffinityArgs)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta3_NodeAffinityArgs_To_config_NodeAffinityArgs(a.(*kubeschedulerconfigv1beta3.NodeAffinityArgs), b.(*schedulerapisconfig.NodeAffinityArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.NodeAffinityArgs)(nil), (*v1beta3.NodeAffinityArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_NodeAffinityArgs_To_v1beta3_NodeAffinityArgs(a.(*config.NodeAffinityArgs), b.(*v1beta3.NodeAffinityArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*schedulerapisconfig.NodeAffinityArgs)(nil), (*kubeschedulerconfigv1beta3.NodeAffinityArgs)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_NodeAffinityArgs_To_v1beta3_NodeAffinityArgs(a.(*schedulerapisconfig.NodeAffinityArgs), b.(*kubeschedulerconfigv1beta3.NodeAffinityArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta3.NodeResourcesBalancedAllocationArgs)(nil), (*config.NodeResourcesBalancedAllocationArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta3_NodeResourcesBalancedAllocationArgs_To_config_NodeResourcesBalancedAllocationArgs(a.(*v1beta3.NodeResourcesBalancedAllocationArgs), b.(*config.NodeResourcesBalancedAllocationArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*kubeschedulerconfigv1beta3.NodeResourcesBalancedAllocationArgs)(nil), (*schedulerapisconfig.NodeResourcesBalancedAllocationArgs)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta3_NodeResourcesBalancedAllocationArgs_To_config_NodeResourcesBalancedAllocationArgs(a.(*kubeschedulerconfigv1beta3.NodeResourcesBalancedAllocationArgs), b.(*schedulerapisconfig.NodeResourcesBalancedAllocationArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.NodeResourcesBalancedAllocationArgs)(nil), (*v1beta3.NodeResourcesBalancedAllocationArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_NodeResourcesBalancedAllocationArgs_To_v1beta3_NodeResourcesBalancedAllocationArgs(a.(*config.NodeResourcesBalancedAllocationArgs), b.(*v1beta3.NodeResourcesBalancedAllocationArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*schedulerapisconfig.NodeResourcesBalancedAllocationArgs)(nil), (*kubeschedulerconfigv1beta3.NodeResourcesBalancedAllocationArgs)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_NodeResourcesBalancedAllocationArgs_To_v1beta3_NodeResourcesBalancedAllocationArgs(a.(*schedulerapisconfig.NodeResourcesBalancedAllocationArgs), b.(*kubeschedulerconfigv1beta3.NodeResourcesBalancedAllocationArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta3.NodeResourcesFitArgs)(nil), (*config.NodeResourcesFitArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta3_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(a.(*v1beta3.NodeResourcesFitArgs), b.(*config.NodeResourcesFitArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*kubeschedulerconfigv1beta3.NodeResourcesFitArgs)(nil), (*schedulerapisconfig.NodeResourcesFitArgs)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta3_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(a.(*kubeschedulerconfigv1beta3.NodeResourcesFitArgs), b.(*schedulerapisconfig.NodeResourcesFitArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.NodeResourcesFitArgs)(nil), (*v1beta3.NodeResourcesFitArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_NodeResourcesFitArgs_To_v1beta3_NodeResourcesFitArgs(a.(*config.NodeResourcesFitArgs), b.(*v1beta3.NodeResourcesFitArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*schedulerapisconfig.NodeResourcesFitArgs)(nil), (*kubeschedulerconfigv1beta3.NodeResourcesFitArgs)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_NodeResourcesFitArgs_To_v1beta3_NodeResourcesFitArgs(a.(*schedulerapisconfig.NodeResourcesFitArgs), b.(*kubeschedulerconfigv1beta3.NodeResourcesFitArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta3.Plugin)(nil), (*config.Plugin)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta3_Plugin_To_config_Plugin(a.(*v1beta3.Plugin), b.(*config.Plugin), scope)
+	if err := s.AddGeneratedConversionFunc((*kubeschedulerconfigv1beta3.Plugin)(nil), (*schedulerapisconfig.Plugin)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta3_Plugin_To_config_Plugin(a.(*kubeschedulerconfigv1beta3.Plugin), b.(*schedulerapisconfig.Plugin), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.Plugin)(nil), (*v1beta3.Plugin)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_Plugin_To_v1beta3_Plugin(a.(*config.Plugin), b.(*v1beta3.Plugin), scope)
+	if err := s.AddGeneratedConversionFunc((*schedulerapisconfig.Plugin)(nil), (*kubeschedulerconfigv1beta3.Plugin)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_Plugin_To_v1beta3_Plugin(a.(*schedulerapisconfig.Plugin), b.(*kubeschedulerconfigv1beta3.Plugin), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta3.PluginConfig)(nil), (*config.PluginConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta3_PluginConfig_To_config_PluginConfig(a.(*v1beta3.PluginConfig), b.(*config.PluginConfig), scope)
+	if err := s.AddGeneratedConversionFunc((*kubeschedulerconfigv1beta3.PluginConfig)(nil), (*schedulerapisconfig.PluginConfig)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta3_PluginConfig_To_config_PluginConfig(a.(*kubeschedulerconfigv1beta3.PluginConfig), b.(*schedulerapisconfig.PluginConfig), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.PluginConfig)(nil), (*v1beta3.PluginConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_PluginConfig_To_v1beta3_PluginConfig(a.(*config.PluginConfig), b.(*v1beta3.PluginConfig), scope)
+	if err := s.AddGeneratedConversionFunc((*schedulerapisconfig.PluginConfig)(nil), (*kubeschedulerconfigv1beta3.PluginConfig)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_PluginConfig_To_v1beta3_PluginConfig(a.(*schedulerapisconfig.PluginConfig), b.(*kubeschedulerconfigv1beta3.PluginConfig), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta3.PluginSet)(nil), (*config.PluginSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta3_PluginSet_To_config_PluginSet(a.(*v1beta3.PluginSet), b.(*config.PluginSet), scope)
+	if err := s.AddGeneratedConversionFunc((*kubeschedulerconfigv1beta3.PluginSet)(nil), (*schedulerapisconfig.PluginSet)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta3_PluginSet_To_config_PluginSet(a.(*kubeschedulerconfigv1beta3.PluginSet), b.(*schedulerapisconfig.PluginSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.PluginSet)(nil), (*v1beta3.PluginSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_PluginSet_To_v1beta3_PluginSet(a.(*config.PluginSet), b.(*v1beta3.PluginSet), scope)
+	if err := s.AddGeneratedConversionFunc((*schedulerapisconfig.PluginSet)(nil), (*kubeschedulerconfigv1beta3.PluginSet)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_PluginSet_To_v1beta3_PluginSet(a.(*schedulerapisconfig.PluginSet), b.(*kubeschedulerconfigv1beta3.PluginSet), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta3.Plugins)(nil), (*config.Plugins)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta3_Plugins_To_config_Plugins(a.(*v1beta3.Plugins), b.(*config.Plugins), scope)
+	if err := s.AddGeneratedConversionFunc((*kubeschedulerconfigv1beta3.Plugins)(nil), (*schedulerapisconfig.Plugins)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta3_Plugins_To_config_Plugins(a.(*kubeschedulerconfigv1beta3.Plugins), b.(*schedulerapisconfig.Plugins), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta3.PodTopologySpreadArgs)(nil), (*config.PodTopologySpreadArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta3_PodTopologySpreadArgs_To_config_PodTopologySpreadArgs(a.(*v1beta3.PodTopologySpreadArgs), b.(*config.PodTopologySpreadArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*kubeschedulerconfigv1beta3.PodTopologySpreadArgs)(nil), (*schedulerapisconfig.PodTopologySpreadArgs)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta3_PodTopologySpreadArgs_To_config_PodTopologySpreadArgs(a.(*kubeschedulerconfigv1beta3.PodTopologySpreadArgs), b.(*schedulerapisconfig.PodTopologySpreadArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.PodTopologySpreadArgs)(nil), (*v1beta3.PodTopologySpreadArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_PodTopologySpreadArgs_To_v1beta3_PodTopologySpreadArgs(a.(*config.PodTopologySpreadArgs), b.(*v1beta3.PodTopologySpreadArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*schedulerapisconfig.PodTopologySpreadArgs)(nil), (*kubeschedulerconfigv1beta3.PodTopologySpreadArgs)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_PodTopologySpreadArgs_To_v1beta3_PodTopologySpreadArgs(a.(*schedulerapisconfig.PodTopologySpreadArgs), b.(*kubeschedulerconfigv1beta3.PodTopologySpreadArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta3.RequestedToCapacityRatioParam)(nil), (*config.RequestedToCapacityRatioParam)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta3_RequestedToCapacityRatioParam_To_config_RequestedToCapacityRatioParam(a.(*v1beta3.RequestedToCapacityRatioParam), b.(*config.RequestedToCapacityRatioParam), scope)
+	if err := s.AddGeneratedConversionFunc((*kubeschedulerconfigv1beta3.RequestedToCapacityRatioParam)(nil), (*schedulerapisconfig.RequestedToCapacityRatioParam)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta3_RequestedToCapacityRatioParam_To_config_RequestedToCapacityRatioParam(a.(*kubeschedulerconfigv1beta3.RequestedToCapacityRatioParam), b.(*schedulerapisconfig.RequestedToCapacityRatioParam), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.RequestedToCapacityRatioParam)(nil), (*v1beta3.RequestedToCapacityRatioParam)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_RequestedToCapacityRatioParam_To_v1beta3_RequestedToCapacityRatioParam(a.(*config.RequestedToCapacityRatioParam), b.(*v1beta3.RequestedToCapacityRatioParam), scope)
+	if err := s.AddGeneratedConversionFunc((*schedulerapisconfig.RequestedToCapacityRatioParam)(nil), (*kubeschedulerconfigv1beta3.RequestedToCapacityRatioParam)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_RequestedToCapacityRatioParam_To_v1beta3_RequestedToCapacityRatioParam(a.(*schedulerapisconfig.RequestedToCapacityRatioParam), b.(*kubeschedulerconfigv1beta3.RequestedToCapacityRatioParam), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta3.ResourceSpec)(nil), (*config.ResourceSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta3_ResourceSpec_To_config_ResourceSpec(a.(*v1beta3.ResourceSpec), b.(*config.ResourceSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*kubeschedulerconfigv1beta3.ResourceSpec)(nil), (*schedulerapisconfig.ResourceSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta3_ResourceSpec_To_config_ResourceSpec(a.(*kubeschedulerconfigv1beta3.ResourceSpec), b.(*schedulerapisconfig.ResourceSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.ResourceSpec)(nil), (*v1beta3.ResourceSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_ResourceSpec_To_v1beta3_ResourceSpec(a.(*config.ResourceSpec), b.(*v1beta3.ResourceSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*schedulerapisconfig.ResourceSpec)(nil), (*kubeschedulerconfigv1beta3.ResourceSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_ResourceSpec_To_v1beta3_ResourceSpec(a.(*schedulerapisconfig.ResourceSpec), b.(*kubeschedulerconfigv1beta3.ResourceSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta3.ScoringStrategy)(nil), (*config.ScoringStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta3_ScoringStrategy_To_config_ScoringStrategy(a.(*v1beta3.ScoringStrategy), b.(*config.ScoringStrategy), scope)
+	if err := s.AddGeneratedConversionFunc((*kubeschedulerconfigv1beta3.ScoringStrategy)(nil), (*schedulerapisconfig.ScoringStrategy)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta3_ScoringStrategy_To_config_ScoringStrategy(a.(*kubeschedulerconfigv1beta3.ScoringStrategy), b.(*schedulerapisconfig.ScoringStrategy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.ScoringStrategy)(nil), (*v1beta3.ScoringStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_ScoringStrategy_To_v1beta3_ScoringStrategy(a.(*config.ScoringStrategy), b.(*v1beta3.ScoringStrategy), scope)
+	if err := s.AddGeneratedConversionFunc((*schedulerapisconfig.ScoringStrategy)(nil), (*kubeschedulerconfigv1beta3.ScoringStrategy)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_ScoringStrategy_To_v1beta3_ScoringStrategy(a.(*schedulerapisconfig.ScoringStrategy), b.(*kubeschedulerconfigv1beta3.ScoringStrategy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta3.UtilizationShapePoint)(nil), (*config.UtilizationShapePoint)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta3_UtilizationShapePoint_To_config_UtilizationShapePoint(a.(*v1beta3.UtilizationShapePoint), b.(*config.UtilizationShapePoint), scope)
+	if err := s.AddGeneratedConversionFunc((*kubeschedulerconfigv1beta3.UtilizationShapePoint)(nil), (*schedulerapisconfig.UtilizationShapePoint)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta3_UtilizationShapePoint_To_config_UtilizationShapePoint(a.(*kubeschedulerconfigv1beta3.UtilizationShapePoint), b.(*schedulerapisconfig.UtilizationShapePoint), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.UtilizationShapePoint)(nil), (*v1beta3.UtilizationShapePoint)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_UtilizationShapePoint_To_v1beta3_UtilizationShapePoint(a.(*config.UtilizationShapePoint), b.(*v1beta3.UtilizationShapePoint), scope)
+	if err := s.AddGeneratedConversionFunc((*schedulerapisconfig.UtilizationShapePoint)(nil), (*kubeschedulerconfigv1beta3.UtilizationShapePoint)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_UtilizationShapePoint_To_v1beta3_UtilizationShapePoint(a.(*schedulerapisconfig.UtilizationShapePoint), b.(*kubeschedulerconfigv1beta3.UtilizationShapePoint), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta3.VolumeBindingArgs)(nil), (*config.VolumeBindingArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta3_VolumeBindingArgs_To_config_VolumeBindingArgs(a.(*v1beta3.VolumeBindingArgs), b.(*config.VolumeBindingArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*kubeschedulerconfigv1beta3.VolumeBindingArgs)(nil), (*schedulerapisconfig.VolumeBindingArgs)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta3_VolumeBindingArgs_To_config_VolumeBindingArgs(a.(*kubeschedulerconfigv1beta3.VolumeBindingArgs), b.(*schedulerapisconfig.VolumeBindingArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.VolumeBindingArgs)(nil), (*v1beta3.VolumeBindingArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_VolumeBindingArgs_To_v1beta3_VolumeBindingArgs(a.(*config.VolumeBindingArgs), b.(*v1beta3.VolumeBindingArgs), scope)
+	if err := s.AddGeneratedConversionFunc((*schedulerapisconfig.VolumeBindingArgs)(nil), (*kubeschedulerconfigv1beta3.VolumeBindingArgs)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_VolumeBindingArgs_To_v1beta3_VolumeBindingArgs(a.(*schedulerapisconfig.VolumeBindingArgs), b.(*kubeschedulerconfigv1beta3.VolumeBindingArgs), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*config.KubeSchedulerConfiguration)(nil), (*v1beta3.KubeSchedulerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_KubeSchedulerConfiguration_To_v1beta3_KubeSchedulerConfiguration(a.(*config.KubeSchedulerConfiguration), b.(*v1beta3.KubeSchedulerConfiguration), scope)
+	if err := s.AddConversionFunc((*schedulerapisconfig.KubeSchedulerConfiguration)(nil), (*kubeschedulerconfigv1beta3.KubeSchedulerConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_KubeSchedulerConfiguration_To_v1beta3_KubeSchedulerConfiguration(a.(*schedulerapisconfig.KubeSchedulerConfiguration), b.(*kubeschedulerconfigv1beta3.KubeSchedulerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*config.KubeSchedulerProfile)(nil), (*v1beta3.KubeSchedulerProfile)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_KubeSchedulerProfile_To_v1beta3_KubeSchedulerProfile(a.(*config.KubeSchedulerProfile), b.(*v1beta3.KubeSchedulerProfile), scope)
+	if err := s.AddConversionFunc((*schedulerapisconfig.KubeSchedulerProfile)(nil), (*kubeschedulerconfigv1beta3.KubeSchedulerProfile)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_KubeSchedulerProfile_To_v1beta3_KubeSchedulerProfile(a.(*schedulerapisconfig.KubeSchedulerProfile), b.(*kubeschedulerconfigv1beta3.KubeSchedulerProfile), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*config.Plugins)(nil), (*v1beta3.Plugins)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_Plugins_To_v1beta3_Plugins(a.(*config.Plugins), b.(*v1beta3.Plugins), scope)
+	if err := s.AddConversionFunc((*schedulerapisconfig.Plugins)(nil), (*kubeschedulerconfigv1beta3.Plugins)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_Plugins_To_v1beta3_Plugins(a.(*schedulerapisconfig.Plugins), b.(*kubeschedulerconfigv1beta3.Plugins), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1beta3.KubeSchedulerConfiguration)(nil), (*config.KubeSchedulerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta3_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(a.(*v1beta3.KubeSchedulerConfiguration), b.(*config.KubeSchedulerConfiguration), scope)
+	if err := s.AddConversionFunc((*kubeschedulerconfigv1beta3.KubeSchedulerConfiguration)(nil), (*schedulerapisconfig.KubeSchedulerConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta3_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(a.(*kubeschedulerconfigv1beta3.KubeSchedulerConfiguration), b.(*schedulerapisconfig.KubeSchedulerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1beta3_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(in *v1beta3.DefaultPreemptionArgs, out *config.DefaultPreemptionArgs, s conversion.Scope) error {
-	if err := v1.Convert_Pointer_int32_To_int32(&in.MinCandidateNodesPercentage, &out.MinCandidateNodesPercentage, s); err != nil {
+func autoConvert_v1beta3_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(in *kubeschedulerconfigv1beta3.DefaultPreemptionArgs, out *schedulerapisconfig.DefaultPreemptionArgs, s apimachinerypkgconversion.Scope) error {
+	if err := apismetav1.Convert_Pointer_int32_To_int32(&in.MinCandidateNodesPercentage, &out.MinCandidateNodesPercentage, s); err != nil {
 		return err
 	}
-	if err := v1.Convert_Pointer_int32_To_int32(&in.MinCandidateNodesAbsolute, &out.MinCandidateNodesAbsolute, s); err != nil {
+	if err := apismetav1.Convert_Pointer_int32_To_int32(&in.MinCandidateNodesAbsolute, &out.MinCandidateNodesAbsolute, s); err != nil {
 		return err
 	}
 	return nil
 }
 
 // Convert_v1beta3_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs is an autogenerated conversion function.
-func Convert_v1beta3_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(in *v1beta3.DefaultPreemptionArgs, out *config.DefaultPreemptionArgs, s conversion.Scope) error {
+func Convert_v1beta3_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(in *kubeschedulerconfigv1beta3.DefaultPreemptionArgs, out *schedulerapisconfig.DefaultPreemptionArgs, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta3_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(in, out, s)
 }
 
-func autoConvert_config_DefaultPreemptionArgs_To_v1beta3_DefaultPreemptionArgs(in *config.DefaultPreemptionArgs, out *v1beta3.DefaultPreemptionArgs, s conversion.Scope) error {
-	if err := v1.Convert_int32_To_Pointer_int32(&in.MinCandidateNodesPercentage, &out.MinCandidateNodesPercentage, s); err != nil {
+func autoConvert_config_DefaultPreemptionArgs_To_v1beta3_DefaultPreemptionArgs(in *schedulerapisconfig.DefaultPreemptionArgs, out *kubeschedulerconfigv1beta3.DefaultPreemptionArgs, s apimachinerypkgconversion.Scope) error {
+	if err := apismetav1.Convert_int32_To_Pointer_int32(&in.MinCandidateNodesPercentage, &out.MinCandidateNodesPercentage, s); err != nil {
 		return err
 	}
-	if err := v1.Convert_int32_To_Pointer_int32(&in.MinCandidateNodesAbsolute, &out.MinCandidateNodesAbsolute, s); err != nil {
+	if err := apismetav1.Convert_int32_To_Pointer_int32(&in.MinCandidateNodesAbsolute, &out.MinCandidateNodesAbsolute, s); err != nil {
 		return err
 	}
 	return nil
 }
 
 // Convert_config_DefaultPreemptionArgs_To_v1beta3_DefaultPreemptionArgs is an autogenerated conversion function.
-func Convert_config_DefaultPreemptionArgs_To_v1beta3_DefaultPreemptionArgs(in *config.DefaultPreemptionArgs, out *v1beta3.DefaultPreemptionArgs, s conversion.Scope) error {
+func Convert_config_DefaultPreemptionArgs_To_v1beta3_DefaultPreemptionArgs(in *schedulerapisconfig.DefaultPreemptionArgs, out *kubeschedulerconfigv1beta3.DefaultPreemptionArgs, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_DefaultPreemptionArgs_To_v1beta3_DefaultPreemptionArgs(in, out, s)
 }
 
-func autoConvert_v1beta3_Extender_To_config_Extender(in *v1beta3.Extender, out *config.Extender, s conversion.Scope) error {
+func autoConvert_v1beta3_Extender_To_config_Extender(in *kubeschedulerconfigv1beta3.Extender, out *schedulerapisconfig.Extender, s apimachinerypkgconversion.Scope) error {
 	out.URLPrefix = in.URLPrefix
 	out.FilterVerb = in.FilterVerb
 	out.PreemptVerb = in.PreemptVerb
@@ -281,20 +282,20 @@ func autoConvert_v1beta3_Extender_To_config_Extender(in *v1beta3.Extender, out *
 	out.Weight = in.Weight
 	out.BindVerb = in.BindVerb
 	out.EnableHTTPS = in.EnableHTTPS
-	out.TLSConfig = (*config.ExtenderTLSConfig)(unsafe.Pointer(in.TLSConfig))
+	out.TLSConfig = (*schedulerapisconfig.ExtenderTLSConfig)(unsafe.Pointer(in.TLSConfig))
 	out.HTTPTimeout = in.HTTPTimeout
 	out.NodeCacheCapable = in.NodeCacheCapable
-	out.ManagedResources = *(*[]config.ExtenderManagedResource)(unsafe.Pointer(&in.ManagedResources))
+	out.ManagedResources = *(*[]schedulerapisconfig.ExtenderManagedResource)(unsafe.Pointer(&in.ManagedResources))
 	out.Ignorable = in.Ignorable
 	return nil
 }
 
 // Convert_v1beta3_Extender_To_config_Extender is an autogenerated conversion function.
-func Convert_v1beta3_Extender_To_config_Extender(in *v1beta3.Extender, out *config.Extender, s conversion.Scope) error {
+func Convert_v1beta3_Extender_To_config_Extender(in *kubeschedulerconfigv1beta3.Extender, out *schedulerapisconfig.Extender, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta3_Extender_To_config_Extender(in, out, s)
 }
 
-func autoConvert_config_Extender_To_v1beta3_Extender(in *config.Extender, out *v1beta3.Extender, s conversion.Scope) error {
+func autoConvert_config_Extender_To_v1beta3_Extender(in *schedulerapisconfig.Extender, out *kubeschedulerconfigv1beta3.Extender, s apimachinerypkgconversion.Scope) error {
 	out.URLPrefix = in.URLPrefix
 	out.FilterVerb = in.FilterVerb
 	out.PreemptVerb = in.PreemptVerb
@@ -302,42 +303,42 @@ func autoConvert_config_Extender_To_v1beta3_Extender(in *config.Extender, out *v
 	out.Weight = in.Weight
 	out.BindVerb = in.BindVerb
 	out.EnableHTTPS = in.EnableHTTPS
-	out.TLSConfig = (*v1beta3.ExtenderTLSConfig)(unsafe.Pointer(in.TLSConfig))
+	out.TLSConfig = (*kubeschedulerconfigv1beta3.ExtenderTLSConfig)(unsafe.Pointer(in.TLSConfig))
 	out.HTTPTimeout = in.HTTPTimeout
 	out.NodeCacheCapable = in.NodeCacheCapable
-	out.ManagedResources = *(*[]v1beta3.ExtenderManagedResource)(unsafe.Pointer(&in.ManagedResources))
+	out.ManagedResources = *(*[]kubeschedulerconfigv1beta3.ExtenderManagedResource)(unsafe.Pointer(&in.ManagedResources))
 	out.Ignorable = in.Ignorable
 	return nil
 }
 
 // Convert_config_Extender_To_v1beta3_Extender is an autogenerated conversion function.
-func Convert_config_Extender_To_v1beta3_Extender(in *config.Extender, out *v1beta3.Extender, s conversion.Scope) error {
+func Convert_config_Extender_To_v1beta3_Extender(in *schedulerapisconfig.Extender, out *kubeschedulerconfigv1beta3.Extender, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_Extender_To_v1beta3_Extender(in, out, s)
 }
 
-func autoConvert_v1beta3_ExtenderManagedResource_To_config_ExtenderManagedResource(in *v1beta3.ExtenderManagedResource, out *config.ExtenderManagedResource, s conversion.Scope) error {
+func autoConvert_v1beta3_ExtenderManagedResource_To_config_ExtenderManagedResource(in *kubeschedulerconfigv1beta3.ExtenderManagedResource, out *schedulerapisconfig.ExtenderManagedResource, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
 	out.IgnoredByScheduler = in.IgnoredByScheduler
 	return nil
 }
 
 // Convert_v1beta3_ExtenderManagedResource_To_config_ExtenderManagedResource is an autogenerated conversion function.
-func Convert_v1beta3_ExtenderManagedResource_To_config_ExtenderManagedResource(in *v1beta3.ExtenderManagedResource, out *config.ExtenderManagedResource, s conversion.Scope) error {
+func Convert_v1beta3_ExtenderManagedResource_To_config_ExtenderManagedResource(in *kubeschedulerconfigv1beta3.ExtenderManagedResource, out *schedulerapisconfig.ExtenderManagedResource, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta3_ExtenderManagedResource_To_config_ExtenderManagedResource(in, out, s)
 }
 
-func autoConvert_config_ExtenderManagedResource_To_v1beta3_ExtenderManagedResource(in *config.ExtenderManagedResource, out *v1beta3.ExtenderManagedResource, s conversion.Scope) error {
+func autoConvert_config_ExtenderManagedResource_To_v1beta3_ExtenderManagedResource(in *schedulerapisconfig.ExtenderManagedResource, out *kubeschedulerconfigv1beta3.ExtenderManagedResource, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
 	out.IgnoredByScheduler = in.IgnoredByScheduler
 	return nil
 }
 
 // Convert_config_ExtenderManagedResource_To_v1beta3_ExtenderManagedResource is an autogenerated conversion function.
-func Convert_config_ExtenderManagedResource_To_v1beta3_ExtenderManagedResource(in *config.ExtenderManagedResource, out *v1beta3.ExtenderManagedResource, s conversion.Scope) error {
+func Convert_config_ExtenderManagedResource_To_v1beta3_ExtenderManagedResource(in *schedulerapisconfig.ExtenderManagedResource, out *kubeschedulerconfigv1beta3.ExtenderManagedResource, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_ExtenderManagedResource_To_v1beta3_ExtenderManagedResource(in, out, s)
 }
 
-func autoConvert_v1beta3_ExtenderTLSConfig_To_config_ExtenderTLSConfig(in *v1beta3.ExtenderTLSConfig, out *config.ExtenderTLSConfig, s conversion.Scope) error {
+func autoConvert_v1beta3_ExtenderTLSConfig_To_config_ExtenderTLSConfig(in *kubeschedulerconfigv1beta3.ExtenderTLSConfig, out *schedulerapisconfig.ExtenderTLSConfig, s apimachinerypkgconversion.Scope) error {
 	out.Insecure = in.Insecure
 	out.ServerName = in.ServerName
 	out.CertFile = in.CertFile
@@ -350,11 +351,11 @@ func autoConvert_v1beta3_ExtenderTLSConfig_To_config_ExtenderTLSConfig(in *v1bet
 }
 
 // Convert_v1beta3_ExtenderTLSConfig_To_config_ExtenderTLSConfig is an autogenerated conversion function.
-func Convert_v1beta3_ExtenderTLSConfig_To_config_ExtenderTLSConfig(in *v1beta3.ExtenderTLSConfig, out *config.ExtenderTLSConfig, s conversion.Scope) error {
+func Convert_v1beta3_ExtenderTLSConfig_To_config_ExtenderTLSConfig(in *kubeschedulerconfigv1beta3.ExtenderTLSConfig, out *schedulerapisconfig.ExtenderTLSConfig, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta3_ExtenderTLSConfig_To_config_ExtenderTLSConfig(in, out, s)
 }
 
-func autoConvert_config_ExtenderTLSConfig_To_v1beta3_ExtenderTLSConfig(in *config.ExtenderTLSConfig, out *v1beta3.ExtenderTLSConfig, s conversion.Scope) error {
+func autoConvert_config_ExtenderTLSConfig_To_v1beta3_ExtenderTLSConfig(in *schedulerapisconfig.ExtenderTLSConfig, out *kubeschedulerconfigv1beta3.ExtenderTLSConfig, s apimachinerypkgconversion.Scope) error {
 	out.Insecure = in.Insecure
 	out.ServerName = in.ServerName
 	out.CertFile = in.CertFile
@@ -367,12 +368,12 @@ func autoConvert_config_ExtenderTLSConfig_To_v1beta3_ExtenderTLSConfig(in *confi
 }
 
 // Convert_config_ExtenderTLSConfig_To_v1beta3_ExtenderTLSConfig is an autogenerated conversion function.
-func Convert_config_ExtenderTLSConfig_To_v1beta3_ExtenderTLSConfig(in *config.ExtenderTLSConfig, out *v1beta3.ExtenderTLSConfig, s conversion.Scope) error {
+func Convert_config_ExtenderTLSConfig_To_v1beta3_ExtenderTLSConfig(in *schedulerapisconfig.ExtenderTLSConfig, out *kubeschedulerconfigv1beta3.ExtenderTLSConfig, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_ExtenderTLSConfig_To_v1beta3_ExtenderTLSConfig(in, out, s)
 }
 
-func autoConvert_v1beta3_InterPodAffinityArgs_To_config_InterPodAffinityArgs(in *v1beta3.InterPodAffinityArgs, out *config.InterPodAffinityArgs, s conversion.Scope) error {
-	if err := v1.Convert_Pointer_int32_To_int32(&in.HardPodAffinityWeight, &out.HardPodAffinityWeight, s); err != nil {
+func autoConvert_v1beta3_InterPodAffinityArgs_To_config_InterPodAffinityArgs(in *kubeschedulerconfigv1beta3.InterPodAffinityArgs, out *schedulerapisconfig.InterPodAffinityArgs, s apimachinerypkgconversion.Scope) error {
+	if err := apismetav1.Convert_Pointer_int32_To_int32(&in.HardPodAffinityWeight, &out.HardPodAffinityWeight, s); err != nil {
 		return err
 	}
 	out.IgnorePreferredTermsOfExistingPods = in.IgnorePreferredTermsOfExistingPods
@@ -380,12 +381,12 @@ func autoConvert_v1beta3_InterPodAffinityArgs_To_config_InterPodAffinityArgs(in 
 }
 
 // Convert_v1beta3_InterPodAffinityArgs_To_config_InterPodAffinityArgs is an autogenerated conversion function.
-func Convert_v1beta3_InterPodAffinityArgs_To_config_InterPodAffinityArgs(in *v1beta3.InterPodAffinityArgs, out *config.InterPodAffinityArgs, s conversion.Scope) error {
+func Convert_v1beta3_InterPodAffinityArgs_To_config_InterPodAffinityArgs(in *kubeschedulerconfigv1beta3.InterPodAffinityArgs, out *schedulerapisconfig.InterPodAffinityArgs, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta3_InterPodAffinityArgs_To_config_InterPodAffinityArgs(in, out, s)
 }
 
-func autoConvert_config_InterPodAffinityArgs_To_v1beta3_InterPodAffinityArgs(in *config.InterPodAffinityArgs, out *v1beta3.InterPodAffinityArgs, s conversion.Scope) error {
-	if err := v1.Convert_int32_To_Pointer_int32(&in.HardPodAffinityWeight, &out.HardPodAffinityWeight, s); err != nil {
+func autoConvert_config_InterPodAffinityArgs_To_v1beta3_InterPodAffinityArgs(in *schedulerapisconfig.InterPodAffinityArgs, out *kubeschedulerconfigv1beta3.InterPodAffinityArgs, s apimachinerypkgconversion.Scope) error {
+	if err := apismetav1.Convert_int32_To_Pointer_int32(&in.HardPodAffinityWeight, &out.HardPodAffinityWeight, s); err != nil {
 		return err
 	}
 	out.IgnorePreferredTermsOfExistingPods = in.IgnorePreferredTermsOfExistingPods
@@ -393,33 +394,33 @@ func autoConvert_config_InterPodAffinityArgs_To_v1beta3_InterPodAffinityArgs(in 
 }
 
 // Convert_config_InterPodAffinityArgs_To_v1beta3_InterPodAffinityArgs is an autogenerated conversion function.
-func Convert_config_InterPodAffinityArgs_To_v1beta3_InterPodAffinityArgs(in *config.InterPodAffinityArgs, out *v1beta3.InterPodAffinityArgs, s conversion.Scope) error {
+func Convert_config_InterPodAffinityArgs_To_v1beta3_InterPodAffinityArgs(in *schedulerapisconfig.InterPodAffinityArgs, out *kubeschedulerconfigv1beta3.InterPodAffinityArgs, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_InterPodAffinityArgs_To_v1beta3_InterPodAffinityArgs(in, out, s)
 }
 
-func autoConvert_v1beta3_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in *v1beta3.KubeSchedulerConfiguration, out *config.KubeSchedulerConfiguration, s conversion.Scope) error {
-	if err := v1.Convert_Pointer_int32_To_int32(&in.Parallelism, &out.Parallelism, s); err != nil {
+func autoConvert_v1beta3_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in *kubeschedulerconfigv1beta3.KubeSchedulerConfiguration, out *schedulerapisconfig.KubeSchedulerConfiguration, s apimachinerypkgconversion.Scope) error {
+	if err := apismetav1.Convert_Pointer_int32_To_int32(&in.Parallelism, &out.Parallelism, s); err != nil {
 		return err
 	}
-	if err := v1alpha1.Convert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
+	if err := componentbaseconfigv1alpha1.Convert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
-	if err := v1alpha1.Convert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
+	if err := componentbaseconfigv1alpha1.Convert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
 		return err
 	}
-	if err := v1alpha1.Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
+	if err := componentbaseconfigv1alpha1.Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
 		return err
 	}
 	out.PercentageOfNodesToScore = (*int32)(unsafe.Pointer(in.PercentageOfNodesToScore))
-	if err := v1.Convert_Pointer_int64_To_int64(&in.PodInitialBackoffSeconds, &out.PodInitialBackoffSeconds, s); err != nil {
+	if err := apismetav1.Convert_Pointer_int64_To_int64(&in.PodInitialBackoffSeconds, &out.PodInitialBackoffSeconds, s); err != nil {
 		return err
 	}
-	if err := v1.Convert_Pointer_int64_To_int64(&in.PodMaxBackoffSeconds, &out.PodMaxBackoffSeconds, s); err != nil {
+	if err := apismetav1.Convert_Pointer_int64_To_int64(&in.PodMaxBackoffSeconds, &out.PodMaxBackoffSeconds, s); err != nil {
 		return err
 	}
 	if in.Profiles != nil {
 		in, out := &in.Profiles, &out.Profiles
-		*out = make([]config.KubeSchedulerProfile, len(*in))
+		*out = make([]schedulerapisconfig.KubeSchedulerProfile, len(*in))
 		for i := range *in {
 			if err := Convert_v1beta3_KubeSchedulerProfile_To_config_KubeSchedulerProfile(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -428,35 +429,35 @@ func autoConvert_v1beta3_KubeSchedulerConfiguration_To_config_KubeSchedulerConfi
 	} else {
 		out.Profiles = nil
 	}
-	out.Extenders = *(*[]config.Extender)(unsafe.Pointer(&in.Extenders))
+	out.Extenders = *(*[]schedulerapisconfig.Extender)(unsafe.Pointer(&in.Extenders))
 	return nil
 }
 
-func autoConvert_config_KubeSchedulerConfiguration_To_v1beta3_KubeSchedulerConfiguration(in *config.KubeSchedulerConfiguration, out *v1beta3.KubeSchedulerConfiguration, s conversion.Scope) error {
-	if err := v1.Convert_int32_To_Pointer_int32(&in.Parallelism, &out.Parallelism, s); err != nil {
+func autoConvert_config_KubeSchedulerConfiguration_To_v1beta3_KubeSchedulerConfiguration(in *schedulerapisconfig.KubeSchedulerConfiguration, out *kubeschedulerconfigv1beta3.KubeSchedulerConfiguration, s apimachinerypkgconversion.Scope) error {
+	if err := apismetav1.Convert_int32_To_Pointer_int32(&in.Parallelism, &out.Parallelism, s); err != nil {
 		return err
 	}
-	if err := v1alpha1.Convert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
+	if err := componentbaseconfigv1alpha1.Convert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
-	if err := v1alpha1.Convert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
+	if err := componentbaseconfigv1alpha1.Convert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
 		return err
 	}
 	// WARNING: in.HealthzBindAddress requires manual conversion: does not exist in peer-type
 	// WARNING: in.MetricsBindAddress requires manual conversion: does not exist in peer-type
-	if err := v1alpha1.Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
+	if err := componentbaseconfigv1alpha1.Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
 		return err
 	}
 	out.PercentageOfNodesToScore = (*int32)(unsafe.Pointer(in.PercentageOfNodesToScore))
-	if err := v1.Convert_int64_To_Pointer_int64(&in.PodInitialBackoffSeconds, &out.PodInitialBackoffSeconds, s); err != nil {
+	if err := apismetav1.Convert_int64_To_Pointer_int64(&in.PodInitialBackoffSeconds, &out.PodInitialBackoffSeconds, s); err != nil {
 		return err
 	}
-	if err := v1.Convert_int64_To_Pointer_int64(&in.PodMaxBackoffSeconds, &out.PodMaxBackoffSeconds, s); err != nil {
+	if err := apismetav1.Convert_int64_To_Pointer_int64(&in.PodMaxBackoffSeconds, &out.PodMaxBackoffSeconds, s); err != nil {
 		return err
 	}
 	if in.Profiles != nil {
 		in, out := &in.Profiles, &out.Profiles
-		*out = make([]v1beta3.KubeSchedulerProfile, len(*in))
+		*out = make([]kubeschedulerconfigv1beta3.KubeSchedulerProfile, len(*in))
 		for i := range *in {
 			if err := Convert_config_KubeSchedulerProfile_To_v1beta3_KubeSchedulerProfile(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -470,13 +471,13 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1beta3_KubeSchedulerConfi
 	return nil
 }
 
-func autoConvert_v1beta3_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in *v1beta3.KubeSchedulerProfile, out *config.KubeSchedulerProfile, s conversion.Scope) error {
-	if err := v1.Convert_Pointer_string_To_string(&in.SchedulerName, &out.SchedulerName, s); err != nil {
+func autoConvert_v1beta3_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in *kubeschedulerconfigv1beta3.KubeSchedulerProfile, out *schedulerapisconfig.KubeSchedulerProfile, s apimachinerypkgconversion.Scope) error {
+	if err := apismetav1.Convert_Pointer_string_To_string(&in.SchedulerName, &out.SchedulerName, s); err != nil {
 		return err
 	}
 	if in.Plugins != nil {
 		in, out := &in.Plugins, &out.Plugins
-		*out = new(config.Plugins)
+		*out = new(schedulerapisconfig.Plugins)
 		if err := Convert_v1beta3_Plugins_To_config_Plugins(*in, *out, s); err != nil {
 			return err
 		}
@@ -485,7 +486,7 @@ func autoConvert_v1beta3_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in 
 	}
 	if in.PluginConfig != nil {
 		in, out := &in.PluginConfig, &out.PluginConfig
-		*out = make([]config.PluginConfig, len(*in))
+		*out = make([]schedulerapisconfig.PluginConfig, len(*in))
 		for i := range *in {
 			if err := Convert_v1beta3_PluginConfig_To_config_PluginConfig(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -498,18 +499,18 @@ func autoConvert_v1beta3_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in 
 }
 
 // Convert_v1beta3_KubeSchedulerProfile_To_config_KubeSchedulerProfile is an autogenerated conversion function.
-func Convert_v1beta3_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in *v1beta3.KubeSchedulerProfile, out *config.KubeSchedulerProfile, s conversion.Scope) error {
+func Convert_v1beta3_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in *kubeschedulerconfigv1beta3.KubeSchedulerProfile, out *schedulerapisconfig.KubeSchedulerProfile, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta3_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in, out, s)
 }
 
-func autoConvert_config_KubeSchedulerProfile_To_v1beta3_KubeSchedulerProfile(in *config.KubeSchedulerProfile, out *v1beta3.KubeSchedulerProfile, s conversion.Scope) error {
-	if err := v1.Convert_string_To_Pointer_string(&in.SchedulerName, &out.SchedulerName, s); err != nil {
+func autoConvert_config_KubeSchedulerProfile_To_v1beta3_KubeSchedulerProfile(in *schedulerapisconfig.KubeSchedulerProfile, out *kubeschedulerconfigv1beta3.KubeSchedulerProfile, s apimachinerypkgconversion.Scope) error {
+	if err := apismetav1.Convert_string_To_Pointer_string(&in.SchedulerName, &out.SchedulerName, s); err != nil {
 		return err
 	}
 	// WARNING: in.PercentageOfNodesToScore requires manual conversion: does not exist in peer-type
 	if in.Plugins != nil {
 		in, out := &in.Plugins, &out.Plugins
-		*out = new(v1beta3.Plugins)
+		*out = new(kubeschedulerconfigv1beta3.Plugins)
 		if err := Convert_config_Plugins_To_v1beta3_Plugins(*in, *out, s); err != nil {
 			return err
 		}
@@ -518,7 +519,7 @@ func autoConvert_config_KubeSchedulerProfile_To_v1beta3_KubeSchedulerProfile(in 
 	}
 	if in.PluginConfig != nil {
 		in, out := &in.PluginConfig, &out.PluginConfig
-		*out = make([]v1beta3.PluginConfig, len(*in))
+		*out = make([]kubeschedulerconfigv1beta3.PluginConfig, len(*in))
 		for i := range *in {
 			if err := Convert_config_PluginConfig_To_v1beta3_PluginConfig(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -530,126 +531,126 @@ func autoConvert_config_KubeSchedulerProfile_To_v1beta3_KubeSchedulerProfile(in 
 	return nil
 }
 
-func autoConvert_v1beta3_NodeAffinityArgs_To_config_NodeAffinityArgs(in *v1beta3.NodeAffinityArgs, out *config.NodeAffinityArgs, s conversion.Scope) error {
-	out.AddedAffinity = (*corev1.NodeAffinity)(unsafe.Pointer(in.AddedAffinity))
+func autoConvert_v1beta3_NodeAffinityArgs_To_config_NodeAffinityArgs(in *kubeschedulerconfigv1beta3.NodeAffinityArgs, out *schedulerapisconfig.NodeAffinityArgs, s apimachinerypkgconversion.Scope) error {
+	out.AddedAffinity = (*apicorev1.NodeAffinity)(unsafe.Pointer(in.AddedAffinity))
 	return nil
 }
 
 // Convert_v1beta3_NodeAffinityArgs_To_config_NodeAffinityArgs is an autogenerated conversion function.
-func Convert_v1beta3_NodeAffinityArgs_To_config_NodeAffinityArgs(in *v1beta3.NodeAffinityArgs, out *config.NodeAffinityArgs, s conversion.Scope) error {
+func Convert_v1beta3_NodeAffinityArgs_To_config_NodeAffinityArgs(in *kubeschedulerconfigv1beta3.NodeAffinityArgs, out *schedulerapisconfig.NodeAffinityArgs, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta3_NodeAffinityArgs_To_config_NodeAffinityArgs(in, out, s)
 }
 
-func autoConvert_config_NodeAffinityArgs_To_v1beta3_NodeAffinityArgs(in *config.NodeAffinityArgs, out *v1beta3.NodeAffinityArgs, s conversion.Scope) error {
-	out.AddedAffinity = (*corev1.NodeAffinity)(unsafe.Pointer(in.AddedAffinity))
+func autoConvert_config_NodeAffinityArgs_To_v1beta3_NodeAffinityArgs(in *schedulerapisconfig.NodeAffinityArgs, out *kubeschedulerconfigv1beta3.NodeAffinityArgs, s apimachinerypkgconversion.Scope) error {
+	out.AddedAffinity = (*apicorev1.NodeAffinity)(unsafe.Pointer(in.AddedAffinity))
 	return nil
 }
 
 // Convert_config_NodeAffinityArgs_To_v1beta3_NodeAffinityArgs is an autogenerated conversion function.
-func Convert_config_NodeAffinityArgs_To_v1beta3_NodeAffinityArgs(in *config.NodeAffinityArgs, out *v1beta3.NodeAffinityArgs, s conversion.Scope) error {
+func Convert_config_NodeAffinityArgs_To_v1beta3_NodeAffinityArgs(in *schedulerapisconfig.NodeAffinityArgs, out *kubeschedulerconfigv1beta3.NodeAffinityArgs, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_NodeAffinityArgs_To_v1beta3_NodeAffinityArgs(in, out, s)
 }
 
-func autoConvert_v1beta3_NodeResourcesBalancedAllocationArgs_To_config_NodeResourcesBalancedAllocationArgs(in *v1beta3.NodeResourcesBalancedAllocationArgs, out *config.NodeResourcesBalancedAllocationArgs, s conversion.Scope) error {
-	out.Resources = *(*[]config.ResourceSpec)(unsafe.Pointer(&in.Resources))
+func autoConvert_v1beta3_NodeResourcesBalancedAllocationArgs_To_config_NodeResourcesBalancedAllocationArgs(in *kubeschedulerconfigv1beta3.NodeResourcesBalancedAllocationArgs, out *schedulerapisconfig.NodeResourcesBalancedAllocationArgs, s apimachinerypkgconversion.Scope) error {
+	out.Resources = *(*[]schedulerapisconfig.ResourceSpec)(unsafe.Pointer(&in.Resources))
 	return nil
 }
 
 // Convert_v1beta3_NodeResourcesBalancedAllocationArgs_To_config_NodeResourcesBalancedAllocationArgs is an autogenerated conversion function.
-func Convert_v1beta3_NodeResourcesBalancedAllocationArgs_To_config_NodeResourcesBalancedAllocationArgs(in *v1beta3.NodeResourcesBalancedAllocationArgs, out *config.NodeResourcesBalancedAllocationArgs, s conversion.Scope) error {
+func Convert_v1beta3_NodeResourcesBalancedAllocationArgs_To_config_NodeResourcesBalancedAllocationArgs(in *kubeschedulerconfigv1beta3.NodeResourcesBalancedAllocationArgs, out *schedulerapisconfig.NodeResourcesBalancedAllocationArgs, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta3_NodeResourcesBalancedAllocationArgs_To_config_NodeResourcesBalancedAllocationArgs(in, out, s)
 }
 
-func autoConvert_config_NodeResourcesBalancedAllocationArgs_To_v1beta3_NodeResourcesBalancedAllocationArgs(in *config.NodeResourcesBalancedAllocationArgs, out *v1beta3.NodeResourcesBalancedAllocationArgs, s conversion.Scope) error {
-	out.Resources = *(*[]v1beta3.ResourceSpec)(unsafe.Pointer(&in.Resources))
+func autoConvert_config_NodeResourcesBalancedAllocationArgs_To_v1beta3_NodeResourcesBalancedAllocationArgs(in *schedulerapisconfig.NodeResourcesBalancedAllocationArgs, out *kubeschedulerconfigv1beta3.NodeResourcesBalancedAllocationArgs, s apimachinerypkgconversion.Scope) error {
+	out.Resources = *(*[]kubeschedulerconfigv1beta3.ResourceSpec)(unsafe.Pointer(&in.Resources))
 	return nil
 }
 
 // Convert_config_NodeResourcesBalancedAllocationArgs_To_v1beta3_NodeResourcesBalancedAllocationArgs is an autogenerated conversion function.
-func Convert_config_NodeResourcesBalancedAllocationArgs_To_v1beta3_NodeResourcesBalancedAllocationArgs(in *config.NodeResourcesBalancedAllocationArgs, out *v1beta3.NodeResourcesBalancedAllocationArgs, s conversion.Scope) error {
+func Convert_config_NodeResourcesBalancedAllocationArgs_To_v1beta3_NodeResourcesBalancedAllocationArgs(in *schedulerapisconfig.NodeResourcesBalancedAllocationArgs, out *kubeschedulerconfigv1beta3.NodeResourcesBalancedAllocationArgs, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_NodeResourcesBalancedAllocationArgs_To_v1beta3_NodeResourcesBalancedAllocationArgs(in, out, s)
 }
 
-func autoConvert_v1beta3_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(in *v1beta3.NodeResourcesFitArgs, out *config.NodeResourcesFitArgs, s conversion.Scope) error {
+func autoConvert_v1beta3_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(in *kubeschedulerconfigv1beta3.NodeResourcesFitArgs, out *schedulerapisconfig.NodeResourcesFitArgs, s apimachinerypkgconversion.Scope) error {
 	out.IgnoredResources = *(*[]string)(unsafe.Pointer(&in.IgnoredResources))
 	out.IgnoredResourceGroups = *(*[]string)(unsafe.Pointer(&in.IgnoredResourceGroups))
-	out.ScoringStrategy = (*config.ScoringStrategy)(unsafe.Pointer(in.ScoringStrategy))
+	out.ScoringStrategy = (*schedulerapisconfig.ScoringStrategy)(unsafe.Pointer(in.ScoringStrategy))
 	return nil
 }
 
 // Convert_v1beta3_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs is an autogenerated conversion function.
-func Convert_v1beta3_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(in *v1beta3.NodeResourcesFitArgs, out *config.NodeResourcesFitArgs, s conversion.Scope) error {
+func Convert_v1beta3_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(in *kubeschedulerconfigv1beta3.NodeResourcesFitArgs, out *schedulerapisconfig.NodeResourcesFitArgs, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta3_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(in, out, s)
 }
 
-func autoConvert_config_NodeResourcesFitArgs_To_v1beta3_NodeResourcesFitArgs(in *config.NodeResourcesFitArgs, out *v1beta3.NodeResourcesFitArgs, s conversion.Scope) error {
+func autoConvert_config_NodeResourcesFitArgs_To_v1beta3_NodeResourcesFitArgs(in *schedulerapisconfig.NodeResourcesFitArgs, out *kubeschedulerconfigv1beta3.NodeResourcesFitArgs, s apimachinerypkgconversion.Scope) error {
 	out.IgnoredResources = *(*[]string)(unsafe.Pointer(&in.IgnoredResources))
 	out.IgnoredResourceGroups = *(*[]string)(unsafe.Pointer(&in.IgnoredResourceGroups))
-	out.ScoringStrategy = (*v1beta3.ScoringStrategy)(unsafe.Pointer(in.ScoringStrategy))
+	out.ScoringStrategy = (*kubeschedulerconfigv1beta3.ScoringStrategy)(unsafe.Pointer(in.ScoringStrategy))
 	return nil
 }
 
 // Convert_config_NodeResourcesFitArgs_To_v1beta3_NodeResourcesFitArgs is an autogenerated conversion function.
-func Convert_config_NodeResourcesFitArgs_To_v1beta3_NodeResourcesFitArgs(in *config.NodeResourcesFitArgs, out *v1beta3.NodeResourcesFitArgs, s conversion.Scope) error {
+func Convert_config_NodeResourcesFitArgs_To_v1beta3_NodeResourcesFitArgs(in *schedulerapisconfig.NodeResourcesFitArgs, out *kubeschedulerconfigv1beta3.NodeResourcesFitArgs, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_NodeResourcesFitArgs_To_v1beta3_NodeResourcesFitArgs(in, out, s)
 }
 
-func autoConvert_v1beta3_Plugin_To_config_Plugin(in *v1beta3.Plugin, out *config.Plugin, s conversion.Scope) error {
+func autoConvert_v1beta3_Plugin_To_config_Plugin(in *kubeschedulerconfigv1beta3.Plugin, out *schedulerapisconfig.Plugin, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
-	if err := v1.Convert_Pointer_int32_To_int32(&in.Weight, &out.Weight, s); err != nil {
+	if err := apismetav1.Convert_Pointer_int32_To_int32(&in.Weight, &out.Weight, s); err != nil {
 		return err
 	}
 	return nil
 }
 
 // Convert_v1beta3_Plugin_To_config_Plugin is an autogenerated conversion function.
-func Convert_v1beta3_Plugin_To_config_Plugin(in *v1beta3.Plugin, out *config.Plugin, s conversion.Scope) error {
+func Convert_v1beta3_Plugin_To_config_Plugin(in *kubeschedulerconfigv1beta3.Plugin, out *schedulerapisconfig.Plugin, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta3_Plugin_To_config_Plugin(in, out, s)
 }
 
-func autoConvert_config_Plugin_To_v1beta3_Plugin(in *config.Plugin, out *v1beta3.Plugin, s conversion.Scope) error {
+func autoConvert_config_Plugin_To_v1beta3_Plugin(in *schedulerapisconfig.Plugin, out *kubeschedulerconfigv1beta3.Plugin, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
-	if err := v1.Convert_int32_To_Pointer_int32(&in.Weight, &out.Weight, s); err != nil {
+	if err := apismetav1.Convert_int32_To_Pointer_int32(&in.Weight, &out.Weight, s); err != nil {
 		return err
 	}
 	return nil
 }
 
 // Convert_config_Plugin_To_v1beta3_Plugin is an autogenerated conversion function.
-func Convert_config_Plugin_To_v1beta3_Plugin(in *config.Plugin, out *v1beta3.Plugin, s conversion.Scope) error {
+func Convert_config_Plugin_To_v1beta3_Plugin(in *schedulerapisconfig.Plugin, out *kubeschedulerconfigv1beta3.Plugin, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_Plugin_To_v1beta3_Plugin(in, out, s)
 }
 
-func autoConvert_v1beta3_PluginConfig_To_config_PluginConfig(in *v1beta3.PluginConfig, out *config.PluginConfig, s conversion.Scope) error {
+func autoConvert_v1beta3_PluginConfig_To_config_PluginConfig(in *kubeschedulerconfigv1beta3.PluginConfig, out *schedulerapisconfig.PluginConfig, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
-	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Args, &out.Args, s); err != nil {
+	if err := apimachinerypkgruntime.Convert_runtime_RawExtension_To_runtime_Object(&in.Args, &out.Args, s); err != nil {
 		return err
 	}
 	return nil
 }
 
 // Convert_v1beta3_PluginConfig_To_config_PluginConfig is an autogenerated conversion function.
-func Convert_v1beta3_PluginConfig_To_config_PluginConfig(in *v1beta3.PluginConfig, out *config.PluginConfig, s conversion.Scope) error {
+func Convert_v1beta3_PluginConfig_To_config_PluginConfig(in *kubeschedulerconfigv1beta3.PluginConfig, out *schedulerapisconfig.PluginConfig, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta3_PluginConfig_To_config_PluginConfig(in, out, s)
 }
 
-func autoConvert_config_PluginConfig_To_v1beta3_PluginConfig(in *config.PluginConfig, out *v1beta3.PluginConfig, s conversion.Scope) error {
+func autoConvert_config_PluginConfig_To_v1beta3_PluginConfig(in *schedulerapisconfig.PluginConfig, out *kubeschedulerconfigv1beta3.PluginConfig, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
-	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Args, &out.Args, s); err != nil {
+	if err := apimachinerypkgruntime.Convert_runtime_Object_To_runtime_RawExtension(&in.Args, &out.Args, s); err != nil {
 		return err
 	}
 	return nil
 }
 
 // Convert_config_PluginConfig_To_v1beta3_PluginConfig is an autogenerated conversion function.
-func Convert_config_PluginConfig_To_v1beta3_PluginConfig(in *config.PluginConfig, out *v1beta3.PluginConfig, s conversion.Scope) error {
+func Convert_config_PluginConfig_To_v1beta3_PluginConfig(in *schedulerapisconfig.PluginConfig, out *kubeschedulerconfigv1beta3.PluginConfig, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_PluginConfig_To_v1beta3_PluginConfig(in, out, s)
 }
 
-func autoConvert_v1beta3_PluginSet_To_config_PluginSet(in *v1beta3.PluginSet, out *config.PluginSet, s conversion.Scope) error {
+func autoConvert_v1beta3_PluginSet_To_config_PluginSet(in *kubeschedulerconfigv1beta3.PluginSet, out *schedulerapisconfig.PluginSet, s apimachinerypkgconversion.Scope) error {
 	if in.Enabled != nil {
 		in, out := &in.Enabled, &out.Enabled
-		*out = make([]config.Plugin, len(*in))
+		*out = make([]schedulerapisconfig.Plugin, len(*in))
 		for i := range *in {
 			if err := Convert_v1beta3_Plugin_To_config_Plugin(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -660,7 +661,7 @@ func autoConvert_v1beta3_PluginSet_To_config_PluginSet(in *v1beta3.PluginSet, ou
 	}
 	if in.Disabled != nil {
 		in, out := &in.Disabled, &out.Disabled
-		*out = make([]config.Plugin, len(*in))
+		*out = make([]schedulerapisconfig.Plugin, len(*in))
 		for i := range *in {
 			if err := Convert_v1beta3_Plugin_To_config_Plugin(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -673,14 +674,14 @@ func autoConvert_v1beta3_PluginSet_To_config_PluginSet(in *v1beta3.PluginSet, ou
 }
 
 // Convert_v1beta3_PluginSet_To_config_PluginSet is an autogenerated conversion function.
-func Convert_v1beta3_PluginSet_To_config_PluginSet(in *v1beta3.PluginSet, out *config.PluginSet, s conversion.Scope) error {
+func Convert_v1beta3_PluginSet_To_config_PluginSet(in *kubeschedulerconfigv1beta3.PluginSet, out *schedulerapisconfig.PluginSet, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta3_PluginSet_To_config_PluginSet(in, out, s)
 }
 
-func autoConvert_config_PluginSet_To_v1beta3_PluginSet(in *config.PluginSet, out *v1beta3.PluginSet, s conversion.Scope) error {
+func autoConvert_config_PluginSet_To_v1beta3_PluginSet(in *schedulerapisconfig.PluginSet, out *kubeschedulerconfigv1beta3.PluginSet, s apimachinerypkgconversion.Scope) error {
 	if in.Enabled != nil {
 		in, out := &in.Enabled, &out.Enabled
-		*out = make([]v1beta3.Plugin, len(*in))
+		*out = make([]kubeschedulerconfigv1beta3.Plugin, len(*in))
 		for i := range *in {
 			if err := Convert_config_Plugin_To_v1beta3_Plugin(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -691,7 +692,7 @@ func autoConvert_config_PluginSet_To_v1beta3_PluginSet(in *config.PluginSet, out
 	}
 	if in.Disabled != nil {
 		in, out := &in.Disabled, &out.Disabled
-		*out = make([]v1beta3.Plugin, len(*in))
+		*out = make([]kubeschedulerconfigv1beta3.Plugin, len(*in))
 		for i := range *in {
 			if err := Convert_config_Plugin_To_v1beta3_Plugin(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -704,11 +705,11 @@ func autoConvert_config_PluginSet_To_v1beta3_PluginSet(in *config.PluginSet, out
 }
 
 // Convert_config_PluginSet_To_v1beta3_PluginSet is an autogenerated conversion function.
-func Convert_config_PluginSet_To_v1beta3_PluginSet(in *config.PluginSet, out *v1beta3.PluginSet, s conversion.Scope) error {
+func Convert_config_PluginSet_To_v1beta3_PluginSet(in *schedulerapisconfig.PluginSet, out *kubeschedulerconfigv1beta3.PluginSet, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_PluginSet_To_v1beta3_PluginSet(in, out, s)
 }
 
-func autoConvert_v1beta3_Plugins_To_config_Plugins(in *v1beta3.Plugins, out *config.Plugins, s conversion.Scope) error {
+func autoConvert_v1beta3_Plugins_To_config_Plugins(in *kubeschedulerconfigv1beta3.Plugins, out *schedulerapisconfig.Plugins, s apimachinerypkgconversion.Scope) error {
 	if err := Convert_v1beta3_PluginSet_To_config_PluginSet(&in.PreEnqueue, &out.PreEnqueue, s); err != nil {
 		return err
 	}
@@ -752,11 +753,11 @@ func autoConvert_v1beta3_Plugins_To_config_Plugins(in *v1beta3.Plugins, out *con
 }
 
 // Convert_v1beta3_Plugins_To_config_Plugins is an autogenerated conversion function.
-func Convert_v1beta3_Plugins_To_config_Plugins(in *v1beta3.Plugins, out *config.Plugins, s conversion.Scope) error {
+func Convert_v1beta3_Plugins_To_config_Plugins(in *kubeschedulerconfigv1beta3.Plugins, out *schedulerapisconfig.Plugins, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta3_Plugins_To_config_Plugins(in, out, s)
 }
 
-func autoConvert_config_Plugins_To_v1beta3_Plugins(in *config.Plugins, out *v1beta3.Plugins, s conversion.Scope) error {
+func autoConvert_config_Plugins_To_v1beta3_Plugins(in *schedulerapisconfig.Plugins, out *kubeschedulerconfigv1beta3.Plugins, s apimachinerypkgconversion.Scope) error {
 	if err := Convert_config_PluginSet_To_v1beta3_PluginSet(&in.PreEnqueue, &out.PreEnqueue, s); err != nil {
 		return err
 	}
@@ -799,138 +800,138 @@ func autoConvert_config_Plugins_To_v1beta3_Plugins(in *config.Plugins, out *v1be
 	return nil
 }
 
-func autoConvert_v1beta3_PodTopologySpreadArgs_To_config_PodTopologySpreadArgs(in *v1beta3.PodTopologySpreadArgs, out *config.PodTopologySpreadArgs, s conversion.Scope) error {
-	out.DefaultConstraints = *(*[]corev1.TopologySpreadConstraint)(unsafe.Pointer(&in.DefaultConstraints))
-	out.DefaultingType = config.PodTopologySpreadConstraintsDefaulting(in.DefaultingType)
+func autoConvert_v1beta3_PodTopologySpreadArgs_To_config_PodTopologySpreadArgs(in *kubeschedulerconfigv1beta3.PodTopologySpreadArgs, out *schedulerapisconfig.PodTopologySpreadArgs, s apimachinerypkgconversion.Scope) error {
+	out.DefaultConstraints = *(*[]apicorev1.TopologySpreadConstraint)(unsafe.Pointer(&in.DefaultConstraints))
+	out.DefaultingType = schedulerapisconfig.PodTopologySpreadConstraintsDefaulting(in.DefaultingType)
 	return nil
 }
 
 // Convert_v1beta3_PodTopologySpreadArgs_To_config_PodTopologySpreadArgs is an autogenerated conversion function.
-func Convert_v1beta3_PodTopologySpreadArgs_To_config_PodTopologySpreadArgs(in *v1beta3.PodTopologySpreadArgs, out *config.PodTopologySpreadArgs, s conversion.Scope) error {
+func Convert_v1beta3_PodTopologySpreadArgs_To_config_PodTopologySpreadArgs(in *kubeschedulerconfigv1beta3.PodTopologySpreadArgs, out *schedulerapisconfig.PodTopologySpreadArgs, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta3_PodTopologySpreadArgs_To_config_PodTopologySpreadArgs(in, out, s)
 }
 
-func autoConvert_config_PodTopologySpreadArgs_To_v1beta3_PodTopologySpreadArgs(in *config.PodTopologySpreadArgs, out *v1beta3.PodTopologySpreadArgs, s conversion.Scope) error {
-	out.DefaultConstraints = *(*[]corev1.TopologySpreadConstraint)(unsafe.Pointer(&in.DefaultConstraints))
-	out.DefaultingType = v1beta3.PodTopologySpreadConstraintsDefaulting(in.DefaultingType)
+func autoConvert_config_PodTopologySpreadArgs_To_v1beta3_PodTopologySpreadArgs(in *schedulerapisconfig.PodTopologySpreadArgs, out *kubeschedulerconfigv1beta3.PodTopologySpreadArgs, s apimachinerypkgconversion.Scope) error {
+	out.DefaultConstraints = *(*[]apicorev1.TopologySpreadConstraint)(unsafe.Pointer(&in.DefaultConstraints))
+	out.DefaultingType = kubeschedulerconfigv1beta3.PodTopologySpreadConstraintsDefaulting(in.DefaultingType)
 	return nil
 }
 
 // Convert_config_PodTopologySpreadArgs_To_v1beta3_PodTopologySpreadArgs is an autogenerated conversion function.
-func Convert_config_PodTopologySpreadArgs_To_v1beta3_PodTopologySpreadArgs(in *config.PodTopologySpreadArgs, out *v1beta3.PodTopologySpreadArgs, s conversion.Scope) error {
+func Convert_config_PodTopologySpreadArgs_To_v1beta3_PodTopologySpreadArgs(in *schedulerapisconfig.PodTopologySpreadArgs, out *kubeschedulerconfigv1beta3.PodTopologySpreadArgs, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_PodTopologySpreadArgs_To_v1beta3_PodTopologySpreadArgs(in, out, s)
 }
 
-func autoConvert_v1beta3_RequestedToCapacityRatioParam_To_config_RequestedToCapacityRatioParam(in *v1beta3.RequestedToCapacityRatioParam, out *config.RequestedToCapacityRatioParam, s conversion.Scope) error {
-	out.Shape = *(*[]config.UtilizationShapePoint)(unsafe.Pointer(&in.Shape))
+func autoConvert_v1beta3_RequestedToCapacityRatioParam_To_config_RequestedToCapacityRatioParam(in *kubeschedulerconfigv1beta3.RequestedToCapacityRatioParam, out *schedulerapisconfig.RequestedToCapacityRatioParam, s apimachinerypkgconversion.Scope) error {
+	out.Shape = *(*[]schedulerapisconfig.UtilizationShapePoint)(unsafe.Pointer(&in.Shape))
 	return nil
 }
 
 // Convert_v1beta3_RequestedToCapacityRatioParam_To_config_RequestedToCapacityRatioParam is an autogenerated conversion function.
-func Convert_v1beta3_RequestedToCapacityRatioParam_To_config_RequestedToCapacityRatioParam(in *v1beta3.RequestedToCapacityRatioParam, out *config.RequestedToCapacityRatioParam, s conversion.Scope) error {
+func Convert_v1beta3_RequestedToCapacityRatioParam_To_config_RequestedToCapacityRatioParam(in *kubeschedulerconfigv1beta3.RequestedToCapacityRatioParam, out *schedulerapisconfig.RequestedToCapacityRatioParam, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta3_RequestedToCapacityRatioParam_To_config_RequestedToCapacityRatioParam(in, out, s)
 }
 
-func autoConvert_config_RequestedToCapacityRatioParam_To_v1beta3_RequestedToCapacityRatioParam(in *config.RequestedToCapacityRatioParam, out *v1beta3.RequestedToCapacityRatioParam, s conversion.Scope) error {
-	out.Shape = *(*[]v1beta3.UtilizationShapePoint)(unsafe.Pointer(&in.Shape))
+func autoConvert_config_RequestedToCapacityRatioParam_To_v1beta3_RequestedToCapacityRatioParam(in *schedulerapisconfig.RequestedToCapacityRatioParam, out *kubeschedulerconfigv1beta3.RequestedToCapacityRatioParam, s apimachinerypkgconversion.Scope) error {
+	out.Shape = *(*[]kubeschedulerconfigv1beta3.UtilizationShapePoint)(unsafe.Pointer(&in.Shape))
 	return nil
 }
 
 // Convert_config_RequestedToCapacityRatioParam_To_v1beta3_RequestedToCapacityRatioParam is an autogenerated conversion function.
-func Convert_config_RequestedToCapacityRatioParam_To_v1beta3_RequestedToCapacityRatioParam(in *config.RequestedToCapacityRatioParam, out *v1beta3.RequestedToCapacityRatioParam, s conversion.Scope) error {
+func Convert_config_RequestedToCapacityRatioParam_To_v1beta3_RequestedToCapacityRatioParam(in *schedulerapisconfig.RequestedToCapacityRatioParam, out *kubeschedulerconfigv1beta3.RequestedToCapacityRatioParam, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_RequestedToCapacityRatioParam_To_v1beta3_RequestedToCapacityRatioParam(in, out, s)
 }
 
-func autoConvert_v1beta3_ResourceSpec_To_config_ResourceSpec(in *v1beta3.ResourceSpec, out *config.ResourceSpec, s conversion.Scope) error {
+func autoConvert_v1beta3_ResourceSpec_To_config_ResourceSpec(in *kubeschedulerconfigv1beta3.ResourceSpec, out *schedulerapisconfig.ResourceSpec, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
 	out.Weight = in.Weight
 	return nil
 }
 
 // Convert_v1beta3_ResourceSpec_To_config_ResourceSpec is an autogenerated conversion function.
-func Convert_v1beta3_ResourceSpec_To_config_ResourceSpec(in *v1beta3.ResourceSpec, out *config.ResourceSpec, s conversion.Scope) error {
+func Convert_v1beta3_ResourceSpec_To_config_ResourceSpec(in *kubeschedulerconfigv1beta3.ResourceSpec, out *schedulerapisconfig.ResourceSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta3_ResourceSpec_To_config_ResourceSpec(in, out, s)
 }
 
-func autoConvert_config_ResourceSpec_To_v1beta3_ResourceSpec(in *config.ResourceSpec, out *v1beta3.ResourceSpec, s conversion.Scope) error {
+func autoConvert_config_ResourceSpec_To_v1beta3_ResourceSpec(in *schedulerapisconfig.ResourceSpec, out *kubeschedulerconfigv1beta3.ResourceSpec, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
 	out.Weight = in.Weight
 	return nil
 }
 
 // Convert_config_ResourceSpec_To_v1beta3_ResourceSpec is an autogenerated conversion function.
-func Convert_config_ResourceSpec_To_v1beta3_ResourceSpec(in *config.ResourceSpec, out *v1beta3.ResourceSpec, s conversion.Scope) error {
+func Convert_config_ResourceSpec_To_v1beta3_ResourceSpec(in *schedulerapisconfig.ResourceSpec, out *kubeschedulerconfigv1beta3.ResourceSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_ResourceSpec_To_v1beta3_ResourceSpec(in, out, s)
 }
 
-func autoConvert_v1beta3_ScoringStrategy_To_config_ScoringStrategy(in *v1beta3.ScoringStrategy, out *config.ScoringStrategy, s conversion.Scope) error {
-	out.Type = config.ScoringStrategyType(in.Type)
-	out.Resources = *(*[]config.ResourceSpec)(unsafe.Pointer(&in.Resources))
-	out.RequestedToCapacityRatio = (*config.RequestedToCapacityRatioParam)(unsafe.Pointer(in.RequestedToCapacityRatio))
+func autoConvert_v1beta3_ScoringStrategy_To_config_ScoringStrategy(in *kubeschedulerconfigv1beta3.ScoringStrategy, out *schedulerapisconfig.ScoringStrategy, s apimachinerypkgconversion.Scope) error {
+	out.Type = schedulerapisconfig.ScoringStrategyType(in.Type)
+	out.Resources = *(*[]schedulerapisconfig.ResourceSpec)(unsafe.Pointer(&in.Resources))
+	out.RequestedToCapacityRatio = (*schedulerapisconfig.RequestedToCapacityRatioParam)(unsafe.Pointer(in.RequestedToCapacityRatio))
 	return nil
 }
 
 // Convert_v1beta3_ScoringStrategy_To_config_ScoringStrategy is an autogenerated conversion function.
-func Convert_v1beta3_ScoringStrategy_To_config_ScoringStrategy(in *v1beta3.ScoringStrategy, out *config.ScoringStrategy, s conversion.Scope) error {
+func Convert_v1beta3_ScoringStrategy_To_config_ScoringStrategy(in *kubeschedulerconfigv1beta3.ScoringStrategy, out *schedulerapisconfig.ScoringStrategy, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta3_ScoringStrategy_To_config_ScoringStrategy(in, out, s)
 }
 
-func autoConvert_config_ScoringStrategy_To_v1beta3_ScoringStrategy(in *config.ScoringStrategy, out *v1beta3.ScoringStrategy, s conversion.Scope) error {
-	out.Type = v1beta3.ScoringStrategyType(in.Type)
-	out.Resources = *(*[]v1beta3.ResourceSpec)(unsafe.Pointer(&in.Resources))
-	out.RequestedToCapacityRatio = (*v1beta3.RequestedToCapacityRatioParam)(unsafe.Pointer(in.RequestedToCapacityRatio))
+func autoConvert_config_ScoringStrategy_To_v1beta3_ScoringStrategy(in *schedulerapisconfig.ScoringStrategy, out *kubeschedulerconfigv1beta3.ScoringStrategy, s apimachinerypkgconversion.Scope) error {
+	out.Type = kubeschedulerconfigv1beta3.ScoringStrategyType(in.Type)
+	out.Resources = *(*[]kubeschedulerconfigv1beta3.ResourceSpec)(unsafe.Pointer(&in.Resources))
+	out.RequestedToCapacityRatio = (*kubeschedulerconfigv1beta3.RequestedToCapacityRatioParam)(unsafe.Pointer(in.RequestedToCapacityRatio))
 	return nil
 }
 
 // Convert_config_ScoringStrategy_To_v1beta3_ScoringStrategy is an autogenerated conversion function.
-func Convert_config_ScoringStrategy_To_v1beta3_ScoringStrategy(in *config.ScoringStrategy, out *v1beta3.ScoringStrategy, s conversion.Scope) error {
+func Convert_config_ScoringStrategy_To_v1beta3_ScoringStrategy(in *schedulerapisconfig.ScoringStrategy, out *kubeschedulerconfigv1beta3.ScoringStrategy, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_ScoringStrategy_To_v1beta3_ScoringStrategy(in, out, s)
 }
 
-func autoConvert_v1beta3_UtilizationShapePoint_To_config_UtilizationShapePoint(in *v1beta3.UtilizationShapePoint, out *config.UtilizationShapePoint, s conversion.Scope) error {
+func autoConvert_v1beta3_UtilizationShapePoint_To_config_UtilizationShapePoint(in *kubeschedulerconfigv1beta3.UtilizationShapePoint, out *schedulerapisconfig.UtilizationShapePoint, s apimachinerypkgconversion.Scope) error {
 	out.Utilization = in.Utilization
 	out.Score = in.Score
 	return nil
 }
 
 // Convert_v1beta3_UtilizationShapePoint_To_config_UtilizationShapePoint is an autogenerated conversion function.
-func Convert_v1beta3_UtilizationShapePoint_To_config_UtilizationShapePoint(in *v1beta3.UtilizationShapePoint, out *config.UtilizationShapePoint, s conversion.Scope) error {
+func Convert_v1beta3_UtilizationShapePoint_To_config_UtilizationShapePoint(in *kubeschedulerconfigv1beta3.UtilizationShapePoint, out *schedulerapisconfig.UtilizationShapePoint, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta3_UtilizationShapePoint_To_config_UtilizationShapePoint(in, out, s)
 }
 
-func autoConvert_config_UtilizationShapePoint_To_v1beta3_UtilizationShapePoint(in *config.UtilizationShapePoint, out *v1beta3.UtilizationShapePoint, s conversion.Scope) error {
+func autoConvert_config_UtilizationShapePoint_To_v1beta3_UtilizationShapePoint(in *schedulerapisconfig.UtilizationShapePoint, out *kubeschedulerconfigv1beta3.UtilizationShapePoint, s apimachinerypkgconversion.Scope) error {
 	out.Utilization = in.Utilization
 	out.Score = in.Score
 	return nil
 }
 
 // Convert_config_UtilizationShapePoint_To_v1beta3_UtilizationShapePoint is an autogenerated conversion function.
-func Convert_config_UtilizationShapePoint_To_v1beta3_UtilizationShapePoint(in *config.UtilizationShapePoint, out *v1beta3.UtilizationShapePoint, s conversion.Scope) error {
+func Convert_config_UtilizationShapePoint_To_v1beta3_UtilizationShapePoint(in *schedulerapisconfig.UtilizationShapePoint, out *kubeschedulerconfigv1beta3.UtilizationShapePoint, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_UtilizationShapePoint_To_v1beta3_UtilizationShapePoint(in, out, s)
 }
 
-func autoConvert_v1beta3_VolumeBindingArgs_To_config_VolumeBindingArgs(in *v1beta3.VolumeBindingArgs, out *config.VolumeBindingArgs, s conversion.Scope) error {
-	if err := v1.Convert_Pointer_int64_To_int64(&in.BindTimeoutSeconds, &out.BindTimeoutSeconds, s); err != nil {
+func autoConvert_v1beta3_VolumeBindingArgs_To_config_VolumeBindingArgs(in *kubeschedulerconfigv1beta3.VolumeBindingArgs, out *schedulerapisconfig.VolumeBindingArgs, s apimachinerypkgconversion.Scope) error {
+	if err := apismetav1.Convert_Pointer_int64_To_int64(&in.BindTimeoutSeconds, &out.BindTimeoutSeconds, s); err != nil {
 		return err
 	}
-	out.Shape = *(*[]config.UtilizationShapePoint)(unsafe.Pointer(&in.Shape))
+	out.Shape = *(*[]schedulerapisconfig.UtilizationShapePoint)(unsafe.Pointer(&in.Shape))
 	return nil
 }
 
 // Convert_v1beta3_VolumeBindingArgs_To_config_VolumeBindingArgs is an autogenerated conversion function.
-func Convert_v1beta3_VolumeBindingArgs_To_config_VolumeBindingArgs(in *v1beta3.VolumeBindingArgs, out *config.VolumeBindingArgs, s conversion.Scope) error {
+func Convert_v1beta3_VolumeBindingArgs_To_config_VolumeBindingArgs(in *kubeschedulerconfigv1beta3.VolumeBindingArgs, out *schedulerapisconfig.VolumeBindingArgs, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta3_VolumeBindingArgs_To_config_VolumeBindingArgs(in, out, s)
 }
 
-func autoConvert_config_VolumeBindingArgs_To_v1beta3_VolumeBindingArgs(in *config.VolumeBindingArgs, out *v1beta3.VolumeBindingArgs, s conversion.Scope) error {
-	if err := v1.Convert_int64_To_Pointer_int64(&in.BindTimeoutSeconds, &out.BindTimeoutSeconds, s); err != nil {
+func autoConvert_config_VolumeBindingArgs_To_v1beta3_VolumeBindingArgs(in *schedulerapisconfig.VolumeBindingArgs, out *kubeschedulerconfigv1beta3.VolumeBindingArgs, s apimachinerypkgconversion.Scope) error {
+	if err := apismetav1.Convert_int64_To_Pointer_int64(&in.BindTimeoutSeconds, &out.BindTimeoutSeconds, s); err != nil {
 		return err
 	}
-	out.Shape = *(*[]v1beta3.UtilizationShapePoint)(unsafe.Pointer(&in.Shape))
+	out.Shape = *(*[]kubeschedulerconfigv1beta3.UtilizationShapePoint)(unsafe.Pointer(&in.Shape))
 	return nil
 }
 
 // Convert_config_VolumeBindingArgs_To_v1beta3_VolumeBindingArgs is an autogenerated conversion function.
-func Convert_config_VolumeBindingArgs_To_v1beta3_VolumeBindingArgs(in *config.VolumeBindingArgs, out *v1beta3.VolumeBindingArgs, s conversion.Scope) error {
+func Convert_config_VolumeBindingArgs_To_v1beta3_VolumeBindingArgs(in *schedulerapisconfig.VolumeBindingArgs, out *kubeschedulerconfigv1beta3.VolumeBindingArgs, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_VolumeBindingArgs_To_v1beta3_VolumeBindingArgs(in, out, s)
 }

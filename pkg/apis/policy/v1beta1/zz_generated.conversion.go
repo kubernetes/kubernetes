@@ -24,14 +24,14 @@ package v1beta1
 import (
 	"unsafe"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/api/policy/v1beta1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/policy"
+	apicorev1 "k8s.io/api/core/v1"
+	apipolicyv1beta1 "k8s.io/api/policy/v1beta1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	pkgutilintstr "k8s.io/apimachinery/pkg/util/intstr"
+	pkgapiscore "k8s.io/kubernetes/pkg/apis/core"
+	pkgapispolicy "k8s.io/kubernetes/pkg/apis/policy"
 )
 
 func init() {
@@ -40,351 +40,351 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1beta1.AllowedCSIDriver)(nil), (*policy.AllowedCSIDriver)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_AllowedCSIDriver_To_policy_AllowedCSIDriver(a.(*v1beta1.AllowedCSIDriver), b.(*policy.AllowedCSIDriver), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*apipolicyv1beta1.AllowedCSIDriver)(nil), (*pkgapispolicy.AllowedCSIDriver)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_AllowedCSIDriver_To_policy_AllowedCSIDriver(a.(*apipolicyv1beta1.AllowedCSIDriver), b.(*pkgapispolicy.AllowedCSIDriver), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*policy.AllowedCSIDriver)(nil), (*v1beta1.AllowedCSIDriver)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_policy_AllowedCSIDriver_To_v1beta1_AllowedCSIDriver(a.(*policy.AllowedCSIDriver), b.(*v1beta1.AllowedCSIDriver), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapispolicy.AllowedCSIDriver)(nil), (*apipolicyv1beta1.AllowedCSIDriver)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_policy_AllowedCSIDriver_To_v1beta1_AllowedCSIDriver(a.(*pkgapispolicy.AllowedCSIDriver), b.(*apipolicyv1beta1.AllowedCSIDriver), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.AllowedFlexVolume)(nil), (*policy.AllowedFlexVolume)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_AllowedFlexVolume_To_policy_AllowedFlexVolume(a.(*v1beta1.AllowedFlexVolume), b.(*policy.AllowedFlexVolume), scope)
+	if err := s.AddGeneratedConversionFunc((*apipolicyv1beta1.AllowedFlexVolume)(nil), (*pkgapispolicy.AllowedFlexVolume)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_AllowedFlexVolume_To_policy_AllowedFlexVolume(a.(*apipolicyv1beta1.AllowedFlexVolume), b.(*pkgapispolicy.AllowedFlexVolume), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*policy.AllowedFlexVolume)(nil), (*v1beta1.AllowedFlexVolume)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_policy_AllowedFlexVolume_To_v1beta1_AllowedFlexVolume(a.(*policy.AllowedFlexVolume), b.(*v1beta1.AllowedFlexVolume), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapispolicy.AllowedFlexVolume)(nil), (*apipolicyv1beta1.AllowedFlexVolume)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_policy_AllowedFlexVolume_To_v1beta1_AllowedFlexVolume(a.(*pkgapispolicy.AllowedFlexVolume), b.(*apipolicyv1beta1.AllowedFlexVolume), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.AllowedHostPath)(nil), (*policy.AllowedHostPath)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_AllowedHostPath_To_policy_AllowedHostPath(a.(*v1beta1.AllowedHostPath), b.(*policy.AllowedHostPath), scope)
+	if err := s.AddGeneratedConversionFunc((*apipolicyv1beta1.AllowedHostPath)(nil), (*pkgapispolicy.AllowedHostPath)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_AllowedHostPath_To_policy_AllowedHostPath(a.(*apipolicyv1beta1.AllowedHostPath), b.(*pkgapispolicy.AllowedHostPath), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*policy.AllowedHostPath)(nil), (*v1beta1.AllowedHostPath)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_policy_AllowedHostPath_To_v1beta1_AllowedHostPath(a.(*policy.AllowedHostPath), b.(*v1beta1.AllowedHostPath), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapispolicy.AllowedHostPath)(nil), (*apipolicyv1beta1.AllowedHostPath)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_policy_AllowedHostPath_To_v1beta1_AllowedHostPath(a.(*pkgapispolicy.AllowedHostPath), b.(*apipolicyv1beta1.AllowedHostPath), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.Eviction)(nil), (*policy.Eviction)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_Eviction_To_policy_Eviction(a.(*v1beta1.Eviction), b.(*policy.Eviction), scope)
+	if err := s.AddGeneratedConversionFunc((*apipolicyv1beta1.Eviction)(nil), (*pkgapispolicy.Eviction)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_Eviction_To_policy_Eviction(a.(*apipolicyv1beta1.Eviction), b.(*pkgapispolicy.Eviction), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*policy.Eviction)(nil), (*v1beta1.Eviction)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_policy_Eviction_To_v1beta1_Eviction(a.(*policy.Eviction), b.(*v1beta1.Eviction), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapispolicy.Eviction)(nil), (*apipolicyv1beta1.Eviction)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_policy_Eviction_To_v1beta1_Eviction(a.(*pkgapispolicy.Eviction), b.(*apipolicyv1beta1.Eviction), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.FSGroupStrategyOptions)(nil), (*policy.FSGroupStrategyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_FSGroupStrategyOptions_To_policy_FSGroupStrategyOptions(a.(*v1beta1.FSGroupStrategyOptions), b.(*policy.FSGroupStrategyOptions), scope)
+	if err := s.AddGeneratedConversionFunc((*apipolicyv1beta1.FSGroupStrategyOptions)(nil), (*pkgapispolicy.FSGroupStrategyOptions)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_FSGroupStrategyOptions_To_policy_FSGroupStrategyOptions(a.(*apipolicyv1beta1.FSGroupStrategyOptions), b.(*pkgapispolicy.FSGroupStrategyOptions), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*policy.FSGroupStrategyOptions)(nil), (*v1beta1.FSGroupStrategyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_policy_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions(a.(*policy.FSGroupStrategyOptions), b.(*v1beta1.FSGroupStrategyOptions), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapispolicy.FSGroupStrategyOptions)(nil), (*apipolicyv1beta1.FSGroupStrategyOptions)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_policy_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions(a.(*pkgapispolicy.FSGroupStrategyOptions), b.(*apipolicyv1beta1.FSGroupStrategyOptions), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.HostPortRange)(nil), (*policy.HostPortRange)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_HostPortRange_To_policy_HostPortRange(a.(*v1beta1.HostPortRange), b.(*policy.HostPortRange), scope)
+	if err := s.AddGeneratedConversionFunc((*apipolicyv1beta1.HostPortRange)(nil), (*pkgapispolicy.HostPortRange)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_HostPortRange_To_policy_HostPortRange(a.(*apipolicyv1beta1.HostPortRange), b.(*pkgapispolicy.HostPortRange), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*policy.HostPortRange)(nil), (*v1beta1.HostPortRange)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_policy_HostPortRange_To_v1beta1_HostPortRange(a.(*policy.HostPortRange), b.(*v1beta1.HostPortRange), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapispolicy.HostPortRange)(nil), (*apipolicyv1beta1.HostPortRange)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_policy_HostPortRange_To_v1beta1_HostPortRange(a.(*pkgapispolicy.HostPortRange), b.(*apipolicyv1beta1.HostPortRange), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.IDRange)(nil), (*policy.IDRange)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_IDRange_To_policy_IDRange(a.(*v1beta1.IDRange), b.(*policy.IDRange), scope)
+	if err := s.AddGeneratedConversionFunc((*apipolicyv1beta1.IDRange)(nil), (*pkgapispolicy.IDRange)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_IDRange_To_policy_IDRange(a.(*apipolicyv1beta1.IDRange), b.(*pkgapispolicy.IDRange), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*policy.IDRange)(nil), (*v1beta1.IDRange)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_policy_IDRange_To_v1beta1_IDRange(a.(*policy.IDRange), b.(*v1beta1.IDRange), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapispolicy.IDRange)(nil), (*apipolicyv1beta1.IDRange)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_policy_IDRange_To_v1beta1_IDRange(a.(*pkgapispolicy.IDRange), b.(*apipolicyv1beta1.IDRange), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.PodDisruptionBudgetList)(nil), (*policy.PodDisruptionBudgetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_PodDisruptionBudgetList_To_policy_PodDisruptionBudgetList(a.(*v1beta1.PodDisruptionBudgetList), b.(*policy.PodDisruptionBudgetList), scope)
+	if err := s.AddGeneratedConversionFunc((*apipolicyv1beta1.PodDisruptionBudgetList)(nil), (*pkgapispolicy.PodDisruptionBudgetList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_PodDisruptionBudgetList_To_policy_PodDisruptionBudgetList(a.(*apipolicyv1beta1.PodDisruptionBudgetList), b.(*pkgapispolicy.PodDisruptionBudgetList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*policy.PodDisruptionBudgetList)(nil), (*v1beta1.PodDisruptionBudgetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_policy_PodDisruptionBudgetList_To_v1beta1_PodDisruptionBudgetList(a.(*policy.PodDisruptionBudgetList), b.(*v1beta1.PodDisruptionBudgetList), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapispolicy.PodDisruptionBudgetList)(nil), (*apipolicyv1beta1.PodDisruptionBudgetList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_policy_PodDisruptionBudgetList_To_v1beta1_PodDisruptionBudgetList(a.(*pkgapispolicy.PodDisruptionBudgetList), b.(*apipolicyv1beta1.PodDisruptionBudgetList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.PodDisruptionBudgetSpec)(nil), (*policy.PodDisruptionBudgetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(a.(*v1beta1.PodDisruptionBudgetSpec), b.(*policy.PodDisruptionBudgetSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*apipolicyv1beta1.PodDisruptionBudgetSpec)(nil), (*pkgapispolicy.PodDisruptionBudgetSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(a.(*apipolicyv1beta1.PodDisruptionBudgetSpec), b.(*pkgapispolicy.PodDisruptionBudgetSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*policy.PodDisruptionBudgetSpec)(nil), (*v1beta1.PodDisruptionBudgetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_policy_PodDisruptionBudgetSpec_To_v1beta1_PodDisruptionBudgetSpec(a.(*policy.PodDisruptionBudgetSpec), b.(*v1beta1.PodDisruptionBudgetSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapispolicy.PodDisruptionBudgetSpec)(nil), (*apipolicyv1beta1.PodDisruptionBudgetSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_policy_PodDisruptionBudgetSpec_To_v1beta1_PodDisruptionBudgetSpec(a.(*pkgapispolicy.PodDisruptionBudgetSpec), b.(*apipolicyv1beta1.PodDisruptionBudgetSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.PodDisruptionBudgetStatus)(nil), (*policy.PodDisruptionBudgetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus(a.(*v1beta1.PodDisruptionBudgetStatus), b.(*policy.PodDisruptionBudgetStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apipolicyv1beta1.PodDisruptionBudgetStatus)(nil), (*pkgapispolicy.PodDisruptionBudgetStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus(a.(*apipolicyv1beta1.PodDisruptionBudgetStatus), b.(*pkgapispolicy.PodDisruptionBudgetStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*policy.PodDisruptionBudgetStatus)(nil), (*v1beta1.PodDisruptionBudgetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_policy_PodDisruptionBudgetStatus_To_v1beta1_PodDisruptionBudgetStatus(a.(*policy.PodDisruptionBudgetStatus), b.(*v1beta1.PodDisruptionBudgetStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapispolicy.PodDisruptionBudgetStatus)(nil), (*apipolicyv1beta1.PodDisruptionBudgetStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_policy_PodDisruptionBudgetStatus_To_v1beta1_PodDisruptionBudgetStatus(a.(*pkgapispolicy.PodDisruptionBudgetStatus), b.(*apipolicyv1beta1.PodDisruptionBudgetStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.PodSecurityPolicy)(nil), (*policy.PodSecurityPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_PodSecurityPolicy_To_policy_PodSecurityPolicy(a.(*v1beta1.PodSecurityPolicy), b.(*policy.PodSecurityPolicy), scope)
+	if err := s.AddGeneratedConversionFunc((*apipolicyv1beta1.PodSecurityPolicy)(nil), (*pkgapispolicy.PodSecurityPolicy)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_PodSecurityPolicy_To_policy_PodSecurityPolicy(a.(*apipolicyv1beta1.PodSecurityPolicy), b.(*pkgapispolicy.PodSecurityPolicy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*policy.PodSecurityPolicy)(nil), (*v1beta1.PodSecurityPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_policy_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(a.(*policy.PodSecurityPolicy), b.(*v1beta1.PodSecurityPolicy), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapispolicy.PodSecurityPolicy)(nil), (*apipolicyv1beta1.PodSecurityPolicy)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_policy_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(a.(*pkgapispolicy.PodSecurityPolicy), b.(*apipolicyv1beta1.PodSecurityPolicy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.PodSecurityPolicyList)(nil), (*policy.PodSecurityPolicyList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_PodSecurityPolicyList_To_policy_PodSecurityPolicyList(a.(*v1beta1.PodSecurityPolicyList), b.(*policy.PodSecurityPolicyList), scope)
+	if err := s.AddGeneratedConversionFunc((*apipolicyv1beta1.PodSecurityPolicyList)(nil), (*pkgapispolicy.PodSecurityPolicyList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_PodSecurityPolicyList_To_policy_PodSecurityPolicyList(a.(*apipolicyv1beta1.PodSecurityPolicyList), b.(*pkgapispolicy.PodSecurityPolicyList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*policy.PodSecurityPolicyList)(nil), (*v1beta1.PodSecurityPolicyList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_policy_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList(a.(*policy.PodSecurityPolicyList), b.(*v1beta1.PodSecurityPolicyList), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapispolicy.PodSecurityPolicyList)(nil), (*apipolicyv1beta1.PodSecurityPolicyList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_policy_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList(a.(*pkgapispolicy.PodSecurityPolicyList), b.(*apipolicyv1beta1.PodSecurityPolicyList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.PodSecurityPolicySpec)(nil), (*policy.PodSecurityPolicySpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_PodSecurityPolicySpec_To_policy_PodSecurityPolicySpec(a.(*v1beta1.PodSecurityPolicySpec), b.(*policy.PodSecurityPolicySpec), scope)
+	if err := s.AddGeneratedConversionFunc((*apipolicyv1beta1.PodSecurityPolicySpec)(nil), (*pkgapispolicy.PodSecurityPolicySpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_PodSecurityPolicySpec_To_policy_PodSecurityPolicySpec(a.(*apipolicyv1beta1.PodSecurityPolicySpec), b.(*pkgapispolicy.PodSecurityPolicySpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*policy.PodSecurityPolicySpec)(nil), (*v1beta1.PodSecurityPolicySpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_policy_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(a.(*policy.PodSecurityPolicySpec), b.(*v1beta1.PodSecurityPolicySpec), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapispolicy.PodSecurityPolicySpec)(nil), (*apipolicyv1beta1.PodSecurityPolicySpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_policy_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(a.(*pkgapispolicy.PodSecurityPolicySpec), b.(*apipolicyv1beta1.PodSecurityPolicySpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.RunAsGroupStrategyOptions)(nil), (*policy.RunAsGroupStrategyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_RunAsGroupStrategyOptions_To_policy_RunAsGroupStrategyOptions(a.(*v1beta1.RunAsGroupStrategyOptions), b.(*policy.RunAsGroupStrategyOptions), scope)
+	if err := s.AddGeneratedConversionFunc((*apipolicyv1beta1.RunAsGroupStrategyOptions)(nil), (*pkgapispolicy.RunAsGroupStrategyOptions)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_RunAsGroupStrategyOptions_To_policy_RunAsGroupStrategyOptions(a.(*apipolicyv1beta1.RunAsGroupStrategyOptions), b.(*pkgapispolicy.RunAsGroupStrategyOptions), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*policy.RunAsGroupStrategyOptions)(nil), (*v1beta1.RunAsGroupStrategyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_policy_RunAsGroupStrategyOptions_To_v1beta1_RunAsGroupStrategyOptions(a.(*policy.RunAsGroupStrategyOptions), b.(*v1beta1.RunAsGroupStrategyOptions), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapispolicy.RunAsGroupStrategyOptions)(nil), (*apipolicyv1beta1.RunAsGroupStrategyOptions)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_policy_RunAsGroupStrategyOptions_To_v1beta1_RunAsGroupStrategyOptions(a.(*pkgapispolicy.RunAsGroupStrategyOptions), b.(*apipolicyv1beta1.RunAsGroupStrategyOptions), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.RunAsUserStrategyOptions)(nil), (*policy.RunAsUserStrategyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_RunAsUserStrategyOptions_To_policy_RunAsUserStrategyOptions(a.(*v1beta1.RunAsUserStrategyOptions), b.(*policy.RunAsUserStrategyOptions), scope)
+	if err := s.AddGeneratedConversionFunc((*apipolicyv1beta1.RunAsUserStrategyOptions)(nil), (*pkgapispolicy.RunAsUserStrategyOptions)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_RunAsUserStrategyOptions_To_policy_RunAsUserStrategyOptions(a.(*apipolicyv1beta1.RunAsUserStrategyOptions), b.(*pkgapispolicy.RunAsUserStrategyOptions), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*policy.RunAsUserStrategyOptions)(nil), (*v1beta1.RunAsUserStrategyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_policy_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions(a.(*policy.RunAsUserStrategyOptions), b.(*v1beta1.RunAsUserStrategyOptions), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapispolicy.RunAsUserStrategyOptions)(nil), (*apipolicyv1beta1.RunAsUserStrategyOptions)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_policy_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions(a.(*pkgapispolicy.RunAsUserStrategyOptions), b.(*apipolicyv1beta1.RunAsUserStrategyOptions), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.RuntimeClassStrategyOptions)(nil), (*policy.RuntimeClassStrategyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_RuntimeClassStrategyOptions_To_policy_RuntimeClassStrategyOptions(a.(*v1beta1.RuntimeClassStrategyOptions), b.(*policy.RuntimeClassStrategyOptions), scope)
+	if err := s.AddGeneratedConversionFunc((*apipolicyv1beta1.RuntimeClassStrategyOptions)(nil), (*pkgapispolicy.RuntimeClassStrategyOptions)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_RuntimeClassStrategyOptions_To_policy_RuntimeClassStrategyOptions(a.(*apipolicyv1beta1.RuntimeClassStrategyOptions), b.(*pkgapispolicy.RuntimeClassStrategyOptions), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*policy.RuntimeClassStrategyOptions)(nil), (*v1beta1.RuntimeClassStrategyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_policy_RuntimeClassStrategyOptions_To_v1beta1_RuntimeClassStrategyOptions(a.(*policy.RuntimeClassStrategyOptions), b.(*v1beta1.RuntimeClassStrategyOptions), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapispolicy.RuntimeClassStrategyOptions)(nil), (*apipolicyv1beta1.RuntimeClassStrategyOptions)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_policy_RuntimeClassStrategyOptions_To_v1beta1_RuntimeClassStrategyOptions(a.(*pkgapispolicy.RuntimeClassStrategyOptions), b.(*apipolicyv1beta1.RuntimeClassStrategyOptions), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.SELinuxStrategyOptions)(nil), (*policy.SELinuxStrategyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_SELinuxStrategyOptions_To_policy_SELinuxStrategyOptions(a.(*v1beta1.SELinuxStrategyOptions), b.(*policy.SELinuxStrategyOptions), scope)
+	if err := s.AddGeneratedConversionFunc((*apipolicyv1beta1.SELinuxStrategyOptions)(nil), (*pkgapispolicy.SELinuxStrategyOptions)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_SELinuxStrategyOptions_To_policy_SELinuxStrategyOptions(a.(*apipolicyv1beta1.SELinuxStrategyOptions), b.(*pkgapispolicy.SELinuxStrategyOptions), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*policy.SELinuxStrategyOptions)(nil), (*v1beta1.SELinuxStrategyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_policy_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(a.(*policy.SELinuxStrategyOptions), b.(*v1beta1.SELinuxStrategyOptions), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapispolicy.SELinuxStrategyOptions)(nil), (*apipolicyv1beta1.SELinuxStrategyOptions)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_policy_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(a.(*pkgapispolicy.SELinuxStrategyOptions), b.(*apipolicyv1beta1.SELinuxStrategyOptions), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.SupplementalGroupsStrategyOptions)(nil), (*policy.SupplementalGroupsStrategyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_SupplementalGroupsStrategyOptions_To_policy_SupplementalGroupsStrategyOptions(a.(*v1beta1.SupplementalGroupsStrategyOptions), b.(*policy.SupplementalGroupsStrategyOptions), scope)
+	if err := s.AddGeneratedConversionFunc((*apipolicyv1beta1.SupplementalGroupsStrategyOptions)(nil), (*pkgapispolicy.SupplementalGroupsStrategyOptions)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_SupplementalGroupsStrategyOptions_To_policy_SupplementalGroupsStrategyOptions(a.(*apipolicyv1beta1.SupplementalGroupsStrategyOptions), b.(*pkgapispolicy.SupplementalGroupsStrategyOptions), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*policy.SupplementalGroupsStrategyOptions)(nil), (*v1beta1.SupplementalGroupsStrategyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_policy_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions(a.(*policy.SupplementalGroupsStrategyOptions), b.(*v1beta1.SupplementalGroupsStrategyOptions), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapispolicy.SupplementalGroupsStrategyOptions)(nil), (*apipolicyv1beta1.SupplementalGroupsStrategyOptions)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_policy_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions(a.(*pkgapispolicy.SupplementalGroupsStrategyOptions), b.(*apipolicyv1beta1.SupplementalGroupsStrategyOptions), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*policy.PodDisruptionBudget)(nil), (*v1beta1.PodDisruptionBudget)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_policy_PodDisruptionBudget_To_v1beta1_PodDisruptionBudget(a.(*policy.PodDisruptionBudget), b.(*v1beta1.PodDisruptionBudget), scope)
+	if err := s.AddConversionFunc((*pkgapispolicy.PodDisruptionBudget)(nil), (*apipolicyv1beta1.PodDisruptionBudget)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_policy_PodDisruptionBudget_To_v1beta1_PodDisruptionBudget(a.(*pkgapispolicy.PodDisruptionBudget), b.(*apipolicyv1beta1.PodDisruptionBudget), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1beta1.PodDisruptionBudget)(nil), (*policy.PodDisruptionBudget)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_PodDisruptionBudget_To_policy_PodDisruptionBudget(a.(*v1beta1.PodDisruptionBudget), b.(*policy.PodDisruptionBudget), scope)
+	if err := s.AddConversionFunc((*apipolicyv1beta1.PodDisruptionBudget)(nil), (*pkgapispolicy.PodDisruptionBudget)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_PodDisruptionBudget_To_policy_PodDisruptionBudget(a.(*apipolicyv1beta1.PodDisruptionBudget), b.(*pkgapispolicy.PodDisruptionBudget), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1beta1_AllowedCSIDriver_To_policy_AllowedCSIDriver(in *v1beta1.AllowedCSIDriver, out *policy.AllowedCSIDriver, s conversion.Scope) error {
+func autoConvert_v1beta1_AllowedCSIDriver_To_policy_AllowedCSIDriver(in *apipolicyv1beta1.AllowedCSIDriver, out *pkgapispolicy.AllowedCSIDriver, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
 	return nil
 }
 
 // Convert_v1beta1_AllowedCSIDriver_To_policy_AllowedCSIDriver is an autogenerated conversion function.
-func Convert_v1beta1_AllowedCSIDriver_To_policy_AllowedCSIDriver(in *v1beta1.AllowedCSIDriver, out *policy.AllowedCSIDriver, s conversion.Scope) error {
+func Convert_v1beta1_AllowedCSIDriver_To_policy_AllowedCSIDriver(in *apipolicyv1beta1.AllowedCSIDriver, out *pkgapispolicy.AllowedCSIDriver, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_AllowedCSIDriver_To_policy_AllowedCSIDriver(in, out, s)
 }
 
-func autoConvert_policy_AllowedCSIDriver_To_v1beta1_AllowedCSIDriver(in *policy.AllowedCSIDriver, out *v1beta1.AllowedCSIDriver, s conversion.Scope) error {
+func autoConvert_policy_AllowedCSIDriver_To_v1beta1_AllowedCSIDriver(in *pkgapispolicy.AllowedCSIDriver, out *apipolicyv1beta1.AllowedCSIDriver, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
 	return nil
 }
 
 // Convert_policy_AllowedCSIDriver_To_v1beta1_AllowedCSIDriver is an autogenerated conversion function.
-func Convert_policy_AllowedCSIDriver_To_v1beta1_AllowedCSIDriver(in *policy.AllowedCSIDriver, out *v1beta1.AllowedCSIDriver, s conversion.Scope) error {
+func Convert_policy_AllowedCSIDriver_To_v1beta1_AllowedCSIDriver(in *pkgapispolicy.AllowedCSIDriver, out *apipolicyv1beta1.AllowedCSIDriver, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_policy_AllowedCSIDriver_To_v1beta1_AllowedCSIDriver(in, out, s)
 }
 
-func autoConvert_v1beta1_AllowedFlexVolume_To_policy_AllowedFlexVolume(in *v1beta1.AllowedFlexVolume, out *policy.AllowedFlexVolume, s conversion.Scope) error {
+func autoConvert_v1beta1_AllowedFlexVolume_To_policy_AllowedFlexVolume(in *apipolicyv1beta1.AllowedFlexVolume, out *pkgapispolicy.AllowedFlexVolume, s apimachinerypkgconversion.Scope) error {
 	out.Driver = in.Driver
 	return nil
 }
 
 // Convert_v1beta1_AllowedFlexVolume_To_policy_AllowedFlexVolume is an autogenerated conversion function.
-func Convert_v1beta1_AllowedFlexVolume_To_policy_AllowedFlexVolume(in *v1beta1.AllowedFlexVolume, out *policy.AllowedFlexVolume, s conversion.Scope) error {
+func Convert_v1beta1_AllowedFlexVolume_To_policy_AllowedFlexVolume(in *apipolicyv1beta1.AllowedFlexVolume, out *pkgapispolicy.AllowedFlexVolume, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_AllowedFlexVolume_To_policy_AllowedFlexVolume(in, out, s)
 }
 
-func autoConvert_policy_AllowedFlexVolume_To_v1beta1_AllowedFlexVolume(in *policy.AllowedFlexVolume, out *v1beta1.AllowedFlexVolume, s conversion.Scope) error {
+func autoConvert_policy_AllowedFlexVolume_To_v1beta1_AllowedFlexVolume(in *pkgapispolicy.AllowedFlexVolume, out *apipolicyv1beta1.AllowedFlexVolume, s apimachinerypkgconversion.Scope) error {
 	out.Driver = in.Driver
 	return nil
 }
 
 // Convert_policy_AllowedFlexVolume_To_v1beta1_AllowedFlexVolume is an autogenerated conversion function.
-func Convert_policy_AllowedFlexVolume_To_v1beta1_AllowedFlexVolume(in *policy.AllowedFlexVolume, out *v1beta1.AllowedFlexVolume, s conversion.Scope) error {
+func Convert_policy_AllowedFlexVolume_To_v1beta1_AllowedFlexVolume(in *pkgapispolicy.AllowedFlexVolume, out *apipolicyv1beta1.AllowedFlexVolume, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_policy_AllowedFlexVolume_To_v1beta1_AllowedFlexVolume(in, out, s)
 }
 
-func autoConvert_v1beta1_AllowedHostPath_To_policy_AllowedHostPath(in *v1beta1.AllowedHostPath, out *policy.AllowedHostPath, s conversion.Scope) error {
+func autoConvert_v1beta1_AllowedHostPath_To_policy_AllowedHostPath(in *apipolicyv1beta1.AllowedHostPath, out *pkgapispolicy.AllowedHostPath, s apimachinerypkgconversion.Scope) error {
 	out.PathPrefix = in.PathPrefix
 	out.ReadOnly = in.ReadOnly
 	return nil
 }
 
 // Convert_v1beta1_AllowedHostPath_To_policy_AllowedHostPath is an autogenerated conversion function.
-func Convert_v1beta1_AllowedHostPath_To_policy_AllowedHostPath(in *v1beta1.AllowedHostPath, out *policy.AllowedHostPath, s conversion.Scope) error {
+func Convert_v1beta1_AllowedHostPath_To_policy_AllowedHostPath(in *apipolicyv1beta1.AllowedHostPath, out *pkgapispolicy.AllowedHostPath, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_AllowedHostPath_To_policy_AllowedHostPath(in, out, s)
 }
 
-func autoConvert_policy_AllowedHostPath_To_v1beta1_AllowedHostPath(in *policy.AllowedHostPath, out *v1beta1.AllowedHostPath, s conversion.Scope) error {
+func autoConvert_policy_AllowedHostPath_To_v1beta1_AllowedHostPath(in *pkgapispolicy.AllowedHostPath, out *apipolicyv1beta1.AllowedHostPath, s apimachinerypkgconversion.Scope) error {
 	out.PathPrefix = in.PathPrefix
 	out.ReadOnly = in.ReadOnly
 	return nil
 }
 
 // Convert_policy_AllowedHostPath_To_v1beta1_AllowedHostPath is an autogenerated conversion function.
-func Convert_policy_AllowedHostPath_To_v1beta1_AllowedHostPath(in *policy.AllowedHostPath, out *v1beta1.AllowedHostPath, s conversion.Scope) error {
+func Convert_policy_AllowedHostPath_To_v1beta1_AllowedHostPath(in *pkgapispolicy.AllowedHostPath, out *apipolicyv1beta1.AllowedHostPath, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_policy_AllowedHostPath_To_v1beta1_AllowedHostPath(in, out, s)
 }
 
-func autoConvert_v1beta1_Eviction_To_policy_Eviction(in *v1beta1.Eviction, out *policy.Eviction, s conversion.Scope) error {
+func autoConvert_v1beta1_Eviction_To_policy_Eviction(in *apipolicyv1beta1.Eviction, out *pkgapispolicy.Eviction, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.DeleteOptions = (*v1.DeleteOptions)(unsafe.Pointer(in.DeleteOptions))
+	out.DeleteOptions = (*apismetav1.DeleteOptions)(unsafe.Pointer(in.DeleteOptions))
 	return nil
 }
 
 // Convert_v1beta1_Eviction_To_policy_Eviction is an autogenerated conversion function.
-func Convert_v1beta1_Eviction_To_policy_Eviction(in *v1beta1.Eviction, out *policy.Eviction, s conversion.Scope) error {
+func Convert_v1beta1_Eviction_To_policy_Eviction(in *apipolicyv1beta1.Eviction, out *pkgapispolicy.Eviction, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_Eviction_To_policy_Eviction(in, out, s)
 }
 
-func autoConvert_policy_Eviction_To_v1beta1_Eviction(in *policy.Eviction, out *v1beta1.Eviction, s conversion.Scope) error {
+func autoConvert_policy_Eviction_To_v1beta1_Eviction(in *pkgapispolicy.Eviction, out *apipolicyv1beta1.Eviction, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.DeleteOptions = (*v1.DeleteOptions)(unsafe.Pointer(in.DeleteOptions))
+	out.DeleteOptions = (*apismetav1.DeleteOptions)(unsafe.Pointer(in.DeleteOptions))
 	return nil
 }
 
 // Convert_policy_Eviction_To_v1beta1_Eviction is an autogenerated conversion function.
-func Convert_policy_Eviction_To_v1beta1_Eviction(in *policy.Eviction, out *v1beta1.Eviction, s conversion.Scope) error {
+func Convert_policy_Eviction_To_v1beta1_Eviction(in *pkgapispolicy.Eviction, out *apipolicyv1beta1.Eviction, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_policy_Eviction_To_v1beta1_Eviction(in, out, s)
 }
 
-func autoConvert_v1beta1_FSGroupStrategyOptions_To_policy_FSGroupStrategyOptions(in *v1beta1.FSGroupStrategyOptions, out *policy.FSGroupStrategyOptions, s conversion.Scope) error {
-	out.Rule = policy.FSGroupStrategyType(in.Rule)
-	out.Ranges = *(*[]policy.IDRange)(unsafe.Pointer(&in.Ranges))
+func autoConvert_v1beta1_FSGroupStrategyOptions_To_policy_FSGroupStrategyOptions(in *apipolicyv1beta1.FSGroupStrategyOptions, out *pkgapispolicy.FSGroupStrategyOptions, s apimachinerypkgconversion.Scope) error {
+	out.Rule = pkgapispolicy.FSGroupStrategyType(in.Rule)
+	out.Ranges = *(*[]pkgapispolicy.IDRange)(unsafe.Pointer(&in.Ranges))
 	return nil
 }
 
 // Convert_v1beta1_FSGroupStrategyOptions_To_policy_FSGroupStrategyOptions is an autogenerated conversion function.
-func Convert_v1beta1_FSGroupStrategyOptions_To_policy_FSGroupStrategyOptions(in *v1beta1.FSGroupStrategyOptions, out *policy.FSGroupStrategyOptions, s conversion.Scope) error {
+func Convert_v1beta1_FSGroupStrategyOptions_To_policy_FSGroupStrategyOptions(in *apipolicyv1beta1.FSGroupStrategyOptions, out *pkgapispolicy.FSGroupStrategyOptions, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_FSGroupStrategyOptions_To_policy_FSGroupStrategyOptions(in, out, s)
 }
 
-func autoConvert_policy_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions(in *policy.FSGroupStrategyOptions, out *v1beta1.FSGroupStrategyOptions, s conversion.Scope) error {
-	out.Rule = v1beta1.FSGroupStrategyType(in.Rule)
-	out.Ranges = *(*[]v1beta1.IDRange)(unsafe.Pointer(&in.Ranges))
+func autoConvert_policy_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions(in *pkgapispolicy.FSGroupStrategyOptions, out *apipolicyv1beta1.FSGroupStrategyOptions, s apimachinerypkgconversion.Scope) error {
+	out.Rule = apipolicyv1beta1.FSGroupStrategyType(in.Rule)
+	out.Ranges = *(*[]apipolicyv1beta1.IDRange)(unsafe.Pointer(&in.Ranges))
 	return nil
 }
 
 // Convert_policy_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions is an autogenerated conversion function.
-func Convert_policy_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions(in *policy.FSGroupStrategyOptions, out *v1beta1.FSGroupStrategyOptions, s conversion.Scope) error {
+func Convert_policy_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions(in *pkgapispolicy.FSGroupStrategyOptions, out *apipolicyv1beta1.FSGroupStrategyOptions, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_policy_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions(in, out, s)
 }
 
-func autoConvert_v1beta1_HostPortRange_To_policy_HostPortRange(in *v1beta1.HostPortRange, out *policy.HostPortRange, s conversion.Scope) error {
+func autoConvert_v1beta1_HostPortRange_To_policy_HostPortRange(in *apipolicyv1beta1.HostPortRange, out *pkgapispolicy.HostPortRange, s apimachinerypkgconversion.Scope) error {
 	out.Min = in.Min
 	out.Max = in.Max
 	return nil
 }
 
 // Convert_v1beta1_HostPortRange_To_policy_HostPortRange is an autogenerated conversion function.
-func Convert_v1beta1_HostPortRange_To_policy_HostPortRange(in *v1beta1.HostPortRange, out *policy.HostPortRange, s conversion.Scope) error {
+func Convert_v1beta1_HostPortRange_To_policy_HostPortRange(in *apipolicyv1beta1.HostPortRange, out *pkgapispolicy.HostPortRange, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_HostPortRange_To_policy_HostPortRange(in, out, s)
 }
 
-func autoConvert_policy_HostPortRange_To_v1beta1_HostPortRange(in *policy.HostPortRange, out *v1beta1.HostPortRange, s conversion.Scope) error {
+func autoConvert_policy_HostPortRange_To_v1beta1_HostPortRange(in *pkgapispolicy.HostPortRange, out *apipolicyv1beta1.HostPortRange, s apimachinerypkgconversion.Scope) error {
 	out.Min = in.Min
 	out.Max = in.Max
 	return nil
 }
 
 // Convert_policy_HostPortRange_To_v1beta1_HostPortRange is an autogenerated conversion function.
-func Convert_policy_HostPortRange_To_v1beta1_HostPortRange(in *policy.HostPortRange, out *v1beta1.HostPortRange, s conversion.Scope) error {
+func Convert_policy_HostPortRange_To_v1beta1_HostPortRange(in *pkgapispolicy.HostPortRange, out *apipolicyv1beta1.HostPortRange, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_policy_HostPortRange_To_v1beta1_HostPortRange(in, out, s)
 }
 
-func autoConvert_v1beta1_IDRange_To_policy_IDRange(in *v1beta1.IDRange, out *policy.IDRange, s conversion.Scope) error {
+func autoConvert_v1beta1_IDRange_To_policy_IDRange(in *apipolicyv1beta1.IDRange, out *pkgapispolicy.IDRange, s apimachinerypkgconversion.Scope) error {
 	out.Min = in.Min
 	out.Max = in.Max
 	return nil
 }
 
 // Convert_v1beta1_IDRange_To_policy_IDRange is an autogenerated conversion function.
-func Convert_v1beta1_IDRange_To_policy_IDRange(in *v1beta1.IDRange, out *policy.IDRange, s conversion.Scope) error {
+func Convert_v1beta1_IDRange_To_policy_IDRange(in *apipolicyv1beta1.IDRange, out *pkgapispolicy.IDRange, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_IDRange_To_policy_IDRange(in, out, s)
 }
 
-func autoConvert_policy_IDRange_To_v1beta1_IDRange(in *policy.IDRange, out *v1beta1.IDRange, s conversion.Scope) error {
+func autoConvert_policy_IDRange_To_v1beta1_IDRange(in *pkgapispolicy.IDRange, out *apipolicyv1beta1.IDRange, s apimachinerypkgconversion.Scope) error {
 	out.Min = in.Min
 	out.Max = in.Max
 	return nil
 }
 
 // Convert_policy_IDRange_To_v1beta1_IDRange is an autogenerated conversion function.
-func Convert_policy_IDRange_To_v1beta1_IDRange(in *policy.IDRange, out *v1beta1.IDRange, s conversion.Scope) error {
+func Convert_policy_IDRange_To_v1beta1_IDRange(in *pkgapispolicy.IDRange, out *apipolicyv1beta1.IDRange, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_policy_IDRange_To_v1beta1_IDRange(in, out, s)
 }
 
-func autoConvert_v1beta1_PodDisruptionBudget_To_policy_PodDisruptionBudget(in *v1beta1.PodDisruptionBudget, out *policy.PodDisruptionBudget, s conversion.Scope) error {
+func autoConvert_v1beta1_PodDisruptionBudget_To_policy_PodDisruptionBudget(in *apipolicyv1beta1.PodDisruptionBudget, out *pkgapispolicy.PodDisruptionBudget, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -395,7 +395,7 @@ func autoConvert_v1beta1_PodDisruptionBudget_To_policy_PodDisruptionBudget(in *v
 	return nil
 }
 
-func autoConvert_policy_PodDisruptionBudget_To_v1beta1_PodDisruptionBudget(in *policy.PodDisruptionBudget, out *v1beta1.PodDisruptionBudget, s conversion.Scope) error {
+func autoConvert_policy_PodDisruptionBudget_To_v1beta1_PodDisruptionBudget(in *pkgapispolicy.PodDisruptionBudget, out *apipolicyv1beta1.PodDisruptionBudget, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_policy_PodDisruptionBudgetSpec_To_v1beta1_PodDisruptionBudgetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -406,11 +406,11 @@ func autoConvert_policy_PodDisruptionBudget_To_v1beta1_PodDisruptionBudget(in *p
 	return nil
 }
 
-func autoConvert_v1beta1_PodDisruptionBudgetList_To_policy_PodDisruptionBudgetList(in *v1beta1.PodDisruptionBudgetList, out *policy.PodDisruptionBudgetList, s conversion.Scope) error {
+func autoConvert_v1beta1_PodDisruptionBudgetList_To_policy_PodDisruptionBudgetList(in *apipolicyv1beta1.PodDisruptionBudgetList, out *pkgapispolicy.PodDisruptionBudgetList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]policy.PodDisruptionBudget, len(*in))
+		*out = make([]pkgapispolicy.PodDisruptionBudget, len(*in))
 		for i := range *in {
 			if err := Convert_v1beta1_PodDisruptionBudget_To_policy_PodDisruptionBudget(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -423,15 +423,15 @@ func autoConvert_v1beta1_PodDisruptionBudgetList_To_policy_PodDisruptionBudgetLi
 }
 
 // Convert_v1beta1_PodDisruptionBudgetList_To_policy_PodDisruptionBudgetList is an autogenerated conversion function.
-func Convert_v1beta1_PodDisruptionBudgetList_To_policy_PodDisruptionBudgetList(in *v1beta1.PodDisruptionBudgetList, out *policy.PodDisruptionBudgetList, s conversion.Scope) error {
+func Convert_v1beta1_PodDisruptionBudgetList_To_policy_PodDisruptionBudgetList(in *apipolicyv1beta1.PodDisruptionBudgetList, out *pkgapispolicy.PodDisruptionBudgetList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_PodDisruptionBudgetList_To_policy_PodDisruptionBudgetList(in, out, s)
 }
 
-func autoConvert_policy_PodDisruptionBudgetList_To_v1beta1_PodDisruptionBudgetList(in *policy.PodDisruptionBudgetList, out *v1beta1.PodDisruptionBudgetList, s conversion.Scope) error {
+func autoConvert_policy_PodDisruptionBudgetList_To_v1beta1_PodDisruptionBudgetList(in *pkgapispolicy.PodDisruptionBudgetList, out *apipolicyv1beta1.PodDisruptionBudgetList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]v1beta1.PodDisruptionBudget, len(*in))
+		*out = make([]apipolicyv1beta1.PodDisruptionBudget, len(*in))
 		for i := range *in {
 			if err := Convert_policy_PodDisruptionBudget_To_v1beta1_PodDisruptionBudget(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -444,69 +444,69 @@ func autoConvert_policy_PodDisruptionBudgetList_To_v1beta1_PodDisruptionBudgetLi
 }
 
 // Convert_policy_PodDisruptionBudgetList_To_v1beta1_PodDisruptionBudgetList is an autogenerated conversion function.
-func Convert_policy_PodDisruptionBudgetList_To_v1beta1_PodDisruptionBudgetList(in *policy.PodDisruptionBudgetList, out *v1beta1.PodDisruptionBudgetList, s conversion.Scope) error {
+func Convert_policy_PodDisruptionBudgetList_To_v1beta1_PodDisruptionBudgetList(in *pkgapispolicy.PodDisruptionBudgetList, out *apipolicyv1beta1.PodDisruptionBudgetList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_policy_PodDisruptionBudgetList_To_v1beta1_PodDisruptionBudgetList(in, out, s)
 }
 
-func autoConvert_v1beta1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(in *v1beta1.PodDisruptionBudgetSpec, out *policy.PodDisruptionBudgetSpec, s conversion.Scope) error {
-	out.MinAvailable = (*intstr.IntOrString)(unsafe.Pointer(in.MinAvailable))
-	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	out.MaxUnavailable = (*intstr.IntOrString)(unsafe.Pointer(in.MaxUnavailable))
-	out.UnhealthyPodEvictionPolicy = (*policy.UnhealthyPodEvictionPolicyType)(unsafe.Pointer(in.UnhealthyPodEvictionPolicy))
+func autoConvert_v1beta1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(in *apipolicyv1beta1.PodDisruptionBudgetSpec, out *pkgapispolicy.PodDisruptionBudgetSpec, s apimachinerypkgconversion.Scope) error {
+	out.MinAvailable = (*pkgutilintstr.IntOrString)(unsafe.Pointer(in.MinAvailable))
+	out.Selector = (*apismetav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.MaxUnavailable = (*pkgutilintstr.IntOrString)(unsafe.Pointer(in.MaxUnavailable))
+	out.UnhealthyPodEvictionPolicy = (*pkgapispolicy.UnhealthyPodEvictionPolicyType)(unsafe.Pointer(in.UnhealthyPodEvictionPolicy))
 	return nil
 }
 
 // Convert_v1beta1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec is an autogenerated conversion function.
-func Convert_v1beta1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(in *v1beta1.PodDisruptionBudgetSpec, out *policy.PodDisruptionBudgetSpec, s conversion.Scope) error {
+func Convert_v1beta1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(in *apipolicyv1beta1.PodDisruptionBudgetSpec, out *pkgapispolicy.PodDisruptionBudgetSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_PodDisruptionBudgetSpec_To_policy_PodDisruptionBudgetSpec(in, out, s)
 }
 
-func autoConvert_policy_PodDisruptionBudgetSpec_To_v1beta1_PodDisruptionBudgetSpec(in *policy.PodDisruptionBudgetSpec, out *v1beta1.PodDisruptionBudgetSpec, s conversion.Scope) error {
-	out.MinAvailable = (*intstr.IntOrString)(unsafe.Pointer(in.MinAvailable))
-	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	out.MaxUnavailable = (*intstr.IntOrString)(unsafe.Pointer(in.MaxUnavailable))
-	out.UnhealthyPodEvictionPolicy = (*v1beta1.UnhealthyPodEvictionPolicyType)(unsafe.Pointer(in.UnhealthyPodEvictionPolicy))
+func autoConvert_policy_PodDisruptionBudgetSpec_To_v1beta1_PodDisruptionBudgetSpec(in *pkgapispolicy.PodDisruptionBudgetSpec, out *apipolicyv1beta1.PodDisruptionBudgetSpec, s apimachinerypkgconversion.Scope) error {
+	out.MinAvailable = (*pkgutilintstr.IntOrString)(unsafe.Pointer(in.MinAvailable))
+	out.Selector = (*apismetav1.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.MaxUnavailable = (*pkgutilintstr.IntOrString)(unsafe.Pointer(in.MaxUnavailable))
+	out.UnhealthyPodEvictionPolicy = (*apipolicyv1beta1.UnhealthyPodEvictionPolicyType)(unsafe.Pointer(in.UnhealthyPodEvictionPolicy))
 	return nil
 }
 
 // Convert_policy_PodDisruptionBudgetSpec_To_v1beta1_PodDisruptionBudgetSpec is an autogenerated conversion function.
-func Convert_policy_PodDisruptionBudgetSpec_To_v1beta1_PodDisruptionBudgetSpec(in *policy.PodDisruptionBudgetSpec, out *v1beta1.PodDisruptionBudgetSpec, s conversion.Scope) error {
+func Convert_policy_PodDisruptionBudgetSpec_To_v1beta1_PodDisruptionBudgetSpec(in *pkgapispolicy.PodDisruptionBudgetSpec, out *apipolicyv1beta1.PodDisruptionBudgetSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_policy_PodDisruptionBudgetSpec_To_v1beta1_PodDisruptionBudgetSpec(in, out, s)
 }
 
-func autoConvert_v1beta1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus(in *v1beta1.PodDisruptionBudgetStatus, out *policy.PodDisruptionBudgetStatus, s conversion.Scope) error {
+func autoConvert_v1beta1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus(in *apipolicyv1beta1.PodDisruptionBudgetStatus, out *pkgapispolicy.PodDisruptionBudgetStatus, s apimachinerypkgconversion.Scope) error {
 	out.ObservedGeneration = in.ObservedGeneration
-	out.DisruptedPods = *(*map[string]v1.Time)(unsafe.Pointer(&in.DisruptedPods))
+	out.DisruptedPods = *(*map[string]apismetav1.Time)(unsafe.Pointer(&in.DisruptedPods))
 	out.DisruptionsAllowed = in.DisruptionsAllowed
 	out.CurrentHealthy = in.CurrentHealthy
 	out.DesiredHealthy = in.DesiredHealthy
 	out.ExpectedPods = in.ExpectedPods
-	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
+	out.Conditions = *(*[]apismetav1.Condition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 
 // Convert_v1beta1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus is an autogenerated conversion function.
-func Convert_v1beta1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus(in *v1beta1.PodDisruptionBudgetStatus, out *policy.PodDisruptionBudgetStatus, s conversion.Scope) error {
+func Convert_v1beta1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus(in *apipolicyv1beta1.PodDisruptionBudgetStatus, out *pkgapispolicy.PodDisruptionBudgetStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus(in, out, s)
 }
 
-func autoConvert_policy_PodDisruptionBudgetStatus_To_v1beta1_PodDisruptionBudgetStatus(in *policy.PodDisruptionBudgetStatus, out *v1beta1.PodDisruptionBudgetStatus, s conversion.Scope) error {
+func autoConvert_policy_PodDisruptionBudgetStatus_To_v1beta1_PodDisruptionBudgetStatus(in *pkgapispolicy.PodDisruptionBudgetStatus, out *apipolicyv1beta1.PodDisruptionBudgetStatus, s apimachinerypkgconversion.Scope) error {
 	out.ObservedGeneration = in.ObservedGeneration
-	out.DisruptedPods = *(*map[string]v1.Time)(unsafe.Pointer(&in.DisruptedPods))
+	out.DisruptedPods = *(*map[string]apismetav1.Time)(unsafe.Pointer(&in.DisruptedPods))
 	out.DisruptionsAllowed = in.DisruptionsAllowed
 	out.CurrentHealthy = in.CurrentHealthy
 	out.DesiredHealthy = in.DesiredHealthy
 	out.ExpectedPods = in.ExpectedPods
-	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
+	out.Conditions = *(*[]apismetav1.Condition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 
 // Convert_policy_PodDisruptionBudgetStatus_To_v1beta1_PodDisruptionBudgetStatus is an autogenerated conversion function.
-func Convert_policy_PodDisruptionBudgetStatus_To_v1beta1_PodDisruptionBudgetStatus(in *policy.PodDisruptionBudgetStatus, out *v1beta1.PodDisruptionBudgetStatus, s conversion.Scope) error {
+func Convert_policy_PodDisruptionBudgetStatus_To_v1beta1_PodDisruptionBudgetStatus(in *pkgapispolicy.PodDisruptionBudgetStatus, out *apipolicyv1beta1.PodDisruptionBudgetStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_policy_PodDisruptionBudgetStatus_To_v1beta1_PodDisruptionBudgetStatus(in, out, s)
 }
 
-func autoConvert_v1beta1_PodSecurityPolicy_To_policy_PodSecurityPolicy(in *v1beta1.PodSecurityPolicy, out *policy.PodSecurityPolicy, s conversion.Scope) error {
+func autoConvert_v1beta1_PodSecurityPolicy_To_policy_PodSecurityPolicy(in *apipolicyv1beta1.PodSecurityPolicy, out *pkgapispolicy.PodSecurityPolicy, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_PodSecurityPolicySpec_To_policy_PodSecurityPolicySpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -515,11 +515,11 @@ func autoConvert_v1beta1_PodSecurityPolicy_To_policy_PodSecurityPolicy(in *v1bet
 }
 
 // Convert_v1beta1_PodSecurityPolicy_To_policy_PodSecurityPolicy is an autogenerated conversion function.
-func Convert_v1beta1_PodSecurityPolicy_To_policy_PodSecurityPolicy(in *v1beta1.PodSecurityPolicy, out *policy.PodSecurityPolicy, s conversion.Scope) error {
+func Convert_v1beta1_PodSecurityPolicy_To_policy_PodSecurityPolicy(in *apipolicyv1beta1.PodSecurityPolicy, out *pkgapispolicy.PodSecurityPolicy, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_PodSecurityPolicy_To_policy_PodSecurityPolicy(in, out, s)
 }
 
-func autoConvert_policy_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(in *policy.PodSecurityPolicy, out *v1beta1.PodSecurityPolicy, s conversion.Scope) error {
+func autoConvert_policy_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(in *pkgapispolicy.PodSecurityPolicy, out *apipolicyv1beta1.PodSecurityPolicy, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_policy_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -528,15 +528,15 @@ func autoConvert_policy_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(in *polic
 }
 
 // Convert_policy_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy is an autogenerated conversion function.
-func Convert_policy_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(in *policy.PodSecurityPolicy, out *v1beta1.PodSecurityPolicy, s conversion.Scope) error {
+func Convert_policy_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(in *pkgapispolicy.PodSecurityPolicy, out *apipolicyv1beta1.PodSecurityPolicy, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_policy_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(in, out, s)
 }
 
-func autoConvert_v1beta1_PodSecurityPolicyList_To_policy_PodSecurityPolicyList(in *v1beta1.PodSecurityPolicyList, out *policy.PodSecurityPolicyList, s conversion.Scope) error {
+func autoConvert_v1beta1_PodSecurityPolicyList_To_policy_PodSecurityPolicyList(in *apipolicyv1beta1.PodSecurityPolicyList, out *pkgapispolicy.PodSecurityPolicyList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]policy.PodSecurityPolicy, len(*in))
+		*out = make([]pkgapispolicy.PodSecurityPolicy, len(*in))
 		for i := range *in {
 			if err := Convert_v1beta1_PodSecurityPolicy_To_policy_PodSecurityPolicy(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -549,15 +549,15 @@ func autoConvert_v1beta1_PodSecurityPolicyList_To_policy_PodSecurityPolicyList(i
 }
 
 // Convert_v1beta1_PodSecurityPolicyList_To_policy_PodSecurityPolicyList is an autogenerated conversion function.
-func Convert_v1beta1_PodSecurityPolicyList_To_policy_PodSecurityPolicyList(in *v1beta1.PodSecurityPolicyList, out *policy.PodSecurityPolicyList, s conversion.Scope) error {
+func Convert_v1beta1_PodSecurityPolicyList_To_policy_PodSecurityPolicyList(in *apipolicyv1beta1.PodSecurityPolicyList, out *pkgapispolicy.PodSecurityPolicyList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_PodSecurityPolicyList_To_policy_PodSecurityPolicyList(in, out, s)
 }
 
-func autoConvert_policy_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList(in *policy.PodSecurityPolicyList, out *v1beta1.PodSecurityPolicyList, s conversion.Scope) error {
+func autoConvert_policy_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList(in *pkgapispolicy.PodSecurityPolicyList, out *apipolicyv1beta1.PodSecurityPolicyList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]v1beta1.PodSecurityPolicy, len(*in))
+		*out = make([]apipolicyv1beta1.PodSecurityPolicy, len(*in))
 		for i := range *in {
 			if err := Convert_policy_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -570,18 +570,18 @@ func autoConvert_policy_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList(i
 }
 
 // Convert_policy_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList is an autogenerated conversion function.
-func Convert_policy_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList(in *policy.PodSecurityPolicyList, out *v1beta1.PodSecurityPolicyList, s conversion.Scope) error {
+func Convert_policy_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList(in *pkgapispolicy.PodSecurityPolicyList, out *apipolicyv1beta1.PodSecurityPolicyList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_policy_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList(in, out, s)
 }
 
-func autoConvert_v1beta1_PodSecurityPolicySpec_To_policy_PodSecurityPolicySpec(in *v1beta1.PodSecurityPolicySpec, out *policy.PodSecurityPolicySpec, s conversion.Scope) error {
+func autoConvert_v1beta1_PodSecurityPolicySpec_To_policy_PodSecurityPolicySpec(in *apipolicyv1beta1.PodSecurityPolicySpec, out *pkgapispolicy.PodSecurityPolicySpec, s apimachinerypkgconversion.Scope) error {
 	out.Privileged = in.Privileged
-	out.DefaultAddCapabilities = *(*[]core.Capability)(unsafe.Pointer(&in.DefaultAddCapabilities))
-	out.RequiredDropCapabilities = *(*[]core.Capability)(unsafe.Pointer(&in.RequiredDropCapabilities))
-	out.AllowedCapabilities = *(*[]core.Capability)(unsafe.Pointer(&in.AllowedCapabilities))
-	out.Volumes = *(*[]policy.FSType)(unsafe.Pointer(&in.Volumes))
+	out.DefaultAddCapabilities = *(*[]pkgapiscore.Capability)(unsafe.Pointer(&in.DefaultAddCapabilities))
+	out.RequiredDropCapabilities = *(*[]pkgapiscore.Capability)(unsafe.Pointer(&in.RequiredDropCapabilities))
+	out.AllowedCapabilities = *(*[]pkgapiscore.Capability)(unsafe.Pointer(&in.AllowedCapabilities))
+	out.Volumes = *(*[]pkgapispolicy.FSType)(unsafe.Pointer(&in.Volumes))
 	out.HostNetwork = in.HostNetwork
-	out.HostPorts = *(*[]policy.HostPortRange)(unsafe.Pointer(&in.HostPorts))
+	out.HostPorts = *(*[]pkgapispolicy.HostPortRange)(unsafe.Pointer(&in.HostPorts))
 	out.HostPID = in.HostPID
 	out.HostIPC = in.HostIPC
 	if err := Convert_v1beta1_SELinuxStrategyOptions_To_policy_SELinuxStrategyOptions(&in.SELinux, &out.SELinux, s); err != nil {
@@ -590,7 +590,7 @@ func autoConvert_v1beta1_PodSecurityPolicySpec_To_policy_PodSecurityPolicySpec(i
 	if err := Convert_v1beta1_RunAsUserStrategyOptions_To_policy_RunAsUserStrategyOptions(&in.RunAsUser, &out.RunAsUser, s); err != nil {
 		return err
 	}
-	out.RunAsGroup = (*policy.RunAsGroupStrategyOptions)(unsafe.Pointer(in.RunAsGroup))
+	out.RunAsGroup = (*pkgapispolicy.RunAsGroupStrategyOptions)(unsafe.Pointer(in.RunAsGroup))
 	if err := Convert_v1beta1_SupplementalGroupsStrategyOptions_To_policy_SupplementalGroupsStrategyOptions(&in.SupplementalGroups, &out.SupplementalGroups, s); err != nil {
 		return err
 	}
@@ -599,32 +599,32 @@ func autoConvert_v1beta1_PodSecurityPolicySpec_To_policy_PodSecurityPolicySpec(i
 	}
 	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
 	out.DefaultAllowPrivilegeEscalation = (*bool)(unsafe.Pointer(in.DefaultAllowPrivilegeEscalation))
-	if err := v1.Convert_Pointer_bool_To_bool(&in.AllowPrivilegeEscalation, &out.AllowPrivilegeEscalation, s); err != nil {
+	if err := apismetav1.Convert_Pointer_bool_To_bool(&in.AllowPrivilegeEscalation, &out.AllowPrivilegeEscalation, s); err != nil {
 		return err
 	}
-	out.AllowedHostPaths = *(*[]policy.AllowedHostPath)(unsafe.Pointer(&in.AllowedHostPaths))
-	out.AllowedFlexVolumes = *(*[]policy.AllowedFlexVolume)(unsafe.Pointer(&in.AllowedFlexVolumes))
-	out.AllowedCSIDrivers = *(*[]policy.AllowedCSIDriver)(unsafe.Pointer(&in.AllowedCSIDrivers))
+	out.AllowedHostPaths = *(*[]pkgapispolicy.AllowedHostPath)(unsafe.Pointer(&in.AllowedHostPaths))
+	out.AllowedFlexVolumes = *(*[]pkgapispolicy.AllowedFlexVolume)(unsafe.Pointer(&in.AllowedFlexVolumes))
+	out.AllowedCSIDrivers = *(*[]pkgapispolicy.AllowedCSIDriver)(unsafe.Pointer(&in.AllowedCSIDrivers))
 	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
 	out.ForbiddenSysctls = *(*[]string)(unsafe.Pointer(&in.ForbiddenSysctls))
-	out.AllowedProcMountTypes = *(*[]core.ProcMountType)(unsafe.Pointer(&in.AllowedProcMountTypes))
-	out.RuntimeClass = (*policy.RuntimeClassStrategyOptions)(unsafe.Pointer(in.RuntimeClass))
+	out.AllowedProcMountTypes = *(*[]pkgapiscore.ProcMountType)(unsafe.Pointer(&in.AllowedProcMountTypes))
+	out.RuntimeClass = (*pkgapispolicy.RuntimeClassStrategyOptions)(unsafe.Pointer(in.RuntimeClass))
 	return nil
 }
 
 // Convert_v1beta1_PodSecurityPolicySpec_To_policy_PodSecurityPolicySpec is an autogenerated conversion function.
-func Convert_v1beta1_PodSecurityPolicySpec_To_policy_PodSecurityPolicySpec(in *v1beta1.PodSecurityPolicySpec, out *policy.PodSecurityPolicySpec, s conversion.Scope) error {
+func Convert_v1beta1_PodSecurityPolicySpec_To_policy_PodSecurityPolicySpec(in *apipolicyv1beta1.PodSecurityPolicySpec, out *pkgapispolicy.PodSecurityPolicySpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_PodSecurityPolicySpec_To_policy_PodSecurityPolicySpec(in, out, s)
 }
 
-func autoConvert_policy_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(in *policy.PodSecurityPolicySpec, out *v1beta1.PodSecurityPolicySpec, s conversion.Scope) error {
+func autoConvert_policy_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(in *pkgapispolicy.PodSecurityPolicySpec, out *apipolicyv1beta1.PodSecurityPolicySpec, s apimachinerypkgconversion.Scope) error {
 	out.Privileged = in.Privileged
-	out.DefaultAddCapabilities = *(*[]corev1.Capability)(unsafe.Pointer(&in.DefaultAddCapabilities))
-	out.RequiredDropCapabilities = *(*[]corev1.Capability)(unsafe.Pointer(&in.RequiredDropCapabilities))
-	out.AllowedCapabilities = *(*[]corev1.Capability)(unsafe.Pointer(&in.AllowedCapabilities))
-	out.Volumes = *(*[]v1beta1.FSType)(unsafe.Pointer(&in.Volumes))
+	out.DefaultAddCapabilities = *(*[]apicorev1.Capability)(unsafe.Pointer(&in.DefaultAddCapabilities))
+	out.RequiredDropCapabilities = *(*[]apicorev1.Capability)(unsafe.Pointer(&in.RequiredDropCapabilities))
+	out.AllowedCapabilities = *(*[]apicorev1.Capability)(unsafe.Pointer(&in.AllowedCapabilities))
+	out.Volumes = *(*[]apipolicyv1beta1.FSType)(unsafe.Pointer(&in.Volumes))
 	out.HostNetwork = in.HostNetwork
-	out.HostPorts = *(*[]v1beta1.HostPortRange)(unsafe.Pointer(&in.HostPorts))
+	out.HostPorts = *(*[]apipolicyv1beta1.HostPortRange)(unsafe.Pointer(&in.HostPorts))
 	out.HostPID = in.HostPID
 	out.HostIPC = in.HostIPC
 	if err := Convert_policy_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(&in.SELinux, &out.SELinux, s); err != nil {
@@ -633,7 +633,7 @@ func autoConvert_policy_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(i
 	if err := Convert_policy_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions(&in.RunAsUser, &out.RunAsUser, s); err != nil {
 		return err
 	}
-	out.RunAsGroup = (*v1beta1.RunAsGroupStrategyOptions)(unsafe.Pointer(in.RunAsGroup))
+	out.RunAsGroup = (*apipolicyv1beta1.RunAsGroupStrategyOptions)(unsafe.Pointer(in.RunAsGroup))
 	if err := Convert_policy_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions(&in.SupplementalGroups, &out.SupplementalGroups, s); err != nil {
 		return err
 	}
@@ -642,130 +642,130 @@ func autoConvert_policy_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(i
 	}
 	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
 	out.DefaultAllowPrivilegeEscalation = (*bool)(unsafe.Pointer(in.DefaultAllowPrivilegeEscalation))
-	if err := v1.Convert_bool_To_Pointer_bool(&in.AllowPrivilegeEscalation, &out.AllowPrivilegeEscalation, s); err != nil {
+	if err := apismetav1.Convert_bool_To_Pointer_bool(&in.AllowPrivilegeEscalation, &out.AllowPrivilegeEscalation, s); err != nil {
 		return err
 	}
-	out.AllowedHostPaths = *(*[]v1beta1.AllowedHostPath)(unsafe.Pointer(&in.AllowedHostPaths))
-	out.AllowedFlexVolumes = *(*[]v1beta1.AllowedFlexVolume)(unsafe.Pointer(&in.AllowedFlexVolumes))
-	out.AllowedCSIDrivers = *(*[]v1beta1.AllowedCSIDriver)(unsafe.Pointer(&in.AllowedCSIDrivers))
+	out.AllowedHostPaths = *(*[]apipolicyv1beta1.AllowedHostPath)(unsafe.Pointer(&in.AllowedHostPaths))
+	out.AllowedFlexVolumes = *(*[]apipolicyv1beta1.AllowedFlexVolume)(unsafe.Pointer(&in.AllowedFlexVolumes))
+	out.AllowedCSIDrivers = *(*[]apipolicyv1beta1.AllowedCSIDriver)(unsafe.Pointer(&in.AllowedCSIDrivers))
 	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
 	out.ForbiddenSysctls = *(*[]string)(unsafe.Pointer(&in.ForbiddenSysctls))
-	out.AllowedProcMountTypes = *(*[]corev1.ProcMountType)(unsafe.Pointer(&in.AllowedProcMountTypes))
-	out.RuntimeClass = (*v1beta1.RuntimeClassStrategyOptions)(unsafe.Pointer(in.RuntimeClass))
+	out.AllowedProcMountTypes = *(*[]apicorev1.ProcMountType)(unsafe.Pointer(&in.AllowedProcMountTypes))
+	out.RuntimeClass = (*apipolicyv1beta1.RuntimeClassStrategyOptions)(unsafe.Pointer(in.RuntimeClass))
 	return nil
 }
 
 // Convert_policy_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec is an autogenerated conversion function.
-func Convert_policy_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(in *policy.PodSecurityPolicySpec, out *v1beta1.PodSecurityPolicySpec, s conversion.Scope) error {
+func Convert_policy_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(in *pkgapispolicy.PodSecurityPolicySpec, out *apipolicyv1beta1.PodSecurityPolicySpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_policy_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(in, out, s)
 }
 
-func autoConvert_v1beta1_RunAsGroupStrategyOptions_To_policy_RunAsGroupStrategyOptions(in *v1beta1.RunAsGroupStrategyOptions, out *policy.RunAsGroupStrategyOptions, s conversion.Scope) error {
-	out.Rule = policy.RunAsGroupStrategy(in.Rule)
-	out.Ranges = *(*[]policy.IDRange)(unsafe.Pointer(&in.Ranges))
+func autoConvert_v1beta1_RunAsGroupStrategyOptions_To_policy_RunAsGroupStrategyOptions(in *apipolicyv1beta1.RunAsGroupStrategyOptions, out *pkgapispolicy.RunAsGroupStrategyOptions, s apimachinerypkgconversion.Scope) error {
+	out.Rule = pkgapispolicy.RunAsGroupStrategy(in.Rule)
+	out.Ranges = *(*[]pkgapispolicy.IDRange)(unsafe.Pointer(&in.Ranges))
 	return nil
 }
 
 // Convert_v1beta1_RunAsGroupStrategyOptions_To_policy_RunAsGroupStrategyOptions is an autogenerated conversion function.
-func Convert_v1beta1_RunAsGroupStrategyOptions_To_policy_RunAsGroupStrategyOptions(in *v1beta1.RunAsGroupStrategyOptions, out *policy.RunAsGroupStrategyOptions, s conversion.Scope) error {
+func Convert_v1beta1_RunAsGroupStrategyOptions_To_policy_RunAsGroupStrategyOptions(in *apipolicyv1beta1.RunAsGroupStrategyOptions, out *pkgapispolicy.RunAsGroupStrategyOptions, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_RunAsGroupStrategyOptions_To_policy_RunAsGroupStrategyOptions(in, out, s)
 }
 
-func autoConvert_policy_RunAsGroupStrategyOptions_To_v1beta1_RunAsGroupStrategyOptions(in *policy.RunAsGroupStrategyOptions, out *v1beta1.RunAsGroupStrategyOptions, s conversion.Scope) error {
-	out.Rule = v1beta1.RunAsGroupStrategy(in.Rule)
-	out.Ranges = *(*[]v1beta1.IDRange)(unsafe.Pointer(&in.Ranges))
+func autoConvert_policy_RunAsGroupStrategyOptions_To_v1beta1_RunAsGroupStrategyOptions(in *pkgapispolicy.RunAsGroupStrategyOptions, out *apipolicyv1beta1.RunAsGroupStrategyOptions, s apimachinerypkgconversion.Scope) error {
+	out.Rule = apipolicyv1beta1.RunAsGroupStrategy(in.Rule)
+	out.Ranges = *(*[]apipolicyv1beta1.IDRange)(unsafe.Pointer(&in.Ranges))
 	return nil
 }
 
 // Convert_policy_RunAsGroupStrategyOptions_To_v1beta1_RunAsGroupStrategyOptions is an autogenerated conversion function.
-func Convert_policy_RunAsGroupStrategyOptions_To_v1beta1_RunAsGroupStrategyOptions(in *policy.RunAsGroupStrategyOptions, out *v1beta1.RunAsGroupStrategyOptions, s conversion.Scope) error {
+func Convert_policy_RunAsGroupStrategyOptions_To_v1beta1_RunAsGroupStrategyOptions(in *pkgapispolicy.RunAsGroupStrategyOptions, out *apipolicyv1beta1.RunAsGroupStrategyOptions, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_policy_RunAsGroupStrategyOptions_To_v1beta1_RunAsGroupStrategyOptions(in, out, s)
 }
 
-func autoConvert_v1beta1_RunAsUserStrategyOptions_To_policy_RunAsUserStrategyOptions(in *v1beta1.RunAsUserStrategyOptions, out *policy.RunAsUserStrategyOptions, s conversion.Scope) error {
-	out.Rule = policy.RunAsUserStrategy(in.Rule)
-	out.Ranges = *(*[]policy.IDRange)(unsafe.Pointer(&in.Ranges))
+func autoConvert_v1beta1_RunAsUserStrategyOptions_To_policy_RunAsUserStrategyOptions(in *apipolicyv1beta1.RunAsUserStrategyOptions, out *pkgapispolicy.RunAsUserStrategyOptions, s apimachinerypkgconversion.Scope) error {
+	out.Rule = pkgapispolicy.RunAsUserStrategy(in.Rule)
+	out.Ranges = *(*[]pkgapispolicy.IDRange)(unsafe.Pointer(&in.Ranges))
 	return nil
 }
 
 // Convert_v1beta1_RunAsUserStrategyOptions_To_policy_RunAsUserStrategyOptions is an autogenerated conversion function.
-func Convert_v1beta1_RunAsUserStrategyOptions_To_policy_RunAsUserStrategyOptions(in *v1beta1.RunAsUserStrategyOptions, out *policy.RunAsUserStrategyOptions, s conversion.Scope) error {
+func Convert_v1beta1_RunAsUserStrategyOptions_To_policy_RunAsUserStrategyOptions(in *apipolicyv1beta1.RunAsUserStrategyOptions, out *pkgapispolicy.RunAsUserStrategyOptions, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_RunAsUserStrategyOptions_To_policy_RunAsUserStrategyOptions(in, out, s)
 }
 
-func autoConvert_policy_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions(in *policy.RunAsUserStrategyOptions, out *v1beta1.RunAsUserStrategyOptions, s conversion.Scope) error {
-	out.Rule = v1beta1.RunAsUserStrategy(in.Rule)
-	out.Ranges = *(*[]v1beta1.IDRange)(unsafe.Pointer(&in.Ranges))
+func autoConvert_policy_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions(in *pkgapispolicy.RunAsUserStrategyOptions, out *apipolicyv1beta1.RunAsUserStrategyOptions, s apimachinerypkgconversion.Scope) error {
+	out.Rule = apipolicyv1beta1.RunAsUserStrategy(in.Rule)
+	out.Ranges = *(*[]apipolicyv1beta1.IDRange)(unsafe.Pointer(&in.Ranges))
 	return nil
 }
 
 // Convert_policy_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions is an autogenerated conversion function.
-func Convert_policy_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions(in *policy.RunAsUserStrategyOptions, out *v1beta1.RunAsUserStrategyOptions, s conversion.Scope) error {
+func Convert_policy_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions(in *pkgapispolicy.RunAsUserStrategyOptions, out *apipolicyv1beta1.RunAsUserStrategyOptions, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_policy_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions(in, out, s)
 }
 
-func autoConvert_v1beta1_RuntimeClassStrategyOptions_To_policy_RuntimeClassStrategyOptions(in *v1beta1.RuntimeClassStrategyOptions, out *policy.RuntimeClassStrategyOptions, s conversion.Scope) error {
+func autoConvert_v1beta1_RuntimeClassStrategyOptions_To_policy_RuntimeClassStrategyOptions(in *apipolicyv1beta1.RuntimeClassStrategyOptions, out *pkgapispolicy.RuntimeClassStrategyOptions, s apimachinerypkgconversion.Scope) error {
 	out.AllowedRuntimeClassNames = *(*[]string)(unsafe.Pointer(&in.AllowedRuntimeClassNames))
 	out.DefaultRuntimeClassName = (*string)(unsafe.Pointer(in.DefaultRuntimeClassName))
 	return nil
 }
 
 // Convert_v1beta1_RuntimeClassStrategyOptions_To_policy_RuntimeClassStrategyOptions is an autogenerated conversion function.
-func Convert_v1beta1_RuntimeClassStrategyOptions_To_policy_RuntimeClassStrategyOptions(in *v1beta1.RuntimeClassStrategyOptions, out *policy.RuntimeClassStrategyOptions, s conversion.Scope) error {
+func Convert_v1beta1_RuntimeClassStrategyOptions_To_policy_RuntimeClassStrategyOptions(in *apipolicyv1beta1.RuntimeClassStrategyOptions, out *pkgapispolicy.RuntimeClassStrategyOptions, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_RuntimeClassStrategyOptions_To_policy_RuntimeClassStrategyOptions(in, out, s)
 }
 
-func autoConvert_policy_RuntimeClassStrategyOptions_To_v1beta1_RuntimeClassStrategyOptions(in *policy.RuntimeClassStrategyOptions, out *v1beta1.RuntimeClassStrategyOptions, s conversion.Scope) error {
+func autoConvert_policy_RuntimeClassStrategyOptions_To_v1beta1_RuntimeClassStrategyOptions(in *pkgapispolicy.RuntimeClassStrategyOptions, out *apipolicyv1beta1.RuntimeClassStrategyOptions, s apimachinerypkgconversion.Scope) error {
 	out.AllowedRuntimeClassNames = *(*[]string)(unsafe.Pointer(&in.AllowedRuntimeClassNames))
 	out.DefaultRuntimeClassName = (*string)(unsafe.Pointer(in.DefaultRuntimeClassName))
 	return nil
 }
 
 // Convert_policy_RuntimeClassStrategyOptions_To_v1beta1_RuntimeClassStrategyOptions is an autogenerated conversion function.
-func Convert_policy_RuntimeClassStrategyOptions_To_v1beta1_RuntimeClassStrategyOptions(in *policy.RuntimeClassStrategyOptions, out *v1beta1.RuntimeClassStrategyOptions, s conversion.Scope) error {
+func Convert_policy_RuntimeClassStrategyOptions_To_v1beta1_RuntimeClassStrategyOptions(in *pkgapispolicy.RuntimeClassStrategyOptions, out *apipolicyv1beta1.RuntimeClassStrategyOptions, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_policy_RuntimeClassStrategyOptions_To_v1beta1_RuntimeClassStrategyOptions(in, out, s)
 }
 
-func autoConvert_v1beta1_SELinuxStrategyOptions_To_policy_SELinuxStrategyOptions(in *v1beta1.SELinuxStrategyOptions, out *policy.SELinuxStrategyOptions, s conversion.Scope) error {
-	out.Rule = policy.SELinuxStrategy(in.Rule)
-	out.SELinuxOptions = (*core.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
+func autoConvert_v1beta1_SELinuxStrategyOptions_To_policy_SELinuxStrategyOptions(in *apipolicyv1beta1.SELinuxStrategyOptions, out *pkgapispolicy.SELinuxStrategyOptions, s apimachinerypkgconversion.Scope) error {
+	out.Rule = pkgapispolicy.SELinuxStrategy(in.Rule)
+	out.SELinuxOptions = (*pkgapiscore.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
 	return nil
 }
 
 // Convert_v1beta1_SELinuxStrategyOptions_To_policy_SELinuxStrategyOptions is an autogenerated conversion function.
-func Convert_v1beta1_SELinuxStrategyOptions_To_policy_SELinuxStrategyOptions(in *v1beta1.SELinuxStrategyOptions, out *policy.SELinuxStrategyOptions, s conversion.Scope) error {
+func Convert_v1beta1_SELinuxStrategyOptions_To_policy_SELinuxStrategyOptions(in *apipolicyv1beta1.SELinuxStrategyOptions, out *pkgapispolicy.SELinuxStrategyOptions, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_SELinuxStrategyOptions_To_policy_SELinuxStrategyOptions(in, out, s)
 }
 
-func autoConvert_policy_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(in *policy.SELinuxStrategyOptions, out *v1beta1.SELinuxStrategyOptions, s conversion.Scope) error {
-	out.Rule = v1beta1.SELinuxStrategy(in.Rule)
-	out.SELinuxOptions = (*corev1.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
+func autoConvert_policy_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(in *pkgapispolicy.SELinuxStrategyOptions, out *apipolicyv1beta1.SELinuxStrategyOptions, s apimachinerypkgconversion.Scope) error {
+	out.Rule = apipolicyv1beta1.SELinuxStrategy(in.Rule)
+	out.SELinuxOptions = (*apicorev1.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
 	return nil
 }
 
 // Convert_policy_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions is an autogenerated conversion function.
-func Convert_policy_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(in *policy.SELinuxStrategyOptions, out *v1beta1.SELinuxStrategyOptions, s conversion.Scope) error {
+func Convert_policy_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(in *pkgapispolicy.SELinuxStrategyOptions, out *apipolicyv1beta1.SELinuxStrategyOptions, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_policy_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(in, out, s)
 }
 
-func autoConvert_v1beta1_SupplementalGroupsStrategyOptions_To_policy_SupplementalGroupsStrategyOptions(in *v1beta1.SupplementalGroupsStrategyOptions, out *policy.SupplementalGroupsStrategyOptions, s conversion.Scope) error {
-	out.Rule = policy.SupplementalGroupsStrategyType(in.Rule)
-	out.Ranges = *(*[]policy.IDRange)(unsafe.Pointer(&in.Ranges))
+func autoConvert_v1beta1_SupplementalGroupsStrategyOptions_To_policy_SupplementalGroupsStrategyOptions(in *apipolicyv1beta1.SupplementalGroupsStrategyOptions, out *pkgapispolicy.SupplementalGroupsStrategyOptions, s apimachinerypkgconversion.Scope) error {
+	out.Rule = pkgapispolicy.SupplementalGroupsStrategyType(in.Rule)
+	out.Ranges = *(*[]pkgapispolicy.IDRange)(unsafe.Pointer(&in.Ranges))
 	return nil
 }
 
 // Convert_v1beta1_SupplementalGroupsStrategyOptions_To_policy_SupplementalGroupsStrategyOptions is an autogenerated conversion function.
-func Convert_v1beta1_SupplementalGroupsStrategyOptions_To_policy_SupplementalGroupsStrategyOptions(in *v1beta1.SupplementalGroupsStrategyOptions, out *policy.SupplementalGroupsStrategyOptions, s conversion.Scope) error {
+func Convert_v1beta1_SupplementalGroupsStrategyOptions_To_policy_SupplementalGroupsStrategyOptions(in *apipolicyv1beta1.SupplementalGroupsStrategyOptions, out *pkgapispolicy.SupplementalGroupsStrategyOptions, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_SupplementalGroupsStrategyOptions_To_policy_SupplementalGroupsStrategyOptions(in, out, s)
 }
 
-func autoConvert_policy_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions(in *policy.SupplementalGroupsStrategyOptions, out *v1beta1.SupplementalGroupsStrategyOptions, s conversion.Scope) error {
-	out.Rule = v1beta1.SupplementalGroupsStrategyType(in.Rule)
-	out.Ranges = *(*[]v1beta1.IDRange)(unsafe.Pointer(&in.Ranges))
+func autoConvert_policy_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions(in *pkgapispolicy.SupplementalGroupsStrategyOptions, out *apipolicyv1beta1.SupplementalGroupsStrategyOptions, s apimachinerypkgconversion.Scope) error {
+	out.Rule = apipolicyv1beta1.SupplementalGroupsStrategyType(in.Rule)
+	out.Ranges = *(*[]apipolicyv1beta1.IDRange)(unsafe.Pointer(&in.Ranges))
 	return nil
 }
 
 // Convert_policy_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions is an autogenerated conversion function.
-func Convert_policy_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions(in *policy.SupplementalGroupsStrategyOptions, out *v1beta1.SupplementalGroupsStrategyOptions, s conversion.Scope) error {
+func Convert_policy_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions(in *pkgapispolicy.SupplementalGroupsStrategyOptions, out *apipolicyv1beta1.SupplementalGroupsStrategyOptions, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_policy_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions(in, out, s)
 }

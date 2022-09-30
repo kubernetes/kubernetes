@@ -22,9 +22,9 @@ limitations under the License.
 package v0
 
 import (
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/abac"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	pkgapisabac "k8s.io/kubernetes/pkg/apis/abac"
 )
 
 func init() {
@@ -33,9 +33,9 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddConversionFunc((*Policy)(nil), (*abac.Policy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v0_Policy_To_abac_Policy(a.(*Policy), b.(*abac.Policy), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddConversionFunc((*Policy)(nil), (*pkgapisabac.Policy)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v0_Policy_To_abac_Policy(a.(*Policy), b.(*pkgapisabac.Policy), scope)
 	}); err != nil {
 		return err
 	}

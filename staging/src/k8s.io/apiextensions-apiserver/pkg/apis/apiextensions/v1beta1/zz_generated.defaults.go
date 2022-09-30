@@ -22,13 +22,13 @@ limitations under the License.
 package v1beta1
 
 import (
-	"k8s.io/apimachinery/pkg/runtime"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
-func RegisterDefaults(scheme *runtime.Scheme) error {
+func RegisterDefaults(scheme *apimachinerypkgruntime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&CustomResourceDefinition{}, func(obj interface{}) { SetObjectDefaults_CustomResourceDefinition(obj.(*CustomResourceDefinition)) })
 	scheme.AddTypeDefaultingFunc(&CustomResourceDefinitionList{}, func(obj interface{}) {
 		SetObjectDefaults_CustomResourceDefinitionList(obj.(*CustomResourceDefinitionList))

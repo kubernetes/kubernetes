@@ -24,10 +24,10 @@ package v1beta2
 import (
 	"unsafe"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	custommetrics "k8s.io/metrics/pkg/apis/custom_metrics"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	pkgapiscustommetrics "k8s.io/metrics/pkg/apis/custom_metrics"
 )
 
 func init() {
@@ -36,96 +36,96 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*MetricIdentifier)(nil), (*custommetrics.MetricIdentifier)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_MetricIdentifier_To_custom_metrics_MetricIdentifier(a.(*MetricIdentifier), b.(*custommetrics.MetricIdentifier), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*MetricIdentifier)(nil), (*pkgapiscustommetrics.MetricIdentifier)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta2_MetricIdentifier_To_custom_metrics_MetricIdentifier(a.(*MetricIdentifier), b.(*pkgapiscustommetrics.MetricIdentifier), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*custommetrics.MetricIdentifier)(nil), (*MetricIdentifier)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_custom_metrics_MetricIdentifier_To_v1beta2_MetricIdentifier(a.(*custommetrics.MetricIdentifier), b.(*MetricIdentifier), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapiscustommetrics.MetricIdentifier)(nil), (*MetricIdentifier)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_custom_metrics_MetricIdentifier_To_v1beta2_MetricIdentifier(a.(*pkgapiscustommetrics.MetricIdentifier), b.(*MetricIdentifier), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*MetricListOptions)(nil), (*custommetrics.MetricListOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_MetricListOptions_To_custom_metrics_MetricListOptions(a.(*MetricListOptions), b.(*custommetrics.MetricListOptions), scope)
+	if err := s.AddGeneratedConversionFunc((*MetricListOptions)(nil), (*pkgapiscustommetrics.MetricListOptions)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta2_MetricListOptions_To_custom_metrics_MetricListOptions(a.(*MetricListOptions), b.(*pkgapiscustommetrics.MetricListOptions), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*custommetrics.MetricListOptions)(nil), (*MetricListOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_custom_metrics_MetricListOptions_To_v1beta2_MetricListOptions(a.(*custommetrics.MetricListOptions), b.(*MetricListOptions), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapiscustommetrics.MetricListOptions)(nil), (*MetricListOptions)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_custom_metrics_MetricListOptions_To_v1beta2_MetricListOptions(a.(*pkgapiscustommetrics.MetricListOptions), b.(*MetricListOptions), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*MetricValue)(nil), (*custommetrics.MetricValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_MetricValue_To_custom_metrics_MetricValue(a.(*MetricValue), b.(*custommetrics.MetricValue), scope)
+	if err := s.AddGeneratedConversionFunc((*MetricValue)(nil), (*pkgapiscustommetrics.MetricValue)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta2_MetricValue_To_custom_metrics_MetricValue(a.(*MetricValue), b.(*pkgapiscustommetrics.MetricValue), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*custommetrics.MetricValue)(nil), (*MetricValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_custom_metrics_MetricValue_To_v1beta2_MetricValue(a.(*custommetrics.MetricValue), b.(*MetricValue), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapiscustommetrics.MetricValue)(nil), (*MetricValue)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_custom_metrics_MetricValue_To_v1beta2_MetricValue(a.(*pkgapiscustommetrics.MetricValue), b.(*MetricValue), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*MetricValueList)(nil), (*custommetrics.MetricValueList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta2_MetricValueList_To_custom_metrics_MetricValueList(a.(*MetricValueList), b.(*custommetrics.MetricValueList), scope)
+	if err := s.AddGeneratedConversionFunc((*MetricValueList)(nil), (*pkgapiscustommetrics.MetricValueList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta2_MetricValueList_To_custom_metrics_MetricValueList(a.(*MetricValueList), b.(*pkgapiscustommetrics.MetricValueList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*custommetrics.MetricValueList)(nil), (*MetricValueList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_custom_metrics_MetricValueList_To_v1beta2_MetricValueList(a.(*custommetrics.MetricValueList), b.(*MetricValueList), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapiscustommetrics.MetricValueList)(nil), (*MetricValueList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_custom_metrics_MetricValueList_To_v1beta2_MetricValueList(a.(*pkgapiscustommetrics.MetricValueList), b.(*MetricValueList), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1beta2_MetricIdentifier_To_custom_metrics_MetricIdentifier(in *MetricIdentifier, out *custommetrics.MetricIdentifier, s conversion.Scope) error {
+func autoConvert_v1beta2_MetricIdentifier_To_custom_metrics_MetricIdentifier(in *MetricIdentifier, out *pkgapiscustommetrics.MetricIdentifier, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
-	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*apismetav1.LabelSelector)(unsafe.Pointer(in.Selector))
 	return nil
 }
 
 // Convert_v1beta2_MetricIdentifier_To_custom_metrics_MetricIdentifier is an autogenerated conversion function.
-func Convert_v1beta2_MetricIdentifier_To_custom_metrics_MetricIdentifier(in *MetricIdentifier, out *custommetrics.MetricIdentifier, s conversion.Scope) error {
+func Convert_v1beta2_MetricIdentifier_To_custom_metrics_MetricIdentifier(in *MetricIdentifier, out *pkgapiscustommetrics.MetricIdentifier, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta2_MetricIdentifier_To_custom_metrics_MetricIdentifier(in, out, s)
 }
 
-func autoConvert_custom_metrics_MetricIdentifier_To_v1beta2_MetricIdentifier(in *custommetrics.MetricIdentifier, out *MetricIdentifier, s conversion.Scope) error {
+func autoConvert_custom_metrics_MetricIdentifier_To_v1beta2_MetricIdentifier(in *pkgapiscustommetrics.MetricIdentifier, out *MetricIdentifier, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
-	out.Selector = (*v1.LabelSelector)(unsafe.Pointer(in.Selector))
+	out.Selector = (*apismetav1.LabelSelector)(unsafe.Pointer(in.Selector))
 	return nil
 }
 
 // Convert_custom_metrics_MetricIdentifier_To_v1beta2_MetricIdentifier is an autogenerated conversion function.
-func Convert_custom_metrics_MetricIdentifier_To_v1beta2_MetricIdentifier(in *custommetrics.MetricIdentifier, out *MetricIdentifier, s conversion.Scope) error {
+func Convert_custom_metrics_MetricIdentifier_To_v1beta2_MetricIdentifier(in *pkgapiscustommetrics.MetricIdentifier, out *MetricIdentifier, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_custom_metrics_MetricIdentifier_To_v1beta2_MetricIdentifier(in, out, s)
 }
 
-func autoConvert_v1beta2_MetricListOptions_To_custom_metrics_MetricListOptions(in *MetricListOptions, out *custommetrics.MetricListOptions, s conversion.Scope) error {
+func autoConvert_v1beta2_MetricListOptions_To_custom_metrics_MetricListOptions(in *MetricListOptions, out *pkgapiscustommetrics.MetricListOptions, s apimachinerypkgconversion.Scope) error {
 	out.LabelSelector = in.LabelSelector
 	out.MetricLabelSelector = in.MetricLabelSelector
 	return nil
 }
 
 // Convert_v1beta2_MetricListOptions_To_custom_metrics_MetricListOptions is an autogenerated conversion function.
-func Convert_v1beta2_MetricListOptions_To_custom_metrics_MetricListOptions(in *MetricListOptions, out *custommetrics.MetricListOptions, s conversion.Scope) error {
+func Convert_v1beta2_MetricListOptions_To_custom_metrics_MetricListOptions(in *MetricListOptions, out *pkgapiscustommetrics.MetricListOptions, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta2_MetricListOptions_To_custom_metrics_MetricListOptions(in, out, s)
 }
 
-func autoConvert_custom_metrics_MetricListOptions_To_v1beta2_MetricListOptions(in *custommetrics.MetricListOptions, out *MetricListOptions, s conversion.Scope) error {
+func autoConvert_custom_metrics_MetricListOptions_To_v1beta2_MetricListOptions(in *pkgapiscustommetrics.MetricListOptions, out *MetricListOptions, s apimachinerypkgconversion.Scope) error {
 	out.LabelSelector = in.LabelSelector
 	out.MetricLabelSelector = in.MetricLabelSelector
 	return nil
 }
 
 // Convert_custom_metrics_MetricListOptions_To_v1beta2_MetricListOptions is an autogenerated conversion function.
-func Convert_custom_metrics_MetricListOptions_To_v1beta2_MetricListOptions(in *custommetrics.MetricListOptions, out *MetricListOptions, s conversion.Scope) error {
+func Convert_custom_metrics_MetricListOptions_To_v1beta2_MetricListOptions(in *pkgapiscustommetrics.MetricListOptions, out *MetricListOptions, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_custom_metrics_MetricListOptions_To_v1beta2_MetricListOptions(in, out, s)
 }
 
-func autoConvert_v1beta2_MetricValue_To_custom_metrics_MetricValue(in *MetricValue, out *custommetrics.MetricValue, s conversion.Scope) error {
-	if err := custommetrics.Convert_v1_ObjectReference_To_custom_metrics_ObjectReference(&in.DescribedObject, &out.DescribedObject, s); err != nil {
+func autoConvert_v1beta2_MetricValue_To_custom_metrics_MetricValue(in *MetricValue, out *pkgapiscustommetrics.MetricValue, s apimachinerypkgconversion.Scope) error {
+	if err := pkgapiscustommetrics.Convert_v1_ObjectReference_To_custom_metrics_ObjectReference(&in.DescribedObject, &out.DescribedObject, s); err != nil {
 		return err
 	}
 	if err := Convert_v1beta2_MetricIdentifier_To_custom_metrics_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
@@ -138,12 +138,12 @@ func autoConvert_v1beta2_MetricValue_To_custom_metrics_MetricValue(in *MetricVal
 }
 
 // Convert_v1beta2_MetricValue_To_custom_metrics_MetricValue is an autogenerated conversion function.
-func Convert_v1beta2_MetricValue_To_custom_metrics_MetricValue(in *MetricValue, out *custommetrics.MetricValue, s conversion.Scope) error {
+func Convert_v1beta2_MetricValue_To_custom_metrics_MetricValue(in *MetricValue, out *pkgapiscustommetrics.MetricValue, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta2_MetricValue_To_custom_metrics_MetricValue(in, out, s)
 }
 
-func autoConvert_custom_metrics_MetricValue_To_v1beta2_MetricValue(in *custommetrics.MetricValue, out *MetricValue, s conversion.Scope) error {
-	if err := custommetrics.Convert_custom_metrics_ObjectReference_To_v1_ObjectReference(&in.DescribedObject, &out.DescribedObject, s); err != nil {
+func autoConvert_custom_metrics_MetricValue_To_v1beta2_MetricValue(in *pkgapiscustommetrics.MetricValue, out *MetricValue, s apimachinerypkgconversion.Scope) error {
+	if err := pkgapiscustommetrics.Convert_custom_metrics_ObjectReference_To_v1_ObjectReference(&in.DescribedObject, &out.DescribedObject, s); err != nil {
 		return err
 	}
 	if err := Convert_custom_metrics_MetricIdentifier_To_v1beta2_MetricIdentifier(&in.Metric, &out.Metric, s); err != nil {
@@ -156,15 +156,15 @@ func autoConvert_custom_metrics_MetricValue_To_v1beta2_MetricValue(in *custommet
 }
 
 // Convert_custom_metrics_MetricValue_To_v1beta2_MetricValue is an autogenerated conversion function.
-func Convert_custom_metrics_MetricValue_To_v1beta2_MetricValue(in *custommetrics.MetricValue, out *MetricValue, s conversion.Scope) error {
+func Convert_custom_metrics_MetricValue_To_v1beta2_MetricValue(in *pkgapiscustommetrics.MetricValue, out *MetricValue, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_custom_metrics_MetricValue_To_v1beta2_MetricValue(in, out, s)
 }
 
-func autoConvert_v1beta2_MetricValueList_To_custom_metrics_MetricValueList(in *MetricValueList, out *custommetrics.MetricValueList, s conversion.Scope) error {
+func autoConvert_v1beta2_MetricValueList_To_custom_metrics_MetricValueList(in *MetricValueList, out *pkgapiscustommetrics.MetricValueList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]custommetrics.MetricValue, len(*in))
+		*out = make([]pkgapiscustommetrics.MetricValue, len(*in))
 		for i := range *in {
 			if err := Convert_v1beta2_MetricValue_To_custom_metrics_MetricValue(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -177,11 +177,11 @@ func autoConvert_v1beta2_MetricValueList_To_custom_metrics_MetricValueList(in *M
 }
 
 // Convert_v1beta2_MetricValueList_To_custom_metrics_MetricValueList is an autogenerated conversion function.
-func Convert_v1beta2_MetricValueList_To_custom_metrics_MetricValueList(in *MetricValueList, out *custommetrics.MetricValueList, s conversion.Scope) error {
+func Convert_v1beta2_MetricValueList_To_custom_metrics_MetricValueList(in *MetricValueList, out *pkgapiscustommetrics.MetricValueList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta2_MetricValueList_To_custom_metrics_MetricValueList(in, out, s)
 }
 
-func autoConvert_custom_metrics_MetricValueList_To_v1beta2_MetricValueList(in *custommetrics.MetricValueList, out *MetricValueList, s conversion.Scope) error {
+func autoConvert_custom_metrics_MetricValueList_To_v1beta2_MetricValueList(in *pkgapiscustommetrics.MetricValueList, out *MetricValueList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -198,6 +198,6 @@ func autoConvert_custom_metrics_MetricValueList_To_v1beta2_MetricValueList(in *c
 }
 
 // Convert_custom_metrics_MetricValueList_To_v1beta2_MetricValueList is an autogenerated conversion function.
-func Convert_custom_metrics_MetricValueList_To_v1beta2_MetricValueList(in *custommetrics.MetricValueList, out *MetricValueList, s conversion.Scope) error {
+func Convert_custom_metrics_MetricValueList_To_v1beta2_MetricValueList(in *pkgapiscustommetrics.MetricValueList, out *MetricValueList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_custom_metrics_MetricValueList_To_v1beta2_MetricValueList(in, out, s)
 }

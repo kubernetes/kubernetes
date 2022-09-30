@@ -22,24 +22,26 @@ limitations under the License.
 package v1beta1
 
 import (
-	"k8s.io/api/policy/v1beta1"
-	"k8s.io/apimachinery/pkg/runtime"
+	apipolicyv1beta1 "k8s.io/api/policy/v1beta1"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
-func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1beta1.PodSecurityPolicy{}, func(obj interface{}) { SetObjectDefaults_PodSecurityPolicy(obj.(*v1beta1.PodSecurityPolicy)) })
-	scheme.AddTypeDefaultingFunc(&v1beta1.PodSecurityPolicyList{}, func(obj interface{}) { SetObjectDefaults_PodSecurityPolicyList(obj.(*v1beta1.PodSecurityPolicyList)) })
+func RegisterDefaults(scheme *apimachinerypkgruntime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&apipolicyv1beta1.PodSecurityPolicy{}, func(obj interface{}) { SetObjectDefaults_PodSecurityPolicy(obj.(*apipolicyv1beta1.PodSecurityPolicy)) })
+	scheme.AddTypeDefaultingFunc(&apipolicyv1beta1.PodSecurityPolicyList{}, func(obj interface{}) {
+		SetObjectDefaults_PodSecurityPolicyList(obj.(*apipolicyv1beta1.PodSecurityPolicyList))
+	})
 	return nil
 }
 
-func SetObjectDefaults_PodSecurityPolicy(in *v1beta1.PodSecurityPolicy) {
+func SetObjectDefaults_PodSecurityPolicy(in *apipolicyv1beta1.PodSecurityPolicy) {
 	SetDefaults_PodSecurityPolicySpec(&in.Spec)
 }
 
-func SetObjectDefaults_PodSecurityPolicyList(in *v1beta1.PodSecurityPolicyList) {
+func SetObjectDefaults_PodSecurityPolicyList(in *apipolicyv1beta1.PodSecurityPolicyList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_PodSecurityPolicy(a)

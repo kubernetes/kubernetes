@@ -22,9 +22,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cloud-provider/controllers/service/config"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	controllersserviceconfig "k8s.io/cloud-provider/controllers/service/config"
 )
 
 func init() {
@@ -33,26 +33,26 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddConversionFunc((*config.ServiceControllerConfiguration)(nil), (*ServiceControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_ServiceControllerConfiguration_To_v1alpha1_ServiceControllerConfiguration(a.(*config.ServiceControllerConfiguration), b.(*ServiceControllerConfiguration), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddConversionFunc((*controllersserviceconfig.ServiceControllerConfiguration)(nil), (*ServiceControllerConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_ServiceControllerConfiguration_To_v1alpha1_ServiceControllerConfiguration(a.(*controllersserviceconfig.ServiceControllerConfiguration), b.(*ServiceControllerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*ServiceControllerConfiguration)(nil), (*config.ServiceControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_ServiceControllerConfiguration_To_config_ServiceControllerConfiguration(a.(*ServiceControllerConfiguration), b.(*config.ServiceControllerConfiguration), scope)
+	if err := s.AddConversionFunc((*ServiceControllerConfiguration)(nil), (*controllersserviceconfig.ServiceControllerConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_ServiceControllerConfiguration_To_config_ServiceControllerConfiguration(a.(*ServiceControllerConfiguration), b.(*controllersserviceconfig.ServiceControllerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1alpha1_ServiceControllerConfiguration_To_config_ServiceControllerConfiguration(in *ServiceControllerConfiguration, out *config.ServiceControllerConfiguration, s conversion.Scope) error {
+func autoConvert_v1alpha1_ServiceControllerConfiguration_To_config_ServiceControllerConfiguration(in *ServiceControllerConfiguration, out *controllersserviceconfig.ServiceControllerConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.ConcurrentServiceSyncs = in.ConcurrentServiceSyncs
 	return nil
 }
 
-func autoConvert_config_ServiceControllerConfiguration_To_v1alpha1_ServiceControllerConfiguration(in *config.ServiceControllerConfiguration, out *ServiceControllerConfiguration, s conversion.Scope) error {
+func autoConvert_config_ServiceControllerConfiguration_To_v1alpha1_ServiceControllerConfiguration(in *controllersserviceconfig.ServiceControllerConfiguration, out *ServiceControllerConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.ConcurrentServiceSyncs = in.ConcurrentServiceSyncs
 	return nil
 }

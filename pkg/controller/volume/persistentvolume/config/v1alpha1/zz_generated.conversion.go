@@ -24,11 +24,11 @@ package v1alpha1
 import (
 	"unsafe"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kube-controller-manager/config/v1alpha1"
-	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	kubecontrollermanagerconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
+	volumepersistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
 )
 
 func init() {
@@ -37,97 +37,97 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.GroupResource)(nil), (*v1.GroupResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_GroupResource_To_v1_GroupResource(a.(*v1alpha1.GroupResource), b.(*v1.GroupResource), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*kubecontrollermanagerconfigv1alpha1.GroupResource)(nil), (*apismetav1.GroupResource)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_GroupResource_To_v1_GroupResource(a.(*kubecontrollermanagerconfigv1alpha1.GroupResource), b.(*apismetav1.GroupResource), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.GroupResource)(nil), (*v1alpha1.GroupResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_GroupResource_To_v1alpha1_GroupResource(a.(*v1.GroupResource), b.(*v1alpha1.GroupResource), scope)
+	if err := s.AddGeneratedConversionFunc((*apismetav1.GroupResource)(nil), (*kubecontrollermanagerconfigv1alpha1.GroupResource)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_GroupResource_To_v1alpha1_GroupResource(a.(*apismetav1.GroupResource), b.(*kubecontrollermanagerconfigv1alpha1.GroupResource), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.PersistentVolumeRecyclerConfiguration)(nil), (*config.PersistentVolumeRecyclerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_PersistentVolumeRecyclerConfiguration_To_config_PersistentVolumeRecyclerConfiguration(a.(*v1alpha1.PersistentVolumeRecyclerConfiguration), b.(*config.PersistentVolumeRecyclerConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*kubecontrollermanagerconfigv1alpha1.PersistentVolumeRecyclerConfiguration)(nil), (*volumepersistentvolumeconfig.PersistentVolumeRecyclerConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_PersistentVolumeRecyclerConfiguration_To_config_PersistentVolumeRecyclerConfiguration(a.(*kubecontrollermanagerconfigv1alpha1.PersistentVolumeRecyclerConfiguration), b.(*volumepersistentvolumeconfig.PersistentVolumeRecyclerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.PersistentVolumeRecyclerConfiguration)(nil), (*v1alpha1.PersistentVolumeRecyclerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_PersistentVolumeRecyclerConfiguration_To_v1alpha1_PersistentVolumeRecyclerConfiguration(a.(*config.PersistentVolumeRecyclerConfiguration), b.(*v1alpha1.PersistentVolumeRecyclerConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*volumepersistentvolumeconfig.PersistentVolumeRecyclerConfiguration)(nil), (*kubecontrollermanagerconfigv1alpha1.PersistentVolumeRecyclerConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_PersistentVolumeRecyclerConfiguration_To_v1alpha1_PersistentVolumeRecyclerConfiguration(a.(*volumepersistentvolumeconfig.PersistentVolumeRecyclerConfiguration), b.(*kubecontrollermanagerconfigv1alpha1.PersistentVolumeRecyclerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.VolumeConfiguration)(nil), (*config.VolumeConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_VolumeConfiguration_To_config_VolumeConfiguration(a.(*v1alpha1.VolumeConfiguration), b.(*config.VolumeConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*kubecontrollermanagerconfigv1alpha1.VolumeConfiguration)(nil), (*volumepersistentvolumeconfig.VolumeConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_VolumeConfiguration_To_config_VolumeConfiguration(a.(*kubecontrollermanagerconfigv1alpha1.VolumeConfiguration), b.(*volumepersistentvolumeconfig.VolumeConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*config.VolumeConfiguration)(nil), (*v1alpha1.VolumeConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_VolumeConfiguration_To_v1alpha1_VolumeConfiguration(a.(*config.VolumeConfiguration), b.(*v1alpha1.VolumeConfiguration), scope)
+	if err := s.AddGeneratedConversionFunc((*volumepersistentvolumeconfig.VolumeConfiguration)(nil), (*kubecontrollermanagerconfigv1alpha1.VolumeConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_VolumeConfiguration_To_v1alpha1_VolumeConfiguration(a.(*volumepersistentvolumeconfig.VolumeConfiguration), b.(*kubecontrollermanagerconfigv1alpha1.VolumeConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*config.PersistentVolumeBinderControllerConfiguration)(nil), (*v1alpha1.PersistentVolumeBinderControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_PersistentVolumeBinderControllerConfiguration_To_v1alpha1_PersistentVolumeBinderControllerConfiguration(a.(*config.PersistentVolumeBinderControllerConfiguration), b.(*v1alpha1.PersistentVolumeBinderControllerConfiguration), scope)
+	if err := s.AddConversionFunc((*volumepersistentvolumeconfig.PersistentVolumeBinderControllerConfiguration)(nil), (*kubecontrollermanagerconfigv1alpha1.PersistentVolumeBinderControllerConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_PersistentVolumeBinderControllerConfiguration_To_v1alpha1_PersistentVolumeBinderControllerConfiguration(a.(*volumepersistentvolumeconfig.PersistentVolumeBinderControllerConfiguration), b.(*kubecontrollermanagerconfigv1alpha1.PersistentVolumeBinderControllerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1alpha1.PersistentVolumeBinderControllerConfiguration)(nil), (*config.PersistentVolumeBinderControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_PersistentVolumeBinderControllerConfiguration_To_config_PersistentVolumeBinderControllerConfiguration(a.(*v1alpha1.PersistentVolumeBinderControllerConfiguration), b.(*config.PersistentVolumeBinderControllerConfiguration), scope)
+	if err := s.AddConversionFunc((*kubecontrollermanagerconfigv1alpha1.PersistentVolumeBinderControllerConfiguration)(nil), (*volumepersistentvolumeconfig.PersistentVolumeBinderControllerConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_PersistentVolumeBinderControllerConfiguration_To_config_PersistentVolumeBinderControllerConfiguration(a.(*kubecontrollermanagerconfigv1alpha1.PersistentVolumeBinderControllerConfiguration), b.(*volumepersistentvolumeconfig.PersistentVolumeBinderControllerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1alpha1_GroupResource_To_v1_GroupResource(in *v1alpha1.GroupResource, out *v1.GroupResource, s conversion.Scope) error {
+func autoConvert_v1alpha1_GroupResource_To_v1_GroupResource(in *kubecontrollermanagerconfigv1alpha1.GroupResource, out *apismetav1.GroupResource, s apimachinerypkgconversion.Scope) error {
 	out.Group = in.Group
 	out.Resource = in.Resource
 	return nil
 }
 
 // Convert_v1alpha1_GroupResource_To_v1_GroupResource is an autogenerated conversion function.
-func Convert_v1alpha1_GroupResource_To_v1_GroupResource(in *v1alpha1.GroupResource, out *v1.GroupResource, s conversion.Scope) error {
+func Convert_v1alpha1_GroupResource_To_v1_GroupResource(in *kubecontrollermanagerconfigv1alpha1.GroupResource, out *apismetav1.GroupResource, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha1_GroupResource_To_v1_GroupResource(in, out, s)
 }
 
-func autoConvert_v1_GroupResource_To_v1alpha1_GroupResource(in *v1.GroupResource, out *v1alpha1.GroupResource, s conversion.Scope) error {
+func autoConvert_v1_GroupResource_To_v1alpha1_GroupResource(in *apismetav1.GroupResource, out *kubecontrollermanagerconfigv1alpha1.GroupResource, s apimachinerypkgconversion.Scope) error {
 	out.Group = in.Group
 	out.Resource = in.Resource
 	return nil
 }
 
 // Convert_v1_GroupResource_To_v1alpha1_GroupResource is an autogenerated conversion function.
-func Convert_v1_GroupResource_To_v1alpha1_GroupResource(in *v1.GroupResource, out *v1alpha1.GroupResource, s conversion.Scope) error {
+func Convert_v1_GroupResource_To_v1alpha1_GroupResource(in *apismetav1.GroupResource, out *kubecontrollermanagerconfigv1alpha1.GroupResource, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_GroupResource_To_v1alpha1_GroupResource(in, out, s)
 }
 
-func autoConvert_v1alpha1_PersistentVolumeBinderControllerConfiguration_To_config_PersistentVolumeBinderControllerConfiguration(in *v1alpha1.PersistentVolumeBinderControllerConfiguration, out *config.PersistentVolumeBinderControllerConfiguration, s conversion.Scope) error {
+func autoConvert_v1alpha1_PersistentVolumeBinderControllerConfiguration_To_config_PersistentVolumeBinderControllerConfiguration(in *kubecontrollermanagerconfigv1alpha1.PersistentVolumeBinderControllerConfiguration, out *volumepersistentvolumeconfig.PersistentVolumeBinderControllerConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.PVClaimBinderSyncPeriod = in.PVClaimBinderSyncPeriod
 	if err := Convert_v1alpha1_VolumeConfiguration_To_config_VolumeConfiguration(&in.VolumeConfiguration, &out.VolumeConfiguration, s); err != nil {
 		return err
 	}
 	out.VolumeHostCIDRDenylist = *(*[]string)(unsafe.Pointer(&in.VolumeHostCIDRDenylist))
-	if err := v1.Convert_Pointer_bool_To_bool(&in.VolumeHostAllowLocalLoopback, &out.VolumeHostAllowLocalLoopback, s); err != nil {
+	if err := apismetav1.Convert_Pointer_bool_To_bool(&in.VolumeHostAllowLocalLoopback, &out.VolumeHostAllowLocalLoopback, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_config_PersistentVolumeBinderControllerConfiguration_To_v1alpha1_PersistentVolumeBinderControllerConfiguration(in *config.PersistentVolumeBinderControllerConfiguration, out *v1alpha1.PersistentVolumeBinderControllerConfiguration, s conversion.Scope) error {
+func autoConvert_config_PersistentVolumeBinderControllerConfiguration_To_v1alpha1_PersistentVolumeBinderControllerConfiguration(in *volumepersistentvolumeconfig.PersistentVolumeBinderControllerConfiguration, out *kubecontrollermanagerconfigv1alpha1.PersistentVolumeBinderControllerConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.PVClaimBinderSyncPeriod = in.PVClaimBinderSyncPeriod
 	if err := Convert_config_VolumeConfiguration_To_v1alpha1_VolumeConfiguration(&in.VolumeConfiguration, &out.VolumeConfiguration, s); err != nil {
 		return err
 	}
 	out.VolumeHostCIDRDenylist = *(*[]string)(unsafe.Pointer(&in.VolumeHostCIDRDenylist))
-	if err := v1.Convert_bool_To_Pointer_bool(&in.VolumeHostAllowLocalLoopback, &out.VolumeHostAllowLocalLoopback, s); err != nil {
+	if err := apismetav1.Convert_bool_To_Pointer_bool(&in.VolumeHostAllowLocalLoopback, &out.VolumeHostAllowLocalLoopback, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1alpha1_PersistentVolumeRecyclerConfiguration_To_config_PersistentVolumeRecyclerConfiguration(in *v1alpha1.PersistentVolumeRecyclerConfiguration, out *config.PersistentVolumeRecyclerConfiguration, s conversion.Scope) error {
+func autoConvert_v1alpha1_PersistentVolumeRecyclerConfiguration_To_config_PersistentVolumeRecyclerConfiguration(in *kubecontrollermanagerconfigv1alpha1.PersistentVolumeRecyclerConfiguration, out *volumepersistentvolumeconfig.PersistentVolumeRecyclerConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.MaximumRetry = in.MaximumRetry
 	out.MinimumTimeoutNFS = in.MinimumTimeoutNFS
 	out.PodTemplateFilePathNFS = in.PodTemplateFilePathNFS
@@ -139,11 +139,11 @@ func autoConvert_v1alpha1_PersistentVolumeRecyclerConfiguration_To_config_Persis
 }
 
 // Convert_v1alpha1_PersistentVolumeRecyclerConfiguration_To_config_PersistentVolumeRecyclerConfiguration is an autogenerated conversion function.
-func Convert_v1alpha1_PersistentVolumeRecyclerConfiguration_To_config_PersistentVolumeRecyclerConfiguration(in *v1alpha1.PersistentVolumeRecyclerConfiguration, out *config.PersistentVolumeRecyclerConfiguration, s conversion.Scope) error {
+func Convert_v1alpha1_PersistentVolumeRecyclerConfiguration_To_config_PersistentVolumeRecyclerConfiguration(in *kubecontrollermanagerconfigv1alpha1.PersistentVolumeRecyclerConfiguration, out *volumepersistentvolumeconfig.PersistentVolumeRecyclerConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha1_PersistentVolumeRecyclerConfiguration_To_config_PersistentVolumeRecyclerConfiguration(in, out, s)
 }
 
-func autoConvert_config_PersistentVolumeRecyclerConfiguration_To_v1alpha1_PersistentVolumeRecyclerConfiguration(in *config.PersistentVolumeRecyclerConfiguration, out *v1alpha1.PersistentVolumeRecyclerConfiguration, s conversion.Scope) error {
+func autoConvert_config_PersistentVolumeRecyclerConfiguration_To_v1alpha1_PersistentVolumeRecyclerConfiguration(in *volumepersistentvolumeconfig.PersistentVolumeRecyclerConfiguration, out *kubecontrollermanagerconfigv1alpha1.PersistentVolumeRecyclerConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.MaximumRetry = in.MaximumRetry
 	out.MinimumTimeoutNFS = in.MinimumTimeoutNFS
 	out.PodTemplateFilePathNFS = in.PodTemplateFilePathNFS
@@ -155,15 +155,15 @@ func autoConvert_config_PersistentVolumeRecyclerConfiguration_To_v1alpha1_Persis
 }
 
 // Convert_config_PersistentVolumeRecyclerConfiguration_To_v1alpha1_PersistentVolumeRecyclerConfiguration is an autogenerated conversion function.
-func Convert_config_PersistentVolumeRecyclerConfiguration_To_v1alpha1_PersistentVolumeRecyclerConfiguration(in *config.PersistentVolumeRecyclerConfiguration, out *v1alpha1.PersistentVolumeRecyclerConfiguration, s conversion.Scope) error {
+func Convert_config_PersistentVolumeRecyclerConfiguration_To_v1alpha1_PersistentVolumeRecyclerConfiguration(in *volumepersistentvolumeconfig.PersistentVolumeRecyclerConfiguration, out *kubecontrollermanagerconfigv1alpha1.PersistentVolumeRecyclerConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_PersistentVolumeRecyclerConfiguration_To_v1alpha1_PersistentVolumeRecyclerConfiguration(in, out, s)
 }
 
-func autoConvert_v1alpha1_VolumeConfiguration_To_config_VolumeConfiguration(in *v1alpha1.VolumeConfiguration, out *config.VolumeConfiguration, s conversion.Scope) error {
-	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableHostPathProvisioning, &out.EnableHostPathProvisioning, s); err != nil {
+func autoConvert_v1alpha1_VolumeConfiguration_To_config_VolumeConfiguration(in *kubecontrollermanagerconfigv1alpha1.VolumeConfiguration, out *volumepersistentvolumeconfig.VolumeConfiguration, s apimachinerypkgconversion.Scope) error {
+	if err := apismetav1.Convert_Pointer_bool_To_bool(&in.EnableHostPathProvisioning, &out.EnableHostPathProvisioning, s); err != nil {
 		return err
 	}
-	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableDynamicProvisioning, &out.EnableDynamicProvisioning, s); err != nil {
+	if err := apismetav1.Convert_Pointer_bool_To_bool(&in.EnableDynamicProvisioning, &out.EnableDynamicProvisioning, s); err != nil {
 		return err
 	}
 	if err := Convert_v1alpha1_PersistentVolumeRecyclerConfiguration_To_config_PersistentVolumeRecyclerConfiguration(&in.PersistentVolumeRecyclerConfiguration, &out.PersistentVolumeRecyclerConfiguration, s); err != nil {
@@ -174,15 +174,15 @@ func autoConvert_v1alpha1_VolumeConfiguration_To_config_VolumeConfiguration(in *
 }
 
 // Convert_v1alpha1_VolumeConfiguration_To_config_VolumeConfiguration is an autogenerated conversion function.
-func Convert_v1alpha1_VolumeConfiguration_To_config_VolumeConfiguration(in *v1alpha1.VolumeConfiguration, out *config.VolumeConfiguration, s conversion.Scope) error {
+func Convert_v1alpha1_VolumeConfiguration_To_config_VolumeConfiguration(in *kubecontrollermanagerconfigv1alpha1.VolumeConfiguration, out *volumepersistentvolumeconfig.VolumeConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha1_VolumeConfiguration_To_config_VolumeConfiguration(in, out, s)
 }
 
-func autoConvert_config_VolumeConfiguration_To_v1alpha1_VolumeConfiguration(in *config.VolumeConfiguration, out *v1alpha1.VolumeConfiguration, s conversion.Scope) error {
-	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableHostPathProvisioning, &out.EnableHostPathProvisioning, s); err != nil {
+func autoConvert_config_VolumeConfiguration_To_v1alpha1_VolumeConfiguration(in *volumepersistentvolumeconfig.VolumeConfiguration, out *kubecontrollermanagerconfigv1alpha1.VolumeConfiguration, s apimachinerypkgconversion.Scope) error {
+	if err := apismetav1.Convert_bool_To_Pointer_bool(&in.EnableHostPathProvisioning, &out.EnableHostPathProvisioning, s); err != nil {
 		return err
 	}
-	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableDynamicProvisioning, &out.EnableDynamicProvisioning, s); err != nil {
+	if err := apismetav1.Convert_bool_To_Pointer_bool(&in.EnableDynamicProvisioning, &out.EnableDynamicProvisioning, s); err != nil {
 		return err
 	}
 	if err := Convert_config_PersistentVolumeRecyclerConfiguration_To_v1alpha1_PersistentVolumeRecyclerConfiguration(&in.PersistentVolumeRecyclerConfiguration, &out.PersistentVolumeRecyclerConfiguration, s); err != nil {
@@ -193,6 +193,6 @@ func autoConvert_config_VolumeConfiguration_To_v1alpha1_VolumeConfiguration(in *
 }
 
 // Convert_config_VolumeConfiguration_To_v1alpha1_VolumeConfiguration is an autogenerated conversion function.
-func Convert_config_VolumeConfiguration_To_v1alpha1_VolumeConfiguration(in *config.VolumeConfiguration, out *v1alpha1.VolumeConfiguration, s conversion.Scope) error {
+func Convert_config_VolumeConfiguration_To_v1alpha1_VolumeConfiguration(in *volumepersistentvolumeconfig.VolumeConfiguration, out *kubecontrollermanagerconfigv1alpha1.VolumeConfiguration, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_config_VolumeConfiguration_To_v1alpha1_VolumeConfiguration(in, out, s)
 }

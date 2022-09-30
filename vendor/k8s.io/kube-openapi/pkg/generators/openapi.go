@@ -160,16 +160,24 @@ func (g *openAPIGen) Imports(c *generator.Context) []string {
 
 func argsFromType(t *types.Type) generator.Args {
 	return generator.Args{
-		"type":              t,
-		"ReferenceCallback": types.Ref(openAPICommonPackagePath, "ReferenceCallback"),
-		"OpenAPIDefinition": types.Ref(openAPICommonPackagePath, "OpenAPIDefinition"),
-		"SpecSchemaType":    types.Ref(specPackagePath, "Schema"),
+		"type":                                  t,
+		"ReferenceCallback":                     types.Ref(openAPICommonPackagePath, "ReferenceCallback"),
+		"OpenAPIDefinition":                     types.Ref(openAPICommonPackagePath, "OpenAPIDefinition"),
+		"EmbedOpenAPIDefinitionIntoV2Extension": types.Ref(openAPICommonPackagePath, "EmbedOpenAPIDefinitionIntoV2Extension"),
+		"GenerateOpenAPIV3OneOfSchema":          types.Ref(openAPICommonPackagePath, "GenerateOpenAPIV3OneOfSchema"),
+		"SpecSchema":                            types.Ref(specPackagePath, "Schema"),
+		"SpecSchemaProps":                       types.Ref(specPackagePath, "SchemaProps"),
+		"SpecSchemaOrArray":                     types.Ref(specPackagePath, "SchemaOrArray"),
+		"SpecSchemaOrBool":                      types.Ref(specPackagePath, "SchemaOrBool"),
+		"SpecVendorExtensible":                  types.Ref(specPackagePath, "VendorExtensible"),
+		"SpecExtensions":                        types.Ref(specPackagePath, "Extensions"),
 	}
 }
 
 func (g *openAPIGen) Init(c *generator.Context, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	sw.Do("func GetOpenAPIDefinitions(ref $.ReferenceCallback|raw$) map[string]$.OpenAPIDefinition|raw$ {\n", argsFromType(nil))
+	sw.Do("func GetOpenAPIDefinitions(ref $.ReferenceCallback|raw$)"+
+		"map[string]$.OpenAPIDefinition|raw$ {\n", argsFromType(nil))
 	sw.Do("return map[string]$.OpenAPIDefinition|raw${\n", argsFromType(nil))
 
 	for _, t := range c.Order {
@@ -340,7 +348,8 @@ func (g openAPITypeWriter) generateCall(t *types.Type) error {
 		case hasV2DefinitionTypeAndFormat:
 			g.Do(nameTmpl+"(ref),\n", args)
 		case hasV2Definition && hasV3Definition:
-			g.Do("common.EmbedOpenAPIDefinitionIntoV2Extension($.type|raw${}.OpenAPIV3Definition(), $.type|raw${}.OpenAPIDefinition()),\n", args)
+			g.Do("$.EmbedOpenAPIDefinitionIntoV2Extension|raw$("+
+				"$.type|raw${}.OpenAPIV3Definition(), $.type|raw${}.OpenAPIDefinition()),\n", args)
 		case hasV2Definition:
 			g.Do("$.type|raw${}.OpenAPIDefinition(),\n", args)
 		case hasV3Definition:
@@ -370,9 +379,10 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 		g.Do("func "+nameTmpl+"(ref $.ReferenceCallback|raw$) $.OpenAPIDefinition|raw$ {\n", args)
 		switch {
 		case hasV2DefinitionTypeAndFormat && hasV3Definition:
-			g.Do("return common.EmbedOpenAPIDefinitionIntoV2Extension($.type|raw${}.OpenAPIV3Definition(), $.OpenAPIDefinition|raw${\n"+
-				"Schema: spec.Schema{\n"+
-				"SchemaProps: spec.SchemaProps{\n", args)
+			g.Do("return $.EmbedOpenAPIDefinitionIntoV2Extension|raw$("+
+				"$.type|raw${}.OpenAPIV3Definition(), $.OpenAPIDefinition|raw${\n"+
+				"Schema: $.SpecSchema|raw${\n"+
+				"SchemaProps: $.SpecSchemaProps|raw${\n", args)
 			g.generateDescription(t.CommentLines)
 			g.Do("Type:$.type|raw${}.OpenAPISchemaType(),\n"+
 				"Format:$.type|raw${}.OpenAPISchemaFormat(),\n"+
@@ -382,19 +392,19 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 			return nil
 		case hasV2DefinitionTypeAndFormat && hasV3OneOfTypes:
 			// generate v3 def.
-			g.Do("return common.EmbedOpenAPIDefinitionIntoV2Extension($.OpenAPIDefinition|raw${\n"+
-				"Schema: spec.Schema{\n"+
-				"SchemaProps: spec.SchemaProps{\n", args)
+			g.Do("return $.EmbedOpenAPIDefinitionIntoV2Extension|raw$($.OpenAPIDefinition|raw${\n"+
+				"Schema: $.SpecSchema|raw${\n"+
+				"SchemaProps: $.SpecSchemaProps|raw${\n", args)
 			g.generateDescription(t.CommentLines)
-			g.Do("OneOf:common.GenerateOpenAPIV3OneOfSchema($.type|raw${}.OpenAPIV3OneOfTypes()),\n"+
+			g.Do("OneOf:$.GenerateOpenAPIV3OneOfSchema|raw$($.type|raw${}.OpenAPIV3OneOfTypes()),\n"+
 				"Format:$.type|raw${}.OpenAPISchemaFormat(),\n"+
 				"},\n"+
 				"},\n"+
 				"},", args)
 			// generate v2 def.
 			g.Do("$.OpenAPIDefinition|raw${\n"+
-				"Schema: spec.Schema{\n"+
-				"SchemaProps: spec.SchemaProps{\n", args)
+				"Schema: $.SpecSchema|raw${\n"+
+				"SchemaProps: $.SpecSchemaProps|raw${\n", args)
 			g.generateDescription(t.CommentLines)
 			g.Do("Type:$.type|raw${}.OpenAPISchemaType(),\n"+
 				"Format:$.type|raw${}.OpenAPISchemaFormat(),\n"+
@@ -404,8 +414,8 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 			return nil
 		case hasV2DefinitionTypeAndFormat:
 			g.Do("return $.OpenAPIDefinition|raw${\n"+
-				"Schema: spec.Schema{\n"+
-				"SchemaProps: spec.SchemaProps{\n", args)
+				"Schema: $.SpecSchema|raw${\n"+
+				"SchemaProps: $.SpecSchemaProps|raw${\n", args)
 			g.generateDescription(t.CommentLines)
 			g.Do("Type:$.type|raw${}.OpenAPISchemaType(),\n"+
 				"Format:$.type|raw${}.OpenAPISchemaFormat(),\n"+
@@ -417,7 +427,9 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 			// having v3 oneOf types without custom v2 type or format does not make sense.
 			return fmt.Errorf("type %q has v3 one of types but not v2 type or format", t.Name)
 		}
-		g.Do("return $.OpenAPIDefinition|raw${\nSchema: spec.Schema{\nSchemaProps: spec.SchemaProps{\n", args)
+		g.Do("return $.OpenAPIDefinition|raw${\n"+
+			"Schema: $.SpecSchema|raw${\n"+
+			"SchemaProps: $.SpecSchemaProps|raw${\n", args)
 		g.generateDescription(t.CommentLines)
 		g.Do("Type: []string{\"object\"},\n", nil)
 
@@ -431,7 +443,7 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 			return err
 		}
 		if propertiesBuf.Len() > 0 {
-			g.Do("Properties: map[string]$.SpecSchemaType|raw${\n", args)
+			g.Do("Properties: map[string]$.SpecSchema|raw${\n", args)
 			g.Do(strings.Replace(propertiesBuf.String(), "$", "$\"$\"$", -1), nil) // escape $ (used as delimiter of the templates)
 			g.Do("},\n", nil)
 		}
@@ -513,7 +525,8 @@ func (g openAPITypeWriter) emitExtensions(extensions []extension, unions []union
 	if len(extensions) == 0 && len(unions) == 0 {
 		return
 	}
-	g.Do("VendorExtensible: spec.VendorExtensible{\nExtensions: spec.Extensions{\n", nil)
+	g.Do("VendorExtensible: $.SpecVendorExtensible|raw${\n"+
+		"Extensions: $.SpecExtensions|raw${\n", argsFromType(nil))
 	for _, extension := range extensions {
 		g.Do("\"$.$\": ", extension.xName)
 		if extension.hasMultipleValues() || extension.isAlwaysArrayFormat() {
@@ -663,7 +676,7 @@ func (g openAPITypeWriter) generateProperty(m *types.Member, parent *types.Type)
 	if err := g.generateMemberExtensions(m, parent); err != nil {
 		return err
 	}
-	g.Do("SchemaProps: spec.SchemaProps{\n", nil)
+	g.Do("SchemaProps: $.SpecSchemaProps|raw${\n", argsFromType(nil))
 	var extraComments []string
 	if enumType, isEnum := g.enumContext.EnumType(m.Type); isEnum {
 		extraComments = enumType.DescriptionLines()
@@ -761,7 +774,10 @@ func (g openAPITypeWriter) generateMapProperty(t *types.Type) error {
 	}
 
 	g.Do("Type: []string{\"object\"},\n", nil)
-	g.Do("AdditionalProperties: &spec.SchemaOrBool{\nAllows: true,\nSchema: &spec.Schema{\nSchemaProps: spec.SchemaProps{\n", nil)
+	g.Do("AdditionalProperties: &$.SpecSchemaOrBool|raw${\n"+
+		"Allows: true,\n"+
+		"Schema: &$.SpecSchema|raw${\n"+
+		"SchemaProps: $.SpecSchemaProps|raw${\n", argsFromType(nil))
 	if err := g.generateDefault(t.Elem.CommentLines, t.Elem, false); err != nil {
 		return err
 	}
@@ -794,7 +810,9 @@ func (g openAPITypeWriter) generateMapProperty(t *types.Type) error {
 func (g openAPITypeWriter) generateSliceProperty(t *types.Type) error {
 	elemType := resolveAliasAndPtrType(t.Elem)
 	g.Do("Type: []string{\"array\"},\n", nil)
-	g.Do("Items: &spec.SchemaOrArray{\nSchema: &spec.Schema{\nSchemaProps: spec.SchemaProps{\n", nil)
+	g.Do("Items: &$.SpecSchemaOrArray|raw${\n"+
+		"Schema: &$.SpecSchema|raw${\n"+
+		"SchemaProps: $.SpecSchemaProps|raw${\n", argsFromType(nil))
 	if err := g.generateDefault(t.Elem.CommentLines, t.Elem, false); err != nil {
 		return err
 	}

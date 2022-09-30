@@ -24,10 +24,10 @@ package v1beta1
 import (
 	"unsafe"
 
-	"k8s.io/api/authorization/v1beta1"
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/authorization"
+	apiauthorizationv1beta1 "k8s.io/api/authorization/v1beta1"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	pkgapisauthorization "k8s.io/kubernetes/pkg/apis/authorization"
 )
 
 func init() {
@@ -36,141 +36,141 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1beta1.LocalSubjectAccessReview)(nil), (*authorization.LocalSubjectAccessReview)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_LocalSubjectAccessReview_To_authorization_LocalSubjectAccessReview(a.(*v1beta1.LocalSubjectAccessReview), b.(*authorization.LocalSubjectAccessReview), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*apiauthorizationv1beta1.LocalSubjectAccessReview)(nil), (*pkgapisauthorization.LocalSubjectAccessReview)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_LocalSubjectAccessReview_To_authorization_LocalSubjectAccessReview(a.(*apiauthorizationv1beta1.LocalSubjectAccessReview), b.(*pkgapisauthorization.LocalSubjectAccessReview), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*authorization.LocalSubjectAccessReview)(nil), (*v1beta1.LocalSubjectAccessReview)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_authorization_LocalSubjectAccessReview_To_v1beta1_LocalSubjectAccessReview(a.(*authorization.LocalSubjectAccessReview), b.(*v1beta1.LocalSubjectAccessReview), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisauthorization.LocalSubjectAccessReview)(nil), (*apiauthorizationv1beta1.LocalSubjectAccessReview)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_authorization_LocalSubjectAccessReview_To_v1beta1_LocalSubjectAccessReview(a.(*pkgapisauthorization.LocalSubjectAccessReview), b.(*apiauthorizationv1beta1.LocalSubjectAccessReview), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.NonResourceAttributes)(nil), (*authorization.NonResourceAttributes)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_NonResourceAttributes_To_authorization_NonResourceAttributes(a.(*v1beta1.NonResourceAttributes), b.(*authorization.NonResourceAttributes), scope)
+	if err := s.AddGeneratedConversionFunc((*apiauthorizationv1beta1.NonResourceAttributes)(nil), (*pkgapisauthorization.NonResourceAttributes)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_NonResourceAttributes_To_authorization_NonResourceAttributes(a.(*apiauthorizationv1beta1.NonResourceAttributes), b.(*pkgapisauthorization.NonResourceAttributes), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*authorization.NonResourceAttributes)(nil), (*v1beta1.NonResourceAttributes)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_authorization_NonResourceAttributes_To_v1beta1_NonResourceAttributes(a.(*authorization.NonResourceAttributes), b.(*v1beta1.NonResourceAttributes), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisauthorization.NonResourceAttributes)(nil), (*apiauthorizationv1beta1.NonResourceAttributes)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_authorization_NonResourceAttributes_To_v1beta1_NonResourceAttributes(a.(*pkgapisauthorization.NonResourceAttributes), b.(*apiauthorizationv1beta1.NonResourceAttributes), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.NonResourceRule)(nil), (*authorization.NonResourceRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_NonResourceRule_To_authorization_NonResourceRule(a.(*v1beta1.NonResourceRule), b.(*authorization.NonResourceRule), scope)
+	if err := s.AddGeneratedConversionFunc((*apiauthorizationv1beta1.NonResourceRule)(nil), (*pkgapisauthorization.NonResourceRule)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_NonResourceRule_To_authorization_NonResourceRule(a.(*apiauthorizationv1beta1.NonResourceRule), b.(*pkgapisauthorization.NonResourceRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*authorization.NonResourceRule)(nil), (*v1beta1.NonResourceRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_authorization_NonResourceRule_To_v1beta1_NonResourceRule(a.(*authorization.NonResourceRule), b.(*v1beta1.NonResourceRule), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisauthorization.NonResourceRule)(nil), (*apiauthorizationv1beta1.NonResourceRule)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_authorization_NonResourceRule_To_v1beta1_NonResourceRule(a.(*pkgapisauthorization.NonResourceRule), b.(*apiauthorizationv1beta1.NonResourceRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.ResourceAttributes)(nil), (*authorization.ResourceAttributes)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_ResourceAttributes_To_authorization_ResourceAttributes(a.(*v1beta1.ResourceAttributes), b.(*authorization.ResourceAttributes), scope)
+	if err := s.AddGeneratedConversionFunc((*apiauthorizationv1beta1.ResourceAttributes)(nil), (*pkgapisauthorization.ResourceAttributes)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_ResourceAttributes_To_authorization_ResourceAttributes(a.(*apiauthorizationv1beta1.ResourceAttributes), b.(*pkgapisauthorization.ResourceAttributes), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*authorization.ResourceAttributes)(nil), (*v1beta1.ResourceAttributes)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_authorization_ResourceAttributes_To_v1beta1_ResourceAttributes(a.(*authorization.ResourceAttributes), b.(*v1beta1.ResourceAttributes), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisauthorization.ResourceAttributes)(nil), (*apiauthorizationv1beta1.ResourceAttributes)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_authorization_ResourceAttributes_To_v1beta1_ResourceAttributes(a.(*pkgapisauthorization.ResourceAttributes), b.(*apiauthorizationv1beta1.ResourceAttributes), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.ResourceRule)(nil), (*authorization.ResourceRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_ResourceRule_To_authorization_ResourceRule(a.(*v1beta1.ResourceRule), b.(*authorization.ResourceRule), scope)
+	if err := s.AddGeneratedConversionFunc((*apiauthorizationv1beta1.ResourceRule)(nil), (*pkgapisauthorization.ResourceRule)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_ResourceRule_To_authorization_ResourceRule(a.(*apiauthorizationv1beta1.ResourceRule), b.(*pkgapisauthorization.ResourceRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*authorization.ResourceRule)(nil), (*v1beta1.ResourceRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_authorization_ResourceRule_To_v1beta1_ResourceRule(a.(*authorization.ResourceRule), b.(*v1beta1.ResourceRule), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisauthorization.ResourceRule)(nil), (*apiauthorizationv1beta1.ResourceRule)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_authorization_ResourceRule_To_v1beta1_ResourceRule(a.(*pkgapisauthorization.ResourceRule), b.(*apiauthorizationv1beta1.ResourceRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.SelfSubjectAccessReview)(nil), (*authorization.SelfSubjectAccessReview)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_SelfSubjectAccessReview_To_authorization_SelfSubjectAccessReview(a.(*v1beta1.SelfSubjectAccessReview), b.(*authorization.SelfSubjectAccessReview), scope)
+	if err := s.AddGeneratedConversionFunc((*apiauthorizationv1beta1.SelfSubjectAccessReview)(nil), (*pkgapisauthorization.SelfSubjectAccessReview)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_SelfSubjectAccessReview_To_authorization_SelfSubjectAccessReview(a.(*apiauthorizationv1beta1.SelfSubjectAccessReview), b.(*pkgapisauthorization.SelfSubjectAccessReview), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*authorization.SelfSubjectAccessReview)(nil), (*v1beta1.SelfSubjectAccessReview)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_authorization_SelfSubjectAccessReview_To_v1beta1_SelfSubjectAccessReview(a.(*authorization.SelfSubjectAccessReview), b.(*v1beta1.SelfSubjectAccessReview), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisauthorization.SelfSubjectAccessReview)(nil), (*apiauthorizationv1beta1.SelfSubjectAccessReview)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_authorization_SelfSubjectAccessReview_To_v1beta1_SelfSubjectAccessReview(a.(*pkgapisauthorization.SelfSubjectAccessReview), b.(*apiauthorizationv1beta1.SelfSubjectAccessReview), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.SelfSubjectAccessReviewSpec)(nil), (*authorization.SelfSubjectAccessReviewSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAccessReviewSpec(a.(*v1beta1.SelfSubjectAccessReviewSpec), b.(*authorization.SelfSubjectAccessReviewSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*apiauthorizationv1beta1.SelfSubjectAccessReviewSpec)(nil), (*pkgapisauthorization.SelfSubjectAccessReviewSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAccessReviewSpec(a.(*apiauthorizationv1beta1.SelfSubjectAccessReviewSpec), b.(*pkgapisauthorization.SelfSubjectAccessReviewSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*authorization.SelfSubjectAccessReviewSpec)(nil), (*v1beta1.SelfSubjectAccessReviewSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec(a.(*authorization.SelfSubjectAccessReviewSpec), b.(*v1beta1.SelfSubjectAccessReviewSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisauthorization.SelfSubjectAccessReviewSpec)(nil), (*apiauthorizationv1beta1.SelfSubjectAccessReviewSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec(a.(*pkgapisauthorization.SelfSubjectAccessReviewSpec), b.(*apiauthorizationv1beta1.SelfSubjectAccessReviewSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.SelfSubjectRulesReview)(nil), (*authorization.SelfSubjectRulesReview)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_SelfSubjectRulesReview_To_authorization_SelfSubjectRulesReview(a.(*v1beta1.SelfSubjectRulesReview), b.(*authorization.SelfSubjectRulesReview), scope)
+	if err := s.AddGeneratedConversionFunc((*apiauthorizationv1beta1.SelfSubjectRulesReview)(nil), (*pkgapisauthorization.SelfSubjectRulesReview)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_SelfSubjectRulesReview_To_authorization_SelfSubjectRulesReview(a.(*apiauthorizationv1beta1.SelfSubjectRulesReview), b.(*pkgapisauthorization.SelfSubjectRulesReview), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*authorization.SelfSubjectRulesReview)(nil), (*v1beta1.SelfSubjectRulesReview)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_authorization_SelfSubjectRulesReview_To_v1beta1_SelfSubjectRulesReview(a.(*authorization.SelfSubjectRulesReview), b.(*v1beta1.SelfSubjectRulesReview), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisauthorization.SelfSubjectRulesReview)(nil), (*apiauthorizationv1beta1.SelfSubjectRulesReview)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_authorization_SelfSubjectRulesReview_To_v1beta1_SelfSubjectRulesReview(a.(*pkgapisauthorization.SelfSubjectRulesReview), b.(*apiauthorizationv1beta1.SelfSubjectRulesReview), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.SelfSubjectRulesReviewSpec)(nil), (*authorization.SelfSubjectRulesReviewSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_SelfSubjectRulesReviewSpec_To_authorization_SelfSubjectRulesReviewSpec(a.(*v1beta1.SelfSubjectRulesReviewSpec), b.(*authorization.SelfSubjectRulesReviewSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*apiauthorizationv1beta1.SelfSubjectRulesReviewSpec)(nil), (*pkgapisauthorization.SelfSubjectRulesReviewSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_SelfSubjectRulesReviewSpec_To_authorization_SelfSubjectRulesReviewSpec(a.(*apiauthorizationv1beta1.SelfSubjectRulesReviewSpec), b.(*pkgapisauthorization.SelfSubjectRulesReviewSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*authorization.SelfSubjectRulesReviewSpec)(nil), (*v1beta1.SelfSubjectRulesReviewSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_authorization_SelfSubjectRulesReviewSpec_To_v1beta1_SelfSubjectRulesReviewSpec(a.(*authorization.SelfSubjectRulesReviewSpec), b.(*v1beta1.SelfSubjectRulesReviewSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisauthorization.SelfSubjectRulesReviewSpec)(nil), (*apiauthorizationv1beta1.SelfSubjectRulesReviewSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_authorization_SelfSubjectRulesReviewSpec_To_v1beta1_SelfSubjectRulesReviewSpec(a.(*pkgapisauthorization.SelfSubjectRulesReviewSpec), b.(*apiauthorizationv1beta1.SelfSubjectRulesReviewSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.SubjectAccessReview)(nil), (*authorization.SubjectAccessReview)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_SubjectAccessReview_To_authorization_SubjectAccessReview(a.(*v1beta1.SubjectAccessReview), b.(*authorization.SubjectAccessReview), scope)
+	if err := s.AddGeneratedConversionFunc((*apiauthorizationv1beta1.SubjectAccessReview)(nil), (*pkgapisauthorization.SubjectAccessReview)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_SubjectAccessReview_To_authorization_SubjectAccessReview(a.(*apiauthorizationv1beta1.SubjectAccessReview), b.(*pkgapisauthorization.SubjectAccessReview), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*authorization.SubjectAccessReview)(nil), (*v1beta1.SubjectAccessReview)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_authorization_SubjectAccessReview_To_v1beta1_SubjectAccessReview(a.(*authorization.SubjectAccessReview), b.(*v1beta1.SubjectAccessReview), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisauthorization.SubjectAccessReview)(nil), (*apiauthorizationv1beta1.SubjectAccessReview)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_authorization_SubjectAccessReview_To_v1beta1_SubjectAccessReview(a.(*pkgapisauthorization.SubjectAccessReview), b.(*apiauthorizationv1beta1.SubjectAccessReview), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.SubjectAccessReviewSpec)(nil), (*authorization.SubjectAccessReviewSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessReviewSpec(a.(*v1beta1.SubjectAccessReviewSpec), b.(*authorization.SubjectAccessReviewSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*apiauthorizationv1beta1.SubjectAccessReviewSpec)(nil), (*pkgapisauthorization.SubjectAccessReviewSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessReviewSpec(a.(*apiauthorizationv1beta1.SubjectAccessReviewSpec), b.(*pkgapisauthorization.SubjectAccessReviewSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*authorization.SubjectAccessReviewSpec)(nil), (*v1beta1.SubjectAccessReviewSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec(a.(*authorization.SubjectAccessReviewSpec), b.(*v1beta1.SubjectAccessReviewSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisauthorization.SubjectAccessReviewSpec)(nil), (*apiauthorizationv1beta1.SubjectAccessReviewSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec(a.(*pkgapisauthorization.SubjectAccessReviewSpec), b.(*apiauthorizationv1beta1.SubjectAccessReviewSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.SubjectAccessReviewStatus)(nil), (*authorization.SubjectAccessReviewStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAccessReviewStatus(a.(*v1beta1.SubjectAccessReviewStatus), b.(*authorization.SubjectAccessReviewStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apiauthorizationv1beta1.SubjectAccessReviewStatus)(nil), (*pkgapisauthorization.SubjectAccessReviewStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAccessReviewStatus(a.(*apiauthorizationv1beta1.SubjectAccessReviewStatus), b.(*pkgapisauthorization.SubjectAccessReviewStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*authorization.SubjectAccessReviewStatus)(nil), (*v1beta1.SubjectAccessReviewStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessReviewStatus(a.(*authorization.SubjectAccessReviewStatus), b.(*v1beta1.SubjectAccessReviewStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisauthorization.SubjectAccessReviewStatus)(nil), (*apiauthorizationv1beta1.SubjectAccessReviewStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessReviewStatus(a.(*pkgapisauthorization.SubjectAccessReviewStatus), b.(*apiauthorizationv1beta1.SubjectAccessReviewStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.SubjectRulesReviewStatus)(nil), (*authorization.SubjectRulesReviewStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_SubjectRulesReviewStatus_To_authorization_SubjectRulesReviewStatus(a.(*v1beta1.SubjectRulesReviewStatus), b.(*authorization.SubjectRulesReviewStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*apiauthorizationv1beta1.SubjectRulesReviewStatus)(nil), (*pkgapisauthorization.SubjectRulesReviewStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_SubjectRulesReviewStatus_To_authorization_SubjectRulesReviewStatus(a.(*apiauthorizationv1beta1.SubjectRulesReviewStatus), b.(*pkgapisauthorization.SubjectRulesReviewStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*authorization.SubjectRulesReviewStatus)(nil), (*v1beta1.SubjectRulesReviewStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_authorization_SubjectRulesReviewStatus_To_v1beta1_SubjectRulesReviewStatus(a.(*authorization.SubjectRulesReviewStatus), b.(*v1beta1.SubjectRulesReviewStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisauthorization.SubjectRulesReviewStatus)(nil), (*apiauthorizationv1beta1.SubjectRulesReviewStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_authorization_SubjectRulesReviewStatus_To_v1beta1_SubjectRulesReviewStatus(a.(*pkgapisauthorization.SubjectRulesReviewStatus), b.(*apiauthorizationv1beta1.SubjectRulesReviewStatus), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1beta1_LocalSubjectAccessReview_To_authorization_LocalSubjectAccessReview(in *v1beta1.LocalSubjectAccessReview, out *authorization.LocalSubjectAccessReview, s conversion.Scope) error {
+func autoConvert_v1beta1_LocalSubjectAccessReview_To_authorization_LocalSubjectAccessReview(in *apiauthorizationv1beta1.LocalSubjectAccessReview, out *pkgapisauthorization.LocalSubjectAccessReview, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessReviewSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -182,11 +182,11 @@ func autoConvert_v1beta1_LocalSubjectAccessReview_To_authorization_LocalSubjectA
 }
 
 // Convert_v1beta1_LocalSubjectAccessReview_To_authorization_LocalSubjectAccessReview is an autogenerated conversion function.
-func Convert_v1beta1_LocalSubjectAccessReview_To_authorization_LocalSubjectAccessReview(in *v1beta1.LocalSubjectAccessReview, out *authorization.LocalSubjectAccessReview, s conversion.Scope) error {
+func Convert_v1beta1_LocalSubjectAccessReview_To_authorization_LocalSubjectAccessReview(in *apiauthorizationv1beta1.LocalSubjectAccessReview, out *pkgapisauthorization.LocalSubjectAccessReview, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_LocalSubjectAccessReview_To_authorization_LocalSubjectAccessReview(in, out, s)
 }
 
-func autoConvert_authorization_LocalSubjectAccessReview_To_v1beta1_LocalSubjectAccessReview(in *authorization.LocalSubjectAccessReview, out *v1beta1.LocalSubjectAccessReview, s conversion.Scope) error {
+func autoConvert_authorization_LocalSubjectAccessReview_To_v1beta1_LocalSubjectAccessReview(in *pkgapisauthorization.LocalSubjectAccessReview, out *apiauthorizationv1beta1.LocalSubjectAccessReview, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -198,55 +198,55 @@ func autoConvert_authorization_LocalSubjectAccessReview_To_v1beta1_LocalSubjectA
 }
 
 // Convert_authorization_LocalSubjectAccessReview_To_v1beta1_LocalSubjectAccessReview is an autogenerated conversion function.
-func Convert_authorization_LocalSubjectAccessReview_To_v1beta1_LocalSubjectAccessReview(in *authorization.LocalSubjectAccessReview, out *v1beta1.LocalSubjectAccessReview, s conversion.Scope) error {
+func Convert_authorization_LocalSubjectAccessReview_To_v1beta1_LocalSubjectAccessReview(in *pkgapisauthorization.LocalSubjectAccessReview, out *apiauthorizationv1beta1.LocalSubjectAccessReview, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_authorization_LocalSubjectAccessReview_To_v1beta1_LocalSubjectAccessReview(in, out, s)
 }
 
-func autoConvert_v1beta1_NonResourceAttributes_To_authorization_NonResourceAttributes(in *v1beta1.NonResourceAttributes, out *authorization.NonResourceAttributes, s conversion.Scope) error {
+func autoConvert_v1beta1_NonResourceAttributes_To_authorization_NonResourceAttributes(in *apiauthorizationv1beta1.NonResourceAttributes, out *pkgapisauthorization.NonResourceAttributes, s apimachinerypkgconversion.Scope) error {
 	out.Path = in.Path
 	out.Verb = in.Verb
 	return nil
 }
 
 // Convert_v1beta1_NonResourceAttributes_To_authorization_NonResourceAttributes is an autogenerated conversion function.
-func Convert_v1beta1_NonResourceAttributes_To_authorization_NonResourceAttributes(in *v1beta1.NonResourceAttributes, out *authorization.NonResourceAttributes, s conversion.Scope) error {
+func Convert_v1beta1_NonResourceAttributes_To_authorization_NonResourceAttributes(in *apiauthorizationv1beta1.NonResourceAttributes, out *pkgapisauthorization.NonResourceAttributes, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_NonResourceAttributes_To_authorization_NonResourceAttributes(in, out, s)
 }
 
-func autoConvert_authorization_NonResourceAttributes_To_v1beta1_NonResourceAttributes(in *authorization.NonResourceAttributes, out *v1beta1.NonResourceAttributes, s conversion.Scope) error {
+func autoConvert_authorization_NonResourceAttributes_To_v1beta1_NonResourceAttributes(in *pkgapisauthorization.NonResourceAttributes, out *apiauthorizationv1beta1.NonResourceAttributes, s apimachinerypkgconversion.Scope) error {
 	out.Path = in.Path
 	out.Verb = in.Verb
 	return nil
 }
 
 // Convert_authorization_NonResourceAttributes_To_v1beta1_NonResourceAttributes is an autogenerated conversion function.
-func Convert_authorization_NonResourceAttributes_To_v1beta1_NonResourceAttributes(in *authorization.NonResourceAttributes, out *v1beta1.NonResourceAttributes, s conversion.Scope) error {
+func Convert_authorization_NonResourceAttributes_To_v1beta1_NonResourceAttributes(in *pkgapisauthorization.NonResourceAttributes, out *apiauthorizationv1beta1.NonResourceAttributes, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_authorization_NonResourceAttributes_To_v1beta1_NonResourceAttributes(in, out, s)
 }
 
-func autoConvert_v1beta1_NonResourceRule_To_authorization_NonResourceRule(in *v1beta1.NonResourceRule, out *authorization.NonResourceRule, s conversion.Scope) error {
+func autoConvert_v1beta1_NonResourceRule_To_authorization_NonResourceRule(in *apiauthorizationv1beta1.NonResourceRule, out *pkgapisauthorization.NonResourceRule, s apimachinerypkgconversion.Scope) error {
 	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
 	out.NonResourceURLs = *(*[]string)(unsafe.Pointer(&in.NonResourceURLs))
 	return nil
 }
 
 // Convert_v1beta1_NonResourceRule_To_authorization_NonResourceRule is an autogenerated conversion function.
-func Convert_v1beta1_NonResourceRule_To_authorization_NonResourceRule(in *v1beta1.NonResourceRule, out *authorization.NonResourceRule, s conversion.Scope) error {
+func Convert_v1beta1_NonResourceRule_To_authorization_NonResourceRule(in *apiauthorizationv1beta1.NonResourceRule, out *pkgapisauthorization.NonResourceRule, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_NonResourceRule_To_authorization_NonResourceRule(in, out, s)
 }
 
-func autoConvert_authorization_NonResourceRule_To_v1beta1_NonResourceRule(in *authorization.NonResourceRule, out *v1beta1.NonResourceRule, s conversion.Scope) error {
+func autoConvert_authorization_NonResourceRule_To_v1beta1_NonResourceRule(in *pkgapisauthorization.NonResourceRule, out *apiauthorizationv1beta1.NonResourceRule, s apimachinerypkgconversion.Scope) error {
 	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
 	out.NonResourceURLs = *(*[]string)(unsafe.Pointer(&in.NonResourceURLs))
 	return nil
 }
 
 // Convert_authorization_NonResourceRule_To_v1beta1_NonResourceRule is an autogenerated conversion function.
-func Convert_authorization_NonResourceRule_To_v1beta1_NonResourceRule(in *authorization.NonResourceRule, out *v1beta1.NonResourceRule, s conversion.Scope) error {
+func Convert_authorization_NonResourceRule_To_v1beta1_NonResourceRule(in *pkgapisauthorization.NonResourceRule, out *apiauthorizationv1beta1.NonResourceRule, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_authorization_NonResourceRule_To_v1beta1_NonResourceRule(in, out, s)
 }
 
-func autoConvert_v1beta1_ResourceAttributes_To_authorization_ResourceAttributes(in *v1beta1.ResourceAttributes, out *authorization.ResourceAttributes, s conversion.Scope) error {
+func autoConvert_v1beta1_ResourceAttributes_To_authorization_ResourceAttributes(in *apiauthorizationv1beta1.ResourceAttributes, out *pkgapisauthorization.ResourceAttributes, s apimachinerypkgconversion.Scope) error {
 	out.Namespace = in.Namespace
 	out.Verb = in.Verb
 	out.Group = in.Group
@@ -258,11 +258,11 @@ func autoConvert_v1beta1_ResourceAttributes_To_authorization_ResourceAttributes(
 }
 
 // Convert_v1beta1_ResourceAttributes_To_authorization_ResourceAttributes is an autogenerated conversion function.
-func Convert_v1beta1_ResourceAttributes_To_authorization_ResourceAttributes(in *v1beta1.ResourceAttributes, out *authorization.ResourceAttributes, s conversion.Scope) error {
+func Convert_v1beta1_ResourceAttributes_To_authorization_ResourceAttributes(in *apiauthorizationv1beta1.ResourceAttributes, out *pkgapisauthorization.ResourceAttributes, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_ResourceAttributes_To_authorization_ResourceAttributes(in, out, s)
 }
 
-func autoConvert_authorization_ResourceAttributes_To_v1beta1_ResourceAttributes(in *authorization.ResourceAttributes, out *v1beta1.ResourceAttributes, s conversion.Scope) error {
+func autoConvert_authorization_ResourceAttributes_To_v1beta1_ResourceAttributes(in *pkgapisauthorization.ResourceAttributes, out *apiauthorizationv1beta1.ResourceAttributes, s apimachinerypkgconversion.Scope) error {
 	out.Namespace = in.Namespace
 	out.Verb = in.Verb
 	out.Group = in.Group
@@ -274,11 +274,11 @@ func autoConvert_authorization_ResourceAttributes_To_v1beta1_ResourceAttributes(
 }
 
 // Convert_authorization_ResourceAttributes_To_v1beta1_ResourceAttributes is an autogenerated conversion function.
-func Convert_authorization_ResourceAttributes_To_v1beta1_ResourceAttributes(in *authorization.ResourceAttributes, out *v1beta1.ResourceAttributes, s conversion.Scope) error {
+func Convert_authorization_ResourceAttributes_To_v1beta1_ResourceAttributes(in *pkgapisauthorization.ResourceAttributes, out *apiauthorizationv1beta1.ResourceAttributes, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_authorization_ResourceAttributes_To_v1beta1_ResourceAttributes(in, out, s)
 }
 
-func autoConvert_v1beta1_ResourceRule_To_authorization_ResourceRule(in *v1beta1.ResourceRule, out *authorization.ResourceRule, s conversion.Scope) error {
+func autoConvert_v1beta1_ResourceRule_To_authorization_ResourceRule(in *apiauthorizationv1beta1.ResourceRule, out *pkgapisauthorization.ResourceRule, s apimachinerypkgconversion.Scope) error {
 	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
 	out.APIGroups = *(*[]string)(unsafe.Pointer(&in.APIGroups))
 	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
@@ -287,11 +287,11 @@ func autoConvert_v1beta1_ResourceRule_To_authorization_ResourceRule(in *v1beta1.
 }
 
 // Convert_v1beta1_ResourceRule_To_authorization_ResourceRule is an autogenerated conversion function.
-func Convert_v1beta1_ResourceRule_To_authorization_ResourceRule(in *v1beta1.ResourceRule, out *authorization.ResourceRule, s conversion.Scope) error {
+func Convert_v1beta1_ResourceRule_To_authorization_ResourceRule(in *apiauthorizationv1beta1.ResourceRule, out *pkgapisauthorization.ResourceRule, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_ResourceRule_To_authorization_ResourceRule(in, out, s)
 }
 
-func autoConvert_authorization_ResourceRule_To_v1beta1_ResourceRule(in *authorization.ResourceRule, out *v1beta1.ResourceRule, s conversion.Scope) error {
+func autoConvert_authorization_ResourceRule_To_v1beta1_ResourceRule(in *pkgapisauthorization.ResourceRule, out *apiauthorizationv1beta1.ResourceRule, s apimachinerypkgconversion.Scope) error {
 	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
 	out.APIGroups = *(*[]string)(unsafe.Pointer(&in.APIGroups))
 	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
@@ -300,11 +300,11 @@ func autoConvert_authorization_ResourceRule_To_v1beta1_ResourceRule(in *authoriz
 }
 
 // Convert_authorization_ResourceRule_To_v1beta1_ResourceRule is an autogenerated conversion function.
-func Convert_authorization_ResourceRule_To_v1beta1_ResourceRule(in *authorization.ResourceRule, out *v1beta1.ResourceRule, s conversion.Scope) error {
+func Convert_authorization_ResourceRule_To_v1beta1_ResourceRule(in *pkgapisauthorization.ResourceRule, out *apiauthorizationv1beta1.ResourceRule, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_authorization_ResourceRule_To_v1beta1_ResourceRule(in, out, s)
 }
 
-func autoConvert_v1beta1_SelfSubjectAccessReview_To_authorization_SelfSubjectAccessReview(in *v1beta1.SelfSubjectAccessReview, out *authorization.SelfSubjectAccessReview, s conversion.Scope) error {
+func autoConvert_v1beta1_SelfSubjectAccessReview_To_authorization_SelfSubjectAccessReview(in *apiauthorizationv1beta1.SelfSubjectAccessReview, out *pkgapisauthorization.SelfSubjectAccessReview, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAccessReviewSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -316,11 +316,11 @@ func autoConvert_v1beta1_SelfSubjectAccessReview_To_authorization_SelfSubjectAcc
 }
 
 // Convert_v1beta1_SelfSubjectAccessReview_To_authorization_SelfSubjectAccessReview is an autogenerated conversion function.
-func Convert_v1beta1_SelfSubjectAccessReview_To_authorization_SelfSubjectAccessReview(in *v1beta1.SelfSubjectAccessReview, out *authorization.SelfSubjectAccessReview, s conversion.Scope) error {
+func Convert_v1beta1_SelfSubjectAccessReview_To_authorization_SelfSubjectAccessReview(in *apiauthorizationv1beta1.SelfSubjectAccessReview, out *pkgapisauthorization.SelfSubjectAccessReview, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_SelfSubjectAccessReview_To_authorization_SelfSubjectAccessReview(in, out, s)
 }
 
-func autoConvert_authorization_SelfSubjectAccessReview_To_v1beta1_SelfSubjectAccessReview(in *authorization.SelfSubjectAccessReview, out *v1beta1.SelfSubjectAccessReview, s conversion.Scope) error {
+func autoConvert_authorization_SelfSubjectAccessReview_To_v1beta1_SelfSubjectAccessReview(in *pkgapisauthorization.SelfSubjectAccessReview, out *apiauthorizationv1beta1.SelfSubjectAccessReview, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -332,33 +332,33 @@ func autoConvert_authorization_SelfSubjectAccessReview_To_v1beta1_SelfSubjectAcc
 }
 
 // Convert_authorization_SelfSubjectAccessReview_To_v1beta1_SelfSubjectAccessReview is an autogenerated conversion function.
-func Convert_authorization_SelfSubjectAccessReview_To_v1beta1_SelfSubjectAccessReview(in *authorization.SelfSubjectAccessReview, out *v1beta1.SelfSubjectAccessReview, s conversion.Scope) error {
+func Convert_authorization_SelfSubjectAccessReview_To_v1beta1_SelfSubjectAccessReview(in *pkgapisauthorization.SelfSubjectAccessReview, out *apiauthorizationv1beta1.SelfSubjectAccessReview, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_authorization_SelfSubjectAccessReview_To_v1beta1_SelfSubjectAccessReview(in, out, s)
 }
 
-func autoConvert_v1beta1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAccessReviewSpec(in *v1beta1.SelfSubjectAccessReviewSpec, out *authorization.SelfSubjectAccessReviewSpec, s conversion.Scope) error {
-	out.ResourceAttributes = (*authorization.ResourceAttributes)(unsafe.Pointer(in.ResourceAttributes))
-	out.NonResourceAttributes = (*authorization.NonResourceAttributes)(unsafe.Pointer(in.NonResourceAttributes))
+func autoConvert_v1beta1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAccessReviewSpec(in *apiauthorizationv1beta1.SelfSubjectAccessReviewSpec, out *pkgapisauthorization.SelfSubjectAccessReviewSpec, s apimachinerypkgconversion.Scope) error {
+	out.ResourceAttributes = (*pkgapisauthorization.ResourceAttributes)(unsafe.Pointer(in.ResourceAttributes))
+	out.NonResourceAttributes = (*pkgapisauthorization.NonResourceAttributes)(unsafe.Pointer(in.NonResourceAttributes))
 	return nil
 }
 
 // Convert_v1beta1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAccessReviewSpec is an autogenerated conversion function.
-func Convert_v1beta1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAccessReviewSpec(in *v1beta1.SelfSubjectAccessReviewSpec, out *authorization.SelfSubjectAccessReviewSpec, s conversion.Scope) error {
+func Convert_v1beta1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAccessReviewSpec(in *apiauthorizationv1beta1.SelfSubjectAccessReviewSpec, out *pkgapisauthorization.SelfSubjectAccessReviewSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAccessReviewSpec(in, out, s)
 }
 
-func autoConvert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec(in *authorization.SelfSubjectAccessReviewSpec, out *v1beta1.SelfSubjectAccessReviewSpec, s conversion.Scope) error {
-	out.ResourceAttributes = (*v1beta1.ResourceAttributes)(unsafe.Pointer(in.ResourceAttributes))
-	out.NonResourceAttributes = (*v1beta1.NonResourceAttributes)(unsafe.Pointer(in.NonResourceAttributes))
+func autoConvert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec(in *pkgapisauthorization.SelfSubjectAccessReviewSpec, out *apiauthorizationv1beta1.SelfSubjectAccessReviewSpec, s apimachinerypkgconversion.Scope) error {
+	out.ResourceAttributes = (*apiauthorizationv1beta1.ResourceAttributes)(unsafe.Pointer(in.ResourceAttributes))
+	out.NonResourceAttributes = (*apiauthorizationv1beta1.NonResourceAttributes)(unsafe.Pointer(in.NonResourceAttributes))
 	return nil
 }
 
 // Convert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec is an autogenerated conversion function.
-func Convert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec(in *authorization.SelfSubjectAccessReviewSpec, out *v1beta1.SelfSubjectAccessReviewSpec, s conversion.Scope) error {
+func Convert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec(in *pkgapisauthorization.SelfSubjectAccessReviewSpec, out *apiauthorizationv1beta1.SelfSubjectAccessReviewSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec(in, out, s)
 }
 
-func autoConvert_v1beta1_SelfSubjectRulesReview_To_authorization_SelfSubjectRulesReview(in *v1beta1.SelfSubjectRulesReview, out *authorization.SelfSubjectRulesReview, s conversion.Scope) error {
+func autoConvert_v1beta1_SelfSubjectRulesReview_To_authorization_SelfSubjectRulesReview(in *apiauthorizationv1beta1.SelfSubjectRulesReview, out *pkgapisauthorization.SelfSubjectRulesReview, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_SelfSubjectRulesReviewSpec_To_authorization_SelfSubjectRulesReviewSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -370,11 +370,11 @@ func autoConvert_v1beta1_SelfSubjectRulesReview_To_authorization_SelfSubjectRule
 }
 
 // Convert_v1beta1_SelfSubjectRulesReview_To_authorization_SelfSubjectRulesReview is an autogenerated conversion function.
-func Convert_v1beta1_SelfSubjectRulesReview_To_authorization_SelfSubjectRulesReview(in *v1beta1.SelfSubjectRulesReview, out *authorization.SelfSubjectRulesReview, s conversion.Scope) error {
+func Convert_v1beta1_SelfSubjectRulesReview_To_authorization_SelfSubjectRulesReview(in *apiauthorizationv1beta1.SelfSubjectRulesReview, out *pkgapisauthorization.SelfSubjectRulesReview, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_SelfSubjectRulesReview_To_authorization_SelfSubjectRulesReview(in, out, s)
 }
 
-func autoConvert_authorization_SelfSubjectRulesReview_To_v1beta1_SelfSubjectRulesReview(in *authorization.SelfSubjectRulesReview, out *v1beta1.SelfSubjectRulesReview, s conversion.Scope) error {
+func autoConvert_authorization_SelfSubjectRulesReview_To_v1beta1_SelfSubjectRulesReview(in *pkgapisauthorization.SelfSubjectRulesReview, out *apiauthorizationv1beta1.SelfSubjectRulesReview, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_authorization_SelfSubjectRulesReviewSpec_To_v1beta1_SelfSubjectRulesReviewSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -386,31 +386,31 @@ func autoConvert_authorization_SelfSubjectRulesReview_To_v1beta1_SelfSubjectRule
 }
 
 // Convert_authorization_SelfSubjectRulesReview_To_v1beta1_SelfSubjectRulesReview is an autogenerated conversion function.
-func Convert_authorization_SelfSubjectRulesReview_To_v1beta1_SelfSubjectRulesReview(in *authorization.SelfSubjectRulesReview, out *v1beta1.SelfSubjectRulesReview, s conversion.Scope) error {
+func Convert_authorization_SelfSubjectRulesReview_To_v1beta1_SelfSubjectRulesReview(in *pkgapisauthorization.SelfSubjectRulesReview, out *apiauthorizationv1beta1.SelfSubjectRulesReview, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_authorization_SelfSubjectRulesReview_To_v1beta1_SelfSubjectRulesReview(in, out, s)
 }
 
-func autoConvert_v1beta1_SelfSubjectRulesReviewSpec_To_authorization_SelfSubjectRulesReviewSpec(in *v1beta1.SelfSubjectRulesReviewSpec, out *authorization.SelfSubjectRulesReviewSpec, s conversion.Scope) error {
+func autoConvert_v1beta1_SelfSubjectRulesReviewSpec_To_authorization_SelfSubjectRulesReviewSpec(in *apiauthorizationv1beta1.SelfSubjectRulesReviewSpec, out *pkgapisauthorization.SelfSubjectRulesReviewSpec, s apimachinerypkgconversion.Scope) error {
 	out.Namespace = in.Namespace
 	return nil
 }
 
 // Convert_v1beta1_SelfSubjectRulesReviewSpec_To_authorization_SelfSubjectRulesReviewSpec is an autogenerated conversion function.
-func Convert_v1beta1_SelfSubjectRulesReviewSpec_To_authorization_SelfSubjectRulesReviewSpec(in *v1beta1.SelfSubjectRulesReviewSpec, out *authorization.SelfSubjectRulesReviewSpec, s conversion.Scope) error {
+func Convert_v1beta1_SelfSubjectRulesReviewSpec_To_authorization_SelfSubjectRulesReviewSpec(in *apiauthorizationv1beta1.SelfSubjectRulesReviewSpec, out *pkgapisauthorization.SelfSubjectRulesReviewSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_SelfSubjectRulesReviewSpec_To_authorization_SelfSubjectRulesReviewSpec(in, out, s)
 }
 
-func autoConvert_authorization_SelfSubjectRulesReviewSpec_To_v1beta1_SelfSubjectRulesReviewSpec(in *authorization.SelfSubjectRulesReviewSpec, out *v1beta1.SelfSubjectRulesReviewSpec, s conversion.Scope) error {
+func autoConvert_authorization_SelfSubjectRulesReviewSpec_To_v1beta1_SelfSubjectRulesReviewSpec(in *pkgapisauthorization.SelfSubjectRulesReviewSpec, out *apiauthorizationv1beta1.SelfSubjectRulesReviewSpec, s apimachinerypkgconversion.Scope) error {
 	out.Namespace = in.Namespace
 	return nil
 }
 
 // Convert_authorization_SelfSubjectRulesReviewSpec_To_v1beta1_SelfSubjectRulesReviewSpec is an autogenerated conversion function.
-func Convert_authorization_SelfSubjectRulesReviewSpec_To_v1beta1_SelfSubjectRulesReviewSpec(in *authorization.SelfSubjectRulesReviewSpec, out *v1beta1.SelfSubjectRulesReviewSpec, s conversion.Scope) error {
+func Convert_authorization_SelfSubjectRulesReviewSpec_To_v1beta1_SelfSubjectRulesReviewSpec(in *pkgapisauthorization.SelfSubjectRulesReviewSpec, out *apiauthorizationv1beta1.SelfSubjectRulesReviewSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_authorization_SelfSubjectRulesReviewSpec_To_v1beta1_SelfSubjectRulesReviewSpec(in, out, s)
 }
 
-func autoConvert_v1beta1_SubjectAccessReview_To_authorization_SubjectAccessReview(in *v1beta1.SubjectAccessReview, out *authorization.SubjectAccessReview, s conversion.Scope) error {
+func autoConvert_v1beta1_SubjectAccessReview_To_authorization_SubjectAccessReview(in *apiauthorizationv1beta1.SubjectAccessReview, out *pkgapisauthorization.SubjectAccessReview, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessReviewSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -422,11 +422,11 @@ func autoConvert_v1beta1_SubjectAccessReview_To_authorization_SubjectAccessRevie
 }
 
 // Convert_v1beta1_SubjectAccessReview_To_authorization_SubjectAccessReview is an autogenerated conversion function.
-func Convert_v1beta1_SubjectAccessReview_To_authorization_SubjectAccessReview(in *v1beta1.SubjectAccessReview, out *authorization.SubjectAccessReview, s conversion.Scope) error {
+func Convert_v1beta1_SubjectAccessReview_To_authorization_SubjectAccessReview(in *apiauthorizationv1beta1.SubjectAccessReview, out *pkgapisauthorization.SubjectAccessReview, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_SubjectAccessReview_To_authorization_SubjectAccessReview(in, out, s)
 }
 
-func autoConvert_authorization_SubjectAccessReview_To_v1beta1_SubjectAccessReview(in *authorization.SubjectAccessReview, out *v1beta1.SubjectAccessReview, s conversion.Scope) error {
+func autoConvert_authorization_SubjectAccessReview_To_v1beta1_SubjectAccessReview(in *pkgapisauthorization.SubjectAccessReview, out *apiauthorizationv1beta1.SubjectAccessReview, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -438,41 +438,41 @@ func autoConvert_authorization_SubjectAccessReview_To_v1beta1_SubjectAccessRevie
 }
 
 // Convert_authorization_SubjectAccessReview_To_v1beta1_SubjectAccessReview is an autogenerated conversion function.
-func Convert_authorization_SubjectAccessReview_To_v1beta1_SubjectAccessReview(in *authorization.SubjectAccessReview, out *v1beta1.SubjectAccessReview, s conversion.Scope) error {
+func Convert_authorization_SubjectAccessReview_To_v1beta1_SubjectAccessReview(in *pkgapisauthorization.SubjectAccessReview, out *apiauthorizationv1beta1.SubjectAccessReview, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_authorization_SubjectAccessReview_To_v1beta1_SubjectAccessReview(in, out, s)
 }
 
-func autoConvert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessReviewSpec(in *v1beta1.SubjectAccessReviewSpec, out *authorization.SubjectAccessReviewSpec, s conversion.Scope) error {
-	out.ResourceAttributes = (*authorization.ResourceAttributes)(unsafe.Pointer(in.ResourceAttributes))
-	out.NonResourceAttributes = (*authorization.NonResourceAttributes)(unsafe.Pointer(in.NonResourceAttributes))
+func autoConvert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessReviewSpec(in *apiauthorizationv1beta1.SubjectAccessReviewSpec, out *pkgapisauthorization.SubjectAccessReviewSpec, s apimachinerypkgconversion.Scope) error {
+	out.ResourceAttributes = (*pkgapisauthorization.ResourceAttributes)(unsafe.Pointer(in.ResourceAttributes))
+	out.NonResourceAttributes = (*pkgapisauthorization.NonResourceAttributes)(unsafe.Pointer(in.NonResourceAttributes))
 	out.User = in.User
 	out.Groups = *(*[]string)(unsafe.Pointer(&in.Groups))
-	out.Extra = *(*map[string]authorization.ExtraValue)(unsafe.Pointer(&in.Extra))
+	out.Extra = *(*map[string]pkgapisauthorization.ExtraValue)(unsafe.Pointer(&in.Extra))
 	out.UID = in.UID
 	return nil
 }
 
 // Convert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessReviewSpec is an autogenerated conversion function.
-func Convert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessReviewSpec(in *v1beta1.SubjectAccessReviewSpec, out *authorization.SubjectAccessReviewSpec, s conversion.Scope) error {
+func Convert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessReviewSpec(in *apiauthorizationv1beta1.SubjectAccessReviewSpec, out *pkgapisauthorization.SubjectAccessReviewSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessReviewSpec(in, out, s)
 }
 
-func autoConvert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec(in *authorization.SubjectAccessReviewSpec, out *v1beta1.SubjectAccessReviewSpec, s conversion.Scope) error {
-	out.ResourceAttributes = (*v1beta1.ResourceAttributes)(unsafe.Pointer(in.ResourceAttributes))
-	out.NonResourceAttributes = (*v1beta1.NonResourceAttributes)(unsafe.Pointer(in.NonResourceAttributes))
+func autoConvert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec(in *pkgapisauthorization.SubjectAccessReviewSpec, out *apiauthorizationv1beta1.SubjectAccessReviewSpec, s apimachinerypkgconversion.Scope) error {
+	out.ResourceAttributes = (*apiauthorizationv1beta1.ResourceAttributes)(unsafe.Pointer(in.ResourceAttributes))
+	out.NonResourceAttributes = (*apiauthorizationv1beta1.NonResourceAttributes)(unsafe.Pointer(in.NonResourceAttributes))
 	out.User = in.User
 	out.Groups = *(*[]string)(unsafe.Pointer(&in.Groups))
-	out.Extra = *(*map[string]v1beta1.ExtraValue)(unsafe.Pointer(&in.Extra))
+	out.Extra = *(*map[string]apiauthorizationv1beta1.ExtraValue)(unsafe.Pointer(&in.Extra))
 	out.UID = in.UID
 	return nil
 }
 
 // Convert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec is an autogenerated conversion function.
-func Convert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec(in *authorization.SubjectAccessReviewSpec, out *v1beta1.SubjectAccessReviewSpec, s conversion.Scope) error {
+func Convert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec(in *pkgapisauthorization.SubjectAccessReviewSpec, out *apiauthorizationv1beta1.SubjectAccessReviewSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec(in, out, s)
 }
 
-func autoConvert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAccessReviewStatus(in *v1beta1.SubjectAccessReviewStatus, out *authorization.SubjectAccessReviewStatus, s conversion.Scope) error {
+func autoConvert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAccessReviewStatus(in *apiauthorizationv1beta1.SubjectAccessReviewStatus, out *pkgapisauthorization.SubjectAccessReviewStatus, s apimachinerypkgconversion.Scope) error {
 	out.Allowed = in.Allowed
 	out.Denied = in.Denied
 	out.Reason = in.Reason
@@ -481,11 +481,11 @@ func autoConvert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAcces
 }
 
 // Convert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAccessReviewStatus is an autogenerated conversion function.
-func Convert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAccessReviewStatus(in *v1beta1.SubjectAccessReviewStatus, out *authorization.SubjectAccessReviewStatus, s conversion.Scope) error {
+func Convert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAccessReviewStatus(in *apiauthorizationv1beta1.SubjectAccessReviewStatus, out *pkgapisauthorization.SubjectAccessReviewStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAccessReviewStatus(in, out, s)
 }
 
-func autoConvert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessReviewStatus(in *authorization.SubjectAccessReviewStatus, out *v1beta1.SubjectAccessReviewStatus, s conversion.Scope) error {
+func autoConvert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessReviewStatus(in *pkgapisauthorization.SubjectAccessReviewStatus, out *apiauthorizationv1beta1.SubjectAccessReviewStatus, s apimachinerypkgconversion.Scope) error {
 	out.Allowed = in.Allowed
 	out.Denied = in.Denied
 	out.Reason = in.Reason
@@ -494,32 +494,32 @@ func autoConvert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAcces
 }
 
 // Convert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessReviewStatus is an autogenerated conversion function.
-func Convert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessReviewStatus(in *authorization.SubjectAccessReviewStatus, out *v1beta1.SubjectAccessReviewStatus, s conversion.Scope) error {
+func Convert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessReviewStatus(in *pkgapisauthorization.SubjectAccessReviewStatus, out *apiauthorizationv1beta1.SubjectAccessReviewStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessReviewStatus(in, out, s)
 }
 
-func autoConvert_v1beta1_SubjectRulesReviewStatus_To_authorization_SubjectRulesReviewStatus(in *v1beta1.SubjectRulesReviewStatus, out *authorization.SubjectRulesReviewStatus, s conversion.Scope) error {
-	out.ResourceRules = *(*[]authorization.ResourceRule)(unsafe.Pointer(&in.ResourceRules))
-	out.NonResourceRules = *(*[]authorization.NonResourceRule)(unsafe.Pointer(&in.NonResourceRules))
+func autoConvert_v1beta1_SubjectRulesReviewStatus_To_authorization_SubjectRulesReviewStatus(in *apiauthorizationv1beta1.SubjectRulesReviewStatus, out *pkgapisauthorization.SubjectRulesReviewStatus, s apimachinerypkgconversion.Scope) error {
+	out.ResourceRules = *(*[]pkgapisauthorization.ResourceRule)(unsafe.Pointer(&in.ResourceRules))
+	out.NonResourceRules = *(*[]pkgapisauthorization.NonResourceRule)(unsafe.Pointer(&in.NonResourceRules))
 	out.Incomplete = in.Incomplete
 	out.EvaluationError = in.EvaluationError
 	return nil
 }
 
 // Convert_v1beta1_SubjectRulesReviewStatus_To_authorization_SubjectRulesReviewStatus is an autogenerated conversion function.
-func Convert_v1beta1_SubjectRulesReviewStatus_To_authorization_SubjectRulesReviewStatus(in *v1beta1.SubjectRulesReviewStatus, out *authorization.SubjectRulesReviewStatus, s conversion.Scope) error {
+func Convert_v1beta1_SubjectRulesReviewStatus_To_authorization_SubjectRulesReviewStatus(in *apiauthorizationv1beta1.SubjectRulesReviewStatus, out *pkgapisauthorization.SubjectRulesReviewStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_SubjectRulesReviewStatus_To_authorization_SubjectRulesReviewStatus(in, out, s)
 }
 
-func autoConvert_authorization_SubjectRulesReviewStatus_To_v1beta1_SubjectRulesReviewStatus(in *authorization.SubjectRulesReviewStatus, out *v1beta1.SubjectRulesReviewStatus, s conversion.Scope) error {
-	out.ResourceRules = *(*[]v1beta1.ResourceRule)(unsafe.Pointer(&in.ResourceRules))
-	out.NonResourceRules = *(*[]v1beta1.NonResourceRule)(unsafe.Pointer(&in.NonResourceRules))
+func autoConvert_authorization_SubjectRulesReviewStatus_To_v1beta1_SubjectRulesReviewStatus(in *pkgapisauthorization.SubjectRulesReviewStatus, out *apiauthorizationv1beta1.SubjectRulesReviewStatus, s apimachinerypkgconversion.Scope) error {
+	out.ResourceRules = *(*[]apiauthorizationv1beta1.ResourceRule)(unsafe.Pointer(&in.ResourceRules))
+	out.NonResourceRules = *(*[]apiauthorizationv1beta1.NonResourceRule)(unsafe.Pointer(&in.NonResourceRules))
 	out.Incomplete = in.Incomplete
 	out.EvaluationError = in.EvaluationError
 	return nil
 }
 
 // Convert_authorization_SubjectRulesReviewStatus_To_v1beta1_SubjectRulesReviewStatus is an autogenerated conversion function.
-func Convert_authorization_SubjectRulesReviewStatus_To_v1beta1_SubjectRulesReviewStatus(in *authorization.SubjectRulesReviewStatus, out *v1beta1.SubjectRulesReviewStatus, s conversion.Scope) error {
+func Convert_authorization_SubjectRulesReviewStatus_To_v1beta1_SubjectRulesReviewStatus(in *pkgapisauthorization.SubjectRulesReviewStatus, out *apiauthorizationv1beta1.SubjectRulesReviewStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_authorization_SubjectRulesReviewStatus_To_v1beta1_SubjectRulesReviewStatus(in, out, s)
 }

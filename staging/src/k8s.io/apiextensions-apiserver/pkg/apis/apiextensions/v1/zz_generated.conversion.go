@@ -24,10 +24,10 @@ package v1
 import (
 	"unsafe"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
+	pkgapisapiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
 )
 
 func init() {
@@ -36,236 +36,236 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*CustomResourceColumnDefinition)(nil), (*apiextensions.CustomResourceColumnDefinition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_CustomResourceColumnDefinition_To_apiextensions_CustomResourceColumnDefinition(a.(*CustomResourceColumnDefinition), b.(*apiextensions.CustomResourceColumnDefinition), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*CustomResourceColumnDefinition)(nil), (*pkgapisapiextensions.CustomResourceColumnDefinition)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_CustomResourceColumnDefinition_To_apiextensions_CustomResourceColumnDefinition(a.(*CustomResourceColumnDefinition), b.(*pkgapisapiextensions.CustomResourceColumnDefinition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.CustomResourceColumnDefinition)(nil), (*CustomResourceColumnDefinition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_CustomResourceColumnDefinition_To_v1_CustomResourceColumnDefinition(a.(*apiextensions.CustomResourceColumnDefinition), b.(*CustomResourceColumnDefinition), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiextensions.CustomResourceColumnDefinition)(nil), (*CustomResourceColumnDefinition)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiextensions_CustomResourceColumnDefinition_To_v1_CustomResourceColumnDefinition(a.(*pkgapisapiextensions.CustomResourceColumnDefinition), b.(*CustomResourceColumnDefinition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*CustomResourceDefinition)(nil), (*apiextensions.CustomResourceDefinition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(a.(*CustomResourceDefinition), b.(*apiextensions.CustomResourceDefinition), scope)
+	if err := s.AddGeneratedConversionFunc((*CustomResourceDefinition)(nil), (*pkgapisapiextensions.CustomResourceDefinition)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(a.(*CustomResourceDefinition), b.(*pkgapisapiextensions.CustomResourceDefinition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.CustomResourceDefinition)(nil), (*CustomResourceDefinition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_CustomResourceDefinition_To_v1_CustomResourceDefinition(a.(*apiextensions.CustomResourceDefinition), b.(*CustomResourceDefinition), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiextensions.CustomResourceDefinition)(nil), (*CustomResourceDefinition)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiextensions_CustomResourceDefinition_To_v1_CustomResourceDefinition(a.(*pkgapisapiextensions.CustomResourceDefinition), b.(*CustomResourceDefinition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*CustomResourceDefinitionCondition)(nil), (*apiextensions.CustomResourceDefinitionCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_CustomResourceDefinitionCondition_To_apiextensions_CustomResourceDefinitionCondition(a.(*CustomResourceDefinitionCondition), b.(*apiextensions.CustomResourceDefinitionCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*CustomResourceDefinitionCondition)(nil), (*pkgapisapiextensions.CustomResourceDefinitionCondition)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_CustomResourceDefinitionCondition_To_apiextensions_CustomResourceDefinitionCondition(a.(*CustomResourceDefinitionCondition), b.(*pkgapisapiextensions.CustomResourceDefinitionCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.CustomResourceDefinitionCondition)(nil), (*CustomResourceDefinitionCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_CustomResourceDefinitionCondition_To_v1_CustomResourceDefinitionCondition(a.(*apiextensions.CustomResourceDefinitionCondition), b.(*CustomResourceDefinitionCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiextensions.CustomResourceDefinitionCondition)(nil), (*CustomResourceDefinitionCondition)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiextensions_CustomResourceDefinitionCondition_To_v1_CustomResourceDefinitionCondition(a.(*pkgapisapiextensions.CustomResourceDefinitionCondition), b.(*CustomResourceDefinitionCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*CustomResourceDefinitionList)(nil), (*apiextensions.CustomResourceDefinitionList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_CustomResourceDefinitionList_To_apiextensions_CustomResourceDefinitionList(a.(*CustomResourceDefinitionList), b.(*apiextensions.CustomResourceDefinitionList), scope)
+	if err := s.AddGeneratedConversionFunc((*CustomResourceDefinitionList)(nil), (*pkgapisapiextensions.CustomResourceDefinitionList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_CustomResourceDefinitionList_To_apiextensions_CustomResourceDefinitionList(a.(*CustomResourceDefinitionList), b.(*pkgapisapiextensions.CustomResourceDefinitionList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.CustomResourceDefinitionList)(nil), (*CustomResourceDefinitionList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_CustomResourceDefinitionList_To_v1_CustomResourceDefinitionList(a.(*apiextensions.CustomResourceDefinitionList), b.(*CustomResourceDefinitionList), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiextensions.CustomResourceDefinitionList)(nil), (*CustomResourceDefinitionList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiextensions_CustomResourceDefinitionList_To_v1_CustomResourceDefinitionList(a.(*pkgapisapiextensions.CustomResourceDefinitionList), b.(*CustomResourceDefinitionList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*CustomResourceDefinitionNames)(nil), (*apiextensions.CustomResourceDefinitionNames)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_CustomResourceDefinitionNames_To_apiextensions_CustomResourceDefinitionNames(a.(*CustomResourceDefinitionNames), b.(*apiextensions.CustomResourceDefinitionNames), scope)
+	if err := s.AddGeneratedConversionFunc((*CustomResourceDefinitionNames)(nil), (*pkgapisapiextensions.CustomResourceDefinitionNames)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_CustomResourceDefinitionNames_To_apiextensions_CustomResourceDefinitionNames(a.(*CustomResourceDefinitionNames), b.(*pkgapisapiextensions.CustomResourceDefinitionNames), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.CustomResourceDefinitionNames)(nil), (*CustomResourceDefinitionNames)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_CustomResourceDefinitionNames_To_v1_CustomResourceDefinitionNames(a.(*apiextensions.CustomResourceDefinitionNames), b.(*CustomResourceDefinitionNames), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiextensions.CustomResourceDefinitionNames)(nil), (*CustomResourceDefinitionNames)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiextensions_CustomResourceDefinitionNames_To_v1_CustomResourceDefinitionNames(a.(*pkgapisapiextensions.CustomResourceDefinitionNames), b.(*CustomResourceDefinitionNames), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*CustomResourceDefinitionStatus)(nil), (*apiextensions.CustomResourceDefinitionStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_CustomResourceDefinitionStatus_To_apiextensions_CustomResourceDefinitionStatus(a.(*CustomResourceDefinitionStatus), b.(*apiextensions.CustomResourceDefinitionStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*CustomResourceDefinitionStatus)(nil), (*pkgapisapiextensions.CustomResourceDefinitionStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_CustomResourceDefinitionStatus_To_apiextensions_CustomResourceDefinitionStatus(a.(*CustomResourceDefinitionStatus), b.(*pkgapisapiextensions.CustomResourceDefinitionStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.CustomResourceDefinitionStatus)(nil), (*CustomResourceDefinitionStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_CustomResourceDefinitionStatus_To_v1_CustomResourceDefinitionStatus(a.(*apiextensions.CustomResourceDefinitionStatus), b.(*CustomResourceDefinitionStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiextensions.CustomResourceDefinitionStatus)(nil), (*CustomResourceDefinitionStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiextensions_CustomResourceDefinitionStatus_To_v1_CustomResourceDefinitionStatus(a.(*pkgapisapiextensions.CustomResourceDefinitionStatus), b.(*CustomResourceDefinitionStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*CustomResourceDefinitionVersion)(nil), (*apiextensions.CustomResourceDefinitionVersion)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_CustomResourceDefinitionVersion_To_apiextensions_CustomResourceDefinitionVersion(a.(*CustomResourceDefinitionVersion), b.(*apiextensions.CustomResourceDefinitionVersion), scope)
+	if err := s.AddGeneratedConversionFunc((*CustomResourceDefinitionVersion)(nil), (*pkgapisapiextensions.CustomResourceDefinitionVersion)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_CustomResourceDefinitionVersion_To_apiextensions_CustomResourceDefinitionVersion(a.(*CustomResourceDefinitionVersion), b.(*pkgapisapiextensions.CustomResourceDefinitionVersion), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.CustomResourceDefinitionVersion)(nil), (*CustomResourceDefinitionVersion)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_CustomResourceDefinitionVersion_To_v1_CustomResourceDefinitionVersion(a.(*apiextensions.CustomResourceDefinitionVersion), b.(*CustomResourceDefinitionVersion), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiextensions.CustomResourceDefinitionVersion)(nil), (*CustomResourceDefinitionVersion)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiextensions_CustomResourceDefinitionVersion_To_v1_CustomResourceDefinitionVersion(a.(*pkgapisapiextensions.CustomResourceDefinitionVersion), b.(*CustomResourceDefinitionVersion), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*CustomResourceSubresourceScale)(nil), (*apiextensions.CustomResourceSubresourceScale)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_CustomResourceSubresourceScale_To_apiextensions_CustomResourceSubresourceScale(a.(*CustomResourceSubresourceScale), b.(*apiextensions.CustomResourceSubresourceScale), scope)
+	if err := s.AddGeneratedConversionFunc((*CustomResourceSubresourceScale)(nil), (*pkgapisapiextensions.CustomResourceSubresourceScale)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_CustomResourceSubresourceScale_To_apiextensions_CustomResourceSubresourceScale(a.(*CustomResourceSubresourceScale), b.(*pkgapisapiextensions.CustomResourceSubresourceScale), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.CustomResourceSubresourceScale)(nil), (*CustomResourceSubresourceScale)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_CustomResourceSubresourceScale_To_v1_CustomResourceSubresourceScale(a.(*apiextensions.CustomResourceSubresourceScale), b.(*CustomResourceSubresourceScale), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiextensions.CustomResourceSubresourceScale)(nil), (*CustomResourceSubresourceScale)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiextensions_CustomResourceSubresourceScale_To_v1_CustomResourceSubresourceScale(a.(*pkgapisapiextensions.CustomResourceSubresourceScale), b.(*CustomResourceSubresourceScale), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*CustomResourceSubresourceStatus)(nil), (*apiextensions.CustomResourceSubresourceStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_CustomResourceSubresourceStatus_To_apiextensions_CustomResourceSubresourceStatus(a.(*CustomResourceSubresourceStatus), b.(*apiextensions.CustomResourceSubresourceStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*CustomResourceSubresourceStatus)(nil), (*pkgapisapiextensions.CustomResourceSubresourceStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_CustomResourceSubresourceStatus_To_apiextensions_CustomResourceSubresourceStatus(a.(*CustomResourceSubresourceStatus), b.(*pkgapisapiextensions.CustomResourceSubresourceStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.CustomResourceSubresourceStatus)(nil), (*CustomResourceSubresourceStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_CustomResourceSubresourceStatus_To_v1_CustomResourceSubresourceStatus(a.(*apiextensions.CustomResourceSubresourceStatus), b.(*CustomResourceSubresourceStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiextensions.CustomResourceSubresourceStatus)(nil), (*CustomResourceSubresourceStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiextensions_CustomResourceSubresourceStatus_To_v1_CustomResourceSubresourceStatus(a.(*pkgapisapiextensions.CustomResourceSubresourceStatus), b.(*CustomResourceSubresourceStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*CustomResourceSubresources)(nil), (*apiextensions.CustomResourceSubresources)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_CustomResourceSubresources_To_apiextensions_CustomResourceSubresources(a.(*CustomResourceSubresources), b.(*apiextensions.CustomResourceSubresources), scope)
+	if err := s.AddGeneratedConversionFunc((*CustomResourceSubresources)(nil), (*pkgapisapiextensions.CustomResourceSubresources)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_CustomResourceSubresources_To_apiextensions_CustomResourceSubresources(a.(*CustomResourceSubresources), b.(*pkgapisapiextensions.CustomResourceSubresources), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.CustomResourceSubresources)(nil), (*CustomResourceSubresources)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_CustomResourceSubresources_To_v1_CustomResourceSubresources(a.(*apiextensions.CustomResourceSubresources), b.(*CustomResourceSubresources), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiextensions.CustomResourceSubresources)(nil), (*CustomResourceSubresources)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiextensions_CustomResourceSubresources_To_v1_CustomResourceSubresources(a.(*pkgapisapiextensions.CustomResourceSubresources), b.(*CustomResourceSubresources), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*CustomResourceValidation)(nil), (*apiextensions.CustomResourceValidation)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(a.(*CustomResourceValidation), b.(*apiextensions.CustomResourceValidation), scope)
+	if err := s.AddGeneratedConversionFunc((*CustomResourceValidation)(nil), (*pkgapisapiextensions.CustomResourceValidation)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(a.(*CustomResourceValidation), b.(*pkgapisapiextensions.CustomResourceValidation), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.CustomResourceValidation)(nil), (*CustomResourceValidation)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_CustomResourceValidation_To_v1_CustomResourceValidation(a.(*apiextensions.CustomResourceValidation), b.(*CustomResourceValidation), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiextensions.CustomResourceValidation)(nil), (*CustomResourceValidation)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiextensions_CustomResourceValidation_To_v1_CustomResourceValidation(a.(*pkgapisapiextensions.CustomResourceValidation), b.(*CustomResourceValidation), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*ExternalDocumentation)(nil), (*apiextensions.ExternalDocumentation)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ExternalDocumentation_To_apiextensions_ExternalDocumentation(a.(*ExternalDocumentation), b.(*apiextensions.ExternalDocumentation), scope)
+	if err := s.AddGeneratedConversionFunc((*ExternalDocumentation)(nil), (*pkgapisapiextensions.ExternalDocumentation)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_ExternalDocumentation_To_apiextensions_ExternalDocumentation(a.(*ExternalDocumentation), b.(*pkgapisapiextensions.ExternalDocumentation), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.ExternalDocumentation)(nil), (*ExternalDocumentation)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_ExternalDocumentation_To_v1_ExternalDocumentation(a.(*apiextensions.ExternalDocumentation), b.(*ExternalDocumentation), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiextensions.ExternalDocumentation)(nil), (*ExternalDocumentation)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiextensions_ExternalDocumentation_To_v1_ExternalDocumentation(a.(*pkgapisapiextensions.ExternalDocumentation), b.(*ExternalDocumentation), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*JSONSchemaProps)(nil), (*apiextensions.JSONSchemaProps)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(a.(*JSONSchemaProps), b.(*apiextensions.JSONSchemaProps), scope)
+	if err := s.AddGeneratedConversionFunc((*JSONSchemaProps)(nil), (*pkgapisapiextensions.JSONSchemaProps)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(a.(*JSONSchemaProps), b.(*pkgapisapiextensions.JSONSchemaProps), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*JSONSchemaPropsOrArray)(nil), (*apiextensions.JSONSchemaPropsOrArray)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_JSONSchemaPropsOrArray_To_apiextensions_JSONSchemaPropsOrArray(a.(*JSONSchemaPropsOrArray), b.(*apiextensions.JSONSchemaPropsOrArray), scope)
+	if err := s.AddGeneratedConversionFunc((*JSONSchemaPropsOrArray)(nil), (*pkgapisapiextensions.JSONSchemaPropsOrArray)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_JSONSchemaPropsOrArray_To_apiextensions_JSONSchemaPropsOrArray(a.(*JSONSchemaPropsOrArray), b.(*pkgapisapiextensions.JSONSchemaPropsOrArray), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.JSONSchemaPropsOrArray)(nil), (*JSONSchemaPropsOrArray)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_JSONSchemaPropsOrArray_To_v1_JSONSchemaPropsOrArray(a.(*apiextensions.JSONSchemaPropsOrArray), b.(*JSONSchemaPropsOrArray), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiextensions.JSONSchemaPropsOrArray)(nil), (*JSONSchemaPropsOrArray)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiextensions_JSONSchemaPropsOrArray_To_v1_JSONSchemaPropsOrArray(a.(*pkgapisapiextensions.JSONSchemaPropsOrArray), b.(*JSONSchemaPropsOrArray), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*JSONSchemaPropsOrBool)(nil), (*apiextensions.JSONSchemaPropsOrBool)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_JSONSchemaPropsOrBool_To_apiextensions_JSONSchemaPropsOrBool(a.(*JSONSchemaPropsOrBool), b.(*apiextensions.JSONSchemaPropsOrBool), scope)
+	if err := s.AddGeneratedConversionFunc((*JSONSchemaPropsOrBool)(nil), (*pkgapisapiextensions.JSONSchemaPropsOrBool)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_JSONSchemaPropsOrBool_To_apiextensions_JSONSchemaPropsOrBool(a.(*JSONSchemaPropsOrBool), b.(*pkgapisapiextensions.JSONSchemaPropsOrBool), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.JSONSchemaPropsOrBool)(nil), (*JSONSchemaPropsOrBool)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_JSONSchemaPropsOrBool_To_v1_JSONSchemaPropsOrBool(a.(*apiextensions.JSONSchemaPropsOrBool), b.(*JSONSchemaPropsOrBool), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiextensions.JSONSchemaPropsOrBool)(nil), (*JSONSchemaPropsOrBool)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiextensions_JSONSchemaPropsOrBool_To_v1_JSONSchemaPropsOrBool(a.(*pkgapisapiextensions.JSONSchemaPropsOrBool), b.(*JSONSchemaPropsOrBool), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*JSONSchemaPropsOrStringArray)(nil), (*apiextensions.JSONSchemaPropsOrStringArray)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_JSONSchemaPropsOrStringArray_To_apiextensions_JSONSchemaPropsOrStringArray(a.(*JSONSchemaPropsOrStringArray), b.(*apiextensions.JSONSchemaPropsOrStringArray), scope)
+	if err := s.AddGeneratedConversionFunc((*JSONSchemaPropsOrStringArray)(nil), (*pkgapisapiextensions.JSONSchemaPropsOrStringArray)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_JSONSchemaPropsOrStringArray_To_apiextensions_JSONSchemaPropsOrStringArray(a.(*JSONSchemaPropsOrStringArray), b.(*pkgapisapiextensions.JSONSchemaPropsOrStringArray), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.JSONSchemaPropsOrStringArray)(nil), (*JSONSchemaPropsOrStringArray)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_JSONSchemaPropsOrStringArray_To_v1_JSONSchemaPropsOrStringArray(a.(*apiextensions.JSONSchemaPropsOrStringArray), b.(*JSONSchemaPropsOrStringArray), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiextensions.JSONSchemaPropsOrStringArray)(nil), (*JSONSchemaPropsOrStringArray)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiextensions_JSONSchemaPropsOrStringArray_To_v1_JSONSchemaPropsOrStringArray(a.(*pkgapisapiextensions.JSONSchemaPropsOrStringArray), b.(*JSONSchemaPropsOrStringArray), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*ServiceReference)(nil), (*apiextensions.ServiceReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ServiceReference_To_apiextensions_ServiceReference(a.(*ServiceReference), b.(*apiextensions.ServiceReference), scope)
+	if err := s.AddGeneratedConversionFunc((*ServiceReference)(nil), (*pkgapisapiextensions.ServiceReference)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_ServiceReference_To_apiextensions_ServiceReference(a.(*ServiceReference), b.(*pkgapisapiextensions.ServiceReference), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.ServiceReference)(nil), (*ServiceReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_ServiceReference_To_v1_ServiceReference(a.(*apiextensions.ServiceReference), b.(*ServiceReference), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiextensions.ServiceReference)(nil), (*ServiceReference)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiextensions_ServiceReference_To_v1_ServiceReference(a.(*pkgapisapiextensions.ServiceReference), b.(*ServiceReference), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*ValidationRule)(nil), (*apiextensions.ValidationRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ValidationRule_To_apiextensions_ValidationRule(a.(*ValidationRule), b.(*apiextensions.ValidationRule), scope)
+	if err := s.AddGeneratedConversionFunc((*ValidationRule)(nil), (*pkgapisapiextensions.ValidationRule)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_ValidationRule_To_apiextensions_ValidationRule(a.(*ValidationRule), b.(*pkgapisapiextensions.ValidationRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.ValidationRule)(nil), (*ValidationRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_ValidationRule_To_v1_ValidationRule(a.(*apiextensions.ValidationRule), b.(*ValidationRule), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiextensions.ValidationRule)(nil), (*ValidationRule)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiextensions_ValidationRule_To_v1_ValidationRule(a.(*pkgapisapiextensions.ValidationRule), b.(*ValidationRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*WebhookClientConfig)(nil), (*apiextensions.WebhookClientConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_WebhookClientConfig_To_apiextensions_WebhookClientConfig(a.(*WebhookClientConfig), b.(*apiextensions.WebhookClientConfig), scope)
+	if err := s.AddGeneratedConversionFunc((*WebhookClientConfig)(nil), (*pkgapisapiextensions.WebhookClientConfig)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_WebhookClientConfig_To_apiextensions_WebhookClientConfig(a.(*WebhookClientConfig), b.(*pkgapisapiextensions.WebhookClientConfig), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*apiextensions.WebhookClientConfig)(nil), (*WebhookClientConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_WebhookClientConfig_To_v1_WebhookClientConfig(a.(*apiextensions.WebhookClientConfig), b.(*WebhookClientConfig), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisapiextensions.WebhookClientConfig)(nil), (*WebhookClientConfig)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiextensions_WebhookClientConfig_To_v1_WebhookClientConfig(a.(*pkgapisapiextensions.WebhookClientConfig), b.(*WebhookClientConfig), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*apiextensions.CustomResourceConversion)(nil), (*CustomResourceConversion)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_CustomResourceConversion_To_v1_CustomResourceConversion(a.(*apiextensions.CustomResourceConversion), b.(*CustomResourceConversion), scope)
+	if err := s.AddConversionFunc((*pkgapisapiextensions.CustomResourceConversion)(nil), (*CustomResourceConversion)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiextensions_CustomResourceConversion_To_v1_CustomResourceConversion(a.(*pkgapisapiextensions.CustomResourceConversion), b.(*CustomResourceConversion), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*apiextensions.CustomResourceDefinitionSpec)(nil), (*CustomResourceDefinitionSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_CustomResourceDefinitionSpec_To_v1_CustomResourceDefinitionSpec(a.(*apiextensions.CustomResourceDefinitionSpec), b.(*CustomResourceDefinitionSpec), scope)
+	if err := s.AddConversionFunc((*pkgapisapiextensions.CustomResourceDefinitionSpec)(nil), (*CustomResourceDefinitionSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiextensions_CustomResourceDefinitionSpec_To_v1_CustomResourceDefinitionSpec(a.(*pkgapisapiextensions.CustomResourceDefinitionSpec), b.(*CustomResourceDefinitionSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*apiextensions.JSONSchemaProps)(nil), (*JSONSchemaProps)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(a.(*apiextensions.JSONSchemaProps), b.(*JSONSchemaProps), scope)
+	if err := s.AddConversionFunc((*pkgapisapiextensions.JSONSchemaProps)(nil), (*JSONSchemaProps)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(a.(*pkgapisapiextensions.JSONSchemaProps), b.(*JSONSchemaProps), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*apiextensions.JSON)(nil), (*JSON)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_JSON_To_v1_JSON(a.(*apiextensions.JSON), b.(*JSON), scope)
+	if err := s.AddConversionFunc((*pkgapisapiextensions.JSON)(nil), (*JSON)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiextensions_JSON_To_v1_JSON(a.(*pkgapisapiextensions.JSON), b.(*JSON), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*apiextensions.ValidationRules)(nil), (*ValidationRules)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apiextensions_ValidationRules_To_v1_ValidationRules(a.(*apiextensions.ValidationRules), b.(*ValidationRules), scope)
+	if err := s.AddConversionFunc((*pkgapisapiextensions.ValidationRules)(nil), (*ValidationRules)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_apiextensions_ValidationRules_To_v1_ValidationRules(a.(*pkgapisapiextensions.ValidationRules), b.(*ValidationRules), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*CustomResourceConversion)(nil), (*apiextensions.CustomResourceConversion)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_CustomResourceConversion_To_apiextensions_CustomResourceConversion(a.(*CustomResourceConversion), b.(*apiextensions.CustomResourceConversion), scope)
+	if err := s.AddConversionFunc((*CustomResourceConversion)(nil), (*pkgapisapiextensions.CustomResourceConversion)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_CustomResourceConversion_To_apiextensions_CustomResourceConversion(a.(*CustomResourceConversion), b.(*pkgapisapiextensions.CustomResourceConversion), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*CustomResourceDefinitionSpec)(nil), (*apiextensions.CustomResourceDefinitionSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_CustomResourceDefinitionSpec_To_apiextensions_CustomResourceDefinitionSpec(a.(*CustomResourceDefinitionSpec), b.(*apiextensions.CustomResourceDefinitionSpec), scope)
+	if err := s.AddConversionFunc((*CustomResourceDefinitionSpec)(nil), (*pkgapisapiextensions.CustomResourceDefinitionSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_CustomResourceDefinitionSpec_To_apiextensions_CustomResourceDefinitionSpec(a.(*CustomResourceDefinitionSpec), b.(*pkgapisapiextensions.CustomResourceDefinitionSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*JSON)(nil), (*apiextensions.JSON)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_JSON_To_apiextensions_JSON(a.(*JSON), b.(*apiextensions.JSON), scope)
+	if err := s.AddConversionFunc((*JSON)(nil), (*pkgapisapiextensions.JSON)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_JSON_To_apiextensions_JSON(a.(*JSON), b.(*pkgapisapiextensions.JSON), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1_CustomResourceColumnDefinition_To_apiextensions_CustomResourceColumnDefinition(in *CustomResourceColumnDefinition, out *apiextensions.CustomResourceColumnDefinition, s conversion.Scope) error {
+func autoConvert_v1_CustomResourceColumnDefinition_To_apiextensions_CustomResourceColumnDefinition(in *CustomResourceColumnDefinition, out *pkgapisapiextensions.CustomResourceColumnDefinition, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
 	out.Type = in.Type
 	out.Format = in.Format
@@ -276,11 +276,11 @@ func autoConvert_v1_CustomResourceColumnDefinition_To_apiextensions_CustomResour
 }
 
 // Convert_v1_CustomResourceColumnDefinition_To_apiextensions_CustomResourceColumnDefinition is an autogenerated conversion function.
-func Convert_v1_CustomResourceColumnDefinition_To_apiextensions_CustomResourceColumnDefinition(in *CustomResourceColumnDefinition, out *apiextensions.CustomResourceColumnDefinition, s conversion.Scope) error {
+func Convert_v1_CustomResourceColumnDefinition_To_apiextensions_CustomResourceColumnDefinition(in *CustomResourceColumnDefinition, out *pkgapisapiextensions.CustomResourceColumnDefinition, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_CustomResourceColumnDefinition_To_apiextensions_CustomResourceColumnDefinition(in, out, s)
 }
 
-func autoConvert_apiextensions_CustomResourceColumnDefinition_To_v1_CustomResourceColumnDefinition(in *apiextensions.CustomResourceColumnDefinition, out *CustomResourceColumnDefinition, s conversion.Scope) error {
+func autoConvert_apiextensions_CustomResourceColumnDefinition_To_v1_CustomResourceColumnDefinition(in *pkgapisapiextensions.CustomResourceColumnDefinition, out *CustomResourceColumnDefinition, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
 	out.Type = in.Type
 	out.Format = in.Format
@@ -291,24 +291,24 @@ func autoConvert_apiextensions_CustomResourceColumnDefinition_To_v1_CustomResour
 }
 
 // Convert_apiextensions_CustomResourceColumnDefinition_To_v1_CustomResourceColumnDefinition is an autogenerated conversion function.
-func Convert_apiextensions_CustomResourceColumnDefinition_To_v1_CustomResourceColumnDefinition(in *apiextensions.CustomResourceColumnDefinition, out *CustomResourceColumnDefinition, s conversion.Scope) error {
+func Convert_apiextensions_CustomResourceColumnDefinition_To_v1_CustomResourceColumnDefinition(in *pkgapisapiextensions.CustomResourceColumnDefinition, out *CustomResourceColumnDefinition, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiextensions_CustomResourceColumnDefinition_To_v1_CustomResourceColumnDefinition(in, out, s)
 }
 
-func autoConvert_v1_CustomResourceConversion_To_apiextensions_CustomResourceConversion(in *CustomResourceConversion, out *apiextensions.CustomResourceConversion, s conversion.Scope) error {
-	out.Strategy = apiextensions.ConversionStrategyType(in.Strategy)
+func autoConvert_v1_CustomResourceConversion_To_apiextensions_CustomResourceConversion(in *CustomResourceConversion, out *pkgapisapiextensions.CustomResourceConversion, s apimachinerypkgconversion.Scope) error {
+	out.Strategy = pkgapisapiextensions.ConversionStrategyType(in.Strategy)
 	// WARNING: in.Webhook requires manual conversion: does not exist in peer-type
 	return nil
 }
 
-func autoConvert_apiextensions_CustomResourceConversion_To_v1_CustomResourceConversion(in *apiextensions.CustomResourceConversion, out *CustomResourceConversion, s conversion.Scope) error {
+func autoConvert_apiextensions_CustomResourceConversion_To_v1_CustomResourceConversion(in *pkgapisapiextensions.CustomResourceConversion, out *CustomResourceConversion, s apimachinerypkgconversion.Scope) error {
 	out.Strategy = ConversionStrategyType(in.Strategy)
 	// WARNING: in.WebhookClientConfig requires manual conversion: does not exist in peer-type
 	// WARNING: in.ConversionReviewVersions requires manual conversion: does not exist in peer-type
 	return nil
 }
 
-func autoConvert_v1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(in *CustomResourceDefinition, out *apiextensions.CustomResourceDefinition, s conversion.Scope) error {
+func autoConvert_v1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(in *CustomResourceDefinition, out *pkgapisapiextensions.CustomResourceDefinition, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_CustomResourceDefinitionSpec_To_apiextensions_CustomResourceDefinitionSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -320,11 +320,11 @@ func autoConvert_v1_CustomResourceDefinition_To_apiextensions_CustomResourceDefi
 }
 
 // Convert_v1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition is an autogenerated conversion function.
-func Convert_v1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(in *CustomResourceDefinition, out *apiextensions.CustomResourceDefinition, s conversion.Scope) error {
+func Convert_v1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(in *CustomResourceDefinition, out *pkgapisapiextensions.CustomResourceDefinition, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(in, out, s)
 }
 
-func autoConvert_apiextensions_CustomResourceDefinition_To_v1_CustomResourceDefinition(in *apiextensions.CustomResourceDefinition, out *CustomResourceDefinition, s conversion.Scope) error {
+func autoConvert_apiextensions_CustomResourceDefinition_To_v1_CustomResourceDefinition(in *pkgapisapiextensions.CustomResourceDefinition, out *CustomResourceDefinition, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apiextensions_CustomResourceDefinitionSpec_To_v1_CustomResourceDefinitionSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -336,13 +336,13 @@ func autoConvert_apiextensions_CustomResourceDefinition_To_v1_CustomResourceDefi
 }
 
 // Convert_apiextensions_CustomResourceDefinition_To_v1_CustomResourceDefinition is an autogenerated conversion function.
-func Convert_apiextensions_CustomResourceDefinition_To_v1_CustomResourceDefinition(in *apiextensions.CustomResourceDefinition, out *CustomResourceDefinition, s conversion.Scope) error {
+func Convert_apiextensions_CustomResourceDefinition_To_v1_CustomResourceDefinition(in *pkgapisapiextensions.CustomResourceDefinition, out *CustomResourceDefinition, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiextensions_CustomResourceDefinition_To_v1_CustomResourceDefinition(in, out, s)
 }
 
-func autoConvert_v1_CustomResourceDefinitionCondition_To_apiextensions_CustomResourceDefinitionCondition(in *CustomResourceDefinitionCondition, out *apiextensions.CustomResourceDefinitionCondition, s conversion.Scope) error {
-	out.Type = apiextensions.CustomResourceDefinitionConditionType(in.Type)
-	out.Status = apiextensions.ConditionStatus(in.Status)
+func autoConvert_v1_CustomResourceDefinitionCondition_To_apiextensions_CustomResourceDefinitionCondition(in *CustomResourceDefinitionCondition, out *pkgapisapiextensions.CustomResourceDefinitionCondition, s apimachinerypkgconversion.Scope) error {
+	out.Type = pkgapisapiextensions.CustomResourceDefinitionConditionType(in.Type)
+	out.Status = pkgapisapiextensions.ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
@@ -350,11 +350,11 @@ func autoConvert_v1_CustomResourceDefinitionCondition_To_apiextensions_CustomRes
 }
 
 // Convert_v1_CustomResourceDefinitionCondition_To_apiextensions_CustomResourceDefinitionCondition is an autogenerated conversion function.
-func Convert_v1_CustomResourceDefinitionCondition_To_apiextensions_CustomResourceDefinitionCondition(in *CustomResourceDefinitionCondition, out *apiextensions.CustomResourceDefinitionCondition, s conversion.Scope) error {
+func Convert_v1_CustomResourceDefinitionCondition_To_apiextensions_CustomResourceDefinitionCondition(in *CustomResourceDefinitionCondition, out *pkgapisapiextensions.CustomResourceDefinitionCondition, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_CustomResourceDefinitionCondition_To_apiextensions_CustomResourceDefinitionCondition(in, out, s)
 }
 
-func autoConvert_apiextensions_CustomResourceDefinitionCondition_To_v1_CustomResourceDefinitionCondition(in *apiextensions.CustomResourceDefinitionCondition, out *CustomResourceDefinitionCondition, s conversion.Scope) error {
+func autoConvert_apiextensions_CustomResourceDefinitionCondition_To_v1_CustomResourceDefinitionCondition(in *pkgapisapiextensions.CustomResourceDefinitionCondition, out *CustomResourceDefinitionCondition, s apimachinerypkgconversion.Scope) error {
 	out.Type = CustomResourceDefinitionConditionType(in.Type)
 	out.Status = ConditionStatus(in.Status)
 	out.LastTransitionTime = in.LastTransitionTime
@@ -364,15 +364,15 @@ func autoConvert_apiextensions_CustomResourceDefinitionCondition_To_v1_CustomRes
 }
 
 // Convert_apiextensions_CustomResourceDefinitionCondition_To_v1_CustomResourceDefinitionCondition is an autogenerated conversion function.
-func Convert_apiextensions_CustomResourceDefinitionCondition_To_v1_CustomResourceDefinitionCondition(in *apiextensions.CustomResourceDefinitionCondition, out *CustomResourceDefinitionCondition, s conversion.Scope) error {
+func Convert_apiextensions_CustomResourceDefinitionCondition_To_v1_CustomResourceDefinitionCondition(in *pkgapisapiextensions.CustomResourceDefinitionCondition, out *CustomResourceDefinitionCondition, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiextensions_CustomResourceDefinitionCondition_To_v1_CustomResourceDefinitionCondition(in, out, s)
 }
 
-func autoConvert_v1_CustomResourceDefinitionList_To_apiextensions_CustomResourceDefinitionList(in *CustomResourceDefinitionList, out *apiextensions.CustomResourceDefinitionList, s conversion.Scope) error {
+func autoConvert_v1_CustomResourceDefinitionList_To_apiextensions_CustomResourceDefinitionList(in *CustomResourceDefinitionList, out *pkgapisapiextensions.CustomResourceDefinitionList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]apiextensions.CustomResourceDefinition, len(*in))
+		*out = make([]pkgapisapiextensions.CustomResourceDefinition, len(*in))
 		for i := range *in {
 			if err := Convert_v1_CustomResourceDefinition_To_apiextensions_CustomResourceDefinition(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -385,11 +385,11 @@ func autoConvert_v1_CustomResourceDefinitionList_To_apiextensions_CustomResource
 }
 
 // Convert_v1_CustomResourceDefinitionList_To_apiextensions_CustomResourceDefinitionList is an autogenerated conversion function.
-func Convert_v1_CustomResourceDefinitionList_To_apiextensions_CustomResourceDefinitionList(in *CustomResourceDefinitionList, out *apiextensions.CustomResourceDefinitionList, s conversion.Scope) error {
+func Convert_v1_CustomResourceDefinitionList_To_apiextensions_CustomResourceDefinitionList(in *CustomResourceDefinitionList, out *pkgapisapiextensions.CustomResourceDefinitionList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_CustomResourceDefinitionList_To_apiextensions_CustomResourceDefinitionList(in, out, s)
 }
 
-func autoConvert_apiextensions_CustomResourceDefinitionList_To_v1_CustomResourceDefinitionList(in *apiextensions.CustomResourceDefinitionList, out *CustomResourceDefinitionList, s conversion.Scope) error {
+func autoConvert_apiextensions_CustomResourceDefinitionList_To_v1_CustomResourceDefinitionList(in *pkgapisapiextensions.CustomResourceDefinitionList, out *CustomResourceDefinitionList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -406,11 +406,11 @@ func autoConvert_apiextensions_CustomResourceDefinitionList_To_v1_CustomResource
 }
 
 // Convert_apiextensions_CustomResourceDefinitionList_To_v1_CustomResourceDefinitionList is an autogenerated conversion function.
-func Convert_apiextensions_CustomResourceDefinitionList_To_v1_CustomResourceDefinitionList(in *apiextensions.CustomResourceDefinitionList, out *CustomResourceDefinitionList, s conversion.Scope) error {
+func Convert_apiextensions_CustomResourceDefinitionList_To_v1_CustomResourceDefinitionList(in *pkgapisapiextensions.CustomResourceDefinitionList, out *CustomResourceDefinitionList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiextensions_CustomResourceDefinitionList_To_v1_CustomResourceDefinitionList(in, out, s)
 }
 
-func autoConvert_v1_CustomResourceDefinitionNames_To_apiextensions_CustomResourceDefinitionNames(in *CustomResourceDefinitionNames, out *apiextensions.CustomResourceDefinitionNames, s conversion.Scope) error {
+func autoConvert_v1_CustomResourceDefinitionNames_To_apiextensions_CustomResourceDefinitionNames(in *CustomResourceDefinitionNames, out *pkgapisapiextensions.CustomResourceDefinitionNames, s apimachinerypkgconversion.Scope) error {
 	out.Plural = in.Plural
 	out.Singular = in.Singular
 	out.ShortNames = *(*[]string)(unsafe.Pointer(&in.ShortNames))
@@ -421,11 +421,11 @@ func autoConvert_v1_CustomResourceDefinitionNames_To_apiextensions_CustomResourc
 }
 
 // Convert_v1_CustomResourceDefinitionNames_To_apiextensions_CustomResourceDefinitionNames is an autogenerated conversion function.
-func Convert_v1_CustomResourceDefinitionNames_To_apiextensions_CustomResourceDefinitionNames(in *CustomResourceDefinitionNames, out *apiextensions.CustomResourceDefinitionNames, s conversion.Scope) error {
+func Convert_v1_CustomResourceDefinitionNames_To_apiextensions_CustomResourceDefinitionNames(in *CustomResourceDefinitionNames, out *pkgapisapiextensions.CustomResourceDefinitionNames, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_CustomResourceDefinitionNames_To_apiextensions_CustomResourceDefinitionNames(in, out, s)
 }
 
-func autoConvert_apiextensions_CustomResourceDefinitionNames_To_v1_CustomResourceDefinitionNames(in *apiextensions.CustomResourceDefinitionNames, out *CustomResourceDefinitionNames, s conversion.Scope) error {
+func autoConvert_apiextensions_CustomResourceDefinitionNames_To_v1_CustomResourceDefinitionNames(in *pkgapisapiextensions.CustomResourceDefinitionNames, out *CustomResourceDefinitionNames, s apimachinerypkgconversion.Scope) error {
 	out.Plural = in.Plural
 	out.Singular = in.Singular
 	out.ShortNames = *(*[]string)(unsafe.Pointer(&in.ShortNames))
@@ -436,19 +436,19 @@ func autoConvert_apiextensions_CustomResourceDefinitionNames_To_v1_CustomResourc
 }
 
 // Convert_apiextensions_CustomResourceDefinitionNames_To_v1_CustomResourceDefinitionNames is an autogenerated conversion function.
-func Convert_apiextensions_CustomResourceDefinitionNames_To_v1_CustomResourceDefinitionNames(in *apiextensions.CustomResourceDefinitionNames, out *CustomResourceDefinitionNames, s conversion.Scope) error {
+func Convert_apiextensions_CustomResourceDefinitionNames_To_v1_CustomResourceDefinitionNames(in *pkgapisapiextensions.CustomResourceDefinitionNames, out *CustomResourceDefinitionNames, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiextensions_CustomResourceDefinitionNames_To_v1_CustomResourceDefinitionNames(in, out, s)
 }
 
-func autoConvert_v1_CustomResourceDefinitionSpec_To_apiextensions_CustomResourceDefinitionSpec(in *CustomResourceDefinitionSpec, out *apiextensions.CustomResourceDefinitionSpec, s conversion.Scope) error {
+func autoConvert_v1_CustomResourceDefinitionSpec_To_apiextensions_CustomResourceDefinitionSpec(in *CustomResourceDefinitionSpec, out *pkgapisapiextensions.CustomResourceDefinitionSpec, s apimachinerypkgconversion.Scope) error {
 	out.Group = in.Group
 	if err := Convert_v1_CustomResourceDefinitionNames_To_apiextensions_CustomResourceDefinitionNames(&in.Names, &out.Names, s); err != nil {
 		return err
 	}
-	out.Scope = apiextensions.ResourceScope(in.Scope)
+	out.Scope = pkgapisapiextensions.ResourceScope(in.Scope)
 	if in.Versions != nil {
 		in, out := &in.Versions, &out.Versions
-		*out = make([]apiextensions.CustomResourceDefinitionVersion, len(*in))
+		*out = make([]pkgapisapiextensions.CustomResourceDefinitionVersion, len(*in))
 		for i := range *in {
 			if err := Convert_v1_CustomResourceDefinitionVersion_To_apiextensions_CustomResourceDefinitionVersion(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -459,20 +459,20 @@ func autoConvert_v1_CustomResourceDefinitionSpec_To_apiextensions_CustomResource
 	}
 	if in.Conversion != nil {
 		in, out := &in.Conversion, &out.Conversion
-		*out = new(apiextensions.CustomResourceConversion)
+		*out = new(pkgapisapiextensions.CustomResourceConversion)
 		if err := Convert_v1_CustomResourceConversion_To_apiextensions_CustomResourceConversion(*in, *out, s); err != nil {
 			return err
 		}
 	} else {
 		out.Conversion = nil
 	}
-	if err := metav1.Convert_bool_To_Pointer_bool(&in.PreserveUnknownFields, &out.PreserveUnknownFields, s); err != nil {
+	if err := apismetav1.Convert_bool_To_Pointer_bool(&in.PreserveUnknownFields, &out.PreserveUnknownFields, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_apiextensions_CustomResourceDefinitionSpec_To_v1_CustomResourceDefinitionSpec(in *apiextensions.CustomResourceDefinitionSpec, out *CustomResourceDefinitionSpec, s conversion.Scope) error {
+func autoConvert_apiextensions_CustomResourceDefinitionSpec_To_v1_CustomResourceDefinitionSpec(in *pkgapisapiextensions.CustomResourceDefinitionSpec, out *CustomResourceDefinitionSpec, s apimachinerypkgconversion.Scope) error {
 	out.Group = in.Group
 	// WARNING: in.Version requires manual conversion: does not exist in peer-type
 	if err := Convert_apiextensions_CustomResourceDefinitionNames_To_v1_CustomResourceDefinitionNames(&in.Names, &out.Names, s); err != nil {
@@ -502,14 +502,14 @@ func autoConvert_apiextensions_CustomResourceDefinitionSpec_To_v1_CustomResource
 	} else {
 		out.Conversion = nil
 	}
-	if err := metav1.Convert_Pointer_bool_To_bool(&in.PreserveUnknownFields, &out.PreserveUnknownFields, s); err != nil {
+	if err := apismetav1.Convert_Pointer_bool_To_bool(&in.PreserveUnknownFields, &out.PreserveUnknownFields, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1_CustomResourceDefinitionStatus_To_apiextensions_CustomResourceDefinitionStatus(in *CustomResourceDefinitionStatus, out *apiextensions.CustomResourceDefinitionStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]apiextensions.CustomResourceDefinitionCondition)(unsafe.Pointer(&in.Conditions))
+func autoConvert_v1_CustomResourceDefinitionStatus_To_apiextensions_CustomResourceDefinitionStatus(in *CustomResourceDefinitionStatus, out *pkgapisapiextensions.CustomResourceDefinitionStatus, s apimachinerypkgconversion.Scope) error {
+	out.Conditions = *(*[]pkgapisapiextensions.CustomResourceDefinitionCondition)(unsafe.Pointer(&in.Conditions))
 	if err := Convert_v1_CustomResourceDefinitionNames_To_apiextensions_CustomResourceDefinitionNames(&in.AcceptedNames, &out.AcceptedNames, s); err != nil {
 		return err
 	}
@@ -518,11 +518,11 @@ func autoConvert_v1_CustomResourceDefinitionStatus_To_apiextensions_CustomResour
 }
 
 // Convert_v1_CustomResourceDefinitionStatus_To_apiextensions_CustomResourceDefinitionStatus is an autogenerated conversion function.
-func Convert_v1_CustomResourceDefinitionStatus_To_apiextensions_CustomResourceDefinitionStatus(in *CustomResourceDefinitionStatus, out *apiextensions.CustomResourceDefinitionStatus, s conversion.Scope) error {
+func Convert_v1_CustomResourceDefinitionStatus_To_apiextensions_CustomResourceDefinitionStatus(in *CustomResourceDefinitionStatus, out *pkgapisapiextensions.CustomResourceDefinitionStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_CustomResourceDefinitionStatus_To_apiextensions_CustomResourceDefinitionStatus(in, out, s)
 }
 
-func autoConvert_apiextensions_CustomResourceDefinitionStatus_To_v1_CustomResourceDefinitionStatus(in *apiextensions.CustomResourceDefinitionStatus, out *CustomResourceDefinitionStatus, s conversion.Scope) error {
+func autoConvert_apiextensions_CustomResourceDefinitionStatus_To_v1_CustomResourceDefinitionStatus(in *pkgapisapiextensions.CustomResourceDefinitionStatus, out *CustomResourceDefinitionStatus, s apimachinerypkgconversion.Scope) error {
 	out.Conditions = *(*[]CustomResourceDefinitionCondition)(unsafe.Pointer(&in.Conditions))
 	if err := Convert_apiextensions_CustomResourceDefinitionNames_To_v1_CustomResourceDefinitionNames(&in.AcceptedNames, &out.AcceptedNames, s); err != nil {
 		return err
@@ -532,11 +532,11 @@ func autoConvert_apiextensions_CustomResourceDefinitionStatus_To_v1_CustomResour
 }
 
 // Convert_apiextensions_CustomResourceDefinitionStatus_To_v1_CustomResourceDefinitionStatus is an autogenerated conversion function.
-func Convert_apiextensions_CustomResourceDefinitionStatus_To_v1_CustomResourceDefinitionStatus(in *apiextensions.CustomResourceDefinitionStatus, out *CustomResourceDefinitionStatus, s conversion.Scope) error {
+func Convert_apiextensions_CustomResourceDefinitionStatus_To_v1_CustomResourceDefinitionStatus(in *pkgapisapiextensions.CustomResourceDefinitionStatus, out *CustomResourceDefinitionStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiextensions_CustomResourceDefinitionStatus_To_v1_CustomResourceDefinitionStatus(in, out, s)
 }
 
-func autoConvert_v1_CustomResourceDefinitionVersion_To_apiextensions_CustomResourceDefinitionVersion(in *CustomResourceDefinitionVersion, out *apiextensions.CustomResourceDefinitionVersion, s conversion.Scope) error {
+func autoConvert_v1_CustomResourceDefinitionVersion_To_apiextensions_CustomResourceDefinitionVersion(in *CustomResourceDefinitionVersion, out *pkgapisapiextensions.CustomResourceDefinitionVersion, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
 	out.Served = in.Served
 	out.Storage = in.Storage
@@ -544,24 +544,24 @@ func autoConvert_v1_CustomResourceDefinitionVersion_To_apiextensions_CustomResou
 	out.DeprecationWarning = (*string)(unsafe.Pointer(in.DeprecationWarning))
 	if in.Schema != nil {
 		in, out := &in.Schema, &out.Schema
-		*out = new(apiextensions.CustomResourceValidation)
+		*out = new(pkgapisapiextensions.CustomResourceValidation)
 		if err := Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(*in, *out, s); err != nil {
 			return err
 		}
 	} else {
 		out.Schema = nil
 	}
-	out.Subresources = (*apiextensions.CustomResourceSubresources)(unsafe.Pointer(in.Subresources))
-	out.AdditionalPrinterColumns = *(*[]apiextensions.CustomResourceColumnDefinition)(unsafe.Pointer(&in.AdditionalPrinterColumns))
+	out.Subresources = (*pkgapisapiextensions.CustomResourceSubresources)(unsafe.Pointer(in.Subresources))
+	out.AdditionalPrinterColumns = *(*[]pkgapisapiextensions.CustomResourceColumnDefinition)(unsafe.Pointer(&in.AdditionalPrinterColumns))
 	return nil
 }
 
 // Convert_v1_CustomResourceDefinitionVersion_To_apiextensions_CustomResourceDefinitionVersion is an autogenerated conversion function.
-func Convert_v1_CustomResourceDefinitionVersion_To_apiextensions_CustomResourceDefinitionVersion(in *CustomResourceDefinitionVersion, out *apiextensions.CustomResourceDefinitionVersion, s conversion.Scope) error {
+func Convert_v1_CustomResourceDefinitionVersion_To_apiextensions_CustomResourceDefinitionVersion(in *CustomResourceDefinitionVersion, out *pkgapisapiextensions.CustomResourceDefinitionVersion, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_CustomResourceDefinitionVersion_To_apiextensions_CustomResourceDefinitionVersion(in, out, s)
 }
 
-func autoConvert_apiextensions_CustomResourceDefinitionVersion_To_v1_CustomResourceDefinitionVersion(in *apiextensions.CustomResourceDefinitionVersion, out *CustomResourceDefinitionVersion, s conversion.Scope) error {
+func autoConvert_apiextensions_CustomResourceDefinitionVersion_To_v1_CustomResourceDefinitionVersion(in *pkgapisapiextensions.CustomResourceDefinitionVersion, out *CustomResourceDefinitionVersion, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
 	out.Served = in.Served
 	out.Storage = in.Storage
@@ -582,11 +582,11 @@ func autoConvert_apiextensions_CustomResourceDefinitionVersion_To_v1_CustomResou
 }
 
 // Convert_apiextensions_CustomResourceDefinitionVersion_To_v1_CustomResourceDefinitionVersion is an autogenerated conversion function.
-func Convert_apiextensions_CustomResourceDefinitionVersion_To_v1_CustomResourceDefinitionVersion(in *apiextensions.CustomResourceDefinitionVersion, out *CustomResourceDefinitionVersion, s conversion.Scope) error {
+func Convert_apiextensions_CustomResourceDefinitionVersion_To_v1_CustomResourceDefinitionVersion(in *pkgapisapiextensions.CustomResourceDefinitionVersion, out *CustomResourceDefinitionVersion, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiextensions_CustomResourceDefinitionVersion_To_v1_CustomResourceDefinitionVersion(in, out, s)
 }
 
-func autoConvert_v1_CustomResourceSubresourceScale_To_apiextensions_CustomResourceSubresourceScale(in *CustomResourceSubresourceScale, out *apiextensions.CustomResourceSubresourceScale, s conversion.Scope) error {
+func autoConvert_v1_CustomResourceSubresourceScale_To_apiextensions_CustomResourceSubresourceScale(in *CustomResourceSubresourceScale, out *pkgapisapiextensions.CustomResourceSubresourceScale, s apimachinerypkgconversion.Scope) error {
 	out.SpecReplicasPath = in.SpecReplicasPath
 	out.StatusReplicasPath = in.StatusReplicasPath
 	out.LabelSelectorPath = (*string)(unsafe.Pointer(in.LabelSelectorPath))
@@ -594,11 +594,11 @@ func autoConvert_v1_CustomResourceSubresourceScale_To_apiextensions_CustomResour
 }
 
 // Convert_v1_CustomResourceSubresourceScale_To_apiextensions_CustomResourceSubresourceScale is an autogenerated conversion function.
-func Convert_v1_CustomResourceSubresourceScale_To_apiextensions_CustomResourceSubresourceScale(in *CustomResourceSubresourceScale, out *apiextensions.CustomResourceSubresourceScale, s conversion.Scope) error {
+func Convert_v1_CustomResourceSubresourceScale_To_apiextensions_CustomResourceSubresourceScale(in *CustomResourceSubresourceScale, out *pkgapisapiextensions.CustomResourceSubresourceScale, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_CustomResourceSubresourceScale_To_apiextensions_CustomResourceSubresourceScale(in, out, s)
 }
 
-func autoConvert_apiextensions_CustomResourceSubresourceScale_To_v1_CustomResourceSubresourceScale(in *apiextensions.CustomResourceSubresourceScale, out *CustomResourceSubresourceScale, s conversion.Scope) error {
+func autoConvert_apiextensions_CustomResourceSubresourceScale_To_v1_CustomResourceSubresourceScale(in *pkgapisapiextensions.CustomResourceSubresourceScale, out *CustomResourceSubresourceScale, s apimachinerypkgconversion.Scope) error {
 	out.SpecReplicasPath = in.SpecReplicasPath
 	out.StatusReplicasPath = in.StatusReplicasPath
 	out.LabelSelectorPath = (*string)(unsafe.Pointer(in.LabelSelectorPath))
@@ -606,54 +606,54 @@ func autoConvert_apiextensions_CustomResourceSubresourceScale_To_v1_CustomResour
 }
 
 // Convert_apiextensions_CustomResourceSubresourceScale_To_v1_CustomResourceSubresourceScale is an autogenerated conversion function.
-func Convert_apiextensions_CustomResourceSubresourceScale_To_v1_CustomResourceSubresourceScale(in *apiextensions.CustomResourceSubresourceScale, out *CustomResourceSubresourceScale, s conversion.Scope) error {
+func Convert_apiextensions_CustomResourceSubresourceScale_To_v1_CustomResourceSubresourceScale(in *pkgapisapiextensions.CustomResourceSubresourceScale, out *CustomResourceSubresourceScale, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiextensions_CustomResourceSubresourceScale_To_v1_CustomResourceSubresourceScale(in, out, s)
 }
 
-func autoConvert_v1_CustomResourceSubresourceStatus_To_apiextensions_CustomResourceSubresourceStatus(in *CustomResourceSubresourceStatus, out *apiextensions.CustomResourceSubresourceStatus, s conversion.Scope) error {
+func autoConvert_v1_CustomResourceSubresourceStatus_To_apiextensions_CustomResourceSubresourceStatus(in *CustomResourceSubresourceStatus, out *pkgapisapiextensions.CustomResourceSubresourceStatus, s apimachinerypkgconversion.Scope) error {
 	return nil
 }
 
 // Convert_v1_CustomResourceSubresourceStatus_To_apiextensions_CustomResourceSubresourceStatus is an autogenerated conversion function.
-func Convert_v1_CustomResourceSubresourceStatus_To_apiextensions_CustomResourceSubresourceStatus(in *CustomResourceSubresourceStatus, out *apiextensions.CustomResourceSubresourceStatus, s conversion.Scope) error {
+func Convert_v1_CustomResourceSubresourceStatus_To_apiextensions_CustomResourceSubresourceStatus(in *CustomResourceSubresourceStatus, out *pkgapisapiextensions.CustomResourceSubresourceStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_CustomResourceSubresourceStatus_To_apiextensions_CustomResourceSubresourceStatus(in, out, s)
 }
 
-func autoConvert_apiextensions_CustomResourceSubresourceStatus_To_v1_CustomResourceSubresourceStatus(in *apiextensions.CustomResourceSubresourceStatus, out *CustomResourceSubresourceStatus, s conversion.Scope) error {
+func autoConvert_apiextensions_CustomResourceSubresourceStatus_To_v1_CustomResourceSubresourceStatus(in *pkgapisapiextensions.CustomResourceSubresourceStatus, out *CustomResourceSubresourceStatus, s apimachinerypkgconversion.Scope) error {
 	return nil
 }
 
 // Convert_apiextensions_CustomResourceSubresourceStatus_To_v1_CustomResourceSubresourceStatus is an autogenerated conversion function.
-func Convert_apiextensions_CustomResourceSubresourceStatus_To_v1_CustomResourceSubresourceStatus(in *apiextensions.CustomResourceSubresourceStatus, out *CustomResourceSubresourceStatus, s conversion.Scope) error {
+func Convert_apiextensions_CustomResourceSubresourceStatus_To_v1_CustomResourceSubresourceStatus(in *pkgapisapiextensions.CustomResourceSubresourceStatus, out *CustomResourceSubresourceStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiextensions_CustomResourceSubresourceStatus_To_v1_CustomResourceSubresourceStatus(in, out, s)
 }
 
-func autoConvert_v1_CustomResourceSubresources_To_apiextensions_CustomResourceSubresources(in *CustomResourceSubresources, out *apiextensions.CustomResourceSubresources, s conversion.Scope) error {
-	out.Status = (*apiextensions.CustomResourceSubresourceStatus)(unsafe.Pointer(in.Status))
-	out.Scale = (*apiextensions.CustomResourceSubresourceScale)(unsafe.Pointer(in.Scale))
+func autoConvert_v1_CustomResourceSubresources_To_apiextensions_CustomResourceSubresources(in *CustomResourceSubresources, out *pkgapisapiextensions.CustomResourceSubresources, s apimachinerypkgconversion.Scope) error {
+	out.Status = (*pkgapisapiextensions.CustomResourceSubresourceStatus)(unsafe.Pointer(in.Status))
+	out.Scale = (*pkgapisapiextensions.CustomResourceSubresourceScale)(unsafe.Pointer(in.Scale))
 	return nil
 }
 
 // Convert_v1_CustomResourceSubresources_To_apiextensions_CustomResourceSubresources is an autogenerated conversion function.
-func Convert_v1_CustomResourceSubresources_To_apiextensions_CustomResourceSubresources(in *CustomResourceSubresources, out *apiextensions.CustomResourceSubresources, s conversion.Scope) error {
+func Convert_v1_CustomResourceSubresources_To_apiextensions_CustomResourceSubresources(in *CustomResourceSubresources, out *pkgapisapiextensions.CustomResourceSubresources, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_CustomResourceSubresources_To_apiextensions_CustomResourceSubresources(in, out, s)
 }
 
-func autoConvert_apiextensions_CustomResourceSubresources_To_v1_CustomResourceSubresources(in *apiextensions.CustomResourceSubresources, out *CustomResourceSubresources, s conversion.Scope) error {
+func autoConvert_apiextensions_CustomResourceSubresources_To_v1_CustomResourceSubresources(in *pkgapisapiextensions.CustomResourceSubresources, out *CustomResourceSubresources, s apimachinerypkgconversion.Scope) error {
 	out.Status = (*CustomResourceSubresourceStatus)(unsafe.Pointer(in.Status))
 	out.Scale = (*CustomResourceSubresourceScale)(unsafe.Pointer(in.Scale))
 	return nil
 }
 
 // Convert_apiextensions_CustomResourceSubresources_To_v1_CustomResourceSubresources is an autogenerated conversion function.
-func Convert_apiextensions_CustomResourceSubresources_To_v1_CustomResourceSubresources(in *apiextensions.CustomResourceSubresources, out *CustomResourceSubresources, s conversion.Scope) error {
+func Convert_apiextensions_CustomResourceSubresources_To_v1_CustomResourceSubresources(in *pkgapisapiextensions.CustomResourceSubresources, out *CustomResourceSubresources, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiextensions_CustomResourceSubresources_To_v1_CustomResourceSubresources(in, out, s)
 }
 
-func autoConvert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(in *CustomResourceValidation, out *apiextensions.CustomResourceValidation, s conversion.Scope) error {
+func autoConvert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(in *CustomResourceValidation, out *pkgapisapiextensions.CustomResourceValidation, s apimachinerypkgconversion.Scope) error {
 	if in.OpenAPIV3Schema != nil {
 		in, out := &in.OpenAPIV3Schema, &out.OpenAPIV3Schema
-		*out = new(apiextensions.JSONSchemaProps)
+		*out = new(pkgapisapiextensions.JSONSchemaProps)
 		if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(*in, *out, s); err != nil {
 			return err
 		}
@@ -664,11 +664,11 @@ func autoConvert_v1_CustomResourceValidation_To_apiextensions_CustomResourceVali
 }
 
 // Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation is an autogenerated conversion function.
-func Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(in *CustomResourceValidation, out *apiextensions.CustomResourceValidation, s conversion.Scope) error {
+func Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(in *CustomResourceValidation, out *pkgapisapiextensions.CustomResourceValidation, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(in, out, s)
 }
 
-func autoConvert_apiextensions_CustomResourceValidation_To_v1_CustomResourceValidation(in *apiextensions.CustomResourceValidation, out *CustomResourceValidation, s conversion.Scope) error {
+func autoConvert_apiextensions_CustomResourceValidation_To_v1_CustomResourceValidation(in *pkgapisapiextensions.CustomResourceValidation, out *CustomResourceValidation, s apimachinerypkgconversion.Scope) error {
 	if in.OpenAPIV3Schema != nil {
 		in, out := &in.OpenAPIV3Schema, &out.OpenAPIV3Schema
 		*out = new(JSONSchemaProps)
@@ -682,45 +682,45 @@ func autoConvert_apiextensions_CustomResourceValidation_To_v1_CustomResourceVali
 }
 
 // Convert_apiextensions_CustomResourceValidation_To_v1_CustomResourceValidation is an autogenerated conversion function.
-func Convert_apiextensions_CustomResourceValidation_To_v1_CustomResourceValidation(in *apiextensions.CustomResourceValidation, out *CustomResourceValidation, s conversion.Scope) error {
+func Convert_apiextensions_CustomResourceValidation_To_v1_CustomResourceValidation(in *pkgapisapiextensions.CustomResourceValidation, out *CustomResourceValidation, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiextensions_CustomResourceValidation_To_v1_CustomResourceValidation(in, out, s)
 }
 
-func autoConvert_v1_ExternalDocumentation_To_apiextensions_ExternalDocumentation(in *ExternalDocumentation, out *apiextensions.ExternalDocumentation, s conversion.Scope) error {
+func autoConvert_v1_ExternalDocumentation_To_apiextensions_ExternalDocumentation(in *ExternalDocumentation, out *pkgapisapiextensions.ExternalDocumentation, s apimachinerypkgconversion.Scope) error {
 	out.Description = in.Description
 	out.URL = in.URL
 	return nil
 }
 
 // Convert_v1_ExternalDocumentation_To_apiextensions_ExternalDocumentation is an autogenerated conversion function.
-func Convert_v1_ExternalDocumentation_To_apiextensions_ExternalDocumentation(in *ExternalDocumentation, out *apiextensions.ExternalDocumentation, s conversion.Scope) error {
+func Convert_v1_ExternalDocumentation_To_apiextensions_ExternalDocumentation(in *ExternalDocumentation, out *pkgapisapiextensions.ExternalDocumentation, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_ExternalDocumentation_To_apiextensions_ExternalDocumentation(in, out, s)
 }
 
-func autoConvert_apiextensions_ExternalDocumentation_To_v1_ExternalDocumentation(in *apiextensions.ExternalDocumentation, out *ExternalDocumentation, s conversion.Scope) error {
+func autoConvert_apiextensions_ExternalDocumentation_To_v1_ExternalDocumentation(in *pkgapisapiextensions.ExternalDocumentation, out *ExternalDocumentation, s apimachinerypkgconversion.Scope) error {
 	out.Description = in.Description
 	out.URL = in.URL
 	return nil
 }
 
 // Convert_apiextensions_ExternalDocumentation_To_v1_ExternalDocumentation is an autogenerated conversion function.
-func Convert_apiextensions_ExternalDocumentation_To_v1_ExternalDocumentation(in *apiextensions.ExternalDocumentation, out *ExternalDocumentation, s conversion.Scope) error {
+func Convert_apiextensions_ExternalDocumentation_To_v1_ExternalDocumentation(in *pkgapisapiextensions.ExternalDocumentation, out *ExternalDocumentation, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiextensions_ExternalDocumentation_To_v1_ExternalDocumentation(in, out, s)
 }
 
-func autoConvert_v1_JSON_To_apiextensions_JSON(in *JSON, out *apiextensions.JSON, s conversion.Scope) error {
+func autoConvert_v1_JSON_To_apiextensions_JSON(in *JSON, out *pkgapisapiextensions.JSON, s apimachinerypkgconversion.Scope) error {
 	// WARNING: in.Raw requires manual conversion: does not exist in peer-type
 	return nil
 }
 
-func autoConvert_apiextensions_JSON_To_v1_JSON(in *apiextensions.JSON, out *JSON, s conversion.Scope) error {
-	// FIXME: Type apiextensions.JSON is unsupported.
+func autoConvert_apiextensions_JSON_To_v1_JSON(in *pkgapisapiextensions.JSON, out *JSON, s apimachinerypkgconversion.Scope) error {
+	// FIXME: Type pkgapisapiextensions.JSON is unsupported.
 	return nil
 }
 
-func autoConvert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JSONSchemaProps, out *apiextensions.JSONSchemaProps, s conversion.Scope) error {
+func autoConvert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JSONSchemaProps, out *pkgapisapiextensions.JSONSchemaProps, s apimachinerypkgconversion.Scope) error {
 	out.ID = in.ID
-	out.Schema = apiextensions.JSONSchemaURL(in.Schema)
+	out.Schema = pkgapisapiextensions.JSONSchemaURL(in.Schema)
 	out.Ref = (*string)(unsafe.Pointer(in.Ref))
 	out.Description = in.Description
 	out.Type = in.Type
@@ -728,7 +728,7 @@ func autoConvert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JSONSch
 	out.Title = in.Title
 	if in.Default != nil {
 		in, out := &in.Default, &out.Default
-		*out = new(apiextensions.JSON)
+		*out = new(pkgapisapiextensions.JSON)
 		if err := Convert_v1_JSON_To_apiextensions_JSON(*in, *out, s); err != nil {
 			return err
 		}
@@ -748,7 +748,7 @@ func autoConvert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JSONSch
 	out.MultipleOf = (*float64)(unsafe.Pointer(in.MultipleOf))
 	if in.Enum != nil {
 		in, out := &in.Enum, &out.Enum
-		*out = make([]apiextensions.JSON, len(*in))
+		*out = make([]pkgapisapiextensions.JSON, len(*in))
 		for i := range *in {
 			if err := Convert_v1_JSON_To_apiextensions_JSON(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -762,7 +762,7 @@ func autoConvert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JSONSch
 	out.Required = *(*[]string)(unsafe.Pointer(&in.Required))
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = new(apiextensions.JSONSchemaPropsOrArray)
+		*out = new(pkgapisapiextensions.JSONSchemaPropsOrArray)
 		if err := Convert_v1_JSONSchemaPropsOrArray_To_apiextensions_JSONSchemaPropsOrArray(*in, *out, s); err != nil {
 			return err
 		}
@@ -771,7 +771,7 @@ func autoConvert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JSONSch
 	}
 	if in.AllOf != nil {
 		in, out := &in.AllOf, &out.AllOf
-		*out = make([]apiextensions.JSONSchemaProps, len(*in))
+		*out = make([]pkgapisapiextensions.JSONSchemaProps, len(*in))
 		for i := range *in {
 			if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -782,7 +782,7 @@ func autoConvert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JSONSch
 	}
 	if in.OneOf != nil {
 		in, out := &in.OneOf, &out.OneOf
-		*out = make([]apiextensions.JSONSchemaProps, len(*in))
+		*out = make([]pkgapisapiextensions.JSONSchemaProps, len(*in))
 		for i := range *in {
 			if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -793,7 +793,7 @@ func autoConvert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JSONSch
 	}
 	if in.AnyOf != nil {
 		in, out := &in.AnyOf, &out.AnyOf
-		*out = make([]apiextensions.JSONSchemaProps, len(*in))
+		*out = make([]pkgapisapiextensions.JSONSchemaProps, len(*in))
 		for i := range *in {
 			if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -804,7 +804,7 @@ func autoConvert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JSONSch
 	}
 	if in.Not != nil {
 		in, out := &in.Not, &out.Not
-		*out = new(apiextensions.JSONSchemaProps)
+		*out = new(pkgapisapiextensions.JSONSchemaProps)
 		if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(*in, *out, s); err != nil {
 			return err
 		}
@@ -813,9 +813,9 @@ func autoConvert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JSONSch
 	}
 	if in.Properties != nil {
 		in, out := &in.Properties, &out.Properties
-		*out = make(map[string]apiextensions.JSONSchemaProps, len(*in))
+		*out = make(map[string]pkgapisapiextensions.JSONSchemaProps, len(*in))
 		for key, val := range *in {
-			newVal := new(apiextensions.JSONSchemaProps)
+			newVal := new(pkgapisapiextensions.JSONSchemaProps)
 			if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&val, newVal, s); err != nil {
 				return err
 			}
@@ -826,7 +826,7 @@ func autoConvert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JSONSch
 	}
 	if in.AdditionalProperties != nil {
 		in, out := &in.AdditionalProperties, &out.AdditionalProperties
-		*out = new(apiextensions.JSONSchemaPropsOrBool)
+		*out = new(pkgapisapiextensions.JSONSchemaPropsOrBool)
 		if err := Convert_v1_JSONSchemaPropsOrBool_To_apiextensions_JSONSchemaPropsOrBool(*in, *out, s); err != nil {
 			return err
 		}
@@ -835,9 +835,9 @@ func autoConvert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JSONSch
 	}
 	if in.PatternProperties != nil {
 		in, out := &in.PatternProperties, &out.PatternProperties
-		*out = make(map[string]apiextensions.JSONSchemaProps, len(*in))
+		*out = make(map[string]pkgapisapiextensions.JSONSchemaProps, len(*in))
 		for key, val := range *in {
-			newVal := new(apiextensions.JSONSchemaProps)
+			newVal := new(pkgapisapiextensions.JSONSchemaProps)
 			if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&val, newVal, s); err != nil {
 				return err
 			}
@@ -848,9 +848,9 @@ func autoConvert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JSONSch
 	}
 	if in.Dependencies != nil {
 		in, out := &in.Dependencies, &out.Dependencies
-		*out = make(apiextensions.JSONSchemaDependencies, len(*in))
+		*out = make(pkgapisapiextensions.JSONSchemaDependencies, len(*in))
 		for key, val := range *in {
-			newVal := new(apiextensions.JSONSchemaPropsOrStringArray)
+			newVal := new(pkgapisapiextensions.JSONSchemaPropsOrStringArray)
 			if err := Convert_v1_JSONSchemaPropsOrStringArray_To_apiextensions_JSONSchemaPropsOrStringArray(&val, newVal, s); err != nil {
 				return err
 			}
@@ -861,7 +861,7 @@ func autoConvert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JSONSch
 	}
 	if in.AdditionalItems != nil {
 		in, out := &in.AdditionalItems, &out.AdditionalItems
-		*out = new(apiextensions.JSONSchemaPropsOrBool)
+		*out = new(pkgapisapiextensions.JSONSchemaPropsOrBool)
 		if err := Convert_v1_JSONSchemaPropsOrBool_To_apiextensions_JSONSchemaPropsOrBool(*in, *out, s); err != nil {
 			return err
 		}
@@ -870,9 +870,9 @@ func autoConvert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JSONSch
 	}
 	if in.Definitions != nil {
 		in, out := &in.Definitions, &out.Definitions
-		*out = make(apiextensions.JSONSchemaDefinitions, len(*in))
+		*out = make(pkgapisapiextensions.JSONSchemaDefinitions, len(*in))
 		for key, val := range *in {
-			newVal := new(apiextensions.JSONSchemaProps)
+			newVal := new(pkgapisapiextensions.JSONSchemaProps)
 			if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&val, newVal, s); err != nil {
 				return err
 			}
@@ -881,10 +881,10 @@ func autoConvert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JSONSch
 	} else {
 		out.Definitions = nil
 	}
-	out.ExternalDocs = (*apiextensions.ExternalDocumentation)(unsafe.Pointer(in.ExternalDocs))
+	out.ExternalDocs = (*pkgapisapiextensions.ExternalDocumentation)(unsafe.Pointer(in.ExternalDocs))
 	if in.Example != nil {
 		in, out := &in.Example, &out.Example
-		*out = new(apiextensions.JSON)
+		*out = new(pkgapisapiextensions.JSON)
 		if err := Convert_v1_JSON_To_apiextensions_JSON(*in, *out, s); err != nil {
 			return err
 		}
@@ -898,16 +898,16 @@ func autoConvert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JSONSch
 	out.XListMapKeys = *(*[]string)(unsafe.Pointer(&in.XListMapKeys))
 	out.XListType = (*string)(unsafe.Pointer(in.XListType))
 	out.XMapType = (*string)(unsafe.Pointer(in.XMapType))
-	out.XValidations = *(*apiextensions.ValidationRules)(unsafe.Pointer(&in.XValidations))
+	out.XValidations = *(*pkgapisapiextensions.ValidationRules)(unsafe.Pointer(&in.XValidations))
 	return nil
 }
 
 // Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps is an autogenerated conversion function.
-func Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JSONSchemaProps, out *apiextensions.JSONSchemaProps, s conversion.Scope) error {
+func Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JSONSchemaProps, out *pkgapisapiextensions.JSONSchemaProps, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in, out, s)
 }
 
-func autoConvert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(in *apiextensions.JSONSchemaProps, out *JSONSchemaProps, s conversion.Scope) error {
+func autoConvert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(in *pkgapisapiextensions.JSONSchemaProps, out *JSONSchemaProps, s apimachinerypkgconversion.Scope) error {
 	out.ID = in.ID
 	out.Schema = JSONSchemaURL(in.Schema)
 	out.Ref = (*string)(unsafe.Pointer(in.Ref))
@@ -1091,10 +1091,10 @@ func autoConvert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(in *apiexte
 	return nil
 }
 
-func autoConvert_v1_JSONSchemaPropsOrArray_To_apiextensions_JSONSchemaPropsOrArray(in *JSONSchemaPropsOrArray, out *apiextensions.JSONSchemaPropsOrArray, s conversion.Scope) error {
+func autoConvert_v1_JSONSchemaPropsOrArray_To_apiextensions_JSONSchemaPropsOrArray(in *JSONSchemaPropsOrArray, out *pkgapisapiextensions.JSONSchemaPropsOrArray, s apimachinerypkgconversion.Scope) error {
 	if in.Schema != nil {
 		in, out := &in.Schema, &out.Schema
-		*out = new(apiextensions.JSONSchemaProps)
+		*out = new(pkgapisapiextensions.JSONSchemaProps)
 		if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(*in, *out, s); err != nil {
 			return err
 		}
@@ -1103,7 +1103,7 @@ func autoConvert_v1_JSONSchemaPropsOrArray_To_apiextensions_JSONSchemaPropsOrArr
 	}
 	if in.JSONSchemas != nil {
 		in, out := &in.JSONSchemas, &out.JSONSchemas
-		*out = make([]apiextensions.JSONSchemaProps, len(*in))
+		*out = make([]pkgapisapiextensions.JSONSchemaProps, len(*in))
 		for i := range *in {
 			if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -1116,11 +1116,11 @@ func autoConvert_v1_JSONSchemaPropsOrArray_To_apiextensions_JSONSchemaPropsOrArr
 }
 
 // Convert_v1_JSONSchemaPropsOrArray_To_apiextensions_JSONSchemaPropsOrArray is an autogenerated conversion function.
-func Convert_v1_JSONSchemaPropsOrArray_To_apiextensions_JSONSchemaPropsOrArray(in *JSONSchemaPropsOrArray, out *apiextensions.JSONSchemaPropsOrArray, s conversion.Scope) error {
+func Convert_v1_JSONSchemaPropsOrArray_To_apiextensions_JSONSchemaPropsOrArray(in *JSONSchemaPropsOrArray, out *pkgapisapiextensions.JSONSchemaPropsOrArray, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_JSONSchemaPropsOrArray_To_apiextensions_JSONSchemaPropsOrArray(in, out, s)
 }
 
-func autoConvert_apiextensions_JSONSchemaPropsOrArray_To_v1_JSONSchemaPropsOrArray(in *apiextensions.JSONSchemaPropsOrArray, out *JSONSchemaPropsOrArray, s conversion.Scope) error {
+func autoConvert_apiextensions_JSONSchemaPropsOrArray_To_v1_JSONSchemaPropsOrArray(in *pkgapisapiextensions.JSONSchemaPropsOrArray, out *JSONSchemaPropsOrArray, s apimachinerypkgconversion.Scope) error {
 	if in.Schema != nil {
 		in, out := &in.Schema, &out.Schema
 		*out = new(JSONSchemaProps)
@@ -1145,15 +1145,15 @@ func autoConvert_apiextensions_JSONSchemaPropsOrArray_To_v1_JSONSchemaPropsOrArr
 }
 
 // Convert_apiextensions_JSONSchemaPropsOrArray_To_v1_JSONSchemaPropsOrArray is an autogenerated conversion function.
-func Convert_apiextensions_JSONSchemaPropsOrArray_To_v1_JSONSchemaPropsOrArray(in *apiextensions.JSONSchemaPropsOrArray, out *JSONSchemaPropsOrArray, s conversion.Scope) error {
+func Convert_apiextensions_JSONSchemaPropsOrArray_To_v1_JSONSchemaPropsOrArray(in *pkgapisapiextensions.JSONSchemaPropsOrArray, out *JSONSchemaPropsOrArray, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiextensions_JSONSchemaPropsOrArray_To_v1_JSONSchemaPropsOrArray(in, out, s)
 }
 
-func autoConvert_v1_JSONSchemaPropsOrBool_To_apiextensions_JSONSchemaPropsOrBool(in *JSONSchemaPropsOrBool, out *apiextensions.JSONSchemaPropsOrBool, s conversion.Scope) error {
+func autoConvert_v1_JSONSchemaPropsOrBool_To_apiextensions_JSONSchemaPropsOrBool(in *JSONSchemaPropsOrBool, out *pkgapisapiextensions.JSONSchemaPropsOrBool, s apimachinerypkgconversion.Scope) error {
 	out.Allows = in.Allows
 	if in.Schema != nil {
 		in, out := &in.Schema, &out.Schema
-		*out = new(apiextensions.JSONSchemaProps)
+		*out = new(pkgapisapiextensions.JSONSchemaProps)
 		if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(*in, *out, s); err != nil {
 			return err
 		}
@@ -1164,11 +1164,11 @@ func autoConvert_v1_JSONSchemaPropsOrBool_To_apiextensions_JSONSchemaPropsOrBool
 }
 
 // Convert_v1_JSONSchemaPropsOrBool_To_apiextensions_JSONSchemaPropsOrBool is an autogenerated conversion function.
-func Convert_v1_JSONSchemaPropsOrBool_To_apiextensions_JSONSchemaPropsOrBool(in *JSONSchemaPropsOrBool, out *apiextensions.JSONSchemaPropsOrBool, s conversion.Scope) error {
+func Convert_v1_JSONSchemaPropsOrBool_To_apiextensions_JSONSchemaPropsOrBool(in *JSONSchemaPropsOrBool, out *pkgapisapiextensions.JSONSchemaPropsOrBool, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_JSONSchemaPropsOrBool_To_apiextensions_JSONSchemaPropsOrBool(in, out, s)
 }
 
-func autoConvert_apiextensions_JSONSchemaPropsOrBool_To_v1_JSONSchemaPropsOrBool(in *apiextensions.JSONSchemaPropsOrBool, out *JSONSchemaPropsOrBool, s conversion.Scope) error {
+func autoConvert_apiextensions_JSONSchemaPropsOrBool_To_v1_JSONSchemaPropsOrBool(in *pkgapisapiextensions.JSONSchemaPropsOrBool, out *JSONSchemaPropsOrBool, s apimachinerypkgconversion.Scope) error {
 	out.Allows = in.Allows
 	if in.Schema != nil {
 		in, out := &in.Schema, &out.Schema
@@ -1183,14 +1183,14 @@ func autoConvert_apiextensions_JSONSchemaPropsOrBool_To_v1_JSONSchemaPropsOrBool
 }
 
 // Convert_apiextensions_JSONSchemaPropsOrBool_To_v1_JSONSchemaPropsOrBool is an autogenerated conversion function.
-func Convert_apiextensions_JSONSchemaPropsOrBool_To_v1_JSONSchemaPropsOrBool(in *apiextensions.JSONSchemaPropsOrBool, out *JSONSchemaPropsOrBool, s conversion.Scope) error {
+func Convert_apiextensions_JSONSchemaPropsOrBool_To_v1_JSONSchemaPropsOrBool(in *pkgapisapiextensions.JSONSchemaPropsOrBool, out *JSONSchemaPropsOrBool, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiextensions_JSONSchemaPropsOrBool_To_v1_JSONSchemaPropsOrBool(in, out, s)
 }
 
-func autoConvert_v1_JSONSchemaPropsOrStringArray_To_apiextensions_JSONSchemaPropsOrStringArray(in *JSONSchemaPropsOrStringArray, out *apiextensions.JSONSchemaPropsOrStringArray, s conversion.Scope) error {
+func autoConvert_v1_JSONSchemaPropsOrStringArray_To_apiextensions_JSONSchemaPropsOrStringArray(in *JSONSchemaPropsOrStringArray, out *pkgapisapiextensions.JSONSchemaPropsOrStringArray, s apimachinerypkgconversion.Scope) error {
 	if in.Schema != nil {
 		in, out := &in.Schema, &out.Schema
-		*out = new(apiextensions.JSONSchemaProps)
+		*out = new(pkgapisapiextensions.JSONSchemaProps)
 		if err := Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(*in, *out, s); err != nil {
 			return err
 		}
@@ -1202,11 +1202,11 @@ func autoConvert_v1_JSONSchemaPropsOrStringArray_To_apiextensions_JSONSchemaProp
 }
 
 // Convert_v1_JSONSchemaPropsOrStringArray_To_apiextensions_JSONSchemaPropsOrStringArray is an autogenerated conversion function.
-func Convert_v1_JSONSchemaPropsOrStringArray_To_apiextensions_JSONSchemaPropsOrStringArray(in *JSONSchemaPropsOrStringArray, out *apiextensions.JSONSchemaPropsOrStringArray, s conversion.Scope) error {
+func Convert_v1_JSONSchemaPropsOrStringArray_To_apiextensions_JSONSchemaPropsOrStringArray(in *JSONSchemaPropsOrStringArray, out *pkgapisapiextensions.JSONSchemaPropsOrStringArray, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_JSONSchemaPropsOrStringArray_To_apiextensions_JSONSchemaPropsOrStringArray(in, out, s)
 }
 
-func autoConvert_apiextensions_JSONSchemaPropsOrStringArray_To_v1_JSONSchemaPropsOrStringArray(in *apiextensions.JSONSchemaPropsOrStringArray, out *JSONSchemaPropsOrStringArray, s conversion.Scope) error {
+func autoConvert_apiextensions_JSONSchemaPropsOrStringArray_To_v1_JSONSchemaPropsOrStringArray(in *pkgapisapiextensions.JSONSchemaPropsOrStringArray, out *JSONSchemaPropsOrStringArray, s apimachinerypkgconversion.Scope) error {
 	if in.Schema != nil {
 		in, out := &in.Schema, &out.Schema
 		*out = new(JSONSchemaProps)
@@ -1221,41 +1221,41 @@ func autoConvert_apiextensions_JSONSchemaPropsOrStringArray_To_v1_JSONSchemaProp
 }
 
 // Convert_apiextensions_JSONSchemaPropsOrStringArray_To_v1_JSONSchemaPropsOrStringArray is an autogenerated conversion function.
-func Convert_apiextensions_JSONSchemaPropsOrStringArray_To_v1_JSONSchemaPropsOrStringArray(in *apiextensions.JSONSchemaPropsOrStringArray, out *JSONSchemaPropsOrStringArray, s conversion.Scope) error {
+func Convert_apiextensions_JSONSchemaPropsOrStringArray_To_v1_JSONSchemaPropsOrStringArray(in *pkgapisapiextensions.JSONSchemaPropsOrStringArray, out *JSONSchemaPropsOrStringArray, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiextensions_JSONSchemaPropsOrStringArray_To_v1_JSONSchemaPropsOrStringArray(in, out, s)
 }
 
-func autoConvert_v1_ServiceReference_To_apiextensions_ServiceReference(in *ServiceReference, out *apiextensions.ServiceReference, s conversion.Scope) error {
+func autoConvert_v1_ServiceReference_To_apiextensions_ServiceReference(in *ServiceReference, out *pkgapisapiextensions.ServiceReference, s apimachinerypkgconversion.Scope) error {
 	out.Namespace = in.Namespace
 	out.Name = in.Name
 	out.Path = (*string)(unsafe.Pointer(in.Path))
-	if err := metav1.Convert_Pointer_int32_To_int32(&in.Port, &out.Port, s); err != nil {
+	if err := apismetav1.Convert_Pointer_int32_To_int32(&in.Port, &out.Port, s); err != nil {
 		return err
 	}
 	return nil
 }
 
 // Convert_v1_ServiceReference_To_apiextensions_ServiceReference is an autogenerated conversion function.
-func Convert_v1_ServiceReference_To_apiextensions_ServiceReference(in *ServiceReference, out *apiextensions.ServiceReference, s conversion.Scope) error {
+func Convert_v1_ServiceReference_To_apiextensions_ServiceReference(in *ServiceReference, out *pkgapisapiextensions.ServiceReference, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_ServiceReference_To_apiextensions_ServiceReference(in, out, s)
 }
 
-func autoConvert_apiextensions_ServiceReference_To_v1_ServiceReference(in *apiextensions.ServiceReference, out *ServiceReference, s conversion.Scope) error {
+func autoConvert_apiextensions_ServiceReference_To_v1_ServiceReference(in *pkgapisapiextensions.ServiceReference, out *ServiceReference, s apimachinerypkgconversion.Scope) error {
 	out.Namespace = in.Namespace
 	out.Name = in.Name
 	out.Path = (*string)(unsafe.Pointer(in.Path))
-	if err := metav1.Convert_int32_To_Pointer_int32(&in.Port, &out.Port, s); err != nil {
+	if err := apismetav1.Convert_int32_To_Pointer_int32(&in.Port, &out.Port, s); err != nil {
 		return err
 	}
 	return nil
 }
 
 // Convert_apiextensions_ServiceReference_To_v1_ServiceReference is an autogenerated conversion function.
-func Convert_apiextensions_ServiceReference_To_v1_ServiceReference(in *apiextensions.ServiceReference, out *ServiceReference, s conversion.Scope) error {
+func Convert_apiextensions_ServiceReference_To_v1_ServiceReference(in *pkgapisapiextensions.ServiceReference, out *ServiceReference, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiextensions_ServiceReference_To_v1_ServiceReference(in, out, s)
 }
 
-func autoConvert_v1_ValidationRule_To_apiextensions_ValidationRule(in *ValidationRule, out *apiextensions.ValidationRule, s conversion.Scope) error {
+func autoConvert_v1_ValidationRule_To_apiextensions_ValidationRule(in *ValidationRule, out *pkgapisapiextensions.ValidationRule, s apimachinerypkgconversion.Scope) error {
 	out.Rule = in.Rule
 	out.Message = in.Message
 	out.MessageExpression = in.MessageExpression
@@ -1263,11 +1263,11 @@ func autoConvert_v1_ValidationRule_To_apiextensions_ValidationRule(in *Validatio
 }
 
 // Convert_v1_ValidationRule_To_apiextensions_ValidationRule is an autogenerated conversion function.
-func Convert_v1_ValidationRule_To_apiextensions_ValidationRule(in *ValidationRule, out *apiextensions.ValidationRule, s conversion.Scope) error {
+func Convert_v1_ValidationRule_To_apiextensions_ValidationRule(in *ValidationRule, out *pkgapisapiextensions.ValidationRule, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_ValidationRule_To_apiextensions_ValidationRule(in, out, s)
 }
 
-func autoConvert_apiextensions_ValidationRule_To_v1_ValidationRule(in *apiextensions.ValidationRule, out *ValidationRule, s conversion.Scope) error {
+func autoConvert_apiextensions_ValidationRule_To_v1_ValidationRule(in *pkgapisapiextensions.ValidationRule, out *ValidationRule, s apimachinerypkgconversion.Scope) error {
 	out.Rule = in.Rule
 	out.Message = in.Message
 	out.MessageExpression = in.MessageExpression
@@ -1275,15 +1275,15 @@ func autoConvert_apiextensions_ValidationRule_To_v1_ValidationRule(in *apiextens
 }
 
 // Convert_apiextensions_ValidationRule_To_v1_ValidationRule is an autogenerated conversion function.
-func Convert_apiextensions_ValidationRule_To_v1_ValidationRule(in *apiextensions.ValidationRule, out *ValidationRule, s conversion.Scope) error {
+func Convert_apiextensions_ValidationRule_To_v1_ValidationRule(in *pkgapisapiextensions.ValidationRule, out *ValidationRule, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiextensions_ValidationRule_To_v1_ValidationRule(in, out, s)
 }
 
-func autoConvert_v1_WebhookClientConfig_To_apiextensions_WebhookClientConfig(in *WebhookClientConfig, out *apiextensions.WebhookClientConfig, s conversion.Scope) error {
+func autoConvert_v1_WebhookClientConfig_To_apiextensions_WebhookClientConfig(in *WebhookClientConfig, out *pkgapisapiextensions.WebhookClientConfig, s apimachinerypkgconversion.Scope) error {
 	out.URL = (*string)(unsafe.Pointer(in.URL))
 	if in.Service != nil {
 		in, out := &in.Service, &out.Service
-		*out = new(apiextensions.ServiceReference)
+		*out = new(pkgapisapiextensions.ServiceReference)
 		if err := Convert_v1_ServiceReference_To_apiextensions_ServiceReference(*in, *out, s); err != nil {
 			return err
 		}
@@ -1295,11 +1295,11 @@ func autoConvert_v1_WebhookClientConfig_To_apiextensions_WebhookClientConfig(in 
 }
 
 // Convert_v1_WebhookClientConfig_To_apiextensions_WebhookClientConfig is an autogenerated conversion function.
-func Convert_v1_WebhookClientConfig_To_apiextensions_WebhookClientConfig(in *WebhookClientConfig, out *apiextensions.WebhookClientConfig, s conversion.Scope) error {
+func Convert_v1_WebhookClientConfig_To_apiextensions_WebhookClientConfig(in *WebhookClientConfig, out *pkgapisapiextensions.WebhookClientConfig, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_WebhookClientConfig_To_apiextensions_WebhookClientConfig(in, out, s)
 }
 
-func autoConvert_apiextensions_WebhookClientConfig_To_v1_WebhookClientConfig(in *apiextensions.WebhookClientConfig, out *WebhookClientConfig, s conversion.Scope) error {
+func autoConvert_apiextensions_WebhookClientConfig_To_v1_WebhookClientConfig(in *pkgapisapiextensions.WebhookClientConfig, out *WebhookClientConfig, s apimachinerypkgconversion.Scope) error {
 	out.URL = (*string)(unsafe.Pointer(in.URL))
 	if in.Service != nil {
 		in, out := &in.Service, &out.Service
@@ -1315,6 +1315,6 @@ func autoConvert_apiextensions_WebhookClientConfig_To_v1_WebhookClientConfig(in 
 }
 
 // Convert_apiextensions_WebhookClientConfig_To_v1_WebhookClientConfig is an autogenerated conversion function.
-func Convert_apiextensions_WebhookClientConfig_To_v1_WebhookClientConfig(in *apiextensions.WebhookClientConfig, out *WebhookClientConfig, s conversion.Scope) error {
+func Convert_apiextensions_WebhookClientConfig_To_v1_WebhookClientConfig(in *pkgapisapiextensions.WebhookClientConfig, out *WebhookClientConfig, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_apiextensions_WebhookClientConfig_To_v1_WebhookClientConfig(in, out, s)
 }

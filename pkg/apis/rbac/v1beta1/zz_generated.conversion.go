@@ -24,11 +24,11 @@ package v1beta1
 import (
 	"unsafe"
 
-	"k8s.io/api/rbac/v1beta1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/rbac"
+	apirbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	pkgapisrbac "k8s.io/kubernetes/pkg/apis/rbac"
 )
 
 func init() {
@@ -37,177 +37,177 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1beta1.AggregationRule)(nil), (*rbac.AggregationRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_AggregationRule_To_rbac_AggregationRule(a.(*v1beta1.AggregationRule), b.(*rbac.AggregationRule), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*apirbacv1beta1.AggregationRule)(nil), (*pkgapisrbac.AggregationRule)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_AggregationRule_To_rbac_AggregationRule(a.(*apirbacv1beta1.AggregationRule), b.(*pkgapisrbac.AggregationRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*rbac.AggregationRule)(nil), (*v1beta1.AggregationRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_AggregationRule_To_v1beta1_AggregationRule(a.(*rbac.AggregationRule), b.(*v1beta1.AggregationRule), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisrbac.AggregationRule)(nil), (*apirbacv1beta1.AggregationRule)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_rbac_AggregationRule_To_v1beta1_AggregationRule(a.(*pkgapisrbac.AggregationRule), b.(*apirbacv1beta1.AggregationRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.ClusterRole)(nil), (*rbac.ClusterRole)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_ClusterRole_To_rbac_ClusterRole(a.(*v1beta1.ClusterRole), b.(*rbac.ClusterRole), scope)
+	if err := s.AddGeneratedConversionFunc((*apirbacv1beta1.ClusterRole)(nil), (*pkgapisrbac.ClusterRole)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_ClusterRole_To_rbac_ClusterRole(a.(*apirbacv1beta1.ClusterRole), b.(*pkgapisrbac.ClusterRole), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*rbac.ClusterRole)(nil), (*v1beta1.ClusterRole)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_ClusterRole_To_v1beta1_ClusterRole(a.(*rbac.ClusterRole), b.(*v1beta1.ClusterRole), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisrbac.ClusterRole)(nil), (*apirbacv1beta1.ClusterRole)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_rbac_ClusterRole_To_v1beta1_ClusterRole(a.(*pkgapisrbac.ClusterRole), b.(*apirbacv1beta1.ClusterRole), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.ClusterRoleBinding)(nil), (*rbac.ClusterRoleBinding)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(a.(*v1beta1.ClusterRoleBinding), b.(*rbac.ClusterRoleBinding), scope)
+	if err := s.AddGeneratedConversionFunc((*apirbacv1beta1.ClusterRoleBinding)(nil), (*pkgapisrbac.ClusterRoleBinding)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(a.(*apirbacv1beta1.ClusterRoleBinding), b.(*pkgapisrbac.ClusterRoleBinding), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*rbac.ClusterRoleBinding)(nil), (*v1beta1.ClusterRoleBinding)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_ClusterRoleBinding_To_v1beta1_ClusterRoleBinding(a.(*rbac.ClusterRoleBinding), b.(*v1beta1.ClusterRoleBinding), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisrbac.ClusterRoleBinding)(nil), (*apirbacv1beta1.ClusterRoleBinding)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_rbac_ClusterRoleBinding_To_v1beta1_ClusterRoleBinding(a.(*pkgapisrbac.ClusterRoleBinding), b.(*apirbacv1beta1.ClusterRoleBinding), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.ClusterRoleBindingList)(nil), (*rbac.ClusterRoleBindingList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_ClusterRoleBindingList_To_rbac_ClusterRoleBindingList(a.(*v1beta1.ClusterRoleBindingList), b.(*rbac.ClusterRoleBindingList), scope)
+	if err := s.AddGeneratedConversionFunc((*apirbacv1beta1.ClusterRoleBindingList)(nil), (*pkgapisrbac.ClusterRoleBindingList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_ClusterRoleBindingList_To_rbac_ClusterRoleBindingList(a.(*apirbacv1beta1.ClusterRoleBindingList), b.(*pkgapisrbac.ClusterRoleBindingList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*rbac.ClusterRoleBindingList)(nil), (*v1beta1.ClusterRoleBindingList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_ClusterRoleBindingList_To_v1beta1_ClusterRoleBindingList(a.(*rbac.ClusterRoleBindingList), b.(*v1beta1.ClusterRoleBindingList), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisrbac.ClusterRoleBindingList)(nil), (*apirbacv1beta1.ClusterRoleBindingList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_rbac_ClusterRoleBindingList_To_v1beta1_ClusterRoleBindingList(a.(*pkgapisrbac.ClusterRoleBindingList), b.(*apirbacv1beta1.ClusterRoleBindingList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.ClusterRoleList)(nil), (*rbac.ClusterRoleList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_ClusterRoleList_To_rbac_ClusterRoleList(a.(*v1beta1.ClusterRoleList), b.(*rbac.ClusterRoleList), scope)
+	if err := s.AddGeneratedConversionFunc((*apirbacv1beta1.ClusterRoleList)(nil), (*pkgapisrbac.ClusterRoleList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_ClusterRoleList_To_rbac_ClusterRoleList(a.(*apirbacv1beta1.ClusterRoleList), b.(*pkgapisrbac.ClusterRoleList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*rbac.ClusterRoleList)(nil), (*v1beta1.ClusterRoleList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_ClusterRoleList_To_v1beta1_ClusterRoleList(a.(*rbac.ClusterRoleList), b.(*v1beta1.ClusterRoleList), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisrbac.ClusterRoleList)(nil), (*apirbacv1beta1.ClusterRoleList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_rbac_ClusterRoleList_To_v1beta1_ClusterRoleList(a.(*pkgapisrbac.ClusterRoleList), b.(*apirbacv1beta1.ClusterRoleList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.PolicyRule)(nil), (*rbac.PolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_PolicyRule_To_rbac_PolicyRule(a.(*v1beta1.PolicyRule), b.(*rbac.PolicyRule), scope)
+	if err := s.AddGeneratedConversionFunc((*apirbacv1beta1.PolicyRule)(nil), (*pkgapisrbac.PolicyRule)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_PolicyRule_To_rbac_PolicyRule(a.(*apirbacv1beta1.PolicyRule), b.(*pkgapisrbac.PolicyRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*rbac.PolicyRule)(nil), (*v1beta1.PolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_PolicyRule_To_v1beta1_PolicyRule(a.(*rbac.PolicyRule), b.(*v1beta1.PolicyRule), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisrbac.PolicyRule)(nil), (*apirbacv1beta1.PolicyRule)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_rbac_PolicyRule_To_v1beta1_PolicyRule(a.(*pkgapisrbac.PolicyRule), b.(*apirbacv1beta1.PolicyRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.Role)(nil), (*rbac.Role)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_Role_To_rbac_Role(a.(*v1beta1.Role), b.(*rbac.Role), scope)
+	if err := s.AddGeneratedConversionFunc((*apirbacv1beta1.Role)(nil), (*pkgapisrbac.Role)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_Role_To_rbac_Role(a.(*apirbacv1beta1.Role), b.(*pkgapisrbac.Role), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*rbac.Role)(nil), (*v1beta1.Role)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_Role_To_v1beta1_Role(a.(*rbac.Role), b.(*v1beta1.Role), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisrbac.Role)(nil), (*apirbacv1beta1.Role)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_rbac_Role_To_v1beta1_Role(a.(*pkgapisrbac.Role), b.(*apirbacv1beta1.Role), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.RoleBinding)(nil), (*rbac.RoleBinding)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_RoleBinding_To_rbac_RoleBinding(a.(*v1beta1.RoleBinding), b.(*rbac.RoleBinding), scope)
+	if err := s.AddGeneratedConversionFunc((*apirbacv1beta1.RoleBinding)(nil), (*pkgapisrbac.RoleBinding)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_RoleBinding_To_rbac_RoleBinding(a.(*apirbacv1beta1.RoleBinding), b.(*pkgapisrbac.RoleBinding), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*rbac.RoleBinding)(nil), (*v1beta1.RoleBinding)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_RoleBinding_To_v1beta1_RoleBinding(a.(*rbac.RoleBinding), b.(*v1beta1.RoleBinding), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisrbac.RoleBinding)(nil), (*apirbacv1beta1.RoleBinding)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_rbac_RoleBinding_To_v1beta1_RoleBinding(a.(*pkgapisrbac.RoleBinding), b.(*apirbacv1beta1.RoleBinding), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.RoleBindingList)(nil), (*rbac.RoleBindingList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_RoleBindingList_To_rbac_RoleBindingList(a.(*v1beta1.RoleBindingList), b.(*rbac.RoleBindingList), scope)
+	if err := s.AddGeneratedConversionFunc((*apirbacv1beta1.RoleBindingList)(nil), (*pkgapisrbac.RoleBindingList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_RoleBindingList_To_rbac_RoleBindingList(a.(*apirbacv1beta1.RoleBindingList), b.(*pkgapisrbac.RoleBindingList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*rbac.RoleBindingList)(nil), (*v1beta1.RoleBindingList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_RoleBindingList_To_v1beta1_RoleBindingList(a.(*rbac.RoleBindingList), b.(*v1beta1.RoleBindingList), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisrbac.RoleBindingList)(nil), (*apirbacv1beta1.RoleBindingList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_rbac_RoleBindingList_To_v1beta1_RoleBindingList(a.(*pkgapisrbac.RoleBindingList), b.(*apirbacv1beta1.RoleBindingList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.RoleList)(nil), (*rbac.RoleList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_RoleList_To_rbac_RoleList(a.(*v1beta1.RoleList), b.(*rbac.RoleList), scope)
+	if err := s.AddGeneratedConversionFunc((*apirbacv1beta1.RoleList)(nil), (*pkgapisrbac.RoleList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_RoleList_To_rbac_RoleList(a.(*apirbacv1beta1.RoleList), b.(*pkgapisrbac.RoleList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*rbac.RoleList)(nil), (*v1beta1.RoleList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_RoleList_To_v1beta1_RoleList(a.(*rbac.RoleList), b.(*v1beta1.RoleList), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisrbac.RoleList)(nil), (*apirbacv1beta1.RoleList)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_rbac_RoleList_To_v1beta1_RoleList(a.(*pkgapisrbac.RoleList), b.(*apirbacv1beta1.RoleList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.RoleRef)(nil), (*rbac.RoleRef)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_RoleRef_To_rbac_RoleRef(a.(*v1beta1.RoleRef), b.(*rbac.RoleRef), scope)
+	if err := s.AddGeneratedConversionFunc((*apirbacv1beta1.RoleRef)(nil), (*pkgapisrbac.RoleRef)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_RoleRef_To_rbac_RoleRef(a.(*apirbacv1beta1.RoleRef), b.(*pkgapisrbac.RoleRef), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*rbac.RoleRef)(nil), (*v1beta1.RoleRef)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_RoleRef_To_v1beta1_RoleRef(a.(*rbac.RoleRef), b.(*v1beta1.RoleRef), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisrbac.RoleRef)(nil), (*apirbacv1beta1.RoleRef)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_rbac_RoleRef_To_v1beta1_RoleRef(a.(*pkgapisrbac.RoleRef), b.(*apirbacv1beta1.RoleRef), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.Subject)(nil), (*rbac.Subject)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_Subject_To_rbac_Subject(a.(*v1beta1.Subject), b.(*rbac.Subject), scope)
+	if err := s.AddGeneratedConversionFunc((*apirbacv1beta1.Subject)(nil), (*pkgapisrbac.Subject)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_Subject_To_rbac_Subject(a.(*apirbacv1beta1.Subject), b.(*pkgapisrbac.Subject), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*rbac.Subject)(nil), (*v1beta1.Subject)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_rbac_Subject_To_v1beta1_Subject(a.(*rbac.Subject), b.(*v1beta1.Subject), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisrbac.Subject)(nil), (*apirbacv1beta1.Subject)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_rbac_Subject_To_v1beta1_Subject(a.(*pkgapisrbac.Subject), b.(*apirbacv1beta1.Subject), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1beta1_AggregationRule_To_rbac_AggregationRule(in *v1beta1.AggregationRule, out *rbac.AggregationRule, s conversion.Scope) error {
-	out.ClusterRoleSelectors = *(*[]v1.LabelSelector)(unsafe.Pointer(&in.ClusterRoleSelectors))
+func autoConvert_v1beta1_AggregationRule_To_rbac_AggregationRule(in *apirbacv1beta1.AggregationRule, out *pkgapisrbac.AggregationRule, s apimachinerypkgconversion.Scope) error {
+	out.ClusterRoleSelectors = *(*[]apismetav1.LabelSelector)(unsafe.Pointer(&in.ClusterRoleSelectors))
 	return nil
 }
 
 // Convert_v1beta1_AggregationRule_To_rbac_AggregationRule is an autogenerated conversion function.
-func Convert_v1beta1_AggregationRule_To_rbac_AggregationRule(in *v1beta1.AggregationRule, out *rbac.AggregationRule, s conversion.Scope) error {
+func Convert_v1beta1_AggregationRule_To_rbac_AggregationRule(in *apirbacv1beta1.AggregationRule, out *pkgapisrbac.AggregationRule, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_AggregationRule_To_rbac_AggregationRule(in, out, s)
 }
 
-func autoConvert_rbac_AggregationRule_To_v1beta1_AggregationRule(in *rbac.AggregationRule, out *v1beta1.AggregationRule, s conversion.Scope) error {
-	out.ClusterRoleSelectors = *(*[]v1.LabelSelector)(unsafe.Pointer(&in.ClusterRoleSelectors))
+func autoConvert_rbac_AggregationRule_To_v1beta1_AggregationRule(in *pkgapisrbac.AggregationRule, out *apirbacv1beta1.AggregationRule, s apimachinerypkgconversion.Scope) error {
+	out.ClusterRoleSelectors = *(*[]apismetav1.LabelSelector)(unsafe.Pointer(&in.ClusterRoleSelectors))
 	return nil
 }
 
 // Convert_rbac_AggregationRule_To_v1beta1_AggregationRule is an autogenerated conversion function.
-func Convert_rbac_AggregationRule_To_v1beta1_AggregationRule(in *rbac.AggregationRule, out *v1beta1.AggregationRule, s conversion.Scope) error {
+func Convert_rbac_AggregationRule_To_v1beta1_AggregationRule(in *pkgapisrbac.AggregationRule, out *apirbacv1beta1.AggregationRule, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_rbac_AggregationRule_To_v1beta1_AggregationRule(in, out, s)
 }
 
-func autoConvert_v1beta1_ClusterRole_To_rbac_ClusterRole(in *v1beta1.ClusterRole, out *rbac.ClusterRole, s conversion.Scope) error {
+func autoConvert_v1beta1_ClusterRole_To_rbac_ClusterRole(in *apirbacv1beta1.ClusterRole, out *pkgapisrbac.ClusterRole, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Rules = *(*[]rbac.PolicyRule)(unsafe.Pointer(&in.Rules))
-	out.AggregationRule = (*rbac.AggregationRule)(unsafe.Pointer(in.AggregationRule))
+	out.Rules = *(*[]pkgapisrbac.PolicyRule)(unsafe.Pointer(&in.Rules))
+	out.AggregationRule = (*pkgapisrbac.AggregationRule)(unsafe.Pointer(in.AggregationRule))
 	return nil
 }
 
 // Convert_v1beta1_ClusterRole_To_rbac_ClusterRole is an autogenerated conversion function.
-func Convert_v1beta1_ClusterRole_To_rbac_ClusterRole(in *v1beta1.ClusterRole, out *rbac.ClusterRole, s conversion.Scope) error {
+func Convert_v1beta1_ClusterRole_To_rbac_ClusterRole(in *apirbacv1beta1.ClusterRole, out *pkgapisrbac.ClusterRole, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_ClusterRole_To_rbac_ClusterRole(in, out, s)
 }
 
-func autoConvert_rbac_ClusterRole_To_v1beta1_ClusterRole(in *rbac.ClusterRole, out *v1beta1.ClusterRole, s conversion.Scope) error {
+func autoConvert_rbac_ClusterRole_To_v1beta1_ClusterRole(in *pkgapisrbac.ClusterRole, out *apirbacv1beta1.ClusterRole, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Rules = *(*[]v1beta1.PolicyRule)(unsafe.Pointer(&in.Rules))
-	out.AggregationRule = (*v1beta1.AggregationRule)(unsafe.Pointer(in.AggregationRule))
+	out.Rules = *(*[]apirbacv1beta1.PolicyRule)(unsafe.Pointer(&in.Rules))
+	out.AggregationRule = (*apirbacv1beta1.AggregationRule)(unsafe.Pointer(in.AggregationRule))
 	return nil
 }
 
 // Convert_rbac_ClusterRole_To_v1beta1_ClusterRole is an autogenerated conversion function.
-func Convert_rbac_ClusterRole_To_v1beta1_ClusterRole(in *rbac.ClusterRole, out *v1beta1.ClusterRole, s conversion.Scope) error {
+func Convert_rbac_ClusterRole_To_v1beta1_ClusterRole(in *pkgapisrbac.ClusterRole, out *apirbacv1beta1.ClusterRole, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_rbac_ClusterRole_To_v1beta1_ClusterRole(in, out, s)
 }
 
-func autoConvert_v1beta1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(in *v1beta1.ClusterRoleBinding, out *rbac.ClusterRoleBinding, s conversion.Scope) error {
+func autoConvert_v1beta1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(in *apirbacv1beta1.ClusterRoleBinding, out *pkgapisrbac.ClusterRoleBinding, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Subjects = *(*[]rbac.Subject)(unsafe.Pointer(&in.Subjects))
+	out.Subjects = *(*[]pkgapisrbac.Subject)(unsafe.Pointer(&in.Subjects))
 	if err := Convert_v1beta1_RoleRef_To_rbac_RoleRef(&in.RoleRef, &out.RoleRef, s); err != nil {
 		return err
 	}
@@ -215,13 +215,13 @@ func autoConvert_v1beta1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(in *v1bet
 }
 
 // Convert_v1beta1_ClusterRoleBinding_To_rbac_ClusterRoleBinding is an autogenerated conversion function.
-func Convert_v1beta1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(in *v1beta1.ClusterRoleBinding, out *rbac.ClusterRoleBinding, s conversion.Scope) error {
+func Convert_v1beta1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(in *apirbacv1beta1.ClusterRoleBinding, out *pkgapisrbac.ClusterRoleBinding, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(in, out, s)
 }
 
-func autoConvert_rbac_ClusterRoleBinding_To_v1beta1_ClusterRoleBinding(in *rbac.ClusterRoleBinding, out *v1beta1.ClusterRoleBinding, s conversion.Scope) error {
+func autoConvert_rbac_ClusterRoleBinding_To_v1beta1_ClusterRoleBinding(in *pkgapisrbac.ClusterRoleBinding, out *apirbacv1beta1.ClusterRoleBinding, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Subjects = *(*[]v1beta1.Subject)(unsafe.Pointer(&in.Subjects))
+	out.Subjects = *(*[]apirbacv1beta1.Subject)(unsafe.Pointer(&in.Subjects))
 	if err := Convert_rbac_RoleRef_To_v1beta1_RoleRef(&in.RoleRef, &out.RoleRef, s); err != nil {
 		return err
 	}
@@ -229,55 +229,55 @@ func autoConvert_rbac_ClusterRoleBinding_To_v1beta1_ClusterRoleBinding(in *rbac.
 }
 
 // Convert_rbac_ClusterRoleBinding_To_v1beta1_ClusterRoleBinding is an autogenerated conversion function.
-func Convert_rbac_ClusterRoleBinding_To_v1beta1_ClusterRoleBinding(in *rbac.ClusterRoleBinding, out *v1beta1.ClusterRoleBinding, s conversion.Scope) error {
+func Convert_rbac_ClusterRoleBinding_To_v1beta1_ClusterRoleBinding(in *pkgapisrbac.ClusterRoleBinding, out *apirbacv1beta1.ClusterRoleBinding, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_rbac_ClusterRoleBinding_To_v1beta1_ClusterRoleBinding(in, out, s)
 }
 
-func autoConvert_v1beta1_ClusterRoleBindingList_To_rbac_ClusterRoleBindingList(in *v1beta1.ClusterRoleBindingList, out *rbac.ClusterRoleBindingList, s conversion.Scope) error {
+func autoConvert_v1beta1_ClusterRoleBindingList_To_rbac_ClusterRoleBindingList(in *apirbacv1beta1.ClusterRoleBindingList, out *pkgapisrbac.ClusterRoleBindingList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]rbac.ClusterRoleBinding)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]pkgapisrbac.ClusterRoleBinding)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_v1beta1_ClusterRoleBindingList_To_rbac_ClusterRoleBindingList is an autogenerated conversion function.
-func Convert_v1beta1_ClusterRoleBindingList_To_rbac_ClusterRoleBindingList(in *v1beta1.ClusterRoleBindingList, out *rbac.ClusterRoleBindingList, s conversion.Scope) error {
+func Convert_v1beta1_ClusterRoleBindingList_To_rbac_ClusterRoleBindingList(in *apirbacv1beta1.ClusterRoleBindingList, out *pkgapisrbac.ClusterRoleBindingList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_ClusterRoleBindingList_To_rbac_ClusterRoleBindingList(in, out, s)
 }
 
-func autoConvert_rbac_ClusterRoleBindingList_To_v1beta1_ClusterRoleBindingList(in *rbac.ClusterRoleBindingList, out *v1beta1.ClusterRoleBindingList, s conversion.Scope) error {
+func autoConvert_rbac_ClusterRoleBindingList_To_v1beta1_ClusterRoleBindingList(in *pkgapisrbac.ClusterRoleBindingList, out *apirbacv1beta1.ClusterRoleBindingList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1beta1.ClusterRoleBinding)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]apirbacv1beta1.ClusterRoleBinding)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_rbac_ClusterRoleBindingList_To_v1beta1_ClusterRoleBindingList is an autogenerated conversion function.
-func Convert_rbac_ClusterRoleBindingList_To_v1beta1_ClusterRoleBindingList(in *rbac.ClusterRoleBindingList, out *v1beta1.ClusterRoleBindingList, s conversion.Scope) error {
+func Convert_rbac_ClusterRoleBindingList_To_v1beta1_ClusterRoleBindingList(in *pkgapisrbac.ClusterRoleBindingList, out *apirbacv1beta1.ClusterRoleBindingList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_rbac_ClusterRoleBindingList_To_v1beta1_ClusterRoleBindingList(in, out, s)
 }
 
-func autoConvert_v1beta1_ClusterRoleList_To_rbac_ClusterRoleList(in *v1beta1.ClusterRoleList, out *rbac.ClusterRoleList, s conversion.Scope) error {
+func autoConvert_v1beta1_ClusterRoleList_To_rbac_ClusterRoleList(in *apirbacv1beta1.ClusterRoleList, out *pkgapisrbac.ClusterRoleList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]rbac.ClusterRole)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]pkgapisrbac.ClusterRole)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_v1beta1_ClusterRoleList_To_rbac_ClusterRoleList is an autogenerated conversion function.
-func Convert_v1beta1_ClusterRoleList_To_rbac_ClusterRoleList(in *v1beta1.ClusterRoleList, out *rbac.ClusterRoleList, s conversion.Scope) error {
+func Convert_v1beta1_ClusterRoleList_To_rbac_ClusterRoleList(in *apirbacv1beta1.ClusterRoleList, out *pkgapisrbac.ClusterRoleList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_ClusterRoleList_To_rbac_ClusterRoleList(in, out, s)
 }
 
-func autoConvert_rbac_ClusterRoleList_To_v1beta1_ClusterRoleList(in *rbac.ClusterRoleList, out *v1beta1.ClusterRoleList, s conversion.Scope) error {
+func autoConvert_rbac_ClusterRoleList_To_v1beta1_ClusterRoleList(in *pkgapisrbac.ClusterRoleList, out *apirbacv1beta1.ClusterRoleList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1beta1.ClusterRole)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]apirbacv1beta1.ClusterRole)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_rbac_ClusterRoleList_To_v1beta1_ClusterRoleList is an autogenerated conversion function.
-func Convert_rbac_ClusterRoleList_To_v1beta1_ClusterRoleList(in *rbac.ClusterRoleList, out *v1beta1.ClusterRoleList, s conversion.Scope) error {
+func Convert_rbac_ClusterRoleList_To_v1beta1_ClusterRoleList(in *pkgapisrbac.ClusterRoleList, out *apirbacv1beta1.ClusterRoleList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_rbac_ClusterRoleList_To_v1beta1_ClusterRoleList(in, out, s)
 }
 
-func autoConvert_v1beta1_PolicyRule_To_rbac_PolicyRule(in *v1beta1.PolicyRule, out *rbac.PolicyRule, s conversion.Scope) error {
+func autoConvert_v1beta1_PolicyRule_To_rbac_PolicyRule(in *apirbacv1beta1.PolicyRule, out *pkgapisrbac.PolicyRule, s apimachinerypkgconversion.Scope) error {
 	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
 	out.APIGroups = *(*[]string)(unsafe.Pointer(&in.APIGroups))
 	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
@@ -287,11 +287,11 @@ func autoConvert_v1beta1_PolicyRule_To_rbac_PolicyRule(in *v1beta1.PolicyRule, o
 }
 
 // Convert_v1beta1_PolicyRule_To_rbac_PolicyRule is an autogenerated conversion function.
-func Convert_v1beta1_PolicyRule_To_rbac_PolicyRule(in *v1beta1.PolicyRule, out *rbac.PolicyRule, s conversion.Scope) error {
+func Convert_v1beta1_PolicyRule_To_rbac_PolicyRule(in *apirbacv1beta1.PolicyRule, out *pkgapisrbac.PolicyRule, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_PolicyRule_To_rbac_PolicyRule(in, out, s)
 }
 
-func autoConvert_rbac_PolicyRule_To_v1beta1_PolicyRule(in *rbac.PolicyRule, out *v1beta1.PolicyRule, s conversion.Scope) error {
+func autoConvert_rbac_PolicyRule_To_v1beta1_PolicyRule(in *pkgapisrbac.PolicyRule, out *apirbacv1beta1.PolicyRule, s apimachinerypkgconversion.Scope) error {
 	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
 	out.APIGroups = *(*[]string)(unsafe.Pointer(&in.APIGroups))
 	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
@@ -301,35 +301,35 @@ func autoConvert_rbac_PolicyRule_To_v1beta1_PolicyRule(in *rbac.PolicyRule, out 
 }
 
 // Convert_rbac_PolicyRule_To_v1beta1_PolicyRule is an autogenerated conversion function.
-func Convert_rbac_PolicyRule_To_v1beta1_PolicyRule(in *rbac.PolicyRule, out *v1beta1.PolicyRule, s conversion.Scope) error {
+func Convert_rbac_PolicyRule_To_v1beta1_PolicyRule(in *pkgapisrbac.PolicyRule, out *apirbacv1beta1.PolicyRule, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_rbac_PolicyRule_To_v1beta1_PolicyRule(in, out, s)
 }
 
-func autoConvert_v1beta1_Role_To_rbac_Role(in *v1beta1.Role, out *rbac.Role, s conversion.Scope) error {
+func autoConvert_v1beta1_Role_To_rbac_Role(in *apirbacv1beta1.Role, out *pkgapisrbac.Role, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Rules = *(*[]rbac.PolicyRule)(unsafe.Pointer(&in.Rules))
+	out.Rules = *(*[]pkgapisrbac.PolicyRule)(unsafe.Pointer(&in.Rules))
 	return nil
 }
 
 // Convert_v1beta1_Role_To_rbac_Role is an autogenerated conversion function.
-func Convert_v1beta1_Role_To_rbac_Role(in *v1beta1.Role, out *rbac.Role, s conversion.Scope) error {
+func Convert_v1beta1_Role_To_rbac_Role(in *apirbacv1beta1.Role, out *pkgapisrbac.Role, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_Role_To_rbac_Role(in, out, s)
 }
 
-func autoConvert_rbac_Role_To_v1beta1_Role(in *rbac.Role, out *v1beta1.Role, s conversion.Scope) error {
+func autoConvert_rbac_Role_To_v1beta1_Role(in *pkgapisrbac.Role, out *apirbacv1beta1.Role, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Rules = *(*[]v1beta1.PolicyRule)(unsafe.Pointer(&in.Rules))
+	out.Rules = *(*[]apirbacv1beta1.PolicyRule)(unsafe.Pointer(&in.Rules))
 	return nil
 }
 
 // Convert_rbac_Role_To_v1beta1_Role is an autogenerated conversion function.
-func Convert_rbac_Role_To_v1beta1_Role(in *rbac.Role, out *v1beta1.Role, s conversion.Scope) error {
+func Convert_rbac_Role_To_v1beta1_Role(in *pkgapisrbac.Role, out *apirbacv1beta1.Role, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_rbac_Role_To_v1beta1_Role(in, out, s)
 }
 
-func autoConvert_v1beta1_RoleBinding_To_rbac_RoleBinding(in *v1beta1.RoleBinding, out *rbac.RoleBinding, s conversion.Scope) error {
+func autoConvert_v1beta1_RoleBinding_To_rbac_RoleBinding(in *apirbacv1beta1.RoleBinding, out *pkgapisrbac.RoleBinding, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Subjects = *(*[]rbac.Subject)(unsafe.Pointer(&in.Subjects))
+	out.Subjects = *(*[]pkgapisrbac.Subject)(unsafe.Pointer(&in.Subjects))
 	if err := Convert_v1beta1_RoleRef_To_rbac_RoleRef(&in.RoleRef, &out.RoleRef, s); err != nil {
 		return err
 	}
@@ -337,13 +337,13 @@ func autoConvert_v1beta1_RoleBinding_To_rbac_RoleBinding(in *v1beta1.RoleBinding
 }
 
 // Convert_v1beta1_RoleBinding_To_rbac_RoleBinding is an autogenerated conversion function.
-func Convert_v1beta1_RoleBinding_To_rbac_RoleBinding(in *v1beta1.RoleBinding, out *rbac.RoleBinding, s conversion.Scope) error {
+func Convert_v1beta1_RoleBinding_To_rbac_RoleBinding(in *apirbacv1beta1.RoleBinding, out *pkgapisrbac.RoleBinding, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_RoleBinding_To_rbac_RoleBinding(in, out, s)
 }
 
-func autoConvert_rbac_RoleBinding_To_v1beta1_RoleBinding(in *rbac.RoleBinding, out *v1beta1.RoleBinding, s conversion.Scope) error {
+func autoConvert_rbac_RoleBinding_To_v1beta1_RoleBinding(in *pkgapisrbac.RoleBinding, out *apirbacv1beta1.RoleBinding, s apimachinerypkgconversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Subjects = *(*[]v1beta1.Subject)(unsafe.Pointer(&in.Subjects))
+	out.Subjects = *(*[]apirbacv1beta1.Subject)(unsafe.Pointer(&in.Subjects))
 	if err := Convert_rbac_RoleRef_To_v1beta1_RoleRef(&in.RoleRef, &out.RoleRef, s); err != nil {
 		return err
 	}
@@ -351,55 +351,55 @@ func autoConvert_rbac_RoleBinding_To_v1beta1_RoleBinding(in *rbac.RoleBinding, o
 }
 
 // Convert_rbac_RoleBinding_To_v1beta1_RoleBinding is an autogenerated conversion function.
-func Convert_rbac_RoleBinding_To_v1beta1_RoleBinding(in *rbac.RoleBinding, out *v1beta1.RoleBinding, s conversion.Scope) error {
+func Convert_rbac_RoleBinding_To_v1beta1_RoleBinding(in *pkgapisrbac.RoleBinding, out *apirbacv1beta1.RoleBinding, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_rbac_RoleBinding_To_v1beta1_RoleBinding(in, out, s)
 }
 
-func autoConvert_v1beta1_RoleBindingList_To_rbac_RoleBindingList(in *v1beta1.RoleBindingList, out *rbac.RoleBindingList, s conversion.Scope) error {
+func autoConvert_v1beta1_RoleBindingList_To_rbac_RoleBindingList(in *apirbacv1beta1.RoleBindingList, out *pkgapisrbac.RoleBindingList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]rbac.RoleBinding)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]pkgapisrbac.RoleBinding)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_v1beta1_RoleBindingList_To_rbac_RoleBindingList is an autogenerated conversion function.
-func Convert_v1beta1_RoleBindingList_To_rbac_RoleBindingList(in *v1beta1.RoleBindingList, out *rbac.RoleBindingList, s conversion.Scope) error {
+func Convert_v1beta1_RoleBindingList_To_rbac_RoleBindingList(in *apirbacv1beta1.RoleBindingList, out *pkgapisrbac.RoleBindingList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_RoleBindingList_To_rbac_RoleBindingList(in, out, s)
 }
 
-func autoConvert_rbac_RoleBindingList_To_v1beta1_RoleBindingList(in *rbac.RoleBindingList, out *v1beta1.RoleBindingList, s conversion.Scope) error {
+func autoConvert_rbac_RoleBindingList_To_v1beta1_RoleBindingList(in *pkgapisrbac.RoleBindingList, out *apirbacv1beta1.RoleBindingList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1beta1.RoleBinding)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]apirbacv1beta1.RoleBinding)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_rbac_RoleBindingList_To_v1beta1_RoleBindingList is an autogenerated conversion function.
-func Convert_rbac_RoleBindingList_To_v1beta1_RoleBindingList(in *rbac.RoleBindingList, out *v1beta1.RoleBindingList, s conversion.Scope) error {
+func Convert_rbac_RoleBindingList_To_v1beta1_RoleBindingList(in *pkgapisrbac.RoleBindingList, out *apirbacv1beta1.RoleBindingList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_rbac_RoleBindingList_To_v1beta1_RoleBindingList(in, out, s)
 }
 
-func autoConvert_v1beta1_RoleList_To_rbac_RoleList(in *v1beta1.RoleList, out *rbac.RoleList, s conversion.Scope) error {
+func autoConvert_v1beta1_RoleList_To_rbac_RoleList(in *apirbacv1beta1.RoleList, out *pkgapisrbac.RoleList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]rbac.Role)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]pkgapisrbac.Role)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_v1beta1_RoleList_To_rbac_RoleList is an autogenerated conversion function.
-func Convert_v1beta1_RoleList_To_rbac_RoleList(in *v1beta1.RoleList, out *rbac.RoleList, s conversion.Scope) error {
+func Convert_v1beta1_RoleList_To_rbac_RoleList(in *apirbacv1beta1.RoleList, out *pkgapisrbac.RoleList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_RoleList_To_rbac_RoleList(in, out, s)
 }
 
-func autoConvert_rbac_RoleList_To_v1beta1_RoleList(in *rbac.RoleList, out *v1beta1.RoleList, s conversion.Scope) error {
+func autoConvert_rbac_RoleList_To_v1beta1_RoleList(in *pkgapisrbac.RoleList, out *apirbacv1beta1.RoleList, s apimachinerypkgconversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1beta1.Role)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]apirbacv1beta1.Role)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
 // Convert_rbac_RoleList_To_v1beta1_RoleList is an autogenerated conversion function.
-func Convert_rbac_RoleList_To_v1beta1_RoleList(in *rbac.RoleList, out *v1beta1.RoleList, s conversion.Scope) error {
+func Convert_rbac_RoleList_To_v1beta1_RoleList(in *pkgapisrbac.RoleList, out *apirbacv1beta1.RoleList, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_rbac_RoleList_To_v1beta1_RoleList(in, out, s)
 }
 
-func autoConvert_v1beta1_RoleRef_To_rbac_RoleRef(in *v1beta1.RoleRef, out *rbac.RoleRef, s conversion.Scope) error {
+func autoConvert_v1beta1_RoleRef_To_rbac_RoleRef(in *apirbacv1beta1.RoleRef, out *pkgapisrbac.RoleRef, s apimachinerypkgconversion.Scope) error {
 	out.APIGroup = in.APIGroup
 	out.Kind = in.Kind
 	out.Name = in.Name
@@ -407,11 +407,11 @@ func autoConvert_v1beta1_RoleRef_To_rbac_RoleRef(in *v1beta1.RoleRef, out *rbac.
 }
 
 // Convert_v1beta1_RoleRef_To_rbac_RoleRef is an autogenerated conversion function.
-func Convert_v1beta1_RoleRef_To_rbac_RoleRef(in *v1beta1.RoleRef, out *rbac.RoleRef, s conversion.Scope) error {
+func Convert_v1beta1_RoleRef_To_rbac_RoleRef(in *apirbacv1beta1.RoleRef, out *pkgapisrbac.RoleRef, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_RoleRef_To_rbac_RoleRef(in, out, s)
 }
 
-func autoConvert_rbac_RoleRef_To_v1beta1_RoleRef(in *rbac.RoleRef, out *v1beta1.RoleRef, s conversion.Scope) error {
+func autoConvert_rbac_RoleRef_To_v1beta1_RoleRef(in *pkgapisrbac.RoleRef, out *apirbacv1beta1.RoleRef, s apimachinerypkgconversion.Scope) error {
 	out.APIGroup = in.APIGroup
 	out.Kind = in.Kind
 	out.Name = in.Name
@@ -419,11 +419,11 @@ func autoConvert_rbac_RoleRef_To_v1beta1_RoleRef(in *rbac.RoleRef, out *v1beta1.
 }
 
 // Convert_rbac_RoleRef_To_v1beta1_RoleRef is an autogenerated conversion function.
-func Convert_rbac_RoleRef_To_v1beta1_RoleRef(in *rbac.RoleRef, out *v1beta1.RoleRef, s conversion.Scope) error {
+func Convert_rbac_RoleRef_To_v1beta1_RoleRef(in *pkgapisrbac.RoleRef, out *apirbacv1beta1.RoleRef, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_rbac_RoleRef_To_v1beta1_RoleRef(in, out, s)
 }
 
-func autoConvert_v1beta1_Subject_To_rbac_Subject(in *v1beta1.Subject, out *rbac.Subject, s conversion.Scope) error {
+func autoConvert_v1beta1_Subject_To_rbac_Subject(in *apirbacv1beta1.Subject, out *pkgapisrbac.Subject, s apimachinerypkgconversion.Scope) error {
 	out.Kind = in.Kind
 	out.APIGroup = in.APIGroup
 	out.Name = in.Name
@@ -432,11 +432,11 @@ func autoConvert_v1beta1_Subject_To_rbac_Subject(in *v1beta1.Subject, out *rbac.
 }
 
 // Convert_v1beta1_Subject_To_rbac_Subject is an autogenerated conversion function.
-func Convert_v1beta1_Subject_To_rbac_Subject(in *v1beta1.Subject, out *rbac.Subject, s conversion.Scope) error {
+func Convert_v1beta1_Subject_To_rbac_Subject(in *apirbacv1beta1.Subject, out *pkgapisrbac.Subject, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_Subject_To_rbac_Subject(in, out, s)
 }
 
-func autoConvert_rbac_Subject_To_v1beta1_Subject(in *rbac.Subject, out *v1beta1.Subject, s conversion.Scope) error {
+func autoConvert_rbac_Subject_To_v1beta1_Subject(in *pkgapisrbac.Subject, out *apirbacv1beta1.Subject, s apimachinerypkgconversion.Scope) error {
 	out.Kind = in.Kind
 	out.APIGroup = in.APIGroup
 	out.Name = in.Name
@@ -445,6 +445,6 @@ func autoConvert_rbac_Subject_To_v1beta1_Subject(in *rbac.Subject, out *v1beta1.
 }
 
 // Convert_rbac_Subject_To_v1beta1_Subject is an autogenerated conversion function.
-func Convert_rbac_Subject_To_v1beta1_Subject(in *rbac.Subject, out *v1beta1.Subject, s conversion.Scope) error {
+func Convert_rbac_Subject_To_v1beta1_Subject(in *pkgapisrbac.Subject, out *apirbacv1beta1.Subject, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_rbac_Subject_To_v1beta1_Subject(in, out, s)
 }

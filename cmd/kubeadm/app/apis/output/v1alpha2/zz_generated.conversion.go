@@ -24,9 +24,9 @@ package v1alpha2
 import (
 	"unsafe"
 
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/output"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	appapisoutput "k8s.io/kubernetes/cmd/kubeadm/app/apis/output"
 )
 
 func init() {
@@ -35,81 +35,81 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*BootstrapToken)(nil), (*output.BootstrapToken)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha2_BootstrapToken_To_output_BootstrapToken(a.(*BootstrapToken), b.(*output.BootstrapToken), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*BootstrapToken)(nil), (*appapisoutput.BootstrapToken)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha2_BootstrapToken_To_output_BootstrapToken(a.(*BootstrapToken), b.(*appapisoutput.BootstrapToken), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*output.BootstrapToken)(nil), (*BootstrapToken)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_output_BootstrapToken_To_v1alpha2_BootstrapToken(a.(*output.BootstrapToken), b.(*BootstrapToken), scope)
+	if err := s.AddGeneratedConversionFunc((*appapisoutput.BootstrapToken)(nil), (*BootstrapToken)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_output_BootstrapToken_To_v1alpha2_BootstrapToken(a.(*appapisoutput.BootstrapToken), b.(*BootstrapToken), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*ComponentConfigVersionState)(nil), (*output.ComponentConfigVersionState)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha2_ComponentConfigVersionState_To_output_ComponentConfigVersionState(a.(*ComponentConfigVersionState), b.(*output.ComponentConfigVersionState), scope)
+	if err := s.AddGeneratedConversionFunc((*ComponentConfigVersionState)(nil), (*appapisoutput.ComponentConfigVersionState)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha2_ComponentConfigVersionState_To_output_ComponentConfigVersionState(a.(*ComponentConfigVersionState), b.(*appapisoutput.ComponentConfigVersionState), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*output.ComponentConfigVersionState)(nil), (*ComponentConfigVersionState)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_output_ComponentConfigVersionState_To_v1alpha2_ComponentConfigVersionState(a.(*output.ComponentConfigVersionState), b.(*ComponentConfigVersionState), scope)
+	if err := s.AddGeneratedConversionFunc((*appapisoutput.ComponentConfigVersionState)(nil), (*ComponentConfigVersionState)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_output_ComponentConfigVersionState_To_v1alpha2_ComponentConfigVersionState(a.(*appapisoutput.ComponentConfigVersionState), b.(*ComponentConfigVersionState), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*ComponentUpgradePlan)(nil), (*output.ComponentUpgradePlan)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha2_ComponentUpgradePlan_To_output_ComponentUpgradePlan(a.(*ComponentUpgradePlan), b.(*output.ComponentUpgradePlan), scope)
+	if err := s.AddGeneratedConversionFunc((*ComponentUpgradePlan)(nil), (*appapisoutput.ComponentUpgradePlan)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha2_ComponentUpgradePlan_To_output_ComponentUpgradePlan(a.(*ComponentUpgradePlan), b.(*appapisoutput.ComponentUpgradePlan), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*output.ComponentUpgradePlan)(nil), (*ComponentUpgradePlan)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_output_ComponentUpgradePlan_To_v1alpha2_ComponentUpgradePlan(a.(*output.ComponentUpgradePlan), b.(*ComponentUpgradePlan), scope)
+	if err := s.AddGeneratedConversionFunc((*appapisoutput.ComponentUpgradePlan)(nil), (*ComponentUpgradePlan)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_output_ComponentUpgradePlan_To_v1alpha2_ComponentUpgradePlan(a.(*appapisoutput.ComponentUpgradePlan), b.(*ComponentUpgradePlan), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*Images)(nil), (*output.Images)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha2_Images_To_output_Images(a.(*Images), b.(*output.Images), scope)
+	if err := s.AddGeneratedConversionFunc((*Images)(nil), (*appapisoutput.Images)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha2_Images_To_output_Images(a.(*Images), b.(*appapisoutput.Images), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*output.Images)(nil), (*Images)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_output_Images_To_v1alpha2_Images(a.(*output.Images), b.(*Images), scope)
+	if err := s.AddGeneratedConversionFunc((*appapisoutput.Images)(nil), (*Images)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_output_Images_To_v1alpha2_Images(a.(*appapisoutput.Images), b.(*Images), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*UpgradePlan)(nil), (*output.UpgradePlan)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha2_UpgradePlan_To_output_UpgradePlan(a.(*UpgradePlan), b.(*output.UpgradePlan), scope)
+	if err := s.AddGeneratedConversionFunc((*UpgradePlan)(nil), (*appapisoutput.UpgradePlan)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha2_UpgradePlan_To_output_UpgradePlan(a.(*UpgradePlan), b.(*appapisoutput.UpgradePlan), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*output.UpgradePlan)(nil), (*UpgradePlan)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_output_UpgradePlan_To_v1alpha2_UpgradePlan(a.(*output.UpgradePlan), b.(*UpgradePlan), scope)
+	if err := s.AddGeneratedConversionFunc((*appapisoutput.UpgradePlan)(nil), (*UpgradePlan)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_output_UpgradePlan_To_v1alpha2_UpgradePlan(a.(*appapisoutput.UpgradePlan), b.(*UpgradePlan), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1alpha2_BootstrapToken_To_output_BootstrapToken(in *BootstrapToken, out *output.BootstrapToken, s conversion.Scope) error {
+func autoConvert_v1alpha2_BootstrapToken_To_output_BootstrapToken(in *BootstrapToken, out *appapisoutput.BootstrapToken, s apimachinerypkgconversion.Scope) error {
 	out.BootstrapToken = in.BootstrapToken
 	return nil
 }
 
 // Convert_v1alpha2_BootstrapToken_To_output_BootstrapToken is an autogenerated conversion function.
-func Convert_v1alpha2_BootstrapToken_To_output_BootstrapToken(in *BootstrapToken, out *output.BootstrapToken, s conversion.Scope) error {
+func Convert_v1alpha2_BootstrapToken_To_output_BootstrapToken(in *BootstrapToken, out *appapisoutput.BootstrapToken, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha2_BootstrapToken_To_output_BootstrapToken(in, out, s)
 }
 
-func autoConvert_output_BootstrapToken_To_v1alpha2_BootstrapToken(in *output.BootstrapToken, out *BootstrapToken, s conversion.Scope) error {
+func autoConvert_output_BootstrapToken_To_v1alpha2_BootstrapToken(in *appapisoutput.BootstrapToken, out *BootstrapToken, s apimachinerypkgconversion.Scope) error {
 	out.BootstrapToken = in.BootstrapToken
 	return nil
 }
 
 // Convert_output_BootstrapToken_To_v1alpha2_BootstrapToken is an autogenerated conversion function.
-func Convert_output_BootstrapToken_To_v1alpha2_BootstrapToken(in *output.BootstrapToken, out *BootstrapToken, s conversion.Scope) error {
+func Convert_output_BootstrapToken_To_v1alpha2_BootstrapToken(in *appapisoutput.BootstrapToken, out *BootstrapToken, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_output_BootstrapToken_To_v1alpha2_BootstrapToken(in, out, s)
 }
 
-func autoConvert_v1alpha2_ComponentConfigVersionState_To_output_ComponentConfigVersionState(in *ComponentConfigVersionState, out *output.ComponentConfigVersionState, s conversion.Scope) error {
+func autoConvert_v1alpha2_ComponentConfigVersionState_To_output_ComponentConfigVersionState(in *ComponentConfigVersionState, out *appapisoutput.ComponentConfigVersionState, s apimachinerypkgconversion.Scope) error {
 	out.Group = in.Group
 	out.CurrentVersion = in.CurrentVersion
 	out.PreferredVersion = in.PreferredVersion
@@ -118,11 +118,11 @@ func autoConvert_v1alpha2_ComponentConfigVersionState_To_output_ComponentConfigV
 }
 
 // Convert_v1alpha2_ComponentConfigVersionState_To_output_ComponentConfigVersionState is an autogenerated conversion function.
-func Convert_v1alpha2_ComponentConfigVersionState_To_output_ComponentConfigVersionState(in *ComponentConfigVersionState, out *output.ComponentConfigVersionState, s conversion.Scope) error {
+func Convert_v1alpha2_ComponentConfigVersionState_To_output_ComponentConfigVersionState(in *ComponentConfigVersionState, out *appapisoutput.ComponentConfigVersionState, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha2_ComponentConfigVersionState_To_output_ComponentConfigVersionState(in, out, s)
 }
 
-func autoConvert_output_ComponentConfigVersionState_To_v1alpha2_ComponentConfigVersionState(in *output.ComponentConfigVersionState, out *ComponentConfigVersionState, s conversion.Scope) error {
+func autoConvert_output_ComponentConfigVersionState_To_v1alpha2_ComponentConfigVersionState(in *appapisoutput.ComponentConfigVersionState, out *ComponentConfigVersionState, s apimachinerypkgconversion.Scope) error {
 	out.Group = in.Group
 	out.CurrentVersion = in.CurrentVersion
 	out.PreferredVersion = in.PreferredVersion
@@ -131,11 +131,11 @@ func autoConvert_output_ComponentConfigVersionState_To_v1alpha2_ComponentConfigV
 }
 
 // Convert_output_ComponentConfigVersionState_To_v1alpha2_ComponentConfigVersionState is an autogenerated conversion function.
-func Convert_output_ComponentConfigVersionState_To_v1alpha2_ComponentConfigVersionState(in *output.ComponentConfigVersionState, out *ComponentConfigVersionState, s conversion.Scope) error {
+func Convert_output_ComponentConfigVersionState_To_v1alpha2_ComponentConfigVersionState(in *appapisoutput.ComponentConfigVersionState, out *ComponentConfigVersionState, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_output_ComponentConfigVersionState_To_v1alpha2_ComponentConfigVersionState(in, out, s)
 }
 
-func autoConvert_v1alpha2_ComponentUpgradePlan_To_output_ComponentUpgradePlan(in *ComponentUpgradePlan, out *output.ComponentUpgradePlan, s conversion.Scope) error {
+func autoConvert_v1alpha2_ComponentUpgradePlan_To_output_ComponentUpgradePlan(in *ComponentUpgradePlan, out *appapisoutput.ComponentUpgradePlan, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
 	out.CurrentVersion = in.CurrentVersion
 	out.NewVersion = in.NewVersion
@@ -143,11 +143,11 @@ func autoConvert_v1alpha2_ComponentUpgradePlan_To_output_ComponentUpgradePlan(in
 }
 
 // Convert_v1alpha2_ComponentUpgradePlan_To_output_ComponentUpgradePlan is an autogenerated conversion function.
-func Convert_v1alpha2_ComponentUpgradePlan_To_output_ComponentUpgradePlan(in *ComponentUpgradePlan, out *output.ComponentUpgradePlan, s conversion.Scope) error {
+func Convert_v1alpha2_ComponentUpgradePlan_To_output_ComponentUpgradePlan(in *ComponentUpgradePlan, out *appapisoutput.ComponentUpgradePlan, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha2_ComponentUpgradePlan_To_output_ComponentUpgradePlan(in, out, s)
 }
 
-func autoConvert_output_ComponentUpgradePlan_To_v1alpha2_ComponentUpgradePlan(in *output.ComponentUpgradePlan, out *ComponentUpgradePlan, s conversion.Scope) error {
+func autoConvert_output_ComponentUpgradePlan_To_v1alpha2_ComponentUpgradePlan(in *appapisoutput.ComponentUpgradePlan, out *ComponentUpgradePlan, s apimachinerypkgconversion.Scope) error {
 	out.Name = in.Name
 	out.CurrentVersion = in.CurrentVersion
 	out.NewVersion = in.NewVersion
@@ -155,48 +155,48 @@ func autoConvert_output_ComponentUpgradePlan_To_v1alpha2_ComponentUpgradePlan(in
 }
 
 // Convert_output_ComponentUpgradePlan_To_v1alpha2_ComponentUpgradePlan is an autogenerated conversion function.
-func Convert_output_ComponentUpgradePlan_To_v1alpha2_ComponentUpgradePlan(in *output.ComponentUpgradePlan, out *ComponentUpgradePlan, s conversion.Scope) error {
+func Convert_output_ComponentUpgradePlan_To_v1alpha2_ComponentUpgradePlan(in *appapisoutput.ComponentUpgradePlan, out *ComponentUpgradePlan, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_output_ComponentUpgradePlan_To_v1alpha2_ComponentUpgradePlan(in, out, s)
 }
 
-func autoConvert_v1alpha2_Images_To_output_Images(in *Images, out *output.Images, s conversion.Scope) error {
+func autoConvert_v1alpha2_Images_To_output_Images(in *Images, out *appapisoutput.Images, s apimachinerypkgconversion.Scope) error {
 	out.Images = *(*[]string)(unsafe.Pointer(&in.Images))
 	return nil
 }
 
 // Convert_v1alpha2_Images_To_output_Images is an autogenerated conversion function.
-func Convert_v1alpha2_Images_To_output_Images(in *Images, out *output.Images, s conversion.Scope) error {
+func Convert_v1alpha2_Images_To_output_Images(in *Images, out *appapisoutput.Images, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha2_Images_To_output_Images(in, out, s)
 }
 
-func autoConvert_output_Images_To_v1alpha2_Images(in *output.Images, out *Images, s conversion.Scope) error {
+func autoConvert_output_Images_To_v1alpha2_Images(in *appapisoutput.Images, out *Images, s apimachinerypkgconversion.Scope) error {
 	out.Images = *(*[]string)(unsafe.Pointer(&in.Images))
 	return nil
 }
 
 // Convert_output_Images_To_v1alpha2_Images is an autogenerated conversion function.
-func Convert_output_Images_To_v1alpha2_Images(in *output.Images, out *Images, s conversion.Scope) error {
+func Convert_output_Images_To_v1alpha2_Images(in *appapisoutput.Images, out *Images, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_output_Images_To_v1alpha2_Images(in, out, s)
 }
 
-func autoConvert_v1alpha2_UpgradePlan_To_output_UpgradePlan(in *UpgradePlan, out *output.UpgradePlan, s conversion.Scope) error {
-	out.Components = *(*[]output.ComponentUpgradePlan)(unsafe.Pointer(&in.Components))
-	out.ConfigVersions = *(*[]output.ComponentConfigVersionState)(unsafe.Pointer(&in.ConfigVersions))
+func autoConvert_v1alpha2_UpgradePlan_To_output_UpgradePlan(in *UpgradePlan, out *appapisoutput.UpgradePlan, s apimachinerypkgconversion.Scope) error {
+	out.Components = *(*[]appapisoutput.ComponentUpgradePlan)(unsafe.Pointer(&in.Components))
+	out.ConfigVersions = *(*[]appapisoutput.ComponentConfigVersionState)(unsafe.Pointer(&in.ConfigVersions))
 	return nil
 }
 
 // Convert_v1alpha2_UpgradePlan_To_output_UpgradePlan is an autogenerated conversion function.
-func Convert_v1alpha2_UpgradePlan_To_output_UpgradePlan(in *UpgradePlan, out *output.UpgradePlan, s conversion.Scope) error {
+func Convert_v1alpha2_UpgradePlan_To_output_UpgradePlan(in *UpgradePlan, out *appapisoutput.UpgradePlan, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha2_UpgradePlan_To_output_UpgradePlan(in, out, s)
 }
 
-func autoConvert_output_UpgradePlan_To_v1alpha2_UpgradePlan(in *output.UpgradePlan, out *UpgradePlan, s conversion.Scope) error {
+func autoConvert_output_UpgradePlan_To_v1alpha2_UpgradePlan(in *appapisoutput.UpgradePlan, out *UpgradePlan, s apimachinerypkgconversion.Scope) error {
 	out.Components = *(*[]ComponentUpgradePlan)(unsafe.Pointer(&in.Components))
 	out.ConfigVersions = *(*[]ComponentConfigVersionState)(unsafe.Pointer(&in.ConfigVersions))
 	return nil
 }
 
 // Convert_output_UpgradePlan_To_v1alpha2_UpgradePlan is an autogenerated conversion function.
-func Convert_output_UpgradePlan_To_v1alpha2_UpgradePlan(in *output.UpgradePlan, out *UpgradePlan, s conversion.Scope) error {
+func Convert_output_UpgradePlan_To_v1alpha2_UpgradePlan(in *appapisoutput.UpgradePlan, out *UpgradePlan, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_output_UpgradePlan_To_v1alpha2_UpgradePlan(in, out, s)
 }

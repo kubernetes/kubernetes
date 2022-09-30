@@ -24,10 +24,10 @@ package v1beta1
 import (
 	"unsafe"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/pkg/apis/clientauthentication"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	pkgapisclientauthentication "k8s.io/client-go/pkg/apis/clientauthentication"
 )
 
 func init() {
@@ -36,100 +36,100 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*Cluster)(nil), (*clientauthentication.Cluster)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_Cluster_To_clientauthentication_Cluster(a.(*Cluster), b.(*clientauthentication.Cluster), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*Cluster)(nil), (*pkgapisclientauthentication.Cluster)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_Cluster_To_clientauthentication_Cluster(a.(*Cluster), b.(*pkgapisclientauthentication.Cluster), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*clientauthentication.Cluster)(nil), (*Cluster)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_clientauthentication_Cluster_To_v1beta1_Cluster(a.(*clientauthentication.Cluster), b.(*Cluster), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisclientauthentication.Cluster)(nil), (*Cluster)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_clientauthentication_Cluster_To_v1beta1_Cluster(a.(*pkgapisclientauthentication.Cluster), b.(*Cluster), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*ExecCredential)(nil), (*clientauthentication.ExecCredential)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_ExecCredential_To_clientauthentication_ExecCredential(a.(*ExecCredential), b.(*clientauthentication.ExecCredential), scope)
+	if err := s.AddGeneratedConversionFunc((*ExecCredential)(nil), (*pkgapisclientauthentication.ExecCredential)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_ExecCredential_To_clientauthentication_ExecCredential(a.(*ExecCredential), b.(*pkgapisclientauthentication.ExecCredential), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*clientauthentication.ExecCredential)(nil), (*ExecCredential)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_clientauthentication_ExecCredential_To_v1beta1_ExecCredential(a.(*clientauthentication.ExecCredential), b.(*ExecCredential), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisclientauthentication.ExecCredential)(nil), (*ExecCredential)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_clientauthentication_ExecCredential_To_v1beta1_ExecCredential(a.(*pkgapisclientauthentication.ExecCredential), b.(*ExecCredential), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*ExecCredentialSpec)(nil), (*clientauthentication.ExecCredentialSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_ExecCredentialSpec_To_clientauthentication_ExecCredentialSpec(a.(*ExecCredentialSpec), b.(*clientauthentication.ExecCredentialSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*ExecCredentialSpec)(nil), (*pkgapisclientauthentication.ExecCredentialSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_ExecCredentialSpec_To_clientauthentication_ExecCredentialSpec(a.(*ExecCredentialSpec), b.(*pkgapisclientauthentication.ExecCredentialSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*clientauthentication.ExecCredentialSpec)(nil), (*ExecCredentialSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_clientauthentication_ExecCredentialSpec_To_v1beta1_ExecCredentialSpec(a.(*clientauthentication.ExecCredentialSpec), b.(*ExecCredentialSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisclientauthentication.ExecCredentialSpec)(nil), (*ExecCredentialSpec)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_clientauthentication_ExecCredentialSpec_To_v1beta1_ExecCredentialSpec(a.(*pkgapisclientauthentication.ExecCredentialSpec), b.(*ExecCredentialSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*ExecCredentialStatus)(nil), (*clientauthentication.ExecCredentialStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_ExecCredentialStatus_To_clientauthentication_ExecCredentialStatus(a.(*ExecCredentialStatus), b.(*clientauthentication.ExecCredentialStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*ExecCredentialStatus)(nil), (*pkgapisclientauthentication.ExecCredentialStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1beta1_ExecCredentialStatus_To_clientauthentication_ExecCredentialStatus(a.(*ExecCredentialStatus), b.(*pkgapisclientauthentication.ExecCredentialStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*clientauthentication.ExecCredentialStatus)(nil), (*ExecCredentialStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_clientauthentication_ExecCredentialStatus_To_v1beta1_ExecCredentialStatus(a.(*clientauthentication.ExecCredentialStatus), b.(*ExecCredentialStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*pkgapisclientauthentication.ExecCredentialStatus)(nil), (*ExecCredentialStatus)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_clientauthentication_ExecCredentialStatus_To_v1beta1_ExecCredentialStatus(a.(*pkgapisclientauthentication.ExecCredentialStatus), b.(*ExecCredentialStatus), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1beta1_Cluster_To_clientauthentication_Cluster(in *Cluster, out *clientauthentication.Cluster, s conversion.Scope) error {
+func autoConvert_v1beta1_Cluster_To_clientauthentication_Cluster(in *Cluster, out *pkgapisclientauthentication.Cluster, s apimachinerypkgconversion.Scope) error {
 	out.Server = in.Server
 	out.TLSServerName = in.TLSServerName
 	out.InsecureSkipTLSVerify = in.InsecureSkipTLSVerify
 	out.CertificateAuthorityData = *(*[]byte)(unsafe.Pointer(&in.CertificateAuthorityData))
 	out.ProxyURL = in.ProxyURL
 	out.DisableCompression = in.DisableCompression
-	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Config, &out.Config, s); err != nil {
+	if err := apimachinerypkgruntime.Convert_runtime_RawExtension_To_runtime_Object(&in.Config, &out.Config, s); err != nil {
 		return err
 	}
 	return nil
 }
 
 // Convert_v1beta1_Cluster_To_clientauthentication_Cluster is an autogenerated conversion function.
-func Convert_v1beta1_Cluster_To_clientauthentication_Cluster(in *Cluster, out *clientauthentication.Cluster, s conversion.Scope) error {
+func Convert_v1beta1_Cluster_To_clientauthentication_Cluster(in *Cluster, out *pkgapisclientauthentication.Cluster, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_Cluster_To_clientauthentication_Cluster(in, out, s)
 }
 
-func autoConvert_clientauthentication_Cluster_To_v1beta1_Cluster(in *clientauthentication.Cluster, out *Cluster, s conversion.Scope) error {
+func autoConvert_clientauthentication_Cluster_To_v1beta1_Cluster(in *pkgapisclientauthentication.Cluster, out *Cluster, s apimachinerypkgconversion.Scope) error {
 	out.Server = in.Server
 	out.TLSServerName = in.TLSServerName
 	out.InsecureSkipTLSVerify = in.InsecureSkipTLSVerify
 	out.CertificateAuthorityData = *(*[]byte)(unsafe.Pointer(&in.CertificateAuthorityData))
 	out.ProxyURL = in.ProxyURL
 	out.DisableCompression = in.DisableCompression
-	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Config, &out.Config, s); err != nil {
+	if err := apimachinerypkgruntime.Convert_runtime_Object_To_runtime_RawExtension(&in.Config, &out.Config, s); err != nil {
 		return err
 	}
 	return nil
 }
 
 // Convert_clientauthentication_Cluster_To_v1beta1_Cluster is an autogenerated conversion function.
-func Convert_clientauthentication_Cluster_To_v1beta1_Cluster(in *clientauthentication.Cluster, out *Cluster, s conversion.Scope) error {
+func Convert_clientauthentication_Cluster_To_v1beta1_Cluster(in *pkgapisclientauthentication.Cluster, out *Cluster, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_clientauthentication_Cluster_To_v1beta1_Cluster(in, out, s)
 }
 
-func autoConvert_v1beta1_ExecCredential_To_clientauthentication_ExecCredential(in *ExecCredential, out *clientauthentication.ExecCredential, s conversion.Scope) error {
+func autoConvert_v1beta1_ExecCredential_To_clientauthentication_ExecCredential(in *ExecCredential, out *pkgapisclientauthentication.ExecCredential, s apimachinerypkgconversion.Scope) error {
 	if err := Convert_v1beta1_ExecCredentialSpec_To_clientauthentication_ExecCredentialSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
-	out.Status = (*clientauthentication.ExecCredentialStatus)(unsafe.Pointer(in.Status))
+	out.Status = (*pkgapisclientauthentication.ExecCredentialStatus)(unsafe.Pointer(in.Status))
 	return nil
 }
 
 // Convert_v1beta1_ExecCredential_To_clientauthentication_ExecCredential is an autogenerated conversion function.
-func Convert_v1beta1_ExecCredential_To_clientauthentication_ExecCredential(in *ExecCredential, out *clientauthentication.ExecCredential, s conversion.Scope) error {
+func Convert_v1beta1_ExecCredential_To_clientauthentication_ExecCredential(in *ExecCredential, out *pkgapisclientauthentication.ExecCredential, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_ExecCredential_To_clientauthentication_ExecCredential(in, out, s)
 }
 
-func autoConvert_clientauthentication_ExecCredential_To_v1beta1_ExecCredential(in *clientauthentication.ExecCredential, out *ExecCredential, s conversion.Scope) error {
+func autoConvert_clientauthentication_ExecCredential_To_v1beta1_ExecCredential(in *pkgapisclientauthentication.ExecCredential, out *ExecCredential, s apimachinerypkgconversion.Scope) error {
 	if err := Convert_clientauthentication_ExecCredentialSpec_To_v1beta1_ExecCredentialSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -138,14 +138,14 @@ func autoConvert_clientauthentication_ExecCredential_To_v1beta1_ExecCredential(i
 }
 
 // Convert_clientauthentication_ExecCredential_To_v1beta1_ExecCredential is an autogenerated conversion function.
-func Convert_clientauthentication_ExecCredential_To_v1beta1_ExecCredential(in *clientauthentication.ExecCredential, out *ExecCredential, s conversion.Scope) error {
+func Convert_clientauthentication_ExecCredential_To_v1beta1_ExecCredential(in *pkgapisclientauthentication.ExecCredential, out *ExecCredential, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_clientauthentication_ExecCredential_To_v1beta1_ExecCredential(in, out, s)
 }
 
-func autoConvert_v1beta1_ExecCredentialSpec_To_clientauthentication_ExecCredentialSpec(in *ExecCredentialSpec, out *clientauthentication.ExecCredentialSpec, s conversion.Scope) error {
+func autoConvert_v1beta1_ExecCredentialSpec_To_clientauthentication_ExecCredentialSpec(in *ExecCredentialSpec, out *pkgapisclientauthentication.ExecCredentialSpec, s apimachinerypkgconversion.Scope) error {
 	if in.Cluster != nil {
 		in, out := &in.Cluster, &out.Cluster
-		*out = new(clientauthentication.Cluster)
+		*out = new(pkgapisclientauthentication.Cluster)
 		if err := Convert_v1beta1_Cluster_To_clientauthentication_Cluster(*in, *out, s); err != nil {
 			return err
 		}
@@ -157,11 +157,11 @@ func autoConvert_v1beta1_ExecCredentialSpec_To_clientauthentication_ExecCredenti
 }
 
 // Convert_v1beta1_ExecCredentialSpec_To_clientauthentication_ExecCredentialSpec is an autogenerated conversion function.
-func Convert_v1beta1_ExecCredentialSpec_To_clientauthentication_ExecCredentialSpec(in *ExecCredentialSpec, out *clientauthentication.ExecCredentialSpec, s conversion.Scope) error {
+func Convert_v1beta1_ExecCredentialSpec_To_clientauthentication_ExecCredentialSpec(in *ExecCredentialSpec, out *pkgapisclientauthentication.ExecCredentialSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_ExecCredentialSpec_To_clientauthentication_ExecCredentialSpec(in, out, s)
 }
 
-func autoConvert_clientauthentication_ExecCredentialSpec_To_v1beta1_ExecCredentialSpec(in *clientauthentication.ExecCredentialSpec, out *ExecCredentialSpec, s conversion.Scope) error {
+func autoConvert_clientauthentication_ExecCredentialSpec_To_v1beta1_ExecCredentialSpec(in *pkgapisclientauthentication.ExecCredentialSpec, out *ExecCredentialSpec, s apimachinerypkgconversion.Scope) error {
 	out.Interactive = in.Interactive
 	if in.Cluster != nil {
 		in, out := &in.Cluster, &out.Cluster
@@ -176,12 +176,12 @@ func autoConvert_clientauthentication_ExecCredentialSpec_To_v1beta1_ExecCredenti
 }
 
 // Convert_clientauthentication_ExecCredentialSpec_To_v1beta1_ExecCredentialSpec is an autogenerated conversion function.
-func Convert_clientauthentication_ExecCredentialSpec_To_v1beta1_ExecCredentialSpec(in *clientauthentication.ExecCredentialSpec, out *ExecCredentialSpec, s conversion.Scope) error {
+func Convert_clientauthentication_ExecCredentialSpec_To_v1beta1_ExecCredentialSpec(in *pkgapisclientauthentication.ExecCredentialSpec, out *ExecCredentialSpec, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_clientauthentication_ExecCredentialSpec_To_v1beta1_ExecCredentialSpec(in, out, s)
 }
 
-func autoConvert_v1beta1_ExecCredentialStatus_To_clientauthentication_ExecCredentialStatus(in *ExecCredentialStatus, out *clientauthentication.ExecCredentialStatus, s conversion.Scope) error {
-	out.ExpirationTimestamp = (*v1.Time)(unsafe.Pointer(in.ExpirationTimestamp))
+func autoConvert_v1beta1_ExecCredentialStatus_To_clientauthentication_ExecCredentialStatus(in *ExecCredentialStatus, out *pkgapisclientauthentication.ExecCredentialStatus, s apimachinerypkgconversion.Scope) error {
+	out.ExpirationTimestamp = (*apismetav1.Time)(unsafe.Pointer(in.ExpirationTimestamp))
 	out.Token = in.Token
 	out.ClientCertificateData = in.ClientCertificateData
 	out.ClientKeyData = in.ClientKeyData
@@ -189,12 +189,12 @@ func autoConvert_v1beta1_ExecCredentialStatus_To_clientauthentication_ExecCreden
 }
 
 // Convert_v1beta1_ExecCredentialStatus_To_clientauthentication_ExecCredentialStatus is an autogenerated conversion function.
-func Convert_v1beta1_ExecCredentialStatus_To_clientauthentication_ExecCredentialStatus(in *ExecCredentialStatus, out *clientauthentication.ExecCredentialStatus, s conversion.Scope) error {
+func Convert_v1beta1_ExecCredentialStatus_To_clientauthentication_ExecCredentialStatus(in *ExecCredentialStatus, out *pkgapisclientauthentication.ExecCredentialStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1beta1_ExecCredentialStatus_To_clientauthentication_ExecCredentialStatus(in, out, s)
 }
 
-func autoConvert_clientauthentication_ExecCredentialStatus_To_v1beta1_ExecCredentialStatus(in *clientauthentication.ExecCredentialStatus, out *ExecCredentialStatus, s conversion.Scope) error {
-	out.ExpirationTimestamp = (*v1.Time)(unsafe.Pointer(in.ExpirationTimestamp))
+func autoConvert_clientauthentication_ExecCredentialStatus_To_v1beta1_ExecCredentialStatus(in *pkgapisclientauthentication.ExecCredentialStatus, out *ExecCredentialStatus, s apimachinerypkgconversion.Scope) error {
+	out.ExpirationTimestamp = (*apismetav1.Time)(unsafe.Pointer(in.ExpirationTimestamp))
 	out.Token = in.Token
 	out.ClientCertificateData = in.ClientCertificateData
 	out.ClientKeyData = in.ClientKeyData
@@ -202,6 +202,6 @@ func autoConvert_clientauthentication_ExecCredentialStatus_To_v1beta1_ExecCreden
 }
 
 // Convert_clientauthentication_ExecCredentialStatus_To_v1beta1_ExecCredentialStatus is an autogenerated conversion function.
-func Convert_clientauthentication_ExecCredentialStatus_To_v1beta1_ExecCredentialStatus(in *clientauthentication.ExecCredentialStatus, out *ExecCredentialStatus, s conversion.Scope) error {
+func Convert_clientauthentication_ExecCredentialStatus_To_v1beta1_ExecCredentialStatus(in *pkgapisclientauthentication.ExecCredentialStatus, out *ExecCredentialStatus, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_clientauthentication_ExecCredentialStatus_To_v1beta1_ExecCredentialStatus(in, out, s)
 }

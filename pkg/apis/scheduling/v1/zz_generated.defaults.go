@@ -22,24 +22,24 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/api/scheduling/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	apischedulingv1 "k8s.io/api/scheduling/v1"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
-func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1.PriorityClass{}, func(obj interface{}) { SetObjectDefaults_PriorityClass(obj.(*v1.PriorityClass)) })
-	scheme.AddTypeDefaultingFunc(&v1.PriorityClassList{}, func(obj interface{}) { SetObjectDefaults_PriorityClassList(obj.(*v1.PriorityClassList)) })
+func RegisterDefaults(scheme *apimachinerypkgruntime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&apischedulingv1.PriorityClass{}, func(obj interface{}) { SetObjectDefaults_PriorityClass(obj.(*apischedulingv1.PriorityClass)) })
+	scheme.AddTypeDefaultingFunc(&apischedulingv1.PriorityClassList{}, func(obj interface{}) { SetObjectDefaults_PriorityClassList(obj.(*apischedulingv1.PriorityClassList)) })
 	return nil
 }
 
-func SetObjectDefaults_PriorityClass(in *v1.PriorityClass) {
+func SetObjectDefaults_PriorityClass(in *apischedulingv1.PriorityClass) {
 	SetDefaults_PriorityClass(in)
 }
 
-func SetObjectDefaults_PriorityClassList(in *v1.PriorityClassList) {
+func SetObjectDefaults_PriorityClassList(in *apischedulingv1.PriorityClassList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_PriorityClass(a)

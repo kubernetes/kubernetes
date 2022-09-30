@@ -22,52 +22,62 @@ limitations under the License.
 package v1beta3
 
 import (
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kube-scheduler/config/v1beta3"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	kubeschedulerconfigv1beta3 "k8s.io/kube-scheduler/config/v1beta3"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
-func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1beta3.DefaultPreemptionArgs{}, func(obj interface{}) { SetObjectDefaults_DefaultPreemptionArgs(obj.(*v1beta3.DefaultPreemptionArgs)) })
-	scheme.AddTypeDefaultingFunc(&v1beta3.InterPodAffinityArgs{}, func(obj interface{}) { SetObjectDefaults_InterPodAffinityArgs(obj.(*v1beta3.InterPodAffinityArgs)) })
-	scheme.AddTypeDefaultingFunc(&v1beta3.KubeSchedulerConfiguration{}, func(obj interface{}) {
-		SetObjectDefaults_KubeSchedulerConfiguration(obj.(*v1beta3.KubeSchedulerConfiguration))
+func RegisterDefaults(scheme *apimachinerypkgruntime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&kubeschedulerconfigv1beta3.DefaultPreemptionArgs{}, func(obj interface{}) {
+		SetObjectDefaults_DefaultPreemptionArgs(obj.(*kubeschedulerconfigv1beta3.DefaultPreemptionArgs))
 	})
-	scheme.AddTypeDefaultingFunc(&v1beta3.NodeResourcesBalancedAllocationArgs{}, func(obj interface{}) {
-		SetObjectDefaults_NodeResourcesBalancedAllocationArgs(obj.(*v1beta3.NodeResourcesBalancedAllocationArgs))
+	scheme.AddTypeDefaultingFunc(&kubeschedulerconfigv1beta3.InterPodAffinityArgs{}, func(obj interface{}) {
+		SetObjectDefaults_InterPodAffinityArgs(obj.(*kubeschedulerconfigv1beta3.InterPodAffinityArgs))
 	})
-	scheme.AddTypeDefaultingFunc(&v1beta3.NodeResourcesFitArgs{}, func(obj interface{}) { SetObjectDefaults_NodeResourcesFitArgs(obj.(*v1beta3.NodeResourcesFitArgs)) })
-	scheme.AddTypeDefaultingFunc(&v1beta3.PodTopologySpreadArgs{}, func(obj interface{}) { SetObjectDefaults_PodTopologySpreadArgs(obj.(*v1beta3.PodTopologySpreadArgs)) })
-	scheme.AddTypeDefaultingFunc(&v1beta3.VolumeBindingArgs{}, func(obj interface{}) { SetObjectDefaults_VolumeBindingArgs(obj.(*v1beta3.VolumeBindingArgs)) })
+	scheme.AddTypeDefaultingFunc(&kubeschedulerconfigv1beta3.KubeSchedulerConfiguration{}, func(obj interface{}) {
+		SetObjectDefaults_KubeSchedulerConfiguration(obj.(*kubeschedulerconfigv1beta3.KubeSchedulerConfiguration))
+	})
+	scheme.AddTypeDefaultingFunc(&kubeschedulerconfigv1beta3.NodeResourcesBalancedAllocationArgs{}, func(obj interface{}) {
+		SetObjectDefaults_NodeResourcesBalancedAllocationArgs(obj.(*kubeschedulerconfigv1beta3.NodeResourcesBalancedAllocationArgs))
+	})
+	scheme.AddTypeDefaultingFunc(&kubeschedulerconfigv1beta3.NodeResourcesFitArgs{}, func(obj interface{}) {
+		SetObjectDefaults_NodeResourcesFitArgs(obj.(*kubeschedulerconfigv1beta3.NodeResourcesFitArgs))
+	})
+	scheme.AddTypeDefaultingFunc(&kubeschedulerconfigv1beta3.PodTopologySpreadArgs{}, func(obj interface{}) {
+		SetObjectDefaults_PodTopologySpreadArgs(obj.(*kubeschedulerconfigv1beta3.PodTopologySpreadArgs))
+	})
+	scheme.AddTypeDefaultingFunc(&kubeschedulerconfigv1beta3.VolumeBindingArgs{}, func(obj interface{}) {
+		SetObjectDefaults_VolumeBindingArgs(obj.(*kubeschedulerconfigv1beta3.VolumeBindingArgs))
+	})
 	return nil
 }
 
-func SetObjectDefaults_DefaultPreemptionArgs(in *v1beta3.DefaultPreemptionArgs) {
+func SetObjectDefaults_DefaultPreemptionArgs(in *kubeschedulerconfigv1beta3.DefaultPreemptionArgs) {
 	SetDefaults_DefaultPreemptionArgs(in)
 }
 
-func SetObjectDefaults_InterPodAffinityArgs(in *v1beta3.InterPodAffinityArgs) {
+func SetObjectDefaults_InterPodAffinityArgs(in *kubeschedulerconfigv1beta3.InterPodAffinityArgs) {
 	SetDefaults_InterPodAffinityArgs(in)
 }
 
-func SetObjectDefaults_KubeSchedulerConfiguration(in *v1beta3.KubeSchedulerConfiguration) {
+func SetObjectDefaults_KubeSchedulerConfiguration(in *kubeschedulerconfigv1beta3.KubeSchedulerConfiguration) {
 	SetDefaults_KubeSchedulerConfiguration(in)
 }
 
-func SetObjectDefaults_NodeResourcesBalancedAllocationArgs(in *v1beta3.NodeResourcesBalancedAllocationArgs) {
+func SetObjectDefaults_NodeResourcesBalancedAllocationArgs(in *kubeschedulerconfigv1beta3.NodeResourcesBalancedAllocationArgs) {
 	SetDefaults_NodeResourcesBalancedAllocationArgs(in)
 }
 
-func SetObjectDefaults_NodeResourcesFitArgs(in *v1beta3.NodeResourcesFitArgs) {
+func SetObjectDefaults_NodeResourcesFitArgs(in *kubeschedulerconfigv1beta3.NodeResourcesFitArgs) {
 	SetDefaults_NodeResourcesFitArgs(in)
 }
 
-func SetObjectDefaults_PodTopologySpreadArgs(in *v1beta3.PodTopologySpreadArgs) {
+func SetObjectDefaults_PodTopologySpreadArgs(in *kubeschedulerconfigv1beta3.PodTopologySpreadArgs) {
 	SetDefaults_PodTopologySpreadArgs(in)
 }
 
-func SetObjectDefaults_VolumeBindingArgs(in *v1beta3.VolumeBindingArgs) {
+func SetObjectDefaults_VolumeBindingArgs(in *kubeschedulerconfigv1beta3.VolumeBindingArgs) {
 	SetDefaults_VolumeBindingArgs(in)
 }

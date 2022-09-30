@@ -22,11 +22,11 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kube-controller-manager/config/v1alpha1"
-	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/config"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apimachinerypkgconversion "k8s.io/apimachinery/pkg/conversion"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
+	kubecontrollermanagerconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
+	volumeattachdetachconfig "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config"
 )
 
 func init() {
@@ -35,60 +35,60 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.GroupResource)(nil), (*v1.GroupResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_GroupResource_To_v1_GroupResource(a.(*v1alpha1.GroupResource), b.(*v1.GroupResource), scope)
+func RegisterConversions(s *apimachinerypkgruntime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*kubecontrollermanagerconfigv1alpha1.GroupResource)(nil), (*apismetav1.GroupResource)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_GroupResource_To_v1_GroupResource(a.(*kubecontrollermanagerconfigv1alpha1.GroupResource), b.(*apismetav1.GroupResource), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.GroupResource)(nil), (*v1alpha1.GroupResource)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_GroupResource_To_v1alpha1_GroupResource(a.(*v1.GroupResource), b.(*v1alpha1.GroupResource), scope)
+	if err := s.AddGeneratedConversionFunc((*apismetav1.GroupResource)(nil), (*kubecontrollermanagerconfigv1alpha1.GroupResource)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1_GroupResource_To_v1alpha1_GroupResource(a.(*apismetav1.GroupResource), b.(*kubecontrollermanagerconfigv1alpha1.GroupResource), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*config.AttachDetachControllerConfiguration)(nil), (*v1alpha1.AttachDetachControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_AttachDetachControllerConfiguration_To_v1alpha1_AttachDetachControllerConfiguration(a.(*config.AttachDetachControllerConfiguration), b.(*v1alpha1.AttachDetachControllerConfiguration), scope)
+	if err := s.AddConversionFunc((*volumeattachdetachconfig.AttachDetachControllerConfiguration)(nil), (*kubecontrollermanagerconfigv1alpha1.AttachDetachControllerConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_config_AttachDetachControllerConfiguration_To_v1alpha1_AttachDetachControllerConfiguration(a.(*volumeattachdetachconfig.AttachDetachControllerConfiguration), b.(*kubecontrollermanagerconfigv1alpha1.AttachDetachControllerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1alpha1.AttachDetachControllerConfiguration)(nil), (*config.AttachDetachControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_AttachDetachControllerConfiguration_To_config_AttachDetachControllerConfiguration(a.(*v1alpha1.AttachDetachControllerConfiguration), b.(*config.AttachDetachControllerConfiguration), scope)
+	if err := s.AddConversionFunc((*kubecontrollermanagerconfigv1alpha1.AttachDetachControllerConfiguration)(nil), (*volumeattachdetachconfig.AttachDetachControllerConfiguration)(nil), func(a, b interface{}, scope apimachinerypkgconversion.Scope) error {
+		return Convert_v1alpha1_AttachDetachControllerConfiguration_To_config_AttachDetachControllerConfiguration(a.(*kubecontrollermanagerconfigv1alpha1.AttachDetachControllerConfiguration), b.(*volumeattachdetachconfig.AttachDetachControllerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1alpha1_AttachDetachControllerConfiguration_To_config_AttachDetachControllerConfiguration(in *v1alpha1.AttachDetachControllerConfiguration, out *config.AttachDetachControllerConfiguration, s conversion.Scope) error {
+func autoConvert_v1alpha1_AttachDetachControllerConfiguration_To_config_AttachDetachControllerConfiguration(in *kubecontrollermanagerconfigv1alpha1.AttachDetachControllerConfiguration, out *volumeattachdetachconfig.AttachDetachControllerConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.DisableAttachDetachReconcilerSync = in.DisableAttachDetachReconcilerSync
 	out.ReconcilerSyncLoopPeriod = in.ReconcilerSyncLoopPeriod
 	return nil
 }
 
-func autoConvert_config_AttachDetachControllerConfiguration_To_v1alpha1_AttachDetachControllerConfiguration(in *config.AttachDetachControllerConfiguration, out *v1alpha1.AttachDetachControllerConfiguration, s conversion.Scope) error {
+func autoConvert_config_AttachDetachControllerConfiguration_To_v1alpha1_AttachDetachControllerConfiguration(in *volumeattachdetachconfig.AttachDetachControllerConfiguration, out *kubecontrollermanagerconfigv1alpha1.AttachDetachControllerConfiguration, s apimachinerypkgconversion.Scope) error {
 	out.DisableAttachDetachReconcilerSync = in.DisableAttachDetachReconcilerSync
 	out.ReconcilerSyncLoopPeriod = in.ReconcilerSyncLoopPeriod
 	return nil
 }
 
-func autoConvert_v1alpha1_GroupResource_To_v1_GroupResource(in *v1alpha1.GroupResource, out *v1.GroupResource, s conversion.Scope) error {
+func autoConvert_v1alpha1_GroupResource_To_v1_GroupResource(in *kubecontrollermanagerconfigv1alpha1.GroupResource, out *apismetav1.GroupResource, s apimachinerypkgconversion.Scope) error {
 	out.Group = in.Group
 	out.Resource = in.Resource
 	return nil
 }
 
 // Convert_v1alpha1_GroupResource_To_v1_GroupResource is an autogenerated conversion function.
-func Convert_v1alpha1_GroupResource_To_v1_GroupResource(in *v1alpha1.GroupResource, out *v1.GroupResource, s conversion.Scope) error {
+func Convert_v1alpha1_GroupResource_To_v1_GroupResource(in *kubecontrollermanagerconfigv1alpha1.GroupResource, out *apismetav1.GroupResource, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1alpha1_GroupResource_To_v1_GroupResource(in, out, s)
 }
 
-func autoConvert_v1_GroupResource_To_v1alpha1_GroupResource(in *v1.GroupResource, out *v1alpha1.GroupResource, s conversion.Scope) error {
+func autoConvert_v1_GroupResource_To_v1alpha1_GroupResource(in *apismetav1.GroupResource, out *kubecontrollermanagerconfigv1alpha1.GroupResource, s apimachinerypkgconversion.Scope) error {
 	out.Group = in.Group
 	out.Resource = in.Resource
 	return nil
 }
 
 // Convert_v1_GroupResource_To_v1alpha1_GroupResource is an autogenerated conversion function.
-func Convert_v1_GroupResource_To_v1alpha1_GroupResource(in *v1.GroupResource, out *v1alpha1.GroupResource, s conversion.Scope) error {
+func Convert_v1_GroupResource_To_v1alpha1_GroupResource(in *apismetav1.GroupResource, out *kubecontrollermanagerconfigv1alpha1.GroupResource, s apimachinerypkgconversion.Scope) error {
 	return autoConvert_v1_GroupResource_To_v1alpha1_GroupResource(in, out, s)
 }

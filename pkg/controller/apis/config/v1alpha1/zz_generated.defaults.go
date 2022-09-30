@@ -22,22 +22,22 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/apimachinery/pkg/runtime"
+	apimachinerypkgruntime "k8s.io/apimachinery/pkg/runtime"
 	cloudproviderconfigv1alpha1 "k8s.io/cloud-provider/config/v1alpha1"
-	"k8s.io/kube-controller-manager/config/v1alpha1"
+	kubecontrollermanagerconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
-func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1alpha1.KubeControllerManagerConfiguration{}, func(obj interface{}) {
-		SetObjectDefaults_KubeControllerManagerConfiguration(obj.(*v1alpha1.KubeControllerManagerConfiguration))
+func RegisterDefaults(scheme *apimachinerypkgruntime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&kubecontrollermanagerconfigv1alpha1.KubeControllerManagerConfiguration{}, func(obj interface{}) {
+		SetObjectDefaults_KubeControllerManagerConfiguration(obj.(*kubecontrollermanagerconfigv1alpha1.KubeControllerManagerConfiguration))
 	})
 	return nil
 }
 
-func SetObjectDefaults_KubeControllerManagerConfiguration(in *v1alpha1.KubeControllerManagerConfiguration) {
+func SetObjectDefaults_KubeControllerManagerConfiguration(in *kubecontrollermanagerconfigv1alpha1.KubeControllerManagerConfiguration) {
 	SetDefaults_KubeControllerManagerConfiguration(in)
 	cloudproviderconfigv1alpha1.SetDefaults_KubeCloudSharedConfiguration(&in.KubeCloudShared)
 }
