@@ -208,6 +208,7 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	deprecatedMasterServiceNamespace := metav1.NamespaceDefault
 	fs.StringVar(&deprecatedMasterServiceNamespace, "master-service-namespace", deprecatedMasterServiceNamespace, ""+
 		"DEPRECATED: the namespace from which the Kubernetes master services should be injected into pods.")
+	fs.MarkDeprecated("master-service-namespace", "This flag will be removed in v1.27")
 
 	fs.IntVar(&s.MaxRequestsInFlight, "max-requests-inflight", s.MaxRequestsInFlight, ""+
 		"This and --max-mutating-requests-inflight are summed to determine the server's total concurrency limit "+
