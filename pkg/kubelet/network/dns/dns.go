@@ -272,7 +272,7 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 			}
 		}
 		if fields[0] == "options" {
-			options = fields[1:]
+			options = appendOptions(options, fields[1:]...)
 		}
 	}
 
@@ -348,6 +348,26 @@ func mergeDNSOptions(existingDNSConfigOptions []string, dnsConfigOptions []v1.Po
 			op = op + ":" + opValue
 		}
 		options = append(options, op)
+	}
+	return options
+}
+
+// appendOptions appends options to the given list, but does not add duplicates.
+// append option will overwrite the previous one either in new line or in the same line.
+func appendOptions(options []string, newOption ...string) []string {
+	var optionMap = make(map[string]string)
+	for _, option := range options {
+		optName := strings.Split(option, ":")[0]
+		optionMap[optName] = option
+	}
+	for _, option := range newOption {
+		optName := strings.Split(option, ":")[0]
+		optionMap[optName] = option
+	}
+
+	options = []string{}
+	for _, v := range optionMap {
+		options = append(options, v)
 	}
 	return options
 }
