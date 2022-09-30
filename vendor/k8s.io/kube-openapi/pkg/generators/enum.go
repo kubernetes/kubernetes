@@ -90,9 +90,9 @@ func parseEnums(c *generator.Context) enumMap {
 	// First, find the builtin "string" type
 	stringType := c.Universe.Type(types.Name{Name: "string"})
 
+	// find all enum types.
 	enumTypes := make(enumMap)
 	for _, p := range c.Universe {
-		// find all enum types.
 		for _, t := range p.Types {
 			if isEnumType(stringType, t) {
 				if _, ok := enumTypes[t.Name]; !ok {
@@ -102,7 +102,10 @@ func parseEnums(c *generator.Context) enumMap {
 				}
 			}
 		}
-		// find all enum values from constants, and try to match each with its type.
+	}
+
+	// find all enum values from constants, and try to match each with its type.
+	for _, p := range c.Universe {
 		for _, c := range p.Constants {
 			enumType := c.Underlying
 			if _, ok := enumTypes[enumType.Name]; ok {

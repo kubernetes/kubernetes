@@ -39,4 +39,5 @@ replace (
 	k8s.io/controller-manager => ../controller-manager
 	k8s.io/kms => ../kms
 	k8s.io/kube-controller-manager => ../kube-controller-manager
+	k8s.io/kube-openapi => github.com/benluddy/kube-openapi v0.0.0-20220929174216-3b907d108da1
 )

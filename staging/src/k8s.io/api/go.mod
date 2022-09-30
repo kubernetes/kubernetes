@@ -37,4 +37,5 @@ require (
 replace (
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
+	k8s.io/kube-openapi => github.com/benluddy/kube-openapi v0.0.0-20220929174216-3b907d108da1
 )
