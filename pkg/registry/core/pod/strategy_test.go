@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -38,11 +39,12 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	utilpointer "k8s.io/utils/pointer"
+
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
-	utilpointer "k8s.io/utils/pointer"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -1500,6 +1502,92 @@ func TestDropNonEphemeralContainerUpdates(t *testing.T) {
 			gotPod := dropNonEphemeralContainerUpdates(tc.newPod, tc.oldPod)
 			if diff := cmp.Diff(tc.wantPod, gotPod); diff != "" {
 				t.Errorf("unexpected diff when dropping fields (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestNodeInclusionPolicyEnablement(t *testing.T) {
+	var (
+		honor            = api.NodeInclusionPolicyHonor
+		ignore           = api.NodeInclusionPolicyIgnore
+		emptyConstraints = []api.TopologySpreadConstraint{
+			{
+				WhenUnsatisfiable: api.DoNotSchedule,
+				TopologyKey:       "kubernetes.io/hostname",
+				MaxSkew:           1,
+			},
+		}
+		defaultConstraints = []api.TopologySpreadConstraint{
+			{
+				NodeAffinityPolicy: &honor,
+				NodeTaintsPolicy:   &ignore,
+				WhenUnsatisfiable:  api.DoNotSchedule,
+				TopologyKey:        "kubernetes.io/hostname",
+				MaxSkew:            1,
+			},
+		}
+	)
+
+	tests := []struct {
+		name                          string
+		topologySpreadConstraints     []api.TopologySpreadConstraint
+		wantTopologySpreadConstraints []api.TopologySpreadConstraint
+		enableNodeInclusionPolicy     bool
+	}{
+		{
+			name:                          "nodeInclusionPolicy enabled with topology unset",
+			topologySpreadConstraints:     emptyConstraints,
+			wantTopologySpreadConstraints: emptyConstraints,
+			enableNodeInclusionPolicy:     true,
+		},
+		{
+			name:                          "nodeInclusionPolicy enabled with topology configured",
+			topologySpreadConstraints:     defaultConstraints,
+			wantTopologySpreadConstraints: defaultConstraints,
+			enableNodeInclusionPolicy:     true,
+		},
+		{
+			name:                          "nodeInclusionPolicy disabled with topology configured",
+			topologySpreadConstraints:     defaultConstraints,
+			wantTopologySpreadConstraints: emptyConstraints,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tc.enableNodeInclusionPolicy)()
+
+			pod := &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "foo",
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{
+						{
+							Name:                     "container",
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+						},
+					},
+				},
+			}
+			wantPod := pod.DeepCopy()
+			pod.Spec.TopologySpreadConstraints = append(pod.Spec.TopologySpreadConstraints, tc.topologySpreadConstraints...)
+
+			errs := Strategy.Validate(genericapirequest.NewContext(), pod)
+			if len(errs) != 0 {
+				t.Errorf("Unexpected error: %v", errs.ToAggregate())
+			}
+
+			Strategy.PrepareForCreate(genericapirequest.NewContext(), pod)
+			wantPod.Spec.TopologySpreadConstraints = append(wantPod.Spec.TopologySpreadConstraints, tc.wantTopologySpreadConstraints...)
+			if diff := cmp.Diff(wantPod, pod, cmpopts.IgnoreFields(pod.Status, "Phase", "QOSClass")); diff != "" {
+				t.Errorf("%s unexpected result (-want, +got): %s", tc.name, diff)
 			}
 		})
 	}
