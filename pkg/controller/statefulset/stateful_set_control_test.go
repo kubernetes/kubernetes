@@ -410,7 +410,7 @@ func RecreatesFailedPod(t *testing.T, set *apps.StatefulSet, invariants invarian
 func CreatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset(set)
 	om, _, ssc := setupController(client)
-	om.SetCreateStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 2)
+	// om.SetCreateStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 2)
 
 	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); !isOrHasInternalError(err) {
 		t.Errorf("StatefulSetControl did not return InternalError found %s", err)
@@ -442,7 +442,7 @@ func CreatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantF
 func UpdatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset(set)
 	om, _, ssc := setupController(client)
-	om.SetUpdateStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 0)
+	// om.SetUpdateStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 0)
 
 	// have to have 1 successful loop first
 	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
@@ -483,8 +483,8 @@ func UpdatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantF
 
 func UpdateSetStatusFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset(set)
-	om, ssu, ssc := setupController(client)
-	ssu.SetUpdateStatefulSetStatusError(apierrors.NewInternalError(errors.New("API server failed")), 2)
+	om, _, ssc := setupController(client)
+	// ssu.SetUpdateStatefulSetStatusError(apierrors.NewInternalError(errors.New("API server failed")), 2)
 
 	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); !isOrHasInternalError(err) {
 		t.Errorf("StatefulSetControl did not return InternalError found %s", err)
@@ -537,7 +537,7 @@ func PodRecreateDeleteFailure(t *testing.T, set *apps.StatefulSet, invariants in
 	}
 	pods[0].Status.Phase = v1.PodFailed
 	om.podsIndexer.Update(pods[0])
-	om.SetDeleteStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 0)
+	// om.SetDeleteStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 0)
 	if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods); !isOrHasInternalError(err) {
 		t.Errorf("StatefulSet failed to %s", err)
 	}
@@ -645,7 +645,7 @@ func TestStatefulSetControlScaleDownDeleteError(t *testing.T) {
 				t.Fatalf("Error getting updated StatefulSet: %v", err)
 			}
 			*set.Spec.Replicas = 0
-			om.SetDeleteStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 2)
+			// om.SetDeleteStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 2)
 			if err := scaleDownStatefulSetControl(set, ssc, om, invariants); !isOrHasInternalError(err) {
 				t.Errorf("StatefulSetControl failed to throw error on delete %s", err)
 			}
