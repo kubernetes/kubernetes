@@ -183,7 +183,8 @@ func TestValidateKubeletFlags(t *testing.T) {
 				ContainerRuntimeOptions: config.ContainerRuntimeOptions{
 					ContainerRuntime: kubetypes.RemoteContainerRuntime,
 				},
-				NodeLabels: tt.labels,
+				RemoteRuntimeEndpoint: "unix:///run/containerd/containerd.sock",
+				NodeLabels:            tt.labels,
 			})
 
 			if tt.error && err == nil {
