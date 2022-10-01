@@ -211,6 +211,37 @@ func (ContainerState) EnumDescriptor() ([]byte, []int) {
 	return fileDescriptor_00212fb1f9d3bf1c, []int{4}
 }
 
+type PullImageProgressGranularity int32
+
+const (
+	// By default send progress information as the image is pulled
+	PullImageProgressGranularity_GRANULARITY_TYPE_BYTES PullImageProgressGranularity = 0
+	// Seng progress information after every n. seconds
+	PullImageProgressGranularity_GRANULARITY_TYPE_TIME PullImageProgressGranularity = 1
+	// Seng progress information after n. percent of the image has been received
+	PullImageProgressGranularity_GRANULARITY_TYPE_PERCENT PullImageProgressGranularity = 2
+)
+
+var PullImageProgressGranularity_name = map[int32]string{
+	0: "GRANULARITY_TYPE_BYTES",
+	1: "GRANULARITY_TYPE_TIME",
+	2: "GRANULARITY_TYPE_PERCENT",
+}
+
+var PullImageProgressGranularity_value = map[string]int32{
+	"GRANULARITY_TYPE_BYTES":   0,
+	"GRANULARITY_TYPE_TIME":    1,
+	"GRANULARITY_TYPE_PERCENT": 2,
+}
+
+func (x PullImageProgressGranularity) String() string {
+	return proto.EnumName(PullImageProgressGranularity_name, int32(x))
+}
+
+func (PullImageProgressGranularity) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_00212fb1f9d3bf1c, []int{5}
+}
+
 type ContainerEventType int32
 
 const (
@@ -243,7 +274,7 @@ func (x ContainerEventType) String() string {
 }
 
 func (ContainerEventType) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{5}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{6}
 }
 
 type MetricType int32
@@ -7215,6 +7246,155 @@ func (m *PullImageResponse) GetImageRef() string {
 	return ""
 }
 
+type PullImageWithProgressRequest struct {
+	// Spec of the image.
+	Image *ImageSpec `protobuf:"bytes,1,opt,name=image,proto3" json:"image,omitempty"`
+	// Authentication configuration for pulling the image.
+	Auth *AuthConfig `protobuf:"bytes,2,opt,name=auth,proto3" json:"auth,omitempty"`
+	// Config of the PodSandbox, which is used to pull image in PodSandbox context.
+	SandboxConfig *PodSandboxConfig `protobuf:"bytes,3,opt,name=sandbox_config,json=sandboxConfig,proto3" json:"sandbox_config,omitempty"`
+	// Granularity type of the progress reports
+	GranularityType PullImageProgressGranularity `protobuf:"varint,4,opt,name=granularity_type,json=granularityType,proto3,enum=runtime.v1.PullImageProgressGranularity" json:"granularity_type,omitempty"`
+	// The interval value of the choosen granularity.
+	// For time based granularity, this is the number of seconds between reports. If time interval is 0, then report is done every 60s.
+	// For percent based granularity, this is the number of percent value between reports. If percent interval is 0, then report is done every 10%
+	// For the default byte based granularity, this is the number of bytes received between reports. If set to 0, then runtime will report progress as image is downloaded.
+	Interval             uint32   `protobuf:"varint,5,opt,name=interval,proto3" json:"interval,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *PullImageWithProgressRequest) Reset()      { *m = PullImageWithProgressRequest{} }
+func (*PullImageWithProgressRequest) ProtoMessage() {}
+func (*PullImageWithProgressRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_00212fb1f9d3bf1c, []int{96}
+}
+func (m *PullImageWithProgressRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *PullImageWithProgressRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_PullImageWithProgressRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *PullImageWithProgressRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_PullImageWithProgressRequest.Merge(m, src)
+}
+func (m *PullImageWithProgressRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *PullImageWithProgressRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_PullImageWithProgressRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_PullImageWithProgressRequest proto.InternalMessageInfo
+
+func (m *PullImageWithProgressRequest) GetImage() *ImageSpec {
+	if m != nil {
+		return m.Image
+	}
+	return nil
+}
+
+func (m *PullImageWithProgressRequest) GetAuth() *AuthConfig {
+	if m != nil {
+		return m.Auth
+	}
+	return nil
+}
+
+func (m *PullImageWithProgressRequest) GetSandboxConfig() *PodSandboxConfig {
+	if m != nil {
+		return m.SandboxConfig
+	}
+	return nil
+}
+
+func (m *PullImageWithProgressRequest) GetGranularityType() PullImageProgressGranularity {
+	if m != nil {
+		return m.GranularityType
+	}
+	return PullImageProgressGranularity_GRANULARITY_TYPE_BYTES
+}
+
+func (m *PullImageWithProgressRequest) GetInterval() uint32 {
+	if m != nil {
+		return m.Interval
+	}
+	return 0
+}
+
+type PullImageWithProgressResponse struct {
+	// Reference to the image in use.
+	ImageRef string `protobuf:"bytes,1,opt,name=image_ref,json=imageRef,proto3" json:"image_ref,omitempty"`
+	// Amount of data received.
+	Offset *UInt64Value `protobuf:"bytes,2,opt,name=offset,proto3" json:"offset,omitempty"`
+	// Total size of the image.
+	Total                *UInt64Value `protobuf:"bytes,3,opt,name=total,proto3" json:"total,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}     `json:"-"`
+	XXX_sizecache        int32        `json:"-"`
+}
+
+func (m *PullImageWithProgressResponse) Reset()      { *m = PullImageWithProgressResponse{} }
+func (*PullImageWithProgressResponse) ProtoMessage() {}
+func (*PullImageWithProgressResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_00212fb1f9d3bf1c, []int{97}
+}
+func (m *PullImageWithProgressResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *PullImageWithProgressResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_PullImageWithProgressResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *PullImageWithProgressResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_PullImageWithProgressResponse.Merge(m, src)
+}
+func (m *PullImageWithProgressResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *PullImageWithProgressResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_PullImageWithProgressResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_PullImageWithProgressResponse proto.InternalMessageInfo
+
+func (m *PullImageWithProgressResponse) GetImageRef() string {
+	if m != nil {
+		return m.ImageRef
+	}
+	return ""
+}
+
+func (m *PullImageWithProgressResponse) GetOffset() *UInt64Value {
+	if m != nil {
+		return m.Offset
+	}
+	return nil
+}
+
+func (m *PullImageWithProgressResponse) GetTotal() *UInt64Value {
+	if m != nil {
+		return m.Total
+	}
+	return nil
+}
+
 type RemoveImageRequest struct {
 	// Spec of the image to remove.
 	Image                *ImageSpec `protobuf:"bytes,1,opt,name=image,proto3" json:"image,omitempty"`
@@ -9556,6 +9736,7 @@ func init() {
 	proto.RegisterEnum("runtime.v1.NamespaceMode", NamespaceMode_name, NamespaceMode_value)
 	proto.RegisterEnum("runtime.v1.PodSandboxState", PodSandboxState_name, PodSandboxState_value)
 	proto.RegisterEnum("runtime.v1.ContainerState", ContainerState_name, ContainerState_value)
+	proto.RegisterEnum("runtime.v1.PullImageProgressGranularity", PullImageProgressGranularity_name, PullImageProgressGranularity_value)
 	proto.RegisterEnum("runtime.v1.ContainerEventType", ContainerEventType_name, ContainerEventType_value)
 	proto.RegisterEnum("runtime.v1.MetricType", MetricType_name, MetricType_value)
 	proto.RegisterEnum("runtime.v1.SecurityProfile_ProfileType", SecurityProfile_ProfileType_name, SecurityProfile_ProfileType_value)
@@ -9684,6 +9865,8 @@ func init() {
 	proto.RegisterType((*AuthConfig)(nil), "runtime.v1.AuthConfig")
 	proto.RegisterType((*PullImageRequest)(nil), "runtime.v1.PullImageRequest")
 	proto.RegisterType((*PullImageResponse)(nil), "runtime.v1.PullImageResponse")
+	proto.RegisterType((*PullImageWithProgressRequest)(nil), "runtime.v1.PullImageWithProgressRequest")
+	proto.RegisterType((*PullImageWithProgressResponse)(nil), "runtime.v1.PullImageWithProgressResponse")
 	proto.RegisterType((*RemoveImageRequest)(nil), "runtime.v1.RemoveImageRequest")
 	proto.RegisterType((*RemoveImageResponse)(nil), "runtime.v1.RemoveImageResponse")
 	proto.RegisterType((*NetworkConfig)(nil), "runtime.v1.NetworkConfig")
@@ -11363,6 +11546,9 @@ type ImageServiceClient interface {
 	ImageStatus(ctx context.Context, in *ImageStatusRequest, opts ...grpc.CallOption) (*ImageStatusResponse, error)
 	// PullImage pulls an image with authentication config.
 	PullImage(ctx context.Context, in *PullImageRequest, opts ...grpc.CallOption) (*PullImageResponse, error)
+	// PullImageWithProgress pulls an image with authentication config.
+	// It returns periodically amount of image pulled so far.
+	PullImageWithProgress(ctx context.Context, in *PullImageWithProgressRequest, opts ...grpc.CallOption) (ImageService_PullImageWithProgressClient, error)
 	// RemoveImage removes the image.
 	// This call is idempotent, and must not return an error if the image has
 	// already been removed.
@@ -11406,6 +11592,38 @@ func (c *imageServiceClient) PullImage(ctx context.Context, in *PullImageRequest
 	return out, nil
 }
 
+func (c *imageServiceClient) PullImageWithProgress(ctx context.Context, in *PullImageWithProgressRequest, opts ...grpc.CallOption) (ImageService_PullImageWithProgressClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_ImageService_serviceDesc.Streams[0], "/runtime.v1.ImageService/PullImageWithProgress", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &imageServicePullImageWithProgressClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type ImageService_PullImageWithProgressClient interface {
+	Recv() (*PullImageWithProgressResponse, error)
+	grpc.ClientStream
+}
+
+type imageServicePullImageWithProgressClient struct {
+	grpc.ClientStream
+}
+
+func (x *imageServicePullImageWithProgressClient) Recv() (*PullImageWithProgressResponse, error) {
+	m := new(PullImageWithProgressResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 func (c *imageServiceClient) RemoveImage(ctx context.Context, in *RemoveImageRequest, opts ...grpc.CallOption) (*RemoveImageResponse, error) {
 	out := new(RemoveImageResponse)
 	err := c.cc.Invoke(ctx, "/runtime.v1.ImageService/RemoveImage", in, out, opts...)
@@ -11434,6 +11652,9 @@ type ImageServiceServer interface {
 	ImageStatus(context.Context, *ImageStatusRequest) (*ImageStatusResponse, error)
 	// PullImage pulls an image with authentication config.
 	PullImage(context.Context, *PullImageRequest) (*PullImageResponse, error)
+	// PullImageWithProgress pulls an image with authentication config.
+	// It returns periodically amount of image pulled so far.
+	PullImageWithProgress(*PullImageWithProgressRequest, ImageService_PullImageWithProgressServer) error
 	// RemoveImage removes the image.
 	// This call is idempotent, and must not return an error if the image has
 	// already been removed.
@@ -11454,6 +11675,9 @@ func (*UnimplementedImageServiceServer) ImageStatus(ctx context.Context, req *Im
 }
 func (*UnimplementedImageServiceServer) PullImage(ctx context.Context, req *PullImageRequest) (*PullImageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PullImage not implemented")
+}
+func (*UnimplementedImageServiceServer) PullImageWithProgress(req *PullImageWithProgressRequest, srv ImageService_PullImageWithProgressServer) error {
+	return status.Errorf(codes.Unimplemented, "method PullImageWithProgress not implemented")
 }
 func (*UnimplementedImageServiceServer) RemoveImage(ctx context.Context, req *RemoveImageRequest) (*RemoveImageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RemoveImage not implemented")
@@ -11520,6 +11744,27 @@ func _ImageService_PullImage_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ImageService_PullImageWithProgress_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(PullImageWithProgressRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(ImageServiceServer).PullImageWithProgress(m, &imageServicePullImageWithProgressServer{stream})
+}
+
+type ImageService_PullImageWithProgressServer interface {
+	Send(*PullImageWithProgressResponse) error
+	grpc.ServerStream
+}
+
+type imageServicePullImageWithProgressServer struct {
+	grpc.ServerStream
+}
+
+func (x *imageServicePullImageWithProgressServer) Send(m *PullImageWithProgressResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 func _ImageService_RemoveImage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RemoveImageRequest)
 	if err := dec(in); err != nil {
@@ -11581,7 +11826,13 @@ var _ImageService_serviceDesc = grpc.ServiceDesc{
 			Handler:    _ImageService_ImageFsInfo_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "PullImageWithProgress",
+			Handler:       _ImageService_PullImageWithProgress_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "api.proto",
 }
 
@@ -17070,6 +17321,129 @@ func (m *PullImageResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *PullImageWithProgressRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *PullImageWithProgressRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PullImageWithProgressRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.Interval != 0 {
+		i = encodeVarintApi(dAtA, i, uint64(m.Interval))
+		i--
+		dAtA[i] = 0x28
+	}
+	if m.GranularityType != 0 {
+		i = encodeVarintApi(dAtA, i, uint64(m.GranularityType))
+		i--
+		dAtA[i] = 0x20
+	}
+	if m.SandboxConfig != nil {
+		{
+			size, err := m.SandboxConfig.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintApi(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
+	}
+	if m.Auth != nil {
+		{
+			size, err := m.Auth.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintApi(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x12
+	}
+	if m.Image != nil {
+		{
+			size, err := m.Image.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintApi(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *PullImageWithProgressResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *PullImageWithProgressResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PullImageWithProgressResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.Total != nil {
+		{
+			size, err := m.Total.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintApi(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
+	}
+	if m.Offset != nil {
+		{
+			size, err := m.Offset.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintApi(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.ImageRef) > 0 {
+		i -= len(m.ImageRef)
+		copy(dAtA[i:], m.ImageRef)
+		i = encodeVarintApi(dAtA, i, uint64(len(m.ImageRef)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *RemoveImageRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -21179,6 +21553,54 @@ func (m *PullImageResponse) Size() (n int) {
 	return n
 }
 
+func (m *PullImageWithProgressRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.Image != nil {
+		l = m.Image.Size()
+		n += 1 + l + sovApi(uint64(l))
+	}
+	if m.Auth != nil {
+		l = m.Auth.Size()
+		n += 1 + l + sovApi(uint64(l))
+	}
+	if m.SandboxConfig != nil {
+		l = m.SandboxConfig.Size()
+		n += 1 + l + sovApi(uint64(l))
+	}
+	if m.GranularityType != 0 {
+		n += 1 + sovApi(uint64(m.GranularityType))
+	}
+	if m.Interval != 0 {
+		n += 1 + sovApi(uint64(m.Interval))
+	}
+	return n
+}
+
+func (m *PullImageWithProgressResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.ImageRef)
+	if l > 0 {
+		n += 1 + l + sovApi(uint64(l))
+	}
+	if m.Offset != nil {
+		l = m.Offset.Size()
+		n += 1 + l + sovApi(uint64(l))
+	}
+	if m.Total != nil {
+		l = m.Total.Size()
+		n += 1 + l + sovApi(uint64(l))
+	}
+	return n
+}
+
 func (m *RemoveImageRequest) Size() (n int) {
 	if m == nil {
 		return 0
@@ -23484,6 +23906,32 @@ func (this *PullImageResponse) String() string {
 	}
 	s := strings.Join([]string{`&PullImageResponse{`,
 		`ImageRef:` + fmt.Sprintf("%v", this.ImageRef) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PullImageWithProgressRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PullImageWithProgressRequest{`,
+		`Image:` + strings.Replace(this.Image.String(), "ImageSpec", "ImageSpec", 1) + `,`,
+		`Auth:` + strings.Replace(this.Auth.String(), "AuthConfig", "AuthConfig", 1) + `,`,
+		`SandboxConfig:` + strings.Replace(this.SandboxConfig.String(), "PodSandboxConfig", "PodSandboxConfig", 1) + `,`,
+		`GranularityType:` + fmt.Sprintf("%v", this.GranularityType) + `,`,
+		`Interval:` + fmt.Sprintf("%v", this.Interval) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PullImageWithProgressResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PullImageWithProgressResponse{`,
+		`ImageRef:` + fmt.Sprintf("%v", this.ImageRef) + `,`,
+		`Offset:` + strings.Replace(this.Offset.String(), "UInt64Value", "UInt64Value", 1) + `,`,
+		`Total:` + strings.Replace(this.Total.String(), "UInt64Value", "UInt64Value", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -41157,6 +41605,356 @@ func (m *PullImageResponse) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.ImageRef = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *PullImageWithProgressRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PullImageWithProgressRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PullImageWithProgressRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Image", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Image == nil {
+				m.Image = &ImageSpec{}
+			}
+			if err := m.Image.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Auth", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Auth == nil {
+				m.Auth = &AuthConfig{}
+			}
+			if err := m.Auth.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SandboxConfig", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SandboxConfig == nil {
+				m.SandboxConfig = &PodSandboxConfig{}
+			}
+			if err := m.SandboxConfig.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field GranularityType", wireType)
+			}
+			m.GranularityType = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.GranularityType |= PullImageProgressGranularity(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Interval", wireType)
+			}
+			m.Interval = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Interval |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *PullImageWithProgressResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PullImageWithProgressResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PullImageWithProgressResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ImageRef", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ImageRef = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Offset", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Offset == nil {
+				m.Offset = &UInt64Value{}
+			}
+			if err := m.Offset.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Total", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Total == nil {
+				m.Total = &UInt64Value{}
+			}
+			if err := m.Total.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
