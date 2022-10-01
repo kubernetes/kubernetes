@@ -46,9 +46,6 @@ OUT_DIR ?= _output
 BIN_DIR := $(OUT_DIR)/bin
 PRJ_SRC_PATH := k8s.io/kubernetes
 
-# Metadata for driving the build lives here.
-META_DIR := .make
-
 ifdef KUBE_GOFLAGS
 $(info KUBE_GOFLAGS is now deprecated. Please use GOFLAGS instead.)
 ifndef GOFLAGS
@@ -305,24 +302,9 @@ ifeq ($(PRINT_HELP),y)
 clean:
 	echo "$$CLEAN_HELP_INFO"
 else
-clean: clean_meta
+clean:
 	build/make-clean.sh
 	hack/make-rules/clean.sh
-endif
-
-define CLEAN_META_HELP_INFO
-# Remove make-related metadata files.
-#
-# Example:
-#   make clean_meta
-endef
-.PHONY: clean_meta
-ifeq ($(PRINT_HELP),y)
-clean_meta:
-	echo "$$CLEAN_META_HELP_INFO"
-else
-clean_meta:
-	rm -rf $(META_DIR)
 endif
 
 # TODO(thockin): Remove this in v1.29.
