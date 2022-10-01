@@ -5,6 +5,7 @@
 <img src="https://github.com/kubernetes/kubernetes/raw/master/logo/logo.png" width="100">
 
 ----
+---
 
 Kubernetes, also known as K8s, is an open source system for managing [containerized applications]
 across multiple hosts. It provides basic mechanisms for deployment, maintenance,
