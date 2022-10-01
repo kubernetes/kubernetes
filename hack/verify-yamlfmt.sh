@@ -30,7 +30,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::util::ensure_clean_working_dir
 
-_tmpdir="$(kube::realpath "$(mktemp -d -t verify-generated-files.XXXXXX)")"
+_tmpdir="$(kube::realpath "$(mktemp -d -t verify-yamlfmt.XXXXXX)")"
 
 _tmp_gopath="${_tmpdir}/go"
 _tmp_kuberoot="${_tmp_gopath}/src/k8s.io/kubernetes"
