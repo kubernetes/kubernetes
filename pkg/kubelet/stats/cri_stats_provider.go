@@ -840,6 +840,20 @@ func removeTerminatedContainers(containers []*runtimeapi.Container) []*runtimeap
 	return result
 }
 
+func cpuStatsInitialized(cpu *statsapi.CPUStats) bool {
+	return cpu != nil &&
+		(*cpu.UsageCoreNanoSeconds != 0 || *cpu.UsageNanoCores != 0)
+}
+
+func memoryStatsInitialized(memory *statsapi.MemoryStats) bool {
+	return memory != nil &&
+		(*memory.UsageBytes != 0 ||
+			*memory.WorkingSetBytes != 0 ||
+			*memory.MajorPageFaults != 0 ||
+			*memory.PageFaults != 0 ||
+			*memory.RSSBytes != 0)
+}
+
 func (p *criStatsProvider) addCadvisorContainerStats(
 	cs *statsapi.ContainerStats,
 	caPodStats *cadvisorapiv2.ContainerInfo,
@@ -849,10 +863,10 @@ func (p *criStatsProvider) addCadvisorContainerStats(
 	}
 
 	cpu, memory := cadvisorInfoToCPUandMemoryStats(caPodStats)
-	if cpu != nil {
+	if cpuStatsInitialized(cpu) {
 		cs.CPU = cpu
 	}
-	if memory != nil {
+	if memoryStatsInitialized(memory) {
 		cs.Memory = memory
 	}
 }
@@ -866,10 +880,10 @@ func (p *criStatsProvider) addCadvisorContainerCPUAndMemoryStats(
 	}
 
 	cpu, memory := cadvisorInfoToCPUandMemoryStats(caPodStats)
-	if cpu != nil {
+	if cpuStatsInitialized(cpu) {
 		cs.CPU = cpu
 	}
-	if memory != nil {
+	if memoryStatsInitialized(memory) {
 		cs.Memory = memory
 	}
 }
