@@ -663,7 +663,6 @@ function kube::build::sync_to_container() {
   kube::build::rsync \
     --delete \
     --filter='H /.git' \
-    --filter='- /.make/' \
     --filter='- /_tmp/' \
     --filter='- /_output/' \
     --filter='- /' \
