@@ -52,7 +52,7 @@ func Convert_kubeadm_JoinConfiguration_To_v1beta2_JoinConfiguration(in *kubeadm.
 	return autoConvert_kubeadm_JoinConfiguration_To_v1beta2_JoinConfiguration(in, out, s)
 }
 
-// Convert_kubeadm_NodeRegistrationOptions_To_v1beta2_NodeRegistrationOption is required since v1beta2 does not have NodeRegistrationOption.ImagePullPolicy
+// Convert_kubeadm_NodeRegistrationOptions_To_v1beta2_NodeRegistrationOptions is required since v1beta2 does not have NodeRegistrationOption.ImagePullPolicy
 func Convert_kubeadm_NodeRegistrationOptions_To_v1beta2_NodeRegistrationOptions(in *kubeadm.NodeRegistrationOptions, out *NodeRegistrationOptions, s conversion.Scope) error {
 	return autoConvert_kubeadm_NodeRegistrationOptions_To_v1beta2_NodeRegistrationOptions(in, out, s)
 }

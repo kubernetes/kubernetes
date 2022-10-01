@@ -149,7 +149,7 @@ func main() {
 	os.Exit(code)
 }
 
-// newControllerManagerCommand creates a *cobra.Command object with default parameters
+// newHollowNodeCommand creates a *cobra.Command object with default parameters
 func newHollowNodeCommand() *cobra.Command {
 	s := &hollowNodeConfig{
 		NodeLabels:        make(map[string]string),
