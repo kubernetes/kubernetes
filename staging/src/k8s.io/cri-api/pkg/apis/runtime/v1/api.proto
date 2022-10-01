@@ -143,6 +143,9 @@ service ImageService {
     rpc ImageStatus(ImageStatusRequest) returns (ImageStatusResponse) {}
     // PullImage pulls an image with authentication config.
     rpc PullImage(PullImageRequest) returns (PullImageResponse) {}
+    // PullImageWithProgress pulls an image with authentication config.
+    // It returns periodically amount of image pulled so far.
+    rpc PullImageWithProgress(PullImageWithProgressRequest) returns (stream PullImageWithProgressResponse) {}
     // RemoveImage removes the image.
     // This call is idempotent, and must not return an error if the image has
     // already been removed.
@@ -1452,6 +1455,40 @@ message PullImageResponse {
     // Reference to the image in use. For most runtimes, this should be an
     // image ID or digest.
     string image_ref = 1;
+}
+
+enum PullImageProgressGranularity {
+     // By default send progress information as the image is pulled
+     GRANULARITY_TYPE_BYTES = 0;
+     // Seng progress information after every n. seconds
+     GRANULARITY_TYPE_TIME = 1;
+     // Seng progress information after n. percent of the image has been received
+     GRANULARITY_TYPE_PERCENT = 2;
+}
+
+message PullImageWithProgressRequest {
+    // Spec of the image.
+    ImageSpec image = 1;
+    // Authentication configuration for pulling the image.
+    AuthConfig auth = 2;
+    // Config of the PodSandbox, which is used to pull image in PodSandbox context.
+    PodSandboxConfig sandbox_config = 3;
+    // Granularity type of the progress reports
+    PullImageProgressGranularity granularity_type = 4;
+    // The interval value of the choosen granularity.
+    // For time based granularity, this is the number of seconds between reports. If time interval is 0, then report is done every 60s.
+    // For percent based granularity, this is the number of percent value between reports. If percent interval is 0, then report is done every 10%
+    // For the default byte based granularity, this is the number of bytes received between reports. If set to 0, then runtime will report progress as image is downloaded.
+    uint32 interval = 5;
+}
+
+message PullImageWithProgressResponse {
+    // Reference to the image in use.
+    string image_ref = 1;
+    // Amount of data received.
+    UInt64Value offset = 2;
+    // Total size of the image.
+    UInt64Value total = 3;
 }
 
 message RemoveImageRequest {
