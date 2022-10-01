@@ -24,6 +24,7 @@ KUBE_VERBOSE="${KUBE_VERBOSE:-1}"
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
+cd "${KUBE_ROOT}"
 
 kube::golang::setup_env
 
@@ -41,6 +42,44 @@ if [[ "${DBG_CODEGEN}" == 1 ]]; then
     kube::log::status "DBG: starting generated_files"
 fi
 
+# This is a partial 'find' command.  The caller is expected to pass the
+# remaining arguments.
+#
+# Example:
+#   kfind -type f -name foobar.go
+function kfind() {
+    # We want to include the "special" vendor directories which are actually
+    # part of the Kubernetes source tree (./staging/*) but we need them to be
+    # named as their ./vendor/* equivalents.  Also, we do not want all of
+    # ./vendor nor ./hack/tools/vendor nor even all of ./vendor/k8s.io.
+    find -H .                      \
+        \(                         \
+        -not \(                    \
+            \(                     \
+                -name '_*' -o      \
+                -name '.[^.]*' -o  \
+                \(                 \
+                  -name 'vendor'   \
+                  -type d          \
+                \) -o              \
+                \(                 \
+                  -name 'testdata' \
+                  -type d          \
+                \)                 \
+            \) -prune              \
+        \)                         \
+        \)                         \
+        "$@"                       \
+        | sed 's|^./staging/src|vendor|'
+}
+
+function find_all_go_dirs() {
+    kfind -type f -name \*.go  \
+        | sed 's|/[^/]*$||'    \
+        | sed 's|^./||'        \
+        | LC_ALL=C sort -u
+}
+
 # This variable holds a list of every directory that contains Go files in this
 # project.  Other rules and variables can use this as a starting point to
 # reduce filesystem accesses.
@@ -48,8 +87,7 @@ if [[ "${DBG_CODEGEN}" == 1 ]]; then
     kube::log::status "DBG: finding all *.go dirs"
 fi
 ALL_GO_DIRS=()
-kube::util::read-array ALL_GO_DIRS < \
-    <(hack/make-rules/helpers/cache_go_dirs.sh .make/all_go_dirs)
+kube::util::read-array ALL_GO_DIRS < <(find_all_go_dirs)
 if [[ "${DBG_CODEGEN}" == 1 ]]; then
     kube::log::status "DBG: found ${#ALL_GO_DIRS[@]} *.go dirs"
 fi
