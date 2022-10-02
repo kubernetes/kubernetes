@@ -130,6 +130,11 @@ if [[ "${KUBERNETES_PROVIDER}" == "azure" ]]; then
     fi
 fi
 
+if [[ "${KUBE_FEATURE_GATES:-}" = *"DisableCloudProviders=true"* ]]; then
+  echo "found DisableCloudProviders=true, removing NoSchedule taint from all nodes"
+  "${KUBE_ROOT}/cluster/kubectl.sh" taint nodes --all node.cloudprovider.kubernetes.io/uninitialized:NoSchedule-
+fi
+
 ginkgo_args=()
 if [[ -n "${CONFORMANCE_TEST_SKIP_REGEX:-}" ]]; then
   ginkgo_args+=("--skip=${CONFORMANCE_TEST_SKIP_REGEX}")
