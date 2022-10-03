@@ -46,6 +46,7 @@ import (
 	v1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
+	v1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
@@ -260,6 +261,12 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Flowcontrol().V1beta2().FlowSchemas().Informer()}, nil
 	case flowcontrolv1beta2.SchemeGroupVersion.WithResource("prioritylevelconfigurations"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Flowcontrol().V1beta2().PriorityLevelConfigurations().Informer()}, nil
+
+		// Group=flowcontrol.apiserver.k8s.io, Version=v1beta3
+	case v1beta3.SchemeGroupVersion.WithResource("flowschemas"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Flowcontrol().V1beta3().FlowSchemas().Informer()}, nil
+	case v1beta3.SchemeGroupVersion.WithResource("prioritylevelconfigurations"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Flowcontrol().V1beta3().PriorityLevelConfigurations().Informer()}, nil
 
 		// Group=internal.apiserver.k8s.io, Version=v1alpha1
 	case apiserverinternalv1alpha1.SchemeGroupVersion.WithResource("storageversions"):

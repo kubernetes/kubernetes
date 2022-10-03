@@ -53,6 +53,7 @@ import (
 	flowcontrolv1alpha1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1"
 	flowcontrolv1beta1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1"
 	flowcontrolv1beta2 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
+	flowcontrolv1beta3 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta3"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	networkingv1alpha1 "k8s.io/client-go/kubernetes/typed/networking/v1alpha1"
 	networkingv1beta1 "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
@@ -106,6 +107,7 @@ type Interface interface {
 	FlowcontrolV1alpha1() flowcontrolv1alpha1.FlowcontrolV1alpha1Interface
 	FlowcontrolV1beta1() flowcontrolv1beta1.FlowcontrolV1beta1Interface
 	FlowcontrolV1beta2() flowcontrolv1beta2.FlowcontrolV1beta2Interface
+	FlowcontrolV1beta3() flowcontrolv1beta3.FlowcontrolV1beta3Interface
 	NetworkingV1() networkingv1.NetworkingV1Interface
 	NetworkingV1alpha1() networkingv1alpha1.NetworkingV1alpha1Interface
 	NetworkingV1beta1() networkingv1beta1.NetworkingV1beta1Interface
@@ -158,6 +160,7 @@ type Clientset struct {
 	flowcontrolV1alpha1          *flowcontrolv1alpha1.FlowcontrolV1alpha1Client
 	flowcontrolV1beta1           *flowcontrolv1beta1.FlowcontrolV1beta1Client
 	flowcontrolV1beta2           *flowcontrolv1beta2.FlowcontrolV1beta2Client
+	flowcontrolV1beta3           *flowcontrolv1beta3.FlowcontrolV1beta3Client
 	networkingV1                 *networkingv1.NetworkingV1Client
 	networkingV1alpha1           *networkingv1alpha1.NetworkingV1alpha1Client
 	networkingV1beta1            *networkingv1beta1.NetworkingV1beta1Client
@@ -325,6 +328,11 @@ func (c *Clientset) FlowcontrolV1beta1() flowcontrolv1beta1.FlowcontrolV1beta1In
 // FlowcontrolV1beta2 retrieves the FlowcontrolV1beta2Client
 func (c *Clientset) FlowcontrolV1beta2() flowcontrolv1beta2.FlowcontrolV1beta2Interface {
 	return c.flowcontrolV1beta2
+}
+
+// FlowcontrolV1beta3 retrieves the FlowcontrolV1beta3Client
+func (c *Clientset) FlowcontrolV1beta3() flowcontrolv1beta3.FlowcontrolV1beta3Interface {
+	return c.flowcontrolV1beta3
 }
 
 // NetworkingV1 retrieves the NetworkingV1Client
@@ -576,6 +584,10 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
+	cs.flowcontrolV1beta3, err = flowcontrolv1beta3.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
 	cs.networkingV1, err = networkingv1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
@@ -695,6 +707,7 @@ func New(c rest.Interface) *Clientset {
 	cs.flowcontrolV1alpha1 = flowcontrolv1alpha1.New(c)
 	cs.flowcontrolV1beta1 = flowcontrolv1beta1.New(c)
 	cs.flowcontrolV1beta2 = flowcontrolv1beta2.New(c)
+	cs.flowcontrolV1beta3 = flowcontrolv1beta3.New(c)
 	cs.networkingV1 = networkingv1.New(c)
 	cs.networkingV1alpha1 = networkingv1alpha1.New(c)
 	cs.networkingV1beta1 = networkingv1beta1.New(c)

@@ -36,7 +36,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
-	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
+	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
@@ -555,9 +555,9 @@ func AddHandlers(h printers.PrintHandler) {
 
 	flowSchemaColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "PriorityLevel", Type: "string", Description: flowcontrolv1beta2.PriorityLevelConfigurationReference{}.SwaggerDoc()["name"]},
-		{Name: "MatchingPrecedence", Type: "string", Description: flowcontrolv1beta2.FlowSchemaSpec{}.SwaggerDoc()["matchingPrecedence"]},
-		{Name: "DistinguisherMethod", Type: "string", Description: flowcontrolv1beta2.FlowSchemaSpec{}.SwaggerDoc()["distinguisherMethod"]},
+		{Name: "PriorityLevel", Type: "string", Description: flowcontrolv1beta3.PriorityLevelConfigurationReference{}.SwaggerDoc()["name"]},
+		{Name: "MatchingPrecedence", Type: "string", Description: flowcontrolv1beta3.FlowSchemaSpec{}.SwaggerDoc()["matchingPrecedence"]},
+		{Name: "DistinguisherMethod", Type: "string", Description: flowcontrolv1beta3.FlowSchemaSpec{}.SwaggerDoc()["distinguisherMethod"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "MissingPL", Type: "string", Description: "references a broken or non-existent PriorityLevelConfiguration"},
 	}
@@ -566,11 +566,11 @@ func AddHandlers(h printers.PrintHandler) {
 
 	priorityLevelColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Type", Type: "string", Description: flowcontrolv1beta2.PriorityLevelConfigurationSpec{}.SwaggerDoc()["type"]},
-		{Name: "AssuredConcurrencyShares", Type: "string", Description: flowcontrolv1beta2.LimitedPriorityLevelConfiguration{}.SwaggerDoc()["assuredConcurrencyShares"]},
-		{Name: "Queues", Type: "string", Description: flowcontrolv1beta2.QueuingConfiguration{}.SwaggerDoc()["queues"]},
-		{Name: "HandSize", Type: "string", Description: flowcontrolv1beta2.QueuingConfiguration{}.SwaggerDoc()["handSize"]},
-		{Name: "QueueLengthLimit", Type: "string", Description: flowcontrolv1beta2.QueuingConfiguration{}.SwaggerDoc()["queueLengthLimit"]},
+		{Name: "Type", Type: "string", Description: flowcontrolv1beta3.PriorityLevelConfigurationSpec{}.SwaggerDoc()["type"]},
+		{Name: "NominalConcurrencyShares", Type: "string", Description: flowcontrolv1beta3.LimitedPriorityLevelConfiguration{}.SwaggerDoc()["nominalConcurrencyShares"]},
+		{Name: "Queues", Type: "string", Description: flowcontrolv1beta3.QueuingConfiguration{}.SwaggerDoc()["queues"]},
+		{Name: "HandSize", Type: "string", Description: flowcontrolv1beta3.QueuingConfiguration{}.SwaggerDoc()["handSize"]},
+		{Name: "QueueLengthLimit", Type: "string", Description: flowcontrolv1beta3.QueuingConfiguration{}.SwaggerDoc()["queueLengthLimit"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	h.TableHandler(priorityLevelColumnDefinitions, printPriorityLevelConfiguration)
@@ -2608,19 +2608,19 @@ func printPriorityLevelConfiguration(obj *flowcontrol.PriorityLevelConfiguration
 		Object: runtime.RawExtension{Object: obj},
 	}
 	name := obj.Name
-	acs := interface{}("<none>")
+	ncs := interface{}("<none>")
 	queues := interface{}("<none>")
 	handSize := interface{}("<none>")
 	queueLengthLimit := interface{}("<none>")
 	if obj.Spec.Limited != nil {
-		acs = obj.Spec.Limited.AssuredConcurrencyShares
+		ncs = obj.Spec.Limited.NominalConcurrencyShares
 		if qc := obj.Spec.Limited.LimitResponse.Queuing; qc != nil {
 			queues = qc.Queues
 			handSize = qc.HandSize
 			queueLengthLimit = qc.QueueLengthLimit
 		}
 	}
-	row.Cells = append(row.Cells, name, string(obj.Spec.Type), acs, queues, handSize, queueLengthLimit, translateTimestampSince(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, name, string(obj.Spec.Type), ncs, queues, handSize, queueLengthLimit, translateTimestampSince(obj.CreationTimestamp))
 
 	return []metav1.TableRow{row}, nil
 }

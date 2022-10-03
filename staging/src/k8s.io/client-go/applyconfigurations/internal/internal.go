@@ -9243,6 +9243,314 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: io.k8s.api.flowcontrol.v1beta3.FlowDistinguisherMethod
+  map:
+    fields:
+    - name: type
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.flowcontrol.v1beta3.FlowSchema
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.flowcontrol.v1beta3.FlowSchemaSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.flowcontrol.v1beta3.FlowSchemaStatus
+      default: {}
+- name: io.k8s.api.flowcontrol.v1beta3.FlowSchemaCondition
+  map:
+    fields:
+    - name: lastTransitionTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+      default: {}
+    - name: message
+      type:
+        scalar: string
+    - name: reason
+      type:
+        scalar: string
+    - name: status
+      type:
+        scalar: string
+    - name: type
+      type:
+        scalar: string
+- name: io.k8s.api.flowcontrol.v1beta3.FlowSchemaSpec
+  map:
+    fields:
+    - name: distinguisherMethod
+      type:
+        namedType: io.k8s.api.flowcontrol.v1beta3.FlowDistinguisherMethod
+    - name: matchingPrecedence
+      type:
+        scalar: numeric
+      default: 0
+    - name: priorityLevelConfiguration
+      type:
+        namedType: io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationReference
+      default: {}
+    - name: rules
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.flowcontrol.v1beta3.PolicyRulesWithSubjects
+          elementRelationship: atomic
+- name: io.k8s.api.flowcontrol.v1beta3.FlowSchemaStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.flowcontrol.v1beta3.FlowSchemaCondition
+          elementRelationship: associative
+          keys:
+          - type
+- name: io.k8s.api.flowcontrol.v1beta3.GroupSubject
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.flowcontrol.v1beta3.LimitResponse
+  map:
+    fields:
+    - name: queuing
+      type:
+        namedType: io.k8s.api.flowcontrol.v1beta3.QueuingConfiguration
+    - name: type
+      type:
+        scalar: string
+      default: ""
+    unions:
+    - discriminator: type
+      fields:
+      - fieldName: queuing
+        discriminatorValue: Queuing
+- name: io.k8s.api.flowcontrol.v1beta3.LimitedPriorityLevelConfiguration
+  map:
+    fields:
+    - name: limitResponse
+      type:
+        namedType: io.k8s.api.flowcontrol.v1beta3.LimitResponse
+      default: {}
+    - name: nominalConcurrencyShares
+      type:
+        scalar: numeric
+      default: 0
+- name: io.k8s.api.flowcontrol.v1beta3.NonResourcePolicyRule
+  map:
+    fields:
+    - name: nonResourceURLs
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+    - name: verbs
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+- name: io.k8s.api.flowcontrol.v1beta3.PolicyRulesWithSubjects
+  map:
+    fields:
+    - name: nonResourceRules
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.flowcontrol.v1beta3.NonResourcePolicyRule
+          elementRelationship: atomic
+    - name: resourceRules
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.flowcontrol.v1beta3.ResourcePolicyRule
+          elementRelationship: atomic
+    - name: subjects
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.flowcontrol.v1beta3.Subject
+          elementRelationship: atomic
+- name: io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfiguration
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationStatus
+      default: {}
+- name: io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationCondition
+  map:
+    fields:
+    - name: lastTransitionTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+      default: {}
+    - name: message
+      type:
+        scalar: string
+    - name: reason
+      type:
+        scalar: string
+    - name: status
+      type:
+        scalar: string
+    - name: type
+      type:
+        scalar: string
+- name: io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationReference
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationSpec
+  map:
+    fields:
+    - name: limited
+      type:
+        namedType: io.k8s.api.flowcontrol.v1beta3.LimitedPriorityLevelConfiguration
+    - name: type
+      type:
+        scalar: string
+      default: ""
+    unions:
+    - discriminator: type
+      fields:
+      - fieldName: limited
+        discriminatorValue: Limited
+- name: io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.flowcontrol.v1beta3.PriorityLevelConfigurationCondition
+          elementRelationship: associative
+          keys:
+          - type
+- name: io.k8s.api.flowcontrol.v1beta3.QueuingConfiguration
+  map:
+    fields:
+    - name: handSize
+      type:
+        scalar: numeric
+      default: 0
+    - name: queueLengthLimit
+      type:
+        scalar: numeric
+      default: 0
+    - name: queues
+      type:
+        scalar: numeric
+      default: 0
+- name: io.k8s.api.flowcontrol.v1beta3.ResourcePolicyRule
+  map:
+    fields:
+    - name: apiGroups
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+    - name: clusterScope
+      type:
+        scalar: boolean
+    - name: namespaces
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+    - name: resources
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+    - name: verbs
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+- name: io.k8s.api.flowcontrol.v1beta3.ServiceAccountSubject
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: namespace
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.flowcontrol.v1beta3.Subject
+  map:
+    fields:
+    - name: group
+      type:
+        namedType: io.k8s.api.flowcontrol.v1beta3.GroupSubject
+    - name: kind
+      type:
+        scalar: string
+      default: ""
+    - name: serviceAccount
+      type:
+        namedType: io.k8s.api.flowcontrol.v1beta3.ServiceAccountSubject
+    - name: user
+      type:
+        namedType: io.k8s.api.flowcontrol.v1beta3.UserSubject
+    unions:
+    - discriminator: kind
+      fields:
+      - fieldName: group
+        discriminatorValue: Group
+      - fieldName: serviceAccount
+        discriminatorValue: ServiceAccount
+      - fieldName: user
+        discriminatorValue: User
+- name: io.k8s.api.flowcontrol.v1beta3.UserSubject
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.imagepolicy.v1alpha1.ImageReview
   map:
     fields:

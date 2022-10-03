@@ -70,11 +70,7 @@ var resetFieldsStatusData = map[schema.GroupVersionResource]string{
 // resetFieldsStatusDefault conflicts with statusDefault
 const resetFieldsStatusDefault = `{"status": {"conditions": [{"type": "MyStatus", "status":"False"}]}}`
 
-var resetFieldsSkippedResources = map[string]struct{}{
-	// TODO: flowschemas is flaking,
-	// possible bug in the flowschemas controller.
-	"flowschemas": {},
-}
+var resetFieldsSkippedResources = map[string]struct{}{}
 
 // noConflicts is the set of reources for which
 // a conflict cannot occur.
@@ -124,9 +120,11 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("flowcontrol.apiserver.k8s.io", "v1alpha1", "flowschemas"):                 `{"metadata": {"labels":{"a":"c"}}, "spec": {"priorityLevelConfiguration": {"name": "name2"}}}`,
 	gvr("flowcontrol.apiserver.k8s.io", "v1beta1", "flowschemas"):                  `{"metadata": {"labels":{"a":"c"}}, "spec": {"priorityLevelConfiguration": {"name": "name2"}}}`,
 	gvr("flowcontrol.apiserver.k8s.io", "v1beta2", "flowschemas"):                  `{"metadata": {"labels":{"a":"c"}}, "spec": {"priorityLevelConfiguration": {"name": "name2"}}}`,
+	gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "flowschemas"):                  `{"metadata": {"labels":{"a":"c"}}, "spec": {"priorityLevelConfiguration": {"name": "name2"}}}`,
 	gvr("flowcontrol.apiserver.k8s.io", "v1alpha1", "prioritylevelconfigurations"): `{"metadata": {"labels":{"a":"c"}}, "spec": {"limited": {"assuredConcurrencyShares": 23}}}`,
 	gvr("flowcontrol.apiserver.k8s.io", "v1beta1", "prioritylevelconfigurations"):  `{"metadata": {"labels":{"a":"c"}}, "spec": {"limited": {"assuredConcurrencyShares": 23}}}`,
 	gvr("flowcontrol.apiserver.k8s.io", "v1beta2", "prioritylevelconfigurations"):  `{"metadata": {"labels":{"a":"c"}}, "spec": {"limited": {"assuredConcurrencyShares": 23}}}`,
+	gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "prioritylevelconfigurations"):  `{"metadata": {"labels":{"a":"c"}}, "spec": {"limited": {"nominalConcurrencyShares": 23}}}`,
 	gvr("extensions", "v1beta1", "ingresses"):                                      `{"spec": {"backend": {"serviceName": "service2"}}}`,
 	gvr("networking.k8s.io", "v1beta1", "ingresses"):                               `{"spec": {"backend": {"serviceName": "service2"}}}`,
 	gvr("networking.k8s.io", "v1", "ingresses"):                                    `{"spec": {"defaultBackend": {"service": {"name": "service2"}}}}`,

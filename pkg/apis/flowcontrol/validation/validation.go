@@ -20,8 +20,12 @@ import (
 	"fmt"
 	"strings"
 
+	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
+	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/util/shufflesharding"
@@ -337,10 +341,10 @@ func ValidateFlowSchemaCondition(condition *flowcontrol.FlowSchemaCondition, fld
 }
 
 // ValidatePriorityLevelConfiguration validates priority-level-configuration.
-func ValidatePriorityLevelConfiguration(pl *flowcontrol.PriorityLevelConfiguration) field.ErrorList {
+func ValidatePriorityLevelConfiguration(pl *flowcontrol.PriorityLevelConfiguration, requestGV schema.GroupVersion) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&pl.ObjectMeta, false, ValidatePriorityLevelConfigurationName, field.NewPath("metadata"))
 	specPath := field.NewPath("spec")
-	allErrs = append(allErrs, ValidatePriorityLevelConfigurationSpec(&pl.Spec, pl.Name, specPath)...)
+	allErrs = append(allErrs, ValidatePriorityLevelConfigurationSpec(&pl.Spec, requestGV, pl.Name, specPath)...)
 	if mand, ok := internalbootstrap.MandatoryPriorityLevelConfigurations[pl.Name]; ok {
 		// Check for almost exact equality.  This is a pretty
 		// strict test, and it is OK in this context because both
@@ -354,13 +358,8 @@ func ValidatePriorityLevelConfiguration(pl *flowcontrol.PriorityLevelConfigurati
 	return allErrs
 }
 
-// ValidatePriorityLevelConfigurationUpdate validates the update of priority-level-configuration.
-func ValidatePriorityLevelConfigurationUpdate(old, pl *flowcontrol.PriorityLevelConfiguration) field.ErrorList {
-	return ValidatePriorityLevelConfiguration(pl)
-}
-
 // ValidatePriorityLevelConfigurationSpec validates priority-level-configuration's spec.
-func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfigurationSpec, name string, fldPath *field.Path) field.ErrorList {
+func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfigurationSpec, requestGV schema.GroupVersion, name string, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if (name == flowcontrol.PriorityLevelConfigurationNameExempt) != (spec.Type == flowcontrol.PriorityLevelEnablementExempt) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), spec.Type, "type must be 'Exempt' if and only if name is 'exempt'"))
@@ -374,7 +373,7 @@ func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfi
 		if spec.Limited == nil {
 			allErrs = append(allErrs, field.Required(fldPath.Child("limited"), "must not be empty when type is Limited"))
 		} else {
-			allErrs = append(allErrs, ValidateLimitedPriorityLevelConfiguration(spec.Limited, fldPath.Child("limited"))...)
+			allErrs = append(allErrs, ValidateLimitedPriorityLevelConfiguration(spec.Limited, requestGV, fldPath.Child("limited"))...)
 		}
 	default:
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), spec.Type, supportedPriorityLevelEnablement.List()))
@@ -383,13 +382,24 @@ func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfi
 }
 
 // ValidateLimitedPriorityLevelConfiguration validates the configuration for an execution-limited priority level
-func ValidateLimitedPriorityLevelConfiguration(lplc *flowcontrol.LimitedPriorityLevelConfiguration, fldPath *field.Path) field.ErrorList {
+func ValidateLimitedPriorityLevelConfiguration(lplc *flowcontrol.LimitedPriorityLevelConfiguration, requestGV schema.GroupVersion, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	if lplc.AssuredConcurrencyShares <= 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("assuredConcurrencyShares"), lplc.AssuredConcurrencyShares, "must be positive"))
+	if lplc.NominalConcurrencyShares <= 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child(getVersionedFieldNameForConcurrencyShares(requestGV)), lplc.NominalConcurrencyShares, "must be positive"))
 	}
 	allErrs = append(allErrs, ValidateLimitResponse(lplc.LimitResponse, fldPath.Child("limitResponse"))...)
 	return allErrs
+}
+
+func getVersionedFieldNameForConcurrencyShares(requestGV schema.GroupVersion) string {
+	switch {
+	case requestGV == flowcontrolv1alpha1.SchemeGroupVersion ||
+		requestGV == flowcontrolv1beta1.SchemeGroupVersion ||
+		requestGV == flowcontrolv1beta2.SchemeGroupVersion:
+		return "assuredConcurrencyShares"
+	default:
+		return "nominalConcurrencyShares"
+	}
 }
 
 // ValidateLimitResponse validates a LimitResponse
