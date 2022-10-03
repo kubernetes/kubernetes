@@ -1371,8 +1371,6 @@ func (proxier *Proxier) syncProxyRules() {
 			} else {
 				klog.V(3).InfoS("Skipped creating Hns LoadBalancer for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)
 			}
-			lbIngressIP.hnsID = hnsLoadBalancer.hnsID
-			klog.V(3).InfoS("Hns LoadBalancer resource created for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)
 
 			if proxier.forwardHealthCheckVip && gatewayHnsendpoint != nil {
 				nodeport := proxier.healthzPort
