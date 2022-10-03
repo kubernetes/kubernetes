@@ -32,14 +32,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -330,13 +328,7 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 			Effect: v1.TaintEffectNoSchedule,
 		}
 
-		// Disable functionality in kubelet related to the `--cloud-provider` component flag.
-		if !utilfeature.DefaultFeatureGate.Enabled(features.DisableCloudProviders) {
-			klog.InfoS("feature DisableCloudProviders is on, disabling taint",
-				"taint", cloudproviderapi.TaintExternalCloudProvider,
-				"effect", v1.TaintEffectNoSchedule)
-			nodeTaints = append(nodeTaints, taint)
-		}
+		nodeTaints = append(nodeTaints, taint)
 	}
 	if len(nodeTaints) > 0 {
 		node.Spec.Taints = nodeTaints
