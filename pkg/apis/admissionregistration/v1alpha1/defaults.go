@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v1alpha1
 
 import (
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilpointer "k8s.io/utils/pointer"
@@ -28,13 +28,13 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 }
 
 // SetDefaults_ValidatingWebhook sets defaults for webhook validating
-func SetDefaults_ValidatingWebhook(obj *admissionregistrationv1.ValidatingWebhook) {
+func SetDefaults_ValidatingWebhook(obj *admissionregistrationv1alpha1.ValidatingWebhook) {
 	if obj.FailurePolicy == nil {
-		policy := admissionregistrationv1.Fail
+		policy := admissionregistrationv1alpha1.Fail
 		obj.FailurePolicy = &policy
 	}
 	if obj.MatchPolicy == nil {
-		policy := admissionregistrationv1.Equivalent
+		policy := admissionregistrationv1alpha1.Equivalent
 		obj.MatchPolicy = &policy
 	}
 	if obj.NamespaceSelector == nil {
@@ -52,13 +52,13 @@ func SetDefaults_ValidatingWebhook(obj *admissionregistrationv1.ValidatingWebhoo
 }
 
 // SetDefaults_MutatingWebhook sets defaults for webhook mutating
-func SetDefaults_MutatingWebhook(obj *admissionregistrationv1.MutatingWebhook) {
+func SetDefaults_MutatingWebhook(obj *admissionregistrationv1alpha1.MutatingWebhook) {
 	if obj.FailurePolicy == nil {
-		policy := admissionregistrationv1.Fail
+		policy := admissionregistrationv1alpha1.Fail
 		obj.FailurePolicy = &policy
 	}
 	if obj.MatchPolicy == nil {
-		policy := admissionregistrationv1.Equivalent
+		policy := admissionregistrationv1alpha1.Equivalent
 		obj.MatchPolicy = &policy
 	}
 	if obj.NamespaceSelector == nil {
@@ -74,21 +74,21 @@ func SetDefaults_MutatingWebhook(obj *admissionregistrationv1.MutatingWebhook) {
 		*obj.TimeoutSeconds = 10
 	}
 	if obj.ReinvocationPolicy == nil {
-		never := admissionregistrationv1.NeverReinvocationPolicy
+		never := admissionregistrationv1alpha1.NeverReinvocationPolicy
 		obj.ReinvocationPolicy = &never
 	}
 }
 
 // SetDefaults_Rule sets defaults for webhook rule
-func SetDefaults_Rule(obj *admissionregistrationv1.Rule) {
+func SetDefaults_Rule(obj *admissionregistrationv1alpha1.Rule) {
 	if obj.Scope == nil {
-		s := admissionregistrationv1.AllScopes
+		s := admissionregistrationv1alpha1.AllScopes
 		obj.Scope = &s
 	}
 }
 
 // SetDefaults_ServiceReference sets defaults for Webhook's ServiceReference
-func SetDefaults_ServiceReference(obj *admissionregistrationv1.ServiceReference) {
+func SetDefaults_ServiceReference(obj *admissionregistrationv1alpha1.ServiceReference) {
 	if obj.Port == nil {
 		obj.Port = utilpointer.Int32Ptr(443)
 	}
