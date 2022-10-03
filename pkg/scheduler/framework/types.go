@@ -598,18 +598,6 @@ func (n *NodeInfo) String() string {
 // AddPodInfo adds pod information to this NodeInfo.
 // Consider using this instead of AddPod if a PodInfo is already computed.
 func (n *NodeInfo) AddPodInfo(podInfo *PodInfo) {
-	res, non0CPU, non0Mem := calculateResource(podInfo.Pod)
-	n.Requested.MilliCPU += res.MilliCPU
-	n.Requested.Memory += res.Memory
-	n.Requested.EphemeralStorage += res.EphemeralStorage
-	if n.Requested.ScalarResources == nil && len(res.ScalarResources) > 0 {
-		n.Requested.ScalarResources = map[v1.ResourceName]int64{}
-	}
-	for rName, rQuant := range res.ScalarResources {
-		n.Requested.ScalarResources[rName] += rQuant
-	}
-	n.NonZeroRequested.MilliCPU += non0CPU
-	n.NonZeroRequested.Memory += non0Mem
 	n.Pods = append(n.Pods, podInfo)
 	if podWithAffinity(podInfo.Pod) {
 		n.PodsWithAffinity = append(n.PodsWithAffinity, podInfo)
@@ -617,12 +605,7 @@ func (n *NodeInfo) AddPodInfo(podInfo *PodInfo) {
 	if podWithRequiredAntiAffinity(podInfo.Pod) {
 		n.PodsWithRequiredAntiAffinity = append(n.PodsWithRequiredAntiAffinity, podInfo)
 	}
-
-	// Consume ports when pods added.
-	n.updateUsedPorts(podInfo.Pod, true)
-	n.updatePVCRefCounts(podInfo.Pod, true)
-
-	n.Generation = nextGeneration()
+	n.update(podInfo.Pod, 1)
 }
 
 // AddPod is a wrapper around AddPodInfo.
@@ -681,31 +664,36 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 			// delete the element
 			n.Pods[i] = n.Pods[len(n.Pods)-1]
 			n.Pods = n.Pods[:len(n.Pods)-1]
-			// reduce the resource data
-			res, non0CPU, non0Mem := calculateResource(pod)
 
-			n.Requested.MilliCPU -= res.MilliCPU
-			n.Requested.Memory -= res.Memory
-			n.Requested.EphemeralStorage -= res.EphemeralStorage
-			if len(res.ScalarResources) > 0 && n.Requested.ScalarResources == nil {
-				n.Requested.ScalarResources = map[v1.ResourceName]int64{}
-			}
-			for rName, rQuant := range res.ScalarResources {
-				n.Requested.ScalarResources[rName] -= rQuant
-			}
-			n.NonZeroRequested.MilliCPU -= non0CPU
-			n.NonZeroRequested.Memory -= non0Mem
-
-			// Release ports when remove Pods.
-			n.updateUsedPorts(pod, false)
-			n.updatePVCRefCounts(pod, false)
-
-			n.Generation = nextGeneration()
+			n.update(pod, -1)
 			n.resetSlicesIfEmpty()
 			return nil
 		}
 	}
 	return fmt.Errorf("no corresponding pod %s in pods of node %s", pod.Name, n.node.Name)
+}
+
+// update node info based on the pod and sign.
+// The sign will be set to `+1` when AddPod and to `-1` when RemovePod.
+func (n *NodeInfo) update(pod *v1.Pod, sign int64) {
+	res, non0CPU, non0Mem := calculateResource(pod)
+	n.Requested.MilliCPU += sign * res.MilliCPU
+	n.Requested.Memory += sign * res.Memory
+	n.Requested.EphemeralStorage += sign * res.EphemeralStorage
+	if n.Requested.ScalarResources == nil && len(res.ScalarResources) > 0 {
+		n.Requested.ScalarResources = map[v1.ResourceName]int64{}
+	}
+	for rName, rQuant := range res.ScalarResources {
+		n.Requested.ScalarResources[rName] += sign * rQuant
+	}
+	n.NonZeroRequested.MilliCPU += sign * non0CPU
+	n.NonZeroRequested.Memory += sign * non0Mem
+
+	// Consume ports when pod added or release ports when pod removed.
+	n.updateUsedPorts(pod, sign > 0)
+	n.updatePVCRefCounts(pod, sign > 0)
+
+	n.Generation = nextGeneration()
 }
 
 // resets the slices to nil so that we can do DeepEqual in unit tests.
