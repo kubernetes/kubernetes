@@ -210,7 +210,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			ObjectMeta: metav1.ObjectMeta{Name: "system:monitoring"},
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("get").URLs(
-					"/metrics",
+					"/metrics", "/metrics/slis",
 					"/livez", "/readyz", "/healthz",
 					"/livez/*", "/readyz/*", "/healthz/*",
 				).RuleOrDie(),

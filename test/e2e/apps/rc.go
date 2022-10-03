@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -390,6 +391,36 @@ var _ = SIGDescribe("ReplicationController", func() {
 			return err
 		})
 	})
+
+	ginkgo.It("should get and update a ReplicationController scale", func() {
+		rcClient := f.ClientSet.CoreV1().ReplicationControllers(ns)
+		rcName := "e2e-rc-" + utilrand.String(5)
+		initialRCReplicaCount := int32(1)
+		expectedRCReplicaCount := int32(2)
+
+		ginkgo.By(fmt.Sprintf("Creating ReplicationController %q", rcName))
+		rc := newRC(rcName, initialRCReplicaCount, map[string]string{"name": rcName}, WebserverImageName, WebserverImage, nil)
+		_, err := rcClient.Create(context.TODO(), rc, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "Failed to create ReplicationController: %v", err)
+
+		err = wait.PollImmediate(1*time.Second, 1*time.Minute, checkReplicationControllerStatusReplicaCount(f, rcName, initialRCReplicaCount))
+		framework.ExpectNoError(err, "failed to confirm the quantity of ReplicationController replicas")
+
+		ginkgo.By(fmt.Sprintf("Getting scale subresource for ReplicationController %q", rcName))
+		scale, err := rcClient.GetScale(context.TODO(), rcName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Failed to get scale subresource: %v", err)
+		framework.ExpectEqual(scale.Status.Replicas, initialRCReplicaCount, "Failed to get the current replica count")
+
+		ginkgo.By("Updating a scale subresource")
+		scale.ResourceVersion = "" // indicate the scale update should be unconditional
+		scale.Spec.Replicas = expectedRCReplicaCount
+		_, err = rcClient.UpdateScale(context.TODO(), rcName, scale, metav1.UpdateOptions{})
+		framework.ExpectNoError(err, "Failed to update scale subresource: %v", err)
+
+		ginkgo.By(fmt.Sprintf("Verifying replicas where modified for replication controller %q", rcName))
+		err = wait.PollImmediate(1*time.Second, 1*time.Minute, checkReplicationControllerStatusReplicaCount(f, rcName, expectedRCReplicaCount))
+		framework.ExpectNoError(err, "failed to confirm the quantity of ReplicationController replicas")
+	})
 })
 
 func newRC(rsName string, replicas int32, rcPodLabels map[string]string, imageName string, image string, args []string) *v1.ReplicationController {
@@ -729,4 +760,21 @@ func watchUntilWithoutRetry(ctx context.Context, watcher watch.Interface, condit
 		}
 	}
 	return lastEvent, nil
+}
+
+func checkReplicationControllerStatusReplicaCount(f *framework.Framework, rcName string, quantity int32) func() (bool, error) {
+	return func() (bool, error) {
+
+		framework.Logf("Get Replication Controller %q to confirm replicas", rcName)
+		rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Get(context.TODO(), rcName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		if rc.Status.Replicas != quantity {
+			return false, nil
+		}
+		framework.Logf("Found %d replicas for %q replication controller", quantity, rc.Name)
+		return true, nil
+	}
 }

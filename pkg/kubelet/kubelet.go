@@ -1960,7 +1960,7 @@ func (kl *Kubelet) rejectPod(pod *v1.Pod, reason, message string) {
 	kl.statusManager.SetPodStatus(pod, v1.PodStatus{
 		Phase:   v1.PodFailed,
 		Reason:  reason,
-		Message: "Pod " + message})
+		Message: "Pod was rejected: " + message})
 }
 
 // canAdmitPod determines if a pod can be admitted, and gives a reason if it

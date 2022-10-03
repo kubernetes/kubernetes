@@ -118,7 +118,7 @@ var _ = utils.SIGDescribe("[Feature:NodeOutOfServiceVolumeDetach] [Disruptive] [
 				LabelSelector: labelSelectorStr,
 				FieldSelector: fields.OneTermNotEqualSelector("spec.nodeName", oldNodeName).String(),
 			}
-			_, err = e2epod.WaitForAllPodsCondition(c, ns, podListOpts, 1, "running and ready", framework.PodListTimeout, testutils.PodRunningReady)
+			_, err = e2epod.WaitForAllPodsCondition(c, ns, podListOpts, 1, "running and ready", framework.PodStartTimeout, testutils.PodRunningReady)
 			framework.ExpectNoError(err)
 
 			// Bring the node back online and remove the taint

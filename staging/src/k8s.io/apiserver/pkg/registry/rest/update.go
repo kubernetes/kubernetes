@@ -29,8 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
 )
 
@@ -127,12 +125,6 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 		return err
 	}
 	objectMeta.SetGeneration(oldMeta.GetGeneration())
-
-	// Ensure managedFields state is removed unless ServerSideApply is enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-		oldMeta.SetManagedFields(nil)
-		objectMeta.SetManagedFields(nil)
-	}
 
 	strategy.PrepareForUpdate(ctx, obj, old)
 

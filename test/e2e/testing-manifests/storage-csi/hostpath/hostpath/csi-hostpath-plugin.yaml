@@ -218,7 +218,7 @@ spec:
       serviceAccountName: csi-hostpathplugin-sa
       containers:
         - name: hostpath
-          image: registry.k8s.io/sig-storage/hostpathplugin:v1.7.3
+          image: registry.k8s.io/sig-storage/hostpathplugin:v1.9.0
           args:
             - "--drivername=hostpath.csi.k8s.io"
             - "--v=5"
@@ -261,7 +261,7 @@ spec:
               name: dev-dir
 
         - name: csi-external-health-monitor-controller
-          image: registry.k8s.io/sig-storage/csi-external-health-monitor-controller:v0.4.0
+          image: registry.k8s.io/sig-storage/csi-external-health-monitor-controller:v0.7.0
           args:
             - "--v=5"
             - "--csi-address=$(ADDRESS)"
@@ -275,7 +275,7 @@ spec:
               mountPath: /csi
 
         - name: node-driver-registrar
-          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.5.0
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.5.1
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
@@ -303,13 +303,13 @@ spec:
           volumeMounts:
           - mountPath: /csi
             name: socket-dir
-          image: registry.k8s.io/sig-storage/livenessprobe:v2.6.0
+          image: registry.k8s.io/sig-storage/livenessprobe:v2.7.0
           args:
           - --csi-address=/csi/csi.sock
           - --health-port=9898
 
         - name: csi-attacher
-          image: registry.k8s.io/sig-storage/csi-attacher:v3.4.0
+          image: registry.k8s.io/sig-storage/csi-attacher:v4.0.0
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
@@ -323,7 +323,7 @@ spec:
             name: socket-dir
 
         - name: csi-provisioner
-          image: registry.k8s.io/sig-storage/csi-provisioner:v3.1.0
+          image: registry.k8s.io/sig-storage/csi-provisioner:v3.3.0
           args:
             - -v=5
             - --csi-address=/csi/csi.sock
@@ -338,7 +338,7 @@ spec:
               name: socket-dir
 
         - name: csi-resizer
-          image: registry.k8s.io/sig-storage/csi-resizer:v1.4.0
+          image: registry.k8s.io/sig-storage/csi-resizer:v1.6.0
           args:
             - -v=5
             - -csi-address=/csi/csi.sock
@@ -352,7 +352,7 @@ spec:
               name: socket-dir
 
         - name: csi-snapshotter
-          image: registry.k8s.io/sig-storage/csi-snapshotter:v5.0.1
+          image: registry.k8s.io/sig-storage/csi-snapshotter:v6.1.0
           args:
             - -v=5
             - --csi-address=/csi/csi.sock

@@ -134,7 +134,8 @@ controller, and serviceaccounts controller.`,
 			if err != nil {
 				return err
 			}
-
+			// add feature enablement metrics
+			utilfeature.DefaultMutableFeatureGate.AddMetrics()
 			return Run(c.Complete(), wait.NeverStop)
 		},
 		Args: func(cmd *cobra.Command, args []string) error {

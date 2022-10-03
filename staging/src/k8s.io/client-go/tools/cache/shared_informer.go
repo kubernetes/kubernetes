@@ -731,7 +731,7 @@ func (p *sharedProcessor) distribute(obj interface{}, sync bool) {
 			// non-sync messages are delivered to every listener
 			listener.add(obj)
 		case isSyncing:
-			// sync messages are delivered to every syncing listenter
+			// sync messages are delivered to every syncing listener
 			listener.add(obj)
 		default:
 			// skipping a sync obj for a non-syncing listener

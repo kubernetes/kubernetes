@@ -138,7 +138,8 @@ func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Op
 	if err != nil {
 		return err
 	}
-
+	// add feature enablement metrics
+	utilfeature.DefaultMutableFeatureGate.AddMetrics()
 	return Run(ctx, cc, sched)
 }
 

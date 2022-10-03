@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/token"
@@ -40,7 +41,10 @@ func decodeMetricCalls(fs []*ast.CallExpr, metricsImportName string, variables m
 			errors = append(errors, err)
 			continue
 		}
-		ms = append(ms, m)
+		if m != nil {
+			ms = append(ms, *m)
+		}
+
 	}
 	return ms, errors
 }
@@ -50,34 +54,36 @@ type metricDecoder struct {
 	variables             map[string]ast.Expr
 }
 
-func (c *metricDecoder) decodeNewMetricCall(fc *ast.CallExpr) (metric, error) {
+func (c *metricDecoder) decodeNewMetricCall(fc *ast.CallExpr) (*metric, error) {
 	var m metric
 	var err error
 	se, ok := fc.Fun.(*ast.SelectorExpr)
 	if !ok {
-		return m, newDecodeErrorf(fc, errNotDirectCall)
+		return nil, newDecodeErrorf(fc, errNotDirectCall)
 	}
 	functionName := se.Sel.String()
 	functionImport, ok := se.X.(*ast.Ident)
 	if !ok {
-		return m, newDecodeErrorf(fc, errNotDirectCall)
+		return nil, newDecodeErrorf(fc, errNotDirectCall)
 	}
 	if functionImport.String() != c.kubeMetricsImportName {
-		return m, newDecodeErrorf(fc, errNotDirectCall)
+		return nil, nil
 	}
 	switch functionName {
 	case "NewCounter", "NewGauge", "NewHistogram", "NewSummary":
 		m, err = c.decodeMetric(fc)
 	case "NewCounterVec", "NewGaugeVec", "NewHistogramVec", "NewSummaryVec":
 		m, err = c.decodeMetricVec(fc)
+	case "Labels", "HandlerOpts", "HandlerFor", "HandlerWithReset":
+		return nil, nil
 	default:
-		return m, newDecodeErrorf(fc, errNotDirectCall)
+		return &m, newDecodeErrorf(fc, errNotDirectCall)
 	}
 	if err != nil {
-		return m, err
+		return &m, err
 	}
 	m.Type = getMetricType(functionName)
-	return m, nil
+	return &m, nil
 }
 
 func getMetricType(functionName string) string {
@@ -110,7 +116,7 @@ func (c *metricDecoder) decodeMetricVec(call *ast.CallExpr) (metric, error) {
 	if err != nil {
 		return m, err
 	}
-	labels, err := decodeLabels(call.Args[1])
+	labels, err := c.decodeLabels(call.Args[1])
 	if err != nil {
 		return m, err
 	}
@@ -119,16 +125,45 @@ func (c *metricDecoder) decodeMetricVec(call *ast.CallExpr) (metric, error) {
 	return m, nil
 }
 
-func decodeLabels(expr ast.Expr) ([]string, error) {
+func (c *metricDecoder) decodeLabels(expr ast.Expr) ([]string, error) {
 	cl, ok := expr.(*ast.CompositeLit)
 	if !ok {
-		return nil, newDecodeErrorf(expr, errInvalidNewMetricCall)
+		id, ok := expr.(*ast.Ident)
+		if !ok {
+			return nil, newDecodeErrorf(expr, errInvalidNewMetricCall)
+		}
+		variableExpr, found := c.variables[id.Name]
+		if !found {
+			return nil, newDecodeErrorf(expr, "couldn't find variable for labels")
+		}
+		cl2, ok := variableExpr.(*ast.CompositeLit)
+		if !ok {
+			return nil, newDecodeErrorf(expr, "couldn't interpret variable for labels")
+		}
+		cl = cl2
 	}
 	labels := make([]string, len(cl.Elts))
 	for i, el := range cl.Elts {
+		v, ok := el.(*ast.Ident)
+		if ok {
+			variableExpr, found := c.variables[v.Name]
+			if !found {
+				return nil, newDecodeErrorf(expr, errBadVariableAttribute)
+			}
+			bl, ok := variableExpr.(*ast.BasicLit)
+			if !ok {
+				return nil, newDecodeErrorf(expr, errNonStringAttribute)
+			}
+			value, err := stringValue(bl)
+			if err != nil {
+				return nil, err
+			}
+			labels[i] = value
+			continue
+		}
 		bl, ok := el.(*ast.BasicLit)
 		if !ok {
-			return nil, newDecodeErrorf(bl, errLabels)
+			return nil, errors.New(errLabels)
 		}
 		value, err := stringValue(bl)
 		if err != nil {
@@ -200,7 +235,38 @@ func (c *metricDecoder) decodeOpts(expr ast.Expr) (metric, error) {
 				if err != nil {
 					return m, err
 				}
+			case *ast.BinaryExpr:
+				var binaryExpr *ast.BinaryExpr
+				binaryExpr = v
+				var okay bool
+				okay = true
 
+				for okay {
+					yV, okay := binaryExpr.Y.(*ast.BasicLit)
+					if !okay {
+						return m, newDecodeErrorf(expr, errNonStringAttribute)
+					}
+					yVal, err := stringValue(yV)
+					if err != nil {
+						return m, newDecodeErrorf(expr, errNonStringAttribute)
+					}
+					value = fmt.Sprintf("%s%s", yVal, value)
+					x, okay := binaryExpr.X.(*ast.BinaryExpr)
+					if !okay {
+						// should be basicLit
+						xV, okay := binaryExpr.X.(*ast.BasicLit)
+						if !okay {
+							return m, newDecodeErrorf(expr, errNonStringAttribute)
+						}
+						xVal, err := stringValue(xV)
+						if err != nil {
+							return m, newDecodeErrorf(expr, errNonStringAttribute)
+						}
+						value = fmt.Sprintf("%s%s", xVal, value)
+						break
+					}
+					binaryExpr = x
+				}
 			default:
 				return m, newDecodeErrorf(expr, errNonStringAttribute)
 			}
@@ -272,8 +338,19 @@ func stringValue(bl *ast.BasicLit) (string, error) {
 
 func (c *metricDecoder) decodeBuckets(expr ast.Expr) ([]float64, error) {
 	switch v := expr.(type) {
+	case *ast.Ident:
+		variableExpr, found := c.variables[v.Name]
+		if !found {
+			return nil, fmt.Errorf("couldn't find variable for bucket")
+		}
+		v2, ok := variableExpr.(*ast.CompositeLit)
+		if !ok {
+			return nil, fmt.Errorf("couldn't find variable for bucket")
+		}
+		return decodeListOfFloats(v2, v2.Elts)
+
 	case *ast.CompositeLit:
-		return decodeListOfFloats(v.Elts)
+		return decodeListOfFloats(v, v.Elts)
 	case *ast.SelectorExpr:
 		variableName := v.Sel.String()
 		importName, ok := v.X.(*ast.Ident)
@@ -415,12 +492,12 @@ func decodeFloatMap(exprs []ast.Expr) (map[float64]float64, error) {
 	return buckets, nil
 }
 
-func decodeListOfFloats(exprs []ast.Expr) ([]float64, error) {
+func decodeListOfFloats(expr ast.Expr, exprs []ast.Expr) ([]float64, error) {
 	buckets := make([]float64, len(exprs))
 	for i, elt := range exprs {
 		bl, ok := elt.(*ast.BasicLit)
 		if !ok {
-			return nil, newDecodeErrorf(bl, errBuckets)
+			return nil, newDecodeErrorf(expr, errBuckets)
 		}
 		if bl.Kind != token.FLOAT && bl.Kind != token.INT {
 			return nil, newDecodeErrorf(bl, errBuckets)
@@ -477,9 +554,7 @@ func decodeStabilityLevel(expr ast.Expr, metricsFrameworkImportName string) (*me
 	if s.String() != metricsFrameworkImportName {
 		return nil, newDecodeErrorf(expr, errStabilityLevel)
 	}
-	if se.Sel.Name != "ALPHA" && se.Sel.Name != "STABLE" {
-		return nil, newDecodeErrorf(expr, errStabilityLevel)
-	}
+
 	stability := metrics.StabilityLevel(se.Sel.Name)
 	return &stability, nil
 }

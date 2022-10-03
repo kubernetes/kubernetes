@@ -887,7 +887,7 @@ func (kl *Kubelet) getPullSecretsForPod(pod *v1.Pod) []v1.Secret {
 
 	for _, secretRef := range pod.Spec.ImagePullSecrets {
 		if len(secretRef.Name) == 0 {
-			// API validation permitted entries with empty names (http://issue.k8s.io/99454#issuecomment-787838112).
+			// API validation permitted entries with empty names (https://issue.k8s.io/99454#issuecomment-787838112).
 			// Ignore to avoid unnecessary warnings.
 			continue
 		}
@@ -1586,9 +1586,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 
 	// copy pod status IPs to avoid race conditions with PodStatus #102806
 	podIPs := make([]string, len(podStatus.IPs))
-	for j, ip := range podStatus.IPs {
-		podIPs[j] = ip
-	}
+	copy(podIPs, podStatus.IPs)
 
 	// make podIPs order match node IP family preference #97979
 	podIPs = kl.sortPodIPs(podIPs)

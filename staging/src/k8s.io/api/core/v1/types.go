@@ -4582,7 +4582,6 @@ type ServiceSpec struct {
 	// implementation (e.g. cloud providers) should ignore Services that set this field.
 	// This field can only be set when creating or updating a Service to type 'LoadBalancer'.
 	// Once set, it can not be changed. This field will be wiped when a service is updated to a non 'LoadBalancer' type.
-	// +featureGate=LoadBalancerClass
 	// +optional
 	LoadBalancerClass *string `json:"loadBalancerClass,omitempty" protobuf:"bytes,21,opt,name=loadBalancerClass"`
 
@@ -5073,7 +5072,7 @@ type NodeStatus struct {
 	// More info: https://kubernetes.io/docs/concepts/nodes/node/#addresses
 	// Note: This field is declared as mergeable, but the merge key is not sufficiently
 	// unique, which can cause data corruption when it is merged. Callers should instead
-	// use a full-replacement patch. See http://pr.k8s.io/79391 for an example.
+	// use a full-replacement patch. See https://pr.k8s.io/79391 for an example.
 	// +optional
 	// +patchMergeKey=type
 	// +patchStrategy=merge

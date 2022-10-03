@@ -66,7 +66,7 @@ func GenYamlTreeCustom(cmd *cobra.Command, dir string, filePrepender, linkHandle
 		}
 	}
 
-	basename := strings.Replace(cmd.CommandPath(), " ", "_", -1) + ".yaml"
+	basename := strings.ReplaceAll(cmd.CommandPath(), " ", "_") + ".yaml"
 	filename := filepath.Join(dir, basename)
 	f, err := os.Create(filename)
 	if err != nil {

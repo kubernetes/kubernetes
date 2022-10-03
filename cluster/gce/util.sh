@@ -1265,6 +1265,11 @@ EOF
 DOCKER_LOG_MAX_FILE: $(yaml-quote "${DOCKER_LOG_MAX_FILE}")
 EOF
   fi
+  if [ -n "${CLOUD_PROVIDER_FLAG:-}" ]; then
+    cat >>"$file" <<EOF
+CLOUD_PROVIDER_FLAG: $(yaml-quote "${CLOUD_PROVIDER_FLAG}")
+EOF
+  fi
   if [ -n "${FEATURE_GATES:-}" ]; then
     cat >>"$file" <<EOF
 FEATURE_GATES: $(yaml-quote "${FEATURE_GATES}")
@@ -3749,12 +3754,13 @@ function kube-down() {
     # Delete all remaining firewall rules and network.
     delete-firewall-rules \
       "${CLUSTER_NAME}-default-internal-master" \
-      "${CLUSTER_NAME}-default-internal-node" \
+      "${CLUSTER_NAME}-default-internal-node"
+
+    if [[ "${KUBE_DELETE_NETWORK}" == "true" ]]; then
+      delete-firewall-rules \
       "${NETWORK}-default-ssh" \
       "${NETWORK}-default-rdp" \
       "${NETWORK}-default-internal"  # Pre-1.5 clusters
-
-    if [[ "${KUBE_DELETE_NETWORK}" == "true" ]]; then
       delete-cloud-nat-router
       # Delete all remaining firewall rules in the network.
       delete-all-firewall-rules || true

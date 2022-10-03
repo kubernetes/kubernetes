@@ -13384,7 +13384,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			numErrs: 0,
 		},
 		{
-			name: "nagative healthCheckNodePort field",
+			name: "negative healthCheckNodePort field",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
@@ -13394,7 +13394,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "nagative healthCheckNodePort field",
+			name: "negative healthCheckNodePort field",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
 				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
@@ -13528,7 +13528,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			},
 			numErrs: 0,
 		},
-		/* cluster IPs. some tests are reduntant */
+		/* cluster IPs. some tests are redundant */
 		{
 			name: "invalid, garbage single ip",
 			tweakSvc: func(s *core.Service) {

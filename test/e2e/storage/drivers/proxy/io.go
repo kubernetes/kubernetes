@@ -70,6 +70,14 @@ func (p PodDirIO) CreateFile(path string, content io.Reader) error {
 	return nil
 }
 
+func (p PodDirIO) Rename(oldPath, newPath string) error {
+	_, stderr, err := p.execute([]string{"mv", oldPath, newPath}, nil)
+	if err != nil {
+		return fmt.Errorf("rename %q -> %q: stderr=%q, %v", oldPath, newPath, stderr, err)
+	}
+	return nil
+}
+
 func (p PodDirIO) RemoveAll(path string) error {
 	_, stderr, err := p.execute([]string{"rm", "-rf", path}, nil)
 	if err != nil {

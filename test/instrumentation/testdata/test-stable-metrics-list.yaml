@@ -1,3 +1,53 @@
+- name: device_plugin_alloc_duration_seconds
+  subsystem: kubelet
+  help: Duration in seconds to serve a device plugin Allocation request. Broken down
+    by resource name.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - resource_name
+  buckets:
+  - 0.005
+  - 0.01
+  - 0.025
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 5
+  - 10
+- name: multiline
+  subsystem: kubelet
+  help: Cumulative number of pod preemptions by preemption resource asdf asdf asdf
+    asdfas dfasdf
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - preemption_signal
+- name: runtime_operations_duration_seconds
+  subsystem: kubelet
+  help: Duration in seconds of runtime operations. Broken down by operation type.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - operation_type
+  buckets:
+  - 0.005
+  - 0.0125
+  - 0.03125
+  - 0.078125
+  - 0.1953125
+  - 0.48828125
+  - 1.220703125
+  - 3.0517578125
+  - 7.62939453125
+  - 19.073486328125
+  - 47.6837158203125
+  - 119.20928955078125
+  - 298.0232238769531
+  - 745.0580596923828
 - name: summary_metric_test
   subsystem: kubelet
   help: Cumulative number of device plugin registrations. Broken down by resource
