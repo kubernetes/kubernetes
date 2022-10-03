@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1_test
+package v1alpha1_test
 
 import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
-	v1 "k8s.io/api/admissionregistration/v1"
+	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,11 +31,11 @@ import (
 )
 
 func TestDefaultAdmissionWebhook(t *testing.T) {
-	fail := v1.Fail
-	equivalent := v1.Equivalent
-	never := v1.NeverReinvocationPolicy
+	fail := v1alpha1.Fail
+	equivalent := v1alpha1.Equivalent
+	never := v1alpha1.NeverReinvocationPolicy
 	ten := int32(10)
-	allScopes := v1.AllScopes
+	allScopes := v1alpha1.AllScopes
 
 	tests := []struct {
 		name     string
@@ -44,11 +44,11 @@ func TestDefaultAdmissionWebhook(t *testing.T) {
 	}{
 		{
 			name: "ValidatingWebhookConfiguration",
-			original: &v1.ValidatingWebhookConfiguration{
-				Webhooks: []v1.ValidatingWebhook{{}},
+			original: &v1alpha1.ValidatingWebhookConfiguration{
+				Webhooks: []v1alpha1.ValidatingWebhook{{}},
 			},
-			expected: &v1.ValidatingWebhookConfiguration{
-				Webhooks: []v1.ValidatingWebhook{{
+			expected: &v1alpha1.ValidatingWebhookConfiguration{
+				Webhooks: []v1alpha1.ValidatingWebhook{{
 					FailurePolicy:     &fail,
 					MatchPolicy:       &equivalent,
 					TimeoutSeconds:    &ten,
@@ -59,11 +59,11 @@ func TestDefaultAdmissionWebhook(t *testing.T) {
 		},
 		{
 			name: "MutatingWebhookConfiguration",
-			original: &v1.MutatingWebhookConfiguration{
-				Webhooks: []v1.MutatingWebhook{{}},
+			original: &v1alpha1.MutatingWebhookConfiguration{
+				Webhooks: []v1alpha1.MutatingWebhook{{}},
 			},
-			expected: &v1.MutatingWebhookConfiguration{
-				Webhooks: []v1.MutatingWebhook{{
+			expected: &v1alpha1.MutatingWebhookConfiguration{
+				Webhooks: []v1alpha1.MutatingWebhook{{
 					FailurePolicy:      &fail,
 					MatchPolicy:        &equivalent,
 					ReinvocationPolicy: &never,
@@ -75,14 +75,14 @@ func TestDefaultAdmissionWebhook(t *testing.T) {
 		},
 		{
 			name: "scope=*",
-			original: &v1.MutatingWebhookConfiguration{
-				Webhooks: []v1.MutatingWebhook{{
-					Rules: []v1.RuleWithOperations{{}},
+			original: &v1alpha1.MutatingWebhookConfiguration{
+				Webhooks: []v1alpha1.MutatingWebhook{{
+					Rules: []v1alpha1.RuleWithOperations{{}},
 				}},
 			},
-			expected: &v1.MutatingWebhookConfiguration{
-				Webhooks: []v1.MutatingWebhook{{
-					Rules: []v1.RuleWithOperations{{Rule: v1.Rule{
+			expected: &v1alpha1.MutatingWebhookConfiguration{
+				Webhooks: []v1alpha1.MutatingWebhook{{
+					Rules: []v1alpha1.RuleWithOperations{{Rule: v1alpha1.Rule{
 						Scope: &allScopes, // defaulted
 					}}},
 					FailurePolicy:      &fail,
@@ -96,17 +96,17 @@ func TestDefaultAdmissionWebhook(t *testing.T) {
 		},
 		{
 			name: "port=443",
-			original: &v1.MutatingWebhookConfiguration{
-				Webhooks: []v1.MutatingWebhook{{
-					ClientConfig: v1.WebhookClientConfig{
-						Service: &v1.ServiceReference{},
+			original: &v1alpha1.MutatingWebhookConfiguration{
+				Webhooks: []v1alpha1.MutatingWebhook{{
+					ClientConfig: v1alpha1.WebhookClientConfig{
+						Service: &v1alpha1.ServiceReference{},
 					},
 				}},
 			},
-			expected: &v1.MutatingWebhookConfiguration{
-				Webhooks: []v1.MutatingWebhook{{
-					ClientConfig: v1.WebhookClientConfig{
-						Service: &v1.ServiceReference{
+			expected: &v1alpha1.MutatingWebhookConfiguration{
+				Webhooks: []v1alpha1.MutatingWebhook{{
+					ClientConfig: v1alpha1.WebhookClientConfig{
+						Service: &v1alpha1.ServiceReference{
 							Port: utilpointer.Int32Ptr(443), // defaulted
 						},
 					},
