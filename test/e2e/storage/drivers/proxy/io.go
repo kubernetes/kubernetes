@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/csi-test/mock/service"
@@ -30,6 +31,7 @@ type PodDirIO struct {
 	Namespace     string
 	PodName       string
 	ContainerName string
+	Logger        *klog.Logger
 }
 
 var _ service.DirIO = PodDirIO{}
@@ -88,7 +90,7 @@ func (p PodDirIO) RemoveAll(path string) error {
 }
 
 func (p PodDirIO) execute(command []string, stdin io.Reader) (string, string, error) {
-	return e2epod.ExecWithOptions(p.F, e2epod.ExecOptions{
+	stdout, stderr, err := e2epod.ExecWithOptions(framework.ExecOptions{
 		Command:       command,
 		Namespace:     p.Namespace,
 		PodName:       p.PodName,
@@ -98,4 +100,10 @@ func (p PodDirIO) execute(command []string, stdin io.Reader) (string, string, er
 		CaptureStderr: true,
 		Quiet:         true,
 	})
+	if p.Logger != nil {
+		p.Logger.Info("Command completed", "command", command, "stdout", stdout, "stderr", stderr, "err", err)
+
+	}
+	return stdout, stderr, err
+
 }
