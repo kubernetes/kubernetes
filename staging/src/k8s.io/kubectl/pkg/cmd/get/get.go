@@ -580,13 +580,6 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			lastMapping = mapping
 		}
 
-		// ensure a versioned object is passed to the custom-columns printer
-		// if we are using OpenAPI columns to print
-		if o.PrintWithOpenAPICols {
-			printer.PrintObj(info.Object, w)
-			continue
-		}
-
 		printer.PrintObj(info.Object, w)
 	}
 	w.Flush()
