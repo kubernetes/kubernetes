@@ -425,4 +425,4 @@ reviewers:
 - dep-reviewers
 __EOF__
 
-kube::log::status "NOTE: don't forget to handle vendor/* files that were added or removed"
+kube::log::status "NOTE: don't forget to handle vendor/* and LICENSE/* files that were added or removed"
