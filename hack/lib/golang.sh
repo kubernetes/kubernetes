@@ -70,7 +70,6 @@ readonly KUBE_SUPPORTED_TEST_PLATFORMS=(
 )
 
 # The set of server targets that we are only building for Linux
-# If you update this list, please also update build/BUILD.
 kube::golang::server_targets() {
   local targets=(
     cmd/kube-proxy
@@ -123,7 +122,6 @@ IFS=" " read -ra KUBE_CONFORMANCE_IMAGE_TARGETS <<< "$(kube::golang::conformance
 readonly KUBE_CONFORMANCE_IMAGE_TARGETS
 
 # The set of server targets that we are only building for Kubernetes nodes
-# If you update this list, please also update build/BUILD.
 kube::golang::node_targets() {
   local targets=(
     cmd/kube-proxy
@@ -256,7 +254,6 @@ kube::golang::setup_platforms() {
 kube::golang::setup_platforms
 
 # The set of client targets that we are building for all platforms
-# If you update this list, please also update build/BUILD.
 readonly KUBE_CLIENT_TARGETS=(
   cmd/kubectl
   cmd/kubectl-convert
@@ -265,7 +262,6 @@ readonly KUBE_CLIENT_BINARIES=("${KUBE_CLIENT_TARGETS[@]##*/}")
 readonly KUBE_CLIENT_BINARIES_WIN=("${KUBE_CLIENT_BINARIES[@]/%/.exe}")
 
 # The set of test targets that we are building for all platforms
-# If you update this list, please also update build/BUILD.
 kube::golang::test_targets() {
   local targets=(
     cmd/gendocs
@@ -283,7 +279,6 @@ IFS=" " read -ra KUBE_TEST_TARGETS <<< "$(kube::golang::test_targets)"
 readonly KUBE_TEST_TARGETS
 readonly KUBE_TEST_BINARIES=("${KUBE_TEST_TARGETS[@]##*/}")
 readonly KUBE_TEST_BINARIES_WIN=("${KUBE_TEST_BINARIES[@]/%/.exe}")
-# If you update this list, please also update build/BUILD.
 readonly KUBE_TEST_PORTABLE=(
   test/e2e/testing-manifests
   test/kubemark
@@ -296,7 +291,6 @@ readonly KUBE_TEST_PORTABLE=(
 # Test targets which run on the Kubernetes clusters directly, so we only
 # need to target server platforms.
 # These binaries will be distributed in the kubernetes-test tarball.
-# If you update this list, please also update build/BUILD.
 kube::golang::server_test_targets() {
   local targets=(
     cmd/kubemark
