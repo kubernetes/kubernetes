@@ -27,14 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
-	utilpointer "k8s.io/utils/pointer"
 )
 
-func TestDefaultAdmissionWebhook(t *testing.T) {
+func TestDefaultAdmissionPolicy(t *testing.T) {
 	fail := v1alpha1.Fail
 	equivalent := v1alpha1.Equivalent
-	never := v1alpha1.NeverReinvocationPolicy
-	ten := int32(10)
 	allScopes := v1alpha1.AllScopes
 
 	tests := []struct {
@@ -43,80 +40,67 @@ func TestDefaultAdmissionWebhook(t *testing.T) {
 		expected runtime.Object
 	}{
 		{
-			name: "ValidatingWebhookConfiguration",
-			original: &v1alpha1.ValidatingWebhookConfiguration{
-				Webhooks: []v1alpha1.ValidatingWebhook{{}},
+			name: "ValidatingAdmissionPolicy",
+			original: &v1alpha1.ValidatingAdmissionPolicy{
+				Spec: v1alpha1.ValidatingAdmissionPolicySpec{
+					MatchConstraints: &v1alpha1.MatchResources{},
+				},
 			},
-			expected: &v1alpha1.ValidatingWebhookConfiguration{
-				Webhooks: []v1alpha1.ValidatingWebhook{{
-					FailurePolicy:     &fail,
-					MatchPolicy:       &equivalent,
-					TimeoutSeconds:    &ten,
-					NamespaceSelector: &metav1.LabelSelector{},
-					ObjectSelector:    &metav1.LabelSelector{},
-				}},
+			expected: &v1alpha1.ValidatingAdmissionPolicy{
+				Spec: v1alpha1.ValidatingAdmissionPolicySpec{
+					MatchConstraints: &v1alpha1.MatchResources{
+						MatchPolicy:       &equivalent,
+						NamespaceSelector: &metav1.LabelSelector{},
+						ObjectSelector:    &metav1.LabelSelector{},
+					},
+					FailurePolicy: &fail,
+				},
 			},
 		},
 		{
-			name: "MutatingWebhookConfiguration",
-			original: &v1alpha1.MutatingWebhookConfiguration{
-				Webhooks: []v1alpha1.MutatingWebhook{{}},
+			name: "ValidatingAdmissionPolicyBinding",
+			original: &v1alpha1.ValidatingAdmissionPolicyBinding{
+				Spec: v1alpha1.ValidatingAdmissionPolicyBindingSpec{
+					MatchResources: &v1alpha1.MatchResources{},
+				},
 			},
-			expected: &v1alpha1.MutatingWebhookConfiguration{
-				Webhooks: []v1alpha1.MutatingWebhook{{
-					FailurePolicy:      &fail,
-					MatchPolicy:        &equivalent,
-					ReinvocationPolicy: &never,
-					TimeoutSeconds:     &ten,
-					NamespaceSelector:  &metav1.LabelSelector{},
-					ObjectSelector:     &metav1.LabelSelector{},
-				}},
+			expected: &v1alpha1.ValidatingAdmissionPolicyBinding{
+				Spec: v1alpha1.ValidatingAdmissionPolicyBindingSpec{
+					MatchResources: &v1alpha1.MatchResources{
+						MatchPolicy:       &equivalent,
+						NamespaceSelector: &metav1.LabelSelector{},
+						ObjectSelector:    &metav1.LabelSelector{},
+					},
+				},
 			},
 		},
 		{
 			name: "scope=*",
-			original: &v1alpha1.MutatingWebhookConfiguration{
-				Webhooks: []v1alpha1.MutatingWebhook{{
-					Rules: []v1alpha1.RuleWithOperations{{}},
-				}},
-			},
-			expected: &v1alpha1.MutatingWebhookConfiguration{
-				Webhooks: []v1alpha1.MutatingWebhook{{
-					Rules: []v1alpha1.RuleWithOperations{{Rule: v1alpha1.Rule{
-						Scope: &allScopes, // defaulted
-					}}},
-					FailurePolicy:      &fail,
-					MatchPolicy:        &equivalent,
-					ReinvocationPolicy: &never,
-					TimeoutSeconds:     &ten,
-					NamespaceSelector:  &metav1.LabelSelector{},
-					ObjectSelector:     &metav1.LabelSelector{},
-				}},
-			},
-		},
-		{
-			name: "port=443",
-			original: &v1alpha1.MutatingWebhookConfiguration{
-				Webhooks: []v1alpha1.MutatingWebhook{{
-					ClientConfig: v1alpha1.WebhookClientConfig{
-						Service: &v1alpha1.ServiceReference{},
+			original: &v1alpha1.ValidatingAdmissionPolicy{
+				Spec: v1alpha1.ValidatingAdmissionPolicySpec{
+					MatchConstraints: &v1alpha1.MatchResources{
+						ResourceRules: []v1alpha1.NamedRuleWithOperations{{}},
 					},
-				}},
+				},
 			},
-			expected: &v1alpha1.MutatingWebhookConfiguration{
-				Webhooks: []v1alpha1.MutatingWebhook{{
-					ClientConfig: v1alpha1.WebhookClientConfig{
-						Service: &v1alpha1.ServiceReference{
-							Port: utilpointer.Int32Ptr(443), // defaulted
+			expected: &v1alpha1.ValidatingAdmissionPolicy{
+				Spec: v1alpha1.ValidatingAdmissionPolicySpec{
+					MatchConstraints: &v1alpha1.MatchResources{
+						MatchPolicy:       &equivalent,
+						NamespaceSelector: &metav1.LabelSelector{},
+						ObjectSelector:    &metav1.LabelSelector{},
+						ResourceRules: []v1alpha1.NamedRuleWithOperations{
+							{
+								RuleWithOperations: v1alpha1.RuleWithOperations{
+									Rule: v1alpha1.Rule{
+										Scope: &allScopes, // defaulted
+									},
+								},
+							},
 						},
 					},
-					FailurePolicy:      &fail,
-					MatchPolicy:        &equivalent,
-					ReinvocationPolicy: &never,
-					TimeoutSeconds:     &ten,
-					NamespaceSelector:  &metav1.LabelSelector{},
-					ObjectSelector:     &metav1.LabelSelector{},
-				}},
+					FailurePolicy: &fail,
+				},
 			},
 		},
 	}
