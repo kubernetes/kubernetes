@@ -31,10 +31,12 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	watch "k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
@@ -795,6 +797,38 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			return true, nil
 		}))
 		framework.Logf("Reconciled root ca configmap in namespace %q", f.Namespace.Name)
+	})
+
+	ginkgo.It("should update a ServiceAccount", func() {
+		saClient := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name)
+		saName := "e2e-sa-" + utilrand.String(5)
+
+		initialServiceAccount := &v1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: saName,
+			},
+			AutomountServiceAccountToken: utilptr.Bool(false),
+		}
+
+		ginkgo.By(fmt.Sprintf("Creating ServiceAccount %q ", saName))
+		createdServiceAccount, err := saClient.Create(context.TODO(), initialServiceAccount, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(createdServiceAccount.AutomountServiceAccountToken, utilptr.Bool(false), "Failed to set AutomountServiceAccountToken")
+		framework.Logf("AutomountServiceAccountToken: %v", *createdServiceAccount.AutomountServiceAccountToken)
+
+		ginkgo.By(fmt.Sprintf("Updating ServiceAccount %q ", saName))
+		var updatedServiceAccount *v1.ServiceAccount
+
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			updateServiceAccount, err := saClient.Get(context.TODO(), saName, metav1.GetOptions{})
+			framework.ExpectNoError(err, "Unable to get ServiceAccount %q", saName)
+			updateServiceAccount.AutomountServiceAccountToken = utilptr.Bool(true)
+			updatedServiceAccount, err = saClient.Update(context.TODO(), updateServiceAccount, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err, "Failed to update ServiceAccount")
+		framework.ExpectEqual(updatedServiceAccount.AutomountServiceAccountToken, utilptr.Bool(true), "Failed to set AutomountServiceAccountToken")
+		framework.Logf("AutomountServiceAccountToken: %v", *updatedServiceAccount.AutomountServiceAccountToken)
 	})
 })
 
