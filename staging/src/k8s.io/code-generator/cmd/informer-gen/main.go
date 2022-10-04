@@ -33,7 +33,6 @@ func main() {
 
 	// Override defaults.
 	// TODO: move out of informer-gen
-	genericArgs.GoHeaderFilePath = util.BoilerplatePath()
 	genericArgs.OutputPackagePath = "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	customArgs.VersionedClientSetPackage = "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	customArgs.InternalClientSetPackage = "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"

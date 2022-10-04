@@ -23,14 +23,6 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 cd "${KUBE_ROOT}"
 
-# If called directly, exit.
-if [[ "${CALLED_FROM_MAIN_MAKEFILE:-""}" == "" ]]; then
-    echo "ERROR: $0 should not be run directly." >&2
-    echo >&2
-    echo "Please run this command using \"make vet\""
-    exit 1
-fi
-
 # Filter out arguments that start with "-" and move them to goflags.
 targets=()
 for arg; do

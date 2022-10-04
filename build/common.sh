@@ -663,12 +663,9 @@ function kube::build::sync_to_container() {
   kube::build::rsync \
     --delete \
     --filter='H /.git' \
-    --filter='- /.make/' \
     --filter='- /_tmp/' \
     --filter='- /_output/' \
     --filter='- /' \
-    --filter='H zz_generated.*' \
-    --filter='H generated.proto' \
     "${KUBE_ROOT}/" "rsync://k8s@${KUBE_RSYNC_ADDR}/k8s/"
 
   kube::build::stop_rsyncd_container
