@@ -136,8 +136,8 @@ func generateTestFileForSubject(subject string, conf GeneratorsConfig) {
 }
 
 func formatSubject(name string) string {
-	name = strings.Replace(name, "-", "_", -1)
-	name = strings.Replace(name, " ", "_", -1)
+	name = strings.ReplaceAll(name, "-", "_")
+	name = strings.ReplaceAll(name, " ", "_")
 	name = strings.Split(name, ".go")[0]
 	name = strings.Split(name, "_test")[0]
 	return name
@@ -223,7 +223,7 @@ func getPackageImportPath() string {
 	if modRoot != "" {
 		modName := moduleName(modRoot)
 		if modName != "" {
-			cd := strings.Replace(workingDir, modRoot, "", -1)
+			cd := strings.ReplaceAll(workingDir, modRoot, "")
 			cd = strings.ReplaceAll(cd, sep, "/")
 			return modName + cd
 		}

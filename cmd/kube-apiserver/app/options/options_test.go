@@ -318,8 +318,9 @@ func TestAddFlags(t *testing.T) {
 		Traces: &apiserveroptions.TracingOptions{
 			ConfigFile: "/var/run/kubernetes/tracing_config.yaml",
 		},
-		IdentityLeaseDurationSeconds:      3600,
-		IdentityLeaseRenewIntervalSeconds: 10,
+		IdentityLeaseDurationSeconds:        3600,
+		IdentityLeaseRenewIntervalSeconds:   10,
+		AggregatorRejectForwardingRedirects: true,
 	}
 
 	if !reflect.DeepEqual(expected, s) {

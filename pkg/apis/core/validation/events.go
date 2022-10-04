@@ -95,7 +95,18 @@ func ValidateEventUpdate(newEvent, oldEvent *core.Event, requestVersion schema.G
 	allErrs = append(allErrs, ValidateImmutableField(newEvent.Count, oldEvent.Count, field.NewPath("count"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newEvent.Reason, oldEvent.Reason, field.NewPath("reason"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newEvent.Type, oldEvent.Type, field.NewPath("type"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newEvent.EventTime, oldEvent.EventTime, field.NewPath("eventTime"))...)
+
+	// Disallow changes to eventTime greater than microsecond-level precision.
+	// Tolerating sub-microsecond changes is required to tolerate updates
+	// from clients that correctly truncate to microsecond-precision when serializing,
+	// or from clients built with incorrect nanosecond-precision protobuf serialization.
+	// See https://github.com/kubernetes/kubernetes/issues/111928
+	newTruncated := newEvent.EventTime.Truncate(time.Microsecond).UTC()
+	oldTruncated := oldEvent.EventTime.Truncate(time.Microsecond).UTC()
+	if newTruncated != oldTruncated {
+		allErrs = append(allErrs, ValidateImmutableField(newEvent.EventTime, oldEvent.EventTime, field.NewPath("eventTime"))...)
+	}
+
 	allErrs = append(allErrs, ValidateImmutableField(newEvent.Action, oldEvent.Action, field.NewPath("action"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newEvent.Related, oldEvent.Related, field.NewPath("related"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newEvent.ReportingController, oldEvent.ReportingController, field.NewPath("reportingController"))...)

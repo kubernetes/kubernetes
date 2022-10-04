@@ -40,13 +40,14 @@ type Node struct {
 	ReportEachBody       func(types.SpecReport)
 	ReportAfterSuiteBody func(types.Report)
 
-	MarkedFocus          bool
-	MarkedPending        bool
-	MarkedSerial         bool
-	MarkedOrdered        bool
-	MarkedOncePerOrdered bool
-	FlakeAttempts        int
-	Labels               Labels
+	MarkedFocus                     bool
+	MarkedPending                   bool
+	MarkedSerial                    bool
+	MarkedOrdered                   bool
+	MarkedOncePerOrdered            bool
+	MarkedSuppressProgressReporting bool
+	FlakeAttempts                   int
+	Labels                          Labels
 
 	NodeIDWhereCleanupWasGenerated uint
 }
@@ -57,12 +58,14 @@ type pendingType bool
 type serialType bool
 type orderedType bool
 type honorsOrderedType bool
+type suppressProgressReporting bool
 
 const Focus = focusType(true)
 const Pending = pendingType(true)
 const Serial = serialType(true)
 const Ordered = orderedType(true)
 const OncePerOrdered = honorsOrderedType(true)
+const SuppressProgressReporting = suppressProgressReporting(true)
 
 type FlakeAttempts uint
 type Offset uint
@@ -113,6 +116,8 @@ func isDecoration(arg interface{}) bool {
 	case t == reflect.TypeOf(Ordered):
 		return true
 	case t == reflect.TypeOf(OncePerOrdered):
+		return true
+	case t == reflect.TypeOf(SuppressProgressReporting):
 		return true
 	case t == reflect.TypeOf(FlakeAttempts(0)):
 		return true
@@ -176,7 +181,6 @@ func NewNode(deprecationTracker *types.DeprecationTracker, nodeType types.NodeTy
 	remainingArgs = []interface{}{}
 	//now process the rest of the args
 	for _, arg := range args {
-
 		switch t := reflect.TypeOf(arg); {
 		case t == reflect.TypeOf(float64(0)):
 			break //ignore deprecated timeouts
@@ -205,6 +209,11 @@ func NewNode(deprecationTracker *types.DeprecationTracker, nodeType types.NodeTy
 			if !nodeType.Is(types.NodeTypeBeforeEach | types.NodeTypeJustBeforeEach | types.NodeTypeAfterEach | types.NodeTypeJustAfterEach) {
 				appendError(types.GinkgoErrors.InvalidDecoratorForNodeType(node.CodeLocation, nodeType, "OncePerOrdered"))
 			}
+		case t == reflect.TypeOf(SuppressProgressReporting):
+			node.MarkedSuppressProgressReporting = bool(arg.(suppressProgressReporting))
+			if nodeType.Is(types.NodeTypeContainer) {
+				appendError(types.GinkgoErrors.InvalidDecoratorForNodeType(node.CodeLocation, nodeType, "SuppressProgressReporting"))
+			}
 		case t == reflect.TypeOf(FlakeAttempts(0)):
 			node.FlakeAttempts = int(arg.(FlakeAttempts))
 			if !nodeType.Is(types.NodeTypesForContainerAndIt) {
@@ -223,6 +232,18 @@ func NewNode(deprecationTracker *types.DeprecationTracker, nodeType types.NodeTy
 				}
 			}
 		case t.Kind() == reflect.Func:
+			if nodeType.Is(types.NodeTypeReportBeforeEach | types.NodeTypeReportAfterEach) {
+				if node.ReportEachBody != nil {
+					appendError(types.GinkgoErrors.MultipleBodyFunctions(node.CodeLocation, nodeType))
+					trackedFunctionError = true
+					break
+				}
+
+				//we can trust that the function is valid because the compiler has our back here
+				node.ReportEachBody = arg.(func(types.SpecReport))
+				break
+			}
+
 			if node.Body != nil {
 				appendError(types.GinkgoErrors.MultipleBodyFunctions(node.CodeLocation, nodeType))
 				trackedFunctionError = true
@@ -251,7 +272,7 @@ func NewNode(deprecationTracker *types.DeprecationTracker, nodeType types.NodeTy
 		appendError(types.GinkgoErrors.InvalidDeclarationOfFocusedAndPending(node.CodeLocation, nodeType))
 	}
 
-	if node.Body == nil && !node.MarkedPending && !trackedFunctionError {
+	if node.Body == nil && node.ReportEachBody == nil && !node.MarkedPending && !trackedFunctionError {
 		appendError(types.GinkgoErrors.MissingBodyFunction(node.CodeLocation, nodeType))
 	}
 	for _, arg := range remainingArgs {
@@ -282,26 +303,6 @@ func NewSynchronizedAfterSuiteNode(allProcsBody func(), proc1Body func(), codeLo
 		SynchronizedAfterSuiteAllProcsBody: allProcsBody,
 		SynchronizedAfterSuiteProc1Body:    proc1Body,
 		CodeLocation:                       codeLocation,
-	}, nil
-}
-
-func NewReportBeforeEachNode(body func(types.SpecReport), codeLocation types.CodeLocation) (Node, []error) {
-	return Node{
-		ID:             UniqueNodeID(),
-		NodeType:       types.NodeTypeReportBeforeEach,
-		ReportEachBody: body,
-		CodeLocation:   codeLocation,
-		NestingLevel:   -1,
-	}, nil
-}
-
-func NewReportAfterEachNode(body func(types.SpecReport), codeLocation types.CodeLocation) (Node, []error) {
-	return Node{
-		ID:             UniqueNodeID(),
-		NodeType:       types.NodeTypeReportAfterEach,
-		ReportEachBody: body,
-		CodeLocation:   codeLocation,
-		NestingLevel:   -1,
 	}, nil
 }
 

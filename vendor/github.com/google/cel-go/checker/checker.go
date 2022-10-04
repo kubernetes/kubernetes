@@ -80,10 +80,10 @@ func (c *checker) check(e *exprpb.Expr) {
 		return
 	}
 
-	switch e.ExprKind.(type) {
+	switch e.GetExprKind().(type) {
 	case *exprpb.Expr_ConstExpr:
 		literal := e.GetConstExpr()
-		switch literal.ConstantKind.(type) {
+		switch literal.GetConstantKind().(type) {
 		case *exprpb.Constant_BoolValue:
 			c.checkBoolLiteral(e)
 		case *exprpb.Constant_BytesValue:
@@ -149,8 +149,8 @@ func (c *checker) checkIdent(e *exprpb.Expr) {
 	identExpr := e.GetIdentExpr()
 	// Check to see if the identifier is declared.
 	if ident := c.env.LookupIdent(identExpr.GetName()); ident != nil {
-		c.setType(e, ident.GetIdent().Type)
-		c.setReference(e, newIdentReference(ident.GetName(), ident.GetIdent().Value))
+		c.setType(e, ident.GetIdent().GetType())
+		c.setReference(e, newIdentReference(ident.GetName(), ident.GetIdent().GetValue()))
 		// Overwrite the identifier with its fully qualified name.
 		identExpr.Name = ident.GetName()
 		return
@@ -186,23 +186,20 @@ func (c *checker) checkSelect(e *exprpb.Expr) {
 	}
 
 	// Interpret as field selection, first traversing down the operand.
-	c.check(sel.Operand)
-	targetType := substitute(c.mappings, c.getType(sel.Operand), false)
+	c.check(sel.GetOperand())
+	targetType := substitute(c.mappings, c.getType(sel.GetOperand()), false)
 	// Assume error type by default as most types do not support field selection.
 	resultType := decls.Error
 	switch kindOf(targetType) {
 	case kindMap:
 		// Maps yield their value type as the selection result type.
 		mapType := targetType.GetMapType()
-		resultType = mapType.ValueType
+		resultType = mapType.GetValueType()
 	case kindObject:
 		// Objects yield their field type declaration as the selection result type, but only if
 		// the field is defined.
 		messageType := targetType
-		if fieldType, found := c.lookupFieldType(
-			c.location(e),
-			messageType.GetMessageType(),
-			sel.Field); found {
+		if fieldType, found := c.lookupFieldType(c.location(e), messageType.GetMessageType(), sel.GetField()); found {
 			resultType = fieldType.Type
 		}
 	case kindTypeParam:
@@ -320,15 +317,15 @@ func (c *checker) resolveOverload(
 
 	var resultType *exprpb.Type
 	var checkedRef *exprpb.Reference
-	for _, overload := range fn.GetFunction().Overloads {
+	for _, overload := range fn.GetFunction().GetOverloads() {
 		// Determine whether the overload is currently considered.
 		if c.env.isOverloadDisabled(overload.GetOverloadId()) {
 			continue
 		}
 
 		// Ensure the call style for the overload matches.
-		if (target == nil && overload.IsInstanceFunction) ||
-			(target != nil && !overload.IsInstanceFunction) {
+		if (target == nil && overload.GetIsInstanceFunction()) ||
+			(target != nil && !overload.GetIsInstanceFunction()) {
 			// not a compatible call style.
 			continue
 		}
@@ -348,13 +345,11 @@ func (c *checker) resolveOverload(
 			if checkedRef == nil {
 				checkedRef = newFunctionReference(overload.GetOverloadId())
 			} else {
-				checkedRef.OverloadId = append(checkedRef.OverloadId, overload.GetOverloadId())
+				checkedRef.OverloadId = append(checkedRef.GetOverloadId(), overload.GetOverloadId())
 			}
 
 			// First matching overload, determines result type.
-			fnResultType := substitute(c.mappings,
-				overloadType.GetFunction().GetResultType(),
-				false)
+			fnResultType := substitute(c.mappings, overloadType.GetFunction().GetResultType(), false)
 			if resultType == nil {
 				resultType = fnResultType
 			} else if !isDyn(resultType) && !proto.Equal(fnResultType, resultType) {
@@ -375,7 +370,7 @@ func (c *checker) resolveOverload(
 func (c *checker) checkCreateList(e *exprpb.Expr) {
 	create := e.GetListExpr()
 	var elemType *exprpb.Type
-	for _, e := range create.Elements {
+	for _, e := range create.GetElements() {
 		c.check(e)
 		elemType = c.joinTypes(c.location(e), elemType, c.getType(e))
 	}
@@ -388,7 +383,7 @@ func (c *checker) checkCreateList(e *exprpb.Expr) {
 
 func (c *checker) checkCreateStruct(e *exprpb.Expr) {
 	str := e.GetStructExpr()
-	if str.MessageName != "" {
+	if str.GetMessageName() != "" {
 		c.checkCreateMessage(e)
 	} else {
 		c.checkCreateMap(e)
@@ -419,22 +414,22 @@ func (c *checker) checkCreateMessage(e *exprpb.Expr) {
 	msgVal := e.GetStructExpr()
 	// Determine the type of the message.
 	messageType := decls.Error
-	decl := c.env.LookupIdent(msgVal.MessageName)
+	decl := c.env.LookupIdent(msgVal.GetMessageName())
 	if decl == nil {
 		c.errors.undeclaredReference(
-			c.location(e), c.env.container.Name(), msgVal.MessageName)
+			c.location(e), c.env.container.Name(), msgVal.GetMessageName())
 		return
 	}
 	// Ensure the type name is fully qualified in the AST.
 	msgVal.MessageName = decl.GetName()
 	c.setReference(e, newIdentReference(decl.GetName(), nil))
 	ident := decl.GetIdent()
-	identKind := kindOf(ident.Type)
+	identKind := kindOf(ident.GetType())
 	if identKind != kindError {
 		if identKind != kindType {
-			c.errors.notAType(c.location(e), ident.Type)
+			c.errors.notAType(c.location(e), ident.GetType())
 		} else {
-			messageType = ident.Type.GetType()
+			messageType = ident.GetType().GetType()
 			if kindOf(messageType) != kindObject {
 				c.errors.notAMessageType(c.location(e), messageType)
 				messageType = decls.Error
@@ -450,12 +445,12 @@ func (c *checker) checkCreateMessage(e *exprpb.Expr) {
 	// Check the field initializers.
 	for _, ent := range msgVal.GetEntries() {
 		field := ent.GetFieldKey()
-		value := ent.Value
+		value := ent.GetValue()
 		c.check(value)
 
 		fieldType := decls.Error
 		if t, found := c.lookupFieldType(
-			c.locationByID(ent.Id),
+			c.locationByID(ent.GetId()),
 			messageType.GetMessageType(),
 			field); found {
 			fieldType = t.Type
@@ -576,25 +571,25 @@ func (c *checker) lookupFieldType(l common.Location, messageType string, fieldNa
 }
 
 func (c *checker) setType(e *exprpb.Expr, t *exprpb.Type) {
-	if old, found := c.types[e.Id]; found && !proto.Equal(old, t) {
+	if old, found := c.types[e.GetId()]; found && !proto.Equal(old, t) {
 		c.errors.ReportError(c.location(e),
 			"(Incompatible) Type already exists for expression: %v(%d) old:%v, new:%v", e, e.GetId(), old, t)
 		return
 	}
-	c.types[e.Id] = t
+	c.types[e.GetId()] = t
 }
 
 func (c *checker) getType(e *exprpb.Expr) *exprpb.Type {
-	return c.types[e.Id]
+	return c.types[e.GetId()]
 }
 
 func (c *checker) setReference(e *exprpb.Expr, r *exprpb.Reference) {
-	if old, found := c.references[e.Id]; found && !proto.Equal(old, r) {
+	if old, found := c.references[e.GetId()]; found && !proto.Equal(old, r) {
 		c.errors.ReportError(c.location(e),
-			"Reference already exists for expression: %v(%d) old:%v, new:%v", e, e.Id, old, r)
+			"Reference already exists for expression: %v(%d) old:%v, new:%v", e, e.GetId(), old, r)
 		return
 	}
-	c.references[e.Id] = r
+	c.references[e.GetId()] = r
 }
 
 func (c *checker) assertType(e *exprpb.Expr, t *exprpb.Type) {
@@ -616,7 +611,7 @@ func newResolution(checkedRef *exprpb.Reference, t *exprpb.Type) *overloadResolu
 }
 
 func (c *checker) location(e *exprpb.Expr) common.Location {
-	return c.locationByID(e.Id)
+	return c.locationByID(e.GetId())
 }
 
 func (c *checker) locationByID(id int64) common.Location {
@@ -624,7 +619,7 @@ func (c *checker) locationByID(id int64) common.Location {
 	var line = 1
 	if offset, found := positions[id]; found {
 		col := int(offset)
-		for _, lineOffset := range c.sourceInfo.LineOffsets {
+		for _, lineOffset := range c.sourceInfo.GetLineOffsets() {
 			if lineOffset < offset {
 				line++
 				col = int(offset - lineOffset)
