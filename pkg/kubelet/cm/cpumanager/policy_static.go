@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 const (
@@ -252,47 +253,56 @@ func (p *staticPolicy) updateCPUsToReuse(pod *v1.Pod, container *v1.Container, c
 	p.cpusToReuse[string(pod.UID)] = p.cpusToReuse[string(pod.UID)].Difference(cset)
 }
 
-func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) error {
-	if numCPUs := p.guaranteedCPUs(pod, container); numCPUs != 0 {
-		klog.InfoS("Static policy: Allocate", "pod", klog.KObj(pod), "containerName", container.Name)
-		// container belongs in an exclusively allocated pool
-
-		if p.options.FullPhysicalCPUsOnly && ((numCPUs % p.topology.CPUsPerCore()) != 0) {
-			// Since CPU Manager has been enabled requesting strict SMT alignment, it means a guaranteed pod can only be admitted
-			// if the CPU requested is a multiple of the number of virtual cpus per physical cores.
-			// In case CPU request is not a multiple of the number of virtual cpus per physical cores the Pod will be put
-			// in Failed state, with SMTAlignmentError as reason. Since the allocation happens in terms of physical cores
-			// and the scheduler is responsible for ensuring that the workload goes to a node that has enough CPUs,
-			// the pod would be placed on a node where there are enough physical cores available to be allocated.
-			// Just like the behaviour in case of static policy, takeByTopology will try to first allocate CPUs from the same socket
-			// and only in case the request cannot be sattisfied on a single socket, CPU allocation is done for a workload to occupy all
-			// CPUs on a physical core. Allocation of individual threads would never have to occur.
-			return SMTAlignmentError{
-				RequestedCPUs: numCPUs,
-				CpusPerCore:   p.topology.CPUsPerCore(),
-			}
-		}
-		if cpuset, ok := s.GetCPUSet(string(pod.UID), container.Name); ok {
-			p.updateCPUsToReuse(pod, container, cpuset)
-			klog.InfoS("Static policy: container already present in state, skipping", "pod", klog.KObj(pod), "containerName", container.Name)
-			return nil
-		}
-
-		// Call Topology Manager to get the aligned socket affinity across all hint providers.
-		hint := p.affinity.GetAffinity(string(pod.UID), container.Name)
-		klog.InfoS("Topology Affinity", "pod", klog.KObj(pod), "containerName", container.Name, "affinity", hint)
-
-		// Allocate CPUs according to the NUMA affinity contained in the hint.
-		cpuset, err := p.allocateCPUs(s, numCPUs, hint.NUMANodeAffinity, p.cpusToReuse[string(pod.UID)])
-		if err != nil {
-			klog.ErrorS(err, "Unable to allocate CPUs", "pod", klog.KObj(pod), "containerName", container.Name, "numCPUs", numCPUs)
-			return err
-		}
-		s.SetCPUSet(string(pod.UID), container.Name, cpuset)
-		p.updateCPUsToReuse(pod, container, cpuset)
-
+func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
+	numCPUs := p.guaranteedCPUs(pod, container)
+	if numCPUs == 0 {
+		// container belongs in the shared pool (nothing to do; use default cpuset)
+		return nil
 	}
-	// container belongs in the shared pool (nothing to do; use default cpuset)
+
+	klog.InfoS("Static policy: Allocate", "pod", klog.KObj(pod), "containerName", container.Name)
+	// container belongs in an exclusively allocated pool
+	metrics.CPUManagerPinningRequestsTotal.Inc()
+	defer func() {
+		if rerr != nil {
+			metrics.CPUManagerPinningErrorsTotal.Inc()
+		}
+	}()
+
+	if p.options.FullPhysicalCPUsOnly && ((numCPUs % p.topology.CPUsPerCore()) != 0) {
+		// Since CPU Manager has been enabled requesting strict SMT alignment, it means a guaranteed pod can only be admitted
+		// if the CPU requested is a multiple of the number of virtual cpus per physical cores.
+		// In case CPU request is not a multiple of the number of virtual cpus per physical cores the Pod will be put
+		// in Failed state, with SMTAlignmentError as reason. Since the allocation happens in terms of physical cores
+		// and the scheduler is responsible for ensuring that the workload goes to a node that has enough CPUs,
+		// the pod would be placed on a node where there are enough physical cores available to be allocated.
+		// Just like the behaviour in case of static policy, takeByTopology will try to first allocate CPUs from the same socket
+		// and only in case the request cannot be sattisfied on a single socket, CPU allocation is done for a workload to occupy all
+		// CPUs on a physical core. Allocation of individual threads would never have to occur.
+		return SMTAlignmentError{
+			RequestedCPUs: numCPUs,
+			CpusPerCore:   p.topology.CPUsPerCore(),
+		}
+	}
+	if cpuset, ok := s.GetCPUSet(string(pod.UID), container.Name); ok {
+		p.updateCPUsToReuse(pod, container, cpuset)
+		klog.InfoS("Static policy: container already present in state, skipping", "pod", klog.KObj(pod), "containerName", container.Name)
+		return nil
+	}
+
+	// Call Topology Manager to get the aligned socket affinity across all hint providers.
+	hint := p.affinity.GetAffinity(string(pod.UID), container.Name)
+	klog.InfoS("Topology Affinity", "pod", klog.KObj(pod), "containerName", container.Name, "affinity", hint)
+
+	// Allocate CPUs according to the NUMA affinity contained in the hint.
+	cpuset, err := p.allocateCPUs(s, numCPUs, hint.NUMANodeAffinity, p.cpusToReuse[string(pod.UID)])
+	if err != nil {
+		klog.ErrorS(err, "Unable to allocate CPUs", "pod", klog.KObj(pod), "containerName", container.Name, "numCPUs", numCPUs)
+		return err
+	}
+	s.SetCPUSet(string(pod.UID), container.Name, cpuset)
+	p.updateCPUsToReuse(pod, container, cpuset)
+
 	return nil
 }
 
