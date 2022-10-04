@@ -38,11 +38,11 @@ should be true:
 - [ ] `make test` executes without error
 - [ ] The upstream tag is pushed to `openshift/kubernetes` to ensure that
       build artifacts are versioned correctly
-      - Upstream tooling uses the value of the most recent tag (e.g. `v1.20.0`)
+      - Upstream tooling uses the value of the most recent tag (e.g. `v1.25.0`)
         in the branch history as the version of the binaries it builds.
       - Pushing the tag is easy as
 ```
-git push git@github.com:openshift/kubernetes.git refs/tags/v1.20.0
+git push git@github.com:openshift/kubernetes.git refs/tags/v1.25.0
 ```
 
 Details to include in the description of the PR:
@@ -123,14 +123,14 @@ git remote add --fetch openshift https://github.com/openshift/kubernetes
 
 ## Creating a new local branch for the new rebase
 
-- Branch the target `k8s.io/kubernetes` release tag (e.g. `v1.20.0`) to a new
+- Branch the target `k8s.io/kubernetes` release tag (e.g. `v1.25.0`) to a new
   local branch
 
 ```
-git checkout -b rebase-1.20.0 v1.20.0
+git checkout -b rebase-1.25.0 v1.25.0
 ```
 
-- Merge `openshift(master)` branch into the `rebase-1.20.0` branch with merge
+- Merge `openshift(master)` branch into the `rebase-1.25.0` branch with merge
   strategy `ours`. It discards all changes from the other branch (`openshift/master`)
   and create a merge commit. This leaves the content of your branch unchanged,
   and when you next merge with the other branch, Git will only consider changes made
@@ -143,21 +143,21 @@ git merge -s ours openshift/master
 
 ## Creating a spreadsheet of carry commits from the previous release
 
-Given the upstream tag (e.g. `v1.19.2`) of the most recent rebase and the name
+Given the upstream tag (e.g. `v1.24.2`) of the most recent rebase and the name
 of the branch that is targeted for rebase (e.g. `openshift/master`), generate a tsv file
 containing the set of carry commits that need to be considered for picking:
 
 ```
-echo 'Comment Sha\tAction\tClean\tSummary\tCommit link\tPR link' > ~/Documents/v1.19.2.tsv
+echo 'Comment Sha\tAction\tClean\tSummary\tCommit link\tPR link' > ~/Documents/v1.24.2.tsv
 ```
 ```
-git log $( git merge-base openshift/master v1.19.2 )..openshift/master --ancestry-path --reverse --no-merges --pretty='tformat:%x09%h%x09%x09%x09%s%x09https://github.com/openshift/kubernetes/commit/%h?w=1' | grep -E $'\t''UPSTREAM: .*'$'\t' | sed -E 's~UPSTREAM: ([0-9]+)(:.*)~UPSTREAM: \1\2\thttps://github.com/kubernetes/kubernetes/pull/\1~' >> ~/Documents/v1.19.2.tsv
+git log $( git merge-base openshift/master v1.24.2 )..openshift/master --ancestry-path --reverse --no-merges --pretty='tformat:%x09%h%x09%x09%x09%s%x09https://github.com/openshift/kubernetes/commit/%h?w=1' | grep -E $'\t''UPSTREAM: .*'$'\t' | sed -E 's~UPSTREAM: ([0-9]+)(:.*)~UPSTREAM: \1\2\thttps://github.com/kubernetes/kubernetes/pull/\1~' >> ~/Documents/v1.24.2.tsv
 ```
 
 This tsv file can be imported into a google sheets spreadsheet to track the
 progress of picking commits to the new rebase branch. The spreadsheet can also
 be a way of communicating with rebase reviewers. For an example of this
-communication, please see the [the spreadsheet used for the 1.19
+communication, please see the [the spreadsheet used for the 1.24
 rebase](https://docs.google.com/spreadsheets/d/10KYptJkDB1z8_RYCQVBYDjdTlRfyoXILMa0Fg8tnNlY/edit).
 
 ## Picking commits from the previous rebase branch to the new branch
@@ -185,7 +185,7 @@ Commits carried on rebase branches have commit messages prefixed as follows:
   - A commit with this message should only be picked into the subsequent rebase branch
     if the commits of the referenced PR are not included in the upstream branch.
   - To check if a given commit is included in the upstream branch, open the referenced
-    upstream PR and check any of its commits for the release tag (e.g. `v.1.20.0`)
+    upstream PR and check any of its commits for the release tag (e.g. `v.1.25.0`)
     targeted by the new rebase branch. For example:
     - <img src="openshift-hack/commit-tag.png">
 
@@ -304,7 +304,7 @@ regression in behavior) can often be skipped and addressed post-merge.
   - Alternatively, run it in the same container as CI is using for build_root that already has
     the etcd at correct version
 ```
-podman run -it --rm -v $( pwd ):/go/k8s.io/kubernetes:Z --workdir=/go/k8s.io/kubernetes registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.16-openshift-4.8 make update OS_RUN_WITHOUT_DOCKER=yes
+podman run -it --rm -v $( pwd ):/go/k8s.io/kubernetes:Z --workdir=/go/k8s.io/kubernetes registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.19-openshift-4.12 make update OS_RUN_WITHOUT_DOCKER=yes
 ```
 - Commit the resulting changes as `UPSTREAM: <drop>: make update`.
 
@@ -327,10 +327,10 @@ merged to the targeted openshift/kubernetes branch after the rebase is
 underway. The following strategy is suggested to minimize the cost of incorporating
 these new commits:
 
-- rename existing rebase branch (e.g. 1.20.0-beta.2 -> 1.20.0-beta.2-old)
+- rename existing rebase branch (e.g. 1.25.0-beta.2 -> 1.25.0-beta.2-old)
 - create new rebase branch from HEAD of master
-- merge the target upstream tag (e.g. 1.20.0-beta.2) with strategy ours
-- pick all carries from renamed rebase branch (e.g. 1.20.0-beta.2-old)
+- merge the target upstream tag (e.g. 1.25.0-beta.2) with strategy ours
+- pick all carries from renamed rebase branch (e.g. 1.25.0-beta.2-old)
 - pick new carries from the openshift/kubernetes target branch
 - add details of the new carries to the spreadsheet
 - update generated files
@@ -403,7 +403,7 @@ them as the highest priority and release blockers for your team:
 ## Followup work
 
 1. Update cluster-kube-apiserver-operator `pre-release-lifecycle` alert's
-`removed_release` version similarly to https://github.com/openshift/cluster-kube-apiserver-operator/pull/1092.
+`removed_release` version similarly to https://github.com/openshift/cluster-kube-apiserver-operator/pull/1382.
 
 ## Updating with `git merge`
 
@@ -415,10 +415,10 @@ to newer released version using `git merge`. To do that follow these steps:
 
 1. Verify upstream changes:
 ```
-git log v1.21.1..v1.21.2 --ancestry-path --reverse --no-merges
+git log v1.25.0..v1.25.2 --ancestry-path --reverse --no-merges
 ```
 2. Revert any commits that were merged into kubernetes between previous update and current one.
-3. `git merge <new_version>`, example `git merge v1.21.2`.
+3. `git merge <new_version>`, example `git merge v1.25.2`.
    Most likely you'll encounter conflicts, but most are around go.sum and go.mod,
    coming from newer versions. Manually verify them, and in most cases pick the
    newer versions of deps. This will be properly update when re-running
@@ -428,6 +428,9 @@ git log v1.21.1..v1.21.2 --ancestry-path --reverse --no-merges
 5. Update openshift dependencies and re-run `hack/update-vendor.sh`.
 6. Update kubernetes version in `openshift-hack/images/hyperkube/Dockerfile.rhel`.
 7. Run `make update` see [Updating generated files](#updating-generated-files).
+   NOTE: Starting from 4.10, there's a problem running `make update`, so before
+   running that `podman` command, edit `staging/src/k8s.io/code-generator/go.mod`
+   file removing this line: `k8s.io/code-generator => ../code-generator`.
 
 
 ## Updating with `rebase.sh` (experimental)
@@ -443,7 +446,7 @@ Here are the steps:
 3. This script requires `jq`, `git`, `podman` and `bash`, `gh` is optional.
 4. In the root dir of that fork run:
 ```
-openshift-hack/rebase.sh --k8s-tag=v1.21.2 --openshift-release=release-4.8 --bugzilla-id=2003027
+openshift-hack/rebase.sh --k8s-tag=v1.25.2 --openshift-release=release-4.12 --bugzilla-id=2003027
 ```
 
 where `k8s-tag` is the [kubernetes/kubernetes](https://github.com/kubernetes/kubernetes/) release tag, the `openshift-release`
