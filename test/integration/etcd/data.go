@@ -386,6 +386,17 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1
+		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): {
+			Stub:             `{"metadata":{"name":"vap1","creationTimestamp":null},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"validations":[{"expression":"object.spec.replicas <= params.maxReplicas","message":"Too many replicas"}]}}`,
+			ExpectedEtcdPath: "/registry/validatingadmissionpolicies/vap1",
+		},
+		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicybindings"): {
+			Stub:             `{"metadata":{"name":"pb1","creationTimestamp":null},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com"}}}`,
+			ExpectedEtcdPath: "/registry/validatingadmissionpolicybindings/pb1",
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/scheduling/v1
 		gvr("scheduling.k8s.io", "v1", "priorityclasses"): {
 			Stub:             `{"metadata":{"name":"pc3"},"Value":1000}`,

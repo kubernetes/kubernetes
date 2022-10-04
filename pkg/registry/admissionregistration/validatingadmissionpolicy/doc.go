@@ -14,11 +14,4 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/admissionregistration
-// +k8s:conversion-gen-external-types=k8s.io/api/admissionregistration/v1alpha1
-// +k8s:defaulter-gen=TypeMeta
-// +k8s:defaulter-gen-input=k8s.io/api/admissionregistration/v1alpha1
-// +groupName=admissionregistration.k8s.io
-
-// Package v1alpha1 is the v1alpha1 version of the API.
-package v1alpha1 // import "k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1"
+package validatingadmissionpolicy // import "k8s.io/kubernetes/pkg/registry/admissionregistration/validatingadmissionpolicy"

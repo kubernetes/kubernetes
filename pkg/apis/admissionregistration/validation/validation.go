@@ -18,13 +18,18 @@ package validation
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
+	"k8s.io/apimachinery/pkg/api/validation/path"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	plugincel "k8s.io/apiserver/pkg/admission/plugin/cel"
+	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	admissionregistrationv1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
@@ -390,6 +395,12 @@ var supportedReinvocationPolicies = sets.NewString(
 	string(admissionregistration.IfNeededReinvocationPolicy),
 )
 
+var supportedValidationPolicyReason = sets.NewString(
+	string(metav1.StatusReasonForbidden),
+	string(metav1.StatusReasonInvalid),
+	string(metav1.StatusReasonRequestEntityTooLarge),
+)
+
 func hasWildcardOperation(operations []admissionregistration.OperationType) bool {
 	for _, o := range operations {
 		if o == admissionregistration.OperationAll {
@@ -513,4 +524,236 @@ func ValidateMutatingWebhookConfigurationUpdate(newC, oldC *admissionregistratio
 		requireRecognizedAdmissionReviewVersion: mutatingHasAcceptedAdmissionReviewVersions(oldC.Webhooks),
 		requireUniqueWebhookNames:               mutatingHasUniqueWebhookNames(oldC.Webhooks),
 	})
+}
+
+// ValidateValidatingAdmissionPolicy validates a ValidatingAdmissionPolicy before creation.
+func ValidateValidatingAdmissionPolicy(p *admissionregistration.ValidatingAdmissionPolicy) field.ErrorList {
+	return validateValidatingAdmissionPolicy(p)
+}
+
+func validateValidatingAdmissionPolicy(p *admissionregistration.ValidatingAdmissionPolicy) field.ErrorList {
+	allErrors := genericvalidation.ValidateObjectMeta(&p.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrors = append(allErrors, validateValidatingAdmissionPolicySpec(&p.Spec, field.NewPath("spec"))...)
+	return allErrors
+}
+
+func validateValidatingAdmissionPolicySpec(spec *admissionregistration.ValidatingAdmissionPolicySpec, fldPath *field.Path) field.ErrorList {
+	var allErrors field.ErrorList
+	if spec.FailurePolicy == nil {
+		allErrors = append(allErrors, field.Required(fldPath.Child("failurePolicy"), ""))
+	} else if !supportedFailurePolicies.Has(string(*spec.FailurePolicy)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("failurePolicy"), *spec.FailurePolicy, supportedFailurePolicies.List()))
+	}
+	if spec.ParamKind != nil {
+		allErrors = append(allErrors, validateParamKind(*spec.ParamKind, fldPath.Child("paramKind"))...)
+	}
+	if spec.MatchConstraints == nil {
+		allErrors = append(allErrors, field.Required(fldPath.Child("matchConstraints"), ""))
+	} else {
+		allErrors = append(allErrors, validateMatchResources(spec.MatchConstraints, fldPath.Child("matchConstraints"))...)
+		// at least one resourceRule must be defined to provide type information
+		if len(spec.MatchConstraints.ResourceRules) == 0 {
+			allErrors = append(allErrors, field.Required(fldPath.Child("matchConstraints", "resourceRules"), ""))
+		}
+	}
+	if len(spec.Validations) == 0 {
+		allErrors = append(allErrors, field.Required(fldPath.Child("validations"), ""))
+	} else {
+		for i, validation := range spec.Validations {
+			allErrors = append(allErrors, validateValidation(&validation, spec.ParamKind, fldPath.Child("validations").Index(i))...)
+		}
+	}
+
+	return allErrors
+}
+
+func validateParamKind(gvk admissionregistration.ParamKind, fldPath *field.Path) field.ErrorList {
+	var allErrors field.ErrorList
+	if len(gvk.APIVersion) == 0 {
+		allErrors = append(allErrors, field.Required(fldPath.Child("apiVersion"), ""))
+	} else if gv, err := parseGroupVersion(gvk.APIVersion); err != nil {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("apiVersion"), gvk.APIVersion, err.Error()))
+	} else {
+		//this matches the APIService group field validation
+		if len(gv.Group) > 0 {
+			if errs := utilvalidation.IsDNS1123Subdomain(gv.Group); len(errs) > 0 {
+				allErrors = append(allErrors, field.Invalid(fldPath.Child("apiVersion"), gv.Group, strings.Join(errs, ",")))
+			}
+		}
+		//this matches the APIService version field validation
+		if len(gv.Version) == 0 {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("apiVersion"), gvk.APIVersion, "version must be specified"))
+		} else {
+			if errs := utilvalidation.IsDNS1035Label(gv.Version); len(errs) > 0 {
+				allErrors = append(allErrors, field.Invalid(fldPath.Child("apiVersion"), gv.Version, strings.Join(errs, ",")))
+			}
+		}
+	}
+	if len(gvk.Kind) == 0 {
+		allErrors = append(allErrors, field.Required(fldPath.Child("kind"), ""))
+	} else if errs := utilvalidation.IsDNS1035Label(strings.ToLower(gvk.Kind)); len(errs) > 0 {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("kind"), gvk.Kind, "may have mixed case, but should otherwise match: "+strings.Join(errs, ",")))
+	}
+
+	return allErrors
+}
+
+type groupVersion struct {
+	Group   string
+	Version string
+}
+
+// parseGroupVersion turns "group/version" string into a groupVersion struct. It reports error
+// if it cannot parse the string.
+func parseGroupVersion(gv string) (groupVersion, error) {
+	if (len(gv) == 0) || (gv == "/") {
+		return groupVersion{}, nil
+	}
+
+	switch strings.Count(gv, "/") {
+	case 0:
+		return groupVersion{"", gv}, nil
+	case 1:
+		i := strings.Index(gv, "/")
+		return groupVersion{gv[:i], gv[i+1:]}, nil
+	default:
+		return groupVersion{}, fmt.Errorf("unexpected GroupVersion string: %v", gv)
+	}
+}
+
+func validateMatchResources(mc *admissionregistration.MatchResources, fldPath *field.Path) field.ErrorList {
+	var allErrors field.ErrorList
+	if mc == nil {
+		return allErrors
+	}
+	if mc.MatchPolicy == nil {
+		allErrors = append(allErrors, field.Required(fldPath.Child("matchPolicy"), ""))
+	} else if !supportedMatchPolicies.Has(string(*mc.MatchPolicy)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("matchPolicy"), *mc.MatchPolicy, supportedMatchPolicies.List()))
+	}
+	if mc.NamespaceSelector == nil {
+		allErrors = append(allErrors, field.Required(fldPath.Child("namespaceSelector"), ""))
+	} else {
+		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(mc.NamespaceSelector, fldPath.Child("namespaceSelector"))...)
+	}
+
+	if mc.ObjectSelector == nil {
+		allErrors = append(allErrors, field.Required(fldPath.Child("labelSelector"), ""))
+	} else {
+		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(mc.ObjectSelector, fldPath.Child("labelSelector"))...)
+	}
+
+	for i, namedRuleWithOperations := range mc.ResourceRules {
+		allErrors = append(allErrors, validateNamedRuleWithOperations(&namedRuleWithOperations, fldPath.Child("resourceRules").Index(i))...)
+	}
+
+	for i, namedRuleWithOperations := range mc.ExcludeResourceRules {
+		allErrors = append(allErrors, validateNamedRuleWithOperations(&namedRuleWithOperations, fldPath.Child("excludeResourceRules").Index(i))...)
+	}
+	return allErrors
+}
+
+func validateNamedRuleWithOperations(n *admissionregistration.NamedRuleWithOperations, fldPath *field.Path) field.ErrorList {
+	var allErrors field.ErrorList
+	resourceNames := sets.NewString()
+	for i, rName := range n.ResourceNames {
+		for _, msg := range path.ValidatePathSegmentName(rName, false) {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("resourceNames").Index(i), rName, msg))
+		}
+		if resourceNames.Has(rName) {
+			allErrors = append(allErrors, field.Duplicate(fldPath.Child("resourceNames").Index(i), rName))
+		} else {
+			resourceNames.Insert(rName)
+		}
+	}
+	allErrors = append(allErrors, validateRuleWithOperations(&n.RuleWithOperations, fldPath)...)
+	return allErrors
+}
+
+func validateValidation(v *admissionregistration.Validation, paramKind *admissionregistration.ParamKind, fldPath *field.Path) field.ErrorList {
+	var allErrors field.ErrorList
+	trimmedExpression := strings.TrimSpace(v.Expression)
+	trimmedMsg := strings.TrimSpace(v.Message)
+	if len(trimmedExpression) == 0 {
+		allErrors = append(allErrors, field.Required(fldPath.Child("expression"), "expression is not specified"))
+	} else {
+		result := plugincel.CompileValidatingPolicyExpression(trimmedExpression, paramKind != nil)
+		if result.Error != nil {
+			switch result.Error.Type {
+			case cel.ErrorTypeRequired:
+				allErrors = append(allErrors, field.Required(fldPath.Child("expression"), result.Error.Detail))
+			case cel.ErrorTypeInvalid:
+				allErrors = append(allErrors, field.Invalid(fldPath.Child("expression"), v.Expression, result.Error.Detail))
+			case cel.ErrorTypeInternal:
+				allErrors = append(allErrors, field.InternalError(fldPath.Child("expression"), result.Error))
+			default:
+				allErrors = append(allErrors, field.InternalError(fldPath.Child("expression"), fmt.Errorf("unsupported error type: %w", result.Error)))
+			}
+		}
+	}
+	if len(v.Message) > 0 && len(trimmedMsg) == 0 {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("message"), v.Message, "message must be non-empty if specified"))
+	} else if hasNewlines(trimmedMsg) {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("message"), v.Message, "message must not contain line breaks"))
+	} else if hasNewlines(trimmedMsg) && trimmedMsg == "" {
+		allErrors = append(allErrors, field.Required(fldPath.Child("message"), "message must be specified if expression contains line breaks"))
+	}
+	if v.Reason != nil && !supportedValidationPolicyReason.Has(string(*v.Reason)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("reason"), *v.Reason, supportedValidationPolicyReason.List()))
+	}
+	return allErrors
+}
+
+var newlineMatcher = regexp.MustCompile(`[\n\r]+`) // valid newline chars in CEL grammar
+func hasNewlines(s string) bool {
+	return newlineMatcher.MatchString(s)
+}
+
+// ValidateValidatingAdmissionPolicyBinding validates a ValidatingAdmissionPolicyBinding before create.
+func ValidateValidatingAdmissionPolicyBinding(pb *admissionregistration.ValidatingAdmissionPolicyBinding) field.ErrorList {
+	return validateValidatingAdmissionPolicyBinding(pb)
+}
+
+func validateValidatingAdmissionPolicyBinding(pb *admissionregistration.ValidatingAdmissionPolicyBinding) field.ErrorList {
+	allErrors := genericvalidation.ValidateObjectMeta(&pb.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrors = append(allErrors, validateValidatingAdmissionPolicyBindingSpec(&pb.Spec, field.NewPath("spec"))...)
+
+	return allErrors
+}
+
+func validateValidatingAdmissionPolicyBindingSpec(spec *admissionregistration.ValidatingAdmissionPolicyBindingSpec, fldPath *field.Path) field.ErrorList {
+	var allErrors field.ErrorList
+
+	if len(spec.PolicyName) == 0 {
+		allErrors = append(allErrors, field.Required(fldPath.Child("policyName"), ""))
+	} else {
+		for _, msg := range genericvalidation.NameIsDNSSubdomain(spec.PolicyName, false) {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("policyName"), spec.PolicyName, msg))
+		}
+	}
+	allErrors = append(allErrors, validateParamRef(spec.ParamRef, fldPath.Child("paramRef"))...)
+	allErrors = append(allErrors, validateMatchResources(spec.MatchResources, fldPath.Child("matchResouces"))...)
+
+	return allErrors
+}
+
+func validateParamRef(pr *admissionregistration.ParamRef, fldPath *field.Path) field.ErrorList {
+	var allErrors field.ErrorList
+	if pr == nil {
+		return allErrors
+	}
+	for _, msg := range path.ValidatePathSegmentName(pr.Name, false) {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("name"), pr.Name, msg))
+	}
+	return allErrors
+}
+
+// ValidateValidatingAdmissionPolicyUpdate validates update of validating admission policy
+func ValidateValidatingAdmissionPolicyUpdate(newC, oldC *admissionregistration.ValidatingAdmissionPolicy) field.ErrorList {
+	return validateValidatingAdmissionPolicy(newC)
+}
+
+// ValidateValidatingAdmissionPolicyBindingUpdate validates update of validating admission policy
+func ValidateValidatingAdmissionPolicyBindingUpdate(newC, oldC *admissionregistration.ValidatingAdmissionPolicyBinding) field.ErrorList {
+	return validateValidatingAdmissionPolicyBinding(newC)
 }
