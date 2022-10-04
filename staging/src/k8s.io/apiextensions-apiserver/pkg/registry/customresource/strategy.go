@@ -116,12 +116,7 @@ func (a customResourceStrategy) PrepareForCreate(ctx context.Context, obj runtim
 
 	accessor, _ := meta.Accessor(obj)
 	if _, found := accessor.GetAnnotations()[genericapirequest.AnnotationKey]; found {
-		// in general the shard annotation is not attached to objects, instead, it is assigned by the storage layer on the fly
-		// to avoid an additional UPDATE request (mismatch on the generation field) replicated objects have the shard annotation set
-		// thus we need to remove the shard annotation and simply return early so that the generation is not reset to 1
-		annotations := accessor.GetAnnotations()
-		delete(annotations, genericapirequest.AnnotationKey)
-		accessor.SetAnnotations(annotations)
+		// to avoid an additional UPDATE request (mismatch on the generation field) replicated objects have the generation field already set
 		return
 	}
 	accessor.SetGeneration(1)
