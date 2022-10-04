@@ -96,6 +96,8 @@ type ContainerStatsManager interface {
 	PodSandboxStats(podSandboxID string) (*runtimeapi.PodSandboxStats, error)
 	// ListPodSandboxStats returns stats of all running pods.
 	ListPodSandboxStats(filter *runtimeapi.PodSandboxStatsFilter) ([]*runtimeapi.PodSandboxStats, error)
+	// ListPodSandboxMetrics returns metrics of all running pods.
+	ListPodSandboxMetrics() ([]*runtimeapi.PodSandboxMetrics, error)
 }
 
 // RuntimeService interface should be implemented by a container runtime.
