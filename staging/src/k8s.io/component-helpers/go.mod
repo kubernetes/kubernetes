@@ -5,17 +5,10 @@ module k8s.io/component-helpers
 go 1.19
 
 require (
-<<<<<<< HEAD
 	github.com/google/go-cmp v0.5.6
 	k8s.io/api v0.25.0
 	k8s.io/apimachinery v0.25.0
 	k8s.io/client-go v0.25.0
-=======
-	github.com/google/go-cmp v0.5.8
-	k8s.io/api v0.0.0
-	k8s.io/apimachinery v0.0.0
-	k8s.io/client-go v0.0.0
->>>>>>> v1.25.2
 	k8s.io/klog/v2 v2.70.1
 	k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed
 )

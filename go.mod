@@ -53,13 +53,8 @@ require (
 	github.com/mrunalp/fileutils v0.5.0
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/mvdan/xurls v1.1.0
-<<<<<<< HEAD
 	github.com/onsi/ginkgo/v2 v2.1.5-0.20220909190140-b488ab12695a
-	github.com/onsi/gomega v1.19.0
-=======
-	github.com/onsi/ginkgo/v2 v2.1.6
 	github.com/onsi/gomega v1.20.1
->>>>>>> v1.25.2
 	github.com/opencontainers/runc v1.1.3
 	github.com/opencontainers/selinux v1.10.0
 	github.com/openshift/api v0.0.0-20220831183848-09c070622e2c
@@ -490,14 +485,9 @@ replace (
 	github.com/mxk/go-flowrate => github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 	github.com/niemeyer/pretty => github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e
 	github.com/olekukonko/tablewriter => github.com/olekukonko/tablewriter v0.0.4
-<<<<<<< HEAD
 	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/ginkgo/v2 => github.com/soltysh/ginkgo/v2 v2.1.5-0.20220909190140-b488ab12695a
-	github.com/onsi/gomega => github.com/onsi/gomega v1.19.0
-=======
-	github.com/onsi/ginkgo/v2 => github.com/onsi/ginkgo/v2 v2.1.6
 	github.com/onsi/gomega => github.com/onsi/gomega v1.20.1
->>>>>>> v1.25.2
 	github.com/opencontainers/go-digest => github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.2
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.3
