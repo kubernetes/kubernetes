@@ -485,7 +485,18 @@ func (ssc *StatefulSetController) syncStatefulSet(ctx context.Context, set *apps
 	klog.V(4).Infof("Successfully synced StatefulSet %s/%s successful", set.Namespace, set.Name)
 	// One more sync to handle the clock skew. This is also helping in requeuing right after status update
 	if set.Spec.MinReadySeconds > 0 && status != nil && status.AvailableReplicas != *set.Spec.Replicas {
-		ssc.enqueueSSAfter(set, time.Duration(set.Spec.MinReadySeconds)*time.Second)
+		enqueueAfterDuration := time.Duration(set.Spec.MinReadySeconds) * time.Second
+		nowTime := time.Now()
+		for _, pod := range pods {
+			if isRunningAndReady(pod) && !isRunningAndAvailable(pod, set.Spec.MinReadySeconds) {
+				readyCondition := podutil.GetPodReadyCondition(pod.Status)
+				podAvailableTime := readyCondition.LastTransitionTime.Time.Add(time.Duration(set.Spec.MinReadySeconds) * time.Second)
+				if podAvailableTime.Sub(nowTime) < enqueueAfterDuration {
+					enqueueAfterDuration = podAvailableTime.Sub(nowTime)
+				}
+			}
+		}
+		ssc.enqueueSSAfter(set, enqueueAfterDuration)
 	}
 
 	return nil

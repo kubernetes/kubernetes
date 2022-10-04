@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"sort"
 	"testing"
+	"time"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -140,6 +141,51 @@ func TestStatefulSetControllerRespectsTermination(t *testing.T) {
 	}
 	if set.Status.Replicas != 0 {
 		t.Errorf("set.Status.Replicas = %v; want 0", set.Status.Replicas)
+	}
+}
+
+func TestStatefulSetControllerRespectsMinReadySecs(t *testing.T) {
+	minReadySecs := int32(20)
+	numReplicas := 1
+	set := setMinReadySeconds(newStatefulSet(numReplicas), minReadySecs)
+	ssc, spc, om, _ := newFakeStatefulSetController(set)
+	if err := scaleUpStatefulSetController(set, ssc, spc, om); err != nil {
+		t.Errorf("Failed to turn up StatefulSet : %s", err)
+	}
+	if obj, _, err := om.setsIndexer.Get(set); err != nil {
+		t.Error(err)
+	} else {
+		set = obj.(*apps.StatefulSet)
+	}
+	if set.Status.Replicas != int32(numReplicas) {
+		t.Errorf("set.Status.Replicas = %v; want %v", set.Status.Replicas, numReplicas)
+	}
+	pods, err := om.setPodReady(set, 0)
+	if err != nil {
+		t.Error(err)
+	}
+	err = ssc.syncStatefulSet(context.TODO(), set, pods)
+	if err != nil {
+		t.Error(err)
+	}
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Error(err)
+	}
+	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+	if isRunningAndAvailable(pods[0], minReadySecs) {
+		t.Fatalf("Pod is available earlier than expected")
+	}
+	time.Sleep(time.Duration(minReadySecs) * time.Second)
+	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+	if !isRunningAndAvailable(pods[0], minReadySecs) {
+		t.Fatalf("Pod is not available after minReadySecs")
 	}
 }
 
