@@ -5984,6 +5984,18 @@ func TestTableRowDeepCopyShouldNotPanic(t *testing.T) {
 			},
 		},
 		{
+			name: "ValidatingAdmissionPolicy",
+			printer: func() ([]metav1.TableRow, error) {
+				return printValidatingAdmissionPolicy(&admissionregistration.ValidatingAdmissionPolicy{}, printers.GenerateOptions{})
+			},
+		},
+		{
+			name: "ValidatingAdmissionPolicyBinding",
+			printer: func() ([]metav1.TableRow, error) {
+				return printValidatingAdmissionPolicyBinding(&admissionregistration.ValidatingAdmissionPolicyBinding{}, printers.GenerateOptions{})
+			},
+		},
+		{
 			name: "Namespace",
 			printer: func() ([]metav1.TableRow, error) {
 				return printNamespace(&api.Namespace{}, printers.GenerateOptions{})
