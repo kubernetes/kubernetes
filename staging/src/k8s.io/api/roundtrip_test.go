@@ -23,6 +23,7 @@ import (
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	admissionregv1 "k8s.io/api/admissionregistration/v1"
+	admissionregv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	admissionregv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
@@ -83,6 +84,7 @@ import (
 var groups = []runtime.SchemeBuilder{
 	admissionv1beta1.SchemeBuilder,
 	admissionv1.SchemeBuilder,
+	admissionregv1alpha1.SchemeBuilder,
 	admissionregv1beta1.SchemeBuilder,
 	admissionregv1.SchemeBuilder,
 	apiserverinternalv1alpha1.SchemeBuilder,
