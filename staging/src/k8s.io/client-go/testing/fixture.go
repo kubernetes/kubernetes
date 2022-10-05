@@ -136,11 +136,7 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 			return true, obj, err
 
 		case DeleteActionImpl:
-			err := tracker.Delete(gvr, ns, action.GetName())
-			if err != nil {
-				return true, nil, err
-			}
-			return true, nil, nil
+			return true, nil, tracker.Delete(gvr, ns, action.GetName())
 
 		case PatchActionImpl:
 			obj, err := tracker.Get(gvr, ns, action.GetName())
