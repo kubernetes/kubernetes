@@ -311,7 +311,7 @@ endif
 .PHONY: generated_files
 generated_files:
 	echo "'make generated_files' is deprecated.  Please use hack/update-codgen.sh instead."
-	true # TODO(thockin): change to false once tests are updated
+	false
 
 define VET_HELP_INFO
 # Run 'go vet'.
