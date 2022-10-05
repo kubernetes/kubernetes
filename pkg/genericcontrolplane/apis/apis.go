@@ -64,7 +64,6 @@ import (
 	coordinationrest "k8s.io/kubernetes/pkg/registry/coordination/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest/genericcontrolplane"
 	eventsrest "k8s.io/kubernetes/pkg/registry/events/rest"
-	flowcontrolrest "k8s.io/kubernetes/pkg/registry/flowcontrol/rest"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 )
 
@@ -187,7 +186,6 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		certificatesrest.RESTStorageProvider{},
 		coordinationrest.RESTStorageProvider{},
 		rbacrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer},
-		flowcontrolrest.RESTStorageProvider{InformerFactory: c.GenericConfig.SharedInformerFactory},
 		admissionregistrationrest.RESTStorageProvider{},
 		eventsrest.RESTStorageProvider{TTL: c.ExtraConfig.EventTTL},
 	}
