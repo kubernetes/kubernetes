@@ -53,10 +53,10 @@ var (
 		kubectl create persistentvolumeclaim simple --storage 1Gi --namespace default 
 
 		# Create a persistent volume claim and define a storageClassName.
-		kubectl create persistentvolumeclaim pvHostPath --storage 1Gi --storageClass manual
+		kubectl create persistentvolumeclaim pvHostPath --storage 1Gi --storage-class manual
 
 		# Create a persistent volume claim includes ReadOnlyMany and ReadWriteMany access modes.
-		kubectl create persistentvolumeclaim mypv --storage 1Gi --accessMode ReadOnlyMany --accessMode ReadWriteMany 
+		kubectl create persistentvolumeclaim mypv --storage 1Gi --access-mode ReadOnlyMany --access-mode ReadWriteMany 
 	`))
 )
 
@@ -119,8 +119,8 @@ func NewCmdCreatePersistentVolumeClaim(f cmdutil.Factory, ioStreams genericcliop
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringVarP(&o.Storage, "storage", "r", o.Storage, "Request specific sizes for storage by the user.")
-	cmd.Flags().StringVarP(&o.StorageClass, "storageClass", "c", o.StorageClass, "A claim can request a particular class by specifying the name of a StorageClass.")
-	cmd.Flags().StringArrayVarP(&o.AccessModes, "accessMode", "m", o.AccessModes, "Claims can request specific access modes (e.g., they can be mounted ReadWriteOnce, ReadOnlyMany, ReadWriteMany, or ReadWriteOncePod).")
+	cmd.Flags().StringVarP(&o.StorageClass, "storage-class", "c", o.StorageClass, "A claim can request a particular class by specifying the name of a StorageClass.")
+	cmd.Flags().StringArrayVarP(&o.AccessModes, "access-mode", "m", o.AccessModes, "Claims can request specific access modes (e.g., they can be mounted ReadWriteOnce, ReadOnlyMany, ReadWriteMany, or ReadWriteOncePod).")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 
 	cmd.MarkFlagRequired("storage")
@@ -285,7 +285,7 @@ out:
 				continue out
 			}
 		}
-		return nil, fmt.Errorf(`invalid accessMode value (%v)`, accessMode)
+		return nil, fmt.Errorf(`invalid access-mode value (%v)`, accessMode)
 	}
 	return accessModes, nil
 }
