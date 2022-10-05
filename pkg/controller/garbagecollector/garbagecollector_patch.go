@@ -17,6 +17,7 @@ limitations under the License.
 package garbagecollector
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"time"
@@ -30,9 +31,9 @@ import (
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metrics"
 )
 
-func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterface, period time.Duration, stopCh <-chan struct{}) {
+func (gc *GarbageCollector) ResyncMonitors(ctx context.Context, discoveryClient discovery.ServerResourcesInterface) {
 	oldResources := make(map[schema.GroupVersionResource]struct{})
-	wait.Until(func() {
+	func() {
 		// Get the current resource list from discovery.
 		newResources := gc.GetDeletableResources(discoveryClient)
 
@@ -98,7 +99,7 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 			// informers keep attempting to sync in the background, so retrying doesn't interrupt them.
 			// the call to resyncMonitors on the reattempt will no-op for resources that still exist.
 			// note that workers stay paused until we successfully resync.
-			if !cache.WaitForNamedCacheSync(fmt.Sprintf("%s: garbage collector", gc.clusterName), waitForStopOrTimeout(stopCh, period), gc.dependencyGraphBuilder.IsSynced) {
+			if !cache.WaitForNamedCacheSync(fmt.Sprintf("%s: garbage collector", gc.clusterName), ctx.Done(), gc.dependencyGraphBuilder.IsSynced) {
 				utilruntime.HandleError(fmt.Errorf("%s: timed out waiting for dependency graph builder sync during GC sync (attempt %d)", gc.clusterName, attempt))
 				metrics.GarbageCollectorResourcesSyncError.Inc()
 				return false, nil
@@ -106,12 +107,12 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 
 			// success, break out of the loop
 			return true, nil
-		}, stopCh)
+		}, ctx.Done())
 
 		// Finally, keep track of our new state. Do this after all preceding steps
 		// have succeeded to ensure we'll retry on subsequent syncs if an error
 		// occurred.
 		oldResources = newResources
 		klog.V(2).Infof("%s: synced garbage collector", gc.clusterName)
-	}, period, stopCh)
+	}()
 }
