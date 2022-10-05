@@ -62,8 +62,6 @@ def get_all_files(rootdir):
             dirs.remove('third_party')
         if '.git' in dirs:
             dirs.remove('.git')
-        if 'BUILD' in files:
-           files.remove('BUILD')
 
         for name in files:
             pathname = os.path.join(root, name)
