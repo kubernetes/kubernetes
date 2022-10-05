@@ -53,16 +53,16 @@ var (
 		kubectl create persistentvolume simple --storage 1Gi
 
 		# Create a persistent volume and define a custom hostPath location.
-		kubectl create persistentvolume pvHostPath --storage 1Gi --hostPath /Volumes/Data
+		kubectl create persistentvolume pvHostPath --storage 1Gi --host-path /Volumes/Data
 
 		# Create a persistent volume and define a storageClassName.
-		kubectl create persistentvolume pvHostPath --storage 1Gi --hostPath /Volumes/Data --storageClass manual
+		kubectl create persistentvolume pvHostPath --storage 1Gi --host-path /Volumes/Data --storage-class manual
 
 		# Create a persistent volume includes ReadOnlyMany and ReadWriteMany access modes.
-		kubectl create persistentvolume mypv --storage 1Gi --hostPath /Volumes/Data --accessMode ReadOnlyMany --accessMode ReadWriteMany 
+		kubectl create persistentvolume mypv --storage 1Gi -p /Volumes/Data --access-mode ReadOnlyMany --access-mode ReadWriteMany 
 
 		# Create a persistent volume and persistent volume claim.
-		kubectl create persistentvolume pvHostPath --storage 1Gi --hostPath /Volumes/Data --namespace default --claim
+		kubectl create persistentvolume pvHostPath --storage 1Gi -p /Volumes/Data --namespace default --claim
 		`))
 )
 
@@ -128,10 +128,10 @@ func NewCmdCreatePersistentVolume(f cmdutil.Factory, ioStreams genericclioptions
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().StringArrayVarP(&o.AccessModes, "accessMode", "m", o.AccessModes, "Set permission to access the volume (e.g., they can be mounted ReadWriteOnce, ReadOnlyMany, ReadWriteMany, or ReadWriteOncePod).")
-	cmd.Flags().StringVarP(&o.HostPath, "hostPath", "p", o.HostPath, "A hostPath uses a file or directory on the Node to emulate network-attached storage.")
+	cmd.Flags().StringArrayVarP(&o.AccessModes, "access-mode", "m", o.AccessModes, "Set permission to access the volume (e.g., they can be mounted ReadWriteOnce, ReadOnlyMany, ReadWriteMany, or ReadWriteOncePod).")
+	cmd.Flags().StringVarP(&o.HostPath, "host-path", "p", o.HostPath, "A hostPath uses a file or directory on the Node to emulate network-attached storage.")
 	cmd.Flags().StringVarP(&o.Storage, "storage", "r", o.Storage, "An administrator provides the storage resource to the volume size.")
-	cmd.Flags().StringVarP(&o.StorageClass, "storageClass", "c", o.StorageClass, "A StorageClass provides a way for administrators to set up dynamic provisioning.")
+	cmd.Flags().StringVarP(&o.StorageClass, "storage-class", "c", o.StorageClass, "A StorageClass provides a way for administrators to set up dynamic provisioning.")
 	cmd.Flags().BoolVar(&o.Claim, "claim", o.Claim, "If true, create a PersistentVolumeClaim associated with the PersistentVolume.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 
@@ -360,7 +360,7 @@ out:
 				continue out
 			}
 		}
-		return nil, fmt.Errorf(`invalid accessMode value (%v)`, accessMode)
+		return nil, fmt.Errorf(`invalid access-mode value (%v)`, accessMode)
 	}
 	return accessModes, nil
 }
