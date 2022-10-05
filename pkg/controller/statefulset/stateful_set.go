@@ -487,6 +487,7 @@ func (ssc *StatefulSetController) syncStatefulSet(ctx context.Context, set *apps
 	if set.Spec.MinReadySeconds > 0 && status != nil && status.AvailableReplicas != *set.Spec.Replicas {
 		enqueueAfterDuration := time.Duration(set.Spec.MinReadySeconds) * time.Second
 		nowTime := time.Now()
+		podsRunningAndAvailable := 0
 		for _, pod := range pods {
 			if isRunningAndReady(pod) && !isRunningAndAvailable(pod, set.Spec.MinReadySeconds) {
 				readyCondition := podutil.GetPodReadyCondition(pod.Status)
@@ -494,7 +495,14 @@ func (ssc *StatefulSetController) syncStatefulSet(ctx context.Context, set *apps
 				if podAvailableTime.Sub(nowTime) < enqueueAfterDuration {
 					enqueueAfterDuration = podAvailableTime.Sub(nowTime)
 				}
+			} else if isRunningAndAvailable(pod, set.Spec.MinReadySeconds) {
+				podsRunningAndAvailable += 1
 			}
+		}
+		if podsRunningAndAvailable == len(pods) {
+			// All pods are actually available
+			// This is likely due to a clock skew between when status.AvailableReplicas is updated and the above loop
+			enqueueAfterDuration = time.Duration(0)
 		}
 		ssc.enqueueSSAfter(set, enqueueAfterDuration)
 	}
