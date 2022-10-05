@@ -93,7 +93,7 @@ const (
 	// alpha: v1.26
 	//
 	// Enables expression validation in Admission Control
-	CelValidatingAdmissionExtensibility featuregate.Feature = "CelValidatingAdmissionExtensibility"
+	CELValidatingAdmission featuregate.Feature = "CELValidatingAdmission"
 
 	// owner: @cici37
 	// kep: http://kep.k8s.io/2876
@@ -222,7 +222,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	AdvancedAuditing: {Default: true, PreRelease: featuregate.GA},
 
-	CelValidatingAdmissionExtensibility: {Default: false, PreRelease: featuregate.Alpha},
+	CELValidatingAdmission: {Default: false, PreRelease: featuregate.Alpha},
 
 	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.Beta},
 
