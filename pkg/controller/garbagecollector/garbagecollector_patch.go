@@ -22,14 +22,39 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/kcp-dev/logicalcluster/v2"
+
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metrics"
 )
+
+// NewClusterAwareGarbageCollector creates a new GarbageCollector for the provided logical cluster.
+func NewClusterAwareGarbageCollector(
+	kubeClient clientset.Interface,
+	metadataClient metadata.Interface,
+	mapper meta.ResettableRESTMapper,
+	ignoredResources map[schema.GroupResource]struct{},
+	sharedInformers informerfactory.InformerFactory,
+	informersStarted <-chan struct{},
+	clusterName logicalcluster.Name,
+) (*GarbageCollector, error) {
+	gc, err := NewGarbageCollector(kubeClient, metadataClient, mapper, ignoredResources, sharedInformers, informersStarted)
+	if err != nil {
+		return nil, err
+	}
+	gc.clusterName = clusterName
+	gc.dependencyGraphBuilder.clusterName = clusterName
+	return gc, nil
+}
 
 func (gc *GarbageCollector) ResyncMonitors(ctx context.Context, discoveryClient discovery.ServerResourcesInterface) {
 	oldResources := make(map[schema.GroupVersionResource]struct{})
