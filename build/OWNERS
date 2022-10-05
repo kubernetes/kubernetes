@@ -5,7 +5,6 @@ reviewers:
   - cblecker
   - cpanato # SIG Technical Lead / RelEng subproject owner / Release Manager
   - dims
-  - fejta
   - jeremyrickard # SIG Technical Lead / RelEng subproject owner
   #- justaugustus # SIG Chair / RelEng subproject owner / Release Manager - approvals only
   - lavalamp
@@ -19,11 +18,11 @@ approvers:
   - bentheelder
   - cblecker
   - dims
-  - fejta
   - justaugustus
   - lavalamp
   - mikedanese
   - spiffxp
 emeritus_approvers:
+  - fejta
   - jbeda
   - zmerlynn
