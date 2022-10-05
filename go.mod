@@ -125,7 +125,7 @@ require (
 	k8s.io/system-validators v1.8.0
 	k8s.io/utils v0.0.0-20220922133306-665eaaec4324
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3
-	sigs.k8s.io/yaml v1.2.0
+	sigs.k8s.io/yaml v1.3.0
 )
 
 require (
@@ -560,5 +560,5 @@ replace (
 	sigs.k8s.io/kustomize/kustomize/v4 => sigs.k8s.io/kustomize/kustomize/v4 v4.5.7
 	sigs.k8s.io/kustomize/kyaml => sigs.k8s.io/kustomize/kyaml v0.13.9
 	sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.2.3
-	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.2.0
+	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.3.0
 )
