@@ -32,6 +32,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -1193,7 +1194,8 @@ func TestRequestWatch(t *testing.T) {
 				c.Client = client
 			}
 			testCase.Request.backoff = &noSleepBackOff{}
-			testCase.Request.retry = &withRetry{maxRetries: testCase.maxRetries}
+			testCase.Request.maxRetries = testCase.maxRetries
+			testCase.Request.retryFn = defaultRequestRetryFn
 
 			watch, err := testCase.Request.Watch(context.Background())
 
@@ -1406,7 +1408,8 @@ func TestRequestStream(t *testing.T) {
 				c.Client = client
 			}
 			testCase.Request.backoff = &noSleepBackOff{}
-			testCase.Request.retry = &withRetry{maxRetries: testCase.maxRetries}
+			testCase.Request.maxRetries = testCase.maxRetries
+			testCase.Request.retryFn = defaultRequestRetryFn
 
 			body, err := testCase.Request.Stream(context.Background())
 
@@ -1495,7 +1498,7 @@ func TestRequestDo(t *testing.T) {
 	}
 	for i, testCase := range testCases {
 		testCase.Request.backoff = &NoBackoff{}
-		testCase.Request.retry = &withRetry{}
+		testCase.Request.retryFn = defaultRequestRetryFn
 		body, err := testCase.Request.Do(context.Background()).Raw()
 		hasErr := err != nil
 		if hasErr != testCase.Err {
@@ -1658,8 +1661,9 @@ func TestConnectionResetByPeerIsRetried(t *testing.T) {
 				return nil, &net.OpError{Err: syscall.ECONNRESET}
 			}),
 		},
-		backoff: backoff,
-		retry:   &withRetry{maxRetries: 10},
+		backoff:    backoff,
+		maxRetries: 10,
+		retryFn:    defaultRequestRetryFn,
 	}
 	// We expect two retries of "connection reset by peer" and the success.
 	_, err := req.Do(context.Background()).Raw()
@@ -2730,8 +2734,9 @@ func TestRequestWithRetry(t *testing.T) {
 				c: &RESTClient{
 					Client: client,
 				},
-				backoff: &noSleepBackOff{},
-				retry:   &withRetry{maxRetries: 1},
+				backoff:    &noSleepBackOff{},
+				maxRetries: 1,
+				retryFn:    defaultRequestRetryFn,
 			}
 
 			var transformFuncInvoked int
@@ -2921,8 +2926,9 @@ func testRequestWithRetry(t *testing.T, key string, doFunc func(ctx context.Cont
 					content: defaultContentConfig(),
 					Client:  client,
 				},
-				backoff: &noSleepBackOff{},
-				retry:   &withRetry{maxRetries: test.maxRetries},
+				backoff:    &noSleepBackOff{},
+				maxRetries: test.maxRetries,
+				retryFn:    defaultRequestRetryFn,
 			}
 
 			doFunc(context.Background(), req)
@@ -2942,5 +2948,52 @@ func testRequestWithRetry(t *testing.T, key string, doFunc func(ctx context.Cont
 				t.Errorf("Expected response body Close to be invoked %d times, but got: %d", expected.respCount.closes, respCountGot.getCloseCount())
 			}
 		})
+	}
+}
+
+func TestRequestConcurrencyWithRetry(t *testing.T) {
+	var attempts int32
+	client := clientForFunc(func(req *http.Request) (*http.Response, error) {
+		defer func() {
+			atomic.AddInt32(&attempts, 1)
+		}()
+
+		// always send a retry-after response
+		return &http.Response{
+			StatusCode: http.StatusInternalServerError,
+			Header:     http.Header{"Retry-After": []string{"1"}},
+		}, nil
+	})
+
+	req := &Request{
+		verb: "POST",
+		c: &RESTClient{
+			content: defaultContentConfig(),
+			Client:  client,
+		},
+		backoff:    &noSleepBackOff{},
+		maxRetries: 9, // 10 attempts in total, including the first
+		retryFn:    defaultRequestRetryFn,
+	}
+
+	concurrency := 20
+	wg := sync.WaitGroup{}
+	wg.Add(concurrency)
+	startCh := make(chan struct{})
+	for i := 0; i < concurrency; i++ {
+		go func() {
+			defer wg.Done()
+			<-startCh
+			req.Do(context.Background())
+		}()
+	}
+
+	close(startCh)
+	wg.Wait()
+
+	// we expect (concurrency*req.maxRetries+1) attempts to be recorded
+	expected := concurrency * (req.maxRetries + 1)
+	if atomic.LoadInt32(&attempts) != int32(expected) {
+		t.Errorf("Expected attempts: %d, but got: %d", expected, attempts)
 	}
 }

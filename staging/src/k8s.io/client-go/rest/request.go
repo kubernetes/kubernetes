@@ -82,6 +82,12 @@ func (r *RequestConstructionError) Error() string {
 
 var noBackoff = &NoBackoff{}
 
+type requestRetryFunc func(maxRetries int) WithRetry
+
+func defaultRequestRetryFn(maxRetries int) WithRetry {
+	return &withRetry{maxRetries: maxRetries}
+}
+
 // Request allows for building up a request to a server in a chained fashion.
 // Any errors are stored until the end of your call, so you only have to
 // check once.
@@ -93,6 +99,7 @@ type Request struct {
 	rateLimiter flowcontrol.RateLimiter
 	backoff     BackoffManager
 	timeout     time.Duration
+	maxRetries  int
 
 	// generic components accessible via method setters
 	verb       string
@@ -109,9 +116,10 @@ type Request struct {
 	subresource  string
 
 	// output
-	err   error
-	body  io.Reader
-	retry WithRetry
+	err  error
+	body io.Reader
+
+	retryFn requestRetryFunc
 }
 
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
@@ -142,7 +150,8 @@ func NewRequest(c *RESTClient) *Request {
 		backoff:        backoff,
 		timeout:        timeout,
 		pathPrefix:     pathPrefix,
-		retry:          &withRetry{maxRetries: 10},
+		maxRetries:     10,
+		retryFn:        defaultRequestRetryFn,
 		warningHandler: c.warningHandler,
 	}
 
@@ -408,7 +417,10 @@ func (r *Request) Timeout(d time.Duration) *Request {
 // function is specifically called with a different value.
 // A zero maxRetries prevent it from doing retires and return an error immediately.
 func (r *Request) MaxRetries(maxRetries int) *Request {
-	r.retry.SetMaxRetries(maxRetries)
+	if maxRetries < 0 {
+		maxRetries = 0
+	}
+	r.maxRetries = maxRetries
 	return r
 }
 
@@ -688,8 +700,10 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 		}
 		return false
 	}
+
 	var retryAfter *RetryAfter
 	url := r.URL().String()
+	withRetry := r.retryFn(r.maxRetries)
 	for {
 		req, err := r.newHTTPRequest(ctx)
 		if err != nil {
@@ -724,9 +738,9 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 			defer readAndCloseResponseBody(resp)
 
 			var retry bool
-			retryAfter, retry = r.retry.NextRetry(req, resp, err, isErrRetryableFunc)
+			retryAfter, retry = withRetry.NextRetry(req, resp, err, isErrRetryableFunc)
 			if retry {
-				err := r.retry.BeforeNextRetry(ctx, r.backoff, retryAfter, url, r.body)
+				err := withRetry.BeforeNextRetry(ctx, r.backoff, retryAfter, url, r.body)
 				if err == nil {
 					return false, nil
 				}
@@ -817,6 +831,7 @@ func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
 	}
 
 	var retryAfter *RetryAfter
+	withRetry := r.retryFn(r.maxRetries)
 	url := r.URL().String()
 	for {
 		req, err := r.newHTTPRequest(ctx)
@@ -862,9 +877,9 @@ func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
 				defer resp.Body.Close()
 
 				var retry bool
-				retryAfter, retry = r.retry.NextRetry(req, resp, err, neverRetryError)
+				retryAfter, retry = withRetry.NextRetry(req, resp, err, neverRetryError)
 				if retry {
-					err := r.retry.BeforeNextRetry(ctx, r.backoff, retryAfter, url, r.body)
+					err := withRetry.BeforeNextRetry(ctx, r.backoff, retryAfter, url, r.body)
 					if err == nil {
 						return false, nil
 					}
@@ -961,6 +976,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 
 	// Right now we make about ten retry attempts if we get a Retry-After response.
 	var retryAfter *RetryAfter
+	withRetry := r.retryFn(r.maxRetries)
 	for {
 		req, err := r.newHTTPRequest(ctx)
 		if err != nil {
@@ -997,7 +1013,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 			}
 
 			var retry bool
-			retryAfter, retry = r.retry.NextRetry(req, resp, err, func(req *http.Request, err error) bool {
+			retryAfter, retry = withRetry.NextRetry(req, resp, err, func(req *http.Request, err error) bool {
 				// "Connection reset by peer" or "apiserver is shutting down" are usually a transient errors.
 				// Thus in case of "GET" operations, we simply retry it.
 				// We are not automatically retrying "write" operations, as they are not idempotent.
@@ -1011,7 +1027,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 				return false
 			})
 			if retry {
-				err := r.retry.BeforeNextRetry(ctx, r.backoff, retryAfter, req.URL.String(), r.body)
+				err := withRetry.BeforeNextRetry(ctx, r.backoff, retryAfter, req.URL.String(), r.body)
 				if err == nil {
 					return false
 				}
