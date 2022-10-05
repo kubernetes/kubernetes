@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// apiserver is the main API server and master for the cluster.
+// APIServer is the main API server and master for the cluster.
 // It is responsible for serving the cluster management API.
 package main
 
