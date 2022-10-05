@@ -36,7 +36,7 @@ var (
 			Namespace:      "some_namespace",
 			Name:           "test_counter_name",
 			Subsystem:      "subsystem",
-			StabilityLevel: ALPHA,
+			StabilityLevel: INTERNAL,
 			Help:           "counter help",
 		},
 	)
@@ -45,7 +45,7 @@ var (
 			Namespace:         "some_namespace",
 			Name:              "test_alpha_dep_counter",
 			Subsystem:         "subsystem",
-			StabilityLevel:    ALPHA,
+			StabilityLevel:    INTERNAL,
 			Help:              "counter help",
 			DeprecatedVersion: "1.15.0",
 		},
@@ -55,7 +55,7 @@ var (
 			Namespace:         "some_namespace",
 			Name:              "test_alpha_hidden_counter",
 			Subsystem:         "subsystem",
-			StabilityLevel:    ALPHA,
+			StabilityLevel:    INTERNAL,
 			Help:              "counter help",
 			DeprecatedVersion: "1.14.0",
 		},
@@ -244,7 +244,7 @@ func TestShowHiddenMetric(t *testing.T) {
 			Namespace:         "some_namespace",
 			Name:              "test_alpha_show_hidden_counter",
 			Subsystem:         "subsystem",
-			StabilityLevel:    ALPHA,
+			StabilityLevel:    INTERNAL,
 			Help:              "counter help",
 			DeprecatedVersion: "1.14.0",
 		},
@@ -497,12 +497,12 @@ func TestRegistryReset(t *testing.T) {
 	nonResettableMetric.Inc()
 
 	nonResettableOutput := `
-        # HELP not_reset_metric [ALPHA] this metric cannot be reset
+        # HELP not_reset_metric [INTERNAL] this metric cannot be reset
         # TYPE not_reset_metric gauge
         not_reset_metric 1
 `
 	resettableOutput := `
-        # HELP reset_metric [ALPHA] this metric can be reset
+        # HELP reset_metric [INTERNAL] this metric can be reset
         # TYPE reset_metric counter
         reset_metric{label="one"} 1
         reset_metric{label="two"} 2
@@ -544,7 +544,7 @@ func TestDisabledMetrics(t *testing.T) {
 	enabledMetric.Inc()
 
 	enabledMetricOutput := `
-        # HELP should_be_enabled [ALPHA] this metric should not be disabled
+        # HELP should_be_enabled [INTERNAL] this metric should not be disabled
         # TYPE should_be_enabled gauge
         should_be_enabled 1
 `

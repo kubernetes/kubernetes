@@ -62,8 +62,8 @@ type Desc struct {
 
 // NewDesc extends prometheus.NewDesc with stability support.
 //
-// The stabilityLevel should be valid stability label, such as "metrics.ALPHA"
-// and "metrics.STABLE"(Maybe "metrics.BETA" in future). Default value "metrics.ALPHA"
+// The stabilityLevel should be valid stability label, such as "metrics.INTERNAL"
+// and "metrics.STABLE"(Maybe "metrics.BETA" in future). Default value "metrics.INTERNAL"
 // will be used in case of empty or invalid stability label.
 //
 // The deprecatedVersion represents in which version this Metric be deprecated.

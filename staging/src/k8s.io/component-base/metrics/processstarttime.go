@@ -26,7 +26,7 @@ var processStartTime = NewGaugeVec(
 	&GaugeOpts{
 		Name:           "process_start_time_seconds",
 		Help:           "Start time of the process since unix epoch in seconds.",
-		StabilityLevel: ALPHA,
+		StabilityLevel: INTERNAL,
 	},
 	[]string{},
 )

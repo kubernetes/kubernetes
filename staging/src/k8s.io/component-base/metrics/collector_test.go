@@ -62,7 +62,7 @@ func TestBaseCustomCollector(t *testing.T) {
 
 	var (
 		alphaDesc = NewDesc("metric_alpha", "alpha metric", []string{"name"}, nil,
-			ALPHA, "")
+			INTERNAL, "")
 		internalDesc = NewDesc("metric_internal", "internal metrics", []string{"name"}, nil,
 			INTERNAL, "")
 		stableDesc = NewDesc("metric_stable", "stable metrics", []string{"name"}, nil,
@@ -81,7 +81,7 @@ func TestBaseCustomCollector(t *testing.T) {
 	}
 
 	expectedMetrics := `
-        # HELP metric_alpha [ALPHA] alpha metric
+        # HELP metric_alpha [INTERNAL] alpha metric
         # TYPE metric_alpha gauge
         metric_alpha{name="value"} 1
 		# HELP metric_internal [INTERNAL] internal metrics
@@ -108,9 +108,9 @@ func TestInvalidCustomCollector(t *testing.T) {
 		Minor:      "17",
 		GitVersion: "v1.17.0-alpha-1.12345",
 	}
-	var namelessDesc = NewDesc("", "this is a nameless metric", nil, nil, ALPHA, "")
-	var duplicatedDescA = NewDesc("test_duplicated_metric", "this is a duplicated metric A", nil, nil, ALPHA, "")
-	var duplicatedDescB = NewDesc("test_duplicated_metric", "this is a duplicated metric B", nil, nil, ALPHA, "")
+	var namelessDesc = NewDesc("", "this is a nameless metric", nil, nil, INTERNAL, "")
+	var duplicatedDescA = NewDesc("test_duplicated_metric", "this is a duplicated metric A", nil, nil, INTERNAL, "")
+	var duplicatedDescB = NewDesc("test_duplicated_metric", "this is a duplicated metric B", nil, nil, INTERNAL, "")
 
 	var tests = []struct {
 		name        string
@@ -152,7 +152,7 @@ func TestCustomCollectorClearState(t *testing.T) {
 
 	var (
 		alphaDesc = NewDesc("metric_alpha", "alpha metric", []string{"name"}, nil,
-			ALPHA, "")
+			INTERNAL, "")
 		stableDesc = NewDesc("metric_stable", "stable metrics", []string{"name"}, nil,
 			STABLE, "")
 		deprecatedDesc = NewDesc("metric_deprecated", "stable deprecated metrics", []string{"name"}, nil,

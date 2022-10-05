@@ -49,7 +49,7 @@ func TestTimingHistogram(t *testing.T) {
 			},
 			registryVersion:     &v115,
 			expectedMetricCount: 1,
-			expectedHelp:        "EXPERIMENTAL: [ALPHA] histogram help message",
+			expectedHelp:        "EXPERIMENTAL: [INTERNAL] histogram help message",
 		},
 		{
 			desc: "Test deprecated",
@@ -64,7 +64,7 @@ func TestTimingHistogram(t *testing.T) {
 			},
 			registryVersion:     &v115,
 			expectedMetricCount: 1,
-			expectedHelp:        "EXPERIMENTAL: [ALPHA] (Deprecated since 1.15.0) histogram help message",
+			expectedHelp:        "EXPERIMENTAL: [INTERNAL] (Deprecated since 1.15.0) histogram help message",
 		},
 		{
 			desc: "Test hidden",
@@ -173,7 +173,7 @@ func TestTimingHistogramVec(t *testing.T) {
 			labels:              []string{"label_a", "label_b"},
 			registryVersion:     &v115,
 			expectedMetricCount: 1,
-			expectedHelp:        "EXPERIMENTAL: [ALPHA] histogram help message",
+			expectedHelp:        "EXPERIMENTAL: [INTERNAL] histogram help message",
 		},
 		{
 			desc: "Test deprecated",
@@ -189,7 +189,7 @@ func TestTimingHistogramVec(t *testing.T) {
 			labels:              []string{"label_a", "label_b"},
 			registryVersion:     &v115,
 			expectedMetricCount: 1,
-			expectedHelp:        "EXPERIMENTAL: [ALPHA] (Deprecated since 1.15.0) histogram help message",
+			expectedHelp:        "EXPERIMENTAL: [INTERNAL] (Deprecated since 1.15.0) histogram help message",
 		},
 		{
 			desc: "Test hidden",

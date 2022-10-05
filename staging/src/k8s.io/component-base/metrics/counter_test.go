@@ -40,11 +40,11 @@ func TestCounter(t *testing.T) {
 				Namespace:      "namespace",
 				Name:           "metric_test_name",
 				Subsystem:      "subsystem",
-				StabilityLevel: ALPHA,
+				StabilityLevel: INTERNAL,
 				Help:           "counter help",
 			},
 			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] counter help",
+			expectedHelp:        "[INTERNAL] counter help",
 		},
 		{
 			desc: "Test deprecated",
@@ -53,11 +53,11 @@ func TestCounter(t *testing.T) {
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
 				Help:              "counter help",
-				StabilityLevel:    ALPHA,
+				StabilityLevel:    INTERNAL,
 				DeprecatedVersion: "1.15.0",
 			},
 			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] (Deprecated since 1.15.0) counter help",
+			expectedHelp:        "[INTERNAL] (Deprecated since 1.15.0) counter help",
 		},
 		{
 			desc: "Test hidden",
@@ -66,7 +66,7 @@ func TestCounter(t *testing.T) {
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
 				Help:              "counter help",
-				StabilityLevel:    ALPHA,
+				StabilityLevel:    INTERNAL,
 				DeprecatedVersion: "1.14.0",
 			},
 			expectedMetricCount: 0,
@@ -132,7 +132,7 @@ func TestCounterVec(t *testing.T) {
 			},
 			labels:                    []string{"label_a", "label_b"},
 			expectedMetricFamilyCount: 1,
-			expectedHelp:              "[ALPHA] counter help",
+			expectedHelp:              "[INTERNAL] counter help",
 		},
 		{
 			desc: "Test deprecated",
@@ -145,7 +145,7 @@ func TestCounterVec(t *testing.T) {
 			},
 			labels:                    []string{"label_a", "label_b"},
 			expectedMetricFamilyCount: 1,
-			expectedHelp:              "[ALPHA] (Deprecated since 1.15.0) counter help",
+			expectedHelp:              "[INTERNAL] (Deprecated since 1.15.0) counter help",
 		},
 		{
 			desc: "Test hidden",
@@ -163,7 +163,7 @@ func TestCounterVec(t *testing.T) {
 		{
 			desc: "Test alpha",
 			CounterOpts: &CounterOpts{
-				StabilityLevel: ALPHA,
+				StabilityLevel: INTERNAL,
 				Namespace:      "namespace",
 				Name:           "metric_test_name",
 				Subsystem:      "subsystem",
@@ -171,7 +171,7 @@ func TestCounterVec(t *testing.T) {
 			},
 			labels:                    []string{"label_a", "label_b"},
 			expectedMetricFamilyCount: 1,
-			expectedHelp:              "[ALPHA] counter help",
+			expectedHelp:              "[INTERNAL] counter help",
 		},
 	}
 

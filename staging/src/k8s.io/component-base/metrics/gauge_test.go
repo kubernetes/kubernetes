@@ -46,7 +46,7 @@ func TestGauge(t *testing.T) {
 			},
 			registryVersion:     &v115,
 			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] gauge help",
+			expectedHelp:        "[INTERNAL] gauge help",
 		},
 		{
 			desc: "Test deprecated",
@@ -59,7 +59,7 @@ func TestGauge(t *testing.T) {
 			},
 			registryVersion:     &v115,
 			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] (Deprecated since 1.15.0) gauge help",
+			expectedHelp:        "[INTERNAL] (Deprecated since 1.15.0) gauge help",
 		},
 		{
 			desc: "Test hidden",
@@ -132,7 +132,7 @@ func TestGaugeVec(t *testing.T) {
 			labels:              []string{"label_a", "label_b"},
 			registryVersion:     &v115,
 			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] gauge help",
+			expectedHelp:        "[INTERNAL] gauge help",
 		},
 		{
 			desc: "Test deprecated",
@@ -146,7 +146,7 @@ func TestGaugeVec(t *testing.T) {
 			labels:              []string{"label_a", "label_b"},
 			registryVersion:     &v115,
 			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] (Deprecated since 1.15.0) gauge help",
+			expectedHelp:        "[INTERNAL] (Deprecated since 1.15.0) gauge help",
 		},
 		{
 			desc: "Test hidden",
@@ -219,7 +219,7 @@ func TestGaugeFunc(t *testing.T) {
 				Help:      "gauge help",
 			},
 			expectedMetrics: `
-# HELP namespace_subsystem_metric_non_deprecated [ALPHA] gauge help
+# HELP namespace_subsystem_metric_non_deprecated [INTERNAL] gauge help
 # TYPE namespace_subsystem_metric_non_deprecated gauge
 namespace_subsystem_metric_non_deprecated 1
 			`,
@@ -234,7 +234,7 @@ namespace_subsystem_metric_non_deprecated 1
 				DeprecatedVersion: "1.17.0",
 			},
 			expectedMetrics: `
-# HELP namespace_subsystem_metric_deprecated [ALPHA] (Deprecated since 1.17.0) gauge help
+# HELP namespace_subsystem_metric_deprecated [INTERNAL] (Deprecated since 1.17.0) gauge help
 # TYPE namespace_subsystem_metric_deprecated gauge
 namespace_subsystem_metric_deprecated 1
 `,

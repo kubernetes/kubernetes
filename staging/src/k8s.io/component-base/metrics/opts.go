@@ -80,11 +80,11 @@ const (
 	STABLE StabilityLevel = "STABLE"
 )
 
-// setDefaults takes 'ALPHA' in case of empty.
+// setDefaults takes 'INTERNAL' in case of empty.
 func (sl *StabilityLevel) setDefaults() {
 	switch *sl {
 	case "":
-		*sl = ALPHA
+		*sl = INTERNAL
 	default:
 		// no-op, since we have a StabilityLevel already
 	}

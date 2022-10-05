@@ -46,7 +46,7 @@ func TestHistogram(t *testing.T) {
 			},
 			registryVersion:     &v115,
 			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] histogram help message",
+			expectedHelp:        "[INTERNAL] histogram help message",
 		},
 		{
 			desc: "Test deprecated",
@@ -60,7 +60,7 @@ func TestHistogram(t *testing.T) {
 			},
 			registryVersion:     &v115,
 			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] (Deprecated since 1.15.0) histogram help message",
+			expectedHelp:        "[INTERNAL] (Deprecated since 1.15.0) histogram help message",
 		},
 		{
 			desc: "Test hidden",
@@ -149,7 +149,7 @@ func TestHistogramVec(t *testing.T) {
 			labels:              []string{"label_a", "label_b"},
 			registryVersion:     &v115,
 			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] histogram help message",
+			expectedHelp:        "[INTERNAL] histogram help message",
 		},
 		{
 			desc: "Test deprecated",
@@ -164,7 +164,7 @@ func TestHistogramVec(t *testing.T) {
 			labels:              []string{"label_a", "label_b"},
 			registryVersion:     &v115,
 			expectedMetricCount: 1,
-			expectedHelp:        "[ALPHA] (Deprecated since 1.15.0) histogram help message",
+			expectedHelp:        "[INTERNAL] (Deprecated since 1.15.0) histogram help message",
 		},
 		{
 			desc: "Test hidden",

@@ -55,7 +55,7 @@ func TestNewFakeKubeRegistry(t *testing.T) {
 			name:   "normal",
 			metric: counter,
 			expected: `
-				# HELP test_normal_total [ALPHA] counter help
+				# HELP test_normal_total [INTERNAL] counter help
 				# TYPE test_normal_total counter
 				test_normal_total 0
 				`,
@@ -64,7 +64,7 @@ func TestNewFakeKubeRegistry(t *testing.T) {
 			name:   "deprecated",
 			metric: deprecatedCounter,
 			expected: `
-				# HELP test_deprecated_total [ALPHA] (Deprecated since 1.18.0) counter help
+				# HELP test_deprecated_total [INTERNAL] (Deprecated since 1.18.0) counter help
 				# TYPE test_deprecated_total counter
 				test_deprecated_total 0
 				`,

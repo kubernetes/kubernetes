@@ -47,7 +47,7 @@ func registerRateLimiterMetric(ownerName string) error {
 		Name:           "rate_limiter_use",
 		Subsystem:      ownerName,
 		Help:           fmt.Sprintf("A metric measuring the saturation of the rate limiter for %v", ownerName),
-		StabilityLevel: metrics.ALPHA,
+		StabilityLevel: metrics.INTERNAL,
 	})
 	if err := legacyregistry.Register(metric); err != nil {
 		return fmt.Errorf("error registering rate limiter usage metric: %v", err)

@@ -35,7 +35,7 @@ var (
 		&k8smetrics.HistogramOpts{
 			Name:           "rest_client_request_duration_seconds",
 			Help:           "Request latency in seconds. Broken down by verb, and host.",
-			StabilityLevel: k8smetrics.ALPHA,
+			StabilityLevel: k8smetrics.INTERNAL,
 			Buckets:        []float64{0.005, 0.025, 0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 15.0, 30.0, 60.0},
 		},
 		[]string{"verb", "host"},
@@ -45,7 +45,7 @@ var (
 		&k8smetrics.HistogramOpts{
 			Name:           "rest_client_request_size_bytes",
 			Help:           "Request size in bytes. Broken down by verb and host.",
-			StabilityLevel: k8smetrics.ALPHA,
+			StabilityLevel: k8smetrics.INTERNAL,
 			// 64 bytes to 16MB
 			Buckets: []float64{64, 256, 512, 1024, 4096, 16384, 65536, 262144, 1048576, 4194304, 16777216},
 		},
@@ -56,7 +56,7 @@ var (
 		&k8smetrics.HistogramOpts{
 			Name:           "rest_client_response_size_bytes",
 			Help:           "Response size in bytes. Broken down by verb and host.",
-			StabilityLevel: k8smetrics.ALPHA,
+			StabilityLevel: k8smetrics.INTERNAL,
 			// 64 bytes to 16MB
 			Buckets: []float64{64, 256, 512, 1024, 4096, 16384, 65536, 262144, 1048576, 4194304, 16777216},
 		},
@@ -90,7 +90,7 @@ var (
 				"is in seconds until certificate expiry (negative if " +
 				"already expired). If auth exec plugins are unused or manage no " +
 				"TLS certificates, the value will be +INF.",
-			StabilityLevel: k8smetrics.ALPHA,
+			StabilityLevel: k8smetrics.INTERNAL,
 		},
 		func() float64 {
 			if execPluginCertTTLAdapter.e == nil {

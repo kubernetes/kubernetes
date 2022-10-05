@@ -45,10 +45,10 @@ func TestDescCreate(t *testing.T) {
 			name:                  "alpha descriptor should be created",
 			fqName:                "normal_alpha_descriptor",
 			help:                  "this is an alpha descriptor",
-			stabilityLevel:        ALPHA,
+			stabilityLevel:        INTERNAL,
 			deprecatedVersion:     "",
 			shouldCreate:          true,
-			expectedAnnotatedHelp: "[ALPHA] this is an alpha descriptor",
+			expectedAnnotatedHelp: "[INTERNAL] this is an alpha descriptor",
 		},
 		{
 			name:                  "stable descriptor should be created",
@@ -120,7 +120,7 @@ func TestDescClearState(t *testing.T) {
 			name:              "alpha descriptor",
 			fqName:            "normal_alpha_descriptor",
 			help:              "this is an alpha descriptor",
-			stabilityLevel:    ALPHA,
+			stabilityLevel:    INTERNAL,
 			deprecatedVersion: "",
 		},
 		{

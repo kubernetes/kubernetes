@@ -32,9 +32,9 @@ func TestDefaultStabilityLevel(t *testing.T) {
 		expectPanic bool
 	}{
 		{
-			name:        "empty should take ALPHA by default",
+			name:        "empty should take INTERNAL by default",
 			inputValue:  "",
-			expectValue: ALPHA,
+			expectValue: INTERNAL,
 			expectPanic: false,
 		},
 		{
