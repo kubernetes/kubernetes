@@ -25,7 +25,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
+	iptablestest "k8s.io/kube-proxy/pkg/util/iptables/testing"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/pointer"
 )

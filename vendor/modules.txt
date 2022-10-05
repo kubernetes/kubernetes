@@ -2130,6 +2130,13 @@ k8s.io/kube-openapi/pkg/validation/validate
 # k8s.io/kube-proxy v0.0.0 => ./staging/src/k8s.io/kube-proxy
 ## explicit; go 1.19
 k8s.io/kube-proxy/config/v1alpha1
+k8s.io/kube-proxy/pkg/util/conntrack
+k8s.io/kube-proxy/pkg/util/ipset
+k8s.io/kube-proxy/pkg/util/ipset/testing
+k8s.io/kube-proxy/pkg/util/iptables
+k8s.io/kube-proxy/pkg/util/iptables/testing
+k8s.io/kube-proxy/pkg/util/ipvs
+k8s.io/kube-proxy/pkg/util/ipvs/testing
 # k8s.io/kube-scheduler v0.0.0 => ./staging/src/k8s.io/kube-scheduler
 ## explicit; go 1.19
 k8s.io/kube-scheduler/config/v1

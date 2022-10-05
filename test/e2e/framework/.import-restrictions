@@ -202,7 +202,6 @@ rules:
       - k8s.io/kubernetes/pkg/util/bandwidth
       - k8s.io/kubernetes/pkg/util/config
       - k8s.io/kubernetes/pkg/util/configz
-      - k8s.io/kubernetes/pkg/util/conntrack
       - k8s.io/kubernetes/pkg/util/env
       - k8s.io/kubernetes/pkg/util/filesystem
       - k8s.io/kubernetes/pkg/util/flag
@@ -210,9 +209,6 @@ rules:
       - k8s.io/kubernetes/pkg/util/goroutinemap
       - k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff
       - k8s.io/kubernetes/pkg/util/hash
-      - k8s.io/kubernetes/pkg/util/ipset
-      - k8s.io/kubernetes/pkg/util/iptables
-      - k8s.io/kubernetes/pkg/util/ipvs
       - k8s.io/kubernetes/pkg/util/labels
       - k8s.io/kubernetes/pkg/util/node
       - k8s.io/kubernetes/pkg/util/oom

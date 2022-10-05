@@ -45,6 +45,7 @@ import (
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	fakesysctl "k8s.io/component-helpers/node/util/sysctl/testing"
+	fakeiptables "k8s.io/kube-proxy/pkg/util/iptables/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
@@ -54,7 +55,6 @@ import (
 	fakeremote "k8s.io/kubernetes/pkg/kubelet/cri/remote/fake"
 	"k8s.io/kubernetes/pkg/kubemark"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
-	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
 	fakeexec "k8s.io/utils/exec/testing"
 )
 

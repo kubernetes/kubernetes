@@ -19,7 +19,7 @@ package ipvs
 import (
 	"sync"
 
-	"k8s.io/kubernetes/pkg/util/ipset"
+	"k8s.io/kube-proxy/pkg/util/ipset"
 )
 
 type safeIpset struct {

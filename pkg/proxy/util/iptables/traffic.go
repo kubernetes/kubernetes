@@ -19,7 +19,7 @@ package iptables
 import (
 	"fmt"
 
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utiliptables "k8s.io/kube-proxy/pkg/util/iptables"
 	netutils "k8s.io/utils/net"
 )
 

@@ -45,6 +45,10 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/events"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
+	"k8s.io/kube-proxy/pkg/util/conntrack"
+	utilipset "k8s.io/kube-proxy/pkg/util/ipset"
+	utiliptables "k8s.io/kube-proxy/pkg/util/iptables"
+	utilipvs "k8s.io/kube-proxy/pkg/util/ipvs"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
@@ -53,10 +57,6 @@ import (
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	"k8s.io/kubernetes/pkg/util/async"
-	"k8s.io/kubernetes/pkg/util/conntrack"
-	utilipset "k8s.io/kubernetes/pkg/util/ipset"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 )
 
 const (

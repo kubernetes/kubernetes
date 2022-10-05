@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/util/iptables"
+	"k8s.io/kube-proxy/pkg/util/iptables"
 )
 
 // IPTablesDump represents a parsed IPTables rules dump (ie, the output of
