@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"testing"
 	"time"
@@ -157,35 +158,34 @@ func TestStatefulSetControllerRespectsMinReadySecs(t *testing.T) {
 	} else {
 		set = obj.(*apps.StatefulSet)
 	}
-	if set.Status.Replicas != int32(numReplicas) {
-		t.Errorf("set.Status.Replicas = %v; want %v", set.Status.Replicas, numReplicas)
-	}
-	pods, err := om.setPodReady(set, 0)
+	pods, err := om.setPodRunning(set, 0)
 	if err != nil {
 		t.Error(err)
 	}
-	err = ssc.syncStatefulSet(context.TODO(), set, pods)
+	pods, err = om.setPodReady(set, 0)
 	if err != nil {
 		t.Error(err)
 	}
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	// both enqueue duration need to be until the pod becomes available, which is sooner than waiting minReadySecs
+	enqueueDuration, err := ssc.syncStatefulSet(context.TODO(), set, pods)
 	if err != nil {
 		t.Error(err)
 	}
-	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
+	timeDifferenceSeconds := 7
+	time.Sleep(time.Duration(timeDifferenceSeconds) * time.Second)
+	enqueueDuration2, err := ssc.syncStatefulSet(context.TODO(), set, pods)
 	if err != nil {
 		t.Error(err)
 	}
-	if isRunningAndAvailable(pods[0], minReadySecs) {
-		t.Fatalf("Pod is available earlier than expected")
+	if enqueueDuration == nil || enqueueDuration2 == nil {
+		t.Fatalf("syncStatefulSet did not enqueue StatefulSet update")
 	}
-	time.Sleep(time.Duration(minReadySecs) * time.Second)
-	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
-	if err != nil {
-		t.Error(err)
+	minReadyDuration := time.Duration(minReadySecs) * time.Second
+	if *enqueueDuration == minReadyDuration || *enqueueDuration2 == minReadyDuration {
+		t.Fatalf("syncStatefulSet enqueued sync for full MinReadySeconds")
 	}
-	if !isRunningAndAvailable(pods[0], minReadySecs) {
-		t.Fatalf("Pod is not available after minReadySecs")
+	if math.Round((*enqueueDuration - *enqueueDuration2).Seconds()) != float64(timeDifferenceSeconds) {
+		t.Fatalf("syncStatefulSet second enqueue duration %v is longer than the first %v", enqueueDuration2, enqueueDuration)
 	}
 }
 
