@@ -419,6 +419,9 @@ rm -f "vendor/OWNERS"
 cat <<__EOF__ > "vendor/OWNERS"
 # See the OWNERS docs at https://go.k8s.io/owners
 
+options:
+  # make root approval non-recursive
+  no_parent_owners: true
 approvers:
 - dep-approvers
 reviewers:
