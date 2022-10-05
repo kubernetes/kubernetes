@@ -88,6 +88,13 @@ const (
 	// audited.
 	AdvancedAuditing featuregate.Feature = "AdvancedAuditing"
 
+	// owner: @cici37 @jpbetz
+	// kep: http://kep.k8s.io/3488
+	// alpha: v1.26
+	//
+	// Enables expression validation in Admission Control
+	CELValidatingAdmission featuregate.Feature = "CELValidatingAdmission"
+
 	// owner: @cici37
 	// kep: https://kep.k8s.io/2876
 	// alpha: v1.23
@@ -214,6 +221,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	APIServerTracing: {Default: false, PreRelease: featuregate.Alpha},
 
 	AdvancedAuditing: {Default: true, PreRelease: featuregate.GA},
+
+	CELValidatingAdmission: {Default: false, PreRelease: featuregate.Alpha},
 
 	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.Beta},
 
