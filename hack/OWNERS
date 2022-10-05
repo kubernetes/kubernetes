@@ -3,7 +3,6 @@
 reviewers:
   - bentheelder
   - cblecker
-  - fejta
   - hwdef
   - justaugustus
   - lavalamp
@@ -17,7 +16,6 @@ approvers:
   - deads2k
   - dims # for local-up-cluster related files
   - enj # for sig-auth related stuff like cert testdata
-  - fejta
   - lavalamp
   - liggitt
   - pwittrock
@@ -28,6 +26,7 @@ approvers:
   - mikedanese
 emeritus_approvers:
   - eparis
+  - fejta
   - ixdy
   - jbeda
   - zmerlynn

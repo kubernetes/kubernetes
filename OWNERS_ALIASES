@@ -207,13 +207,11 @@ aliases:
   sig-testing-reviewers:
     - bentheelder
     - cblecker
-    - fejta
     - spiffxp
     - dims
   sig-testing-approvers:
     - bentheelder
     - cblecker
-    - fejta
     - spiffxp
     # emeritus
     # - ixdy
