@@ -165,7 +165,15 @@ func (mounter *SafeFormatAndMount) FormatAndMount(source string, target string, 
 // be used by callers that pass sensitive material (like passwords) as mount
 // options.
 func (mounter *SafeFormatAndMount) FormatAndMountSensitive(source string, target string, fstype string, options []string, sensitiveOptions []string) error {
-	return mounter.formatAndMountSensitive(source, target, fstype, options, sensitiveOptions)
+	return mounter.FormatAndMountSensitiveWithFormatOptions(source, target, fstype, options, sensitiveOptions, nil /* formatOptions */)
+}
+
+// FormatAndMountSensitiveWithFormatOptions behaves exactly the same as
+// FormatAndMountSensitive, but allows for options to be passed when the disk
+// is formatted. These options are NOT validated in any way and should never
+// come directly from untrusted user input as that would be an injection risk.
+func (mounter *SafeFormatAndMount) FormatAndMountSensitiveWithFormatOptions(source string, target string, fstype string, options []string, sensitiveOptions []string, formatOptions []string) error {
+	return mounter.formatAndMountSensitive(source, target, fstype, options, sensitiveOptions, formatOptions)
 }
 
 // getMountRefsByDev finds all references to the device provided
