@@ -257,13 +257,13 @@ function copy-to-staging() {
 function set-preferred-region() {
   case ${ZONE} in
     asia-*)
-      PREFERRED_REGION=("asia" "us" "eu")
+      PREFERRED_REGION=("asia-northeast1" "us-central1" "europe-west6")
       ;;
     europe-*)
-      PREFERRED_REGION=("eu" "us" "asia")
+      PREFERRED_REGION=("europe-west6" "us-central1" "asia-northeast1")
       ;;
     *)
-      PREFERRED_REGION=("us" "eu" "asia")
+      PREFERRED_REGION=("us-central1" "europe-west6" "asia-northeast1")
       ;;
   esac
 
@@ -327,7 +327,7 @@ function upload-tars() {
 
   for region in "${PREFERRED_REGION[@]}"; do
     suffix="-${region}"
-    if [[ "${suffix}" == "-us" ]]; then
+    if [[ "${suffix}" == "-us-central1" ]]; then
       suffix=""
     fi
     local staging_bucket="gs://kubernetes-staging-${project_hash}${suffix}"
