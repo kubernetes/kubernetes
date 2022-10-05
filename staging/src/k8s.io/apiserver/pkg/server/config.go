@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apimachinery/pkg/version"
@@ -67,6 +68,7 @@ import (
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/component-base/logs"
+	"k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
@@ -316,6 +318,10 @@ type AuthorizationInfo struct {
 	// Authorizer determines whether the subject is allowed to make the request based only
 	// on the RequestURI
 	Authorizer authorizer.Authorizer
+}
+
+func init() {
+	utilruntime.Must(features.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 }
 
 // NewConfig returns a Config struct with the default values
@@ -882,13 +888,18 @@ func installAPI(s *GenericAPIServer, c *Config) {
 		// so far, only logging related endpoints are considered valid to add for these debug flags.
 		routes.DebugFlags{}.Install(s.Handler.NonGoRestfulMux, "v", routes.StringFlagPutHandler(logs.GlogSetter))
 	}
+
 	if c.EnableMetrics {
 		if c.EnableProfiling {
 			routes.MetricsWithReset{}.Install(s.Handler.NonGoRestfulMux)
-			slis.SLIMetricsWithReset{}.Install(s.Handler.NonGoRestfulMux)
+			if utilfeature.DefaultFeatureGate.Enabled(features.ComponentSLIs) {
+				slis.SLIMetricsWithReset{}.Install(s.Handler.NonGoRestfulMux)
+			}
 		} else {
 			routes.DefaultMetrics{}.Install(s.Handler.NonGoRestfulMux)
-			slis.SLIMetrics{}.Install(s.Handler.NonGoRestfulMux)
+			if utilfeature.DefaultFeatureGate.Enabled(features.ComponentSLIs) {
+				slis.SLIMetrics{}.Install(s.Handler.NonGoRestfulMux)
+			}
 		}
 	}
 
