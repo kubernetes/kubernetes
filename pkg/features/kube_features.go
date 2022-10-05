@@ -1026,7 +1026,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.AdvancedAuditing: {Default: true, PreRelease: featuregate.GA},
 
-	genericfeatures.CelValidatingAdmissionExtensibility: {Default: false, PreRelease: featuregate.Alpha},
+	genericfeatures.CELValidatingAdmission: {Default: false, PreRelease: featuregate.Alpha},
 
 	genericfeatures.CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.Beta},
 
