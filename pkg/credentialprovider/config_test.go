@@ -19,10 +19,12 @@ package credentialprovider
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -399,6 +401,48 @@ func TestReadDockerConfigJSONFileFromBytes(t *testing.T) {
 			if !reflect.DeepEqual(cfg, tc.expectedCfg) {
 				t.Fatalf("expected: %v got %v", tc.expectedCfg, cfg)
 			}
+		}
+	}
+}
+
+func TestDockerConfigEntryStringRedaction(t *testing.T) {
+	secret := "secret"
+	testCases := []struct {
+		id         string
+		inputCfg   DockerConfigEntry
+		outputFunc func(DockerConfigEntry) string
+	}{
+		{
+			id: "String is redacted",
+			inputCfg: DockerConfigEntry{
+				Username: "foo",
+				Password: secret,
+				Email:    "foo@example.com",
+			},
+			outputFunc: func(d DockerConfigEntry) string {
+				return fmt.Sprintf("%s", d)
+			},
+		},
+		{
+			id: "GoString is redacted",
+			inputCfg: DockerConfigEntry{
+				Username: "foo",
+				Password: secret,
+				Email:    "foo@example.com",
+			},
+			outputFunc: func(d DockerConfigEntry) string {
+				return fmt.Sprintf("%#v", d)
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		output := tc.outputFunc(tc.inputCfg)
+		if strings.Contains(output, secret) {
+			t.Errorf("%s: Expected output (%s) not to contain %s", tc.id, output, secret)
+		}
+		if !strings.Contains(output, "REDACTED") {
+			t.Errorf("%s: Expected output (%s) to contain REDACTED", tc.id, output)
 		}
 	}
 }

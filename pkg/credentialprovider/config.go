@@ -57,6 +57,17 @@ type DockerConfigEntry struct {
 	Provider DockerConfigProvider
 }
 
+func (d DockerConfigEntry) GoString() string {
+	return fmt.Sprintf(
+		`credentialprovider.DockerConfigEntry{Username: %q, Password: "REDACTED", Email: %q, Provider: %#v}`,
+		d.Username, d.Email, d.Provider,
+	)
+}
+
+func (d DockerConfigEntry) String() string {
+	return fmt.Sprintf("DockerConfigEntry(Username: %s, Password: REDACTED, Email: %s)", d.Username, d.Email)
+}
+
 var (
 	preferredPathLock sync.Mutex
 	preferredPath     = ""
