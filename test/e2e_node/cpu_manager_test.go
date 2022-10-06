@@ -89,7 +89,7 @@ func deletePodSyncByName(f *framework.Framework, podName string) {
 	delOpts := metav1.DeleteOptions{
 		GracePeriodSeconds: &gp,
 	}
-	f.PodClient().DeleteSync(podName, delOpts, framework.DefaultPodDeletionTimeout)
+	e2epod.NewPodClient(f).DeleteSync(podName, delOpts, e2epod.DefaultPodDeletionTimeout)
 }
 
 func deletePods(f *framework.Framework, podNames []string) {
@@ -243,7 +243,7 @@ func runGuPodTest(f *framework.Framework, cpuCount int) {
 		},
 	}
 	pod = makeCPUManagerPod("gu-pod", ctnAttrs)
-	pod = f.PodClient().CreateSync(pod)
+	pod = e2epod.NewPodClient(f).CreateSync(pod)
 
 	ginkgo.By("checking if the expected cpuset was assigned")
 	// any full CPU is fine - we cannot nor we should predict which one, though
@@ -279,7 +279,7 @@ func runNonGuPodTest(f *framework.Framework, cpuCap int64) {
 		},
 	}
 	pod = makeCPUManagerPod("non-gu-pod", ctnAttrs)
-	pod = f.PodClient().CreateSync(pod)
+	pod = e2epod.NewPodClient(f).CreateSync(pod)
 
 	ginkgo.By("checking if the expected cpuset was assigned")
 	expAllowedCPUsListRegex = fmt.Sprintf("^0-%d\n$", cpuCap-1)
@@ -287,7 +287,7 @@ func runNonGuPodTest(f *framework.Framework, cpuCap int64) {
 	if cpuCap == 1 {
 		expAllowedCPUsListRegex = "^0\n$"
 	}
-	err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+	err = e2epod.NewPodClient(f).MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
 	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod.Spec.Containers[0].Name, pod.Name)
 
@@ -313,7 +313,7 @@ func runMultipleGuNonGuPods(f *framework.Framework, cpuCap int64, cpuAlloc int64
 		},
 	}
 	pod1 = makeCPUManagerPod("gu-pod", ctnAttrs)
-	pod1 = f.PodClient().CreateSync(pod1)
+	pod1 = e2epod.NewPodClient(f).CreateSync(pod1)
 
 	ctnAttrs = []ctnAttribute{
 		{
@@ -323,7 +323,7 @@ func runMultipleGuNonGuPods(f *framework.Framework, cpuCap int64, cpuAlloc int64
 		},
 	}
 	pod2 = makeCPUManagerPod("non-gu-pod", ctnAttrs)
-	pod2 = f.PodClient().CreateSync(pod2)
+	pod2 = e2epod.NewPodClient(f).CreateSync(pod2)
 
 	ginkgo.By("checking if the expected cpuset was assigned")
 	cpu1 = 1
@@ -337,7 +337,7 @@ func runMultipleGuNonGuPods(f *framework.Framework, cpuCap int64, cpuAlloc int64
 		}
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
-	err = f.PodClient().MatchContainerOutput(pod1.Name, pod1.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+	err = e2epod.NewPodClient(f).MatchContainerOutput(pod1.Name, pod1.Spec.Containers[0].Name, expAllowedCPUsListRegex)
 	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod1.Spec.Containers[0].Name, pod1.Name)
 
@@ -347,7 +347,7 @@ func runMultipleGuNonGuPods(f *framework.Framework, cpuCap int64, cpuAlloc int64
 		cpuListString = fmt.Sprintf("%s", cset.Difference(cpuset.NewCPUSet(cpu1)))
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%s\n$", cpuListString)
-	err = f.PodClient().MatchContainerOutput(pod2.Name, pod2.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+	err = e2epod.NewPodClient(f).MatchContainerOutput(pod2.Name, pod2.Spec.Containers[0].Name, expAllowedCPUsListRegex)
 	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod2.Spec.Containers[0].Name, pod2.Name)
 	ginkgo.By("by deleting the pods and waiting for container removal")
@@ -372,7 +372,7 @@ func runMultipleCPUGuPod(f *framework.Framework) {
 		},
 	}
 	pod = makeCPUManagerPod("gu-pod", ctnAttrs)
-	pod = f.PodClient().CreateSync(pod)
+	pod = e2epod.NewPodClient(f).CreateSync(pod)
 
 	ginkgo.By("checking if the expected cpuset was assigned")
 	cpuListString = "1-2"
@@ -394,7 +394,7 @@ func runMultipleCPUGuPod(f *framework.Framework) {
 		}
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%s\n$", cpuListString)
-	err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+	err = e2epod.NewPodClient(f).MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
 	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod.Spec.Containers[0].Name, pod.Name)
 
@@ -423,7 +423,7 @@ func runMultipleCPUContainersGuPod(f *framework.Framework) {
 		},
 	}
 	pod = makeCPUManagerPod("gu-pod", ctnAttrs)
-	pod = f.PodClient().CreateSync(pod)
+	pod = e2epod.NewPodClient(f).CreateSync(pod)
 
 	ginkgo.By("checking if the expected cpuset was assigned")
 	cpu1, cpu2 = 1, 2
@@ -445,11 +445,11 @@ func runMultipleCPUContainersGuPod(f *framework.Framework) {
 		}
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%d|%d\n$", cpu1, cpu2)
-	err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+	err = e2epod.NewPodClient(f).MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
 	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod.Spec.Containers[0].Name, pod.Name)
 
-	err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[1].Name, expAllowedCPUsListRegex)
+	err = e2epod.NewPodClient(f).MatchContainerOutput(pod.Name, pod.Spec.Containers[1].Name, expAllowedCPUsListRegex)
 	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod.Spec.Containers[1].Name, pod.Name)
 
@@ -475,7 +475,7 @@ func runMultipleGuPods(f *framework.Framework) {
 		},
 	}
 	pod1 = makeCPUManagerPod("gu-pod1", ctnAttrs)
-	pod1 = f.PodClient().CreateSync(pod1)
+	pod1 = e2epod.NewPodClient(f).CreateSync(pod1)
 
 	ctnAttrs = []ctnAttribute{
 		{
@@ -485,7 +485,7 @@ func runMultipleGuPods(f *framework.Framework) {
 		},
 	}
 	pod2 = makeCPUManagerPod("gu-pod2", ctnAttrs)
-	pod2 = f.PodClient().CreateSync(pod2)
+	pod2 = e2epod.NewPodClient(f).CreateSync(pod2)
 
 	ginkgo.By("checking if the expected cpuset was assigned")
 	cpu1, cpu2 = 1, 2
@@ -507,12 +507,12 @@ func runMultipleGuPods(f *framework.Framework) {
 		}
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
-	err = f.PodClient().MatchContainerOutput(pod1.Name, pod1.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+	err = e2epod.NewPodClient(f).MatchContainerOutput(pod1.Name, pod1.Spec.Containers[0].Name, expAllowedCPUsListRegex)
 	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod1.Spec.Containers[0].Name, pod1.Name)
 
 	expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu2)
-	err = f.PodClient().MatchContainerOutput(pod2.Name, pod2.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+	err = e2epod.NewPodClient(f).MatchContainerOutput(pod2.Name, pod2.Spec.Containers[0].Name, expAllowedCPUsListRegex)
 	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod2.Spec.Containers[0].Name, pod2.Name)
 	ginkgo.By("by deleting the pods and waiting for container removal")
@@ -594,7 +594,7 @@ func runCPUManagerTests(f *framework.Framework) {
 			},
 		}
 		pod = makeCPUManagerPod("gu-pod-testremove", ctnAttrs)
-		pod = f.PodClient().CreateSync(pod)
+		pod = e2epod.NewPodClient(f).CreateSync(pod)
 
 		ginkgo.By("checking if the expected cpuset was assigned")
 		cpu1 = 1
@@ -608,7 +608,7 @@ func runCPUManagerTests(f *framework.Framework) {
 			}
 		}
 		expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
-		err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+		err = e2epod.NewPodClient(f).MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
 		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 			pod.Spec.Containers[0].Name, pod.Name)
 
@@ -691,7 +691,7 @@ func runSMTAlignmentNegativeTests(f *framework.Framework) {
 	}
 	pod := makeCPUManagerPod("gu-pod", ctnAttrs)
 	// CreateSync would wait for pod to become Ready - which will never happen if production code works as intended!
-	pod = f.PodClient().Create(pod)
+	pod = e2epod.NewPodClient(f).Create(pod)
 
 	err := e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, "Failed", 30*time.Second, func(pod *v1.Pod) (bool, error) {
 		if pod.Status.Phase != v1.PodPending {
@@ -700,7 +700,7 @@ func runSMTAlignmentNegativeTests(f *framework.Framework) {
 		return false, nil
 	})
 	framework.ExpectNoError(err)
-	pod, err = f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
+	pod, err = e2epod.NewPodClient(f).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 
 	if pod.Status.Phase != v1.PodFailed {
@@ -731,7 +731,7 @@ func runSMTAlignmentPositiveTests(f *framework.Framework, smtLevel int) {
 		},
 	}
 	pod := makeCPUManagerPod("gu-pod", ctnAttrs)
-	pod = f.PodClient().CreateSync(pod)
+	pod = e2epod.NewPodClient(f).CreateSync(pod)
 
 	for _, cnt := range pod.Spec.Containers {
 		ginkgo.By(fmt.Sprintf("validating the container %s on Gu pod %s", cnt.Name, pod.Name))

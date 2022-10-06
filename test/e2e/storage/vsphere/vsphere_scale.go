@@ -109,7 +109,7 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 		nodeSelectorList = createNodeLabels(client, namespace, nodes)
 		ginkgo.DeferCleanup(func() {
 			for _, node := range nodes.Items {
-				framework.RemoveLabelOffNode(client, node.Name, NodeLabelKey)
+				e2enode.RemoveLabelOffNode(client, node.Name, NodeLabelKey)
 			}
 		})
 	})
@@ -234,7 +234,7 @@ func createNodeLabels(client clientset.Interface, namespace string, nodes *v1.No
 			labelValue: labelVal,
 		}
 		nodeSelectorList = append(nodeSelectorList, nodeSelector)
-		framework.AddOrUpdateLabelOnNode(client, node.Name, NodeLabelKey, labelVal)
+		e2enode.AddOrUpdateLabelOnNode(client, node.Name, NodeLabelKey, labelVal)
 	}
 	return nodeSelectorList
 }

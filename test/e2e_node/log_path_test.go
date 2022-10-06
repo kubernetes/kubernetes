@@ -39,7 +39,7 @@ const (
 var _ = SIGDescribe("ContainerLogPath [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("kubelet-container-log-path")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-	var podClient *framework.PodClient
+	var podClient *e2epod.PodClient
 
 	ginkgo.Describe("Pod with a container", func() {
 		ginkgo.Context("printed log to stdout", func() {
@@ -117,7 +117,7 @@ var _ = SIGDescribe("ContainerLogPath [NodeConformance]", func() {
 
 			var logPodName string
 			ginkgo.BeforeEach(func() {
-				podClient = f.PodClient()
+				podClient = e2epod.NewPodClient(f)
 				logPodName = "log-pod-" + string(uuid.NewUUID())
 				err := createAndWaitPod(makeLogPod(logPodName, logString))
 				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logPodName)

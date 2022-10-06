@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
@@ -713,7 +714,7 @@ func TestConcurrentAccessToRelatedVolumes(f *framework.Framework, cs clientset.I
 			// Check that all pods have the same content
 			index := i + 1
 			ginkgo.By(fmt.Sprintf("Checking if the volume in pod%d has expected initial content", index))
-			_, err := framework.LookForStringInPodExec(pods[i].Namespace, pods[i].Name, commands, expectedContent, time.Minute)
+			_, err := e2eoutput.LookForStringInPodExec(pods[i].Namespace, pods[i].Name, commands, expectedContent, time.Minute)
 			framework.ExpectNoError(err, "failed: finding the contents of the block volume %s.", fileName)
 		} else {
 			fileName := "/mnt/volume1/index.html"
@@ -721,7 +722,7 @@ func TestConcurrentAccessToRelatedVolumes(f *framework.Framework, cs clientset.I
 			// Check that all pods have the same content
 			index := i + 1
 			ginkgo.By(fmt.Sprintf("Checking if the volume in pod%d has expected initial content", index))
-			_, err := framework.LookForStringInPodExec(pods[i].Namespace, pods[i].Name, commands, expectedContent, time.Minute)
+			_, err := e2eoutput.LookForStringInPodExec(pods[i].Namespace, pods[i].Name, commands, expectedContent, time.Minute)
 			framework.ExpectNoError(err, "failed: finding the contents of the mounted file %s.", fileName)
 		}
 	}

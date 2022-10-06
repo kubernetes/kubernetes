@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
@@ -81,7 +82,7 @@ var _ = SIGDescribe("Secrets", func() {
 			},
 		}
 
-		f.TestContainerOutput("consume secrets", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(f, "consume secrets", pod, 0, []string{
 			"SECRET_DATA=value-1",
 		})
 	})
@@ -125,7 +126,7 @@ var _ = SIGDescribe("Secrets", func() {
 			},
 		}
 
-		f.TestContainerOutput("consume secrets", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(f, "consume secrets", pod, 0, []string{
 			"data-1=value-1", "data-2=value-2", "data-3=value-3",
 			"p-data-1=value-1", "p-data-2=value-2", "p-data-3=value-3",
 		})

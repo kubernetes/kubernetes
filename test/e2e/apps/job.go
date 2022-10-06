@@ -351,7 +351,7 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to get PodList for job %s in namespace: %s", job.Name, f.Namespace.Name)
 		gomega.Expect(pods.Items).To(gomega.HaveLen(int(parallelism)))
 		pod := pods.Items[0]
-		f.PodClient().Update(pod.Name, func(pod *v1.Pod) {
+		e2epod.NewPodClient(f).Update(pod.Name, func(pod *v1.Pod) {
 			pod.OwnerReferences = nil
 		})
 
@@ -370,7 +370,7 @@ var _ = SIGDescribe("Job", func() {
 		)).To(gomega.Succeed(), "wait for pod %q to be readopted", pod.Name)
 
 		ginkgo.By("Removing the labels from the Job's Pod")
-		f.PodClient().Update(pod.Name, func(pod *v1.Pod) {
+		e2epod.NewPodClient(f).Update(pod.Name, func(pod *v1.Pod) {
 			pod.Labels = nil
 		})
 

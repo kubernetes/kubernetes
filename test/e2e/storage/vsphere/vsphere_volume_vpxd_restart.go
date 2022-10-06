@@ -80,7 +80,7 @@ var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vs
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
 
 		nodes, err := e2enode.GetReadySchedulableNodes(client)
 		framework.ExpectNoError(err)
@@ -91,7 +91,7 @@ var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vs
 			nodeInfo := TestContext.NodeMapper.GetNodeInfo(nodes.Items[i].Name)
 			nodeName := nodes.Items[i].Name
 			nodeLabel := "vsphere_e2e_" + string(uuid.NewUUID())
-			framework.AddOrUpdateLabelOnNode(client, nodeName, labelKey, nodeLabel)
+			e2enode.AddOrUpdateLabelOnNode(client, nodeName, labelKey, nodeLabel)
 
 			vcHost := nodeInfo.VSphere.Config.Hostname
 			vcNodesMap[vcHost] = append(vcNodesMap[vcHost], node{

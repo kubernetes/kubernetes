@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -73,7 +74,7 @@ var _ = SIGDescribe("Services", func() {
 		//using hybrid_network methods
 		ginkgo.By("creating Windows testing Pod")
 		testPod := createTestPod(f, windowsBusyBoximage, windowsOS)
-		testPod = f.PodClient().CreateSync(testPod)
+		testPod = e2epod.NewPodClient(f).CreateSync(testPod)
 
 		ginkgo.By("verifying that pod has the correct nodeSelector")
 		// Admission controllers may sometimes do the wrong thing

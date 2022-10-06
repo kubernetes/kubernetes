@@ -63,7 +63,7 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:StorageProvider]", fun
 		e2eskipper.SkipUnlessProviderIs("aws", "gce")
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 
 		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
 		framework.ExpectNoError(err)
@@ -72,8 +72,8 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:StorageProvider]", fun
 		nodeKey = "mounted_volume_expand_" + ns
 		nodeLabelValue = ns
 		nodeKeyValueLabel = map[string]string{nodeKey: nodeLabelValue}
-		framework.AddOrUpdateLabelOnNode(c, nodeName, nodeKey, nodeLabelValue)
-		ginkgo.DeferCleanup(framework.RemoveLabelOffNode, c, nodeName, nodeKey)
+		e2enode.AddOrUpdateLabelOnNode(c, nodeName, nodeKey, nodeLabelValue)
+		ginkgo.DeferCleanup(e2enode.RemoveLabelOffNode, c, nodeName, nodeKey)
 
 		test := testsuites.StorageClassTest{
 			Name:                 "default",

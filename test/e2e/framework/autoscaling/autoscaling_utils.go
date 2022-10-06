@@ -40,6 +40,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
@@ -628,7 +629,7 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, resourceCli
 	dpConfig := testutils.DeploymentConfig{
 		RCConfig: rcConfig,
 	}
-	dpConfig.NodeDumpFunc = framework.DumpNodeDebugInfo
+	dpConfig.NodeDumpFunc = e2edebug.DumpNodeDebugInfo
 	dpConfig.ContainerDumpFunc = e2ekubectl.LogFailedContainers
 
 	switch kind {
@@ -736,7 +737,7 @@ func DeleteHorizontalPodAutoscaler(rc *ResourceConsumer, autoscalerName string) 
 // runReplicaSet launches (and verifies correctness) of a replicaset.
 func runReplicaSet(config testutils.ReplicaSetConfig) error {
 	ginkgo.By(fmt.Sprintf("creating replicaset %s in namespace %s", config.Name, config.Namespace))
-	config.NodeDumpFunc = framework.DumpNodeDebugInfo
+	config.NodeDumpFunc = e2edebug.DumpNodeDebugInfo
 	config.ContainerDumpFunc = e2ekubectl.LogFailedContainers
 	return testutils.RunReplicaSet(config)
 }

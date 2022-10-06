@@ -23,14 +23,13 @@ import (
 	"strconv"
 	"strings"
 
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	netutils "k8s.io/utils/net"
-
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	netutils "k8s.io/utils/net"
 )
 
 // probeConnectivityArgs is set of arguments for a probeConnectivity
@@ -192,7 +191,7 @@ func (k *kubeManager) probeConnectivity(args *probeConnectivityArgs) (bool, stri
 
 // executeRemoteCommand executes a remote shell command on the given pod.
 func (k *kubeManager) executeRemoteCommand(namespace string, pod string, containerName string, command []string) (string, string, error) {
-	return k.framework.ExecWithOptions(framework.ExecOptions{
+	return e2epod.ExecWithOptions(k.framework, e2epod.ExecOptions{
 		Command:            command,
 		Namespace:          namespace,
 		PodName:            pod,

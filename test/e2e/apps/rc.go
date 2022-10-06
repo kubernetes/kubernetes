@@ -596,7 +596,7 @@ func testReplicationControllerConditionCheck(f *framework.Framework) {
 func testRCAdoptMatchingOrphans(f *framework.Framework) {
 	name := "pod-adoption"
 	ginkgo.By(fmt.Sprintf("Given a Pod with a 'name' label %s is created", name))
-	p := f.PodClient().CreateSync(&v1.Pod{
+	p := e2epod.NewPodClient(f).CreateSync(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{

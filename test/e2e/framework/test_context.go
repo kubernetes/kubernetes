@@ -197,6 +197,9 @@ type TestContextType struct {
 
 // NodeKillerConfig describes configuration of NodeKiller -- a utility to
 // simulate node failures.
+//
+// TODO: move this and the corresponding command line flags into
+// test/e2e/framework/node.
 type NodeKillerConfig struct {
 	// Enabled determines whether NodeKill should do anything at all.
 	// All other options below are ignored if Enabled = false.

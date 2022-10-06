@@ -28,7 +28,6 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/chaosmonkey"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eginkgowrapper "k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/utils/junit"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -75,7 +74,7 @@ func FinalizeUpgradeTest(start time.Time, tc *junit.TestCase) {
 	}
 
 	switch r := r.(type) {
-	case e2eginkgowrapper.FailurePanic:
+	case framework.FailurePanic:
 		tc.Failures = []*junit.Failure{
 			{
 				Message: r.Message,

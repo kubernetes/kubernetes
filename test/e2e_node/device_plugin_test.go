@@ -123,7 +123,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 				}
 			}
 			dptemplate = dp.DeepCopy()
-			devicePluginPod = f.PodClient().CreateSync(dp)
+			devicePluginPod = e2epod.NewPodClient(f).CreateSync(dp)
 
 			ginkgo.By("Waiting for devices to become available on the local node")
 			gomega.Eventually(func() bool {
@@ -143,10 +143,10 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 		ginkgo.AfterEach(func() {
 			ginkgo.By("Deleting the device plugin pod")
-			f.PodClient().DeleteSync(devicePluginPod.Name, metav1.DeleteOptions{}, time.Minute)
+			e2epod.NewPodClient(f).DeleteSync(devicePluginPod.Name, metav1.DeleteOptions{}, time.Minute)
 
 			ginkgo.By("Deleting any Pods created by the test")
-			l, err := f.PodClient().List(context.TODO(), metav1.ListOptions{})
+			l, err := e2epod.NewPodClient(f).List(context.TODO(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
 			for _, p := range l.Items {
 				if p.Namespace != f.Namespace.Name {
@@ -154,7 +154,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 				}
 
 				framework.Logf("Deleting pod: %s", p.Name)
-				f.PodClient().DeleteSync(p.Name, metav1.DeleteOptions{}, 2*time.Minute)
+				e2epod.NewPodClient(f).DeleteSync(p.Name, metav1.DeleteOptions{}, 2*time.Minute)
 			}
 
 			restartKubelet(true)
@@ -170,7 +170,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 		ginkgo.It("Can schedule a pod that requires a device", func() {
 			podRECMD := "devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep 60"
-			pod1 := f.PodClient().CreateSync(makeBusyboxPod(resourceName, podRECMD))
+			pod1 := e2epod.NewPodClient(f).CreateSync(makeBusyboxPod(resourceName, podRECMD))
 			deviceIDRE := "stub devices: (Dev-[0-9]+)"
 			devID1 := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
 			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")))
@@ -225,12 +225,12 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 		ginkgo.It("Keeps device plugin assignments across pod and kubelet restarts", func() {
 			podRECMD := "devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep 60"
-			pod1 := f.PodClient().CreateSync(makeBusyboxPod(resourceName, podRECMD))
+			pod1 := e2epod.NewPodClient(f).CreateSync(makeBusyboxPod(resourceName, podRECMD))
 			deviceIDRE := "stub devices: (Dev-[0-9]+)"
 			devID1 := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
 			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")))
 
-			pod1, err := f.PodClient().Get(context.TODO(), pod1.Name, metav1.GetOptions{})
+			pod1, err := e2epod.NewPodClient(f).Get(context.TODO(), pod1.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			ensurePodContainerRestart(f, pod1.Name, pod1.Name)
@@ -243,7 +243,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			restartKubelet(true)
 
 			ginkgo.By("Wait for node to be ready again")
-			framework.WaitForAllNodesSchedulable(f.ClientSet, 5*time.Minute)
+			e2enode.WaitForAllNodesSchedulable(f.ClientSet, 5*time.Minute)
 
 			ginkgo.By("Validating that assignment is kept")
 			ensurePodContainerRestart(f, pod1.Name, pod1.Name)
@@ -254,30 +254,30 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 		ginkgo.It("Keeps device plugin assignments after the device plugin has been re-registered", func() {
 			podRECMD := "devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep 60"
-			pod1 := f.PodClient().CreateSync(makeBusyboxPod(resourceName, podRECMD))
+			pod1 := e2epod.NewPodClient(f).CreateSync(makeBusyboxPod(resourceName, podRECMD))
 			deviceIDRE := "stub devices: (Dev-[0-9]+)"
 			devID1 := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
 			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")))
 
-			pod1, err := f.PodClient().Get(context.TODO(), pod1.Name, metav1.GetOptions{})
+			pod1, err := e2epod.NewPodClient(f).Get(context.TODO(), pod1.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Restarting Kubelet")
 			restartKubelet(true)
 
 			ginkgo.By("Wait for node to be ready again")
-			framework.WaitForAllNodesSchedulable(f.ClientSet, 5*time.Minute)
+			e2enode.WaitForAllNodesSchedulable(f.ClientSet, 5*time.Minute)
 
 			ginkgo.By("Re-Register resources and delete the plugin pod")
 			gp := int64(0)
 			deleteOptions := metav1.DeleteOptions{
 				GracePeriodSeconds: &gp,
 			}
-			f.PodClient().DeleteSync(devicePluginPod.Name, deleteOptions, time.Minute)
+			e2epod.NewPodClient(f).DeleteSync(devicePluginPod.Name, deleteOptions, time.Minute)
 			waitForContainerRemoval(devicePluginPod.Spec.Containers[0].Name, devicePluginPod.Name, devicePluginPod.Namespace)
 
 			ginkgo.By("Recreating the plugin pod")
-			devicePluginPod = f.PodClient().CreateSync(dptemplate)
+			devicePluginPod = e2epod.NewPodClient(f).CreateSync(dptemplate)
 
 			ginkgo.By("Confirming that after a kubelet and pod restart, fake-device assignment is kept")
 			ensurePodContainerRestart(f, pod1.Name, pod1.Name)
@@ -293,7 +293,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
 
 			ginkgo.By("Creating another pod")
-			pod2 := f.PodClient().CreateSync(makeBusyboxPod(resourceName, podRECMD))
+			pod2 := e2epod.NewPodClient(f).CreateSync(makeBusyboxPod(resourceName, podRECMD))
 
 			ginkgo.By("Checking that pod got a different fake device")
 			devID2 := parseLog(f, pod2.Name, pod2.Name, deviceIDRE)
@@ -331,13 +331,13 @@ func makeBusyboxPod(resourceName, cmd string) *v1.Pod {
 func ensurePodContainerRestart(f *framework.Framework, podName string, contName string) {
 	var initialCount int32
 	var currentCount int32
-	p, err := f.PodClient().Get(context.TODO(), podName, metav1.GetOptions{})
+	p, err := e2epod.NewPodClient(f).Get(context.TODO(), podName, metav1.GetOptions{})
 	if err != nil || len(p.Status.ContainerStatuses) < 1 {
 		framework.Failf("ensurePodContainerRestart failed for pod %q: %v", podName, err)
 	}
 	initialCount = p.Status.ContainerStatuses[0].RestartCount
 	gomega.Eventually(func() bool {
-		p, err = f.PodClient().Get(context.TODO(), podName, metav1.GetOptions{})
+		p, err = e2epod.NewPodClient(f).Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil || len(p.Status.ContainerStatuses) < 1 {
 			return false
 		}

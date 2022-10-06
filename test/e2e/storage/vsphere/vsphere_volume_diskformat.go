@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -76,8 +77,8 @@ var _ = utils.SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 		nodeName = GetReadySchedulableRandomNodeInfo().Name
 		nodeLabelValue = "vsphere_e2e_" + string(uuid.NewUUID())
 		nodeKeyValueLabel = map[string]string{NodeLabelKey: nodeLabelValue}
-		framework.AddOrUpdateLabelOnNode(client, nodeName, NodeLabelKey, nodeLabelValue)
-		ginkgo.DeferCleanup(framework.RemoveLabelOffNode, client, nodeName, NodeLabelKey)
+		e2enode.AddOrUpdateLabelOnNode(client, nodeName, NodeLabelKey, nodeLabelValue)
+		ginkgo.DeferCleanup(e2enode.RemoveLabelOffNode, client, nodeName, NodeLabelKey)
 	})
 
 	ginkgo.It("verify disk format type - eagerzeroedthick is honored for dynamically provisioned pv using storageclass", func() {

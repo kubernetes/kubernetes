@@ -191,7 +191,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		ginkgo.By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
 		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
-		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
+		e2enode.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		// Wait a bit
@@ -223,7 +223,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		ginkgo.By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
 		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
-		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
+		e2enode.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		// Wait a bit
@@ -256,7 +256,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		ginkgo.By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
 		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
-		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
+		e2enode.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		// Wait a bit
@@ -303,7 +303,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		ginkgo.By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
 		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
-		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
+		e2enode.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		taintRemoved := false
 		defer func() {
 			if !taintRemoved {
@@ -378,11 +378,11 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 		ginkgo.By("Trying to apply a taint on the Nodes")
 		testTaint := getTestTaint()
 		e2enode.AddOrUpdateTaintOnNode(cs, nodeName1, testTaint)
-		framework.ExpectNodeHasTaint(cs, nodeName1, &testTaint)
+		e2enode.ExpectNodeHasTaint(cs, nodeName1, &testTaint)
 		defer e2enode.RemoveTaintOffNode(cs, nodeName1, testTaint)
 		if nodeName2 != nodeName1 {
 			e2enode.AddOrUpdateTaintOnNode(cs, nodeName2, testTaint)
-			framework.ExpectNodeHasTaint(cs, nodeName2, &testTaint)
+			e2enode.ExpectNodeHasTaint(cs, nodeName2, &testTaint)
 			defer e2enode.RemoveTaintOffNode(cs, nodeName2, testTaint)
 		}
 
@@ -451,7 +451,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 		ginkgo.By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
 		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
-		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
+		e2enode.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 
 		// 3. Wait to see if both pods get evicted in between [5, 25] seconds

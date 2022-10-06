@@ -95,7 +95,7 @@ func (p *loadLoggingPod) Name() string {
 
 func (p *loadLoggingPod) Start(f *framework.Framework) error {
 	framework.Logf("Starting load logging pod %s", p.name)
-	f.PodClient().Create(&v1.Pod{
+	e2epod.NewPodClient(f).Create(&v1.Pod{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: p.name,
 		},
@@ -161,7 +161,7 @@ func (p *execLoggingPod) Name() string {
 
 func (p *execLoggingPod) Start(f *framework.Framework) error {
 	framework.Logf("Starting repeating logging pod %s", p.name)
-	f.PodClient().Create(&v1.Pod{
+	e2epod.NewPodClient(f).Create(&v1.Pod{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: p.name,
 		},

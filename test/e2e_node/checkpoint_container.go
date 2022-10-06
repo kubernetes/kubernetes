@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -68,7 +69,7 @@ var _ = SIGDescribe("Checkpoint Container [NodeFeature:CheckpointContainer]", fu
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	ginkgo.It("will checkpoint a container out of a pod", func() {
 		ginkgo.By("creating a target pod")
-		podClient := f.PodClient()
+		podClient := e2epod.NewPodClient(f)
 		pod := podClient.CreateSync(&v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "checkpoint-container-pod"},
 			Spec: v1.PodSpec{

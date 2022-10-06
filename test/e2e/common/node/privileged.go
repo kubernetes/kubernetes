@@ -20,9 +20,10 @@ import (
 	"fmt"
 
 	"github.com/onsi/ginkgo/v2"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
@@ -66,16 +67,16 @@ func (c *PrivilegedPodTestConfig) run(containerName string, expectSuccess bool) 
 	cmd := []string{"ip", "link", "add", "dummy1", "type", "dummy"}
 	reverseCmd := []string{"ip", "link", "del", "dummy1"}
 
-	stdout, stderr, err := c.f.ExecCommandInContainerWithFullOutput(
-		c.privilegedPod, containerName, cmd...)
+	stdout, stderr, err := e2epod.ExecCommandInContainerWithFullOutput(
+		c.f, c.privilegedPod, containerName, cmd...)
 	msg := fmt.Sprintf("cmd %v, stdout %q, stderr %q", cmd, stdout, stderr)
 
 	if expectSuccess {
 		framework.ExpectNoError(err, msg)
 		// We need to clean up the dummy link that was created, as it
 		// leaks out into the node level -- yuck.
-		_, _, err := c.f.ExecCommandInContainerWithFullOutput(
-			c.privilegedPod, containerName, reverseCmd...)
+		_, _, err := e2epod.ExecCommandInContainerWithFullOutput(
+			c.f, c.privilegedPod, containerName, reverseCmd...)
 		framework.ExpectNoError(err,
 			fmt.Sprintf("could not remove dummy1 link: %v", err))
 	} else {
@@ -115,5 +116,5 @@ func (c *PrivilegedPodTestConfig) createPodsSpec() *v1.Pod {
 
 func (c *PrivilegedPodTestConfig) createPods() {
 	podSpec := c.createPodsSpec()
-	c.pod = c.f.PodClient().CreateSync(podSpec)
+	c.pod = e2epod.NewPodClient(c.f).CreateSync(podSpec)
 }

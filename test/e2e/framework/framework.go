@@ -28,7 +28,6 @@ import (
 	"os"
 	"path"
 	"strings"
-	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -50,15 +49,30 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
-
-	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
-	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 )
 
 const (
 	// DefaultNamespaceDeletionTimeout is timeout duration for waiting for a namespace deletion.
 	DefaultNamespaceDeletionTimeout = 5 * time.Minute
+)
+
+var (
+	// NewFrameworkExtensions lists functions that get called by
+	// NewFramework after constructing a new framework and after
+	// calling ginkgo.BeforeEach for the framework.
+	//
+	// This can be used by extensions of the core framework to modify
+	// settings in the framework instance or to add additional callbacks
+	// with gingko.BeforeEach/AfterEach/DeferCleanup.
+	//
+	// When a test runs, functions will be invoked in this order:
+	// - f.BeforeEach
+	// - all BeforeEaches in the order in which they were defined (first-in-first-out)
+	// - It callback
+	// - all AfterEaches in the order in which they were defined
+	// - all DeferCleanups with the order reversed (first-in-last-out)
+	// - f.AfterEach
+	NewFrameworkExtensions []func(f *Framework)
 )
 
 // Framework supports common operations used by e2e tests; it will keep a client & a namespace for you.
@@ -85,16 +99,6 @@ type Framework struct {
 	NamespaceDeletionTimeout         time.Duration
 	NamespacePodSecurityEnforceLevel admissionapi.Level // The pod security enforcement level for namespaces to be applied.
 
-	gatherer *ContainerResourceGatherer
-	// Constraints that passed to a check which is executed after data is gathered to
-	// see if 99% of results are within acceptable bounds. It has to be injected in the test,
-	// as expectations vary greatly. Constraints are grouped by the container names.
-	AddonResourceConstraints map[string]ResourceConstraint
-
-	logsSizeWaitGroup    sync.WaitGroup
-	logsSizeCloseChannel chan bool
-	logsSizeVerifier     *LogsSizeVerifier
-
 	// Flaky operation failures in an e2e test can be captured through this.
 	flakeReport *FlakeReport
 
@@ -105,12 +109,17 @@ type Framework struct {
 	// or stdout if ReportDir is not set once test ends.
 	TestSummaries []TestDataSummary
 
-	// Place to keep ClusterAutoscaler metrics from before test in order to compute delta.
-	clusterAutoscalerMetricsBeforeTest e2emetrics.Collection
-
 	// Timeouts contains the custom timeouts used during the test execution.
 	Timeouts *TimeoutContext
+
+	// DumpAllNamespaceInfo is invoked by the framework to record
+	// information about a namespace after a test failure.
+	DumpAllNamespaceInfo DumpAllNamespaceInfoAction
 }
+
+// DumpAllNamespaceInfoAction is called after each failed test for namespaces
+// created for the test.
+type DumpAllNamespaceInfoAction func(f *Framework, namespace string)
 
 // TestDataSummary is an interface for managing test data.
 type TestDataSummary interface {
@@ -148,14 +157,19 @@ func NewDefaultFramework(baseName string) *Framework {
 // NewFramework creates a test framework.
 func NewFramework(baseName string, options Options, client clientset.Interface) *Framework {
 	f := &Framework{
-		BaseName:                 baseName,
-		AddonResourceConstraints: make(map[string]ResourceConstraint),
-		Options:                  options,
-		ClientSet:                client,
-		Timeouts:                 NewTimeoutContextWithDefaults(),
+		BaseName:  baseName,
+		Options:   options,
+		ClientSet: client,
+		Timeouts:  NewTimeoutContextWithDefaults(),
 	}
 
+	// The order is important here: if the extension calls ginkgo.BeforeEach
+	// itself, then it can be sure that f.BeforeEach already ran when its
+	// own callback gets invoked.
 	ginkgo.BeforeEach(f.BeforeEach, AnnotatedLocation("set up framework"))
+	for _, extension := range NewFrameworkExtensions {
+		extension(f)
+	}
 
 	return f
 }
@@ -235,59 +249,6 @@ func (f *Framework) BeforeEach() {
 		f.UniqueName = fmt.Sprintf("%s-%08x", f.BaseName, rand.Int31())
 	}
 
-	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" {
-		var err error
-		var nodeMode NodesSet
-		switch TestContext.GatherKubeSystemResourceUsageData {
-		case "master":
-			nodeMode = MasterNodes
-		case "masteranddns":
-			nodeMode = MasterAndDNSNodes
-		default:
-			nodeMode = AllNodes
-		}
-
-		f.gatherer, err = NewResourceUsageGatherer(f.ClientSet, ResourceGathererOptions{
-			InKubemark:                  ProviderIs("kubemark"),
-			Nodes:                       nodeMode,
-			ResourceDataGatheringPeriod: 60 * time.Second,
-			ProbeDuration:               15 * time.Second,
-			PrintVerboseLogs:            false,
-		}, nil)
-		if err != nil {
-			Logf("Error while creating NewResourceUsageGatherer: %v", err)
-		} else {
-			go f.gatherer.StartGatheringData()
-		}
-	}
-
-	if TestContext.GatherLogsSizes {
-		f.logsSizeWaitGroup = sync.WaitGroup{}
-		f.logsSizeWaitGroup.Add(1)
-		f.logsSizeCloseChannel = make(chan bool)
-		f.logsSizeVerifier = NewLogsVerifier(f.ClientSet, f.logsSizeCloseChannel)
-		go func() {
-			f.logsSizeVerifier.Run()
-			f.logsSizeWaitGroup.Done()
-		}()
-	}
-
-	gatherMetricsAfterTest := TestContext.GatherMetricsAfterTest == "true" || TestContext.GatherMetricsAfterTest == "master"
-	if gatherMetricsAfterTest && TestContext.IncludeClusterAutoscalerMetrics {
-		grabber, err := e2emetrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, f.ClientConfig(), !ProviderIs("kubemark"), false, false, false, TestContext.IncludeClusterAutoscalerMetrics, false)
-		if err != nil {
-			Logf("Failed to create MetricsGrabber (skipping ClusterAutoscaler metrics gathering before test): %v", err)
-		} else {
-			f.clusterAutoscalerMetricsBeforeTest, err = grabber.Grab()
-			if err != nil {
-				Logf("MetricsGrabber failed to grab CA metrics before test (skipping metrics gathering): %v", err)
-			} else {
-				Logf("Gathered ClusterAutoscaler metrics before test")
-			}
-		}
-
-	}
-
 	f.flakeReport = NewFlakeReport()
 }
 
@@ -301,7 +262,7 @@ func (f *Framework) dumpNamespaceInfo() {
 	ginkgo.By("dump namespace information after failure", func() {
 		if !f.SkipNamespaceCreation {
 			for _, ns := range f.namespacesToDelete {
-				DumpAllNamespaceInfo(f.ClientSet, ns.Name)
+				f.DumpAllNamespaceInfo(f, ns.Name)
 			}
 		}
 	})
@@ -367,8 +328,8 @@ func (f *Framework) AfterEach() {
 						nsDeletionErrors[ns.Name] = err
 
 						// Dump namespace if we are unable to delete the namespace and the dump was not already performed.
-						if !ginkgo.CurrentSpecReport().Failed() && TestContext.DumpLogsOnFailure {
-							DumpAllNamespaceInfo(f.ClientSet, ns.Name)
+						if !ginkgo.CurrentSpecReport().Failed() && TestContext.DumpLogsOnFailure && f.DumpAllNamespaceInfo != nil {
+							f.DumpAllNamespaceInfo(f, ns.Name)
 						}
 					} else {
 						Logf("Namespace %v was already deleted", ns.Name)
@@ -399,37 +360,6 @@ func (f *Framework) AfterEach() {
 		}
 	}()
 
-	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" && f.gatherer != nil {
-		ginkgo.By("Collecting resource usage data")
-		summary, resourceViolationError := f.gatherer.StopAndSummarize([]int{90, 99, 100}, f.AddonResourceConstraints)
-		defer ExpectNoError(resourceViolationError)
-		f.TestSummaries = append(f.TestSummaries, summary)
-	}
-
-	if TestContext.GatherLogsSizes {
-		ginkgo.By("Gathering log sizes data")
-		close(f.logsSizeCloseChannel)
-		f.logsSizeWaitGroup.Wait()
-		f.TestSummaries = append(f.TestSummaries, f.logsSizeVerifier.GetSummary())
-	}
-
-	if TestContext.GatherMetricsAfterTest != "false" {
-		ginkgo.By("Gathering metrics")
-		// Grab apiserver, scheduler, controller-manager metrics and (optionally) nodes' kubelet metrics.
-		grabMetricsFromKubelets := TestContext.GatherMetricsAfterTest != "master" && !ProviderIs("kubemark")
-		grabber, err := e2emetrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, f.ClientConfig(), grabMetricsFromKubelets, true, true, true, TestContext.IncludeClusterAutoscalerMetrics, false)
-		if err != nil {
-			Logf("Failed to create MetricsGrabber (skipping metrics gathering): %v", err)
-		} else {
-			received, err := grabber.Grab()
-			if err != nil {
-				Logf("MetricsGrabber failed to grab some of the metrics: %v", err)
-			}
-			(*e2emetrics.ComponentCollection)(&received).ComputeClusterAutoscalerMetricsDelta(f.clusterAutoscalerMetricsBeforeTest)
-			f.TestSummaries = append(f.TestSummaries, (*e2emetrics.ComponentCollection)(&received))
-		}
-	}
-
 	TestContext.CloudConfig.Provider.FrameworkAfterEach(f)
 
 	// Report any flakes that were observed in the e2e test and reset.
@@ -439,13 +369,6 @@ func (f *Framework) AfterEach() {
 	}
 
 	printSummaries(f.TestSummaries, f.BaseName)
-
-	// Check whether all nodes are ready after the test.
-	// This is explicitly done at the very end of the test, to avoid
-	// e.g. not removing namespace in case of this failure.
-	if err := AllNodesReady(f.ClientSet, 3*time.Minute); err != nil {
-		Failf("All nodes should be ready after test, %v", err)
-	}
 }
 
 // DeleteNamespace can be used to delete a namespace. Additionally it can be used to
@@ -474,8 +397,8 @@ func (f *Framework) DeleteNamespace(name string) {
 		}
 	}()
 	// if current test failed then we should dump namespace information
-	if !f.SkipNamespaceCreation && ginkgo.CurrentSpecReport().Failed() && TestContext.DumpLogsOnFailure {
-		DumpAllNamespaceInfo(f.ClientSet, name)
+	if !f.SkipNamespaceCreation && ginkgo.CurrentSpecReport().Failed() && TestContext.DumpLogsOnFailure && f.DumpAllNamespaceInfo != nil {
+		f.DumpAllNamespaceInfo(f, name)
 	}
 
 }
@@ -536,20 +459,6 @@ func (f *Framework) ClientConfig() *rest.Config {
 	ret.ContentType = runtime.ContentTypeJSON
 	ret.AcceptContentTypes = runtime.ContentTypeJSON
 	return ret
-}
-
-// TestContainerOutput runs the given pod in the given namespace and waits
-// for all of the containers in the podSpec to move into the 'Success' status, and tests
-// the specified container log against the given expected output using a substring matcher.
-func (f *Framework) TestContainerOutput(scenarioName string, pod *v1.Pod, containerIndex int, expectedOutput []string) {
-	f.testContainerOutputMatcher(scenarioName, pod, containerIndex, expectedOutput, gomega.ContainSubstring)
-}
-
-// TestContainerOutputRegexp runs the given pod in the given namespace and waits
-// for all of the containers in the podSpec to move into the 'Success' status, and tests
-// the specified container log against the given expected output using a regexp matcher.
-func (f *Framework) TestContainerOutputRegexp(scenarioName string, pod *v1.Pod, containerIndex int, expectedOutput []string) {
-	f.testContainerOutputMatcher(scenarioName, pod, containerIndex, expectedOutput, gomega.MatchRegexp)
 }
 
 // KubeUser is a struct for managing kubernetes user info.

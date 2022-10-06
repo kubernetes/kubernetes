@@ -63,7 +63,7 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume volume expan
 		e2eskipper.SkipUnlessSSHKeyPresent()
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+		framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 		var err error
 
 		node, err = e2enode.GetRandomReadySchedulableNode(f.ClientSet)
@@ -73,8 +73,8 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Mounted flexvolume volume expan
 		nodeKey = "mounted_flexvolume_expand_" + ns
 		nodeLabelValue = ns
 		nodeKeyValueLabel = map[string]string{nodeKey: nodeLabelValue}
-		framework.AddOrUpdateLabelOnNode(c, nodeName, nodeKey, nodeLabelValue)
-		ginkgo.DeferCleanup(framework.RemoveLabelOffNode, c, nodeName, nodeKey)
+		e2enode.AddOrUpdateLabelOnNode(c, nodeName, nodeKey, nodeLabelValue)
+		ginkgo.DeferCleanup(e2enode.RemoveLabelOffNode, c, nodeName, nodeKey)
 
 		test := testsuites.StorageClassTest{
 			Name:                 "flexvolume-resize",

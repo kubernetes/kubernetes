@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -133,5 +134,5 @@ func testDownwardAPIForEphemeralStorage(f *framework.Framework, podName string, 
 }
 
 func testDownwardAPIUsingPod(f *framework.Framework, pod *v1.Pod, env []v1.EnvVar, expectations []string) {
-	f.TestContainerOutputRegexp("downward api env vars", pod, 0, expectations)
+	e2epodoutput.TestContainerOutputRegexp(f, "downward api env vars", pod, 0, expectations)
 }

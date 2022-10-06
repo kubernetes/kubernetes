@@ -62,6 +62,11 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/storage"
 	_ "k8s.io/kubernetes/test/e2e/storage/external"
 	_ "k8s.io/kubernetes/test/e2e/windows"
+
+	// reconfigure framework
+	_ "k8s.io/kubernetes/test/e2e/framework/debug/init"
+	_ "k8s.io/kubernetes/test/e2e/framework/metrics/init"
+	_ "k8s.io/kubernetes/test/e2e/framework/node/init"
 )
 
 // handleFlags sets up all flags and parses the command line.

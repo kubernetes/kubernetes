@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -38,7 +39,7 @@ var _ = SIGDescribe("Containers", func() {
 	framework.ConformanceIt("should use the image defaults if command and args are blank [NodeConformance]", func() {
 		pod := entrypointTestPod(f.Namespace.Name)
 		pod.Spec.Containers[0].Args = nil
-		pod = f.PodClient().Create(pod)
+		pod = e2epod.NewPodClient(f).Create(pod)
 		err := e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 		framework.ExpectNoError(err, "Expected pod %q to be running, got error: %v", pod.Name, err)
 		pollLogs := func() (string, error) {
@@ -57,7 +58,7 @@ var _ = SIGDescribe("Containers", func() {
 	*/
 	framework.ConformanceIt("should be able to override the image's default arguments (container cmd) [NodeConformance]", func() {
 		pod := entrypointTestPod(f.Namespace.Name, "entrypoint-tester", "override", "arguments")
-		f.TestContainerOutput("override arguments", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(f, "override arguments", pod, 0, []string{
 			"[/agnhost entrypoint-tester override arguments]",
 		})
 	})
@@ -73,7 +74,7 @@ var _ = SIGDescribe("Containers", func() {
 		pod := entrypointTestPod(f.Namespace.Name, "entrypoint-tester")
 		pod.Spec.Containers[0].Command = []string{"/agnhost-2"}
 
-		f.TestContainerOutput("override command", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(f, "override command", pod, 0, []string{
 			"[/agnhost-2 entrypoint-tester]",
 		})
 	})
@@ -87,7 +88,7 @@ var _ = SIGDescribe("Containers", func() {
 		pod := entrypointTestPod(f.Namespace.Name, "entrypoint-tester", "override", "arguments")
 		pod.Spec.Containers[0].Command = []string{"/agnhost-2"}
 
-		f.TestContainerOutput("override all", pod, 0, []string{
+		e2epodoutput.TestContainerOutput(f, "override all", pod, 0, []string{
 			"[/agnhost-2 entrypoint-tester override arguments]",
 		})
 	})

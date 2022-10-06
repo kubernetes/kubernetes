@@ -327,7 +327,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			nodeNames = Get2NodesThatCanRunPod(f)
 			ginkgo.By(fmt.Sprintf("Apply dedicated topologyKey %v for this test on the 2 nodes.", topologyKey))
 			for _, nodeName := range nodeNames {
-				framework.AddOrUpdateLabelOnNode(cs, nodeName, topologyKey, nodeName)
+				e2enode.AddOrUpdateLabelOnNode(cs, nodeName, topologyKey, nodeName)
 
 				node, err := cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
@@ -342,7 +342,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		})
 		ginkgo.AfterEach(func() {
 			for _, nodeName := range nodeNames {
-				framework.RemoveLabelOffNode(cs, nodeName, topologyKey)
+				e2enode.RemoveLabelOffNode(cs, nodeName, topologyKey)
 			}
 			for _, node := range nodes {
 				nodeCopy := node.DeepCopy()
