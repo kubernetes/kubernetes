@@ -585,10 +585,27 @@ providers:
 EOF
 }
 
-function ensure-container-runtime {
+function ensure-containerd-runtime {
   # Install containerd/runc if requested
   if [[ -n "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" || -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
     log-wrap "InstallContainerdUbuntu" install-containerd-ubuntu
+  fi
+
+  # Fall back to installing distro specific containerd, if not found
+  if ! command -v containerd >/dev/null 2>&1; then
+    local linuxrelease="cos"
+    if [[ -n "$(command -v lsb_release)" ]]; then
+      linuxrelease=$(lsb_release -si)
+    fi
+    case "${linuxrelease}" in
+      Ubuntu)
+        log-wrap "InstallContainerdUbuntu" install-containerd-ubuntu
+        ;;
+      *)
+        echo "Installing containerd for linux release ${linuxrelease} not supported" >&2
+        exit 2
+        ;;
+    esac
   fi
 
   # when custom containerd version is installed sourcing containerd_env.sh will add all tools like ctr to the PATH
@@ -612,6 +629,19 @@ function ensure-container-runtime {
     exit 2
   fi
   runc --version
+}
+
+function ensure-container-runtime {
+  case "${CONTAINER_RUNTIME_NAME:-containerd}" in
+    containerd)
+      ensure-containerd-runtime
+      ;;
+    #TODO: Add crio support
+    *)
+      echo "Unsupported container runtime (${CONTAINER_RUNTIME_NAME})." >&2
+      exit 2
+      ;;
+  esac
 }
 
 # Downloads kubernetes binaries and kube-system manifest tarball, unpacks them,
