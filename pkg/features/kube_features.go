@@ -568,6 +568,7 @@ const (
 	// kep: https://kep.k8s.io/1435
 	// alpha: v1.20
 	// beta: v1.24
+	// ga: v1.26
 	//
 	// Enables the usage of different protocols in the same Service with type=LoadBalancer
 	MixedProtocolLBService featuregate.Feature = "MixedProtocolLBService"
@@ -969,7 +970,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	MinimizeIPTablesRestore: {Default: false, PreRelease: featuregate.Alpha},
 
-	MixedProtocolLBService: {Default: true, PreRelease: featuregate.Beta},
+	MixedProtocolLBService: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	MultiCIDRRangeAllocator: {Default: false, PreRelease: featuregate.Alpha},
 

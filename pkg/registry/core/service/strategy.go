@@ -81,7 +81,6 @@ func (svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 func (svcStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	service := obj.(*api.Service)
 	allErrs := validation.ValidateServiceCreate(service)
-	allErrs = append(allErrs, validation.ValidateConditionalService(service, nil)...)
 	return allErrs
 }
 
@@ -98,7 +97,6 @@ func (svcStrategy) AllowCreateOnUpdate() bool {
 
 func (strategy svcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	allErrs := validation.ValidateServiceUpdate(obj.(*api.Service), old.(*api.Service))
-	allErrs = append(allErrs, validation.ValidateConditionalService(obj.(*api.Service), old.(*api.Service))...)
 	return allErrs
 }
 
@@ -119,44 +117,12 @@ func (svcStrategy) AllowUnconditionalUpdate() bool {
 //	}
 func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.MixedProtocolLBService) {
-		if !serviceConditionsInUse(oldSvc) {
-			newSvc.Status.Conditions = nil
-		}
-		if !loadBalancerPortsInUse(oldSvc) {
-			for i := range newSvc.Status.LoadBalancer.Ingress {
-				newSvc.Status.LoadBalancer.Ingress[i].Ports = nil
-			}
-		}
-	}
-
 	// Clear InternalTrafficPolicy if not enabled
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
 		if !serviceInternalTrafficPolicyInUse(oldSvc) {
 			newSvc.Spec.InternalTrafficPolicy = nil
 		}
 	}
-}
-
-// returns true when the svc.Status.Conditions field is in use.
-func serviceConditionsInUse(svc *api.Service) bool {
-	if svc == nil {
-		return false
-	}
-	return svc.Status.Conditions != nil
-}
-
-// returns true when the svc.Status.LoadBalancer.Ingress.Ports field is in use.
-func loadBalancerPortsInUse(svc *api.Service) bool {
-	if svc == nil {
-		return false
-	}
-	for _, ing := range svc.Status.LoadBalancer.Ingress {
-		if ing.Ports != nil {
-			return true
-		}
-	}
-	return false
 }
 
 func serviceInternalTrafficPolicyInUse(svc *api.Service) bool {

@@ -3731,6 +3731,78 @@ var _ = common.SIGDescribe("Services", func() {
 
 		framework.Logf("Collection of services has been deleted")
 	})
+	/*
+		Release: v1.26
+		Testname: Service, same ports with different protocols on a Load Balancer Service
+		Description: Create a LoadBalancer service with two ports that have the same value but use different protocols. Add a Pod that listens on both ports. The Pod must be reachable via the ClusterIP and both ports
+	*/
+	ginkgo.It("should serve endpoints on same port and different protocol for internal traffic on Type LoadBalancer ", func() {
+		serviceName := "multiprotocol-lb-test"
+		ns := f.Namespace.Name
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
+
+		defer func() {
+			err := cs.CoreV1().Services(ns).Delete(context.TODO(), serviceName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
+		}()
+
+		svc1port := "svc1"
+		svc2port := "svc2"
+
+		ginkgo.By("creating service " + serviceName + " in namespace " + ns)
+		svc, err := jig.CreateLoadBalancerServiceWaitForClusterIPOnly(2*time.Minute, func(service *v1.Service) {
+			service.Spec.Ports = []v1.ServicePort{
+				{
+					Name:       "portname1",
+					Port:       80,
+					TargetPort: intstr.FromString(svc1port),
+					Protocol:   v1.ProtocolTCP,
+				},
+				{
+					Name:       "portname2",
+					Port:       81,
+					TargetPort: intstr.FromString(svc2port),
+					Protocol:   v1.ProtocolUDP,
+				},
+			}
+		})
+		framework.ExpectNoError(err)
+
+		port1 := 100
+		port2 := 101
+
+		names := map[string]bool{}
+		defer func() {
+			for name := range names {
+				err := cs.CoreV1().Pods(ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", name, ns)
+			}
+		}()
+
+		containerPorts := []v1.ContainerPort{
+			{
+				Name:          svc1port,
+				ContainerPort: int32(port1),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          svc2port,
+				ContainerPort: int32(port2),
+				Protocol:      v1.ProtocolUDP,
+			},
+		}
+
+		podname1 := "pod1"
+
+		createPodOrFail(f, ns, podname1, jig.Labels, containerPorts, "netexec", "--http-port", strconv.Itoa(port1), "--udp-port", strconv.Itoa(port2))
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podname1: {port1, port2}})
+
+		ginkgo.By("Checking if the Service forwards traffic to pods")
+		execPod := e2epod.CreateExecPodOrFail(cs, ns, "execpod", nil)
+		err = jig.CheckServiceReachability(svc, execPod)
+		framework.ExpectNoError(err)
+		e2epod.DeletePodOrFail(cs, ns, podname1)
+	})
 
 })
 
