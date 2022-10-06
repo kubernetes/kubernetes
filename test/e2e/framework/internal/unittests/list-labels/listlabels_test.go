@@ -14,28 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package bugs
+package listlabels
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/internal/unittests"
+	"k8s.io/kubernetes/test/e2e/framework/internal/unittests/bugs"
 )
 
-func TestBugs(t *testing.T) {
-	assert.NoError(t, framework.FormatBugs())
-	RecordBugs()
-	Describe()
-
-	err := framework.FormatBugs()
-	require.Error(t, err)
-	require.Equal(t, bugOutput, err.Error())
-
-	output, code := unittests.GetFrameworkOutput(t, nil)
-	assert.Equal(t, 1, code)
-	assert.Equal(t, "ERROR: E2E suite initialization was faulty, these errors must be fixed:\n"+bugOutput, output)
+func TestListTests(t *testing.T) {
+	bugs.Describe()
+	framework.CheckForBugs = false
+	output, code := unittests.GetFrameworkOutput(t, map[string]string{"list-labels": "true"})
+	assert.Equal(t, 0, code)
+	assert.Equal(t, bugs.ListLabelsOutput, output)
 }
