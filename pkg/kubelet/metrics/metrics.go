@@ -527,6 +527,16 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(RunningContainerCount)
 		legacyregistry.MustRegister(RunningPodCount)
 		legacyregistry.MustRegister(ManagedEphemeralContainers)
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResources) {
+			legacyregistry.MustRegister(PodResourcesEndpointRequestsTotalCount)
+
+			if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResourcesGetAllocatable) {
+				legacyregistry.MustRegister(PodResourcesEndpointRequestsListCount)
+				legacyregistry.MustRegister(PodResourcesEndpointRequestsGetAllocatableCount)
+				legacyregistry.MustRegister(PodResourcesEndpointErrorsListCount)
+				legacyregistry.MustRegister(PodResourcesEndpointErrorsGetAllocatableCount)
+			}
+		}
 		legacyregistry.MustRegister(StartedPodsTotal)
 		legacyregistry.MustRegister(StartedPodsErrorsTotal)
 		legacyregistry.MustRegister(StartedContainersTotal)
@@ -537,6 +547,7 @@ func Register(collectors ...metrics.StableCollector) {
 		}
 		legacyregistry.MustRegister(RunPodSandboxDuration)
 		legacyregistry.MustRegister(RunPodSandboxErrors)
+
 		for _, collector := range collectors {
 			legacyregistry.CustomMustRegister(collector)
 		}
