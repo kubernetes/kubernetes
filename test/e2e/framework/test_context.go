@@ -60,6 +60,14 @@ var (
 	// Output is used for output when not running tests, for example in -list-tests.
 	// Test output should go to ginkgo.GinkgoWriter.
 	Output io.Writer = os.Stdout
+
+	// Exit is called when the framework detects fatal errors or when
+	// it is done with the execution of e.g. -list-tests.
+	Exit = os.Exit
+
+	// CheckForBugs determines whether the framework bails out when
+	// test initialization found any bugs.
+	CheckForBugs = true
 )
 
 // TestContextType contains test settings and global state. Due to
@@ -495,7 +503,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 		for _, v := range image.GetImageConfigs() {
 			fmt.Println(v.GetE2EImage())
 		}
-		os.Exit(0)
+		Exit(0)
 	}
 
 	// Reconfigure gomega defaults. The poll interval should be suitable
@@ -509,15 +517,15 @@ func AfterReadingAllFlags(t *TestContextType) {
 
 	// ginkgo.PreviewSpecs will expand all nodes and thus may find new bugs.
 	report := ginkgo.PreviewSpecs("Kubernetes e2e test statistics")
-	if err := FormatBugs(); err != nil {
+	if err := FormatBugs(); CheckForBugs && err != nil {
 		// Refuse to do anything if the E2E suite is buggy.
 		fmt.Fprint(Output, "ERROR: E2E suite initialization was faulty, these errors must be fixed:")
 		fmt.Fprint(Output, "\n"+err.Error())
-		os.Exit(1)
+		Exit(1)
 	}
 	if t.listLabels || t.listTests {
 		listTestInformation(report)
-		os.Exit(0)
+		Exit(0)
 	}
 
 	// Only set a default host if one won't be supplied via kubeconfig
@@ -579,7 +587,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 		} else {
 			klog.Errorf("Failed to setup provider config for %q: %v", TestContext.Provider, err)
 		}
-		os.Exit(1)
+		Exit(1)
 	}
 
 	if TestContext.ReportDir != "" {
@@ -589,13 +597,13 @@ func AfterReadingAllFlags(t *TestContextType) {
 		// in parallel, so we will get "exists" error in most of them.
 		if err := os.MkdirAll(TestContext.ReportDir, 0777); err != nil && !os.IsExist(err) {
 			klog.Errorf("Create report dir: %v", err)
-			os.Exit(1)
+			Exit(1)
 		}
 		ginkgoDir := path.Join(TestContext.ReportDir, "ginkgo")
 		if TestContext.ReportCompleteGinkgo || TestContext.ReportCompleteJUnit {
 			if err := os.MkdirAll(ginkgoDir, 0777); err != nil && !os.IsExist(err) {
 				klog.Errorf("Create <report-dir>/ginkgo: %v", err)
-				os.Exit(1)
+				Exit(1)
 			}
 		}
 
