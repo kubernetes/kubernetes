@@ -107,8 +107,8 @@ func main() {
 	}
 	fmt.Println(string(y))
 	/* Output:
-	name: John
 	age: 30
+	name: John
 	*/
 	j2, err := yaml.YAMLToJSON(y)
 	if err != nil {
