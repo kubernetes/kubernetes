@@ -2,7 +2,7 @@
 
 <!-- TODO: Placeholder README. Update with more detail and repo contents once initial implementation is in place. -->
 
-This repository contains the KMS proto APIs.
+This repository contains the KMS proto APIs and reference implementation.
 
 See https://github.com/kubernetes/enhancements/tree/master/keps/sig-auth/3299-kms-v2-improvements for more details.
 
