@@ -159,6 +159,9 @@ fi
 # Optional: set feature gates
 FEATURE_GATES=${KUBE_FEATURE_GATES:-}
 
+#Optional: disable the cloud provider no schedule taint for testing.
+TEST_IGNORE_CLOUDPROVIDER_TAINT=${KUBE_TEST_IGNORE_CLOUDPROVIDER_TAINT:-}
+
 TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD:-100}
 
 # Extra docker options for nodes.
@@ -293,6 +296,8 @@ export LOGGING_DESTINATION=${KUBE_LOGGING_DESTINATION:-gcp} # options: gcp
 # Optional: When set to true, Elasticsearch and Kibana will be setup as part of the cluster bring up.
 export ENABLE_CLUSTER_LOGGING=${KUBE_ENABLE_CLUSTER_LOGGING:-true}
 export ELASTICSEARCH_LOGGING_REPLICAS=1
+
+export TEST_IGNORE_CLOUDPROVIDER_TAINT=${KUBE_TEST_IGNORE_CLOUDPROVIDER_TAINT:-false}
 
 # Optional: Don't require https for registries in our local RFC1918 network
 if [[ ${KUBE_ENABLE_INSECURE_REGISTRY:-false} = 'true' ]]; then
