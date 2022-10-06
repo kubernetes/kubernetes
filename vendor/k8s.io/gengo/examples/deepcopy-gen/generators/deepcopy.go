@@ -173,18 +173,24 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		pkgNeedsGeneration := (ptagValue == tagValuePackage)
 		if !pkgNeedsGeneration {
 			// If the pkg-scoped tag did not exist, scan all types for one that
-			// explicitly wants generation.
+			// explicitly wants generation. Ensure all types that want generation
+			// can be copied.
+			var uncopyable []string
 			for _, t := range pkg.Types {
 				klog.V(5).Infof("  considering type %q", t.Name.String())
 				ttag := extractEnabledTypeTag(t)
 				if ttag != nil && ttag.value == "true" {
 					klog.V(5).Infof("    tag=true")
 					if !copyableType(t) {
-						klog.Fatalf("Type %v requests deepcopy generation but is not copyable", t)
+						uncopyable = append(uncopyable, fmt.Sprintf("%v", t))
+					} else {
+						pkgNeedsGeneration = true
 					}
-					pkgNeedsGeneration = true
-					break
 				}
+			}
+			if len(uncopyable) > 0 {
+				klog.Fatalf("Types requested deepcopy generation but are not copyable: %s",
+					strings.Join(uncopyable, ", "))
 			}
 		}
 

@@ -55,6 +55,27 @@ func (tracker *DefaultImportTracker) AddTypes(types ...*types.Type) {
 		tracker.AddType(t)
 	}
 }
+func (tracker *DefaultImportTracker) AddSymbol(symbol types.Name) {
+	if tracker.local.Package == symbol.Package {
+		return
+	}
+
+	if len(symbol.Package) == 0 {
+		return
+	}
+	path := symbol.Path
+	if len(path) == 0 {
+		path = symbol.Package
+	}
+	if _, ok := tracker.pathToName[path]; ok {
+		return
+	}
+
+	name := tracker.LocalName(symbol)
+	tracker.nameToPath[name] = path
+	tracker.pathToName[path] = name
+}
+
 func (tracker *DefaultImportTracker) AddType(t *types.Type) {
 	if tracker.local.Package == t.Name.Package {
 		return
@@ -70,19 +91,7 @@ func (tracker *DefaultImportTracker) AddType(t *types.Type) {
 		return
 	}
 
-	if len(t.Name.Package) == 0 {
-		return
-	}
-	path := t.Name.Path
-	if len(path) == 0 {
-		path = t.Name.Package
-	}
-	if _, ok := tracker.pathToName[path]; ok {
-		return
-	}
-	name := tracker.LocalName(t.Name)
-	tracker.nameToPath[name] = path
-	tracker.pathToName[path] = name
+	tracker.AddSymbol(t.Name)
 }
 
 func (tracker *DefaultImportTracker) ImportLines() []string {
