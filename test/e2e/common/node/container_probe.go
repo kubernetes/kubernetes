@@ -943,7 +943,7 @@ func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	containerName := pod.Spec.Containers[0].Name
 	// At the end of the test, clean up by removing the pod.
 	defer func() {
-		ginkgo.By("deleting the pod")
+		ginkgo.By("deleting the pod (liveness test)")
 		podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
 	}()
 	ginkgo.By(fmt.Sprintf("Creating pod %s in namespace %s", pod.Name, ns))
@@ -971,6 +971,11 @@ func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 		pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", pod.Name))
 		restartCount := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
+		// Since this is one of the slowest tests, its good to have logs between the 3 minute convergence time...
+		// see https://github.com/kubernetes/kubernetes/issues/110839
+		if time.Since(start)*time.Second % 30 == 0 {
+			framework.Logf("RunLivenessTest: Still waiting for number of restarts to be > %v...", expectNumRestarts)
+		}
 		if restartCount != lastRestartCount {
 			framework.Logf("Restart count of pod %s/%s is now %d (%v elapsed)",
 				ns, pod.Name, restartCount, time.Since(start))
