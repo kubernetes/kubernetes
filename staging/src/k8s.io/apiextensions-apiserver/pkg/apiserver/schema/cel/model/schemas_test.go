@@ -25,6 +25,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	apiservercel "k8s.io/apiserver/pkg/cel"
 )
 
 func TestSchemaDeclType(t *testing.T) {
@@ -86,15 +87,15 @@ func TestSchemaDeclType(t *testing.T) {
 func TestSchemaDeclTypes(t *testing.T) {
 	ts := testSchema()
 	cust := SchemaDeclType(ts, true).MaybeAssignTypeName("CustomObject")
-	typeMap := FieldTypeMap("CustomObject", cust)
+	typeMap := apiservercel.FieldTypeMap("CustomObject", cust)
 	nested, _ := cust.FindField("nested")
 	metadata, _ := cust.FindField("metadata")
-	expectedObjTypeMap := map[string]*DeclType{
+	expectedObjTypeMap := map[string]*apiservercel.DeclType{
 		"CustomObject":          cust,
 		"CustomObject.nested":   nested.Type,
 		"CustomObject.metadata": metadata.Type,
 	}
-	objTypeMap := map[string]*DeclType{}
+	objTypeMap := map[string]*apiservercel.DeclType{}
 	for name, t := range typeMap {
 		if t.IsObject() {
 			objTypeMap[name] = t
@@ -406,7 +407,7 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 				},
 			},
 			// should be exactly equal to maxDurationSizeJSON
-			ExpectedMaxElements: maxDurationSizeJSON,
+			ExpectedMaxElements: apiservercel.MaxDurationSizeJSON,
 		},
 		{
 			Name: "dateSize",
@@ -419,7 +420,7 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 				},
 			},
 			// should be exactly equal to dateSizeJSON
-			ExpectedMaxElements: dateSizeJSON,
+			ExpectedMaxElements: apiservercel.JSONDateSize,
 		},
 		{
 			Name: "maxdatetimeSize",
@@ -432,7 +433,7 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 				},
 			},
 			// should be exactly equal to maxDatetimeSizeJSON
-			ExpectedMaxElements: maxDatetimeSizeJSON,
+			ExpectedMaxElements: apiservercel.MaxDatetimeSizeJSON,
 		},
 		{
 			Name: "maxintOrStringSize",
@@ -442,7 +443,7 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 				},
 			},
 			// should be exactly equal to maxRequestSizeBytes - 2 (to allow for quotes in the case of a string)
-			ExpectedMaxElements: maxRequestSizeBytes - 2,
+			ExpectedMaxElements: apiservercel.MaxRequestSizeBytes - 2,
 		},
 		{
 			Name: "objectDefaultFieldArray",
@@ -495,7 +496,7 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 				},
 			},
 			// note that unlike regular strings we don't have to take unicode into account,
-			// so we we expect the max length to be exactly equal to the user-supplied one
+			// so we expect the max length to be exactly equal to the user-supplied one
 			ExpectedMaxElements: 20,
 		},
 	}

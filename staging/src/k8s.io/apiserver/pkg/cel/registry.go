@@ -14,13 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package model
+package cel
 
 import (
 	"sync"
 
 	"github.com/google/cel-go/cel"
-	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
 // Resolver declares methods to find policy templates and related configuration objects.
@@ -30,12 +29,11 @@ type Resolver interface {
 	FindType(name string) (*DeclType, bool)
 }
 
-// NewRegistry create a registry for keeping track of environments, schemas, templates, and more
+// NewRegistry create a registry for keeping track of environments and types
 // from a base cel.Env expression environment.
 func NewRegistry(stdExprEnv *cel.Env) *Registry {
 	return &Registry{
 		exprEnvs: map[string]*cel.Env{"": stdExprEnv},
-		schemas:  map[string]*schema.Structural{},
 		types: map[string]*DeclType{
 			BoolType.TypeName():      BoolType,
 			BytesType.TypeName():     BytesType,
@@ -58,7 +56,6 @@ func NewRegistry(stdExprEnv *cel.Env) *Registry {
 type Registry struct {
 	rwMux    sync.RWMutex
 	exprEnvs map[string]*cel.Env
-	schemas  map[string]*schema.Structural
 	types    map[string]*DeclType
 }
 

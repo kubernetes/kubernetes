@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package model
+package cel
 
 import (
 	"fmt"
@@ -79,7 +79,7 @@ func NewObjectType(name string, fields map[string]*DeclField) *DeclType {
 	return t
 }
 
-func newSimpleTypeWithMinSize(name string, celType *cel.Type, zeroVal ref.Val, minSize int64) *DeclType {
+func NewSimpleTypeWithMinSize(name string, celType *cel.Type, zeroVal ref.Val, minSize int64) *DeclType {
 	return &DeclType{
 		name:              name,
 		celType:           celType,
@@ -282,6 +282,16 @@ type DeclField struct {
 	Required     bool
 	enumValues   []interface{}
 	defaultValue interface{}
+}
+
+func NewDeclField(name string, declType *DeclType, required bool, enumValues []interface{}, defaultValue interface{}) *DeclField {
+	return &DeclField{
+		Name:         name,
+		Type:         declType,
+		Required:     required,
+		enumValues:   enumValues,
+		defaultValue: defaultValue,
+	}
 }
 
 // TypeName returns the string type name of the field.
@@ -495,44 +505,44 @@ type schemaTypeProvider struct {
 var (
 	// AnyType is equivalent to the CEL 'protobuf.Any' type in that the value may have any of the
 	// types supported.
-	AnyType = newSimpleTypeWithMinSize("any", cel.AnyType, nil, 1)
+	AnyType = NewSimpleTypeWithMinSize("any", cel.AnyType, nil, 1)
 
 	// BoolType is equivalent to the CEL 'bool' type.
-	BoolType = newSimpleTypeWithMinSize("bool", cel.BoolType, types.False, minBoolSize)
+	BoolType = NewSimpleTypeWithMinSize("bool", cel.BoolType, types.False, MinBoolSize)
 
 	// BytesType is equivalent to the CEL 'bytes' type.
-	BytesType = newSimpleTypeWithMinSize("bytes", cel.BytesType, types.Bytes([]byte{}), minStringSize)
+	BytesType = NewSimpleTypeWithMinSize("bytes", cel.BytesType, types.Bytes([]byte{}), MinStringSize)
 
 	// DoubleType is equivalent to the CEL 'double' type which is a 64-bit floating point value.
-	DoubleType = newSimpleTypeWithMinSize("double", cel.DoubleType, types.Double(0), minNumberSize)
+	DoubleType = NewSimpleTypeWithMinSize("double", cel.DoubleType, types.Double(0), MinNumberSize)
 
 	// DurationType is equivalent to the CEL 'duration' type.
-	DurationType = newSimpleTypeWithMinSize("duration", cel.DurationType, types.Duration{Duration: time.Duration(0)}, minDurationSizeJSON)
+	DurationType = NewSimpleTypeWithMinSize("duration", cel.DurationType, types.Duration{Duration: time.Duration(0)}, MinDurationSizeJSON)
 
 	// DateType is equivalent to the CEL 'date' type.
-	DateType = newSimpleTypeWithMinSize("date", cel.TimestampType, types.Timestamp{Time: time.Time{}}, dateSizeJSON)
+	DateType = NewSimpleTypeWithMinSize("date", cel.TimestampType, types.Timestamp{Time: time.Time{}}, JSONDateSize)
 
 	// DynType is the equivalent of the CEL 'dyn' concept which indicates that the type will be
 	// determined at runtime rather than compile time.
-	DynType = newSimpleTypeWithMinSize("dyn", cel.DynType, nil, 1)
+	DynType = NewSimpleTypeWithMinSize("dyn", cel.DynType, nil, 1)
 
 	// IntType is equivalent to the CEL 'int' type which is a 64-bit signed int.
-	IntType = newSimpleTypeWithMinSize("int", cel.IntType, types.IntZero, minNumberSize)
+	IntType = NewSimpleTypeWithMinSize("int", cel.IntType, types.IntZero, MinNumberSize)
 
 	// NullType is equivalent to the CEL 'null_type'.
-	NullType = newSimpleTypeWithMinSize("null_type", cel.NullType, types.NullValue, 4)
+	NullType = NewSimpleTypeWithMinSize("null_type", cel.NullType, types.NullValue, 4)
 
 	// StringType is equivalent to the CEL 'string' type which is expected to be a UTF-8 string.
 	// StringType values may either be string literals or expression strings.
-	StringType = newSimpleTypeWithMinSize("string", cel.StringType, types.String(""), minStringSize)
+	StringType = NewSimpleTypeWithMinSize("string", cel.StringType, types.String(""), MinStringSize)
 
 	// TimestampType corresponds to the well-known protobuf.Timestamp type supported within CEL.
 	// Note that both the OpenAPI date and date-time types map onto TimestampType, so not all types
 	// labeled as Timestamp will necessarily have the same MinSerializedSize.
-	TimestampType = newSimpleTypeWithMinSize("timestamp", cel.TimestampType, types.Timestamp{Time: time.Time{}}, dateSizeJSON)
+	TimestampType = NewSimpleTypeWithMinSize("timestamp", cel.TimestampType, types.Timestamp{Time: time.Time{}}, JSONDateSize)
 
 	// UintType is equivalent to the CEL 'uint' type.
-	UintType = newSimpleTypeWithMinSize("uint", cel.UintType, types.Uint(0), 1)
+	UintType = NewSimpleTypeWithMinSize("uint", cel.UintType, types.Uint(0), 1)
 
 	// ListType is equivalent to the CEL 'list' type.
 	ListType = NewListType(AnyType, noMaxLength)

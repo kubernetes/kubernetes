@@ -22,37 +22,13 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 
+	apiservercel "k8s.io/apiserver/pkg/cel"
+
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
-const (
-	// the largest request that will be accepted is 3MB
-	// TODO(DangerOnTheRanger): wire in MaxRequestBodyBytes from apiserver/pkg/server/options/server_run_options.go to make this configurable
-	maxRequestSizeBytes = int64(3 * 1024 * 1024)
-	// OpenAPI duration strings follow RFC 3339, section 5.6 - see the comment on maxDatetimeSizeJSON
-	maxDurationSizeJSON = 32
-	// OpenAPI datetime strings follow RFC 3339, section 5.6, and the longest possible
-	// such string is 9999-12-31T23:59:59.999999999Z, which has length 30 - we add 2
-	// to allow for quotation marks
-	maxDatetimeSizeJSON = 32
-	// Golang allows a string of 0 to be parsed as a duration, so that plus 2 to account for
-	// quotation marks makes 3
-	minDurationSizeJSON = 3
-	// RFC 3339 dates require YYYY-MM-DD, and then we add 2 to allow for quotation marks
-	dateSizeJSON = 12
-	// RFC 3339 datetimes require a full date (YYYY-MM-DD) and full time (HH:MM:SS), and we add 3 for
-	// quotation marks like always in addition to the capital T that separates the date and time
-	minDatetimeSizeJSON = 21
-	// ""
-	minStringSize = 2
-	// true
-	minBoolSize = 4
-	// 0
-	minNumberSize = 1
-)
-
 // SchemaDeclType converts the structural schema to a CEL declaration, or returns nil if the
-// the structural schema should not be exposed in CEL expressions.
+// structural schema should not be exposed in CEL expressions.
 // Set isResourceRoot to true for the root of a custom resource or embedded resource.
 //
 // Schemas with XPreserveUnknownFields not exposed unless they are objects. Array and "maps" schemas
@@ -60,7 +36,7 @@ const (
 // if their schema is not exposed.
 //
 // The CEL declaration for objects with XPreserveUnknownFields does not expose unknown fields.
-func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
+func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *apiservercel.DeclType {
 	if s == nil {
 		return nil
 	}
@@ -77,9 +53,9 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 		// To validate requirements on both the int and string representation:
 		//  `type(intOrStringField) == int ? intOrStringField < 5 : double(intOrStringField.replace('%', '')) < 0.5
 		//
-		dyn := newSimpleTypeWithMinSize("dyn", cel.DynType, nil, 1) // smallest value for a serialied x-kubernetes-int-or-string is 0
+		dyn := apiservercel.NewSimpleTypeWithMinSize("dyn", cel.DynType, nil, 1) // smallest value for a serialized x-kubernetes-int-or-string is 0
 		// handle x-kubernetes-int-or-string by returning the max length/min serialized size of the largest possible string
-		dyn.MaxElements = maxRequestSizeBytes - 2
+		dyn.MaxElements = apiservercel.MaxRequestSizeBytes - 2
 		return dyn
 	}
 
@@ -106,7 +82,7 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 			} else {
 				maxItems = estimateMaxArrayItemsFromMinSize(itemsType.MinSerializedSize)
 			}
-			return NewListType(itemsType, maxItems)
+			return apiservercel.NewListType(itemsType, maxItems)
 		}
 		return nil
 	case "object":
@@ -119,11 +95,11 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 				} else {
 					maxProperties = estimateMaxAdditionalPropertiesFromMinSize(propsType.MinSerializedSize)
 				}
-				return NewMapType(StringType, propsType, maxProperties)
+				return apiservercel.NewMapType(apiservercel.StringType, propsType, maxProperties)
 			}
 			return nil
 		}
-		fields := make(map[string]*DeclField, len(s.Properties))
+		fields := make(map[string]*apiservercel.DeclField, len(s.Properties))
 
 		required := map[string]bool{}
 		if s.ValueValidation != nil {
@@ -141,14 +117,8 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 				}
 			}
 			if fieldType := SchemaDeclType(&prop, prop.XEmbeddedResource); fieldType != nil {
-				if propName, ok := Escape(name); ok {
-					fields[propName] = &DeclField{
-						Name:         propName,
-						Required:     required[name],
-						Type:         fieldType,
-						defaultValue: prop.Default.Object,
-						enumValues:   enumValues, // Enum values are represented as strings in CEL
-					}
+				if propName, ok := apiservercel.Escape(name); ok {
+					fields[propName] = apiservercel.NewDeclField(propName, fieldType, required[name], enumValues, prop.Default.Object)
 				}
 				// the min serialized size for an object is 2 (for {}) plus the min size of all its required
 				// properties
@@ -159,14 +129,14 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 				}
 			}
 		}
-		objType := NewObjectType("object", fields)
+		objType := apiservercel.NewObjectType("object", fields)
 		objType.MinSerializedSize = minSerializedSize
 		return objType
 	case "string":
 		if s.ValueValidation != nil {
 			switch s.ValueValidation.Format {
 			case "byte":
-				byteWithMaxLength := newSimpleTypeWithMinSize("bytes", cel.BytesType, types.Bytes([]byte{}), minStringSize)
+				byteWithMaxLength := apiservercel.NewSimpleTypeWithMinSize("bytes", cel.BytesType, types.Bytes([]byte{}), apiservercel.MinStringSize)
 				if s.ValueValidation.MaxLength != nil {
 					byteWithMaxLength.MaxElements = zeroIfNegative(*s.ValueValidation.MaxLength)
 				} else {
@@ -174,20 +144,20 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 				}
 				return byteWithMaxLength
 			case "duration":
-				durationWithMaxLength := newSimpleTypeWithMinSize("duration", cel.DurationType, types.Duration{Duration: time.Duration(0)}, int64(minDurationSizeJSON))
+				durationWithMaxLength := apiservercel.NewSimpleTypeWithMinSize("duration", cel.DurationType, types.Duration{Duration: time.Duration(0)}, int64(apiservercel.MinDurationSizeJSON))
 				durationWithMaxLength.MaxElements = estimateMaxStringLengthPerRequest(s)
 				return durationWithMaxLength
 			case "date":
-				timestampWithMaxLength := newSimpleTypeWithMinSize("timestamp", cel.TimestampType, types.Timestamp{Time: time.Time{}}, int64(dateSizeJSON))
+				timestampWithMaxLength := apiservercel.NewSimpleTypeWithMinSize("timestamp", cel.TimestampType, types.Timestamp{Time: time.Time{}}, int64(apiservercel.JSONDateSize))
 				timestampWithMaxLength.MaxElements = estimateMaxStringLengthPerRequest(s)
 				return timestampWithMaxLength
 			case "date-time":
-				timestampWithMaxLength := newSimpleTypeWithMinSize("timestamp", cel.TimestampType, types.Timestamp{Time: time.Time{}}, int64(minDatetimeSizeJSON))
+				timestampWithMaxLength := apiservercel.NewSimpleTypeWithMinSize("timestamp", cel.TimestampType, types.Timestamp{Time: time.Time{}}, int64(apiservercel.MinDatetimeSizeJSON))
 				timestampWithMaxLength.MaxElements = estimateMaxStringLengthPerRequest(s)
 				return timestampWithMaxLength
 			}
 		}
-		strWithMaxLength := newSimpleTypeWithMinSize("string", cel.StringType, types.String(""), minStringSize)
+		strWithMaxLength := apiservercel.NewSimpleTypeWithMinSize("string", cel.StringType, types.String(""), apiservercel.MinStringSize)
 		if s.ValueValidation != nil && s.ValueValidation.MaxLength != nil {
 			// multiply the user-provided max length by 4 in the case of an otherwise-untyped string
 			// we do this because the OpenAPIv3 spec indicates that maxLength is specified in runes/code points,
@@ -199,11 +169,11 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 		}
 		return strWithMaxLength
 	case "boolean":
-		return BoolType
+		return apiservercel.BoolType
 	case "number":
-		return DoubleType
+		return apiservercel.DoubleType
 	case "integer":
-		return IntType
+		return apiservercel.IntType
 	}
 	return nil
 }
@@ -259,7 +229,7 @@ func WithTypeAndObjectMeta(s *schema.Structural) *schema.Structural {
 // this function.
 func MaxCardinality(minSize int64) uint64 {
 	sz := minSize + 1 // assume at least one comma between elements
-	return uint64(maxRequestSizeBytes / sz)
+	return uint64(apiservercel.MaxRequestSizeBytes / sz)
 }
 
 // estimateMaxStringLengthPerRequest estimates the maximum string length (in characters)
@@ -268,18 +238,18 @@ func MaxCardinality(minSize int64) uint64 {
 func estimateMaxStringLengthPerRequest(s *schema.Structural) int64 {
 	if s.ValueValidation == nil || s.XIntOrString {
 		// subtract 2 to account for ""
-		return (maxRequestSizeBytes - 2)
+		return apiservercel.MaxRequestSizeBytes - 2
 	}
 	switch s.ValueValidation.Format {
 	case "duration":
-		return maxDurationSizeJSON
+		return apiservercel.MaxDurationSizeJSON
 	case "date":
-		return dateSizeJSON
+		return apiservercel.JSONDateSize
 	case "date-time":
-		return maxDatetimeSizeJSON
+		return apiservercel.MaxDatetimeSizeJSON
 	default:
 		// subtract 2 to account for ""
-		return (maxRequestSizeBytes - 2)
+		return apiservercel.MaxRequestSizeBytes - 2
 	}
 }
 
@@ -287,7 +257,7 @@ func estimateMaxStringLengthPerRequest(s *schema.Structural) int64 {
 // the provided minimum serialized size that can fit into a single request.
 func estimateMaxArrayItemsFromMinSize(minSize int64) int64 {
 	// subtract 2 to account for [ and ]
-	return (maxRequestSizeBytes - 2) / (minSize + 1)
+	return (apiservercel.MaxRequestSizeBytes - 2) / (minSize + 1)
 }
 
 // estimateMaxAdditionalPropertiesPerRequest estimates the maximum number of additional properties
@@ -297,5 +267,5 @@ func estimateMaxAdditionalPropertiesFromMinSize(minSize int64) int64 {
 	// will all vary in length
 	keyValuePairSize := minSize + 6
 	// subtract 2 to account for { and }
-	return (maxRequestSizeBytes - 2) / keyValuePairSize
+	return (apiservercel.MaxRequestSizeBytes - 2) / keyValuePairSize
 }
