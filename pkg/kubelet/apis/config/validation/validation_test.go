@@ -38,6 +38,7 @@ var (
 		EnforceNodeAllocatable:          enforceNodeAllocatable,
 		SystemReservedCgroup:            "/system.slice",
 		KubeReservedCgroup:              "/kubelet.service",
+		PodLogsDir:                      "/logs",
 		SystemCgroups:                   "",
 		CgroupRoot:                      "",
 		EventBurst:                      10,
@@ -568,6 +569,27 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			return conf
 		},
 		errMsg: "invalid configuration: containerLogMonitorInterval must be a positive time duration greater than or equal to 3s",
+	}, {
+		name: "invalid podLogsPath",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.PodLogsDir = ""
+			return conf
+		},
+		errMsg: "invalid configuration: podLogsPath was not specified",
+	}, {
+		name: "pod logs path must be absolute",
+		configure: func(config *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			config.PodLogsDir = "./test"
+			return config
+		},
+		errMsg: `invalid configuration: pod logs path "./test" must be absolute path`,
+	}, {
+		name: "pod logs path must be normalized",
+		configure: func(config *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			config.PodLogsDir = "/path/../"
+			return config
+		},
+		errMsg: `invalid configuration: pod logs path "/path/../" must be normalized`,
 	}}
 
 	for _, tc := range cases {

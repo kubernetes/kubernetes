@@ -83,6 +83,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				"memory": "50%",
 			}
 			obj.OOMScoreAdj = int32(qos.KubeletOOMScoreAdj)
+			obj.PodLogsDir = "/var/log/pods"
 			obj.Port = ports.KubeletPort
 			obj.ReadOnlyPort = ports.KubeletReadOnlyPort
 			obj.RegistryBurst = 10

@@ -48,6 +48,13 @@ func (kl *Kubelet) getRootDir() string {
 	return kl.rootDirectory
 }
 
+// getPodLogsDir returns the full path to the directory that kubelet can use
+// to store pod's log files. This defaults to /var/log/pods if not specified
+// otherwise in the config file.
+func (kl *Kubelet) getPodLogsDir() string {
+	return kl.podLogsDirectory
+}
+
 // getPodsDir returns the full path to the directory under which pod
 // directories are created.
 func (kl *Kubelet) getPodsDir() string {
