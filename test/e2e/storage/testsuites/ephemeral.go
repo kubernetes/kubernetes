@@ -118,7 +118,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 	f := framework.NewFrameworkWithCustomTimeouts("ephemeral", storageframework.GetDriverTimeouts(driver))
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	init := func() {
+	init := func(ctx context.Context) {
 		if pattern.VolType == storageframework.CSIInlineVolume {
 			eDriver, _ = driver.(storageframework.EphemeralTestDriver)
 		}
@@ -126,7 +126,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 			// The GenericEphemeralVolume feature is GA, but
 			// perhaps this test is run against an older Kubernetes
 			// where the feature might be disabled.
-			enabled, err := GenericEphemeralVolumesEnabled(f.ClientSet, f.Timeouts, f.Namespace.Name)
+			enabled, err := GenericEphemeralVolumesEnabled(ctx, f.ClientSet, f.Timeouts, f.Namespace.Name)
 			framework.ExpectNoError(err, "check GenericEphemeralVolume feature")
 			if !enabled {
 				e2eskipper.Skipf("Cluster doesn't support %q volumes -- skipping", pattern.VolType)
@@ -169,12 +169,12 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 		framework.ExpectNoError(err, "while cleaning up")
 	}
 
-	ginkgo.It("should create read-only inline ephemeral volume", func() {
+	ginkgo.It("should create read-only inline ephemeral volume", func(ctx context.Context) {
 		if pattern.VolMode == v1.PersistentVolumeBlock {
 			e2eskipper.Skipf("raw block volumes cannot be read-only")
 		}
 
-		init()
+		init(ctx)
 		defer cleanup()
 
 		l.testCase.ReadOnly = true
@@ -187,11 +187,11 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 			e2evolume.VerifyExecInPodSucceed(f, pod, command)
 			return nil
 		}
-		l.testCase.TestEphemeral()
+		l.testCase.TestEphemeral(ctx)
 	})
 
-	ginkgo.It("should create read/write inline ephemeral volume", func() {
-		init()
+	ginkgo.It("should create read/write inline ephemeral volume", func(ctx context.Context) {
+		init(ctx)
 		defer cleanup()
 
 		l.testCase.ReadOnly = false
@@ -207,15 +207,15 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 			e2evolume.VerifyExecInPodSucceed(f, pod, command)
 			return nil
 		}
-		l.testCase.TestEphemeral()
+		l.testCase.TestEphemeral(ctx)
 	})
 
-	ginkgo.It("should support expansion of pvcs created for ephemeral pvcs", func() {
+	ginkgo.It("should support expansion of pvcs created for ephemeral pvcs", func(ctx context.Context) {
 		if pattern.VolType != storageframework.GenericEphemeralVolume {
 			e2eskipper.Skipf("Skipping %s test for expansion", pattern.VolType)
 		}
 
-		init()
+		init(ctx)
 		defer cleanup()
 
 		if !driver.GetDriverInfo().Capabilities[storageframework.CapOnlineExpansion] {
@@ -236,7 +236,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 				}
 			}
 			pvcName := fmt.Sprintf("%s-%s", podName, outerPodVolumeSpecName)
-			pvc, err := f.ClientSet.CoreV1().PersistentVolumeClaims(pod.Namespace).Get(context.TODO(), pvcName, metav1.GetOptions{})
+			pvc, err := f.ClientSet.CoreV1().PersistentVolumeClaims(pod.Namespace).Get(ctx, pvcName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "error getting ephemeral pvc")
 
 			ginkgo.By("Expanding current pvc")
@@ -267,12 +267,12 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 			framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
 			return nil
 		}
-		l.testCase.TestEphemeral()
+		l.testCase.TestEphemeral(ctx)
 
 	})
 
-	ginkgo.It("should support two pods which have the same volume definition", func() {
-		init()
+	ginkgo.It("should support two pods which have the same volume definition", func(ctx context.Context) {
+		init(ctx)
 		defer cleanup()
 
 		// We test in read-only mode if that is all that the driver supports,
@@ -285,7 +285,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 
 		l.testCase.RunningPodCheck = func(pod *v1.Pod) interface{} {
 			// Create another pod with the same inline volume attributes.
-			pod2 := StartInPodWithInlineVolume(f.ClientSet, f.Namespace.Name, "inline-volume-tester2", "sleep 100000",
+			pod2 := StartInPodWithInlineVolume(ctx, f.ClientSet, f.Namespace.Name, "inline-volume-tester2", "sleep 100000",
 				[]v1.VolumeSource{pod.Spec.Volumes[0].VolumeSource},
 				readOnly,
 				l.testCase.Node)
@@ -302,24 +302,24 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 				e2evolume.VerifyExecInPodSucceed(f, pod2, "[ ! -f /mnt/test-0/hello-world ]")
 			}
 
-			defer StopPodAndDependents(f.ClientSet, f.Timeouts, pod2)
+			defer StopPodAndDependents(ctx, f.ClientSet, f.Timeouts, pod2)
 			return nil
 		}
 
-		l.testCase.TestEphemeral()
+		l.testCase.TestEphemeral(ctx)
 	})
 
-	ginkgo.It("should support multiple inline ephemeral volumes", func() {
+	ginkgo.It("should support multiple inline ephemeral volumes", func(ctx context.Context) {
 		if pattern.BindingMode == storagev1.VolumeBindingImmediate &&
 			pattern.VolType == storageframework.GenericEphemeralVolume {
 			e2eskipper.Skipf("Multiple generic ephemeral volumes with immediate binding may cause pod startup failures when the volumes get created in separate topology segments.")
 		}
 
-		init()
+		init(ctx)
 		defer cleanup()
 
 		l.testCase.NumInlineVolumes = 2
-		l.testCase.TestEphemeral()
+		l.testCase.TestEphemeral(ctx)
 	})
 }
 
@@ -368,7 +368,7 @@ type EphemeralTest struct {
 }
 
 // TestEphemeral tests pod creation with one ephemeral volume.
-func (t EphemeralTest) TestEphemeral() {
+func (t EphemeralTest) TestEphemeral(ctx context.Context) {
 	client := t.Client
 	gomega.Expect(client).NotTo(gomega.BeNil(), "EphemeralTest.Client is required")
 
@@ -401,13 +401,13 @@ func (t EphemeralTest) TestEphemeral() {
 		}
 		volumes = append(volumes, volume)
 	}
-	pod := StartInPodWithInlineVolume(client, t.Namespace, "inline-volume-tester", command, volumes, t.ReadOnly, t.Node)
+	pod := StartInPodWithInlineVolume(ctx, client, t.Namespace, "inline-volume-tester", command, volumes, t.ReadOnly, t.Node)
 	defer func() {
 		// pod might be nil now.
-		StopPodAndDependents(client, t.Timeouts, pod)
+		StopPodAndDependents(ctx, client, t.Timeouts, pod)
 	}()
 	framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(client, pod.Name, pod.Namespace, t.Timeouts.PodStartSlow), "waiting for pod with inline volume")
-	runningPod, err := client.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+	runningPod, err := client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "get pod")
 	actualNodeName := runningPod.Spec.NodeName
 
@@ -417,12 +417,12 @@ func (t EphemeralTest) TestEphemeral() {
 		runningPodData = t.RunningPodCheck(pod)
 	}
 
-	StopPodAndDependents(client, t.Timeouts, pod)
+	StopPodAndDependents(ctx, client, t.Timeouts, pod)
 	pod = nil // Don't stop twice.
 
 	// There should be no dangling PVCs in the namespace now. There might be for
 	// generic ephemeral volumes, if something went wrong...
-	pvcs, err := client.CoreV1().PersistentVolumeClaims(t.Namespace).List(context.TODO(), metav1.ListOptions{})
+	pvcs, err := client.CoreV1().PersistentVolumeClaims(t.Namespace).List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err, "list PVCs")
 	gomega.Expect(pvcs.Items).Should(gomega.BeEmpty(), "no dangling PVCs")
 
@@ -433,7 +433,7 @@ func (t EphemeralTest) TestEphemeral() {
 
 // StartInPodWithInlineVolume starts a command in a pod with given volume(s) mounted to /mnt/test-<number> directory.
 // The caller is responsible for checking the pod and deleting it.
-func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command string, volumes []v1.VolumeSource, readOnly bool, node e2epod.NodeSelection) *v1.Pod {
+func StartInPodWithInlineVolume(ctx context.Context, c clientset.Interface, ns, podName, command string, volumes []v1.VolumeSource, readOnly bool, node e2epod.NodeSelection) *v1.Pod {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -484,15 +484,15 @@ func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command stri
 			})
 	}
 
-	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
+	pod, err := c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create pod")
 	return pod
 }
 
 // CSIInlineVolumesEnabled checks whether the running cluster has the CSIInlineVolumes feature gate enabled.
 // It does that by trying to create a pod that uses that feature.
-func CSIInlineVolumesEnabled(c clientset.Interface, t *framework.TimeoutContext, ns string) (bool, error) {
-	return VolumeSourceEnabled(c, t, ns, v1.VolumeSource{
+func CSIInlineVolumesEnabled(ctx context.Context, c clientset.Interface, t *framework.TimeoutContext, ns string) (bool, error) {
+	return VolumeSourceEnabled(ctx, c, t, ns, v1.VolumeSource{
 		CSI: &v1.CSIVolumeSource{
 			Driver: "no-such-driver.example.com",
 		},
@@ -501,9 +501,9 @@ func CSIInlineVolumesEnabled(c clientset.Interface, t *framework.TimeoutContext,
 
 // GenericEphemeralVolumesEnabled checks whether the running cluster has the GenericEphemeralVolume feature gate enabled.
 // It does that by trying to create a pod that uses that feature.
-func GenericEphemeralVolumesEnabled(c clientset.Interface, t *framework.TimeoutContext, ns string) (bool, error) {
+func GenericEphemeralVolumesEnabled(ctx context.Context, c clientset.Interface, t *framework.TimeoutContext, ns string) (bool, error) {
 	storageClassName := "no-such-storage-class"
-	return VolumeSourceEnabled(c, t, ns, v1.VolumeSource{
+	return VolumeSourceEnabled(ctx, c, t, ns, v1.VolumeSource{
 		Ephemeral: &v1.EphemeralVolumeSource{
 			VolumeClaimTemplate: &v1.PersistentVolumeClaimTemplate{
 				Spec: v1.PersistentVolumeClaimSpec{
@@ -522,7 +522,7 @@ func GenericEphemeralVolumesEnabled(c clientset.Interface, t *framework.TimeoutC
 
 // VolumeSourceEnabled checks whether a certain kind of volume source is enabled by trying
 // to create a pod that uses it.
-func VolumeSourceEnabled(c clientset.Interface, t *framework.TimeoutContext, ns string, volume v1.VolumeSource) (bool, error) {
+func VolumeSourceEnabled(ctx context.Context, c clientset.Interface, t *framework.TimeoutContext, ns string, volume v1.VolumeSource) (bool, error) {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -554,12 +554,12 @@ func VolumeSourceEnabled(c clientset.Interface, t *framework.TimeoutContext, ns 
 		},
 	}
 
-	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
+	pod, err := c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
 
 	switch {
 	case err == nil:
 		// Pod was created, feature supported.
-		StopPodAndDependents(c, t, pod)
+		StopPodAndDependents(ctx, c, t, pod)
 		return true, nil
 	case apierrors.IsInvalid(err):
 		// "Invalid" because it uses a feature that isn't supported.

@@ -317,7 +317,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 	// [        node1        ]
 	//   |                 |     <- same volume mode
 	// [volume1]   ->  [restored volume1 snapshot]
-	ginkgo.It("should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]", func() {
+	ginkgo.It("should concurrently access the volume and restored snapshot from pods on the same node [LinuxOnly][Feature:VolumeSnapshotDataSource][Feature:VolumeSourceXFS]", func(ctx context.Context) {
 		init()
 		defer cleanup()
 
@@ -342,8 +342,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		}
 		testConfig := storageframework.ConvertTestConfig(l.config)
 		dc := l.config.Framework.DynamicClient
-		dataSource, cleanupFunc := prepareSnapshotDataSourceForProvisioning(f, testConfig, l.config, pattern, l.cs, dc, resource.Pvc, resource.Sc, sDriver, pattern.VolMode, expectedContent)
-		defer cleanupFunc()
+		dataSource := prepareSnapshotDataSourceForProvisioning(ctx, f, testConfig, l.config, pattern, l.cs, dc, resource.Pvc, resource.Sc, sDriver, pattern.VolMode, expectedContent)
 
 		// Create 2nd PVC for testing
 		pvc2 := &v1.PersistentVolumeClaim{
@@ -372,7 +371,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 	// [        node1        ]
 	//   |                 |     <- same volume mode
 	// [volume1]   ->  [cloned volume1]
-	ginkgo.It("should concurrently access the volume and its clone from pods on the same node [LinuxOnly][Feature:VolumeSourceXFS]", func() {
+	ginkgo.It("should concurrently access the volume and its clone from pods on the same node [LinuxOnly][Feature:VolumeSourceXFS]", func(ctx context.Context) {
 		init()
 		defer cleanup()
 
@@ -387,8 +386,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		l.resources = append(l.resources, resource)
 		pvcs := []*v1.PersistentVolumeClaim{resource.Pvc}
 		testConfig := storageframework.ConvertTestConfig(l.config)
-		dataSource, cleanupFunc := preparePVCDataSourceForProvisioning(f, testConfig, l.cs, resource.Pvc, resource.Sc, pattern.VolMode, expectedContent)
-		defer cleanupFunc()
+		dataSource := preparePVCDataSourceForProvisioning(ctx, f, testConfig, l.cs, resource.Pvc, resource.Sc, pattern.VolMode, expectedContent)
 
 		// Create 2nd PVC for testing
 		pvc2 := &v1.PersistentVolumeClaim{

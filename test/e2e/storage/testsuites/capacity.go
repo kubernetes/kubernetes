@@ -100,7 +100,7 @@ func (p *capacityTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		}
 	}
 
-	ginkgo.It("provides storage capacity information", func() {
+	ginkgo.It("provides storage capacity information", func(ctx context.Context) {
 		init()
 
 		timeout := time.Minute
@@ -131,12 +131,12 @@ func (p *capacityTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		}
 
 		// Create storage class and wait for capacity information.
-		_, clearProvisionedStorageClass := SetupStorageClass(f.ClientSet, sc)
-		defer clearProvisionedStorageClass()
+		sc := SetupStorageClass(ctx, f.ClientSet, sc)
 		listAll.Should(MatchCapacities(matcher), "after creating storage class")
 
 		// Delete storage class again and wait for removal of storage capacity information.
-		clearProvisionedStorageClass()
+		err := f.ClientSet.StorageV1().StorageClasses().Delete(ctx, sc.Name, metav1.DeleteOptions{})
+		framework.ExpectNoError(err, "delete storage class")
 		listAll.ShouldNot(MatchCapacities(matchSC), "after deleting storage class")
 	})
 }
