@@ -44,7 +44,7 @@ func NewCounter(opts *CounterOpts) *Counter {
 
 	kc := &Counter{
 		CounterOpts: opts,
-		lazyMetric:  lazyMetric{},
+		lazyMetric:  lazyMetric{stabilityLevel: opts.StabilityLevel},
 	}
 	kc.setPrometheusCounter(noop)
 	kc.lazyInit(kc, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
@@ -129,7 +129,7 @@ func NewCounterVec(opts *CounterOpts, labels []string) *CounterVec {
 		CounterVec:     noopCounterVec,
 		CounterOpts:    opts,
 		originalLabels: labels,
-		lazyMetric:     lazyMetric{},
+		lazyMetric:     lazyMetric{stabilityLevel: opts.StabilityLevel},
 	}
 	cv.lazyInit(cv, fqName)
 	return cv

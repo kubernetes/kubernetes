@@ -36,6 +36,31 @@ var (
 	registries          []*kubeRegistry // stores all registries created by NewKubeRegistry()
 	registriesLock      sync.RWMutex
 	disabledMetrics     = map[string]struct{}{}
+
+	registeredMetrics = NewCounterVec(
+		&CounterOpts{
+			Name:           "registered_metric_total",
+			Help:           "The count of registered metrics broken by stability level and deprecation version.",
+			StabilityLevel: ALPHA,
+		},
+		[]string{"stability_level", "deprecated_version"},
+	)
+
+	disabledMetricsTotal = NewCounter(
+		&CounterOpts{
+			Name:           "disabled_metric_total",
+			Help:           "The count of disabled metrics.",
+			StabilityLevel: ALPHA,
+		},
+	)
+
+	hiddenMetricsTotal = NewCounter(
+		&CounterOpts{
+			Name:           "hidden_metric_total",
+			Help:           "The count of hidden metrics.",
+			StabilityLevel: ALPHA,
+		},
+	)
 )
 
 // shouldHide be used to check if a specific metric with deprecated version should be hidden
@@ -67,6 +92,7 @@ func SetDisabledMetric(name string) {
 	disabledMetricsLock.Lock()
 	defer disabledMetricsLock.Unlock()
 	disabledMetrics[name] = struct{}{}
+	disabledMetricsTotal.Inc()
 }
 
 // SetShowHidden will enable showing hidden metrics. This will no-opt
@@ -250,6 +276,7 @@ func (kr *kubeRegistry) trackHiddenCollector(c Registerable) {
 	defer kr.hiddenCollectorsLock.Unlock()
 
 	kr.hiddenCollectors[c.FQName()] = c
+	hiddenMetricsTotal.Inc()
 }
 
 // trackStableCollectors stores all custom collectors.
@@ -329,9 +356,11 @@ func newKubeRegistry(v apimachineryversion.Info) *kubeRegistry {
 	return r
 }
 
-// NewKubeRegistry creates a new vanilla Registry without any Collectors
-// pre-registered.
+// NewKubeRegistry creates a new vanilla Registry
 func NewKubeRegistry() KubeRegistry {
 	r := newKubeRegistry(BuildVersion())
+	r.MustRegister(registeredMetrics)
+	r.MustRegister(disabledMetricsTotal)
+	r.MustRegister(hiddenMetricsTotal)
 	return r
 }
