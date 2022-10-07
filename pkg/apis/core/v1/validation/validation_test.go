@@ -17,9 +17,10 @@ limitations under the License.
 package validation
 
 import (
+	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -89,8 +90,10 @@ func TestValidateResourceRequirements(t *testing.T) {
 	}
 
 	errorCase := []struct {
-		name         string
-		requirements v1.ResourceRequirements
+		name                  string
+		requirements          v1.ResourceRequirements
+		skipLimitValueCheck   bool
+		skipRequestValueCheck bool
 	}{
 		{
 			name: "Resources with Requests Larger Than Limits",
@@ -114,6 +117,7 @@ func TestValidateResourceRequirements(t *testing.T) {
 					v1.ResourceName("my.org"): resource.MustParse("10m"),
 				},
 			},
+			skipRequestValueCheck: true,
 		},
 		{
 			name: "Invalid Resources with Limits",
@@ -122,14 +126,41 @@ func TestValidateResourceRequirements(t *testing.T) {
 					v1.ResourceName("my.org"): resource.MustParse("9m"),
 				},
 			},
+			skipLimitValueCheck: true,
 		},
 	}
 	for _, tc := range errorCase {
 		t.Run(tc.name, func(t *testing.T) {
-			if errs := ValidateResourceRequirements(&tc.requirements, field.NewPath("resources")); len(errs) == 0 {
+			errs := ValidateResourceRequirements(&tc.requirements, field.NewPath("resources"))
+			if len(errs) == 0 {
 				t.Errorf("expected error")
 			}
+			validateNamesAndValuesInDescription(t, tc.requirements.Limits, errs, tc.skipLimitValueCheck, "limit")
+			validateNamesAndValuesInDescription(t, tc.requirements.Requests, errs, tc.skipRequestValueCheck, "request")
 		})
+	}
+}
+
+func validateNamesAndValuesInDescription(t *testing.T, r v1.ResourceList, errs field.ErrorList, skipValueTest bool, rl string) {
+	for name, value := range r {
+		containsName := false
+		containsValue := false
+
+		for _, e := range errs {
+			if strings.Contains(e.Error(), name.String()) {
+				containsName = true
+			}
+
+			if strings.Contains(e.Error(), value.String()) {
+				containsValue = true
+			}
+		}
+		if !containsName {
+			t.Errorf("error must contain %s name", rl)
+		}
+		if !containsValue && !skipValueTest {
+			t.Errorf("error must contain %s value", rl)
+		}
 	}
 }
 
