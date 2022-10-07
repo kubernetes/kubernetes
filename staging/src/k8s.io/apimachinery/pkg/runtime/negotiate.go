@@ -89,6 +89,7 @@ func NewClientNegotiator(serializer NegotiatedSerializer, gv schema.GroupVersion
 	return &clientNegotiator{
 		serializer: serializer,
 		encode:     gv,
+		decode:     gv,
 	}
 }
 
