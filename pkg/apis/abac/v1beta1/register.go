@@ -29,13 +29,6 @@ const GroupName = "abac.authorization.kubernetes.io"
 // SchemeGroupVersion is the API group and version for abac v1beta1
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1beta1"}
 
-func init() {
-	// TODO: Delete this init function, abac should not have its own scheme.
-	utilruntime.Must(addKnownTypes(abac.Scheme))
-
-	utilruntime.Must(RegisterConversions(abac.Scheme))
-}
-
 var (
 	// SchemeBuilder is the scheme builder with scheme init functions to run for this API package
 	// TODO: move SchemeBuilder with zz_generated.deepcopy.go to k8s.io/api.
