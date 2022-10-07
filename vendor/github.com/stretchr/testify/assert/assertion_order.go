@@ -50,7 +50,7 @@ func isOrdered(t TestingT, object interface{}, allowedComparesResults []CompareT
 //    assert.IsIncreasing(t, []float{1, 2})
 //    assert.IsIncreasing(t, []string{"a", "b"})
 func IsIncreasing(t TestingT, object interface{}, msgAndArgs ...interface{}) bool {
-	return isOrdered(t, object, []CompareType{compareLess}, "\"%v\" is not less than \"%v\"", msgAndArgs)
+	return isOrdered(t, object, []CompareType{compareLess}, "\"%v\" is not less than \"%v\"", msgAndArgs...)
 }
 
 // IsNonIncreasing asserts that the collection is not increasing
@@ -59,7 +59,7 @@ func IsIncreasing(t TestingT, object interface{}, msgAndArgs ...interface{}) boo
 //    assert.IsNonIncreasing(t, []float{2, 1})
 //    assert.IsNonIncreasing(t, []string{"b", "a"})
 func IsNonIncreasing(t TestingT, object interface{}, msgAndArgs ...interface{}) bool {
-	return isOrdered(t, object, []CompareType{compareEqual, compareGreater}, "\"%v\" is not greater than or equal to \"%v\"", msgAndArgs)
+	return isOrdered(t, object, []CompareType{compareEqual, compareGreater}, "\"%v\" is not greater than or equal to \"%v\"", msgAndArgs...)
 }
 
 // IsDecreasing asserts that the collection is decreasing
@@ -68,7 +68,7 @@ func IsNonIncreasing(t TestingT, object interface{}, msgAndArgs ...interface{}) 
 //    assert.IsDecreasing(t, []float{2, 1})
 //    assert.IsDecreasing(t, []string{"b", "a"})
 func IsDecreasing(t TestingT, object interface{}, msgAndArgs ...interface{}) bool {
-	return isOrdered(t, object, []CompareType{compareGreater}, "\"%v\" is not greater than \"%v\"", msgAndArgs)
+	return isOrdered(t, object, []CompareType{compareGreater}, "\"%v\" is not greater than \"%v\"", msgAndArgs...)
 }
 
 // IsNonDecreasing asserts that the collection is not decreasing
@@ -77,5 +77,5 @@ func IsDecreasing(t TestingT, object interface{}, msgAndArgs ...interface{}) boo
 //    assert.IsNonDecreasing(t, []float{1, 2})
 //    assert.IsNonDecreasing(t, []string{"a", "b"})
 func IsNonDecreasing(t TestingT, object interface{}, msgAndArgs ...interface{}) bool {
-	return isOrdered(t, object, []CompareType{compareLess, compareEqual}, "\"%v\" is not less than or equal to \"%v\"", msgAndArgs)
+	return isOrdered(t, object, []CompareType{compareLess, compareEqual}, "\"%v\" is not less than or equal to \"%v\"", msgAndArgs...)
 }
