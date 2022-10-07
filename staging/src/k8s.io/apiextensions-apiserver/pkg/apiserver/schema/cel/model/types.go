@@ -1,16 +1,18 @@
-// Copyright 2020 Google LLC
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//    https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+Copyright 2022 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 
 package model
 
@@ -79,9 +81,9 @@ func NewObjectType(name string, fields map[string]*DeclField) *DeclType {
 
 func newSimpleTypeWithMinSize(name string, celType *cel.Type, zeroVal ref.Val, minSize int64) *DeclType {
 	return &DeclType{
-		name: name,
-		celType: celType,
-		defaultValue: zeroVal,
+		name:              name,
+		celType:           celType,
+		defaultValue:      zeroVal,
 		MinSerializedSize: minSize,
 	}
 }
@@ -471,35 +473,6 @@ func (rt *RuleTypes) findDeclType(typeName string) (*DeclType, bool) {
 		return declType, true
 	}
 	return nil, false
-}
-
-func (rt *RuleTypes) convertToCustomType(dyn *DynValue, declType *DeclType) *DynValue {
-	switch v := dyn.Value().(type) {
-	case *MapValue:
-		if declType.IsObject() {
-			obj := v.ConvertToObject(declType)
-			for name, f := range obj.fieldMap {
-				field := declType.Fields[name]
-				f.Ref = rt.convertToCustomType(f.Ref, field.Type)
-			}
-			dyn.SetValue(obj)
-			return dyn
-		}
-		fieldType := declType.ElemType
-		for _, f := range v.fieldMap {
-			f.Ref = rt.convertToCustomType(f.Ref, fieldType)
-		}
-		return dyn
-	case *ListValue:
-		for i := 0; i < len(v.Entries); i++ {
-			elem := v.Entries[i]
-			elem = rt.convertToCustomType(elem, declType.ElemType)
-			v.Entries[i] = elem
-		}
-		return dyn
-	default:
-		return dyn
-	}
 }
 
 func newSchemaTypeProvider(kind string, declType *DeclType) (*schemaTypeProvider, error) {

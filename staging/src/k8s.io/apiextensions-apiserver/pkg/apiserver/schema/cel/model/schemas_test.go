@@ -1,16 +1,18 @@
-// Copyright 2020 Google LLC
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//    https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+Copyright 2022 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 
 package model
 
@@ -335,12 +337,12 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 						Type: "object",
 					},
 					Properties: map[string]schema.Structural{
-						"required": schema.Structural{
+						"required": {
 							Generic: schema.Generic{
 								Type: "string",
 							},
 						},
-						"optional": schema.Structural{
+						"optional": {
 							Generic: schema.Generic{
 								Type: "string",
 							},
@@ -453,7 +455,7 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 						Type: "object",
 					},
 					Properties: map[string]schema.Structural{
-						"field": schema.Structural{
+						"field": {
 							Generic: schema.Generic{
 								Type:    "string",
 								Default: schema.JSON{Object: "default"},

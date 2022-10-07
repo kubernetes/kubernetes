@@ -28,7 +28,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/library"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/metrics"
-	celmodel "k8s.io/apiextensions-apiserver/third_party/forked/celopenapi/model"
+	celmodel "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
 )
 
 const (
