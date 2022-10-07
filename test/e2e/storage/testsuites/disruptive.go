@@ -74,8 +74,7 @@ func (s *disruptiveTestSuite) SkipUnsupportedTests(driver storageframework.TestD
 
 func (s *disruptiveTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
-		config        *storageframework.PerTestConfig
-		driverCleanup func()
+		config *storageframework.PerTestConfig
 
 		cs clientset.Interface
 		ns *v1.Namespace
@@ -97,7 +96,7 @@ func (s *disruptiveTestSuite) DefineTests(driver storageframework.TestDriver, pa
 		l.cs = f.ClientSet
 
 		// Now do the more expensive test initialization.
-		l.config, l.driverCleanup = driver.PrepareTest(f)
+		l.config = driver.PrepareTest(f)
 
 		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
 		l.resource = storageframework.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
@@ -118,8 +117,6 @@ func (s *disruptiveTestSuite) DefineTests(driver storageframework.TestDriver, pa
 			l.resource = nil
 		}
 
-		errs = append(errs, storageutils.TryFunc(l.driverCleanup))
-		l.driverCleanup = nil
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
 	}
 

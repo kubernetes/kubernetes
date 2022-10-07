@@ -47,9 +47,9 @@ type TestDriver interface {
 	SkipUnsupportedTest(TestPattern)
 
 	// PrepareTest is called at test execution time each time a new test case is about to start.
-	// It sets up all necessary resources and returns the per-test configuration
-	// plus a cleanup function that frees all allocated resources.
-	PrepareTest(f *framework.Framework) (*PerTestConfig, func())
+	// It sets up all necessary resources and returns the per-test configuration.
+	// Cleanup is handled via ginkgo.DeferCleanup inside PrepareTest.
+	PrepareTest(f *framework.Framework) *PerTestConfig
 }
 
 // TestVolume is the result of PreprovisionedVolumeTestDriver.CreateVolume.

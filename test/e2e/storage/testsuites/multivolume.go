@@ -87,8 +87,7 @@ func (t *multiVolumeTestSuite) SkipUnsupportedTests(driver storageframework.Test
 
 func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
-		config        *storageframework.PerTestConfig
-		driverCleanup func()
+		config *storageframework.PerTestConfig
 
 		cs        clientset.Interface
 		ns        *v1.Namespace
@@ -114,7 +113,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		l.driver = driver
 
 		// Now do the more expensive test initialization.
-		l.config, l.driverCleanup = driver.PrepareTest(f)
+		l.config = driver.PrepareTest(f)
 		l.migrationCheck = newMigrationOpCheck(f.ClientSet, f.ClientConfig(), dInfo.InTreePluginName)
 	}
 
@@ -124,8 +123,6 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 			errs = append(errs, resource.CleanupResource())
 		}
 
-		errs = append(errs, storageutils.TryFunc(l.driverCleanup))
-		l.driverCleanup = nil
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleanup resource")
 		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}

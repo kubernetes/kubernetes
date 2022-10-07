@@ -90,8 +90,7 @@ func (t *volumeLimitsTestSuite) SkipUnsupportedTests(driver storageframework.Tes
 
 func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
-		config      *storageframework.PerTestConfig
-		testCleanup func()
+		config *storageframework.PerTestConfig
 
 		cs clientset.Interface
 		ns *v1.Namespace
@@ -137,8 +136,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 		l.ns = f.Namespace
 		l.cs = f.ClientSet
 
-		l.config, l.testCleanup = driver.PrepareTest(f)
-		defer l.testCleanup()
+		l.config = driver.PrepareTest(f)
 
 		ginkgo.By("Picking a node")
 		// Some CSI drivers are deployed to a single node (e.g csi-hostpath),
@@ -255,8 +253,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 		l.ns = f.Namespace
 		l.cs = f.ClientSet
 
-		l.config, l.testCleanup = driver.PrepareTest(f)
-		defer l.testCleanup()
+		l.config = driver.PrepareTest(f)
 
 		nodeNames := []string{}
 		if l.config.ClientNodeSelection.Name != "" {

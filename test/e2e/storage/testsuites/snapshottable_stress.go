@@ -128,18 +128,17 @@ func (t *snapshottableStressTestSuite) DefineTests(driver storageframework.TestD
 		driverInfo = driver.GetDriverInfo()
 		snapshottableDriver, _ = driver.(storageframework.SnapshottableTestDriver)
 		cs = f.ClientSet
-		config, driverCleanup := driver.PrepareTest(f)
+		config := driver.PrepareTest(f)
 		ctx, cancel := context.WithCancel(context.Background())
 
 		stressTest = &snapshottableStressTest{
-			config:        config,
-			driverCleanup: driverCleanup,
-			volumes:       []*storageframework.VolumeResource{},
-			snapshots:     []*storageframework.SnapshotResource{},
-			pods:          []*v1.Pod{},
-			testOptions:   *driverInfo.VolumeSnapshotStressTestOptions,
-			ctx:           ctx,
-			cancel:        cancel,
+			config:      config,
+			volumes:     []*storageframework.VolumeResource{},
+			snapshots:   []*storageframework.SnapshotResource{},
+			pods:        []*v1.Pod{},
+			testOptions: *driverInfo.VolumeSnapshotStressTestOptions,
+			ctx:         ctx,
+			cancel:      cancel,
 		}
 	}
 

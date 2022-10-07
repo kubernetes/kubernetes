@@ -35,7 +35,6 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
-	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -104,8 +103,7 @@ func (p *ephemeralTestSuite) SkipUnsupportedTests(driver storageframework.TestDr
 
 func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
-		config        *storageframework.PerTestConfig
-		driverCleanup func()
+		config *storageframework.PerTestConfig
 
 		testCase *EphemeralTest
 		resource *storageframework.VolumeResource
@@ -138,7 +136,7 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 		l = local{}
 
 		// Now do the more expensive test initialization.
-		l.config, l.driverCleanup = driver.PrepareTest(f)
+		l.config = driver.PrepareTest(f)
 		l.resource = storageframework.CreateVolumeResource(driver, l.config, pattern, e2evolume.SizeRange{})
 
 		switch pattern.VolType {
@@ -167,7 +165,6 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 	cleanup := func() {
 		var cleanUpErrs []error
 		cleanUpErrs = append(cleanUpErrs, l.resource.CleanupResource())
-		cleanUpErrs = append(cleanUpErrs, storageutils.TryFunc(l.driverCleanup))
 		err := utilerrors.NewAggregate(cleanUpErrs)
 		framework.ExpectNoError(err, "while cleaning up")
 	}

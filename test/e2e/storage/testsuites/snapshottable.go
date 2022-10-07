@@ -112,10 +112,9 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 
 	ginkgo.Describe("volume snapshot controller", func() {
 		var (
-			err           error
-			config        *storageframework.PerTestConfig
-			driverCleanup func()
-			cleanupSteps  []func()
+			err          error
+			config       *storageframework.PerTestConfig
+			cleanupSteps []func()
 
 			cs                  clientset.Interface
 			dc                  dynamic.Interface
@@ -135,8 +134,7 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 			dc = f.DynamicClient
 
 			// Now do the more expensive test initialization.
-			config, driverCleanup = driver.PrepareTest(f)
-			cleanupSteps = append(cleanupSteps, driverCleanup)
+			config = driver.PrepareTest(f)
 
 			cleanupSteps = append(cleanupSteps, func() {
 				framework.ExpectNoError(volumeResource.CleanupResource())

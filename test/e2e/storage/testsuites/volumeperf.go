@@ -93,14 +93,13 @@ func (t *volumePerformanceTestSuite) SkipUnsupportedTests(driver storageframewor
 
 func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
-		config      *storageframework.PerTestConfig
-		testCleanup func()
-		cs          clientset.Interface
-		ns          *v1.Namespace
-		scName      string
-		pvcs        []*v1.PersistentVolumeClaim
-		options     *storageframework.PerformanceTestOptions
-		stopCh      chan struct{}
+		config  *storageframework.PerTestConfig
+		cs      clientset.Interface
+		ns      *v1.Namespace
+		scName  string
+		pvcs    []*v1.PersistentVolumeClaim
+		options *storageframework.PerformanceTestOptions
+		stopCh  chan struct{}
 	}
 	var (
 		dInfo *storageframework.DriverInfo
@@ -142,7 +141,6 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 		ginkgo.By(fmt.Sprintf("Deleting Storage Class %s", l.scName))
 		err := l.cs.StorageV1().StorageClasses().Delete(context.TODO(), l.scName, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
-		l.testCleanup()
 	})
 
 	ginkgo.It("should provision volumes at scale within performance constraints [Slow] [Serial]", func() {
@@ -151,7 +149,7 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 			ns:      f.Namespace,
 			options: dInfo.PerformanceTestOptions,
 		}
-		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.config = driver.PrepareTest(f)
 
 		// Stats for volume provisioning operation
 		// TODO: Add stats for attach, resize and snapshot

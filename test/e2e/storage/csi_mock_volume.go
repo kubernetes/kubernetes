@@ -181,8 +181,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 
 		m.driver = drivers.InitMockCSIDriver(driverOpts)
-		config, testCleanup := m.driver.PrepareTest(f)
-		m.testCleanups = append(m.testCleanups, testCleanup)
+		config := m.driver.PrepareTest(f)
 		m.config = config
 		m.provisioner = config.GetUniqueDriverName()
 

@@ -33,7 +33,6 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
-	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -81,10 +80,9 @@ func (p *capacityTestSuite) SkipUnsupportedTests(driver storageframework.TestDri
 
 func (p *capacityTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	var (
-		dInfo         = driver.GetDriverInfo()
-		dDriver       storageframework.DynamicPVTestDriver
-		driverCleanup func()
-		sc            *storagev1.StorageClass
+		dInfo   = driver.GetDriverInfo()
+		dDriver storageframework.DynamicPVTestDriver
+		sc      *storagev1.StorageClass
 	)
 
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
@@ -95,23 +93,15 @@ func (p *capacityTestSuite) DefineTests(driver storageframework.TestDriver, patt
 	init := func() {
 		dDriver, _ = driver.(storageframework.DynamicPVTestDriver)
 		// Now do the more expensive test initialization.
-		config, cleanup := driver.PrepareTest(f)
-		driverCleanup = cleanup
+		config := driver.PrepareTest(f)
 		sc = dDriver.GetDynamicProvisionStorageClass(config, pattern.FsType)
 		if sc == nil {
 			e2eskipper.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", dInfo.Name)
 		}
 	}
 
-	cleanup := func() {
-		err := storageutils.TryFunc(driverCleanup)
-		driverCleanup = nil
-		framework.ExpectNoError(err, "while cleaning up driver")
-	}
-
 	ginkgo.It("provides storage capacity information", func() {
 		init()
-		defer cleanup()
 
 		timeout := time.Minute
 		pollInterval := time.Second

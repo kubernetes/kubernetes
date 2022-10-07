@@ -114,8 +114,7 @@ func (p *provisioningTestSuite) SkipUnsupportedTests(driver storageframework.Tes
 
 func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
-		config        *storageframework.PerTestConfig
-		driverCleanup func()
+		config *storageframework.PerTestConfig
 
 		testCase  *StorageClassTest
 		cs        clientset.Interface
@@ -140,7 +139,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		l = local{}
 		dDriver, _ = driver.(storageframework.DynamicPVTestDriver)
 		// Now do the more expensive test initialization.
-		l.config, l.driverCleanup = driver.PrepareTest(f)
+		l.config = driver.PrepareTest(f)
 		l.migrationCheck = newMigrationOpCheck(f.ClientSet, f.ClientConfig(), dInfo.InTreePluginName)
 		l.cs = l.config.Framework.ClientSet
 		testVolumeSizeRange := p.GetTestSuiteInfo().SupportedSizeRange
@@ -177,10 +176,6 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 	}
 
 	cleanup := func() {
-		err := storageutils.TryFunc(l.driverCleanup)
-		l.driverCleanup = nil
-		framework.ExpectNoError(err, "while cleaning up driver")
-
 		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
 
