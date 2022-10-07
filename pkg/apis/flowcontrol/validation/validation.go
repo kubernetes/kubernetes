@@ -388,6 +388,14 @@ func ValidateLimitedPriorityLevelConfiguration(lplc *flowcontrol.LimitedPriority
 		allErrs = append(allErrs, field.Invalid(fldPath.Child(getVersionedFieldNameForConcurrencyShares(requestGV)), lplc.NominalConcurrencyShares, "must be positive"))
 	}
 	allErrs = append(allErrs, ValidateLimitResponse(lplc.LimitResponse, fldPath.Child("limitResponse"))...)
+
+	if lplc.LendablePercent != nil && !(*lplc.LendablePercent >= 0 && *lplc.LendablePercent <= 100) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("lendablePercent"), *lplc.LendablePercent, "must be between 0 and 100, inclusive"))
+	}
+	if lplc.BorrowingLimitPercent != nil && *lplc.BorrowingLimitPercent < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("borrowingLimitPercent"), *lplc.BorrowingLimitPercent, "if specified, must be a non-negative integer"))
+	}
+
 	return allErrs
 }
 
