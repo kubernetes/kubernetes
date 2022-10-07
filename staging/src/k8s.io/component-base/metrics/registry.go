@@ -155,6 +155,8 @@ type KubeRegistry interface {
 	// Reset invokes the Reset() function on all items in the registry
 	// which are added as resettables.
 	Reset()
+	// RegisterMetaMetrics registers metrics about the number of registered metrics.
+	RegisterMetaMetrics()
 }
 
 // kubeRegistry is a wrapper around a prometheus registry-type object. Upon initialization
@@ -359,8 +361,11 @@ func newKubeRegistry(v apimachineryversion.Info) *kubeRegistry {
 // NewKubeRegistry creates a new vanilla Registry
 func NewKubeRegistry() KubeRegistry {
 	r := newKubeRegistry(BuildVersion())
+	return r
+}
+
+func (r *kubeRegistry) RegisterMetaMetrics() {
 	r.MustRegister(registeredMetrics)
 	r.MustRegister(disabledMetricsTotal)
 	r.MustRegister(hiddenMetricsTotal)
-	return r
 }
