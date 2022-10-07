@@ -89,14 +89,6 @@ func (r *lazyMetric) lazyInit(self kubeCollector, fqName string) {
 	r.self = self
 }
 
-func stabilityLevelOrDefault(sl string) string {
-	if sl == "" {
-		return string(INTERNAL)
-	} else {
-		return sl
-	}
-}
-
 // preprocessMetric figures out whether the lazy metric should be hidden or not.
 // This method takes a Version argument which should be the version of the binary in which
 // this code is currently being executed. A metric can be hidden under two conditions:
