@@ -34,7 +34,7 @@ LATEST_ETCD_VERSION?=3.5.5
 # REVISION provides a version number for this image and all it's bundled
 # artifacts. It should start at zero for each LATEST_ETCD_VERSION and increment
 # for each revision of this image at that etcd version.
-REVISION?=0
+REVISION?=1
 
 # IMAGE_TAG Uniquely identifies registry.k8s.io/etcd docker image with a tag of the form "<etcd-version>-<revision>".
 IMAGE_TAG=$(LATEST_ETCD_VERSION)-$(REVISION)
@@ -43,7 +43,7 @@ ARCH?=amd64
 
 # Operating systems supported: linux, windows
 OS ?= linux
-# OS Version for the Windows images: 1809, 20H2, ltsc2022
+# OS Version for the Windows images: 1809, ltsc2022
 OSVERSION ?= 1809
 
 # The output type could either be docker (local), or registry.
@@ -54,7 +54,7 @@ ALL_OS = linux windows
 ALL_ARCH.linux = amd64 arm arm64 ppc64le s390x
 ALL_OS_ARCH.linux = $(foreach arch, ${ALL_ARCH.linux}, linux-$(arch))
 ALL_ARCH.windows = amd64
-ALL_OSVERSIONS.windows := 1809 20H2 ltsc2022
+ALL_OSVERSIONS.windows := 1809 ltsc2022
 ALL_OS_ARCH.windows = $(foreach arch, $(ALL_ARCH.windows), $(foreach osversion, ${ALL_OSVERSIONS.windows}, windows-$(arch)-${osversion}))
 ALL_OS_ARCH = $(foreach os, $(ALL_OS), ${ALL_OS_ARCH.${os}})
 
