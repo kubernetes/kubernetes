@@ -72,6 +72,7 @@ type lazyMetric struct {
 	markDeprecationOnce sync.Once
 	createOnce          sync.Once
 	self                kubeCollector
+	stabilityLevel      StabilityLevel
 }
 
 func (r *lazyMetric) IsCreated() bool {
@@ -149,6 +150,7 @@ func (r *lazyMetric) Create(version *semver.Version) bool {
 	if r.IsHidden() {
 		return false
 	}
+
 	r.createOnce.Do(func() {
 		r.createLock.Lock()
 		defer r.createLock.Unlock()
@@ -159,6 +161,13 @@ func (r *lazyMetric) Create(version *semver.Version) bool {
 			r.self.initializeMetric()
 		}
 	})
+	sl := r.stabilityLevel
+	deprecatedV := r.self.DeprecatedVersion()
+	dv := ""
+	if deprecatedV != nil {
+		dv = deprecatedV.String()
+	}
+	registeredMetrics.WithLabelValues(string(sl), dv).Inc()
 	return r.IsCreated()
 }
 

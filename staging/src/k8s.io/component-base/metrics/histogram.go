@@ -52,7 +52,7 @@ func NewHistogram(opts *HistogramOpts) *Histogram {
 
 	h := &Histogram{
 		HistogramOpts: opts,
-		lazyMetric:    lazyMetric{},
+		lazyMetric:    lazyMetric{stabilityLevel: opts.StabilityLevel},
 	}
 	h.setPrometheusHistogram(noopMetric{})
 	h.lazyInit(h, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
@@ -119,7 +119,7 @@ func NewHistogramVec(opts *HistogramOpts, labels []string) *HistogramVec {
 		HistogramVec:   noopHistogramVec,
 		HistogramOpts:  opts,
 		originalLabels: labels,
-		lazyMetric:     lazyMetric{},
+		lazyMetric:     lazyMetric{stabilityLevel: opts.StabilityLevel},
 	}
 	v.lazyInit(v, fqName)
 	return v
