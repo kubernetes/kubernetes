@@ -2,6 +2,7 @@ package internal
 
 import (
 	"strings"
+	"time"
 
 	"github.com/onsi/ginkgo/v2/types"
 )
@@ -38,6 +39,10 @@ func (s Spec) FlakeAttempts() int {
 	}
 
 	return flakeAttempts
+}
+
+func (s Spec) SpecTimeout() time.Duration {
+	return s.FirstNodeWithType(types.NodeTypeIt).SpecTimeout
 }
 
 type Specs []Spec

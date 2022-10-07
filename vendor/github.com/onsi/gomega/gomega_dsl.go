@@ -22,7 +22,7 @@ import (
 	"github.com/onsi/gomega/types"
 )
 
-const GOMEGA_VERSION = "1.20.1"
+const GOMEGA_VERSION = "1.22.1"
 
 const nilGomegaPanic = `You are trying to make an assertion, but haven't registered Gomega's fail handler.
 If you're using Ginkgo then you probably forgot to put your assertion in an It().
@@ -233,7 +233,7 @@ func ExpectWithOffset(offset int, actual interface{}, extra ...interface{}) Asse
 Eventually enables making assertions on asynchronous behavior.
 
 Eventually checks that an assertion *eventually* passes.  Eventually blocks when called and attempts an assertion periodically until it passes or a timeout occurs.  Both the timeout and polling interval are configurable as optional arguments.
-The first optional argument is the timeout (which defaults to 1s), the second is the polling interval (which defaults to 10ms).  Both intervals can be specified as time.Duration, parsable duration strings or floats/integers (in which case they are interpreted as seconds).
+The first optional argument is the timeout (which defaults to 1s), the second is the polling interval (which defaults to 10ms).  Both intervals can be specified as time.Duration, parsable duration strings or floats/integers (in which case they are interpreted as seconds).  In addition an optional context.Context can be passed in - Eventually will keep trying until either the timeout epxires or the context is cancelled, whichever comes first.
 
 Eventually works with any Gomega compatible matcher and supports making assertions against three categories of actual value:
 
@@ -266,7 +266,7 @@ this will trigger Go's race detector as the goroutine polling via Eventually wil
 
 **Category 2: Make Eventually assertions on functions**
 
-Eventually can be passed functions that **take no arguments** and **return at least one value**.  When configured this way, Eventually will poll the function repeatedly and pass the first returned value to the matcher.
+Eventually can be passed functions that **return at least one value**.  When configured this way, Eventually will poll the function repeatedly and pass the first returned value to the matcher.
 
 For example:
 
@@ -286,7 +286,27 @@ Then
 
 will pass only if and when the returned error is nil *and* the returned string satisfies the matcher.
 
-It is important to note that the function passed into Eventually is invoked *synchronously* when polled.  Eventually does not (in fact, it cannot) kill the function if it takes longer to return than Eventually's configured timeout.  You should design your functions with this in mind.
+Eventually can also accept functions that take arguments, however you must provide those arguments using .WithArguments().  For example, consider a function that takes a user-id and makes a network request to fetch a full name:
+	func FetchFullName(userId int) (string, error)
+
+You can poll this function like so:
+	Eventually(FetchFullName).WithArguments(1138).Should(Equal("Wookie"))
+
+It is important to note that the function passed into Eventually is invoked *synchronously* when polled.  Eventually does not (in fact, it cannot) kill the function if it takes longer to return than Eventually's configured timeout.  A common practice here is to use a context.  Here's an example that combines Ginkgo's spec timeout support with Eventually:
+
+	It("fetches the correct count", func(ctx SpecContext) {
+		Eventually(func() int {
+			return client.FetchCount(ctx, "/users")
+		}, ctx).Should(BeNumerically(">=", 17))
+	}, SpecTimeout(time.Second))
+
+you an also use Eventually().WithContext(ctx) to pass in the context.  Passed-in contexts play nicely with paseed-in arguments as long as the context appears first.  You can rewrite the above example as:
+
+	It("fetches the correct count", func(ctx SpecContext) {
+		Eventually(client.FetchCount).WithContext(ctx).WithArguments("/users").Should(BeNumerically(">=", 17))
+	}, SpecTimeout(time.Second))
+
+Either way the context passd to Eventually is also passed to the underlying funciton.  Now, when Ginkgo cancels the context both the FetchCount client and Gomega will be informed and can exit.
 
 **Category 3: Making assertions _in_ the function passed into Eventually**
 
@@ -316,12 +336,28 @@ For example:
 
 will rerun the function until all assertions pass.
 
-`Eventually` specifying a timeout interval (and an optional polling interval) are
-the same as `Eventually(...).WithTimeout` or `Eventually(...).WithTimeout(...).WithPolling`.
+You can also pass additional arugments to functions that take a Gomega.  The only rule is that the Gomega argument must be first.  If you also want to pass the context attached to Eventually you must ensure that is the second argument.  For example:
+
+	Eventually(func(g Gomega, ctx context.Context, path string, expected ...string){
+		tok, err := client.GetToken(ctx)
+		g.Expect(err).NotTo(HaveOccurred())
+
+		elements, err := client.Fetch(ctx, tok, path)
+		g.Expect(err).NotTo(HaveOccurred())
+		g.Expect(elements).To(ConsistOf(expected))
+	}).WithContext(ctx).WithArguments("/names", "Joe", "Jane", "Sam").Should(Succeed())
+
+Finally, in addition to passing timeouts and a context to Eventually you can be more explicit with Eventually's chaining configuration methods:
+
+	Eventually(..., "1s", "2s", ctx).Should(...)
+
+is equivalent to
+
+    Eventually(...).WithTimeout(time.Second).WithPolling(2*time.Second).WithContext(ctx).Should(...)
 */
-func Eventually(actual interface{}, intervals ...interface{}) AsyncAssertion {
+func Eventually(actual interface{}, args ...interface{}) AsyncAssertion {
 	ensureDefaultGomegaIsConfigured()
-	return Default.Eventually(actual, intervals...)
+	return Default.Eventually(actual, args...)
 }
 
 // EventuallyWithOffset operates like Eventually but takes an additional
@@ -333,9 +369,9 @@ func Eventually(actual interface{}, intervals ...interface{}) AsyncAssertion {
 // `EventuallyWithOffset` specifying a timeout interval (and an optional polling interval) are
 // the same as `Eventually(...).WithOffset(...).WithTimeout` or
 // `Eventually(...).WithOffset(...).WithTimeout(...).WithPolling`.
-func EventuallyWithOffset(offset int, actual interface{}, intervals ...interface{}) AsyncAssertion {
+func EventuallyWithOffset(offset int, actual interface{}, args ...interface{}) AsyncAssertion {
 	ensureDefaultGomegaIsConfigured()
-	return Default.EventuallyWithOffset(offset, actual, intervals...)
+	return Default.EventuallyWithOffset(offset, actual, args...)
 }
 
 /*
@@ -343,7 +379,7 @@ Consistently, like Eventually, enables making assertions on asynchronous behavio
 
 Consistently blocks when called for a specified duration.  During that duration Consistently repeatedly polls its matcher and ensures that it is satisfied.  If the matcher is consistently satisfied, then Consistently will pass.  Otherwise Consistently will fail.
 
-Both the total waiting duration and the polling interval are configurable as optional arguments.  The first optional argument is the duration that Consistently will run for (defaults to 100ms), and the second argument is the polling interval (defaults to 10ms).  As with Eventually, these intervals can be passed in as time.Duration, parsable duration strings or an integer or float number of seconds.
+Both the total waiting duration and the polling interval are configurable as optional arguments.  The first optional argument is the duration that Consistently will run for (defaults to 100ms), and the second argument is the polling interval (defaults to 10ms).  As with Eventually, these intervals can be passed in as time.Duration, parsable duration strings or an integer or float number of seconds.  You can also pass in an optional context.Context - Consistently will exit early (with a failure) if the context is cancelled before the waiting duration expires.
 
 Consistently accepts the same three categories of actual as Eventually, check the Eventually docs to learn more.
 
@@ -353,9 +389,9 @@ Consistently is useful in cases where you want to assert that something *does no
 
 This will block for 200 milliseconds and repeatedly check the channel and ensure nothing has been received.
 */
-func Consistently(actual interface{}, intervals ...interface{}) AsyncAssertion {
+func Consistently(actual interface{}, args ...interface{}) AsyncAssertion {
 	ensureDefaultGomegaIsConfigured()
-	return Default.Consistently(actual, intervals...)
+	return Default.Consistently(actual, args...)
 }
 
 // ConsistentlyWithOffset operates like Consistently but takes an additional
@@ -364,10 +400,43 @@ func Consistently(actual interface{}, intervals ...interface{}) AsyncAssertion {
 //
 // `ConsistentlyWithOffset` is the same as `Consistently(...).WithOffset` and
 // optional `WithTimeout` and `WithPolling`.
-func ConsistentlyWithOffset(offset int, actual interface{}, intervals ...interface{}) AsyncAssertion {
+func ConsistentlyWithOffset(offset int, actual interface{}, args ...interface{}) AsyncAssertion {
 	ensureDefaultGomegaIsConfigured()
-	return Default.ConsistentlyWithOffset(offset, actual, intervals...)
+	return Default.ConsistentlyWithOffset(offset, actual, args...)
 }
+
+/*
+StopTrying can be used to signal to Eventually and Consistently that the polled function will not change
+and that they should stop trying.  In the case of Eventually, if a match does not occur in this, final, iteration then a failure will result.  In the case of Consistently, as long as this last iteration satisfies the match, the assertion will be considered successful.
+
+You can send the StopTrying signal by either returning a StopTrying("message") messages as an error from your passed-in function  _or_ by calling StopTrying("message").Now() to trigger a panic and end execution.
+
+Here are a couple of examples.  This is how you might use StopTrying() as an error to signal that Eventually should stop:
+
+	playerIndex, numPlayers := 0, 11
+	Eventually(func() (string, error) {
+		name := client.FetchPlayer(playerIndex)
+		playerIndex += 1
+		if playerIndex == numPlayers {
+			return name, StopTrying("No more players left")
+		} else {
+			return name, nil
+		}
+	}).Should(Equal("Patrick Mahomes"))
+
+note that the final `name` returned alongside `StopTrying()` will be processed.
+
+And here's an example where `StopTrying().Now()` is called to halt execution immediately:
+
+	Eventually(func() []string {
+		names, err := client.FetchAllPlayers()
+		if err == client.IRRECOVERABLE_ERROR {
+			StopTrying("Irrecoverable error occurred").Now()
+		}
+		return names
+	}).Should(ContainElement("Patrick Mahomes"))
+*/
+var StopTrying = internal.StopTrying
 
 // SetDefaultEventuallyTimeout sets the default timeout duration for Eventually. Eventually will repeatedly poll your condition until it succeeds, or until this timeout elapses.
 func SetDefaultEventuallyTimeout(t time.Duration) {

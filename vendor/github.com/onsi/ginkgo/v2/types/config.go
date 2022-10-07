@@ -33,6 +33,7 @@ type SuiteConfig struct {
 	Timeout               time.Duration
 	OutputInterceptorMode string
 	SourceRoots           []string
+	GracePeriod           time.Duration
 
 	ParallelProcess int
 	ParallelTotal   int
@@ -45,6 +46,7 @@ func NewDefaultSuiteConfig() SuiteConfig {
 		Timeout:         time.Hour,
 		ParallelProcess: 1,
 		ParallelTotal:   1,
+		GracePeriod:     30 * time.Second,
 	}
 }
 
@@ -283,6 +285,8 @@ var SuiteConfigFlags = GinkgoFlags{
 		Usage: "The location to look for source code when generating progress reports.  You can pass multiple --source-root flags."},
 	{KeyPath: "S.Timeout", Name: "timeout", SectionKey: "debug", UsageDefaultValue: "1h",
 		Usage: "Test suite fails if it does not complete within the specified timeout."},
+	{KeyPath: "S.GracePeriod", Name: "grace-period", SectionKey: "debug", UsageDefaultValue: "30s",
+		Usage: "When interrupted, Ginkgo will wait for GracePeriod for the current running node to exit before moving on to the next one."},
 	{KeyPath: "S.OutputInterceptorMode", Name: "output-interceptor-mode", SectionKey: "debug", UsageArgument: "dup, swap, or none",
 		Usage: "If set, ginkgo will use the specified output interception strategy when running in parallel.  Defaults to dup on unix and swap on windows."},
 
@@ -388,6 +392,10 @@ func VetConfig(flagSet GinkgoFlagSet, suiteConfig SuiteConfig, reporterConfig Re
 
 	if suiteConfig.DryRun && suiteConfig.ParallelTotal > 1 {
 		errors = append(errors, GinkgoErrors.DryRunInParallelConfiguration())
+	}
+
+	if suiteConfig.GracePeriod <= 0 {
+		errors = append(errors, GinkgoErrors.GracePeriodCannotBeZero())
 	}
 
 	if len(suiteConfig.FocusFiles) > 0 {
