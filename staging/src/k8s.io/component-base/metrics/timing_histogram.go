@@ -57,7 +57,7 @@ func NewTestableTimingHistogram(nowFunc func() time.Time, opts *TimingHistogramO
 	h := &TimingHistogram{
 		TimingHistogramOpts: opts,
 		nowFunc:             nowFunc,
-		lazyMetric:          lazyMetric{},
+		lazyMetric:          lazyMetric{stabilityLevel: opts.StabilityLevel},
 	}
 	h.setPrometheusHistogram(noopMetric{})
 	h.lazyInit(h, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
@@ -136,7 +136,7 @@ func NewTestableTimingHistogramVec(nowFunc func() time.Time, opts *TimingHistogr
 		TimingHistogramOpts: opts,
 		nowFunc:             nowFunc,
 		originalLabels:      labels,
-		lazyMetric:          lazyMetric{},
+		lazyMetric:          lazyMetric{stabilityLevel: opts.StabilityLevel},
 	}
 	v.lazyInit(v, fqName)
 	return v
