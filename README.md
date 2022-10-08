@@ -7,8 +7,7 @@
 ----
 
 Kubernetes, also known as K8s, is an open source system for managing [containerized applications]
-across multiple hosts. It provides basic mechanisms for deployment, maintenance,
-and scaling of applications.
+across multiple hosts. It provides basic mechanisms for deploying, maintaining, and scaling applications.
 
 Kubernetes builds upon a decade and a half of experience at Google running
 production workloads at scale using a system called [Borg],
@@ -32,7 +31,7 @@ Try our [interactive tutorial].
 Take a free course on [Scalable Microservices with Kubernetes].
 
 To use Kubernetes code as a library in other applications, see the [list of published components](https://git.k8s.io/kubernetes/staging/README.md).
-Use of the `k8s.io/kubernetes` module or `k8s.io/kubernetes/...` packages as libraries is not supported.
+Use of the `k8s.io/kubernetes` module or `k8s.io/kubernetes/...` packages as libraries are not supported.
 
 ## To start developing K8s
 
@@ -40,7 +39,7 @@ The [community repository] hosts all information about
 building Kubernetes from source, how to contribute code
 and documentation, who to contact about what, etc.
 
-If you want to build Kubernetes right away there are two options:
+If you want to build Kubernetes right away, there are two options:
 
 ##### You have a working [Go environment].
 
@@ -65,7 +64,7 @@ For the full story, head over to the [developer's documentation].
 ## Support
 
 If you need support, start with the [troubleshooting guide],
-and work your way through the process that we've outlined.
+and work your way through the process we've outlined.
 
 That said, if you have questions, reach out to us
 [one way or another][communication].
@@ -104,4 +103,4 @@ The [Kubernetes Steering community repo](https://github.com/kubernetes/steering)
 
 ## Roadmap 
 
-The [Kubernetes Enhancements repo](https://github.com/kubernetes/enhancements) provides information about Kubernetes releases, as well as feature tracking and backlogs.
+The [Kubernetes Enhancements repo](https://github.com/kubernetes/enhancements) provides information about Kubernetes releases, feature tracking, and backlogs.
