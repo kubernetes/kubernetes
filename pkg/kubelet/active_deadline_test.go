@@ -70,6 +70,7 @@ func TestNewActiveDeadlineHandler(t *testing.T) {
 	for i, testCase := range testCases {
 		actual, err := newActiveDeadlineHandler(testCase.podStatusProvider, testCase.recorder, testCase.clock)
 
+		// 0th case is the only one expected to pass, and is kept for coverage and confidence check
 		if i == 0 {
 			expected := &activeDeadlineHandler{
 				clock:             fakeClock,
