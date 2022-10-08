@@ -1066,13 +1066,16 @@ func newPodWithHugePageValue(resourceName api.ResourceName, value resource.Quant
 
 func TestPodStrategyValidate(t *testing.T) {
 	const containerName = "container"
-	errTest := []struct {
-		name string
-		pod  *api.Pod
+
+	tests := []struct {
+		name    string
+		pod     *api.Pod
+		wantErr bool
 	}{
 		{
-			name: "a new pod setting container with indivisible hugepages values",
-			pod:  newPodWithHugePageValue(api.ResourceHugePagesPrefix+"1Mi", resource.MustParse("1.1Mi")),
+			name:    "a new pod setting container with indivisible hugepages values",
+			pod:     newPodWithHugePageValue(api.ResourceHugePagesPrefix+"1Mi", resource.MustParse("1.1Mi")),
+			wantErr: true,
 		},
 		{
 			name: "a new pod setting init-container with indivisible hugepages values",
@@ -1100,6 +1103,7 @@ func TestPodStrategyValidate(t *testing.T) {
 					},
 				},
 			},
+			wantErr: true,
 		},
 		{
 			name: "a new pod setting init-container with indivisible hugepages values while container with divisible hugepages values",
@@ -1141,21 +1145,8 @@ func TestPodStrategyValidate(t *testing.T) {
 					},
 				},
 			},
+			wantErr: true,
 		},
-	}
-
-	for _, tc := range errTest {
-		t.Run(tc.name, func(t *testing.T) {
-			if errs := Strategy.Validate(genericapirequest.NewContext(), tc.pod); len(errs) == 0 {
-				t.Error("expected failure")
-			}
-		})
-	}
-
-	tests := []struct {
-		name string
-		pod  *api.Pod
-	}{
 		{
 			name: "a new pod setting container with divisible hugepages values",
 			pod: &api.Pod{
@@ -1189,8 +1180,12 @@ func TestPodStrategyValidate(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if errs := Strategy.Validate(genericapirequest.NewContext(), tc.pod); len(errs) != 0 {
-				t.Errorf("unexpected error:%v", errs)
+			errs := Strategy.Validate(genericapirequest.NewContext(), tc.pod)
+			if tc.wantErr && len(errs) == 0 {
+				t.Errorf("expected errors but got none")
+			}
+			if !tc.wantErr && len(errs) != 0 {
+				t.Errorf("unexpected errors: %v", errs.ToAggregate())
 			}
 		})
 	}
