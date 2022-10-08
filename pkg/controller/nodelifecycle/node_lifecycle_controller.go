@@ -834,9 +834,10 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 		var gracePeriod time.Duration
 		var observedReadyCondition v1.NodeCondition
 		var currentReadyCondition *v1.NodeCondition
+		var markPodsNotReady bool
 		node := nodes[i].DeepCopy()
 		if err := wait.PollImmediate(retrySleepTime, retrySleepTime*scheduler.NodeHealthUpdateRetry, func() (bool, error) {
-			gracePeriod, observedReadyCondition, currentReadyCondition, err = nc.tryUpdateNodeHealth(ctx, node)
+			gracePeriod, observedReadyCondition, currentReadyCondition, markPodsNotReady, err = nc.tryUpdateNodeHealth(ctx, node)
 			if err == nil {
 				return true, nil
 			}
@@ -862,7 +863,7 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 			pods, err := nc.getPodsAssignedToNode(node.Name)
 			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to list pods of node %v: %v", node.Name, err))
-				if currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue {
+				if markPodsNotReady {
 					// If error happened during node status transition (Ready -> NotReady)
 					// we need to mark node for retry to force MarkPodsNotReady execution
 					// in the next iteration.
@@ -880,7 +881,7 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 
 			_, needsRetry := nc.nodesToRetry.Load(node.Name)
 			switch {
-			case currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue:
+			case markPodsNotReady:
 				// Report node event only once when status changed.
 				controllerutil.RecordNodeStatusChange(nc.recorder, node, "NodeNotReady")
 				fallthrough
@@ -999,7 +1000,7 @@ func isNodeExcludedFromDisruptionChecks(node *v1.Node) bool {
 
 // tryUpdateNodeHealth checks a given node's conditions and tries to update it. Returns grace period to
 // which given node is entitled, state of current and last observed Ready Condition, and an error if it occurred.
-func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (time.Duration, v1.NodeCondition, *v1.NodeCondition, error) {
+func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (time.Duration, v1.NodeCondition, *v1.NodeCondition, bool, error) {
 	nodeHealth := nc.nodeHealthMap.getDeepCopy(node.Name)
 	defer func() {
 		nc.nodeHealthMap.set(node.Name, nodeHealth)
@@ -1008,6 +1009,7 @@ func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (t
 	var gracePeriod time.Duration
 	var observedReadyCondition v1.NodeCondition
 	_, currentReadyCondition := controllerutil.GetNodeCondition(&node.Status, v1.NodeReady)
+	var markPodsNotReady bool
 	if currentReadyCondition == nil {
 		// If ready condition is nil, then kubelet (or nodecontroller) never posted node status.
 		// A fake ready condition is created, where LastHeartbeatTime and LastTransitionTime is set
@@ -1141,6 +1143,7 @@ func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (t
 					currentCondition.Reason = "NodeStatusUnknown"
 					currentCondition.Message = "Kubelet stopped posting node status."
 					currentCondition.LastTransitionTime = nowTimestamp
+					markPodsNotReady = true
 				}
 			}
 		}
@@ -1150,7 +1153,7 @@ func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (t
 		if !apiequality.Semantic.DeepEqual(currentReadyCondition, &observedReadyCondition) {
 			if _, err := nc.kubeClient.CoreV1().Nodes().UpdateStatus(ctx, node, metav1.UpdateOptions{}); err != nil {
 				klog.Errorf("Error updating node %s: %v", node.Name, err)
-				return gracePeriod, observedReadyCondition, currentReadyCondition, err
+				return gracePeriod, observedReadyCondition, currentReadyCondition, markPodsNotReady, err
 			}
 			nodeHealth = &nodeHealthData{
 				status:                   &node.Status,
@@ -1158,11 +1161,11 @@ func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (t
 				readyTransitionTimestamp: nc.now(),
 				lease:                    observedLease,
 			}
-			return gracePeriod, observedReadyCondition, currentReadyCondition, nil
+			return gracePeriod, observedReadyCondition, currentReadyCondition, markPodsNotReady, nil
 		}
 	}
 
-	return gracePeriod, observedReadyCondition, currentReadyCondition, nil
+	return gracePeriod, observedReadyCondition, currentReadyCondition, markPodsNotReady, nil
 }
 
 func (nc *Controller) handleDisruption(ctx context.Context, zoneToNodeConditions map[string][]*v1.NodeCondition, nodes []*v1.Node) {
