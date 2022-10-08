@@ -175,7 +175,7 @@ func GetHollowKubeletConfig(opt *HollowKubeletOptions) (*options.KubeletFlags, *
 	c.EnableServer = true
 	c.Address = "0.0.0.0" /* bind address */
 	c.Port = int32(opt.KubeletPort)
-	c.ReadOnlyPort = 0
+	c.ReadOnlyPort = int32(opt.KubeletReadOnlyPort)
 	c.StaticPodPath = podFilePath
 	c.FileCheckFrequency.Duration = 20 * time.Second
 	c.HTTPCheckFrequency.Duration = 20 * time.Second
