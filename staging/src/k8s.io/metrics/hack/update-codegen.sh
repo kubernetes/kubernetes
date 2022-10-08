@@ -19,14 +19,16 @@ set -o nounset
 set -o pipefail
 
 SCRIPT_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
-CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; ls -d -1 ./vendor/k8s.io/code-generator 2>/dev/null || echo ../code-generator)}
+CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; go list -f '{{.Dir}}' k8s.io/code-generator)}
 
 source "${CODEGEN_PKG}/kube_codegen.sh"
 
 # generate the code with:
-# --output-base    because this script should also be able to run inside the vendor dir of
-#                  k8s.io/kubernetes. The output-base is needed for the generators to output into the vendor dir
-#                  instead of the $GOPATH directly. For normal projects this can be dropped.
+# --output-base    because this script should also be able to run inside the
+#                  staging dir of k8s.io/kubernetes. The output-base is needed
+#                  for the generators to output into the staging dir instead of
+#                  the $GOPATH directly. For normal projects this can be
+#                  dropped.
 #
 # we skip informers and listers for metrics, because we don't quite support the requisite operations yet
 # we skip generating the internal clientset as it's not really needed

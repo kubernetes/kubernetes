@@ -41,7 +41,9 @@ gotoprotobuf=$(kube::util::find-binary "go-to-protobuf")
 # core Google protobuf types
 PATH="${KUBE_ROOT}/_output/bin:${PATH}" \
   "${gotoprotobuf}" \
-  --proto-import="${KUBE_ROOT}/vendor" \
+  -v "${KUBE_VERBOSE}" \
+  --proto-import="${KUBE_ROOT}/vendor" `# required for gogo.proto` \
+  --proto-import="${KUBE_ROOT}/staging/src" \
   --proto-import="${KUBE_ROOT}/third_party/protobuf" \
   --packages="$(IFS=, ; echo "$*")" \
   --go-header-file "${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt"
