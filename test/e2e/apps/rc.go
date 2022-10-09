@@ -392,7 +392,14 @@ var _ = SIGDescribe("ReplicationController", func() {
 		})
 	})
 
-	ginkgo.It("should get and update a ReplicationController scale", func() {
+	/*
+		Release: v1.26
+		Testname: Replication Controller, get and update ReplicationController scale
+		Description: A ReplicationController is created which MUST succeed. It MUST
+		succeed when reading the ReplicationController scale. When updating the
+		ReplicationController scale it MUST succeed and the field MUST equal the new value.
+	*/
+	framework.ConformanceIt("should get and update a ReplicationController scale", func() {
 		rcClient := f.ClientSet.CoreV1().ReplicationControllers(ns)
 		rcName := "e2e-rc-" + utilrand.String(5)
 		initialRCReplicaCount := int32(1)
