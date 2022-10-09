@@ -22,10 +22,10 @@ limitations under the License.
 package appsv1beta2
 
 import (
-	v1beta2 "k8s.io/api/apps/v1beta2"
-	conversion "k8s.io/apimachinery/pkg/conversion"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	scheme "k8s.io/client-go/scale/scheme"
+	"k8s.io/api/apps/v1beta2"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/scale/scheme"
 )
 
 func init() {

@@ -22,13 +22,13 @@ limitations under the License.
 package v1beta1
 
 import (
-	unsafe "unsafe"
+	"unsafe"
 
-	v1beta1 "k8s.io/api/rbac/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	conversion "k8s.io/apimachinery/pkg/conversion"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	rbac "k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/api/rbac/v1beta1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
 func init() {

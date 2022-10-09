@@ -22,8 +22,8 @@ limitations under the License.
 package v1beta3
 
 import (
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1beta3 "k8s.io/kube-scheduler/config/v1beta3"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kube-scheduler/config/v1beta3"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.

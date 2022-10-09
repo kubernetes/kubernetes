@@ -22,11 +22,11 @@ limitations under the License.
 package v1alpha2
 
 import (
-	unsafe "unsafe"
+	"unsafe"
 
-	conversion "k8s.io/apimachinery/pkg/conversion"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	output "k8s.io/kubernetes/cmd/kubeadm/app/apis/output"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/output"
 )
 
 func init() {

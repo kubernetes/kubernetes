@@ -22,12 +22,12 @@ limitations under the License.
 package v1alpha1
 
 import (
-	unsafe "unsafe"
+	"unsafe"
 
-	conversion "k8s.io/apimachinery/pkg/conversion"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
 	configv1alpha1 "k8s.io/component-base/config/v1alpha1"
-	config "k8s.io/controller-manager/config"
+	"k8s.io/controller-manager/config"
 )
 
 func init() {

@@ -22,9 +22,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	cloudproviderconfigv1alpha1 "k8s.io/cloud-provider/config/v1alpha1"
-	v1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
+	"k8s.io/kube-controller-manager/config/v1alpha1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.

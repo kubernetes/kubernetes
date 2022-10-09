@@ -22,14 +22,14 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	conversion "k8s.io/apimachinery/pkg/conversion"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
 	cloudproviderconfigv1alpha1 "k8s.io/cloud-provider/config/v1alpha1"
 	serviceconfigv1alpha1 "k8s.io/cloud-provider/controllers/service/config/v1alpha1"
 	configv1alpha1 "k8s.io/controller-manager/config/v1alpha1"
-	v1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
-	config "k8s.io/kubernetes/pkg/controller/apis/config"
+	"k8s.io/kube-controller-manager/config/v1alpha1"
+	"k8s.io/kubernetes/pkg/controller/apis/config"
 	signerconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/certificates/signer/config/v1alpha1"
 	cronjobconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/cronjob/config/v1alpha1"
 	daemonconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/daemon/config/v1alpha1"

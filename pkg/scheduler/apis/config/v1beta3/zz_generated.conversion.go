@@ -22,15 +22,15 @@ limitations under the License.
 package v1beta3
 
 import (
-	unsafe "unsafe"
+	"unsafe"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	conversion "k8s.io/apimachinery/pkg/conversion"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1alpha1 "k8s.io/component-base/config/v1alpha1"
-	v1beta3 "k8s.io/kube-scheduler/config/v1beta3"
-	config "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/component-base/config/v1alpha1"
+	"k8s.io/kube-scheduler/config/v1beta3"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
 func init() {

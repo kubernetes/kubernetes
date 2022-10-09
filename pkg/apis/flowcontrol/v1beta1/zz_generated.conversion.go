@@ -22,12 +22,12 @@ limitations under the License.
 package v1beta1
 
 import (
-	unsafe "unsafe"
+	"unsafe"
 
-	v1beta1 "k8s.io/api/flowcontrol/v1beta1"
-	conversion "k8s.io/apimachinery/pkg/conversion"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	flowcontrol "k8s.io/kubernetes/pkg/apis/flowcontrol"
+	"k8s.io/api/flowcontrol/v1beta1"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 )
 
 func init() {
