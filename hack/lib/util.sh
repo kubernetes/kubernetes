@@ -308,12 +308,24 @@ kube::util::remove-gen-docs() {
 kube::util::group-version-to-pkg-path() {
   local group_version="$1"
 
-  while IFS=$'\n' read -r api; do
-    if [[ "${api}" = "${group_version/.*k8s.io/}" ]]; then
-      echo "vendor/k8s.io/api/${group_version/.*k8s.io/}"
+  # Make a list of all know APIs by listing their dirs.
+  local apidirs=()
+  kube::util::read-array apidirs < <(
+      cd "${KUBE_ROOT}/staging/src/k8s.io/api" || return 1 # make shellcheck happy
+      find . -name types.go -exec dirname {} \; \
+        | sed "s|\./||g" \
+        | LC_ALL=C sort -u)
+
+  # Compare each API dir against the requested GV, and if we find it, no
+  # special handling needed.
+  for api in "${apidirs[@]}"; do
+    # Change "foo.bar.k8s.io/v1" -> "foo/v1" notation.
+    local simple_gv="${group_version/.*k8s.io/}"
+    if [[ "${api}" = "${simple_gv}" ]]; then
+      echo "vendor/k8s.io/api/${simple_gv}"
       return
     fi
-  done < <(cd "${KUBE_ROOT}/staging/src/k8s.io/api" && find . -name types.go -exec dirname {} \; | sed "s|\./||g" | sort)
+  done
 
   # "v1" is the API GroupVersion
   if [[ "${group_version}" == "v1" ]]; then
