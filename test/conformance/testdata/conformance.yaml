@@ -2393,6 +2393,16 @@
     validate the pod resources are applied to the Limitrange
   release: v1.18
   file: test/e2e/scheduling/limit_range.go
+- testname: LimitRange, list, patch and delete a LimitRange by collection
+  codename: '[sig-scheduling] LimitRange should list, patch and delete a LimitRange
+    by collection [Conformance]'
+  description: When two limitRanges are created in different namespaces, both MUST
+    succeed. Listing limitRanges across all namespaces with a labelSelector MUST find
+    both limitRanges. When patching the first limitRange it MUST succeed and the fields
+    MUST equal the new values. When deleting the limitRange by collection with a labelSelector
+    it MUST delete only one limitRange.
+  release: v1.26
+  file: test/e2e/scheduling/limit_range.go
 - testname: Scheduler, resource limits
   codename: '[sig-scheduling] SchedulerPredicates [Serial] validates resource limits
     of pods that are allowed to run  [Conformance]'
