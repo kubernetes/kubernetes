@@ -88,16 +88,13 @@
   type: Histogram
   stabilityLevel: STABLE
   buckets:
-  - 5
-  - 10
-  - 15
-  - 20
-  - 25
-  - 30
-  - 35
-  - 40
-  - 45
-  - 50
+  - 1
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
 - name: queue_incoming_pods_total
   subsystem: scheduler
   help: Number of pods added to scheduling queues by event and queue type.
