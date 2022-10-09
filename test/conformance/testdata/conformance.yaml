@@ -1083,6 +1083,12 @@
     ServiceAccount will be deleted and MUST find a deleted watch event.
   release: v1.19
   file: test/e2e/auth/service_accounts.go
+- testname: ServiceAccount, update a ServiceAccount
+  codename: '[sig-auth] ServiceAccounts should update a ServiceAccount [Conformance]'
+  description: A ServiceAccount is created which MUST succeed. When updating the ServiceAccount
+    it MUST succeed and the field MUST equal the new value.
+  release: v1.26
+  file: test/e2e/auth/service_accounts.go
 - testname: Kubectl, guestbook application
   codename: '[sig-cli] Kubectl client Guestbook application should create and stop
     a working application  [Conformance]'
