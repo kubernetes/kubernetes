@@ -5,8 +5,8 @@ options:
   no_parent_owners: true
 reviewers:
   - aojea
-  - neolit123
   - johnSchnake
+  - neolit123
   - SataQiu
 approvers:
   - andrewsykim
@@ -15,13 +15,13 @@ approvers:
   - bowei # for test/e2e/{dns*,network}.go
   - caseydavenport # for test/e2e/{dns*,network}.go
   - cblecker
-  - dims
-  - MrHohn
   - deads2k
+  - dims
   - enj
   - janetkuo
   - liggitt
   - mikedanese
+  - MrHohn
   - msau42
   - neolit123
   - oomichi

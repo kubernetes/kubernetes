@@ -4,13 +4,13 @@ options:
   # make root approval non-recursive
   no_parent_owners: true
 reviewers:
-  - dims
   - dchen1107
+  - dims
   - lavalamp
   - thockin
 approvers:
-  - dims
   - dchen1107
+  - dims
   - lavalamp
   - thockin
 emeritus_approvers:

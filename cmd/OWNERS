@@ -5,13 +5,13 @@ options:
   no_parent_owners: true
 reviewers:
   - dchen1107
+  - dims
   - lavalamp
   - mikedanese
   - thockin
-  - dims
 approvers:
   - dchen1107
+  - dims
   - lavalamp
   - mikedanese
   - thockin
-  - dims

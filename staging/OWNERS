@@ -8,12 +8,12 @@ approvers:
   - lavalamp
   - smarterclayton
 reviewers:
+  - caesarxuchao
+  - deads2k
   - dims
   - lavalamp
-  - smarterclayton
-  - wojtek-t
-  - deads2k
-  - caesarxuchao
-  - mikedanese
   - liggitt
+  - mikedanese
+  - smarterclayton
   - sttts
+  - wojtek-t

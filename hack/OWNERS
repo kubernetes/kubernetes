@@ -9,10 +9,10 @@ reviewers:
   - hwdef
   - justaugustus
   - lavalamp
+  - mikedanese
   - SataQiu
   - spiffxp
   - sttts
-  - mikedanese
 approvers:
   - bentheelder
   - cblecker
@@ -21,12 +21,12 @@ approvers:
   - enj # for sig-auth related stuff like cert testdata
   - lavalamp
   - liggitt
+  - mikedanese
   - pwittrock
   - SataQiu
   - soltysh # for sig-cli related stuff
   - spiffxp
   - sttts
-  - mikedanese
 emeritus_approvers:
   - eparis
   - fejta
