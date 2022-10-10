@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/utils/pointer"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1999,6 +2000,7 @@ func newPodDiskStats(pod *v1.Pod, rootFsUsed, logsUsed, perLocalVolumeUsed resou
 	logsUsedBytes := uint64(logsUsed.Value())
 	for range pod.Spec.Containers {
 		result.Containers = append(result.Containers, statsapi.ContainerStats{
+			Name: pod.Name,
 			Rootfs: &statsapi.FsStats{
 				UsedBytes: &rootFsUsedBytes,
 			},
@@ -2008,6 +2010,8 @@ func newPodDiskStats(pod *v1.Pod, rootFsUsed, logsUsed, perLocalVolumeUsed resou
 		})
 	}
 
+	ephemeralStorageUsedBytes := rootFsUsedBytes + logsUsedBytes
+
 	perLocalVolumeUsedBytes := uint64(perLocalVolumeUsed.Value())
 	for _, volumeName := range localVolumeNames(pod) {
 		result.VolumeStats = append(result.VolumeStats, statsapi.VolumeStats{
@@ -2016,6 +2020,11 @@ func newPodDiskStats(pod *v1.Pod, rootFsUsed, logsUsed, perLocalVolumeUsed resou
 				UsedBytes: &perLocalVolumeUsedBytes,
 			},
 		})
+		ephemeralStorageUsedBytes += perLocalVolumeUsedBytes
+	}
+
+	result.EphemeralStorage = &statsapi.FsStats{
+		UsedBytes: pointer.Uint64(ephemeralStorageUsedBytes),
 	}
 
 	return result

@@ -34,8 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -493,6 +495,11 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	// Set PodScheduledCondition.LastTransitionTime.
 	updateLastTransitionTime(&status, &oldStatus, v1.PodScheduled)
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		// Set ResourceExhausted.LastTransitionTime
+		updateLastTransitionTime(&status, &oldStatus, kubetypes.ResourceExhausted)
+	}
+
 	// ensure that the start time does not change across updates.
 	if oldStatus.StartTime != nil && !oldStatus.StartTime.IsZero() {
 		status.StartTime = oldStatus.StartTime
@@ -868,9 +875,29 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningCon
 			podConditions = append(podConditions, c)
 		}
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		// update pod failure conditions if a new one is present, otherwise preserve the old one
+		cType := kubetypes.ResourceExhausted
+		_, condition := podutil.GetPodConditionFromList(newPodStatus.Conditions, cType)
+		if condition == nil {
+			_, condition = podutil.GetPodConditionFromList(oldPodStatus.Conditions, cType)
+		}
+		if condition != nil {
+			podConditions = append(podConditions, *condition)
+		}
+	}
+
 	for _, c := range newPodStatus.Conditions {
 		if kubetypes.PodConditionByKubelet(c.Type) {
-			podConditions = append(podConditions, c)
+			if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+				// skip copying of pod failure conditions here, as they are copied (if any present) already
+				if c.Type != kubetypes.ResourceExhausted {
+					podConditions = append(podConditions, c)
+				}
+			} else {
+				podConditions = append(podConditions, c)
+			}
 		}
 	}
 	newPodStatus.Conditions = podConditions

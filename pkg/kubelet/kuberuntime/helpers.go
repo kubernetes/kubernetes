@@ -146,7 +146,7 @@ func (m *kubeGenericRuntimeManager) getImageUser(image string) (*int64, string, 
 // 3. container gets OOMKilled.
 func isInitContainerFailed(status *kubecontainer.Status) bool {
 	// When oomkilled occurs, init container should be considered as a failure.
-	if status.Reason == "OOMKilled" {
+	if status.Reason == kubecontainer.OOMKilledReason {
 		return true
 	}
 

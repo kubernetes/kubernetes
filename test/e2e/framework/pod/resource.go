@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -621,6 +623,20 @@ func GetPodSecretUpdateTimeout(c clientset.Interface) time.Duration {
 	}
 	podLogTimeout := 240*time.Second + secretTTL
 	return podLogTimeout
+}
+
+// verify pod has the expected condition, skip comparison of the time-based fields: LastProbeTime, LastTransitionTime
+func VerifyPodHasCondition(f *framework.Framework, pod *v1.Pod, wantCondition v1.PodCondition) {
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "Failed to get the recent pod object for name: %q", pod.Name)
+
+	gotCondition := findPodConditionByType(&pod.Status, wantCondition.Type)
+	if gotCondition == nil {
+		framework.Failf("pod %q should have the condition: %q, pod status: %v", pod.Name, wantCondition, pod.Status)
+	}
+	if diff := cmp.Diff(wantCondition, *gotCondition, cmpopts.IgnoreFields(v1.PodCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
+		framework.Failf("pod %q has unexpected pod condition: %s", pod.Name, diff)
+	}
 }
 
 func getNodeTTLAnnotationValue(c clientset.Interface) (time.Duration, error) {

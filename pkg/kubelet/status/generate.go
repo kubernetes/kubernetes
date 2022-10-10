@@ -245,3 +245,31 @@ func generatePodReadyConditionForTerminalPhase(podPhase v1.PodPhase) v1.PodCondi
 
 	return condition
 }
+
+func GenerateResourceExhaustedCondition(podStatus *v1.PodStatus) *v1.PodCondition {
+	if oomKilledContainer := getOOMKilledContainer(podStatus.InitContainerStatuses, podStatus.ContainerStatuses); oomKilledContainer != nil {
+		return &v1.PodCondition{
+			Type:    kubetypes.ResourceExhausted,
+			Status:  v1.ConditionTrue,
+			Reason:  kubecontainer.OOMKilledReason,
+			Message: fmt.Sprintf("OOMKilled container: %s", oomKilledContainer.Name),
+		}
+	}
+	return nil
+}
+
+func getOOMKilledContainer(initContainerStatuses, containerStatuses []v1.ContainerStatus) *v1.ContainerStatus {
+	if oomKilledContainer := getOOMKilledContainerInList(initContainerStatuses); oomKilledContainer != nil {
+		return oomKilledContainer
+	}
+	return getOOMKilledContainerInList(containerStatuses)
+}
+
+func getOOMKilledContainerInList(containerStatuses []v1.ContainerStatus) *v1.ContainerStatus {
+	for _, container := range containerStatuses {
+		if container.State.Terminated != nil && container.State.Terminated.Reason == kubecontainer.OOMKilledReason {
+			return &container
+		}
+	}
+	return nil
+}

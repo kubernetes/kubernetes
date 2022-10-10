@@ -1510,6 +1510,23 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 			s.Conditions = append(s.Conditions, c)
 		}
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		// copy over the ResourceExhausted condition based on OOM killed containers
+		_, podFailureCondition := podutil.GetPodConditionFromList(oldPodStatus.Conditions, kubetypes.ResourceExhausted)
+
+		// generate the ResourceExhausted condition based on the pod status if the restart policy is Never -
+		// in order to ensure the condition is valid and would not change if the container is restarted
+		if pod.Spec.RestartPolicy == v1.RestartPolicyNever {
+			if generatedCondition := status.GenerateResourceExhaustedCondition(s); generatedCondition != nil {
+				podFailureCondition = generatedCondition
+			}
+		}
+		if podFailureCondition != nil {
+			s.Conditions = append(s.Conditions, *podFailureCondition)
+		}
+	}
+
 	// set all Kubelet-owned conditions
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodHasNetworkCondition) {
 		s.Conditions = append(s.Conditions, status.GeneratePodHasNetworkCondition(pod, podStatus))

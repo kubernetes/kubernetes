@@ -668,3 +668,8 @@ const (
 	// log output that the termination message can contain.
 	MaxContainerTerminationMessageLogLines = 80
 )
+
+// Constant for the reason field set for containers terminated by OOM killer
+const (
+	OOMKilledReason = "OOMKilled"
+)

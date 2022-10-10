@@ -16,6 +16,8 @@ limitations under the License.
 
 package types
 
+import v1 "k8s.io/api/core/v1"
+
 const (
 	// ResolvConfDefault is the system default DNS resolver configuration.
 	ResolvConfDefault = "/etc/resolv.conf"
@@ -52,4 +54,18 @@ const (
 	// pod and IP address(es) assigned. Images for containers specified in the pod
 	// spec can be pulled and containers launched after this condition is true.
 	PodHasNetwork = "PodHasNetwork"
+)
+
+const (
+	// ResourceExhausted indicates the pod is in the Failed phase or is about to
+	// transition into the Failed phase (and is about to be deleted) due to either:
+	// - exceeding its ephemeral storage limits; or
+	// - running an OOM killed container when the pod's .spec.restartPolicy=Never.
+	ResourceExhausted = v1.PodConditionType("ResourceExhausted")
+)
+
+// Reasons for pod failure conditions added by Kubelet
+const (
+	EphemeralStorageLimitExceeded = "EphemeralStorageLimitExceeded"
+	OOMKilled                     = "OOMKilled"
 )

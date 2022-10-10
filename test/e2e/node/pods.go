@@ -651,13 +651,13 @@ func (v *podStartVerifier) Verify(event watch.Event) error {
 		return fmt.Errorf("pod %s on node %s had incorrect containers: %#v", pod.Name, pod.Spec.NodeName, pod.Status.ContainerStatuses)
 	}
 
-	if status := findContainerStatusInPod(pod, "blocked"); status != nil {
+	if status := e2epod.FindContainerStatusInPod(pod, "blocked"); status != nil {
 		if (status.Started != nil && *status.Started == true) || status.LastTerminationState.Terminated != nil || status.State.Waiting == nil {
 			return fmt.Errorf("pod %s on node %s should not have started the blocked container: %#v", pod.Name, pod.Spec.NodeName, status)
 		}
 	}
 
-	status := findContainerStatusInPod(pod, "fail")
+	status := e2epod.FindContainerStatusInPod(pod, "fail")
 	if status == nil {
 		return fmt.Errorf("pod %s on node %s had incorrect containers: %#v", pod.Name, pod.Spec.NodeName, pod.Status)
 	}
@@ -740,24 +740,4 @@ func (v *podStartVerifier) VerifyFinal(scenario string, total time.Duration) (*v
 
 	framework.Logf("Pod %s on node %s %s total=%s run=%s execute=%s", pod.Name, pod.Spec.NodeName, scenario, total, v.completeDuration, v.duration)
 	return pod, errs
-}
-
-// findContainerStatusInPod finds a container status by its name in the provided pod
-func findContainerStatusInPod(pod *v1.Pod, containerName string) *v1.ContainerStatus {
-	for _, container := range pod.Status.InitContainerStatuses {
-		if container.Name == containerName {
-			return &container
-		}
-	}
-	for _, container := range pod.Status.ContainerStatuses {
-		if container.Name == containerName {
-			return &container
-		}
-	}
-	for _, container := range pod.Status.EphemeralContainerStatuses {
-		if container.Name == containerName {
-			return &container
-		}
-	}
-	return nil
 }

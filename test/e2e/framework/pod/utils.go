@@ -231,3 +231,33 @@ func mixinRestrictedContainerSecurityContext(container *v1.Container) {
 		}
 	}
 }
+
+// FindContainerStatusInPod finds a container status by its name in the provided pod
+func FindContainerStatusInPod(pod *v1.Pod, containerName string) *v1.ContainerStatus {
+	for _, container := range pod.Status.InitContainerStatuses {
+		if container.Name == containerName {
+			return &container
+		}
+	}
+	for _, container := range pod.Status.ContainerStatuses {
+		if container.Name == containerName {
+			return &container
+		}
+	}
+	for _, container := range pod.Status.EphemeralContainerStatuses {
+		if container.Name == containerName {
+			return &container
+		}
+	}
+	return nil
+}
+
+// findPodConditionByType loop ups the pod condition by type in the pod status
+func findPodConditionByType(podStatus *v1.PodStatus, conditionType v1.PodConditionType) *v1.PodCondition {
+	for _, cond := range podStatus.Conditions {
+		if cond.Type == conditionType {
+			return &cond
+		}
+	}
+	return nil
+}

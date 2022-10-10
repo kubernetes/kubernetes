@@ -20,10 +20,11 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -489,6 +490,119 @@ func TestGeneratePodHasNetworkCondition(t *testing.T) {
 			condition := GeneratePodHasNetworkCondition(test.pod, test.status)
 			require.Equal(t, test.expected.Type, condition.Type)
 			require.Equal(t, test.expected.Status, condition.Status)
+		})
+	}
+}
+
+func TestResourceExhaustedCondition(t *testing.T) {
+	for desc, test := range map[string]struct {
+		pod           *v1.Pod
+		status        *v1.PodStatus
+		wantCondition *v1.PodCondition
+	}{
+		"Empty pod status": {
+			pod:           &v1.Pod{},
+			status:        &v1.PodStatus{},
+			wantCondition: nil,
+		},
+		"Container OOM killed": {
+			pod: &v1.Pod{},
+			status: &v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name: "A",
+						State: v1.ContainerState{
+							Running: &v1.ContainerStateRunning{},
+						},
+					},
+					{
+						Name: "B",
+						State: v1.ContainerState{
+							Terminated: &v1.ContainerStateTerminated{
+								Reason:   "OOMKilled",
+								ExitCode: 137,
+							},
+						},
+					},
+				},
+			},
+			wantCondition: &v1.PodCondition{
+				Type:    kubetypes.ResourceExhausted,
+				Status:  v1.ConditionTrue,
+				Reason:  "OOMKilled",
+				Message: "OOMKilled container: B",
+			},
+		},
+		"Init container OOM killed": {
+			pod: &v1.Pod{},
+			status: &v1.PodStatus{
+				InitContainerStatuses: []v1.ContainerStatus{
+					{
+						Name: "InitA",
+						State: v1.ContainerState{
+							Terminated: &v1.ContainerStateTerminated{
+								Reason:   "OOMKilled",
+								ExitCode: 137,
+							},
+						},
+					},
+				},
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name: "B",
+						State: v1.ContainerState{
+							Waiting: &v1.ContainerStateWaiting{},
+						},
+					},
+				},
+			},
+			wantCondition: &v1.PodCondition{
+				Type:    kubetypes.ResourceExhausted,
+				Status:  v1.ConditionTrue,
+				Reason:  "OOMKilled",
+				Message: "OOMKilled container: InitA",
+			},
+		},
+		"No OOM killed container": {
+			pod: &v1.Pod{},
+			status: &v1.PodStatus{
+				InitContainerStatuses: []v1.ContainerStatus{
+					{
+						Name: "InitA",
+						State: v1.ContainerState{
+							Terminated: &v1.ContainerStateTerminated{
+								ExitCode: 0,
+							},
+						},
+					},
+				},
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name: "B",
+						State: v1.ContainerState{
+							Running: &v1.ContainerStateRunning{},
+						},
+					},
+				},
+			},
+			wantCondition: nil,
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			gotCondition := GenerateResourceExhaustedCondition(test.status)
+			if test.wantCondition == nil {
+				if gotCondition != nil {
+					t.Errorf("Got unexpected pod condition: %v", *gotCondition)
+				}
+			} else {
+				if gotCondition == nil {
+					t.Errorf("Missing expected condition: %v", *test.wantCondition)
+				} else {
+					if diff := cmp.Diff(*test.wantCondition, *gotCondition); diff != "" {
+						t.Errorf("Unexpected pod condition: %s", diff)
+					}
+				}
+			}
 		})
 	}
 }

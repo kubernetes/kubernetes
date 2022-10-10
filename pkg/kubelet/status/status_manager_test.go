@@ -34,11 +34,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	kubeconfigmap "k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -1397,21 +1400,90 @@ func deleteAction() core.DeleteAction {
 
 func TestMergePodStatus(t *testing.T) {
 	useCases := []struct {
-		desc                 string
-		hasRunningContainers bool
-		oldPodStatus         func(input v1.PodStatus) v1.PodStatus
-		newPodStatus         func(input v1.PodStatus) v1.PodStatus
-		expectPodStatus      v1.PodStatus
+		desc                          string
+		enablePodDisruptionConditions bool
+		hasRunningContainers          bool
+		oldPodStatus                  func(input v1.PodStatus) v1.PodStatus
+		newPodStatus                  func(input v1.PodStatus) v1.PodStatus
+		expectPodStatus               v1.PodStatus
 	}{
 		{
 			"no change",
+			false,
 			false,
 			func(input v1.PodStatus) v1.PodStatus { return input },
 			func(input v1.PodStatus) v1.PodStatus { return input },
 			getPodStatus(),
 		},
 		{
+			"add ResourceExhausted condition",
+			true,
+			false,
+			func(input v1.PodStatus) v1.PodStatus { return input },
+			func(input v1.PodStatus) v1.PodStatus {
+				input.Conditions = append(input.Conditions, v1.PodCondition{
+					Type:   kubetypes.ResourceExhausted,
+					Status: v1.ConditionTrue,
+					Reason: "OOMKilled",
+				})
+				return input
+			},
+			v1.PodStatus{
+				Phase: v1.PodRunning,
+				Conditions: []v1.PodCondition{
+					{
+						Type:   v1.PodReady,
+						Status: v1.ConditionTrue,
+					},
+					{
+						Type:   v1.PodScheduled,
+						Status: v1.ConditionTrue,
+					},
+					{
+						Type:   kubetypes.ResourceExhausted,
+						Status: v1.ConditionTrue,
+						Reason: "OOMKilled",
+					},
+				},
+				Message: "Message",
+			},
+		},
+		{
+			"preserve ResourceExhausted condition",
+			true,
+			false,
+			func(input v1.PodStatus) v1.PodStatus {
+				input.Conditions = append(input.Conditions, v1.PodCondition{
+					Type:   kubetypes.ResourceExhausted,
+					Status: v1.ConditionTrue,
+					Reason: "OOMKilled",
+				})
+				return input
+			},
+			func(input v1.PodStatus) v1.PodStatus { return input },
+			v1.PodStatus{
+				Phase: v1.PodRunning,
+				Conditions: []v1.PodCondition{
+					{
+						Type:   v1.PodReady,
+						Status: v1.ConditionTrue,
+					},
+					{
+						Type:   v1.PodScheduled,
+						Status: v1.ConditionTrue,
+					},
+					{
+						Type:   kubetypes.ResourceExhausted,
+						Status: v1.ConditionTrue,
+						Reason: "OOMKilled",
+					},
+				},
+				Message: "Message",
+			},
+		},
+		{
 			"readiness changes",
+			false,
 			false,
 			func(input v1.PodStatus) v1.PodStatus { return input },
 			func(input v1.PodStatus) v1.PodStatus {
@@ -1435,6 +1507,7 @@ func TestMergePodStatus(t *testing.T) {
 		},
 		{
 			"additional pod condition",
+			false,
 			false,
 			func(input v1.PodStatus) v1.PodStatus {
 				input.Conditions = append(input.Conditions, v1.PodCondition{
@@ -1465,6 +1538,7 @@ func TestMergePodStatus(t *testing.T) {
 		},
 		{
 			"additional pod condition and readiness changes",
+			false,
 			false,
 			func(input v1.PodStatus) v1.PodStatus {
 				input.Conditions = append(input.Conditions, v1.PodCondition{
@@ -1498,6 +1572,7 @@ func TestMergePodStatus(t *testing.T) {
 		},
 		{
 			"additional pod condition changes",
+			false,
 			false,
 			func(input v1.PodStatus) v1.PodStatus {
 				input.Conditions = append(input.Conditions, v1.PodCondition{
@@ -1535,6 +1610,7 @@ func TestMergePodStatus(t *testing.T) {
 		{
 			"phase is transitioning to failed and no containers running",
 			false,
+			false,
 			func(input v1.PodStatus) v1.PodStatus {
 				input.Phase = v1.PodRunning
 				input.Reason = "Unknown"
@@ -1569,6 +1645,7 @@ func TestMergePodStatus(t *testing.T) {
 		},
 		{
 			"phase is transitioning to failed and containers running",
+			false,
 			true,
 			func(input v1.PodStatus) v1.PodStatus {
 				input.Phase = v1.PodRunning
@@ -1602,6 +1679,7 @@ func TestMergePodStatus(t *testing.T) {
 
 	for _, tc := range useCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, tc.enablePodDisruptionConditions)()
 			output := mergePodStatus(tc.oldPodStatus(getPodStatus()), tc.newPodStatus(getPodStatus()), tc.hasRunningContainers)
 			if !conditionsEqual(output.Conditions, tc.expectPodStatus.Conditions) || !statusEqual(output, tc.expectPodStatus) {
 				t.Fatalf("unexpected output: %s", cmp.Diff(tc.expectPodStatus, output))

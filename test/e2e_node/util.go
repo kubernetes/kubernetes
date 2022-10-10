@@ -80,6 +80,10 @@ const (
 	memoryManagerStateFile = "/var/lib/kubelet/memory_manager_state"
 )
 
+const (
+	ResourceExhausted = "ResourceExhausted"
+)
+
 var kubeletHealthCheckURL = fmt.Sprintf("http://127.0.0.1:%d/healthz", ports.KubeletHealthzPort)
 
 func getNodeSummary() (*stats.Summary, error) {
