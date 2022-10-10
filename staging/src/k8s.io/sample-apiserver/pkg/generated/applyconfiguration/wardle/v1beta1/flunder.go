@@ -21,6 +21,7 @@ package v1beta1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	applyconfigurationsmetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	wardlev1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
 )
@@ -176,18 +177,7 @@ func (b *FlunderApplyConfiguration) WithAnnotations(entries map[string]string) *
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
 func (b *FlunderApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *FlunderApplyConfiguration {
-	b.ensureObjectMetaApplyConfigurationExists()
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithOwnerReferences")
-		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
-	}
-	return b
-}
-
-// WithFinalizers adds the given value to the Finalizers field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+	/ and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Finalizers field.
 func (b *FlunderApplyConfiguration) WithFinalizers(values ...string) *FlunderApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
@@ -199,7 +189,7 @@ func (b *FlunderApplyConfiguration) WithFinalizers(values ...string) *FlunderApp
 
 func (b *FlunderApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &applyconfigurationsmetav1.ObjectMetaApplyConfiguration{}
 	}
 }
 

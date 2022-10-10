@@ -609,6 +609,7 @@ function codegen::applyconfigs() {
         | xargs -0 rm -f
 
     "${applyconfigurationgen}" \
+        --v "${KUBE_VERBOSE}" \
         --openapi-schema <("${modelsschema}") \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-base "${KUBE_ROOT}/staging/src" \
