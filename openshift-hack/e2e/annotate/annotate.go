@@ -206,7 +206,8 @@ func (r *ginkgoTestRenamer) generateRename(name string, node types.TestSpec) {
 		}
 	}
 
-	if !r.excludedTestsFilter.MatchString(newName) {
+	// Append suite name to test, if it doesn't already have one
+	if !r.excludedTestsFilter.MatchString(newName) && !strings.Contains(newName, "[Suite:") {
 		isSerial := strings.Contains(newName, "[Serial]")
 		isConformance := strings.Contains(newName, "[Conformance]")
 		switch {
