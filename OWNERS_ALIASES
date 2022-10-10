@@ -1,4 +1,6 @@
 aliases:
+  # Note: sig-architecture-approvers has approval on root files (including go.mod/go.sum) until https://github.com/kubernetes/test-infra/pull/21398 is resolved.
+  # People with approve rights via this alias should defer dependency update PRs to dep-approvers.
   sig-architecture-approvers:
     - dims
     - derekwaynecarr
@@ -462,6 +464,8 @@ aliases:
     - jayunit100
     - jsturtevant
     - marosset
+  # Note: dep-approvers has approval on root files (including OWNERS_ALIASES) until https://github.com/kubernetes/test-infra/pull/21398 is resolved.
+  # People with approve rights via this alias should defer updates of root files other than go.mod/go.sum to dep-approvers.
   dep-approvers:
     - BenTheElder
     - cblecker

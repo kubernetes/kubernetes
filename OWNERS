@@ -2,8 +2,12 @@
 
 filters:
   ".*":
-    reviewers: []
-    approvers: []
+    reviewers:
+      - dep-reviewers
+      - sig-architecture-approvers
+    approvers:
+      - dep-approvers # for go.mod/go.sum
+      - sig-architecture-approvers # for OWNERS_ALIASES and other root files
     emeritus_approvers:
       - bgrant0607
       - brendandburns
