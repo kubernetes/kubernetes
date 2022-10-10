@@ -27,6 +27,9 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
+// TODO(DangerOnTheRanger): wire in MaxRequestBodyBytes from apiserver/pkg/server/options/server_run_options.go to make this configurable
+const maxRequestSizeBytes = apiservercel.DefaultMaxRequestSizeBytes
+
 // SchemaDeclType converts the structural schema to a CEL declaration, or returns nil if the
 // structural schema should not be exposed in CEL expressions.
 // Set isResourceRoot to true for the root of a custom resource or embedded resource.
@@ -55,7 +58,7 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *apiservercel.Dec
 		//
 		dyn := apiservercel.NewSimpleTypeWithMinSize("dyn", cel.DynType, nil, 1) // smallest value for a serialized x-kubernetes-int-or-string is 0
 		// handle x-kubernetes-int-or-string by returning the max length/min serialized size of the largest possible string
-		dyn.MaxElements = apiservercel.MaxRequestSizeBytes - 2
+		dyn.MaxElements = maxRequestSizeBytes - 2
 		return dyn
 	}
 
@@ -229,7 +232,7 @@ func WithTypeAndObjectMeta(s *schema.Structural) *schema.Structural {
 // this function.
 func MaxCardinality(minSize int64) uint64 {
 	sz := minSize + 1 // assume at least one comma between elements
-	return uint64(apiservercel.MaxRequestSizeBytes / sz)
+	return uint64(maxRequestSizeBytes / sz)
 }
 
 // estimateMaxStringLengthPerRequest estimates the maximum string length (in characters)
@@ -238,7 +241,7 @@ func MaxCardinality(minSize int64) uint64 {
 func estimateMaxStringLengthPerRequest(s *schema.Structural) int64 {
 	if s.ValueValidation == nil || s.XIntOrString {
 		// subtract 2 to account for ""
-		return apiservercel.MaxRequestSizeBytes - 2
+		return maxRequestSizeBytes - 2
 	}
 	switch s.ValueValidation.Format {
 	case "duration":
@@ -249,7 +252,7 @@ func estimateMaxStringLengthPerRequest(s *schema.Structural) int64 {
 		return apiservercel.MaxDatetimeSizeJSON
 	default:
 		// subtract 2 to account for ""
-		return apiservercel.MaxRequestSizeBytes - 2
+		return maxRequestSizeBytes - 2
 	}
 }
 
@@ -257,7 +260,7 @@ func estimateMaxStringLengthPerRequest(s *schema.Structural) int64 {
 // the provided minimum serialized size that can fit into a single request.
 func estimateMaxArrayItemsFromMinSize(minSize int64) int64 {
 	// subtract 2 to account for [ and ]
-	return (apiservercel.MaxRequestSizeBytes - 2) / (minSize + 1)
+	return (maxRequestSizeBytes - 2) / (minSize + 1)
 }
 
 // estimateMaxAdditionalPropertiesPerRequest estimates the maximum number of additional properties
@@ -267,5 +270,5 @@ func estimateMaxAdditionalPropertiesFromMinSize(minSize int64) int64 {
 	// will all vary in length
 	keyValuePairSize := minSize + 6
 	// subtract 2 to account for { and }
-	return (apiservercel.MaxRequestSizeBytes - 2) / keyValuePairSize
+	return (maxRequestSizeBytes - 2) / keyValuePairSize
 }

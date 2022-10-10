@@ -17,9 +17,8 @@ limitations under the License.
 package cel
 
 const (
-	// MaxRequestSizeBytes is the largest request that will be accepted is 3MB
-	// TODO(DangerOnTheRanger): wire in MaxRequestBodyBytes from apiserver/pkg/server/options/server_run_options.go to make this configurable
-	MaxRequestSizeBytes = int64(3 * 1024 * 1024)
+	// DefaultMaxRequestSizeBytes is the size of the largest request that will be accepted
+	DefaultMaxRequestSizeBytes = int64(3 * 1024 * 1024)
 
 	// MaxDurationSizeJSON
 	// OpenAPI duration strings follow RFC 3339, section 5.6 - see the comment on maxDatetimeSizeJSON

@@ -443,7 +443,7 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 				},
 			},
 			// should be exactly equal to maxRequestSizeBytes - 2 (to allow for quotes in the case of a string)
-			ExpectedMaxElements: apiservercel.MaxRequestSizeBytes - 2,
+			ExpectedMaxElements: apiservercel.DefaultMaxRequestSizeBytes - 2,
 		},
 		{
 			Name: "objectDefaultFieldArray",
