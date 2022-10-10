@@ -27,16 +27,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	netutils "k8s.io/utils/net"
@@ -2496,14 +2496,306 @@ func Test_generateAPIPodStatus(t *testing.T) {
 	now := metav1.Now()
 
 	tests := []struct {
-		name                           string
-		pod                            *v1.Pod
-		currentStatus                  *kubecontainer.PodStatus
-		unreadyContainer               []string
-		previousStatus                 v1.PodStatus
-		expected                       v1.PodStatus
-		expectedPodHasNetworkCondition v1.PodCondition
+		name                               string
+		pod                                *v1.Pod
+		currentStatus                      *kubecontainer.PodStatus
+		unreadyContainer                   []string
+		previousStatus                     v1.PodStatus
+		expected                           v1.PodStatus
+		expectedPodHasNetworkCondition     v1.PodCondition
+		expectedResourceExhaustedCondition v1.PodCondition
 	}{
+		{
+			name: "Single container OOMKilled; RestartPolicy=OnFailure",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "containerA"},
+					},
+					RestartPolicy: v1.RestartPolicyOnFailure,
+				},
+				ObjectMeta: metav1.ObjectMeta{Name: "my-pod", DeletionTimestamp: &now},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+					},
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:       kubecontainer.ContainerID{ID: "containerA"},
+						Name:     "containerA",
+						Reason:   "OOMKilled",
+						ExitCode: 137,
+						State:    kubecontainer.ContainerStateExited,
+					},
+				},
+			},
+			previousStatus: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					runningState("containerA"),
+				},
+			},
+			expected: v1.PodStatus{
+				Phase:    v1.PodRunning,
+				HostIP:   "127.0.0.1",
+				QOSClass: v1.PodQOSBestEffort,
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
+					{Type: v1.PodReady, Status: v1.ConditionTrue},
+					{Type: v1.ContainersReady, Status: v1.ConditionTrue},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+				},
+				InitContainerStatuses:      []v1.ContainerStatus{},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:        "containerA",
+						ContainerID: "://containerA",
+						Ready:       true,
+						State: v1.ContainerState{
+							Terminated: &v1.ContainerStateTerminated{
+								ExitCode:    137,
+								Reason:      "OOMKilled",
+								ContainerID: "://containerA",
+							},
+						},
+					},
+				},
+			},
+			expectedPodHasNetworkCondition: v1.PodCondition{
+				Type:   kubetypes.PodHasNetwork,
+				Status: v1.ConditionFalse,
+			},
+			// no ResourceExhausted pod failure condition is expected at the pod
+			// level as the container is going to be restarted.
+			expectedResourceExhaustedCondition: v1.PodCondition{},
+		},
+		{
+			name: "Single container OOMKilled",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "containerA"},
+					},
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+				ObjectMeta: metav1.ObjectMeta{Name: "my-pod", DeletionTimestamp: &now},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+					},
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:       kubecontainer.ContainerID{ID: "containerA"},
+						Name:     "containerA",
+						Reason:   "OOMKilled",
+						ExitCode: 137,
+						State:    kubecontainer.ContainerStateExited,
+					},
+				},
+			},
+			previousStatus: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					runningState("containerA"),
+				},
+			},
+			expected: v1.PodStatus{
+				Phase:    v1.PodFailed,
+				HostIP:   "127.0.0.1",
+				QOSClass: v1.PodQOSBestEffort,
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
+					{Type: v1.PodReady, Status: v1.ConditionFalse, Reason: "PodFailed"},
+					{Type: v1.ContainersReady, Status: v1.ConditionFalse, Reason: "PodFailed"},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+				},
+				InitContainerStatuses:      []v1.ContainerStatus{},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:        "containerA",
+						ContainerID: "://containerA",
+						Ready:       true,
+						State: v1.ContainerState{
+							Terminated: &v1.ContainerStateTerminated{
+								ExitCode:    137,
+								Reason:      "OOMKilled",
+								ContainerID: "://containerA",
+							},
+						},
+					},
+				},
+			},
+			expectedPodHasNetworkCondition: v1.PodCondition{
+				Type:   kubetypes.PodHasNetwork,
+				Status: v1.ConditionFalse,
+			},
+			expectedResourceExhaustedCondition: v1.PodCondition{
+				Type:    kubetypes.ResourceExhausted,
+				Status:  v1.ConditionTrue,
+				Reason:  "OOMKilled",
+				Message: "OOMKilled container: containerA",
+			},
+		},
+		{
+			name: "Init container OOMKilled",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{Name: "containerA"},
+					},
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+				ObjectMeta: metav1.ObjectMeta{Name: "my-pod", DeletionTimestamp: &now},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					InitContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+					},
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:       kubecontainer.ContainerID{ID: "containerA"},
+						Name:     "containerA",
+						Reason:   "OOMKilled",
+						ExitCode: 137,
+						State:    kubecontainer.ContainerStateExited,
+					},
+				},
+			},
+			previousStatus: v1.PodStatus{
+				InitContainerStatuses: []v1.ContainerStatus{
+					runningState("containerA"),
+				},
+			},
+			expected: v1.PodStatus{
+				Phase:    v1.PodFailed,
+				HostIP:   "127.0.0.1",
+				QOSClass: v1.PodQOSBestEffort,
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodInitialized, Status: v1.ConditionFalse, Reason: "ContainersNotInitialized", Message: "containers with incomplete status: [containerA]"},
+					{Type: v1.PodReady, Status: v1.ConditionFalse, Reason: "PodFailed"},
+					{Type: v1.ContainersReady, Status: v1.ConditionFalse, Reason: "PodFailed"},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+				},
+				InitContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:        "containerA",
+						ContainerID: "://containerA",
+						Ready:       false,
+						State: v1.ContainerState{
+							Terminated: &v1.ContainerStateTerminated{
+								ExitCode:    137,
+								Reason:      "OOMKilled",
+								ContainerID: "://containerA",
+							},
+						},
+					},
+				},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
+				ContainerStatuses:          []v1.ContainerStatus{},
+			},
+			expectedPodHasNetworkCondition: v1.PodCondition{
+				Type:   kubetypes.PodHasNetwork,
+				Status: v1.ConditionFalse,
+			},
+			expectedResourceExhaustedCondition: v1.PodCondition{
+				Type:    kubetypes.ResourceExhausted,
+				Status:  v1.ConditionTrue,
+				Reason:  "OOMKilled",
+				Message: "OOMKilled container: containerA",
+			},
+		},
+		{
+			name: "Two containers, one OOMKilled",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "containerA"},
+						{Name: "containerB"},
+					},
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+				ObjectMeta: metav1.ObjectMeta{Name: "my-pod", DeletionTimestamp: &now},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:       kubecontainer.ContainerID{ID: "containerA"},
+						Name:     "containerA",
+						Reason:   "OOMKilled",
+						ExitCode: 137,
+						State:    kubecontainer.ContainerStateExited,
+					},
+					{
+						ID:    kubecontainer.ContainerID{ID: "containerB"},
+						Name:  "containerB",
+						State: kubecontainer.ContainerStateRunning,
+					},
+				},
+			},
+			expected: v1.PodStatus{
+				Phase:    v1.PodRunning,
+				HostIP:   "127.0.0.1",
+				QOSClass: v1.PodQOSBestEffort,
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
+					{Type: v1.PodReady, Status: v1.ConditionTrue},
+					{Type: v1.ContainersReady, Status: v1.ConditionTrue},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+				},
+				InitContainerStatuses:      []v1.ContainerStatus{},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name:        "containerA",
+						ContainerID: "://containerA",
+						Ready:       true,
+						State: v1.ContainerState{
+							Terminated: &v1.ContainerStateTerminated{
+								ExitCode:    137,
+								Reason:      "OOMKilled",
+								ContainerID: "://containerA",
+							},
+						},
+					},
+					{
+						Name:        "containerB",
+						ContainerID: "://containerB",
+						Ready:       true,
+						State: v1.ContainerState{
+							Running: &v1.ContainerStateRunning{},
+						},
+					},
+				},
+			},
+			expectedPodHasNetworkCondition: v1.PodCondition{
+				Type:   kubetypes.PodHasNetwork,
+				Status: v1.ConditionFalse,
+			},
+			expectedResourceExhaustedCondition: v1.PodCondition{
+				Type:    kubetypes.ResourceExhausted,
+				Status:  v1.ConditionTrue,
+				Reason:  "OOMKilled",
+				Message: "OOMKilled container: containerA",
+			},
+		},
 		{
 			name: "current status ready, with previous statuses and deletion",
 			pod: &v1.Pod{
@@ -2533,6 +2825,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					{Type: v1.ContainersReady, Status: v1.ConditionTrue},
 					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
 				},
+				InitContainerStatuses:      []v1.ContainerStatus{},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
 				ContainerStatuses: []v1.ContainerStatus{
 					ready(waitingWithLastTerminationUnknown("containerA", 0)),
 					ready(waitingWithLastTerminationUnknown("containerB", 0)),
@@ -2542,6 +2836,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Type:   kubetypes.PodHasNetwork,
 				Status: v1.ConditionTrue,
 			},
+			expectedResourceExhaustedCondition: v1.PodCondition{},
 		},
 		{
 			name: "current status ready, with previous statuses and no deletion",
@@ -2571,6 +2866,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					{Type: v1.ContainersReady, Status: v1.ConditionTrue},
 					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
 				},
+				InitContainerStatuses:      []v1.ContainerStatus{},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
 				ContainerStatuses: []v1.ContainerStatus{
 					ready(waitingWithLastTerminationUnknown("containerA", 1)),
 					ready(waitingWithLastTerminationUnknown("containerB", 1)),
@@ -2580,6 +2877,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Type:   kubetypes.PodHasNetwork,
 				Status: v1.ConditionTrue,
 			},
+			expectedResourceExhaustedCondition: v1.PodCondition{},
 		},
 		{
 			name: "terminal phase cannot be changed (apiserver previous is succeeded)",
@@ -2610,6 +2908,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					{Type: v1.ContainersReady, Status: v1.ConditionFalse, Reason: "PodCompleted"},
 					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
 				},
+				InitContainerStatuses:      []v1.ContainerStatus{},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
 				ContainerStatuses: []v1.ContainerStatus{
 					ready(waitingWithLastTerminationUnknown("containerA", 1)),
 					ready(waitingWithLastTerminationUnknown("containerB", 1)),
@@ -2619,6 +2919,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Type:   kubetypes.PodHasNetwork,
 				Status: v1.ConditionFalse,
 			},
+			expectedResourceExhaustedCondition: v1.PodCondition{},
 		},
 		{
 			name: "terminal phase from previous status must remain terminal, restartAlways",
@@ -2653,6 +2954,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					{Type: v1.ContainersReady, Status: v1.ConditionFalse, Reason: "PodCompleted"},
 					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
 				},
+				InitContainerStatuses:      []v1.ContainerStatus{},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
 				ContainerStatuses: []v1.ContainerStatus{
 					ready(waitingWithLastTerminationUnknown("containerA", 1)),
 					ready(waitingWithLastTerminationUnknown("containerB", 1)),
@@ -2664,6 +2967,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Type:   kubetypes.PodHasNetwork,
 				Status: v1.ConditionFalse,
 			},
+			expectedResourceExhaustedCondition: v1.PodCondition{},
 		},
 		{
 			name: "terminal phase from previous status must remain terminal, restartNever",
@@ -2705,6 +3009,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					{Type: v1.ContainersReady, Status: v1.ConditionFalse, Reason: "PodCompleted"},
 					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
 				},
+				InitContainerStatuses:      []v1.ContainerStatus{},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
 				ContainerStatuses: []v1.ContainerStatus{
 					ready(succeededState("containerA")),
 					ready(succeededState("containerB")),
@@ -2716,6 +3022,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Type:   kubetypes.PodHasNetwork,
 				Status: v1.ConditionFalse,
 			},
+			expectedResourceExhaustedCondition: v1.PodCondition{},
 		},
 		{
 			name: "running can revert to pending",
@@ -2746,6 +3053,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					{Type: v1.ContainersReady, Status: v1.ConditionTrue},
 					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
 				},
+				InitContainerStatuses:      []v1.ContainerStatus{},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
 				ContainerStatuses: []v1.ContainerStatus{
 					ready(waitingStateWithReason("containerA", "ContainerCreating")),
 					ready(waitingStateWithReason("containerB", "ContainerCreating")),
@@ -2755,6 +3064,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Type:   kubetypes.PodHasNetwork,
 				Status: v1.ConditionTrue,
 			},
+			expectedResourceExhaustedCondition: v1.PodCondition{},
 		},
 		{
 			name: "reason and message are preserved when phase doesn't change",
@@ -2800,6 +3110,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					{Type: v1.ContainersReady, Status: v1.ConditionTrue},
 					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
 				},
+				InitContainerStatuses:      []v1.ContainerStatus{},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
 				ContainerStatuses: []v1.ContainerStatus{
 					ready(waitingStateWithReason("containerA", "ContainerCreating")),
 					ready(withID(runningStateWithStartedAt("containerB", time.Unix(1, 0).UTC()), "://foo")),
@@ -2809,6 +3121,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Type:   kubetypes.PodHasNetwork,
 				Status: v1.ConditionTrue,
 			},
+			expectedResourceExhaustedCondition: v1.PodCondition{},
 		},
 		{
 			name: "reason and message are cleared when phase changes",
@@ -2858,6 +3171,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					{Type: v1.ContainersReady, Status: v1.ConditionTrue},
 					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
 				},
+				InitContainerStatuses:      []v1.ContainerStatus{},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
 				ContainerStatuses: []v1.ContainerStatus{
 					ready(withID(runningStateWithStartedAt("containerA", time.Unix(1, 0).UTC()), "://c1")),
 					ready(withID(runningStateWithStartedAt("containerB", time.Unix(2, 0).UTC()), "://c2")),
@@ -2867,27 +3182,35 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Type:   kubetypes.PodHasNetwork,
 				Status: v1.ConditionTrue,
 			},
+			expectedResourceExhaustedCondition: v1.PodCondition{},
 		},
 	}
 	for _, test := range tests {
 		for _, enablePodHasNetworkCondition := range []bool{false, true} {
-			t.Run(test.name, func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHasNetworkCondition, enablePodHasNetworkCondition)()
-				testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-				defer testKubelet.Cleanup()
-				kl := testKubelet.kubelet
-				kl.statusManager.SetPodStatus(test.pod, test.previousStatus)
-				for _, name := range test.unreadyContainer {
-					kl.readinessManager.Set(kubecontainer.BuildContainerID("", findContainerStatusByName(test.expected, name).ContainerID), results.Failure, test.pod)
-				}
-				actual := kl.generateAPIPodStatus(test.pod, test.currentStatus)
-				if enablePodHasNetworkCondition {
-					test.expected.Conditions = append([]v1.PodCondition{test.expectedPodHasNetworkCondition}, test.expected.Conditions...)
-				}
-				if !apiequality.Semantic.DeepEqual(test.expected, actual) {
-					t.Fatalf("Unexpected status: %s", diff.ObjectReflectDiff(actual, test.expected))
-				}
-			})
+			for _, enablePodDisruptionConditions := range []bool{false, true} {
+				t.Run(fmt.Sprintf("name=%s,enablePodHasNetworkCondition=%v,enablePodDisruptionConditions=%v", test.name, enablePodHasNetworkCondition, enablePodDisruptionConditions), func(t *testing.T) {
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHasNetworkCondition, enablePodHasNetworkCondition)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, enablePodDisruptionConditions)()
+					testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+					defer testKubelet.Cleanup()
+					kl := testKubelet.kubelet
+					kl.statusManager.SetPodStatus(test.pod, test.previousStatus)
+					for _, name := range test.unreadyContainer {
+						kl.readinessManager.Set(kubecontainer.BuildContainerID("", findContainerStatusByName(test.expected, name).ContainerID), results.Failure, test.pod)
+					}
+					actual := kl.generateAPIPodStatus(test.pod, test.currentStatus)
+					expected := test.expected.DeepCopy()
+					if enablePodHasNetworkCondition {
+						expected.Conditions = append([]v1.PodCondition{test.expectedPodHasNetworkCondition}, expected.Conditions...)
+					}
+					if enablePodDisruptionConditions && test.expectedResourceExhaustedCondition.Type == kubetypes.ResourceExhausted {
+						expected.Conditions = append([]v1.PodCondition{test.expectedResourceExhaustedCondition}, expected.Conditions...)
+					}
+					if diff := cmp.Diff(*expected, actual, cmpopts.IgnoreFields(v1.PodCondition{}, "LastTransitionTime")); diff != "" {
+						t.Fatalf("Unexpected status: %s", diff)
+					}
+				})
+			}
 		}
 	}
 }

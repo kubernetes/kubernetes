@@ -149,6 +149,29 @@ func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 	}))
 }
 
+// UpdateStatus updates the pod status. It retries if there is a conflict, throw out error if
+// there is any other apierrors. name is the pod name, updateFn is the function updating the
+// pod status.
+func (c *PodClient) UpdateStatus(name string, updateFn func(podStatus *v1.PodStatus)) {
+	framework.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*30, func() (bool, error) {
+		pod, err := c.PodInterface.Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			return false, fmt.Errorf("failed to get pod %q: %v", name, err)
+		}
+		updateFn(&pod.Status)
+		_, err = c.PodInterface.UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{})
+		if err == nil {
+			framework.Logf("Successfully updated pod %q", name)
+			return true, nil
+		}
+		if apierrors.IsConflict(err) {
+			framework.Logf("Conflicting update to pod %q, re-get and re-update: %v", name, err)
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to update pod %q: %v", name, err)
+	}))
+}
+
 // AddEphemeralContainerSync adds an EphemeralContainer to a pod and waits for it to be running.
 func (c *PodClient) AddEphemeralContainerSync(pod *v1.Pod, ec *v1.EphemeralContainer, timeout time.Duration) error {
 	namespace := c.f.Namespace.Name

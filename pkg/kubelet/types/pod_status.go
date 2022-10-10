@@ -42,5 +42,31 @@ func PodConditionByKubelet(conditionType v1.PodConditionType) bool {
 			return true
 		}
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		if PodFailureCondition(conditionType) {
+			return true
+		}
+	}
 	return false
+}
+
+// PodFailureCondition returns the if the pod condition type is a pod failure condition
+func PodFailureCondition(conditionType v1.PodConditionType) bool {
+	for _, podFailureType := range PodFailureConditions() {
+		if podFailureType == conditionType {
+			return true
+		}
+	}
+	return false
+}
+
+// PodFailureConditions returns the list of pod failure conditions
+func PodFailureConditions() []v1.PodConditionType {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		return []v1.PodConditionType{
+			v1.AlphaNoCompatGuaranteeDisruptionTarget,
+			ResourceExhausted,
+		}
+	}
+	return []v1.PodConditionType{}
 }

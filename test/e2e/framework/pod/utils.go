@@ -17,12 +17,17 @@ limitations under the License.
 package pod
 
 import (
+	"context"
 	"flag"
 	"fmt"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	psaapi "k8s.io/pod-security-admission/api"
 	psapolicy "k8s.io/pod-security-admission/policy"
@@ -229,5 +234,49 @@ func mixinRestrictedContainerSecurityContext(container *v1.Container) {
 		if len(container.SecurityContext.Capabilities.Drop) == 0 {
 			container.SecurityContext.Capabilities.Drop = []v1.Capability{"ALL"}
 		}
+	}
+}
+
+// FindContainerStatusInPod finds a container status by its name in the provided pod
+func FindContainerStatusInPod(pod *v1.Pod, containerName string) *v1.ContainerStatus {
+	for _, container := range pod.Status.InitContainerStatuses {
+		if container.Name == containerName {
+			return &container
+		}
+	}
+	for _, container := range pod.Status.ContainerStatuses {
+		if container.Name == containerName {
+			return &container
+		}
+	}
+	for _, container := range pod.Status.EphemeralContainerStatuses {
+		if container.Name == containerName {
+			return &container
+		}
+	}
+	return nil
+}
+
+// GetPodConditionFromStatus returns pod condition by the type
+func GetPodConditionFromStatus(podStatus *v1.PodStatus, conditionType v1.PodConditionType) *v1.PodCondition {
+	for _, cond := range podStatus.Conditions {
+		if cond.Type == conditionType {
+			return &cond
+		}
+	}
+	return nil
+}
+
+// verify pod has the expected condition, skip comparison of the time-based fields: LastProbeTime, LastTransitionTime
+func VerifyPodHasCondition(f *framework.Framework, pod *v1.Pod, wantCondition v1.PodCondition) {
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "Failed to get the recent pod object for name: %q", pod.Name)
+
+	gotCondition := GetPodConditionFromStatus(&pod.Status, wantCondition.Type)
+	if gotCondition == nil {
+		framework.Failf("pod %q should have the condition: %q, pod status: %v", pod.Name, wantCondition, pod.Status)
+	}
+	if diff := cmp.Diff(wantCondition, *gotCondition, cmpopts.IgnoreFields(v1.PodCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
+		framework.Failf("pod %q has unexpected pod condition: %s", pod.Name, diff)
 	}
 }

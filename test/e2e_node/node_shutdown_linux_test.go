@@ -55,6 +55,162 @@ import (
 var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShutdown] [NodeFeature:GracefulNodeShutdownBasedOnPodPriority]", func() {
 	f := framework.NewDefaultFramework("graceful-node-shutdown")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+
+	ginkgo.Context("when gracefully shutting down; pod disruption conditions enabled [Feature:PodDisruptionConditions]", func() {
+
+		const (
+			pollInterval                        = 1 * time.Second
+			podStatusUpdateTimeout              = 30 * time.Second
+			nodeStatusUpdateTimeout             = 30 * time.Second
+			nodeShutdownGracePeriod             = 20 * time.Second
+			nodeShutdownGracePeriodCriticalPods = 10 * time.Second
+		)
+
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.FeatureGates = map[string]bool{
+				string(features.GracefulNodeShutdown):                   true,
+				string(features.PodDisruptionConditions):                true,
+				string(features.GracefulNodeShutdownBasedOnPodPriority): false,
+			}
+			initialConfig.ShutdownGracePeriod = metav1.Duration{Duration: nodeShutdownGracePeriod}
+			initialConfig.ShutdownGracePeriodCriticalPods = metav1.Duration{Duration: nodeShutdownGracePeriodCriticalPods}
+		})
+
+		ginkgo.BeforeEach(func() {
+			ginkgo.By("Wait for the node to be ready")
+			waitForNodeReady()
+		})
+
+		ginkgo.AfterEach(func() {
+			ginkgo.By("Emitting Shutdown false signal; cancelling the shutdown")
+			err := emitSignalPrepareForShutdown(false)
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("should add the DisruptionTarget pod failure condition to the evicted pods", func() {
+			nodeName := getNodeName(f)
+			nodeSelector := fields.Set{
+				"spec.nodeName": nodeName,
+			}.AsSelector().String()
+
+			pod_without_condition := getGracePeriodOverrideTestPod("without-condition", nodeName, 5, "")
+			pod_with_condition_true := getGracePeriodOverrideTestPod("with-condition-true", nodeName, 5, "")
+			pod_with_condition_false := getGracePeriodOverrideTestPod("with-condition-false", nodeName, 5, "")
+
+			// Define test pods
+			pods := []*v1.Pod{
+				pod_without_condition,
+				pod_with_condition_true,
+				pod_with_condition_false,
+			}
+
+			ginkgo.By("reating batch pods")
+			e2epod.NewPodClient(f).CreateBatch(pods)
+
+			list, err := e2epod.NewPodClient(f).List(context.TODO(), metav1.ListOptions{
+				FieldSelector: nodeSelector,
+			})
+
+			framework.ExpectNoError(err)
+			framework.ExpectEqual(len(list.Items), len(pods), "the number of pods is not as expected")
+
+			e2epod.NewPodClient(f).UpdateStatus(pod_with_condition_true.Name, func(podStatus *v1.PodStatus) {
+				podStatus.Conditions = append(podStatus.Conditions, v1.PodCondition{
+					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Status: v1.ConditionTrue,
+					Reason: "AddedByAPI",
+				})
+			})
+			e2epod.NewPodClient(f).UpdateStatus(pod_with_condition_false.Name, func(podStatus *v1.PodStatus) {
+				podStatus.Conditions = append(podStatus.Conditions, v1.PodCondition{
+					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Status: v1.ConditionFalse,
+					Reason: "AddedByAPI",
+				})
+			})
+			list, err = e2epod.NewPodClient(f).List(context.TODO(), metav1.ListOptions{
+				FieldSelector: nodeSelector,
+			})
+			if err != nil {
+				framework.Failf("Failed to start batch pod: %q", err)
+			}
+			framework.ExpectEqual(len(list.Items), len(pods), "the number of pods is not as expected")
+
+			for _, pod := range list.Items {
+				framework.Logf("Pod %q status conditions: %q", pod.Name, &pod.Status.Conditions)
+			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			go func() {
+				defer ginkgo.GinkgoRecover()
+				w := &cache.ListWatch{
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return f.ClientSet.CoreV1().Pods(f.Namespace.Name).Watch(context.TODO(), options)
+					},
+				}
+
+				// Setup watch to continuously monitor any pod events and detect invalid pod status updates
+				_, err = watchtools.Until(ctx, list.ResourceVersion, w, func(event watch.Event) (bool, error) {
+					if pod, ok := event.Object.(*v1.Pod); ok {
+						if isPodStatusAffectedByIssue108594(pod) {
+							return false, fmt.Errorf("failing test due to detecting invalid pod status")
+						}
+						// Watch will never terminate (only when the test ends due to context cancellation)
+						return false, nil
+					}
+					return false, nil
+				})
+
+				// Ignore timeout error since the context will be explicitly cancelled and the watch will never return true
+				if err != nil && err != wait.ErrWaitTimeout {
+					framework.Failf("watch for invalid pod status failed: %v", err.Error())
+				}
+			}()
+
+			ginkgo.By("Verifying batch pods are running")
+			for _, pod := range list.Items {
+				if podReady, err := testutils.PodRunningReady(&pod); err != nil || !podReady {
+					framework.Failf("Failed to start batch pod: %v", pod.Name)
+				}
+			}
+
+			ginkgo.By("Emitting shutdown signal")
+			err = emitSignalPrepareForShutdown(true)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Verifying that all pods are shutdown")
+			// All pod should be shutdown
+			gomega.Eventually(func() error {
+				list, err = e2epod.NewPodClient(f).List(context.TODO(), metav1.ListOptions{
+					FieldSelector: nodeSelector,
+				})
+				if err != nil {
+					return err
+				}
+				framework.ExpectEqual(len(list.Items), len(pods), "the number of pods is not as expected")
+
+				for _, pod := range list.Items {
+					if !isPodShutdown(&pod) {
+						framework.Logf("Expecting pod to be shutdown, but it's not currently: Pod: %q, Pod Status %+v", pod.Name, pod.Status)
+						return fmt.Errorf("pod should be shutdown, phase: %s", pod.Status.Phase)
+					}
+					e2epod.VerifyPodHasCondition(f, &pod, v1.PodCondition{
+						Type:    v1.AlphaNoCompatGuaranteeDisruptionTarget,
+						Status:  v1.ConditionTrue,
+						Reason:  "DeletionByKubelet",
+						Message: "Shutdown manager: deleting due to node shutdown event",
+					})
+				}
+				return nil
+			},
+				// Critical pod starts shutdown after (nodeShutdownGracePeriod-nodeShutdownGracePeriodCriticalPods)
+				podStatusUpdateTimeout+(nodeShutdownGracePeriod-nodeShutdownGracePeriodCriticalPods),
+				pollInterval).Should(gomega.BeNil())
+
+		})
+	})
+
 	ginkgo.Context("when gracefully shutting down", func() {
 
 		const (

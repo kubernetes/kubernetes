@@ -66,6 +66,7 @@ import (
 	"k8s.io/klog/v2"
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
@@ -1971,10 +1972,20 @@ func (kl *Kubelet) deletePod(pod *v1.Pod) error {
 // and updates the pod to the failed phase in the status manage.
 func (kl *Kubelet) rejectPod(pod *v1.Pod, reason, message string) {
 	kl.recorder.Eventf(pod, v1.EventTypeWarning, reason, message)
-	kl.statusManager.SetPodStatus(pod, v1.PodStatus{
+	podMessage := "Pod was rejected: " + message
+	podStatus := v1.PodStatus{
 		Phase:   v1.PodFailed,
 		Reason:  reason,
-		Message: "Pod was rejected: " + message})
+		Message: podMessage}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		podutil.UpdatePodCondition(&podStatus, &v1.PodCondition{
+			Type:    v1.AlphaNoCompatGuaranteeDisruptionTarget,
+			Status:  v1.ConditionTrue,
+			Reason:  kubetypes.DeletionByKubelet,
+			Message: podMessage,
+		})
+	}
+	kl.statusManager.SetPodStatus(pod, podStatus)
 }
 
 // canAdmitPod determines if a pod can be admitted, and gives a reason if it

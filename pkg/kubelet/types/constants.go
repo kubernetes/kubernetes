@@ -53,3 +53,18 @@ const (
 	// spec can be pulled and containers launched after this condition is true.
 	PodHasNetwork = "PodHasNetwork"
 )
+
+const (
+	// ResourceExhausted indicates the pod is in the Failed phase or is about to
+	// transition into the Failed phase (and is about to be deleted) due to either:
+	// - exceeding its ephemeral storage limits; or
+	// - running an OOM killed container when the pod's .spec.restartPolicy=Never.
+	ResourceExhausted = "ResourceExhausted"
+)
+
+// Reasons for pod failure conditions added by Kubelet
+const (
+	DeletionByKubelet             = "DeletionByKubelet"
+	EphemeralStorageLimitExceeded = "EphemeralStorageLimitExceeded"
+	OOMKilled                     = "OOMKilled"
+)

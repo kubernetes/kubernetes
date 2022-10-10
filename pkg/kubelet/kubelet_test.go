@@ -30,9 +30,13 @@ import (
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	core "k8s.io/client-go/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
@@ -47,6 +51,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/features"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -732,6 +737,17 @@ func (nl testNodeLister) Get(name string) (*v1.Node, error) {
 
 func (nl testNodeLister) List(_ labels.Selector) (ret []*v1.Node, err error) {
 	return nl.nodes, nil
+}
+
+func verifyPodStatus(t *testing.T, kl *Kubelet, podUID types.UID, wantPodStatus v1.PodStatus) {
+	t.Helper()
+	gotPodStatus, found := kl.statusManager.GetPodStatus(podUID)
+	require.True(t, found, "Status of pod %q is not found in the status map", podUID)
+	if diff := cmp.Diff(wantPodStatus, gotPodStatus,
+		cmpopts.IgnoreFields(v1.PodCondition{}, "LastProbeTime", "LastTransitionTime"),
+		cmpopts.IgnoreFields(v1.PodStatus{}, "StartTime")); diff != "" {
+		t.Errorf("Unexpected pod status of the evicted pod (-want,+got):\n%s", diff)
+	}
 }
 
 func checkPodStatus(t *testing.T, kl *Kubelet, pod *v1.Pod, phase v1.PodPhase) {
@@ -2409,6 +2425,67 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, podToReject, v1.PodFailed)
 	checkPodStatus(t, kl, podToAdmit, v1.PodPending)
+}
+
+// Test verifies the pod status after rejected by admission handler
+func TestHandlePodAdditions_VerifyPodStatus(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	kl.nodeLister = testNodeLister{nodes: []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
+			Status: v1.NodeStatus{
+				Allocatable: v1.ResourceList{
+					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
+				},
+			},
+		},
+	}}
+
+	testCases := map[string]struct {
+		wantPodStatus v1.PodStatus
+	}{
+		"verify status of rejected pod": {
+			wantPodStatus: v1.PodStatus{
+				Phase:   v1.PodFailed,
+				Reason:  "Rejected",
+				Message: "Pod was rejected: Pod is rejected",
+			},
+		},
+	}
+	pod_index := 0
+	for name, tc := range testCases {
+		for _, enablePodDisruptionConditions := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s;PodDisruptionConditions=%v", name, enablePodDisruptionConditions), func(t *testing.T) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, enablePodDisruptionConditions)()
+
+				pod := v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						UID:  types.UID(fmt.Sprintf("poduid-%v", pod_index)),
+						Name: fmt.Sprintf("podname-%v", pod_index),
+					},
+				}
+				pod_index += 1
+
+				pods := []*v1.Pod{&pod}
+
+				kl.admitHandlers.AddPodAdmitHandler(&testPodAdmitHandler{podsToReject: pods})
+				kl.HandlePodAdditions(pods)
+
+				wantPodStatus := tc.wantPodStatus.DeepCopy()
+				if enablePodDisruptionConditions {
+					wantPodStatus.Conditions = append(wantPodStatus.Conditions, v1.PodCondition{
+						Type:    "DisruptionTarget",
+						Status:  "True",
+						Reason:  "DeletionByKubelet",
+						Message: "Pod was rejected: Pod is rejected",
+					})
+				}
+				verifyPodStatus(t, kl, pod.UID, *wantPodStatus)
+			})
+		}
+	}
 }
 
 // testPodSyncLoopHandler is a lifecycle.PodSyncLoopHandler that is used for testing.

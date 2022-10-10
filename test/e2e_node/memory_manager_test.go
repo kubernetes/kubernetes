@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
@@ -712,6 +713,91 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 
 				verifyMemoryPinning(testPod, allNUMANodes)
 			})
+		})
+	})
+
+	// the test verify the pod failure condition is added in case of admission failure
+	ginkgo.Context("PodDisruptionConditions enabled [Feature:PodDisruptionConditions]", func() {
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			kubeParams := *defaultKubeParams
+			kubeParams.memoryManagerPolicy = staticPolicy
+			initialConfig.FeatureGates = map[string]bool{
+				string(features.PodDisruptionConditions): true,
+			}
+			if !*isMultiNUMASupported {
+				ginkgo.Skip("The machines has less than two NUMA nodes")
+			}
+			updateKubeletConfigWithMemoryManagerParams(initialConfig, &kubeParams)
+		})
+
+		ginkgo.JustAfterEach(func() {
+			// reset containers attributes
+			ctnParams = []memoryManagerCtnAttributes{}
+			initCtnParams = []memoryManagerCtnAttributes{}
+		})
+
+		// the test requires at least two NUMA nodes
+		// test on each NUMA node will start the pod that will consume almost all memory of the NUMA node except 256Mi
+		// after it will start an additional pod with the memory request that can not be satisfied by the single NUMA node
+		// free memory
+
+		var workloadPods []*v1.Pod
+
+		ginkgo.BeforeEach(func() {
+			ctnParams = []memoryManagerCtnAttributes{
+				{
+					ctnName: "memory-manager-static",
+					cpus:    "100m",
+					memory:  "384Mi",
+				},
+			}
+		})
+
+		ginkgo.JustBeforeEach(func() {
+			stateData, err := getMemoryManagerState()
+			framework.ExpectNoError(err)
+
+			for _, memoryState := range stateData.MachineState {
+				// consume all memory except of 256Mi on each NUMA node via workload pods
+				workloadPodMemory := memoryState.MemoryMap[v1.ResourceMemory].Free - 256*1024*1024
+				memoryQuantity := resource.NewQuantity(int64(workloadPodMemory), resource.BinarySI)
+				workloadCtnAttrs := []memoryManagerCtnAttributes{
+					{
+						ctnName: "workload-pod",
+						cpus:    "100m",
+						memory:  memoryQuantity.String(),
+					},
+				}
+				workloadPod := makeMemoryManagerPod(workloadCtnAttrs[0].ctnName, initCtnParams, workloadCtnAttrs)
+
+				workloadPod = e2epod.NewPodClient(f).CreateSync(workloadPod)
+				workloadPods = append(workloadPods, workloadPod)
+			}
+		})
+
+		ginkgo.It("should be rejected and pod disruption condition should be added", func() {
+			ginkgo.By("Creating the pod")
+			testPod = e2epod.NewPodClient(f).Create(testPod)
+
+			ginkgo.By("Checking that pod failed to start because of admission error")
+			e2epod.WaitForPodFailedReason(f.ClientSet, testPod, "UnexpectedAdmissionError", 5*time.Minute)
+
+			ginkgo.By("Checking that pod has the expected pod failure condition")
+			e2epod.VerifyPodHasCondition(f, testPod, v1.PodCondition{
+				Type:    v1.AlphaNoCompatGuaranteeDisruptionTarget,
+				Status:  v1.ConditionTrue,
+				Reason:  "DeletionByKubelet",
+				Message: "Pod was rejected: Allocate failed due to [memorymanager] failed to get the default NUMA affinity, no NUMA nodes with enough memory is available, which is unexpected",
+			})
+
+		})
+
+		ginkgo.JustAfterEach(func() {
+			for _, workloadPod := range workloadPods {
+				if workloadPod.Name != "" {
+					e2epod.NewPodClient(f).DeleteSync(workloadPod.Name, metav1.DeleteOptions{}, 2*time.Minute)
+				}
+			}
 		})
 	})
 })

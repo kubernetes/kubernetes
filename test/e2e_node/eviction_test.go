@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -287,6 +288,52 @@ var _ = SIGDescribe("LocalStorageCapacityIsolationMemoryBackedVolumeEviction [Sl
 	})
 })
 
+var _ = SIGDescribe("LocalStorageCapacityIsolationMemoryBackedVolumeEviction [Slow] [Serial] [Disruptive] [Feature:LocalStorageCapacityIsolation][NodeFeature:Eviction][Feature:PodDisruptionConditions]", func() {
+	f := framework.NewDefaultFramework("localstorage-eviction-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	evictionTestTimeout := 7 * time.Minute
+
+	ginkgo.Context(fmt.Sprintf(testContextFmt, "evictions due to pod local storage violations [Feature:PodDisruptionConditions]"), func() {
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			// setting a threshold to 0% disables; non-empty map overrides default value (necessary due to omitempty)
+			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalMemoryAvailable): "0%"}
+			initialConfig.FeatureGates = map[string]bool{
+				"SizeMemoryBackedVolumes":                false,
+				string(features.PodDisruptionConditions): true,
+			}
+		})
+
+		sizeLimit := resource.MustParse("100Mi")
+		containerLimit := v1.ResourceList{v1.ResourceEphemeralStorage: sizeLimit}
+		useOverLimit := 200 /* Mb */
+
+		runEvictionTest(f, evictionTestTimeout, noPressure, noStarvedResource, logDiskMetrics, []podEvictSpec{
+			{
+				evictionPriority: 1, // Should be evicted due to disk limit
+				pod: diskConsumingPod("emptydir-memory-over-volume-sizelimit", useOverLimit, &v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{Medium: "Memory", SizeLimit: &sizeLimit},
+				}, v1.ResourceRequirements{}),
+				wantPodDisruptionCondition: &v1.PodCondition{
+					Type:    ResourceExhausted,
+					Status:  v1.ConditionTrue,
+					Reason:  "EphemeralStorageLimitExceeded",
+					Message: `Usage of EmptyDir volume "test-volume" exceeds the limit "100Mi". `,
+				},
+			},
+			{
+				evictionPriority: 1, // This pod should cross the container limit by writing to its writable layer.
+				pod:              diskConsumingPod("container-disk-limit", useOverLimit, nil, v1.ResourceRequirements{Limits: containerLimit}),
+				wantPodDisruptionCondition: &v1.PodCondition{
+					Type:    ResourceExhausted,
+					Status:  v1.ConditionTrue,
+					Reason:  "EphemeralStorageLimitExceeded",
+					Message: `Pod ephemeral local storage usage exceeds the total limit of containers 100Mi. `,
+				},
+			},
+		})
+	})
+})
+
 // LocalStorageCapacityIsolationEviction tests that container and volume local storage limits are enforced through evictions
 var _ = SIGDescribe("LocalStorageCapacityIsolationEviction [Slow] [Serial] [Disruptive] [Feature:LocalStorageCapacityIsolation][NodeFeature:Eviction]", func() {
 	f := framework.NewDefaultFramework("localstorage-eviction-test")
@@ -502,13 +549,49 @@ var _ = SIGDescribe("PriorityPidEvictionOrdering [Slow] [Serial] [Disruptive][No
 	})
 })
 
+// PodFailureConditionDuePidEviction tests that pod failure condition is added when evicting a pod due to pid pressure
+var _ = SIGDescribe("PodFailureConditionDuePidEviction [Slow] [Serial] [Disruptive][NodeFeature:Eviction] [Feature:PodDisruptionConditions]", func() {
+	f := framework.NewDefaultFramework("pidpressure-eviction-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	pressureTimeout := 2 * time.Minute
+	expectedNodeCondition := v1.NodePIDPressure
+	expectedStarvedResource := noStarvedResource
+
+	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			pidsConsumed := int64(10000)
+			summary := eventuallyGetSummary()
+			availablePids := *(summary.Node.Rlimit.MaxPID) - *(summary.Node.Rlimit.NumOfRunningProcesses)
+			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalPIDAvailable): fmt.Sprintf("%d", availablePids-pidsConsumed)}
+			initialConfig.EvictionMinimumReclaim = map[string]string{}
+			initialConfig.FeatureGates = map[string]bool{
+				string(features.PodDisruptionConditions): true,
+			}
+		})
+		specs := []podEvictSpec{
+			{
+				evictionPriority: 1,
+				pod:              pidConsumingPod("fork-bomb-container-with-high-priority", 12000),
+				wantPodDisruptionCondition: &v1.PodCondition{
+					Type:    v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Status:  v1.ConditionTrue,
+					Reason:  "DeletionByKubelet",
+					Message: "The node was low on resource: pids. ",
+				},
+			},
+		}
+		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logPidMetrics, specs)
+	})
+})
+
 // Struct used by runEvictionTest that specifies the pod, and when that pod should be evicted, relative to other pods
 type podEvictSpec struct {
 	// P0 should never be evicted, P1 shouldn't evict before P2, etc.
 	// If two are ranked at P1, either is permitted to fail before the other.
 	// The test ends when all pods other than p0 have been evicted
-	evictionPriority int
-	pod              *v1.Pod
+	evictionPriority           int
+	pod                        *v1.Pod
+	wantPodDisruptionCondition *v1.PodCondition
 }
 
 // runEvictionTest sets up a testing environment given the provided pods, and checks a few things:
@@ -559,6 +642,9 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 				logFunc()
 				return verifyEvictionOrdering(f, testSpecs)
 			}, pressureTimeout, evictionPollInterval).Should(gomega.BeNil())
+
+			ginkgo.By("checking for the expected pod conditions for evicted pods")
+			verifyPodConditions(f, testSpecs)
 
 			// We observe pressure from the API server.  The eviction manager observes pressure from the kubelet internal stats.
 			// This means the eviction manager will observe pressure before we will, creating a delay between when the eviction manager
@@ -723,6 +809,16 @@ func verifyEvictionOrdering(f *framework.Framework, testSpecs []podEvictSpec) er
 		return nil
 	}
 	return fmt.Errorf("pods that should be evicted are still running: %#v", pendingPods)
+}
+
+func verifyPodConditions(f *framework.Framework, testSpecs []podEvictSpec) {
+	for _, spec := range testSpecs {
+		if spec.evictionPriority != 0 && spec.wantPodDisruptionCondition != nil {
+			if spec.wantPodDisruptionCondition != nil {
+				e2epod.VerifyPodHasCondition(f, spec.pod, *spec.wantPodDisruptionCondition)
+			}
+		}
+	}
 }
 
 func verifyEvictionEvents(f *framework.Framework, testSpecs []podEvictSpec, expectedStarvedResource v1.ResourceName) {
