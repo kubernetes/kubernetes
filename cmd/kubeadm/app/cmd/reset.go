@@ -212,7 +212,7 @@ func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 		return newResetData(cmd, resetOptions, in, out)
 	})
 
-	// binds the Runner to kubeadm init command by altering
+	// binds the Runner to kubeadm reset command by altering
 	// command help, adding --skip-phases flag and by adding phases subcommands
 	resetRunner.BindToCommand(cmd)
 
