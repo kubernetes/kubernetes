@@ -5,9 +5,15 @@ options:
   no_parent_owners: true
 reviewers:
   - aojea
+  - dchen1107
   - johnSchnake
+  - lavalamp
+  - liggitt
   - neolit123
   - SataQiu
+  - smarterclayton
+  - thockin
+  - wojtek-t
 approvers:
   - andrewsykim
   - aojea
@@ -15,10 +21,12 @@ approvers:
   - bowei # for test/e2e/{dns*,network}.go
   - caseydavenport # for test/e2e/{dns*,network}.go
   - cblecker
+  - dchen1107
   - deads2k
   - dims
   - enj
   - janetkuo
+  - lavalamp
   - liggitt
   - mikedanese
   - MrHohn
@@ -32,6 +40,8 @@ approvers:
   - smarterclayton
   - soltysh
   - sttts
+  - thockin
+  - wojtek-t
 emeritus_approvers:
   - eparis
   - foxish

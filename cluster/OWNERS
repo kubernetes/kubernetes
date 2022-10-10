@@ -8,14 +8,18 @@ reviewers:
   - cheftako
   - dims
   - justaugustus
+  - liggitt
   - mikedanese
   - spiffxp
+  - wojtek-t
 approvers:
   - bentheelder
   - cheftako
   - dims
+  - liggitt
   - mikedanese
   - spiffxp
+  - wojtek-t
 emeritus_approvers:
   - eparis
   - roberthbailey # 2019-03-08
