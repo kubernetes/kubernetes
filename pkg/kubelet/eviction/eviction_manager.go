@@ -27,11 +27,14 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	apiv1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	"k8s.io/kubernetes/pkg/features"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -386,7 +389,16 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 			gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
 		}
 		message, annotations := evictionMessage(resourceToReclaim, pod, statsFunc)
-		if m.evictPod(pod, gracePeriodOverride, message, annotations) {
+		var condition *v1.PodCondition
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+			condition = &v1.PodCondition{
+				Type:    v1.AlphaNoCompatGuaranteeDisruptionTarget,
+				Status:  v1.ConditionTrue,
+				Reason:  v1.AlphaNoCompatGuaranteePodReasonTerminationByKubelet,
+				Message: message,
+			}
+		}
+		if m.evictPod(pod, gracePeriodOverride, message, annotations, condition) {
 			metrics.Evictions.WithLabelValues(string(thresholdToReclaim.Signal)).Inc()
 			return []*v1.Pod{pod}
 		}
@@ -492,7 +504,7 @@ func (m *managerImpl) emptyDirLimitEviction(podStats statsapi.PodStats, pod *v1.
 			used := podVolumeUsed[pod.Spec.Volumes[i].Name]
 			if used != nil && size != nil && size.Sign() == 1 && used.Cmp(*size) > 0 {
 				// the emptyDir usage exceeds the size limit, evict the pod
-				if m.evictPod(pod, 0, fmt.Sprintf(emptyDirMessageFmt, pod.Spec.Volumes[i].Name, size.String()), nil) {
+				if m.evictPod(pod, 0, fmt.Sprintf(emptyDirMessageFmt, pod.Spec.Volumes[i].Name, size.String()), nil, nil) {
 					metrics.Evictions.WithLabelValues(signalEmptyDirFsLimit).Inc()
 					return true
 				}
@@ -519,7 +531,8 @@ func (m *managerImpl) podEphemeralStorageLimitEviction(podStats statsapi.PodStat
 	podEphemeralStorageLimit := podLimits[v1.ResourceEphemeralStorage]
 	if podEphemeralStorageTotalUsage.Cmp(podEphemeralStorageLimit) > 0 {
 		// the total usage of pod exceeds the total size limit of containers, evict the pod
-		if m.evictPod(pod, 0, fmt.Sprintf(podEphemeralStorageMessageFmt, podEphemeralStorageLimit.String()), nil) {
+		message := fmt.Sprintf(podEphemeralStorageMessageFmt, podEphemeralStorageLimit.String())
+		if m.evictPod(pod, 0, message, nil, nil) {
 			metrics.Evictions.WithLabelValues(signalEphemeralPodFsLimit).Inc()
 			return true
 		}
@@ -545,7 +558,7 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(podStats statsapi.P
 
 		if ephemeralStorageThreshold, ok := thresholdsMap[containerStat.Name]; ok {
 			if ephemeralStorageThreshold.Cmp(*containerUsed) < 0 {
-				if m.evictPod(pod, 0, fmt.Sprintf(containerEphemeralStorageMessageFmt, containerStat.Name, ephemeralStorageThreshold.String()), nil) {
+				if m.evictPod(pod, 0, fmt.Sprintf(containerEphemeralStorageMessageFmt, containerStat.Name, ephemeralStorageThreshold.String()), nil, nil) {
 					metrics.Evictions.WithLabelValues(signalEphemeralContainerFsLimit).Inc()
 					return true
 				}
@@ -556,7 +569,7 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(podStats statsapi.P
 	return false
 }
 
-func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg string, annotations map[string]string) bool {
+func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg string, annotations map[string]string, condition *v1.PodCondition) bool {
 	// If the pod is marked as critical and static, and support for critical pod annotations is enabled,
 	// do not evict such pods. Static pods are not re-admitted after evictions.
 	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
@@ -572,6 +585,9 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 		status.Phase = v1.PodFailed
 		status.Reason = Reason
 		status.Message = evictMsg
+		if condition != nil {
+			podutil.UpdatePodCondition(status, condition)
+		}
 	})
 	if err != nil {
 		klog.ErrorS(err, "Eviction manager: pod failed to evict", "pod", klog.KObj(pod))

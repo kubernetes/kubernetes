@@ -2433,7 +2433,7 @@ const (
 	PodReasonSchedulingGated = "SchedulingGated"
 	// ContainersReady indicates whether all containers in the pod are ready.
 	ContainersReady PodConditionType = "ContainersReady"
-	// AlphaNoCompatGuaranteeDisruptionTarget indicates the pod is about to be deleted due to a
+	// AlphaNoCompatGuaranteeDisruptionTarget indicates the pod is about to be terminated due to a
 	// disruption (such as preemption, eviction API or garbage-collection).
 	// The constant is to be renamed once the name is accepted within the KEP-3329.
 	AlphaNoCompatGuaranteeDisruptionTarget PodConditionType = "DisruptionTarget"

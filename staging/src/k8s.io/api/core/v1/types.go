@@ -2654,7 +2654,7 @@ const (
 	PodReady PodConditionType = "Ready"
 	// PodScheduled represents status of the scheduling process for this pod.
 	PodScheduled PodConditionType = "PodScheduled"
-	// AlphaNoCompatGuaranteeDisruptionTarget indicates the pod is about to be deleted due to a
+	// AlphaNoCompatGuaranteeDisruptionTarget indicates the pod is about to be terminated due to a
 	// disruption (such as preemption, eviction API or garbage-collection).
 	// The constant is to be renamed once the name is accepted within the KEP-3329.
 	AlphaNoCompatGuaranteeDisruptionTarget PodConditionType = "DisruptionTarget"
@@ -2673,6 +2673,10 @@ const (
 	// PodReasonSchedulerError reason in PodScheduled PodCondition means that some internal error happens
 	// during scheduling, for example due to nodeAffinity parsing errors.
 	PodReasonSchedulerError = "SchedulerError"
+
+	// TerminationByKubelet reason in DisruptionTarget pod condition indicates that the termination
+	// is initiated by kubelet
+	AlphaNoCompatGuaranteePodReasonTerminationByKubelet = "TerminationByKubelet"
 )
 
 // PodCondition contains details for the current condition of this pod.

@@ -34,8 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -150,7 +152,8 @@ func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager, podD
 func isPodStatusByKubeletEqual(oldStatus, status *v1.PodStatus) bool {
 	oldCopy := oldStatus.DeepCopy()
 	for _, c := range status.Conditions {
-		if kubetypes.PodConditionByKubelet(c.Type) {
+		// both owned and shared conditions are used for kubelet status equality
+		if kubetypes.PodConditionByKubelet(c.Type) || kubetypes.PodConditionSharedByKubelet(c.Type) {
 			_, oc := podutil.GetPodCondition(oldCopy, c.Type)
 			if oc == nil || oc.Status != c.Status || oc.Message != c.Message || oc.Reason != c.Reason {
 				return false
@@ -500,6 +503,11 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 
 	// Set PodScheduledCondition.LastTransitionTime.
 	updateLastTransitionTime(&status, &oldStatus, v1.PodScheduled)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		// Set DisruptionTarget.LastTransitionTime.
+		updateLastTransitionTime(&status, &oldStatus, v1.AlphaNoCompatGuaranteeDisruptionTarget)
+	}
 
 	// ensure that the start time does not change across updates.
 	if oldStatus.StartTime != nil && !oldStatus.StartTime.IsZero() {
@@ -879,9 +887,17 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningCon
 			podConditions = append(podConditions, c)
 		}
 	}
+
 	for _, c := range newPodStatus.Conditions {
 		if kubetypes.PodConditionByKubelet(c.Type) {
 			podConditions = append(podConditions, c)
+		} else if kubetypes.PodConditionSharedByKubelet(c.Type) {
+			// for shared conditions we update or append in podConditions
+			if i, _ := podutil.GetPodConditionFromList(podConditions, c.Type); i >= 0 {
+				podConditions[i] = c
+			} else {
+				podConditions = append(podConditions, c)
+			}
 		}
 	}
 	newPodStatus.Conditions = podConditions
@@ -900,6 +916,16 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningCon
 			newPodStatus.Phase = oldPodStatus.Phase
 			newPodStatus.Reason = oldPodStatus.Reason
 			newPodStatus.Message = oldPodStatus.Message
+			if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+				// revert setting of the pod disruption condition until the pod is terminal in order to do not issue
+				// an unnecessary PATCH request
+				revertPodCondition(&oldPodStatus, &newPodStatus, v1.AlphaNoCompatGuaranteeDisruptionTarget)
+			}
+		} else {
+			if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+				// update the LastTransitionTime when transitioning into the failed state
+				updateLastTransitionTime(&newPodStatus, &oldPodStatus, v1.AlphaNoCompatGuaranteeDisruptionTarget)
+			}
 		}
 	}
 
@@ -918,6 +944,18 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningCon
 	}
 
 	return newPodStatus
+}
+
+func revertPodCondition(oldPodStatus, newPodStatus *v1.PodStatus, cType v1.PodConditionType) {
+	if newIndex, newCondition := podutil.GetPodConditionFromList(newPodStatus.Conditions, cType); newCondition != nil {
+		if _, oldCondition := podutil.GetPodConditionFromList(oldPodStatus.Conditions, cType); oldCondition != nil {
+			// revert the new condition to what was before
+			newPodStatus.Conditions[newIndex] = *oldCondition
+		} else {
+			// delete the new condition as it wasn't there before
+			newPodStatus.Conditions = append(newPodStatus.Conditions[:newIndex], newPodStatus.Conditions[newIndex+1:]...)
+		}
+	}
 }
 
 // NeedToReconcilePodReadiness returns if the pod "Ready" condition need to be reconcile
