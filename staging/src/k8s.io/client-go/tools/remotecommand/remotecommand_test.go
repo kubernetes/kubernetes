@@ -157,29 +157,27 @@ func TestSPDYExecutorStream(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		server := newTestHTTPServer(test.attacher, &test.options)
+		t.Run(test.name, func(t *testing.T) {
+			server := newTestHTTPServer(test.attacher, &test.options)
+			defer server.Close()
 
-		ctx, cancelFn := context.Background(), func() {}
-		if test.timeout > 0 {
-			ctx, cancelFn = context.WithTimeout(ctx, test.timeout)
-		}
+			ctx, cancel := context.Background(), func() {}
+			if test.timeout > 0 {
+				ctx, cancel = context.WithTimeout(ctx, test.timeout)
+			}
+			defer cancel()
 
-		err := func(ctx context.Context, cancel context.CancelFunc) error {
-			defer cancelFn()
-			return attach2Server(ctx, server.URL, test.options)
-		}(ctx, cancelFn)
+			err := attach2Server(ctx, server.URL, test.options)
 
-		gotError := ""
-		if err != nil {
-			gotError = err.Error()
-		}
-		if test.expectError != gotError {
-			t.Errorf("%s: expected [%v], got [%v]", test.name, test.expectError, gotError)
-		}
-
-		server.Close()
+			gotError := ""
+			if err != nil {
+				gotError = err.Error()
+			}
+			if test.expectError != gotError {
+				t.Errorf("%s: expected [%v], got [%v]", test.name, test.expectError, gotError)
+			}
+		})
 	}
-
 }
 
 func newTestHTTPServer(f AttachFunc, options *StreamOptions) *httptest.Server {
