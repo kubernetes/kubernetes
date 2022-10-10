@@ -26,7 +26,10 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/pkg/features"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	rctest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
@@ -168,7 +171,7 @@ func newSeccompPod(podFieldProfile, containerFieldProfile *v1.SeccompProfile, po
 	return pod
 }
 
-func TestGeneratePodSandboxWindowsConfig(t *testing.T) {
+func TestGeneratePodSandboxWindowsConfig_HostProcess(t *testing.T) {
 	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
@@ -336,13 +339,93 @@ func TestGeneratePodSandboxWindowsConfig(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostNetwork, false)()
 			pod := &v1.Pod{}
 			pod.Spec = *testCase.podSpec
 
 			wc, err := m.generatePodSandboxWindowsConfig(pod)
 
-			assert.Equal(t, wc, testCase.expectedWindowsConfig)
-			assert.Equal(t, err, testCase.expectedError)
+			assert.Equal(t, testCase.expectedWindowsConfig, wc)
+			assert.Equal(t, testCase.expectedError, err)
+		})
+	}
+}
+
+func TestGeneratePodSandboxWindowsConfig_HostNetwork(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	require.NoError(t, err)
+
+	const containerName = "container"
+
+	testCases := []struct {
+		name                      string
+		hostNetworkFeatureEnabled bool
+		podSpec                   *v1.PodSpec
+		expectedWindowsConfig     *runtimeapi.WindowsPodSandboxConfig
+	}{
+		{
+			name:                      "feature disabled, hostNetwork=false",
+			hostNetworkFeatureEnabled: false,
+			podSpec: &v1.PodSpec{
+				HostNetwork: false,
+				Containers:  []v1.Container{{Name: containerName}},
+			},
+			expectedWindowsConfig: &runtimeapi.WindowsPodSandboxConfig{
+				SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{},
+			},
+		},
+		{
+			name:                      "feature disabled, hostNetwork=true",
+			hostNetworkFeatureEnabled: false,
+			podSpec: &v1.PodSpec{
+				HostNetwork: true,
+				Containers:  []v1.Container{{Name: containerName}},
+			},
+			expectedWindowsConfig: &runtimeapi.WindowsPodSandboxConfig{
+				SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{},
+			}},
+		{
+			name:                      "feature enabled, hostNetwork=false",
+			hostNetworkFeatureEnabled: true,
+			podSpec: &v1.PodSpec{
+				HostNetwork: false,
+				Containers:  []v1.Container{{Name: containerName}},
+			},
+			expectedWindowsConfig: &runtimeapi.WindowsPodSandboxConfig{
+				SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{
+					NamespaceOptions: &runtimeapi.WindowsNamespaceOption{
+						Network: runtimeapi.NamespaceMode_POD,
+					},
+				},
+			},
+		},
+		{
+			name:                      "feature enabled, hostNetwork=true",
+			hostNetworkFeatureEnabled: true,
+			podSpec: &v1.PodSpec{
+				HostNetwork: true,
+				Containers:  []v1.Container{{Name: containerName}},
+			},
+			expectedWindowsConfig: &runtimeapi.WindowsPodSandboxConfig{
+				SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{
+					NamespaceOptions: &runtimeapi.WindowsNamespaceOption{
+						Network: runtimeapi.NamespaceMode_NODE,
+					},
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostNetwork, testCase.hostNetworkFeatureEnabled)()
+			pod := &v1.Pod{}
+			pod.Spec = *testCase.podSpec
+
+			wc, err := m.generatePodSandboxWindowsConfig(pod)
+
+			assert.Equal(t, testCase.expectedWindowsConfig, wc)
+			assert.Equal(t, nil, err)
 		})
 	}
 }
