@@ -699,10 +699,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 		return false, nil
 	}
 
-	completionMode := string(batch.NonIndexedCompletion)
-	if isIndexedJob(&job) {
-		completionMode = string(batch.IndexedCompletion)
-	}
+	completionMode := getCompletionMode(&job)
 	action := metrics.JobSyncActionReconciling
 
 	defer func() {
@@ -906,10 +903,13 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 			job.Status.CompletedIndexes = succeededIndexes.String()
 		}
 		job.Status.UncountedTerminatedPods = nil
-		jm.enactJobFinished(&job, finishedCondition)
+		jobFinished := jm.enactJobFinished(&job, finishedCondition)
 
 		if _, err := jm.updateStatusHandler(ctx, &job); err != nil {
 			return forget, err
+		}
+		if jobFinished {
+			jm.recordJobFinished(&job, finishedCondition)
 		}
 
 		if jobHasNewFailure && !IsJobFinished(&job) {
@@ -1105,12 +1105,16 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 	if job, needsFlush, err = jm.flushUncountedAndRemoveFinalizers(ctx, job, podsToRemoveFinalizer, uidsWithFinalizer, &oldCounters, needsFlush); err != nil {
 		return err
 	}
-	if jm.enactJobFinished(job, finishedCond) {
+	jobFinished := jm.enactJobFinished(job, finishedCond)
+	if jobFinished {
 		needsFlush = true
 	}
 	if needsFlush {
 		if _, err := jm.updateStatusHandler(ctx, job); err != nil {
 			return fmt.Errorf("removing uncounted pods from status: %w", err)
+		}
+		if jobFinished {
+			jm.recordJobFinished(job, finishedCond)
 		}
 		recordJobPodFinished(job, oldCounters)
 	}
@@ -1244,16 +1248,20 @@ func (jm *Controller) enactJobFinished(job *batch.Job, finishedCond *batch.JobCo
 			return false
 		}
 	}
-	completionMode := string(batch.NonIndexedCompletion)
-	if isIndexedJob(job) {
-		completionMode = string(*job.Spec.CompletionMode)
-	}
 	job.Status.Conditions, _ = ensureJobConditionStatus(job.Status.Conditions, finishedCond.Type, finishedCond.Status, finishedCond.Reason, finishedCond.Message)
+	if finishedCond.Type == batch.JobComplete {
+		job.Status.CompletionTime = &finishedCond.LastTransitionTime
+	}
+	return true
+}
+
+// recordJobFinished records events and the job_finished_total metric for a finished job.
+func (jm *Controller) recordJobFinished(job *batch.Job, finishedCond *batch.JobCondition) bool {
+	completionMode := getCompletionMode(job)
 	if finishedCond.Type == batch.JobComplete {
 		if job.Spec.Completions != nil && job.Status.Succeeded > *job.Spec.Completions {
 			jm.recorder.Event(job, v1.EventTypeWarning, "TooManySucceededPods", "Too many succeeded pods running after completion count reached")
 		}
-		job.Status.CompletionTime = &finishedCond.LastTransitionTime
 		jm.recorder.Event(job, v1.EventTypeNormal, "Completed", "Job completed")
 		metrics.JobFinishedNum.WithLabelValues(completionMode, "succeeded").Inc()
 	} else {
@@ -1611,6 +1619,14 @@ func countValidPodsWithFilter(job *batch.Job, pods []*v1.Pod, uncounted sets.Str
 		}
 	}
 	return result
+}
+
+// getCompletionMode returns string representation of the completion mode. Used as a label value for metrics.
+func getCompletionMode(job *batch.Job) string {
+	if isIndexedJob(job) {
+		return string(batch.IndexedCompletion)
+	}
+	return string(batch.NonIndexedCompletion)
 }
 
 func trackingUncountedPods(job *batch.Job) bool {
