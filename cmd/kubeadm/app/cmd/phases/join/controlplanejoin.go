@@ -48,6 +48,9 @@ func getControlPlaneJoinPhaseFlags(name string) []string {
 	if name != "mark-control-plane" {
 		flags = append(flags, options.APIServerAdvertiseAddress)
 	}
+	if name != "update-status" {
+		flags = append(flags, options.DryRun)
+	}
 	return flags
 }
 

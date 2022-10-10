@@ -81,6 +81,7 @@ func getControlPlanePreparePhaseFlags(name string) []string {
 			options.TokenStr,
 			options.CertificateKey,
 			options.Patches,
+			options.DryRun,
 		}
 	case "download-certs":
 		flags = []string{
@@ -93,6 +94,7 @@ func getControlPlanePreparePhaseFlags(name string) []string {
 			options.TLSBootstrapToken,
 			options.TokenStr,
 			options.CertificateKey,
+			options.DryRun,
 		}
 	case "certs":
 		flags = []string{
@@ -118,6 +120,7 @@ func getControlPlanePreparePhaseFlags(name string) []string {
 			options.TLSBootstrapToken,
 			options.TokenStr,
 			options.CertificateKey,
+			options.DryRun,
 		}
 	case "control-plane":
 		flags = []string{
@@ -126,6 +129,7 @@ func getControlPlanePreparePhaseFlags(name string) []string {
 			options.CfgPath,
 			options.ControlPlane,
 			options.Patches,
+			options.DryRun,
 		}
 	default:
 		flags = []string{}

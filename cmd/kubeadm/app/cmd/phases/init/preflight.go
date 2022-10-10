@@ -47,6 +47,7 @@ func NewPreflightPhase() workflow.Phase {
 		InheritFlags: []string{
 			options.CfgPath,
 			options.IgnorePreflightErrors,
+			options.DryRun,
 		},
 	}
 }

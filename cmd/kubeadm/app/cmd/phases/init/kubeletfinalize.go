@@ -51,14 +51,14 @@ func NewKubeletFinalizePhase() workflow.Phase {
 			{
 				Name:           "all",
 				Short:          "Run all kubelet-finalize phases",
-				InheritFlags:   []string{options.CfgPath, options.CertificatesDir},
+				InheritFlags:   []string{options.CfgPath, options.CertificatesDir, options.DryRun},
 				Example:        kubeletFinalizePhaseExample,
 				RunAllSiblings: true,
 			},
 			{
 				Name:         "experimental-cert-rotation",
 				Short:        "Enable kubelet client certificate rotation",
-				InheritFlags: []string{options.CfgPath, options.CertificatesDir},
+				InheritFlags: []string{options.CfgPath, options.CertificatesDir, options.DryRun},
 				Run:          runKubeletFinalizeCertRotation,
 			},
 		},
