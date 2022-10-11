@@ -1046,7 +1046,7 @@ golang.org/x/sys/windows/svc/mgr
 # golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 => golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 ## explicit; go 1.17
 golang.org/x/term
-# golang.org/x/text v0.3.7 => golang.org/x/text v0.3.7
+# golang.org/x/text v0.3.8 => golang.org/x/text v0.3.8
 ## explicit; go 1.17
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
@@ -2721,7 +2721,7 @@ sigs.k8s.io/yaml
 # golang.org/x/sync => golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 # golang.org/x/sys => golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f
 # golang.org/x/term => golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
-# golang.org/x/text => golang.org/x/text v0.3.7
+# golang.org/x/text => golang.org/x/text v0.3.8
 # golang.org/x/time => golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
 # golang.org/x/tools => golang.org/x/tools v0.1.12
 # golang.org/x/xerrors => golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1

@@ -966,7 +966,7 @@ var coreTags = []language.CompactCoreInfo{ // 773 elements
 	0x3fd00000, 0x3fd00072, 0x3fd000da, 0x3fd0010c,
 	0x3ff00000, 0x3ff000d1, 0x40100000, 0x401000c3,
 	0x40200000, 0x4020004c, 0x40700000, 0x40800000,
-	0x4085a000, 0x4085a0ba, 0x408e3000, 0x408e30ba,
+	0x4085a000, 0x4085a0ba, 0x408e8000, 0x408e80ba,
 	0x40c00000, 0x40c000b3, 0x41200000, 0x41200111,
 	0x41600000, 0x4160010f, 0x41c00000, 0x41d00000,
 	// Entry 280 - 29F
@@ -994,7 +994,7 @@ var coreTags = []language.CompactCoreInfo{ // 773 elements
 	0x4ae00130, 0x4b400000, 0x4b400099, 0x4b4000e8,
 	0x4bc00000, 0x4bc05000, 0x4bc05024, 0x4bc20000,
 	0x4bc20137, 0x4bc5a000, 0x4bc5a137, 0x4be00000,
-	0x4be5a000, 0x4be5a0b4, 0x4beeb000, 0x4beeb0b4,
+	0x4be5a000, 0x4be5a0b4, 0x4bef1000, 0x4bef10b4,
 	0x4c000000, 0x4c300000, 0x4c30013e, 0x4c900000,
 	// Entry 2E0 - 2FF
 	0x4c900001, 0x4cc00000, 0x4cc0012f, 0x4ce00000,
@@ -1012,4 +1012,4 @@ var coreTags = []language.CompactCoreInfo{ // 773 elements
 
 const specialTagsStr string = "ca-ES-valencia en-US-u-va-posix"
 
-// Total table size 3147 bytes (3KiB); checksum: BE816D44
+// Total table size 3147 bytes (3KiB); checksum: 6772C83C
