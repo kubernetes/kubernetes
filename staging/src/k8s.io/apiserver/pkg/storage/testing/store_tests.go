@@ -47,7 +47,7 @@ type KeyValidation func(ctx context.Context, t *testing.T, key string)
 
 func RunTestCreate(ctx context.Context, t *testing.T, store storage.Interface, validation KeyValidation) {
 	out := &example.Pod{}
-	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", SelfLink: "testlink"}}
+	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns", SelfLink: "testlink"}}
 
 	// verify that kv pair is empty before set
 	key := computePodKey(obj)
@@ -73,7 +73,7 @@ func RunTestCreate(ctx context.Context, t *testing.T, store storage.Interface, v
 }
 
 func RunTestCreateWithTTL(ctx context.Context, t *testing.T, store storage.Interface) {
-	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}}
 	out := &example.Pod{}
 
 	key := computePodKey(input)
@@ -89,7 +89,7 @@ func RunTestCreateWithTTL(ctx context.Context, t *testing.T, store storage.Inter
 }
 
 func RunTestCreateWithKeyExist(ctx context.Context, t *testing.T, store storage.Interface) {
-	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}}
 	key, _ := testPropagateStore(ctx, t, store, obj)
 	out := &example.Pod{}
 
@@ -101,7 +101,7 @@ func RunTestCreateWithKeyExist(ctx context.Context, t *testing.T, store storage.
 
 func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 	// create an object to test
-	key, createdObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, createdObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
 	// update the object once to allow get by exact resource version to be tested
 	updateObj := createdObj.DeepCopy()
 	updateObj.Annotations = map[string]string{"test-annotation": "1"}
@@ -115,7 +115,7 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 		t.Fatalf("Update failed: %v", err)
 	}
 	// create an additional object to increment the resource version for pods above the resource version of the foo object
-	secondObj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
+	secondObj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "test-ns"}}
 	lastUpdatedObj := &example.Pod{}
 	if err := store.Create(ctx, computePodKey(secondObj), secondObj, lastUpdatedObj, 0); err != nil {
 		t.Fatalf("Set failed: %v", err)
@@ -225,7 +225,7 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 }
 
 func RunTestUnconditionalDelete(ctx context.Context, t *testing.T, store storage.Interface) {
-	key, storedObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
 
 	tests := []struct {
 		name              string
@@ -269,7 +269,8 @@ func RunTestUnconditionalDelete(ctx context.Context, t *testing.T, store storage
 }
 
 func RunTestConditionalDelete(ctx context.Context, t *testing.T, store storage.Interface) {
-	key, storedObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
+	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns", UID: "A"}}
+	key, storedObj := testPropagateStore(ctx, t, store, obj)
 
 	tests := []struct {
 		name                string
@@ -305,7 +306,8 @@ func RunTestConditionalDelete(ctx context.Context, t *testing.T, store storage.I
 			}
 			out.ResourceVersion = storedObj.ResourceVersion
 			ExpectNoDiff(t, "incorrect pod:", storedObj, out)
-			key, storedObj = testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
+			obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns", UID: "A"}}
+			key, storedObj = testPropagateStore(ctx, t, store, obj)
 		})
 	}
 }
@@ -336,7 +338,7 @@ func RunTestConditionalDelete(ctx context.Context, t *testing.T, store storage.I
 //   [DONE] Added TestPreconditionalDeleteWithSuggestion
 
 func RunTestDeleteWithSuggestion(ctx context.Context, t *testing.T, store storage.Interface) {
-	key, originalPod := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
+	key, originalPod := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: "test-ns"}})
 
 	out := &example.Pod{}
 	if err := store.Delete(ctx, key, out, nil, storage.ValidateAllObjectFunc, originalPod); err != nil {
@@ -349,7 +351,7 @@ func RunTestDeleteWithSuggestion(ctx context.Context, t *testing.T, store storag
 }
 
 func RunTestDeleteWithSuggestionAndConflict(ctx context.Context, t *testing.T, store storage.Interface) {
-	key, originalPod := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
+	key, originalPod := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: "test-ns"}})
 
 	// First update, so originalPod is outdated.
 	updatedPod := &example.Pod{}
@@ -373,7 +375,7 @@ func RunTestDeleteWithSuggestionAndConflict(ctx context.Context, t *testing.T, s
 }
 
 func RunTestDeleteWithSuggestionOfDeletedObject(ctx context.Context, t *testing.T, store storage.Interface) {
-	key, originalPod := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
+	key, originalPod := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: "test-ns"}})
 
 	// First delete, so originalPod is outdated.
 	deletedPod := &example.Pod{}
@@ -389,7 +391,7 @@ func RunTestDeleteWithSuggestionOfDeletedObject(ctx context.Context, t *testing.
 }
 
 func RunTestValidateDeletionWithSuggestion(ctx context.Context, t *testing.T, store storage.Interface) {
-	key, originalPod := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
+	key, originalPod := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: "test-ns"}})
 
 	// Check that validaing fresh object fails is called once and fails.
 	validationCalls := 0
@@ -441,7 +443,7 @@ func RunTestValidateDeletionWithSuggestion(ctx context.Context, t *testing.T, st
 }
 
 func RunTestPreconditionalDeleteWithSuggestion(ctx context.Context, t *testing.T, store storage.Interface) {
-	key, originalPod := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
+	key, originalPod := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: "test-ns"}})
 
 	// First update, so originalPod is outdated.
 	updatedPod := &example.Pod{}
@@ -510,14 +512,14 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 	}{
 		{
 			name:        "rejects invalid resource version",
-			prefix:      "/",
+			prefix:      "/pods",
 			pred:        storage.Everything,
 			rv:          "abc",
 			expectError: true,
 		},
 		{
 			name:   "rejects resource version and continue token",
-			prefix: "/",
+			prefix: "/pods",
 			pred: storage.SelectionPredicate{
 				Label:    labels.Everything(),
 				Field:    fields.Everything(),
@@ -529,26 +531,26 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:             "rejects resource version set too high",
-			prefix:           "/",
+			prefix:           "/pods",
 			rv:               strconv.FormatInt(math.MaxInt64, 10),
 			expectRVTooLarge: true,
 		},
 		{
 			name:        "test List on existing key",
-			prefix:      "/first/",
+			prefix:      "/pods/first/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{preset[0]},
 		},
 		{
 			name:        "test List on existing key with resource version set to 0",
-			prefix:      "/first/",
+			prefix:      "/pods/first/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{preset[0]},
 			rv:          "0",
 		},
 		{
 			name:        "test List on existing key with resource version set before first write, match=Exact",
-			prefix:      "/first/",
+			prefix:      "/pods/first/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{},
 			rv:          initialRV,
@@ -557,7 +559,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:        "test List on existing key with resource version set to 0, match=NotOlderThan",
-			prefix:      "/first/",
+			prefix:      "/pods/first/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{preset[0]},
 			rv:          "0",
@@ -565,7 +567,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:        "test List on existing key with resource version set to 0, match=Invalid",
-			prefix:      "/first/",
+			prefix:      "/pods/first/",
 			pred:        storage.Everything,
 			rv:          "0",
 			rvMatch:     "Invalid",
@@ -573,7 +575,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:        "test List on existing key with resource version set before first write, match=NotOlderThan",
-			prefix:      "/first/",
+			prefix:      "/pods/first/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{preset[0]},
 			rv:          initialRV,
@@ -581,7 +583,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:        "test List on existing key with resource version set before first write, match=Invalid",
-			prefix:      "/first/",
+			prefix:      "/pods/first/",
 			pred:        storage.Everything,
 			rv:          initialRV,
 			rvMatch:     "Invalid",
@@ -589,14 +591,14 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:        "test List on existing key with resource version set to current resource version",
-			prefix:      "/first/",
+			prefix:      "/pods/first/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{preset[0]},
 			rv:          list.ResourceVersion,
 		},
 		{
 			name:        "test List on existing key with resource version set to current resource version, match=Exact",
-			prefix:      "/first/",
+			prefix:      "/pods/first/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{preset[0]},
 			rv:          list.ResourceVersion,
@@ -605,7 +607,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:        "test List on existing key with resource version set to current resource version, match=NotOlderThan",
-			prefix:      "/first/",
+			prefix:      "/pods/first/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{preset[0]},
 			rv:          list.ResourceVersion,
@@ -613,13 +615,13 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:        "test List on non-existing key",
-			prefix:      "/non-existing/",
+			prefix:      "/pods/non-existing/",
 			pred:        storage.Everything,
 			expectedOut: nil,
 		},
 		{
 			name:   "test List with pod name matching",
-			prefix: "/first/",
+			prefix: "/pods/first/",
 			pred: storage.SelectionPredicate{
 				Label: labels.Everything(),
 				Field: fields.ParseSelectorOrDie("metadata.name!=bar"),
@@ -628,7 +630,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:   "test List with limit",
-			prefix: "/second/",
+			prefix: "/pods/second/",
 			pred: storage.SelectionPredicate{
 				Label: labels.Everything(),
 				Field: fields.Everything(),
@@ -640,7 +642,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:   "test List with limit at current resource version",
-			prefix: "/second/",
+			prefix: "/pods/second/",
 			pred: storage.SelectionPredicate{
 				Label: labels.Everything(),
 				Field: fields.Everything(),
@@ -654,7 +656,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:   "test List with limit at current resource version and match=Exact",
-			prefix: "/second/",
+			prefix: "/pods/second/",
 			pred: storage.SelectionPredicate{
 				Label: labels.Everything(),
 				Field: fields.Everything(),
@@ -669,7 +671,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:   "test List with limit at resource version 0",
-			prefix: "/second/",
+			prefix: "/pods/second/",
 			pred: storage.SelectionPredicate{
 				Label: labels.Everything(),
 				Field: fields.Everything(),
@@ -683,7 +685,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:   "test List with limit at resource version 0 match=NotOlderThan",
-			prefix: "/second/",
+			prefix: "/pods/second/",
 			pred: storage.SelectionPredicate{
 				Label: labels.Everything(),
 				Field: fields.Everything(),
@@ -698,7 +700,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:   "test List with limit at resource version before first write and match=Exact",
-			prefix: "/second/",
+			prefix: "/pods/second/",
 			pred: storage.SelectionPredicate{
 				Label: labels.Everything(),
 				Field: fields.Everything(),
@@ -712,7 +714,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:   "test List with pregenerated continue token",
-			prefix: "/second/",
+			prefix: "/pods/second/",
 			pred: storage.SelectionPredicate{
 				Label:    labels.Everything(),
 				Field:    fields.Everything(),
@@ -723,7 +725,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:   "ignores resource version 0 for List with pregenerated continue token",
-			prefix: "/second/",
+			prefix: "/pods/second/",
 			pred: storage.SelectionPredicate{
 				Label:    labels.Everything(),
 				Field:    fields.Everything(),
@@ -735,13 +737,13 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:        "test List with multiple levels of directories and expect flattened result",
-			prefix:      "/second/",
+			prefix:      "/pods/second/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{preset[1], preset[2]},
 		},
 		{
 			name:   "test List with filter returning only one item, ensure only a single page returned",
-			prefix: "/",
+			prefix: "/pods",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
 				Label: labels.Everything(),
@@ -752,7 +754,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:   "test List with filter returning only one item, covers the entire list",
-			prefix: "/",
+			prefix: "/pods",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
 				Label: labels.Everything(),
@@ -763,7 +765,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:   "test List with filter returning only one item, covers the entire list, with resource version 0",
-			prefix: "/",
+			prefix: "/pods",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
 				Label: labels.Everything(),
@@ -775,7 +777,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:   "test List with filter returning two items, more pages possible",
-			prefix: "/",
+			prefix: "/pods",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "bar"),
 				Label: labels.Everything(),
@@ -786,7 +788,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:   "filter returns two items split across multiple pages",
-			prefix: "/",
+			prefix: "/pods",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "foo"),
 				Label: labels.Everything(),
@@ -796,7 +798,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:   "filter returns one item for last page, ends on last item, not full",
-			prefix: "/",
+			prefix: "/pods",
 			pred: storage.SelectionPredicate{
 				Field:    fields.OneTermEqualSelector("metadata.name", "foo"),
 				Label:    labels.Everything(),
@@ -807,7 +809,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:   "filter returns one item for last page, starts on last item, full",
-			prefix: "/",
+			prefix: "/pods",
 			pred: storage.SelectionPredicate{
 				Field:    fields.OneTermEqualSelector("metadata.name", "foo"),
 				Label:    labels.Everything(),
@@ -818,7 +820,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:   "filter returns one item for last page, starts on last item, partial page",
-			prefix: "/",
+			prefix: "/pods",
 			pred: storage.SelectionPredicate{
 				Field:    fields.OneTermEqualSelector("metadata.name", "foo"),
 				Label:    labels.Everything(),
@@ -829,7 +831,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:   "filter returns two items, page size equal to total list size",
-			prefix: "/",
+			prefix: "/pods",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "foo"),
 				Label: labels.Everything(),
@@ -839,7 +841,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		},
 		{
 			name:   "filter returns one item, page size equal to total list size",
-			prefix: "/",
+			prefix: "/pods",
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "barfoo"),
 				Label: labels.Everything(),
@@ -936,7 +938,7 @@ func RunTestListWithoutPaging(ctx context.Context, t *testing.T, store storage.I
 		{
 			name:          "test List with limit when paging disabled",
 			disablePaging: true,
-			prefix:        "/second/",
+			prefix:        "/pods/second/",
 			pred: storage.SelectionPredicate{
 				Label: labels.Everything(),
 				Field: fields.Everything(),
@@ -1033,7 +1035,7 @@ func seedMultiLevelData(ctx context.Context, store storage.Interface) (string, [
 
 	// we want to figure out the resourceVersion before we create anything
 	initialList := &example.PodList{}
-	if err := store.GetList(ctx, "/", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, initialList); err != nil {
+	if err := store.GetList(ctx, "/pods", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, initialList); err != nil {
 		return "", nil, fmt.Errorf("failed to determine starting resourceVersion: %w", err)
 	}
 	initialRV := initialList.ResourceVersion
@@ -1054,7 +1056,7 @@ func seedMultiLevelData(ctx context.Context, store storage.Interface) (string, [
 }
 
 func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage.Interface) {
-	key, prevStoredObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, prevStoredObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
 	prevRV, _ := strconv.Atoi(prevStoredObj.ResourceVersion)
 
 	storedObj := &example.Pod{}
@@ -1259,7 +1261,7 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 		Predicate:       pred(1, ""),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods", options, out); err != nil {
 		t.Fatalf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1279,13 +1281,13 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 		Predicate:       pred(0, continueFromSecondItem),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
 		t.Fatalf("Unexpected continuation token set")
 	}
-	key, rv, err := storage.DecodeContinue(continueFromSecondItem, "/")
+	key, rv, err := storage.DecodeContinue(continueFromSecondItem, "/pods")
 	t.Logf("continue token was %d %s %v", rv, key, err)
 	ExpectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj, *preset[2].storedObj}, out.Items)
 	if validation != nil {
@@ -1299,7 +1301,7 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 		Predicate:       pred(1, continueFromSecondItem),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1318,7 +1320,7 @@ func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.In
 		Predicate:       pred(1, continueFromThirdItem),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -1357,7 +1359,7 @@ func RunTestListPaginationRareObject(ctx context.Context, t *testing.T, store st
 		},
 		Recursive: true,
 	}
-	if err := store.GetList(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods", options, out); err != nil {
 		t.Fatalf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -1429,7 +1431,7 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 		Predicate:       pred(2, ""),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods", options, out); err != nil {
 		t.Errorf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1456,7 +1458,7 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 		Predicate:       pred(2, cont),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods", options, out); err != nil {
 		t.Errorf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -1531,7 +1533,7 @@ func RunTestListInconsistentContinuation(ctx context.Context, t *testing.T, stor
 		Predicate:       pred(1, ""),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods", options, out); err != nil {
 		t.Fatalf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1568,7 +1570,7 @@ func RunTestListInconsistentContinuation(ctx context.Context, t *testing.T, stor
 		Predicate:       pred(0, continueFromSecondItem),
 		Recursive:       true,
 	}
-	err := store.GetList(ctx, "/", options, out)
+	err := store.GetList(ctx, "/pods", options, out)
 	if err == nil {
 		t.Fatalf("unexpected no error")
 	}
@@ -1590,7 +1592,7 @@ func RunTestListInconsistentContinuation(ctx context.Context, t *testing.T, stor
 		Predicate:       pred(1, inconsistentContinueFromSecondItem),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1609,7 +1611,7 @@ func RunTestListInconsistentContinuation(ctx context.Context, t *testing.T, stor
 		Predicate:       pred(1, continueFromThirdItem),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, "/pods", options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -1678,7 +1680,7 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store InterfaceWit
 		Predicate: predicate,
 		Recursive: true,
 	}
-	if err := store.GetList(ctx, "/", options, &result1); err != nil {
+	if err := store.GetList(ctx, "/pods", options, &result1); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -1691,7 +1693,7 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store InterfaceWit
 	}
 
 	result2 := example.PodList{}
-	if err := store.GetList(ctx, "/", options, &result2); err != nil {
+	if err := store.GetList(ctx, "/pods", options, &result2); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -1701,7 +1703,7 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store InterfaceWit
 	options.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
 
 	result3 := example.PodList{}
-	if err := store.GetList(ctx, "/", options, &result3); err != nil {
+	if err := store.GetList(ctx, "/pods", options, &result3); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -1709,7 +1711,7 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store InterfaceWit
 	options.ResourceVersionMatch = metav1.ResourceVersionMatchExact
 
 	result4 := example.PodList{}
-	if err := store.GetList(ctx, "/", options, &result4); err != nil {
+	if err := store.GetList(ctx, "/pods", options, &result4); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -1717,7 +1719,7 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store InterfaceWit
 }
 
 func RunTestGuaranteedUpdate(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer, validation KeyValidation) {
-	inputObj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}}
+	inputObj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns", UID: "A"}}
 	key := computePodKey(inputObj)
 
 	tests := []struct {
@@ -1873,7 +1875,7 @@ func RunTestGuaranteedUpdate(ctx context.Context, t *testing.T, store InterfaceW
 }
 
 func RunTestGuaranteedUpdateWithTTL(ctx context.Context, t *testing.T, store storage.Interface) {
-	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}}
 	key := computePodKey(input)
 
 	out := &example.Pod{}
@@ -1894,7 +1896,7 @@ func RunTestGuaranteedUpdateWithTTL(ctx context.Context, t *testing.T, store sto
 }
 
 func RunTestGuaranteedUpdateChecksStoredData(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer) {
-	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}}
 	key := computePodKey(input)
 
 	// serialize input into etcd with data that would be normalized by a write -
@@ -1959,7 +1961,7 @@ func RunTestGuaranteedUpdateChecksStoredData(ctx context.Context, t *testing.T, 
 }
 
 func RunTestGuaranteedUpdateWithConflict(ctx context.Context, t *testing.T, store storage.Interface) {
-	key, _ := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, _ := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
 
 	errChan := make(chan error, 1)
 	var firstToFinish sync.WaitGroup
@@ -2004,7 +2006,7 @@ func RunTestGuaranteedUpdateWithConflict(ctx context.Context, t *testing.T, stor
 }
 
 func RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx context.Context, t *testing.T, store storage.Interface) {
-	key, originalPod := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, originalPod := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
 
 	// First, update without a suggestion so originalPod is outdated
 	updatedPod := &example.Pod{}
@@ -2127,7 +2129,7 @@ func RunTestTransformationFailure(ctx context.Context, t *testing.T, store Inter
 		Predicate: storage.Everything,
 		Recursive: true,
 	}
-	if err := store.GetList(ctx, "/", storageOpts, &got); !storage.IsInternalError(err) {
+	if err := store.GetList(ctx, "/pods", storageOpts, &got); !storage.IsInternalError(err) {
 		t.Errorf("Unexpected error %v", err)
 	}
 

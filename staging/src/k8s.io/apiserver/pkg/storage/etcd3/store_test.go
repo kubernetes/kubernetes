@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"reflect"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -61,9 +61,8 @@ func newPod() runtime.Object {
 	return &example.Pod{}
 }
 
-func checkStorageInvariants(prefix string, etcdClient *clientv3.Client, codec runtime.Codec) storagetesting.KeyValidation {
+func checkStorageInvariants(etcdClient *clientv3.Client, codec runtime.Codec) storagetesting.KeyValidation {
 	return func(ctx context.Context, t *testing.T, key string) {
-		key = path.Join(prefix, key)
 		getResp, err := etcdClient.KV.Get(ctx, key)
 		if err != nil {
 			t.Fatalf("etcdClient.KV.Get failed: %v", err)
@@ -87,7 +86,7 @@ func checkStorageInvariants(prefix string, etcdClient *clientv3.Client, codec ru
 
 func TestCreate(t *testing.T) {
 	ctx, store, etcdClient := testSetup(t)
-	storagetesting.RunTestCreate(ctx, t, store, checkStorageInvariants("/", etcdClient, store.codec))
+	storagetesting.RunTestCreate(ctx, t, store, checkStorageInvariants(etcdClient, store.codec))
 }
 
 func TestCreateWithTTL(t *testing.T) {
@@ -160,7 +159,7 @@ func (s *storeWithPrefixTransformer) UpdatePrefixTransformer(modifier storagetes
 
 func TestGuaranteedUpdate(t *testing.T) {
 	ctx, store, etcdClient := testSetup(t)
-	storagetesting.RunTestGuaranteedUpdate(ctx, t, &storeWithPrefixTransformer{store}, checkStorageInvariants("/", etcdClient, store.codec))
+	storagetesting.RunTestGuaranteedUpdate(ctx, t, &storeWithPrefixTransformer{store}, checkStorageInvariants(etcdClient, store.codec))
 }
 
 func TestGuaranteedUpdateWithTTL(t *testing.T) {
@@ -287,9 +286,9 @@ func TestCount(t *testing.T) {
 
 func TestPrefix(t *testing.T) {
 	testcases := map[string]string{
-		"custom/prefix":     "/custom/prefix",
-		"/custom//prefix//": "/custom/prefix",
-		"/registry":         "/registry",
+		"custom/prefix":     "/custom/prefix/",
+		"/custom//prefix//": "/custom/prefix/",
+		"/registry":         "/registry/",
 	}
 	for configuredPrefix, effectivePrefix := range testcases {
 		_, store, _ := testSetup(t, withPrefix(configuredPrefix))
@@ -547,4 +546,79 @@ func testSetup(t *testing.T, opts ...setupOption) (context.Context, *store, *cli
 	)
 	ctx := context.Background()
 	return ctx, store, client
+}
+
+func TestValidateKey(t *testing.T) {
+	validKeys := []string{
+		"/foo/bar/baz/a.b.c/",
+		"/foo",
+		"foo/bar/baz",
+		"/foo/bar..baz/",
+		"/foo/bar..",
+		"foo",
+		"foo/bar",
+		"/foo/bar/",
+	}
+	invalidKeys := []string{
+		"/foo/bar/../a.b.c/",
+		"..",
+		"/..",
+		"../",
+		"/foo/bar/..",
+		"../foo/bar",
+		"/../foo",
+		"/foo/bar/../",
+		".",
+		"/.",
+		"./",
+		"/./",
+		"/foo/.",
+		"./bar",
+		"/foo/./bar/",
+	}
+	const (
+		pathPrefix   = "/first/second"
+		expectPrefix = pathPrefix + "/"
+	)
+	_, store, _ := testSetup(t, withPrefix(pathPrefix))
+
+	for _, key := range validKeys {
+		k, err := store.prepareKey(key)
+		if err != nil {
+			t.Errorf("key %q should be valid; unexpected error: %v", key, err)
+		} else if !strings.HasPrefix(k, expectPrefix) {
+			t.Errorf("key %q should have prefix %q", k, expectPrefix)
+		}
+	}
+
+	for _, key := range invalidKeys {
+		_, err := store.prepareKey(key)
+		if err == nil {
+			t.Errorf("key %q should be invalid", key)
+		}
+	}
+}
+
+func TestInvalidKeys(t *testing.T) {
+	const invalidKey = "/foo/bar/../baz"
+	expectedError := fmt.Sprintf("invalid key: %q", invalidKey)
+
+	expectInvalidKey := func(methodName string, err error) {
+		if err == nil {
+			t.Errorf("[%s] expected invalid key error; got nil", methodName)
+		} else if err.Error() != expectedError {
+			t.Errorf("[%s] expected invalid key error; got %v", methodName, err)
+		}
+	}
+
+	ctx, store, _ := testSetup(t)
+	expectInvalidKey("Create", store.Create(ctx, invalidKey, nil, nil, 0))
+	expectInvalidKey("Delete", store.Delete(ctx, invalidKey, nil, nil, nil, nil))
+	_, watchErr := store.Watch(ctx, invalidKey, storage.ListOptions{})
+	expectInvalidKey("Watch", watchErr)
+	expectInvalidKey("Get", store.Get(ctx, invalidKey, storage.GetOptions{}, nil))
+	expectInvalidKey("GetList", store.GetList(ctx, invalidKey, storage.ListOptions{}, nil))
+	expectInvalidKey("GuaranteedUpdate", store.GuaranteedUpdate(ctx, invalidKey, nil, true, nil, nil, nil))
+	_, countErr := store.Count(invalidKey)
+	expectInvalidKey("Count", countErr)
 }
