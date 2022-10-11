@@ -460,17 +460,14 @@ func initScheduler(stop <-chan struct{}, cache internalcache.Cache, queue intern
 		return nil, nil, err
 	}
 
-	s := newScheduler(
-		cache,
-		nil,
-		nil,
-		stop,
-		queue,
-		profile.Map{testSchedulerName: fwk},
-		client,
-		nil,
-		0,
-	)
+	s := &Scheduler{
+		Cache:           cache,
+		client:          client,
+		StopEverything:  stop,
+		SchedulingQueue: queue,
+		Profiles:        profile.Map{testSchedulerName: fwk},
+	}
+	s.applyDefaultHandlers()
 
 	return s, fwk, nil
 }

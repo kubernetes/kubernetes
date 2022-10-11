@@ -584,24 +584,20 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			s := newScheduler(
-				cache,
-				nil,
-				func() *framework.QueuedPodInfo {
+			sched := &Scheduler{
+				Cache:  cache,
+				client: client,
+				NextPod: func() *framework.QueuedPodInfo {
 					return &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(item.sendPod)}
 				},
-				nil,
-				internalqueue.NewTestQueue(ctx, nil),
-				profile.Map{
-					testSchedulerName: fwk,
-				},
-				client,
-				nil,
-				0)
-			s.SchedulePod = func(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (ScheduleResult, error) {
+				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
+				Profiles:        profile.Map{testSchedulerName: fwk},
+			}
+
+			sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (ScheduleResult, error) {
 				return item.mockResult.result, item.mockResult.err
 			}
-			s.FailureHandler = func(_ context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, err error, _ string, _ *framework.NominatingInfo) {
+			sched.FailureHandler = func(_ context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, err error, _ string, _ *framework.NominatingInfo) {
 				gotPod = p.Pod
 				gotError = err
 
@@ -616,7 +612,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				}
 				close(called)
 			})
-			s.scheduleOne(ctx)
+			sched.scheduleOne(ctx)
 			<-called
 			if e, a := item.expectAssumedPod, gotAssumedPod; !reflect.DeepEqual(e, a) {
 				t.Errorf("assumed pod: wanted %v, got %v", e, a)
@@ -2011,20 +2007,17 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			scheduler := newScheduler(
-				cache,
-				nil,
-				nil,
-				nil,
-				nil,
-				nil,
-				nil,
-				snapshot,
-				schedulerapi.DefaultPercentageOfNodesToScore)
+			sched := &Scheduler{
+				Cache:                    cache,
+				nodeInfoSnapshot:         snapshot,
+				percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
+			}
+			sched.applyDefaultHandlers()
+
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
 
-			result, err := scheduler.SchedulePod(ctx, fwk, framework.NewCycleState(), test.pod)
+			result, err := sched.SchedulePod(ctx, fwk, framework.NewCycleState(), test.pod)
 			if err != test.wErr {
 				gotFitErr, gotOK := err.(*framework.FitError)
 				wantFitErr, wantOK := test.wErr.(*framework.FitError)
@@ -2324,19 +2317,14 @@ func TestZeroRequest(t *testing.T) {
 				t.Fatalf("error creating framework: %+v", err)
 			}
 
-			scheduler := newScheduler(
-				nil,
-				nil,
-				nil,
-				nil,
-				nil,
-				nil,
-				nil,
-				snapshot,
-				schedulerapi.DefaultPercentageOfNodesToScore)
+			sched := &Scheduler{
+				nodeInfoSnapshot:         snapshot,
+				percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
+			}
+			sched.applyDefaultHandlers()
 
 			state := framework.NewCycleState()
-			_, _, err = scheduler.findNodesThatFitPod(ctx, fwk, state, test.pod)
+			_, _, err = sched.findNodesThatFitPod(ctx, fwk, state, test.pod)
 			if err != nil {
 				t.Fatalf("error filtering nodes: %+v", err)
 			}
@@ -2511,18 +2499,15 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 				t.Fatal(err)
 			}
 			snapshot := internalcache.NewSnapshot(nil, nodes)
-			scheduler := newScheduler(
-				cache,
-				nil,
-				nil,
-				nil,
-				nil,
-				nil,
-				nil,
-				snapshot,
-				schedulerapi.DefaultPercentageOfNodesToScore)
 
-			_, _, err = scheduler.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), test.pod)
+			sched := &Scheduler{
+				Cache:                    cache,
+				nodeInfoSnapshot:         snapshot,
+				percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
+			}
+			sched.applyDefaultHandlers()
+
+			_, _, err = sched.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), test.pod)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -2572,18 +2557,14 @@ func makeScheduler(nodes []*v1.Node) *Scheduler {
 		cache.AddNode(n)
 	}
 
-	s := newScheduler(
-		cache,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		emptySnapshot,
-		schedulerapi.DefaultPercentageOfNodesToScore)
-	cache.UpdateSnapshot(s.nodeInfoSnapshot)
-	return s
+	sched := &Scheduler{
+		Cache:                    cache,
+		nodeInfoSnapshot:         emptySnapshot,
+		percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
+	}
+	sched.applyDefaultHandlers()
+	cache.UpdateSnapshot(sched.nodeInfoSnapshot)
+	return sched
 }
 
 func makeNode(node string, milliCPU, memory int64) *v1.Node {
@@ -2671,20 +2652,19 @@ func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, c
 	)
 
 	errChan := make(chan error, 1)
-	sched := newScheduler(
-		cache,
-		nil,
-		func() *framework.QueuedPodInfo {
+	sched := &Scheduler{
+		Cache:                    cache,
+		client:                   client,
+		nodeInfoSnapshot:         internalcache.NewEmptySnapshot(),
+		percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
+		NextPod: func() *framework.QueuedPodInfo {
 			return &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(clientcache.Pop(queuedPodStore).(*v1.Pod))}
 		},
-		nil,
-		schedulingQueue,
-		profile.Map{
-			testSchedulerName: fwk,
-		},
-		client,
-		internalcache.NewEmptySnapshot(),
-		schedulerapi.DefaultPercentageOfNodesToScore)
+		SchedulingQueue: schedulingQueue,
+		Profiles:        profile.Map{testSchedulerName: fwk},
+	}
+
+	sched.SchedulePod = sched.schedulePod
 	sched.FailureHandler = func(_ context.Context, _ framework.Framework, p *framework.QueuedPodInfo, err error, _ string, _ *framework.NominatingInfo) {
 		errChan <- err
 
