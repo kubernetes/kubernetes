@@ -17,9 +17,11 @@ limitations under the License.
 package proxy
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/csi-test/mock/service"
@@ -30,6 +32,7 @@ type PodDirIO struct {
 	Namespace     string
 	PodName       string
 	ContainerName string
+	Logger        *klog.Logger
 }
 
 var _ service.DirIO = PodDirIO{}
@@ -64,9 +67,23 @@ func (p PodDirIO) Mkdir(path string) error {
 }
 
 func (p PodDirIO) CreateFile(path string, content io.Reader) error {
-	_, stderr, err := p.execute([]string{"dd", "of=" + path}, content)
+	// Piping the content into dd via stdin turned out to be unreliable.
+	// Sometimes dd would stop after writing zero bytes, without an error
+	// from ExecWithOptions (reported as
+	// https://github.com/kubernetes/kubernetes/issues/112834).
+	//
+	// Therefore the content is now encoded inside the command itself.
+	data, err := io.ReadAll(content)
 	if err != nil {
-		return fmt.Errorf("dd of=%s: stderr=%q, %v", path, stderr, err)
+		return fmt.Errorf("read content: %v", err)
+	}
+	encoded := make([]byte, base64.StdEncoding.EncodedLen(len(data)))
+	base64.StdEncoding.Encode(encoded, data)
+	_, stderr, err := p.execute([]string{"sh", "-c", fmt.Sprintf(`base64 -d >'%s' <<EOF
+%s
+EOF`, path, string(encoded))}, nil)
+	if err != nil {
+		return fmt.Errorf("decoding into %q: stderr=%q, %v", path, stderr, err)
 	}
 	return nil
 }
@@ -88,7 +105,7 @@ func (p PodDirIO) RemoveAll(path string) error {
 }
 
 func (p PodDirIO) execute(command []string, stdin io.Reader) (string, string, error) {
-	return e2epod.ExecWithOptions(p.F, e2epod.ExecOptions{
+	stdout, stderr, err := e2epod.ExecWithOptions(p.F, e2epod.ExecOptions{
 		Command:       command,
 		Namespace:     p.Namespace,
 		PodName:       p.PodName,
@@ -98,4 +115,10 @@ func (p PodDirIO) execute(command []string, stdin io.Reader) (string, string, er
 		CaptureStderr: true,
 		Quiet:         true,
 	})
+	if p.Logger != nil {
+		p.Logger.Info("Command completed", "command", command, "stdout", stdout, "stderr", stderr, "err", err)
+
+	}
+	return stdout, stderr, err
+
 }
