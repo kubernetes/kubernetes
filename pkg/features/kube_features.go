@@ -223,8 +223,10 @@ const (
 	// NodePublishVolume calls.
 	DelegateFSGroupToCSIDriver featuregate.Feature = "DelegateFSGroupToCSIDriver"
 
-	// owner: @jiayingz
+	// owner: @jiayingz, @swatisehgal (for GA graduation)
+	// alpha: v1.8
 	// beta: v1.10
+	// GA: v1.26
 	//
 	// Enables support for Device Plugins
 	DevicePlugins featuregate.Feature = "DevicePlugins"
@@ -853,7 +855,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	DelegateFSGroupToCSIDriver: {Default: true, PreRelease: featuregate.Beta},
 
-	DevicePlugins: {Default: true, PreRelease: featuregate.Beta},
+	DevicePlugins: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.26
 
 	DisableAcceleratorUsageMetrics: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
