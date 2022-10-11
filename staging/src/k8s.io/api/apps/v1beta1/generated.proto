@@ -388,7 +388,7 @@ message StatefulSetOrdinals {
   // If set, replica ordinals will be numbered
   // [.spec.ordinals.start, .spec.ordinals.start - .spec.replicas).
   // +optional
-  optional int32 replicaStartOrdinal = 1;
+  optional int32 start = 1;
 }
 
 // StatefulSetPersistentVolumeClaimRetentionPolicy describes the policy used for PVCs
