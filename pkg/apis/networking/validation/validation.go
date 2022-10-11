@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"net/netip"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -195,7 +196,7 @@ func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path) field.ErrorLi
 		allErrs = append(allErrs, field.Required(fldPath.Child("cidr"), ""))
 		return allErrs
 	}
-	cidrIPNet, err := apivalidation.ValidateCIDR(ipb.CIDR)
+	cidr, err := apivalidation.ValidateCIDR(ipb.CIDR)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("cidr"), ipb.CIDR, "not a valid CIDR"))
 		return allErrs
@@ -208,9 +209,9 @@ func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path) field.ErrorLi
 			allErrs = append(allErrs, field.Invalid(exceptPath, exceptIP, "not a valid CIDR"))
 			return allErrs
 		}
-		cidrMaskLen, _ := cidrIPNet.Mask.Size()
-		exceptMaskLen, _ := exceptCIDR.Mask.Size()
-		if !cidrIPNet.Contains(exceptCIDR.IP) || cidrMaskLen >= exceptMaskLen {
+		cidrMaskLen := cidr.Masked().Bits()
+		exceptMaskLen := exceptCIDR.Masked().Bits()
+		if !cidr.Contains(exceptCIDR.Addr()) || cidrMaskLen >= exceptMaskLen {
 			allErrs = append(allErrs, field.Invalid(exceptPath, exceptIP, "must be a strict subset of `cidr`"))
 		}
 	}
@@ -645,23 +646,21 @@ func validateCIDRConfig(configCIDR string, perNodeHostBits, maxMaskSize int32, i
 	var allErrs field.ErrorList
 	minPerNodeHostBits := int32(4)
 
-	ip, ipNet, err := netutils.ParseCIDRSloppy(configCIDR)
+	cidr, err := netip.ParsePrefix(configCIDR)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child(string(ipFamily)), configCIDR, fmt.Sprintf("must be a valid CIDR: %s", configCIDR)))
 		return allErrs
 	}
 
-	if ipFamily == v1.IPv4Protocol && !netutils.IsIPv4(ip) {
+	if ipFamily == v1.IPv4Protocol && !cidr.Addr().Is4() {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child(string(ipFamily)), configCIDR, "must be a valid IPv4 CIDR"))
 	}
-	if ipFamily == v1.IPv6Protocol && !netutils.IsIPv6(ip) {
+	if ipFamily == v1.IPv6Protocol && !cidr.Addr().Is6() {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child(string(ipFamily)), configCIDR, "must be a valid IPv6 CIDR"))
 	}
 
 	// Validate PerNodeHostBits
-	maskSize, _ := ipNet.Mask.Size()
-	maxPerNodeHostBits := maxMaskSize - int32(maskSize)
-
+	maxPerNodeHostBits := maxMaskSize - int32(cidr.Masked().Bits())
 	if perNodeHostBits < minPerNodeHostBits {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("perNodeHostBits"), perNodeHostBits, fmt.Sprintf("must be greater than or equal to %d", minPerNodeHostBits)))
 	}
