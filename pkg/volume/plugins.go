@@ -18,7 +18,7 @@ package volume
 
 import (
 	"fmt"
-	"net"
+	"net/netip"
 	"strings"
 	"sync"
 
@@ -419,7 +419,7 @@ type VolumeHost interface {
 	GetHostName() string
 
 	// Returns host IP or nil in the case of error.
-	GetHostIP() (net.IP, error)
+	GetHostIP() (netip.Addr, error)
 
 	// Returns node allocatable.
 	GetNodeAllocatable() (v1.ResourceList, error)

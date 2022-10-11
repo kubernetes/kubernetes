@@ -25,7 +25,7 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
-	"net"
+	"net/netip"
 	"reflect"
 	"strconv"
 	"strings"
@@ -175,7 +175,7 @@ type Proxier struct {
 	exec           utilexec.Interface
 	localDetector  proxyutiliptables.LocalTrafficDetector
 	hostname       string
-	nodeIP         net.IP
+	nodeIP         netip.Addr
 	recorder       events.EventRecorder
 
 	serviceHealthServer healthcheck.ServiceHealthServer
@@ -224,7 +224,7 @@ func NewProxier(ipt utiliptables.Interface,
 	masqueradeBit int,
 	localDetector proxyutiliptables.LocalTrafficDetector,
 	hostname string,
-	nodeIP net.IP,
+	nodeIP netip.Addr,
 	recorder events.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	nodePortAddresses []string,
@@ -320,7 +320,7 @@ func NewDualStackProxier(
 	masqueradeBit int,
 	localDetectors [2]proxyutiliptables.LocalTrafficDetector,
 	hostname string,
-	nodeIP [2]net.IP,
+	nodeIP [2]netip.Addr,
 	recorder events.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	nodePortAddresses []string,
@@ -1286,7 +1286,7 @@ func (proxier *Proxier) syncProxyRules() {
 			allowFromNode := false
 			for _, src := range svcInfo.LoadBalancerSourceRanges() {
 				proxier.natRules.Write(args, "-s", src, "-j", string(externalTrafficChain))
-				_, cidr, err := netutils.ParseCIDRSloppy(src)
+				cidr, err := netip.ParsePrefix(src)
 				if err != nil {
 					klog.ErrorS(err, "Error parsing CIDR in LoadBalancerSourceRanges, dropping it", "cidr", cidr)
 				} else if cidr.Contains(proxier.nodeIP) {

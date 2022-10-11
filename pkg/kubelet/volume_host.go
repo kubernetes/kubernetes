@@ -18,7 +18,7 @@ package kubelet
 
 import (
 	"fmt"
-	"net"
+	"net/netip"
 	"runtime"
 
 	"k8s.io/klog/v2"
@@ -240,10 +240,10 @@ func (kvh *kubeletVolumeHost) GetHostName() string {
 	return kvh.kubelet.hostname
 }
 
-func (kvh *kubeletVolumeHost) GetHostIP() (net.IP, error) {
+func (kvh *kubeletVolumeHost) GetHostIP() (netip.Addr, error) {
 	hostIPs, err := kvh.kubelet.GetHostIPs()
 	if err != nil {
-		return nil, err
+		return netip.Addr{}, err
 	}
 	return hostIPs[0], err
 }

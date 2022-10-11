@@ -19,7 +19,7 @@ package node
 import (
 	"context"
 	"fmt"
-	"net"
+	"net/netip"
 	"os"
 	"strings"
 	"time"
@@ -30,7 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -91,21 +90,21 @@ func GetPreferredNodeAddress(node *v1.Node, preferredAddressTypes []v1.NodeAddre
 // (for nodes that actually have dual-stack IPs). Among other things, the IPs returned
 // from this function are used as the `.status.PodIPs` values for host-network pods on the
 // node, and the first IP is used as the `.status.HostIP` for all pods on the node.
-func GetNodeHostIPs(node *v1.Node) ([]net.IP, error) {
+func GetNodeHostIPs(node *v1.Node) ([]netip.Addr, error) {
 	// Re-sort the addresses with InternalIPs first and then ExternalIPs
-	allIPs := make([]net.IP, 0, len(node.Status.Addresses))
+	allIPs := make([]netip.Addr, 0, len(node.Status.Addresses))
 	for _, addr := range node.Status.Addresses {
 		if addr.Type == v1.NodeInternalIP {
-			ip := netutils.ParseIPSloppy(addr.Address)
-			if ip != nil {
+			ip, _ := netip.ParseAddr(addr.Address)
+			if ip.IsValid() {
 				allIPs = append(allIPs, ip)
 			}
 		}
 	}
 	for _, addr := range node.Status.Addresses {
 		if addr.Type == v1.NodeExternalIP {
-			ip := netutils.ParseIPSloppy(addr.Address)
-			if ip != nil {
+			ip, _ := netip.ParseAddr(addr.Address)
+			if ip.IsValid() {
 				allIPs = append(allIPs, ip)
 			}
 		}
@@ -114,9 +113,9 @@ func GetNodeHostIPs(node *v1.Node) ([]net.IP, error) {
 		return nil, fmt.Errorf("host IP unknown; known addresses: %v", node.Status.Addresses)
 	}
 
-	nodeIPs := []net.IP{allIPs[0]}
+	nodeIPs := []netip.Addr{allIPs[0]}
 	for _, ip := range allIPs {
-		if netutils.IsIPv6(ip) != netutils.IsIPv6(nodeIPs[0]) {
+		if ip.Is6() != nodeIPs[0].Is6() {
 			nodeIPs = append(nodeIPs, ip)
 			break
 		}
@@ -126,10 +125,10 @@ func GetNodeHostIPs(node *v1.Node) ([]net.IP, error) {
 }
 
 // GetNodeHostIP returns the provided node's "primary" IP; see GetNodeHostIPs for more details
-func GetNodeHostIP(node *v1.Node) (net.IP, error) {
+func GetNodeHostIP(node *v1.Node) (netip.Addr, error) {
 	ips, err := GetNodeHostIPs(node)
 	if err != nil {
-		return nil, err
+		return netip.Addr{}, err
 	}
 	// GetNodeHostIPs always returns at least one IP if it didn't return an error
 	return ips[0], nil
@@ -137,8 +136,8 @@ func GetNodeHostIP(node *v1.Node) (net.IP, error) {
 
 // GetNodeIP returns an IP (as with GetNodeHostIP) for the node with the provided name.
 // If required, it will wait for the node to be created.
-func GetNodeIP(client clientset.Interface, name string) net.IP {
-	var nodeIP net.IP
+func GetNodeIP(client clientset.Interface, name string) netip.Addr {
+	var nodeIP netip.Addr
 	backoff := wait.Backoff{
 		Steps:    6,
 		Duration: 1 * time.Second,

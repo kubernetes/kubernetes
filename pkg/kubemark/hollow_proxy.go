@@ -18,6 +18,7 @@ package kubemark
 
 import (
 	"fmt"
+	"net/netip"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -34,7 +35,6 @@ import (
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	utilexec "k8s.io/utils/exec"
-	netutils "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 
 	"k8s.io/klog/v2"
@@ -81,12 +81,12 @@ func NewHollowProxyOrDie(
 
 	if useRealProxier {
 		nodeIP := utilnode.GetNodeIP(client, nodeName)
-		if nodeIP == nil {
+		if !nodeIP.IsValid() {
 			klog.InfoS("can't determine this node's IP, assuming 127.0.0.1")
-			nodeIP = netutils.ParseIPSloppy("127.0.0.1")
+			nodeIP, _ = netip.ParseAddr("127.0.0.1")
 		}
 		// Real proxier with fake iptables, sysctl, etc underneath it.
-		//var err error
+		// var err error
 		proxier, err = iptables.NewProxier(
 			iptInterface,
 			sysctl,

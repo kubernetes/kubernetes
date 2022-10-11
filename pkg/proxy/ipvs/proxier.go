@@ -23,6 +23,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net"
+	"net/netip"
 	"os"
 	"reflect"
 	"regexp"
@@ -261,7 +262,7 @@ type Proxier struct {
 	masqueradeMark string
 	localDetector  proxyutiliptables.LocalTrafficDetector
 	hostname       string
-	nodeIP         net.IP
+	nodeIP         netip.Addr
 	recorder       events.EventRecorder
 
 	serviceHealthServer healthcheck.ServiceHealthServer
@@ -374,7 +375,7 @@ func NewProxier(ipt utiliptables.Interface,
 	masqueradeBit int,
 	localDetector proxyutiliptables.LocalTrafficDetector,
 	hostname string,
-	nodeIP net.IP,
+	nodeIP netip.Addr,
 	recorder events.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	scheduler string,
@@ -542,7 +543,7 @@ func NewDualStackProxier(
 	masqueradeBit int,
 	localDetectors [2]proxyutiliptables.LocalTrafficDetector,
 	hostname string,
-	nodeIP [2]net.IP,
+	nodeIP [2]netip.Addr,
 	recorder events.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	scheduler string,
@@ -1350,7 +1351,7 @@ func (proxier *Proxier) syncProxyRules() {
 					proxier.ipsetList[kubeLoadBalancerSourceCIDRSet].activeEntries.Insert(entry.String())
 
 					// ignore error because it has been validated
-					_, cidr, _ := netutils.ParseCIDRSloppy(src)
+					cidr, _ := netip.ParsePrefix(src)
 					if cidr.Contains(proxier.nodeIP) {
 						allowFromNode = true
 					}
@@ -2114,7 +2115,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 }
 
 func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, currentServices map[string]*utilipvs.VirtualServer, legacyBindAddrs map[string]bool) {
-	isIPv6 := netutils.IsIPv6(proxier.nodeIP)
+	isIPv6 := proxier.nodeIP.Is6()
 	for cs := range currentServices {
 		svc := currentServices[cs]
 		if proxier.isIPInExcludeCIDRs(svc.Address) {
@@ -2155,9 +2156,10 @@ func (proxier *Proxier) isIPInExcludeCIDRs(ip net.IP) bool {
 
 func (proxier *Proxier) getLegacyBindAddr(activeBindAddrs map[string]bool, currentBindAddrs []string) map[string]bool {
 	legacyAddrs := make(map[string]bool)
-	isIPv6 := netutils.IsIPv6(proxier.nodeIP)
+	isIPv6 := proxier.nodeIP.Is6()
 	for _, addr := range currentBindAddrs {
-		addrIsIPv6 := netutils.IsIPv6(netutils.ParseIPSloppy(addr))
+		ipa, _ := netip.ParseAddr(addr)
+		addrIsIPv6 := ipa.Is6()
 		if addrIsIPv6 && !isIPv6 || !addrIsIPv6 && isIPv6 {
 			continue
 		}

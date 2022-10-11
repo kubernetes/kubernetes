@@ -18,7 +18,7 @@ package persistentvolume
 
 import (
 	"fmt"
-	"net"
+	"net/netip"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
@@ -91,8 +91,8 @@ func (ctrl *PersistentVolumeController) GetHostName() string {
 	return ""
 }
 
-func (ctrl *PersistentVolumeController) GetHostIP() (net.IP, error) {
-	return nil, fmt.Errorf("PersistentVolumeController.GetHostIP() is not implemented")
+func (ctrl *PersistentVolumeController) GetHostIP() (netip.Addr, error) {
+	return netip.Addr{}, fmt.Errorf("PersistentVolumeController.GetHostIP() is not implemented")
 }
 
 func (ctrl *PersistentVolumeController) GetNodeAllocatable() (v1.ResourceList, error) {

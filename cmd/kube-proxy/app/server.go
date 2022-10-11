@@ -21,8 +21,8 @@ package app
 import (
 	goflag "flag"
 	"fmt"
-	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"strings"
 	"time"
@@ -82,7 +82,6 @@ import (
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/utils/exec"
-	netutils "k8s.io/utils/net"
 	"k8s.io/utils/pointer"
 )
 
@@ -809,14 +808,14 @@ func getConntrackMax(config kubeproxyconfig.KubeProxyConntrackConfiguration) (in
 // 1. config.bindAddress if bindAddress is not 0.0.0.0 or ::
 // 2. the primary IP from the Node object, if set
 // 3. if no IP is found it defaults to 127.0.0.1 and IPv4
-func detectNodeIP(client clientset.Interface, hostname, bindAddress string) net.IP {
-	nodeIP := netutils.ParseIPSloppy(bindAddress)
+func detectNodeIP(client clientset.Interface, hostname, bindAddress string) netip.Addr {
+	nodeIP, _ := netip.ParseAddr(bindAddress)
 	if nodeIP.IsUnspecified() {
 		nodeIP = utilnode.GetNodeIP(client, hostname)
 	}
-	if nodeIP == nil {
+	if !nodeIP.IsValid() {
 		klog.InfoS("Can't determine this node's IP, assuming 127.0.0.1; if this is incorrect, please set the --bind-address flag")
-		nodeIP = netutils.ParseIPSloppy("127.0.0.1")
+		nodeIP, _ = netip.ParseAddr("127.0.0.1")
 	}
 	return nodeIP
 }
@@ -824,11 +823,11 @@ func detectNodeIP(client clientset.Interface, hostname, bindAddress string) net.
 // nodeIPTuple takes an addresses and return a tuple (ipv4,ipv6)
 // The returned tuple is guaranteed to have the order (ipv4,ipv6). The address NOT of the passed address
 // will have "any" address (0.0.0.0 or ::) inserted.
-func nodeIPTuple(bindAddress string) [2]net.IP {
-	nodes := [2]net.IP{net.IPv4zero, net.IPv6zero}
+func nodeIPTuple(bindAddress string) [2]netip.Addr {
+	nodes := [2]netip.Addr{netip.IPv4Unspecified(), netip.IPv6Unspecified()}
 
-	adr := netutils.ParseIPSloppy(bindAddress)
-	if netutils.IsIPv6(adr) {
+	adr, _ := netip.ParseAddr(bindAddress)
+	if adr.Is6() {
 		nodes[1] = adr
 	} else {
 		nodes[0] = adr

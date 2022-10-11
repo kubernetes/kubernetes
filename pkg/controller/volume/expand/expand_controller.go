@@ -19,7 +19,7 @@ package expand
 import (
 	"context"
 	"fmt"
-	"net"
+	"net/netip"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -438,8 +438,8 @@ func (expc *expandController) GetHostName() string {
 	return ""
 }
 
-func (expc *expandController) GetHostIP() (net.IP, error) {
-	return nil, fmt.Errorf("GetHostIP not supported by expand controller's VolumeHost implementation")
+func (expc *expandController) GetHostIP() (netip.Addr, error) {
+	return netip.Addr{}, fmt.Errorf("GetHostIP not supported by expand controller's VolumeHost implementation")
 }
 
 func (expc *expandController) GetNodeAllocatable() (v1.ResourceList, error) {

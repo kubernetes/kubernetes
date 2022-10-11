@@ -148,7 +148,7 @@ func newProxyServer(
 	klog.V(2).InfoS("DetectLocalMode", "LocalMode", string(detectLocalMode))
 
 	primaryProtocol := utiliptables.ProtocolIPv4
-	if netutils.IsIPv6(nodeIP) {
+	if nodeIP.Is6() {
 		primaryProtocol = utiliptables.ProtocolIPv6
 	}
 	execer := exec.New()

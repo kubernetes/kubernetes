@@ -20,7 +20,7 @@ package attachdetach
 
 import (
 	"fmt"
-	"net"
+	"net/netip"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -855,8 +855,8 @@ func (adc *attachDetachController) GetHostName() string {
 	return ""
 }
 
-func (adc *attachDetachController) GetHostIP() (net.IP, error) {
-	return nil, fmt.Errorf("GetHostIP() not supported by Attach/Detach controller's VolumeHost implementation")
+func (adc *attachDetachController) GetHostIP() (netip.Addr, error) {
+	return netip.Addr{}, fmt.Errorf("GetHostIP() not supported by Attach/Detach controller's VolumeHost implementation")
 }
 
 func (adc *attachDetachController) GetNodeAllocatable() (v1.ResourceList, error) {

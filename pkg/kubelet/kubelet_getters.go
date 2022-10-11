@@ -19,7 +19,7 @@ package kubelet
 import (
 	"context"
 	"fmt"
-	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 
@@ -269,7 +269,7 @@ func (kl *Kubelet) GetPodCgroupRoot() string {
 }
 
 // GetHostIPs returns host IPs or nil in case of error.
-func (kl *Kubelet) GetHostIPs() ([]net.IP, error) {
+func (kl *Kubelet) GetHostIPs() ([]netip.Addr, error) {
 	node, err := kl.GetNode()
 	if err != nil {
 		return nil, fmt.Errorf("cannot get node: %v", err)
@@ -279,7 +279,7 @@ func (kl *Kubelet) GetHostIPs() ([]net.IP, error) {
 
 // getHostIPsAnyWay attempts to return the host IPs from kubelet's nodeInfo, or
 // the initialNode.
-func (kl *Kubelet) getHostIPsAnyWay() ([]net.IP, error) {
+func (kl *Kubelet) getHostIPsAnyWay() ([]netip.Addr, error) {
 	node, err := kl.getNodeAnyWay()
 	if err != nil {
 		return nil, err
