@@ -5665,6 +5665,7 @@ type ContainerStatus struct {
 	// image ID
 	ImageRef string `protobuf:"bytes,9,opt,name=image_ref,json=imageRef,proto3" json:"image_ref,omitempty"`
 	// Brief CamelCase string explaining why container is in its current state.
+	// Must be set to "OOMKilled" for containers terminated by cgroup-based Out-of-Memory killer.
 	Reason string `protobuf:"bytes,10,opt,name=reason,proto3" json:"reason,omitempty"`
 	// Human-readable message indicating details about why container is in its
 	// current state.
