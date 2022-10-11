@@ -54,6 +54,7 @@ var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
 
 const defaultTestPrefix = "test!"
+const basePath = "/keybase"
 
 func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
@@ -446,13 +447,13 @@ func TestTransformationFailure(t *testing.T) {
 		obj       *example.Pod
 		storedObj *example.Pod
 	}{{
-		key: "/one-level/test",
+		key: basePath + "/one-level/test",
 		obj: &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 			Spec:       storagetesting.DeepEqualSafePodSpec(),
 		},
 	}, {
-		key: "/two-level/1/test",
+		key: basePath + "/two-level/1/test",
 		obj: &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "baz"},
 			Spec:       storagetesting.DeepEqualSafePodSpec(),
@@ -484,7 +485,7 @@ func TestTransformationFailure(t *testing.T) {
 		Predicate: storage.Everything,
 		Recursive: true,
 	}
-	if err := store.GetList(ctx, "/", storageOpts, &got); !storage.IsInternalError(err) {
+	if err := store.GetList(ctx, basePath, storageOpts, &got); !storage.IsInternalError(err) {
 		t.Errorf("Unexpected error %v", err)
 	}
 
@@ -531,7 +532,7 @@ func TestListContinuation(t *testing.T) {
 	etcdClient.KV = recorder
 
 	// Setup storage with the following structure:
-	//  /
+	//  /keybase/
 	//   - one-level/
 	//  |            - test
 	//  |
@@ -548,15 +549,15 @@ func TestListContinuation(t *testing.T) {
 		storedObj *example.Pod
 	}{
 		{
-			key: "/one-level/test",
+			key: basePath + "/one-level/test",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 		},
 		{
-			key: "/two-level/1/test",
+			key: basePath + "/two-level/1/test",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 		},
 		{
-			key: "/two-level/2/test",
+			key: basePath + "/two-level/2/test",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
 		},
 	}
@@ -588,7 +589,7 @@ func TestListContinuation(t *testing.T) {
 		Predicate:       pred(1, ""),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, basePath, options, out); err != nil {
 		t.Fatalf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -613,13 +614,13 @@ func TestListContinuation(t *testing.T) {
 		Predicate:       pred(0, continueFromSecondItem),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, basePath, options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
 		t.Fatalf("Unexpected continuation token set")
 	}
-	key, rv, err := storage.DecodeContinue(continueFromSecondItem, "/")
+	key, rv, err := storage.DecodeContinue(continueFromSecondItem, basePath)
 	t.Logf("continue token was %d %s %v", rv, key, err)
 	storagetesting.ExpectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj, *preset[2].storedObj}, out.Items)
 	if transformer.reads != 2 {
@@ -638,7 +639,7 @@ func TestListContinuation(t *testing.T) {
 		Predicate:       pred(1, continueFromSecondItem),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, basePath, options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -662,7 +663,7 @@ func TestListContinuation(t *testing.T) {
 		Predicate:       pred(1, continueFromThirdItem),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, basePath, options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -688,7 +689,7 @@ func TestListPaginationRareObject(t *testing.T) {
 	podCount := 1000
 	var pods []*example.Pod
 	for i := 0; i < podCount; i++ {
-		key := fmt.Sprintf("/one-level/pod-%d", i)
+		key := basePath + fmt.Sprintf("/one-level/pod-%d", i)
 		obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("pod-%d", i)}}
 		storedObj := &example.Pod{}
 		err := store.Create(ctx, key, obj, storedObj, 0)
@@ -711,7 +712,7 @@ func TestListPaginationRareObject(t *testing.T) {
 		},
 		Recursive: true,
 	}
-	if err := store.GetList(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, basePath, options, out); err != nil {
 		t.Fatalf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -782,7 +783,7 @@ func TestListContinuationWithFilter(t *testing.T) {
 
 	for i, ps := range preset {
 		preset[i].storedObj = &example.Pod{}
-		err := store.Create(ctx, ps.key, ps.obj, preset[i].storedObj, 0)
+		err := store.Create(ctx, basePath+ps.key, ps.obj, preset[i].storedObj, 0)
 		if err != nil {
 			t.Fatalf("Set failed: %v", err)
 		}
@@ -810,7 +811,7 @@ func TestListContinuationWithFilter(t *testing.T) {
 		Predicate:       pred(2, ""),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, basePath, options, out); err != nil {
 		t.Errorf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -842,7 +843,7 @@ func TestListContinuationWithFilter(t *testing.T) {
 		Predicate:       pred(2, cont),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, basePath, options, out); err != nil {
 		t.Errorf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -863,7 +864,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 	ctx, store, client := testSetup(t)
 
 	// Setup storage with the following structure:
-	//  /
+	//  /keybase/
 	//   - one-level/
 	//  |            - test
 	//  |
@@ -880,15 +881,15 @@ func TestListInconsistentContinuation(t *testing.T) {
 		storedObj *example.Pod
 	}{
 		{
-			key: "/one-level/test",
+			key: basePath + "/one-level/test",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 		},
 		{
-			key: "/two-level/1/test",
+			key: basePath + "/two-level/1/test",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 		},
 		{
-			key: "/two-level/2/test",
+			key: basePath + "/two-level/2/test",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
 		},
 	}
@@ -920,7 +921,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 		Predicate:       pred(1, ""),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, basePath, options, out); err != nil {
 		t.Fatalf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -964,7 +965,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 		Predicate:       pred(0, continueFromSecondItem),
 		Recursive:       true,
 	}
-	err = store.GetList(ctx, "/", options, out)
+	err = store.GetList(ctx, basePath, options, out)
 	if err == nil {
 		t.Fatalf("unexpected no error")
 	}
@@ -986,7 +987,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 		Predicate:       pred(1, inconsistentContinueFromSecondItem),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, basePath, options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1005,7 +1006,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 		Predicate:       pred(1, continueFromThirdItem),
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/", options, out); err != nil {
+	if err := store.GetList(ctx, basePath, options, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -1127,9 +1128,9 @@ func testSetup(t *testing.T, opts ...setupOption) (context.Context, *store, *cli
 
 func TestPrefix(t *testing.T) {
 	testcases := map[string]string{
-		"custom/prefix":     "/custom/prefix",
-		"/custom//prefix//": "/custom/prefix",
-		"/registry":         "/registry",
+		"custom/prefix":     "/custom/prefix/",
+		"/custom//prefix//": "/custom/prefix/",
+		"/registry":         "/registry/",
 	}
 	for configuredPrefix, effectivePrefix := range testcases {
 		_, store, _ := testSetup(t, withPrefix(configuredPrefix))
@@ -1302,7 +1303,7 @@ func TestConsistentList(t *testing.T) {
 		Predicate: predicate,
 		Recursive: true,
 	}
-	if err := store.GetList(ctx, "/", options, &result1); err != nil {
+	if err := store.GetList(ctx, basePath, options, &result1); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -1315,7 +1316,7 @@ func TestConsistentList(t *testing.T) {
 	}
 
 	result2 := example.PodList{}
-	if err := store.GetList(ctx, "/", options, &result2); err != nil {
+	if err := store.GetList(ctx, basePath, options, &result2); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -1325,7 +1326,7 @@ func TestConsistentList(t *testing.T) {
 	options.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
 
 	result3 := example.PodList{}
-	if err := store.GetList(ctx, "/", options, &result3); err != nil {
+	if err := store.GetList(ctx, basePath, options, &result3); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -1333,7 +1334,7 @@ func TestConsistentList(t *testing.T) {
 	options.ResourceVersionMatch = metav1.ResourceVersionMatchExact
 
 	result4 := example.PodList{}
-	if err := store.GetList(ctx, "/", options, &result4); err != nil {
+	if err := store.GetList(ctx, basePath, options, &result4); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -1383,4 +1384,79 @@ func TestLeaseMaxObjectCount(t *testing.T) {
 			t.Errorf("Lease manager recorded count %v should be %v", store.leaseManager.leaseAttachedObjectCount, tc.expectAttachedCount)
 		}
 	}
+}
+
+func TestValidateKey(t *testing.T) {
+	validKeys := []string{
+		"/foo/bar/baz/a.b.c/",
+		"/foo",
+		"foo/bar/baz",
+		"/foo/bar..baz/",
+		"/foo/bar..",
+		"foo",
+		"foo/bar",
+		"/foo/bar/",
+	}
+	invalidKeys := []string{
+		"/foo/bar/../a.b.c/",
+		"..",
+		"/..",
+		"../",
+		"/foo/bar/..",
+		"../foo/bar",
+		"/../foo",
+		"/foo/bar/../",
+		".",
+		"/.",
+		"./",
+		"/./",
+		"/foo/.",
+		"./bar",
+		"/foo/./bar/",
+	}
+	const (
+		pathPrefix   = "/first/second"
+		expectPrefix = pathPrefix + "/"
+	)
+	_, store, _ := testSetup(t, withPrefix(pathPrefix))
+
+	for _, key := range validKeys {
+		k, err := store.prepareKey(key)
+		if err != nil {
+			t.Errorf("key %q should be valid; unexpected error: %v", key, err)
+		} else if !strings.HasPrefix(k, expectPrefix) {
+			t.Errorf("key %q should have prefix %q", k, expectPrefix)
+		}
+	}
+
+	for _, key := range invalidKeys {
+		_, err := store.prepareKey(key)
+		if err == nil {
+			t.Errorf("key %q should be invalid", key)
+		}
+	}
+}
+
+func TestInvalidKeys(t *testing.T) {
+	const invalidKey = "/foo/bar/../baz"
+	expectedError := fmt.Sprintf("invalid key: %q", invalidKey)
+
+	expectInvalidKey := func(methodName string, err error) {
+		if err == nil {
+			t.Errorf("[%s] expected invalid key error; got nil", methodName)
+		} else if err.Error() != expectedError {
+			t.Errorf("[%s] expected invalid key error; got %v", methodName, err)
+		}
+	}
+
+	ctx, store, _ := testSetup(t)
+	expectInvalidKey("Create", store.Create(ctx, invalidKey, nil, nil, 0))
+	expectInvalidKey("Delete", store.Delete(ctx, invalidKey, nil, nil, nil, nil))
+	_, watchErr := store.Watch(ctx, invalidKey, storage.ListOptions{})
+	expectInvalidKey("Watch", watchErr)
+	expectInvalidKey("Get", store.Get(ctx, invalidKey, storage.GetOptions{}, nil))
+	expectInvalidKey("GetList", store.GetList(ctx, invalidKey, storage.ListOptions{}, nil))
+	expectInvalidKey("GuaranteedUpdate", store.GuaranteedUpdate(ctx, invalidKey, nil, true, nil, nil, nil))
+	_, countErr := store.Count(invalidKey)
+	expectInvalidKey("Count", countErr)
 }
