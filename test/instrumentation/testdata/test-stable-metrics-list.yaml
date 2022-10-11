@@ -85,3 +85,54 @@
   - 2.5
   - 5
   - 10
+- name: priority_level_seat_utilization
+  subsystem: subsystem
+  namespace: namespace
+  help: Observations, at the end of every nanosecond, of utilization of seats for
+    any stage of execution (but only initial stage for WATCHes)
+  type: TimingRatioHistogram
+  stabilityLevel: BETA
+  labels:
+  - priorityLevel
+  buckets:
+  - 0
+  - 0.1
+  - 0.2
+  - 0.3
+  - 0.4
+  - 0.5
+  - 0.6
+  - 0.7
+  - 0.8
+  - 0.9
+  - 0.95
+  - 0.99
+  - 1
+  constLabels:
+    phase: executing
+- name: label
+  subsystem: const
+  namespace: test
+  help: Observations, at the end of every nanosecond, of utilization of seats for
+    any stage of execution (but only initial stage for WATCHes)
+  type: TimingRatioHistogram
+  stabilityLevel: BETA
+  labels:
+  - priorityLevel
+  buckets:
+  - 0
+  - 0.1
+  - 0.2
+  - 0.3
+  - 0.4
+  - 0.5
+  - 0.6
+  - 0.7
+  - 0.8
+  - 0.9
+  - 0.95
+  - 0.99
+  - 1
+  constLabels:
+    phase: blah
+    somestring: executing

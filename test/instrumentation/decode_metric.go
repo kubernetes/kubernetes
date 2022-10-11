@@ -70,9 +70,9 @@ func (c *metricDecoder) decodeNewMetricCall(fc *ast.CallExpr) (*metric, error) {
 		return nil, nil
 	}
 	switch functionName {
-	case "NewCounter", "NewGauge", "NewHistogram", "NewSummary":
+	case "NewCounter", "NewGauge", "NewHistogram", "NewSummary", "NewTimingHistogram":
 		m, err = c.decodeMetric(fc)
-	case "NewCounterVec", "NewGaugeVec", "NewHistogramVec", "NewSummaryVec":
+	case "NewCounterVec", "NewGaugeVec", "NewHistogramVec", "NewSummaryVec", "NewTimingHistogramVec":
 		m, err = c.decodeMetricVec(fc)
 	case "Labels", "HandlerOpts", "HandlerFor", "HandlerWithReset":
 		return nil, nil
@@ -96,6 +96,8 @@ func getMetricType(functionName string) string {
 		return histogramMetricType
 	case "NewSummary", "NewSummaryVec":
 		return summaryMetricType
+	case "NewTimingHistogram", "NewTimingHistogramVec":
+		return timingRatioHistogram
 	default:
 		panic("getMetricType expects correct function name")
 	}
@@ -295,6 +297,12 @@ func (c *metricDecoder) decodeOpts(expr ast.Expr) (metric, error) {
 				return m, err
 			}
 			m.StabilityLevel = string(*level)
+		case "ConstLabels":
+			labels, err := c.decodeConstLabels(kv.Value)
+			if err != nil {
+				return m, err
+			}
+			m.ConstLabels = labels
 		case "AgeBuckets", "BufCap":
 			uintVal, err := c.decodeUint32(kv.Value)
 			if err != nil {
@@ -557,4 +565,44 @@ func decodeStabilityLevel(expr ast.Expr, metricsFrameworkImportName string) (*me
 
 	stability := metrics.StabilityLevel(se.Sel.Name)
 	return &stability, nil
+}
+
+func (c *metricDecoder) decodeConstLabels(expr ast.Expr) (map[string]string, error) {
+	retval := map[string]string{}
+	switch v := expr.(type) {
+	case *ast.CompositeLit:
+		for _, e2 := range v.Elts {
+			kv := e2.(*ast.KeyValueExpr)
+			key := ""
+			switch k := kv.Key.(type) {
+
+			case *ast.Ident:
+				variableExpr, found := c.variables[k.Name]
+				if !found {
+					return nil, newDecodeErrorf(expr, errBadVariableAttribute)
+				}
+				bl, ok := variableExpr.(*ast.BasicLit)
+				if !ok {
+					return nil, newDecodeErrorf(expr, errNonStringAttribute)
+				}
+				k2, err := stringValue(bl)
+				if err != nil {
+					return nil, err
+				}
+				key = k2
+			case *ast.BasicLit:
+				k2, err := stringValue(k)
+				if err != nil {
+					return nil, err
+				}
+				key = k2
+			}
+			val, err := stringValue(kv.Value.(*ast.BasicLit))
+			if err != nil {
+				return nil, err
+			}
+			retval[key] = val
+		}
+	}
+	return retval, nil
 }

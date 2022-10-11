@@ -63,6 +63,16 @@ const (
 	RunPodSandboxErrorsKey   = "run_podsandbox_errors_total"
 )
 
+const (
+	requestKind         = "request_kind"
+	priorityLevel       = "priority_level"
+	flowSchema          = "flow_schema"
+	phase               = "phase"
+	LabelNamePhase      = "phase"
+	LabelValueWaiting   = "waiting"
+	LabelValueExecuting = "executing"
+)
+
 var (
 	defObjectives = map[float64]float64{0.5: 0.5, 0.75: 0.75}
 	testBuckets   = []float64{0, 0.5, 1.0}
@@ -130,6 +140,35 @@ var (
 			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
+	)
+	// PriorityLevelExecutionSeatsGaugeVec creates observers of seats occupied throughout execution for priority levels
+	PriorityLevelExecutionSeatsGaugeVec = metrics.NewTimingHistogramVec(
+		&metrics.TimingHistogramOpts{
+			Namespace: "namespace",
+			Subsystem: "subsystem",
+			Name:      "priority_level_seat_utilization",
+			Help:      "Observations, at the end of every nanosecond, of utilization of seats for any stage of execution (but only initial stage for WATCHes)",
+			// Buckets for both 0.99 and 1.0 mean PromQL's histogram_quantile will reveal saturation
+			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 1},
+			ConstLabels:    map[string]string{phase: "executing"},
+			StabilityLevel: metrics.BETA,
+		},
+		[]string{"priorityLevel"},
+	)
+
+	// PriorityLevelExecutionSeatsGaugeVec creates observers of seats occupied throughout execution for priority levels
+	TestConstLabels = metrics.NewTimingHistogramVec(
+		&metrics.TimingHistogramOpts{
+			Namespace: "test",
+			Subsystem: "const",
+			Name:      "label",
+			Help:      "Observations, at the end of every nanosecond, of utilization of seats for any stage of execution (but only initial stage for WATCHes)",
+			// Buckets for both 0.99 and 1.0 mean PromQL's histogram_quantile will reveal saturation
+			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 1},
+			ConstLabels:    map[string]string{"somestring": "executing", phase: "blah"},
+			StabilityLevel: metrics.BETA,
+		},
+		[]string{"priorityLevel"},
 	)
 	// PLEGRelistDuration is a Histogram that tracks the duration (in seconds) it takes for relisting pods in the Kubelet's
 	// Pod Lifecycle Event Generator (PLEG).
