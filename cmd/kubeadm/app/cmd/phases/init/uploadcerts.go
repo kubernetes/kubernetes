@@ -41,6 +41,7 @@ func NewUploadCertsPhase() workflow.Phase {
 			options.UploadCerts,
 			options.CertificateKey,
 			options.SkipCertificateKeyPrint,
+			options.DryRun,
 		},
 	}
 }

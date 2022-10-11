@@ -97,6 +97,7 @@ func getUploadConfigPhaseFlags() []string {
 	return []string{
 		options.CfgPath,
 		options.KubeconfigPath,
+		options.DryRun,
 	}
 }
 

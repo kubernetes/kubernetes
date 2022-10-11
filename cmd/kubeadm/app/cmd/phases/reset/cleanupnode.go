@@ -49,6 +49,7 @@ func NewCleanupNodePhase() workflow.Phase {
 			options.CertificatesDir,
 			options.NodeCRISocket,
 			options.CleanupTmpDir,
+			options.DryRun,
 		},
 	}
 }

@@ -44,6 +44,7 @@ func NewRemoveETCDMemberPhase() workflow.Phase {
 		Run:   runRemoveETCDMemberPhase,
 		InheritFlags: []string{
 			options.KubeconfigPath,
+			options.DryRun,
 		},
 	}
 }
