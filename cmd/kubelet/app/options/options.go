@@ -189,13 +189,6 @@ func ValidateKubeletFlags(f *KubeletFlags) error {
 		return fmt.Errorf("unsupported CRI runtime: %q, only %q is currently supported", f.ContainerRuntime, kubetypes.RemoteContainerRuntime)
 	}
 
-	// Note: maybe we can test it for being a valid socket address as an additional improvement.
-	// The only problem with it will be that some setups may not specify 'unix://' prefix.
-	// So just check empty for back compat.
-	if f.RemoteRuntimeEndpoint == "" {
-		return fmt.Errorf("the container runtime endpoint address was not specified or empty, use --container-runtime-endpoint to set")
-	}
-
 	return nil
 }
 

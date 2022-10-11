@@ -469,7 +469,7 @@ type KubeletConfiguration struct {
 
 	// ContainerRuntimeEndpoint is the endpoint of container runtime.
 	// unix domain sockets supported on Linux while npipes and tcp endpoints are supported for windows.
-	// Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime
+	// Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime'
 	ContainerRuntimeEndpoint string
 
 	// ImageServiceEndpoint is the endpoint of container image service.

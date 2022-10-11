@@ -58631,7 +58631,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"containerRuntimeEndpoint": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ContainerRuntimeEndpoint is the endpoint of container runtime. unix domain sockets supported on Linux while npipes and tcp endpoints are supported for windows. Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime",
+							Description: "ContainerRuntimeEndpoint is the endpoint of container runtime. Unix Domain Sockets are supported on Linux, while npipe and tcp endpoints are supported on Windows. Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime'",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -58639,7 +58639,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"imageServiceEndpoint": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ImageServiceEndpoint is the endpoint of container image service. If not specified the default value is ContainerRuntimeEndpoint",
+							Description: "ImageServiceEndpoint is the endpoint of container image service. Unix Domain Socket are supported on Linux, while npipe and tcp endpoints are supported on Windows. Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime'. If not specified, the value in containerRuntimeEndpoint is used.",
 							Type:        []string{"string"},
 							Format:      "",
 						},

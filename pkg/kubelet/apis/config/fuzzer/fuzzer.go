@@ -107,7 +107,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.ConfigMapAndSecretChangeDetectionStrategy = "Watch"
 			obj.AllowedUnsafeSysctls = []string{}
 			obj.VolumePluginDir = kubeletconfigv1beta1.DefaultVolumePluginDir
-			obj.ContainerRuntimeEndpoint = "containerd.sock"
+			obj.ContainerRuntimeEndpoint = "unix:///run/containerd/containerd.sock"
 
 			if obj.Logging.Format == "" {
 				obj.Logging.Format = "text"

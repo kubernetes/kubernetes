@@ -805,12 +805,14 @@ type KubeletConfiguration struct {
 	LocalStorageCapacityIsolation *bool `json:"localStorageCapacityIsolation,omitempty"`
 
 	// ContainerRuntimeEndpoint is the endpoint of container runtime.
-	// unix domain sockets supported on Linux while npipes and tcp endpoints are supported for windows.
-	// Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime
+	// Unix Domain Sockets are supported on Linux, while npipe and tcp endpoints are supported on Windows.
+	// Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime'
 	ContainerRuntimeEndpoint string `json:"containerRuntimeEndpoint"`
 
 	// ImageServiceEndpoint is the endpoint of container image service.
-	// If not specified the default value is ContainerRuntimeEndpoint
+	// Unix Domain Socket are supported on Linux, while npipe and tcp endpoints are supported on Windows.
+	// Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime'.
+	// If not specified, the value in containerRuntimeEndpoint is used.
 	// +optional
 	ImageServiceEndpoint string `json:"imageServiceEndpoint,omitempty"`
 }
