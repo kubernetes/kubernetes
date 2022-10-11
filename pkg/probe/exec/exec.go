@@ -18,8 +18,11 @@ package exec
 
 import (
 	"bytes"
+	"sync"
 
+	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	"k8s.io/kubernetes/pkg/probe"
@@ -33,21 +36,32 @@ const (
 )
 
 // New creates a Prober.
-func New() Prober {
-	return execProber{}
+func New(recorder record.EventRecorder) Prober {
+	return execProber{
+		recorder:   recorder,
+		recordOnce: &sync.Once{},
+	}
 }
 
 // Prober is an interface defining the Probe object for container readiness/liveness checks.
 type Prober interface {
-	Probe(e exec.Cmd) (probe.Result, string, error)
+	Probe(e exec.Cmd, pod *v1.Pod) (probe.Result, string, error)
 }
 
-type execProber struct{}
+type execProber struct {
+	// recorder is used to emit a single Event when an exec probe times out
+	// but the ExecProbeTimeout feature gate is disabled.
+	// TODO: remove when ExecProbeTimeout feature gate is removed.
+	recorder record.EventRecorder
+	// recordOnce is used to ensure only 1 event is emitted by recorder per probe.
+	// TODO: remove when ExecProbeTimeout feature gate is removed.
+	recordOnce *sync.Once
+}
 
 // Probe executes a command to check the liveness/readiness of container
 // from executing a command. Returns the Result status, command output, and
 // errors if any.
-func (pr execProber) Probe(e exec.Cmd) (probe.Result, string, error) {
+func (pr execProber) Probe(e exec.Cmd, pod *v1.Pod) (probe.Result, string, error) {
 	var dataBuffer bytes.Buffer
 	writer := ioutils.LimitWriter(&dataBuffer, maxReadLength)
 
@@ -75,6 +89,10 @@ func (pr execProber) Probe(e exec.Cmd) (probe.Result, string, error) {
 				// When exec probe timeout, data is empty, so we should return timeoutErr.Error() as the stdout.
 				return probe.Failure, timeoutErr.Error(), nil
 			}
+
+			pr.recordOnce.Do(func() {
+				pr.recorder.Event(pod, v1.EventTypeWarning, "KubeletExecProbeTimeoutIgnored", "Kubelet exec probe timed out but was ignored since ExecProbeTimeout feature gate was disabled")
+			})
 
 			klog.Warningf("Exec probe timed out after %s but ExecProbeTimeout feature gate was disabled", timeoutErr.Timeout())
 		}

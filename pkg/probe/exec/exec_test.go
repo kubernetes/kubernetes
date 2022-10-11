@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/probe"
 )
 
@@ -101,7 +102,7 @@ func (f *fakeExitError) ExitStatus() int {
 }
 
 func TestExec(t *testing.T) {
-	prober := New()
+	prober := New(&record.FakeRecorder{})
 
 	tenKilobyte := strings.Repeat("logs-123", 128*10)      // 8*128*10=10240 = 10KB of text.
 	elevenKilobyte := strings.Repeat("logs-123", 8*128*11) // 8*128*11=11264 = 11KB of text.
@@ -131,7 +132,7 @@ func TestExec(t *testing.T) {
 			out: []byte(test.output),
 			err: test.err,
 		}
-		status, output, err := prober.Probe(&fake)
+		status, output, err := prober.Probe(&fake, nil)
 		if status != test.expectedStatus {
 			t.Errorf("[%d] expected %v, got %v", i, test.expectedStatus, status)
 		}

@@ -315,7 +315,7 @@ func TestProbe(t *testing.T) {
 			}
 
 			if len(test.expectCommand) > 0 {
-				prober.exec = execprobe.New()
+				prober.exec = execprobe.New(prober.recorder)
 				prober.runner = &containertest.FakeContainerCommandRunner{}
 				_, err := prober.probe(probeType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
 				if err != nil {

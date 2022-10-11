@@ -131,7 +131,7 @@ type fakeExecProber struct {
 	err    error
 }
 
-func (p fakeExecProber) Probe(c exec.Cmd) (probe.Result, string, error) {
+func (p fakeExecProber) Probe(c exec.Cmd, pod *v1.Pod) (probe.Result, string, error) {
 	return p.result, "", p.err
 }
 
@@ -147,8 +147,8 @@ func (p *syncExecProber) set(result probe.Result, err error) {
 	p.err = err
 }
 
-func (p *syncExecProber) Probe(cmd exec.Cmd) (probe.Result, string, error) {
+func (p *syncExecProber) Probe(cmd exec.Cmd, pod *v1.Pod) (probe.Result, string, error) {
 	p.RLock()
 	defer p.RUnlock()
-	return p.fakeExecProber.Probe(cmd)
+	return p.fakeExecProber.Probe(cmd, pod)
 }

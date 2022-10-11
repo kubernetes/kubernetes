@@ -66,7 +66,7 @@ func newProber(
 
 	const followNonLocalRedirects = false
 	return &prober{
-		exec:     execprobe.New(),
+		exec:     execprobe.New(recorder),
 		http:     httpprobe.New(followNonLocalRedirects),
 		tcp:      tcpprobe.New(),
 		grpc:     grpcprobe.New(),
@@ -155,7 +155,7 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 	if p.Exec != nil {
 		klog.V(4).InfoS("Exec-Probe runProbe", "pod", klog.KObj(pod), "containerName", container.Name, "execCommand", p.Exec.Command)
 		command := kubecontainer.ExpandContainerCommandOnlyStatic(p.Exec.Command, container.Env)
-		return pb.exec.Probe(pb.newExecInContainer(container, containerID, command, timeout))
+		return pb.exec.Probe(pb.newExecInContainer(container, containerID, command, timeout), pod)
 	}
 	if p.HTTPGet != nil {
 		scheme := strings.ToLower(string(p.HTTPGet.Scheme))
