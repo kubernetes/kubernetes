@@ -577,25 +577,29 @@ func TestGetOpenAPISchemaV3(t *testing.T) {
 	}
 
 	for k, v := range paths {
-		actual, err := v.Schema()
+		actual, err := v.SchemaPB()
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		expected := testV3Specs[k]
-		if !golangproto.Equal(expected, actual) {
+		expectedPB, err := golangproto.Marshal(expected)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(expectedPB, actual) {
 			t.Fatalf("expected \n%v\n\ngot:\n%v", expected, actual)
 		}
 
 		// Ensure that fetching schema once again does not return same instance
-		actualAgain, err := v.Schema()
+		actualAgain, err := v.SchemaPB()
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		if reflect.ValueOf(actual).Pointer() == reflect.ValueOf(actualAgain).Pointer() {
 			t.Fatal("expected schema not to be cached")
-		} else if !golangproto.Equal(actual, actualAgain) {
+		} else if !reflect.DeepEqual(expectedPB, actualAgain) {
 			t.Fatal("expected schema values to be equal")
 		}
 	}

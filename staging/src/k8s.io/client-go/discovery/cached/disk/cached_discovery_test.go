@@ -175,14 +175,14 @@ func TestOpenAPIDiskCache(t *testing.T) {
 	for k, v := range paths {
 		i++
 
-		_, err = v.Schema()
+		_, err = v.SchemaJSON()
 		assert.NoError(t, err)
 
 		path := "/openapi/v3/" + strings.TrimPrefix(k, "/")
 		assert.Equal(t, 1, fakeServer.RequestCounters[path])
 
 		// Ensure schema call is served from memory
-		_, err = v.Schema()
+		_, err = v.SchemaJSON()
 		assert.NoError(t, err)
 		assert.Equal(t, 1, fakeServer.RequestCounters[path])
 
@@ -196,7 +196,7 @@ func TestOpenAPIDiskCache(t *testing.T) {
 		}
 
 		// Ensure schema call is still served from disk
-		_, err = newPaths[k].Schema()
+		_, err = newPaths[k].SchemaJSON()
 		assert.NoError(t, err)
 		assert.Equal(t, 1+i, fakeServer.RequestCounters["/openapi/v3"])
 		assert.Equal(t, 1, fakeServer.RequestCounters[path])

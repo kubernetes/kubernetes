@@ -416,7 +416,7 @@ func TestOpenAPIMemCache(t *testing.T) {
 	require.NoError(t, err)
 
 	for k, v := range paths {
-		original, err := v.Schema()
+		original, err := v.SchemaPB()
 		if !assert.NoError(t, err) {
 			continue
 		}
@@ -426,7 +426,7 @@ func TestOpenAPIMemCache(t *testing.T) {
 			continue
 		}
 
-		schemaAgain, err := pathsAgain[k].Schema()
+		schemaAgain, err := pathsAgain[k].SchemaPB()
 		if !assert.NoError(t, err) {
 			continue
 		}
@@ -442,7 +442,7 @@ func TestOpenAPIMemCache(t *testing.T) {
 			continue
 		}
 
-		schemaAgain, err = pathsAgain[k].Schema()
+		schemaAgain, err = pathsAgain[k].SchemaPB()
 		if !assert.NoError(t, err) {
 			continue
 		}

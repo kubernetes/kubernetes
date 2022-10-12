@@ -19,15 +19,16 @@ package openapi
 import (
 	"context"
 
-	openapi_v3 "github.com/google/gnostic/openapiv3"
-	"google.golang.org/protobuf/proto"
 	"k8s.io/kube-openapi/pkg/handler3"
 )
 
 const openAPIV3mimePb = "application/com.github.proto-openapi.spec.v3@v1.0+protobuf"
+const jsonMime = "application/json"
 
 type GroupVersion interface {
-	Schema() (*openapi_v3.Document, error)
+	// Raw data types
+	SchemaJSON() ([]byte, error)
+	SchemaPB() ([]byte, error)
 }
 
 type groupversion struct {
@@ -39,7 +40,7 @@ func newGroupVersion(client *client, item handler3.OpenAPIV3DiscoveryGroupVersio
 	return &groupversion{client: client, item: item}
 }
 
-func (g *groupversion) Schema() (*openapi_v3.Document, error) {
+func (g *groupversion) SchemaPB() ([]byte, error) {
 	data, err := g.client.restClient.Get().
 		RequestURI(g.item.ServerRelativeURL).
 		SetHeader("Accept", openAPIV3mimePb).
@@ -49,11 +50,18 @@ func (g *groupversion) Schema() (*openapi_v3.Document, error) {
 	if err != nil {
 		return nil, err
 	}
+	return data, nil
+}
 
-	document := &openapi_v3.Document{}
-	if err := proto.Unmarshal(data, document); err != nil {
+func (g *groupversion) SchemaJSON() ([]byte, error) {
+	data, err := g.client.restClient.Get().
+		RequestURI(g.item.ServerRelativeURL).
+		SetHeader("Accept", jsonMime).
+		Do(context.TODO()).
+		Raw()
+
+	if err != nil {
 		return nil, err
 	}
-
-	return document, nil
+	return data, nil
 }
