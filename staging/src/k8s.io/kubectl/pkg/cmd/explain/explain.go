@@ -18,14 +18,17 @@ package explain
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/discovery"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/explain"
+	explainv2 "k8s.io/kubectl/pkg/explain/v2"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/openapi"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -62,12 +65,25 @@ type ExplainOptions struct {
 
 	Mapper meta.RESTMapper
 	Schema openapi.Resources
+
+	// Toggles whether the OpenAPI v3 template-based renderer should be used to show
+	// output.
+	EnableOpenAPIV3 bool
+
+	// Name of the template to use with the openapiv3 template renderer. If
+	// `EnableOpenAPIV3` is disabled, this does nothing
+	OutputFormat string
+
+	// Client capable of fetching openapi documents from the user's cluster
+	DiscoveryClient discovery.DiscoveryInterface
 }
 
 func NewExplainOptions(parent string, streams genericclioptions.IOStreams) *ExplainOptions {
 	return &ExplainOptions{
-		IOStreams: streams,
-		CmdParent: parent,
+		IOStreams:       streams,
+		CmdParent:       parent,
+		EnableOpenAPIV3: os.Getenv("KUBECTL_EXPLAIN_OPENAPIV3") == "true",
+		OutputFormat:    "plaintext",
 	}
 }
 
@@ -89,6 +105,12 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericclioptions.I
 	}
 	cmd.Flags().BoolVar(&o.Recursive, "recursive", o.Recursive, "Print the fields of fields (Currently only 1 level deep)")
 	cmd.Flags().StringVar(&o.APIVersion, "api-version", o.APIVersion, "Get different explanations for particular API version (API group/version)")
+
+	// Only enable --output as a valid flag if the feature is enabled
+	if o.EnableOpenAPIV3 {
+		cmd.Flags().StringVar(&o.OutputFormat, "output", o.OutputFormat, "Format in which to render the schema")
+	}
+
 	return cmd
 }
 
@@ -102,6 +124,15 @@ func (o *ExplainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	o.Schema, err = f.OpenAPISchema()
 	if err != nil {
 		return err
+	}
+
+	// Only openapi v3 needs the discovery client.
+	if o.EnableOpenAPIV3 {
+		clientset, err := f.KubernetesClientSet()
+		if err != nil {
+			return err
+		}
+		o.DiscoveryClient = clientset.DiscoveryClient
 	}
 
 	o.args = args
@@ -140,6 +171,17 @@ func (o *ExplainOptions) Run() error {
 		if err != nil {
 			return err
 		}
+	}
+
+	if o.EnableOpenAPIV3 {
+		return explainv2.PrintModelDescription(
+			fieldsPath,
+			o.Out,
+			o.DiscoveryClient.OpenAPIV3(),
+			fullySpecifiedGVR,
+			recursive,
+			o.OutputFormat,
+		)
 	}
 
 	gvk, _ := o.Mapper.KindFor(fullySpecifiedGVR)
