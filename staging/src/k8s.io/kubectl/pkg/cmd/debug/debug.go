@@ -547,6 +547,14 @@ func (o *DebugOptions) generateDebugContainer(pod *corev1.Pod) (*corev1.Pod, *co
 		if ec.SecurityContext == nil {
 			return nil, nil, fmt.Errorf("Container for SecurityContext not found")
 		}
+	} else {
+		// If the POD has runAsNonRoot:true a securityContext MUST be specified.
+		// Otherwise a non-runnable ephemeral container is created.
+		if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.RunAsNonRoot != nil {
+			if *pod.Spec.SecurityContext.RunAsNonRoot {
+				return nil, nil, fmt.Errorf("Must have a SecurityContext when POD has runAsNonRoot:true")
+			}
+		}
 	}
 
 	if o.ArgsOnly {
