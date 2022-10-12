@@ -960,7 +960,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan podWork) {
 			// when the context is cancelled we expect an update to already be queued
 			klog.V(2).InfoS("Sync exited with context cancellation error", "pod", klog.KObj(pod), "podUID", pod.UID, "updateType", update.WorkType)
 
-		case err != nil:
+		case err != nil && update.WorkType != TerminatedPodWork:
 			// we will queue a retry
 			klog.ErrorS(err, "Error syncing pod, skipping", "pod", klog.KObj(pod), "podUID", pod.UID)
 
