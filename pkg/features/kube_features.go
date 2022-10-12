@@ -59,9 +59,10 @@ const (
 	// Enable nodes to change CPUCFSQuotaPeriod
 	CPUCFSQuotaPeriod featuregate.Feature = "CustomCPUCFSQuotaPeriod"
 
-	// owner: @ConnorDoyle
+	// owner: @ConnorDoyle, @fromanirh (only for GA graduation)
 	// alpha: v1.8
 	// beta: v1.10
+	// GA: v1.26
 	//
 	// Alternative container-level CPU affinity policies.
 	CPUManager featuregate.Feature = "CPUManager"
@@ -831,7 +832,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CPUCFSQuotaPeriod: {Default: false, PreRelease: featuregate.Alpha},
 
-	CPUManager: {Default: true, PreRelease: featuregate.Beta},
+	CPUManager: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.26
 
 	CPUManagerPolicyAlphaOptions: {Default: false, PreRelease: featuregate.Alpha},
 
