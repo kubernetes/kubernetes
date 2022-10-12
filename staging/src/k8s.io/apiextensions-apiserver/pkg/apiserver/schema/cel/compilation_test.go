@@ -22,6 +22,8 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apiserver/pkg/cel"
+
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
@@ -79,12 +81,12 @@ func (m fnMatcher) String() string {
 }
 
 type errorMatcher struct {
-	errorType ErrorType
+	errorType cel.ErrorType
 	contains  string
 }
 
 func invalidError(contains string) validationMatcher {
-	return errorMatcher{errorType: ErrorTypeInvalid, contains: contains}
+	return errorMatcher{errorType: cel.ErrorTypeInvalid, contains: contains}
 }
 
 func (v errorMatcher) matches(cr CompilationResult) bool {

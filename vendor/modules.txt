@@ -1321,8 +1321,6 @@ k8s.io/apiextensions-apiserver/pkg/apiserver
 k8s.io/apiextensions-apiserver/pkg/apiserver/conversion
 k8s.io/apiextensions-apiserver/pkg/apiserver/schema
 k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel
-k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/library
-k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/metrics
 k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model
 k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting
 k8s.io/apiextensions-apiserver/pkg/apiserver/schema/listtype
@@ -1492,6 +1490,9 @@ k8s.io/apiserver/pkg/authorization/authorizer
 k8s.io/apiserver/pkg/authorization/authorizerfactory
 k8s.io/apiserver/pkg/authorization/path
 k8s.io/apiserver/pkg/authorization/union
+k8s.io/apiserver/pkg/cel
+k8s.io/apiserver/pkg/cel/library
+k8s.io/apiserver/pkg/cel/metrics
 k8s.io/apiserver/pkg/endpoints
 k8s.io/apiserver/pkg/endpoints/deprecation
 k8s.io/apiserver/pkg/endpoints/discovery

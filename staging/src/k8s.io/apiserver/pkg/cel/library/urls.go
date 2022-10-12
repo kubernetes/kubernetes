@@ -22,7 +22,8 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
-	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
+
+	apiservercel "k8s.io/apiserver/pkg/cel"
 )
 
 // URLs provides a CEL function library extension of URL parsing functions.
@@ -113,25 +114,25 @@ type urls struct{}
 
 var urlLibraryDecls = map[string][]cel.FunctionOpt{
 	"url": {
-		cel.Overload("string_to_url", []*cel.Type{cel.StringType}, model.URLType,
+		cel.Overload("string_to_url", []*cel.Type{cel.StringType}, apiservercel.URLType,
 			cel.UnaryBinding(stringToUrl))},
 	"getScheme": {
-		cel.MemberOverload("url_get_scheme", []*cel.Type{model.URLType}, cel.StringType,
+		cel.MemberOverload("url_get_scheme", []*cel.Type{apiservercel.URLType}, cel.StringType,
 			cel.UnaryBinding(getScheme))},
 	"getHost": {
-		cel.MemberOverload("url_get_host", []*cel.Type{model.URLType}, cel.StringType,
+		cel.MemberOverload("url_get_host", []*cel.Type{apiservercel.URLType}, cel.StringType,
 			cel.UnaryBinding(getHost))},
 	"getHostname": {
-		cel.MemberOverload("url_get_hostname", []*cel.Type{model.URLType}, cel.StringType,
+		cel.MemberOverload("url_get_hostname", []*cel.Type{apiservercel.URLType}, cel.StringType,
 			cel.UnaryBinding(getHostname))},
 	"getPort": {
-		cel.MemberOverload("url_get_port", []*cel.Type{model.URLType}, cel.StringType,
+		cel.MemberOverload("url_get_port", []*cel.Type{apiservercel.URLType}, cel.StringType,
 			cel.UnaryBinding(getPort))},
 	"getEscapedPath": {
-		cel.MemberOverload("url_get_escaped_path", []*cel.Type{model.URLType}, cel.StringType,
+		cel.MemberOverload("url_get_escaped_path", []*cel.Type{apiservercel.URLType}, cel.StringType,
 			cel.UnaryBinding(getEscapedPath))},
 	"getQuery": {
-		cel.MemberOverload("url_get_query", []*cel.Type{model.URLType},
+		cel.MemberOverload("url_get_query", []*cel.Type{apiservercel.URLType},
 			cel.MapType(cel.StringType, cel.ListType(cel.StringType)),
 			cel.UnaryBinding(getQuery))},
 	"isURL": {
@@ -169,7 +170,7 @@ func stringToUrl(arg ref.Val) ref.Val {
 		// Errors are not expected here since Parse is a more lenient parser than ParseRequestURI.
 		return types.NewErr("URL parse error during conversion from string: %v", err)
 	}
-	return model.URL{URL: u}
+	return apiservercel.URL{URL: u}
 }
 
 func getScheme(arg ref.Val) ref.Val {

@@ -24,11 +24,13 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker"
+
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
-	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/library"
-	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/metrics"
 	celmodel "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
+	apiservercel "k8s.io/apiserver/pkg/cel"
+	"k8s.io/apiserver/pkg/cel/library"
+	"k8s.io/apiserver/pkg/cel/metrics"
 )
 
 const (
@@ -56,7 +58,7 @@ const (
 // CompilationResult represents the cel compilation result for one rule
 type CompilationResult struct {
 	Program cel.Program
-	Error   *Error
+	Error   *apiservercel.Error
 	// If true, the compiled expression contains a reference to the identifier "oldSelf", and its corresponding rule
 	// is implicitly a transition rule.
 	TransitionRule bool
@@ -97,7 +99,7 @@ func getBaseEnv() (*cel.Env, error) {
 //   - nil Program, nil Error: The provided rule was empty so compilation was not attempted
 //
 // perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit as input.
-func Compile(s *schema.Structural, declType *celmodel.DeclType, perCallLimit uint64) ([]CompilationResult, error) {
+func Compile(s *schema.Structural, declType *apiservercel.DeclType, perCallLimit uint64) ([]CompilationResult, error) {
 	t := time.Now()
 	defer metrics.Metrics.ObserveCompilation(time.Since(t))
 	if len(s.Extensions.XValidations) == 0 {
@@ -106,15 +108,15 @@ func Compile(s *schema.Structural, declType *celmodel.DeclType, perCallLimit uin
 	celRules := s.Extensions.XValidations
 
 	var propDecls []cel.EnvOption
-	var root *celmodel.DeclType
+	var root *apiservercel.DeclType
 	var ok bool
 	baseEnv, err := getBaseEnv()
 	if err != nil {
 		return nil, err
 	}
-	reg := celmodel.NewRegistry(baseEnv)
+	reg := apiservercel.NewRegistry(baseEnv)
 	scopedTypeName := generateUniqueSelfTypeName()
-	rt, err := celmodel.NewRuleTypes(scopedTypeName, declType, reg)
+	rt, err := apiservercel.NewRuleTypes(scopedTypeName, declType, reg)
 	if err != nil {
 		return nil, err
 	}
@@ -158,18 +160,18 @@ func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit u
 	}
 	ast, issues := env.Compile(rule.Rule)
 	if issues != nil {
-		compilationResult.Error = &Error{ErrorTypeInvalid, "compilation failed: " + issues.String()}
+		compilationResult.Error = &apiservercel.Error{apiservercel.ErrorTypeInvalid, "compilation failed: " + issues.String()}
 		return
 	}
 	if ast.OutputType() != cel.BoolType {
-		compilationResult.Error = &Error{ErrorTypeInvalid, "cel expression must evaluate to a bool"}
+		compilationResult.Error = &apiservercel.Error{apiservercel.ErrorTypeInvalid, "cel expression must evaluate to a bool"}
 		return
 	}
 
 	checkedExpr, err := cel.AstToCheckedExpr(ast)
 	if err != nil {
 		// should be impossible since env.Compile returned no issues
-		compilationResult.Error = &Error{ErrorTypeInternal, "unexpected compilation error: " + err.Error()}
+		compilationResult.Error = &apiservercel.Error{apiservercel.ErrorTypeInternal, "unexpected compilation error: " + err.Error()}
 		return
 	}
 	for _, ref := range checkedExpr.ReferenceMap {
@@ -188,12 +190,12 @@ func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit u
 		cel.InterruptCheckFrequency(checkFrequency),
 	)
 	if err != nil {
-		compilationResult.Error = &Error{ErrorTypeInvalid, "program instantiation failed: " + err.Error()}
+		compilationResult.Error = &apiservercel.Error{apiservercel.ErrorTypeInvalid, "program instantiation failed: " + err.Error()}
 		return
 	}
 	costEst, err := env.EstimateCost(ast, estimator)
 	if err != nil {
-		compilationResult.Error = &Error{ErrorTypeInternal, "cost estimation failed: " + err.Error()}
+		compilationResult.Error = &apiservercel.Error{apiservercel.ErrorTypeInternal, "cost estimation failed: " + err.Error()}
 		return
 	}
 	compilationResult.MaxCost = costEst.Max
@@ -210,12 +212,12 @@ func generateUniqueSelfTypeName() string {
 	return fmt.Sprintf("selfType%d", time.Now().Nanosecond())
 }
 
-func newCostEstimator(root *celmodel.DeclType) *library.CostEstimator {
+func newCostEstimator(root *apiservercel.DeclType) *library.CostEstimator {
 	return &library.CostEstimator{SizeEstimator: &sizeEstimator{root: root}}
 }
 
 type sizeEstimator struct {
-	root *celmodel.DeclType
+	root *apiservercel.DeclType
 }
 
 func (c *sizeEstimator) EstimateSize(element checker.AstNode) *checker.SizeEstimate {
