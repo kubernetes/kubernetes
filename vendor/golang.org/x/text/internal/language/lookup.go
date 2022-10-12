@@ -328,7 +328,7 @@ func (r Region) IsPrivateUse() bool {
 	return r.typ()&iso3166UserAssigned != 0
 }
 
-type Script uint8
+type Script uint16
 
 // getScriptID returns the script id for string s. It assumes that s
 // is of the format [A-Z][a-z]{3}.
