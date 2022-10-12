@@ -170,7 +170,7 @@ var (
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 				NominalConcurrencyShares: 30,
-				LendablePercent:          pointer.Int32(0),
+				LendablePercent:          pointer.Int32(33),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{
@@ -187,7 +187,7 @@ var (
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 				NominalConcurrencyShares: 40,
-				LendablePercent:          pointer.Int32(0),
+				LendablePercent:          pointer.Int32(25),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{
@@ -223,7 +223,7 @@ var (
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 				NominalConcurrencyShares: 40,
-				LendablePercent:          pointer.Int32(0),
+				LendablePercent:          pointer.Int32(50),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{
@@ -241,7 +241,7 @@ var (
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 				NominalConcurrencyShares: 100,
-				LendablePercent:          pointer.Int32(0),
+				LendablePercent:          pointer.Int32(90),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{
@@ -259,7 +259,7 @@ var (
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 				NominalConcurrencyShares: 20,
-				LendablePercent:          pointer.Int32(0),
+				LendablePercent:          pointer.Int32(50),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{
