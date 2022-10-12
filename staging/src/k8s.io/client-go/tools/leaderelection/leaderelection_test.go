@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"sync"
 	"testing"
 	"time"
@@ -81,6 +82,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 		observedRecord rl.LeaderElectionRecord
 		observedTime   time.Time
 		reactors       []Reactor
+		expectedEvents []string
 
 		expectSuccess    bool
 		transitionLeader bool
@@ -240,9 +242,10 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 			var lock rl.Interface
 
 			objectMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
+			recorder := record.NewFakeRecorder(100)
 			resourceLockConfig := rl.ResourceLockConfig{
 				Identity:      "baz",
-				EventRecorder: &record.FakeRecorder{},
+				EventRecorder: recorder,
 			}
 			c := &fake.Clientset{}
 			for _, reactor := range test.reactors {
@@ -306,6 +309,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 			if reportedLeader != test.outHolder {
 				t.Errorf("reported leader was not the new leader. expected %q, got %q", test.outHolder, reportedLeader)
 			}
+			assertEqualEvents(t, test.expectedEvents, recorder.Events)
 		})
 	}
 }
@@ -383,6 +387,7 @@ func testTryAcquireOrRenewMultiLock(t *testing.T, objectType string) {
 		observedRawRecord []byte
 		observedTime      time.Time
 		reactors          []Reactor
+		expectedEvents    []string
 
 		expectSuccess    bool
 		transitionLeader bool
@@ -799,9 +804,10 @@ func testTryAcquireOrRenewMultiLock(t *testing.T, objectType string) {
 			wg.Add(1)
 			var reportedLeader string
 
+			recorder := record.NewFakeRecorder(100)
 			resourceLockConfig := rl.ResourceLockConfig{
 				Identity:      "baz",
-				EventRecorder: &record.FakeRecorder{},
+				EventRecorder: recorder,
 			}
 			c := &fake.Clientset{}
 			for _, reactor := range test.reactors {
@@ -858,6 +864,7 @@ func testTryAcquireOrRenewMultiLock(t *testing.T, objectType string) {
 			if reportedLeader != test.outHolder {
 				t.Errorf("reported leader was not the new leader. expected %q, got %q", test.outHolder, reportedLeader)
 			}
+			assertEqualEvents(t, test.expectedEvents, recorder.Events)
 		})
 	}
 }
@@ -878,6 +885,7 @@ func testReleaseLease(t *testing.T, objectType string) {
 		observedRecord rl.LeaderElectionRecord
 		observedTime   time.Time
 		reactors       []Reactor
+		expectedEvents []string
 
 		expectSuccess    bool
 		transitionLeader bool
@@ -923,9 +931,10 @@ func testReleaseLease(t *testing.T, objectType string) {
 			var lock rl.Interface
 
 			objectMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
+			recorder := record.NewFakeRecorder(100)
 			resourceLockConfig := rl.ResourceLockConfig{
 				Identity:      "baz",
-				EventRecorder: &record.FakeRecorder{},
+				EventRecorder: recorder,
 			}
 			c := &fake.Clientset{}
 			for _, reactor := range test.reactors {
@@ -998,6 +1007,7 @@ func testReleaseLease(t *testing.T, objectType string) {
 			if reportedLeader != test.outHolder {
 				t.Errorf("reported leader was not the new leader. expected %q, got %q", test.outHolder, reportedLeader)
 			}
+			assertEqualEvents(t, test.expectedEvents, recorder.Events)
 		})
 	}
 }
@@ -1051,8 +1061,9 @@ func testReleaseOnCancellation(t *testing.T, objectType string) {
 	}
 
 	tests := []struct {
-		name     string
-		reactors []Reactor
+		name           string
+		reactors       []Reactor
+		expectedEvents []string
 	}{
 		{
 			name: "release acquired lock on cancellation of update",
@@ -1099,6 +1110,10 @@ func testReleaseOnCancellation(t *testing.T, objectType string) {
 						return true, lockObj, nil
 					},
 				},
+			},
+			expectedEvents: []string{
+				"Normal LeaderElection baz became leader",
+				"Normal LeaderElection baz stopped leading",
 			},
 		},
 		{
@@ -1148,6 +1163,10 @@ func testReleaseOnCancellation(t *testing.T, objectType string) {
 					},
 				},
 			},
+			expectedEvents: []string{
+				"Normal LeaderElection baz became leader",
+				"Normal LeaderElection baz stopped leading",
+			},
 		},
 	}
 
@@ -1157,9 +1176,10 @@ func testReleaseOnCancellation(t *testing.T, objectType string) {
 			wg.Add(1)
 			resetVars()
 
+			recorder := record.NewFakeRecorder(100)
 			resourceLockConfig := rl.ResourceLockConfig{
 				Identity:      "baz",
-				EventRecorder: &record.FakeRecorder{},
+				EventRecorder: recorder,
 			}
 			c := &fake.Clientset{}
 			for _, reactor := range test.reactors {
@@ -1212,6 +1232,31 @@ func testReleaseOnCancellation(t *testing.T, objectType string) {
 				t.Fatal("the lock was not released")
 			}
 			wg.Wait()
+			assertEqualEvents(t, test.expectedEvents, recorder.Events)
 		})
+	}
+}
+
+func assertEqualEvents(t *testing.T, expected []string, actual <-chan string) {
+	c := time.After(wait.ForeverTestTimeout)
+	for _, e := range expected {
+		select {
+		case a := <-actual:
+			if e != a {
+				t.Errorf("Expected event %q, got %q", e, a)
+				return
+			}
+		case <-c:
+			t.Errorf("Expected event %q, got nothing", e)
+			// continue iterating to print all expected events
+		}
+	}
+	for {
+		select {
+		case a := <-actual:
+			t.Errorf("Unexpected event: %q", a)
+		default:
+			return // No more events, as expected.
+		}
 	}
 }

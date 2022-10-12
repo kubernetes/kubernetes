@@ -64,9 +64,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
-	"k8s.io/utils/clock"
-
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -199,9 +198,7 @@ type LeaderElector struct {
 // stopped holding the leader lease
 func (le *LeaderElector) Run(ctx context.Context) {
 	defer runtime.HandleCrash()
-	defer func() {
-		le.config.Callbacks.OnStoppedLeading()
-	}()
+	defer le.config.Callbacks.OnStoppedLeading()
 
 	if !le.acquire(ctx) {
 		return // ctx signalled done
@@ -263,6 +260,7 @@ func (le *LeaderElector) acquire(ctx context.Context) bool {
 
 // renew loops calling tryAcquireOrRenew and returns immediately when tryAcquireOrRenew fails or ctx signals done.
 func (le *LeaderElector) renew(ctx context.Context) {
+	defer le.config.Lock.RecordEvent("stopped leading")
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	wait.Until(func() {
@@ -278,7 +276,6 @@ func (le *LeaderElector) renew(ctx context.Context) {
 			klog.V(5).Infof("successfully renewed lease %v", desc)
 			return
 		}
-		le.config.Lock.RecordEvent("stopped leading")
 		le.metrics.leaderOff(le.config.Name)
 		klog.Infof("failed to renew lease %v: %v", desc, err)
 		cancel()
