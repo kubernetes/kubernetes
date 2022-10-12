@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"k8s.io/component-base/metrics"
 )
@@ -70,7 +71,7 @@ func (c *metricDecoder) decodeNewMetricCall(fc *ast.CallExpr) (*metric, error) {
 		return nil, nil
 	}
 	switch functionName {
-	case "NewCounter", "NewGauge", "NewHistogram", "NewSummary", "NewTimingHistogram":
+	case "NewCounter", "NewGauge", "NewHistogram", "NewSummary", "NewTimingHistogram", "NewGaugeFunc":
 		m, err = c.decodeMetric(fc)
 	case "NewCounterVec", "NewGaugeVec", "NewHistogramVec", "NewSummaryVec", "NewTimingHistogramVec":
 		m, err = c.decodeMetricVec(fc)
@@ -90,7 +91,7 @@ func getMetricType(functionName string) string {
 	switch functionName {
 	case "NewCounter", "NewCounterVec":
 		return counterMetricType
-	case "NewGauge", "NewGaugeVec":
+	case "NewGauge", "NewGaugeVec", "NewGaugeFunc":
 		return gaugeMetricType
 	case "NewHistogram", "NewHistogramVec":
 		return histogramMetricType
@@ -104,7 +105,7 @@ func getMetricType(functionName string) string {
 }
 
 func (c *metricDecoder) decodeMetric(call *ast.CallExpr) (metric, error) {
-	if len(call.Args) != 1 {
+	if len(call.Args) > 2 {
 		return metric{}, newDecodeErrorf(call, errInvalidNewMetricCall)
 	}
 	return c.decodeOpts(call.Args[0])
@@ -326,7 +327,6 @@ func (c *metricDecoder) decodeOpts(expr ast.Expr) (metric, error) {
 		case "MaxAge":
 			int64Val, err := c.decodeInt64(kv.Value)
 			if err != nil {
-				print(key)
 				return m, err
 			}
 			m.MaxAge = int64Val
@@ -462,14 +462,62 @@ func (c *metricDecoder) decodeInt64(expr ast.Expr) (int64, error) {
 				return 1000 * 1000 * 1000 * 60 * 10, nil
 			}
 		}
+	case *ast.Ident:
+		variableExpr, found := c.variables[v.Name]
+		if found {
+			be, ok := variableExpr.(*ast.BinaryExpr)
+			if ok {
+				i, err2, done := c.extractTimeExpression(be)
+				if done {
+					return i, err2
+				}
+			}
+
+		}
+
 	case *ast.CallExpr:
 		_, ok := v.Fun.(*ast.SelectorExpr)
 		if !ok {
 			return 0, newDecodeErrorf(v, errDecodeInt64)
 		}
 		return 0, nil
+	case *ast.BinaryExpr:
+		i, err2, done := c.extractTimeExpression(v)
+		if done {
+			return i, err2
+		}
 	}
 	return 0, newDecodeErrorf(expr, errDecodeInt64)
+}
+
+func (c *metricDecoder) extractTimeExpression(v *ast.BinaryExpr) (int64, error, bool) {
+	x := v.X.(*ast.BasicLit)
+	if x.Kind != token.FLOAT && x.Kind != token.INT {
+		print(x.Kind)
+	}
+
+	xValue, err := strconv.ParseInt(x.Value, 10, 64)
+	if err != nil {
+		return 0, err, true
+	}
+
+	switch y := v.Y.(type) {
+	case *ast.SelectorExpr:
+		variableName := y.Sel.String()
+		importName, ok := y.X.(*ast.Ident)
+		if ok && importName.String() == "time" {
+			if variableName == "Hour" {
+				return xValue * int64(time.Hour), nil, true
+			}
+			if variableName == "Minute" {
+				return xValue * int64(time.Minute), nil, true
+			}
+			if variableName == "Second" {
+				return xValue * int64(time.Second), nil, true
+			}
+		}
+	}
+	return 0, nil, false
 }
 
 func decodeFloatMap(exprs []ast.Expr) (map[float64]float64, error) {

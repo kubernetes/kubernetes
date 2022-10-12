@@ -1,3 +1,10 @@
+- name: certificate_manager_client_ttl_seconds
+  subsystem: kubelet
+  help: Gauge of the TTL (time-to-live) of the Kubelet's client certificate. The value
+    is in seconds until certificate expiry (negative if already expired). If client
+    certificate is invalid or unused, the value will be +INF.
+  type: Gauge
+  stabilityLevel: BETA
 - name: device_plugin_alloc_duration_seconds
   subsystem: kubelet
   help: Duration in seconds to serve a device plugin Allocation request. Broken down
@@ -18,6 +25,20 @@
   - 2.5
   - 5
   - 10
+- name: max_age
+  subsystem: kubelet
+  help: 'Duration in seconds to sync a single pod. Broken down by operation type:
+    create, update, or sync'
+  type: Summary
+  stabilityLevel: BETA
+  maxAge: 7200000000000
+- name: max_age_const
+  subsystem: kubelet
+  help: 'Duration in seconds to sync a single pod. Broken down by operation type:
+    create, update, or sync'
+  type: Summary
+  stabilityLevel: BETA
+  maxAge: 120000000000
 - name: multiline
   subsystem: kubelet
   help: Cumulative number of pod preemptions by preemption resource asdf asdf asdf
