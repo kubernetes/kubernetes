@@ -256,12 +256,6 @@ const (
 	// Enables usage of hugepages-<size> in downward API.
 	DownwardAPIHugePages featuregate.Feature = "DownwardAPIHugePages"
 
-	// owner: @mtaufen
-	// alpha: v1.4
-	// beta: v1.11
-	// deprecated: 1.22
-	DynamicKubeletConfig featuregate.Feature = "DynamicKubeletConfig"
-
 	// owner: @andrewsykim
 	// kep: https://kep.k8s.io/1672
 	// alpha: v1.20
@@ -862,8 +856,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	DisableKubeletCloudCredentialProviders: {Default: false, PreRelease: featuregate.Alpha},
 
 	DownwardAPIHugePages: {Default: true, PreRelease: featuregate.Beta}, // on by default in 1.22
-
-	DynamicKubeletConfig: {Default: false, PreRelease: featuregate.Deprecated}, // feature gate is deprecated in 1.22, kubelet logic is removed in 1.24, api server logic can be removed in 1.26
 
 	EndpointSliceTerminatingCondition: {Default: true, PreRelease: featuregate.Beta},
 

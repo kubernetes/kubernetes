@@ -5259,6 +5259,8 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 }
 
 // validation specific to Node.Spec.ConfigSource
+// The field ConfigSource is deprecated and will not be used. The validation is kept in place
+// for the backward compatibility
 func validateNodeConfigSourceSpec(source *core.NodeConfigSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	count := int(0)
@@ -5276,6 +5278,8 @@ func validateNodeConfigSourceSpec(source *core.NodeConfigSource, fldPath *field.
 }
 
 // validation specific to Node.Spec.ConfigSource.ConfigMap
+// The field ConfigSource is deprecated and will not be used. The validation is kept in place
+// for the backward compatibility
 func validateConfigMapNodeConfigSourceSpec(source *core.ConfigMapNodeConfigSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// uid and resourceVersion must not be set in spec
