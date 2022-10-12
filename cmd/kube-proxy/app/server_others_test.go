@@ -31,9 +31,12 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	netutils "k8s.io/utils/net"
 
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	clientgotesting "k8s.io/client-go/testing"
 
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
@@ -741,5 +744,54 @@ detectLocalMode: "BridgeInterface"`)
 			t.Errorf("[%s] Timeout: unable to get any events or internal timeout.", tc.name)
 		}
 		tearDown(file, tempDir)
+	}
+}
+
+func Test_waitForPodCIDR(t *testing.T) {
+	expected := []string{"192.168.0.0/24", "fd00:1:2::/64"}
+	nodeName := "test-node"
+	oldNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            nodeName,
+			ResourceVersion: "1000",
+		},
+		Spec: v1.NodeSpec{
+			PodCIDR:  "10.0.0.0/24",
+			PodCIDRs: []string{"10.0.0.0/24", "2001:db2:1/64"},
+		},
+	}
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            nodeName,
+			ResourceVersion: "1",
+		},
+	}
+	updatedNode := node.DeepCopy()
+	updatedNode.Spec.PodCIDRs = expected
+	updatedNode.Spec.PodCIDR = expected[0]
+
+	// start with the new node
+	client := clientsetfake.NewSimpleClientset()
+	client.AddReactor("list", "nodes", func(action clientgotesting.Action) (handled bool, ret runtime.Object, err error) {
+		obj := &v1.NodeList{}
+		return true, obj, nil
+	})
+	fakeWatch := watch.NewFake()
+	client.PrependWatchReactor("nodes", clientgotesting.DefaultWatchReactor(fakeWatch, nil))
+
+	go func() {
+		fakeWatch.Add(node)
+		// receive a delete event for the old node
+		fakeWatch.Delete(oldNode)
+		// set the PodCIDRs on the new node
+		fakeWatch.Modify(updatedNode)
+	}()
+	got, err := waitForPodCIDR(client, node.Name)
+	if err != nil {
+		t.Errorf("waitForPodCIDR() unexpected error %v", err)
+		return
+	}
+	if !reflect.DeepEqual(got.Spec.PodCIDRs, expected) {
+		t.Errorf("waitForPodCIDR() got %v expected to be %v ", got.Spec.PodCIDRs, expected)
 	}
 }
