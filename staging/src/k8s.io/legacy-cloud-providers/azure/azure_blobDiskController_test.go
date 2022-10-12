@@ -88,7 +88,7 @@ func TestCreateVolume(t *testing.T) {
 	diskName, diskURI, requestGB, err := b.CreateVolume("testBlob", "testsa", "type", b.common.location, 10)
 	expectedErr := fmt.Errorf("could not get storage key for storage account testsa: could not get storage key for "+
 		"storage account testsa: Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: %w", error(nil))
-	assert.Equal(t, expectedErr, err)
+	assert.EqualError(t, err, expectedErr.Error())
 	assert.Empty(t, diskName)
 	assert.Empty(t, diskURI)
 	assert.Zero(t, requestGB)
@@ -124,10 +124,10 @@ func TestDeleteVolume(t *testing.T) {
 	diskURL := "https://foo.blob./vhds/bar.vhd"
 	err := b.DeleteVolume(diskURL)
 	expectedErr := fmt.Errorf("no key for storage account foo, err Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: %w", error(nil))
-	assert.Equal(t, expectedErr, err)
+	assert.EqualError(t, err, expectedErr.Error())
 
 	err = b.DeleteVolume(diskURL)
-	assert.Equal(t, expectedErr, err)
+	assert.EqualError(t, err, expectedErr.Error())
 
 	mockSAClient.EXPECT().ListKeys(gomock.Any(), b.common.resourceGroup, "foo").Return(storage.AccountListKeysResult{
 		Keys: &[]storage.AccountKey{
