@@ -900,7 +900,9 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 			klog.InfoS("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
 		} else {
 			// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
-			podInfo.PodInfo = framework.NewPodInfo(cachedPod.DeepCopy())
+			// ignore this err since apiserver doesn't properly validate affinity terms
+			// and we can't fix the validation for backwards compatibility.
+			podInfo.PodInfo, _ = framework.NewPodInfo(cachedPod.DeepCopy())
 			if err := sched.SchedulingQueue.AddUnschedulableIfNotPresent(podInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
 				klog.ErrorS(err, "Error occurred")
 			}

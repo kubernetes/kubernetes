@@ -162,10 +162,9 @@ func (pl *InterPodAffinity) PreScore(
 		topologyScore: make(map[string]map[string]int64),
 	}
 
-	state.podInfo = framework.NewPodInfo(pod)
-	if state.podInfo.ParseError != nil {
+	if state.podInfo, err = framework.NewPodInfo(pod); err != nil {
 		// Ideally we never reach here, because errors will be caught by PreFilter
-		return framework.AsStatus(fmt.Errorf("failed to parse pod: %w", state.podInfo.ParseError))
+		return framework.AsStatus(fmt.Errorf("failed to parse pod: %w", err))
 	}
 
 	for i := range state.podInfo.PreferredAffinityTerms {

@@ -762,8 +762,11 @@ func (p *PriorityQueue) podsCompareBackoffCompleted(podInfo1, podInfo2 interface
 // newQueuedPodInfo builds a QueuedPodInfo object.
 func (p *PriorityQueue) newQueuedPodInfo(pod *v1.Pod, plugins ...string) *framework.QueuedPodInfo {
 	now := p.clock.Now()
+	// ignore this err since apiserver doesn't properly validate affinity terms
+	// and we can't fix the validation for backwards compatibility.
+	podInfo, _ := framework.NewPodInfo(pod)
 	return &framework.QueuedPodInfo{
-		PodInfo:                 framework.NewPodInfo(pod),
+		PodInfo:                 podInfo,
 		Timestamp:               now,
 		InitialAttemptTimestamp: now,
 		UnschedulablePlugins:    sets.NewString(plugins...),
