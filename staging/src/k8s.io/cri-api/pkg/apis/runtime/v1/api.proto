@@ -121,6 +121,16 @@ service RuntimeService {
 
     // GetContainerEvents gets container events from the CRI runtime
     rpc  GetContainerEvents(GetEventsRequest) returns (stream ContainerEventResponse) {}
+
+    // ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
+    // This list should be static at startup: either the client and server restart together when
+    // adding or removing metrics descriptors, or they should not change.
+    // Put differently, if ListPodSandboxMetrics references a name that is not described in the initial
+    // ListMetricDescriptors call, then the metric will not be broadcasted.
+    rpc ListMetricDescriptors(ListMetricDescriptorsRequest) returns (ListMetricDescriptorsResponse) {}
+
+    // ListPodSandboxMetrics gets pod sandbox metrics from CRI Runtime
+    rpc ListPodSandboxMetrics(ListPodSandboxMetricsRequest) returns (ListPodSandboxMetricsResponse) {}
 }
 
 // ImageService defines the public APIs for managing images.
@@ -1715,4 +1725,59 @@ enum ContainerEventType {
 
     // Container deleted
     CONTAINER_DELETED_EVENT = 3;
+}
+
+message ListMetricDescriptorsRequest {}
+
+message ListMetricDescriptorsResponse {
+    repeated MetricDescriptor descriptors = 1;
+}
+
+message MetricDescriptor {
+    // The name field will be used as a unique identifier of this MetricDescriptor,
+    // and be used in conjunction with the Metric structure to populate the full Metric.
+    string name = 1;
+    string help = 2;
+    // When a metric uses this metric descriptor, it should only define
+    // labels that have previously been declared in label_keys.
+    // It is the responsibility of the runtime to correctly keep sorted the keys and values.
+    // If the two slices have different length, the behavior is undefined.
+    repeated string label_keys = 3;
+}
+
+message ListPodSandboxMetricsRequest {} 
+
+message ListPodSandboxMetricsResponse {
+    repeated PodSandboxMetrics pod_metrics = 1;
+}
+
+message PodSandboxMetrics {
+    string pod_sandbox_id = 1;
+    repeated Metric metrics = 2;
+    repeated ContainerMetrics container_metrics = 3;
+}
+
+message ContainerMetrics {
+    string container_id = 1;
+    repeated Metric metrics = 2;
+}
+
+message Metric {
+    // Name must match a name previously returned in a MetricDescriptors call,
+    // otherwise, it will be ignored.
+    string name = 1;
+    // Timestamp should be 0 if the metric was gathered live.
+    // If it was cached, the Timestamp should reflect the time it was collected.
+    int64 timestamp = 2;
+    MetricType metric_type = 3;
+    // The corresponding LabelValues to the LabelKeys defined in the MetricDescriptor.
+    // It is the responsibility of the runtime to correctly keep sorted the keys and values.
+    // If the two slices have different length, the behavior is undefined.
+    repeated string label_values = 4;
+    UInt64Value value = 5;
+}
+
+enum MetricType {
+    COUNTER = 0;
+    GAUGE = 1;
 }
