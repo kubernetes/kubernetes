@@ -494,7 +494,13 @@ func Register(collectors ...metrics.StableCollector) {
 				return 0
 			},
 		))
-
+		_ = metrics.Labels{
+			"probe_type": "1",
+			"container":  "2",
+			"pod":        "podName",
+			"namespace":  "space",
+			"pod_uid":    "123",
+		}
 	})
 }
 

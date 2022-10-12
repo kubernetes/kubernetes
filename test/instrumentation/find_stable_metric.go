@@ -29,6 +29,7 @@ var metricsOptionStructuresNames = []string{
 	"GaugeOpts",
 	"HistogramOpts",
 	"SummaryOpts",
+	"TimingHistogramOpts",
 }
 
 func findStableMetricDeclaration(tree ast.Node, metricsImportName string) ([]*ast.CallExpr, []error) {
@@ -98,7 +99,7 @@ func (f *stableMetricFinder) Visit(node ast.Node) (w ast.Visitor) {
 func isMetricOps(name string) bool {
 	var found = false
 	for _, optsName := range metricsOptionStructuresNames {
-		if name != optsName {
+		if name == optsName {
 			found = true
 			break
 		}
