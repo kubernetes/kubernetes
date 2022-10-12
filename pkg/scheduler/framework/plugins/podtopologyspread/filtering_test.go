@@ -505,7 +505,7 @@ func TestPreFilterState(t *testing.T) {
 					{
 						MaxSkew:            3,
 						TopologyKey:        "node",
-						Selector:           labels.SelectorFromValidatedSet(labels.Set{"foo": "bar"}),
+						Selector:           mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Label("foo", "bar").Obj()),
 						MinDomains:         1,
 						NodeAffinityPolicy: v1.NodeInclusionPolicyHonor,
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
@@ -513,7 +513,7 @@ func TestPreFilterState(t *testing.T) {
 					{
 						MaxSkew:            5,
 						TopologyKey:        "rack",
-						Selector:           labels.SelectorFromValidatedSet(labels.Set{"foo": "bar"}),
+						Selector:           mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Label("foo", "bar").Obj()),
 						MinDomains:         1,
 						NodeAffinityPolicy: v1.NodeInclusionPolicyHonor,
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
@@ -1283,7 +1283,7 @@ func TestPreFilterState(t *testing.T) {
 					{
 						MaxSkew:            1,
 						TopologyKey:        "zone",
-						Selector:           labels.SelectorFromValidatedSet(labels.Set{"foo": "a"}),
+						Selector:           mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Label("foo", "a").Obj()),
 						MinDomains:         1,
 						NodeAffinityPolicy: v1.NodeInclusionPolicyHonor,
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,

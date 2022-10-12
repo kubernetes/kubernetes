@@ -919,14 +919,6 @@ func SelectorFromSet(ls Set) Selector {
 	return SelectorFromValidatedSet(ls)
 }
 
-var (
-	// Create constants for hot-path selectors
-	value0Path, keyPath = func() (*field.Path, *field.Path) {
-		path := field.ToPath()
-		return path.Child("values").Index(0), path.Child("key")
-	}()
-)
-
 // ValidatedSelectorFromSet returns a Selector which will match exactly the given Set. A
 // nil and empty Sets are considered equivalent to Everything().
 // The Set is validated client-side, which allows to catch errors early.
@@ -934,29 +926,35 @@ func ValidatedSelectorFromSet(ls Set) (Selector, error) {
 	if ls == nil || len(ls) == 0 {
 		return internalSelector{}, nil
 	}
-
-	var allErrs field.ErrorList
-	for k, v := range ls {
-		if err := validateLabelKey(k, keyPath); err != nil {
-			allErrs = append(allErrs, err)
+	requirements := make([]Requirement, 0, len(ls))
+	for label, value := range ls {
+		r, err := NewRequirement(label, selection.Equals, []string{value})
+		if err != nil {
+			return nil, err
 		}
-		if err := validateLabelValue(k, v, value0Path); err != nil {
-			allErrs = append(allErrs, err)
-		}
+		requirements = append(requirements, *r)
 	}
-
-	// TODO: validate labels are valid label values
-	return setSelector(ls), allErrs.ToAggregate()
+	// sort to have deterministic string representation
+	sort.Sort(ByKey(requirements))
+	return internalSelector(requirements), nil
 }
 
 // SelectorFromValidatedSet returns a Selector which will match exactly the given Set.
 // A nil and empty Sets are considered equivalent to Everything().
 // It assumes that Set is already validated and doesn't do any validation.
+// Note: this method copies the Set; if the Set is immutable, consider wrapping it with SetSelector
+// instead, which does not copy.
 func SelectorFromValidatedSet(ls Set) Selector {
 	if ls == nil || len(ls) == 0 {
 		return internalSelector{}
 	}
-	return setSelector(ls)
+	requirements := make([]Requirement, 0, len(ls))
+	for label, value := range ls {
+		requirements = append(requirements, Requirement{key: label, operator: selection.Equals, strValues: []string{value}})
+	}
+	// sort to have deterministic string representation
+	sort.Sort(ByKey(requirements))
+	return internalSelector(requirements)
 }
 
 // ParseToRequirements takes a string representing a selector and returns a list of
@@ -968,9 +966,13 @@ func ParseToRequirements(selector string, opts ...field.PathOption) ([]Requireme
 	return parse(selector, field.ToPath(opts...))
 }
 
-type setSelector Set
+// SetSelector wraps a Set, allowing it to implement the Selector interface. Unlike
+// Set.AsSelectorPreValidated (which copies the input Set), this type simply wraps the underlying
+// Set. As a result, it is substantially more efficient, but requires the caller to not mutate the
+// Set.
+type SetSelector Set
 
-func (s setSelector) Matches(labels Labels) bool {
+func (s SetSelector) Matches(labels Labels) bool {
 	for k, v := range s {
 		if !labels.Has(k) || v != labels.Get(k) {
 			return false
@@ -979,11 +981,11 @@ func (s setSelector) Matches(labels Labels) bool {
 	return true
 }
 
-func (s setSelector) Empty() bool {
+func (s SetSelector) Empty() bool {
 	return len(s) == 0
 }
 
-func (s setSelector) String() string {
+func (s SetSelector) String() string {
 	keys := make([]string, 0, len(s))
 	for k := range s {
 		keys = append(keys, k)
@@ -1004,28 +1006,28 @@ func (s setSelector) String() string {
 	return b.String()
 }
 
-func (s setSelector) Add(r ...Requirement) Selector {
+func (s SetSelector) Add(r ...Requirement) Selector {
 	return s.toFullSelector().Add(r...)
 }
 
-func (s setSelector) Requirements() (requirements Requirements, selectable bool) {
+func (s SetSelector) Requirements() (requirements Requirements, selectable bool) {
 	return s.toFullSelector().Requirements()
 }
 
-func (s setSelector) DeepCopySelector() Selector {
-	res := make(setSelector, len(s))
+func (s SetSelector) DeepCopySelector() Selector {
+	res := make(SetSelector, len(s))
 	for k, v := range s {
 		res[k] = v
 	}
 	return res
 }
 
-func (s setSelector) RequiresExactMatch(label string) (value string, found bool) {
+func (s SetSelector) RequiresExactMatch(label string) (value string, found bool) {
 	v, f := s[label]
 	return v, f
 }
 
-func (s setSelector) toFullSelector() Selector {
+func (s SetSelector) toFullSelector() Selector {
 	if s == nil || len(s) == 0 {
 		return internalSelector{}
 	}
@@ -1038,4 +1040,4 @@ func (s setSelector) toFullSelector() Selector {
 	return internalSelector(requirements)
 }
 
-var _ Selector = setSelector{}
+var _ Selector = SetSelector{}
