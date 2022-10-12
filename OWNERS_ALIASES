@@ -473,6 +473,7 @@ aliases:
     - thockin
     - sttts
     - soltysh
+    - liggitt
   dep-reviewers:
     - logicalhan
   feature-approvers:
