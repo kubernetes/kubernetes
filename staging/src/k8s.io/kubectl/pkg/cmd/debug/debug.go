@@ -104,25 +104,26 @@ var nameSuffixFunc = utilrand.String
 
 // DebugOptions holds the options for an invocation of kubectl debug.
 type DebugOptions struct {
-	Args            []string
-	ArgsOnly        bool
-	Attach          bool
-	Container       string
-	CopyTo          string
-	Replace         bool
-	Env             []corev1.EnvVar
-	Image           string
-	Interactive     bool
-	Namespace       string
-	TargetNames     []string
-	PullPolicy      corev1.PullPolicy
-	Quiet           bool
-	SameNode        bool
-	SetImages       map[string]string
-	ShareProcesses  bool
-	TargetContainer string
-	TTY             bool
-	Profile         string
+	Args                []string
+	ArgsOnly            bool
+	Attach              bool
+	Container           string
+	CopyTo              string
+	Replace             bool
+	Env                 []corev1.EnvVar
+	Image               string
+	Interactive         bool
+	Namespace           string
+	TargetNames         []string
+	PullPolicy          corev1.PullPolicy
+	Quiet               bool
+	SameNode            bool
+	SetImages           map[string]string
+	ShareProcesses      bool
+	TargetContainer     string
+	TTY                 bool
+	Profile             string
+	SecurityContextFrom string
 
 	attachChanged         bool
 	shareProcessedChanged bool
@@ -183,6 +184,7 @@ func addDebugFlags(cmd *cobra.Command, opt *DebugOptions) {
 	cmd.Flags().StringVar(&opt.TargetContainer, "target", "", i18n.T("When using an ephemeral container, target processes in this container name."))
 	cmd.Flags().BoolVarP(&opt.TTY, "tty", "t", opt.TTY, i18n.T("Allocate a TTY for the debugging container."))
 	cmd.Flags().StringVar(&opt.Profile, "profile", ProfileLegacy, i18n.T("Debugging profile."))
+	cmd.Flags().StringVar(&opt.SecurityContextFrom, "security-context-from", "", i18n.T("Copy the securityContext from this container"))
 }
 
 // Complete finishes run-time initialization of debug.DebugOptions.
@@ -248,6 +250,9 @@ func (o *DebugOptions) Validate() error {
 		}
 		if len(o.Args) > 0 && len(o.Container) == 0 && len(o.Image) == 0 {
 			return fmt.Errorf("you must specify an existing container or a new image when specifying args.")
+		}
+		if len(o.SecurityContextFrom) > 0 {
+			return fmt.Errorf("--security-context-from can not be used with --copy-to.")
 		}
 	} else {
 		// These flags are exclusive to --copy-to
@@ -529,6 +534,19 @@ func (o *DebugOptions) generateDebugContainer(pod *corev1.Pod) (*corev1.Pod, *co
 			TTY:                      o.TTY,
 		},
 		TargetContainerName: o.TargetContainer,
+	}
+
+	if len(o.SecurityContextFrom) > 0 {
+		// The securityContext shall be copied form this container
+		for _, c := range pod.Spec.Containers {
+			if c.Name == o.SecurityContextFrom {
+				ec.SecurityContext = c.SecurityContext.DeepCopy()
+				break
+			}
+		}
+		if ec.SecurityContext == nil {
+			return nil, nil, fmt.Errorf("Container for SecurityContext not found")
+		}
 	}
 
 	if o.ArgsOnly {
