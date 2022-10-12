@@ -122,6 +122,9 @@ service RuntimeService {
     // GetContainerEvents gets container events from the CRI runtime
     rpc  GetContainerEvents(GetEventsRequest) returns (stream ContainerEventResponse) {}
 
+    // ListPodSandboxMetrics gets pod sandbox metrics from CRI Runtime
+    rpc ListPodSandboxMetrics(ListPodSandboxMetricsRequest) returns (ListPodSandboxMetricsResponse) {}
+
 }
 
 // ImageService defines the public APIs for managing images.
@@ -1603,4 +1606,40 @@ enum ContainerEventType {
 
     // Container deleted
     CONTAINER_DELETED_EVENT = 3;
+}
+
+message ListPodSandboxMetricsRequest {} 
+
+message ListPodSandboxMetricsResponse {
+    repeated PodSandboxMetrics pod_metrics = 1;
+}
+
+message PodSandboxMetrics {
+    string pod_sandbox_id = 1;
+    repeated Metric metrics = 2;
+    repeated ContainerMetrics container_metrics = 3;
+}
+
+message ContainerMetrics {
+    string container_id = 1;
+    repeated Metric metrics = 2;
+}
+
+message Metric {
+    string name = 1;
+    // return 0 if metric is cached
+    int64 timestamp = 2;
+    repeated LabelPair labels = 3;
+    MetricType metric_type = 4;
+    Int64Value value = 5;
+}
+
+message LabelPair {
+    string name = 1;
+    string value = 2;
+}
+
+enum MetricType {
+    COUNTER = 0;
+    GAUGE = 1;
 }

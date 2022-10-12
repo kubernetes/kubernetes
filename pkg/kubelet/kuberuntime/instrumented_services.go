@@ -342,3 +342,12 @@ func (in instrumentedRuntimeService) GetContainerEvents(containerEventsCh chan *
 	recordError(operation, err)
 	return err
 }
+
+func (in instrumentedRuntimeService) ListPodSandboxMetrics() ([]*runtimeapi.PodSandboxMetrics, error) {
+	const operation = "list_podsandbox_metrics"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.service.ListPodSandboxMetrics()
+	recordError(operation, err)
+	return out, err
+}
