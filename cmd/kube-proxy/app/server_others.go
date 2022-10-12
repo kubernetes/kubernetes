@@ -391,6 +391,7 @@ func newProxyServer(
 		ConfigSyncPeriod:       config.ConfigSyncPeriod.Duration,
 		HealthzServer:          healthzServer,
 		UseEndpointSlices:      useEndpointSlices,
+		localDetectorMode:      detectLocalMode,
 	}, nil
 }
 
