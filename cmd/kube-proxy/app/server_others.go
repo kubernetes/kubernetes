@@ -64,8 +64,6 @@ import (
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
-
-	"k8s.io/klog/v2"
 )
 
 // timeoutForNodePodCIDR is the time to wait for allocators to assign a PodCIDR to the
@@ -387,6 +385,7 @@ func newProxyServer(
 		ConfigSyncPeriod:       config.ConfigSyncPeriod.Duration,
 		HealthzServer:          healthzServer,
 		UseEndpointSlices:      useEndpointSlices,
+		localDetectorMode:      detectLocalMode,
 	}, nil
 }
 
