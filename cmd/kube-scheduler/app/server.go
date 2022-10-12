@@ -47,7 +47,9 @@ import (
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	"k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/term"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
@@ -64,6 +66,7 @@ import (
 
 func init() {
 	utilruntime.Must(logsapi.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+	utilruntime.Must(features.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 }
 
 // Option configures a framework.Registry.
@@ -273,6 +276,9 @@ func newHealthzAndMetricsHandler(config *kubeschedulerconfig.KubeSchedulerConfig
 	pathRecorderMux := mux.NewPathRecorderMux("kube-scheduler")
 	healthz.InstallHandler(pathRecorderMux, checks...)
 	installMetricHandler(pathRecorderMux, informers, isLeader)
+	if utilfeature.DefaultFeatureGate.Enabled(features.ComponentSLIs) {
+		slis.SLIMetricsWithReset{}.Install(pathRecorderMux)
+	}
 	if config.EnableProfiling {
 		routes.Profiling{}.Install(pathRecorderMux)
 		if config.EnableContentionProfiling {
