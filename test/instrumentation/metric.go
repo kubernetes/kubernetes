@@ -21,10 +21,11 @@ import (
 )
 
 const (
-	counterMetricType   = "Counter"
-	gaugeMetricType     = "Gauge"
-	histogramMetricType = "Histogram"
-	summaryMetricType   = "Summary"
+	counterMetricType    = "Counter"
+	gaugeMetricType      = "Gauge"
+	histogramMetricType  = "Histogram"
+	summaryMetricType    = "Summary"
+	timingRatioHistogram = "TimingRatioHistogram"
 )
 
 type metric struct {
@@ -41,6 +42,7 @@ type metric struct {
 	AgeBuckets        uint32              `yaml:"ageBuckets,omitempty"`
 	BufCap            uint32              `yaml:"bufCap,omitempty"`
 	MaxAge            int64               `yaml:"maxAge,omitempty"`
+	ConstLabels       map[string]string   `yaml:"constLabels,omitempty"`
 }
 
 func (m metric) buildFQName() string {
