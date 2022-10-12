@@ -338,6 +338,7 @@ func newProxyServer(
 		OOMScoreAdj:            config.OOMScoreAdj,
 		ConfigSyncPeriod:       config.ConfigSyncPeriod.Duration,
 		HealthzServer:          healthzServer,
+		localDetectorMode:      detectLocalMode,
 	}, nil
 }
 
