@@ -443,7 +443,6 @@ func (c *metricDecoder) decodeUint32(expr ast.Expr) (uint32, error) {
 func (c *metricDecoder) decodeInt64(expr ast.Expr) (int64, error) {
 	switch v := expr.(type) {
 	case *ast.BasicLit:
-		println("BasicLit")
 		if v.Kind != token.FLOAT && v.Kind != token.INT {
 			print(v.Kind)
 		}
@@ -454,10 +453,8 @@ func (c *metricDecoder) decodeInt64(expr ast.Expr) (int64, error) {
 		}
 		return value, nil
 	case *ast.SelectorExpr:
-		println("SelectorExpr")
 		variableName := v.Sel.String()
 		importName, ok := v.X.(*ast.Ident)
-		println(variableName)
 		if ok && importName.String() == c.kubeMetricsImportName {
 			if variableName == "DefMaxAge" {
 				// hardcode this for now. This is a duration but we'll output it as
@@ -479,19 +476,16 @@ func (c *metricDecoder) decodeInt64(expr ast.Expr) (int64, error) {
 		}
 
 	case *ast.CallExpr:
-		println("CallExpr")
 		_, ok := v.Fun.(*ast.SelectorExpr)
 		if !ok {
 			return 0, newDecodeErrorf(v, errDecodeInt64)
 		}
 		return 0, nil
 	case *ast.BinaryExpr:
-
 		i, err2, done := c.extractTimeExpression(v)
 		if done {
 			return i, err2
 		}
-
 	}
 	return 0, newDecodeErrorf(expr, errDecodeInt64)
 }
