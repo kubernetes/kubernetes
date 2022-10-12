@@ -15,6 +15,57 @@
   - 128
   - 256
   - 512
+- name: job_pods_finished_total
+  subsystem: job_controller
+  help: The number of finished Pods that are fully tracked
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - completion_mode
+  - result
+- name: job_sync_duration_seconds
+  subsystem: job_controller
+  help: The time it took to sync a job
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+  - action
+  - completion_mode
+  - result
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+- name: job_syncs_total
+  subsystem: job_controller
+  help: The number of job syncs
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - action
+  - completion_mode
+  - result
+- name: jobs_finished_total
+  subsystem: job_controller
+  help: The number of finished jobs
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - completion_mode
+  - reason
+  - result
 - name: evictions_total
   subsystem: node_collector
   help: Number of Node evictions that happened since current instance of NodeController
