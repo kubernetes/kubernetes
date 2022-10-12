@@ -481,6 +481,20 @@ func Register(collectors ...metrics.StableCollector) {
 		for _, collector := range collectors {
 			legacyregistry.CustomMustRegister(collector)
 		}
+		legacyregistry.RawMustRegister(metrics.NewGaugeFunc(
+			&metrics.GaugeOpts{
+				Subsystem: "kubelet",
+				Name:      "certificate_manager_client_ttl_seconds",
+				Help: "Gauge of the TTL (time-to-live) of the Kubelet's client certificate. " +
+					"The value is in seconds until certificate expiry (negative if already expired). " +
+					"If client certificate is invalid or unused, the value will be +INF.",
+				StabilityLevel: metrics.BETA,
+			},
+			func() float64 {
+				return 0
+			},
+		))
+
 	})
 }
 

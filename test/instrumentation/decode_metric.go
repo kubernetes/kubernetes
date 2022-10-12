@@ -70,7 +70,7 @@ func (c *metricDecoder) decodeNewMetricCall(fc *ast.CallExpr) (*metric, error) {
 		return nil, nil
 	}
 	switch functionName {
-	case "NewCounter", "NewGauge", "NewHistogram", "NewSummary", "NewTimingHistogram":
+	case "NewCounter", "NewGauge", "NewHistogram", "NewSummary", "NewTimingHistogram", "NewGaugeFunc":
 		m, err = c.decodeMetric(fc)
 	case "NewCounterVec", "NewGaugeVec", "NewHistogramVec", "NewSummaryVec", "NewTimingHistogramVec":
 		m, err = c.decodeMetricVec(fc)
@@ -90,7 +90,7 @@ func getMetricType(functionName string) string {
 	switch functionName {
 	case "NewCounter", "NewCounterVec":
 		return counterMetricType
-	case "NewGauge", "NewGaugeVec":
+	case "NewGauge", "NewGaugeVec", "NewGaugeFunc":
 		return gaugeMetricType
 	case "NewHistogram", "NewHistogramVec":
 		return histogramMetricType
@@ -104,7 +104,7 @@ func getMetricType(functionName string) string {
 }
 
 func (c *metricDecoder) decodeMetric(call *ast.CallExpr) (metric, error) {
-	if len(call.Args) != 1 {
+	if len(call.Args) > 2 {
 		return metric{}, newDecodeErrorf(call, errInvalidNewMetricCall)
 	}
 	return c.decodeOpts(call.Args[0])

@@ -1,3 +1,10 @@
+- name: certificate_manager_client_ttl_seconds
+  subsystem: kubelet
+  help: Gauge of the TTL (time-to-live) of the Kubelet's client certificate. The value
+    is in seconds until certificate expiry (negative if already expired). If client
+    certificate is invalid or unused, the value will be +INF.
+  type: Gauge
+  stabilityLevel: BETA
 - name: device_plugin_alloc_duration_seconds
   subsystem: kubelet
   help: Duration in seconds to serve a device plugin Allocation request. Broken down
