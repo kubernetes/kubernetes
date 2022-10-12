@@ -64,24 +64,60 @@ func TestSortStrings(t *testing.T) {
 }
 
 func TestContainsString(t *testing.T) {
-	src := []string{"aa", "bb", "cc"}
-	if !ContainsString(src, "bb", nil) {
-		t.Errorf("ContainsString didn't find the string as expected")
+	testCases := []struct {
+		name           string
+		expectedResult bool
+		strings        []string
+		find           string
+		modifier       func(s string) string
+	}{
+		{
+			name:           "string-existent-no-modifier",
+			expectedResult: true,
+			strings:        []string{"foo", "bar", "baz"},
+			find:           "foo",
+			modifier:       nil,
+		},
+		{
+			name:           "string-non-existent-no-modifier",
+			expectedResult: false,
+			strings:        []string{"foo", "bar", "baz"},
+			find:           "not-foo",
+			modifier:       nil,
+		},
+		{
+			name:           "string-existent-via-modifier",
+			expectedResult: true,
+			strings:        []string{"foo", "bar", "baz"},
+			find:           "foo-baz",
+			modifier: func(in string) string {
+				if in == "foo" {
+					return "foo-baz"
+				}
+				return "something-else"
+			},
+		},
+		{
+			name:           "string-existent-but-not-with-modifier",
+			expectedResult: false,
+			strings:        []string{"foo", "bar", "baz"},
+			find:           "foo",
+			modifier: func(in string) string {
+				if in == "foo" {
+					return "foo-baz"
+				}
+				return "something-else"
+			},
+		},
 	}
 
-	modifier := func(s string) string {
-		if s == "cc" {
-			return "ee"
-		}
-		return s
-	}
-	if !ContainsString(src, "ee", modifier) {
-		t.Errorf("ContainsString didn't find the string by modifier")
-	}
-
-	src = make([]string, 0)
-	if ContainsString(src, "", nil) {
-		t.Errorf("The result returned is not the expected result")
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			res := ContainsString(testCase.strings, testCase.find, testCase.modifier)
+			if res != testCase.expectedResult {
+				t.Fatalf("test:%v failed expected %v got %v", testCase.name, testCase.expectedResult, res)
+			}
+		})
 	}
 }
 
