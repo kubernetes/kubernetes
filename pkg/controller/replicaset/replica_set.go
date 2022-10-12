@@ -626,9 +626,9 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 		// expired even if other pods are deleted.
 		rsc.expectations.ExpectDeletions(rsKey, getPodKeys(podsToDelete))
 
-		errCh := make(chan error, diff)
+		errCh := make(chan error, len(podsToDelete))
 		var wg sync.WaitGroup
-		wg.Add(diff)
+		wg.Add(len(podsToDelete))
 		for _, pod := range podsToDelete {
 			go func(targetPod *v1.Pod) {
 				defer wg.Done()
