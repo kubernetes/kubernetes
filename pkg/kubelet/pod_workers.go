@@ -774,7 +774,6 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 	if (becameTerminating || wasGracePeriodShortened) && status.cancelFn != nil {
 		klog.V(3).InfoS("Cancelling current pod sync", "pod", klog.KObj(pod), "podUID", pod.UID, "updateType", work.WorkType)
 		status.cancelFn()
-		return
 	}
 }
 
