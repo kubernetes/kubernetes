@@ -352,13 +352,13 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) volumetypes.GeneratedOperations {
 
 	attachVolumeFunc := func() volumetypes.OperationContext {
-		attachableVolumePlugin, err :=
-			og.volumePluginMgr.FindAttachablePluginBySpec(volumeToAttach.VolumeSpec)
-
 		migrated := getMigratedStatusBySpec(volumeToAttach.VolumeSpec)
 
-		if err != nil || attachableVolumePlugin == nil {
-			eventErr, detailedErr := volumeToAttach.GenerateError("AttachVolume.FindAttachablePluginBySpec failed", err)
+		// Find attachable plugin
+		attachableVolumePlugin, findPluginErr :=
+			og.volumePluginMgr.FindAttachablePluginBySpec(volumeToAttach.VolumeSpec)
+		if findPluginErr != nil || attachableVolumePlugin == nil {
+			eventErr, detailedErr := volumeToAttach.GenerateError("AttachVolume.FindAttachablePluginBySpec failed", findPluginErr)
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 		}
 
@@ -371,7 +371,6 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 		// Execute attach
 		devicePath, attachErr := volumeAttacher.Attach(
 			volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
-
 		if attachErr != nil {
 			uncertainNode := volumeToAttach.NodeName
 			if derr, ok := attachErr.(*volerr.DanglingAttachError); ok {
