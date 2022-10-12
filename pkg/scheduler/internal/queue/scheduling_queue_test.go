@@ -58,22 +58,22 @@ var (
 	lowPriority, midPriority, highPriority = int32(0), int32(100), int32(1000)
 	mediumPriority                         = (lowPriority + highPriority) / 2
 
-	highPriorityPodInfo = framework.NewPodInfo(
+	highPriorityPodInfo = mustNewPodInfo(
 		st.MakePod().Name("hpp").Namespace("ns1").UID("hppns1").Priority(highPriority).Obj(),
 	)
-	highPriNominatedPodInfo = framework.NewPodInfo(
+	highPriNominatedPodInfo = mustNewPodInfo(
 		st.MakePod().Name("hpp").Namespace("ns1").UID("hppns1").Priority(highPriority).NominatedNodeName("node1").Obj(),
 	)
-	medPriorityPodInfo = framework.NewPodInfo(
+	medPriorityPodInfo = mustNewPodInfo(
 		st.MakePod().Name("mpp").Namespace("ns2").UID("mppns2").Annotation("annot2", "val2").Priority(mediumPriority).NominatedNodeName("node1").Obj(),
 	)
-	unschedulablePodInfo = framework.NewPodInfo(
+	unschedulablePodInfo = mustNewPodInfo(
 		st.MakePod().Name("up").Namespace("ns1").UID("upns1").Annotation("annot2", "val2").Priority(lowPriority).NominatedNodeName("node1").Condition(v1.PodScheduled, v1.ConditionFalse, v1.PodReasonUnschedulable).Obj(),
 	)
-	nonExistentPodInfo = framework.NewPodInfo(
+	nonExistentPodInfo = mustNewPodInfo(
 		st.MakePod().Name("ne").Namespace("ns1").UID("nens1").Obj(),
 	)
-	scheduledPodInfo = framework.NewPodInfo(
+	scheduledPodInfo = mustNewPodInfo(
 		st.MakePod().Name("sp").Namespace("ns1").UID("spns1").Node("foo").Obj(),
 	)
 )
@@ -772,11 +772,11 @@ func TestPriorityQueue_UpdateNominatedPodForNode(t *testing.T) {
 		t.Errorf("add failed: %v", err)
 	}
 	// Update unschedulablePodInfo on a different node than specified in the pod.
-	q.AddNominatedPod(framework.NewPodInfo(unschedulablePodInfo.Pod),
+	q.AddNominatedPod(mustNewTestPodInfo(t, unschedulablePodInfo.Pod),
 		&framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "node5"})
 
 	// Update nominated node name of a pod on a node that is not specified in the pod object.
-	q.AddNominatedPod(framework.NewPodInfo(highPriorityPodInfo.Pod),
+	q.AddNominatedPod(mustNewTestPodInfo(t, highPriorityPodInfo.Pod),
 		&framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "node2"})
 	expectedNominatedPods := &nominator{
 		nominatedPodToNode: map[types.UID]string{
@@ -829,7 +829,7 @@ func TestPriorityQueue_UpdateNominatedPodForNode(t *testing.T) {
 	// Nothing should change.
 	scheduledPodCopy := scheduledPodInfo.Pod.DeepCopy()
 	scheduledPodInfo.Pod.Spec.NodeName = ""
-	q.AddNominatedPod(framework.NewPodInfo(scheduledPodCopy), &framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "node1"})
+	q.AddNominatedPod(mustNewTestPodInfo(t, scheduledPodCopy), &framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "node1"})
 	if diff := cmp.Diff(q.PodNominator, expectedNominatedPods, cmp.AllowUnexported(nominator{}), cmpopts.IgnoreFields(nominator{}, "podLister", "RWMutex")); diff != "" {
 		t.Errorf("Unexpected diff after nominating a scheduled pod (-want, +got):\n%s", diff)
 	}
@@ -895,35 +895,35 @@ func TestUnschedulablePodsMap(t *testing.T) {
 			name:      "create, update, delete subset of pods",
 			podsToAdd: []*v1.Pod{pods[0], pods[1], pods[2], pods[3]},
 			expectedMapAfterAdd: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[0]): {PodInfo: framework.NewPodInfo(pods[0]), UnschedulablePlugins: sets.NewString()},
-				util.GetPodFullName(pods[1]): {PodInfo: framework.NewPodInfo(pods[1]), UnschedulablePlugins: sets.NewString()},
-				util.GetPodFullName(pods[2]): {PodInfo: framework.NewPodInfo(pods[2]), UnschedulablePlugins: sets.NewString()},
-				util.GetPodFullName(pods[3]): {PodInfo: framework.NewPodInfo(pods[3]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, pods[0]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, pods[1]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, pods[3]), UnschedulablePlugins: sets.NewString()},
 			},
 			podsToUpdate: []*v1.Pod{updatedPods[0]},
 			expectedMapAfterUpdate: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[0]): {PodInfo: framework.NewPodInfo(updatedPods[0]), UnschedulablePlugins: sets.NewString()},
-				util.GetPodFullName(pods[1]): {PodInfo: framework.NewPodInfo(pods[1]), UnschedulablePlugins: sets.NewString()},
-				util.GetPodFullName(pods[2]): {PodInfo: framework.NewPodInfo(pods[2]), UnschedulablePlugins: sets.NewString()},
-				util.GetPodFullName(pods[3]): {PodInfo: framework.NewPodInfo(pods[3]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, updatedPods[0]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, pods[1]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, pods[3]), UnschedulablePlugins: sets.NewString()},
 			},
 			podsToDelete: []*v1.Pod{pods[0], pods[1]},
 			expectedMapAfterDelete: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[2]): {PodInfo: framework.NewPodInfo(pods[2]), UnschedulablePlugins: sets.NewString()},
-				util.GetPodFullName(pods[3]): {PodInfo: framework.NewPodInfo(pods[3]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, pods[3]), UnschedulablePlugins: sets.NewString()},
 			},
 		},
 		{
 			name:      "create, update, delete all",
 			podsToAdd: []*v1.Pod{pods[0], pods[3]},
 			expectedMapAfterAdd: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[0]): {PodInfo: framework.NewPodInfo(pods[0]), UnschedulablePlugins: sets.NewString()},
-				util.GetPodFullName(pods[3]): {PodInfo: framework.NewPodInfo(pods[3]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, pods[0]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, pods[3]), UnschedulablePlugins: sets.NewString()},
 			},
 			podsToUpdate: []*v1.Pod{updatedPods[3]},
 			expectedMapAfterUpdate: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[0]): {PodInfo: framework.NewPodInfo(pods[0]), UnschedulablePlugins: sets.NewString()},
-				util.GetPodFullName(pods[3]): {PodInfo: framework.NewPodInfo(updatedPods[3]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, pods[0]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, updatedPods[3]), UnschedulablePlugins: sets.NewString()},
 			},
 			podsToDelete:           []*v1.Pod{pods[0], pods[3]},
 			expectedMapAfterDelete: map[string]*framework.QueuedPodInfo{},
@@ -932,17 +932,17 @@ func TestUnschedulablePodsMap(t *testing.T) {
 			name:      "delete non-existing and existing pods",
 			podsToAdd: []*v1.Pod{pods[1], pods[2]},
 			expectedMapAfterAdd: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[1]): {PodInfo: framework.NewPodInfo(pods[1]), UnschedulablePlugins: sets.NewString()},
-				util.GetPodFullName(pods[2]): {PodInfo: framework.NewPodInfo(pods[2]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, pods[1]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.NewString()},
 			},
 			podsToUpdate: []*v1.Pod{updatedPods[1]},
 			expectedMapAfterUpdate: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[1]): {PodInfo: framework.NewPodInfo(updatedPods[1]), UnschedulablePlugins: sets.NewString()},
-				util.GetPodFullName(pods[2]): {PodInfo: framework.NewPodInfo(pods[2]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, updatedPods[1]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.NewString()},
 			},
 			podsToDelete: []*v1.Pod{pods[2], pods[3]},
 			expectedMapAfterDelete: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[1]): {PodInfo: framework.NewPodInfo(updatedPods[1]), UnschedulablePlugins: sets.NewString()},
+				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, updatedPods[1]), UnschedulablePlugins: sets.NewString()},
 			},
 		},
 	}
@@ -1210,11 +1210,11 @@ func TestPriorityQueue_initPodMaxInUnschedulablePodsDuration(t *testing.T) {
 
 	var timestamp = time.Now()
 	pInfo1 := &framework.QueuedPodInfo{
-		PodInfo:   framework.NewPodInfo(pod1),
+		PodInfo:   mustNewTestPodInfo(t, pod1),
 		Timestamp: timestamp.Add(-time.Second),
 	}
 	pInfo2 := &framework.QueuedPodInfo{
-		PodInfo:   framework.NewPodInfo(pod2),
+		PodInfo:   mustNewTestPodInfo(t, pod2),
 		Timestamp: timestamp.Add(-2 * time.Second),
 	}
 
@@ -1342,11 +1342,11 @@ func TestPodTimestamp(t *testing.T) {
 
 	var timestamp = time.Now()
 	pInfo1 := &framework.QueuedPodInfo{
-		PodInfo:   framework.NewPodInfo(pod1),
+		PodInfo:   mustNewTestPodInfo(t, pod1),
 		Timestamp: timestamp,
 	}
 	pInfo2 := &framework.QueuedPodInfo{
-		PodInfo:   framework.NewPodInfo(pod2),
+		PodInfo:   mustNewTestPodInfo(t, pod2),
 		Timestamp: timestamp.Add(time.Second),
 	}
 
@@ -1649,7 +1649,7 @@ func TestIncomingPodsMetrics(t *testing.T) {
 	var pInfos = make([]*framework.QueuedPodInfo, 0, 3)
 	for i := 1; i <= 3; i++ {
 		p := &framework.QueuedPodInfo{
-			PodInfo: framework.NewPodInfo(
+			PodInfo: mustNewTestPodInfo(t,
 				st.MakePod().Name(fmt.Sprintf("test-pod-%d", i)).Namespace(fmt.Sprintf("ns%d", i)).UID(fmt.Sprintf("tp-%d", i)).Obj()),
 			Timestamp: timestamp,
 		}
@@ -1984,7 +1984,7 @@ func makeQueuedPodInfos(num int, timestamp time.Time) []*framework.QueuedPodInfo
 	var pInfos = make([]*framework.QueuedPodInfo, 0, num)
 	for i := 1; i <= num; i++ {
 		p := &framework.QueuedPodInfo{
-			PodInfo:   framework.NewPodInfo(st.MakePod().Name(fmt.Sprintf("test-pod-%d", i)).Namespace(fmt.Sprintf("ns%d", i)).UID(fmt.Sprintf("tp-%d", i)).Obj()),
+			PodInfo:   mustNewPodInfo(st.MakePod().Name(fmt.Sprintf("test-pod-%d", i)).Namespace(fmt.Sprintf("ns%d", i)).UID(fmt.Sprintf("tp-%d", i)).Obj()),
 			Timestamp: timestamp,
 		}
 		pInfos = append(pInfos, p)
@@ -2032,4 +2032,20 @@ func TestPriorityQueue_calculateBackoffDuration(t *testing.T) {
 			}
 		})
 	}
+}
+
+func mustNewTestPodInfo(t *testing.T, pod *v1.Pod) *framework.PodInfo {
+	podInfo, err := framework.NewPodInfo(pod)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return podInfo
+}
+
+func mustNewPodInfo(pod *v1.Pod) *framework.PodInfo {
+	podInfo, err := framework.NewPodInfo(pod)
+	if err != nil {
+		panic(err)
+	}
+	return podInfo
 }

@@ -1667,7 +1667,7 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 			podNominator := internalqueue.NewPodNominator(nil)
 			if tt.nominatedPod != nil {
 				podNominator.AddNominatedPod(
-					framework.NewPodInfo(tt.nominatedPod),
+					mustNewPodInfo(t, tt.nominatedPod),
 					&framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: nodeName})
 			}
 			profile := config.KubeSchedulerProfile{Plugins: cfgPls}
@@ -2687,4 +2687,12 @@ func collectAndComparePermitWaitDuration(t *testing.T, wantRes string) {
 			t.Errorf("Expect latency to be greater than 0, got: %v", value)
 		}
 	}
+}
+
+func mustNewPodInfo(t *testing.T, pod *v1.Pod) *framework.PodInfo {
+	podInfo, err := framework.NewPodInfo(pod)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return podInfo
 }
