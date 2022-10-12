@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"k8s.io/component-base/metrics"
 )
@@ -326,7 +327,6 @@ func (c *metricDecoder) decodeOpts(expr ast.Expr) (metric, error) {
 		case "MaxAge":
 			int64Val, err := c.decodeInt64(kv.Value)
 			if err != nil {
-				print(key)
 				return m, err
 			}
 			m.MaxAge = int64Val
@@ -443,6 +443,7 @@ func (c *metricDecoder) decodeUint32(expr ast.Expr) (uint32, error) {
 func (c *metricDecoder) decodeInt64(expr ast.Expr) (int64, error) {
 	switch v := expr.(type) {
 	case *ast.BasicLit:
+		println("BasicLit")
 		if v.Kind != token.FLOAT && v.Kind != token.INT {
 			print(v.Kind)
 		}
@@ -453,8 +454,10 @@ func (c *metricDecoder) decodeInt64(expr ast.Expr) (int64, error) {
 		}
 		return value, nil
 	case *ast.SelectorExpr:
+		println("SelectorExpr")
 		variableName := v.Sel.String()
 		importName, ok := v.X.(*ast.Ident)
+		println(variableName)
 		if ok && importName.String() == c.kubeMetricsImportName {
 			if variableName == "DefMaxAge" {
 				// hardcode this for now. This is a duration but we'll output it as
@@ -462,14 +465,65 @@ func (c *metricDecoder) decodeInt64(expr ast.Expr) (int64, error) {
 				return 1000 * 1000 * 1000 * 60 * 10, nil
 			}
 		}
+	case *ast.Ident:
+		variableExpr, found := c.variables[v.Name]
+		if found {
+			be, ok := variableExpr.(*ast.BinaryExpr)
+			if ok {
+				i, err2, done := c.extractTimeExpression(be)
+				if done {
+					return i, err2
+				}
+			}
+
+		}
+
 	case *ast.CallExpr:
+		println("CallExpr")
 		_, ok := v.Fun.(*ast.SelectorExpr)
 		if !ok {
 			return 0, newDecodeErrorf(v, errDecodeInt64)
 		}
 		return 0, nil
+	case *ast.BinaryExpr:
+
+		i, err2, done := c.extractTimeExpression(v)
+		if done {
+			return i, err2
+		}
+
 	}
 	return 0, newDecodeErrorf(expr, errDecodeInt64)
+}
+
+func (c *metricDecoder) extractTimeExpression(v *ast.BinaryExpr) (int64, error, bool) {
+	x := v.X.(*ast.BasicLit)
+	if x.Kind != token.FLOAT && x.Kind != token.INT {
+		print(x.Kind)
+	}
+
+	xValue, err := strconv.ParseInt(x.Value, 10, 64)
+	if err != nil {
+		return 0, err, true
+	}
+
+	switch y := v.Y.(type) {
+	case *ast.SelectorExpr:
+		variableName := y.Sel.String()
+		importName, ok := y.X.(*ast.Ident)
+		if ok && importName.String() == "time" {
+			if variableName == "Hour" {
+				return xValue * int64(time.Hour), nil, true
+			}
+			if variableName == "Minute" {
+				return xValue * int64(time.Minute), nil, true
+			}
+			if variableName == "Second" {
+				return xValue * int64(time.Second), nil, true
+			}
+		}
+	}
+	return 0, nil, false
 }
 
 func decodeFloatMap(exprs []ast.Expr) (map[float64]float64, error) {
