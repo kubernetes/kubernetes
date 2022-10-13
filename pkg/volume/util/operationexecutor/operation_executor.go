@@ -948,10 +948,11 @@ func (oe *operationExecutor) MountVolume(
 		// Creates a map to device if a volume is attached
 		generatedOperations, err = oe.operationGenerator.GenerateMapVolumeFunc(
 			waitForAttachTimeout, volumeToMount, actualStateOfWorld)
+		if err != nil {
+			return err
+		}
 	}
-	if err != nil {
-		return err
-	}
+
 	// Avoid executing mount/map from multiple pods referencing the
 	// same volume in parallel
 	podName := nestedpendingoperations.EmptyUniquePodName
