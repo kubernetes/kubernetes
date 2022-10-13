@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -371,6 +372,7 @@ func (m *kubeGenericRuntimeManager) GetPods(all bool) ([]*kubecontainer.Pod, err
 			continue
 		}
 		p.Sandboxes = append(p.Sandboxes, converted)
+		p.CreatedAt = uint64(s.GetCreatedAt())
 	}
 
 	containers, err := m.getKubeletContainers(all)
@@ -409,6 +411,15 @@ func (m *kubeGenericRuntimeManager) GetPods(all bool) ([]*kubecontainer.Pod, err
 	for _, pod := range pods {
 		result = append(result, pod)
 	}
+
+	// There are scenarios where multiple pods are running in parallel having
+	// the same name, because one of them have not been fully terminated yet.
+	// To avoid unexpected behavior on container name based search (for example
+	// by calling *Kubelet.findContainer() without specifying a pod ID), we now
+	// return the list of pods ordered by their creation time.
+	sort.SliceStable(result, func(i, j int) bool {
+		return result[i].CreatedAt > result[j].CreatedAt
+	})
 
 	return result, nil
 }

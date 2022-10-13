@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"fmt"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -473,6 +474,7 @@ func TestGetPods(t *testing.T) {
 			ID:         types.UID("12345678"),
 			Name:       "foo",
 			Namespace:  "new",
+			CreatedAt:  uint64(fakeSandbox.CreatedAt),
 			Containers: []*kubecontainer.Container{containers[0], containers[1]},
 			Sandboxes:  []*kubecontainer.Container{sandbox},
 		},
@@ -484,6 +486,35 @@ func TestGetPods(t *testing.T) {
 	if !verifyPods(expected, actual) {
 		t.Errorf("expected %#v, got %#v", expected, actual)
 	}
+}
+
+func TestGetPodsSorted(t *testing.T) {
+	fakeRuntime, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}}
+
+	createdTimestamps := []uint64{10, 5, 20}
+	fakeSandboxes := []*apitest.FakePodSandbox{}
+	for i, createdAt := range createdTimestamps {
+		pod.UID = types.UID(fmt.Sprint(i))
+		fakeSandboxes = append(fakeSandboxes, makeFakePodSandbox(t, m, sandboxTemplate{
+			pod:       pod,
+			createdAt: int64(createdAt),
+			state:     runtimeapi.PodSandboxState_SANDBOX_READY,
+		}))
+	}
+	fakeRuntime.SetFakeSandboxes(fakeSandboxes)
+
+	actual, err := m.GetPods(false)
+	assert.NoError(t, err)
+
+	assert.Len(t, actual, 3)
+
+	// Verify that the pods are sorted by their creation time (newest/biggest timestamp first)
+	assert.Equal(t, uint64(createdTimestamps[2]), actual[0].CreatedAt)
+	assert.Equal(t, uint64(createdTimestamps[0]), actual[1].CreatedAt)
+	assert.Equal(t, uint64(createdTimestamps[1]), actual[2].CreatedAt)
 }
 
 func TestKillPod(t *testing.T) {
