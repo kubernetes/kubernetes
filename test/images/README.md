@@ -94,8 +94,8 @@ the regular image building process. This helper image can be found in at `e2etea
 It can be used by anyone, but if you need to build your own, you can read more about it [here](windows/README.md).
 
 For Windows, in order to spawn process-isolated containers, the container OS version should closely match
-the host OS version. For this reason, we build test images for different Windows OS Versions: 1809 (Windows Server 2019),
-20H2, ltsc2022. In order to add support for a new Windows OS version, a new entry for that OS version will have
+the host OS version. For this reason, we build test images for different Windows OS Versions: 1809 (Windows Server 2019)
+and ltsc2022 (Windows Server 2022). In order to add support for a new Windows OS version, a new entry for that OS version will have
 to be first added to the `windows-servercore-cache` and `busybox` images, followed by the rest of the images.
 These images are then used by the rest of the E2E test images as a cache / base image.
 
