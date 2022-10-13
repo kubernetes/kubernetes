@@ -37,7 +37,7 @@ type CRConverterFactory struct {
 
 // converterMetricFactorySingleton protects us from reregistration of metrics on repeated
 // apiextensions-apiserver runs.
-var converterMetricFactorySingleton = newConverterMertricFactory()
+var converterMetricFactorySingleton = newConverterMetricFactory()
 
 // NewCRConverterFactory creates a new CRConverterFactory
 func NewCRConverterFactory(serviceResolver webhook.ServiceResolver, authResolverWrapper webhook.AuthenticationInfoResolverWrapper) (*CRConverterFactory, error) {
@@ -66,7 +66,7 @@ func (m *CRConverterFactory) NewConverter(crd *apiextensionsv1.CustomResourceDef
 		if err != nil {
 			return nil, nil, err
 		}
-		converter, err = converterMetricFactorySingleton.addMetrics("webhook", crd.Name, converter)
+		converter, err = converterMetricFactorySingleton.addMetrics(crd.Name, converter)
 		if err != nil {
 			return nil, nil, err
 		}
