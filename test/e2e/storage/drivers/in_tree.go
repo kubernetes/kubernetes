@@ -105,10 +105,11 @@ func InitNFSDriver() storageframework.TestDriver {
 			SupportedMountOption: sets.NewString("relatime"),
 			RequiredMountOption:  sets.NewString("vers=4.1"),
 			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence: true,
-				storageframework.CapExec:        true,
-				storageframework.CapRWX:         true,
-				storageframework.CapMultiPODs:   true,
+				storageframework.CapPersistence:       true,
+				storageframework.CapExec:              true,
+				storageframework.CapRWX:               true,
+				storageframework.CapMultiPODs:         true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -249,12 +250,13 @@ func InitISCSIDriver() storageframework.TestDriver {
 			),
 			TopologyKeys: []string{v1.LabelHostname},
 			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence: true,
-				storageframework.CapFsGroup:     true,
-				storageframework.CapBlock:       true,
-				storageframework.CapExec:        true,
-				storageframework.CapMultiPODs:   true,
-				storageframework.CapTopology:    true,
+				storageframework.CapPersistence:       true,
+				storageframework.CapFsGroup:           true,
+				storageframework.CapBlock:             true,
+				storageframework.CapExec:              true,
+				storageframework.CapMultiPODs:         true,
+				storageframework.CapTopology:          true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -431,11 +433,12 @@ func InitRbdDriver() storageframework.TestDriver {
 				"ext4",
 			),
 			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence: true,
-				storageframework.CapFsGroup:     true,
-				storageframework.CapBlock:       true,
-				storageframework.CapExec:        true,
-				storageframework.CapMultiPODs:   true,
+				storageframework.CapPersistence:       true,
+				storageframework.CapFsGroup:           true,
+				storageframework.CapBlock:             true,
+				storageframework.CapExec:              true,
+				storageframework.CapMultiPODs:         true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -559,10 +562,11 @@ func InitCephFSDriver() storageframework.TestDriver {
 				"", // Default fsType
 			),
 			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence: true,
-				storageframework.CapExec:        true,
-				storageframework.CapRWX:         true,
-				storageframework.CapMultiPODs:   true,
+				storageframework.CapPersistence:       true,
+				storageframework.CapExec:              true,
+				storageframework.CapRWX:               true,
+				storageframework.CapMultiPODs:         true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -662,10 +666,11 @@ func InitHostPathDriver() storageframework.TestDriver {
 			),
 			TopologyKeys: []string{v1.LabelHostname},
 			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence:      true,
-				storageframework.CapMultiPODs:        true,
-				storageframework.CapSingleNodeVolume: true,
-				storageframework.CapTopology:         true,
+				storageframework.CapPersistence:       true,
+				storageframework.CapMultiPODs:         true,
+				storageframework.CapSingleNodeVolume:  true,
+				storageframework.CapTopology:          true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -737,10 +742,11 @@ func InitHostPathSymlinkDriver() storageframework.TestDriver {
 			),
 			TopologyKeys: []string{v1.LabelHostname},
 			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence:      true,
-				storageframework.CapMultiPODs:        true,
-				storageframework.CapSingleNodeVolume: true,
-				storageframework.CapTopology:         true,
+				storageframework.CapPersistence:       true,
+				storageframework.CapMultiPODs:         true,
+				storageframework.CapSingleNodeVolume:  true,
+				storageframework.CapTopology:          true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -966,8 +972,9 @@ func InitGcePdDriver() storageframework.TestDriver {
 				storageframework.CapNodeExpansion:       true,
 				// GCE supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
-				storageframework.CapVolumeLimits: false,
-				storageframework.CapTopology:     true,
+				storageframework.CapVolumeLimits:      false,
+				storageframework.CapTopology:          true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -998,8 +1005,9 @@ func InitWindowsGcePdDriver() storageframework.TestDriver {
 				storageframework.CapMultiPODs:           true,
 				// GCE supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
-				storageframework.CapVolumeLimits: false,
-				storageframework.CapTopology:     true,
+				storageframework.CapVolumeLimits:      false,
+				storageframework.CapTopology:          true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -1136,12 +1144,13 @@ func InitVSphereDriver() storageframework.TestDriver {
 			),
 			TopologyKeys: []string{v1.LabelFailureDomainBetaZone},
 			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence: true,
-				storageframework.CapFsGroup:     true,
-				storageframework.CapExec:        true,
-				storageframework.CapMultiPODs:   true,
-				storageframework.CapTopology:    true,
-				storageframework.CapBlock:       true,
+				storageframework.CapPersistence:       true,
+				storageframework.CapFsGroup:           true,
+				storageframework.CapExec:              true,
+				storageframework.CapMultiPODs:         true,
+				storageframework.CapTopology:          true,
+				storageframework.CapBlock:             true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -1282,8 +1291,9 @@ func InitAzureDiskDriver() storageframework.TestDriver {
 				storageframework.CapMultiPODs:   true,
 				// Azure supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
-				storageframework.CapVolumeLimits: false,
-				storageframework.CapTopology:     true,
+				storageframework.CapVolumeLimits:      false,
+				storageframework.CapTopology:          true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -1431,8 +1441,9 @@ func InitAwsDriver() storageframework.TestDriver {
 				storageframework.CapOnlineExpansion:     true,
 				// AWS supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
-				storageframework.CapVolumeLimits: false,
-				storageframework.CapTopology:     true,
+				storageframework.CapVolumeLimits:      false,
+				storageframework.CapTopology:          true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -1551,21 +1562,23 @@ type localVolume struct {
 var (
 	// capabilities
 	defaultLocalVolumeCapabilities = map[storageframework.Capability]bool{
-		storageframework.CapPersistence:      true,
-		storageframework.CapFsGroup:          true,
-		storageframework.CapBlock:            false,
-		storageframework.CapExec:             true,
-		storageframework.CapMultiPODs:        true,
-		storageframework.CapSingleNodeVolume: true,
+		storageframework.CapPersistence:       true,
+		storageframework.CapFsGroup:           true,
+		storageframework.CapBlock:             false,
+		storageframework.CapExec:              true,
+		storageframework.CapMultiPODs:         true,
+		storageframework.CapSingleNodeVolume:  true,
+		storageframework.CapMultiplePVsSameID: true,
 	}
 	localVolumeCapabitilies = map[utils.LocalVolumeType]map[storageframework.Capability]bool{
 		utils.LocalVolumeBlock: {
-			storageframework.CapPersistence:      true,
-			storageframework.CapFsGroup:          true,
-			storageframework.CapBlock:            true,
-			storageframework.CapExec:             true,
-			storageframework.CapMultiPODs:        true,
-			storageframework.CapSingleNodeVolume: true,
+			storageframework.CapPersistence:       true,
+			storageframework.CapFsGroup:           true,
+			storageframework.CapBlock:             true,
+			storageframework.CapExec:              true,
+			storageframework.CapMultiPODs:         true,
+			storageframework.CapSingleNodeVolume:  true,
+			storageframework.CapMultiplePVsSameID: true,
 		},
 	}
 	// fstype
@@ -1796,6 +1809,7 @@ func InitAzureFileDriver() storageframework.TestDriver {
 				storageframework.CapMultiPODs:           true,
 				storageframework.CapControllerExpansion: true,
 				storageframework.CapNodeExpansion:       true,
+				storageframework.CapMultiplePVsSameID:   true,
 			},
 		},
 	}

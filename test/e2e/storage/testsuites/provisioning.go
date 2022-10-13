@@ -530,6 +530,10 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			e2eskipper.Skipf("skipping multiple PV mount test for block mode")
 		}
 
+		if !dInfo.Capabilities[storageframework.CapMultiplePVsSameID] {
+			e2eskipper.Skipf("this driver does not support multiple PVs with the same volumeHandle")
+		}
+
 		init()
 		defer cleanup()
 
