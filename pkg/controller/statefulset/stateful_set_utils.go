@@ -67,7 +67,7 @@ func getParentNameAndOrdinal(pod *v1.Pod) (string, int) {
 		return parent, ordinal
 	}
 	parent = subMatches[1]
-	if i, err := strconv.ParseInt(subMatches[2], 10, 32); err == nil {
+	if i, err := strconv.ParseInt(subMatches[2], 10, 64); err == nil {
 		ordinal = int(i)
 	}
 	return parent, ordinal

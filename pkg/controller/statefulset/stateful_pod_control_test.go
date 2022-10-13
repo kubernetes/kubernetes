@@ -266,6 +266,32 @@ func TestStatefulPodControlNoOpUpdate(t *testing.T) {
 	}
 }
 
+func TestStatefulPodControlNoOpUpdateOrdinalBignum(t *testing.T) {
+	recorder := record.NewFakeRecorder(808464432)
+	set := newStatefulSet(3)
+	pod := newStatefulSetPod(set, 3472328296227680256)
+	fakeClient := &fake.Clientset{}
+	claims := getPersistentVolumeClaims(set, pod)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	for k := range claims {
+		claim := claims[k]
+		indexer.Add(&claim)
+	}
+	claimLister := corelisters.NewPersistentVolumeClaimLister(indexer)
+	control := NewStatefulPodControl(fakeClient, nil, claimLister, recorder)
+	fakeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
+		t.Error("no-op update should not make any client invocation")
+		return true, nil, apierrors.NewInternalError(errors.New("if we are here we have a problem"))
+	})
+	if err := control.UpdateStatefulPod(set, pod); err != nil {
+		t.Errorf("Error returned on no-op update error: %s", err)
+	}
+	events := collectEvents(recorder.Events)
+	if eventCount := len(events); eventCount != 0 {
+		t.Errorf("no-op update: got %d events, but want 0", eventCount)
+	}
+}
+
 func TestStatefulPodControlUpdatesIdentity(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)
