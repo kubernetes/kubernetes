@@ -344,11 +344,11 @@ func migrateCoreDNSCorefile(client clientset.Interface, cm *v1.ConfigMap, corefi
 // GetCoreDNSInfo gets the current CoreDNS installed and the current Corefile Configuration of CoreDNS.
 func GetCoreDNSInfo(client clientset.Interface) (*v1.ConfigMap, string, string, error) {
 	coreDNSConfigMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), kubeadmconstants.CoreDNSConfigMap, metav1.GetOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, "", "", nil
+		}
 		return nil, "", "", err
-	}
-	if apierrors.IsNotFound(err) {
-		return nil, "", "", nil
 	}
 	corefile, ok := coreDNSConfigMap.Data["Corefile"]
 	if !ok {
