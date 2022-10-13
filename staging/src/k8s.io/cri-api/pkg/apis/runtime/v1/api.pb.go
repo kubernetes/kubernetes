@@ -917,7 +917,11 @@ type LinuxSandboxSecurityContext struct {
 	// If set, the root filesystem of the sandbox is read-only.
 	ReadonlyRootfs bool `protobuf:"varint,4,opt,name=readonly_rootfs,json=readonlyRootfs,proto3" json:"readonly_rootfs,omitempty"`
 	// List of groups applied to the first process run in the sandbox, in
-	// addition to the sandbox's primary GID.
+	// addition to the sandbox's primary GID, and group memberships defined
+	// in the container image for the sandbox's primary UID of the container process.
+	// If the list is empty, no additional groups are added to any container.
+	// Note that group memberships defined in the container image for the sandbox's primary UID
+	// of the container process are still effective, even if they are not included in this list.
 	SupplementalGroups []int64 `protobuf:"varint,5,rep,packed,name=supplemental_groups,json=supplementalGroups,proto3" json:"supplemental_groups,omitempty"`
 	// Indicates whether the sandbox will be asked to run a privileged
 	// container. If a privileged container is to be executed within it, this
@@ -3624,7 +3628,11 @@ type LinuxContainerSecurityContext struct {
 	// If set, the root filesystem of the container is read-only.
 	ReadonlyRootfs bool `protobuf:"varint,7,opt,name=readonly_rootfs,json=readonlyRootfs,proto3" json:"readonly_rootfs,omitempty"`
 	// List of groups applied to the first process run in the container, in
-	// addition to the container's primary GID.
+	// addition to the container's primary GID, and group memberships defined
+	// in the container image for the container's primary UID of the container process.
+	// If the list is empty, no additional groups are added to any container.
+	// Note that group memberships defined in the container image for the container's primary UID
+	// of the container process are still effective, even if they are not included in this list.
 	SupplementalGroups []int64 `protobuf:"varint,8,rep,packed,name=supplemental_groups,json=supplementalGroups,proto3" json:"supplemental_groups,omitempty"`
 	// no_new_privs defines if the flag for no_new_privs should be set on the
 	// container.
