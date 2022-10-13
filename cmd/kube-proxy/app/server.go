@@ -257,10 +257,7 @@ func (o *Options) initWatcher() error {
 }
 
 func (o *Options) eventHandler(ent fsnotify.Event) {
-	eventOpIs := func(Op fsnotify.Op) bool {
-		return ent.Op&Op == Op
-	}
-	if eventOpIs(fsnotify.Write) || eventOpIs(fsnotify.Rename) {
+	if ent.Has(fsnotify.Write) || ent.Has(fsnotify.Rename) {
 		// error out when ConfigFile is updated
 		o.errCh <- fmt.Errorf("content of the proxy server's configuration file was updated")
 		return
