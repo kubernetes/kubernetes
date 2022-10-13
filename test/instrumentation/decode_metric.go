@@ -60,6 +60,14 @@ func (c *metricDecoder) decodeNewMetricCall(fc *ast.CallExpr) (*metric, error) {
 	var err error
 	se, ok := fc.Fun.(*ast.SelectorExpr)
 	if !ok {
+		// account for timing ratio histogram functions
+		switch v := fc.Fun.(type) {
+		case *ast.Ident:
+			if v.Name == "NewTimingRatioHistogramVec" {
+				m, err = c.decodeMetricVecForTimingRatioHistogram(fc)
+				return &m, err
+			}
+		}
 		return nil, newDecodeErrorf(fc, errNotDirectCall)
 	}
 	functionName := se.Sel.String()
@@ -97,7 +105,7 @@ func getMetricType(functionName string) string {
 		return histogramMetricType
 	case "NewSummary", "NewSummaryVec":
 		return summaryMetricType
-	case "NewTimingHistogram", "NewTimingHistogramVec":
+	case "NewTimingHistogram", "NewTimingHistogramVec", "NewTimingRatioHistogramVec":
 		return timingRatioHistogram
 	default:
 		panic("getMetricType expects correct function name")
@@ -126,6 +134,53 @@ func (c *metricDecoder) decodeMetricVec(call *ast.CallExpr) (metric, error) {
 	sort.Strings(labels)
 	m.Labels = labels
 	return m, nil
+}
+
+func (c *metricDecoder) decodeMetricVecForTimingRatioHistogram(call *ast.CallExpr) (metric, error) {
+	m, err := c.decodeOpts(call.Args[0])
+	if err != nil {
+		return m, err
+	}
+	labels, err := c.decodeLabelsFromArray(call.Args[1:])
+	if err != nil {
+		return m, err
+	}
+	sort.Strings(labels)
+	m.Labels = labels
+	return m, nil
+}
+
+func (c *metricDecoder) decodeLabelsFromArray(exprs []ast.Expr) ([]string, error) {
+	retval := []string{}
+	for _, e := range exprs {
+		id, ok := e.(*ast.Ident)
+		if !ok {
+			if bl, ok := e.(*ast.BasicLit); ok {
+				v, err := stringValue(bl)
+				if err != nil {
+					return nil, err
+				}
+				retval = append(retval, v)
+				continue
+			}
+			return nil, newDecodeErrorf(e, errInvalidNewMetricCall)
+		}
+		variableExpr, found := c.variables[id.Name]
+		if !found {
+			return nil, newDecodeErrorf(e, "couldn't find variable for labels")
+		}
+		bl, ok := variableExpr.(*ast.BasicLit)
+		if !ok {
+			return nil, newDecodeErrorf(e, "couldn't interpret variable for labels")
+		}
+		v, err := stringValue(bl)
+		if err != nil {
+			return nil, err
+		}
+		retval = append(retval, v)
+	}
+
+	return retval, nil
 }
 
 func (c *metricDecoder) decodeLabels(expr ast.Expr) ([]string, error) {
