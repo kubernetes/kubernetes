@@ -404,13 +404,19 @@ func (c *metricDecoder) decodeBuckets(expr ast.Expr) ([]float64, error) {
 	case *ast.Ident:
 		variableExpr, found := c.variables[v.Name]
 		if !found {
-			return nil, fmt.Errorf("couldn't find variable for bucket")
+			return nil, newDecodeErrorf(v, "couldn't find variable for bucket")
 		}
-		v2, ok := variableExpr.(*ast.CompositeLit)
-		if !ok {
-			return nil, fmt.Errorf("couldn't find variable for bucket")
+		switch v2 := variableExpr.(type) {
+		case *ast.CompositeLit:
+			return decodeListOfFloats(v2, v2.Elts)
+		case *ast.CallExpr:
+			float64s, err2, done := c.decodeBucketFunctionCall(v2)
+			if done {
+				return float64s, err2
+			}
+		default:
+			return nil, newDecodeErrorf(v, "couldn't find variable for bucket")
 		}
-		return decodeListOfFloats(v2, v2.Elts)
 
 	case *ast.CompositeLit:
 		return decodeListOfFloats(v, v.Elts)
@@ -421,30 +427,38 @@ func (c *metricDecoder) decodeBuckets(expr ast.Expr) ([]float64, error) {
 			return metrics.DefBuckets, nil
 		}
 	case *ast.CallExpr:
-		se, ok := v.Fun.(*ast.SelectorExpr)
-		if !ok {
-			return nil, newDecodeErrorf(v, errBuckets)
-		}
-		functionName := se.Sel.String()
-		functionImport, ok := se.X.(*ast.Ident)
-		if !ok {
-			return nil, newDecodeErrorf(v, errBuckets)
-		}
-		if functionImport.String() != c.kubeMetricsImportName {
-			return nil, newDecodeErrorf(v, errBuckets)
-		}
-		firstArg, secondArg, thirdArg, err := decodeBucketArguments(v)
-		if err != nil {
-			return nil, err
-		}
-		switch functionName {
-		case "LinearBuckets":
-			return metrics.LinearBuckets(firstArg, secondArg, thirdArg), nil
-		case "ExponentialBuckets":
-			return metrics.ExponentialBuckets(firstArg, secondArg, thirdArg), nil
+		float64s, err2, done := c.decodeBucketFunctionCall(v)
+		if done {
+			return float64s, err2
 		}
 	}
 	return nil, newDecodeErrorf(expr, errBuckets)
+}
+
+func (c *metricDecoder) decodeBucketFunctionCall(v *ast.CallExpr) ([]float64, error, bool) {
+	se, ok := v.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return nil, newDecodeErrorf(v, errBuckets), true
+	}
+	functionName := se.Sel.String()
+	functionImport, ok := se.X.(*ast.Ident)
+	if !ok {
+		return nil, newDecodeErrorf(v, errBuckets), true
+	}
+	if functionImport.String() != c.kubeMetricsImportName {
+		return nil, newDecodeErrorf(v, errBuckets), true
+	}
+	firstArg, secondArg, thirdArg, err := decodeBucketArguments(v)
+	if err != nil {
+		return nil, err, true
+	}
+	switch functionName {
+	case "LinearBuckets":
+		return metrics.LinearBuckets(firstArg, secondArg, thirdArg), nil, true
+	case "ExponentialBuckets":
+		return metrics.ExponentialBuckets(firstArg, secondArg, thirdArg), nil, true
+	}
+	return nil, nil, false
 }
 
 func (c *metricDecoder) decodeObjectives(expr ast.Expr) (map[float64]float64, error) {
