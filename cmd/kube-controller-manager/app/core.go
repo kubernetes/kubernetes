@@ -41,7 +41,6 @@ import (
 	cloudnodelifecyclecontroller "k8s.io/cloud-provider/controllers/nodelifecycle"
 	routecontroller "k8s.io/cloud-provider/controllers/route"
 	servicecontroller "k8s.io/cloud-provider/controllers/service"
-	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/controller-manager/controller"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
@@ -409,12 +408,6 @@ func startResourceQuotaController(ctx context.Context, controllerContext Control
 		Registry:                  generic.NewRegistry(quotaConfiguration.Evaluators()),
 		UpdateFilter:              quotainstall.DefaultUpdateFilter(),
 	}
-	if resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
-			return nil, true, err
-		}
-	}
-
 	resourceQuotaController, err := resourcequotacontroller.NewController(resourceQuotaControllerOptions)
 	if err != nil {
 		return nil, false, err

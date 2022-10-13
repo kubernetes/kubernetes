@@ -37,7 +37,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	clientretry "k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/registry/core/secret"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -90,11 +89,6 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 
 		maxRetries:   maxRetries,
 		autoGenerate: options.AutoGenerate,
-	}
-	if cl != nil && cl.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_tokens_controller", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
-			return nil, err
-		}
 	}
 
 	e.serviceAccounts = serviceAccounts.Lister()
