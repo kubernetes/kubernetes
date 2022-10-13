@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -51,54 +50,11 @@ type Transformer interface {
 	TransformToStorage(ctx context.Context, data []byte, dataCtx Context) (out []byte, err error)
 }
 
-type identityTransformer struct{}
-
-// IdentityTransformer performs no transformation of the provided data.
-var IdentityTransformer Transformer = identityTransformer{}
-
-func (identityTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx Context) ([]byte, bool, error) {
-	return data, false, nil
-}
-func (identityTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx Context) ([]byte, error) {
-	return data, nil
-}
-
 // DefaultContext is a simple implementation of Context for a slice of bytes.
 type DefaultContext []byte
 
 // AuthenticatedData returns itself.
-func (c DefaultContext) AuthenticatedData() []byte { return []byte(c) }
-
-// MutableTransformer allows a transformer to be changed safely at runtime.
-type MutableTransformer struct {
-	lock        sync.RWMutex
-	transformer Transformer
-}
-
-// NewMutableTransformer creates a transformer that can be updated at any time by calling Set()
-func NewMutableTransformer(transformer Transformer) *MutableTransformer {
-	return &MutableTransformer{transformer: transformer}
-}
-
-// Set updates the nested transformer.
-func (t *MutableTransformer) Set(transformer Transformer) {
-	t.lock.Lock()
-	t.transformer = transformer
-	t.lock.Unlock()
-}
-
-func (t *MutableTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx Context) (out []byte, stale bool, err error) {
-	t.lock.RLock()
-	transformer := t.transformer
-	t.lock.RUnlock()
-	return transformer.TransformFromStorage(ctx, data, dataCtx)
-}
-func (t *MutableTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx Context) (out []byte, err error) {
-	t.lock.RLock()
-	transformer := t.transformer
-	t.lock.RUnlock()
-	return transformer.TransformToStorage(ctx, data, dataCtx)
-}
+func (c DefaultContext) AuthenticatedData() []byte { return c }
 
 // PrefixTransformer holds a transformer interface and the prefix that the transformation is located under.
 type PrefixTransformer struct {
