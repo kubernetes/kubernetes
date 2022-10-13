@@ -99,6 +99,11 @@ To tell Cobra *not* to provide the default `completion` command:
 rootCmd.CompletionOptions.DisableDefaultCmd = true
 ```
 
+To tell Cobra to mark the default `completion` command as *hidden*:
+```
+rootCmd.CompletionOptions.HiddenDefaultCmd = true
+```
+
 To tell Cobra *not* to provide the user with the `--no-descriptions` flag to the completion sub-commands:
 ```
 rootCmd.CompletionOptions.DisableNoDescFlag = true
@@ -530,6 +535,21 @@ search for a keyword in charts
 $ helm s[tab]
 search  show  status
 ```
+### Aliases
+
+You can also configure `powershell` aliases for your program and they will also support completions.
+
+```
+$ sal aliasname origcommand
+$ Register-ArgumentCompleter -CommandName 'aliasname' -ScriptBlock $__origcommandCompleterBlock
+
+# and now when you run `aliasname` completion will make
+# suggestions as it did for `origcommand`.
+
+$ aliasname <tab>
+completion     firstcommand   secondcommand
+```
+The name of the completer block variable is of the form `$__<programName>CompleterBlock` where every `-` and `:` in the program name have been replaced with `_`, to respect powershell naming syntax.
 
 ### Limitations
 

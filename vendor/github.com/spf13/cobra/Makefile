@@ -6,7 +6,7 @@ $(warning "could not find golangci-lint in $(PATH), run: curl -sfL https://insta
 endif
 
 ifeq (, $(shell which richgo))
-$(warning "could not find richgo in $(PATH), run: go get github.com/kyoh86/richgo")
+$(warning "could not find richgo in $(PATH), run: go install github.com/kyoh86/richgo@latest")
 endif
 
 .PHONY: fmt lint test install_deps clean
