@@ -164,7 +164,7 @@ func TestWithRetryAfter(t *testing.T) {
 
 			wrapped := WithWaitGroup(handler, func(*http.Request, *apirequest.RequestInfo) bool {
 				return false
-			}, safeWG)
+			}, safeWG, nil)
 			wrapped = WithRetryAfter(wrapped, test.shutdownDelayDurationElapsedFn())
 
 			req, err := http.NewRequest(http.MethodGet, test.requestURL, nil)

@@ -233,7 +233,8 @@ type Config struct {
 	// lifecycleSignals provides access to the various signals
 	// that happen during lifecycle of the apiserver.
 	// it's intentionally marked private as it should never be overridden.
-	lifecycleSignals lifecycleSignals
+	lifecycleSignals             lifecycleSignals
+	longRunningRequestTerminator *longRunningRequestTerminator
 
 	// StorageObjectCountTracker is used to keep track of the total number of objects
 	// in the storage per resource, so we can estimate width of incoming requests.
@@ -247,6 +248,8 @@ type Config struct {
 	// If enabled, after ShutdownDelayDuration elapses, any incoming request is
 	// rejected with a 429 status code and a 'Retry-After' response.
 	ShutdownSendRetryAfter bool
+
+	ShutdownLongRunningRequestsTimeout time.Duration
 
 	//===========================================================================
 	// values below here are targets for removal
@@ -347,6 +350,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		id = "kube-apiserver-" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(hash[:16]))
 	}
 	lifecycleSignals := newLifecycleSignals()
+	longRunningRequestTerminator := newLongRunningRequestTerminator()
 
 	return &Config{
 		Serializer:                  codecs,
@@ -389,9 +393,10 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
-		LongRunningFunc:           genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
-		lifecycleSignals:          lifecycleSignals,
-		StorageObjectCountTracker: flowcontrolrequest.NewStorageObjectCountTracker(),
+		LongRunningFunc:              genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
+		lifecycleSignals:             lifecycleSignals,
+		longRunningRequestTerminator: longRunningRequestTerminator,
+		StorageObjectCountTracker:    flowcontrolrequest.NewStorageObjectCountTracker(),
 
 		APIServerID:           id,
 		StorageVersionManager: storageversion.NewDefaultManager(),
@@ -680,8 +685,10 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		maxRequestBodyBytes: c.MaxRequestBodyBytes,
 		livezClock:          clock.RealClock{},
 
-		lifecycleSignals:       c.lifecycleSignals,
-		ShutdownSendRetryAfter: c.ShutdownSendRetryAfter,
+		lifecycleSignals:                   c.lifecycleSignals,
+		longRunningRequestTerminator:       c.longRunningRequestTerminator,
+		ShutdownSendRetryAfter:             c.ShutdownSendRetryAfter,
+		ShutdownLongRunningRequestsTimeout: c.ShutdownLongRunningRequestsTimeout,
 
 		APIServerID:           c.APIServerID,
 		StorageVersionManager: c.StorageVersionManager,
@@ -887,7 +894,11 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 
 	handler = genericapifilters.WithRequestDeadline(handler, c.AuditBackend, c.AuditPolicyRuleEvaluator,
 		c.LongRunningFunc, c.Serializer, c.RequestTimeout)
-	handler = genericfilters.WithWaitGroup(handler, c.LongRunningFunc, c.HandlerChainWaitGroup)
+	if c.ShutdownLongRunningRequestsTimeout != time.Duration(0) {
+		handler = genericfilters.WithWaitGroup(handler, c.LongRunningFunc, c.HandlerChainWaitGroup, c.longRunningRequestTerminator)
+	} else {
+		handler = genericfilters.WithWaitGroup(handler, c.LongRunningFunc, c.HandlerChainWaitGroup, nil)
+	}
 	if c.SecureServing != nil && !c.SecureServing.DisableHTTP2 && c.GoawayChance > 0 {
 		handler = genericfilters.WithProbabilisticGoaway(handler, c.GoawayChance)
 	}

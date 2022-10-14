@@ -243,6 +243,8 @@ type GenericAPIServer struct {
 	// lifecycleSignals provides access to the various signals that happen during the life cycle of the apiserver.
 	lifecycleSignals lifecycleSignals
 
+	longRunningRequestTerminator *longRunningRequestTerminator
+
 	// destroyFns contains a list of functions that should be called on shutdown to clean up resources.
 	destroyFns []func()
 
@@ -260,6 +262,8 @@ type GenericAPIServer struct {
 	// If enabled, after ShutdownDelayDuration elapses, any incoming request is
 	// rejected with a 429 status code and a 'Retry-After' response.
 	ShutdownSendRetryAfter bool
+
+	ShutdownLongRunningRequestsTimeout time.Duration
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -455,6 +459,8 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 // |           |                        ---------------|                 |
 // |           |                                       |                 |
 // |           |                         (HandlerChainWaitGroup::Wait)   |
+// |           |                  with ShutdownLongRunningRequestsTimeout|
+// |           |                                       |                 |
 // |           |                                       |                 |
 // |           |                    InFlightRequestsDrained (drainedCh)  |
 // |           |                                       |                 |
@@ -598,6 +604,22 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		// TODO: can we consolidate these two modes of graceful termination?
 		s.HandlerChainWaitGroup.Wait()
 	}()
+
+	if s.ShutdownLongRunningRequestsTimeout != time.Duration(0) {
+		go func() {
+			defer klog.V(1).InfoS("[graceful-termination] shutdown event - draining timed out", "name", drainedCh.Name())
+			defer drainedCh.Signal()
+
+			<-notAcceptingNewRequestCh.Signaled()
+
+			// Start terminating
+			s.longRunningRequestTerminator.startTerminating(s.ShutdownLongRunningRequestsTimeout)
+
+			select {
+			case <-time.After(s.ShutdownLongRunningRequestsTimeout):
+			}
+		}()
+	}
 
 	klog.V(1).Info("[graceful-termination] waiting for shutdown to be initiated")
 	<-stopCh

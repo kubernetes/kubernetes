@@ -79,7 +79,7 @@ T0+70s: AfterShutdownDelayDuration: shutdown delay duration has passed
 	- note: these new request(s) will not show up in audit logs
 
 T0 + 70s + up to 60s: InFlightRequestsDrained: existing in flight requests have been drained
-	- long running requests are outside of this scope
+	- long running requests are outside of this scope (unless ShutdownLongRunningRequestsTimeout is set)
 	- up to 60s: the default value of 'ShutdownTimeout' is 60s, this means that
       any request in flight has a hard timeout of 60s.
 	- server.Shutdown is called, the HTTP Server stops listening immediately

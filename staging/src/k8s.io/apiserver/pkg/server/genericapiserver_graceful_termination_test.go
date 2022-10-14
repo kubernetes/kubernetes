@@ -145,7 +145,7 @@ func newSignalInterceptingTestStep() *signalInterceptingTestStep {
 //	             |                       |-------------------------------------------------|
 //	             |                       |                                                 |
 //	             |             close(stopHttpServerCh)                         HandlerChainWaitGroup.Wait()
-//	             |                       |                                                 |
+//	             |                       |                              with ShutdownLongRunningRequestsTimeout
 //	             |            server.Shutdown(timeout=60s)                                 |
 //	             |                       |                                                 |
 //	             |              stop listener (net/http)                                   |
@@ -172,12 +172,12 @@ func newSignalInterceptingTestStep() *signalInterceptingTestStep {
 //	         return nil
 func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t *testing.T) {
 	fakeAudit := &fakeAudit{}
-	s := newGenericAPIServer(t, fakeAudit, false)
+	s := newGenericAPIServer(t, fakeAudit, false, time.Duration(0))
 	connReusingClient := newClient(false)
 	doer := setupDoer(t, s.SecureServingInfo)
 
 	// handler for a request that we want to keep in flight through to the end
-	inflightRequest := setupInFlightReuestHandler(s)
+	inflightRequest := setupInFlightRequestHandler(s)
 
 	// API calls from the pre-shutdown hook(s) must succeed up to
 	// the point where the HTTP server is shut down.
@@ -380,12 +380,12 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 //     return nil
 func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t *testing.T) {
 	fakeAudit := &fakeAudit{}
-	s := newGenericAPIServer(t, fakeAudit, true)
+	s := newGenericAPIServer(t, fakeAudit, true, time.Duration(0))
 	connReusingClient := newClient(false)
 	doer := setupDoer(t, s.SecureServingInfo)
 
 	// handler for a request that we want to keep in flight through to the end
-	inflightRequest := setupInFlightReuestHandler(s)
+	inflightRequest := setupInFlightRequestHandler(s)
 
 	// API calls from the pre-shutdown hook(s) must succeed up to
 	// the point where the HTTP server is shut down.
@@ -519,11 +519,46 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t 
 	}
 }
 
+func TestGracefulTerminationDrainedTimedOutWithShutdownLongRunningRequests(t *testing.T) {
+	fakeAudit := &fakeAudit{}
+	s := newGenericAPIServer(t, fakeAudit, true, time.Second)
+	connReusingClient := newClient(false)
+	doer := setupDoer(t, s.SecureServingInfo)
+
+	// handler for a request that we want to keep in flight through to the end
+	inflightHangingRequest := setupInFlightHangingRequest(s)
+	signals := &s.lifecycleSignals
+
+	// start the API server
+	stopCh, runCompletedCh := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(runCompletedCh)
+		s.PrepareRun().Run(stopCh)
+	}()
+	waitForAPIServerStarted(t, doer)
+
+	// fire a request now so it is in-flight on the server now.
+	inflightHangingRequest.launch(doer, connReusingClient)
+	waitForeverUntil(t, inflightHangingRequest.startedCh, "in-flight request did not reach the server")
+
+	// signal termination event: initiate a shutdown
+	close(stopCh)
+	waitForeverUntilSignaled(t, signals.ShutdownInitiated)
+
+	waitForeverUntilSignaled(t, signals.AfterShutdownDelayDuration)
+	waitForeverUntilSignaled(t, signals.NotAcceptingNewRequest)
+
+	// All requests in flight have been drained except for inflightHangingRequest.
+	// Wait till ShutdownLongRunningRequestsTimeout fires
+	waitForeverUntilSignaled(t, signals.InFlightRequestsDrained)
+	waitForeverUntilSignaled(t, signals.HTTPServerStoppedListening)
+}
+
 func TestMuxAndDiscoveryComplete(t *testing.T) {
 	// setup
 	testSignal1 := make(chan struct{})
 	testSignal2 := make(chan struct{})
-	s := newGenericAPIServer(t, &fakeAudit{}, true)
+	s := newGenericAPIServer(t, &fakeAudit{}, true, time.Duration(0))
 	s.muxAndDiscoveryCompleteSignals["TestSignal1"] = testSignal1
 	s.muxAndDiscoveryCompleteSignals["TestSignal2"] = testSignal2
 	doer := setupDoer(t, s.SecureServingInfo)
@@ -569,13 +604,13 @@ func TestPreShutdownHooks(t *testing.T) {
 		{
 			name: "ShutdownSendRetryAfter is disabled",
 			server: func() *GenericAPIServer {
-				return newGenericAPIServer(t, &fakeAudit{}, false)
+				return newGenericAPIServer(t, &fakeAudit{}, false, time.Duration(0))
 			},
 		},
 		{
 			name: "ShutdownSendRetryAfter is enabled",
 			server: func() *GenericAPIServer {
-				return newGenericAPIServer(t, &fakeAudit{}, true)
+				return newGenericAPIServer(t, &fakeAudit{}, true, time.Duration(0))
 			},
 		},
 	}
@@ -663,7 +698,7 @@ type inFlightRequest struct {
 	url                  string
 }
 
-func setupInFlightReuestHandler(s *GenericAPIServer) *inFlightRequest {
+func setupInFlightRequestHandler(s *GenericAPIServer) *inFlightRequest {
 	inflight := &inFlightRequest{
 		blockedCh: make(chan struct{}),
 		startedCh: make(chan struct{}),
@@ -674,6 +709,23 @@ func setupInFlightReuestHandler(s *GenericAPIServer) *inFlightRequest {
 		close(inflight.startedCh)
 		// this request handler blocks until we deliberately unblock it.
 		<-inflight.blockedCh
+		w.WriteHeader(http.StatusOK)
+	})
+	s.Handler.NonGoRestfulMux.Handle(inflight.url, handler)
+	return inflight
+}
+
+func setupInFlightHangingRequest(s *GenericAPIServer) *inFlightRequest {
+	inflight := &inFlightRequest{
+		blockedCh: make(chan struct{}),
+		startedCh: make(chan struct{}),
+		resultCh:  make(chan result),
+		url:       "/in-flight-hanging-request",
+	}
+	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		close(inflight.startedCh)
+		// This request hangs indefinitely
+		<-make(chan int)
 		w.WriteHeader(http.StatusOK)
 	})
 	s.Handler.NonGoRestfulMux.Handle(inflight.url, handler)
@@ -946,10 +998,11 @@ func newClient(useNewConnection bool) *http.Client {
 	}
 }
 
-func newGenericAPIServer(t *testing.T, fAudit *fakeAudit, keepListening bool) *GenericAPIServer {
+func newGenericAPIServer(t *testing.T, fAudit *fakeAudit, keepListening bool, shutdownTimeout time.Duration) *GenericAPIServer {
 	config, _ := setUp(t)
 	config.ShutdownDelayDuration = 100 * time.Millisecond
 	config.ShutdownSendRetryAfter = keepListening
+	config.ShutdownLongRunningRequestsTimeout = shutdownTimeout
 	config.AuditPolicyRuleEvaluator = fAudit
 	config.AuditBackend = fAudit
 

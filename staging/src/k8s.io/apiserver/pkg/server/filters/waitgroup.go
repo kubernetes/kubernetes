@@ -17,6 +17,7 @@ limitations under the License.
 package filters
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -31,13 +32,13 @@ import (
 )
 
 // WithWaitGroup adds all non long-running requests to wait group, which is used for graceful shutdown.
-func WithWaitGroup(handler http.Handler, longRunning apirequest.LongRunningRequestCheck, wg *utilwaitgroup.SafeWaitGroup) http.Handler {
+func WithWaitGroup(handler http.Handler, longRunning apirequest.LongRunningRequestCheck, wg *utilwaitgroup.SafeWaitGroup, terminator RequestTerminator) http.Handler {
 	// NOTE: both WithWaitGroup and WithRetryAfter must use the same exact isRequestExemptFunc 'isRequestExemptFromRetryAfter,
 	// otherwise SafeWaitGroup might wait indefinitely and will prevent the server from shutting down gracefully.
-	return withWaitGroup(handler, longRunning, wg, isRequestExemptFromRetryAfter)
+	return withWaitGroup(handler, longRunning, wg, isRequestExemptFromRetryAfter, terminator)
 }
 
-func withWaitGroup(handler http.Handler, longRunning apirequest.LongRunningRequestCheck, wg *utilwaitgroup.SafeWaitGroup, isRequestExemptFn isRequestExemptFunc) http.Handler {
+func withWaitGroup(handler http.Handler, longRunning apirequest.LongRunningRequestCheck, wg *utilwaitgroup.SafeWaitGroup, isRequestExemptFn isRequestExemptFunc, terminator RequestTerminator) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
 		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
@@ -47,7 +48,8 @@ func withWaitGroup(handler http.Handler, longRunning apirequest.LongRunningReque
 			return
 		}
 
-		if longRunning(req, requestInfo) {
+		longRunningRequest := longRunning(req, requestInfo)
+		if terminator == nil && longRunningRequest {
 			handler.ServeHTTP(w, req)
 			return
 		}
@@ -73,7 +75,17 @@ func withWaitGroup(handler http.Handler, longRunning apirequest.LongRunningReque
 			return
 		}
 
+		if terminator != nil && longRunningRequest {
+			newCtx, cancelFn := terminator.Attach(ctx)
+			ctx = newCtx
+			defer cancelFn()
+		}
+
 		defer wg.Done()
-		handler.ServeHTTP(w, req)
+		handler.ServeHTTP(w, req.WithContext(ctx))
 	})
+}
+
+type RequestTerminator interface {
+	Attach(context.Context) (context.Context, context.CancelFunc)
 }
