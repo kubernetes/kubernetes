@@ -1262,8 +1262,14 @@ func (p *podWorkers) removeTerminatedWorker(uid types.UID) {
 	}
 
 	if !status.finished {
-		klog.V(4).InfoS("Pod worker has been requested for removal but is still not fully terminated", "podUID", uid)
-		return
+		// force deleted pod could not be synced again as it not exist in pod manager while it's termnation work failed,
+		// so we should shutdown the pod worker immediately, the housekeeping can cover it's cleanup.
+		if status.IsTerminationStarted() && !status.working {
+			klog.V(0).InfoS("Pod has been removed from desired list but is still not fully terminated, still shutdown the worker", "podUID", uid)
+		} else {
+			klog.V(4).InfoS("Pod worker has been requested for removal but is still not fully terminated", "podUID", uid)
+			return
+		}
 	}
 
 	if status.restartRequested {

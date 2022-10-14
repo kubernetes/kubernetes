@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strconv"
 	"sync"
@@ -1259,6 +1260,20 @@ func Test_removeTerminatedWorker(t *testing.T) {
 			},
 			removed: false,
 		},
+		{
+			desc: "terminating failed worker",
+			podSyncStatus: &podSyncStatus{
+				finished:           false,
+				fullname:           "fake-fullname",
+				working:            false,
+				startedTerminating: true,
+			},
+			startedStaticPodsByFullname: make(map[string]types.UID),
+			waitingToStartStaticPodsByFullname: map[string][]types.UID{
+				"fake-fullname": {podUID},
+			},
+			removed: true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1277,6 +1292,64 @@ func Test_removeTerminatedWorker(t *testing.T) {
 				t.Errorf("Expected pod worker to not be removed")
 			}
 		})
+	}
+}
+
+func TestSyncKnownPodsWithTerminationFailed(t *testing.T) {
+	podWorkers, _ := createPodWorkers()
+	// mock terminating failure
+	podWorkers.syncTerminatingPodFn = func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, runningPod *kubecontainer.Pod, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
+		return fmt.Errorf("Pod terminating failed")
+	}
+	numPods := 2
+	for i := 0; i < numPods; i++ {
+		podWorkers.UpdatePod(UpdatePodOptions{
+			Pod:        newPod(strconv.Itoa(i), "name"),
+			UpdateType: kubetypes.SyncPodUpdate,
+		})
+	}
+	drainWorkers(podWorkers, numPods)
+
+	if len(podWorkers.podUpdates) != numPods {
+		t.Errorf("Incorrect number of open channels %v", len(podWorkers.podUpdates))
+	}
+
+	desiredPods := map[types.UID]sets.Empty{}
+	desiredPods[types.UID("0")] = sets.Empty{}
+	desiredPods[types.UID("1")] = sets.Empty{}
+
+	// verify workers that are not terminated stay open even if config no longer
+	// sees them
+	podWorkers.SyncKnownPods(nil)
+	if len(podWorkers.podUpdates) != 2 {
+		t.Errorf("Incorrect number of open channels %v", len(podWorkers.podUpdates))
+	}
+	if len(podWorkers.podSyncStatuses) != 2 {
+		t.Errorf("Incorrect number of tracked statuses: %#v", podWorkers.podSyncStatuses)
+	}
+	if len(podWorkers.lastUndeliveredWorkUpdate) != 0 {
+		t.Errorf("Incorrect number of tracked statuses: %#v", podWorkers.lastUndeliveredWorkUpdate)
+	}
+
+	for uid := range desiredPods {
+		pod := newPod(string(uid), "name")
+		podWorkers.UpdatePod(UpdatePodOptions{
+			Pod:        pod,
+			UpdateType: kubetypes.SyncPodKill,
+		})
+	}
+	drainWorkers(podWorkers, numPods)
+
+	// verify once those pods terminate (via some other flow) the workers are cleared
+	podWorkers.SyncKnownPods(nil)
+	if len(podWorkers.podUpdates) != 0 {
+		t.Errorf("Incorrect number of open channels %v", len(podWorkers.podUpdates))
+	}
+	if len(podWorkers.podSyncStatuses) != 0 {
+		t.Errorf("Incorrect number of tracked statuses: %#v", podWorkers.podSyncStatuses)
+	}
+	if len(podWorkers.lastUndeliveredWorkUpdate) != 0 {
+		t.Errorf("Incorrect number of tracked statuses: %#v", podWorkers.lastUndeliveredWorkUpdate)
 	}
 }
 
