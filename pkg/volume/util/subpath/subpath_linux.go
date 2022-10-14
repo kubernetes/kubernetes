@@ -245,6 +245,7 @@ func doCleanSubPaths(mounter mount.Interface, podDir string, volumeName string) 
 
 	containerDirs, err := ioutil.ReadDir(subPathDir)
 	if err != nil {
+		// subPathDir not exist is normal, means not configure sub path on volumeMount
 		if os.IsNotExist(err) {
 			return nil
 		}
