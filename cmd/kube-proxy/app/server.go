@@ -588,6 +588,7 @@ func serveHealthz(hz healthcheck.ProxierHealthUpdater, errCh chan error) {
 		return
 	}
 
+	cancelCh := make(chan struct{})
 	fn := func() {
 		err := hz.Run()
 		if err != nil {
@@ -595,14 +596,14 @@ func serveHealthz(hz healthcheck.ProxierHealthUpdater, errCh chan error) {
 			if errCh != nil {
 				errCh <- fmt.Errorf("healthz server failed: %v", err)
 				// if in hardfail mode, never retry again
-				blockCh := make(chan error)
-				<-blockCh
+				close(cancelCh)
+				return
 			}
 		} else {
 			klog.ErrorS(nil, "Healthz server returned without error")
 		}
 	}
-	go wait.Until(fn, 5*time.Second, wait.NeverStop)
+	go wait.Until(fn, 5*time.Second, cancelCh)
 }
 
 func serveMetrics(bindAddress string, proxyMode kubeproxyconfig.ProxyMode, enableProfiling bool, errCh chan error) {
@@ -627,6 +628,7 @@ func serveMetrics(bindAddress string, proxyMode kubeproxyconfig.ProxyMode, enabl
 
 	configz.InstallHandler(proxyMux)
 
+	cancelCh := make(chan struct{})
 	fn := func() {
 		err := http.ListenAndServe(bindAddress, proxyMux)
 		if err != nil {
@@ -635,12 +637,12 @@ func serveMetrics(bindAddress string, proxyMode kubeproxyconfig.ProxyMode, enabl
 			if errCh != nil {
 				errCh <- err
 				// if in hardfail mode, never retry again
-				blockCh := make(chan error)
-				<-blockCh
+				close(cancelCh)
+				return
 			}
 		}
 	}
-	go wait.Until(fn, 5*time.Second, wait.NeverStop)
+	go wait.Until(fn, 5*time.Second, cancelCh)
 }
 
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
