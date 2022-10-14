@@ -903,6 +903,14 @@
     Pod or delete and replace it with a new Pod
   release: v1.13
   file: test/e2e/apps/rc.go
+- testname: Replication Controller, get and update ReplicationController scale
+  codename: '[sig-apps] ReplicationController should get and update a ReplicationController
+    scale [Conformance]'
+  description: A ReplicationController is created which MUST succeed. It MUST succeed
+    when reading the ReplicationController scale. When updating the ReplicationController
+    scale it MUST succeed and the field MUST equal the new value.
+  release: v1.26
+  file: test/e2e/apps/rc.go
 - testname: Replication Controller, release pods
   codename: '[sig-apps] ReplicationController should release no longer matching pods
     [Conformance]'
