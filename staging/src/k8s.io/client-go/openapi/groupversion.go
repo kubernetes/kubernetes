@@ -22,13 +22,10 @@ import (
 	"k8s.io/kube-openapi/pkg/handler3"
 )
 
-const openAPIV3mimePb = "application/com.github.proto-openapi.spec.v3@v1.0+protobuf"
-const jsonMime = "application/json"
+const ContentTypeOpenAPIV3PB = "application/com.github.proto-openapi.spec.v3@v1.0+protobuf"
 
 type GroupVersion interface {
-	// Raw data types
-	SchemaJSON() ([]byte, error)
-	SchemaPB() ([]byte, error)
+	Schema(contentType string) ([]byte, error)
 }
 
 type groupversion struct {
@@ -40,23 +37,10 @@ func newGroupVersion(client *client, item handler3.OpenAPIV3DiscoveryGroupVersio
 	return &groupversion{client: client, item: item}
 }
 
-func (g *groupversion) SchemaPB() ([]byte, error) {
+func (g *groupversion) Schema(contentType string) ([]byte, error) {
 	data, err := g.client.restClient.Get().
 		RequestURI(g.item.ServerRelativeURL).
-		SetHeader("Accept", openAPIV3mimePb).
-		Do(context.TODO()).
-		Raw()
-
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
-func (g *groupversion) SchemaJSON() ([]byte, error) {
-	data, err := g.client.restClient.Get().
-		RequestURI(g.item.ServerRelativeURL).
-		SetHeader("Accept", jsonMime).
+		SetHeader("Accept", contentType).
 		Do(context.TODO()).
 		Raw()
 

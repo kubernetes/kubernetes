@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
@@ -169,38 +170,52 @@ func TestOpenAPIDiskCache(t *testing.T) {
 	paths, err := openapiClient.Paths()
 	require.NoError(t, err)
 	assert.Equal(t, 1, fakeServer.RequestCounters["/openapi/v3"])
-
 	require.Greater(t, len(paths), 0)
-	i := 0
-	for k, v := range paths {
-		i++
 
-		_, err = v.SchemaJSON()
-		assert.NoError(t, err)
-
-		path := "/openapi/v3/" + strings.TrimPrefix(k, "/")
-		assert.Equal(t, 1, fakeServer.RequestCounters[path])
-
-		// Ensure schema call is served from memory
-		_, err = v.SchemaJSON()
-		assert.NoError(t, err)
-		assert.Equal(t, 1, fakeServer.RequestCounters[path])
-
-		client.Invalidate()
-
-		// Refetch the schema from a new openapi client to try to force a new
-		// http request
-		newPaths, err := client.OpenAPIV3().Paths()
-		if !assert.NoError(t, err) {
-			continue
-		}
-
-		// Ensure schema call is still served from disk
-		_, err = newPaths[k].SchemaJSON()
-		assert.NoError(t, err)
-		assert.Equal(t, 1+i, fakeServer.RequestCounters["/openapi/v3"])
-		assert.Equal(t, 1, fakeServer.RequestCounters[path])
+	contentTypes := []string{
+		runtime.ContentTypeJSON, openapi.ContentTypeOpenAPIV3PB,
 	}
+
+	for _, contentType := range contentTypes {
+		t.Run(contentType, func(t *testing.T) {
+			// Reset all counters (cant just reset to nil since reference is shared)
+			for k := range fakeServer.RequestCounters {
+				delete(fakeServer.RequestCounters, k)
+			}
+
+			i := 0
+			for k, v := range paths {
+				i++
+
+				_, err = v.Schema(contentType)
+				assert.NoError(t, err)
+
+				path := "/openapi/v3/" + strings.TrimPrefix(k, "/")
+				assert.Equal(t, 1, fakeServer.RequestCounters[path])
+
+				// Ensure schema call is served from memory
+				_, err = v.Schema(contentType)
+				assert.NoError(t, err)
+				assert.Equal(t, 1, fakeServer.RequestCounters[path])
+
+				client.Invalidate()
+
+				// Refetch the schema from a new openapi client to try to force a new
+				// http request
+				newPaths, err := client.OpenAPIV3().Paths()
+				if !assert.NoError(t, err) {
+					continue
+				}
+
+				// Ensure schema call is still served from disk
+				_, err = newPaths[k].Schema(contentType)
+				assert.NoError(t, err)
+				assert.Equal(t, i, fakeServer.RequestCounters["/openapi/v3"])
+				assert.Equal(t, 1, fakeServer.RequestCounters[path])
+			}
+		})
+	}
+
 }
 
 type fakeDiscoveryClient struct {

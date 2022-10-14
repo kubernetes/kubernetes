@@ -25,13 +25,13 @@ import (
 type groupversion struct {
 	delegate openapi.GroupVersion
 
-	jsonOnce  sync.Once
-	jsonBytes []byte
-	jsonErr   error
+	lock sync.Mutex
+	docs map[string]docInfo
+}
 
-	pbOnce  sync.Once
-	pbBytes []byte
-	pbErr   error
+type docInfo struct {
+	data []byte
+	err  error
 }
 
 func newGroupVersion(delegate openapi.GroupVersion) *groupversion {
@@ -40,18 +40,19 @@ func newGroupVersion(delegate openapi.GroupVersion) *groupversion {
 	}
 }
 
-func (g *groupversion) SchemaPB() ([]byte, error) {
-	g.pbOnce.Do(func() {
-		g.pbBytes, g.pbErr = g.delegate.SchemaPB()
-	})
+func (g *groupversion) Schema(contentType string) ([]byte, error) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
 
-	return g.pbBytes, g.pbErr
-}
+	cachedInfo, ok := g.docs[contentType]
+	if !ok {
+		if g.docs == nil {
+			g.docs = make(map[string]docInfo)
+		}
 
-func (g *groupversion) SchemaJSON() ([]byte, error) {
-	g.jsonOnce.Do(func() {
-		g.jsonBytes, g.jsonErr = g.delegate.SchemaJSON()
-	})
+		cachedInfo.data, cachedInfo.err = g.delegate.Schema(contentType)
+		g.docs[contentType] = cachedInfo
+	}
 
-	return g.jsonBytes, g.jsonErr
+	return cachedInfo.data, cachedInfo.err
 }

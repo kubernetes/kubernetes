@@ -29,15 +29,20 @@ import (
 	"github.com/gogo/protobuf/proto"
 	openapi_v2 "github.com/google/gnostic/openapiv2"
 	openapi_v3 "github.com/google/gnostic/openapiv3"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	golangproto "google.golang.org/protobuf/proto"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/client-go/openapi"
 	restclient "k8s.io/client-go/rest"
 	testutil "k8s.io/client-go/util/testing"
+	"k8s.io/kube-openapi/pkg/spec3"
 )
 
 func TestGetServerVersion(t *testing.T) {
@@ -537,7 +542,7 @@ func openapiSchemaFakeServer(t *testing.T) (*httptest.Server, error) {
 	return server, nil
 }
 
-func openapiV3SchemaFakeServer(t *testing.T) (*httptest.Server, map[string]*openapi_v3.Document, error) {
+func openapiV3SchemaFakeServer(t *testing.T) (*httptest.Server, map[string]*spec3.OpenAPI, error) {
 	res, err := testutil.NewFakeOpenAPIV3Server("testdata")
 	if err != nil {
 		return nil, nil, err
@@ -576,32 +581,64 @@ func TestGetOpenAPISchemaV3(t *testing.T) {
 		t.Fatalf("unexpected error getting openapi: %v", err)
 	}
 
-	for k, v := range paths {
-		actual, err := v.SchemaPB()
-		if err != nil {
-			t.Fatal(err)
-		}
+	contentTypes := []string{
+		runtime.ContentTypeJSON, openapi.ContentTypeOpenAPIV3PB,
+	}
 
-		expected := testV3Specs[k]
-		expectedPB, err := golangproto.Marshal(expected)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !reflect.DeepEqual(expectedPB, actual) {
-			t.Fatalf("expected \n%v\n\ngot:\n%v", expected, actual)
-		}
+	for _, contentType := range contentTypes {
+		t.Run(contentType, func(t *testing.T) {
+			for k, v := range paths {
+				actual, err := v.Schema(contentType)
+				if err != nil {
+					t.Fatal(err)
+				}
 
-		// Ensure that fetching schema once again does not return same instance
-		actualAgain, err := v.SchemaPB()
-		if err != nil {
-			t.Fatal(err)
-		}
+				expected := testV3Specs[k]
+				if contentType == runtime.ContentTypeJSON {
+					var actualSpec spec3.OpenAPI
 
-		if reflect.ValueOf(actual).Pointer() == reflect.ValueOf(actualAgain).Pointer() {
-			t.Fatal("expected schema not to be cached")
-		} else if !reflect.DeepEqual(expectedPB, actualAgain) {
-			t.Fatal("expected schema values to be equal")
-		}
+					if err := json.Unmarshal(actual, &actualSpec); err != nil {
+						t.Fatal(err)
+					}
+
+					// Cannot use DeepEqual directly due to differences in how
+					// default key is being handled in gnostic vs kube-openapi
+					// Our test server parses the files in directly as gnostic
+					// which retains empty maps/lists, etc.
+					require.EqualValues(t, expected, &actualSpec)
+				} else {
+					// Convert to JSON then to gnostic then to PB for comparison
+					expectedJSON, err := json.Marshal(expected)
+					if err != nil {
+						t.Fatal(err)
+					}
+
+					expectedGnostic, err := openapi_v3.ParseDocument(expectedJSON)
+					if err != nil {
+						t.Fatal(err)
+					}
+
+					expectedPB, err := golangproto.Marshal(expectedGnostic)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if !reflect.DeepEqual(expectedPB, actual) {
+						t.Fatalf("expected equal values: %v", cmp.Diff(expectedPB, actual))
+					}
+				}
+
+				// Ensure that fetching schema once again does not return same instance
+				actualAgain, err := v.Schema(contentType)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if reflect.ValueOf(actual).Pointer() == reflect.ValueOf(actualAgain).Pointer() {
+					t.Fatal("expected schema not to be cached")
+				}
+			}
+
+		})
 	}
 }
 

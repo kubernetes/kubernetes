@@ -27,8 +27,10 @@ import (
 	"github.com/stretchr/testify/require"
 	errorsutil "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/fake"
+	"k8s.io/client-go/openapi"
 	"k8s.io/client-go/rest"
 	testutil "k8s.io/client-go/util/testing"
 )
@@ -415,40 +417,48 @@ func TestOpenAPIMemCache(t *testing.T) {
 	paths, err := openapiClient.Paths()
 	require.NoError(t, err)
 
-	for k, v := range paths {
-		original, err := v.SchemaPB()
-		if !assert.NoError(t, err) {
-			continue
-		}
+	contentTypes := []string{
+		runtime.ContentTypeJSON, openapi.ContentTypeOpenAPIV3PB,
+	}
 
-		pathsAgain, err := openapiClient.Paths()
-		if !assert.NoError(t, err) {
-			continue
-		}
+	for _, contentType := range contentTypes {
+		t.Run(contentType, func(t *testing.T) {
+			for k, v := range paths {
+				original, err := v.Schema(contentType)
+				if !assert.NoError(t, err) {
+					continue
+				}
 
-		schemaAgain, err := pathsAgain[k].SchemaPB()
-		if !assert.NoError(t, err) {
-			continue
-		}
+				pathsAgain, err := openapiClient.Paths()
+				if !assert.NoError(t, err) {
+					continue
+				}
 
-		assert.True(t, reflect.ValueOf(paths).Pointer() == reflect.ValueOf(pathsAgain).Pointer())
-		assert.True(t, reflect.ValueOf(original).Pointer() == reflect.ValueOf(schemaAgain).Pointer())
+				schemaAgain, err := pathsAgain[k].Schema(contentType)
+				if !assert.NoError(t, err) {
+					continue
+				}
 
-		// Invalidate and try again. This time pointers should not be equal
-		client.Invalidate()
+				assert.True(t, reflect.ValueOf(paths).Pointer() == reflect.ValueOf(pathsAgain).Pointer())
+				assert.True(t, reflect.ValueOf(original).Pointer() == reflect.ValueOf(schemaAgain).Pointer())
 
-		pathsAgain, err = client.OpenAPIV3().Paths()
-		if !assert.NoError(t, err) {
-			continue
-		}
+				// Invalidate and try again. This time pointers should not be equal
+				client.Invalidate()
 
-		schemaAgain, err = pathsAgain[k].SchemaPB()
-		if !assert.NoError(t, err) {
-			continue
-		}
+				pathsAgain, err = client.OpenAPIV3().Paths()
+				if !assert.NoError(t, err) {
+					continue
+				}
 
-		assert.True(t, reflect.ValueOf(paths).Pointer() != reflect.ValueOf(pathsAgain).Pointer())
-		assert.True(t, reflect.ValueOf(original).Pointer() != reflect.ValueOf(schemaAgain).Pointer())
-		assert.Equal(t, original, schemaAgain)
+				schemaAgain, err = pathsAgain[k].Schema(contentType)
+				if !assert.NoError(t, err) {
+					continue
+				}
+
+				assert.True(t, reflect.ValueOf(paths).Pointer() != reflect.ValueOf(pathsAgain).Pointer())
+				assert.True(t, reflect.ValueOf(original).Pointer() != reflect.ValueOf(schemaAgain).Pointer())
+				assert.Equal(t, original, schemaAgain)
+			}
+		})
 	}
 }
