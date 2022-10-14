@@ -1074,6 +1074,7 @@ filename | sha512 hash
 All container images are available as manifest lists and support the described
 architectures. It is also possible to pull a specific architecture directly by
 adding the "-$ARCH" suffix  to the container image name.
+
 name | architectures
 ---- | -------------
 [k8s.gcr.io/conformance:v1.24.0](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/conformance) | [amd64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/conformance-amd64), [arm](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/conformance-arm), [arm64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/conformance-arm64), [ppc64le](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/conformance-ppc64le), [s390x](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/conformance-s390x)
@@ -1273,9 +1274,11 @@ Service `ClusterIP` are unique, hence, trying to create a Service with a `Cluste
 - Added a path `/header?key=` to `agnhost netexec` allowing one to view what the header value is of the incoming request.
 
   Ex:
-
-  ```$ curl -H "X-Forwarded-For: something" 172.17.0.2:8080/header?key=X-Forwarded-For
-  something``` ([#107796](https://github.com/kubernetes/kubernetes/pull/107796), [@alexanderConstantinescu](https://github.com/alexanderConstantinescu))
+  ```
+  $ curl -H "X-Forwarded-For: something" 172.17.0.2:8080/header?key=X-Forwarded-For
+  something
+  ```
+   ([#107796](https://github.com/kubernetes/kubernetes/pull/107796), [@alexanderConstantinescu](https://github.com/alexanderConstantinescu))
 - Added completion for `kubectl config set-context`. ([#106739](https://github.com/kubernetes/kubernetes/pull/106739), [@kebe7jun](https://github.com/kebe7jun))
 - Added field `add_ambient_capabilities` to the Capabilities message in the CRI-API. ([#104620](https://github.com/kubernetes/kubernetes/pull/104620), [@vinayakankugoyal](https://github.com/vinayakankugoyal))
 - Added label selector flag to all `kubectl rollout` commands. ([#99758](https://github.com/kubernetes/kubernetes/pull/99758), [@aramperes](https://github.com/aramperes))
