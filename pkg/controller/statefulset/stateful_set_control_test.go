@@ -2696,7 +2696,7 @@ func checkClaimInvarients(set *apps.StatefulSet, pod *v1.Pod, claim *v1.Persiste
 			return fmt.Errorf("claim %s does not have owner ref on condemned pod %s for scaledown delete", claim.Name, pod.Name)
 		}
 		if podInOrdinalRange(pod, set) && hasOwnerRef(claim, pod) {
-			return fmt.Errorf("claim %s has unexpected owner ref on condemned pod %s for scaledown delete. ordinal: %d, [%d,%d]", claim.Name, pod.Name, getOrdinal(pod), getStartOrdinal(set), getEndOrdinal(set))
+			return fmt.Errorf("claim %s has unexpected owner ref on condemned pod %s for scaledown delete", claim.Name, pod.Name)
 		}
 	case policy.WhenScaled == delete && policy.WhenDeleted == delete:
 		if !podInOrdinalRange(pod, set) {

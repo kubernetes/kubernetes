@@ -148,8 +148,8 @@ type StatefulSetPersistentVolumeClaimRetentionPolicy struct {
 type StatefulSetOrdinals struct {
 	// Start is the number representing the first index that is used to represent
 	// replica ordinals. Defaults to 0.
-	// If set, replica ordinals will be numbered
-	// [.spec.ordinals.start, .spec.ordinals.start - .spec.replicas).
+	// If set, replica ordinals will be numbered in the range:
+	// [.spec.ordinals.start, .spec.ordinals.start + .spec.replicas).
 	// +optional
 	Start int32
 }
