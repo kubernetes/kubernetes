@@ -1467,8 +1467,8 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	kl.syncLoop(updates, kl)
 }
 
-// syncPod is the transaction script for the sync of a single pod (setting up)
-// a pod. This method is reentrant and expected to converge a pod towards the
+// syncPod is the transaction script for the sync of a single pod (setting up
+// a pod). This method is reentrant and expected to converge a pod towards the
 // desired state of the spec. The reverse (teardown) is handled in
 // syncTerminatingPod and syncTerminatedPod. If syncPod exits without error,
 // then the pod runtime state is in sync with the desired configuration state
