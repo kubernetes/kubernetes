@@ -405,8 +405,8 @@ func (s *SimpleStream) Close() error {
 	return nil
 }
 
-func (obj *SimpleStream) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
-func (obj *SimpleStream) DeepCopyObject() runtime.Object {
+func (s *SimpleStream) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (s *SimpleStream) DeepCopyObject() runtime.Object {
 	panic("SimpleStream does not support DeepCopy")
 }
 
