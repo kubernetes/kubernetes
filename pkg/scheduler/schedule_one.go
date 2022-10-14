@@ -101,6 +101,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		// will fit due to the preemption. It is also possible that a different pod will schedule
 		// into the resources that were preempted, but this is harmless.
 		var nominatingInfo *framework.NominatingInfo
+		reason := v1.PodReasonUnschedulable
 		if fitError, ok := err.(*framework.FitError); ok {
 			if !fwk.HasPostFilterPlugins() {
 				klog.V(3).InfoS("No PostFilter plugins are registered, so no preemption will be performed")
@@ -129,8 +130,9 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			nominatingInfo = clearNominatedNode
 			klog.ErrorS(err, "Error selecting node for pod", "pod", klog.KObj(pod))
 			metrics.PodScheduleError(fwk.ProfileName(), metrics.SinceInSeconds(start))
+			reason = SchedulerError
 		}
-		sched.FailureHandler(ctx, fwk, podInfo, err, v1.PodReasonUnschedulable, nominatingInfo)
+		sched.FailureHandler(ctx, fwk, podInfo, err, reason, nominatingInfo)
 		return
 	}
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
