@@ -110,6 +110,7 @@ func TestAPIResourcesRun(t *testing.T) {
 					Kind:       "Foo",
 					Verbs:      []string{"get", "list"},
 					ShortNames: []string{"f", "fo"},
+					Categories: []string{"some-category"},
 				},
 				{
 					Name:       "bars",
@@ -117,6 +118,7 @@ func TestAPIResourcesRun(t *testing.T) {
 					Kind:       "Bar",
 					Verbs:      []string{"get", "list", "create"},
 					ShortNames: []string{},
+					Categories: []string{},
 				},
 			},
 		},
@@ -129,6 +131,7 @@ func TestAPIResourcesRun(t *testing.T) {
 					Kind:       "Baz",
 					Verbs:      []string{"get", "list", "create", "delete"},
 					ShortNames: []string{"b"},
+					Categories: []string{"some-category", "another-category"},
 				},
 				{
 					Name:       "NoVerbs",
@@ -136,6 +139,7 @@ func TestAPIResourcesRun(t *testing.T) {
 					Kind:       "NoVerbs",
 					Verbs:      []string{},
 					ShortNames: []string{"b"},
+					Categories: []string{},
 				},
 			},
 		},
@@ -189,10 +193,10 @@ bazzes   b            somegroup/v1   true         Baz
 			commandSetupFn: func(cmd *cobra.Command) {
 				cmd.Flags().Set("output", "wide")
 			},
-			expectedOutput: `NAME     SHORTNAMES   APIVERSION     NAMESPACED   KIND   VERBS
-bars                  v1             true         Bar    [get list create]
-foos     f,fo         v1             false        Foo    [get list]
-bazzes   b            somegroup/v1   true         Baz    [get list create delete]
+			expectedOutput: `NAME     SHORTNAMES   APIVERSION     NAMESPACED   KIND   VERBS                    CATEGORIES
+bars                  v1             true         Bar    get,list,create          
+foos     f,fo         v1             false        Foo    get,list                 some-category
+bazzes   b            somegroup/v1   true         Baz    get,list,create,delete   some-category,another-category
 `,
 			expectedInvalidations: 1,
 		},
@@ -233,6 +237,27 @@ bazzes   b            somegroup/v1   true         Baz
 			name: "multiple verbs",
 			commandSetupFn: func(cmd *cobra.Command) {
 				cmd.Flags().Set("verbs", "create,delete")
+			},
+			expectedOutput: `NAME     SHORTNAMES   APIVERSION     NAMESPACED   KIND
+bazzes   b            somegroup/v1   true         Baz
+`,
+			expectedInvalidations: 1,
+		},
+		{
+			name: "single category",
+			commandSetupFn: func(cmd *cobra.Command) {
+				cmd.Flags().Set("categories", "some-category")
+			},
+			expectedOutput: `NAME     SHORTNAMES   APIVERSION     NAMESPACED   KIND
+foos     f,fo         v1             false        Foo
+bazzes   b            somegroup/v1   true         Baz
+`,
+			expectedInvalidations: 1,
+		},
+		{
+			name: "multiple categories",
+			commandSetupFn: func(cmd *cobra.Command) {
+				cmd.Flags().Set("categories", "some-category,another-category")
 			},
 			expectedOutput: `NAME     SHORTNAMES   APIVERSION     NAMESPACED   KIND
 bazzes   b            somegroup/v1   true         Baz

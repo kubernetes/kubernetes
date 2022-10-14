@@ -66,6 +66,7 @@ type APIResourceOptions struct {
 	Verbs      []string
 	NoHeaders  bool
 	Cached     bool
+	Categories []string
 
 	genericclioptions.IOStreams
 }
@@ -109,6 +110,7 @@ func NewCmdAPIResources(f cmdutil.Factory, ioStreams genericclioptions.IOStreams
 	cmd.Flags().StringSliceVar(&o.Verbs, "verbs", o.Verbs, "Limit to resources that support the specified verbs.")
 	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.SortBy, "If non-empty, sort list of resources using specified field. The field can be either 'name' or 'kind'.")
 	cmd.Flags().BoolVar(&o.Cached, "cached", o.Cached, "Use the cached list of resources if available.")
+	cmd.Flags().StringSliceVar(&o.Categories, "categories", o.Categories, "Limit to resources that belong the the specified categories.")
 	return cmd
 }
 
@@ -185,6 +187,10 @@ func (o *APIResourceOptions) RunAPIResources(cmd *cobra.Command, f cmdutil.Facto
 			if len(o.Verbs) > 0 && !sets.NewString(resource.Verbs...).HasAll(o.Verbs...) {
 				continue
 			}
+			// filter to resources that belong to the specified categories
+			if len(o.Categories) > 0 && !sets.NewString(resource.Categories...).HasAll(o.Categories...) {
+				continue
+			}
 			resources = append(resources, groupResource{
 				APIGroup:        gv.Group,
 				APIGroupVersion: gv.String(),
@@ -211,13 +217,14 @@ func (o *APIResourceOptions) RunAPIResources(cmd *cobra.Command, f cmdutil.Facto
 				errs = append(errs, err)
 			}
 		case "wide":
-			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%v\t%s\t%v\n",
+			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%v\t%s\t%v\t%v\n",
 				r.APIResource.Name,
 				strings.Join(r.APIResource.ShortNames, ","),
 				r.APIGroupVersion,
 				r.APIResource.Namespaced,
 				r.APIResource.Kind,
-				r.APIResource.Verbs); err != nil {
+				strings.Join(r.APIResource.Verbs, ","),
+				strings.Join(r.APIResource.Categories, ",")); err != nil {
 				errs = append(errs, err)
 			}
 		case "":
@@ -241,7 +248,7 @@ func (o *APIResourceOptions) RunAPIResources(cmd *cobra.Command, f cmdutil.Facto
 func printContextHeaders(out io.Writer, output string) error {
 	columnNames := []string{"NAME", "SHORTNAMES", "APIVERSION", "NAMESPACED", "KIND"}
 	if output == "wide" {
-		columnNames = append(columnNames, "VERBS")
+		columnNames = append(columnNames, "VERBS", "CATEGORIES")
 	}
 	_, err := fmt.Fprintf(out, "%s\n", strings.Join(columnNames, "\t"))
 	return err
