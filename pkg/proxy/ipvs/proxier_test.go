@@ -670,6 +670,8 @@ func TestNodePortIPv4(t *testing.T) {
 					JumpChain: "ACCEPT", MatchSet: kubeHealthCheckNodePortSet,
 				}},
 				string(kubeServicesChain): {{
+					JumpChain: "RETURN", SourceAddress: "127.0.0.0/8",
+				}, {
 					JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
 				}, {
 					JumpChain: string(kubeNodePortChain), MatchSet: "",
@@ -2052,6 +2054,8 @@ func TestLoadBalancer(t *testing.T) {
 	// Check iptables chain and rules
 	epIpt := netlinktest.ExpectedIptablesChain{
 		string(kubeServicesChain): {{
+			JumpChain: "RETURN", SourceAddress: "127.0.0.0/8",
+		}, {
 			JumpChain: string(kubeLoadBalancerChain), MatchSet: kubeLoadBalancerSet,
 		}, {
 			JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
@@ -2152,6 +2156,8 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 	// Check iptables chain and rules
 	epIpt := netlinktest.ExpectedIptablesChain{
 		string(kubeServicesChain): {{
+			JumpChain: "RETURN", SourceAddress: "127.0.0.0/8",
+		}, {
 			JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
 		}, {
 			JumpChain: string(kubeNodePortChain), MatchSet: "",
@@ -2324,6 +2330,8 @@ func TestLoadBalancerSourceRanges(t *testing.T) {
 	// Check iptables chain and rules
 	epIpt := netlinktest.ExpectedIptablesChain{
 		string(kubeServicesChain): {{
+			JumpChain: "RETURN", SourceAddress: "127.0.0.0/8",
+		}, {
 			JumpChain: string(kubeLoadBalancerChain), MatchSet: kubeLoadBalancerSet,
 		}, {
 			JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
@@ -2403,6 +2411,7 @@ func TestAcceptIPVSTraffic(t *testing.T) {
 	// Check iptables chain and rules
 	epIpt := netlinktest.ExpectedIptablesChain{
 		string(kubeServicesChain): {
+			{JumpChain: "RETURN", SourceAddress: "127.0.0.0/8"},
 			{JumpChain: string(kubeLoadBalancerChain), MatchSet: kubeLoadBalancerSet},
 			{JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet},
 			{JumpChain: string(kubeMarkMasqChain), MatchSet: kubeExternalIPSet},
@@ -2501,6 +2510,8 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	// Check iptables chain and rules
 	epIpt := netlinktest.ExpectedIptablesChain{
 		string(kubeServicesChain): {{
+			JumpChain: "RETURN", SourceAddress: "127.0.0.0/8",
+		}, {
 			JumpChain: string(kubeLoadBalancerChain), MatchSet: kubeLoadBalancerSet,
 		}, {
 			JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
@@ -6087,5 +6098,46 @@ func TestNoEndpointsMetric(t *testing.T) {
 		if tc.expectedSyncProxyRulesNoLocalEndpointsTotalExternal != int(syncProxyRulesNoLocalEndpointsTotalExternal) {
 			t.Errorf("sync_proxy_rules_no_endpoints_total metric mismatch(external): got=%d, expected %d", int(syncProxyRulesNoLocalEndpointsTotalExternal), tc.expectedSyncProxyRulesNoLocalEndpointsTotalExternal)
 		}
+	}
+}
+
+func TestDismissLocalhostRuleExist(t *testing.T) {
+	tests := []struct {
+		name     string
+		ipFamily v1.IPFamily
+		src      string
+	}{
+		{
+			name:     "ipv4 rule",
+			ipFamily: v1.IPv4Protocol,
+			src:      "127.0.0.0/8",
+		},
+		{
+			name:     "ipv6 rule",
+			ipFamily: v1.IPv6Protocol,
+			src:      "::1/128",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ipt := iptablestest.NewFake()
+			if test.ipFamily == v1.IPv6Protocol {
+				ipt = iptablestest.NewIPv6Fake()
+			}
+			ipvs := ipvstest.NewFake()
+			ipset := ipsettest.NewFake(testIPSetVersion)
+			fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, test.ipFamily)
+
+			fp.syncProxyRules()
+
+			rules := getRules(ipt, kubeServicesChain)
+			if len(rules) <= 0 {
+				t.Errorf("skip loop back ip in kubeservice chain not exist")
+				return
+			}
+			if !rules[0].Jump.Matches("RETURN") || !rules[0].SourceAddress.Matches(test.src) {
+				t.Errorf("rules not match, expect jump: %s, got: %s; expect source address: %s, got: %s", "RETURN", rules[0].Jump.String(), test.src, rules[0].SourceAddress.String())
+			}
+		})
 	}
 }

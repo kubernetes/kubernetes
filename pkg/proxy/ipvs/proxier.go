@@ -1648,6 +1648,14 @@ func (proxier *Proxier) syncProxyRules() {
 // according to proxier.ipsetList information and the ipset match relationship that `ipsetWithIptablesChain` specified.
 // some ipset(kubeClusterIPSet for example) have particular match rules and iptables jump relation should be sync separately.
 func (proxier *Proxier) writeIptablesRules() {
+
+	// Dismiss connects to localhost early in the service chain
+	loAddr := "127.0.0.0/8"
+	if proxier.ipFamily == v1.IPv6Protocol {
+		loAddr = "::1/128"
+	}
+	proxier.natRules.Write("-A", string(kubeServicesChain), "-s", loAddr, "-j", "RETURN")
+
 	// We are creating those slices ones here to avoid memory reallocations
 	// in every loop. Note that reuse the memory, instead of doing:
 	//   slice = <some new slice>
