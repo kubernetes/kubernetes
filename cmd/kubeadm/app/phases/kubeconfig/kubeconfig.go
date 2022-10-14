@@ -140,6 +140,9 @@ func createKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration, kub
 // NB. this method holds the information about how kubeadm creates kubeconfig files.
 func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConfigSpec, error) {
 	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
+	if os.IsNotExist(errors.Cause(err)) {
+		return nil, errors.Wrap(err, "the CA files do not exist, please run `kubeadm init phase certs ca` to generate it")
+	}
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
 	}
