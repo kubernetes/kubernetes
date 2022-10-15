@@ -18,7 +18,7 @@ require (
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
-	k8s.io/kube-openapi v0.0.0-20220803162953-67bda5d908f1
+	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280
 	k8s.io/utils v0.0.0-20220922133306-665eaaec4324
 	sigs.k8s.io/kustomize/api v0.12.1
 	sigs.k8s.io/kustomize/kyaml v0.13.9

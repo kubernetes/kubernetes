@@ -11,7 +11,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/gengo v0.0.0-20220902162205-c0856e24416d
 	k8s.io/klog/v2 v2.80.1
-	k8s.io/kube-openapi v0.0.0-20220803162953-67bda5d908f1
+	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280
 )
 
 require (
@@ -22,6 +22,7 @@ require (
 	github.com/go-openapi/swag v0.19.14 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
+	github.com/google/gofuzz v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/mailru/easyjson v0.7.6 // indirect

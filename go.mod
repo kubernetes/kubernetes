@@ -112,7 +112,7 @@ require (
 	k8s.io/kms v0.0.0
 	k8s.io/kube-aggregator v0.0.0
 	k8s.io/kube-controller-manager v0.0.0
-	k8s.io/kube-openapi v0.0.0-20220803162953-67bda5d908f1
+	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280
 	k8s.io/kube-proxy v0.0.0
 	k8s.io/kube-scheduler v0.0.0
 	k8s.io/kubectl v0.0.0
@@ -337,7 +337,6 @@ replace (
 	github.com/frankban/quicktest => github.com/frankban/quicktest v1.11.3
 	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.6.0
 	github.com/fvbommel/sortorder => github.com/fvbommel/sortorder v1.0.1
-	github.com/getkin/kin-openapi => github.com/getkin/kin-openapi v0.76.0
 	github.com/getsentry/raven-go => github.com/getsentry/raven-go v0.2.0
 	github.com/ghodss/yaml => github.com/ghodss/yaml v1.0.0
 	github.com/go-errors/errors => github.com/go-errors/errors v1.0.1
@@ -539,7 +538,7 @@ replace (
 	k8s.io/kms => ./staging/src/k8s.io/kms
 	k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 	k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
-	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20220803162953-67bda5d908f1
+	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280
 	k8s.io/kube-proxy => ./staging/src/k8s.io/kube-proxy
 	k8s.io/kube-scheduler => ./staging/src/k8s.io/kube-scheduler
 	k8s.io/kubectl => ./staging/src/k8s.io/kubectl
