@@ -57,7 +57,9 @@ import (
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/logs"
+	metricsfeatures "k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	"k8s.io/klog/v2"
@@ -85,6 +87,10 @@ import (
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/pointer"
 )
+
+func init() {
+	utilruntime.Must(metricsfeatures.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+}
 
 // proxyRun defines the interface to run a specified ProxyServer
 type proxyRun interface {
@@ -607,6 +613,9 @@ func serveMetrics(bindAddress string, proxyMode kubeproxyconfig.ProxyMode, enabl
 
 	proxyMux := mux.NewPathRecorderMux("kube-proxy")
 	healthz.InstallHandler(proxyMux)
+	if utilfeature.DefaultFeatureGate.Enabled(metricsfeatures.ComponentSLIs) {
+		slis.SLIMetricsWithReset{}.Install(proxyMux)
+	}
 	proxyMux.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
