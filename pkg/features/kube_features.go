@@ -699,6 +699,7 @@ const (
 	// kep: https://kep.k8s.io/3070
 	// alpha: v1.24
 	// beta: v1.25
+	// ga: v1.26
 	//
 	// Subdivide the ClusterIP range for dynamic and static IP allocation.
 	ServiceIPStaticSubrange featuregate.Feature = "ServiceIPStaticSubrange"
@@ -978,7 +979,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	SeccompDefault: {Default: true, PreRelease: featuregate.Beta},
 
-	ServiceIPStaticSubrange: {Default: true, PreRelease: featuregate.Beta},
+	ServiceIPStaticSubrange: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	ServiceInternalTrafficPolicy: {Default: true, PreRelease: featuregate.Beta},
 
