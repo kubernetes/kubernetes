@@ -168,7 +168,6 @@ rules:
       - k8s.io/kubernetes/pkg/proxy/ipvs
       - k8s.io/kubernetes/pkg/proxy/metaproxier
       - k8s.io/kubernetes/pkg/proxy/metrics
-      - k8s.io/kubernetes/pkg/proxy/userspace
       - k8s.io/kubernetes/pkg/proxy/util
       - k8s.io/kubernetes/pkg/registry/core/service/allocator
       - k8s.io/kubernetes/pkg/registry/core/service/portallocator

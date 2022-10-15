@@ -58,8 +58,7 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 				IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
 					SyncPeriod: metav1.Duration{Duration: 30 * time.Second},
 				},
-				OOMScoreAdj:    &oomScore,
-				UDPIdleTimeout: metav1.Duration{Duration: 250 * time.Millisecond},
+				OOMScoreAdj: &oomScore,
 				Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
 					MaxPerCore:            &ctMaxPerCore,
 					Min:                   &ctMin,
@@ -94,8 +93,7 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 				IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
 					SyncPeriod: metav1.Duration{Duration: 30 * time.Second},
 				},
-				OOMScoreAdj:    &oomScore,
-				UDPIdleTimeout: metav1.Duration{Duration: 250 * time.Millisecond},
+				OOMScoreAdj: &oomScore,
 				Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
 					MaxPerCore:            &ctMaxPerCore,
 					Min:                   &ctMin,

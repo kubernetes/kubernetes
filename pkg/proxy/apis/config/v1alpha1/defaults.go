@@ -67,10 +67,6 @@ func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyCo
 	if obj.IPVS.SyncPeriod.Duration == 0 {
 		obj.IPVS.SyncPeriod = metav1.Duration{Duration: 30 * time.Second}
 	}
-	zero := metav1.Duration{}
-	if obj.UDPIdleTimeout == zero {
-		obj.UDPIdleTimeout = metav1.Duration{Duration: 250 * time.Millisecond}
-	}
 
 	if obj.Conntrack.MaxPerCore == nil {
 		obj.Conntrack.MaxPerCore = pointer.Int32(32 * 1024)
