@@ -595,6 +595,7 @@ type CredentialProvider struct {
 	// MUST use the same encoding version as the input. Current supported values are:
 	// - credentialprovider.kubelet.k8s.io/v1alpha1
 	// - credentialprovider.kubelet.k8s.io/v1beta1
+	// - credentialprovider.kubelet.k8s.io/v1
 	APIVersion string
 
 	// Arguments to pass to the command when executing it.

@@ -349,6 +349,10 @@ API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1beta2,Exten
 API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1beta3,ExtenderTLSConfig,CAData
 API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1beta3,ExtenderTLSConfig,CertData
 API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1beta3,ExtenderTLSConfig,KeyData
+API rule violation: list_type_missing,k8s.io/kubelet/config/v1,CredentialProvider,Args
+API rule violation: list_type_missing,k8s.io/kubelet/config/v1,CredentialProvider,Env
+API rule violation: list_type_missing,k8s.io/kubelet/config/v1,CredentialProvider,MatchImages
+API rule violation: list_type_missing,k8s.io/kubelet/config/v1,CredentialProviderConfig,Providers
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1alpha1,CredentialProvider,Args
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1alpha1,CredentialProvider,Env
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1alpha1,CredentialProvider,MatchImages
