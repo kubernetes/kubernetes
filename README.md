@@ -105,3 +105,14 @@ The [Kubernetes Steering community repo](https://github.com/kubernetes/steering)
 ## Roadmap 
 
 The [Kubernetes Enhancements repo](https://github.com/kubernetes/enhancements) provides information about Kubernetes releases, as well as feature tracking and backlogs.
+
+## Software Bill of Materials
+
+We intend to ensure the quality and integrity of the artifacts produced on each release cut by adding a Bill of Materials (BOM).
+The BOM will be published in [SPDX](https://spdx.dev) format and will include integrity and licensing information for the artifacts we produce.
+
+You can download the SBOM for your particular release by entering the release version into the following endpoint (ie `v1.25.3`):
+
+`https://sbom.k8s.io/<your-version>/source`
+
+You may generate your own bill of materials using [kubernetes-sigs/bom](https://github.com/kubernetes-sigs/bom).
