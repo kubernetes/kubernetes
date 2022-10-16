@@ -1190,8 +1190,12 @@ func init() {
 			return nil, fmt.Errorf("unable to validate custom endpoint overrides: %v", err)
 		}
 
+		regionName, err := getRegionFromMetadata(cfg)
+		if err != nil {
+			return nil, err
+		}
 		sess, err := session.NewSessionWithOptions(session.Options{
-			Config:            aws.Config{},
+			Config:            *aws.NewConfig().WithRegion(regionName).WithSTSRegionalEndpoint(endpoints.RegionalSTSEndpoint),
 			SharedConfigState: session.SharedConfigEnable,
 		})
 		if err != nil {
@@ -1216,6 +1220,32 @@ func init() {
 		aws := newAWSSDKProvider(creds, cfg)
 		return newAWSCloud(*cfg, aws)
 	})
+}
+
+func getRegionFromMetadata(cfg *CloudConfig) (string, error) {
+	klog.Infof("Get AWS region from metadata client")
+
+	metadata, err := newAWSSDKProvider(nil, cfg).Metadata()
+	if err != nil {
+		return "", fmt.Errorf("error creating AWS metadata client: %q", err)
+	}
+
+	err = updateConfigZone(cfg, metadata)
+	if err != nil {
+		return "", fmt.Errorf("unable to determine AWS zone from cloud provider config or EC2 instance metadata: %v", err)
+	}
+
+	zone := cfg.Global.Zone
+	if len(zone) <= 1 {
+		return "", fmt.Errorf("invalid AWS zone in config file: %s", zone)
+	}
+
+	regionName, err := azToRegion(zone)
+	if err != nil {
+		return "", err
+	}
+
+	return regionName, nil
 }
 
 // readAWSCloudConfig reads an instance of AWSCloudConfig from config reader.
