@@ -30,7 +30,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
-	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 )
@@ -93,10 +92,6 @@ func NewNodeIpamController(
 		&v1core.EventSinkImpl{
 			Interface: kubeClient.CoreV1().Events(""),
 		})
-
-	if kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("node_ipam_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
-	}
 
 	// Cloud CIDR allocator does not rely on clusterCIDR or nodeCIDRMaskSize for allocation.
 	if allocatorType != ipam.CloudAllocatorType {

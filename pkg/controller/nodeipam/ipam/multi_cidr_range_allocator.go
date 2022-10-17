@@ -46,7 +46,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -132,10 +131,6 @@ func NewMultiCIDRRangeAllocator(
 		&v1core.EventSinkImpl{
 			Interface: client.CoreV1().Events(""),
 		})
-
-	if client.CoreV1().RESTClient().GetRateLimiter() != nil {
-		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("multi_cidr_range_allocator", client.CoreV1().RESTClient().GetRateLimiter())
-	}
 
 	ra := &multiCIDRRangeAllocator{
 		client:                client,
