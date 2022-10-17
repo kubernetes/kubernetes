@@ -234,6 +234,8 @@ func DownloadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration
 		return errors.Wrap(err, "error decoding secret data with provided key")
 	}
 
+	fmt.Printf("[download-certs] Saving the certificates to the folder: %q\n", cfg.CertificatesDir)
+
 	for certOrKeyName, certOrKeyPath := range certsToTransfer(cfg) {
 		certOrKeyData, found := secretData[certOrKeyNameToSecretName(certOrKeyName)]
 		if !found {

@@ -21,10 +21,12 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
+	"path/filepath"
 
 	"github.com/pkg/errors"
 
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -151,6 +153,7 @@ func (t CertificateTree) CreateTree(ic *kubeadmapi.InitConfiguration) error {
 				continue
 			}
 			// CA key exists; just use that to create new certificates.
+			klog.V(1).Infof("[certs] Using the existing CA certificate %q and key %q\n", filepath.Join(ic.CertificatesDir, fmt.Sprintf("%s.crt", ca.BaseName)), filepath.Join(ic.CertificatesDir, fmt.Sprintf("%s.key", ca.BaseName)))
 		} else {
 			// CACert doesn't already exist, create a new cert and key.
 			caCert, caKey, err = pkiutil.NewCertificateAuthority(cfg)
