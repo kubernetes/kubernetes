@@ -81,7 +81,6 @@ func NewKubeConfigPhase() workflow.Phase {
 			NewKubeConfigFilePhase(kubeadmconstants.ControllerManagerKubeConfigFileName),
 			NewKubeConfigFilePhase(kubeadmconstants.SchedulerKubeConfigFileName),
 		},
-		Run: runKubeConfig,
 	}
 }
 
@@ -113,16 +112,6 @@ func getKubeConfigPhaseFlags(name string) []string {
 		)
 	}
 	return flags
-}
-
-func runKubeConfig(c workflow.RunData) error {
-	data, ok := c.(InitData)
-	if !ok {
-		return errors.New("kubeconfig phase invoked with an invalid data struct")
-	}
-
-	fmt.Printf("[kubeconfig] Using kubeconfig folder %q\n", data.KubeConfigDir())
-	return nil
 }
 
 // runKubeConfigFile executes kubeconfig creation logic.

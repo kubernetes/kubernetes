@@ -55,7 +55,6 @@ func NewCertsPhase() workflow.Phase {
 		Name:   "certs",
 		Short:  "Certificate generation",
 		Phases: newCertSubPhases(),
-		Run:    runCerts,
 		Long:   cmdutil.MacroCommandLongDescription,
 	}
 }
@@ -189,16 +188,6 @@ func runCertsSa(c workflow.RunData) error {
 
 	// create the new service account key (or use existing)
 	return certsphase.CreateServiceAccountKeyAndPublicKeyFiles(data.CertificateWriteDir(), data.Cfg().ClusterConfiguration.PublicKeyAlgorithm())
-}
-
-func runCerts(c workflow.RunData) error {
-	data, ok := c.(InitData)
-	if !ok {
-		return errors.New("certs phase invoked with an invalid data struct")
-	}
-
-	fmt.Printf("[certs] Using certificateDir folder %q\n", data.CertificateWriteDir())
-	return nil
 }
 
 func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {

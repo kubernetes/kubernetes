@@ -79,7 +79,6 @@ func NewControlPlanePhase() workflow.Phase {
 			newControlPlaneSubphase(kubeadmconstants.KubeControllerManager),
 			newControlPlaneSubphase(kubeadmconstants.KubeScheduler),
 		},
-		Run: runControlPlanePhase,
 	}
 	return phase
 }
@@ -125,16 +124,6 @@ func getControlPlanePhaseFlags(name string) []string {
 		)
 	}
 	return flags
-}
-
-func runControlPlanePhase(c workflow.RunData) error {
-	data, ok := c.(InitData)
-	if !ok {
-		return errors.New("control-plane phase invoked with an invalid data struct")
-	}
-
-	fmt.Printf("[control-plane] Using manifest folder %q\n", data.ManifestDir())
-	return nil
 }
 
 func runControlPlaneSubphase(component string) func(c workflow.RunData) error {
