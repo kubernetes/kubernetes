@@ -176,12 +176,13 @@ func (sched *Scheduler) schedulingCycle(ctx context.Context, state *framework.Cy
 
 	// Run the Reserve method of reserve plugins.
 	if sts := fwk.RunReservePluginsReserve(ctx, state, assumedPod, scheduleResult.SuggestedHost); !sts.IsSuccess() {
-		metrics.PodScheduleError(fwk.ProfileName(), metrics.SinceInSeconds(start))
 		// trigger un-reserve to clean up state associated with the reserved Pod
 		fwk.RunReservePluginsUnreserve(ctx, state, assumedPod, scheduleResult.SuggestedHost)
 		if forgetErr := sched.Cache.ForgetPod(assumedPod); forgetErr != nil {
 			klog.ErrorS(forgetErr, "Scheduler cache ForgetPod failed")
 		}
+
+		metrics.PodScheduleError(fwk.ProfileName(), metrics.SinceInSeconds(start))
 		sched.FailureHandler(ctx, fwk, assumedPodInfo, sts.AsError(), v1.PodReasonSchedulerError, clearNominatedNode)
 		return ScheduleResult{}, nil
 	}
@@ -189,6 +190,12 @@ func (sched *Scheduler) schedulingCycle(ctx context.Context, state *framework.Cy
 	// Run "permit" plugins.
 	runPermitStatus := fwk.RunPermitPlugins(ctx, state, assumedPod, scheduleResult.SuggestedHost)
 	if !runPermitStatus.IsWait() && !runPermitStatus.IsSuccess() {
+		// One of the plugins returned status different from success or wait.
+		fwk.RunReservePluginsUnreserve(ctx, state, assumedPod, scheduleResult.SuggestedHost)
+		if forgetErr := sched.Cache.ForgetPod(assumedPod); forgetErr != nil {
+			klog.ErrorS(forgetErr, "Scheduler cache ForgetPod failed")
+		}
+
 		var reason string
 		if runPermitStatus.IsUnschedulable() {
 			metrics.PodUnschedulable(fwk.ProfileName(), metrics.SinceInSeconds(start))
@@ -197,11 +204,7 @@ func (sched *Scheduler) schedulingCycle(ctx context.Context, state *framework.Cy
 			metrics.PodScheduleError(fwk.ProfileName(), metrics.SinceInSeconds(start))
 			reason = v1.PodReasonSchedulerError
 		}
-		// One of the plugins returned status different from success or wait.
-		fwk.RunReservePluginsUnreserve(ctx, state, assumedPod, scheduleResult.SuggestedHost)
-		if forgetErr := sched.Cache.ForgetPod(assumedPod); forgetErr != nil {
-			klog.ErrorS(forgetErr, "Scheduler cache ForgetPod failed")
-		}
+
 		sched.FailureHandler(ctx, fwk, assumedPodInfo, runPermitStatus.AsError(), reason, clearNominatedNode)
 		return ScheduleResult{}, nil
 	}
@@ -222,14 +225,6 @@ func (sched *Scheduler) bindingCycle(ctx context.Context, state *framework.Cycle
 
 	waitOnPermitStatus := fwk.WaitOnPermit(ctx, assumedPod)
 	if !waitOnPermitStatus.IsSuccess() {
-		var reason string
-		if waitOnPermitStatus.IsUnschedulable() {
-			metrics.PodUnschedulable(fwk.ProfileName(), metrics.SinceInSeconds(start))
-			reason = v1.PodReasonUnschedulable
-		} else {
-			metrics.PodScheduleError(fwk.ProfileName(), metrics.SinceInSeconds(start))
-			reason = v1.PodReasonSchedulerError
-		}
 		// trigger un-reserve plugins to clean up state associated with the reserved Pod
 		fwk.RunReservePluginsUnreserve(ctx, state, assumedPod, scheduleResult.SuggestedHost)
 		if forgetErr := sched.Cache.ForgetPod(assumedPod); forgetErr != nil {
@@ -249,6 +244,15 @@ func (sched *Scheduler) bindingCycle(ctx context.Context, state *framework.Cycle
 				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, nil)
 			}
 		}
+
+		var reason string
+		if waitOnPermitStatus.IsUnschedulable() {
+			metrics.PodUnschedulable(fwk.ProfileName(), metrics.SinceInSeconds(start))
+			reason = v1.PodReasonUnschedulable
+		} else {
+			metrics.PodScheduleError(fwk.ProfileName(), metrics.SinceInSeconds(start))
+			reason = v1.PodReasonSchedulerError
+		}
 		sched.FailureHandler(ctx, fwk, assumedPodInfo, waitOnPermitStatus.AsError(), reason, clearNominatedNode)
 		return
 	}
@@ -256,15 +260,6 @@ func (sched *Scheduler) bindingCycle(ctx context.Context, state *framework.Cycle
 	// Run "prebind" plugins.
 	preBindStatus := fwk.RunPreBindPlugins(ctx, state, assumedPod, scheduleResult.SuggestedHost)
 	if !preBindStatus.IsSuccess() {
-		var reason string
-		if preBindStatus.IsUnschedulable() {
-			metrics.PodUnschedulable(fwk.ProfileName(), metrics.SinceInSeconds(start))
-			reason = v1.PodReasonUnschedulable
-		} else {
-			metrics.PodScheduleError(fwk.ProfileName(), metrics.SinceInSeconds(start))
-			reason = v1.PodReasonSchedulerError
-		}
-
 		// trigger un-reserve plugins to clean up state associated with the reserved Pod
 		fwk.RunReservePluginsUnreserve(ctx, state, assumedPod, scheduleResult.SuggestedHost)
 		if forgetErr := sched.Cache.ForgetPod(assumedPod); forgetErr != nil {
@@ -281,14 +276,9 @@ func (sched *Scheduler) bindingCycle(ctx context.Context, state *framework.Cycle
 				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, nil)
 			}
 		}
-		sched.FailureHandler(ctx, fwk, assumedPodInfo, preBindStatus.AsError(), reason, clearNominatedNode)
-		return
-	}
 
-	bindStatus := sched.bind(ctx, fwk, assumedPod, scheduleResult.SuggestedHost, state)
-	if !bindStatus.IsSuccess() {
 		var reason string
-		if bindStatus.IsUnschedulable() {
+		if preBindStatus.IsUnschedulable() {
 			metrics.PodUnschedulable(fwk.ProfileName(), metrics.SinceInSeconds(start))
 			reason = v1.PodReasonUnschedulable
 		} else {
@@ -296,6 +286,12 @@ func (sched *Scheduler) bindingCycle(ctx context.Context, state *framework.Cycle
 			reason = v1.PodReasonSchedulerError
 		}
 
+		sched.FailureHandler(ctx, fwk, assumedPodInfo, preBindStatus.AsError(), reason, clearNominatedNode)
+		return
+	}
+
+	bindStatus := sched.bind(ctx, fwk, assumedPod, scheduleResult.SuggestedHost, state)
+	if !bindStatus.IsSuccess() {
 		// trigger un-reserve plugins to clean up state associated with the reserved Pod
 		fwk.RunReservePluginsUnreserve(ctx, state, assumedPod, scheduleResult.SuggestedHost)
 		if err := sched.Cache.ForgetPod(assumedPod); err != nil {
@@ -312,6 +308,16 @@ func (sched *Scheduler) bindingCycle(ctx context.Context, state *framework.Cycle
 				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, nil)
 			}
 		}
+
+		var reason string
+		if bindStatus.IsUnschedulable() {
+			metrics.PodUnschedulable(fwk.ProfileName(), metrics.SinceInSeconds(start))
+			reason = v1.PodReasonUnschedulable
+		} else {
+			metrics.PodScheduleError(fwk.ProfileName(), metrics.SinceInSeconds(start))
+			reason = v1.PodReasonSchedulerError
+		}
+
 		sched.FailureHandler(ctx, fwk, assumedPodInfo, fmt.Errorf("binding rejected: %w", bindStatus.AsError()), reason, clearNominatedNode)
 		return
 	}
