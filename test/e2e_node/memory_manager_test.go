@@ -621,7 +621,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 						return false
 					}
 
-					if !strings.Contains(tmpPod.Status.Message, "Pod Allocate failed due to [memorymanager]") {
+					if !strings.Contains(tmpPod.Status.Message, "Allocate failed due to [memorymanager]") {
 						return false
 					}
 
