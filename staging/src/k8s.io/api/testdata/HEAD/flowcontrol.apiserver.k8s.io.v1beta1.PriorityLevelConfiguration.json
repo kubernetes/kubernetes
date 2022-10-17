@@ -54,7 +54,9 @@
           "handSize": 2,
           "queueLengthLimit": 3
         }
-      }
+      },
+      "lendablePercent": 3,
+      "borrowingLimitPercent": 4
     }
   },
   "status": {
