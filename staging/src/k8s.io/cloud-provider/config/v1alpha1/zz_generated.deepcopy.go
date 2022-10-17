@@ -31,6 +31,7 @@ func (in *CloudControllerManagerConfiguration) DeepCopyInto(out *CloudController
 	out.TypeMeta = in.TypeMeta
 	in.Generic.DeepCopyInto(&out.Generic)
 	in.KubeCloudShared.DeepCopyInto(&out.KubeCloudShared)
+	out.NodeController = in.NodeController
 	out.ServiceController = in.ServiceController
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
 	return

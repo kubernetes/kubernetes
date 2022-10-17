@@ -101,6 +101,7 @@ type CloudNodeController struct {
 	cloud cloudprovider.Interface
 
 	nodeStatusUpdateFrequency time.Duration
+	workerCount               int32
 
 	nodesLister corelisters.NodeLister
 	nodesSynced cache.InformerSynced
@@ -112,7 +113,8 @@ func NewCloudNodeController(
 	nodeInformer coreinformers.NodeInformer,
 	kubeClient clientset.Interface,
 	cloud cloudprovider.Interface,
-	nodeStatusUpdateFrequency time.Duration) (*CloudNodeController, error) {
+	nodeStatusUpdateFrequency time.Duration,
+	workerCount int32) (*CloudNodeController, error) {
 
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"})
@@ -130,6 +132,7 @@ func NewCloudNodeController(
 		recorder:                  recorder,
 		cloud:                     cloud,
 		nodeStatusUpdateFrequency: nodeStatusUpdateFrequency,
+		workerCount:               workerCount,
 		nodesLister:               nodeInformer.Lister(),
 		nodesSynced:               nodeInformer.Informer().HasSynced,
 		workqueue:                 workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Nodes"),
@@ -178,7 +181,9 @@ func (cnc *CloudNodeController) Run(stopCh <-chan struct{}, controllerManagerMet
 		}
 	}, cnc.nodeStatusUpdateFrequency, stopCh)
 
-	go wait.Until(cnc.runWorker, time.Second, stopCh)
+	for i := int32(0); i < cnc.workerCount; i++ {
+		go wait.Until(cnc.runWorker, time.Second, stopCh)
+	}
 
 	<-stopCh
 }
