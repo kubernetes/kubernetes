@@ -3507,8 +3507,6 @@ type PodValidationOptions struct {
 	AllowInvalidPodDeletionCost bool
 	// Allow pod spec to use non-integer multiple of huge page unit size
 	AllowIndivisibleHugePagesValues bool
-	// Allow hostProcess field to be set in windows security context
-	AllowWindowsHostProcessField bool
 	// Allow more DNSSearchPaths and longer DNSSearchListChars
 	AllowExpandedDNSConfig bool
 }
@@ -3614,7 +3612,7 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 	allErrs = append(allErrs, validatePodDNSConfig(spec.DNSConfig, &spec.DNSPolicy, fldPath.Child("dnsConfig"), opts)...)
 	allErrs = append(allErrs, validateReadinessGates(spec.ReadinessGates, fldPath.Child("readinessGates"))...)
 	allErrs = append(allErrs, validateTopologySpreadConstraints(spec.TopologySpreadConstraints, fldPath.Child("topologySpreadConstraints"))...)
-	allErrs = append(allErrs, validateWindowsHostProcessPod(spec, fldPath, opts)...)
+	allErrs = append(allErrs, validateWindowsHostProcessPod(spec, fldPath)...)
 	allErrs = append(allErrs, validateHostUsers(spec, fldPath)...)
 	if len(spec.ServiceAccountName) > 0 {
 		for _, msg := range ValidateServiceAccountName(spec.ServiceAccountName, false) {
@@ -6376,7 +6374,7 @@ func validateWindowsSecurityContextOptions(windowsOptions *core.WindowsSecurityC
 	return allErrs
 }
 
-func validateWindowsHostProcessPod(podSpec *core.PodSpec, fieldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func validateWindowsHostProcessPod(podSpec *core.PodSpec, fieldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	// Keep track of container and hostProcess container count for validate
@@ -6386,13 +6384,6 @@ func validateWindowsHostProcessPod(podSpec *core.PodSpec, fieldPath *field.Path,
 	var podHostProcess *bool
 	if podSpec.SecurityContext != nil && podSpec.SecurityContext.WindowsOptions != nil {
 		podHostProcess = podSpec.SecurityContext.WindowsOptions.HostProcess
-	}
-
-	if !opts.AllowWindowsHostProcessField && podHostProcess != nil {
-		// Do not allow pods to persist data that sets hostProcess (true or false)
-		errMsg := "not allowed when feature gate 'WindowsHostProcessContainers' is not enabled"
-		allErrs = append(allErrs, field.Forbidden(fieldPath.Child("securityContext", "windowsOptions", "hostProcess"), errMsg))
-		return allErrs
 	}
 
 	hostNetwork := false
@@ -6406,12 +6397,6 @@ func validateWindowsHostProcessPod(podSpec *core.PodSpec, fieldPath *field.Path,
 		var containerHostProcess *bool = nil
 		if c.SecurityContext != nil && c.SecurityContext.WindowsOptions != nil {
 			containerHostProcess = c.SecurityContext.WindowsOptions.HostProcess
-		}
-
-		if !opts.AllowWindowsHostProcessField && containerHostProcess != nil {
-			// Do not allow pods to persist data that sets hostProcess (true or false)
-			errMsg := "not allowed when feature gate 'WindowsHostProcessContainers' is not enabled"
-			allErrs = append(allErrs, field.Forbidden(cFieldPath.Child("securityContext", "windowsOptions", "hostProcess"), errMsg))
 		}
 
 		if podHostProcess != nil && containerHostProcess != nil && *podHostProcess != *containerHostProcess {
@@ -6432,13 +6417,6 @@ func validateWindowsHostProcessPod(podSpec *core.PodSpec, fieldPath *field.Path,
 	})
 
 	if hostProcessContainerCount > 0 {
-		// Fail Pod validation if feature is not enabled (unless podspec already exists and contains HostProcess fields) instead of dropping fields based on PRR reivew.
-		if !opts.AllowWindowsHostProcessField {
-			errMsg := "pod must not contain Windows hostProcess containers when feature gate 'WindowsHostProcessContainers' is not enabled"
-			allErrs = append(allErrs, field.Forbidden(fieldPath, errMsg))
-			return allErrs
-		}
-
 		// At present, if a Windows Pods contains any HostProcess containers than all containers must be
 		// HostProcess containers (explicitly set or inherited).
 		if hostProcessContainerCount != containerCount {

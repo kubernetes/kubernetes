@@ -100,12 +100,4 @@ func TestApplyPlatformSpecificContainerConfig(t *testing.T) {
 		},
 	}
 	assert.Equal(t, expectedWindowsConfig, containerConfig.Windows)
-
-	// Check if it fails if we require HostProcess but the feature is not enabled.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostProcessContainers, false)()
-	err = fakeRuntimeSvc.applyPlatformSpecificContainerConfig(containerConfig, &pod.Spec.Containers[0], pod, new(int64), "foo", nil)
-	expectedErrMsg := "pod contains HostProcess containers but feature 'WindowsHostProcessContainers' is not enabled"
-	if err == nil || err.Error() != expectedErrMsg {
-		t.Errorf("expected error message `%s` but got `%v`", expectedErrMsg, err)
-	}
 }
