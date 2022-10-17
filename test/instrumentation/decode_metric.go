@@ -438,6 +438,38 @@ func (c *metricDecoder) decodeBuckets(expr ast.Expr) ([]float64, error) {
 func (c *metricDecoder) decodeBucketFunctionCall(v *ast.CallExpr) ([]float64, error, bool) {
 	se, ok := v.Fun.(*ast.SelectorExpr)
 	if !ok {
+		// support merged
+		if ai, ok := v.Fun.(*ast.Ident); ok && ai.Name == "merge" {
+			merged := []float64{}
+			for _, arg := range v.Args {
+				v2, ok := arg.(*ast.CallExpr)
+				if !ok {
+					return nil, newDecodeErrorf(v2, errBuckets), true
+				}
+				se, ok = v2.Fun.(*ast.SelectorExpr)
+				if ok {
+					functionName := se.Sel.String()
+					functionImport, ok := se.X.(*ast.Ident)
+					if !ok {
+						return nil, newDecodeErrorf(v, errBuckets), true
+					}
+					if functionImport.String() != c.kubeMetricsImportName {
+						return nil, newDecodeErrorf(v, errBuckets), true
+					}
+					firstArg, secondArg, thirdArg, err := decodeBucketArguments(v2)
+					if err != nil {
+						return nil, err, true
+					}
+					switch functionName {
+					case "LinearBuckets":
+						merged = append(merged, metrics.LinearBuckets(firstArg, secondArg, thirdArg)...)
+					case "ExponentialBuckets":
+						merged = append(merged, metrics.LinearBuckets(firstArg, secondArg, thirdArg)...)
+					}
+				}
+			}
+			return merged, nil, true
+		}
 		return nil, newDecodeErrorf(v, errBuckets), true
 	}
 	functionName := se.Sel.String()
