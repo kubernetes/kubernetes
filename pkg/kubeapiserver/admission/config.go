@@ -18,6 +18,10 @@ package admission
 
 import (
 	"io/ioutil"
+	"k8s.io/apiserver/pkg/admission/plugin/cel"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/dynamic"
 	"net/http"
 	"time"
 
@@ -78,5 +82,33 @@ func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselec
 		return nil
 	}
 
-	return []admission.PluginInitializer{webhookPluginInitializer, kubePluginInitializer}, admissionPostStartHook, nil
+	initializers := []admission.PluginInitializer{webhookPluginInitializer, kubePluginInitializer}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CELValidatingAdmission) {
+		dynamicClient, err := dynamic.NewForConfig(c.LoopbackClientConfig)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// Create CEL admission controller
+		var celAdmissionController = cel.NewAdmissionController(
+			c.ExternalInformers.Admissionregistration().V1alpha1().ValidatingAdmissionPolicies().Informer(),
+			c.ExternalInformers.Admissionregistration().V1alpha1().ValidatingAdmissionPolicyBindings().Informer(),
+			// FIXME: integrate here with Jared's work?
+			nil,
+			discoveryRESTMapper,
+			dynamicClient,
+		)
+		celAdmissionPluginInitializer := cel.NewPluginInitializer(celAdmissionController)
+		initializers = append(initializers, celAdmissionPluginInitializer)
+
+		hookDelegate := admissionPostStartHook
+		admissionPostStartHook = func(context genericapiserver.PostStartHookContext) error {
+			go celAdmissionController.Run(context.StopCh)
+			return hookDelegate(context)
+		}
+	}
+
+	return initializers, admissionPostStartHook, nil
+
 }

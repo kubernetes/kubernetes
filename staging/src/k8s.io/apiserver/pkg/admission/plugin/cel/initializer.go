@@ -25,6 +25,7 @@ import (
 type CELPolicyEvaluator interface {
 	Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error
 	HasSynced() bool
+	Run(stopCh <-chan struct{})
 }
 
 // NewPluginInitializer creates a plugin initializer which dependency injects a

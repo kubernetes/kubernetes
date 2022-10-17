@@ -28,9 +28,9 @@ type informer[T runtime.Object] struct {
 	lister[T]
 }
 
-func NewInformer[T runtime.Object](informe cache.SharedIndexInformer) Informer[T] {
+func NewInformer[T runtime.Object](informe cache.SharedIndexInformer, convert_func func(interface{}) T) Informer[T] {
 	return informer[T]{
 		SharedIndexInformer: informe,
-		lister:              NewLister[T](informe.GetIndexer()),
+		lister:              NewLister[T](informe.GetIndexer(), convert_func),
 	}
 }

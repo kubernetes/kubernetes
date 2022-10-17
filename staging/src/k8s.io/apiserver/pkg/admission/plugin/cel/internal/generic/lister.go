@@ -61,7 +61,8 @@ func (w namespacedLister[T]) Get(name string) (T, error) {
 }
 
 type lister[T runtime.Object] struct {
-	indexer cache.Indexer
+	indexer      cache.Indexer
+	convert_func func(interface{}) T
 }
 
 func (w lister[T]) List(selector labels.Selector) (ret []T, err error) {
@@ -87,7 +88,11 @@ func (w lister[T]) Get(name string) (T, error) {
 			Message: fmt.Sprintf("%s not found", name),
 		}}
 	}
-	result = obj.(T)
+	if w.convert_func == nil {
+		result = obj.(T)
+	} else {
+		result = w.convert_func(obj)
+	}
 	return result, nil
 }
 
@@ -95,6 +100,6 @@ func (w lister[T]) Namespaced(namespace string) NamespacedLister[T] {
 	return namespacedLister[T]{namespace: namespace, indexer: w.indexer}
 }
 
-func NewLister[T runtime.Object](indexer cache.Indexer) lister[T] {
-	return lister[T]{indexer: indexer}
+func NewLister[T runtime.Object](indexer cache.Indexer, convert_func func(interface{}) T) lister[T] {
+	return lister[T]{indexer: indexer, convert_func: convert_func}
 }

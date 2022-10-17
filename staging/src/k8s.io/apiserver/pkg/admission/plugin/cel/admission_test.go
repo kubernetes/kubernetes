@@ -319,7 +319,7 @@ func TestBasicPolicyDefinitionFailure(t *testing.T) {
 			numCompiles += 1
 			datalock.Unlock()
 
-			return func(a admission.Attributes, params *unstructured.Unstructured) []PolicyDecision {
+			return func(a admission.Attributes, params *unstructured.Unstructured) ([]PolicyDecision, error) {
 				datalock.Lock()
 				passedParams = append(passedParams, params)
 				datalock.Unlock()
@@ -330,7 +330,7 @@ func TestBasicPolicyDefinitionFailure(t *testing.T) {
 						Kind:    Deny,
 						Message: "Denied",
 					},
-				}
+				}, nil
 			}, nil
 		}),
 		ParamSource:   &paramsGVK,
@@ -405,7 +405,7 @@ func TestDefinitionDoesntMatch(t *testing.T) {
 			numCompiles += 1
 			datalock.Unlock()
 
-			return func(a admission.Attributes, params *unstructured.Unstructured) []PolicyDecision {
+			return func(a admission.Attributes, params *unstructured.Unstructured) ([]PolicyDecision, error) {
 				datalock.Lock()
 				passedParams = append(passedParams, params)
 				datalock.Unlock()
@@ -416,7 +416,7 @@ func TestDefinitionDoesntMatch(t *testing.T) {
 						Kind:    Deny,
 						Message: "Denied",
 					},
-				}
+				}, nil
 			}, nil
 		}),
 		ParamSource:   &paramsGVK,
@@ -540,7 +540,7 @@ func TestReconfigureBinding(t *testing.T) {
 			numCompiles += 1
 			datalock.Unlock()
 
-			return func(a admission.Attributes, params *unstructured.Unstructured) []PolicyDecision {
+			return func(a admission.Attributes, params *unstructured.Unstructured) ([]PolicyDecision, error) {
 				datalock.Lock()
 				passedParams = append(passedParams, params)
 				datalock.Unlock()
@@ -551,7 +551,7 @@ func TestReconfigureBinding(t *testing.T) {
 						Kind:    Deny,
 						Message: "Denied",
 					},
-				}
+				}, nil
 			}, nil
 		}),
 		ParamSource:   &paramsGVK,
@@ -673,7 +673,7 @@ func TestRemoveDefinition(t *testing.T) {
 			numCompiles += 1
 			datalock.Unlock()
 
-			return func(a admission.Attributes, params *unstructured.Unstructured) []PolicyDecision {
+			return func(a admission.Attributes, params *unstructured.Unstructured) ([]PolicyDecision, error) {
 				datalock.Lock()
 				passedParams = append(passedParams, params)
 				datalock.Unlock()
@@ -684,7 +684,7 @@ func TestRemoveDefinition(t *testing.T) {
 						Kind:    Deny,
 						Message: "Denied",
 					},
-				}
+				}, nil
 			}, nil
 		}),
 		ParamSource:   &paramsGVK,
@@ -767,7 +767,7 @@ func TestRemoveBinding(t *testing.T) {
 			numCompiles += 1
 			datalock.Unlock()
 
-			return func(a admission.Attributes, params *unstructured.Unstructured) []PolicyDecision {
+			return func(a admission.Attributes, params *unstructured.Unstructured) ([]PolicyDecision, error) {
 				datalock.Lock()
 				passedParams = append(passedParams, params)
 				datalock.Unlock()
@@ -778,7 +778,7 @@ func TestRemoveBinding(t *testing.T) {
 						Kind:    Deny,
 						Message: "Denied",
 					},
-				}
+				}, nil
 			}, nil
 		}),
 		ParamSource:   &paramsGVK,
@@ -845,14 +845,14 @@ func TestInvalidParamSourceGVK(t *testing.T) {
 			ResourceVersion: "1",
 		},
 		CompileFunc: ptrTo(func(converter ObjectConverter) (EvaluatorFunc, error) {
-			return func(a admission.Attributes, params *unstructured.Unstructured) []PolicyDecision {
+			return func(a admission.Attributes, params *unstructured.Unstructured) ([]PolicyDecision, error) {
 				// Policy always denies
 				return []PolicyDecision{
 					{
 						Kind:    Deny,
 						Message: "Denied",
 					},
-				}
+				}, nil
 			}, nil
 		}),
 		ParamSource:   ptrTo(paramsGVK.GroupVersion().WithKind("BadParamKind")),
@@ -914,7 +914,7 @@ func TestInvalidParamSourceInstanceName(t *testing.T) {
 			numCompiles += 1
 			datalock.Unlock()
 
-			return func(a admission.Attributes, params *unstructured.Unstructured) []PolicyDecision {
+			return func(a admission.Attributes, params *unstructured.Unstructured) ([]PolicyDecision, error) {
 				datalock.Lock()
 				passedParams = append(passedParams, params)
 				datalock.Unlock()
@@ -925,7 +925,7 @@ func TestInvalidParamSourceInstanceName(t *testing.T) {
 						Kind:    Deny,
 						Message: "Denied",
 					},
-				}
+				}, nil
 			}, nil
 		}),
 		ParamSource:   &paramsGVK,
@@ -988,7 +988,7 @@ func TestEmptyParamSource(t *testing.T) {
 			numCompiles += 1
 			datalock.Unlock()
 
-			return func(a admission.Attributes, params *unstructured.Unstructured) []PolicyDecision {
+			return func(a admission.Attributes, params *unstructured.Unstructured) ([]PolicyDecision, error) {
 				datalock.Lock()
 				passedParams = append(passedParams, params)
 				datalock.Unlock()
@@ -999,7 +999,7 @@ func TestEmptyParamSource(t *testing.T) {
 						Kind:    Deny,
 						Message: "Denied",
 					},
-				}
+				}, nil
 			}, nil
 		}),
 		ParamSource:   nil,
