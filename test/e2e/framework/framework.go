@@ -66,12 +66,21 @@ var (
 	// with gingko.BeforeEach/AfterEach/DeferCleanup.
 	//
 	// When a test runs, functions will be invoked in this order:
+	// - BeforeEaches defined by tests before f.NewDefaultFramework
+	//   in the order in which they were defined (first-in-first-out)
 	// - f.BeforeEach
-	// - all BeforeEaches in the order in which they were defined (first-in-first-out)
+	// - BeforeEaches defined by tests after f.NewDefaultFramework
 	// - It callback
 	// - all AfterEaches in the order in which they were defined
 	// - all DeferCleanups with the order reversed (first-in-last-out)
 	// - f.AfterEach
+	//
+	// Because a test might skip test execution in a BeforeEach that runs
+	// before f.BeforeEach, AfterEach callbacks that depend on the
+	// framework instance must check whether it was initialized. They can
+	// do that by checking f.ClientSet for nil. DeferCleanup callbacks
+	// don't need to do this because they get defined when the test
+	// runs.
 	NewFrameworkExtensions []func(f *Framework)
 )
 
@@ -344,7 +353,9 @@ func (f *Framework) AfterEach() {
 			}
 		}
 
-		// Paranoia-- prevent reuse!
+		// Unsetting this is relevant for a following test that uses
+		// the same instance because it might not reach f.BeforeEach
+		// when some other BeforeEach skips the test first.
 		f.Namespace = nil
 		f.clientConfig = nil
 		f.ClientSet = nil
