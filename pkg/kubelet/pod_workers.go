@@ -936,6 +936,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan podWork) {
 			switch {
 			case update.WorkType == TerminatedPodWork:
 				err = p.syncTerminatedPodFn(ctx, pod, status)
+				klog.V(2).InfoS("The static pod syncTerminated failed", "pod", klog.KObj(pod), "podUID", pod.UID, "updateType", update.WorkType, "err", err)
 
 			case update.WorkType == TerminatingPodWork:
 				var gracePeriod *int64
