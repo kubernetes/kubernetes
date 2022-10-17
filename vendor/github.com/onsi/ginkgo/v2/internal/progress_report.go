@@ -48,7 +48,7 @@ type ProgressStepCursor struct {
 	StartTime    time.Time
 }
 
-func NewProgressReport(isRunningInParallel bool, report types.SpecReport, currentNode Node, currentNodeStartTime time.Time, currentStep ProgressStepCursor, gwOutput string, sourceRoots []string, includeAll bool) (types.ProgressReport, error) {
+func NewProgressReport(isRunningInParallel bool, report types.SpecReport, currentNode Node, currentNodeStartTime time.Time, currentStep ProgressStepCursor, gwOutput string, additionalReports []string, sourceRoots []string, includeAll bool) (types.ProgressReport, error) {
 	pr := types.ProgressReport{
 		ParallelProcess:   report.ParallelProcess,
 		RunningInParallel: isRunningInParallel,
@@ -68,6 +68,8 @@ func NewProgressReport(isRunningInParallel bool, report types.SpecReport, curren
 		CurrentStepText:      currentStep.Text,
 		CurrentStepLocation:  currentStep.CodeLocation,
 		CurrentStepStartTime: currentStep.StartTime,
+
+		AdditionalReports: additionalReports,
 
 		CapturedGinkgoWriterOutput: gwOutput,
 		GinkgoWriterOffset:         len(gwOutput),

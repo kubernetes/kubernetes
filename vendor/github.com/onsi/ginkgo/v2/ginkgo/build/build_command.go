@@ -39,6 +39,8 @@ func buildSpecs(args []string, cliConfig types.CLIConfig, goFlagsConfig types.Go
 		command.AbortWith("Found no test suites")
 	}
 
+	internal.VerifyCLIAndFrameworkVersion(suites)
+
 	opc := internal.NewOrderedParallelCompiler(cliConfig.ComputedNumCompilers())
 	opc.StartCompiling(suites, goFlagsConfig)
 

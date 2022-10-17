@@ -1,5 +1,4 @@
 package types
-
 import (
 	"fmt"
 	"os"
