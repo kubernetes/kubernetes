@@ -388,7 +388,6 @@ func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOption
 
 	list := &unstructured.UnstructuredList{}
 	list.SetRemainingItemCount(entireList.GetRemainingItemCount())
-	list.SetSelfLink(entireList.GetSelfLink())
 	list.SetResourceVersion(entireList.GetResourceVersion())
 	list.SetContinue(entireList.GetContinue())
 	list.GetObjectKind().SetGroupVersionKind(listGVK)
