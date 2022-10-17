@@ -38,14 +38,9 @@ func newGroupVersion(client *client, item handler3.OpenAPIV3DiscoveryGroupVersio
 }
 
 func (g *groupversion) Schema(contentType string) ([]byte, error) {
-	data, err := g.client.restClient.Get().
+	return g.client.restClient.Get().
 		RequestURI(g.item.ServerRelativeURL).
 		SetHeader("Accept", contentType).
 		Do(context.TODO()).
 		Raw()
-
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
 }

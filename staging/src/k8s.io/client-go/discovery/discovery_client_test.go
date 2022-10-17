@@ -594,7 +594,9 @@ func TestGetOpenAPISchemaV3(t *testing.T) {
 				}
 
 				expected := testV3Specs[k]
-				if contentType == runtime.ContentTypeJSON {
+				switch contentType {
+
+				case runtime.ContentTypeJSON:
 					var actualSpec spec3.OpenAPI
 
 					if err := json.Unmarshal(actual, &actualSpec); err != nil {
@@ -606,7 +608,7 @@ func TestGetOpenAPISchemaV3(t *testing.T) {
 					// Our test server parses the files in directly as gnostic
 					// which retains empty maps/lists, etc.
 					require.EqualValues(t, expected, &actualSpec)
-				} else {
+				case openapi.ContentTypeOpenAPIV3PB:
 					// Convert to JSON then to gnostic then to PB for comparison
 					expectedJSON, err := json.Marshal(expected)
 					if err != nil {
@@ -625,6 +627,8 @@ func TestGetOpenAPISchemaV3(t *testing.T) {
 					if !reflect.DeepEqual(expectedPB, actual) {
 						t.Fatalf("expected equal values: %v", cmp.Diff(expectedPB, actual))
 					}
+				default:
+					panic(fmt.Errorf("unrecognized content type: %v", contentType))
 				}
 
 				// Ensure that fetching schema once again does not return same instance
