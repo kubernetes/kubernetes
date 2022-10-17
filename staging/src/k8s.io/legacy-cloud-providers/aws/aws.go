@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"path"
 	"regexp"
 	"sort"
@@ -1467,6 +1468,17 @@ func (c *Cloud) HasClusterID() bool {
 	return len(c.tagging.clusterID()) > 0
 }
 
+// isAWSNotFound returns true if the error was caused by an AWS API 404 response.
+func isAWSNotFound(err error) bool {
+	if err != nil {
+		var aerr awserr.RequestFailure
+		if errors.As(err, &aerr) {
+			return aerr.StatusCode() == http.StatusNotFound
+		}
+	}
+	return false
+}
+
 // NodeAddresses is an implementation of Instances.NodeAddresses.
 func (c *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.NodeAddress, error) {
 	if c.selfAWSInstance.nodeName == name || len(name) == 0 {
@@ -1518,6 +1530,27 @@ func (c *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.No
 					continue
 				}
 				addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: internalIP})
+			}
+		}
+
+		// IPv6. Ordered after IPv4 addresses, so legacy code can continue to just use the "first" address in a dual-stack cluster.
+		for _, macID := range macIDs {
+			ipPath := path.Join("network/interfaces/macs/", macID, "ipv6s")
+			ips, err := c.metadata.GetMetadata(ipPath)
+			if err != nil {
+				if isAWSNotFound(err) {
+					// No IPv6 configured. Not an error, just a disappointment.
+					continue
+				}
+				return nil, fmt.Errorf("error querying AWS metadata for %q: %q", ipPath, err)
+			}
+
+			for _, ip := range strings.Split(ips, "\n") {
+				if ip == "" {
+					continue
+				}
+				// NB: "Internal" is actually about intra-cluster reachability, and not public vs private.
+				addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: ip})
 			}
 		}
 
@@ -1605,6 +1638,25 @@ func extractNodeAddresses(instance *ec2.Instance) ([]v1.NodeAddress, error) {
 				if ip == nil {
 					return nil, fmt.Errorf("EC2 instance had invalid private address: %s (%q)", aws.StringValue(instance.InstanceId), ipAddress)
 				}
+				addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: ip.String()})
+			}
+		}
+	}
+
+	// IPv6. Ordered after IPv4 addresses, so legacy code can continue to just use the "first" address.
+	for _, networkInterface := range instance.NetworkInterfaces {
+		// skip network interfaces that are not currently in use
+		if aws.StringValue(networkInterface.Status) != ec2.NetworkInterfaceStatusInUse {
+			continue
+		}
+
+		for _, addr6 := range networkInterface.Ipv6Addresses {
+			if ipAddress := aws.StringValue(addr6.Ipv6Address); ipAddress != "" {
+				ip := netutils.ParseIPSloppy(ipAddress)
+				if ip == nil {
+					return nil, fmt.Errorf("EC2 instance had invalid IPv6 address: %s (%q)", aws.StringValue(instance.InstanceId), ipAddress)
+				}
+				// NB: "Internal" is actually about intra-cluster reachability, and not public vs private.
 				addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: ip.String()})
 			}
 		}
