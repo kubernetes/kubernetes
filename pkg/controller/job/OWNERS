@@ -5,5 +5,6 @@ approvers:
   - alculquicondor
 reviewers:
   - sig-apps-reviewers
+  - mimowo
 labels:
   - sig/apps
