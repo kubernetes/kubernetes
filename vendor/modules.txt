@@ -2189,6 +2189,7 @@ k8s.io/kubectl/pkg/cmd/wait
 k8s.io/kubectl/pkg/describe
 k8s.io/kubectl/pkg/drain
 k8s.io/kubectl/pkg/explain
+k8s.io/kubectl/pkg/explain/v2
 k8s.io/kubectl/pkg/generate
 k8s.io/kubectl/pkg/generate/versioned
 k8s.io/kubectl/pkg/metricsutil
