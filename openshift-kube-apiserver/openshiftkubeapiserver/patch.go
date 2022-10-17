@@ -80,6 +80,12 @@ func OpenShiftKubeAPIServerConfigPatch(genericConfig *genericapiserver.Config, k
 		managementcpusoverride.NewInitializer(openshiftInformers.getOpenshiftInfraInformers().Config().V1().Infrastructures()),
 		managednode.NewInitializer(openshiftInformers.getOpenshiftInfraInformers().Config().V1().Infrastructures()),
 	)
+
+	// This is needed in order to have the correct initializers for the SCC admission plugin which is used to mutate
+	// PodSpecs for PodSpec-y workload objects in the pod security admission plugin.
+	enablement.SCCAdmissionPlugin.SetAuthorizer(genericConfig.Authorization.Authorizer)
+	enablement.SCCAdmissionPlugin.SetSecurityInformers(openshiftInformers.getOpenshiftSecurityInformers().Security().V1().SecurityContextConstraints())
+	enablement.SCCAdmissionPlugin.SetExternalKubeInformerFactory(kubeInformers)
 	// END ADMISSION
 
 	// HANDLER CHAIN (with oauth server and web console)
