@@ -183,6 +183,13 @@ const (
 	// for dynamic provisioning exists, the driver is expected to provide
 	// capacity information for it.
 	CapCapacity Capability = "capacity"
+
+	// To support ReadWriteOncePod, the following CSI sidecars must be
+	// updated to these versions or greater:
+	// - csi-provisioner:v3.0.0+
+	// - csi-attacher:v3.3.0+
+	// - csi-resizer:v1.3.0+
+	CapReadWriteOncePod Capability = "readWriteOncePod"
 )
 
 // DriverInfo represents static information about a TestDriver.
