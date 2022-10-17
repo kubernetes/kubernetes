@@ -189,7 +189,13 @@ func (pm *PatchManager) ApplyPatchesToTarget(patchTarget *PatchTarget) error {
 				var patchObj jsonpatch.Patch
 				patchObj, err = jsonpatch.DecodePatch(patchBytes)
 				if err == nil {
-					patchedData, err = patchObj.Apply(patchedData)
+					patchOptions := &jsonpatch.ApplyOptions{
+						SupportNegativeIndices:   true,
+						AccumulatedCopySizeLimit: 0,
+						AllowMissingPathOnRemove: false,
+						EnsurePathExistsOnAdd:    true,
+					}
+					patchedData, err = patchObj.ApplyWithOptions(patchedData, patchOptions)
 				}
 
 			// Merge patch.
