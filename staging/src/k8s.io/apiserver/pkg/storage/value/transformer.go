@@ -154,13 +154,13 @@ func (t *prefixTransformers) TransformFromStorage(ctx context.Context, data []by
 func (t *prefixTransformers) TransformToStorage(ctx context.Context, data []byte, dataCtx Context) ([]byte, error) {
 	start := time.Now()
 	transformer := t.transformers[0]
-	prefixedData := make([]byte, len(transformer.Prefix), len(data)+len(transformer.Prefix))
-	copy(prefixedData, transformer.Prefix)
 	result, err := transformer.Transformer.TransformToStorage(ctx, data, dataCtx)
 	RecordTransformation("to_storage", string(transformer.Prefix), start, err)
 	if err != nil {
 		return nil, err
 	}
+	prefixedData := make([]byte, len(transformer.Prefix), len(result)+len(transformer.Prefix))
+	copy(prefixedData, transformer.Prefix)
 	prefixedData = append(prefixedData, result...)
 	return prefixedData, nil
 }
