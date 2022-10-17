@@ -115,7 +115,7 @@ func (c *celAdmissionController) reconcilePolicyDefinition(namespace, name strin
 		)
 
 		controller := generic.NewController(
-			generic.NewInformer[*unstructured.Unstructured](informer.Informer()),
+			generic.NewInformer[*unstructured.Unstructured](informer.Informer(), nil),
 			c.reconcileParams,
 			generic.ControllerOptions{
 				Workers: 1,

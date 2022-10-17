@@ -130,7 +130,7 @@ func NewAdmissionController(
 	}
 
 	c.policyDefinitionsController = generic.NewController(
-		generic.NewInformer[PolicyDefinition](policyDefinitionsInformer),
+		generic.NewInformer[PolicyDefinition](policyDefinitionsInformer, NewPolicyFrom),
 		c.reconcilePolicyDefinition,
 		generic.ControllerOptions{
 			Workers: 1,
@@ -138,7 +138,7 @@ func NewAdmissionController(
 		},
 	)
 	c.policyBindingController = generic.NewController(
-		generic.NewInformer[PolicyBinding](policyBindingInformer),
+		generic.NewInformer[PolicyBinding](policyBindingInformer, NewBindingFrom),
 		c.reconcilePolicyBinding,
 		generic.ControllerOptions{
 			Workers: 1,
@@ -286,7 +286,13 @@ func (c *celAdmissionController) Validate(
 				c.bindingInfos[namespacedBindingName] = bindingInfo
 			}
 
-			decisions := bindingInfo.evaluator(a, param)
+			decisions, err := bindingInfo.evaluator(a, param)
+			if err != nil {
+				// runtime error. Apply failure policy
+				wrappedError := fmt.Errorf("failed to evaluate CEL expression: %w", err)
+				addConfigError(wrappedError, definition, binding)
+				continue
+			}
 			for _, decision := range decisions {
 				switch decision.Kind {
 				case Admit:
