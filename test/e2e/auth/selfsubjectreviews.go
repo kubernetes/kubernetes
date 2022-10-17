@@ -41,7 +41,7 @@ var _ = SIGDescribe("SelfSubjectReview [Feature:APISelfSubjectReview]", func() {
 		The selfsubjectreviews resource MUST exist in the /apis/authentication.k8s.io/v1alpha1 discovery document.
 		The selfsubjectreviews resource must support create.
 	*/
-	ginkgo.It("should support SelfSubjectReview API operations", func() {
+	ginkgo.It("should support SelfSubjectReview API operations", func(ctx context.Context) {
 		// Setup
 		ssarAPIVersion := "v1alpha1"
 

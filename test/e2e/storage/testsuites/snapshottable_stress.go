@@ -251,7 +251,7 @@ func (t *snapshottableStressTestSuite) DefineTests(driver storageframework.TestD
 		createPodsAndVolumes()
 	})
 
-	ginkgo.It("should support snapshotting of many volumes repeatedly [Slow] [Serial]", func() {
+	ginkgo.It("should support snapshotting of many volumes repeatedly [Slow] [Serial]", func(ctx context.Context) {
 		// Repeatedly create and delete snapshots of each volume.
 		for i := 0; i < stressTest.testOptions.NumPods; i++ {
 			for j := 0; j < stressTest.testOptions.NumSnapshots; j++ {

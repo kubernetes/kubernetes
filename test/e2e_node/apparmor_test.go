@@ -57,11 +57,11 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 			f := framework.NewDefaultFramework("apparmor-test")
 			f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-			ginkgo.It("should reject an unloaded profile", func() {
+			ginkgo.It("should reject an unloaded profile", func(ctx context.Context) {
 				status := runAppArmorTest(f, false, v1.AppArmorBetaProfileNamePrefix+"non-existent-profile")
 				gomega.Expect(status.ContainerStatuses[0].State.Waiting.Message).To(gomega.ContainSubstring("apparmor"))
 			})
-			ginkgo.It("should enforce a profile blocking writes", func() {
+			ginkgo.It("should enforce a profile blocking writes", func(ctx context.Context) {
 				status := runAppArmorTest(f, true, v1.AppArmorBetaProfileNamePrefix+apparmorProfilePrefix+"deny-write")
 				if len(status.ContainerStatuses) == 0 {
 					framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
@@ -72,7 +72,7 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 				gomega.Expect(state.ExitCode).To(gomega.Not(gomega.BeZero()), "ContainerStateTerminated: %+v", state)
 
 			})
-			ginkgo.It("should enforce a permissive profile", func() {
+			ginkgo.It("should enforce a permissive profile", func(ctx context.Context) {
 				status := runAppArmorTest(f, true, v1.AppArmorBetaProfileNamePrefix+apparmorProfilePrefix+"audit-write")
 				if len(status.ContainerStatuses) == 0 {
 					framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
@@ -88,7 +88,7 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 			f := framework.NewDefaultFramework("apparmor-test")
 			f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-			ginkgo.It("should reject a pod with an AppArmor profile", func() {
+			ginkgo.It("should reject a pod with an AppArmor profile", func(ctx context.Context) {
 				status := runAppArmorTest(f, false, v1.AppArmorBetaProfileRuntimeDefault)
 				expectSoftRejection(status)
 			})

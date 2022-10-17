@@ -196,7 +196,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 	switch pattern.VolType {
 	case storageframework.PreprovisionedPV:
 		if pattern.VolMode == v1.PersistentVolumeBlock && !isBlockSupported {
-			ginkgo.It("should fail to create pod by failing to mount volume [Slow]", func() {
+			ginkgo.It("should fail to create pod by failing to mount volume [Slow]", func(ctx context.Context) {
 				manualInit()
 				defer cleanup()
 
@@ -257,7 +257,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 
 	case storageframework.DynamicPV:
 		if pattern.VolMode == v1.PersistentVolumeBlock && !isBlockSupported {
-			ginkgo.It("should fail in binding dynamic provisioned PV to PVC [Slow][LinuxOnly]", func() {
+			ginkgo.It("should fail in binding dynamic provisioned PV to PVC [Slow][LinuxOnly]", func(ctx context.Context) {
 				manualInit()
 				defer cleanup()
 
@@ -296,7 +296,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 		framework.Failf("Volume mode test doesn't support volType: %v", pattern.VolType)
 	}
 
-	ginkgo.It("should fail to use a volume in a pod with mismatched mode [Slow]", func() {
+	ginkgo.It("should fail to use a volume in a pod with mismatched mode [Slow]", func(ctx context.Context) {
 		skipTestIfBlockNotSupported(driver)
 		init()
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
@@ -351,7 +351,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 		framework.ExpectEqual(p.Status.Phase, v1.PodPending, "Pod phase isn't pending")
 	})
 
-	ginkgo.It("should not mount / map unused volumes in a pod [LinuxOnly]", func() {
+	ginkgo.It("should not mount / map unused volumes in a pod [LinuxOnly]", func(ctx context.Context) {
 		if pattern.VolMode == v1.PersistentVolumeBlock {
 			skipTestIfBlockNotSupported(driver)
 		}

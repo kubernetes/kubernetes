@@ -62,12 +62,12 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 		nodes := NewNodes(f, 1, 1)
 		driver := NewDriver(f, nodes, networkResources) // All tests get their own driver instance.
 		b := newBuilder(f, driver)
-		ginkgo.It("registers plugin", func() {
+		ginkgo.It("registers plugin", func(ctx context.Context) {
 			ginkgo.By("the driver is running")
 		})
 
 		// This test does not pass at the moment because kubelet doesn't retry.
-		ginkgo.It("must retry NodePrepareResource", func() {
+		ginkgo.It("must retry NodePrepareResource", func(ctx context.Context) {
 			// We have exactly one host.
 			m := MethodInstance{driver.Nodenames()[0], NodePrepareResourceMethod}
 
@@ -96,7 +96,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				framework.Fail("NodePrepareResource should have been called again")
 			}
 		})
-		ginkgo.It("must not run a pod if a claim is not reserved for it", func() {
+		ginkgo.It("must not run a pod if a claim is not reserved for it", func(ctx context.Context) {
 			parameters := b.parameters()
 			claim := b.externalClaim(resourcev1alpha1.AllocationModeImmediate)
 			pod := b.podExternal()
@@ -119,7 +119,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				return nil
 			}, 20*time.Second, 200*time.Millisecond).Should(gomega.BeNil())
 		})
-		ginkgo.It("must unprepare resources for force-deleted pod", func() {
+		ginkgo.It("must unprepare resources for force-deleted pod", func(ctx context.Context) {
 			parameters := b.parameters()
 			claim := b.externalClaim(resourcev1alpha1.AllocationModeImmediate)
 			pod := b.podExternal()
@@ -151,7 +151,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 		b.parametersCounter = 1
 		b.classParametersName = b.parametersName()
 
-		ginkgo.It("supports claim and class parameters", func() {
+		ginkgo.It("supports claim and class parameters", func(ctx context.Context) {
 			classParameters := b.parameters("x", "y")
 			claimParameters := b.parameters()
 			pod, template := b.podInline(resourcev1alpha1.AllocationModeWaitForFirstConsumer)
@@ -170,7 +170,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 		// claimTests tries out several different combinations of pods with
 		// claims, both inline and external.
 		claimTests := func(allocationMode resourcev1alpha1.AllocationMode) {
-			ginkgo.It("supports simple pod referencing inline resource claim", func() {
+			ginkgo.It("supports simple pod referencing inline resource claim", func(ctx context.Context) {
 				parameters := b.parameters()
 				pod, template := b.podInline(allocationMode)
 				b.create(ctx, parameters, pod, template)
@@ -178,7 +178,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				b.testPod(f.ClientSet, pod)
 			})
 
-			ginkgo.It("supports inline claim referenced by multiple containers", func() {
+			ginkgo.It("supports inline claim referenced by multiple containers", func(ctx context.Context) {
 				parameters := b.parameters()
 				pod, template := b.podInlineMultiple(allocationMode)
 				b.create(ctx, parameters, pod, template)
@@ -186,7 +186,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				b.testPod(f.ClientSet, pod)
 			})
 
-			ginkgo.It("supports simple pod referencing external resource claim", func() {
+			ginkgo.It("supports simple pod referencing external resource claim", func(ctx context.Context) {
 				parameters := b.parameters()
 				pod := b.podExternal()
 				b.create(ctx, parameters, b.externalClaim(allocationMode), pod)
@@ -194,7 +194,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				b.testPod(f.ClientSet, pod)
 			})
 
-			ginkgo.It("supports external claim referenced by multiple pods", func() {
+			ginkgo.It("supports external claim referenced by multiple pods", func(ctx context.Context) {
 				parameters := b.parameters()
 				pod1 := b.podExternal()
 				pod2 := b.podExternal()
@@ -207,7 +207,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				}
 			})
 
-			ginkgo.It("supports external claim referenced by multiple containers of multiple pods", func() {
+			ginkgo.It("supports external claim referenced by multiple containers of multiple pods", func(ctx context.Context) {
 				parameters := b.parameters()
 				pod1 := b.podExternalMultiple()
 				pod2 := b.podExternalMultiple()
@@ -220,7 +220,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				}
 			})
 
-			ginkgo.It("supports init containers", func() {
+			ginkgo.It("supports init containers", func(ctx context.Context) {
 				parameters := b.parameters()
 				pod, template := b.podInline(allocationMode)
 				pod.Spec.InitContainers = []v1.Container{pod.Spec.Containers[0]}
@@ -248,7 +248,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 			driver := NewDriver(f, nodes, networkResources)
 			b := newBuilder(f, driver)
 
-			ginkgo.It("schedules onto different nodes", func() {
+			ginkgo.It("schedules onto different nodes", func(ctx context.Context) {
 				parameters := b.parameters()
 				label := "app.kubernetes.io/instance"
 				instance := f.UniqueName + "-test-app"
@@ -295,7 +295,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 			b := newBuilder(f, driver)
 
 			tests := func(allocationMode resourcev1alpha1.AllocationMode) {
-				ginkgo.It("uses all resources", func() {
+				ginkgo.It("uses all resources", func(ctx context.Context) {
 					var objs = []klog.KMetadata{
 						b.parameters(),
 					}
@@ -360,7 +360,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 			})
 			b := newBuilder(f, driver)
 
-			ginkgo.It("works", func() {
+			ginkgo.It("works", func(ctx context.Context) {
 				// A pod with two claims can run on a node, but
 				// only if allocation of both succeeds. This
 				// tests simulates the scenario where one claim
@@ -474,7 +474,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 		driver2.NameSuffix = "-other"
 		b2 := newBuilder(f, driver2)
 
-		ginkgo.It("work", func() {
+		ginkgo.It("work", func(ctx context.Context) {
 			parameters1 := b1.parameters()
 			parameters2 := b2.parameters()
 			claim1 := b1.externalClaim(resourcev1alpha1.AllocationModeWaitForFirstConsumer)

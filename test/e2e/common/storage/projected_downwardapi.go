@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -50,7 +51,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 	   Testname: Projected Volume, DownwardAPI, pod name
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able to read the pod name from the mounted DownwardAPIVolumeFiles.
 	*/
-	framework.ConformanceIt("should provide podname only [NodeConformance]", func() {
+	framework.ConformanceIt("should provide podname only [NodeConformance]", func(ctx context.Context) {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podinfo/podname")
 
@@ -65,7 +66,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. The default mode for the volume mount is set to 0400. Pod MUST be able to read the pod name from the mounted DownwardAPIVolumeFiles and the volume mode must be -r--------.
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should set DefaultMode on files [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("should set DefaultMode on files [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		defaultMode := int32(0400)
 		pod := projectedDownwardAPIVolumePodForModeTest(podName, "/etc/podinfo/podname", nil, &defaultMode)
@@ -81,7 +82,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. The default mode for the volume mount is set to 0400. Pod MUST be able to read the pod name from the mounted DownwardAPIVolumeFiles and the volume mode must be -r--------.
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should set mode on item file [LinuxOnly] [NodeConformance]", func() {
+	framework.ConformanceIt("should set mode on item file [LinuxOnly] [NodeConformance]", func(ctx context.Context) {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		mode := int32(0400)
 		pod := projectedDownwardAPIVolumePodForModeTest(podName, "/etc/podinfo/podname", &mode, nil)
@@ -91,7 +92,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		})
 	})
 
-	ginkgo.It("should provide podname as non-root with fsgroup [LinuxOnly] [NodeFeature:FSGroup]", func() {
+	ginkgo.It("should provide podname as non-root with fsgroup [LinuxOnly] [NodeFeature:FSGroup]", func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		podName := "metadata-volume-" + string(uuid.NewUUID())
@@ -106,7 +107,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		})
 	})
 
-	ginkgo.It("should provide podname as non-root with fsgroup and defaultMode [LinuxOnly] [NodeFeature:FSGroup]", func() {
+	ginkgo.It("should provide podname as non-root with fsgroup and defaultMode [LinuxOnly] [NodeFeature:FSGroup]", func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options, and it does not support setting file permissions.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		podName := "metadata-volume-" + string(uuid.NewUUID())
@@ -127,7 +128,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 	   Testname: Projected Volume, DownwardAPI, update labels
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests and label items. Pod MUST be able to read the labels from the mounted DownwardAPIVolumeFiles. Labels are then updated. Pod MUST be able to read the updated values for the Labels.
 	*/
-	framework.ConformanceIt("should update labels on modification [NodeConformance]", func() {
+	framework.ConformanceIt("should update labels on modification [NodeConformance]", func(ctx context.Context) {
 		labels := map[string]string{}
 		labels["key1"] = "value1"
 		labels["key2"] = "value2"
@@ -159,7 +160,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 	   Testname: Projected Volume, DownwardAPI, update annotation
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests and annotation items. Pod MUST be able to read the annotations from the mounted DownwardAPIVolumeFiles. Annotations are then updated. Pod MUST be able to read the updated values for the Annotations.
 	*/
-	framework.ConformanceIt("should update annotations on modification [NodeConformance]", func() {
+	framework.ConformanceIt("should update annotations on modification [NodeConformance]", func(ctx context.Context) {
 		annotations := map[string]string{}
 		annotations["builder"] = "bar"
 		podName := "annotationupdate" + string(uuid.NewUUID())
@@ -190,7 +191,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 	   Testname: Projected Volume, DownwardAPI, CPU limits
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able to read the cpu limits from the mounted DownwardAPIVolumeFiles.
 	*/
-	framework.ConformanceIt("should provide container's cpu limit [NodeConformance]", func() {
+	framework.ConformanceIt("should provide container's cpu limit [NodeConformance]", func(ctx context.Context) {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/podinfo/cpu_limit")
 
@@ -204,7 +205,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 	   Testname: Projected Volume, DownwardAPI, memory limits
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able to read the memory limits from the mounted DownwardAPIVolumeFiles.
 	*/
-	framework.ConformanceIt("should provide container's memory limit [NodeConformance]", func() {
+	framework.ConformanceIt("should provide container's memory limit [NodeConformance]", func(ctx context.Context) {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/podinfo/memory_limit")
 
@@ -218,7 +219,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 	   Testname: Projected Volume, DownwardAPI, CPU request
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able to read the cpu request from the mounted DownwardAPIVolumeFiles.
 	*/
-	framework.ConformanceIt("should provide container's cpu request [NodeConformance]", func() {
+	framework.ConformanceIt("should provide container's cpu request [NodeConformance]", func(ctx context.Context) {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/podinfo/cpu_request")
 
@@ -232,7 +233,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 	   Testname: Projected Volume, DownwardAPI, memory request
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able to read the memory request from the mounted DownwardAPIVolumeFiles.
 	*/
-	framework.ConformanceIt("should provide container's memory request [NodeConformance]", func() {
+	framework.ConformanceIt("should provide container's memory request [NodeConformance]", func(ctx context.Context) {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/podinfo/memory_request")
 
@@ -246,7 +247,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 	   Testname: Projected Volume, DownwardAPI, CPU limit, node allocatable
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests.  The CPU and memory resources for requests and limits are NOT specified for the container. Pod MUST be able to read the default cpu limits from the mounted DownwardAPIVolumeFiles.
 	*/
-	framework.ConformanceIt("should provide node allocatable (cpu) as default cpu limit if the limit is not set [NodeConformance]", func() {
+	framework.ConformanceIt("should provide node allocatable (cpu) as default cpu limit if the limit is not set [NodeConformance]", func(ctx context.Context) {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForDefaultContainerResources(podName, "/etc/podinfo/cpu_limit")
 
@@ -258,7 +259,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 	   Testname: Projected Volume, DownwardAPI, memory limit, node allocatable
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests.  The CPU and memory resources for requests and limits are NOT specified for the container. Pod MUST be able to read the default memory limits from the mounted DownwardAPIVolumeFiles.
 	*/
-	framework.ConformanceIt("should provide node allocatable (memory) as default memory limit if the limit is not set [NodeConformance]", func() {
+	framework.ConformanceIt("should provide node allocatable (memory) as default memory limit if the limit is not set [NodeConformance]", func(ctx context.Context) {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForDefaultContainerResources(podName, "/etc/podinfo/memory_limit")
 

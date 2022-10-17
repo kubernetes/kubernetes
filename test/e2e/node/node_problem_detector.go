@@ -59,7 +59,7 @@ var _ = SIGDescribe("NodeProblemDetector", func() {
 		e2enode.WaitForTotalHealthy(f.ClientSet, time.Minute)
 	})
 
-	ginkgo.It("should run without error", func() {
+	ginkgo.It("should run without error", func(ctx context.Context) {
 		ginkgo.By("Getting all nodes and their SSH-able IP addresses")
 		readyNodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 		framework.ExpectNoError(err)

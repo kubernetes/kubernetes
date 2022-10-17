@@ -165,11 +165,11 @@ var _ = SIGDescribe("PreStop", func() {
 		Testname: Pods, prestop hook
 		Description: Create a server pod with a rest endpoint '/write' that changes state.Received field. Create a Pod with a pre-stop handle that posts to the /write endpoint on the server Pod. Verify that the Pod with pre-stop hook is running. Delete the Pod with the pre-stop hook. Before the Pod is deleted, pre-stop handler MUST be called when configured. Verify that the Pod is deleted and a call to prestop hook is verified by checking the status received on the server Pod.
 	*/
-	framework.ConformanceIt("should call prestop when killing a pod ", func() {
+	framework.ConformanceIt("should call prestop when killing a pod ", func(ctx context.Context) {
 		testPreStop(f.ClientSet, f.Namespace.Name)
 	})
 
-	ginkgo.It("graceful pod terminated should wait until preStop hook completes the process", func() {
+	ginkgo.It("graceful pod terminated should wait until preStop hook completes the process", func(ctx context.Context) {
 		gracefulTerminationPeriodSeconds := int64(30)
 		ginkgo.By("creating the pod")
 		name := "pod-prestop-hook-" + string(uuid.NewUUID())

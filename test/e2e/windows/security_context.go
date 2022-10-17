@@ -44,7 +44,7 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 	f := framework.NewDefaultFramework("windows-run-as-username")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("should be able create pods and run containers with a given username", func() {
+	ginkgo.It("should be able create pods and run containers with a given username", func(ctx context.Context) {
 		ginkgo.By("Creating 2 pods: 1 with the default user, and one with a custom one.")
 		podDefault := runAsUserNamePod(nil)
 		e2eoutput.TestContainerOutput(f, "check default user", podDefault, 0, []string{"ContainerUser"})
@@ -53,7 +53,7 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 		e2eoutput.TestContainerOutput(f, "check set user", podUserName, 0, []string{"ContainerAdministrator"})
 	})
 
-	ginkgo.It("should not be able to create pods with unknown usernames at Pod level", func() {
+	ginkgo.It("should not be able to create pods with unknown usernames at Pod level", func(ctx context.Context) {
 		ginkgo.By("Creating a pod with an invalid username")
 		podInvalid := e2epod.NewPodClient(f).Create(runAsUserNamePod(toPtr("FooLish")))
 
@@ -100,7 +100,7 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 		}, framework.PodStartTimeout, 1*time.Second).Should(gomega.BeTrue())
 	})
 
-	ginkgo.It("should not be able to create pods with unknown usernames at Container level", func() {
+	ginkgo.It("should not be able to create pods with unknown usernames at Container level", func(ctx context.Context) {
 		ginkgo.By("Creating a pod with an invalid username at container level and pod running as ContainerUser")
 		p := runAsUserNamePod(toPtr("FooLish"))
 		p.Spec.SecurityContext.WindowsOptions.RunAsUserName = toPtr("ContainerUser")
@@ -116,7 +116,7 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 		}
 	})
 
-	ginkgo.It("should override SecurityContext username if set", func() {
+	ginkgo.It("should override SecurityContext username if set", func(ctx context.Context) {
 		ginkgo.By("Creating a pod with 2 containers with different username configurations.")
 
 		pod := runAsUserNamePod(toPtr("ContainerAdministrator"))
@@ -131,7 +131,7 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 		e2eoutput.TestContainerOutput(f, "check pod SecurityContext username", pod, 1, []string{"ContainerAdministrator"})
 	})
 
-	ginkgo.It("should ignore Linux Specific SecurityContext if set", func() {
+	ginkgo.It("should ignore Linux Specific SecurityContext if set", func(ctx context.Context) {
 		ginkgo.By("Creating a pod with SELinux options")
 		// It is sufficient to show that the pod comes up here. Since we're stripping the SELinux and other linux
 		// security contexts in apiserver and not updating the pod object in the apiserver, we cannot validate the
@@ -155,7 +155,7 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 			f.Namespace.Name), "failed to wait for pod %s to be running", windowsPodWithSELinux.Name)
 	})
 
-	ginkgo.It("should not be able to create pods with containers running as ContainerAdministrator when runAsNonRoot is true", func() {
+	ginkgo.It("should not be able to create pods with containers running as ContainerAdministrator when runAsNonRoot is true", func(ctx context.Context) {
 		ginkgo.By("Creating a pod")
 
 		p := runAsUserNamePod(toPtr("ContainerAdministrator"))
@@ -173,7 +173,7 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 		framework.ExpectEqual(true, strings.Contains(event.Message, expectedEventError), "Event error should indicate non-root policy caused container to not start")
 	})
 
-	ginkgo.It("should not be able to create pods with containers running as CONTAINERADMINISTRATOR when runAsNonRoot is true", func() {
+	ginkgo.It("should not be able to create pods with containers running as CONTAINERADMINISTRATOR when runAsNonRoot is true", func(ctx context.Context) {
 		ginkgo.By("Creating a pod")
 
 		p := runAsUserNamePod(toPtr("CONTAINERADMINISTRATOR"))

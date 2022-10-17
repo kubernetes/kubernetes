@@ -55,7 +55,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 	f := framework.NewDefaultFramework("apf")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("should ensure that requests can be classified by adding FlowSchema and PriorityLevelConfiguration", func() {
+	ginkgo.It("should ensure that requests can be classified by adding FlowSchema and PriorityLevelConfiguration", func(ctx context.Context) {
 		testingFlowSchemaName := "e2e-testing-flowschema"
 		testingPriorityLevelName := "e2e-testing-prioritylevel"
 		matchingUsername := "noxu"
@@ -97,7 +97,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 	// clients making requests at different rates, we test to make sure that the
 	// higher QPS client cannot drown out the other one despite having higher
 	// priority.
-	ginkgo.It("should ensure that requests can't be drowned out (priority)", func() {
+	ginkgo.It("should ensure that requests can't be drowned out (priority)", func(ctx context.Context) {
 		// See https://github.com/kubernetes/kubernetes/issues/96710
 		ginkgo.Skip("skipping test until flakiness is resolved")
 
@@ -184,7 +184,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 	// and priority level. We expect APF's "ByUser" flow distinguisher to isolate
 	// the two clients and not allow one client to drown out the other despite
 	// having a higher QPS.
-	ginkgo.It("should ensure that requests can't be drowned out (fairness)", func() {
+	ginkgo.It("should ensure that requests can't be drowned out (fairness)", func(ctx context.Context) {
 		// See https://github.com/kubernetes/kubernetes/issues/96710
 		ginkgo.Skip("skipping test until flakiness is resolved")
 

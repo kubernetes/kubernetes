@@ -17,6 +17,7 @@ limitations under the License.
 package windows
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strconv"
@@ -45,7 +46,7 @@ var _ = SIGDescribe("Services", func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 		cs = f.ClientSet
 	})
-	ginkgo.It("should be able to create a functioning NodePort service for Windows", func() {
+	ginkgo.It("should be able to create a functioning NodePort service for Windows", func(ctx context.Context) {
 		serviceName := "nodeport-test"
 		ns := f.Namespace.Name
 

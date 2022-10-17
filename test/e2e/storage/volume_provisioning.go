@@ -419,7 +419,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			framework.ExpectNoError(e2epv.WaitForPersistentVolumeDeleted(c, pv.Name, 1*time.Second, 30*time.Second))
 		})
 
-		ginkgo.It("should test that deleting a claim before the volume is provisioned deletes the volume.", func() {
+		ginkgo.It("should test that deleting a claim before the volume is provisioned deletes the volume.", func(ctx context.Context) {
 			// This case tests for the regressions of a bug fixed by PR #21268
 			// REGRESSION: Deleting the PVC before the PV is provisioned can result in the PV
 			// not being deleted.
@@ -465,7 +465,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			framework.Logf("0 PersistentVolumes remain.")
 		})
 
-		ginkgo.It("deletion should be idempotent", func() {
+		ginkgo.It("deletion should be idempotent", func(ctx context.Context) {
 			// This test ensures that deletion of a volume is idempotent.
 			// It creates a PV with Retain policy, deletes underlying AWS / GCE
 			// volume and changes the reclaim policy to Delete.
@@ -623,7 +623,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		})
 
 		// Modifying the default storage class can be disruptive to other tests that depend on it
-		ginkgo.It("should be disabled by changing the default annotation [Serial] [Disruptive]", func() {
+		ginkgo.It("should be disabled by changing the default annotation [Serial] [Disruptive]", func(ctx context.Context) {
 			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 			e2epv.SkipIfNoDefaultStorageClass(c)
 
@@ -662,7 +662,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		})
 
 		// Modifying the default storage class can be disruptive to other tests that depend on it
-		ginkgo.It("should be disabled by removing the default annotation [Serial] [Disruptive]", func() {
+		ginkgo.It("should be disabled by removing the default annotation [Serial] [Disruptive]", func(ctx context.Context) {
 			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 			e2epv.SkipIfNoDefaultStorageClass(c)
 

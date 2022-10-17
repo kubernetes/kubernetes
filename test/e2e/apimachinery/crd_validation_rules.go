@@ -94,7 +94,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 		  }
 	   }
 	}`))
-	ginkgo.It("MUST NOT fail validation for create of a custom resource that satisfies the x-kubernetes-validations rules", func() {
+	ginkgo.It("MUST NOT fail validation for create of a custom resource that satisfies the x-kubernetes-validations rules", func(ctx context.Context) {
 		ginkgo.By("Creating a custom resource definition with validation rules")
 		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithValidationExpression, false)
 		crd, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
@@ -124,7 +124,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 		}}, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "validation rules satisfied")
 	})
-	ginkgo.It("MUST fail validation for create of a custom resource that does not satisfy the x-kubernetes-validations rules", func() {
+	ginkgo.It("MUST fail validation for create of a custom resource that does not satisfy the x-kubernetes-validations rules", func(ctx context.Context) {
 		ginkgo.By("Creating a custom resource definition with validation rules")
 		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithValidationExpression, false)
 		crd, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
@@ -156,7 +156,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 		}
 	})
 
-	ginkgo.It("MUST fail create of a custom resource definition that contains a x-kubernetes-validations rule that refers to a property that do not exist", func() {
+	ginkgo.It("MUST fail create of a custom resource definition that contains a x-kubernetes-validations rule that refers to a property that do not exist", func(ctx context.Context) {
 		ginkgo.By("Defining a custom resource definition with a validation rule that refers to a property that do not exist")
 		var schemaWithInvalidValidationRule = unmarshallSchema([]byte(`{
 		   "type":"object",
@@ -181,7 +181,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 		}
 	})
 
-	ginkgo.It("MUST fail create of a custom resource definition that contains an x-kubernetes-validations rule that contains a syntax error", func() {
+	ginkgo.It("MUST fail create of a custom resource definition that contains an x-kubernetes-validations rule that contains a syntax error", func(ctx context.Context) {
 		ginkgo.By("Defining a custom resource definition that contains a validation rule with a syntax error")
 		var schemaWithSyntaxErrorRule = unmarshallSchema([]byte(`{
 		   "type":"object",
@@ -203,7 +203,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 		}
 	})
 
-	ginkgo.It("MUST fail create of a custom resource definition that contains an x-kubernetes-validations rule that exceeds the estimated cost limit", func() {
+	ginkgo.It("MUST fail create of a custom resource definition that contains an x-kubernetes-validations rule that exceeds the estimated cost limit", func(ctx context.Context) {
 		ginkgo.By("Defining a custom resource definition that contains a validation rule that exceeds the cost limit")
 		var schemaWithExpensiveRule = unmarshallSchema([]byte(`{
 		   "type":"object",
@@ -236,7 +236,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 		}
 	})
 
-	ginkgo.It("MUST fail create of a custom resource that exceeds the runtime cost limit for x-kubernetes-validations rule execution", func() {
+	ginkgo.It("MUST fail create of a custom resource that exceeds the runtime cost limit for x-kubernetes-validations rule execution", func(ctx context.Context) {
 		ginkgo.By("Defining a custom resource definition including an expensive rule on a large amount of data")
 		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithValidationExpression, false)
 		_, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
@@ -266,7 +266,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", f
 		}
 	})
 
-	ginkgo.It("MUST fail update of a custom resource that does not satisfy a x-kubernetes-validations transition rule", func() {
+	ginkgo.It("MUST fail update of a custom resource that does not satisfy a x-kubernetes-validations transition rule", func(ctx context.Context) {
 		ginkgo.By("Defining a custom resource definition with a x-kubernetes-validations transition rule")
 		var schemaWithTransitionRule = unmarshallSchema([]byte(`{
 		   "type":"object",

@@ -17,6 +17,7 @@ limitations under the License.
 package autoscaling
 
 import (
+	"context"
 	"time"
 
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
@@ -53,7 +54,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 	waitBuffer := 1 * time.Minute
 
 	ginkgo.Describe("with short downscale stabilization window", func() {
-		ginkgo.It("should scale down soon after the stabilization period", func() {
+		ginkgo.It("should scale down soon after the stabilization period", func(ctx context.Context) {
 			ginkgo.By("setting up resource consumer and HPA")
 			initPods := 1
 			initCPUUsageTotal := initPods * usageForSingleReplica
@@ -94,7 +95,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 	})
 
 	ginkgo.Describe("with long upscale stabilization window", func() {
-		ginkgo.It("should scale up only after the stabilization period", func() {
+		ginkgo.It("should scale up only after the stabilization period", func(ctx context.Context) {
 			ginkgo.By("setting up resource consumer and HPA")
 			initPods := 2
 			initCPUUsageTotal := initPods * usageForSingleReplica
@@ -135,7 +136,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 	})
 
 	ginkgo.Describe("with autoscaling disabled", func() {
-		ginkgo.It("shouldn't scale up", func() {
+		ginkgo.It("shouldn't scale up", func(ctx context.Context) {
 			ginkgo.By("setting up resource consumer and HPA")
 			initPods := 1
 			initCPUUsageTotal := initPods * usageForSingleReplica
@@ -170,7 +171,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 			framework.ExpectEqual(replicas == initPods, true, "had %s replicas, still have %s replicas after time deadline", initPods, replicas)
 		})
 
-		ginkgo.It("shouldn't scale down", func() {
+		ginkgo.It("shouldn't scale down", func(ctx context.Context) {
 			ginkgo.By("setting up resource consumer and HPA")
 			initPods := 3
 			initCPUUsageTotal := initPods * usageForSingleReplica
@@ -213,7 +214,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 		targetCPUUtilizationPercent := 25
 		usageForSingleReplica := 45
 
-		ginkgo.It("should scale up no more than given number of Pods per minute", func() {
+		ginkgo.It("should scale up no more than given number of Pods per minute", func(ctx context.Context) {
 			ginkgo.By("setting up resource consumer and HPA")
 			initPods := 1
 			initCPUUsageTotal := initPods * usageForSingleReplica
@@ -255,7 +256,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 			framework.ExpectEqual(timeWaitedFor3 < deadline, true, "waited %s, wanted less than %s", timeWaitedFor3, deadline)
 		})
 
-		ginkgo.It("should scale down no more than given number of Pods per minute", func() {
+		ginkgo.It("should scale down no more than given number of Pods per minute", func(ctx context.Context) {
 			ginkgo.By("setting up resource consumer and HPA")
 			initPods := 3
 			initCPUUsageTotal := initPods * usageForSingleReplica
@@ -303,7 +304,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 		targetCPUUtilizationPercent := 25
 		usageForSingleReplica := 45
 
-		ginkgo.It("should scale up no more than given percentage of current Pods per minute", func() {
+		ginkgo.It("should scale up no more than given percentage of current Pods per minute", func(ctx context.Context) {
 			ginkgo.By("setting up resource consumer and HPA")
 			initPods := 2
 			initCPUUsageTotal := initPods * usageForSingleReplica
@@ -346,7 +347,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 			framework.ExpectEqual(timeWaitedFor5 < deadline, true, "waited %s, wanted less than %s", timeWaitedFor5, deadline)
 		})
 
-		ginkgo.It("should scale down no more than given percentage of current Pods per minute", func() {
+		ginkgo.It("should scale down no more than given percentage of current Pods per minute", func(ctx context.Context) {
 			ginkgo.By("setting up resource consumer and HPA")
 			initPods := 7
 			initCPUUsageTotal := initPods * usageForSingleReplica
@@ -393,7 +394,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 	ginkgo.Describe("with both scale up and down controls configured", func() {
 		waitBuffer := 2 * time.Minute
 
-		ginkgo.It("should keep recommendation within the range over two stabilization windows", func() {
+		ginkgo.It("should keep recommendation within the range over two stabilization windows", func(ctx context.Context) {
 			ginkgo.By("setting up resource consumer and HPA")
 			initPods := 2
 			initCPUUsageTotal := initPods * usageForSingleReplica
@@ -444,7 +445,7 @@ var _ = SIGDescribe("[Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (n
 			framework.ExpectEqual(timeWaited < waitDeadline, true, "waited %s, wanted less than %s", timeWaited, waitDeadline)
 		})
 
-		ginkgo.It("should keep recommendation within the range with stabilization window and pod limit rate", func() {
+		ginkgo.It("should keep recommendation within the range with stabilization window and pod limit rate", func(ctx context.Context) {
 			ginkgo.By("setting up resource consumer and HPA")
 			initPods := 2
 			initCPUUsageTotal := initPods * usageForSingleReplica

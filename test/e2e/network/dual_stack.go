@@ -56,7 +56,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		podClient = e2epod.NewPodClient(f)
 	})
 
-	ginkgo.It("should have ipv4 and ipv6 internal node ip", func() {
+	ginkgo.It("should have ipv4 and ipv6 internal node ip", func(ctx context.Context) {
 		// TODO (aramase) can switch to new function to get all nodes
 		nodeList, err := e2enode.GetReadySchedulableNodes(cs)
 		framework.ExpectNoError(err)
@@ -73,7 +73,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		}
 	})
 
-	ginkgo.It("should create pod, add ipv6 and ipv4 ip to pod ips", func() {
+	ginkgo.It("should create pod, add ipv6 and ipv4 ip to pod ips", func(ctx context.Context) {
 		podName := "pod-dualstack-ips"
 
 		pod := &v1.Pod{
@@ -112,7 +112,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 	})
 
 	// takes close to 140s to complete, so doesn't need to be marked [SLOW]
-	ginkgo.It("should be able to reach pod on ipv4 and ipv6 ip", func() {
+	ginkgo.It("should be able to reach pod on ipv4 and ipv6 ip", func(ctx context.Context) {
 		serverDeploymentName := "dualstack-server"
 		clientDeploymentName := "dualstack-client"
 
@@ -201,7 +201,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		assertNetworkConnectivity(f, *serverPods, *clientPods, "dualstack-test-client", "80")
 	})
 
-	ginkgo.It("should create a single stack service with cluster ip from primary service range", func() {
+	ginkgo.It("should create a single stack service with cluster ip from primary service range", func(ctx context.Context) {
 		serviceName := "defaultclusterip"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -248,7 +248,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		}
 	})
 
-	ginkgo.It("should create service with ipv4 cluster ip", func() {
+	ginkgo.It("should create service with ipv4 cluster ip", func(ctx context.Context) {
 		serviceName := "ipv4clusterip"
 		ns := f.Namespace.Name
 
@@ -293,7 +293,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		}
 	})
 
-	ginkgo.It("should create service with ipv6 cluster ip", func() {
+	ginkgo.It("should create service with ipv6 cluster ip", func(ctx context.Context) {
 		serviceName := "ipv6clusterip"
 		ns := f.Namespace.Name
 		ipv6 := v1.IPv6Protocol
@@ -338,7 +338,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		}
 	})
 
-	ginkgo.It("should create service with ipv4,v6 cluster ip", func() {
+	ginkgo.It("should create service with ipv4,v6 cluster ip", func(ctx context.Context) {
 		serviceName := "ipv4ipv6clusterip"
 		ns := f.Namespace.Name
 
@@ -383,7 +383,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		}
 	})
 
-	ginkgo.It("should create service with ipv6,v4 cluster ip", func() {
+	ginkgo.It("should create service with ipv6,v4 cluster ip", func(ctx context.Context) {
 		serviceName := "ipv6ipv4clusterip"
 		ns := f.Namespace.Name
 
@@ -434,7 +434,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 	// but using the secondary IP, so we run the same tests for each ClusterIP family
 	ginkgo.Describe("Granular Checks: Services Secondary IP Family [LinuxOnly]", func() {
 
-		ginkgo.It("should function for pod-Service: http", func() {
+		ginkgo.It("should function for pod-Service: http", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
 			err := config.DialFromTestContainer("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -448,7 +448,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 			}
 		})
 
-		ginkgo.It("should function for pod-Service: udp", func() {
+		ginkgo.It("should function for pod-Service: udp", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
 			err := config.DialFromTestContainer("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -463,7 +463,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		})
 
 		// [Disruptive] because it conflicts with tests that call CheckSCTPModuleLoadedOnNodes
-		ginkgo.It("should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive]", func() {
+		ginkgo.It("should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive]", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack, e2enetwork.EnableSCTP)
 			ginkgo.By(fmt.Sprintf("dialing(sctp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterSCTPPort))
 			err := config.DialFromTestContainer("sctp", config.SecondaryClusterIP, e2enetwork.ClusterSCTPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -478,7 +478,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 			}
 		})
 
-		ginkgo.It("should function for node-Service: http", func() {
+		ginkgo.It("should function for node-Service: http", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack, e2enetwork.UseHostNetwork)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (config.clusterIP)", config.SecondaryNodeIP, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
 			err := config.DialFromNode("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -493,7 +493,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 			}
 		})
 
-		ginkgo.It("should function for node-Service: udp", func() {
+		ginkgo.It("should function for node-Service: udp", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack, e2enetwork.UseHostNetwork)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (config.clusterIP)", config.SecondaryNodeIP, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
 			err := config.DialFromNode("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -508,7 +508,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 			}
 		})
 
-		ginkgo.It("should function for endpoint-Service: http", func() {
+		ginkgo.It("should function for endpoint-Service: http", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v (endpoint) --> %v:%v (config.clusterIP)", config.EndpointPods[0].Name, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
 			err := config.DialFromEndpointContainer("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -522,7 +522,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 			}
 		})
 
-		ginkgo.It("should function for endpoint-Service: udp", func() {
+		ginkgo.It("should function for endpoint-Service: udp", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v (endpoint) --> %v:%v (config.clusterIP)", config.EndpointPods[0].Name, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
 			err := config.DialFromEndpointContainer("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -536,7 +536,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 			}
 		})
 
-		ginkgo.It("should update endpoints: http", func() {
+		ginkgo.It("should update endpoints: http", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
 			err := config.DialFromTestContainer("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -552,7 +552,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 			}
 		})
 
-		ginkgo.It("should update endpoints: udp", func() {
+		ginkgo.It("should update endpoints: udp", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
 			err := config.DialFromTestContainer("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -570,7 +570,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		})
 
 		// [LinuxOnly]: Windows does not support session affinity.
-		ginkgo.It("should function for client IP based session affinity: http [LinuxOnly]", func() {
+		ginkgo.It("should function for client IP based session affinity: http [LinuxOnly]", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIPs[1], e2enetwork.ClusterHTTPPort))
 
@@ -588,7 +588,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		})
 
 		// [LinuxOnly]: Windows does not support session affinity.
-		ginkgo.It("should function for client IP based session affinity: udp [LinuxOnly]", func() {
+		ginkgo.It("should function for client IP based session affinity: udp [LinuxOnly]", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIPs[1], e2enetwork.ClusterUDPPort))
 
@@ -605,14 +605,14 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 			}
 		})
 
-		ginkgo.It("should be able to handle large requests: http", func() {
+		ginkgo.It("should be able to handle large requests: http", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
 			message := strings.Repeat("42", 1000)
 			config.DialEchoFromTestContainer("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, message)
 		})
 
-		ginkgo.It("should be able to handle large requests: udp", func() {
+		ginkgo.It("should be able to handle large requests: udp", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
 			message := "n" + strings.Repeat("o", 1999)
@@ -622,7 +622,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		// if the endpoints pods use hostNetwork, several tests can't run in parallel
 		// because the pods will try to acquire the same port in the host.
 		// We run the test in serial, to avoid port conflicts.
-		ginkgo.It("should function for service endpoints using hostNetwork", func() {
+		ginkgo.It("should function for service endpoints using hostNetwork", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack, e2enetwork.UseHostNetwork, e2enetwork.EndpointsUseHostNetwork)
 
 			ginkgo.By("pod-Service(hostNetwork): http")

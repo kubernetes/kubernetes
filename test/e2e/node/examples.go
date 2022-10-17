@@ -68,7 +68,7 @@ var _ = SIGDescribe("[Feature:Example]", func() {
 	})
 
 	ginkgo.Describe("Liveness", func() {
-		ginkgo.It("liveness pods should be automatically restarted", func() {
+		ginkgo.It("liveness pods should be automatically restarted", func(ctx context.Context) {
 			test := "test/fixtures/doc-yaml/user-guide/liveness"
 			execYaml := readFile(test, "exec-liveness.yaml.in")
 			httpYaml := readFile(test, "http-liveness.yaml.in")
@@ -115,7 +115,7 @@ var _ = SIGDescribe("[Feature:Example]", func() {
 	})
 
 	ginkgo.Describe("Secret", func() {
-		ginkgo.It("should create a pod that reads a secret", func() {
+		ginkgo.It("should create a pod that reads a secret", func(ctx context.Context) {
 			test := "test/fixtures/doc-yaml/user-guide/secrets"
 			secretYaml := readFile(test, "secret.yaml")
 			podYaml := readFile(test, "secret-pod.yaml.in")
@@ -135,7 +135,7 @@ var _ = SIGDescribe("[Feature:Example]", func() {
 	})
 
 	ginkgo.Describe("Downward API", func() {
-		ginkgo.It("should create a pod that prints his name and namespace", func() {
+		ginkgo.It("should create a pod that prints his name and namespace", func(ctx context.Context) {
 			test := "test/fixtures/doc-yaml/user-guide/downward-api"
 			podYaml := readFile(test, "dapi-pod.yaml.in")
 			podName := "dapi-test-pod"

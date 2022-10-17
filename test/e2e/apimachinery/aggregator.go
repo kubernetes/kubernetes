@@ -83,7 +83,7 @@ var _ = SIGDescribe("Aggregator", func() {
 		    Description: Ensure that the sample-apiserver code from 1.17 and compiled against 1.17
 			will work on the current Aggregator/API-Server.
 	*/
-	framework.ConformanceIt("Should be able to support the 1.17 Sample API Server using the current Aggregator", func() {
+	framework.ConformanceIt("Should be able to support the 1.17 Sample API Server using the current Aggregator", func(ctx context.Context) {
 		// Testing a 1.17 version of the sample-apiserver
 		TestSampleAPIServer(f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer))
 	})

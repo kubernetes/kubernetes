@@ -97,7 +97,7 @@ var _ = utils.SIGDescribe("vcp-performance [Feature:vsphere]", func() {
 		nodeSelectorList = createNodeLabels(client, namespace, nodes)
 	})
 
-	ginkgo.It("vcp performance tests", func() {
+	ginkgo.It("vcp performance tests", func(ctx context.Context) {
 		scList := getTestStorageClasses(client, policyName, datastoreName)
 		defer func(scList []*storagev1.StorageClass) {
 			for _, sc := range scList {

@@ -69,7 +69,7 @@ var _ = utils.SIGDescribe("[Feature:Flexvolumes] Detaching volumes", func() {
 		suffix = ns.Name
 	})
 
-	ginkgo.It("should not work when mount is in progress [Slow]", func() {
+	ginkgo.It("should not work when mount is in progress [Slow]", func(ctx context.Context) {
 		e2eskipper.SkipUnlessSSHKeyPresent()
 
 		driver := "attachable-with-long-mount"

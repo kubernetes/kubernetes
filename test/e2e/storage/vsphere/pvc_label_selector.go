@@ -84,7 +84,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:LabelSele
 				testCleanupVSpherePVClabelselector(c, ns, nodeInfo, volumePath, pvSsd, pvcSsd, pvcVvol)
 			}
 		})
-		ginkgo.It("should bind volume with claim for given label", func() {
+		ginkgo.It("should bind volume with claim for given label", func(ctx context.Context) {
 			volumePath, pvSsd, pvcSsd, pvcVvol, err = testSetupVSpherePVClabelselector(c, nodeInfo, ns, ssdlabels, vvollabels)
 			framework.ExpectNoError(err)
 

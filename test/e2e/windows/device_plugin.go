@@ -50,7 +50,7 @@ var _ = SIGDescribe("[Feature:GPUDevicePlugin] Device Plugin", func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 		cs = f.ClientSet
 	})
-	ginkgo.It("should be able to create a functioning device plugin for Windows", func() {
+	ginkgo.It("should be able to create a functioning device plugin for Windows", func(ctx context.Context) {
 		ginkgo.By("creating Windows device plugin daemonset")
 		dsName := "directx-device-plugin"
 		daemonsetNameLabel := "daemonset-name"

@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -53,7 +54,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 			ginkgo.By("Recording processes in system cgroups")
 			recordSystemCgroupProcesses()
 		})
-		ginkgo.It("should report resource usage through the stats api", func() {
+		ginkgo.It("should report resource usage through the stats api", func(ctx context.Context) {
 			const pod0 = "stats-busybox-0"
 			const pod1 = "stats-busybox-1"
 

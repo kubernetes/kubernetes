@@ -74,7 +74,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		}
 	})
 
-	ginkgo.It("should be able to change the type and ports of a TCP service [Slow]", func() {
+	ginkgo.It("should be able to change the type and ports of a TCP service [Slow]", func(ctx context.Context) {
 		// requires cloud load-balancer support
 		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 
@@ -284,7 +284,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		testNotReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeout)
 	})
 
-	ginkgo.It("should be able to change the type and ports of a UDP service [Slow]", func() {
+	ginkgo.It("should be able to change the type and ports of a UDP service [Slow]", func(ctx context.Context) {
 		// requires cloud load-balancer support
 		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 
@@ -484,7 +484,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		testNotReachableUDP(udpIngressIP, svcPort, loadBalancerLagTimeout)
 	})
 
-	ginkgo.It("should only allow access from service loadbalancer source ranges [Slow]", func() {
+	ginkgo.It("should only allow access from service loadbalancer source ranges [Slow]", func(ctx context.Context) {
 		// this feature currently supported only on GCE/GKE/AWS
 		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws", "azure")
 
@@ -568,7 +568,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		checkReachabilityFromPod(true, loadBalancerCreateTimeout, namespace, dropPod.Name, svcIP)
 	})
 
-	ginkgo.It("should be able to create an internal type load balancer [Slow]", func() {
+	ginkgo.It("should be able to create an internal type load balancer [Slow]", func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("azure", "gke", "gce")
 
 		createTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
@@ -693,7 +693,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	// This test creates a load balancer, make sure its health check interval
 	// equals to gceHcCheckIntervalSeconds. Then the interval is manipulated
 	// to be something else, see if the interval will be reconciled.
-	ginkgo.It("should reconcile LB health check interval [Slow][Serial][Disruptive]", func() {
+	ginkgo.It("should reconcile LB health check interval [Slow][Serial][Disruptive]", func(ctx context.Context) {
 		const gceHcCheckIntervalSeconds = int64(8)
 		// This test is for clusters on GCE.
 		// (It restarts kube-controller-manager, which we don't support on GKE)
@@ -766,7 +766,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	})
 
 	// [LinuxOnly]: Windows does not support session affinity.
-	ginkgo.It("should have session affinity work for LoadBalancer service with ESIPP on [Slow] [LinuxOnly]", func() {
+	ginkgo.It("should have session affinity work for LoadBalancer service with ESIPP on [Slow] [LinuxOnly]", func(ctx context.Context) {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
 		e2eskipper.SkipIfProviderIs("aws")
 
@@ -777,7 +777,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	})
 
 	// [LinuxOnly]: Windows does not support session affinity.
-	ginkgo.It("should be able to switch session affinity for LoadBalancer service with ESIPP on [Slow] [LinuxOnly]", func() {
+	ginkgo.It("should be able to switch session affinity for LoadBalancer service with ESIPP on [Slow] [LinuxOnly]", func(ctx context.Context) {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
 		e2eskipper.SkipIfProviderIs("aws")
 
@@ -788,7 +788,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	})
 
 	// [LinuxOnly]: Windows does not support session affinity.
-	ginkgo.It("should have session affinity work for LoadBalancer service with ESIPP off [Slow] [LinuxOnly]", func() {
+	ginkgo.It("should have session affinity work for LoadBalancer service with ESIPP off [Slow] [LinuxOnly]", func(ctx context.Context) {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
 		e2eskipper.SkipIfProviderIs("aws")
 
@@ -799,7 +799,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	})
 
 	// [LinuxOnly]: Windows does not support session affinity.
-	ginkgo.It("should be able to switch session affinity for LoadBalancer service with ESIPP off [Slow] [LinuxOnly]", func() {
+	ginkgo.It("should be able to switch session affinity for LoadBalancer service with ESIPP off [Slow] [LinuxOnly]", func(ctx context.Context) {
 		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
 		e2eskipper.SkipIfProviderIs("aws")
 
@@ -815,7 +815,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	// 2. Update service to type=ClusterIP. Finalizer should be removed.
 	// 3. Update service to type=LoadBalancer. Finalizer should be added.
 	// 4. Delete service with type=LoadBalancer. Finalizer should be removed.
-	ginkgo.It("should handle load balancer cleanup finalizer for service [Slow]", func() {
+	ginkgo.It("should handle load balancer cleanup finalizer for service [Slow]", func(ctx context.Context) {
 		jig := e2eservice.NewTestJig(cs, f.Namespace.Name, "lb-finalizer")
 
 		ginkgo.By("Create load balancer service")
@@ -847,7 +847,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		e2eservice.WaitForServiceUpdatedWithFinalizer(cs, svc.Namespace, svc.Name, true)
 	})
 
-	ginkgo.It("should be able to create LoadBalancer Service without NodePort and change it [Slow]", func() {
+	ginkgo.It("should be able to create LoadBalancer Service without NodePort and change it [Slow]", func(ctx context.Context) {
 		// requires cloud load-balancer support
 		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 
@@ -973,7 +973,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		e2eservice.TestReachableHTTP(tcpIngressIP, svcPort, loadBalancerLagTimeout)
 	})
 
-	ginkgo.It("should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on different nodes", func() {
+	ginkgo.It("should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on different nodes", func(ctx context.Context) {
 		// requires cloud load-balancer support
 		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws", "azure")
 		ns := f.Namespace.Name
@@ -1105,7 +1105,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		}
 	})
 
-	ginkgo.It("should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on the same nodes", func() {
+	ginkgo.It("should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on the same nodes", func(ctx context.Context) {
 		// requires cloud load-balancer support
 		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws", "azure")
 		ns := f.Namespace.Name
@@ -1263,7 +1263,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 		}
 	})
 
-	ginkgo.It("should work for type=LoadBalancer", func() {
+	ginkgo.It("should work for type=LoadBalancer", func(ctx context.Context) {
 		namespace := f.Namespace.Name
 		serviceName := "external-local-lb"
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
@@ -1311,7 +1311,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 		}
 	})
 
-	ginkgo.It("should work for type=NodePort", func() {
+	ginkgo.It("should work for type=NodePort", func(ctx context.Context) {
 		namespace := f.Namespace.Name
 		serviceName := "external-local-nodeport"
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
@@ -1343,7 +1343,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 		}
 	})
 
-	ginkgo.It("should only target nodes with endpoints", func() {
+	ginkgo.It("should only target nodes with endpoints", func(ctx context.Context) {
 		namespace := f.Namespace.Name
 		serviceName := "external-local-nodes"
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
@@ -1419,7 +1419,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 		}
 	})
 
-	ginkgo.It("should work from pods", func() {
+	ginkgo.It("should work from pods", func(ctx context.Context) {
 		var err error
 		namespace := f.Namespace.Name
 		serviceName := "external-local-pods"
@@ -1477,7 +1477,7 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 		}
 	})
 
-	ginkgo.It("should handle updates to ExternalTrafficPolicy field", func() {
+	ginkgo.It("should handle updates to ExternalTrafficPolicy field", func(ctx context.Context) {
 		namespace := f.Namespace.Name
 		serviceName := "external-local-update"
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)

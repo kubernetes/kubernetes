@@ -134,7 +134,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 			readOnly := t.readOnly
 			readOnlyTxt := readOnlyMap[readOnly]
 
-			ginkgo.It(fmt.Sprintf("for %s PD with pod delete grace period of %q", readOnlyTxt, t.descr), func() {
+			ginkgo.It(fmt.Sprintf("for %s PD with pod delete grace period of %q", readOnlyTxt, t.descr), func(ctx context.Context) {
 				e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 				if readOnly {
 					e2eskipper.SkipIfProviderIs("aws")
@@ -254,7 +254,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 			numContainers := t.numContainers
 			t := t
 
-			ginkgo.It(fmt.Sprintf("using %d containers and %d PDs", numContainers, numPDs), func() {
+			ginkgo.It(fmt.Sprintf("using %d containers and %d PDs", numContainers, numPDs), func(ctx context.Context) {
 				e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 				var host0Pod *v1.Pod
 				var err error
@@ -348,7 +348,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 
 		for _, t := range tests {
 			disruptOp := t.disruptOp
-			ginkgo.It(fmt.Sprintf("when %s", t.descr), func() {
+			ginkgo.It(fmt.Sprintf("when %s", t.descr), func(ctx context.Context) {
 				e2eskipper.SkipUnlessProviderIs("gce")
 				origNodeCnt := len(nodes.Items) // healhy nodes running kubelet
 
@@ -449,7 +449,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 		}
 	})
 
-	ginkgo.It("should be able to delete a non-existent PD without error", func() {
+	ginkgo.It("should be able to delete a non-existent PD without error", func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("gce")
 
 		ginkgo.By("delete a PD")
@@ -458,7 +458,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 
 	// This test is marked to run as serial so as device selection on AWS does not
 	// conflict with other concurrent attach operations.
-	ginkgo.It("[Serial] attach on previously attached volumes should work", func() {
+	ginkgo.It("[Serial] attach on previously attached volumes should work", func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
 		ginkgo.By("creating PD")
 		diskName, err := e2epv.CreatePDWithRetry()

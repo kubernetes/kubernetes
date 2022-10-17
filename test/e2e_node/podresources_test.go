@@ -588,7 +588,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 					initialConfig.ReservedSystemCPUs = cpus
 				})
 
-				ginkgo.It("should return the expected responses", func() {
+				ginkgo.It("should return the expected responses", func(ctx context.Context) {
 					onlineCPUs, err := getOnlineCPUs()
 					framework.ExpectNoError(err)
 
@@ -616,7 +616,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 		})
 
 		ginkgo.Context("with CPU manager None policy", func() {
-			ginkgo.It("should return the expected responses", func() {
+			ginkgo.It("should return the expected responses", func(ctx context.Context) {
 				// current default is "none" policy - no need to restart the kubelet
 
 				requireSRIOVDevices()
@@ -672,7 +672,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 					initialConfig.ReservedSystemCPUs = cpus
 				})
 
-				ginkgo.It("should return the expected responses", func() {
+				ginkgo.It("should return the expected responses", func(ctx context.Context) {
 					onlineCPUs, err := getOnlineCPUs()
 					framework.ExpectNoError(err)
 
@@ -690,7 +690,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 		})
 
 		ginkgo.Context("with CPU manager None policy", func() {
-			ginkgo.It("should return the expected responses", func() {
+			ginkgo.It("should return the expected responses", func(ctx context.Context) {
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 				framework.ExpectNoError(err)
 
@@ -712,7 +712,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 				initialConfig.FeatureGates[string(kubefeatures.KubeletPodResourcesGetAllocatable)] = false
 			})
 
-			ginkgo.It("should return the expected error with the feature gate disabled", func() {
+			ginkgo.It("should return the expected error with the feature gate disabled", func(ctx context.Context) {
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 				framework.ExpectNoError(err)
 
@@ -760,7 +760,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 					initialConfig.ReservedSystemCPUs = cpus
 				})
 
-				ginkgo.It("should return proper podresources the same as before the restart of kubelet", func() {
+				ginkgo.It("should return proper podresources the same as before the restart of kubelet", func(ctx context.Context) {
 					dpPod := setupKubeVirtDevicePluginOrFail(f)
 					defer teardownKubeVirtDevicePluginOrFail(f, dpPod)
 
@@ -842,7 +842,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			framework.ExpectNoError(err)
 		})
 
-		ginkgo.It("should report the values for the podresources metrics", func() {
+		ginkgo.It("should report the values for the podresources metrics", func(ctx context.Context) {
 			// we updated the kubelet config in BeforeEach, so we can assume we start fresh.
 			// being [Serial], we can also assume noone else but us is running pods.
 			ginkgo.By("Checking the value of the podresources metrics")

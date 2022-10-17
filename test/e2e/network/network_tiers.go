@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -63,7 +64,7 @@ var _ = common.SIGDescribe("Services GCE [Slow]", func() {
 		//reset serviceLBNames
 		serviceLBNames = []string{}
 	})
-	ginkgo.It("should be able to create and tear down a standard-tier load balancer [Slow]", func() {
+	ginkgo.It("should be able to create and tear down a standard-tier load balancer [Slow]", func(ctx context.Context) {
 		lagTimeout := e2eservice.LoadBalancerLagTimeoutDefault
 		createTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
 

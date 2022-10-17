@@ -95,7 +95,7 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Describe("GMSA support", func() {
-		ginkgo.It("works end to end", func() {
+		ginkgo.It("works end to end", func(ctx context.Context) {
 			defer ginkgo.GinkgoRecover()
 
 			ginkgo.By("finding the worker node that fulfills this test's assumptions")
@@ -165,7 +165,7 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
 			}, 1*time.Minute, 1*time.Second).Should(gomega.BeTrue())
 		})
 
-		ginkgo.It("can read and write file to remote SMB folder", func() {
+		ginkgo.It("can read and write file to remote SMB folder", func(ctx context.Context) {
 			defer ginkgo.GinkgoRecover()
 
 			ginkgo.By("finding the worker node that fulfills this test's assumptions")

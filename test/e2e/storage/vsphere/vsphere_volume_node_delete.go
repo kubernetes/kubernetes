@@ -51,7 +51,7 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 		workingDir = GetAndExpectStringEnvVar("VSPHERE_WORKING_DIR")
 	})
 
-	ginkgo.It("node unregister", func() {
+	ginkgo.It("node unregister", func(ctx context.Context) {
 		ginkgo.By("Get total Ready nodes")
 		nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 		framework.ExpectNoError(err)

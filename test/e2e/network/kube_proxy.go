@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"net"
@@ -52,7 +53,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 	fr := framework.NewDefaultFramework("kube-proxy")
 	fr.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("should set TCP CLOSE_WAIT timeout [Privileged]", func() {
+	ginkgo.It("should set TCP CLOSE_WAIT timeout [Privileged]", func(ctx context.Context) {
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(fr.ClientSet, 2)
 		framework.ExpectNoError(err)
 		if len(nodes.Items) < 2 {

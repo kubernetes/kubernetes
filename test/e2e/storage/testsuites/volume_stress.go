@@ -195,7 +195,7 @@ func (t *volumeStressTestSuite) DefineTests(driver storageframework.TestDriver, 
 		createPodsAndVolumes()
 	})
 
-	ginkgo.It("multiple pods should access different volumes repeatedly [Slow] [Serial]", func() {
+	ginkgo.It("multiple pods should access different volumes repeatedly [Slow] [Serial]", func(ctx context.Context) {
 		// Restart pod repeatedly
 		for i := 0; i < l.testOptions.NumPods; i++ {
 			podIndex := i

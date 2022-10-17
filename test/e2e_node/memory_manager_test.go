@@ -378,7 +378,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 		})
 
 		// TODO: move the test to pod resource API test suite, see - https://github.com/kubernetes/kubernetes/issues/101945
-		ginkgo.It("should report memory data during request to pod resources GetAllocatableResources", func() {
+		ginkgo.It("should report memory data during request to pod resources GetAllocatableResources", func(ctx context.Context) {
 			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 			framework.ExpectNoError(err)
 
@@ -439,7 +439,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 				}
 			})
 
-			ginkgo.It("should succeed to start the pod", func() {
+			ginkgo.It("should succeed to start the pod", func(ctx context.Context) {
 				ginkgo.By("Running the test pod")
 				testPod = e2epod.NewPodClient(f).CreateSync(testPod)
 
@@ -464,7 +464,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 				}
 			})
 
-			ginkgo.It("should succeed to start the pod", func() {
+			ginkgo.It("should succeed to start the pod", func(ctx context.Context) {
 				ginkgo.By("Running the test pod")
 				testPod = e2epod.NewPodClient(f).CreateSync(testPod)
 
@@ -495,7 +495,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 				testPod2 = makeMemoryManagerPod("memory-manager-static", initCtnParams, ctnParams)
 			})
 
-			ginkgo.It("should succeed to start all pods", func() {
+			ginkgo.It("should succeed to start all pods", func(ctx context.Context) {
 				ginkgo.By("Running the test pod and the test pod 2")
 				testPod = e2epod.NewPodClient(f).CreateSync(testPod)
 
@@ -512,7 +512,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 			})
 
 			// TODO: move the test to pod resource API test suite, see - https://github.com/kubernetes/kubernetes/issues/101945
-			ginkgo.It("should report memory data for each guaranteed pod and container during request to pod resources List", func() {
+			ginkgo.It("should report memory data for each guaranteed pod and container during request to pod resources List", func(ctx context.Context) {
 				ginkgo.By("Running the test pod and the test pod 2")
 				testPod = e2epod.NewPodClient(f).CreateSync(testPod)
 
@@ -604,7 +604,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 				}
 			})
 
-			ginkgo.It("should be rejected", func() {
+			ginkgo.It("should be rejected", func(ctx context.Context) {
 				ginkgo.By("Creating the pod")
 				testPod = e2epod.NewPodClient(f).Create(testPod)
 
@@ -663,7 +663,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 			})
 
 			// TODO: move the test to pod resource API test suite, see - https://github.com/kubernetes/kubernetes/issues/101945
-			ginkgo.It("should not report any memory data during request to pod resources GetAllocatableResources", func() {
+			ginkgo.It("should not report any memory data during request to pod resources GetAllocatableResources", func(ctx context.Context) {
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 				framework.ExpectNoError(err)
 
@@ -678,7 +678,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 			})
 
 			// TODO: move the test to pod resource API test suite, see - https://github.com/kubernetes/kubernetes/issues/101945
-			ginkgo.It("should not report any memory data during request to pod resources List", func() {
+			ginkgo.It("should not report any memory data during request to pod resources List", func(ctx context.Context) {
 				testPod = e2epod.NewPodClient(f).CreateSync(testPod)
 
 				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
@@ -702,7 +702,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 				}
 			})
 
-			ginkgo.It("should succeed to start the pod", func() {
+			ginkgo.It("should succeed to start the pod", func(ctx context.Context) {
 				testPod = e2epod.NewPodClient(f).CreateSync(testPod)
 
 				// it no taste to verify NUMA pinning when the node has only one NUMA node

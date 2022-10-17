@@ -45,7 +45,7 @@ var _ = SIGDescribe("TTLAfterFinished", func() {
 	f := framework.NewDefaultFramework("ttlafterfinished")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
-	ginkgo.It("job should be deleted once it finishes after TTL seconds", func() {
+	ginkgo.It("job should be deleted once it finishes after TTL seconds", func(ctx context.Context) {
 		testFinishedJob(f)
 	})
 })

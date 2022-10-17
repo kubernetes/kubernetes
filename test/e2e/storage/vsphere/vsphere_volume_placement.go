@@ -97,7 +97,7 @@ var _ = utils.SIGDescribe("Volume Placement [Feature:vsphere]", func() {
 
 	*/
 
-	ginkgo.It("should create and delete pod with the same volume source on the same worker node", func() {
+	ginkgo.It("should create and delete pod with the same volume source on the same worker node", func(ctx context.Context) {
 		var volumeFiles []string
 		pod := createPodWithVolumeAndNodeSelector(c, ns, node1Name, node1KeyValueLabel, volumePaths)
 
@@ -137,7 +137,7 @@ var _ = utils.SIGDescribe("Volume Placement [Feature:vsphere]", func() {
 		13. Delete pod.
 	*/
 
-	ginkgo.It("should create and delete pod with the same volume source attach/detach to different worker nodes", func() {
+	ginkgo.It("should create and delete pod with the same volume source attach/detach to different worker nodes", func(ctx context.Context) {
 		var volumeFiles []string
 		pod := createPodWithVolumeAndNodeSelector(c, ns, node1Name, node1KeyValueLabel, volumePaths)
 		// Create empty files on the mounted volumes on the pod to verify volume is writable
@@ -172,7 +172,7 @@ var _ = utils.SIGDescribe("Volume Placement [Feature:vsphere]", func() {
 		10. Wait for vmdk1 and vmdk2 to be detached from node.
 	*/
 
-	ginkgo.It("should create and delete pod with multiple volumes from same datastore", func() {
+	ginkgo.It("should create and delete pod with multiple volumes from same datastore", func(ctx context.Context) {
 		ginkgo.By("creating another vmdk")
 		volumePath, err := vsp.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
 		framework.ExpectNoError(err)
@@ -214,7 +214,7 @@ var _ = utils.SIGDescribe("Volume Placement [Feature:vsphere]", func() {
 		9. Delete POD.
 		10. Wait for vmdk1 and vmdk2 to be detached from node.
 	*/
-	ginkgo.It("should create and delete pod with multiple volumes from different datastore", func() {
+	ginkgo.It("should create and delete pod with multiple volumes from different datastore", func(ctx context.Context) {
 		ginkgo.By("creating another vmdk on non default shared datastore")
 		var volumeOptions *VolumeOptions
 		volumeOptions = new(VolumeOptions)
@@ -266,7 +266,7 @@ var _ = utils.SIGDescribe("Volume Placement [Feature:vsphere]", func() {
 		    10. Repeatedly (5 times) perform step 4 to 9 and verify associated volume's content is matching.
 		    11. Wait for vmdk1 and vmdk2 to be detached from node.
 	*/
-	ginkgo.It("test back to back pod creation and deletion with different volume sources on the same worker node", func() {
+	ginkgo.It("test back to back pod creation and deletion with different volume sources on the same worker node", func(ctx context.Context) {
 		var (
 			podA                *v1.Pod
 			podB                *v1.Pod

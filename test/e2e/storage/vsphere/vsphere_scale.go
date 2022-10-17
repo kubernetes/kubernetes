@@ -114,7 +114,7 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 		})
 	})
 
-	ginkgo.It("vsphere scale tests", func() {
+	ginkgo.It("vsphere scale tests", func(ctx context.Context) {
 		var pvcClaimList []string
 		nodeVolumeMap := make(map[string][]string)
 		// Volumes will be provisioned with each different types of Storage Class

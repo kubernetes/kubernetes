@@ -89,7 +89,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 	f := framework.NewDefaultFramework("host-process-test-windows")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("should run as a process on the host/node", func() {
+	ginkgo.It("should run as a process on the host/node", func(ctx context.Context) {
 
 		ginkgo.By("selecting a Windows node")
 		targetNode, err := findWindowsNode(f)
@@ -138,7 +138,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
 	})
 
-	ginkgo.It("should support init containers", func() {
+	ginkgo.It("should support init containers", func(ctx context.Context) {
 		ginkgo.By("scheduling a pod with a container that verifies init container can configure the node")
 		podName := "host-process-init-pods"
 		filename := fmt.Sprintf("/testfile%s.txt", string(uuid.NewUUID()))
@@ -198,7 +198,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
 	})
 
-	ginkgo.It("container command path validation", func() {
+	ginkgo.It("container command path validation", func(ctx context.Context) {
 
 		// The way hostprocess containers are created is being updated in container
 		// v1.7 to better support volume mounts and part of these changes include
@@ -446,7 +446,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 
 	})
 
-	ginkgo.It("should support various volume mount types", func() {
+	ginkgo.It("should support various volume mount types", func(ctx context.Context) {
 		ns := f.Namespace
 
 		ginkgo.By("Creating a configmap containing test data and a validation script")
@@ -507,7 +507,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
 	})
 
-	ginkgo.It("metrics should report count of started and failed to start HostProcess containers", func() {
+	ginkgo.It("metrics should report count of started and failed to start HostProcess containers", func(ctx context.Context) {
 		ginkgo.By("Selecting a Windows node")
 		targetNode, err := findWindowsNode(f)
 		framework.ExpectNoError(err, "Error finding Windows node")
@@ -613,7 +613,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		gomega.Expect(beforeMetrics.StartedInitContainersErrorCount).To(gomega.BeNumerically("<", afterMetrics.StartedInitContainersErrorCount), "Count of started HostProcess errors init containers should increase")
 	})
 
-	ginkgo.It("container stats validation", func() {
+	ginkgo.It("container stats validation", func(ctx context.Context) {
 		ginkgo.By("selecting a Windows node")
 		targetNode, err := findWindowsNode(f)
 		framework.ExpectNoError(err, "Error finding Windows node")
@@ -692,7 +692,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		}
 	})
 
-	ginkgo.It("should support querying api-server using in-cluster config", func() {
+	ginkgo.It("should support querying api-server using in-cluster config", func(ctx context.Context) {
 		// This functionality is only support on containerd  v1.7+
 		ginkgo.By("Ensuring Windows nodes are running containerd v1.7+")
 		windowsNode, err := findWindowsNode(f)
@@ -771,7 +771,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			"app logs should not contain 'status=failed")
 	})
 
-	ginkgo.It("should run as localgroup accounts", func() {
+	ginkgo.It("should run as localgroup accounts", func(ctx context.Context) {
 		// This functionality is only supported on containerd v1.7+
 		ginkgo.By("Ensuring Windows nodes are running containerd v1.7+")
 		windowsNode, err := findWindowsNode(f)

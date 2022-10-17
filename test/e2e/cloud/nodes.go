@@ -44,7 +44,7 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 		c = f.ClientSet
 	})
 
-	ginkgo.It("should be deleted on API server if it doesn't exist in the cloud provider", func() {
+	ginkgo.It("should be deleted on API server if it doesn't exist in the cloud provider", func(ctx context.Context) {
 		ginkgo.By("deleting a node on the cloud provider")
 
 		nodeToDelete, err := e2enode.GetRandomReadySchedulableNode(c)

@@ -127,7 +127,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		resources is found, the scheduler MUST preempt a lower priority pod and
 		schedule the high priority pod.
 	*/
-	framework.ConformanceIt("validates basic preemption works", func() {
+	framework.ConformanceIt("validates basic preemption works", func(ctx context.Context) {
 		var podRes v1.ResourceList
 
 		// Create two pods per node that uses a lot of the node's resources.
@@ -221,7 +221,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		resources is found, the scheduler MUST preempt a lower priority pod to
 		schedule the critical pod.
 	*/
-	framework.ConformanceIt("validates lower priority pod preemption by critical pod", func() {
+	framework.ConformanceIt("validates lower priority pod preemption by critical pod", func(ctx context.Context) {
 		var podRes v1.ResourceList
 
 		ginkgo.By("Create pods that use 4/5 of node resources.")
@@ -324,7 +324,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	// 2. Schedule a higher priority pod which also consumes 1/1 of node resources
 	// 3. See if the pod with lower priority is preempted and has the pod disruption condition
 	// 4. Remove the finalizer so that the pod can be deleted by GC
-	ginkgo.It("validates pod disruption condition is added to the preempted pod", func() {
+	ginkgo.It("validates pod disruption condition is added to the preempted pod", func(ctx context.Context) {
 		podRes := v1.ResourceList{testExtendedResource: resource.MustParse("1")}
 
 		ginkgo.By("Select a node to run the lower and higher priority pods")
@@ -431,7 +431,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			}
 		})
 
-		ginkgo.It("validates proper pods are preempted", func() {
+		ginkgo.It("validates proper pods are preempted", func(ctx context.Context) {
 			podLabel := "e2e-pts-preemption"
 			nodeAffinity := &v1.Affinity{
 				NodeAffinity: &v1.NodeAffinity{
@@ -621,7 +621,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			Testname: Pod preemption verification
 			Description: Four levels of Pods in ReplicaSets with different levels of Priority, restricted by given CPU limits MUST launch. Priority 1 - 3 Pods MUST spawn first followed by Priority 4 Pod. The ReplicaSets with Replicas MUST contain the expected number of Replicas.
 		*/
-		framework.ConformanceIt("runs ReplicaSets to verify preemption running path", func() {
+		framework.ConformanceIt("runs ReplicaSets to verify preemption running path", func(ctx context.Context) {
 			podNamesSeen := []int32{0, 0, 0}
 			stopCh := make(chan struct{})
 
@@ -811,7 +811,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			either patched or updated it MUST succeed. When any immutable field is either patched or
 			updated it MUST fail.
 		*/
-		framework.ConformanceIt("verify PriorityClass endpoints can be operated with different HTTP methods", func() {
+		framework.ConformanceIt("verify PriorityClass endpoints can be operated with different HTTP methods", func(ctx context.Context) {
 			// 1. Patch/Update on immutable fields will fail.
 			pcCopy := pcs[0].DeepCopy()
 			pcCopy.Value = pcCopy.Value * 10

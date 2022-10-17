@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -67,7 +68,7 @@ var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 				},
 			} {
 				testCase := testCase
-				ginkgo.It(testCase.description+" [NodeConformance]", func() {
+				ginkgo.It(testCase.description+" [NodeConformance]", func(ctx context.Context) {
 					name := "image-pull-test"
 					command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
 					container := node.ConformanceContainer{

@@ -142,7 +142,7 @@ var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]",
 	f := framework.NewDefaultFramework("network-perf")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
-	ginkgo.It(fmt.Sprintf("should run iperf2"), func() {
+	ginkgo.It(fmt.Sprintf("should run iperf2"), func(ctx context.Context) {
 		readySchedulableNodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 		framework.ExpectNoError(err)
 

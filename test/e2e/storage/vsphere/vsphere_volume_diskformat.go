@@ -81,15 +81,15 @@ var _ = utils.SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 		ginkgo.DeferCleanup(e2enode.RemoveLabelOffNode, client, nodeName, NodeLabelKey)
 	})
 
-	ginkgo.It("verify disk format type - eagerzeroedthick is honored for dynamically provisioned pv using storageclass", func() {
+	ginkgo.It("verify disk format type - eagerzeroedthick is honored for dynamically provisioned pv using storageclass", func(ctx context.Context) {
 		ginkgo.By("Invoking Test for diskformat: eagerzeroedthick")
 		invokeTest(f, client, namespace, nodeName, nodeKeyValueLabel, "eagerzeroedthick")
 	})
-	ginkgo.It("verify disk format type - zeroedthick is honored for dynamically provisioned pv using storageclass", func() {
+	ginkgo.It("verify disk format type - zeroedthick is honored for dynamically provisioned pv using storageclass", func(ctx context.Context) {
 		ginkgo.By("Invoking Test for diskformat: zeroedthick")
 		invokeTest(f, client, namespace, nodeName, nodeKeyValueLabel, "zeroedthick")
 	})
-	ginkgo.It("verify disk format type - thin is honored for dynamically provisioned pv using storageclass", func() {
+	ginkgo.It("verify disk format type - thin is honored for dynamically provisioned pv using storageclass", func(ctx context.Context) {
 		ginkgo.By("Invoking Test for diskformat: thin")
 		invokeTest(f, client, namespace, nodeName, nodeKeyValueLabel, "thin")
 	})

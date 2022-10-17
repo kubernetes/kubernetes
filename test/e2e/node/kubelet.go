@@ -343,7 +343,7 @@ var _ = SIGDescribe("kubelet", func() {
 			name := fmt.Sprintf(
 				"kubelet should be able to delete %d pods per node in %v.", itArg.podsPerNode, itArg.timeout)
 			itArg := itArg
-			ginkgo.It(name, func() {
+			ginkgo.It(name, func(ctx context.Context) {
 				totalPods := itArg.podsPerNode * numNodes
 				ginkgo.By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
 				rcName := fmt.Sprintf("cleanup%d-%s", totalPods, string(uuid.NewUUID()))
@@ -436,7 +436,7 @@ var _ = SIGDescribe("kubelet", func() {
 			// execute It blocks from above table of tests
 			for _, t := range testTbl {
 				t := t
-				ginkgo.It(t.itDescr, func() {
+				ginkgo.It(t.itDescr, func(ctx context.Context) {
 					pod = createPodUsingNfs(f, c, ns, nfsIP, t.podCmd)
 
 					ginkgo.By("Stop the NFS server")
@@ -482,7 +482,7 @@ var _ = SIGDescribe("kubelet", func() {
 			returns something or not!
 		*/
 
-		ginkgo.It("should return the logs ", func() {
+		ginkgo.It("should return the logs ", func(ctx context.Context) {
 			ginkgo.By("Starting the command")
 			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
 
@@ -497,7 +497,7 @@ var _ = SIGDescribe("kubelet", func() {
 			returns something or not!
 		*/
 
-		ginkgo.It("should return the logs for the requested service", func() {
+		ginkgo.It("should return the logs for the requested service", func(ctx context.Context) {
 			ginkgo.By("Starting the command")
 			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
 
@@ -512,7 +512,7 @@ var _ = SIGDescribe("kubelet", func() {
 			returns something or not!
 		*/
 
-		ginkgo.It("should return the logs for the provided path", func() {
+		ginkgo.It("should return the logs for the provided path", func(ctx context.Context) {
 			ginkgo.By("Starting the command")
 			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
 

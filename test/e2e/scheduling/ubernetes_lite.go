@@ -74,11 +74,11 @@ var _ = SIGDescribe("Multi-AZ Clusters", func() {
 			cleanUp()
 		}
 	})
-	ginkgo.It("should spread the pods of a service across zones [Serial]", func() {
+	ginkgo.It("should spread the pods of a service across zones [Serial]", func(ctx context.Context) {
 		SpreadServiceOrFail(f, 5*zoneCount, zoneNames, imageutils.GetPauseImageName())
 	})
 
-	ginkgo.It("should spread the pods of a replication controller across zones [Serial]", func() {
+	ginkgo.It("should spread the pods of a replication controller across zones [Serial]", func(ctx context.Context) {
 		SpreadRCOrFail(f, int32(5*zoneCount), zoneNames, framework.ServeHostnameImage, []string{"serve-hostname"})
 	})
 })

@@ -336,7 +336,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			Testname: Kubectl, replication controller
 			Description: Create a Pod and a container with a given image. Configure replication controller to run 2 replicas. The number of running instances of the Pod MUST equal the number of replicas set on the replication controller which is 2.
 		*/
-		framework.ConformanceIt("should create and stop a replication controller ", func() {
+		framework.ConformanceIt("should create and stop a replication controller ", func(ctx context.Context) {
 			defer cleanupKubectlInputs(nautilus, ns, updateDemoSelector)
 
 			ginkgo.By("creating a replication controller")
@@ -349,7 +349,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			Testname: Kubectl, scale replication controller
 			Description: Create a Pod and a container with a given image. Configure replication controller to run 2 replicas. The number of running instances of the Pod MUST equal the number of replicas set on the replication controller which is 2. Update the replicaset to 1. Number of running instances of the Pod MUST be 1. Update the replicaset to 2. Number of running instances of the Pod MUST be 2.
 		*/
-		framework.ConformanceIt("should scale a replication controller ", func() {
+		framework.ConformanceIt("should scale a replication controller ", func(ctx context.Context) {
 			defer cleanupKubectlInputs(nautilus, ns, updateDemoSelector)
 
 			ginkgo.By("creating a replication controller")
@@ -391,7 +391,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			Testname: Kubectl, guestbook application
 			Description: Create Guestbook application that contains an agnhost primary server, 2 agnhost replicas, frontend application, frontend service and agnhost primary service and agnhost replica service. Using frontend service, the test will write an entry into the guestbook application which will store the entry into the backend agnhost store. Application flow MUST work as expected and the data written MUST be available to read.
 		*/
-		framework.ConformanceIt("should create and stop a working application ", func() {
+		framework.ConformanceIt("should create and stop a working application ", func(ctx context.Context) {
 			defer forEachGBFile(func(contents string) {
 				cleanupKubectlInputs(contents, ns)
 			})
@@ -418,7 +418,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			cleanupKubectlInputs(podYaml, ns, simplePodSelector)
 		})
 
-		ginkgo.It("should support exec", func() {
+		ginkgo.It("should support exec", func(ctx context.Context) {
 			ginkgo.By("executing a command in the container")
 			execOutput := e2ekubectl.RunKubectlOrDie(ns, "exec", podRunningTimeoutArg, simplePodName, "--", "echo", "running", "in", "container")
 			if e, a := "running in container", strings.TrimSpace(execOutput); e != a {
@@ -458,7 +458,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			}
 		})
 
-		ginkgo.It("should support exec using resource/name", func() {
+		ginkgo.It("should support exec using resource/name", func(ctx context.Context) {
 			ginkgo.By("executing a command in the container")
 			execOutput := e2ekubectl.RunKubectlOrDie(ns, "exec", podRunningTimeoutArg, simplePodResourceName, "--", "echo", "running", "in", "container")
 			if e, a := "running in container", strings.TrimSpace(execOutput); e != a {
@@ -466,7 +466,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			}
 		})
 
-		ginkgo.It("should support exec through an HTTP proxy", func() {
+		ginkgo.It("should support exec through an HTTP proxy", func(ctx context.Context) {
 			// Fail if the variable isn't set
 			if framework.TestContext.Host == "" {
 				framework.Failf("--host variable must be set to the full URI to the api server on e2e run.")
@@ -500,7 +500,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			}
 		})
 
-		ginkgo.It("should support exec through kubectl proxy", func() {
+		ginkgo.It("should support exec through kubectl proxy", func(ctx context.Context) {
 			// Fail if the variable isn't set
 			if framework.TestContext.Host == "" {
 				framework.Failf("--host variable must be set to the full URI to the api server on e2e run.")
@@ -527,12 +527,12 @@ var _ = SIGDescribe("Kubectl client", func() {
 		})
 
 		ginkgo.Context("should return command exit codes", func() {
-			ginkgo.It("execing into a container with a successful command", func() {
+			ginkgo.It("execing into a container with a successful command", func(ctx context.Context) {
 				_, err := e2ekubectl.NewKubectlCommand(ns, "exec", "httpd", podRunningTimeoutArg, "--", "/bin/sh", "-c", "exit 0").Exec()
 				framework.ExpectNoError(err)
 			})
 
-			ginkgo.It("execing into a container with a failing command", func() {
+			ginkgo.It("execing into a container with a failing command", func(ctx context.Context) {
 				_, err := e2ekubectl.NewKubectlCommand(ns, "exec", "httpd", podRunningTimeoutArg, "--", "/bin/sh", "-c", "exit 42").Exec()
 				ee, ok := err.(uexec.ExitError)
 				if !ok {
@@ -541,12 +541,12 @@ var _ = SIGDescribe("Kubectl client", func() {
 				framework.ExpectEqual(ee.ExitStatus(), 42)
 			})
 
-			ginkgo.It("running a successful command", func() {
+			ginkgo.It("running a successful command", func(ctx context.Context) {
 				_, err := e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=Never", podRunningTimeoutArg, "success", "--", "/bin/sh", "-c", "exit 0").Exec()
 				framework.ExpectNoError(err)
 			})
 
-			ginkgo.It("running a failing command", func() {
+			ginkgo.It("running a failing command", func(ctx context.Context) {
 				_, err := e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=Never", podRunningTimeoutArg, "failure-1", "--", "/bin/sh", "-c", "exit 42").Exec()
 				ee, ok := err.(uexec.ExitError)
 				if !ok {
@@ -555,7 +555,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				framework.ExpectEqual(ee.ExitStatus(), 42)
 			})
 
-			ginkgo.It("[Slow] running a failing command without --restart=Never", func() {
+			ginkgo.It("[Slow] running a failing command without --restart=Never", func(ctx context.Context) {
 				_, err := e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=OnFailure", podRunningTimeoutArg, "failure-2", "--", "/bin/sh", "-c", "cat && exit 42").
 					WithStdinData("abcd1234").
 					Exec()
@@ -568,7 +568,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				}
 			})
 
-			ginkgo.It("[Slow] running a failing command without --restart=Never, but with --rm", func() {
+			ginkgo.It("[Slow] running a failing command without --restart=Never, but with --rm", func(ctx context.Context) {
 				_, err := e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=OnFailure", "--rm", podRunningTimeoutArg, "failure-3", "--", "/bin/sh", "-c", "cat && exit 42").
 					WithStdinData("abcd1234").
 					Exec()
@@ -582,7 +582,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				e2epod.WaitForPodToDisappear(f.ClientSet, ns, "failure-3", labels.Everything(), 2*time.Second, wait.ForeverTestTimeout)
 			})
 
-			ginkgo.It("[Slow] running a failing command with --leave-stdin-open", func() {
+			ginkgo.It("[Slow] running a failing command with --leave-stdin-open", func(ctx context.Context) {
 				_, err := e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=Never", podRunningTimeoutArg, "failure-4", "--leave-stdin-open", "--", "/bin/sh", "-c", "exit 42").
 					WithStdinData("abcd1234").
 					Exec()
@@ -590,7 +590,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			})
 		})
 
-		ginkgo.It("should support inline execution and attach", func() {
+		ginkgo.It("should support inline execution and attach", func(ctx context.Context) {
 			waitForStdinContent := func(pod, content string) string {
 				var logOutput string
 				err := wait.Poll(10*time.Second, 5*time.Minute, func() (bool, error) {
@@ -650,7 +650,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			gomega.Expect(c.CoreV1().Pods(ns).Delete(context.TODO(), "run-test-3", metav1.DeleteOptions{})).To(gomega.BeNil())
 		})
 
-		ginkgo.It("should contain last line of the log", func() {
+		ginkgo.It("should contain last line of the log", func(ctx context.Context) {
 			podName := "run-log-test"
 
 			ginkgo.By("executing a command with run")
@@ -664,7 +664,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			gomega.Expect(logOutput).To(gomega.ContainSubstring("EOF"))
 		})
 
-		ginkgo.It("should support port-forward", func() {
+		ginkgo.It("should support port-forward", func(ctx context.Context) {
 			ginkgo.By("forwarding the container port to a local port")
 			cmd := runPortForward(ns, simplePodName, simplePodPort)
 			defer cmd.Stop()
@@ -681,7 +681,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			}
 		})
 
-		ginkgo.It("should handle in-cluster config", func() {
+		ginkgo.It("should handle in-cluster config", func(ctx context.Context) {
 			// This test does not work for dynamically linked kubectl binaries; only statically linked ones. The
 			// problem happens when the kubectl binary is copied to a pod in the cluster. For dynamically linked
 			// binaries, the necessary libraries are not also copied. For this reason, the test can not be
@@ -821,7 +821,7 @@ metadata:
 			Testname: Kubectl, check version v1
 			Description: Run kubectl to get api versions, output MUST contain returned versions with 'v1' listed.
 		*/
-		framework.ConformanceIt("should check if v1 is in available api versions ", func() {
+		framework.ConformanceIt("should check if v1 is in available api versions ", func(ctx context.Context) {
 			ginkgo.By("validating api versions")
 			output := e2ekubectl.RunKubectlOrDie(ns, "api-versions")
 			if !strings.Contains(output, "v1") {
@@ -831,7 +831,7 @@ metadata:
 	})
 
 	ginkgo.Describe("Kubectl get componentstatuses", func() {
-		ginkgo.It("should get componentstatuses", func() {
+		ginkgo.It("should get componentstatuses", func(ctx context.Context) {
 			ginkgo.By("getting list of componentstatuses")
 			output := e2ekubectl.RunKubectlOrDie(ns, "get", "componentstatuses", "-o", "jsonpath={.items[*].metadata.name}")
 			components := strings.Split(output, " ")
@@ -844,7 +844,7 @@ metadata:
 	})
 
 	ginkgo.Describe("Kubectl apply", func() {
-		ginkgo.It("should apply a new configuration to an existing RC", func() {
+		ginkgo.It("should apply a new configuration to an existing RC", func(ctx context.Context) {
 			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostControllerFilename)))
 
 			ginkgo.By("creating Agnhost RC")
@@ -857,7 +857,7 @@ metadata:
 			ginkgo.By("checking the result")
 			forEachReplicationController(c, ns, "app", "agnhost", validateReplicationControllerConfiguration)
 		})
-		ginkgo.It("should reuse port when apply to an existing SVC", func() {
+		ginkgo.It("should reuse port when apply to an existing SVC", func(ctx context.Context) {
 			serviceJSON := readTestFileOrDie(agnhostServiceFilename)
 
 			ginkgo.By("creating Agnhost SVC")
@@ -878,7 +878,7 @@ metadata:
 			}
 		})
 
-		ginkgo.It("apply set/view last-applied", func() {
+		ginkgo.It("apply set/view last-applied", func(ctx context.Context) {
 			deployment1Yaml := commonutils.SubstituteImageName(string(readTestFileOrDie(httpdDeployment1Filename)))
 			deployment2Yaml := commonutils.SubstituteImageName(string(readTestFileOrDie(httpdDeployment2Filename)))
 			deployment3Yaml := commonutils.SubstituteImageName(string(readTestFileOrDie(httpdDeployment3Filename)))
@@ -928,7 +928,7 @@ metadata:
 			Testname: Kubectl, diff Deployment
 			Description: Create a Deployment with httpd image. Declare the same Deployment with a different image, busybox. Diff of live Deployment with declared Deployment MUST include the difference between live and declared image.
 		*/
-		framework.ConformanceIt("should check if kubectl diff finds a difference for Deployments", func() {
+		framework.ConformanceIt("should check if kubectl diff finds a difference for Deployments", func(ctx context.Context) {
 			ginkgo.By("create deployment with httpd image")
 			deployment := commonutils.SubstituteImageName(string(readTestFileOrDie(httpdDeployment3Filename)))
 			e2ekubectl.RunKubectlOrDieInput(ns, deployment, "create", "-f", "-")
@@ -959,7 +959,7 @@ metadata:
 			Testname: Kubectl, server-side dry-run Pod
 			Description: The command 'kubectl run' must create a pod with the specified image name. After, the command 'kubectl patch pod -p {...} --dry-run=server' should update the Pod with the new image name and server-side dry-run enabled. The image name must not change.
 		*/
-		framework.ConformanceIt("should check if kubectl can dry-run update Pods", func() {
+		framework.ConformanceIt("should check if kubectl can dry-run update Pods", func(ctx context.Context) {
 			ginkgo.By("running the image " + httpdImage)
 			podName := "e2e-test-httpd-pod"
 			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+httpdImage, podRunningTimeoutArg, "--labels=run="+podName)
@@ -1033,7 +1033,7 @@ metadata:
 	}
 
 	ginkgo.Describe("Kubectl validation", func() {
-		ginkgo.It("should create/apply a CR with unknown fields for CRD with no validation schema", func() {
+		ginkgo.It("should create/apply a CR with unknown fields for CRD with no validation schema", func(ctx context.Context) {
 			ginkgo.By("create CRD with no validation schema")
 			crd, err := crd.CreateTestCRD(f)
 			if err != nil {
@@ -1051,7 +1051,7 @@ metadata:
 			}
 		})
 
-		ginkgo.It("should create/apply a valid CR for CRD with validation schema", func() {
+		ginkgo.It("should create/apply a valid CR for CRD with validation schema", func(ctx context.Context) {
 			ginkgo.By("prepare CRD with validation schema")
 			crd, err := crd.CreateTestCRD(f, func(crd *apiextensionsv1.CustomResourceDefinition) {
 				props := &apiextensionsv1.JSONSchemaProps{}
@@ -1077,7 +1077,7 @@ metadata:
 			}
 		})
 
-		ginkgo.It("should create/apply an invalid/valid CR with arbitrary-extra properties for CRD with partially-specified validation schema", func() {
+		ginkgo.It("should create/apply an invalid/valid CR with arbitrary-extra properties for CRD with partially-specified validation schema", func(ctx context.Context) {
 			ginkgo.By("prepare CRD with partially-specified validation schema")
 			crd, err := crd.CreateTestCRD(f, func(crd *apiextensionsv1.CustomResourceDefinition) {
 				props := &apiextensionsv1.JSONSchemaProps{}
@@ -1118,7 +1118,7 @@ metadata:
 			framework.ExpectNoError(err, "creating custom resource")
 		})
 
-		ginkgo.It("should detect unknown metadata fields in both the root and embedded object of a CR", func() {
+		ginkgo.It("should detect unknown metadata fields in both the root and embedded object of a CR", func(ctx context.Context) {
 			ginkgo.By("prepare CRD with x-kubernetes-embedded-resource: true")
 			opt := func(crd *apiextensionsv1.CustomResourceDefinition) {
 				props := &apiextensionsv1.JSONSchemaProps{}
@@ -1194,7 +1194,7 @@ metadata:
 			}
 		})
 
-		ginkgo.It("should detect unknown metadata fields of a typed object", func() {
+		ginkgo.It("should detect unknown metadata fields of a typed object", func(ctx context.Context) {
 			ginkgo.By("calling kubectl create deployment")
 			invalidMetaDeployment := `
 	{
@@ -1247,7 +1247,7 @@ metadata:
 			Testname: Kubectl, cluster info
 			Description: Call kubectl to get cluster-info, output MUST contain cluster-info returned and Kubernetes control plane SHOULD be running.
 		*/
-		framework.ConformanceIt("should check if Kubernetes control plane services is included in cluster-info ", func() {
+		framework.ConformanceIt("should check if Kubernetes control plane services is included in cluster-info ", func(ctx context.Context) {
 			ginkgo.By("validating cluster-info")
 			output := e2ekubectl.RunKubectlOrDie(ns, "cluster-info")
 			// Can't check exact strings due to terminal control commands (colors)
@@ -1261,7 +1261,7 @@ metadata:
 	})
 
 	ginkgo.Describe("Kubectl cluster-info dump", func() {
-		ginkgo.It("should check if cluster-info dump succeeds", func() {
+		ginkgo.It("should check if cluster-info dump succeeds", func(ctx context.Context) {
 			ginkgo.By("running cluster-info dump")
 			e2ekubectl.RunKubectlOrDie(ns, "cluster-info", "dump")
 		})
@@ -1273,7 +1273,7 @@ metadata:
 			Testname: Kubectl, describe pod or rc
 			Description: Deploy an agnhost controller and an agnhost service. Kubectl describe pods SHOULD return the name, namespace, labels, state and other information as expected. Kubectl describe on rc, service, node and namespace SHOULD also return proper information.
 		*/
-		framework.ConformanceIt("should check if kubectl describe prints relevant information for rc and pods ", func() {
+		framework.ConformanceIt("should check if kubectl describe prints relevant information for rc and pods ", func(ctx context.Context) {
 			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostControllerFilename)))
 			serviceJSON := readTestFileOrDie(agnhostServiceFilename)
 
@@ -1370,7 +1370,7 @@ metadata:
 			// Quota and limitrange are skipped for now.
 		})
 
-		ginkgo.It("should check if kubectl describe prints relevant information for cronjob", func() {
+		ginkgo.It("should check if kubectl describe prints relevant information for cronjob", func(ctx context.Context) {
 			ginkgo.By("creating a cronjob")
 			cronjobYaml := commonutils.SubstituteImageName(string(readTestFileOrDie("busybox-cronjob.yaml.in")))
 			e2ekubectl.RunKubectlOrDieInput(ns, cronjobYaml, "create", "-f", "-")
@@ -1412,7 +1412,7 @@ metadata:
 			Testname: Kubectl, create service, replication controller
 			Description: Create a Pod running agnhost listening to port 6379. Using kubectl expose the agnhost primary replication controllers at port 1234. Validate that the replication controller is listening on port 1234 and the target port is set to 6379, port that agnhost primary is listening. Using kubectl expose the agnhost primary as a service at port 2345. The service MUST be listening on port 2345 and the target port is set to 6379, port that agnhost primary is listening.
 		*/
-		framework.ConformanceIt("should create services for rc ", func() {
+		framework.ConformanceIt("should create services for rc ", func(ctx context.Context) {
 			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostControllerFilename)))
 
 			agnhostPort := 6379
@@ -1506,7 +1506,7 @@ metadata:
 			Testname: Kubectl, label update
 			Description: When a Pod is running, update a Label using 'kubectl label' command. The label MUST be created in the Pod. A 'kubectl get pod' with -l option on the container MUST verify that the label can be read back. Use 'kubectl label label-' to remove the label. 'kubectl get pod' with -l option SHOULD not list the deleted label as the label is removed.
 		*/
-		framework.ConformanceIt("should update the label on a resource ", func() {
+		framework.ConformanceIt("should update the label on a resource ", func(ctx context.Context) {
 			labelName := "testing-label"
 			labelValue := "testing-label-value"
 
@@ -1545,7 +1545,7 @@ metadata:
 			Testname: Kubectl, copy
 			Description: When a Pod is running, copy a known file from it to a temporary local destination.
 		*/
-		ginkgo.It("should copy a file from a running Pod", func() {
+		ginkgo.It("should copy a file from a running Pod", func(ctx context.Context) {
 			remoteContents := "foobar\n"
 			podSource := fmt.Sprintf("%s:/root/foo/bar/foo.bar", busyboxPodName)
 			tempDestination, err := os.CreateTemp(os.TempDir(), "copy-foobar")
@@ -1589,7 +1589,7 @@ metadata:
 				'kubectl --since=1s' should output logs that are only 1 second older from now
 				'kubectl --since=24h' should output logs that are only 1 day older from now
 		*/
-		framework.ConformanceIt("should be able to retrieve and filter logs ", func() {
+		framework.ConformanceIt("should be able to retrieve and filter logs ", func(ctx context.Context) {
 			// Split("something\n", "\n") returns ["something", ""], so
 			// strip trailing newline first
 			lines := func(out string) []string {
@@ -1649,7 +1649,7 @@ metadata:
 			Testname: Kubectl, patch to annotate
 			Description: Start running agnhost and a replication controller. When the pod is running, using 'kubectl patch' command add annotations. The annotation MUST be added to running pods and SHOULD be able to read added annotations from each of the Pods running under the replication controller.
 		*/
-		framework.ConformanceIt("should add annotations for pods in rc ", func() {
+		framework.ConformanceIt("should add annotations for pods in rc ", func(ctx context.Context) {
 			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostControllerFilename)))
 			ginkgo.By("creating Agnhost RC")
 			e2ekubectl.RunKubectlOrDieInput(ns, controllerJSON, "create", "-f", "-")
@@ -1682,7 +1682,7 @@ metadata:
 			Testname: Kubectl, version
 			Description: The command 'kubectl version' MUST return the major, minor versions,  GitCommit, etc of the Client and the Server that the kubectl is configured to connect to.
 		*/
-		framework.ConformanceIt("should check is all data is printed ", func() {
+		framework.ConformanceIt("should check is all data is printed ", func(ctx context.Context) {
 			versionString := e2ekubectl.RunKubectlOrDie(ns, "version")
 			// we expect following values for: Major -> digit, Minor -> numeric followed by an optional '+',  GitCommit -> alphanumeric
 			requiredItems := []string{"Client Version: ", "Server Version: "}
@@ -1710,7 +1710,7 @@ metadata:
 			Testname: Kubectl, run pod
 			Description: Command 'kubectl run' MUST create a pod, when a image name is specified in the run command. After the run command there SHOULD be a pod that should exist with one container running the specified image.
 		*/
-		framework.ConformanceIt("should create a pod from an image when restart is Never ", func() {
+		framework.ConformanceIt("should create a pod from an image when restart is Never ", func(ctx context.Context) {
 			ginkgo.By("running the image " + httpdImage)
 			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--restart=Never", podRunningTimeoutArg, "--image="+httpdImage)
 			ginkgo.By("verifying the pod " + podName + " was created")
@@ -1744,7 +1744,7 @@ metadata:
 			Testname: Kubectl, replace
 			Description: Command 'kubectl replace' on a existing Pod with a new spec MUST update the image of the container running in the Pod. A -f option to 'kubectl replace' SHOULD force to re-create the resource. The new Pod SHOULD have the container with new change to the image.
 		*/
-		framework.ConformanceIt("should update a single-container pod's image ", func() {
+		framework.ConformanceIt("should update a single-container pod's image ", func(ctx context.Context) {
 			ginkgo.By("running the image " + httpdImage)
 			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+httpdImage, podRunningTimeoutArg, "--labels=run="+podName)
 
@@ -1784,7 +1784,7 @@ metadata:
 			Testname: Kubectl, proxy port zero
 			Description: Start a proxy server on port zero by running 'kubectl proxy' with --port=0. Call the proxy server by requesting api versions from unix socket. The proxy server MUST provide at least one version string.
 		*/
-		framework.ConformanceIt("should support proxy with --port 0 ", func() {
+		framework.ConformanceIt("should support proxy with --port 0 ", func(ctx context.Context) {
 			ginkgo.By("starting the proxy server")
 			port, cmd, err := startProxyServer(ns)
 			if cmd != nil {
@@ -1809,7 +1809,7 @@ metadata:
 			Testname: Kubectl, proxy socket
 			Description: Start a proxy server on by running 'kubectl proxy' with --unix-socket=<some path>. Call the proxy server by requesting api versions from  http://locahost:0/api. The proxy server MUST provide at least one version string
 		*/
-		framework.ConformanceIt("should support --unix-socket=/path ", func() {
+		framework.ConformanceIt("should support --unix-socket=/path ", func(ctx context.Context) {
 			ginkgo.By("Starting the proxy")
 			tmpdir, err := os.MkdirTemp("", "kubectl-proxy-unix")
 			if err != nil {
@@ -1842,7 +1842,7 @@ metadata:
 	// This test must run [Serial] because it modifies the node so it doesn't allow pods to execute on
 	// it, which will affect anything else running in parallel.
 	ginkgo.Describe("Kubectl taint [Serial]", func() {
-		ginkgo.It("should update the taint on a node", func() {
+		ginkgo.It("should update the taint on a node", func(ctx context.Context) {
 			testTaint := v1.Taint{
 				Key:    fmt.Sprintf("kubernetes.io/e2e-taint-key-001-%s", string(uuid.NewUUID())),
 				Value:  "testing-taint-value",
@@ -1873,7 +1873,7 @@ metadata:
 			}
 		})
 
-		ginkgo.It("should remove all the taints with the same key off a node", func() {
+		ginkgo.It("should remove all the taints with the same key off a node", func(ctx context.Context) {
 			testTaint := v1.Taint{
 				Key:    fmt.Sprintf("kubernetes.io/e2e-taint-key-002-%s", string(uuid.NewUUID())),
 				Value:  "testing-taint-value",
@@ -1942,7 +1942,7 @@ metadata:
 	})
 
 	ginkgo.Describe("Kubectl events", func() {
-		ginkgo.It("should show event when pod is created", func() {
+		ginkgo.It("should show event when pod is created", func(ctx context.Context) {
 			podName := "e2e-test-httpd-pod"
 			ginkgo.By("running the image " + httpdImage)
 			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+httpdImage, podRunningTimeoutArg, "--labels=run="+podName)
@@ -1972,7 +1972,7 @@ metadata:
 	})
 
 	ginkgo.Describe("Kubectl create quota", func() {
-		ginkgo.It("should create a quota without scopes", func() {
+		ginkgo.It("should create a quota without scopes", func(ctx context.Context) {
 			quotaName := "million"
 
 			ginkgo.By("calling kubectl quota")
@@ -2000,7 +2000,7 @@ metadata:
 			}
 		})
 
-		ginkgo.It("should create a quota with scopes", func() {
+		ginkgo.It("should create a quota with scopes", func(ctx context.Context) {
 			quotaName := "scopes"
 
 			ginkgo.By("calling kubectl quota")
@@ -2027,7 +2027,7 @@ metadata:
 			}
 		})
 
-		ginkgo.It("should reject quota with invalid scopes", func() {
+		ginkgo.It("should reject quota with invalid scopes", func(ctx context.Context) {
 			quotaName := "scopes"
 
 			ginkgo.By("calling kubectl quota")
@@ -2039,7 +2039,7 @@ metadata:
 	})
 
 	ginkgo.Describe("kubectl wait", func() {
-		ginkgo.It("should ignore not found error with --for=delete", func() {
+		ginkgo.It("should ignore not found error with --for=delete", func(ctx context.Context) {
 			ginkgo.By("calling kubectl wait --for=delete")
 			e2ekubectl.RunKubectlOrDie(ns, "wait", "--for=delete", "pod/doesnotexist")
 			e2ekubectl.RunKubectlOrDie(ns, "wait", "--for=delete", "pod", "--selector=app.kubernetes.io/name=noexist")

@@ -112,7 +112,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			framework.ExpectNoError(err)
 		})
 
-		ginkgo.It("should be able to delete nodes", func() {
+		ginkgo.It("should be able to delete nodes", func(ctx context.Context) {
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-delete-node"
@@ -142,7 +142,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 		})
 
 		// TODO: Bug here - testName is not correct
-		ginkgo.It("should be able to add nodes", func() {
+		ginkgo.It("should be able to add nodes", func(ctx context.Context) {
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-add-node"

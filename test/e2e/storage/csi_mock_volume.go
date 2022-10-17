@@ -389,7 +389,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 		for _, t := range tests {
 			test := t
-			ginkgo.It(t.name, func() {
+			ginkgo.It(t.name, func(ctx context.Context) {
 				var err error
 				init(testParameters{registerDriver: test.deployClusterRegistrar, disableAttach: test.disableAttach})
 				defer cleanup()
@@ -427,7 +427,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 	})
 
 	ginkgo.Context("CSI CSIDriver deployment after pod creation using non-attachable mock driver", func() {
-		ginkgo.It("should bringup pod after deploying CSIDriver attach=false [Slow]", func() {
+		ginkgo.It("should bringup pod after deploying CSIDriver attach=false [Slow]", func(ctx context.Context) {
 			var err error
 			init(testParameters{registerDriver: false, disableAttach: true})
 			defer cleanup()
@@ -586,7 +586,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 	})
 
 	ginkgo.Context("CSI volume limit information using mock driver", func() {
-		ginkgo.It("should report attach limit when limit is bigger than 0 [Slow]", func() {
+		ginkgo.It("should report attach limit when limit is bigger than 0 [Slow]", func(ctx context.Context) {
 			// define volume limit to be 2 for this test
 			var err error
 			init(testParameters{attachLimit: 2})
@@ -617,7 +617,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			framework.ExpectNoError(err, "while waiting for max volume condition on pod : %+v", pod3)
 		})
 
-		ginkgo.It("should report attach limit for generic ephemeral volume when persistent volume is attached [Slow]", func() {
+		ginkgo.It("should report attach limit for generic ephemeral volume when persistent volume is attached [Slow]", func(ctx context.Context) {
 			// define volume limit to be 2 for this test
 			var err error
 			init(testParameters{attachLimit: 1})
@@ -642,7 +642,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			framework.ExpectNoError(err, "while waiting for max volume condition on pod : %+v", pod2)
 		})
 
-		ginkgo.It("should report attach limit for persistent volume when generic ephemeral volume is attached [Slow]", func() {
+		ginkgo.It("should report attach limit for persistent volume when generic ephemeral volume is attached [Slow]", func(ctx context.Context) {
 			// define volume limit to be 2 for this test
 			var err error
 			init(testParameters{attachLimit: 1})
@@ -697,7 +697,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 		for _, t := range tests {
 			test := t
-			ginkgo.It(t.name, func() {
+			ginkgo.It(t.name, func(ctx context.Context) {
 				var err error
 				tp := testParameters{
 					enableResizing:          true,
@@ -796,7 +796,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 		for _, t := range tests {
 			test := t
-			ginkgo.It(test.name, func() {
+			ginkgo.It(test.name, func(ctx context.Context) {
 				var err error
 				params := testParameters{enableResizing: true, enableNodeExpansion: true}
 				if test.disableAttach {
@@ -939,7 +939,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 		for _, t := range tests {
 			test := t
-			ginkgo.It(test.name, func() {
+			ginkgo.It(test.name, func(ctx context.Context) {
 				var hooks *drivers.Hooks
 				if test.nodeStageHook != nil {
 					hooks = createPreHook("NodeStageVolume", test.nodeStageHook)
@@ -1072,7 +1072,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 		for _, t := range tests {
 			test := t
-			ginkgo.It(test.name, func() {
+			ginkgo.It(test.name, func(ctx context.Context) {
 				// Index of the last deleted pod. NodeUnstage calls are then related to this pod.
 				var deletedPodNumber int64 = 1
 				var hooks *drivers.Hooks
@@ -1191,7 +1191,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 		for _, t := range tests {
 			test := t
-			ginkgo.It(test.name, func() {
+			ginkgo.It(test.name, func(ctx context.Context) {
 				var err error
 				params := testParameters{
 					lateBinding:    test.lateBinding,
@@ -1410,7 +1410,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 		for _, t := range tests {
 			test := t
-			ginkgo.It(t.name, func() {
+			ginkgo.It(t.name, func(ctx context.Context) {
 				scName := "mock-csi-storage-capacity-" + f.UniqueName
 				init(testParameters{
 					registerDriver:  true,
@@ -1497,7 +1497,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 		for _, test := range tests {
 			test := test
-			ginkgo.It(test.name, func() {
+			ginkgo.It(test.name, func(ctx context.Context) {
 				var hooks *drivers.Hooks
 				if test.createSnapshotHook != nil {
 					hooks = createPreHook("CreateSnapshot", test.createSnapshotHook)
@@ -1635,7 +1635,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		for _, test := range tests {
 			test := test
 			csiServiceAccountTokenEnabled := test.tokenRequests != nil
-			ginkgo.It(test.desc, func() {
+			ginkgo.It(test.desc, func(ctx context.Context) {
 				init(testParameters{
 					registerDriver:    test.deployCSIDriverObject,
 					tokenRequests:     test.tokenRequests,
@@ -1693,7 +1693,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 		for _, t := range tests {
 			test := t
-			ginkgo.It(test.name, func() {
+			ginkgo.It(test.name, func(ctx context.Context) {
 				if framework.NodeOSDistroIs("windows") {
 					e2eskipper.Skipf("FSGroupPolicy is only applied on linux nodes -- skipping")
 				}
@@ -1768,7 +1768,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 		for _, t := range tests {
 			t := t
-			ginkgo.It(t.name, func() {
+			ginkgo.It(t.name, func(ctx context.Context) {
 				var nodeStageFsGroup, nodePublishFsGroup string
 				if framework.NodeOSDistroIs("windows") {
 					e2eskipper.Skipf("FSGroupPolicy is only applied on linux nodes -- skipping")
@@ -1835,7 +1835,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 		for _, test := range tests {
 			test := test
-			ginkgo.It(test.name, func() {
+			ginkgo.It(test.name, func(ctx context.Context) {
 				hooks := createPreHook("CreateSnapshot", test.createSnapshotHook)
 				init(testParameters{
 					disableAttach:  true,
@@ -1926,7 +1926,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 		for _, test := range tests {
 			test := test
-			ginkgo.It(test.name, func() {
+			ginkgo.It(test.name, func(ctx context.Context) {
 				init(testParameters{
 					disableAttach:  true,
 					registerDriver: true,
@@ -2069,7 +2069,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 		for _, t := range tests {
 			t := t
-			ginkgo.It(t.name, func() {
+			ginkgo.It(t.name, func(ctx context.Context) {
 				if framework.NodeOSDistroIs("windows") {
 					e2eskipper.Skipf("SELinuxMount is only applied on linux nodes -- skipping")
 				}

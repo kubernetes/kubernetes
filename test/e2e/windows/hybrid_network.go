@@ -17,6 +17,7 @@ limitations under the License.
 package windows
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -53,7 +54,7 @@ var _ = SIGDescribe("Hybrid cluster network", func() {
 
 	ginkgo.Context("for all supported CNIs", func() {
 
-		ginkgo.It("should have stable networking for Linux and Windows pods", func() {
+		ginkgo.It("should have stable networking for Linux and Windows pods", func(ctx context.Context) {
 
 			linuxPod := createTestPod(f, linuxBusyBoxImage, linuxOS)
 			ginkgo.By("creating a linux pod and waiting for it to be running")
@@ -75,7 +76,7 @@ var _ = SIGDescribe("Hybrid cluster network", func() {
 
 		})
 
-		ginkgo.It("should provide Internet connection for Linux containers using DNS [Feature:Networking-DNS]", func() {
+		ginkgo.It("should provide Internet connection for Linux containers using DNS [Feature:Networking-DNS]", func(ctx context.Context) {
 			linuxPod := createTestPod(f, linuxBusyBoxImage, linuxOS)
 			ginkgo.By("creating a linux pod and waiting for it to be running")
 			linuxPod = e2epod.NewPodClient(f).CreateSync(linuxPod)
@@ -86,7 +87,7 @@ var _ = SIGDescribe("Hybrid cluster network", func() {
 			assertConsistentConnectivity(f, linuxPod.ObjectMeta.Name, linuxOS, linuxCheck("8.8.8.8", 53))
 		})
 
-		ginkgo.It("should provide Internet connection for Windows containers using DNS [Feature:Networking-DNS]", func() {
+		ginkgo.It("should provide Internet connection for Windows containers using DNS [Feature:Networking-DNS]", func(ctx context.Context) {
 			windowsPod := createTestPod(f, windowsBusyBoximage, windowsOS)
 			ginkgo.By("creating a windows pod and waiting for it to be running")
 			windowsPod = e2epod.NewPodClient(f).CreateSync(windowsPod)

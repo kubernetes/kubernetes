@@ -22,6 +22,7 @@ limitations under the License.
 package windows
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -44,7 +45,7 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Kubelet [Slow]", func() {
 
 	ginkgo.Describe("kubelet GMSA support", func() {
 		ginkgo.Context("when creating a pod with correct GMSA credential specs", func() {
-			ginkgo.It("passes the credential specs down to the Pod's containers", func() {
+			ginkgo.It("passes the credential specs down to the Pod's containers", func(ctx context.Context) {
 				defer ginkgo.GinkgoRecover()
 
 				podName := "with-correct-gmsa-specs"

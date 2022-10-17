@@ -72,7 +72,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Testname: ResourceQuota, object count quota, resourcequotas
 		Description: Create a ResourceQuota. Creation MUST be successful and its ResourceQuotaStatus MUST match to expected used and total allowed resource quota count within namespace.
 	*/
-	framework.ConformanceIt("should create a ResourceQuota and ensure its status is promptly calculated.", func() {
+	framework.ConformanceIt("should create a ResourceQuota and ensure its status is promptly calculated.", func(ctx context.Context) {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -97,7 +97,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Create a Service. Its creation MUST be successful and resource usage count against the Service object and resourceQuota object MUST be captured in ResourceQuotaStatus of the ResourceQuota.
 		Delete the Service. Deletion MUST succeed and resource usage count against the Service object MUST be released from ResourceQuotaStatus of the ResourceQuota.
 	*/
-	framework.ConformanceIt("should create a ResourceQuota and capture the life of a service.", func() {
+	framework.ConformanceIt("should create a ResourceQuota and capture the life of a service.", func(ctx context.Context) {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -157,7 +157,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Create a Secret. Its creation MUST be successful and resource usage count against the Secret object and resourceQuota object MUST be captured in ResourceQuotaStatus of the ResourceQuota.
 		Delete the Secret. Deletion MUST succeed and resource usage count against the Secret object MUST be released from ResourceQuotaStatus of the ResourceQuota.
 	*/
-	framework.ConformanceIt("should create a ResourceQuota and capture the life of a secret.", func() {
+	framework.ConformanceIt("should create a ResourceQuota and capture the life of a secret.", func(ctx context.Context) {
 		ginkgo.By("Discovering how many secrets are in namespace by default")
 		found, unchanged := 0, 0
 		// On contended servers the service account controller can slow down, leading to the count changing during a run.
@@ -227,7 +227,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Update the successfully created pod's resource requests. Updation MUST fail as a Pod can not dynamically update its resource requirements.
 		Delete the successfully created Pod. Pod Deletion MUST be scuccessful and it MUST release the allocated resource counts from ResourceQuotaStatus of the ResourceQuota.
 	*/
-	framework.ConformanceIt("should create a ResourceQuota and capture the life of a pod.", func() {
+	framework.ConformanceIt("should create a ResourceQuota and capture the life of a pod.", func(ctx context.Context) {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -323,7 +323,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Create a ConfigMap. Its creation MUST be successful and resource usage count against the ConfigMap object MUST be captured in ResourceQuotaStatus of the ResourceQuota.
 		Delete the ConfigMap. Deletion MUST succeed and resource usage count against the ConfigMap object MUST be released from ResourceQuotaStatus of the ResourceQuota.
 	*/
-	framework.ConformanceIt("should create a ResourceQuota and capture the life of a configMap.", func() {
+	framework.ConformanceIt("should create a ResourceQuota and capture the life of a configMap.", func(ctx context.Context) {
 		found, unchanged := 0, 0
 		// On contended servers the service account controller can slow down, leading to the count changing during a run.
 		// Wait up to 15s for the count to stabilize, assuming that updates come at a consistent rate, and are not held indefinitely.
@@ -389,7 +389,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Create a ReplicationController. Its creation MUST be successful and resource usage count against the ReplicationController object MUST be captured in ResourceQuotaStatus of the ResourceQuota.
 		Delete the ReplicationController. Deletion MUST succeed and resource usage count against the ReplicationController object MUST be released from ResourceQuotaStatus of the ResourceQuota.
 	*/
-	framework.ConformanceIt("should create a ResourceQuota and capture the life of a replication controller.", func() {
+	framework.ConformanceIt("should create a ResourceQuota and capture the life of a replication controller.", func(ctx context.Context) {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -445,7 +445,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Create a ReplicaSet. Its creation MUST be successful and resource usage count against the ReplicaSet object MUST be captured in ResourceQuotaStatus of the ResourceQuota.
 		Delete the ReplicaSet. Deletion MUST succeed and resource usage count against the ReplicaSet object MUST be released from ResourceQuotaStatus of the ResourceQuota.
 	*/
-	framework.ConformanceIt("should create a ResourceQuota and capture the life of a replica set.", func() {
+	framework.ConformanceIt("should create a ResourceQuota and capture the life of a replica set.", func(ctx context.Context) {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -492,7 +492,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Delete the PVC. Deletion MUST succeed and resource usage count against its PVC and storage object MUST be released from ResourceQuotaStatus of the ResourceQuota.
 		[NotConformancePromotable] as test suite do not have any e2e at this moment which are explicitly verifying PV and PVC behaviour.
 	*/
-	ginkgo.It("should create a ResourceQuota and capture the life of a persistent volume claim", func() {
+	ginkgo.It("should create a ResourceQuota and capture the life of a persistent volume claim", func(ctx context.Context) {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -542,7 +542,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Delete the PVC. Deletion MUST succeed and resource usage count against  PVC, storageClass and storage object MUST be released from ResourceQuotaStatus of the ResourceQuota.
 		[NotConformancePromotable] as test suite do not have any e2e at this moment which are explicitly verifying PV and PVC behaviour.
 	*/
-	ginkgo.It("should create a ResourceQuota and capture the life of a persistent volume claim with a storage class", func() {
+	ginkgo.It("should create a ResourceQuota and capture the life of a persistent volume claim with a storage class", func(ctx context.Context) {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -594,7 +594,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should create a ResourceQuota and capture the life of a custom resource.", func() {
+	ginkgo.It("should create a ResourceQuota and capture the life of a custom resource.", func(ctx context.Context) {
 		ginkgo.By("Creating a Custom Resource Definition")
 		testcrd, err := crd.CreateTestCRD(f)
 		framework.ExpectNoError(err)
@@ -687,7 +687,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Create a pod with specified activeDeadlineSeconds and resourceRequirements for CPU and Memory fall within quota limits. Pod creation MUST be successful and usage count MUST be captured in ResourceQuotaStatus of 'Terminating' scoped ResourceQuota but MUST NOT in 'NotTerminating' scoped ResourceQuota.
 		Delete the Pod. Pod deletion MUST succeed and Pod resource usage count MUST be released from ResourceQuotaStatus of 'Terminating' scoped ResourceQuota.
 	*/
-	framework.ConformanceIt("should verify ResourceQuota with terminating scopes.", func() {
+	framework.ConformanceIt("should verify ResourceQuota with terminating scopes.", func(ctx context.Context) {
 		ginkgo.By("Creating a ResourceQuota with terminating scope")
 		quotaTerminatingName := "quota-terminating"
 		resourceQuotaTerminating, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScope(quotaTerminatingName, v1.ResourceQuotaScopeTerminating))
@@ -800,7 +800,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Create a 'NotBestEffort' Pod by explicitly specifying resource limits and requests. Pod creation MUST be successful and usage count MUST be captured in ResourceQuotaStatus of 'NotBestEffort' scoped ResourceQuota but MUST NOT in 'BestEffort' scoped ResourceQuota.
 		Delete the Pod. Pod deletion MUST succeed and Pod resource usage count MUST be released from ResourceQuotaStatus of 'NotBestEffort' scoped ResourceQuota.
 	*/
-	framework.ConformanceIt("should verify ResourceQuota with best effort scope.", func() {
+	framework.ConformanceIt("should verify ResourceQuota with best effort scope.", func(ctx context.Context) {
 		ginkgo.By("Creating a ResourceQuota with best effort scope")
 		resourceQuotaBestEffort, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScope("quota-besteffort", v1.ResourceQuotaScopeBestEffort))
 		framework.ExpectNoError(err)
@@ -881,7 +881,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		When ResourceQuota is updated to modify CPU and Memory quota limits, update MUST succeed with updated values for CPU and Memory limits.
 		When ResourceQuota is deleted, it MUST not be available in the namespace.
 	*/
-	framework.ConformanceIt("should be able to update and delete ResourceQuota.", func() {
+	framework.ConformanceIt("should be able to update and delete ResourceQuota.", func(ctx context.Context) {
 		client := f.ClientSet
 		ns := f.Namespace.Name
 
@@ -940,7 +940,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		the new values. It MUST succeed at deleting a collection of
 		ResourceQuota via a label selector.
 	*/
-	framework.ConformanceIt("should manage the lifecycle of a ResourceQuota", func() {
+	framework.ConformanceIt("should manage the lifecycle of a ResourceQuota", func(ctx context.Context) {
 		client := f.ClientSet
 		ns := f.Namespace.Name
 
@@ -1007,7 +1007,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		values MUST succeed. The spec spec MUST NOT be changed when
 		patching /status.
 	*/
-	framework.ConformanceIt("should apply changes to a resourcequota status", func() {
+	framework.ConformanceIt("should apply changes to a resourcequota status", func(ctx context.Context) {
 		ns := f.Namespace.Name
 		rqClient := f.ClientSet.CoreV1().ResourceQuotas(ns)
 		rqName := "e2e-rq-status-" + utilrand.String(5)
@@ -1202,7 +1202,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 var _ = SIGDescribe("ResourceQuota [Feature:ScopeSelectors]", func() {
 	f := framework.NewDefaultFramework("scope-selectors")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
-	ginkgo.It("should verify ResourceQuota with best effort scope using scope-selectors.", func() {
+	ginkgo.It("should verify ResourceQuota with best effort scope using scope-selectors.", func(ctx context.Context) {
 		ginkgo.By("Creating a ResourceQuota with best effort scope")
 		resourceQuotaBestEffort, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScopeSelector("quota-besteffort", v1.ResourceQuotaScopeBestEffort))
 		framework.ExpectNoError(err)
@@ -1275,7 +1275,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:ScopeSelectors]", func() {
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotBestEffort.Name, usedResources)
 		framework.ExpectNoError(err)
 	})
-	ginkgo.It("should verify ResourceQuota with terminating scopes through scope selectors.", func() {
+	ginkgo.It("should verify ResourceQuota with terminating scopes through scope selectors.", func(ctx context.Context) {
 		ginkgo.By("Creating a ResourceQuota with terminating scope")
 		quotaTerminatingName := "quota-terminating"
 		resourceQuotaTerminating, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScopeSelector(quotaTerminatingName, v1.ResourceQuotaScopeTerminating))
@@ -1384,7 +1384,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 	f := framework.NewDefaultFramework("resourcequota-priorityclass")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
-	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with same priority class.", func() {
+	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with same priority class.", func(ctx context.Context) {
 
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass1"}, Value: int32(1000)}, metav1.CreateOptions{})
 		if err != nil && !apierrors.IsAlreadyExists(err) {
@@ -1425,7 +1425,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against 2 pods with same priority class.", func() {
+	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against 2 pods with same priority class.", func(ctx context.Context) {
 
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass2"}, Value: int32(1000)}, metav1.CreateOptions{})
 		if err != nil && !apierrors.IsAlreadyExists(err) {
@@ -1472,7 +1472,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against 2 pods with different priority class.", func() {
+	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against 2 pods with different priority class.", func(ctx context.Context) {
 
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass3"}, Value: int32(1000)}, metav1.CreateOptions{})
 		if err != nil && !apierrors.IsAlreadyExists(err) {
@@ -1521,7 +1521,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should verify ResourceQuota's multiple priority class scope (quota set to pod count: 2) against 2 pods with same priority classes.", func() {
+	ginkgo.It("should verify ResourceQuota's multiple priority class scope (quota set to pod count: 2) against 2 pods with same priority classes.", func(ctx context.Context) {
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass5"}, Value: int32(1000)}, metav1.CreateOptions{})
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			framework.Failf("unexpected error while creating priority class: %v", err)
@@ -1579,7 +1579,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with different priority class (ScopeSelectorOpNotIn).", func() {
+	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with different priority class (ScopeSelectorOpNotIn).", func(ctx context.Context) {
 
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass7"}, Value: int32(1000)}, metav1.CreateOptions{})
 		if err != nil && !apierrors.IsAlreadyExists(err) {
@@ -1615,7 +1615,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with different priority class (ScopeSelectorOpExists).", func() {
+	ginkgo.It("should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with different priority class (ScopeSelectorOpExists).", func(ctx context.Context) {
 
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass8"}, Value: int32(1000)}, metav1.CreateOptions{})
 		if err != nil && !apierrors.IsAlreadyExists(err) {
@@ -1656,7 +1656,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should verify ResourceQuota's priority class scope (cpu, memory quota set) against a pod with same priority class.", func() {
+	ginkgo.It("should verify ResourceQuota's priority class scope (cpu, memory quota set) against a pod with same priority class.", func(ctx context.Context) {
 
 		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: "pclass9"}, Value: int32(1000)}, metav1.CreateOptions{})
 		if err != nil && !apierrors.IsAlreadyExists(err) {
@@ -1725,7 +1725,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 var _ = SIGDescribe("ResourceQuota", func() {
 	f := framework.NewDefaultFramework("cross-namespace-pod-affinity")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
-	ginkgo.It("should verify ResourceQuota with cross namespace pod affinity scope using scope-selectors.", func() {
+	ginkgo.It("should verify ResourceQuota with cross namespace pod affinity scope using scope-selectors.", func(ctx context.Context) {
 		ginkgo.By("Creating a ResourceQuota with cross namespace pod affinity scope")
 		quota, err := createResourceQuota(
 			f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScopeSelector("quota-cross-namespace-pod-affinity", v1.ResourceQuotaScopeCrossNamespacePodAffinity))

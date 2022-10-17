@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -44,7 +45,7 @@ var _ = SIGDescribe("SSH", func() {
 		e2eskipper.SkipUnlessSSHKeyPresent()
 	})
 
-	ginkgo.It("should SSH to all nodes and run commands", func() {
+	ginkgo.It("should SSH to all nodes and run commands", func(ctx context.Context) {
 		// Get all nodes' external IPs.
 		ginkgo.By("Getting all nodes' SSH-able IP addresses")
 		hosts, err := e2essh.NodeSSHHosts(f.ClientSet)

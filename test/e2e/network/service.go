@@ -774,7 +774,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Testname: Kubernetes Service
 		Description: By default when a kubernetes cluster is running there MUST be a 'kubernetes' service running in the cluster.
 	*/
-	framework.ConformanceIt("should provide secure master service ", func() {
+	framework.ConformanceIt("should provide secure master service ", func(ctx context.Context) {
 		_, err := cs.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to fetch the service object for the service named kubernetes")
 	})
@@ -784,7 +784,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Testname: Service, endpoints
 		Description: Create a service with a endpoint without any Pods, the service MUST run and show empty endpoints. Add a pod to the service and the service MUST validate to show all the endpoints for the ports exposed by the Pod. Add another Pod then the list of all Ports exposed by both the Pods MUST be valid and have corresponding service endpoint. Once the second Pod is deleted then set of endpoint MUST be validated to show only ports from the first container that are exposed. Once both pods are deleted the endpoints from the service MUST be empty.
 	*/
-	framework.ConformanceIt("should serve a basic endpoint from pods ", func() {
+	framework.ConformanceIt("should serve a basic endpoint from pods ", func(ctx context.Context) {
 		serviceName := "endpoint-test2"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -845,7 +845,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Testname: Service, endpoints with multiple ports
 		Description: Create a service with two ports but no Pods are added to the service yet.  The service MUST run and show empty set of endpoints. Add a Pod to the first port, service MUST list one endpoint for the Pod on that port. Add another Pod to the second port, service MUST list both the endpoints. Delete the first Pod and the service MUST list only the endpoint to the second Pod. Delete the second Pod and the service must now have empty set of endpoints.
 	*/
-	framework.ConformanceIt("should serve multiport endpoints from pods ", func() {
+	framework.ConformanceIt("should serve multiport endpoints from pods ", func(ctx context.Context) {
 		// repacking functionality is intentionally not tested here - it's better to test it in an integration test.
 		serviceName := "multi-endpoint-test"
 		ns := f.Namespace.Name
@@ -926,7 +926,7 @@ var _ = common.SIGDescribe("Services", func() {
 		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{})
 	})
 
-	ginkgo.It("should be updated after adding or deleting ports ", func() {
+	ginkgo.It("should be updated after adding or deleting ports ", func(ctx context.Context) {
 		serviceName := "edit-port-test"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -1013,7 +1013,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should preserve source pod IP for traffic thru service cluster IP [LinuxOnly]", func() {
+	ginkgo.It("should preserve source pod IP for traffic thru service cluster IP [LinuxOnly]", func(ctx context.Context) {
 		// this test is creating a pod with HostNetwork=true, which is not supported on Windows.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
@@ -1096,7 +1096,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should allow pods to hairpin back to themselves through services", func() {
+	ginkgo.It("should allow pods to hairpin back to themselves through services", func(ctx context.Context) {
 		serviceName := "hairpin-test"
 		ns := f.Namespace.Name
 
@@ -1125,7 +1125,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should be able to up and down services", func() {
+	ginkgo.It("should be able to up and down services", func(ctx context.Context) {
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, defaultServeHostnameServicePort
 
@@ -1171,7 +1171,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames3, svc3IP, servicePort))
 	})
 
-	ginkgo.It("should work after the service has been recreated", func() {
+	ginkgo.It("should work after the service has been recreated", func(ctx context.Context) {
 		serviceName := "service-deletion"
 		ns := f.Namespace.Name
 		numPods, servicePort := 1, defaultServeHostnameServicePort
@@ -1209,7 +1209,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames, svc.Spec.ClusterIP, servicePort))
 	})
 
-	ginkgo.It("should work after restarting kube-proxy [Disruptive]", func() {
+	ginkgo.It("should work after restarting kube-proxy [Disruptive]", func(ctx context.Context) {
 		kubeProxyLabelSet := map[string]string{clusterAddonLabelKey: kubeProxyLabelName}
 		e2eskipper.SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem(kubeProxyLabelName, cs, metav1.NamespaceSystem, kubeProxyLabelSet)
 
@@ -1246,7 +1246,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames2, svc2IP, servicePort))
 	})
 
-	ginkgo.It("should work after restarting apiserver [Disruptive]", func() {
+	ginkgo.It("should work after restarting apiserver [Disruptive]", func(ctx context.Context) {
 
 		if !framework.ProviderIs("gke") {
 			e2eskipper.SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem(kubeAPIServerLabelName, cs, metav1.NamespaceSystem, map[string]string{clusterComponentKey: kubeAPIServerLabelName})
@@ -1299,7 +1299,7 @@ var _ = common.SIGDescribe("Services", func() {
 		The client Pod MUST be able to access the NodePort service by service name and cluster
 		IP on the service port, and on nodes' internal and external IPs on the NodePort.
 	*/
-	framework.ConformanceIt("should be able to create a functioning NodePort service", func() {
+	framework.ConformanceIt("should be able to create a functioning NodePort service", func(ctx context.Context) {
 		serviceName := "nodeport-test"
 		ns := f.Namespace.Name
 
@@ -1325,7 +1325,7 @@ var _ = common.SIGDescribe("Services", func() {
 		The IP ranges here are reserved for documentation according to
 		[RFC 5737](https://tools.ietf.org/html/rfc5737) Section 3 and should not be used by any host.
 	*/
-	ginkgo.It("should be possible to connect to a service via ExternalIP when the external IP is not assigned to a node", func() {
+	ginkgo.It("should be possible to connect to a service via ExternalIP when the external IP is not assigned to a node", func(ctx context.Context) {
 		serviceName := "externalip-test"
 		ns := f.Namespace.Name
 		externalIP := "203.0.113.250"
@@ -1362,7 +1362,7 @@ var _ = common.SIGDescribe("Services", func() {
 		When this NodePort service is updated to use two protocols i.e. TCP and UDP for same assigned service port 80, service update MUST be successful by allocating two NodePorts to the service and
 		service MUST be able to serve both TCP and UDP requests over same service port 80.
 	*/
-	ginkgo.It("should be able to update service type to NodePort listening on same port number but different protocols", func() {
+	ginkgo.It("should be able to update service type to NodePort listening on same port number but different protocols", func(ctx context.Context) {
 		serviceName := "nodeport-update-service"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -1435,7 +1435,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Update the service from ExternalName to ClusterIP by removing ExternalName entry, assigning port 80 as service port and TCP as protocol.
 		Service update MUST be successful by assigning ClusterIP to the service and it MUST be reachable over serviceName and ClusterIP on provided service port.
 	*/
-	framework.ConformanceIt("should be able to change the type from ExternalName to ClusterIP", func() {
+	framework.ConformanceIt("should be able to change the type from ExternalName to ClusterIP", func(ctx context.Context) {
 		serviceName := "externalname-service"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -1474,7 +1474,7 @@ var _ = common.SIGDescribe("Services", func() {
 		service update MUST be successful by exposing service on every node's IP on dynamically assigned NodePort and, ClusterIP MUST be assigned to route service requests.
 		Service MUST be reachable over serviceName and the ClusterIP on servicePort. Service MUST also be reachable over node's IP on NodePort.
 	*/
-	framework.ConformanceIt("should be able to change the type from ExternalName to NodePort", func() {
+	framework.ConformanceIt("should be able to change the type from ExternalName to NodePort", func(ctx context.Context) {
 		serviceName := "externalname-service"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -1512,7 +1512,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Update service type from ClusterIP to ExternalName by setting CNAME entry as externalName. Service update MUST be successful and service MUST not has associated ClusterIP.
 		Service MUST be able to resolve to IP address by returning A records ensuring service is pointing to provided externalName.
 	*/
-	framework.ConformanceIt("should be able to change the type from ClusterIP to ExternalName", func() {
+	framework.ConformanceIt("should be able to change the type from ClusterIP to ExternalName", func(ctx context.Context) {
 		serviceName := "clusterip-service"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -1554,7 +1554,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Update the service type from NodePort to ExternalName by setting CNAME entry as externalName. Service update MUST be successful and, MUST not has ClusterIP associated with the service and, allocated NodePort MUST be released.
 		Service MUST be able to resolve to IP address by returning A records ensuring service is pointing to provided externalName.
 	*/
-	framework.ConformanceIt("should be able to change the type from NodePort to ExternalName", func() {
+	framework.ConformanceIt("should be able to change the type from NodePort to ExternalName", func(ctx context.Context) {
 		serviceName := "nodeport-service"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -1591,7 +1591,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should prevent NodePort collisions", func() {
+	ginkgo.It("should prevent NodePort collisions", func(ctx context.Context) {
 		// TODO: use the ServiceTestJig here
 		baseName := "nodeport-collision-"
 		serviceName1 := baseName + "1"
@@ -1645,7 +1645,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName1, ns)
 	})
 
-	ginkgo.It("should check NodePort out-of-range", func() {
+	ginkgo.It("should check NodePort out-of-range", func(ctx context.Context) {
 		// TODO: use the ServiceTestJig here
 		serviceName := "nodeport-range-test"
 		ns := f.Namespace.Name
@@ -1712,7 +1712,7 @@ var _ = common.SIGDescribe("Services", func() {
 		gomega.Expect(fmt.Sprintf("%v", err)).To(gomega.MatchRegexp(expectedErr))
 	})
 
-	ginkgo.It("should release NodePorts on delete", func() {
+	ginkgo.It("should release NodePorts on delete", func(ctx context.Context) {
 		// TODO: use the ServiceTestJig here
 		serviceName := "nodeport-reuse"
 		ns := f.Namespace.Name
@@ -1775,7 +1775,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 	})
 
-	ginkgo.It("should create endpoints for unready pods", func() {
+	ginkgo.It("should create endpoints for unready pods", func(ctx context.Context) {
 		serviceName := "tolerate-unready"
 		ns := f.Namespace.Name
 
@@ -1921,7 +1921,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should be able to connect to terminating and unready endpoints if PublishNotReadyAddresses is true", func() {
+	ginkgo.It("should be able to connect to terminating and unready endpoints if PublishNotReadyAddresses is true", func(ctx context.Context) {
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, 2)
 		framework.ExpectNoError(err)
 		nodeCounts := len(nodes.Items)
@@ -2040,7 +2040,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should not be able to connect to terminating and unready endpoints if PublishNotReadyAddresses is false", func() {
+	ginkgo.It("should not be able to connect to terminating and unready endpoints if PublishNotReadyAddresses is false", func(ctx context.Context) {
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, 2)
 		framework.ExpectNoError(err)
 		nodeCounts := len(nodes.Items)
@@ -2188,13 +2188,13 @@ var _ = common.SIGDescribe("Services", func() {
 		Service MUST be reachable over serviceName and the ClusterIP on servicePort.
 		[LinuxOnly]: Windows does not support session affinity.
 	*/
-	framework.ConformanceIt("should have session affinity work for service with type clusterIP [LinuxOnly]", func() {
+	framework.ConformanceIt("should have session affinity work for service with type clusterIP [LinuxOnly]", func(ctx context.Context) {
 		svc := getServeHostnameService("affinity-clusterip")
 		svc.Spec.Type = v1.ServiceTypeClusterIP
 		execAffinityTestForNonLBService(f, cs, svc)
 	})
 
-	ginkgo.It("should have session affinity timeout work for service with type clusterIP [LinuxOnly]", func() {
+	ginkgo.It("should have session affinity timeout work for service with type clusterIP [LinuxOnly]", func(ctx context.Context) {
 		svc := getServeHostnameService("affinity-clusterip-timeout")
 		svc.Spec.Type = v1.ServiceTypeClusterIP
 		execAffinityTestForSessionAffinityTimeout(f, cs, svc)
@@ -2210,7 +2210,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Service MUST be reachable over serviceName and the ClusterIP on servicePort.
 		[LinuxOnly]: Windows does not support session affinity.
 	*/
-	framework.ConformanceIt("should be able to switch session affinity for service with type clusterIP [LinuxOnly]", func() {
+	framework.ConformanceIt("should be able to switch session affinity for service with type clusterIP [LinuxOnly]", func(ctx context.Context) {
 		svc := getServeHostnameService("affinity-clusterip-transition")
 		svc.Spec.Type = v1.ServiceTypeClusterIP
 		execAffinityTestForNonLBServiceWithTransition(f, cs, svc)
@@ -2225,13 +2225,13 @@ var _ = common.SIGDescribe("Services", func() {
 		Service MUST be reachable over serviceName and the ClusterIP on servicePort. Service MUST also be reachable over node's IP on NodePort.
 		[LinuxOnly]: Windows does not support session affinity.
 	*/
-	framework.ConformanceIt("should have session affinity work for NodePort service [LinuxOnly]", func() {
+	framework.ConformanceIt("should have session affinity work for NodePort service [LinuxOnly]", func(ctx context.Context) {
 		svc := getServeHostnameService("affinity-nodeport")
 		svc.Spec.Type = v1.ServiceTypeNodePort
 		execAffinityTestForNonLBService(f, cs, svc)
 	})
 
-	ginkgo.It("should have session affinity timeout work for NodePort service [LinuxOnly]", func() {
+	ginkgo.It("should have session affinity timeout work for NodePort service [LinuxOnly]", func(ctx context.Context) {
 		svc := getServeHostnameService("affinity-nodeport-timeout")
 		svc.Spec.Type = v1.ServiceTypeNodePort
 		execAffinityTestForSessionAffinityTimeout(f, cs, svc)
@@ -2247,13 +2247,13 @@ var _ = common.SIGDescribe("Services", func() {
 		Service MUST be reachable over serviceName and the ClusterIP on servicePort. Service MUST also be reachable over node's IP on NodePort.
 		[LinuxOnly]: Windows does not support session affinity.
 	*/
-	framework.ConformanceIt("should be able to switch session affinity for NodePort service [LinuxOnly]", func() {
+	framework.ConformanceIt("should be able to switch session affinity for NodePort service [LinuxOnly]", func(ctx context.Context) {
 		svc := getServeHostnameService("affinity-nodeport-transition")
 		svc.Spec.Type = v1.ServiceTypeNodePort
 		execAffinityTestForNonLBServiceWithTransition(f, cs, svc)
 	})
 
-	ginkgo.It("should implement service.kubernetes.io/service-proxy-name", func() {
+	ginkgo.It("should implement service.kubernetes.io/service-proxy-name", func(ctx context.Context) {
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, defaultServeHostnameServicePort
 		serviceProxyNameLabels := map[string]string{"service.kubernetes.io/service-proxy-name": "foo-bar"}
@@ -2304,7 +2304,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(verifyServeHostnameServiceDown(cs, ns, svcDisabledIP, servicePort))
 	})
 
-	ginkgo.It("should implement service.kubernetes.io/headless", func() {
+	ginkgo.It("should implement service.kubernetes.io/headless", func(ctx context.Context) {
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, defaultServeHostnameServicePort
 		serviceHeadlessLabels := map[string]string{v1.IsHeadlessService: ""}
@@ -2356,7 +2356,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(verifyServeHostnameServiceDown(cs, ns, svcHeadlessIP, servicePort))
 	})
 
-	ginkgo.It("should be rejected when no endpoints exist", func() {
+	ginkgo.It("should be rejected when no endpoints exist", func(ctx context.Context) {
 		namespace := f.Namespace.Name
 		serviceName := "no-pods"
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
@@ -2401,7 +2401,7 @@ var _ = common.SIGDescribe("Services", func() {
 	})
 
 	// regression test for https://issues.k8s.io/109414 and https://issues.k8s.io/109718
-	ginkgo.It("should be rejected for evicted pods (no endpoints exist)", func() {
+	ginkgo.It("should be rejected for evicted pods (no endpoints exist)", func(ctx context.Context) {
 		namespace := f.Namespace.Name
 		serviceName := "evicted-pods"
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
@@ -2491,7 +2491,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should respect internalTrafficPolicy=Local Pod to Pod [Feature:ServiceInternalTrafficPolicy]", func() {
+	ginkgo.It("should respect internalTrafficPolicy=Local Pod to Pod [Feature:ServiceInternalTrafficPolicy]", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		// TODO: remove this skip when windows-based proxies implement internalTrafficPolicy
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
@@ -2569,7 +2569,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should respect internalTrafficPolicy=Local Pod (hostNetwork: true) to Pod [Feature:ServiceInternalTrafficPolicy]", func() {
+	ginkgo.It("should respect internalTrafficPolicy=Local Pod (hostNetwork: true) to Pod [Feature:ServiceInternalTrafficPolicy]", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		// TODO: remove this skip when windows-based proxies implement internalTrafficPolicy
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
@@ -2649,7 +2649,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should respect internalTrafficPolicy=Local Pod and Node, to Pod (hostNetwork: true) [Feature:ServiceInternalTrafficPolicy]", func() {
+	ginkgo.It("should respect internalTrafficPolicy=Local Pod and Node, to Pod (hostNetwork: true) [Feature:ServiceInternalTrafficPolicy]", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		// TODO: remove this skip when windows-based proxies implement internalTrafficPolicy
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
@@ -2761,7 +2761,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should fail health check node port if there are only terminating endpoints [Feature:ProxyTerminatingEndpoints]", func() {
+	ginkgo.It("should fail health check node port if there are only terminating endpoints [Feature:ProxyTerminatingEndpoints]", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
@@ -2860,7 +2860,7 @@ var _ = common.SIGDescribe("Services", func() {
 		execHostnameTest(*pausePod0, nodePortAddress, webserverPod0.Name)
 	})
 
-	ginkgo.It("should fallback to terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Cluster [Feature:ProxyTerminatingEndpoints]", func() {
+	ginkgo.It("should fallback to terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Cluster [Feature:ProxyTerminatingEndpoints]", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
@@ -2943,7 +2943,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should fallback to local terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Local [Feature:ProxyTerminatingEndpoints]", func() {
+	ginkgo.It("should fallback to local terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Local [Feature:ProxyTerminatingEndpoints]", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
@@ -3031,7 +3031,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should fallback to terminating endpoints when there are no ready endpoints with externallTrafficPolicy=Cluster [Feature:ProxyTerminatingEndpoints]", func() {
+	ginkgo.It("should fallback to terminating endpoints when there are no ready endpoints with externallTrafficPolicy=Cluster [Feature:ProxyTerminatingEndpoints]", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
@@ -3116,7 +3116,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should fallback to local terminating endpoints when there are no ready endpoints with externalTrafficPolicy=Local [Feature:ProxyTerminatingEndpoints]", func() {
+	ginkgo.It("should fallback to local terminating endpoints when there are no ready endpoints with externalTrafficPolicy=Local [Feature:ProxyTerminatingEndpoints]", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
@@ -3216,7 +3216,7 @@ var _ = common.SIGDescribe("Services", func() {
 	   Testname: Find Kubernetes Service in default Namespace
 	   Description: List all Services in all Namespaces, response MUST include a Service named Kubernetes with the Namespace of default.
 	*/
-	framework.ConformanceIt("should find a service from listing all namespaces", func() {
+	framework.ConformanceIt("should find a service from listing all namespaces", func(ctx context.Context) {
 		ginkgo.By("fetching services")
 		svcs, _ := f.ClientSet.CoreV1().Services("").List(context.TODO(), metav1.ListOptions{})
 
@@ -3241,7 +3241,7 @@ var _ = common.SIGDescribe("Services", func() {
 	   The endpoint is then patched with a new IPv4 address and port, a check after the patch MUST the changes.
 	   The endpoint is deleted by it's label, a watch listens for the deleted watch event.
 	*/
-	framework.ConformanceIt("should test the lifecycle of an Endpoint", func() {
+	framework.ConformanceIt("should test the lifecycle of an Endpoint", func(ctx context.Context) {
 		testNamespaceName := f.Namespace.Name
 		testEndpointName := "testservice"
 		testEndpoints := v1.Endpoints{
@@ -3425,7 +3425,7 @@ var _ = common.SIGDescribe("Services", func() {
 		When updating /status the action MUST be validated.
 		When patching a service the action MUST be validated.
 	*/
-	framework.ConformanceIt("should complete a service status lifecycle", func() {
+	framework.ConformanceIt("should complete a service status lifecycle", func(ctx context.Context) {
 
 		ns := f.Namespace.Name
 		svcResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "services"}
@@ -3651,7 +3651,7 @@ var _ = common.SIGDescribe("Services", func() {
 		of services via a label selector. It MUST locate only
 		one service after deleting the service collection.
 	*/
-	framework.ConformanceIt("should delete a collection of services", func() {
+	framework.ConformanceIt("should delete a collection of services", func(ctx context.Context) {
 
 		ns := f.Namespace.Name
 		svcClient := f.ClientSet.CoreV1().Services(ns)
@@ -3729,7 +3729,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Testname: Service, same ports with different protocols on a Load Balancer Service
 		Description: Create a LoadBalancer service with two ports that have the same value but use different protocols. Add a Pod that listens on both ports. The Pod must be reachable via the ClusterIP and both ports
 	*/
-	ginkgo.It("should serve endpoints on same port and different protocol for internal traffic on Type LoadBalancer ", func() {
+	ginkgo.It("should serve endpoints on same port and different protocol for internal traffic on Type LoadBalancer ", func(ctx context.Context) {
 		serviceName := "multiprotocol-lb-test"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -4340,7 +4340,7 @@ var _ = common.SIGDescribe("SCTP [LinuxOnly]", func() {
 		cs = f.ClientSet
 	})
 
-	ginkgo.It("should allow creating a basic SCTP service with pod and endpoints", func() {
+	ginkgo.It("should allow creating a basic SCTP service with pod and endpoints", func(ctx context.Context) {
 		serviceName := "sctp-endpoint-test"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -4394,7 +4394,7 @@ var _ = common.SIGDescribe("SCTP [LinuxOnly]", func() {
 		}
 	})
 
-	ginkgo.It("should create a Pod with SCTP HostPort", func() {
+	ginkgo.It("should create a Pod with SCTP HostPort", func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(cs)
 		framework.ExpectNoError(err)
 		hostExec := utils.NewHostExec(f)
@@ -4448,7 +4448,7 @@ var _ = common.SIGDescribe("SCTP [LinuxOnly]", func() {
 			framework.Failf("The state of the sctp module has changed due to the test case")
 		}
 	})
-	ginkgo.It("should create a ClusterIP Service with SCTP ports", func() {
+	ginkgo.It("should create a ClusterIP Service with SCTP ports", func(ctx context.Context) {
 		ginkgo.By("checking that kube-proxy is in iptables mode")
 		if proxyMode, err := proxyMode(f); err != nil {
 			e2eskipper.Skipf("Couldn't detect KubeProxy mode - skip, %v", err)

@@ -140,7 +140,7 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 		}
 	})
 
-	ginkgo.It("verify volume remains attached after master kubelet restart", func() {
+	ginkgo.It("verify volume remains attached after master kubelet restart", func(ctx context.Context) {
 		e2eskipper.SkipUnlessSSHKeyPresent()
 
 		// Create pod on each node

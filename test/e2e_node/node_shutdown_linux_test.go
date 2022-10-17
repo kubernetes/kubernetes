@@ -85,7 +85,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 			framework.ExpectNoError(err)
 		})
 
-		ginkgo.It("should add the DisruptionTarget pod failure condition to the evicted pods", func() {
+		ginkgo.It("should add the DisruptionTarget pod failure condition to the evicted pods", func(ctx context.Context) {
 			nodeName := getNodeName(f)
 			nodeSelector := fields.Set{
 				"spec.nodeName": nodeName,
@@ -188,7 +188,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 			framework.ExpectNoError(err)
 		})
 
-		ginkgo.It("should be able to gracefully shutdown pods with various grace periods", func() {
+		ginkgo.It("should be able to gracefully shutdown pods with various grace periods", func(ctx context.Context) {
 			nodeName := getNodeName(f)
 			nodeSelector := fields.Set{
 				"spec.nodeName": nodeName,
@@ -302,7 +302,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 
 		})
 
-		ginkgo.It("should be able to handle a cancelled shutdown", func() {
+		ginkgo.It("should be able to handle a cancelled shutdown", func(ctx context.Context) {
 			ginkgo.By("Emitting Shutdown signal")
 			err := emitSignalPrepareForShutdown(true)
 			framework.ExpectNoError(err)
@@ -326,7 +326,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 			}, nodeStatusUpdateTimeout, pollInterval).Should(gomega.BeNil())
 		})
 
-		ginkgo.It("after restart dbus, should be able to gracefully shutdown", func() {
+		ginkgo.It("after restart dbus, should be able to gracefully shutdown", func(ctx context.Context) {
 			// allows manual restart of dbus to work in Ubuntu.
 			err := overlayDbusConfig()
 			framework.ExpectNoError(err)
@@ -427,7 +427,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 			framework.ExpectNoError(err)
 		})
 
-		ginkgo.It("should be able to gracefully shutdown pods with various grace periods", func() {
+		ginkgo.It("should be able to gracefully shutdown pods with various grace periods", func(ctx context.Context) {
 			nodeName := getNodeName(f)
 			nodeSelector := fields.Set{
 				"spec.nodeName": nodeName,

@@ -90,7 +90,7 @@ var _ = common.SIGDescribe("CVE-2021-29923", func() {
 		IMPORTANT: CoreDNS since version 1.8.5 discard IPs with leading zeros so Services are not resolvable, and is probably that
 		most of the ecosystem has done the same, however, Kubernetes doesn't impose any restriction, users should migrate their IPs.
 	*/
-	ginkgo.It("IPv4 Service Type ClusterIP with leading zeros should work interpreted as decimal", func() {
+	ginkgo.It("IPv4 Service Type ClusterIP with leading zeros should work interpreted as decimal", func(ctx context.Context) {
 		serviceName := "funny-ip"
 		// Use a very uncommon port to reduce the risk of conflicts with other tests that create services.
 		servicePort := 7180

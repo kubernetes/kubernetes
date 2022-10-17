@@ -301,7 +301,7 @@ current-context: local-context
 			hostLogFile = "/var/lib/kubelet/pods/" + string(pod.UID) + "/volumes/kubernetes.io~empty-dir" + logFile
 		})
 
-		ginkgo.It("should generate node condition and events for corresponding errors", func() {
+		ginkgo.It("should generate node condition and events for corresponding errors", func(ctx context.Context) {
 			for _, test := range []struct {
 				description      string
 				timestamp        time.Time

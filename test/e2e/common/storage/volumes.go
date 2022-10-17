@@ -43,6 +43,8 @@ limitations under the License.
 package storage
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -74,7 +76,7 @@ var _ = SIGDescribe("Volumes", func() {
 	// NFS
 	////////////////////////////////////////////////////////////////////////
 	ginkgo.Describe("NFSv4", func() {
-		ginkgo.It("should be mountable for NFSv4", func() {
+		ginkgo.It("should be mountable for NFSv4", func(ctx context.Context) {
 			config, _, serverHost := e2evolume.NewNFSServer(c, namespace.Name, []string{})
 			defer e2evolume.TestServerCleanup(f, config)
 
@@ -98,7 +100,7 @@ var _ = SIGDescribe("Volumes", func() {
 	})
 
 	ginkgo.Describe("NFSv3", func() {
-		ginkgo.It("should be mountable for NFSv3", func() {
+		ginkgo.It("should be mountable for NFSv3", func(ctx context.Context) {
 			config, _, serverHost := e2evolume.NewNFSServer(c, namespace.Name, []string{})
 			defer e2evolume.TestServerCleanup(f, config)
 

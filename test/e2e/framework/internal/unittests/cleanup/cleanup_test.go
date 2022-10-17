@@ -22,6 +22,7 @@ limitations under the License.
 package cleanup
 
 import (
+	"context"
 	"flag"
 	"regexp"
 	"testing"
@@ -77,7 +78,7 @@ var _ = ginkgo.Describe("e2e", func() {
 		framework.Logf("after #2")
 	})
 
-	ginkgo.It("works", func() {
+	ginkgo.It("works", func(ctx context.Context) {
 		// DeferCleanup invokes in first-in-last-out order
 		ginkgo.DeferCleanup(func() {
 			framework.Logf("cleanup last")

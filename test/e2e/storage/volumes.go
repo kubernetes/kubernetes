@@ -47,7 +47,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 	})
 
 	ginkgo.Describe("ConfigMap", func() {
-		ginkgo.It("should be mountable", func() {
+		ginkgo.It("should be mountable", func(ctx context.Context) {
 			config := e2evolume.TestConfig{
 				Namespace: namespace.Name,
 				Prefix:    "configmap",

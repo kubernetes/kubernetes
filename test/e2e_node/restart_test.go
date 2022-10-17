@@ -88,7 +88,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("Container Runtime", func() {
 		ginkgo.Context("Network", func() {
-			ginkgo.It("should recover from ip leak", func() {
+			ginkgo.It("should recover from ip leak", func(ctx context.Context) {
 				pods := newTestPods(podCount, false, imageutils.GetPauseImageName(), "restart-container-runtime-test")
 				ginkgo.By(fmt.Sprintf("Trying to create %d pods on node", len(pods)))
 				createBatchPodWithRateControl(f, pods, podCreationInterval)
@@ -144,7 +144,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 	})
 
 	ginkgo.Context("Dbus", func() {
-		ginkgo.It("should continue to run pods after a restart", func() {
+		ginkgo.It("should continue to run pods after a restart", func(ctx context.Context) {
 			// Allow dbus to be restarted on ubuntu
 			err := overlayDbusConfig()
 			framework.ExpectNoError(err)
@@ -198,7 +198,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive]", func() {
 	})
 
 	ginkgo.Context("Kubelet", func() {
-		ginkgo.It("should correctly account for terminated pods after restart", func() {
+		ginkgo.It("should correctly account for terminated pods after restart", func(ctx context.Context) {
 			node := getLocalNode(f)
 			cpus := node.Status.Allocatable[v1.ResourceCPU]
 			numCpus := int((&cpus).Value())

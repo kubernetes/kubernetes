@@ -49,7 +49,7 @@ var _ = SIGDescribe("Discovery", func() {
 		setupServerCert(namespaceName, serviceName)
 	})
 
-	ginkgo.It("should accurately determine present and missing resources", func() {
+	ginkgo.It("should accurately determine present and missing resources", func(ctx context.Context) {
 		// checks that legacy api group resources function
 		ok, err := clientdiscovery.IsResourceEnabled(f.ClientSet.Discovery(), schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"})
 		framework.ExpectNoError(err)
@@ -76,7 +76,7 @@ var _ = SIGDescribe("Discovery", func() {
 		}
 	})
 
-	ginkgo.It("Custom resource should have storage version hash", func() {
+	ginkgo.It("Custom resource should have storage version hash", func(ctx context.Context) {
 		testcrd, err := crd.CreateTestCRD(f)
 		if err != nil {
 			return
@@ -119,7 +119,7 @@ var _ = SIGDescribe("Discovery", func() {
 	   Description: Ensure that a list of apis is retrieved.
 	   Each api group found MUST return a valid PreferredVersion unless the group suffix is example.com.
 	*/
-	framework.ConformanceIt("should validate PreferredVersion for each APIGroup", func() {
+	framework.ConformanceIt("should validate PreferredVersion for each APIGroup", func(ctx context.Context) {
 
 		// get list of APIGroup endpoints
 		list := &metav1.APIGroupList{}

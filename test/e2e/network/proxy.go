@@ -98,7 +98,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			Testname: Proxy, logs service endpoint
 			Description: Select any node in the cluster to invoke  /logs endpoint  using the /nodes/proxy subresource from the kubelet port. This endpoint MUST be reachable.
 		*/
-		framework.ConformanceIt("should proxy through a service and a pod ", func() {
+		framework.ConformanceIt("should proxy through a service and a pod ", func(ctx context.Context) {
 			start := time.Now()
 			labels := map[string]string{"proxy-service-target": "true"}
 			service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), &v1.Service{
@@ -283,7 +283,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			ProxyWithPath using a list of http methods. A valid
 			response MUST be returned for each endpoint.
 		*/
-		framework.ConformanceIt("A set of valid responses are returned for both pod and service ProxyWithPath", func() {
+		framework.ConformanceIt("A set of valid responses are returned for both pod and service ProxyWithPath", func(ctx context.Context) {
 
 			ns := f.Namespace.Name
 			msg := "foo"
@@ -377,7 +377,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			Proxy using a list of http methods. A valid response
 			MUST be returned for each endpoint.
 		*/
-		framework.ConformanceIt("A set of valid responses are returned for both pod and service Proxy", func() {
+		framework.ConformanceIt("A set of valid responses are returned for both pod and service Proxy", func(ctx context.Context) {
 
 			ns := f.Namespace.Name
 			msg := "foo"
