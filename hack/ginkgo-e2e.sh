@@ -176,13 +176,10 @@ fi
 
 # NOTE: Ginkgo's default timeout has been reduced from 24h to 1h in V2, set it manually here as "24h"
 # for backward compatibility purpose.
-# Set --output-interceptor-mode= none to circumvent cases where the code grabbing the stdout/stderr pipe
-# is not under the framework control and may cause hangs (https://github.com/onsi/ginkgo/issues/851)
 "${program[@]}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
   "${auth_config[@]:+${auth_config[@]}}" \
   --ginkgo.flake-attempts="${FLAKE_ATTEMPTS}" \
   --ginkgo.timeout="24h" \
-  --ginkgo.output-interceptor-mode=none \
   --host="${KUBE_MASTER_URL}" \
   --provider="${KUBERNETES_PROVIDER}" \
   --gce-project="${PROJECT:-}" \
