@@ -235,6 +235,11 @@ func (in *KubeSchedulerProfile) DeepCopyInto(out *KubeSchedulerProfile) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.PercentageOfNodesToScore != nil {
+		in, out := &in.PercentageOfNodesToScore, &out.PercentageOfNodesToScore
+		*out = new(int32)
+		**out = **in
+	}
 	if in.Plugins != nil {
 		in, out := &in.Plugins, &out.Plugins
 		*out = new(Plugins)

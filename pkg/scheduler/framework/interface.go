@@ -574,8 +574,11 @@ type Framework interface {
 	// ListPlugins returns a map of extension point name to list of configured Plugins.
 	ListPlugins() *config.Plugins
 
-	// ProfileName returns the profile name associated to this framework.
+	// ProfileName returns the profile name associated to a profile.
 	ProfileName() string
+
+	// PercentageOfNodesToScore returns percentageOfNodesToScore associated to a profile.
+	PercentageOfNodesToScore() *int32
 }
 
 // Handle provides data and some tools that plugins can use. It is

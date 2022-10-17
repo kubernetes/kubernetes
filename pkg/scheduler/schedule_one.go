@@ -511,7 +511,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 	diagnosis framework.Diagnosis,
 	nodes []*framework.NodeInfo) ([]*v1.Node, error) {
 	numAllNodes := len(nodes)
-	numNodesToFind := sched.numFeasibleNodesToFind(int32(numAllNodes))
+	numNodesToFind := sched.numFeasibleNodesToFind(fwk.PercentageOfNodesToScore(), int32(numAllNodes))
 
 	// Create feasible list with enough space to avoid growing it
 	// and allow assigning.
@@ -576,21 +576,27 @@ func (sched *Scheduler) findNodesThatPassFilters(
 
 // numFeasibleNodesToFind returns the number of feasible nodes that once found, the scheduler stops
 // its search for more feasible nodes.
-func (sched *Scheduler) numFeasibleNodesToFind(numAllNodes int32) (numNodes int32) {
-	if numAllNodes < minFeasibleNodesToFind || sched.percentageOfNodesToScore >= 100 {
+func (sched *Scheduler) numFeasibleNodesToFind(percentageOfNodesToScore *int32, numAllNodes int32) (numNodes int32) {
+	if numAllNodes < minFeasibleNodesToFind {
 		return numAllNodes
 	}
 
-	adaptivePercentage := sched.percentageOfNodesToScore
-	if adaptivePercentage <= 0 {
-		basePercentageOfNodesToScore := int32(50)
-		adaptivePercentage = basePercentageOfNodesToScore - numAllNodes/125
-		if adaptivePercentage < minFeasibleNodesPercentageToFind {
-			adaptivePercentage = minFeasibleNodesPercentageToFind
+	// Use profile percentageOfNodesToScore if it's set. Otherwise, use global percentageOfNodesToScore.
+	var percentage int32
+	if percentageOfNodesToScore != nil {
+		percentage = *percentageOfNodesToScore
+	} else {
+		percentage = sched.percentageOfNodesToScore
+	}
+
+	if percentage == 0 {
+		percentage = int32(50) - numAllNodes/125
+		if percentage < minFeasibleNodesPercentageToFind {
+			percentage = minFeasibleNodesPercentageToFind
 		}
 	}
 
-	numNodes = numAllNodes * adaptivePercentage / 100
+	numNodes = numAllNodes * percentage / 100
 	if numNodes < minFeasibleNodesToFind {
 		return minFeasibleNodesToFind
 	}
