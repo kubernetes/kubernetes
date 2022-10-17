@@ -4,9 +4,12 @@ import (
 	"io/ioutil"
 	"path"
 
+	"k8s.io/kubernetes/plugin/pkg/admission/security/podsecurity"
+
 	configv1 "github.com/openshift/api/config/v1"
 	kubecontrolplanev1 "github.com/openshift/api/kubecontrolplane/v1"
 	osinv1 "github.com/openshift/api/osin/v1"
+	"github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/sccadmission"
 	"github.com/openshift/library-go/pkg/config/helpers"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -74,6 +77,8 @@ func ForceGlobalInitializationForOpenShift() {
 		},
 	})
 
+	podsecurity.SCCMutatingPodSpecExtractorInstance.SetSCCAdmission(SCCAdmissionPlugin)
+
 	// add permissions we require on our kube-apiserver
 	// TODO, we should scrub these out
 	bootstrappolicy.ClusterRoles = bootstrappolicy.OpenshiftClusterRoles
@@ -83,3 +88,5 @@ func ForceGlobalInitializationForOpenShift() {
 	// SkipSystemMastersAuthorizer disable implicitly added system/master authz, and turn it into another authz mode "SystemMasters", to be added via authorization-mode
 	authorizer.SkipSystemMastersAuthorizer()
 }
+
+var SCCAdmissionPlugin = sccadmission.NewConstraint()

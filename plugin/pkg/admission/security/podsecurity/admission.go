@@ -115,7 +115,7 @@ func newPlugin(reader io.Reader) (*Plugin, error) {
 			Configuration:    config,
 			Evaluator:        evaluator,
 			Metrics:          getDefaultRecorder(),
-			PodSpecExtractor: podsecurityadmission.DefaultPodSpecExtractor{},
+			PodSpecExtractor: SCCMutatingPodSpecExtractorInstance,
 		},
 	}, nil
 }
