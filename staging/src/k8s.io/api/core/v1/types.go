@@ -4572,6 +4572,16 @@ type ServiceSpec struct {
 	// +optional
 	AllocateLoadBalancerNodePorts *bool `json:"allocateLoadBalancerNodePorts,omitempty" protobuf:"bytes,20,opt,name=allocateLoadBalancerNodePorts"`
 
+	// AllocateLoadBalancerClusterIP defines if cluster ip will be automatically
+	// allocated for services with type LoadBalancer.  Default is "true". It
+	// may be set to "false" if the cluster load-balancer does not rely on
+	// cluster ip.  If the caller requests specific cluster ip (by specifying a
+	// value), those requests will be respected, regardless of this field.
+	// This field may only be set for services with type LoadBalancer and will
+	// be cleared if the type is changed to any other type.
+	// +optional
+	AllocateLoadBalancerClusterIP *bool `json:"allocateLoadBalancerClusterIP,omitempty" protobuf:"bytes,20,opt,name=allocateLoadBalancerClusterIP"`
+
 	// loadBalancerClass is the class of the load balancer implementation this Service belongs to.
 	// If specified, the value of this field must be a label-style identifier, with an optional prefix,
 	// e.g. "internal-vip" or "example.com/internal-vip". Unprefixed names are reserved for end-users.

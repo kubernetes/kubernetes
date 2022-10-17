@@ -3925,6 +3925,15 @@ type ServiceSpec struct {
 	// be cleared if the type is changed to any other type.
 	// +optional
 	AllocateLoadBalancerNodePorts *bool
+	// AllocateLoadBalancerClusterIP defines if cluster ip will be automatically
+	// allocated for services with type LoadBalancer.  Default is "true". It
+	// may be set to "false" if the cluster loadBalancer does not rely on
+	// cluster ip.  If the caller requests specific cluster ip (by specifying a
+	// value), those requests will be respected, regardless of this field.
+	// This field may only be set for services with type LoadBalancer and will
+	// be cleared if the type is changed to any other type.
+	// +optional
+	AllocateLoadBalancerClusterIP *bool
 
 	// loadBalancerClass is the class of the load balancer implementation this Service belongs to.
 	// If specified, the value of this field must be a label-style identifier, with an optional prefix,

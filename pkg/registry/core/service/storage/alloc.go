@@ -341,6 +341,10 @@ func (al *Allocators) allocClusterIPs(service *api.Service, dryRun bool) (map[ap
 		return nil, nil
 	}
 
+	if service.Spec.Type == api.ServiceTypeLoadBalancer && service.Spec.AllocateLoadBalancerClusterIP != nil && !*service.Spec.AllocateLoadBalancerClusterIP {
+		return nil, nil
+	}
+
 	// headless don't get ClusterIPs
 	if len(service.Spec.ClusterIPs) > 0 && service.Spec.ClusterIPs[0] == api.ClusterIPNone {
 		return nil, nil

@@ -42,6 +42,7 @@ type ServiceSpecApplyConfiguration struct {
 	IPFamilies                    []corev1.IPFamily                        `json:"ipFamilies,omitempty"`
 	IPFamilyPolicy                *corev1.IPFamilyPolicy                   `json:"ipFamilyPolicy,omitempty"`
 	AllocateLoadBalancerNodePorts *bool                                    `json:"allocateLoadBalancerNodePorts,omitempty"`
+	AllocateLoadBalancerClusterIP *bool                                    `json:"allocateLoadBalancerClusterIP,omitempty"`
 	LoadBalancerClass             *string                                  `json:"loadBalancerClass,omitempty"`
 	InternalTrafficPolicy         *corev1.ServiceInternalTrafficPolicyType `json:"internalTrafficPolicy,omitempty"`
 }
@@ -204,6 +205,14 @@ func (b *ServiceSpecApplyConfiguration) WithIPFamilyPolicy(value corev1.IPFamily
 // If called multiple times, the AllocateLoadBalancerNodePorts field is set to the value of the last call.
 func (b *ServiceSpecApplyConfiguration) WithAllocateLoadBalancerNodePorts(value bool) *ServiceSpecApplyConfiguration {
 	b.AllocateLoadBalancerNodePorts = &value
+	return b
+}
+
+// WithAllocateLoadBalancerClusterIP sets the AllocateLoadBalancerClusterIP field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AllocateLoadBalancerClusterIP field is set to the value of the last call.
+func (b *ServiceSpecApplyConfiguration) WithAllocateLoadBalancerClusterIP(value bool) *ServiceSpecApplyConfiguration {
+	b.AllocateLoadBalancerClusterIP = &value
 	return b
 }
 

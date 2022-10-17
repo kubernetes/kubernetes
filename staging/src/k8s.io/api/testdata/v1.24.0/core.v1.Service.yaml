@@ -34,6 +34,7 @@ metadata:
   uid: uidValue
 spec:
   allocateLoadBalancerNodePorts: true
+  allocateLoadBalancerClusterIP: true
   clusterIP: clusterIPValue
   clusterIPs:
   - clusterIPsValue

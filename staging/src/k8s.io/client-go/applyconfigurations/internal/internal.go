@@ -6697,6 +6697,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.core.v1.ServiceSpec
   map:
     fields:
+    - name: allocateLoadBalancerClusterIP
+      type:
+        scalar: boolean
     - name: allocateLoadBalancerNodePorts
       type:
         scalar: boolean

@@ -273,12 +273,17 @@ func dropTypeDependentFields(newSvc *api.Service, oldSvc *api.Service) {
 		newSvc.Spec.HealthCheckNodePort = 0
 	}
 
-	// If a user is switching to a type that doesn't need allocatedLoadBalancerNodePorts AND they did not change
+	// If a user is switching to a type that doesn't need allocatedLoadBalancerNodePorts, allocateLoadBalancerClusterIP AND they did not change
 	// this field, it is safe to drop it.
 	if oldSvc.Spec.Type == api.ServiceTypeLoadBalancer && newSvc.Spec.Type != api.ServiceTypeLoadBalancer {
 		if newSvc.Spec.AllocateLoadBalancerNodePorts != nil && oldSvc.Spec.AllocateLoadBalancerNodePorts != nil {
 			if *oldSvc.Spec.AllocateLoadBalancerNodePorts == *newSvc.Spec.AllocateLoadBalancerNodePorts {
 				newSvc.Spec.AllocateLoadBalancerNodePorts = nil
+			}
+		}
+		if newSvc.Spec.AllocateLoadBalancerClusterIP != nil && oldSvc.Spec.AllocateLoadBalancerClusterIP != nil {
+			if *oldSvc.Spec.AllocateLoadBalancerClusterIP == *newSvc.Spec.AllocateLoadBalancerClusterIP {
+				newSvc.Spec.AllocateLoadBalancerClusterIP = nil
 			}
 		}
 	}
@@ -310,6 +315,13 @@ func dropTypeDependentFields(newSvc *api.Service, oldSvc *api.Service) {
 func needsClusterIP(svc *api.Service) bool {
 	if svc.Spec.Type == api.ServiceTypeExternalName {
 		return false
+	}
+	if svc.Spec.Type == api.ServiceTypeLoadBalancer {
+		if svc.Spec.AllocateLoadBalancerClusterIP == nil {
+			return true
+		} else {
+			return *svc.Spec.AllocateLoadBalancerClusterIP
+		}
 	}
 	return true
 }

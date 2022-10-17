@@ -5403,6 +5403,11 @@ func (in *ServiceSpec) DeepCopyInto(out *ServiceSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.AllocateLoadBalancerClusterIP != nil {
+		in, out := &in.AllocateLoadBalancerClusterIP, &out.AllocateLoadBalancerClusterIP
+		*out = new(bool)
+		**out = **in
+	}
 	if in.LoadBalancerClass != nil {
 		in, out := &in.LoadBalancerClass, &out.LoadBalancerClass
 		*out = new(string)

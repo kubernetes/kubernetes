@@ -144,6 +144,9 @@ func SetDefaults_Service(obj *v1.Service) {
 		if obj.Spec.AllocateLoadBalancerNodePorts == nil {
 			obj.Spec.AllocateLoadBalancerNodePorts = pointer.BoolPtr(true)
 		}
+		if obj.Spec.AllocateLoadBalancerClusterIP == nil {
+			obj.Spec.AllocateLoadBalancerClusterIP = pointer.BoolPtr(true)
+		}
 	}
 }
 func SetDefaults_Pod(obj *v1.Pod) {

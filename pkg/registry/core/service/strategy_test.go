@@ -410,6 +410,15 @@ func TestDropTypeDependentFields(t *testing.T) {
 	clearAllocateLoadBalancerNodePorts := func(svc *api.Service) {
 		svc.Spec.AllocateLoadBalancerNodePorts = nil
 	}
+	setAllocateLoadBalancerClusterIPTrue := func(svc *api.Service) {
+		svc.Spec.AllocateLoadBalancerClusterIP = utilpointer.BoolPtr(true)
+	}
+	setAllocateLoadBalancerClusterIPFalse := func(svc *api.Service) {
+		svc.Spec.AllocateLoadBalancerClusterIP = utilpointer.BoolPtr(false)
+	}
+	clearAllocateLoadBalancerClusterIP := func(svc *api.Service) {
+		svc.Spec.AllocateLoadBalancerClusterIP = nil
+	}
 	setLoadBalancerClass := func(svc *api.Service) {
 		svc.Spec.LoadBalancerClass = utilpointer.StringPtr("test-load-balancer-class")
 	}
@@ -546,6 +555,46 @@ func TestDropTypeDependentFields(t *testing.T) {
 			svc:    makeValidServiceCustom(setTypeLoadBalancer, setAllocateLoadBalancerNodePortsFalse),
 			patch:  patches(setTypeNodePort, setAllocateLoadBalancerNodePortsTrue),
 			expect: makeValidServiceCustom(setTypeNodePort, setAllocateLoadBalancerNodePortsTrue),
+		}, { // allocatedLoadBalancerClusterIP cases
+			name:   "clear allocatedLoadBalancerClusterIP true -> true",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setAllocateLoadBalancerClusterIPTrue),
+			patch:  setTypeClusterIP,
+			expect: makeValidServiceCustom(setTypeClusterIP),
+		}, {
+			name:   "clear allocatedLoadBalancerClusterIP false -> false",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setAllocateLoadBalancerClusterIPFalse),
+			patch:  setTypeClusterIP,
+			expect: makeValidServiceCustom(setTypeClusterIP),
+		}, {
+			name:   "set allocatedLoadBalancerClusterIP nil -> true",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer),
+			patch:  patches(setTypeClusterIP, setAllocateLoadBalancerClusterIPTrue),
+			expect: makeValidServiceCustom(setTypeClusterIP, setAllocateLoadBalancerClusterIPTrue),
+		}, {
+			name:   "set allocatedLoadBalancerClusterIP nil -> false",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer),
+			patch:  patches(setTypeClusterIP, setAllocateLoadBalancerClusterIPFalse),
+			expect: makeValidServiceCustom(setTypeClusterIP, setAllocateLoadBalancerClusterIPFalse),
+		}, {
+			name:   "set allocatedLoadBalancerClusterIP true -> nil",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setAllocateLoadBalancerClusterIPTrue),
+			patch:  patches(setTypeClusterIP, clearAllocateLoadBalancerClusterIP),
+			expect: makeValidServiceCustom(setTypeClusterIP),
+		}, {
+			name:   "set allocatedLoadBalancerClusterIP false -> nil",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setAllocateLoadBalancerClusterIPFalse),
+			patch:  patches(setTypeClusterIP, clearAllocateLoadBalancerClusterIP),
+			expect: makeValidServiceCustom(setTypeClusterIP),
+		}, {
+			name:   "set allocatedLoadBalancerClusterIP true -> false",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setAllocateLoadBalancerClusterIPTrue),
+			patch:  patches(setTypeClusterIP, setAllocateLoadBalancerClusterIPFalse),
+			expect: makeValidServiceCustom(setTypeClusterIP, setAllocateLoadBalancerClusterIPFalse),
+		}, {
+			name:   "set allocatedLoadBalancerClusterIP false -> true",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setAllocateLoadBalancerClusterIPFalse),
+			patch:  patches(setTypeClusterIP, setAllocateLoadBalancerClusterIPTrue),
+			expect: makeValidServiceCustom(setTypeClusterIP, setAllocateLoadBalancerClusterIPTrue),
 		}, { // loadBalancerClass cases
 			name:   "clear loadBalancerClass when set Service type LoadBalancer -> non LoadBalancer",
 			svc:    makeValidServiceCustom(setTypeLoadBalancer, setLoadBalancerClass),
@@ -584,6 +633,7 @@ func TestDropTypeDependentFields(t *testing.T) {
 			if tc.patch != nil {
 				tc.patch(result)
 			}
+			t.Logf("test cases %v", tc.name)
 			dropTypeDependentFields(result, tc.svc)
 			if result.Spec.ClusterIP != tc.expect.Spec.ClusterIP {
 				t.Errorf("expected clusterIP %q, got %q", tc.expect.Spec.ClusterIP, result.Spec.ClusterIP)
