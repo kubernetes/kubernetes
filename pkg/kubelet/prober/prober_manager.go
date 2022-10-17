@@ -173,39 +173,40 @@ func (m *manager) AddPod(pod *v1.Pod) {
 	key := probeKey{podUID: pod.UID}
 	for _, c := range pod.Spec.Containers {
 		key.containerName = c.Name
+		hasProbe := false
 
 		if c.StartupProbe != nil {
+			hasProbe = true
 			key.probeType = startup
 			if _, ok := m.workers[key]; ok {
 				klog.V(8).ErrorS(nil, "Startup probe already exists for container",
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
-			w := newWorker(m, startup, pod, c)
-			m.workers[key] = w
-			go w.run()
 		}
 
 		if c.ReadinessProbe != nil {
+			hasProbe = true
 			key.probeType = readiness
 			if _, ok := m.workers[key]; ok {
 				klog.V(8).ErrorS(nil, "Readiness probe already exists for container",
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
-			w := newWorker(m, readiness, pod, c)
-			m.workers[key] = w
-			go w.run()
 		}
 
 		if c.LivenessProbe != nil {
+			hasProbe = true
 			key.probeType = liveness
 			if _, ok := m.workers[key]; ok {
 				klog.V(8).ErrorS(nil, "Liveness probe already exists for container",
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
-			w := newWorker(m, liveness, pod, c)
+		}
+
+		if hasProbe {
+			w := newWorker(m, key.probeType, pod, c)
 			m.workers[key] = w
 			go w.run()
 		}
