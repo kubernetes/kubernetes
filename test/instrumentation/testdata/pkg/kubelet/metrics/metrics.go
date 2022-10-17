@@ -469,7 +469,7 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           RunningContainersKey,
 			Help:           "Number of containers currently running",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"container_state"},
 	)
