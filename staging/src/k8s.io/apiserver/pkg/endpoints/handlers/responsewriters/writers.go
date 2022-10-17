@@ -263,7 +263,7 @@ func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiat
 		// if original statusCode was not successful we need to return the original error
 		// we cannot hide it behind negotiation problems
 		if statusCode < http.StatusOK || statusCode >= http.StatusBadRequest {
-			WriteRawJSON(int(statusCode), object, w)
+			WriteRawJSON(statusCode, object, w)
 			return
 		}
 		status := ErrorToAPIStatus(err)
