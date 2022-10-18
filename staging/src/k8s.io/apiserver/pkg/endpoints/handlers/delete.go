@@ -77,7 +77,8 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 
 		options := &metav1.DeleteOptions{}
 		if allowsOptions {
-			body, err := limitedReadBody(req, scope.MaxRequestBodyBytes)
+			body, err := limitedReadBodyWithRecordMetric(ctx, req, scope.MaxRequestBodyBytes, scope.Resource.GroupResource().String(), requestmetrics.Delete)
+			trace.Step("limitedReadBody done", utiltrace.Field{"len", len(body)}, utiltrace.Field{"err", err})
 			if err != nil {
 				scope.err(err, w, req)
 				return
@@ -225,13 +226,14 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 
 		options := &metav1.DeleteOptions{}
 		if checkBody {
-			body, err := limitedReadBody(req, scope.MaxRequestBodyBytes)
+			body, err := limitedReadBodyWithRecordMetric(ctx, req, scope.MaxRequestBodyBytes, scope.Resource.GroupResource().String(), requestmetrics.DeleteCollection)
+			trace.Step("limitedReadBody done", utiltrace.Field{"len", len(body)}, utiltrace.Field{"err", err})
 			if err != nil {
 				scope.err(err, w, req)
 				return
 			}
 			if len(body) > 0 {
-				s, err := negotiation.NegotiateInputSerializer(req, false, scope.Serializer)
+				s, err := negotiation.NegotiateInputSerializer(req, false, metainternalversionscheme.Codecs)
 				if err != nil {
 					scope.err(err, w, req)
 					return
