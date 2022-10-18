@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"os"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -47,6 +48,12 @@ func createProductNameFile() (string, error) {
 // referenced by gceProductNameFile being removed, which is the opposite of
 // the other tests
 func TestMetadata(t *testing.T) {
+	// This test requires onGCEVM to return True. On Linux, this can be faked by creating a
+	// Product Name File. But on Windows, onGCEVM makes the following syscall instead:
+	// wmic computersystem get model
+	if runtime.GOOS == "windows" && !onGCEVM() {
+		t.Skip("Skipping test on Windows, not on GCE.")
+	}
 	var err error
 	gceProductNameFile, err = createProductNameFile()
 	if err != nil {
