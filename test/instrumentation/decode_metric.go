@@ -496,19 +496,15 @@ func (c *metricDecoder) decodeBucketFunctionCall(v *ast.CallExpr) ([]float64, er
 	case "MergeBuckets":
 		merged := []float64{}
 		for _, arg := range v.Args {
-			cl, ok := arg.(*ast.CompositeLit)
-			if ok {
-				fs, err := decodeListOfFloats(cl, cl.Elts)
+			switch argExpr := arg.(type) {
+			case *ast.CompositeLit:
+				fs, err := decodeListOfFloats(argExpr, argExpr.Elts)
 				if err != nil {
 					return nil, err, true
 				}
 				merged = append(merged, fs...)
-			} else {
-				v2, ok := arg.(*ast.CallExpr)
-				if !ok {
-					return nil, newDecodeErrorf(v2, errBuckets), true
-				}
-				se, ok = v2.Fun.(*ast.SelectorExpr)
+			case *ast.CallExpr:
+				se, ok = argExpr.Fun.(*ast.SelectorExpr)
 				if ok {
 					functionName := se.Sel.String()
 					functionImport, ok := se.X.(*ast.Ident)
@@ -518,7 +514,7 @@ func (c *metricDecoder) decodeBucketFunctionCall(v *ast.CallExpr) ([]float64, er
 					if functionImport.String() != c.kubeMetricsImportName {
 						return nil, newDecodeErrorf(v, errBuckets), true
 					}
-					firstArg, secondArg, thirdArg, err := decodeBucketArguments(v2)
+					firstArg, secondArg, thirdArg, err := decodeBucketArguments(argExpr)
 					if err != nil {
 						return nil, err, true
 					}
