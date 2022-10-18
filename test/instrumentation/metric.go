@@ -53,6 +53,11 @@ type byFQName []metric
 
 func (ms byFQName) Len() int { return len(ms) }
 func (ms byFQName) Less(i, j int) bool {
+	if ms[i].StabilityLevel < ms[j].StabilityLevel {
+		return true
+	} else if ms[i].StabilityLevel > ms[j].StabilityLevel {
+		return false
+	}
 	return ms[i].buildFQName() < ms[j].buildFQName()
 }
 func (ms byFQName) Swap(i, j int) {
