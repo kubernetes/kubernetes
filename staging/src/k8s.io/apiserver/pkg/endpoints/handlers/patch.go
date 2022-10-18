@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	kjson "sigs.k8s.io/json"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -403,7 +403,7 @@ func (p *jsonPatcher) applyJSPatch(versionedJS []byte) (patchedJS []byte, strict
 		}
 
 		patchedJS, retErr = jsonpatch.MergePatch(versionedJS, p.patchBytes)
-		if retErr == jsonpatch.ErrBadJSONPatch {
+		if retErr == fmt.Errorf("Invalid JSON Patch") {
 			return nil, nil, errors.NewBadRequest(retErr.Error())
 		}
 		return patchedJS, strictErrors, retErr

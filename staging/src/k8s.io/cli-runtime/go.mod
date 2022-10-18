@@ -6,7 +6,7 @@ go 1.19
 
 require (
 	github.com/davecgh/go-spew v1.1.1
-	github.com/evanphx/json-patch v4.12.0+incompatible
+	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/google/gnostic v0.5.7-v3refs
 	github.com/google/uuid v1.1.2
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
@@ -27,6 +27,7 @@ require (
 
 require (
 	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
+	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/go-errors/errors v1.0.1 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect

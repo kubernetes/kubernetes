@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch/v5"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/klog/v2"

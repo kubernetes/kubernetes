@@ -32,7 +32,6 @@ require (
 	github.com/docker/go-units v0.4.0
 	github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153
 	github.com/emicklei/go-restful/v3 v3.9.0
-	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/go-logr/logr v1.2.3
@@ -157,6 +156,7 @@ require (
 	github.com/daviddengcn/go-colortext v1.0.0 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/euank/go-kmsg-parser v2.0.0+incompatible // indirect
+	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d // indirect
 	github.com/fatih/camelcase v1.0.0 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
@@ -330,6 +330,7 @@ replace (
 	github.com/envoyproxy/protoc-gen-validate => github.com/envoyproxy/protoc-gen-validate v0.1.0
 	github.com/euank/go-kmsg-parser => github.com/euank/go-kmsg-parser v2.0.0+incompatible
 	github.com/evanphx/json-patch => github.com/evanphx/json-patch v4.12.0+incompatible
+	github.com/evanphx/json-patch/v5 => github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/exponent-io/jsonpath => github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d
 	github.com/fatih/camelcase => github.com/fatih/camelcase v1.0.0
 	github.com/felixge/httpsnoop => github.com/felixge/httpsnoop v1.0.3
@@ -387,6 +388,7 @@ replace (
 	github.com/imdario/mergo => github.com/imdario/mergo v0.3.6
 	github.com/inconshreveable/mousetrap => github.com/inconshreveable/mousetrap v1.0.1
 	github.com/ishidawataru/sctp => github.com/ishidawataru/sctp v0.0.0-20190723014705-7c296d48a2b5
+	github.com/jessevdk/go-flags => github.com/jessevdk/go-flags v1.4.0
 	github.com/jmespath/go-jmespath => github.com/jmespath/go-jmespath v0.4.0
 	github.com/jmespath/go-jmespath/internal/testify => github.com/jmespath/go-jmespath/internal/testify v1.5.1
 	github.com/jonboulle/clockwork => github.com/jonboulle/clockwork v0.2.2
