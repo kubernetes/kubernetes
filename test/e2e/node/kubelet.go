@@ -465,6 +465,10 @@ var _ = SIGDescribe("kubelet", func() {
 
 	//Test kubectl alpha node-logs <node-name> commands
 	ginkgo.Describe("kubectl node-logs <node-name> [Feature:NodeLogViewer]", func() {
+		const (
+			RFC3339 = "2006-01-02T15:04:05+00:00"
+		)
+
 		var (
 			numNodes  int
 			nodeNames sets.String
@@ -529,7 +533,7 @@ var _ = SIGDescribe("kubelet", func() {
 			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
 			cmd := tk.KubectlCmd("alpha", "node-logs", "--role", "master", "--query", "kubelet", "--tail", n, "-o", "short")
 			result := runKubectlCommand(cmd, "--role --query --tail")
-			logs := journalctlCommand("-u", "kubelet", "-n", n)
+			logs := journalctlCommand("-u", "kubelet", "-n", n, "--utc")
 			if result != logs {
 				framework.Failf("Failed to receive the correct kubelet logs or the correct amount of lines of logs")
 			}
@@ -558,7 +562,7 @@ var _ = SIGDescribe("kubelet", func() {
 			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
 			cmd := tk.KubectlCmd("alpha", "node-logs", "--role", "master", "--query", "kubelet", "--pattern", "kubelet", "-o", "short")
 			result := runKubectlCommand(cmd, "--role --query --pattern")
-			logs := journalctlCommand("-u", "kubelet", "-b", "0", "-g", "kubelet")
+			logs := journalctlCommand("-u", "kubelet", "-b", "0", "-g", "kubelet", "--utc")
 			if result != logs {
 				framework.Failf("Failed to receive the correct kubelet logs for the specific pattern")
 			}
@@ -588,21 +592,20 @@ var _ = SIGDescribe("kubelet", func() {
 
 		ginkgo.It("should return the logs for the requested query of the specific node from 4 hours ago", func() {
 			ginkgo.By("Starting the command")
-			start := time.Now()
-			const RFC3339 = "2006-01-02T15:04:05Z07:00"
+			start := time.Now().UTC()
 			count := 4
 			start = start.Add(time.Duration(-count) * time.Hour)
 			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
 			cmd := tk.KubectlCmd("alpha", "node-logs", "--role", "master", "--query", "kubelet", "--since-time", start.Format(RFC3339), "-o", "short")
+			logs := journalctlCommand("-u", "kubelet", "-S", "'4 hours ago'", "--utc")
 			result := runKubectlCommand(cmd, "--role --query --since-time")
-			logs := journalctlCommand("-u", "kubelet", "-S", "4 hours ago", "")
 			if result != logs {
 				framework.Failf("Failed to receive the correct kubelet logs since the specific time")
 			}
 		})
 
 		/*
-			Test if kubectl node-logs <node-name> --Q kubelet --boot -1 -o short
+			Test if kubectl node-logs <node-name> --query kubelet --boot -1 -o short
 			returns the kubelet logs or not!
 		*/
 
@@ -612,7 +615,7 @@ var _ = SIGDescribe("kubelet", func() {
 			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
 			cmd := tk.KubectlCmd("alpha", "node-logs", "--role", "master", "--query", "kubelet", "--boot", n, "-o", "short")
 			result := runKubectlCommand(cmd, "--role --query --boot")
-			logs := journalctlCommand("-u", "kubelet", "-b", n)
+			logs := journalctlCommand("-u", "kubelet", "-b", n, "--utc")
 			if result != logs {
 				framework.Failf("Failed to receive the correct kubelet logs for the %s boot", n)
 			}
@@ -657,12 +660,11 @@ var _ = SIGDescribe("kubelet", func() {
 
 		ginkgo.It("should return the logs for the requested query until the current date and time", func() {
 			ginkgo.By("Starting the command")
-			const RFC3339 = "2006-01-02T15:04:05Z07:00"
-			start := time.Now()
+			start := time.Now().UTC()
 			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
 			cmd := tk.KubectlCmd("alpha", "node-logs", "--role", "master", "--query", "kubelet", "-o", "short", "--until-time", start.Format(RFC3339))
 			result := runKubectlCommand(cmd, "--role --query --until-time")
-			logs := journalctlCommand("-u", "kubelet", "-U", "now")
+			logs := journalctlCommand("-u", "kubelet", "-U", "'now'", "--utc")
 			if result != logs {
 				framework.Failf("Failed to receive the correct kubelet logs")
 			}
@@ -678,7 +680,7 @@ var _ = SIGDescribe("kubelet", func() {
 			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
 			cmd := tk.KubectlCmd("alpha", "node-logs", "--role", "master", "--query", "kubelet", "-o", "short")
 			result := runKubectlCommand(cmd, "--query -o")
-			logs := journalctlCommand("-u", "kubelet", "-b", "0")
+			logs := journalctlCommand("-u", "kubelet", "-b", "0", "--utc")
 			if result != logs {
 				framework.Failf("Failed to receive the correct kubelet logs")
 			}
@@ -696,7 +698,7 @@ var _ = SIGDescribe("kubelet", func() {
 			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
 			cmd := tk.KubectlCmd("alpha", "node-logs", "--role", "master", "--query", "kubelet", "-o", "short")
 			result := runKubectlCommand(cmd, "--query -o")
-			logs := journalctlCommand("-u", "kubelet", "-b", "0")
+			logs := journalctlCommand("-u", "kubelet", "-b", "0", "--utc")
 			if result != logs {
 				framework.Failf("Failed to receive the correct kubelet logs for the specific timezone")
 			}
@@ -745,6 +747,7 @@ func journalctlCommand(arg ...string) string {
 	command := exec.Command("journalctl", arg...)
 	out, err := command.Output()
 	if err != nil {
+		framework.Logf("Command: %v\nError: %v", command, err)
 		framework.Failf("Error at running journalctl command")
 	}
 	framework.Logf("Journalctl output: %s", out)
