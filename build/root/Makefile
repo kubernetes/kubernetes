@@ -310,7 +310,7 @@ endif
 # TODO(thockin): Remove this in v1.29.
 .PHONY: generated_files
 generated_files:
-	echo "'make generated_files' is deprecated.  Please use hack/update-codgen.sh instead."
+	echo "'make generated_files' is deprecated.  Please use hack/update-codegen.sh instead."
 	false
 
 define VET_HELP_INFO
