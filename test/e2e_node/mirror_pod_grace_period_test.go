@@ -24,6 +24,8 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gstruct"
+	"github.com/prometheus/common/model"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -133,6 +135,38 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 
 		ginkgo.Context("and the container runtime is temporarily down during pod termination [NodeConformance] [Serial] [Disruptive]", func() {
 			ginkgo.It("the mirror pod should terminate successfully", func(ctx context.Context) {
+				ginkgo.By("verifying the pod is described as syncing in metrics")
+				gomega.Eventually(ctx, getKubeletMetrics, 5*time.Second, time.Second).Should(gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+					"kubelet_working_pods": gstruct.MatchElements(sampleLabelID, 0, gstruct.Elements{
+						`kubelet_working_pods{config="desired", lifecycle="sync", static=""}`:                    timelessSample(0),
+						`kubelet_working_pods{config="desired", lifecycle="sync", static="true"}`:                timelessSample(1),
+						`kubelet_working_pods{config="orphan", lifecycle="sync", static=""}`:                     timelessSample(0),
+						`kubelet_working_pods{config="orphan", lifecycle="sync", static="true"}`:                 timelessSample(0),
+						`kubelet_working_pods{config="runtime_only", lifecycle="sync", static="unknown"}`:        timelessSample(0),
+						`kubelet_working_pods{config="desired", lifecycle="terminating", static=""}`:             timelessSample(0),
+						`kubelet_working_pods{config="desired", lifecycle="terminating", static="true"}`:         timelessSample(0),
+						`kubelet_working_pods{config="orphan", lifecycle="terminating", static=""}`:              timelessSample(0),
+						`kubelet_working_pods{config="orphan", lifecycle="terminating", static="true"}`:          timelessSample(0),
+						`kubelet_working_pods{config="runtime_only", lifecycle="terminating", static="unknown"}`: timelessSample(0),
+						`kubelet_working_pods{config="desired", lifecycle="terminated", static=""}`:              timelessSample(0),
+						`kubelet_working_pods{config="desired", lifecycle="terminated", static="true"}`:          timelessSample(0),
+						`kubelet_working_pods{config="orphan", lifecycle="terminated", static=""}`:               timelessSample(0),
+						`kubelet_working_pods{config="orphan", lifecycle="terminated", static="true"}`:           timelessSample(0),
+						`kubelet_working_pods{config="runtime_only", lifecycle="terminated", static="unknown"}`:  timelessSample(0),
+					}),
+					"kubelet_mirror_pods": gstruct.MatchElements(sampleLabelID, 0, gstruct.Elements{
+						`kubelet_mirror_pods`: timelessSample(1),
+					}),
+					"kubelet_active_pods": gstruct.MatchElements(sampleLabelID, 0, gstruct.Elements{
+						`kubelet_active_pods{static=""}`:     timelessSample(0),
+						`kubelet_active_pods{static="true"}`: timelessSample(1),
+					}),
+					"kubelet_desired_pods": gstruct.MatchElements(sampleLabelID, 0, gstruct.Elements{
+						`kubelet_desired_pods{static=""}`:     timelessSample(0),
+						`kubelet_desired_pods{static="true"}`: timelessSample(1),
+					}),
+				}))
+
 				ginkgo.By("delete the static pod")
 				err := deleteStaticPod(podPath, staticPodName, ns)
 				framework.ExpectNoError(err)
@@ -152,17 +186,104 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 					return err
 				}, 2*time.Minute, time.Second*5).ShouldNot(gomega.Succeed())
 
+				ginkgo.By("verifying the mirror pod is running")
+				gomega.Consistently(ctx, func(ctx context.Context) error {
+					return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
+				}, 19*time.Second, 200*time.Millisecond).Should(gomega.BeNil())
+
+				ginkgo.By("verifying the pod is described as terminating in metrics")
+				gomega.Eventually(ctx, getKubeletMetrics, 5*time.Second, time.Second).Should(gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+					"kubelet_working_pods": gstruct.MatchElements(sampleLabelID, 0, gstruct.Elements{
+						`kubelet_working_pods{config="desired", lifecycle="sync", static=""}`:                    timelessSample(0),
+						`kubelet_working_pods{config="desired", lifecycle="sync", static="true"}`:                timelessSample(0),
+						`kubelet_working_pods{config="orphan", lifecycle="sync", static=""}`:                     timelessSample(0),
+						`kubelet_working_pods{config="orphan", lifecycle="sync", static="true"}`:                 timelessSample(0),
+						`kubelet_working_pods{config="runtime_only", lifecycle="sync", static="unknown"}`:        timelessSample(0),
+						`kubelet_working_pods{config="desired", lifecycle="terminating", static=""}`:             timelessSample(0),
+						`kubelet_working_pods{config="desired", lifecycle="terminating", static="true"}`:         timelessSample(0),
+						`kubelet_working_pods{config="orphan", lifecycle="terminating", static=""}`:              timelessSample(0),
+						`kubelet_working_pods{config="orphan", lifecycle="terminating", static="true"}`:          timelessSample(1),
+						`kubelet_working_pods{config="runtime_only", lifecycle="terminating", static="unknown"}`: timelessSample(0),
+						`kubelet_working_pods{config="desired", lifecycle="terminated", static=""}`:              timelessSample(0),
+						`kubelet_working_pods{config="desired", lifecycle="terminated", static="true"}`:          timelessSample(0),
+						`kubelet_working_pods{config="orphan", lifecycle="terminated", static=""}`:               timelessSample(0),
+						`kubelet_working_pods{config="orphan", lifecycle="terminated", static="true"}`:           timelessSample(0),
+						`kubelet_working_pods{config="runtime_only", lifecycle="terminated", static="unknown"}`:  timelessSample(0),
+					}),
+					"kubelet_mirror_pods": gstruct.MatchElements(sampleLabelID, 0, gstruct.Elements{
+						`kubelet_mirror_pods`: timelessSample(1),
+					}),
+					"kubelet_active_pods": gstruct.MatchElements(sampleLabelID, 0, gstruct.Elements{
+						`kubelet_active_pods{static=""}`: timelessSample(0),
+						// TODO: the pod is still running and consuming resources, it should be considered in
+						// admission https://github.com/kubernetes/kubernetes/issues/104824 for static pods at
+						// least, which means it should be 1
+						`kubelet_active_pods{static="true"}`: timelessSample(0),
+					}),
+					"kubelet_desired_pods": gstruct.MatchElements(sampleLabelID, 0, gstruct.Elements{
+						`kubelet_desired_pods{static=""}`:     timelessSample(0),
+						`kubelet_desired_pods{static="true"}`: timelessSample(0),
+					})}))
+
 				ginkgo.By("start the container runtime")
 				err = startContainerRuntime()
 				framework.ExpectNoError(err, "expected no error starting the container runtime")
-				gomega.Consistently(ctx, func(ctx context.Context) error {
-					ginkgo.By(fmt.Sprintf("verifying that the mirror pod (%s/%s) is running", ns, mirrorPodName))
-					err := checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
+				ginkgo.By("waiting for the container runtime to start")
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					r, _, err := getCRIClient()
 					if err != nil {
-						return fmt.Errorf("expected mirror pod (%s/%s) to be running but it was not: %v", ns, mirrorPodName, err)
+						return fmt.Errorf("error getting CRI client: %w", err)
 					}
+					status, err := r.Status(ctx, true)
+					if err != nil {
+						return fmt.Errorf("error checking CRI status: %w", err)
+					}
+					framework.Logf("Runtime started: %#v", status)
 					return nil
-				}, time.Second*30, time.Second*5).Should(gomega.Succeed())
+				}, 2*time.Minute, time.Second*5).Should(gomega.Succeed())
+
+				ginkgo.By(fmt.Sprintf("verifying that the mirror pod (%s/%s) stops running after about 30s", ns, mirrorPodName))
+				// from the time the container runtime starts, it should take a maximum of:
+				// 20s (grace period) + 2 sync transitions * 1s + 2s between housekeeping + 3s to detect CRI up +
+				//   2s overhead
+				// which we calculate here as "about 30s", so we try a bit longer than that but verify that it is
+				// tightly bounded by not waiting longer (we want to catch regressions to shutdown)
+				time.Sleep(30 * time.Second)
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					return checkMirrorPodDisappear(ctx, f.ClientSet, mirrorPodName, ns)
+				}, time.Second*3, time.Second).Should(gomega.Succeed())
+
+				ginkgo.By("verifying the pod finishes terminating and is removed from metrics")
+				gomega.Eventually(ctx, getKubeletMetrics, 15*time.Second, time.Second).Should(gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+					"kubelet_working_pods": gstruct.MatchElements(sampleLabelID, 0, gstruct.Elements{
+						`kubelet_working_pods{config="desired", lifecycle="sync", static=""}`:                    timelessSample(0),
+						`kubelet_working_pods{config="desired", lifecycle="sync", static="true"}`:                timelessSample(0),
+						`kubelet_working_pods{config="orphan", lifecycle="sync", static=""}`:                     timelessSample(0),
+						`kubelet_working_pods{config="orphan", lifecycle="sync", static="true"}`:                 timelessSample(0),
+						`kubelet_working_pods{config="runtime_only", lifecycle="sync", static="unknown"}`:        timelessSample(0),
+						`kubelet_working_pods{config="desired", lifecycle="terminating", static=""}`:             timelessSample(0),
+						`kubelet_working_pods{config="desired", lifecycle="terminating", static="true"}`:         timelessSample(0),
+						`kubelet_working_pods{config="orphan", lifecycle="terminating", static=""}`:              timelessSample(0),
+						`kubelet_working_pods{config="orphan", lifecycle="terminating", static="true"}`:          timelessSample(0),
+						`kubelet_working_pods{config="runtime_only", lifecycle="terminating", static="unknown"}`: timelessSample(0),
+						`kubelet_working_pods{config="desired", lifecycle="terminated", static=""}`:              timelessSample(0),
+						`kubelet_working_pods{config="desired", lifecycle="terminated", static="true"}`:          timelessSample(0),
+						`kubelet_working_pods{config="orphan", lifecycle="terminated", static=""}`:               timelessSample(0),
+						`kubelet_working_pods{config="orphan", lifecycle="terminated", static="true"}`:           timelessSample(0),
+						`kubelet_working_pods{config="runtime_only", lifecycle="terminated", static="unknown"}`:  timelessSample(0),
+					}),
+					"kubelet_mirror_pods": gstruct.MatchElements(sampleLabelID, 0, gstruct.Elements{
+						`kubelet_mirror_pods`: timelessSample(0),
+					}),
+					"kubelet_active_pods": gstruct.MatchElements(sampleLabelID, 0, gstruct.Elements{
+						`kubelet_active_pods{static=""}`:     timelessSample(0),
+						`kubelet_active_pods{static="true"}`: timelessSample(0),
+					}),
+					"kubelet_desired_pods": gstruct.MatchElements(sampleLabelID, 0, gstruct.Elements{
+						`kubelet_desired_pods{static=""}`:     timelessSample(0),
+						`kubelet_desired_pods{static="true"}`: timelessSample(0),
+					}),
+				}))
 			})
 
 			ginkgo.AfterEach(func(ctx context.Context) {
@@ -245,4 +366,9 @@ func checkMirrorPodRunningWithUID(ctx context.Context, cl clientset.Interface, n
 		return fmt.Errorf("expected the mirror pod %q to be running, got %q", name, pod.Status.Phase)
 	}
 	return nil
+}
+
+func sampleLabelID(element interface{}) string {
+	el := element.(*model.Sample)
+	return el.Metric.String()
 }

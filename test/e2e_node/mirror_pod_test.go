@@ -18,7 +18,6 @@ package e2enode
 
 import (
 	"context"
-	goerrors "errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -411,7 +410,10 @@ func checkMirrorPodDisappear(ctx context.Context, cl clientset.Interface, name, 
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
-	return goerrors.New("pod not disappear")
+	if err == nil {
+		return fmt.Errorf("mirror pod %v/%v still exists", namespace, name)
+	}
+	return fmt.Errorf("expect mirror pod %v/%v to not exist but got error: %w", namespace, name, err)
 }
 
 func checkMirrorPodRunning(ctx context.Context, cl clientset.Interface, name, namespace string) error {
