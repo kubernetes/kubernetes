@@ -190,6 +190,16 @@ const (
 	// - csi-attacher:v3.3.0+
 	// - csi-resizer:v1.3.0+
 	CapReadWriteOncePod Capability = "readWriteOncePod"
+
+	// The driver can handle two PersistentVolumes with the same VolumeHandle (= volume_id in CSI spec).
+	// This capability is highly recommended for volumes that support ReadWriteMany access mode,
+	// because creating multiple PVs for the same VolumeHandle is frequently used to share a single
+	// volume among multiple namespaces.
+	// Note that this capability needs to be disabled only for CSI drivers that break CSI boundary and
+	// inspect Kubernetes PersistentVolume objects. A CSI driver that implements only CSI and does not
+	// talk to Kubernetes API server in any way should keep this capability enabled, because
+	// they will see the same NodeStage / NodePublish requests as if only one PV existed.
+	CapMultiplePVsSameID Capability = "multiplePVsSameID"
 )
 
 // DriverInfo represents static information about a TestDriver.
