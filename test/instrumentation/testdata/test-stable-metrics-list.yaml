@@ -84,6 +84,37 @@
   - 240
   - 270
   - 300
+- name: network_programming_duration_seconds2
+  subsystem: kube_proxy
+  help: In Cluster Network Programming Latency in seconds
+  type: Histogram
+  stabilityLevel: BETA
+  buckets:
+  - 0.25
+  - 0.5
+  - 1
+  - 5
+  - 10
+  - 59
+  - 60
+  - 65
+  - 70
+  - 75
+  - 80
+  - 85
+  - 90
+  - 95
+  - 100
+  - 105
+  - 110
+  - 115
+  - 120
+  - 150
+  - 180
+  - 210
+  - 240
+  - 270
+  - 300
 - name: certificate_manager_client_ttl_seconds
   subsystem: kubelet
   help: Gauge of the TTL (time-to-live) of the Kubelet's client certificate. The value

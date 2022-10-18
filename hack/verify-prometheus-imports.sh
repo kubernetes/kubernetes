@@ -43,6 +43,7 @@ allowed_prometheus_importers=(
   ./staging/src/k8s.io/component-base/metrics/prometheusextension/weighted_histogram.go
   ./staging/src/k8s.io/component-base/metrics/prometheusextension/weighted_histogram_test.go
   ./staging/src/k8s.io/component-base/metrics/prometheusextension/weighted_histogram_vec.go
+  ./staging/src/k8s.io/component-base/metrics/buckets.go
   ./staging/src/k8s.io/component-base/metrics/collector.go
   ./staging/src/k8s.io/component-base/metrics/collector_test.go
   ./staging/src/k8s.io/component-base/metrics/counter.go

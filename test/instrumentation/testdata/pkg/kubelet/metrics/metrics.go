@@ -488,6 +488,21 @@ var (
 			StabilityLevel: metrics.BETA,
 		},
 	)
+
+	NetworkProgrammingLatency2 = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem: "kube_proxy",
+			Name:      "network_programming_duration_seconds2",
+			Help:      "In Cluster Network Programming Latency in seconds",
+			Buckets: metrics.MergeBuckets(
+				metrics.LinearBuckets(0.25, 0.25, 2), // 0.25s, 0.50s
+				[]float64{1, 5, 10, 59},              // 1s, 2s, 3s, ... 59s
+				metrics.LinearBuckets(60, 5, 12),     // 60s, 65s, 70s, ... 115s
+				metrics.LinearBuckets(120, 30, 7),    // 2min, 2.5min, 3min, ..., 5min
+			),
+			StabilityLevel: metrics.BETA,
+		},
+	)
 )
 
 var registerMetrics sync.Once
