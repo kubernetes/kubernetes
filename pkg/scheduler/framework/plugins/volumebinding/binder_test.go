@@ -20,17 +20,17 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"reflect"
 	"sort"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
@@ -431,13 +431,13 @@ func (env *testEnv) validatePodCache(t *testing.T, node string, pod *v1.Pod, pod
 	} else {
 		for i := 0; i < aLen; i++ {
 			// Validate PV
-			if !reflect.DeepEqual(expectedBindings[i].pv, bindings[i].pv) {
-				t.Errorf("binding.pv doesn't match [A-expected, B-got]: %s", diff.ObjectDiff(expectedBindings[i].pv, bindings[i].pv))
+			if diff := cmp.Diff(expectedBindings[i].pv, bindings[i].pv); diff != "" {
+				t.Errorf("binding.pv doesn't match (-want, +got):\n%s", diff)
 			}
 
 			// Validate PVC
-			if !reflect.DeepEqual(expectedBindings[i].pvc, bindings[i].pvc) {
-				t.Errorf("binding.pvc doesn't match [A-expected, B-got]: %s", diff.ObjectDiff(expectedBindings[i].pvc, bindings[i].pvc))
+			if diff := cmp.Diff(expectedBindings[i].pvc, bindings[i].pvc); diff != "" {
+				t.Errorf("binding.pvc doesn't match (-want, +got):\n%s", diff)
 			}
 		}
 	}
@@ -452,8 +452,8 @@ func (env *testEnv) validatePodCache(t *testing.T, node string, pod *v1.Pod, pod
 		t.Error("expected empty provisionings, got nil")
 	} else {
 		for i := 0; i < aLen; i++ {
-			if !reflect.DeepEqual(expectedProvisionings[i], provisionedClaims[i]) {
-				t.Errorf("provisioned claims doesn't match [A-expected, B-got]: %s", diff.ObjectDiff(expectedProvisionings[i], provisionedClaims[i]))
+			if diff := cmp.Diff(expectedProvisionings[i], provisionedClaims[i]); diff != "" {
+				t.Errorf("provisioned claims doesn't match (-want, +got):\n%s", diff)
 			}
 		}
 	}
@@ -538,8 +538,8 @@ func (env *testEnv) validateBind(
 		// Cache may be overridden by API object with higher version, compare but ignore resource version.
 		newCachedPV := cachedPV.DeepCopy()
 		newCachedPV.ResourceVersion = pv.ResourceVersion
-		if !reflect.DeepEqual(newCachedPV, pv) {
-			t.Errorf("cached PV check failed [A-expected, B-got]:\n%s", diff.ObjectDiff(pv, cachedPV))
+		if diff := cmp.Diff(pv, newCachedPV); diff != "" {
+			t.Errorf("cached PV check failed (-want, +got):\n%s", diff)
 		}
 	}
 
@@ -565,8 +565,8 @@ func (env *testEnv) validateProvision(
 		// Cache may be overridden by API object with higher version, compare but ignore resource version.
 		newCachedPVC := cachedPVC.DeepCopy()
 		newCachedPVC.ResourceVersion = pvc.ResourceVersion
-		if !reflect.DeepEqual(newCachedPVC, pvc) {
-			t.Errorf("cached PVC check failed [A-expected, B-got]:\n%s", diff.ObjectDiff(pvc, cachedPVC))
+		if diff := cmp.Diff(pvc, newCachedPVC); diff != "" {
+			t.Errorf("cached PVC check failed (-want, +got):\n%s", diff)
 		}
 	}
 
