@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/util/webhook"
 )
 
 func TestConversion(t *testing.T) {
@@ -154,10 +153,6 @@ func TestConversion(t *testing.T) {
 		},
 	}
 
-	CRConverterFactory, err := NewCRConverterFactory(nil, func(resolver webhook.AuthenticationInfoResolver) webhook.AuthenticationInfoResolver { return nil })
-	if err != nil {
-		t.Fatalf("Cannot create conversion factory: %v", err)
-	}
 	for _, test := range tests {
 		testCRD := apiextensionsv1.CustomResourceDefinition{
 			Spec: apiextensionsv1.CustomResourceDefinitionSpec{
@@ -171,7 +166,7 @@ func TestConversion(t *testing.T) {
 			testCRD.Spec.Versions = append(testCRD.Spec.Versions, apiextensionsv1.CustomResourceDefinitionVersion{Name: gv.Version, Served: true})
 			testCRD.Spec.Group = gv.Group
 		}
-		safeConverter, _, err := CRConverterFactory.NewConverter(&testCRD)
+		safeConverter, _, err := NewDelegatingConverter(&testCRD, NewNOPConverter())
 		if err != nil {
 			t.Fatalf("Cannot create converter: %v", err)
 		}

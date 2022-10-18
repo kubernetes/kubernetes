@@ -26,6 +26,12 @@ import (
 type nopConverter struct {
 }
 
+// NewNOPConverter creates a new no-op converter. The only "conversion" it performs is to set the group and version to
+// targetGV.
+func NewNOPConverter() *nopConverter {
+	return &nopConverter{}
+}
+
 var _ CRConverter = &nopConverter{}
 
 // ConvertToVersion converts in object to the given gv in place and returns the same `in` object.

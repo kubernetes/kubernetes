@@ -72,7 +72,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
-	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/scale/scheme/autoscalingv1"
@@ -109,7 +108,7 @@ type crdHandler struct {
 	// CRD establishing process for HA clusters.
 	masterCount int
 
-	converterFactory *conversion.CRConverterFactory
+	converterFactory conversion.Factory
 
 	// so that we can do create on update.
 	authorizer authorizer.Authorizer
@@ -172,14 +171,18 @@ func NewCustomResourceDefinitionHandler(
 	restOptionsGetter generic.RESTOptionsGetter,
 	admission admission.Interface,
 	establishingController *establish.EstablishingController,
-	serviceResolver webhook.ServiceResolver,
-	authResolverWrapper webhook.AuthenticationInfoResolverWrapper,
+	converterFactory conversion.Factory,
 	masterCount int,
 	authorizer authorizer.Authorizer,
 	requestTimeout time.Duration,
 	minRequestTimeout time.Duration,
 	staticOpenAPISpec *spec.Swagger,
 	maxRequestBodyBytes int64) (*crdHandler, error) {
+
+	if converterFactory == nil {
+		return nil, fmt.Errorf("converterFactory is required")
+	}
+
 	ret := &crdHandler{
 		versionDiscoveryHandler: versionDiscoveryHandler,
 		groupDiscoveryHandler:   groupDiscoveryHandler,
@@ -189,6 +192,7 @@ func NewCustomResourceDefinitionHandler(
 		restOptionsGetter:       restOptionsGetter,
 		admission:               admission,
 		establishingController:  establishingController,
+		converterFactory:        converterFactory,
 		masterCount:             masterCount,
 		authorizer:              authorizer,
 		requestTimeout:          requestTimeout,
@@ -203,11 +207,6 @@ func NewCustomResourceDefinitionHandler(
 			ret.removeDeadStorage()
 		},
 	})
-	crConverterFactory, err := conversion.NewCRConverterFactory(serviceResolver, authResolverWrapper)
-	if err != nil {
-		return nil, err
-	}
-	ret.converterFactory = crConverterFactory
 
 	ret.customStorage.Store(crdStorageMap{})
 
@@ -690,7 +689,12 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		}
 	}
 
-	safeConverter, unsafeConverter, err := r.converterFactory.NewConverter(crd)
+	converter, err := r.converterFactory.NewConverter(crd)
+	if err != nil {
+		return nil, fmt.Errorf("error creating converter for %s: %w", crd.Name, err)
+	}
+
+	safeConverter, unsafeConverter, err := conversion.NewDelegatingConverter(crd, converter)
 	if err != nil {
 		return nil, err
 	}
