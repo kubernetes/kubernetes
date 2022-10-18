@@ -679,6 +679,17 @@ func testThreeWayPatch(t *testing.T, c JSONMergePatchTestCase) {
 }
 
 func testPatchCreation(t *testing.T, expected, actual []byte, description string) {
+	// remarshal JSON to get a sorted json object
+	var err error
+	actual, err = remarshalJSON(actual)
+	if err != nil {
+		t.Fatalf("error: %s", err)
+	}
+	expected, err = remarshalJSON(expected)
+	if err != nil {
+		t.Fatalf("error: %s", err)
+	}
+
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("error in test case: %s\nexpected patch:\n%s\ngot:\n%s\n",
 			description, jsonToYAMLOrError(expected), jsonToYAMLOrError(actual))
@@ -744,4 +755,13 @@ func jsonToYAML(j []byte) ([]byte, error) {
 		return nil, fmt.Errorf("json to yaml failed: %v\n%v\n", err, j)
 	}
 	return y, nil
+}
+
+func remarshalJSON(bytes []byte) ([]byte, error) {
+	var jsonObject interface{}
+	err := json.Unmarshal(bytes, &jsonObject)
+	if err != nil {
+		return nil, fmt.Errorf("json remarshaling failed: %v\n", err)
+	}
+	return json.Marshal(jsonObject)
 }
