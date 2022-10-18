@@ -421,6 +421,25 @@ func WaitForPodNameUnschedulableInNamespace(c clientset.Interface, podName, name
 	})
 }
 
+// WaitTimeoutForPodNoLongerRunningOrNotFoundInNamespace waits default amount of time (defaultPodDeletionTimeout)
+// for the specified pod to stop running or disappear. Returns an error if timeout occurs first.
+func WaitTimeoutForPodNoLongerRunningOrNotFoundInNamespace(c clientset.Interface, podName, namespace string) error {
+	return wait.PollImmediate(poll, defaultPodDeletionTimeout, func() (bool, error) {
+		pod, err := c.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		if err != nil {
+			return handleWaitingAPIError(err, true, "getting pod %s", podIdentifier(namespace, podName))
+		}
+		switch pod.Status.Phase {
+		case v1.PodFailed, v1.PodSucceeded:
+			return true, nil
+		}
+		return false, nil
+	})
+}
+
 // WaitForPodNameRunningInNamespace waits default amount of time (PodStartTimeout) for the specified pod to become running.
 // Returns an error if timeout occurs first, or pod goes in to failed state.
 func WaitForPodNameRunningInNamespace(c clientset.Interface, podName, namespace string) error {
