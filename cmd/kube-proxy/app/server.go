@@ -66,7 +66,6 @@ import (
 	"k8s.io/kube-proxy/config/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/apis"
@@ -544,6 +543,7 @@ type ProxyServer struct {
 	OOMScoreAdj            *int32
 	ConfigSyncPeriod       time.Duration
 	HealthzServer          healthcheck.ProxierHealthUpdater
+	localDetectorMode      kubeproxyconfig.LocalMode
 }
 
 // createClients creates a kube client and an event client from the given config and masterOverride.
@@ -758,20 +758,23 @@ func (s *ProxyServer) Run() error {
 	// function must configure its shared informer event handlers first.
 	informerFactory.Start(wait.NeverStop)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
-		// Make an informer that selects for our nodename.
-		currentNodeInformerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.ConfigSyncPeriod,
-			informers.WithTweakListOptions(func(options *metav1.ListOptions) {
-				options.FieldSelector = fields.OneTermEqualSelector("metadata.name", s.NodeRef.Name).String()
-			}))
-		nodeConfig := config.NewNodeConfig(currentNodeInformerFactory.Core().V1().Nodes(), s.ConfigSyncPeriod)
-		nodeConfig.RegisterEventHandler(s.Proxier)
-		go nodeConfig.Run(wait.NeverStop)
-
-		// This has to start after the calls to NewNodeConfig because that must
-		// configure the shared informer event handler first.
-		currentNodeInformerFactory.Start(wait.NeverStop)
+	// Make an informer that selects for our nodename.
+	currentNodeInformerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.ConfigSyncPeriod,
+		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", s.NodeRef.Name).String()
+		}))
+	nodeConfig := config.NewNodeConfig(currentNodeInformerFactory.Core().V1().Nodes(), s.ConfigSyncPeriod)
+	// https://issues.k8s.io/111321
+	if s.localDetectorMode == kubeproxyconfig.LocalModeNodeCIDR {
+		nodeConfig.RegisterEventHandler(&proxy.NodePodCIDRHandler{})
 	}
+	nodeConfig.RegisterEventHandler(s.Proxier)
+
+	go nodeConfig.Run(wait.NeverStop)
+
+	// This has to start after the calls to NewNodeConfig because that must
+	// configure the shared informer event handler first.
+	currentNodeInformerFactory.Start(wait.NeverStop)
 
 	// Birth Cry after the birth is successful
 	s.birthCry()
