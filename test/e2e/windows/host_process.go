@@ -679,6 +679,85 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 			framework.Failf("Failed to get stats for pod %s/%s", f.Namespace.Name, podName)
 		}
 	})
+
+	ginkgo.It("should support querying api-server using in-cluster config", func() {
+		// This functionality is only support on containerd  v1.7+
+		ginkgo.By("Ensuring Windows nodes are running containerd v1.7+")
+		windowsNode, err := findWindowsNode(f)
+		framework.ExpectNoError(err, "error finding Windows node")
+		r, v, err := getNodeContainerRuntimeAndVersion(windowsNode)
+		framework.ExpectNoError(err, "error getting node container runtime and version")
+		framework.Logf("Got runtime: %s, version %v for node %s", r, v, windowsNode.Name)
+
+		if !strings.EqualFold(r, "containerd") {
+			e2eskipper.Skipf("container runtime is not containerd")
+		}
+
+		v1dot7 := semver.MustParse("1.7.0")
+		if v.LT(v1dot7) {
+			e2eskipper.Skipf("container runtime is < 1.7.0")
+		}
+
+		ginkgo.By("Scheduling a pod that runs agnhost inclusterclient")
+		podName := "host-process-agnhost-icc"
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: podName,
+			},
+			Spec: v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess:   &trueVar,
+						RunAsUserName: &User_NTAuthoritySystem,
+					},
+				},
+				HostNetwork: true,
+				Containers: []v1.Container{
+					{
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Name:  "hpc-agnhost",
+						// TODO: Figure out why we need to copy agnhost as agnhost.exe here
+						// Possibly related to https://github.com/microsoft/hcsshim/issues/1128 and
+						// https://github.com/microsoft/hcsshim/pull/1174 updating PATHEXT here doesn't
+						// seem address the issue.
+						Command: []string{"cmd", "/C", "copy", "c:\\hpc\\agnhost", "c:\\hpc\\agnhost.exe", "&&", "c:\\hpc\\agnhost.exe", "inclusterclient"},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+				NodeSelector: map[string]string{
+					"kubernetes.io/os": "windows",
+				},
+			},
+		}
+
+		pc := e2epod.NewPodClient(f)
+		pc.Create(pod)
+
+		ginkgo.By("Waiting for pod to run")
+		e2epod.WaitForPodsRunningReady(f.ClientSet, f.Namespace.Name, 1, 0, 3*time.Minute, make(map[string]string))
+
+		ginkgo.By("Waiting for 60 seconds")
+		// We wait an additional 60 seconds after the pod is Running because the
+		// `InClusterClient` app in the agnhost image waits 30 seconds before
+		// starting to make queries - https://github.com/kubernetes/kubernetes/blob/ceee3783ed963497db669504241af2ca6a11610f/test/images/agnhost/inclusterclient/main.go#L51
+		time.Sleep(60 * time.Second)
+
+		ginkgo.By("Ensuring the test app was able to successfully query the api-server")
+		logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, "hpc-agnhost")
+		framework.ExpectNoError(err, "Error getting pod logs")
+
+		framework.Logf("Logs: %s\n", logs)
+
+		framework.ExpectEqual(
+			strings.Contains(logs, "calling /healthz"),
+			true,
+			"app logs should contain 'calling /healthz'")
+
+		framework.ExpectEqual(
+			strings.Contains(logs, "status=failed"),
+			false,
+			"app logs should not contain 'status=failed")
+	})
 })
 
 func makeTestPodWithVolumeMounts(name string) *v1.Pod {
