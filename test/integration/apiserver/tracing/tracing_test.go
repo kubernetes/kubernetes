@@ -41,24 +41,56 @@ import (
 )
 
 func TestAPIServerTracing(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIServerTracing, true)()
-
 	// Listen for traces from the API Server before starting it, so the
 	// API Server will successfully connect right away during the test.
 	listener, err := net.Listen("tcp", "localhost:")
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Write the configuration for tracing to a file
+	tracingConfigFile, err := os.CreateTemp("", "tracing-config.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tracingConfigFile.Name())
 
-	traceFound := make(chan struct{})
-	defer close(traceFound)
-	srv := grpc.NewServer()
-	traceservice.RegisterTraceServiceServer(srv, &traceServer{
-		traceFound: traceFound,
-		filterFunc: containsNodeListSpan})
+	if err := os.WriteFile(tracingConfigFile.Name(), []byte(fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1alpha1
+kind: TracingConfiguration
+endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
+		t.Fatal(err)
+	}
+	testAPIServerTracing(t,
+		listener,
+		[]string{"--tracing-config-file=" + tracingConfigFile.Name()},
+	)
+}
 
-	go srv.Serve(listener)
-	defer srv.Stop()
+func TestAPIServerTracingWithEgressSelector(t *testing.T) {
+	// Listen for traces from the API Server before starting it, so the
+	// API Server will successfully connect right away during the test.
+	listener, err := net.Listen("tcp", "localhost:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Use an egress selector which doesn't have a controlplane config to ensure
+	// tracing works in that context. Write the egress selector configuration to a file.
+	egressSelectorConfigFile, err := os.CreateTemp("", "egress_selector_configuration.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(egressSelectorConfigFile.Name())
+
+	if err := os.WriteFile(egressSelectorConfigFile.Name(), []byte(`
+apiVersion: apiserver.config.k8s.io/v1beta1
+kind: EgressSelectorConfiguration
+egressSelections:
+- name: cluster
+  connection:
+    proxyProtocol: Direct
+    transport:`), os.FileMode(0755)); err != nil {
+		t.Fatal(err)
+	}
 
 	// Write the configuration for tracing to a file
 	tracingConfigFile, err := os.CreateTemp("", "tracing-config.yaml")
@@ -73,11 +105,32 @@ kind: TracingConfiguration
 endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 		t.Fatal(err)
 	}
+	testAPIServerTracing(t,
+		listener,
+		[]string{
+			"--tracing-config-file=" + tracingConfigFile.Name(),
+			"--egress-selector-config-file=" + egressSelectorConfigFile.Name(),
+		},
+	)
+}
+
+func testAPIServerTracing(t *testing.T, listener net.Listener, apiserverArgs []string) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIServerTracing, true)()
+
+	traceFound := make(chan struct{})
+	defer close(traceFound)
+	srv := grpc.NewServer()
+	traceservice.RegisterTraceServiceServer(srv, &traceServer{
+		traceFound: traceFound,
+		filterFunc: containsNodeListSpan})
+
+	go srv.Serve(listener)
+	defer srv.Stop()
 
 	// Start the API Server with our tracing configuration
 	testServer := kubeapiservertesting.StartTestServerOrDie(t,
 		kubeapiservertesting.NewDefaultTestServerOptions(),
-		[]string{"--tracing-config-file=" + tracingConfigFile.Name()},
+		apiserverArgs,
 		framework.SharedEtcd(),
 	)
 	defer testServer.TearDownFn()
