@@ -523,7 +523,7 @@ func (m *manager) updateContainerCPUSet(containerID string, cpus cpuset.CPUSet) 
 }
 
 func (m *manager) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet {
-	if result, ok := m.state.GetCPUSet(string(podUID), containerName); ok {
+	if result, ok := m.state.GetCPUSet(podUID, containerName); ok {
 		return result
 	}
 

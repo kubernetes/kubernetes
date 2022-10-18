@@ -147,9 +147,9 @@ func (gcc *PodGCController) gcTerminating(ctx context.Context, pods []*v1.Pod) {
 	terminatingPods := []*v1.Pod{}
 	for _, pod := range pods {
 		if isPodTerminating(pod) {
-			node, err := gcc.nodeLister.Get(string(pod.Spec.NodeName))
+			node, err := gcc.nodeLister.Get(pod.Spec.NodeName)
 			if err != nil {
-				klog.Errorf("failed to get node %s : %s", string(pod.Spec.NodeName), err)
+				klog.Errorf("failed to get node %s : %s", pod.Spec.NodeName, err)
 				continue
 			}
 			// Add this pod to terminatingPods list only if the following conditions are met:
