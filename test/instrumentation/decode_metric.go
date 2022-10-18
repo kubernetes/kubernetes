@@ -480,15 +480,58 @@ func (c *metricDecoder) decodeBucketFunctionCall(v *ast.CallExpr) ([]float64, er
 	if functionImport.String() != c.kubeMetricsImportName {
 		return nil, newDecodeErrorf(v, errBuckets), true
 	}
-	firstArg, secondArg, thirdArg, err := decodeBucketArguments(v)
-	if err != nil {
-		return nil, err, true
-	}
 	switch functionName {
 	case "LinearBuckets":
+		firstArg, secondArg, thirdArg, err := decodeBucketArguments(v)
+		if err != nil {
+			return nil, err, true
+		}
 		return metrics.LinearBuckets(firstArg, secondArg, thirdArg), nil, true
 	case "ExponentialBuckets":
+		firstArg, secondArg, thirdArg, err := decodeBucketArguments(v)
+		if err != nil {
+			return nil, err, true
+		}
 		return metrics.ExponentialBuckets(firstArg, secondArg, thirdArg), nil, true
+	case "MergeBuckets":
+		merged := []float64{}
+		for _, arg := range v.Args {
+			cl, ok := arg.(*ast.CompositeLit)
+			if ok {
+				fs, err := decodeListOfFloats(cl, cl.Elts)
+				if err != nil {
+					return nil, err, true
+				}
+				merged = append(merged, fs...)
+			} else {
+				v2, ok := arg.(*ast.CallExpr)
+				if !ok {
+					return nil, newDecodeErrorf(v2, errBuckets), true
+				}
+				se, ok = v2.Fun.(*ast.SelectorExpr)
+				if ok {
+					functionName := se.Sel.String()
+					functionImport, ok := se.X.(*ast.Ident)
+					if !ok {
+						return nil, newDecodeErrorf(v, errBuckets), true
+					}
+					if functionImport.String() != c.kubeMetricsImportName {
+						return nil, newDecodeErrorf(v, errBuckets), true
+					}
+					firstArg, secondArg, thirdArg, err := decodeBucketArguments(v2)
+					if err != nil {
+						return nil, err, true
+					}
+					switch functionName {
+					case "LinearBuckets":
+						merged = append(merged, metrics.LinearBuckets(firstArg, secondArg, thirdArg)...)
+					case "ExponentialBuckets":
+						merged = append(merged, metrics.LinearBuckets(firstArg, secondArg, thirdArg)...)
+					}
+				}
+			}
+		}
+		return merged, nil, true
 	}
 	return nil, nil, false
 }
