@@ -589,6 +589,22 @@ func (nc *Controller) doNodeProcessingPassWorker(ctx context.Context) {
 			return
 		}
 		nodeName := obj.(string)
+		if nc.runTaintManager {
+			node, err := nc.nodeLister.Get(nodeName)
+			if node != nil && err == nil && (taintutils.TaintExists(node.Spec.Taints, UnreachableTaintTemplate) || taintutils.TaintExists(node.Spec.Taints, NotReadyTaintTemplate)) {
+				_, currentReadyCondition := controllerutil.GetNodeCondition(&node.Status, v1.NodeReady)
+				if currentReadyCondition != nil && currentReadyCondition.Status == v1.ConditionTrue {
+					removed, err := nc.markNodeAsReachable(ctx, node)
+					if err != nil {
+						klog.Errorf("Failed to remove taints from node %v. Will retry in next iteration.", node.Name)
+					}
+					if removed {
+						klog.V(2).Infof("Node %s is healthy again, removing all taints", node.Name)
+					}
+				}
+			}
+		}
+
 		if err := nc.doNoScheduleTaintingPass(ctx, nodeName); err != nil {
 			klog.Errorf("Failed to taint NoSchedule on node <%s>, requeue it: %v", nodeName, err)
 			// TODO(k82cn): Add nodeName back to the queue
