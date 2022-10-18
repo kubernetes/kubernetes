@@ -179,6 +179,7 @@ func (c *delegatingCRConverter) ConvertToVersion(in runtime.Object, target runti
 		// TODO: should this be a typed error?
 		return nil, fmt.Errorf("%v is unstructured and is not suitable for converting to %q", fromGVK.String(), target)
 	}
+
 	// Special-case typed scale conversion if this custom resource supports a scale endpoint
 	if c.convertScale {
 		if _, isInScale := in.(*autoscalingv1.Scale); isInScale {
@@ -204,6 +205,13 @@ func (c *delegatingCRConverter) ConvertToVersion(in runtime.Object, target runti
 			}
 		}
 	}
+
+	// A smoke test in API machinery calls the converter on empty objects during startup. The test is initiated here:
+	// https://github.com/kubernetes/kubernetes/blob/dbb448bbdcb9e440eee57024ffa5f1698956a054/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go#L201
+	if isEmptyUnstructuredObject(in) {
+		return NewNOPConverter().Convert(in, toGVK.GroupVersion())
+	}
+	
 	return c.converter.Convert(in, toGVK.GroupVersion())
 }
 
@@ -231,4 +239,23 @@ func (c *safeConverterWrapper) Convert(in, out, context interface{}) error {
 // ConvertToVersion makes a copy of in object and then delegate the call to the unsafe converter.
 func (c *safeConverterWrapper) ConvertToVersion(in runtime.Object, target runtime.GroupVersioner) (runtime.Object, error) {
 	return c.unsafe.ConvertToVersion(in.DeepCopyObject(), target)
+}
+
+// isEmptyUnstructuredObject returns true if in is an empty unstructured object, i.e. an unstructured object that does
+// not have any field except apiVersion and kind.
+func isEmptyUnstructuredObject(in runtime.Object) bool {
+	u, ok := in.(*unstructured.Unstructured)
+	if !ok {
+		return false
+	}
+	if len(u.Object) != 2 {
+		return false
+	}
+	if _, ok := u.Object["kind"]; !ok {
+		return false
+	}
+	if _, ok := u.Object["apiVersion"]; !ok {
+		return false
+	}
+	return true
 }

@@ -229,15 +229,6 @@ func getConvertedObjectsFromResponse(expectedUID types.UID, response runtime.Obj
 
 func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) (runtime.Object, error) {
 	ctx := context.TODO()
-	// In general, the webhook should not do any defaulting or validation. A special case of that is an empty object
-	// conversion that must result an empty object and practically is the same as nopConverter.
-	// A smoke test in API machinery calls the converter on empty objects. As this case happens consistently
-	// it special cased here not to call webhook converter. The test initiated here:
-	// https://github.com/kubernetes/kubernetes/blob/dbb448bbdcb9e440eee57024ffa5f1698956a054/staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go#L201
-	if isEmptyUnstructuredObject(in) {
-		return c.nopConverter.Convert(in, toGV)
-	}
-
 	listObj, isList := in.(*unstructured.UnstructuredList)
 
 	requestUID := uuid.NewUUID()
@@ -450,23 +441,4 @@ func restoreObjectMeta(original, converted *unstructured.Unstructured) error {
 	}
 
 	return nil
-}
-
-// isEmptyUnstructuredObject returns true if in is an empty unstructured object, i.e. an unstructured object that does
-// not have any field except apiVersion and kind.
-func isEmptyUnstructuredObject(in runtime.Object) bool {
-	u, ok := in.(*unstructured.Unstructured)
-	if !ok {
-		return false
-	}
-	if len(u.Object) != 2 {
-		return false
-	}
-	if _, ok := u.Object["kind"]; !ok {
-		return false
-	}
-	if _, ok := u.Object["apiVersion"]; !ok {
-		return false
-	}
-	return true
 }
