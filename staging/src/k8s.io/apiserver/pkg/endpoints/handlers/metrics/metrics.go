@@ -24,10 +24,11 @@ import (
 type RequestBodyVerb string
 
 const (
-	Patch  RequestBodyVerb = "patch"
-	Delete RequestBodyVerb = "delete"
-	Update RequestBodyVerb = "update"
-	Create RequestBodyVerb = "create"
+	Patch            RequestBodyVerb = "patch"
+	Delete           RequestBodyVerb = "delete"
+	Update           RequestBodyVerb = "update"
+	Create           RequestBodyVerb = "create"
+	DeleteCollection RequestBodyVerb = "delete_collection"
 )
 
 var (
