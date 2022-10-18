@@ -78,7 +78,7 @@ That said, if you have questions, reach out to us
 [containerized applications]: https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/
 [developer's documentation]: https://git.k8s.io/community/contributors/devel#readme
 [Docker environment]: https://docs.docker.com/engine
-[Go environment]: https://golang.org/doc/install
+[Go environment]: https://go.dev/doc/install
 [GoPkg]: https://pkg.go.dev/k8s.io/kubernetes
 [GoPkg Widget]: https://pkg.go.dev/badge/k8s.io/kubernetes.svg
 [interactive tutorial]: https://kubernetes.io/docs/tutorials/kubernetes-basics
