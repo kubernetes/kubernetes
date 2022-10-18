@@ -244,7 +244,7 @@ type Dependencies struct {
 	TLSOptions               *server.TLSOptions
 	RemoteRuntimeService     internalapi.RuntimeService
 	RemoteImageService       internalapi.ImageManagerService
-	PodStartupLatencyTracker *util.PodStartupLatencyTracker
+	PodStartupLatencyTracker util.PodStartupLatencyTracker
 	// remove it after cadvisor.UsingLegacyCadvisorStats dropped.
 	useLegacyCadvisorStats bool
 }

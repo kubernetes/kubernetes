@@ -24,11 +24,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -159,6 +159,12 @@ func pullerTestCases() []pullerTestCase {
 	}
 }
 
+type mockPodPullingTimeRecorder struct{}
+
+func (m *mockPodPullingTimeRecorder) RecordImageStartedPulling(podUID types.UID) {}
+
+func (m *mockPodPullingTimeRecorder) RecordImageFinishedPulling(podUID types.UID) {}
+
 func pullerTestEnv(c pullerTestCase, serialized bool) (puller ImageManager, fakeClock *testingclock.FakeClock, fakeRuntime *ctest.FakeRuntime, container *v1.Container) {
 	container = &v1.Container{
 		Name:            "container_name",
@@ -177,9 +183,7 @@ func pullerTestEnv(c pullerTestCase, serialized bool) (puller ImageManager, fake
 	fakeRuntime.Err = c.pullerErr
 	fakeRuntime.InspectErr = c.inspectErr
 
-	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
-
-	puller = NewImageManager(fakeRecorder, fakeRuntime, backOff, serialized, c.qps, c.burst, podStartupLatencyTracker)
+	puller = NewImageManager(fakeRecorder, fakeRuntime, backOff, serialized, c.qps, c.burst, &mockPodPullingTimeRecorder{})
 	return
 }
 

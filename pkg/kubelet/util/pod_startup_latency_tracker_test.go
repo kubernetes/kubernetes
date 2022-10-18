@@ -45,7 +45,10 @@ func TestNoEvents(t *testing.T) {
 		wants := ""
 
 		metrics.Register()
-		tracker := NewPodStartupLatencyTracker()
+
+		tracker := &basicPodStartupLatencyTracker{
+			pods: map[types.UID]*perPodState{},
+		}
 
 		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), metricsName); err != nil {
 			t.Fatal(err)
@@ -63,7 +66,10 @@ func TestPodsRunningBeforeKubeletStarted(t *testing.T) {
 		wants := ""
 
 		metrics.Register()
-		tracker := NewPodStartupLatencyTracker()
+
+		tracker := &basicPodStartupLatencyTracker{
+			pods: map[types.UID]*perPodState{},
+		}
 
 		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), metricsName); err != nil {
 			t.Fatal(err)
@@ -121,8 +127,11 @@ kubelet_pod_start_sli_duration_seconds_count 1
 		fakeClock := testingclock.NewFakeClock(frozenTime)
 
 		metrics.Register()
-		tracker := NewPodStartupLatencyTracker()
-		tracker.clock = fakeClock
+
+		tracker := &basicPodStartupLatencyTracker{
+			pods:  map[types.UID]*perPodState{},
+			clock: fakeClock,
+		}
 
 		podInit := buildInitializingPod()
 		tracker.ObservedPodOnWatch(podInit, frozenTime)
@@ -190,8 +199,11 @@ kubelet_pod_start_sli_duration_seconds_count 1
 		fakeClock := testingclock.NewFakeClock(frozenTime)
 
 		metrics.Register()
-		tracker := NewPodStartupLatencyTracker()
-		tracker.clock = fakeClock
+
+		tracker := &basicPodStartupLatencyTracker{
+			pods:  map[types.UID]*perPodState{},
+			clock: fakeClock,
+		}
 
 		podInitializing := buildInitializingPod()
 		tracker.ObservedPodOnWatch(podInitializing, frozenTime)

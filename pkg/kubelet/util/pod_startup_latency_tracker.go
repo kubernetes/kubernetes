@@ -29,7 +29,15 @@ import (
 
 // PodStartupLatencyTracker records key moments for startup latency calculation,
 // e.g. image pulling or pod observed running on watch.
-type PodStartupLatencyTracker struct {
+type PodStartupLatencyTracker interface {
+	ObservedPodOnWatch(pod *v1.Pod, when time.Time)
+	RecordImageStartedPulling(podUID types.UID)
+	RecordImageFinishedPulling(podUID types.UID)
+	RecordStatusUpdated(pod *v1.Pod)
+	DeletePodStartupState(podUID types.UID)
+}
+
+type basicPodStartupLatencyTracker struct {
 	// protect against concurrent read and write on pods map
 	lock sync.Mutex
 	pods map[types.UID]*perPodState
@@ -46,15 +54,15 @@ type perPodState struct {
 	metricRecorded bool
 }
 
-func NewPodStartupLatencyTracker() *PodStartupLatencyTracker {
-	return &PodStartupLatencyTracker{
+// NewPodStartupLatencyTracker creates an instance of PodStartupLatencyTracker
+func NewPodStartupLatencyTracker() PodStartupLatencyTracker {
+	return &basicPodStartupLatencyTracker{
 		pods:  map[types.UID]*perPodState{},
 		clock: clock.RealClock{},
 	}
 }
 
-// ObservedPodOnWatch to be called from somewhere where we look for pods.
-func (p *PodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when time.Time) {
+func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when time.Time) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -105,7 +113,7 @@ func (p *PodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when time.Tim
 	}
 }
 
-func (p *PodStartupLatencyTracker) RecordImageStartedPulling(podUID types.UID) {
+func (p *basicPodStartupLatencyTracker) RecordImageStartedPulling(podUID types.UID) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -119,7 +127,7 @@ func (p *PodStartupLatencyTracker) RecordImageStartedPulling(podUID types.UID) {
 	}
 }
 
-func (p *PodStartupLatencyTracker) RecordImageFinishedPulling(podUID types.UID) {
+func (p *basicPodStartupLatencyTracker) RecordImageFinishedPulling(podUID types.UID) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -131,7 +139,7 @@ func (p *PodStartupLatencyTracker) RecordImageFinishedPulling(podUID types.UID) 
 	state.lastFinishedPulling = p.clock.Now() // Now is always grater than values from the past.
 }
 
-func (p *PodStartupLatencyTracker) RecordStatusUpdated(pod *v1.Pod) {
+func (p *basicPodStartupLatencyTracker) RecordStatusUpdated(pod *v1.Pod) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -151,7 +159,7 @@ func (p *PodStartupLatencyTracker) RecordStatusUpdated(pod *v1.Pod) {
 	}
 
 	if hasPodStartedSLO(pod) {
-		klog.V(2).InfoS("Mark when the pod was running for the first time", "pod", klog.KObj(pod), "rv", pod.ResourceVersion)
+		klog.V(3).InfoS("Mark when the pod was running for the first time", "pod", klog.KObj(pod), "rv", pod.ResourceVersion)
 		state.observedRunningTime = p.clock.Now()
 	}
 }
@@ -170,7 +178,7 @@ func hasPodStartedSLO(pod *v1.Pod) bool {
 	return true
 }
 
-func (p *PodStartupLatencyTracker) DeletePodStartupState(podUID types.UID) {
+func (p *basicPodStartupLatencyTracker) DeletePodStartupState(podUID types.UID) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
