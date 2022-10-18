@@ -93,7 +93,7 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 			e2epod.DeletePodOrFail(c, ns, config.pod.Name)
 		}
 		for _, config := range configs {
-			e2epod.WaitForPodNoLongerRunningInNamespace(c, config.pod.Name, ns)
+			e2epod.WaitTimeoutForPodNoLongerRunningOrNotFoundInNamespace(c, config.pod.Name, ns)
 			e2epv.PVPVCCleanup(c, ns, config.pv, config.pvc)
 			err = e2epv.DeletePVSource(config.pvSource)
 			framework.ExpectNoError(err)
