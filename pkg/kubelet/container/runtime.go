@@ -169,6 +169,8 @@ type Pod struct {
 	// The name and namespace of the pod, which is readable by human.
 	Name      string
 	Namespace string
+	// Creation timestamps of the Pod in nanoseconds.
+	CreatedAt uint64
 	// List of containers that belongs to this pod. It may contain only
 	// running containers, or mixed with dead ones (when GetPods(true)).
 	Containers []*Container
