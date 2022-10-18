@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -73,7 +73,7 @@ func (c *converterMetricFactory) addMetrics(crdName string, converter CRConverte
 	return &converterMetric{latencies: metric, delegate: converter, crdName: crdName}, nil
 }
 
-func (m *converterMetric) Convert(in runtime.Object, targetGV schema.GroupVersion) (runtime.Object, error) {
+func (m *converterMetric) Convert(in *unstructured.UnstructuredList, targetGV schema.GroupVersion) (*unstructured.UnstructuredList, error) {
 	start := time.Now()
 	obj, err := m.delegate.Convert(in, targetGV)
 	fromVersion := in.GetObjectKind().GroupVersionKind().Version

@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -186,5 +187,104 @@ func TestConversion(t *testing.T) {
 				t.Fatalf("%s: Expected = %v, Actual = %v", test.Name, test.ExpectedObject, actual)
 			}
 		}
+	}
+}
+
+func TestGetObjectsToConvert(t *testing.T) {
+	v1Object := &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "foo/v1", "kind": "Widget", "metadata": map[string]interface{}{"name": "myv1"}}}
+	v2Object := &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "foo/v2", "kind": "Widget", "metadata": map[string]interface{}{"name": "myv2"}}}
+	v3Object := &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "foo/v3", "kind": "Widget", "metadata": map[string]interface{}{"name": "myv3"}}}
+
+	testcases := []struct {
+		Name          string
+		List          *unstructured.UnstructuredList
+		APIVersion    string
+		ValidVersions map[schema.GroupVersion]bool
+
+		ExpectObjects []*unstructured.Unstructured
+		ExpectError   bool
+	}{
+		{
+			Name:       "empty list",
+			List:       &unstructured.UnstructuredList{},
+			APIVersion: "foo/v1",
+			ValidVersions: map[schema.GroupVersion]bool{
+				{Group: "foo", Version: "v1"}: true,
+			},
+			ExpectObjects: nil,
+		},
+		{
+			Name: "one-item list, in desired version",
+			List: &unstructured.UnstructuredList{
+				Items: []unstructured.Unstructured{*v1Object},
+			},
+			ValidVersions: map[schema.GroupVersion]bool{
+				{Group: "foo", Version: "v1"}: true,
+			},
+			APIVersion:    "foo/v1",
+			ExpectObjects: nil,
+		},
+		{
+			Name: "one-item list, not in desired version",
+			List: &unstructured.UnstructuredList{
+				Items: []unstructured.Unstructured{*v2Object},
+			},
+			ValidVersions: map[schema.GroupVersion]bool{
+				{Group: "foo", Version: "v1"}: true,
+				{Group: "foo", Version: "v2"}: true,
+			},
+			APIVersion:    "foo/v1",
+			ExpectObjects: []*unstructured.Unstructured{v2Object},
+		},
+		{
+			Name: "multi-item list, in desired version",
+			List: &unstructured.UnstructuredList{
+				Items: []unstructured.Unstructured{*v1Object, *v1Object, *v1Object},
+			},
+			ValidVersions: map[schema.GroupVersion]bool{
+				{Group: "foo", Version: "v1"}: true,
+				{Group: "foo", Version: "v2"}: true,
+			},
+			APIVersion:    "foo/v1",
+			ExpectObjects: nil,
+		},
+		{
+			Name: "multi-item list, mixed versions",
+			List: &unstructured.UnstructuredList{
+				Items: []unstructured.Unstructured{*v1Object, *v2Object, *v3Object},
+			},
+			ValidVersions: map[schema.GroupVersion]bool{
+				{Group: "foo", Version: "v1"}: true,
+				{Group: "foo", Version: "v2"}: true,
+				{Group: "foo", Version: "v3"}: true,
+			},
+			APIVersion:    "foo/v1",
+			ExpectObjects: []*unstructured.Unstructured{v2Object, v3Object},
+		},
+		{
+			Name: "multi-item list, invalid versions",
+			List: &unstructured.UnstructuredList{
+				Items: []unstructured.Unstructured{*v1Object, *v2Object, *v3Object},
+			},
+			ValidVersions: map[schema.GroupVersion]bool{
+				{Group: "foo", Version: "v2"}: true,
+				{Group: "foo", Version: "v3"}: true,
+			},
+			APIVersion:    "foo/v1",
+			ExpectObjects: nil,
+			ExpectError:   true,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.Name, func(t *testing.T) {
+			objects, err := getObjectsToConvert(tc.List, tc.APIVersion, tc.ValidVersions)
+			gotError := err != nil
+			if e, a := tc.ExpectError, gotError; e != a {
+				t.Fatalf("error: expected %t, got %t", e, a)
+			}
+			if !reflect.DeepEqual(objects, tc.ExpectObjects) {
+				t.Errorf("unexpected diff: %s", cmp.Diff(tc.ExpectObjects, objects))
+			}
+		})
 	}
 }
