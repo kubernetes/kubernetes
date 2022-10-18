@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -64,6 +65,7 @@ type FakeNodeHandler struct {
 	// Input: Hooks determine if request is valid or not
 	CreateHook func(*FakeNodeHandler, *v1.Node) bool
 	Existing   []*v1.Node
+	AsyncCalls []func(*FakeNodeHandler)
 
 	// Output
 	CreatedNodes        []*v1.Node
@@ -131,10 +133,11 @@ func (m *FakeNodeHandler) Create(_ context.Context, node *v1.Node, _ metav1.Crea
 }
 
 // Get returns a Node from the fake store.
-func (m *FakeNodeHandler) Get(_ context.Context, name string, opts metav1.GetOptions) (*v1.Node, error) {
+func (m *FakeNodeHandler) Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Node, error) {
 	m.lock.Lock()
 	defer func() {
 		m.RequestCount++
+		m.runAsyncCalls()
 		m.lock.Unlock()
 	}()
 	for i := range m.UpdatedNodes {
@@ -150,6 +153,12 @@ func (m *FakeNodeHandler) Get(_ context.Context, name string, opts metav1.GetOpt
 		}
 	}
 	return nil, nil
+}
+
+func (m *FakeNodeHandler) runAsyncCalls() {
+	for _, a := range m.AsyncCalls {
+		a(m)
+	}
 }
 
 // List returns a list of Nodes from the fake store.
@@ -212,6 +221,9 @@ func (m *FakeNodeHandler) Update(_ context.Context, node *v1.Node, _ metav1.Upda
 	nodeCopy := *node
 	for i, updateNode := range m.UpdatedNodes {
 		if updateNode.Name == nodeCopy.Name {
+			if updateNode.GetObjectMeta().GetResourceVersion() != nodeCopy.GetObjectMeta().GetResourceVersion() {
+				return nil, apierrors.NewConflict(schema.GroupResource{}, "fake conflict", nil)
+			}
 			m.UpdatedNodes[i] = &nodeCopy
 			return node, nil
 		}
@@ -345,6 +357,9 @@ func (m *FakeNodeHandler) Patch(_ context.Context, name string, pt types.PatchTy
 	if updatedNodeIndex < 0 {
 		m.UpdatedNodes = append(m.UpdatedNodes, &updatedNode)
 	} else {
+		if updatedNode.GetObjectMeta().GetResourceVersion() != m.UpdatedNodes[updatedNodeIndex].GetObjectMeta().GetResourceVersion() {
+			return nil, apierrors.NewConflict(schema.GroupResource{}, "fake conflict", nil)
+		}
 		m.UpdatedNodes[updatedNodeIndex] = &updatedNode
 	}
 
