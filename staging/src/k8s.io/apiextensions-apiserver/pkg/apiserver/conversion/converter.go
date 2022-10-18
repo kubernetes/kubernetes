@@ -57,7 +57,7 @@ func (m *CRConverterFactory) NewConverter(crd *apiextensionsv1.CustomResourceDef
 		validVersions[schema.GroupVersion{Group: crd.Spec.Group, Version: version.Name}] = true
 	}
 
-	var converter crConverterInterface
+	var converter CRConverter
 	switch crd.Spec.Conversion.Strategy {
 	case apiextensionsv1.NoneConverter:
 		converter = &nopConverter{}
@@ -91,8 +91,8 @@ func (m *CRConverterFactory) NewConverter(crd *apiextensionsv1.CustomResourceDef
 	return &safeConverterWrapper{unsafe}, unsafe, nil
 }
 
-// crConverterInterface is the interface all cr converters must implement
-type crConverterInterface interface {
+// CRConverter is the interface all CR converters must implement
+type CRConverter interface {
 	// Convert converts in object to the given gvk and returns the converted object.
 	// Note that the function may mutate in object and return it. A safe wrapper will make sure
 	// a safe converter will be returned.
@@ -103,7 +103,7 @@ type crConverterInterface interface {
 // user defined conversion strategy given in the CustomResourceDefinition.
 type crConverter struct {
 	convertScale  bool
-	converter     crConverterInterface
+	converter     CRConverter
 	validVersions map[schema.GroupVersion]bool
 	clusterScoped bool
 }

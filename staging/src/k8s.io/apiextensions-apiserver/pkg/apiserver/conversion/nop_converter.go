@@ -26,7 +26,7 @@ import (
 type nopConverter struct {
 }
 
-var _ crConverterInterface = &nopConverter{}
+var _ CRConverter = &nopConverter{}
 
 // ConvertToVersion converts in object to the given gv in place and returns the same `in` object.
 func (c *nopConverter) Convert(in runtime.Object, targetGV schema.GroupVersion) (runtime.Object, error) {
