@@ -36,7 +36,6 @@ func NewClusterGetterFromClient(client kcpkubernetesclientset.ClusterInterface, 
 		client:               client,
 		secretLister:         secretLister,
 		serviceAccountLister: serviceAccountLister,
-		//podLister:            podLister,
 	}
 }
 
@@ -53,7 +52,6 @@ func (s *serviceAccountTokenClusterGetter) Cluster(name logicalcluster.Name) ser
 		s.secretLister.Cluster(name),
 		s.serviceAccountLister.Cluster(name),
 		nil,
-		//s.podLister.Cluster(name),
 	)
 }
 
