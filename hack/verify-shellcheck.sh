@@ -39,6 +39,10 @@ disabled=(
   # this lint disallows non-constant source, which we use extensively without
   # any known bugs
   1090
+  # this lint warns when shellcheck cannot find a sourced file
+  # this wouldn't be a bad idea to warn on, but it fails on lots of path
+  # dependent sourcing, so just disable enforcing it
+  1091
   # this lint prefers command -v to which, they are not the same
   2230
 )
