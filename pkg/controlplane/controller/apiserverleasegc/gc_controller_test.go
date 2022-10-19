@@ -29,6 +29,7 @@ import (
 	"k8s.io/utils/pointer"
 )
 
+// Test_Controller validates the garbage collection logic for the apiserverleasegc controller.
 func Test_Controller(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	tests := []struct {
@@ -134,7 +135,7 @@ func Test_Controller(t *testing.T) {
 			controller := NewAPIServerLeaseGC(clientset, 100*time.Millisecond, metav1.NamespaceSystem, "k8s.io/component=kube-apiserver")
 			go controller.Run(nil)
 
-			time.Sleep(1 * time.Second)
+			time.Sleep(time.Second)
 
 			_, err := clientset.CoordinationV1().Leases(test.lease.Namespace).Get(context.TODO(), test.lease.Name, metav1.GetOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
