@@ -520,6 +520,8 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 
 		ginkgo.By("Scheduling a pod with a HostProcess init container that will fail")
 
+		badUserName := "bad-user-name"
+
 		podName := "host-process-metrics-pod-failing-init-container"
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -535,6 +537,11 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 				HostNetwork: true,
 				InitContainers: []v1.Container{
 					{
+						SecurityContext: &v1.SecurityContext{
+							WindowsOptions: &v1.WindowsSecurityContextOptions{
+								RunAsUserName: &badUserName,
+							},
+						},
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Name:    "failing-init-container",
 						Command: []string{"foobar.exe"},
@@ -571,6 +578,11 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 				HostNetwork: true,
 				Containers: []v1.Container{
 					{
+						SecurityContext: &v1.SecurityContext{
+							WindowsOptions: &v1.WindowsSecurityContextOptions{
+								RunAsUserName: &badUserName,
+							},
+						},
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Name:    "failing-container",
 						Command: []string{"foobar.exe"},
