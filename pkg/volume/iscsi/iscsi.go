@@ -221,7 +221,7 @@ func (plugin *iscsiPlugin) newUnmapperInternal(volName string, podUID types.UID,
 	}, nil
 }
 
-func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
 	// Find globalPDPath from pod volume directory(mountPath)
 	var globalPDPath string
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
@@ -233,10 +233,10 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 	if io.IsInconsistentReadError(err) {
 		klog.Errorf("Failed to read mount refs from /proc/mounts for %s: %s", mountPath, err)
 		klog.Errorf("Kubelet cannot unmount volume at %s, please unmount it and all mounts of the same device manually.", mountPath)
-		return nil, err
+		return volume.ReconstructedVolume{}, err
 	}
 	if err != nil {
-		return nil, err
+		return volume.ReconstructedVolume{}, err
 	}
 
 	for _, path := range paths {
@@ -247,25 +247,25 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 	}
 	// Couldn't fetch globalPDPath
 	if len(globalPDPath) == 0 {
-		return nil, fmt.Errorf("couldn't fetch globalPDPath. failed to obtain volume spec")
+		return volume.ReconstructedVolume{}, fmt.Errorf("couldn't fetch globalPDPath. failed to obtain volume spec")
 	}
 
 	// Obtain iscsi disk configurations from globalPDPath
 	device, _, err := extractDeviceAndPrefix(globalPDPath)
 	if err != nil {
-		return nil, err
+		return volume.ReconstructedVolume{}, err
 	}
 	bkpPortal, iqn, err := extractPortalAndIqn(device)
 	if err != nil {
-		return nil, err
+		return volume.ReconstructedVolume{}, err
 	}
 	arr := strings.Split(device, "-lun-")
 	if len(arr) < 2 {
-		return nil, fmt.Errorf("failed to retrieve lun from globalPDPath: %v", globalPDPath)
+		return volume.ReconstructedVolume{}, fmt.Errorf("failed to retrieve lun from globalPDPath: %v", globalPDPath)
 	}
 	lun, err := strconv.Atoi(arr[1])
 	if err != nil {
-		return nil, err
+		return volume.ReconstructedVolume{}, err
 	}
 	iface, _ := extractIface(globalPDPath)
 	iscsiVolume := &v1.Volume{
@@ -279,7 +279,9 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(iscsiVolume), nil
+	return volume.ReconstructedVolume{
+		Spec: volume.NewSpecFromVolume(iscsiVolume),
+	}, nil
 }
 
 func (plugin *iscsiPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, mapPath string) (*volume.Spec, error) {

@@ -362,38 +362,38 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 			}
 
 			// rebuild spec
-			spec, err := plug.ConstructVolumeSpec("test-pv", filepath.Dir(csiMounter.GetPath()))
+			rec, err := plug.ConstructVolumeSpec("test-pv", filepath.Dir(csiMounter.GetPath()))
 			if err != nil {
 				t.Fatal(err)
 			}
-			if spec == nil {
+			if rec.Spec == nil {
 				t.Fatal("nil volume.Spec constructed")
 			}
 
 			// inspect spec
-			if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.CSI == nil {
+			if rec.Spec.PersistentVolume == nil || rec.Spec.PersistentVolume.Spec.CSI == nil {
 				t.Fatal("CSIPersistentVolume not found in constructed spec ")
 			}
 
-			volHandle := spec.PersistentVolume.Spec.CSI.VolumeHandle
+			volHandle := rec.Spec.PersistentVolume.Spec.CSI.VolumeHandle
 			if volHandle != tc.originSpec.PersistentVolume.Spec.CSI.VolumeHandle {
 				t.Error("unexpected volumeHandle constructed:", volHandle)
 			}
-			driverName := spec.PersistentVolume.Spec.CSI.Driver
+			driverName := rec.Spec.PersistentVolume.Spec.CSI.Driver
 			if driverName != tc.originSpec.PersistentVolume.Spec.CSI.Driver {
 				t.Error("unexpected driverName constructed:", driverName)
 			}
 
-			if spec.PersistentVolume.Spec.VolumeMode == nil {
+			if rec.Spec.PersistentVolume.Spec.VolumeMode == nil {
 				t.Fatalf("Volume mode has not been set.")
 			}
 
-			if *spec.PersistentVolume.Spec.VolumeMode != api.PersistentVolumeFilesystem {
-				t.Errorf("Unexpected volume mode %q", *spec.PersistentVolume.Spec.VolumeMode)
+			if *rec.Spec.PersistentVolume.Spec.VolumeMode != api.PersistentVolumeFilesystem {
+				t.Errorf("Unexpected volume mode %q", *rec.Spec.PersistentVolume.Spec.VolumeMode)
 			}
 
-			if spec.Name() != tc.specVolID {
-				t.Errorf("Unexpected spec name constructed %s", spec.Name())
+			if rec.Spec.Name() != tc.specVolID {
+				t.Errorf("Unexpected spec name constructed %s", rec.Spec.Name())
 			}
 		})
 	}
@@ -496,44 +496,44 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 			}
 
 			// rebuild spec
-			spec, err := plug.ConstructVolumeSpec("test-pv", filepath.Dir(csiMounter.GetPath()))
+			rec, err := plug.ConstructVolumeSpec("test-pv", filepath.Dir(csiMounter.GetPath()))
 			if err != nil {
 				t.Fatal(err)
 			}
-			if spec == nil {
+			if rec.Spec == nil {
 				t.Fatal("nil volume.Spec constructed")
 			}
 
-			if spec.Name() != tc.specVolID {
-				t.Errorf("unexpected spec name constructed volume.Spec: %s", spec.Name())
+			if rec.Spec.Name() != tc.specVolID {
+				t.Errorf("unexpected spec name constructed volume.Spec: %s", rec.Spec.Name())
 			}
 
 			switch {
-			case spec.Volume != nil:
-				if spec.Volume.CSI == nil {
+			case rec.Spec.Volume != nil:
+				if rec.Spec.Volume.CSI == nil {
 					t.Error("missing CSIVolumeSource in constructed volume.Spec")
 				}
-				if spec.Volume.CSI.Driver != tc.originSpec.Volume.CSI.Driver {
-					t.Error("unexpected driver in constructed volume source:", spec.Volume.CSI.Driver)
+				if rec.Spec.Volume.CSI.Driver != tc.originSpec.Volume.CSI.Driver {
+					t.Error("unexpected driver in constructed volume source:", rec.Spec.Volume.CSI.Driver)
 				}
 
-			case spec.PersistentVolume != nil:
-				if spec.PersistentVolume.Spec.CSI == nil {
+			case rec.Spec.PersistentVolume != nil:
+				if rec.Spec.PersistentVolume.Spec.CSI == nil {
 					t.Fatal("missing CSIPersistentVolumeSource in constructed volume.spec")
 				}
-				volHandle := spec.PersistentVolume.Spec.CSI.VolumeHandle
+				volHandle := rec.Spec.PersistentVolume.Spec.CSI.VolumeHandle
 				if volHandle != tc.originSpec.PersistentVolume.Spec.CSI.VolumeHandle {
 					t.Error("unexpected volumeHandle constructed in persistent volume source:", volHandle)
 				}
-				driverName := spec.PersistentVolume.Spec.CSI.Driver
+				driverName := rec.Spec.PersistentVolume.Spec.CSI.Driver
 				if driverName != tc.originSpec.PersistentVolume.Spec.CSI.Driver {
 					t.Error("unexpected driverName constructed in persistent volume source:", driverName)
 				}
-				if spec.PersistentVolume.Spec.VolumeMode == nil {
+				if rec.Spec.PersistentVolume.Spec.VolumeMode == nil {
 					t.Fatalf("Volume mode has not been set.")
 				}
-				if *spec.PersistentVolume.Spec.VolumeMode != api.PersistentVolumeFilesystem {
-					t.Errorf("Unexpected volume mode %q", *spec.PersistentVolume.Spec.VolumeMode)
+				if *rec.Spec.PersistentVolume.Spec.VolumeMode != api.PersistentVolumeFilesystem {
+					t.Errorf("Unexpected volume mode %q", *rec.Spec.PersistentVolume.Spec.VolumeMode)
 				}
 			default:
 				t.Fatal("invalid volume.Spec constructed")

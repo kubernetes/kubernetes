@@ -631,15 +631,15 @@ func TestConstructVolumeSpec(t *testing.T) {
 		if err = fakeMounter.Mount(c.targetPath, podMountPath, "fake", []string{"bind"}); err != nil {
 			t.Fatalf("Mount %s to %s failed: %v", c.targetPath, podMountPath, err)
 		}
-		spec, err := plug.ConstructVolumeSpec(c.volumeName, podMountPath)
+		rec, err := plug.ConstructVolumeSpec(c.volumeName, podMountPath)
 		if err != nil {
 			t.Errorf("ConstructVolumeSpec failed: %v", err)
 		} else {
-			if spec.Volume.RBD.RBDPool != pool {
-				t.Errorf("Mismatch rbd pool: wanted %s, got %s", pool, spec.Volume.RBD.RBDPool)
+			if rec.Spec.Volume.RBD.RBDPool != pool {
+				t.Errorf("Mismatch rbd pool: wanted %s, got %s", pool, rec.Spec.Volume.RBD.RBDPool)
 			}
-			if spec.Volume.RBD.RBDImage != image {
-				t.Fatalf("Mismatch rbd image: wanted %s, got %s", image, spec.Volume.RBD.RBDImage)
+			if rec.Spec.Volume.RBD.RBDImage != image {
+				t.Fatalf("Mismatch rbd image: wanted %s, got %s", image, rec.Spec.Volume.RBD.RBDImage)
 			}
 		}
 		if err = fakeMounter.Unmount(podMountPath); err != nil {

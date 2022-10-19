@@ -1,9 +1,12 @@
 /*
-Copyright 2022 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -136,7 +139,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 		return nil, fmt.Errorf("could not find block volume plugin %q (spec.Name: %q) pod %q (UID: %q)", volume.pluginName, volume.volumeSpecName, volume.podName, pod.UID)
 	}
 
-	volumeSpec, err := rc.operationExecutor.ReconstructVolumeOperation(
+	reconstructed, err := rc.operationExecutor.ReconstructVolumeOperation(
 		volume.volumeMode,
 		plugin,
 		mapperPlugin,
@@ -148,6 +151,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 	if err != nil {
 		return nil, err
 	}
+	volumeSpec := reconstructed.Spec
 
 	// We have to find the plugins by volume spec (NOT by plugin name) here
 	// in order to correctly reconstruct ephemeral volume types.

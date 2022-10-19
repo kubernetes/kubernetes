@@ -443,14 +443,14 @@ func TestCSI_VolumeAll(t *testing.T) {
 			// ******** Volume Reconstruction ************* //
 			volPath := filepath.Dir(csiMounter.GetPath())
 			t.Log("csiTest.VolumeAll entering plugin.ConstructVolumeSpec for path", volPath)
-			spec, err := volPlug.ConstructVolumeSpec(test.volName, volPath)
+			rec, err := volPlug.ConstructVolumeSpec(test.volName, volPath)
 			if err != nil {
 				t.Fatalf("csiTest.VolumeAll plugin.ConstructVolumeSpec failed: %s", err)
 			} else {
-				if spec == nil {
+				if rec.Spec == nil {
 					t.Fatalf("csiTest.VolumeAll plugin.ConstructVolumeSpec returned nil spec")
 				} else {
-					volSpec = spec
+					volSpec = rec.Spec
 
 					if test.isInline {
 						if volSpec.Volume == nil || volSpec.Volume.CSI == nil {

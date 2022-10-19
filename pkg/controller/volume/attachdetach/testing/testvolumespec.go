@@ -424,7 +424,7 @@ func (plugin *TestPlugin) NewUnmounter(name string, podUID types.UID) (volume.Un
 	return nil, nil
 }
 
-func (plugin *TestPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (plugin *TestPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
 	fakeVolume := &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
@@ -435,7 +435,9 @@ func (plugin *TestPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*vo
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(fakeVolume), nil
+	return volume.ReconstructedVolume{
+		Spec: volume.NewSpecFromVolume(fakeVolume),
+	}, nil
 }
 
 func (plugin *TestPlugin) NewAttacher() (volume.Attacher, error) {
