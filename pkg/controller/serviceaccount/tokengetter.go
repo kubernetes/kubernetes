@@ -14,18 +14,48 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// +kcp-code-generator:skip
+
 package serviceaccount
 
 import (
 	"context"
+
+	kcpkubernetesclientset "github.com/kcp-dev/client-go/clients/clientset/versioned"
+	kcpcorev1listers "github.com/kcp-dev/client-go/clients/listers/core/v1"
+	"github.com/kcp-dev/logicalcluster/v2"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	clientset "k8s.io/client-go/kubernetes"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/tools/clusters"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
+
+func NewClusterGetterFromClient(client kcpkubernetesclientset.ClusterInterface, secretLister kcpcorev1listers.SecretClusterLister, serviceAccountLister kcpcorev1listers.ServiceAccountClusterLister /*podLister kcpcorev1listers.PodClusterLister*/) serviceaccount.ServiceAccountTokenClusterGetter {
+	return &serviceAccountTokenClusterGetter{
+		client:               client,
+		secretLister:         secretLister,
+		serviceAccountLister: serviceAccountLister,
+		//podLister:            podLister,
+	}
+}
+
+type serviceAccountTokenClusterGetter struct {
+	client               kcpkubernetesclientset.ClusterInterface
+	secretLister         kcpcorev1listers.SecretClusterLister
+	serviceAccountLister kcpcorev1listers.ServiceAccountClusterLister
+	podLister            kcpcorev1listers.PodClusterLister
+}
+
+func (s *serviceAccountTokenClusterGetter) Cluster(name logicalcluster.Name) serviceaccount.ServiceAccountTokenGetter {
+	return NewGetterFromClient(
+		s.client.Cluster(name),
+		s.secretLister.Cluster(name),
+		s.serviceAccountLister.Cluster(name),
+		nil,
+		//s.podLister.Cluster(name),
+	)
+}
 
 // clientGetter implements ServiceAccountTokenGetter using a clientset.Interface
 type clientGetter struct {
@@ -47,25 +77,16 @@ func (c clientGetter) GetServiceAccount(namespace, name string) (*v1.ServiceAcco
 	if serviceAccount, err := c.serviceAccountLister.ServiceAccounts(namespace).Get(name); err == nil {
 		return serviceAccount, nil
 	}
-	clusterName, name := clusters.SplitClusterAwareKey(name)
-	clusterCtx := genericapirequest.WithCluster(context.TODO(), genericapirequest.Cluster{Name: clusterName})
-	return c.client.CoreV1().ServiceAccounts(namespace).Get(clusterCtx, name, metav1.GetOptions{})
+	return c.client.CoreV1().ServiceAccounts(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (c clientGetter) GetPod(namespace, name string) (*v1.Pod, error) {
-	if pod, err := c.podLister.Pods(namespace).Get(name); err == nil {
-		return pod, nil
-	}
-	clusterName, name := clusters.SplitClusterAwareKey(name)
-	clusterCtx := genericapirequest.WithCluster(context.TODO(), genericapirequest.Cluster{Name: clusterName})
-	return c.client.CoreV1().Pods(namespace).Get(clusterCtx, name, metav1.GetOptions{})
+	return c.client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (c clientGetter) GetSecret(namespace, name string) (*v1.Secret, error) {
 	if secret, err := c.secretLister.Secrets(namespace).Get(name); err == nil {
 		return secret, nil
 	}
-	clusterName, name := clusters.SplitClusterAwareKey(name)
-	clusterCtx := genericapirequest.WithCluster(context.TODO(), genericapirequest.Cluster{Name: clusterName})
-	return c.client.CoreV1().Secrets(namespace).Get(clusterCtx, name, metav1.GetOptions{})
+	return c.client.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }

@@ -79,7 +79,7 @@ type Config struct {
 	RequestHeaderConfig *authenticatorfactory.RequestHeaderConfig
 
 	// TODO, this is the only non-serializable part of the entire config.  Factor it out into a clientconfig
-	ServiceAccountTokenGetter   serviceaccount.ServiceAccountTokenGetter
+	ServiceAccountTokenGetter   serviceaccount.ServiceAccountTokenClusterGetter
 	BootstrapTokenAuthenticator authenticator.Token
 	// ClientCAContentProvider are the options for verifying incoming connections using mTLS and directly assigning to users.
 	// Generally this is the CA bundle file used to authenticate client certificates
@@ -266,7 +266,7 @@ func newAuthenticatorFromOIDCIssuerURL(opts oidc.Options) (authenticator.Token, 
 }
 
 // newLegacyServiceAccountAuthenticator returns an authenticator.Token or an error
-func newLegacyServiceAccountAuthenticator(keyfiles []string, lookup bool, apiAudiences authenticator.Audiences, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter) (authenticator.Token, error) {
+func newLegacyServiceAccountAuthenticator(keyfiles []string, lookup bool, apiAudiences authenticator.Audiences, serviceAccountGetter serviceaccount.ServiceAccountTokenClusterGetter) (authenticator.Token, error) {
 	allPublicKeys := []interface{}{}
 	for _, keyfile := range keyfiles {
 		publicKeys, err := keyutil.PublicKeysFromFile(keyfile)
@@ -281,7 +281,7 @@ func newLegacyServiceAccountAuthenticator(keyfiles []string, lookup bool, apiAud
 }
 
 // newServiceAccountAuthenticator returns an authenticator.Token or an error
-func newServiceAccountAuthenticator(issuers []string, keyfiles []string, apiAudiences authenticator.Audiences, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter) (authenticator.Token, error) {
+func newServiceAccountAuthenticator(issuers []string, keyfiles []string, apiAudiences authenticator.Audiences, serviceAccountGetter serviceaccount.ServiceAccountTokenClusterGetter) (authenticator.Token, error) {
 	allPublicKeys := []interface{}{}
 	for _, keyfile := range keyfiles {
 		publicKeys, err := keyutil.PublicKeysFromFile(keyfile)
