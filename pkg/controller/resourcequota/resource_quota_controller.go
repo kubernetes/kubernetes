@@ -198,7 +198,7 @@ func (rq *Controller) enqueueAll() {
 		return
 	}
 	for i := range rqs {
-		key, err := controller.KeyFunc(rqs[i])
+		key, err := cache.LegacyDeletionHandlingMetaNamespaceKeyFunc(rqs[i])
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("%s: couldn't get key for object %+v: %v", rq.clusterName, rqs[i], err))
 			continue
@@ -209,7 +209,7 @@ func (rq *Controller) enqueueAll() {
 
 // obj could be an *v1.ResourceQuota, or a DeletionFinalStateUnknown marker item.
 func (rq *Controller) enqueueResourceQuota(obj interface{}) {
-	key, err := controller.KeyFunc(obj)
+	key, err := cache.LegacyDeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		klog.Errorf("%s: Couldn't get key for object %+v: %v", rq.clusterName, obj, err)
 		return
@@ -218,7 +218,7 @@ func (rq *Controller) enqueueResourceQuota(obj interface{}) {
 }
 
 func (rq *Controller) addQuota(obj interface{}) {
-	key, err := controller.KeyFunc(obj)
+	key, err := cache.LegacyDeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		klog.Errorf("%s: Couldn't get key for object %+v: %v", rq.clusterName, obj, err)
 		return
