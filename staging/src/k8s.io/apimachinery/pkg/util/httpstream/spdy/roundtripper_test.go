@@ -27,6 +27,8 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"sync/atomic"
+	"syscall"
 	"testing"
 
 	"github.com/armon/go-socks5"
@@ -120,6 +122,24 @@ func localhostCertPool(t *testing.T) *x509.CertPool {
 func TestRoundTripAndNewConnection(t *testing.T) {
 	localhostPool := localhostCertPool(t)
 
+	const (
+		dialerDefault = iota
+		dialerDialFunc
+		dialerDialer
+	)
+	var dialerUsed int32 = dialerDefault
+	dialFunc := func(ctx context.Context, network, address string) (net.Conn, error) {
+		atomic.StoreInt32(&dialerUsed, dialerDialFunc)
+		var nd net.Dialer
+		return nd.DialContext(ctx, network, address)
+	}
+	dialer := &net.Dialer{
+		Control: func(network, address string, c syscall.RawConn) error {
+			dialerUsed = dialerDialer
+			return nil
+		},
+	}
+
 	testCases := map[string]struct {
 		serverFunc             func(http.Handler) *httptest.Server
 		proxyServerFunc        func(http.Handler) *httptest.Server
@@ -129,6 +149,9 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 		serverUpgradeHeader    string
 		serverStatusCode       int
 		shouldError            bool
+		dialer                 *net.Dialer
+		dialFunc               func(context.Context, string, string) (net.Conn, error)
+		expectedDialer         int32
 	}{
 		"no headers": {
 			serverFunc:             httptest.NewServer,
@@ -291,6 +314,37 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 			serverStatusCode:       http.StatusSwitchingProtocols,
 			shouldError:            false,
 		},
+		"DialContext -> DialContext": {
+			serverFunc:             httpsServerValidHostname(t),
+			clientTLS:              &tls.Config{RootCAs: localhostPool},
+			serverConnectionHeader: "Upgrade",
+			serverUpgradeHeader:    "SPDY/3.1",
+			serverStatusCode:       http.StatusSwitchingProtocols,
+			shouldError:            false,
+			dialFunc:               dialFunc,
+			expectedDialer:         dialerDialFunc,
+		},
+		"Dialer, DialContext -> DialContext": {
+			serverFunc:             httpsServerValidHostname(t),
+			clientTLS:              &tls.Config{RootCAs: localhostPool},
+			serverConnectionHeader: "Upgrade",
+			serverUpgradeHeader:    "SPDY/3.1",
+			serverStatusCode:       http.StatusSwitchingProtocols,
+			shouldError:            false,
+			dialer:                 dialer,
+			dialFunc:               dialFunc,
+			expectedDialer:         dialerDialFunc,
+		},
+		"Dialer -> Dialer": {
+			serverFunc:             httpsServerValidHostname(t),
+			clientTLS:              &tls.Config{RootCAs: localhostPool},
+			serverConnectionHeader: "Upgrade",
+			serverUpgradeHeader:    "SPDY/3.1",
+			serverStatusCode:       http.StatusSwitchingProtocols,
+			shouldError:            false,
+			dialer:                 dialer,
+			expectedDialer:         dialerDialer,
+		},
 	}
 
 	for k, testCase := range testCases {
@@ -315,6 +369,8 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 			}
 
 			spdyTransport := NewRoundTripper(testCase.clientTLS)
+			spdyTransport.Dialer = testCase.dialer
+			spdyTransport.DialContext = testCase.dialFunc
 
 			var proxierCalled bool
 			var proxyCalledWithHost string
@@ -348,6 +404,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 
 			client := &http.Client{Transport: spdyTransport}
 
+			atomic.StoreInt32(&dialerUsed, dialerDefault)
 			resp, err := client.Do(req)
 			var conn httpstream.Connection
 			if err == nil {
@@ -361,6 +418,9 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 				return
 			}
 			defer conn.Close()
+			if atomic.LoadInt32(&dialerUsed) != testCase.expectedDialer {
+				t.Errorf("expected dialerUsed=%d, got %d", testCase.expectedDialer, dialerUsed)
+			}
 
 			if resp.StatusCode != http.StatusSwitchingProtocols {
 				t.Fatalf("expected http 101 switching protocols, got %d", resp.StatusCode)

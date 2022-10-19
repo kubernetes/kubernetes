@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"golang.org/x/net/proxy"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -58,8 +59,12 @@ type SpdyRoundTripper struct {
 	// conn is the underlying network connection to the remote server.
 	conn net.Conn
 
-	// Dialer is the dialer used to connect.  Used if non-nil.
+	// Deprecated: Dialer is the dialer used to connect.  Used if non-nil and DialContext is nil.
 	Dialer *net.Dialer
+
+	// DialContext is the function used to create new underlying connections. Optional, if not specified
+	// Dialer is used.
+	DialContext func(ctx context.Context, network, address string) (net.Conn, error)
 
 	// proxier knows which proxy to use given a request, defaults to http.ProxyFromEnvironment
 	// Used primarily for mocking the proxy discovery in tests.
@@ -113,6 +118,9 @@ type RoundTripperConfig struct {
 	// PingPeriod is a period for sending SPDY Pings on the connection.
 	// Optional.
 	PingPeriod time.Duration
+	// DialContext is a dialer used to establish an underlying socket connection. Optional, if empty a default dialer
+	// will be used.
+	DialContext func(ctx context.Context, network string, address string) (net.Conn, error)
 }
 
 // TLSClientConfig implements pkg/util/net.TLSClientConfigHolder for proper TLS checking during
@@ -199,6 +207,20 @@ func (s *SpdyRoundTripper) dialWithHttpProxy(req *http.Request, proxyURL *url.UR
 	return rwc, nil
 }
 
+var _ = (proxy.ContextDialer)((*fnDialer)(nil))
+var _ = (proxy.Dialer)((*fnDialer)(nil))
+
+type fnDialer struct {
+	fn func(ctx context.Context, network, address string) (net.Conn, error)
+}
+
+func (f fnDialer) Dial(network, addr string) (c net.Conn, err error) {
+	return f.fn(context.Background(), network, addr)
+}
+func (f fnDialer) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	return f.fn(ctx, network, addr)
+}
+
 // dialWithSocks5Proxy dials the host specified by url through a socks5 proxy.
 func (s *SpdyRoundTripper) dialWithSocks5Proxy(req *http.Request, proxyURL *url.URL) (net.Conn, error) {
 	// ensure we use a canonical host with proxyReq
@@ -214,11 +236,13 @@ func (s *SpdyRoundTripper) dialWithSocks5Proxy(req *http.Request, proxyURL *url.
 		}
 	}
 
-	dialer := s.Dialer
-	if dialer == nil {
-		dialer = &net.Dialer{
-			Timeout: 30 * time.Second,
-		}
+	var dialer proxy.Dialer = &net.Dialer{
+		Timeout: 30 * time.Second,
+	}
+	if s.DialContext != nil {
+		dialer = fnDialer{s.DialContext}
+	} else if s.Dialer != nil {
+		dialer = s.Dialer
 	}
 
 	proxyDialer, err := proxy.SOCKS5("tcp", proxyDialAddr, auth, dialer)
@@ -245,7 +269,6 @@ func (s *SpdyRoundTripper) dialWithSocks5Proxy(req *http.Request, proxyURL *url.
 
 // tlsConn returns a TLS client side connection using rwc as the underlying transport.
 func (s *SpdyRoundTripper) tlsConn(ctx context.Context, rwc net.Conn, targetHost string) (net.Conn, error) {
-
 	host, _, err := net.SplitHostPort(targetHost)
 	if err != nil {
 		return nil, err
@@ -273,20 +296,26 @@ func (s *SpdyRoundTripper) tlsConn(ctx context.Context, rwc net.Conn, targetHost
 // dialWithoutProxy dials the host specified by url, using TLS if appropriate.
 func (s *SpdyRoundTripper) dialWithoutProxy(ctx context.Context, url *url.URL) (net.Conn, error) {
 	dialAddr := netutil.CanonicalAddr(url)
-	dialer := s.Dialer
-	if dialer == nil {
-		dialer = &net.Dialer{}
+	dial := s.DialContext
+	// prefer DialContext
+	if dial == nil {
+		// but fallback to the provided Dialer and then a generic net.Dialer
+		if s.Dialer != nil {
+			dial = s.Dialer.DialContext
+		} else {
+			nd := &net.Dialer{}
+			dial = nd.DialContext
+		}
 	}
 
-	if url.Scheme == "http" {
-		return dialer.DialContext(ctx, "tcp", dialAddr)
+	conn, err := dial(ctx, "tcp", dialAddr)
+	if err != nil {
+		return nil, err
 	}
-
-	tlsDialer := tls.Dialer{
-		NetDialer: dialer,
-		Config:    s.tlsConfig,
+	if url.Scheme == "https" {
+		return s.tlsConn(ctx, conn, dialAddr)
 	}
-	return tlsDialer.DialContext(ctx, "tcp", dialAddr)
+	return conn, nil
 }
 
 // proxyAuth returns, for a given proxy URL, the value to be used for the Proxy-Authorization header
