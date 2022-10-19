@@ -18,11 +18,12 @@
 
 # A set of helpers for tests
 
-readonly reset=$(tput sgr0)
-readonly  bold=$(tput bold)
-readonly black=$(tput setaf 0)
-readonly   red=$(tput setaf 1)
-readonly green=$(tput setaf 2)
+reset=$(tput sgr0)
+bold=$(tput bold)
+black=$(tput setaf 0)
+red=$(tput setaf 1)
+green=$(tput setaf 2)
+readonly reset bold black red green
 
 kube::test::clear_all() {
   if kube::test::if_supports_resource "rc" ; then
