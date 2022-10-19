@@ -22,11 +22,11 @@ import (
 	"sort"
 	"time"
 
+	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
+	kcprbacclient "github.com/kcp-dev/client-go/clients/clientset/versioned/typed/rbac/v1"
+	kcprbacinformers "github.com/kcp-dev/client-go/clients/informers/rbac/v1"
+	kcprbaclisters "github.com/kcp-dev/client-go/clients/listers/rbac/v1"
 	"github.com/kcp-dev/logicalcluster/v2"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
-	rbacv1ac "k8s.io/client-go/applyconfigurations/rbac/v1"
-	"k8s.io/klog/v2"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -35,20 +35,18 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	rbacinformers "k8s.io/client-go/informers/rbac/v1"
-	rbacclient "k8s.io/client-go/kubernetes/typed/rbac/v1"
-	rbaclisters "k8s.io/client-go/listers/rbac/v1"
+	rbacv1ac "k8s.io/client-go/applyconfigurations/rbac/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-
-	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/klog/v2"
 )
 
 // ClusterRoleAggregationController is a controller to combine cluster roles
 type ClusterRoleAggregationController struct {
-	clusterRoleClient  rbacclient.ClusterRolesGetter
-	clusterRoleLister  rbaclisters.ClusterRoleLister
+	clusterRoleClient  kcprbacclient.ClusterRolesClusterGetter
+	clusterRoleLister  kcprbaclisters.ClusterRoleClusterLister
 	clusterRolesSynced cache.InformerSynced
 
 	syncHandler func(ctx context.Context, key string) error
@@ -56,7 +54,7 @@ type ClusterRoleAggregationController struct {
 }
 
 // NewClusterRoleAggregation creates a new controller
-func NewClusterRoleAggregation(clusterRoleInformer rbacinformers.ClusterRoleInformer, clusterRoleClient rbacclient.ClusterRolesGetter) *ClusterRoleAggregationController {
+func NewClusterRoleAggregation(clusterRoleInformer kcprbacinformers.ClusterRoleClusterInformer, clusterRoleClient kcprbacclient.ClusterRolesClusterGetter) *ClusterRoleAggregationController {
 	c := &ClusterRoleAggregationController{
 		clusterRoleClient:  clusterRoleClient,
 		clusterRoleLister:  clusterRoleInformer.Lister(),
@@ -68,24 +66,24 @@ func NewClusterRoleAggregation(clusterRoleInformer rbacinformers.ClusterRoleInfo
 
 	clusterRoleInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			c.enqueue()
+			c.enqueue(obj)
 		},
 		UpdateFunc: func(old, cur interface{}) {
-			c.enqueue()
+			c.enqueue(cur)
 		},
 		DeleteFunc: func(uncast interface{}) {
-			c.enqueue()
+			c.enqueue(uncast)
 		},
 	})
 	return c
 }
 
 func (c *ClusterRoleAggregationController) syncClusterRole(ctx context.Context, key string) error {
-	_, name, err := cache.SplitMetaNamespaceKey(key)
+	clusterName, _, name, err := kcpcache.SplitMetaClusterNamespaceKey(key)
 	if err != nil {
 		return err
 	}
-	sharedClusterRole, err := c.clusterRoleLister.Get(name)
+	sharedClusterRole, err := c.clusterRoleLister.Cluster(clusterName).Get(name)
 	if errors.IsNotFound(err) {
 		return nil
 	}
@@ -103,7 +101,7 @@ func (c *ClusterRoleAggregationController) syncClusterRole(ctx context.Context, 
 		if err != nil {
 			return err
 		}
-		clusterRoles, err := c.clusterRoleLister.List(runtimeLabelSelector)
+		clusterRoles, err := c.clusterRoleLister.Cluster(clusterName).List(runtimeLabelSelector)
 		if err != nil {
 			return err
 		}
@@ -127,7 +125,6 @@ func (c *ClusterRoleAggregationController) syncClusterRole(ctx context.Context, 
 		return nil
 	}
 
-	ctx = genericapirequest.WithCluster(ctx, genericapirequest.Cluster{Name: logicalcluster.From(sharedClusterRole)})
 	if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 		err = c.applyClusterRoles(ctx, sharedClusterRole, newPolicyRules)
 		if errors.IsUnsupportedMediaType(err) { // TODO: Remove this fallback at least one release after ServerSideApply GA
@@ -148,7 +145,7 @@ func (c *ClusterRoleAggregationController) applyClusterRoles(ctx context.Context
 		WithRules(toApplyPolicyRules(newPolicyRules)...)
 
 	opts := metav1.ApplyOptions{FieldManager: "clusterrole-aggregation-controller", Force: true}
-	_, err := c.clusterRoleClient.ClusterRoles().Apply(ctx, clusterRoleApply, opts)
+	_, err := c.clusterRoleClient.ClusterRoles().Cluster(logicalcluster.From(sharedClusterRole)).Apply(ctx, clusterRoleApply, opts)
 	return err
 }
 
@@ -158,7 +155,7 @@ func (c *ClusterRoleAggregationController) updateClusterRoles(ctx context.Contex
 	for _, rule := range newPolicyRules {
 		clusterRole.Rules = append(clusterRole.Rules, *rule.DeepCopy())
 	}
-	_, err := c.clusterRoleClient.ClusterRoles().Update(ctx, clusterRole, metav1.UpdateOptions{})
+	_, err := c.clusterRoleClient.ClusterRoles().Cluster(logicalcluster.From(sharedClusterRole)).Update(ctx, clusterRole, metav1.UpdateOptions{})
 	return err
 }
 
@@ -232,11 +229,22 @@ func (c *ClusterRoleAggregationController) processNextWorkItem(ctx context.Conte
 	return true
 }
 
-func (c *ClusterRoleAggregationController) enqueue() {
+func (c *ClusterRoleAggregationController) enqueue(obj interface{}) {
+	key, err := kcpcache.DeletionHandlingMetaClusterNamespaceKeyFunc(obj)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
+	clusterName, _, _, err := kcpcache.SplitMetaClusterNamespaceKey(key)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
+
 	// this is unusual, but since the set of all clusterroles is small and we don't know the dependency
 	// graph, just queue up every thing each time.  This allows errors to be selectively retried if there
 	// is a problem updating a single role
-	allClusterRoles, err := c.clusterRoleLister.List(labels.Everything())
+	allClusterRoles, err := c.clusterRoleLister.Cluster(clusterName).List(labels.Everything())
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't list all objects %v", err))
 		return
@@ -246,7 +254,7 @@ func (c *ClusterRoleAggregationController) enqueue() {
 		if clusterRole.AggregationRule == nil {
 			continue
 		}
-		key, err := controller.KeyFunc(clusterRole)
+		key, err := kcpcache.DeletionHandlingMetaClusterNamespaceKeyFunc(clusterRole)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", clusterRole, err))
 			return
