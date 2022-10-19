@@ -19,10 +19,13 @@ package storage
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -92,12 +95,21 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 		for _, config := range configs {
 			e2epod.DeletePodOrFail(c, ns, config.pod.Name)
 		}
-		for _, config := range configs {
-			e2epod.WaitTimeoutForPodNoLongerRunningOrNotFoundInNamespace(c, config.pod.Name, ns)
-			e2epv.PVPVCCleanup(c, ns, config.pv, config.pvc)
-			err = e2epv.DeletePVSource(config.pvSource)
-			framework.ExpectNoError(err)
+		var wg sync.WaitGroup
+		wg.Add(len(configs))
+		for i := range configs {
+			go func(config *staticPVTestConfig) {
+				defer ginkgo.GinkgoRecover()
+				defer wg.Done()
+				err := e2epod.WaitForPodToDisappear(c, ns, config.pod.Name, labels.Everything(), framework.Poll, f.Timeouts.PodDelete)
+				framework.ExpectNoError(err, "while waiting for pod to disappear")
+				errs := e2epv.PVPVCCleanup(c, ns, config.pv, config.pvc)
+				framework.ExpectNoError(utilerrors.NewAggregate(errs), "while cleaning up PVs and PVCs")
+				err = e2epv.DeletePVSource(config.pvSource)
+				framework.ExpectNoError(err, "while deleting PVSource")
+			}(configs[i])
 		}
+		wg.Wait()
 	}()
 
 	for i, config := range configs {
