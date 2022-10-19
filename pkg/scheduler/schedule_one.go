@@ -370,13 +370,13 @@ func (sched *Scheduler) skipPodSchedule(fwk framework.Framework, pod *v1.Pod) bo
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a FitError with reasons.
 func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (result ScheduleResult, err error) {
-	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
-	defer trace.LogIfLong(100 * time.Millisecond)
+	trace := utiltrace.New(ctx, "Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
+	defer trace.LogIfLong(ctx, 100*time.Millisecond)
 
 	if err := sched.Cache.UpdateSnapshot(sched.nodeInfoSnapshot); err != nil {
 		return result, err
 	}
-	trace.Step("Snapshotting scheduler cache and node infos done")
+	trace.Step(ctx, "Snapshotting scheduler cache and node infos done")
 
 	if sched.nodeInfoSnapshot.NumNodes() == 0 {
 		return result, ErrNoNodesAvailable
@@ -386,7 +386,7 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 	if err != nil {
 		return result, err
 	}
-	trace.Step("Computing predicates done")
+	trace.Step(ctx, "Computing predicates done")
 
 	if len(feasibleNodes) == 0 {
 		return result, &framework.FitError{
@@ -411,7 +411,7 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 	}
 
 	host, err := selectHost(priorityList)
-	trace.Step("Prioritizing done")
+	trace.Step(ctx, "Prioritizing done")
 
 	return ScheduleResult{
 		SuggestedHost:  host,

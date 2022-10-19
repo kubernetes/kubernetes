@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -513,6 +514,7 @@ func (f *DeltaFIFO) IsClosed() bool {
 // Pop returns a 'Deltas', which has a complete list of all the things
 // that happened to the object (deltas) while it was sitting in the queue.
 func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
+	ctx := context.Background()
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	for {
@@ -545,11 +547,11 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 		// and new items can't be added until processing finish.
 		// https://github.com/kubernetes/kubernetes/issues/103789
 		if depth > 10 {
-			trace := utiltrace.New("DeltaFIFO Pop Process",
+			trace := utiltrace.New(ctx, "DeltaFIFO Pop Process",
 				utiltrace.Field{Key: "ID", Value: id},
 				utiltrace.Field{Key: "Depth", Value: depth},
 				utiltrace.Field{Key: "Reason", Value: "slow event handlers blocking the queue"})
-			defer trace.LogIfLong(100 * time.Millisecond)
+			defer trace.LogIfLong(ctx, 100*time.Millisecond)
 		}
 		err := process(item)
 		if e, ok := err.(ErrRequeue); ok {

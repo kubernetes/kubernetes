@@ -233,14 +233,14 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 	if err != nil {
 		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("could not get REST client: %w", err), Status: apierrors.NewBadRequest("error getting REST client")}
 	}
-	trace := utiltrace.New("Call mutating webhook",
+	trace := utiltrace.New(ctx, "Call mutating webhook",
 		utiltrace.Field{"configuration", configurationName},
 		utiltrace.Field{"webhook", h.Name},
 		utiltrace.Field{"resource", attr.GetResource()},
 		utiltrace.Field{"subresource", attr.GetSubresource()},
 		utiltrace.Field{"operation", attr.GetOperation()},
 		utiltrace.Field{"UID", uid})
-	defer trace.LogIfLong(500 * time.Millisecond)
+	defer trace.LogIfLong(ctx, 500*time.Millisecond)
 
 	// if the webhook has a specific timeout, wrap the context to apply it
 	if h.TimeoutSeconds != nil {
@@ -279,7 +279,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 		}
 		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("failed to call webhook: %w", err), Status: status}
 	}
-	trace.Step("Request completed")
+	trace.Step(ctx, "Request completed")
 
 	result, err := webhookrequest.VerifyAdmissionResponse(uid, true, response)
 	if err != nil {
@@ -353,7 +353,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 	}
 
 	changed = !apiequality.Semantic.DeepEqual(attr.VersionedObject, newVersionedObject)
-	trace.Step("Patch applied")
+	trace.Step(ctx, "Patch applied")
 	annotator.addPatchAnnotation(patchObj, result.PatchType)
 	attr.Dirty = true
 	attr.VersionedObject = newVersionedObject

@@ -346,11 +346,12 @@ func (runner *runner) Protocol() Protocol {
 
 // SaveInto is part of Interface.
 func (runner *runner) SaveInto(table Table, buffer *bytes.Buffer) error {
+	ctx := context.Background()
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
 
-	trace := utiltrace.New("iptables save")
-	defer trace.LogIfLong(2 * time.Second)
+	trace := utiltrace.New(ctx, "iptables save")
+	defer trace.LogIfLong(ctx, 2*time.Second)
 
 	// run and return
 	iptablesSaveCmd := iptablesSaveCommand(runner.protocol)
@@ -388,11 +389,12 @@ type iptablesLocker interface {
 
 // restoreInternal is the shared part of Restore/RestoreAll
 func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFlag, counters RestoreCountersFlag) error {
+	ctx := context.Background()
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
 
-	trace := utiltrace.New("iptables restore")
-	defer trace.LogIfLong(2 * time.Second)
+	trace := utiltrace.New(ctx, "iptables restore")
+	defer trace.LogIfLong(ctx, 2*time.Second)
 
 	if !flush {
 		args = append(args, "--noflush")
@@ -409,7 +411,7 @@ func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFla
 		if err != nil {
 			return err
 		}
-		trace.Step("Locks grabbed")
+		trace.Step(ctx, "Locks grabbed")
 		defer func(locker iptablesLocker) {
 			if err := locker.Close(); err != nil {
 				klog.Errorf("Failed to close iptables locks: %v", err)
@@ -621,12 +623,13 @@ func (runner *runner) Monitor(canary Chain, tables []Table, reloadFunc func(), i
 // ChainExists is part of Interface
 func (runner *runner) ChainExists(table Table, chain Chain) (bool, error) {
 	fullArgs := makeFullArgs(table, chain)
+	ctx := context.Background()
 
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
 
-	trace := utiltrace.New("iptables ChainExists")
-	defer trace.LogIfLong(2 * time.Second)
+	trace := utiltrace.New(ctx, "iptables ChainExists")
+	defer trace.LogIfLong(ctx, 2*time.Second)
 
 	_, err := runner.run(opListChain, fullArgs)
 	return err == nil, err

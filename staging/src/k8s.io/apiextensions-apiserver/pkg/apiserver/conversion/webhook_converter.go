@@ -226,6 +226,7 @@ func getConvertedObjectsFromResponse(expectedUID types.UID, response runtime.Obj
 }
 
 func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) (runtime.Object, error) {
+	ctx := context.TODO()
 	// In general, the webhook should not do any defaulting or validation. A special case of that is an empty object
 	// conversion that must result an empty object and practically is the same as nopConverter.
 	// A smoke test in API machinery calls the converter on empty objects. As this case happens consistently
@@ -258,7 +259,7 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 		return out, nil
 	}
 
-	trace := utiltrace.New("Call conversion webhook",
+	trace := utiltrace.New(ctx, "Call conversion webhook",
 		utiltrace.Field{"custom-resource-definition", c.name},
 		utiltrace.Field{"desired-api-version", desiredAPIVersion},
 		utiltrace.Field{"object-count", objCount},
@@ -266,16 +267,15 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 	// Only log conversion webhook traces that exceed a 8ms per object limit plus a 50ms request overhead allowance.
 	// The per object limit uses the SLO for conversion webhooks (~4ms per object) plus time to serialize/deserialize
 	// the conversion request on the apiserver side (~4ms per object).
-	defer trace.LogIfLong(time.Duration(50+8*objCount) * time.Millisecond)
+	defer trace.LogIfLong(ctx, time.Duration(50+8*objCount)*time.Millisecond)
 
 	// TODO: Figure out if adding one second timeout make sense here.
-	ctx := context.TODO()
 	r := c.restClient.Post().Body(request).Do(ctx)
 	if err := r.Into(response); err != nil {
 		// TODO: Return a webhook specific error to be able to convert it to meta.Status
 		return nil, fmt.Errorf("conversion webhook for %v failed: %v", in.GetObjectKind().GroupVersionKind(), err)
 	}
-	trace.Step("Request completed")
+	trace.Step(ctx, "Request completed")
 
 	convertedObjects, err := getConvertedObjectsFromResponse(requestUID, response)
 	if err != nil {

@@ -52,15 +52,15 @@ type getterFunc func(ctx context.Context, name string, req *http.Request, trace 
 // passed-in getterFunc to perform the actual get.
 func getResourceHandler(scope *RequestScope, getter getterFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		trace := utiltrace.New("Get", traceFields(req)...)
-		defer trace.LogIfLong(500 * time.Millisecond)
+		ctx := req.Context()
+		trace := utiltrace.New(ctx, "Get", traceFields(req)...)
+		defer trace.LogIfLong(ctx, 500*time.Millisecond)
 
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
 			scope.err(err, w, req)
 			return
 		}
-		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
 
 		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
@@ -75,8 +75,8 @@ func getResourceHandler(scope *RequestScope, getter getterFunc) http.HandlerFunc
 			return
 		}
 
-		trace.Step("About to write a response")
-		defer trace.Step("Writing http response done")
+		trace.Step(ctx, "About to write a response")
+		defer trace.Step(ctx, "Writing http response done")
 		transformResponseObject(ctx, scope, trace, req, w, http.StatusOK, outputMediaType, result)
 	}
 }
@@ -105,7 +105,7 @@ func GetResource(r rest.Getter, scope *RequestScope) http.HandlerFunc {
 				}
 			}
 			if trace != nil {
-				trace.Step("About to Get from storage")
+				trace.Step(ctx, "About to Get from storage")
 			}
 			return r.Get(ctx, name, &options)
 		})
@@ -116,13 +116,13 @@ func GetResourceWithOptions(r rest.GetterWithOptions, scope *RequestScope, isSub
 	return getResourceHandler(scope,
 		func(ctx context.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error) {
 			opts, subpath, subpathKey := r.NewGetOptions()
-			trace.Step("About to process Get options")
+			trace.Step(ctx, "About to process Get options")
 			if err := getRequestOptions(req, scope, opts, subpath, subpathKey, isSubresource); err != nil {
 				err = errors.NewBadRequest(err.Error())
 				return nil, err
 			}
 			if trace != nil {
-				trace.Step("About to Get from storage")
+				trace.Step(ctx, "About to Get from storage")
 			}
 			return r.Get(ctx, name, opts)
 		})
@@ -168,8 +168,9 @@ func getRequestOptions(req *http.Request, scope *RequestScope, into runtime.Obje
 
 func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatch bool, minRequestTimeout time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
 		// For performance tracking purposes.
-		trace := utiltrace.New("List", traceFields(req)...)
+		trace := utiltrace.New(ctx, "List", traceFields(req)...)
 
 		namespace, err := scope.Namer.Namespace(req)
 		if err != nil {
@@ -185,7 +186,6 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 			hasName = false
 		}
 
-		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
 
 		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
@@ -273,15 +273,15 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 		}
 
 		// Log only long List requests (ignore Watch).
-		defer trace.LogIfLong(500 * time.Millisecond)
-		trace.Step("About to List from storage")
+		defer trace.LogIfLong(ctx, 500*time.Millisecond)
+		trace.Step(ctx, "About to List from storage")
 		result, err := r.List(ctx, &opts)
 		if err != nil {
 			scope.err(err, w, req)
 			return
 		}
-		trace.Step("Listing from storage done")
-		defer trace.Step("Writing http response done", utiltrace.Field{"count", meta.LenList(result)})
+		trace.Step(ctx, "Listing from storage done")
+		defer trace.Step(ctx, "Writing http response done", utiltrace.Field{"count", meta.LenList(result)})
 		transformResponseObject(ctx, scope, trace, req, w, http.StatusOK, outputMediaType, result)
 	}
 }

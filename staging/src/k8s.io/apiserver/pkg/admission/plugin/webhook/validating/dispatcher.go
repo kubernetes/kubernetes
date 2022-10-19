@@ -232,14 +232,14 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWeb
 	if err != nil {
 		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("could not get REST client: %w", err), Status: apierrors.NewBadRequest("error getting REST client")}
 	}
-	trace := utiltrace.New("Call validating webhook",
+	trace := utiltrace.New(ctx, "Call validating webhook",
 		utiltrace.Field{"configuration", invocation.Webhook.GetConfigurationName()},
 		utiltrace.Field{"webhook", h.Name},
 		utiltrace.Field{"resource", attr.GetResource()},
 		utiltrace.Field{"subresource", attr.GetSubresource()},
 		utiltrace.Field{"operation", attr.GetOperation()},
 		utiltrace.Field{"UID", uid})
-	defer trace.LogIfLong(500 * time.Millisecond)
+	defer trace.LogIfLong(ctx, 500*time.Millisecond)
 
 	// if the webhook has a specific timeout, wrap the context to apply it
 	if h.TimeoutSeconds != nil {
@@ -278,7 +278,7 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWeb
 		}
 		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("failed to call webhook: %w", err), Status: status}
 	}
-	trace.Step("Request completed")
+	trace.Step(ctx, "Request completed")
 
 	result, err := webhookrequest.VerifyAdmissionResponse(uid, false, response)
 	if err != nil {

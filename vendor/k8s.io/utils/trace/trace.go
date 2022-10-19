@@ -130,14 +130,14 @@ func (t *Trace) writeItem(b *bytes.Buffer, formatter string, startTime time.Time
 
 // New creates a Trace with the specified name. The name identifies the operation to be traced. The
 // Fields add key value pairs to provide additional details about the trace, such as operation inputs.
-func New(name string, fields ...Field) *Trace {
+func New(_ context.Context, name string, fields ...Field) *Trace {
 	return &Trace{name: name, startTime: time.Now(), fields: fields}
 }
 
 // Step adds a new step with a specific message. Call this at the end of an execution step to record
 // how long it took. The Fields add key value pairs to provide additional details about the trace
 // step.
-func (t *Trace) Step(msg string, fields ...Field) {
+func (t *Trace) Step(_ context.Context, msg string, fields ...Field) {
 	if t.traceItems == nil {
 		// traces almost always have less than 6 steps, do this to avoid more than a single allocation
 		t.traceItems = make([]traceItem, 0, 6)
@@ -149,8 +149,8 @@ func (t *Trace) Step(msg string, fields ...Field) {
 // As a convenience, if the receiver is nil, returns a top level trace. This allows
 // one to call FromContext(ctx).Nest without having to check if the trace
 // in the context is nil.
-func (t *Trace) Nest(msg string, fields ...Field) *Trace {
-	newTrace := New(msg, fields...)
+func (t *Trace) Nest(ctx context.Context, msg string, fields ...Field) *Trace {
+	newTrace := New(ctx, msg, fields...)
 	if t != nil {
 		newTrace.parentTrace = t
 		t.traceItems = append(t.traceItems, newTrace)
@@ -161,7 +161,7 @@ func (t *Trace) Nest(msg string, fields ...Field) *Trace {
 // Log is used to dump all the steps in the Trace. It also logs the nested trace messages using indentation.
 // If the Trace is nested it is not immediately logged. Instead, it is logged when the trace it is nested within
 // is logged.
-func (t *Trace) Log() {
+func (t *Trace) Log(_ context.Context) {
 	endTime := time.Now()
 	t.endTime = &endTime
 	// an explicit logging request should dump all the steps out at the higher level
@@ -177,9 +177,9 @@ func (t *Trace) Log() {
 // their own threshold.
 // If the Trace is nested it is not immediately logged. Instead, it is logged when the trace it
 // is nested within is logged.
-func (t *Trace) LogIfLong(threshold time.Duration) {
+func (t *Trace) LogIfLong(ctx context.Context, threshold time.Duration) {
 	t.threshold = &threshold
-	t.Log()
+	t.Log(ctx)
 }
 
 // logTopLevelTraces finds all traces in a hierarchy of nested traces that should be logged but do not have any

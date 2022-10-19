@@ -17,6 +17,7 @@ limitations under the License.
 package cacher
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"sort"
@@ -425,6 +426,7 @@ func (w *watchCache) List() []interface{} {
 // NOTE: This function acquired lock and doesn't release it.
 // You HAVE TO explicitly call w.RUnlock() after this function.
 func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *utiltrace.Trace) error {
+	ctx := context.Background()
 	startTime := w.clock.Now()
 
 	// In case resourceVersion is 0, we accept arbitrarily stale result.
@@ -450,7 +452,7 @@ func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *utilt
 
 	w.RLock()
 	if trace != nil {
-		trace.Step("watchCache locked acquired")
+		trace.Step(ctx, "watchCache locked acquired")
 	}
 	for w.resourceVersion < resourceVersion {
 		if w.clock.Since(startTime) >= blockTimeout {
@@ -460,7 +462,7 @@ func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *utilt
 		w.cond.Wait()
 	}
 	if trace != nil {
-		trace.Step("watchCache fresh enough")
+		trace.Step(ctx, "watchCache fresh enough")
 	}
 	return nil
 }

@@ -669,15 +669,15 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		return c.storage.GetList(ctx, key, opts, listObj)
 	}
 
-	trace := utiltrace.New("cacher list",
+	trace := utiltrace.New(ctx, "cacher list",
 		utiltrace.Field{Key: "audit-id", Value: endpointsrequest.GetAuditIDTruncated(ctx)},
 		utiltrace.Field{Key: "type", Value: c.groupResource.String()})
-	defer trace.LogIfLong(500 * time.Millisecond)
+	defer trace.LogIfLong(ctx, 500*time.Millisecond)
 
 	if err := c.ready.wait(); err != nil {
 		return errors.NewServiceUnavailable(err.Error())
 	}
-	trace.Step("Ready")
+	trace.Step(ctx, "Ready")
 
 	// List elements with at least 'listRV' from cache.
 	listPtr, err := meta.GetItemsPtr(listObj)
@@ -697,12 +697,12 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	if err != nil {
 		return err
 	}
-	trace.Step("Listed items from cache", utiltrace.Field{Key: "count", Value: len(objs)})
+	trace.Step(ctx, "Listed items from cache", utiltrace.Field{Key: "count", Value: len(objs)})
 	if len(objs) > listVal.Cap() && pred.Label.Empty() && pred.Field.Empty() {
 		// Resize the slice appropriately, since we already know that none
 		// of the elements will be filtered out.
 		listVal.Set(reflect.MakeSlice(reflect.SliceOf(c.objectType.Elem()), 0, len(objs)))
-		trace.Step("Resized result")
+		trace.Step(ctx, "Resized result")
 	}
 	for _, obj := range objs {
 		elem, ok := obj.(*storeElement)
@@ -713,7 +713,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object).Elem()))
 		}
 	}
-	trace.Step("Filtered items", utiltrace.Field{Key: "count", Value: listVal.Len()})
+	trace.Step(ctx, "Filtered items", utiltrace.Field{Key: "count", Value: listVal.Len()})
 	if c.versioner != nil {
 		if err := c.versioner.UpdateList(listObj, readResourceVersion, "", nil); err != nil {
 			return err

@@ -355,11 +355,12 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 // list simply lists all items and records a resource version obtained from the server at the moment of the call.
 // the resource version can be used for further progress notification (aka. watch).
 func (r *Reflector) list(stopCh <-chan struct{}) error {
+	ctx := context.Background()
 	var resourceVersion string
 	options := metav1.ListOptions{ResourceVersion: r.relistResourceVersion()}
 
-	initTrace := trace.New("Reflector ListAndWatch", trace.Field{Key: "name", Value: r.name})
-	defer initTrace.LogIfLong(10 * time.Second)
+	initTrace := trace.New(ctx, "Reflector ListAndWatch", trace.Field{Key: "name", Value: r.name})
+	defer initTrace.LogIfLong(ctx, 10*time.Second)
 	var list runtime.Object
 	var paginatedResult bool
 	var err error
@@ -419,7 +420,7 @@ func (r *Reflector) list(stopCh <-chan struct{}) error {
 		panic(r)
 	case <-listCh:
 	}
-	initTrace.Step("Objects listed", trace.Field{Key: "error", Value: err})
+	initTrace.Step(ctx, "Objects listed", trace.Field{Key: "error", Value: err})
 	if err != nil {
 		klog.Warningf("%s: failed to list %v: %v", r.name, r.expectedTypeName, err)
 		return fmt.Errorf("failed to list %v: %w", r.expectedTypeName, err)
@@ -445,18 +446,18 @@ func (r *Reflector) list(stopCh <-chan struct{}) error {
 		return fmt.Errorf("unable to understand list result %#v: %v", list, err)
 	}
 	resourceVersion = listMetaInterface.GetResourceVersion()
-	initTrace.Step("Resource version extracted")
+	initTrace.Step(ctx, "Resource version extracted")
 	items, err := meta.ExtractList(list)
 	if err != nil {
 		return fmt.Errorf("unable to understand list result %#v (%v)", list, err)
 	}
-	initTrace.Step("Objects extracted")
+	initTrace.Step(ctx, "Objects extracted")
 	if err := r.syncWith(items, resourceVersion); err != nil {
 		return fmt.Errorf("unable to sync list result: %v", err)
 	}
-	initTrace.Step("SyncWith done")
+	initTrace.Step(ctx, "SyncWith done")
 	r.setLastSyncResourceVersion(resourceVersion)
-	initTrace.Step("Resource version updated")
+	initTrace.Step(ctx, "Resource version updated")
 	return nil
 }
 

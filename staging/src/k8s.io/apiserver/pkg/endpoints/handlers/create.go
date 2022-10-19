@@ -50,9 +50,10 @@ var namespaceGVR = schema.GroupVersionResource{Group: "", Version: "v1", Resourc
 
 func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Interface, includeName bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
 		// For performance tracking purposes.
-		trace := utiltrace.New("Create", traceFields(req)...)
-		defer trace.LogIfLong(500 * time.Millisecond)
+		trace := utiltrace.New(ctx, "Create", traceFields(req)...)
+		defer trace.LogIfLong(ctx, 500*time.Millisecond)
 
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
@@ -72,7 +73,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 
 		// enforce a timeout of at most requestTimeoutUpperBound (34s) or less if the user-provided
 		// timeout inside the parent context is lower than requestTimeoutUpperBound.
-		ctx, cancel := context.WithTimeout(req.Context(), requestTimeoutUpperBound)
+		ctx, cancel := context.WithTimeout(ctx, requestTimeoutUpperBound)
 		defer cancel()
 		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
 		if err != nil {
@@ -88,7 +89,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		}
 
 		body, err := limitedReadBodyWithRecordMetric(ctx, req, scope.MaxRequestBodyBytes, scope.Resource.GroupResource().String(), requestmetrics.Create)
-		trace.Step("limitedReadBody done", utiltrace.Field{"len", len(body)}, utiltrace.Field{"err", err})
+		trace.Step(ctx, "limitedReadBody done", utiltrace.Field{"len", len(body)}, utiltrace.Field{"err", err})
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -118,7 +119,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		}
 
 		decoder := scope.Serializer.DecoderToVersion(decodeSerializer, scope.HubGroupVersion)
-		trace.Step("About to convert to expected version")
+		trace.Step(ctx, "About to convert to expected version")
 		obj, gvk, err := decoder.Decode(body, &defaultGVK, original)
 		if err != nil {
 			strictError, isStrictError := runtime.AsStrictDecodingError(err)
@@ -141,7 +142,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			scope.err(err, w, req)
 			return
 		}
-		trace.Step("Conversion done")
+		trace.Step(ctx, "Conversion done")
 
 		// On create, get name from new object if unset
 		if len(name) == 0 {
@@ -168,7 +169,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			}
 		}
 
-		trace.Step("About to store object in database")
+		trace.Step(ctx, "About to store object in database")
 		admissionAttributes := admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, options, dryrun.IsDryRun(options.DryRun), userInfo)
 		requestFunc := func() (runtime.Object, error) {
 			return r.Create(
@@ -208,7 +209,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			}
 			return result, err
 		})
-		trace.Step("Write to database call finished", utiltrace.Field{"len", len(body)}, utiltrace.Field{"err", err})
+		trace.Step(ctx, "Write to database call finished", utiltrace.Field{"len", len(body)}, utiltrace.Field{"err", err})
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -220,8 +221,8 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			status.Code = int32(code)
 		}
 
-		trace.Step("About to write a response")
-		defer trace.Step("Writing http response done")
+		trace.Step(ctx, "About to write a response")
+		defer trace.Step(ctx, "Writing http response done")
 		transformResponseObject(ctx, scope, trace, req, w, code, outputMediaType, result)
 	}
 }

@@ -239,8 +239,8 @@ func (d *dialerCreator) createDialer() utilnet.DialFunc {
 		return directDialer
 	}
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
-		trace := utiltrace.New(fmt.Sprintf("Proxy via %s protocol over %s", d.options.protocol, d.options.transport), utiltrace.Field{Key: "address", Value: addr})
-		defer trace.LogIfLong(500 * time.Millisecond)
+		trace := utiltrace.New(ctx, fmt.Sprintf("Proxy via %s protocol over %s", d.options.protocol, d.options.transport), utiltrace.Field{Key: "address", Value: addr})
+		defer trace.LogIfLong(ctx, 500*time.Millisecond)
 		start := egressmetrics.Metrics.Clock().Now()
 		proxier, err := d.connector.connect(ctx)
 		if err != nil {

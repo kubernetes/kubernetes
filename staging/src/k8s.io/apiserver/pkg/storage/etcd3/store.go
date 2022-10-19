@@ -152,22 +152,22 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 
 // Create implements storage.Interface.Create.
 func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
-	trace := utiltrace.New("Create etcd3",
+	trace := utiltrace.New(ctx, "Create etcd3",
 		utiltrace.Field{Key: "audit-id", Value: endpointsrequest.GetAuditIDTruncated(ctx)},
 		utiltrace.Field{Key: "key", Value: key},
 		utiltrace.Field{Key: "type", Value: getTypeName(obj)},
 		utiltrace.Field{Key: "resource", Value: s.groupResourceString},
 	)
-	defer trace.LogIfLong(500 * time.Millisecond)
+	defer trace.LogIfLong(ctx, 500*time.Millisecond)
 	if version, err := s.versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
 		return errors.New("resourceVersion should not be set on objects to be created")
 	}
 	if err := s.versioner.PrepareObjectForStorage(obj); err != nil {
 		return fmt.Errorf("PrepareObjectForStorage failed: %v", err)
 	}
-	trace.Step("About to Encode")
+	trace.Step(ctx, "About to Encode")
 	data, err := runtime.Encode(s.codec, obj)
-	trace.Step("Encode finished", utiltrace.Field{Key: "len", Value: len(data)}, utiltrace.Field{Key: "err", Value: err})
+	trace.Step(ctx, "Encode finished", utiltrace.Field{Key: "len", Value: len(data)}, utiltrace.Field{Key: "err", Value: err})
 	if err != nil {
 		return err
 	}
@@ -179,7 +179,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	}
 
 	newData, err := s.transformer.TransformToStorage(ctx, data, authenticatedDataString(key))
-	trace.Step("TransformToStorage finished", utiltrace.Field{Key: "err", Value: err})
+	trace.Step(ctx, "TransformToStorage finished", utiltrace.Field{Key: "err", Value: err})
 	if err != nil {
 		return storage.NewInternalError(err.Error())
 	}
@@ -191,7 +191,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 		clientv3.OpPut(key, string(newData), opts...),
 	).Commit()
 	metrics.RecordEtcdRequestLatency("create", s.groupResourceString, startTime)
-	trace.Step("Txn call finished", utiltrace.Field{Key: "err", Value: err})
+	trace.Step(ctx, "Txn call finished", utiltrace.Field{Key: "err", Value: err})
 	if err != nil {
 		return err
 	}
@@ -203,7 +203,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	if out != nil {
 		putResp := txnResp.Responses[0].GetResponsePut()
 		err = decode(s.codec, s.versioner, data, out, putResp.Header.Revision)
-		trace.Step("decode finished", utiltrace.Field{Key: "len", Value: len(data)}, utiltrace.Field{Key: "err", Value: err})
+		trace.Step(ctx, "decode finished", utiltrace.Field{Key: "len", Value: len(data)}, utiltrace.Field{Key: "err", Value: err})
 		return err
 	}
 	return nil
@@ -331,12 +331,12 @@ func (s *store) conditionalDelete(
 func (s *store) GuaranteedUpdate(
 	ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
 	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
-	trace := utiltrace.New("GuaranteedUpdate etcd3",
+	trace := utiltrace.New(ctx, "GuaranteedUpdate etcd3",
 		utiltrace.Field{Key: "audit-id", Value: endpointsrequest.GetAuditIDTruncated(ctx)},
 		utiltrace.Field{Key: "key", Value: key},
 		utiltrace.Field{Key: "type", Value: getTypeName(destination)},
 		utiltrace.Field{Key: "resource", Value: s.groupResourceString})
-	defer trace.LogIfLong(500 * time.Millisecond)
+	defer trace.LogIfLong(ctx, 500*time.Millisecond)
 
 	v, err := conversion.EnforcePtr(destination)
 	if err != nil {
@@ -365,7 +365,7 @@ func (s *store) GuaranteedUpdate(
 	if err != nil {
 		return err
 	}
-	trace.Step("initial value restored")
+	trace.Step(ctx, "initial value restored")
 
 	transformContext := authenticatedDataString(key)
 	for {
@@ -414,9 +414,9 @@ func (s *store) GuaranteedUpdate(
 			continue
 		}
 
-		trace.Step("About to Encode")
+		trace.Step(ctx, "About to Encode")
 		data, err := runtime.Encode(s.codec, ret)
-		trace.Step("Encode finished", utiltrace.Field{Key: "len", Value: len(data)}, utiltrace.Field{Key: "err", Value: err})
+		trace.Step(ctx, "Encode finished", utiltrace.Field{Key: "len", Value: len(data)}, utiltrace.Field{Key: "err", Value: err})
 		if err != nil {
 			return err
 		}
@@ -442,7 +442,7 @@ func (s *store) GuaranteedUpdate(
 		}
 
 		newData, err := s.transformer.TransformToStorage(ctx, data, transformContext)
-		trace.Step("TransformToStorage finished", utiltrace.Field{Key: "err", Value: err})
+		trace.Step(ctx, "TransformToStorage finished", utiltrace.Field{Key: "err", Value: err})
 		if err != nil {
 			return storage.NewInternalError(err.Error())
 		}
@@ -451,7 +451,7 @@ func (s *store) GuaranteedUpdate(
 		if err != nil {
 			return err
 		}
-		trace.Step("Transaction prepared")
+		trace.Step(ctx, "Transaction prepared")
 
 		startTime := time.Now()
 		txnResp, err := s.client.KV.Txn(ctx).If(
@@ -462,11 +462,11 @@ func (s *store) GuaranteedUpdate(
 			clientv3.OpGet(key),
 		).Commit()
 		metrics.RecordEtcdRequestLatency("update", s.groupResourceString, startTime)
-		trace.Step("Txn call finished", utiltrace.Field{Key: "err", Value: err})
+		trace.Step(ctx, "Txn call finished", utiltrace.Field{Key: "err", Value: err})
 		if err != nil {
 			return err
 		}
-		trace.Step("Transaction committed")
+		trace.Step(ctx, "Transaction committed")
 		if !txnResp.Succeeded {
 			getResp := (*clientv3.GetResponse)(txnResp.Responses[0].GetResponseRange())
 			klog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", key)
@@ -474,14 +474,14 @@ func (s *store) GuaranteedUpdate(
 			if err != nil {
 				return err
 			}
-			trace.Step("Retry value restored")
+			trace.Step(ctx, "Retry value restored")
 			origStateIsCurrent = true
 			continue
 		}
 		putResp := txnResp.Responses[0].GetResponsePut()
 
 		err = decode(s.codec, s.versioner, data, destination, putResp.Header.Revision)
-		trace.Step("decode finished", utiltrace.Field{Key: "len", Value: len(data)}, utiltrace.Field{Key: "err", Value: err})
+		trace.Step(ctx, "decode finished", utiltrace.Field{Key: "len", Value: len(data)}, utiltrace.Field{Key: "err", Value: err})
 		return err
 	}
 }
@@ -528,14 +528,14 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	resourceVersion := opts.ResourceVersion
 	match := opts.ResourceVersionMatch
 	pred := opts.Predicate
-	trace := utiltrace.New(fmt.Sprintf("List(recursive=%v) etcd3", recursive),
+	trace := utiltrace.New(ctx, fmt.Sprintf("List(recursive=%v) etcd3", recursive),
 		utiltrace.Field{Key: "audit-id", Value: endpointsrequest.GetAuditIDTruncated(ctx)},
 		utiltrace.Field{Key: "key", Value: key},
 		utiltrace.Field{Key: "resourceVersion", Value: resourceVersion},
 		utiltrace.Field{Key: "resourceVersionMatch", Value: match},
 		utiltrace.Field{Key: "limit", Value: pred.Limit},
 		utiltrace.Field{Key: "continue", Value: pred.Continue})
-	defer trace.LogIfLong(500 * time.Millisecond)
+	defer trace.LogIfLong(ctx, 500*time.Millisecond)
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err

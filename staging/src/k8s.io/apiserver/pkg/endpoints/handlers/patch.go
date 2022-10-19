@@ -61,9 +61,10 @@ const (
 // PatchResource returns a function that will handle a resource patch.
 func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interface, patchTypes []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
 		// For performance tracking purposes.
-		trace := utiltrace.New("Patch", traceFields(req)...)
-		defer trace.LogIfLong(500 * time.Millisecond)
+		trace := utiltrace.New(ctx, "Patch", traceFields(req)...)
+		defer trace.LogIfLong(ctx, 500*time.Millisecond)
 
 		// Do this first, otherwise name extraction can fail for unrecognized content types
 		// TODO: handle this in negotiation
@@ -88,7 +89,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 
 		// enforce a timeout of at most requestTimeoutUpperBound (34s) or less if the user-provided
 		// timeout inside the parent context is lower than requestTimeoutUpperBound.
-		ctx, cancel := context.WithTimeout(req.Context(), requestTimeoutUpperBound)
+		ctx, cancel := context.WithTimeout(ctx, requestTimeoutUpperBound)
 		defer cancel()
 
 		ctx = request.WithNamespace(ctx, namespace)
@@ -100,7 +101,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 		}
 
 		patchBytes, err := limitedReadBodyWithRecordMetric(ctx, req, scope.MaxRequestBodyBytes, scope.Resource.GroupResource().String(), requestmetrics.Patch)
-		trace.Step("limitedReadBody done", utiltrace.Field{"len", len(patchBytes)}, utiltrace.Field{"err", err})
+		trace.Step(ctx, "limitedReadBody done", utiltrace.Field{"len", len(patchBytes)}, utiltrace.Field{"err", err})
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -122,7 +123,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 		admit = admission.WithAudit(admit)
 
 		audit.LogRequestPatch(req.Context(), patchBytes)
-		trace.Step("Recorded the audit event")
+		trace.Step(ctx, "Recorded the audit event")
 
 		baseContentType := runtime.ContentTypeJSON
 		if patchType == types.ApplyPatchType {
@@ -228,15 +229,15 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			scope.err(err, w, req)
 			return
 		}
-		trace.Step("Object stored in database")
+		trace.Step(ctx, "Object stored in database")
 
 		status := http.StatusOK
 		if wasCreated {
 			status = http.StatusCreated
 		}
 
-		trace.Step("About to write a response")
-		defer trace.Step("Writing http response done")
+		trace.Step(ctx, "About to write a response")
+		defer trace.Step(ctx, "Writing http response done")
 		transformResponseObject(ctx, scope, trace, req, w, status, outputMediaType, result)
 	}
 }
@@ -544,7 +545,7 @@ func strategicPatchObject(
 // TODO: rename this function because the name implies it is related to applyPatcher
 func (p *patcher) applyPatch(ctx context.Context, _, currentObject runtime.Object) (objToUpdate runtime.Object, patchErr error) {
 	// Make sure we actually have a persisted currentObject
-	p.trace.Step("About to apply patch")
+	p.trace.Step(ctx, "About to apply patch")
 	currentObjectHasUID, err := hasUID(currentObject)
 	if err != nil {
 		return nil, err
@@ -593,7 +594,7 @@ func (p *patcher) admissionAttributes(ctx context.Context, updatedObject runtime
 // and is given the currently persisted object and the patched object as input.
 // TODO: rename this function because the name implies it is related to applyPatcher
 func (p *patcher) applyAdmission(ctx context.Context, patchedObject runtime.Object, currentObject runtime.Object) (runtime.Object, error) {
-	p.trace.Step("About to check admission control")
+	p.trace.Step(ctx, "About to check admission control")
 	var operation admission.Operation
 	var options runtime.Object
 	if hasUID, err := hasUID(currentObject); err != nil {

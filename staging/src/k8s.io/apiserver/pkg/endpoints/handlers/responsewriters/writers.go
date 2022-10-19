@@ -18,6 +18,7 @@ package responsewriters
 
 import (
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -87,14 +88,15 @@ func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSe
 // The context is optional and can be nil. This method will perform optional content compression if requested by
 // a client and the feature gate for APIResponseCompression is enabled.
 func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
-	trace := utiltrace.New("SerializeObject",
-		utiltrace.Field{"audit-id", request.GetAuditIDTruncated(req.Context())},
+	ctx := req.Context()
+	trace := utiltrace.New(ctx, "SerializeObject",
+		utiltrace.Field{"audit-id", request.GetAuditIDTruncated(ctx)},
 		utiltrace.Field{"method", req.Method},
 		utiltrace.Field{"url", req.URL.Path},
 		utiltrace.Field{"protocol", req.Proto},
 		utiltrace.Field{"mediaType", mediaType},
 		utiltrace.Field{"encoder", encoder.Identifier()})
-	defer trace.LogIfLong(5 * time.Second)
+	defer trace.LogIfLong(ctx, 5*time.Second)
 
 	w := &deferredResponseWriter{
 		mediaType:       mediaType,
@@ -102,6 +104,7 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 		contentEncoding: negotiateContentEncoding(req),
 		hw:              hw,
 		trace:           trace,
+		ctx:             ctx,
 	}
 
 	err := encoder.Encode(object, w)
@@ -191,17 +194,18 @@ type deferredResponseWriter struct {
 	hw         http.ResponseWriter
 	w          io.Writer
 
+	ctx   context.Context
 	trace *utiltrace.Trace
 }
 
 func (w *deferredResponseWriter) Write(p []byte) (n int, err error) {
 	if w.trace != nil {
 		// This Step usually wraps in-memory object serialization.
-		w.trace.Step("About to start writing response", utiltrace.Field{"size", len(p)})
+		w.trace.Step(w.ctx, "About to start writing response", utiltrace.Field{"size", len(p)})
 
 		firstWrite := !w.hasWritten
 		defer func() {
-			w.trace.Step("Write call finished",
+			w.trace.Step(w.ctx, "Write call finished",
 				utiltrace.Field{"writer", fmt.Sprintf("%T", w.w)},
 				utiltrace.Field{"size", len(p)},
 				utiltrace.Field{"firstWrite", firstWrite},

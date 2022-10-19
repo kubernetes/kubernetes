@@ -47,9 +47,10 @@ import (
 // UpdateResource returns a function that will handle a resource update
 func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
 		// For performance tracking purposes.
-		trace := utiltrace.New("Update", traceFields(req)...)
-		defer trace.LogIfLong(500 * time.Millisecond)
+		trace := utiltrace.New(ctx, "Update", traceFields(req)...)
+		defer trace.LogIfLong(ctx, 500*time.Millisecond)
 
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
@@ -59,7 +60,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 
 		// enforce a timeout of at most requestTimeoutUpperBound (34s) or less if the user-provided
 		// timeout inside the parent context is lower than requestTimeoutUpperBound.
-		ctx, cancel := context.WithTimeout(req.Context(), requestTimeoutUpperBound)
+		ctx, cancel := context.WithTimeout(ctx, requestTimeoutUpperBound)
 		defer cancel()
 
 		ctx = request.WithNamespace(ctx, namespace)
@@ -71,7 +72,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 		}
 
 		body, err := limitedReadBodyWithRecordMetric(ctx, req, scope.MaxRequestBodyBytes, scope.Resource.GroupResource().String(), requestmetrics.Update)
-		trace.Step("limitedReadBody done", utiltrace.Field{"len", len(body)}, utiltrace.Field{"err", err})
+		trace.Step(ctx, "limitedReadBody done", utiltrace.Field{"len", len(body)}, utiltrace.Field{"err", err})
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -105,7 +106,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 		}
 
 		decoder := scope.Serializer.DecoderToVersion(decodeSerializer, scope.HubGroupVersion)
-		trace.Step("About to convert to expected version")
+		trace.Step(ctx, "About to convert to expected version")
 		obj, gvk, err := decoder.Decode(body, &defaultGVK, original)
 		if err != nil {
 			strictError, isStrictError := runtime.AsStrictDecodingError(err)
@@ -128,7 +129,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			scope.err(err, w, req)
 			return
 		}
-		trace.Step("Conversion done")
+		trace.Step(ctx, "Conversion done")
 
 		audit.LogRequestObject(req.Context(), obj, objGV, scope.Resource, scope.Subresource, scope.Serializer)
 		admit = admission.WithAudit(admit)
@@ -207,7 +208,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			Name:            name,
 		}
 
-		trace.Step("About to store object in database")
+		trace.Step(ctx, "About to store object in database")
 		wasCreated := false
 		requestFunc := func() (runtime.Object, error) {
 			obj, created, err := r.Update(
@@ -242,7 +243,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			}
 			return result, err
 		})
-		trace.Step("Write to database call finished", utiltrace.Field{"len", len(body)}, utiltrace.Field{"err", err})
+		trace.Step(ctx, "Write to database call finished", utiltrace.Field{"len", len(body)}, utiltrace.Field{"err", err})
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -253,8 +254,8 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			status = http.StatusCreated
 		}
 
-		trace.Step("About to write a response")
-		defer trace.Step("Writing http response done")
+		trace.Step(ctx, "About to write a response")
+		defer trace.Step(ctx, "Writing http response done")
 		transformResponseObject(ctx, scope, trace, req, w, status, outputMediaType, result)
 	}
 }

@@ -121,19 +121,20 @@ func (b *backend) ProcessEvents(ev ...*auditinternal.Event) bool {
 }
 
 func (b *backend) processEvents(ev ...*auditinternal.Event) error {
+	ctx := context.Background()
 	var list auditinternal.EventList
 	for _, e := range ev {
 		list.Items = append(list.Items, *e)
 	}
-	return b.w.WithExponentialBackoff(context.Background(), func() rest.Result {
-		trace := utiltrace.New("Call Audit Events webhook",
+	return b.w.WithExponentialBackoff(ctx, func() rest.Result {
+		trace := utiltrace.New(ctx, "Call Audit Events webhook",
 			utiltrace.Field{"name", b.name},
 			utiltrace.Field{"event-count", len(list.Items)})
 		// Only log audit webhook traces that exceed a 25ms per object limit plus a 50ms
 		// request overhead allowance. The high per object limit used here is primarily to
 		// allow enough time for the serialization/deserialization of audit events, which
 		// contain nested request and response objects plus additional event fields.
-		defer trace.LogIfLong(time.Duration(50+25*len(list.Items)) * time.Millisecond)
+		defer trace.LogIfLong(ctx, time.Duration(50+25*len(list.Items))*time.Millisecond)
 		return b.w.RestClient.Post().Body(&list).Do(context.TODO())
 	}).Error()
 }

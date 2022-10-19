@@ -17,6 +17,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -96,6 +97,7 @@ func (s *volumeStatCalculator) GetLatest() (PodVolumeStats, bool) {
 // calcAndStoreStats calculates PodVolumeStats for a given pod and writes the result to the s.latest cache.
 // If the pod references PVCs, the prometheus metrics for those are updated with the result.
 func (s *volumeStatCalculator) calcAndStoreStats() {
+	ctx := context.Background()
 	// Find all Volumes for the Pod
 	volumes, found := s.statsProvider.ListVolumesForPod(s.pod.UID)
 	blockVolumes, bvFound := s.statsProvider.ListBlockVolumesForPod(s.pod.UID)
@@ -135,8 +137,8 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 	var persistentStats []stats.VolumeStats
 	for name, v := range metricVolumes {
 		metric, err := func() (*volume.Metrics, error) {
-			trace := utiltrace.New(fmt.Sprintf("Calculate volume metrics of %v for pod %v/%v", name, s.pod.Namespace, s.pod.Name))
-			defer trace.LogIfLong(1 * time.Second)
+			trace := utiltrace.New(ctx, fmt.Sprintf("Calculate volume metrics of %v for pod %v/%v", name, s.pod.Namespace, s.pod.Name))
+			defer trace.LogIfLong(ctx, 1*time.Second)
 			return v.GetMetrics()
 		}()
 		if err != nil {
