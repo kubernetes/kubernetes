@@ -42,6 +42,10 @@ func setupController(clientset kubernetes.Interface) {
 	informerFactory.Start(nil)
 }
 
+// Test_StorageVersionUpdatedWithAllEncodingVersionsEqualOnLeaseDeletion validates that
+// status.serverStorageVersions is updated when a kube-apiserver Lease is deleted.
+// If the remaining Leases agree on a new encoding version, status.commonEncodingVersion
+// should reflect the newly agreed version.
 func Test_StorageVersionUpdatedWithAllEncodingVersionsEqualOnLeaseDeletion(t *testing.T) {
 	lease1 := &coordinationv1.Lease{
 		ObjectMeta: metav1.ObjectMeta{
@@ -160,6 +164,10 @@ func Test_StorageVersionUpdatedWithAllEncodingVersionsEqualOnLeaseDeletion(t *te
 	}
 }
 
+// Test_StorageVersionUpdatedWithDifferentEncodingVersionsOnLeaseDeletion validates that
+// status.serverStorageVersions is updated when a kube-apiserver Lease is deleted.
+// If the remaining Leases do not agree on a new encoding version, status.commonEncodingVersion
+// should remain unchanged.
 func Test_StorageVersionUpdatedWithDifferentEncodingVersionsOnLeaseDeletion(t *testing.T) {
 	lease1 := &coordinationv1.Lease{
 		ObjectMeta: metav1.ObjectMeta{
@@ -261,6 +269,8 @@ func Test_StorageVersionUpdatedWithDifferentEncodingVersionsOnLeaseDeletion(t *t
 	}
 }
 
+// Test_StorageVersionContainsInvalidLeaseID validates that status.serverStorageVersions
+// only contains the holder identity from kube-apiserver Leases that exist.
 func Test_StorageVersionContainsInvalidLeaseID(t *testing.T) {
 	lease1 := &coordinationv1.Lease{
 		ObjectMeta: metav1.ObjectMeta{
@@ -378,6 +388,8 @@ func Test_StorageVersionContainsInvalidLeaseID(t *testing.T) {
 	}
 }
 
+// Test_StorageVersionDeletedOnLeaseDeletion validates that a StorageVersion
+// object is deleted if there are no kube-apiserver Leases.
 func Test_StorageVersionDeletedOnLeaseDeletion(t *testing.T) {
 	lease1 := &coordinationv1.Lease{
 		ObjectMeta: metav1.ObjectMeta{
