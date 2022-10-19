@@ -53,7 +53,7 @@ var LogHTTPRequestHandler = request.NamedHandler{
 }
 
 func logRequest(r *request.Request) {
-	if !r.Config.LogLevel.AtLeast(aws.LogDebug) {
+	if !r.Config.LogLevel.AtLeast(aws.LogDebug) || r.Config.Logger == nil {
 		return
 	}
 
@@ -94,6 +94,10 @@ var LogHTTPRequestHeaderHandler = request.NamedHandler{
 }
 
 func logRequestHeader(r *request.Request) {
+	if !r.Config.LogLevel.AtLeast(aws.LogDebug) || r.Config.Logger == nil {
+		return
+	}
+
 	b, err := httputil.DumpRequestOut(r.HTTPRequest, false)
 	if err != nil {
 		r.Config.Logger.Log(fmt.Sprintf(logReqErrMsg,
@@ -124,7 +128,7 @@ var LogHTTPResponseHandler = request.NamedHandler{
 }
 
 func logResponse(r *request.Request) {
-	if !r.Config.LogLevel.AtLeast(aws.LogDebug) {
+	if !r.Config.LogLevel.AtLeast(aws.LogDebug) || r.Config.Logger == nil {
 		return
 	}
 
@@ -186,7 +190,7 @@ var LogHTTPResponseHeaderHandler = request.NamedHandler{
 }
 
 func logResponseHeader(r *request.Request) {
-	if r.Config.Logger == nil {
+	if !r.Config.LogLevel.AtLeast(aws.LogDebug) || r.Config.Logger == nil {
 		return
 	}
 

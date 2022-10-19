@@ -66,6 +66,18 @@ const (
 
 	// S3 ARN Region Usage
 	s3UseARNRegionKey = "s3_use_arn_region"
+
+	// EC2 IMDS Endpoint Mode
+	ec2MetadataServiceEndpointModeKey = "ec2_metadata_service_endpoint_mode"
+
+	// EC2 IMDS Endpoint
+	ec2MetadataServiceEndpointKey = "ec2_metadata_service_endpoint"
+
+	// Use DualStack Endpoint Resolution
+	useDualStackEndpoint = "use_dualstack_endpoint"
+
+	// Use FIPS Endpoint Resolution
+	useFIPSEndpointKey = "use_fips_endpoint"
 )
 
 // sharedConfig represents the configuration fields of the SDK config files.
@@ -145,6 +157,28 @@ type sharedConfig struct {
 	//
 	// s3_use_arn_region=true
 	S3UseARNRegion bool
+
+	// Specifies the EC2 Instance Metadata Service default endpoint selection mode (IPv4 or IPv6)
+	//
+	// ec2_metadata_service_endpoint_mode=IPv6
+	EC2IMDSEndpointMode endpoints.EC2IMDSEndpointModeState
+
+	// Specifies the EC2 Instance Metadata Service endpoint to use. If specified it overrides EC2IMDSEndpointMode.
+	//
+	// ec2_metadata_service_endpoint=http://fd00:ec2::254
+	EC2IMDSEndpoint string
+
+	// Specifies that SDK clients must resolve a dual-stack endpoint for
+	// services.
+	//
+	// use_dualstack_endpoint=true
+	UseDualStackEndpoint endpoints.DualStackEndpointState
+
+	// Specifies that SDK clients must resolve a FIPS endpoint for
+	// services.
+	//
+	// use_fips_endpoint=true
+	UseFIPSEndpoint endpoints.FIPSEndpointState
 }
 
 type sharedConfigFile struct {
@@ -334,6 +368,16 @@ func (cfg *sharedConfig) setFromIniFile(profile string, file sharedConfigFile, e
 		updateString(&cfg.SSORegion, section, ssoRegionKey)
 		updateString(&cfg.SSORoleName, section, ssoRoleNameKey)
 		updateString(&cfg.SSOStartURL, section, ssoStartURL)
+
+		if err := updateEC2MetadataServiceEndpointMode(&cfg.EC2IMDSEndpointMode, section, ec2MetadataServiceEndpointModeKey); err != nil {
+			return fmt.Errorf("failed to load %s from shared config, %s, %v",
+				ec2MetadataServiceEndpointModeKey, file.Filename, err)
+		}
+		updateString(&cfg.EC2IMDSEndpoint, section, ec2MetadataServiceEndpointKey)
+
+		updateUseDualStackEndpoint(&cfg.UseDualStackEndpoint, section, useDualStackEndpoint)
+
+		updateUseFIPSEndpoint(&cfg.UseFIPSEndpoint, section, useFIPSEndpointKey)
 	}
 
 	updateString(&cfg.CredentialProcess, section, credentialProcessKey)
@@ -362,6 +406,14 @@ func (cfg *sharedConfig) setFromIniFile(profile string, file sharedConfigFile, e
 	updateBool(&cfg.S3UseARNRegion, section, s3UseARNRegionKey)
 
 	return nil
+}
+
+func updateEC2MetadataServiceEndpointMode(endpointMode *endpoints.EC2IMDSEndpointModeState, section ini.Section, key string) error {
+	if !section.Has(key) {
+		return nil
+	}
+	value := section.String(key)
+	return endpointMode.SetFromString(value)
 }
 
 func (cfg *sharedConfig) validateCredentialsConfig(profile string) error {
@@ -642,4 +694,36 @@ func (e CredentialRequiresARNError) OrigErr() error {
 // Error satisfies the error interface.
 func (e CredentialRequiresARNError) Error() string {
 	return awserr.SprintError(e.Code(), e.Message(), "", nil)
+}
+
+// updateEndpointDiscoveryType will only update the dst with the value in the section, if
+// a valid key and corresponding EndpointDiscoveryType is found.
+func updateUseDualStackEndpoint(dst *endpoints.DualStackEndpointState, section ini.Section, key string) {
+	if !section.Has(key) {
+		return
+	}
+
+	if section.Bool(key) {
+		*dst = endpoints.DualStackEndpointStateEnabled
+	} else {
+		*dst = endpoints.DualStackEndpointStateDisabled
+	}
+
+	return
+}
+
+// updateEndpointDiscoveryType will only update the dst with the value in the section, if
+// a valid key and corresponding EndpointDiscoveryType is found.
+func updateUseFIPSEndpoint(dst *endpoints.FIPSEndpointState, section ini.Section, key string) {
+	if !section.Has(key) {
+		return
+	}
+
+	if section.Bool(key) {
+		*dst = endpoints.FIPSEndpointStateEnabled
+	} else {
+		*dst = endpoints.FIPSEndpointStateDisabled
+	}
+
+	return
 }
