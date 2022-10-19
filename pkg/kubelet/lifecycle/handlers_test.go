@@ -19,7 +19,9 @@ package lifecycle
 import (
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
@@ -743,5 +745,74 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 	}
 	if fakeHTTPGetter.url != "http://foo:8080/bar" {
 		t.Errorf("unexpected url: %s", fakeHTTPGetter.url)
+	}
+}
+
+func TestRunHandlerHttpsFailureFallback(t *testing.T) {
+	var actualHeaders http.Header
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		actualHeaders = r.Header.Clone()
+	}))
+	defer srv.Close()
+	_, port, err := net.SplitHostPort(srv.Listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fakePodStatusProvider := stubPodStatusProvider("127.0.0.1")
+
+	handlerRunner := NewHandlerRunner(srv.Client(), &fakeContainerCommandRunner{}, fakePodStatusProvider).(*handlerRunner)
+
+	containerName := "containerFoo"
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
+	container := v1.Container{
+		Name: containerName,
+		Lifecycle: &v1.Lifecycle{
+			PostStart: &v1.LifecycleHandler{
+				HTTPGet: &v1.HTTPGetAction{
+					// set the scheme to https to ensure it falls back to HTTP.
+					Scheme: "https",
+					Host:   "127.0.0.1",
+					Port:   intstr.FromString(port),
+					Path:   "bar",
+					HTTPHeaders: []v1.HTTPHeader{
+						{
+							Name:  "Authorization",
+							Value: "secret",
+						},
+					},
+				},
+			},
+		},
+	}
+	pod := v1.Pod{}
+	pod.ObjectMeta.Name = "podFoo"
+	pod.ObjectMeta.Namespace = "nsFoo"
+	pod.Spec.Containers = []v1.Container{container}
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, true)()
+	msg, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if msg != "" {
+		t.Errorf("unexpected error message: %q", msg)
+	}
+	if actualHeaders.Get("Authorization") != "" {
+		t.Error("unexpected Authorization header")
+	}
+}
+
+func TestIsHTTPResponseError(t *testing.T) {
+	s := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+	defer s.Close()
+	req, err := http.NewRequest("GET", s.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.URL.Scheme = "https"
+	_, err = http.DefaultClient.Do(req)
+	if !isHTTPResponseError(err) {
+		t.Errorf("unexpected http response error: %v", err)
 	}
 }

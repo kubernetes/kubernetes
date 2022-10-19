@@ -17,11 +17,15 @@ limitations under the License.
 package lifecycle
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -132,6 +136,23 @@ func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 		}
 		resp, err := hr.httpDoer.Do(req)
 		discardHTTPRespBody(resp)
+
+		if isHTTPResponseError(err) {
+			// TODO: emit an event about the fallback
+			// TODO: increment a metric about the fallback
+			klog.V(1).ErrorS(err, "HTTPS request to lifecycle hook got HTTP response, retrying with HTTP.", "pod", klog.KObj(pod), "host", req.URL.Host)
+
+			req := req.Clone(context.Background())
+			req.URL.Scheme = "http"
+			req.Header.Del("Authorization")
+			resp, httpErr := hr.httpDoer.Do(req)
+
+			// clear err since the fallback succeeded
+			if httpErr == nil {
+				err = nil
+			}
+			discardHTTPRespBody(resp)
+		}
 		return err
 	}
 
@@ -200,4 +221,15 @@ func (a *appArmorAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
 		Reason:  "AppArmor",
 		Message: fmt.Sprintf("Cannot enforce AppArmor: %v", err),
 	}
+}
+
+func isHTTPResponseError(err error) bool {
+	if err == nil {
+		return false
+	}
+	urlErr := &url.Error{}
+	if !errors.As(err, &urlErr) {
+		return false
+	}
+	return strings.Contains(urlErr.Err.Error(), "server gave HTTP response to HTTPS client")
 }
