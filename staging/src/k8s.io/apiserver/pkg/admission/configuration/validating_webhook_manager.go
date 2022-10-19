@@ -21,7 +21,7 @@ import (
 	"sort"
 	"sync/atomic"
 
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
+	"github.com/kcp-dev/logicalcluster/v2"
 
 	"k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,6 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/client-go/informers"
+	admissionregistrationinformers "k8s.io/client-go/informers/admissionregistration/v1"
 	admissionregistrationlisters "k8s.io/client-go/listers/admissionregistration/v1"
 	"k8s.io/client-go/tools/cache"
 )
@@ -49,6 +50,10 @@ var _ generic.Source = &validatingWebhookConfigurationManager{}
 
 func NewValidatingWebhookConfigurationManager(f informers.SharedInformerFactory) generic.Source {
 	informer := f.Admissionregistration().V1().ValidatingWebhookConfigurations()
+	return NewValidatingWebhookConfigurationManagerForInformer(informer)
+}
+
+func NewValidatingWebhookConfigurationManagerForInformer(informer admissionregistrationinformers.ValidatingWebhookConfigurationInformer) generic.Source {
 	manager := &validatingWebhookConfigurationManager{
 		configuration:              &atomic.Value{},
 		lister:                     informer.Lister(),

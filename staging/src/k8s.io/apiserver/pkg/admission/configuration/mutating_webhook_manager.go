@@ -29,6 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/client-go/informers"
+	admissionregistrationinformers "k8s.io/client-go/informers/admissionregistration/v1"
 	admissionregistrationlisters "k8s.io/client-go/listers/admissionregistration/v1"
 	"k8s.io/client-go/tools/cache"
 )
@@ -49,6 +50,10 @@ var _ generic.Source = &mutatingWebhookConfigurationManager{}
 
 func NewMutatingWebhookConfigurationManager(f informers.SharedInformerFactory) generic.Source {
 	informer := f.Admissionregistration().V1().MutatingWebhookConfigurations()
+	return NewMutatingWebhookConfigurationManagerForInformer(informer)
+}
+
+func NewMutatingWebhookConfigurationManagerForInformer(informer admissionregistrationinformers.MutatingWebhookConfigurationInformer) generic.Source {
 	manager := &mutatingWebhookConfigurationManager{
 		configuration:              &atomic.Value{},
 		lister:                     informer.Lister(),
