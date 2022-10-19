@@ -22,7 +22,7 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/endpoints/discovery"
+	discovery "k8s.io/apiserver/pkg/endpoints/discovery/unaggregated"
 )
 
 type versionDiscoveryHandler struct {

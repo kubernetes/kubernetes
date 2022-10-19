@@ -30,7 +30,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
-	"k8s.io/apiserver/pkg/endpoints/discovery"
+	discovery "k8s.io/apiserver/pkg/endpoints/discovery/unaggregated"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
