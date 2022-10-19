@@ -265,7 +265,7 @@ func NewKubeGenericRuntimeManager(
 		serializeImagePulls,
 		imagePullQPS,
 		imagePullBurst)
-	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(insecureContainerLifecycleHTTPClient, kubeRuntimeManager, kubeRuntimeManager)
+	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(insecureContainerLifecycleHTTPClient, kubeRuntimeManager, kubeRuntimeManager, recorder)
 	kubeRuntimeManager.containerGC = newContainerGC(runtimeService, podStateProvider, kubeRuntimeManager)
 	kubeRuntimeManager.podStateProvider = podStateProvider
 

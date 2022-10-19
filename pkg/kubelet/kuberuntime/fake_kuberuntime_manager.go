@@ -127,7 +127,8 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(
 		&fakeHTTP{},
 		kubeRuntimeManager,
-		kubeRuntimeManager)
+		kubeRuntimeManager,
+		recorder)
 
 	kubeRuntimeManager.getNodeAllocatable = func() v1.ResourceList {
 		return v1.ResourceList{

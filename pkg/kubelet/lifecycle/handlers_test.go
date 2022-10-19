@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -115,7 +116,7 @@ func (f podStatusProviderFunc) GetPodStatus(uid types.UID, name, namespace strin
 
 func TestRunHandlerExec(t *testing.T) {
 	fakeCommandRunner := fakeContainerCommandRunner{}
-	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeCommandRunner, nil)
+	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeCommandRunner, nil, nil)
 
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	containerName := "containerFoo"
@@ -161,7 +162,7 @@ func (f *fakeHTTP) Do(req *http.Request) (*http.Response, error) {
 func TestRunHandlerHttp(t *testing.T) {
 	fakeHTTPGetter := fakeHTTP{}
 	fakePodStatusProvider := stubPodStatusProvider("127.0.0.1")
-	handlerRunner := NewHandlerRunner(&fakeHTTPGetter, &fakeContainerCommandRunner{}, fakePodStatusProvider)
+	handlerRunner := NewHandlerRunner(&fakeHTTPGetter, &fakeContainerCommandRunner{}, fakePodStatusProvider, nil)
 
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	containerName := "containerFoo"
@@ -197,7 +198,7 @@ func TestRunHandlerHttpWithHeaders(t *testing.T) {
 	fakeHTTPDoer := fakeHTTP{}
 	fakePodStatusProvider := stubPodStatusProvider("127.0.0.1")
 
-	handlerRunner := NewHandlerRunner(&fakeHTTPDoer, &fakeContainerCommandRunner{}, fakePodStatusProvider)
+	handlerRunner := NewHandlerRunner(&fakeHTTPDoer, &fakeContainerCommandRunner{}, fakePodStatusProvider, nil)
 
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	containerName := "containerFoo"
@@ -237,7 +238,7 @@ func TestRunHandlerHttpWithHeaders(t *testing.T) {
 func TestRunHandlerHttps(t *testing.T) {
 	fakeHTTPDoer := fakeHTTP{}
 	fakePodStatusProvider := stubPodStatusProvider("127.0.0.1")
-	handlerRunner := NewHandlerRunner(&fakeHTTPDoer, &fakeContainerCommandRunner{}, fakePodStatusProvider)
+	handlerRunner := NewHandlerRunner(&fakeHTTPDoer, &fakeContainerCommandRunner{}, fakePodStatusProvider, nil)
 
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	containerName := "containerFoo"
@@ -345,7 +346,7 @@ func TestRunHandlerHTTPPort(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, tt.FeatureGateEnabled)()
 			fakeHTTPDoer := fakeHTTP{}
-			handlerRunner := NewHandlerRunner(&fakeHTTPDoer, &fakeContainerCommandRunner{}, fakePodStatusProvider)
+			handlerRunner := NewHandlerRunner(&fakeHTTPDoer, &fakeContainerCommandRunner{}, fakePodStatusProvider, nil)
 
 			container.Lifecycle.PostStart.HTTPGet.Port = tt.Port
 			pod.Spec.Containers = []v1.Container{container}
@@ -621,7 +622,7 @@ func TestRunHTTPHandler(t *testing.T) {
 
 			verify := func(t *testing.T, expectedHeader http.Header, expectedURL string) {
 				fakeHTTPDoer := fakeHTTP{}
-				handlerRunner := NewHandlerRunner(&fakeHTTPDoer, &fakeContainerCommandRunner{}, fakePodStatusProvider)
+				handlerRunner := NewHandlerRunner(&fakeHTTPDoer, &fakeContainerCommandRunner{}, fakePodStatusProvider, nil)
 
 				_, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
 				if err != nil {
@@ -650,7 +651,7 @@ func TestRunHTTPHandler(t *testing.T) {
 }
 
 func TestRunHandlerNil(t *testing.T) {
-	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, nil)
+	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, nil, nil)
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	podName := "podFoo"
 	podNamespace := "nsFoo"
@@ -675,7 +676,7 @@ func TestRunHandlerNil(t *testing.T) {
 func TestRunHandlerExecFailure(t *testing.T) {
 	expectedErr := fmt.Errorf("invalid command")
 	fakeCommandRunner := fakeContainerCommandRunner{Err: expectedErr, Msg: expectedErr.Error()}
-	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeCommandRunner, nil)
+	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeCommandRunner, nil, nil)
 
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	containerName := "containerFoo"
@@ -715,7 +716,7 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 
 	fakePodStatusProvider := stubPodStatusProvider("127.0.0.1")
 
-	handlerRunner := NewHandlerRunner(&fakeHTTPGetter, &fakeContainerCommandRunner{}, fakePodStatusProvider)
+	handlerRunner := NewHandlerRunner(&fakeHTTPGetter, &fakeContainerCommandRunner{}, fakePodStatusProvider, nil)
 
 	containerName := "containerFoo"
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
@@ -759,9 +760,11 @@ func TestRunHandlerHttpsFailureFallback(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	recorder := &record.FakeRecorder{Events: make(chan string, 10)}
+
 	fakePodStatusProvider := stubPodStatusProvider("127.0.0.1")
 
-	handlerRunner := NewHandlerRunner(srv.Client(), &fakeContainerCommandRunner{}, fakePodStatusProvider).(*handlerRunner)
+	handlerRunner := NewHandlerRunner(srv.Client(), &fakeContainerCommandRunner{}, fakePodStatusProvider, recorder).(*handlerRunner)
 
 	containerName := "containerFoo"
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
@@ -800,6 +803,15 @@ func TestRunHandlerHttpsFailureFallback(t *testing.T) {
 	}
 	if actualHeaders.Get("Authorization") != "" {
 		t.Error("unexpected Authorization header")
+	}
+
+	select {
+	case event := <-recorder.Events:
+		if !strings.Contains(event, "LifecycleHTTPFallback") {
+			t.Fatalf("expected LifecycleHTTPFallback event, got %q", event)
+		}
+	default:
+		t.Fatal("no event recorded")
 	}
 }
 

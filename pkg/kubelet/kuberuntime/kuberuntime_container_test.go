@@ -295,7 +295,8 @@ func TestLifeCycleHook(t *testing.T) {
 	lcHanlder := lifecycle.NewHandlerRunner(
 		fakeHTTP,
 		fakeRunner,
-		fakePodStatusProvider)
+		fakePodStatusProvider,
+		nil)
 
 	m.runner = lcHanlder
 
