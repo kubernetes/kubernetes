@@ -19,14 +19,14 @@ package status
 import (
 	"context"
 	"fmt"
-	"k8s.io/apiextensions-apiserver/pkg/kcp"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"reflect"
 	"strings"
 	"time"
 
 	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
+	kcpthirdpartycache "github.com/kcp-dev/client-go/third_party/k8s.io/client-go/tools/cache"
 	"github.com/kcp-dev/logicalcluster/v2"
+	"k8s.io/apiextensions-apiserver/pkg/kcp"
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -53,12 +53,12 @@ type NamingConditionController struct {
 	crdClient client.CustomResourceDefinitionsGetter
 
 	crdLister             listers.CustomResourceDefinitionLister
-	clusterAwareCRDLister kcp.ClusterAwareCRDLister
+	clusterAwareCRDLister kcp.ClusterAwareCRDClusterLister
 	crdSynced             cache.InformerSynced
 	// crdMutationCache backs our lister and keeps track of committed updates to avoid racy
 	// write/lookup cycles.  It's got 100 slots by default, so it unlikely to overrun
 	// TODO to revisit this if naming conflicts are found to occur in the wild
-	crdMutationCache cache.MutationCache
+	crdMutationCache kcpthirdpartycache.MutationCache
 
 	// To allow injection for testing.
 	syncFn func(key string) error
@@ -69,7 +69,7 @@ type NamingConditionController struct {
 func NewNamingConditionController(
 	crdInformer informers.CustomResourceDefinitionInformer,
 	crdClient client.CustomResourceDefinitionsGetter,
-	clusterAwareCRDLister kcp.ClusterAwareCRDLister,
+	clusterAwareCRDLister kcp.ClusterAwareCRDClusterLister,
 ) *NamingConditionController {
 	c := &NamingConditionController{
 		crdClient:             crdClient,
@@ -97,8 +97,7 @@ func (c *NamingConditionController) getAcceptedNamesForGroup(clusterName logical
 	allResources = sets.String{}
 	allKinds = sets.String{}
 
-	ctx := request.WithCluster(context.TODO(), request.Cluster{Name: clusterName})
-	list, err := c.clusterAwareCRDLister.List(ctx, labels.Everything())
+	list, err := c.clusterAwareCRDLister.Cluster(clusterName).List(context.TODO(), labels.Everything())
 	if err != nil {
 		panic(err)
 	}
@@ -263,7 +262,7 @@ func (c *NamingConditionController) sync(key string) error {
 	if apierrors.IsNotFound(err) {
 		// CRD was deleted and has freed its names.
 		// Reconsider all other CRDs in the same group.
-		if err := c.requeueAllOtherGroupCRDs(key); err != nil {
+		if err := c.requeueAllOtherGroupCRDs(clusterName, name); err != nil {
 			return err
 		}
 		return nil
@@ -304,7 +303,7 @@ func (c *NamingConditionController) sync(key string) error {
 
 	// we updated our status, so we may be releasing a name.  When this happens, we need to rekick everything in our group
 	// if we fail to rekick, just return as normal.  We'll get everything on a resync
-	if err := c.requeueAllOtherGroupCRDs(key); err != nil {
+	if err := c.requeueAllOtherGroupCRDs(clusterName, name); err != nil {
 		return err
 	}
 
@@ -393,13 +392,7 @@ func (c *NamingConditionController) deleteCustomResourceDefinition(obj interface
 	c.enqueue(castObj)
 }
 
-func (c *NamingConditionController) requeueAllOtherGroupCRDs(name string) error {
-	// HACK(kcp): name is a key from the shared informer's cache. With the changes we've
-	// made to cache.MetaNamespaceKeyFunc to encode the cluster name as part of the key,
-	// we have to decode it here (into "cluster name" and "name") so we can make sure to
-	// re-encode the key correctly down below when adding to the work queue.
-	clusterName, name := clusters.SplitClusterAwareKey(name)
-
+func (c *NamingConditionController) requeueAllOtherGroupCRDs(clusterName logicalcluster.Name, name string) error {
 	pluralGroup := strings.SplitN(name, ".", 2)
 	var groupForName string
 
@@ -413,18 +406,14 @@ func (c *NamingConditionController) requeueAllOtherGroupCRDs(name string) error 
 		groupForName = pluralGroup[1]
 	}
 
-	ctx := request.WithCluster(context.TODO(), request.Cluster{Name: clusterName})
-	list, err := c.clusterAwareCRDLister.List(ctx, labels.Everything())
+	list, err := c.clusterAwareCRDLister.Cluster(clusterName).List(context.TODO(), labels.Everything())
 	if err != nil {
 		return err
 	}
 
 	for _, curr := range list {
 		if curr.Spec.Group == groupForName && curr.Name != name {
-			// HACK(kcp): make sure to re-encode the cluster name in the key so
-			// future sync() calls are able to have crdLister.Get() work properly.
-			clusterKey := clusters.ToClusterAwareKey(clusterName, curr.Name)
-			c.queue.Add(clusterKey)
+			c.enqueue(curr)
 		}
 	}
 	return nil

@@ -111,7 +111,7 @@ type crdHandler struct {
 	customStorage atomic.Value
 
 	crdLister             listers.CustomResourceDefinitionLister
-	clusterAwareCRDLister kcp.ClusterAwareCRDLister
+	clusterAwareCRDLister kcp.ClusterAwareCRDClusterLister
 	crdIndexer            cache.Indexer
 
 	delegate          http.Handler
@@ -293,6 +293,12 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	clusterName, err := apirequest.ClusterNameFrom(req.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	group := requestInfo.APIGroup
 	if group == "" {
 		group = "core"
@@ -300,7 +306,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	crdName := requestInfo.Resource + "." + group
 
-	crd, err := r.clusterAwareCRDLister.Get(req.Context(), crdName)
+	crd, err := r.clusterAwareCRDLister.Cluster(clusterName).Get(req.Context(), crdName)
 	if apierrors.IsNotFound(err) {
 		r.delegate.ServeHTTP(w, req)
 		return
@@ -745,7 +751,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensionsv1.CustomResour
 	// If updateCustomResourceDefinition sees an update and happens later, the storage will be deleted and
 	// we will re-create the updated storage on demand. If updateCustomResourceDefinition happens before,
 	// we make sure that we observe the same up-to-date CRD.
-	crd, err := r.clusterAwareCRDLister.Refresh(crd)
+	crd, err := r.clusterAwareCRDLister.Cluster(logicalcluster.From(crd)).Refresh(crd)
 	if err != nil {
 		return nil, err
 	}

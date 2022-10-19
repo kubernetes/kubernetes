@@ -93,7 +93,7 @@ type ExtraConfig struct {
 	Informers externalinformers.SharedInformerFactory
 
 	// KCP
-	ClusterAwareCRDLister  kcp.ClusterAwareCRDLister
+	ClusterAwareCRDLister  kcp.ClusterAwareCRDClusterLister
 	TableConverterProvider TableConverterProvider
 }
 
@@ -126,7 +126,7 @@ type CustomResourceDefinitions struct {
 	rootDiscoveryHandler    *rootDiscoveryHandler
 
 	// KCP
-	ClusterAwareCRDLister kcp.ClusterAwareCRDLister
+	ClusterAwareCRDLister kcp.ClusterAwareCRDClusterLister
 }
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
