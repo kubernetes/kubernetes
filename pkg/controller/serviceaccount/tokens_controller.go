@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"time"
 
+	kcpthirdpartycache "github.com/kcp-dev/client-go/third_party/k8s.io/client-go/tools/cache"
 	"github.com/kcp-dev/logicalcluster/v2"
 
 	v1 "k8s.io/api/core/v1"
@@ -113,7 +114,7 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 	)
 
 	secretCache := secrets.Informer().GetIndexer()
-	e.updatedSecrets = cache.NewIntegerResourceVersionMutationCache(secretCache, secretCache, 60*time.Second, true)
+	e.updatedSecrets = kcpthirdpartycache.NewIntegerResourceVersionMutationCache(kcpcache.DeletionHandlingMetaClusterNamespaceKeyFunc, secretCache, secretCache, 60*time.Second, true)
 	e.secretSynced = secrets.Informer().HasSynced
 	secrets.Informer().AddEventHandlerWithResyncPeriod(
 		cache.FilteringResourceEventHandler{
@@ -149,7 +150,7 @@ type TokensController struct {
 	// updatedSecrets is a wrapper around the shared cache which allows us to record
 	// and return our local mutations (since we're very likely to act on an updated
 	// secret before the watch reports it).
-	updatedSecrets cache.MutationCache
+	updatedSecrets kcpthirdpartycache.MutationCache
 
 	// Since we join two objects, we'll watch both of them with controllers.
 	serviceAccountSynced cache.InformerSynced
@@ -674,7 +675,7 @@ func (e *TokensController) getServiceAccount(clusterName logicalcluster.Name, ns
 
 func (e *TokensController) getSecret(clusterName logicalcluster.Name, ns string, name string, uid types.UID, fetchOnCacheMiss bool) (*v1.Secret, error) {
 	// Look up in cache
-	obj, exists, err := e.updatedSecrets.GetByKey(makeCacheKey(ns, clusters.ToClusterAwareKey(clusterName, name)))
+	obj, exists, err := e.updatedSecrets.GetByKey(kcpcache.ToClusterAwareKey(clusterName.String(), ns, name))
 	if err != nil {
 		return nil, err
 	}
