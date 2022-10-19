@@ -18,9 +18,35 @@ package framework
 
 import (
 	"path"
+	"reflect"
 
 	"github.com/onsi/ginkgo/v2/types"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
+
+var errInterface = reflect.TypeOf((*error)(nil)).Elem()
+
+// IgnoreNotFound can be used to wrap an arbitrary function in a call to
+// [ginkgo.DeferCleanup]. When the wrapped function returns an error that
+// `apierrors.IsNotFound` considers as "not found", the error is ignored
+// instead of failing the test during cleanup. This is useful for cleanup code
+// that just needs to ensure that some object does not exist anymore.
+func IgnoreNotFound(in any) any {
+	inType := reflect.TypeOf(in)
+	inValue := reflect.ValueOf(in)
+	return reflect.MakeFunc(inType, func(args []reflect.Value) []reflect.Value {
+		out := inValue.Call(args)
+		if len(out) > 0 {
+			lastValue := out[len(out)-1]
+			last := lastValue.Interface()
+			if last != nil && lastValue.Type().Implements(errInterface) && apierrors.IsNotFound(last.(error)) {
+				out[len(out)-1] = reflect.Zero(errInterface)
+			}
+		}
+		return out
+	}).Interface()
+}
 
 // AnnotatedLocation can be used to provide more informative source code
 // locations by passing the result as additional parameter to a
