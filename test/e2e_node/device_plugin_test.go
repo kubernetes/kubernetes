@@ -181,6 +181,11 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			v1PodResources, err := getV1NodeDevices()
 			framework.ExpectNoError(err)
 
+			framework.Logf("v1alphaPodResources.PodResources:%+v\n", v1alphaPodResources.PodResources)
+			framework.Logf("v1PodResources.PodResources:%+v\n", v1PodResources.PodResources)
+			framework.Logf("len(v1alphaPodResources.PodResources):%+v", len(v1alphaPodResources.PodResources))
+			framework.Logf("len(v1PodResources.PodResources):%+v", len(v1PodResources.PodResources))
+
 			framework.ExpectEqual(len(v1alphaPodResources.PodResources), 2)
 			framework.ExpectEqual(len(v1PodResources.PodResources), 2)
 
