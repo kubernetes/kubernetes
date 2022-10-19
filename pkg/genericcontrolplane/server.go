@@ -25,6 +25,8 @@ import (
 	"net/url"
 	"time"
 
+	kcpkubernetesclientset "github.com/kcp-dev/client-go/clients/clientset/versioned"
+	kcpkubernetesinformers "github.com/kcp-dev/client-go/clients/informers"
 	"github.com/kcp-dev/logicalcluster/v2"
 
 	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
@@ -33,9 +35,11 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/union"
+	"k8s.io/apiserver/pkg/clientsethack"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericfeatures "k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/informerfactoryhack"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
@@ -160,7 +164,7 @@ func CreateServerChain(miniAggregatorConfig aggregator.CompletedMiniAggregatorCo
 func CreateKubeAPIServerConfig(
 	genericConfig *genericapiserver.Config,
 	o options.CompletedServerRunOptions,
-	versionedInformers kubeexternalinformers.SharedInformerFactory,
+	versionedInformers kcpkubernetesinformers.SharedInformerFactory,
 	additionalPluginInitializers []admission.PluginInitializer,
 	storageFactory *serverstorage.DefaultStorageFactory,
 ) (
@@ -220,11 +224,15 @@ func CreateKubeAPIServerConfig(
 		config.ExtraConfig.ClusterAuthenticationInfo.RequestHeaderUsernameHeaders = requestHeaderConfig.UsernameHeaders
 	}
 
+	client, err := kcpkubernetesclientset.NewForConfig(config.GenericConfig.LoopbackClientConfig)
+	if err != nil {
+		return nil, err
+	}
 	if err := o.ServerRunOptions.Admission.ApplyTo(
 		config.GenericConfig,
-		config.ExtraConfig.VersionedInformers,
-		config.GenericConfig.LoopbackClientConfig,
-		feature.DefaultFeatureGate,
+		informerfactoryhack.Wrap(config.ExtraConfig.VersionedInformers),
+		clientsethack.Wrap(client),
+		utilfeature.DefaultFeatureGate,
 		additionalPluginInitializers...); err != nil {
 		return nil, err
 	}
