@@ -22,6 +22,9 @@ import (
 	"net/http"
 	"time"
 
+	kcpkubernetesclientset "github.com/kcp-dev/client-go/clients/clientset/versioned"
+	kcpkubernetesinformers "github.com/kcp-dev/client-go/clients/informers"
+	"github.com/kcp-dev/logicalcluster/v2"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -43,18 +46,12 @@ import (
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/component-helpers/apimachinery/lease"
 	"k8s.io/klog/v2"
 	flowcontrolv1beta1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1"
 	flowcontrolv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
 	"k8s.io/kubernetes/pkg/controlplane/controller/apiserverleasegc"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
-	"k8s.io/kubernetes/pkg/routes"
-	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/utils/clock"
-
 	// RESTStorage installers
 	admissionregistrationrest "k8s.io/kubernetes/pkg/registry/admissionregistration/rest"
 	apiserverinternalrest "k8s.io/kubernetes/pkg/registry/apiserverinternal/rest"
@@ -65,6 +62,9 @@ import (
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest/genericcontrolplane"
 	eventsrest "k8s.io/kubernetes/pkg/registry/events/rest"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
+	"k8s.io/kubernetes/pkg/routes"
+	"k8s.io/kubernetes/pkg/serviceaccount"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -106,7 +106,7 @@ type ExtraConfig struct {
 	ServiceAccountJWKSURI    string
 	ServiceAccountPublicKeys []interface{}
 
-	VersionedInformers informers.SharedInformerFactory
+	VersionedInformers kcpkubernetesinformers.SharedInformerFactory
 
 	IdentityLeaseDurationSeconds      int
 	IdentityLeaseRenewIntervalSeconds int
@@ -138,7 +138,7 @@ type GenericControlPlane struct {
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
 func (c *Config) Complete() CompletedConfig {
 	cfg := completedConfig{
-		c.GenericConfig.Complete(c.ExtraConfig.VersionedInformers),
+		c.GenericConfig.Complete(nil), // TODO: when we have users of this, we will need a shared informer factory super-interface hack on both ends so as to not have to refactor the world
 		&c.ExtraConfig,
 	}
 
@@ -194,11 +194,11 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 
 	m.GenericAPIServer.AddPostStartHookOrDie("start-cluster-authentication-info-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-		kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
+		kubeClient, err := kcpkubernetesclientset.NewForConfig(hookContext.LoopbackClientConfig)
 		if err != nil {
 			return err
 		}
-		controller := clusterauthenticationtrust.NewClusterAuthenticationTrustController(m.ClusterAuthenticationInfo, kubeClient)
+		controller := clusterauthenticationtrust.NewClusterAuthenticationTrustController(m.ClusterAuthenticationInfo, kubeClient.Cluster(logicalcluster.New("root")))
 
 		// generate a context  from stopCh. This is to avoid modifying files which are relying on apiserver
 		// TODO: See if we can pass ctx to the current method
@@ -239,13 +239,13 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 
 	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.APIServerIdentity) {
 		m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-			kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
+			kubeClient, err := kcpkubernetesclientset.NewForConfig(hookContext.LoopbackClientConfig)
 			if err != nil {
 				return err
 			}
 			controller := lease.NewController(
 				clock.RealClock{},
-				kubeClient,
+				kubeClient.Cluster(logicalcluster.New("root")),
 				m.GenericAPIServer.APIServerID,
 				int32(c.ExtraConfig.IdentityLeaseDurationSeconds),
 				nil,
@@ -256,12 +256,12 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			return nil
 		})
 		m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-garbage-collector", func(hookContext genericapiserver.PostStartHookContext) error {
-			kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
+			kubeClient, err := kcpkubernetesclientset.NewForConfig(hookContext.LoopbackClientConfig)
 			if err != nil {
 				return err
 			}
 			go apiserverleasegc.NewAPIServerLeaseGC(
-				kubeClient,
+				kubeClient.Cluster(logicalcluster.New("root")),
 				time.Duration(c.ExtraConfig.IdentityLeaseDurationSeconds)*time.Second,
 				metav1.NamespaceSystem,
 				KubeAPIServerIdentityLeaseLabelSelector,
