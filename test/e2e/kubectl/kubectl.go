@@ -1942,7 +1942,7 @@ metadata:
 	})
 
 	ginkgo.Describe("Kubectl events", func() {
-		ginkgo.It("should show event when pod is created ", func() {
+		ginkgo.It("should show event when pod is created", func() {
 			podName := "e2e-test-httpd-pod"
 			ginkgo.By("running the image " + httpdImage)
 			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+httpdImage, podRunningTimeoutArg, "--labels=run="+podName)
@@ -1957,7 +1957,9 @@ metadata:
 			ginkgo.By("show started event for this pod")
 			events := e2ekubectl.RunKubectlOrDie(ns, "alpha", "events", "--for=pod/"+podName)
 
-			if !strings.Contains(events, fmt.Sprintf("Normal   Scheduled   Pod/%s", podName)) {
+			// replace multi spaces into single white space
+			eventsStr := strings.Join(strings.Fields(strings.TrimSpace(events)), " ")
+			if !strings.Contains(string(eventsStr), fmt.Sprintf("Normal Scheduled Pod/%s", podName)) {
 				framework.Failf("failed to list expected event")
 			}
 
