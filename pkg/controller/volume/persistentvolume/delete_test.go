@@ -18,9 +18,6 @@ package persistentvolume
 
 import (
 	"errors"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -35,8 +32,6 @@ import (
 // 3. Compare resulting volumes with expected volumes.
 func TestDeleteSync(t *testing.T) {
 	const gceDriver = "pd.csi.storage.gke.io"
-	// Default enable the HonorPVReclaimPolicy feature gate.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)()
 	tests := []controllerTest{
 		{
 			// delete volume bound by controller

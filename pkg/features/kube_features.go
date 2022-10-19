@@ -884,7 +884,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	HPAContainerMetrics: {Default: false, PreRelease: featuregate.Alpha},
 
-	HonorPVReclaimPolicy: {Default: false, PreRelease: featuregate.Alpha},
+	HonorPVReclaimPolicy: {Default: true, PreRelease: featuregate.Beta},
 
 	IdentifyPodOS: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
 
