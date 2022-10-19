@@ -135,15 +135,23 @@ if [[ "${TEST_IGNORE_CLOUDPROVIDER_TAINT:-}" == true ]]; then
   "${KUBE_ROOT}/cluster/kubectl.sh" taint nodes --all node.cloudprovider.kubernetes.io/uninitialized:NoSchedule-
 fi
 
-ginkgo_args=()
+# These arguments are understood by both Ginkgo test suite and CLI.
+# Some arguments (like --nodes) are only supported when using the CLI.
+# Those get set below when choosing the program.
+ginkgo_args=(
+  "--slow-spec-threshold=${GINKGO_SLOW_SPEC_THRESHOLD:-300s}"
+  "--poll-progress-after=${GINKGO_POLL_PROGRESS_AFTER:-300s}"
+  "--poll-progress-interval=${GINKGO_POLL_PROGRESS_INTERVAL:-20s}"
+  "--source-root=${KUBE_ROOT}"
+)
+
+# NOTE: Ginkgo's default timeout has been reduced from 24h to 1h in V2, set it manually here as "24h"
+# for backward compatibility purpose.
+ginkgo_args+=("--timeout=${GINKGO_TIMEOUT:-24h}")
+
 if [[ -n "${CONFORMANCE_TEST_SKIP_REGEX:-}" ]]; then
   ginkgo_args+=("--skip=${CONFORMANCE_TEST_SKIP_REGEX}")
   ginkgo_args+=("--seed=1436380640")
-fi
-if [[ -n "${GINKGO_PARALLEL_NODES:-}" ]]; then
-  ginkgo_args+=("--nodes=${GINKGO_PARALLEL_NODES}")
-elif [[ ${GINKGO_PARALLEL} =~ ^[yY]$ ]]; then
-  ginkgo_args+=("--nodes=25")
 fi
 
 if [[ "${GINKGO_UNTIL_IT_FAILS:-}" == true ]]; then
@@ -154,6 +162,7 @@ FLAKE_ATTEMPTS=1
 if [[ "${GINKGO_TOLERATE_FLAKES}" == "y" ]]; then
   FLAKE_ATTEMPTS=2
 fi
+ginkgo_args+=("--flake-attempts=${FLAKE_ATTEMPTS}")
 
 if [[ "${GINKGO_NO_COLOR}" == "y" ]]; then
   ginkgo_args+=("--no-color")
@@ -166,20 +175,41 @@ fi
 PATH=$(dirname "${e2e_test}"):"${PATH}"
 export PATH
 
-# Choose the program to execute.
-program=("${ginkgo}")
-if [[ "${E2E_TEST_DEBUG_TOOL}" == "delve" ]]; then
-  program=("dlv" "exec")
-elif [[ "${E2E_TEST_DEBUG_TOOL}" == "gdb" ]]; then
-  program=("gdb")
+# Choose the program to execute and additional arguments for it.
+#
+# Note that the e2e.test binary must have been built with "make DBG=1"
+# when using debuggers, otherwise debug information gets stripped.
+case "${E2E_TEST_DEBUG_TOOL:-ginkgo}" in
+  ginkgo)
+    program=("${ginkgo}")
+    if [[ -n "${GINKGO_PARALLEL_NODES:-}" ]]; then
+      program+=("--nodes=${GINKGO_PARALLEL_NODES}")
+    elif [[ ${GINKGO_PARALLEL} =~ ^[yY]$ ]]; then
+      program+=("--nodes=25")
+    fi
+    program+=("${ginkgo_args[@]:+${ginkgo_args[@]}}")
+    ;;
+  delve) program=("dlv" "exec") ;;
+  gdb) program=("gdb") ;;
+  *) kube::log::error_exit "Unsupported E2E_TEST_DEBUG_TOOL=${E2E_TEST_DEBUG_TOOL}" ;;
+esac
+
+# Move Ginkgo arguments that are understood by the suite when not using
+# the CLI.
+suite_args=()
+if [ "${E2E_TEST_DEBUG_TOOL}" != "ginkgo" ]; then
+  for arg in "${ginkgo_args[@]}"; do
+    suite_args+=("--ginkgo.${arg#--}")
+  done
 fi
 
-# NOTE: Ginkgo's default timeout has been reduced from 24h to 1h in V2, set it manually here as "24h"
-# for backward compatibility purpose.
-"${program[@]}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
+# The following invocation is fairly complex. Let's dump it to simplify
+# determining what the final options are. Enabled by default in CI
+# environments like Prow.
+case "${GINKGO_SHOW_COMMAND:-${CI:-no}}" in y|yes|true) set -x ;; esac
+
+"${program[@]}" "${e2e_test}" -- \
   "${auth_config[@]:+${auth_config[@]}}" \
-  --ginkgo.flake-attempts="${FLAKE_ATTEMPTS}" \
-  --ginkgo.timeout="24h" \
   --host="${KUBE_MASTER_URL}" \
   --provider="${KUBERNETES_PROVIDER}" \
   --gce-project="${PROJECT:-}" \
@@ -199,13 +229,10 @@ fi
   --docker-config-file="${DOCKER_CONFIG_FILE:-}" \
   --dns-domain="${KUBE_DNS_DOMAIN:-cluster.local}" \
   --prepull-images="${PREPULL_IMAGES:-false}" \
-  --ginkgo.slow-spec-threshold="${GINKGO_SLOW_SPEC_THRESHOLD:-300s}" \
-  --ginkgo.poll-progress-after="${GINKGO_POLL_PROGRESS_AFTER:-300s}" \
-  --ginkgo.poll-progress-interval="${GINKGO_POLL_PROGRESS_INTERVAL:-20s}" \
-  --ginkgo.source-root="${KUBE_ROOT}" \
   ${MASTER_OS_DISTRIBUTION:+"--master-os-distro=${MASTER_OS_DISTRIBUTION}"} \
   ${NODE_OS_DISTRIBUTION:+"--node-os-distro=${NODE_OS_DISTRIBUTION}"} \
   ${NUM_NODES:+"--num-nodes=${NUM_NODES}"} \
   ${E2E_REPORT_DIR:+"--report-dir=${E2E_REPORT_DIR}"} \
   ${E2E_REPORT_PREFIX:+"--report-prefix=${E2E_REPORT_PREFIX}"} \
+  "${suite_args[@]:+${suite_args[@]}}" \
   "${@:-}"
