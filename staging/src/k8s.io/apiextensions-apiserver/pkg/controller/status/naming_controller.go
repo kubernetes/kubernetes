@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
 	"github.com/kcp-dev/logicalcluster/v2"
 	"k8s.io/klog/v2"
 
@@ -44,7 +45,6 @@ import (
 	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
-	"k8s.io/client-go/tools/clusters"
 )
 
 // This controller is reserving names. To avoid conflicts, be sure to run only one instance of the worker at a time.
@@ -112,7 +112,12 @@ func (c *NamingConditionController) getAcceptedNamesForGroup(clusterName logical
 		// this makes sure that if we tight loop on update and run, our mutation cache will show
 		// us the version of the objects we just updated to.
 		item := curr
-		obj, exists, err := c.crdMutationCache.GetByKey(clusters.ToClusterAwareKey(logicalcluster.From(curr), curr.Name))
+		key, err := kcpcache.DeletionHandlingMetaClusterNamespaceKeyFunc(item)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", item, err))
+			continue
+		}
+		obj, exists, err := c.crdMutationCache.GetByKey(key)
 		if exists && err == nil {
 			item = obj.(*apiextensionsv1.CustomResourceDefinition)
 		}
@@ -248,7 +253,13 @@ func equalToAcceptedOrFresh(requestedName, acceptedName string, usedNames sets.S
 }
 
 func (c *NamingConditionController) sync(key string) error {
-	inCustomResourceDefinition, err := c.crdLister.Get(key)
+	clusterName, _, name, err := kcpcache.SplitMetaClusterNamespaceKey(key)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return nil
+	}
+	formattedKey := clusterName.String() + "|" + name
+	inCustomResourceDefinition, err := c.crdLister.Get(formattedKey)
 	if apierrors.IsNotFound(err) {
 		// CRD was deleted and has freed its names.
 		// Reconsider all other CRDs in the same group.
@@ -343,7 +354,7 @@ func (c *NamingConditionController) processNextWorkItem() bool {
 }
 
 func (c *NamingConditionController) enqueue(obj *apiextensionsv1.CustomResourceDefinition) {
-	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+	key, err := kcpcache.DeletionHandlingMetaClusterNamespaceKeyFunc(obj)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", obj, err))
 		return

@@ -22,6 +22,7 @@ import (
 	"io"
 	"time"
 
+	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
@@ -36,7 +37,6 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/tools/clusters"
 	"k8s.io/utils/clock"
 )
 
@@ -91,6 +91,7 @@ func (l *Lifecycle) Admit(ctx context.Context, a admission.Attributes, o admissi
 	if err != nil {
 		return errors.NewInternalError(err)
 	}
+	namespaceKey := kcpcache.ToClusterAwareKey(clusterName.String(), "", a.GetName())
 
 	if a.GetKind().GroupKind() == v1.SchemeGroupVersion.WithKind("Namespace").GroupKind() {
 		// if a namespace is deleted, we want to prevent all further creates into it
@@ -123,8 +124,6 @@ func (l *Lifecycle) Admit(ctx context.Context, a admission.Attributes, o admissi
 		exists bool
 	)
 
-	namespaceKey := a.GetNamespace()
-	namespaceKey = clusters.ToClusterAwareKey(clusterName, namespaceKey)
 
 	namespace, err := l.namespaceLister.Get(namespaceKey)
 	if err != nil {

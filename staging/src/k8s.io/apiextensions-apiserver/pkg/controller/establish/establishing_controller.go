@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
 	"github.com/kcp-dev/logicalcluster/v2"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,7 +37,6 @@ import (
 	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
-	"k8s.io/client-go/tools/clusters"
 )
 
 // EstablishingController controls how and when CRD is established.
@@ -68,7 +68,7 @@ func NewEstablishingController(crdInformer informers.CustomResourceDefinitionInf
 
 // QueueCRD adds CRD into the establishing queue.
 func (ec *EstablishingController) QueueCRD(name string, clusterName logicalcluster.Name, timeout time.Duration) {
-	ec.queue.AddAfter(clusters.ToClusterAwareKey(clusterName, name), timeout)
+	ec.queue.AddAfter(kcpcache.ToClusterAwareKey(clusterName.String(), "", name), timeout)
 }
 
 // Run starts the EstablishingController.
@@ -117,7 +117,12 @@ func (ec *EstablishingController) processNextWorkItem() bool {
 
 // sync is used to turn CRDs into the Established state.
 func (ec *EstablishingController) sync(key string) error {
-	cachedCRD, err := ec.crdLister.Get(key)
+	clusterName, _, name, err := kcpcache.SplitMetaClusterNamespaceKey(key)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return nil
+	}
+	cachedCRD, err := ec.crdLister.Get(clusterName.String() + "|" + name)
 	if apierrors.IsNotFound(err) {
 		return nil
 	}

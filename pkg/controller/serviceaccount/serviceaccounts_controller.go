@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
 	"github.com/kcp-dev/logicalcluster/v2"
 
 	"k8s.io/api/core/v1"
@@ -34,7 +35,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/clusters"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
@@ -192,7 +192,12 @@ func (c *ServiceAccountsController) syncNamespace(ctx context.Context, key strin
 		klog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Since(startTime))
 	}()
 
-	ns, err := c.nsLister.Get(key)
+	clusterName, _, namespaceName, err := kcpcache.SplitMetaClusterNamespaceKey(key)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return err
+	}
+
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
@@ -231,15 +236,10 @@ func (c *ServiceAccountsController) syncNamespace(ctx context.Context, key strin
 }
 
 func (c *ServiceAccountsController) enqueueNamespace(obj metav1.Object) {
-	namespaceKey := obj.GetNamespace()
-	if len(namespaceKey) == 0 {
-		namespaceKey = obj.GetName()
+	key, err := kcpcache.MetaClusterNamespaceKeyFunc(obj)
+	if err != nil {
+		utilruntime.HandleError(err)
 	}
 
-	clusterName := logicalcluster.From(obj)
-	if !clusterName.Empty() {
-		namespaceKey = clusters.ToClusterAwareKey(clusterName, namespaceKey)
-	}
-
-	c.queue.Add(namespaceKey)
+	c.queue.Add(key)
 }
