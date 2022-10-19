@@ -175,6 +175,8 @@ func BuildGenericConfig(
 ) (
 	genericConfig *genericapiserver.Config,
 	storageFactory *serverstorage.DefaultStorageFactory,
+	versionedInformers kcpkubernetesinformers.SharedInformerFactory,
+	clientgoExternalClient kcpkubernetesclientset.ClusterInterface,
 	lastErr error,
 ) {
 	genericConfig = genericapiserver.NewConfig(genericcontrolplanescheme.Codecs)
@@ -244,12 +246,12 @@ func BuildGenericConfig(
 
 	kubeClientConfig := genericConfig.LoopbackClientConfig
 	clientutils.EnableMultiCluster(genericConfig.LoopbackClientConfig, genericConfig, "namespaces", "apiservices", "customresourcedefinitions", "clusterroles", "clusterrolebindings", "roles", "rolebindings", "serviceaccounts", "secrets")
-	clientgoExternalClient, err := clientgoclientset.NewForConfig(kubeClientConfig)
+	clientgoExternalClient, err = kcpkubernetesclientset.NewForConfig(kubeClientConfig)
 	if err != nil {
 		lastErr = fmt.Errorf("failed to create real external clientset: %v", err)
 		return
 	}
-	versionedInformers := clientgoinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
+	versionedInformers = kcpkubernetesinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
 
 	// Authentication.ApplyTo requires already applied OpenAPIConfig and EgressSelector if present
 	if lastErr = o.Authentication.ApplyTo(&genericConfig.Authentication, genericConfig.SecureServing, genericConfig.EgressSelector, genericConfig.OpenAPIConfig, genericConfig.OpenAPIV3Config, clientgoExternalClient, versionedInformers); lastErr != nil {
