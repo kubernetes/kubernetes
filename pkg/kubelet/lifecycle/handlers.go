@@ -35,6 +35,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	httpprobe "k8s.io/kubernetes/pkg/probe/http"
@@ -150,7 +151,7 @@ func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 
 			// clear err since the fallback succeeded
 			if httpErr == nil {
-				// TODO: increment a metric about the fallback
+				metrics.LifecycleHandlerHTTPFallbacks.Inc()
 				if eventRecorder != nil {
 					// report the fallback with an event
 					eventRecorder.Event(pod, v1.EventTypeWarning, "LifecycleHTTPFallback", fmt.Sprintf("request to HTTPS lifecycle hook %s got HTTP response, retry with HTTP succeeded", req.URL.Host))

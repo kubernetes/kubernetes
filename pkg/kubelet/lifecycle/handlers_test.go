@@ -34,8 +34,11 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
@@ -750,6 +753,14 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 }
 
 func TestRunHandlerHttpsFailureFallback(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, true)()
+
+	// Since prometheus' gatherer is global, other tests may have updated metrics already, so
+	// we need to reset them prior running this test.
+	// This also implies that we can't run this test in parallel with other tests.
+	metrics.Register()
+	legacyregistry.Reset()
+
 	var actualHeaders http.Header
 	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		actualHeaders = r.Header.Clone()
@@ -792,7 +803,6 @@ func TestRunHandlerHttpsFailureFallback(t *testing.T) {
 	pod.ObjectMeta.Name = "podFoo"
 	pod.ObjectMeta.Namespace = "nsFoo"
 	pod.Spec.Containers = []v1.Container{container}
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, true)()
 	msg, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
 
 	if err != nil {
@@ -803,6 +813,16 @@ func TestRunHandlerHttpsFailureFallback(t *testing.T) {
 	}
 	if actualHeaders.Get("Authorization") != "" {
 		t.Error("unexpected Authorization header")
+	}
+
+	expectedMetrics := `
+# HELP kubelet_lifecycle_handler_http_fallbacks_total [ALPHA] The number of times lifecycle handlers successfully fell back to http from https.
+# TYPE kubelet_lifecycle_handler_http_fallbacks_total counter
+kubelet_lifecycle_handler_http_fallbacks_total 1
+`
+
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedMetrics), "kubelet_lifecycle_handler_http_fallbacks_total"); err != nil {
+		t.Fatal(err)
 	}
 
 	select {
