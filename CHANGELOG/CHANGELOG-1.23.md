@@ -2825,7 +2825,7 @@ filename | sha512 hash
 - Fixes a bug that could result in the EndpointSlice controller unnecessarily updating EndpointSlices associated with a Service that had Topology Aware Hints enabled. (#105267, @llhuii) [SIG Apps and Network]
 - Fixes the `should support building a client with a CSR` e2e test to work with clusters configured with short certificate lifetimes (#105396, @liggitt) [SIG Auth and Testing]
 - Generic ephemeral volumes can be used also as raw block devices, but the Pod validation was refusing to create pods with that combination. (#105682, @pohly) [SIG Apps, Storage and Testing]
-- Generic ephemeral volumes were not considered properly by the the node limits scheduler filter and the kubelet hostpath check. (#100482, @pohly) [SIG Node, Scheduling, Storage and Testing]
+- Generic ephemeral volumes were not considered properly by the node limits scheduler filter and the kubelet hostpath check. (#100482, @pohly) [SIG Node, Scheduling, Storage and Testing]
 - Kube-apiserver: fix a memory leak when deleting multiple objects with a deletecollection. (#105606, @sxllwx) [SIG API Machinery]
 - Kubeadm: do not allow empty "--config" paths to be passed to "kubeadm kubeconfig user" (#105649, @navist2020) [SIG Cluster Lifecycle]
 - Kubelet did not report `kubelet_volume_stats_*` metrics for generic ephemeral voiumes. (#105569, @pohly) [SIG Node]

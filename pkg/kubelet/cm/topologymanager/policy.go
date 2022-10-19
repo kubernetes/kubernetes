@@ -317,7 +317,7 @@ func iterateAllProviderTopologyHints(allProviderHints [][]TopologyHint, callback
 		}
 
 		// Loop through all hints for provider 'i', and recurse to build the
-		// the permutation of this hint with all hints from providers 'i++'.
+		// permutation of this hint with all hints from providers 'i++'.
 		for j := range allProviderHints[i] {
 			iterate(i+1, append(accum, allProviderHints[i][j]))
 		}

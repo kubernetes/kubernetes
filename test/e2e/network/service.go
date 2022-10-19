@@ -319,7 +319,7 @@ func StopServeHostnameService(clientset clientset.Interface, ns, name string) er
 }
 
 // verifyServeHostnameServiceUp wgets the given serviceIP:servicePort from the
-// the host exec pod of host network type and from the exec pod of container network type.
+// host exec pod of host network type and from the exec pod of container network type.
 // Each pod in the service is expected to echo its name. These names are compared with the
 // given expectedPods list after a sort | uniq.
 func verifyServeHostnameServiceUp(c clientset.Interface, ns string, expectedPods []string, serviceIP string, servicePort int) error {

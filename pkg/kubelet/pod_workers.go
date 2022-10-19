@@ -916,7 +916,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan podWork) {
 				// wait until we see the next refresh from the PLEG via the cache (max 2s)
 				// TODO: this adds ~1s of latency on all transitions from sync to terminating
 				//  to terminated, and on all termination retries (including evictions). We should
-				//  improve latency by making the the pleg continuous and by allowing pod status
+				//  improve latency by making the pleg continuous and by allowing pod status
 				//  changes to be refreshed when key events happen (killPod, sync->terminating).
 				//  Improving this latency also reduces the possibility that a terminated
 				//  container's status is garbage collected before we have a chance to update the

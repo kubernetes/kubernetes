@@ -135,7 +135,7 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 		ginkgo.By("Creating a pod with SELinux options")
 		// It is sufficient to show that the pod comes up here. Since we're stripping the SELinux and other linux
 		// security contexts in apiserver and not updating the pod object in the apiserver, we cannot validate the
-		// the pod object to not have those security contexts. However the pod coming to running state is a sufficient
+		// pod object to not have those security contexts. However the pod coming to running state is a sufficient
 		// enough condition for us to validate since prior to https://github.com/kubernetes/kubernetes/pull/93475
 		// the pod would have failed to come up.
 		windowsPodWithSELinux := createTestPod(f, windowsBusyBoximage, windowsOS)
