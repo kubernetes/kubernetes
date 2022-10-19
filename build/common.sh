@@ -38,10 +38,12 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Constants
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
-readonly KUBE_BUILD_IMAGE_CROSS_TAG="$(cat "${KUBE_ROOT}/build/build-image/cross/VERSION")"
+KUBE_BUILD_IMAGE_CROSS_TAG="$(cat "${KUBE_ROOT}/build/build-image/cross/VERSION")"
+readonly KUBE_BUILD_IMAGE_CROSS_TAG
 
 readonly KUBE_DOCKER_REGISTRY="${KUBE_DOCKER_REGISTRY:-registry.k8s.io}"
-readonly KUBE_BASE_IMAGE_REGISTRY="${KUBE_BASE_IMAGE_REGISTRY:-registry.k8s.io/build-image}"
+KUBE_BASE_IMAGE_REGISTRY="${KUBE_BASE_IMAGE_REGISTRY:-registry.k8s.io/build-image}"
+readonly KUBE_BASE_IMAGE_REGISTRY
 
 # This version number is used to cause everyone to rebuild their data containers
 # and build image.  This is especially useful for automated build systems like
@@ -49,12 +51,15 @@ readonly KUBE_BASE_IMAGE_REGISTRY="${KUBE_BASE_IMAGE_REGISTRY:-registry.k8s.io/b
 #
 # Increment/change this number if you change the build image (anything under
 # build/build-image) or change the set of volumes in the data container.
-readonly KUBE_BUILD_IMAGE_VERSION_BASE="$(cat "${KUBE_ROOT}/build/build-image/VERSION")"
+KUBE_BUILD_IMAGE_VERSION_BASE="$(cat "${KUBE_ROOT}/build/build-image/VERSION")"
+readonly KUBE_BUILD_IMAGE_VERSION_BASE
 readonly KUBE_BUILD_IMAGE_VERSION="${KUBE_BUILD_IMAGE_VERSION_BASE}-${KUBE_BUILD_IMAGE_CROSS_TAG}"
 
 # Make it possible to override the `kube-cross` image, and tag independent of `KUBE_BASE_IMAGE_REGISTRY`
-readonly KUBE_CROSS_IMAGE="${KUBE_CROSS_IMAGE:-"${KUBE_BASE_IMAGE_REGISTRY}/kube-cross"}"
-readonly KUBE_CROSS_VERSION="${KUBE_CROSS_VERSION:-"${KUBE_BUILD_IMAGE_CROSS_TAG}"}"
+KUBE_CROSS_IMAGE="${KUBE_CROSS_IMAGE:-"${KUBE_BASE_IMAGE_REGISTRY}/kube-cross"}"
+readonly KUBE_CROSS_IMAGE
+KUBE_CROSS_VERSION="${KUBE_CROSS_VERSION:-"${KUBE_BUILD_IMAGE_CROSS_TAG}"}"
+readonly KUBE_CROSS_VERSION
 
 # Here we map the output directories across both the local and remote _output
 # directories:
