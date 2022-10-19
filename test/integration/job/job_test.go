@@ -78,9 +78,7 @@ func TestMetrics(t *testing.T) {
 	closeFn, restConfig, clientSet, ns := setup(t, "simple")
 	defer closeFn()
 	ctx, cancel := startJobControllerAndWaitForCaches(restConfig)
-	defer func() {
-		cancel()
-	}()
+	defer cancel()
 
 	testCases := map[string]struct {
 		job                       *batchv1.Job
@@ -144,13 +142,14 @@ func TestMetrics(t *testing.T) {
 			validateJobSucceeded(ctx, t, clientSet, jobObj)
 
 			// verify metric values after the job is finished
-			validateMetricValue(t, metrics.JobFinishedNum, tc.wantJobFinishedNumMetric)
-			validateMetricValue(t, metrics.JobPodsFinished, tc.wantJobPodsFinishedMetric)
+			validateCounterMetric(t, metrics.JobFinishedNum, tc.wantJobFinishedNumMetric)
+			validateCounterMetric(t, metrics.JobPodsFinished, tc.wantJobPodsFinishedMetric)
+			validateTerminatedPodsTrackingFinalizerMetric(t, int(*jobObj.Spec.Parallelism))
 		})
 	}
 }
 
-func validateMetricValue(t *testing.T, counterVec *basemetrics.CounterVec, wantMetric metricLabelsWithValue) {
+func validateCounterMetric(t *testing.T, counterVec *basemetrics.CounterVec, wantMetric metricLabelsWithValue) {
 	t.Helper()
 	var cmpErr error
 	err := wait.PollImmediate(10*time.Millisecond, 10*time.Second, func() (bool, error) {
@@ -166,11 +165,22 @@ func validateMetricValue(t *testing.T, counterVec *basemetrics.CounterVec, wantM
 		return true, nil
 	})
 	if err != nil {
-		t.Errorf("Failed waiting for expected metric delta: %q", err)
+		t.Errorf("Failed waiting for expected metric: %q", err)
 	}
 	if cmpErr != nil {
 		t.Error(cmpErr)
 	}
+}
+
+func validateTerminatedPodsTrackingFinalizerMetric(t *testing.T, want int) {
+	validateCounterMetric(t, metrics.TerminatedPodsTrackingFinalizerTotal, metricLabelsWithValue{
+		Value:  want,
+		Labels: []string{metrics.Add},
+	})
+	validateCounterMetric(t, metrics.TerminatedPodsTrackingFinalizerTotal, metricLabelsWithValue{
+		Value:  want,
+		Labels: []string{metrics.Delete},
+	})
 }
 
 // TestJobPodFailurePolicyWithFailedPodDeletedDuringControllerRestart verifies that the job is properly marked as Failed
@@ -238,6 +248,7 @@ func TestJobPodFailurePolicyWithFailedPodDeletedDuringControllerRestart(t *testi
 	defer func() {
 		cancel()
 	}()
+	resetMetrics()
 	restConfig.QPS = 200
 	restConfig.Burst = 200
 
@@ -556,6 +567,7 @@ func TestParallelJob(t *testing.T) {
 			defer closeFn()
 			ctx, cancel := startJobControllerAndWaitForCaches(restConfig)
 			defer cancel()
+			resetMetrics()
 
 			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 				Spec: batchv1.JobSpec{
@@ -631,6 +643,9 @@ func TestParallelJob(t *testing.T) {
 			}
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, want, false)
 			validateFinishedPodsNoFinalizer(ctx, t, clientSet, jobObj)
+			if tc.trackWithFinalizers {
+				validateTerminatedPodsTrackingFinalizerMetric(t, 7)
+			}
 		})
 	}
 }
@@ -803,9 +818,8 @@ func TestIndexedJob(t *testing.T) {
 			closeFn, restConfig, clientSet, ns := setup(t, "indexed")
 			defer closeFn()
 			ctx, cancel := startJobControllerAndWaitForCaches(restConfig)
-			defer func() {
-				cancel()
-			}()
+			defer cancel()
+			resetMetrics()
 
 			mode := batchv1.IndexedCompletion
 			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
@@ -863,6 +877,9 @@ func TestIndexedJob(t *testing.T) {
 			validateIndexedJobPods(ctx, t, clientSet, jobObj, nil, "0-3")
 			validateJobSucceeded(ctx, t, clientSet, jobObj)
 			validateFinishedPodsNoFinalizer(ctx, t, clientSet, jobObj)
+			if wFinalizers {
+				validateTerminatedPodsTrackingFinalizerMetric(t, 5)
+			}
 		})
 	}
 }
@@ -957,6 +974,7 @@ func TestOrphanPodsFinalizersClearedWithGC(t *testing.T) {
 			restConfig.QPS = 1
 			restConfig.Burst = 1
 			jc, ctx, cancel := createJobControllerWithSharedInformers(restConfig, informerSet)
+			resetMetrics()
 			defer cancel()
 			restConfig.QPS = 200
 			restConfig.Burst = 200
@@ -989,6 +1007,8 @@ func TestOrphanPodsFinalizersClearedWithGC(t *testing.T) {
 				t.Fatalf("Failed to delete job: %v", err)
 			}
 			validateNoOrphanPodsWithFinalizers(ctx, t, clientSet, jobObj)
+			// Pods never finished, so they are not counted in the metric.
+			validateTerminatedPodsTrackingFinalizerMetric(t, 0)
 		})
 	}
 }
@@ -1676,6 +1696,7 @@ func startJobControllerAndWaitForCaches(restConfig *restclient.Config) (context.
 }
 
 func resetMetrics() {
+	metrics.TerminatedPodsTrackingFinalizerTotal.Reset()
 	metrics.JobFinishedNum.Reset()
 	metrics.JobPodsFinished.Reset()
 }

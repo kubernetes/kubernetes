@@ -246,6 +246,7 @@ func (jm *Controller) resolveControllerRef(namespace string, controllerRef *meta
 // When a pod is created, enqueue the controller that manages it and update its expectations.
 func (jm *Controller) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
+	recordFinishedPodWithTrackingFinalizer(nil, pod)
 	if pod.DeletionTimestamp != nil {
 		// on a restart of the controller, it's possible a new pod shows up in a state that
 		// is already pending deletion. Prevent the pod from being a creation observation.
@@ -288,6 +289,7 @@ func (jm *Controller) addPod(obj interface{}) {
 func (jm *Controller) updatePod(old, cur interface{}) {
 	curPod := cur.(*v1.Pod)
 	oldPod := old.(*v1.Pod)
+	recordFinishedPodWithTrackingFinalizer(oldPod, curPod)
 	if curPod.ResourceVersion == oldPod.ResourceVersion {
 		// Periodic resync will send update events for all known pods.
 		// Two different versions of the same pod will always have different RVs.
@@ -362,6 +364,9 @@ func (jm *Controller) updatePod(old, cur interface{}) {
 // obj could be an *v1.Pod, or a DeleteFinalStateUnknown marker item.
 func (jm *Controller) deletePod(obj interface{}, final bool) {
 	pod, ok := obj.(*v1.Pod)
+	if final {
+		recordFinishedPodWithTrackingFinalizer(pod, nil)
+	}
 
 	// When a delete is dropped, the relist will notice a pod in the store not
 	// in the list, leading to the insertion of a tombstone object which contains
@@ -1671,15 +1676,6 @@ func removeTrackingAnnotationPatch(job *batch.Job) []byte {
 	}
 	patchBytes, _ := json.Marshal(patch)
 	return patchBytes
-}
-
-func hasJobTrackingFinalizer(pod *v1.Pod) bool {
-	for _, fin := range pod.Finalizers {
-		if fin == batch.JobTrackingFinalizer {
-			return true
-		}
-	}
-	return false
 }
 
 type uncountedTerminatedPods struct {
