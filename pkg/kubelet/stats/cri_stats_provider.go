@@ -166,11 +166,12 @@ func (p *criStatsProvider) listPodStatsPartiallyFromCRI(ctx context.Context, upd
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all container stats: %v", err)
 	}
-	allInfos, err := getCadvisorContainerInfo(p.cadvisor)
+
+	caAllInfos, err := getCadvisorContainerInfo(p.cadvisor)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch cadvisor stats: %v", err)
 	}
-	caInfos, allInfos := getCRICadvisorStats(allInfos)
+	caInfos, caAllInfos := getCRICadvisorStats(caAllInfos)
 
 	// get network stats for containers.
 	// This is only used on Windows. For other platforms, (nil, nil) should be returned.
@@ -200,20 +201,23 @@ func (p *criStatsProvider) listPodStatsPartiallyFromCRI(ctx context.Context, upd
 			sandboxIDToPodStats[podSandboxID] = ps
 		}
 
-		// Fill available stats for full set of required pod stats
-		cs := p.makeContainerStats(stats, container, rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata(), updateCPUNanoCoreUsage)
-		p.addPodNetworkStats(ps, podSandboxID, caInfos, cs, containerNetworkStats[podSandboxID])
-		p.addPodCPUMemoryStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
-		p.addProcessStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
+		// Create the stats of the container so that cAdvisor stats and CRI stats both can use it
+		cs := buildContainerStats(stats, container, false)
 
 		// If cadvisor stats is available for the container, use it to populate
-		// container stats
+		// container stats for cAdvisor stats to be applied before the CRI stats.
 		caStats, caFound := caInfos[containerID]
 		if !caFound {
 			klog.V(5).InfoS("Unable to find cadvisor stats for container", "containerID", containerID)
 		} else {
 			p.addCadvisorContainerStats(cs, &caStats)
 		}
+
+		// Fill available stats for full set of required pod stats
+		p.makeContainerStats(stats, container, rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata(), updateCPUNanoCoreUsage, cs)
+		p.addPodNetworkStats(ps, podSandboxID, caInfos, cs, containerNetworkStats[podSandboxID])
+		p.addPodCPUMemoryStats(ps, cs)
+		p.addProcessStats(ps, types.UID(podSandbox.Metadata.Uid), caAllInfos, cs)
 		ps.Containers = append(ps.Containers, *cs)
 	}
 	// cleanup outdated caches.
@@ -250,8 +254,10 @@ func (p *criStatsProvider) listPodStatsStrictlyFromCRI(ctx context.Context, upda
 			if !found {
 				continue
 			}
+
+			cs := buildContainerStats(criContainerStat, container, false)
 			// Fill available stats for full set of required pod stats
-			cs := p.makeContainerStats(criContainerStat, container, rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata(), updateCPUNanoCoreUsage)
+			p.makeContainerStats(criContainerStat, container, rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata(), updateCPUNanoCoreUsage, cs)
 			ps.Containers = append(ps.Containers, *cs)
 		}
 		addCRIPodNetworkStats(ps, criSandboxStat)
@@ -302,19 +308,19 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([]stat
 		)
 	}
 
-	resp, err := p.runtimeService.ListContainerStats(ctx, &runtimeapi.ContainerStatsFilter{})
+	criListContainerStatsResp, err := p.runtimeService.ListContainerStats(ctx, &runtimeapi.ContainerStatsFilter{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all container stats: %v", err)
 	}
 
-	allInfos, err := getCadvisorContainerInfo(p.cadvisor)
+	caAllInfos, err := getCadvisorContainerInfo(p.cadvisor)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch cadvisor stats: %v", err)
 	}
-	caInfos, allInfos := getCRICadvisorStats(allInfos)
+	caInfos, caAllInfos := getCRICadvisorStats(caAllInfos)
 
-	for _, stats := range resp {
-		containerID := stats.Attributes.Id
+	for _, criStats := range criListContainerStatsResp {
+		containerID := criStats.Attributes.Id
 		container, found := containerMap[containerID]
 		if !found {
 			continue
@@ -333,25 +339,29 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([]stat
 			ps = buildPodStats(podSandbox)
 			sandboxIDToPodStats[podSandboxID] = ps
 		}
-
-		// Fill available CPU and memory stats for full set of required pod stats
-		cs := p.makeContainerCPUAndMemoryStats(stats, container)
-		p.addPodCPUMemoryStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
+		// Create the stats of the container so that cAdvisor stats and CRI stats both can use it
+		cs := buildContainerStats(criStats, container, true)
 
 		// If cadvisor stats is available for the container, use it to populate
-		// container stats
+		// container stats for cAdvisor stats to be applied before the CRI stats.
 		caStats, caFound := caInfos[containerID]
 		if !caFound {
 			klog.V(4).InfoS("Unable to find cadvisor stats for container", "containerID", containerID)
 		} else {
 			p.addCadvisorContainerCPUAndMemoryStats(cs, &caStats)
 		}
+
+		// Fill available CPU and memory stats for full set of required pod stats
+		p.makeContainerCPUAndMemoryStats(criStats, cs)
+		p.addPodCPUMemoryStats(ps, cs)
 		ps.Containers = append(ps.Containers, *cs)
 	}
 	// cleanup outdated caches.
 	p.cleanupOutdatedCaches()
 
 	for _, s := range sandboxIDToPodStats {
+		// If CPU and Memory stats cannot be obtained from CRI, it is obtained from cadvisor at the end.
+		p.addPodCPUMemoryStatsFromCadvisor(s, caAllInfos)
 		result = append(result, *s)
 	}
 	return result, nil
@@ -470,6 +480,23 @@ func buildPodStats(podSandbox *runtimeapi.PodSandbox) *statsapi.PodStats {
 	}
 }
 
+// buildContainerStats returns a ContainerStats that identifies the Container managing cinfo
+func buildContainerStats(stats *runtimeapi.ContainerStats, container *runtimeapi.Container, includeCPUAndMemoryStatsOnly bool) *statsapi.ContainerStats {
+	cs := &statsapi.ContainerStats{
+		Name: stats.Attributes.Metadata.Name,
+		// The StartTime in the summary API is the container creation time.
+		StartTime: metav1.NewTime(time.Unix(0, container.CreatedAt)),
+		CPU:       &statsapi.CPUStats{},
+		Memory:    &statsapi.MemoryStats{},
+		// UserDefinedMetrics is not supported by CRI.
+	}
+	if !includeCPUAndMemoryStatsOnly {
+		cs.Rootfs = &statsapi.FsStats{}
+		cs.Logs = &statsapi.FsStats{}
+	}
+	return cs
+}
+
 func (p *criStatsProvider) addPodNetworkStats(
 	ps *statsapi.PodStats,
 	podSandboxID string,
@@ -499,25 +526,13 @@ func (p *criStatsProvider) addPodNetworkStats(
 
 func (p *criStatsProvider) addPodCPUMemoryStats(
 	ps *statsapi.PodStats,
-	podUID types.UID,
-	allInfos map[string]cadvisorapiv2.ContainerInfo,
 	cs *statsapi.ContainerStats,
 ) {
-	// try get cpu and memory stats from cadvisor first.
-	podCgroupInfo := getCadvisorPodInfoFromPodUID(podUID, allInfos)
-	if podCgroupInfo != nil {
-		cpu, memory := cadvisorInfoToCPUandMemoryStats(podCgroupInfo)
-		ps.CPU = cpu
-		ps.Memory = memory
-		return
-	}
-
 	// Sum Pod cpu and memory stats from containers stats.
 	if cs.CPU != nil {
 		if ps.CPU == nil {
 			ps.CPU = &statsapi.CPUStats{}
 		}
-
 		ps.CPU.Time = cs.CPU.Time
 		usageCoreNanoSeconds := getUint64Value(cs.CPU.UsageCoreNanoSeconds) + getUint64Value(ps.CPU.UsageCoreNanoSeconds)
 		usageNanoCores := getUint64Value(cs.CPU.UsageNanoCores) + getUint64Value(ps.CPU.UsageNanoCores)
@@ -546,6 +561,27 @@ func (p *criStatsProvider) addPodCPUMemoryStats(
 	}
 }
 
+func (p *criStatsProvider) addPodCPUMemoryStatsFromCadvisor(
+	ps *statsapi.PodStats,
+	cadvisorAllInfos map[string]cadvisorapiv2.ContainerInfo,
+) {
+	if ps.CPU != nil && ps.Memory != nil {
+		return
+	}
+
+	// try to get cpu and memory stats from cadvisor finally.
+	podUID := types.UID(ps.PodRef.UID)
+	podCgroupInfo := getCadvisorPodInfoFromPodUID(podUID, cadvisorAllInfos)
+	if podCgroupInfo != nil {
+		cpu, memory := cadvisorInfoToCPUandMemoryStats(podCgroupInfo)
+		if ps.CPU == nil {
+			ps.CPU = cpu
+		}
+		if ps.Memory == nil {
+			ps.Memory = memory
+		}
+	}
+}
 func (p *criStatsProvider) addProcessStats(
 	ps *statsapi.PodStats,
 	podUID types.UID,
@@ -567,16 +603,8 @@ func (p *criStatsProvider) makeContainerStats(
 	fsIDtoInfo map[runtimeapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo,
 	meta *runtimeapi.PodSandboxMetadata,
 	updateCPUNanoCoreUsage bool,
-) *statsapi.ContainerStats {
-	result := &statsapi.ContainerStats{
-		Name: stats.Attributes.Metadata.Name,
-		// The StartTime in the summary API is the container creation time.
-		StartTime: metav1.NewTime(time.Unix(0, container.CreatedAt)),
-		CPU:       &statsapi.CPUStats{},
-		Memory:    &statsapi.MemoryStats{},
-		Rootfs:    &statsapi.FsStats{},
-		// UserDefinedMetrics is not supported by CRI.
-	}
+	result *statsapi.ContainerStats,
+) {
 	if stats.Cpu != nil {
 		result.CPU.Time = metav1.NewTime(time.Unix(0, stats.Cpu.Timestamp))
 		if stats.Cpu.UsageCoreNanoSeconds != nil {
@@ -640,21 +668,12 @@ func (p *criStatsProvider) makeContainerStats(
 	if err != nil {
 		klog.ErrorS(err, "Unable to fetch container log stats", "containerName", container.GetMetadata().GetName())
 	}
-	return result
 }
 
 func (p *criStatsProvider) makeContainerCPUAndMemoryStats(
 	stats *runtimeapi.ContainerStats,
-	container *runtimeapi.Container,
-) *statsapi.ContainerStats {
-	result := &statsapi.ContainerStats{
-		Name: stats.Attributes.Metadata.Name,
-		// The StartTime in the summary API is the container creation time.
-		StartTime: metav1.NewTime(time.Unix(0, container.CreatedAt)),
-		CPU:       &statsapi.CPUStats{},
-		Memory:    &statsapi.MemoryStats{},
-		// UserDefinedMetrics is not supported by CRI.
-	}
+	result *statsapi.ContainerStats,
+) {
 	if stats.Cpu != nil {
 		result.CPU.Time = metav1.NewTime(time.Unix(0, stats.Cpu.Timestamp))
 		if stats.Cpu.UsageCoreNanoSeconds != nil {
@@ -679,8 +698,6 @@ func (p *criStatsProvider) makeContainerCPUAndMemoryStats(
 		result.Memory.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
 		result.Memory.WorkingSetBytes = uint64Ptr(0)
 	}
-
-	return result
 }
 
 // getContainerUsageNanoCores first attempts to get the usage nano cores from the stats reported

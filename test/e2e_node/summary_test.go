@@ -170,7 +170,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 						"StartTime": recent(maxStartAge),
 						"CPU": ptrMatchAllFields(gstruct.Fields{
 							"Time":                 recent(maxStatsAge),
-							"UsageNanoCores":       bounded(10000, 1e9),
+							"UsageNanoCores":       gomega.SatisfyAny(gstruct.PointTo(gomega.BeZero()), bounded(10000, 1e9)),
 							"UsageCoreNanoSeconds": bounded(10000000, 1e11),
 						}),
 						"Memory": ptrMatchAllFields(gstruct.Fields{
@@ -217,7 +217,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 				}),
 				"CPU": ptrMatchAllFields(gstruct.Fields{
 					"Time":                 recent(maxStatsAge),
-					"UsageNanoCores":       bounded(10000, 1e9),
+					"UsageNanoCores":       gomega.SatisfyAny(gstruct.PointTo(gomega.BeZero()), bounded(10000, 1e9)),
 					"UsageCoreNanoSeconds": bounded(10000000, 1e11),
 				}),
 				"Memory": ptrMatchAllFields(gstruct.Fields{
