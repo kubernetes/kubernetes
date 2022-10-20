@@ -32,7 +32,7 @@ func (o *NodeControllerOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
-	fs.Int32Var(&o.WorkerCount, "workerCount", o.WorkerCount, "Number of workers synchronizing node status.")
+	fs.Int32Var(&o.WorkerCount, "worker-count", o.WorkerCount, "Number of workers synchronizing node status.")
 }
 
 // ApplyTo fills up ServiceController config with options.
