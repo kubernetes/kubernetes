@@ -505,6 +505,9 @@ func TestSensitiveMountOptions(t *testing.T) {
 			if !strings.Contains(mountArgsLogStr, mountFlag) {
 				t.Errorf("Expected mountFlag (%q) to exist in returned mountArgsLogStr (%q), but it does", mountFlag, mountArgsLogStr)
 			}
+			if strings.Count(mountArgsLogStr, mountFlag) > 1 {
+				t.Errorf("Expected mountFlag (%q) to appear once in returned mountArgsLogStr (%q), but it appears many times", mountFlag, mountArgsLogStr)
+			}
 		}
 		for _, option := range v.options {
 			if found := mountArgsContainOption(t, mountArgs, option); !found {

@@ -23,7 +23,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/moby/sys/mountinfo"
 	"io/fs"
 	"io/ioutil"
 	"os"
@@ -33,6 +32,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/moby/sys/mountinfo"
 
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
@@ -313,12 +314,11 @@ func MakeMountArgsSensitiveWithMountFlags(source, target, fstype string, options
 	mountArgsLogStr = ""
 
 	mountArgs = append(mountArgs, mountFlags...)
-	mountArgsLogStr += strings.Join(mountFlags, " ")
-
 	if len(fstype) > 0 {
 		mountArgs = append(mountArgs, "-t", fstype)
-		mountArgsLogStr += strings.Join(mountArgs, " ")
 	}
+	mountArgsLogStr += strings.Join(mountArgs, " ")
+
 	if len(options) > 0 || len(sensitiveOptions) > 0 {
 		combinedOptions := []string{}
 		combinedOptions = append(combinedOptions, options...)
