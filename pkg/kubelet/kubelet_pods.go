@@ -343,7 +343,11 @@ func ensureHostsFile(fileName string, hostIPs []string, hostName, hostDomainName
 		hostsFileContent = managedHostsFileContent(hostIPs, hostName, hostDomainName, hostAliases)
 	}
 
-	return os.WriteFile(fileName, hostsFileContent, 0644)
+	hostsFilePerm := os.FileMode(0644)
+	if err := os.WriteFile(fileName, hostsFileContent, hostsFilePerm); err != nil {
+		return err
+	}
+	return os.Chmod(fileName, hostsFilePerm)
 }
 
 // nodeHostsFileContent reads the content of node's hosts file.
