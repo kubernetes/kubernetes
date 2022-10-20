@@ -48,11 +48,25 @@ type NodeScore struct {
 	Score int64
 }
 
-// PluginToNodeScores declares a map from plugin name to its NodeScoreList.
-type PluginToNodeScores map[string]NodeScoreList
-
 // NodeToStatusMap declares map from node name to its status.
 type NodeToStatusMap map[string]*Status
+
+// NodePluginScores is a struct with node name and scores for that node.
+type NodePluginScores struct {
+	// Name is node name.
+	Name string
+	// Scores is scores from plugins and extenders.
+	Scores []PluginScore
+	// TotalScore is the total score in Scores.
+	TotalScore int64
+}
+
+// PluginScore is a struct with plugin/extender name and score.
+type PluginScore struct {
+	// Name is the name of plugin or extender.
+	Name  string
+	Score int64
+}
 
 // Code is the Status code/type which is returned from plugins.
 type Code int
@@ -712,11 +726,11 @@ type PluginsRunner interface {
 	// RunPreScorePlugins runs the set of configured PreScore plugins. If any
 	// of these plugins returns any status other than "Success", the given pod is rejected.
 	RunPreScorePlugins(context.Context, *CycleState, *v1.Pod, []*v1.Node) *Status
-	// RunScorePlugins runs the set of configured Score plugins. It returns a map that
-	// stores for each Score plugin name the corresponding NodeScoreList(s).
+	// RunScorePlugins runs the set of configured scoring plugins.
+	// It returns a list that stores scores from each plugin and total score for each Node.
 	// It also returns *Status, which is set to non-success if any of the plugins returns
 	// a non-success status.
-	RunScorePlugins(context.Context, *CycleState, *v1.Pod, []*v1.Node) (PluginToNodeScores, *Status)
+	RunScorePlugins(context.Context, *CycleState, *v1.Pod, []*v1.Node) ([]NodePluginScores, *Status)
 	// RunFilterPlugins runs the set of configured Filter plugins for pod on
 	// the given node. Note that for the node being evaluated, the passed nodeInfo
 	// reference could be different from the one in NodeInfoSnapshot map (e.g., pods

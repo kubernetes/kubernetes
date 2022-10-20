@@ -696,7 +696,7 @@ func prioritizeNodes(
 	}
 
 	// Run the Score plugins.
-	scoresMap, scoreStatus := fwk.RunScorePlugins(ctx, state, pod, nodes)
+	nodesScores, scoreStatus := fwk.RunScorePlugins(ctx, state, pod, nodes)
 	if !scoreStatus.IsSuccess() {
 		return nil, scoreStatus.AsError()
 	}
@@ -704,21 +704,17 @@ func prioritizeNodes(
 	// Additional details logged at level 10 if enabled.
 	klogV := klog.V(10)
 	if klogV.Enabled() {
-		for plugin, nodeScoreList := range scoresMap {
-			for _, nodeScore := range nodeScoreList {
-				klogV.InfoS("Plugin scored node for pod", "pod", klog.KObj(pod), "plugin", plugin, "node", nodeScore.Name, "score", nodeScore.Score)
+		for _, nodeScore := range nodesScores {
+			for _, pluginScore := range nodeScore.Scores {
+				klogV.InfoS("Plugin scored node for pod", "pod", klog.KObj(pod), "plugin", pluginScore.Name, "node", nodeScore.Name, "score", pluginScore.Score)
 			}
 		}
 	}
 
 	// Summarize all scores.
-	result := make(framework.NodeScoreList, 0, len(nodes))
-
-	for i := range nodes {
-		result = append(result, framework.NodeScore{Name: nodes[i].Name, Score: 0})
-		for j := range scoresMap {
-			result[i].Score += scoresMap[j][i].Score
-		}
+	result := make(framework.NodeScoreList, len(nodes))
+	for i, pluginScores := range nodesScores {
+		result[i] = framework.NodeScore{Name: nodes[i].Name, Score: pluginScores.TotalScore}
 	}
 
 	if len(extenders) != 0 && nodes != nil {
