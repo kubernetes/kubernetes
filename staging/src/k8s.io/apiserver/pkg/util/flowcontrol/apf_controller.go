@@ -71,21 +71,16 @@ const (
 	// Borrowing among priority levels will be accomplished by periodically
 	// adjusting the current concurrency limits (CurrentCLs);
 	// borrowingAdjustmentPeriod is that period.
-	borrowingAdjustmentPeriod = 10 * time.Second //nolint:golint,unused
+	borrowingAdjustmentPeriod = 10 * time.Second
 
-	// The input to the borrowing is smoothed seat demand figures.
-	// Every adjustment period, each priority level's smoothed demand is adjusted
-	// based on an envelope of that level's recent seat demand.  The formula is:
-	// SmoothSeatDemand := max( EnvelopeSeatDemand,
-	//                          seatDemandSmoothingCoefficient     * SmoothSeatDemand +
-	//                          (1-seatDemandSmoothingCoefficient) * EnvelopeSeatDemand ).
-	// Qualitatively: this parameter controls the rate at which the smoothed seat demand drifts
-	// down toward the envelope of seat demand while that is lower.
-	// The particular number appearing here has the property that half of the
-	// current smoothed value comes from the smoothed value of 5 minutes ago.
+	// The input to the seat borrowing is smoothed seat demand figures.
+	// This constant controls the decay rate of that smoothing,
+	// as described in the comment on the `seatDemandStats` field of `priorityLevelState`.
+	// The particular number appearing here has the property that half-life
+	// of that decay is 5 minutes.
 	// This is a very preliminary guess at a good value and is likely to be tweaked
 	// once we get some experience with borrowing.
-	seatDemandSmoothingCoefficient = 0.977 //nolint:golint,unused
+	seatDemandSmoothingCoefficient = 0.977
 )
 
 // The funcs in this package follow the naming convention that the suffix
@@ -217,6 +212,43 @@ type priorityLevelState struct {
 
 	// Observer of number of seats occupied throughout execution
 	execSeatsObs metrics.RatioedGauge
+
+	// Integrator of seat demand, reset every CurrentCL adjustment period
+	seatDemandIntegrator fq.Integrator
+
+	// seatDemandStats is derived from periodically examining the seatDemandIntegrator.
+	// The average, standard deviation, and high watermark come directly from the integrator.
+	// envelope = avg + stdDev.
+	// Periodically smoothed gets replaced with `max(envelope, A*smoothed + (1-A)*envelope)`,
+	// where A is seatDemandSmoothingCoefficient.
+	seatDemandStats seatDemandStats
+}
+
+type seatDemandStats struct {
+	avg           float64
+	stdDev        float64
+	highWatermark float64
+	envelope      float64
+	smoothed      float64
+}
+
+func newSeatDemandStats(val float64) seatDemandStats {
+	return seatDemandStats{
+		avg:           val,
+		stdDev:        0,
+		highWatermark: val,
+		envelope:      val,
+		smoothed:      val,
+	}
+}
+
+func (stats *seatDemandStats) update(obs fq.IntegratorResults) {
+	stats.avg = obs.Average
+	stats.stdDev = obs.Deviation
+	stats.highWatermark = obs.Max
+	envelope := obs.Average + obs.Deviation
+	stats.envelope = envelope
+	stats.smoothed = math.Max(envelope, seatDemandSmoothingCoefficient*stats.smoothed+(1-seatDemandSmoothingCoefficient)*envelope)
 }
 
 // NewTestableController is extra flexible to facilitate testing
@@ -325,9 +357,23 @@ func (cfgCtlr *configController) Run(stopCh <-chan struct{}) error {
 	klog.Info("Running API Priority and Fairness config worker")
 	go wait.Until(cfgCtlr.runWorker, time.Second, stopCh)
 
+	klog.Info("Running API Priority and Fairness periodic rebalancing process")
+	go wait.Until(cfgCtlr.updateBorrowing, borrowingAdjustmentPeriod, stopCh)
+
 	<-stopCh
 	klog.Info("Shutting down API Priority and Fairness config worker")
 	return nil
+}
+
+func (cfgCtlr *configController) updateBorrowing() {
+	cfgCtlr.lock.Lock()
+	defer cfgCtlr.lock.Unlock()
+	for _, plState := range cfgCtlr.priorityLevelStates {
+		obs := plState.seatDemandIntegrator.Reset()
+		plState.seatDemandStats.update(obs)
+		// TODO: set borrowing metrics introduced in https://github.com/kubernetes/enhancements/pull/3391
+		// TODO: updathe CurrentCL as described in https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/1040-priority-and-fairness#dispatching
+	}
 }
 
 // runWorker is the logic of the one and only worker goroutine.  We
@@ -552,9 +598,13 @@ func (meal *cfgMeal) digestNewPLsLocked(newPLs []*flowcontrol.PriorityLevelConfi
 		state := meal.cfgCtlr.priorityLevelStates[pl.Name]
 		if state == nil {
 			labelValues := []string{pl.Name}
-			state = &priorityLevelState{reqsGaugePair: metrics.RatioedGaugeVecPhasedElementPair(meal.cfgCtlr.reqsGaugeVec, 1, 1, labelValues), execSeatsObs: meal.cfgCtlr.execSeatsGaugeVec.NewForLabelValuesSafe(0, 1, labelValues)}
+			state = &priorityLevelState{
+				reqsGaugePair:        metrics.RatioedGaugeVecPhasedElementPair(meal.cfgCtlr.reqsGaugeVec, 1, 1, labelValues),
+				execSeatsObs:         meal.cfgCtlr.execSeatsGaugeVec.NewForLabelValuesSafe(0, 1, labelValues),
+				seatDemandIntegrator: fq.NewNamedIntegrator(meal.cfgCtlr.clock, pl.Name),
+			}
 		}
-		qsCompleter, err := queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, state.queues, pl, meal.cfgCtlr.requestWaitLimit, state.reqsGaugePair, state.execSeatsObs)
+		qsCompleter, err := queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, state.queues, pl, meal.cfgCtlr.requestWaitLimit, state.reqsGaugePair, state.execSeatsObs, state.seatDemandIntegrator)
 		if err != nil {
 			klog.Warningf("Ignoring PriorityLevelConfiguration object %s because its spec (%s) is broken: %s", pl.Name, fcfmt.Fmt(pl.Spec), err)
 			continue
@@ -658,7 +708,7 @@ func (meal *cfgMeal) processOldPLsLocked() {
 			}
 		}
 		var err error
-		plState.qsCompleter, err = queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, plState.queues, plState.pl, meal.cfgCtlr.requestWaitLimit, plState.reqsGaugePair, plState.execSeatsObs)
+		plState.qsCompleter, err = queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, plState.queues, plState.pl, meal.cfgCtlr.requestWaitLimit, plState.reqsGaugePair, plState.execSeatsObs, plState.seatDemandIntegrator)
 		if err != nil {
 			// This can not happen because queueSetCompleterForPL already approved this config
 			panic(fmt.Sprintf("%s from name=%q spec=%s", err, plName, fcfmt.Fmt(plState.pl.Spec)))
@@ -702,6 +752,8 @@ func (meal *cfgMeal) finishQueueSetReconfigsLocked() {
 
 		if plState.queues == nil {
 			klog.V(5).Infof("Introducing queues for priority level %q: config=%s, concurrencyLimit=%d, quiescing=%v (shares=%v, shareSum=%v)", plName, fcfmt.Fmt(plState.pl.Spec), concurrencyLimit, plState.quiescing, plState.pl.Spec.Limited.NominalConcurrencyShares, meal.shareSum)
+			plState.seatDemandStats = newSeatDemandStats(float64(concurrencyLimit))
+			// TODO: initialize as described in https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/1040-priority-and-fairness#dispatching once NominalCL values are implemented
 		} else {
 			klog.V(5).Infof("Retaining queues for priority level %q: config=%s, concurrencyLimit=%d, quiescing=%v, numPending=%d (shares=%v, shareSum=%v)", plName, fcfmt.Fmt(plState.pl.Spec), concurrencyLimit, plState.quiescing, plState.numPending, plState.pl.Spec.Limited.NominalConcurrencyShares, meal.shareSum)
 		}
@@ -713,7 +765,7 @@ func (meal *cfgMeal) finishQueueSetReconfigsLocked() {
 // given priority level configuration.  Returns nil if that config
 // does not call for limiting.  Returns nil and an error if the given
 // object is malformed in a way that is a problem for this package.
-func queueSetCompleterForPL(qsf fq.QueueSetFactory, queues fq.QueueSet, pl *flowcontrol.PriorityLevelConfiguration, requestWaitLimit time.Duration, reqsIntPair metrics.RatioedGaugePair, execSeatsObs metrics.RatioedGauge) (fq.QueueSetCompleter, error) {
+func queueSetCompleterForPL(qsf fq.QueueSetFactory, queues fq.QueueSet, pl *flowcontrol.PriorityLevelConfiguration, requestWaitLimit time.Duration, reqsIntPair metrics.RatioedGaugePair, execSeatsObs metrics.RatioedGauge, seatDemandIntgrator fq.Integrator) (fq.QueueSetCompleter, error) {
 	if (pl.Spec.Type == flowcontrol.PriorityLevelEnablementExempt) != (pl.Spec.Limited == nil) {
 		return nil, errors.New("broken union structure at the top")
 	}
@@ -742,7 +794,7 @@ func queueSetCompleterForPL(qsf fq.QueueSetFactory, queues fq.QueueSet, pl *flow
 	if queues != nil {
 		qsc, err = queues.BeginConfigChange(qcQS)
 	} else {
-		qsc, err = qsf.BeginConstruction(qcQS, reqsIntPair, execSeatsObs)
+		qsc, err = qsf.BeginConstruction(qcQS, reqsIntPair, execSeatsObs, seatDemandIntgrator)
 	}
 	if err != nil {
 		err = fmt.Errorf("priority level %q has QueuingConfiguration %#+v, which is invalid: %w", pl.Name, qcAPI, err)
@@ -790,17 +842,19 @@ func (meal *cfgMeal) imaginePL(proto *flowcontrol.PriorityLevelConfiguration, re
 	labelValues := []string{proto.Name}
 	reqsGaugePair := metrics.RatioedGaugeVecPhasedElementPair(meal.cfgCtlr.reqsGaugeVec, 1, 1, labelValues)
 	execSeatsObs := meal.cfgCtlr.execSeatsGaugeVec.NewForLabelValuesSafe(0, 1, labelValues)
-	qsCompleter, err := queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, nil, proto, requestWaitLimit, reqsGaugePair, execSeatsObs)
+	seatDemandIntegrator := fq.NewNamedIntegrator(meal.cfgCtlr.clock, proto.Name)
+	qsCompleter, err := queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, nil, proto, requestWaitLimit, reqsGaugePair, execSeatsObs, seatDemandIntegrator)
 	if err != nil {
 		// This can not happen because proto is one of the mandatory
 		// objects and these are not erroneous
 		panic(err)
 	}
 	meal.newPLStates[proto.Name] = &priorityLevelState{
-		pl:            proto,
-		qsCompleter:   qsCompleter,
-		reqsGaugePair: reqsGaugePair,
-		execSeatsObs:  execSeatsObs,
+		pl:                   proto,
+		qsCompleter:          qsCompleter,
+		reqsGaugePair:        reqsGaugePair,
+		execSeatsObs:         execSeatsObs,
+		seatDemandIntegrator: seatDemandIntegrator,
 	}
 	if proto.Spec.Limited != nil {
 		meal.shareSum += float64(proto.Spec.Limited.NominalConcurrencyShares)
