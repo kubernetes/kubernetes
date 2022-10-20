@@ -62,19 +62,19 @@ func NewProgressReporter(progressReportURL string) *ProgressReporter {
 	return rep
 }
 
-// SendUpdates serializes the current progress and prints it to stdout and also posts it to the configured endpoint if set.
+// SendUpdates serializes the current progress and posts it to the configured endpoint if set.
+// It does not print to stdout because that interferes with progress reporting by Ginko
+// and (when Ginkgo does output redirection) doesn't actually appear on the screen anyway.
 func (reporter *ProgressReporter) SendUpdates() {
-	b := reporter.serialize()
-	fmt.Println(string(b))
-	go reporter.postProgressToURL(b)
-}
-
-func (reporter *ProgressReporter) postProgressToURL(b []byte) {
 	// If a progressURL and client is set/available then POST to it. Noop otherwise.
 	if reporter.client == nil || len(reporter.progressURL) == 0 {
 		return
 	}
+	b := reporter.serialize()
+	go reporter.postProgressToURL(b)
+}
 
+func (reporter *ProgressReporter) postProgressToURL(b []byte) {
 	resp, err := reporter.client.Post(reporter.progressURL, "application/json", bytes.NewReader(b))
 	if err != nil {
 		klog.Errorf("Failed to post progress update to %v: %v", reporter.progressURL, err)
