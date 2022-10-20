@@ -784,7 +784,6 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		fsGroup                        int64
 		driverFSGroupPolicy            bool
 		supportMode                    storage.FSGroupPolicy
-		delegateFSGroupFeatureGate     bool
 		driverSupportsVolumeMountGroup bool
 		expectedFSGroupInNodePublish   string
 	}{
@@ -916,46 +915,32 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 			supportMode:         storage.FileFSGroupPolicy,
 		},
 		{
-			name:                           "fsgroup provided, DelegateFSGroupToCSIDriver feature enabled, driver supports volume mount group; expect fsgroup to be passed to NodePublishVolume",
+			name:                           "fsgroup provided, driver supports volume mount group; expect fsgroup to be passed to NodePublishVolume",
 			fsType:                         "ext4",
 			setFsGroup:                     true,
 			fsGroup:                        3000,
-			delegateFSGroupFeatureGate:     true,
 			driverSupportsVolumeMountGroup: true,
 			expectedFSGroupInNodePublish:   "3000",
 		},
 		{
-			name:                           "fsgroup not provided, DelegateFSGroupToCSIDriver feature enabled, driver supports volume mount group; expect fsgroup not to be passed to NodePublishVolume",
+			name:                           "fsgroup not provided, driver supports volume mount group; expect fsgroup not to be passed to NodePublishVolume",
 			fsType:                         "ext4",
 			setFsGroup:                     false,
-			delegateFSGroupFeatureGate:     true,
 			driverSupportsVolumeMountGroup: true,
 			expectedFSGroupInNodePublish:   "",
 		},
 		{
-			name:                           "fsgroup provided, DelegateFSGroupToCSIDriver feature enabled, driver does not support volume mount group; expect fsgroup not to be passed to NodePublishVolume",
+			name:                           "fsgroup provided, driver does not support volume mount group; expect fsgroup not to be passed to NodePublishVolume",
 			fsType:                         "ext4",
 			setFsGroup:                     true,
 			fsGroup:                        3000,
-			delegateFSGroupFeatureGate:     true,
 			driverSupportsVolumeMountGroup: false,
-			expectedFSGroupInNodePublish:   "",
-		},
-		{
-			name:                           "fsgroup provided, DelegateFSGroupToCSIDriver feature disabled, driver supports volume mount group; expect fsgroup not to be passed to NodePublishVolume",
-			fsType:                         "ext4",
-			setFsGroup:                     true,
-			fsGroup:                        3000,
-			delegateFSGroupFeatureGate:     false,
-			driverSupportsVolumeMountGroup: true,
 			expectedFSGroupInNodePublish:   "",
 		},
 	}
 
 	for i, tc := range testCases {
 		t.Logf("Running test %s", tc.name)
-
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DelegateFSGroupToCSIDriver, tc.delegateFSGroupFeatureGate)()
 
 		volName := fmt.Sprintf("test-vol-%d", i)
 		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
