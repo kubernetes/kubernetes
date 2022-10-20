@@ -55,5 +55,13 @@ ADD agnhost agnhost
 # entrypoint is used by the containers.
 RUN ln -s agnhost agnhost-2
 
+# this user and group is used in a E2E test case of 
+# SupplementalGroups with pre-defined group in the image
+# - image-user(uid=1000)
+# - image-user belongs to group-defined-in-image(gid=50000)
+RUN adduser -u 1000 -D image-user && \
+    addgroup -g 50000 group-defined-in-image && \
+    addgroup image-user group-defined-in-image
+
 ENTRYPOINT ["/agnhost"]
 CMD ["pause"]
