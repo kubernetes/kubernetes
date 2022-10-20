@@ -18,7 +18,7 @@ package options
 
 import (
 	"github.com/spf13/pflag"
-	
+
 	nodeconfig "k8s.io/cloud-provider/controllers/node/config"
 )
 
@@ -33,7 +33,7 @@ func (o *NodeControllerOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
-	fs.Int32Var(&o.WorkerCount, "worker-count", o.WorkerCount, "Number of workers synchronizing node status.")
+	fs.Int32Var(&o.WorkerCount, "node-controller-worker-count", o.WorkerCount, "Number of workers synchronizing node status.")
 }
 
 // ApplyTo fills up ServiceController config with options.

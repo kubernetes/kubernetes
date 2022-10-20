@@ -175,7 +175,7 @@ func TestAddFlags(t *testing.T) {
 		"--route-reconciliation-period=30s",
 		"--secure-port=10001",
 		"--use-service-account-credentials=false",
-		"--workerCount=5",
+		"--node-controller-worker-count=5",
 	}
 	err = fs.Parse(args)
 	if err != nil {
