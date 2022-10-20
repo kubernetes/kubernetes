@@ -350,6 +350,7 @@ __EOF__
   # First pass, custom resource fails, but crd apply succeeds.
   output_message=$(! kubectl apply -f hack/testdata/multi-resource-4.yaml 2>&1 "${kube_flags[@]:?}")
   kube::test::if_has_string "${output_message}" 'no matches for kind "Widget" in version "example.com/v1"'
+  kubectl wait --timeout=2s --for=condition=Established=true crd/widgets.example.com
   output_message=$(! kubectl get widgets foo 2>&1 "${kube_flags[@]:?}")
   kube::test::if_has_string "${output_message}" 'widgets.example.com "foo" not found'
   kube::test::get_object_assert 'crds widgets.example.com' "{{${id_field}}}" 'widgets.example.com'
