@@ -920,7 +920,8 @@ func (m *kubeGenericRuntimeManager) doBackOff(pod *v1.Pod, container *v1.Contain
 	key := getStableKey(pod, container)
 	if backOff.IsInBackOffSince(key, ts) {
 		if containerRef, err := kubecontainer.GenerateContainerRef(pod, container); err == nil {
-			m.recorder.Eventf(containerRef, v1.EventTypeWarning, events.BackOffStartContainer, "Back-off restarting failed container")
+			m.recorder.Eventf(containerRef, v1.EventTypeWarning, events.BackOffStartContainer,
+				fmt.Sprintf("Back-off restarting failed container %s in pod %s", container.Name, format.Pod(pod)))
 		}
 		err := fmt.Errorf("back-off %s restarting failed container=%s pod=%s", backOff.Get(key), container.Name, format.Pod(pod))
 		klog.V(3).InfoS("Back-off restarting failed container", "err", err.Error())
