@@ -28,9 +28,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -276,11 +281,21 @@ func TestLifeCycleHook(t *testing.T) {
 
 	fakeRunner := &containertest.FakeContainerCommandRunner{}
 	fakeHTTP := &fakeHTTP{}
+	fakePodStatusProvider := podStatusProviderFunc(func(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
+		return &kubecontainer.PodStatus{
+			ID:        uid,
+			Name:      name,
+			Namespace: namespace,
+			IPs: []string{
+				"127.0.0.1",
+			},
+		}, nil
+	})
 
 	lcHanlder := lifecycle.NewHandlerRunner(
 		fakeHTTP,
 		fakeRunner,
-		nil)
+		fakePodStatusProvider)
 
 	m.runner = lcHanlder
 
@@ -295,13 +310,27 @@ func TestLifeCycleHook(t *testing.T) {
 
 	// Configured and working HTTP hook
 	t.Run("PreStop-HTTPGet", func(t *testing.T) {
-		defer func() { fakeHTTP.url = "" }()
-		testPod.Spec.Containers[0].Lifecycle = httpLifeCycle
-		m.killContainer(testPod, cID, "foo", "testKill", "", &gracePeriod)
+		t.Run("inconsistent", func(t *testing.T) {
+			defer func() { fakeHTTP.req = nil }()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, false)()
+			httpLifeCycle.PreStop.HTTPGet.Port = intstr.IntOrString{}
+			testPod.Spec.Containers[0].Lifecycle = httpLifeCycle
+			m.killContainer(testPod, cID, "foo", "testKill", "", &gracePeriod)
 
-		if !strings.Contains(fakeHTTP.url, httpLifeCycle.PreStop.HTTPGet.Host) {
-			t.Errorf("HTTP Prestop hook was not invoked")
-		}
+			if fakeHTTP.req == nil || !strings.Contains(fakeHTTP.req.URL.String(), httpLifeCycle.PreStop.HTTPGet.Host) {
+				t.Errorf("HTTP Prestop hook was not invoked")
+			}
+		})
+		t.Run("consistent", func(t *testing.T) {
+			defer func() { fakeHTTP.req = nil }()
+			httpLifeCycle.PreStop.HTTPGet.Port = intstr.FromInt(80)
+			testPod.Spec.Containers[0].Lifecycle = httpLifeCycle
+			m.killContainer(testPod, cID, "foo", "testKill", "", &gracePeriod)
+
+			if fakeHTTP.req == nil || !strings.Contains(fakeHTTP.req.URL.String(), httpLifeCycle.PreStop.HTTPGet.Host) {
+				t.Errorf("HTTP Prestop hook was not invoked")
+			}
+		})
 	})
 
 	// When there is no time to run PreStopHook
@@ -313,8 +342,8 @@ func TestLifeCycleHook(t *testing.T) {
 
 		m.killContainer(testPod, cID, "foo", "testKill", "", &gracePeriodLocal)
 
-		if strings.Contains(fakeHTTP.url, httpLifeCycle.PreStop.HTTPGet.Host) {
-			t.Errorf("HTTP Should not execute when gracePeriod is 0")
+		if fakeHTTP.req != nil {
+			t.Errorf("HTTP Prestop hook Should not execute when gracePeriod is 0")
 		}
 	})
 

@@ -408,6 +408,23 @@ func NewAgnhostPod(ns, podName string, volumes []v1.Volume, mounts []v1.VolumeMo
 	return pod
 }
 
+func NewAgnhostPodFromContainers(ns, podName string, volumes []v1.Volume, containers ...v1.Container) *v1.Pod {
+	immediate := int64(0)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: ns,
+		},
+		Spec: v1.PodSpec{
+			Containers:                    containers[:],
+			Volumes:                       volumes,
+			SecurityContext:               &v1.PodSecurityContext{},
+			TerminationGracePeriodSeconds: &immediate,
+		},
+	}
+	return pod
+}
+
 // NewAgnhostContainer returns the container Spec of an agnhost container.
 func NewAgnhostContainer(containerName string, mounts []v1.VolumeMount, ports []v1.ContainerPort, args ...string) v1.Container {
 	if len(args) == 0 {

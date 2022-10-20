@@ -19,15 +19,9 @@ package prober
 import (
 	"fmt"
 	"io"
-	"net"
-	"net/http"
-	"net/url"
-	"strconv"
-	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -140,16 +134,6 @@ func (pb *prober) runProbeWithRetries(probeType probeType, p *v1.Probe, pod *v1.
 	return result, output, err
 }
 
-// buildHeaderMap takes a list of HTTPHeader <name, value> string
-// pairs and returns a populated string->[]string http.Header map.
-func buildHeader(headerList []v1.HTTPHeader) http.Header {
-	headers := make(http.Header)
-	for _, header := range headerList {
-		headers[header.Name] = append(headers[header.Name], header.Value)
-	}
-	return headers
-}
-
 func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID) (probe.Result, string, error) {
 	timeout := time.Duration(p.TimeoutSeconds) * time.Second
 	if p.Exec != nil {
@@ -158,24 +142,22 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 		return pb.exec.Probe(pb.newExecInContainer(container, containerID, command, timeout))
 	}
 	if p.HTTPGet != nil {
-		scheme := strings.ToLower(string(p.HTTPGet.Scheme))
-		host := p.HTTPGet.Host
-		if host == "" {
-			host = status.PodIP
-		}
-		port, err := extractPort(p.HTTPGet.Port, container)
+		req, err := httpprobe.NewRequestForHTTPGetAction(p.HTTPGet, &container, status.PodIP, "probe")
 		if err != nil {
 			return probe.Unknown, "", err
 		}
-		path := p.HTTPGet.Path
-		klog.V(4).InfoS("HTTP-Probe", "scheme", scheme, "host", host, "port", port, "path", path, "timeout", timeout)
-		url := formatURL(scheme, host, port, path)
-		headers := buildHeader(p.HTTPGet.HTTPHeaders)
-		klog.V(4).InfoS("HTTP-Probe Headers", "headers", headers)
-		return pb.http.Probe(url, headers, timeout)
+		if klogV4 := klog.V(4); klogV4.Enabled() {
+			port := req.URL.Port()
+			host := req.URL.Hostname()
+			path := req.URL.Path
+			scheme := req.URL.Scheme
+			headers := p.HTTPGet.HTTPHeaders
+			klogV4.InfoS("HTTP-Probe", "scheme", scheme, "host", host, "port", port, "path", path, "timeout", timeout, "headers", headers)
+		}
+		return pb.http.Probe(req, timeout)
 	}
 	if p.TCPSocket != nil {
-		port, err := extractPort(p.TCPSocket.Port, container)
+		port, err := probe.ResolveContainerPort(p.TCPSocket.Port, &container)
 		if err != nil {
 			return probe.Unknown, "", err
 		}
@@ -196,52 +178,6 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 
 	klog.InfoS("Failed to find probe builder for container", "containerName", container.Name)
 	return probe.Unknown, "", fmt.Errorf("missing probe handler for %s:%s", format.Pod(pod), container.Name)
-}
-
-func extractPort(param intstr.IntOrString, container v1.Container) (int, error) {
-	port := -1
-	var err error
-	switch param.Type {
-	case intstr.Int:
-		port = param.IntValue()
-	case intstr.String:
-		if port, err = findPortByName(container, param.StrVal); err != nil {
-			// Last ditch effort - maybe it was an int stored as string?
-			if port, err = strconv.Atoi(param.StrVal); err != nil {
-				return port, err
-			}
-		}
-	default:
-		return port, fmt.Errorf("intOrString had no kind: %+v", param)
-	}
-	if port > 0 && port < 65536 {
-		return port, nil
-	}
-	return port, fmt.Errorf("invalid port number: %v", port)
-}
-
-// findPortByName is a helper function to look up a port in a container by name.
-func findPortByName(container v1.Container, portName string) (int, error) {
-	for _, port := range container.Ports {
-		if port.Name == portName {
-			return int(port.ContainerPort), nil
-		}
-	}
-	return 0, fmt.Errorf("port %s not found", portName)
-}
-
-// formatURL formats a URL from args.  For testability.
-func formatURL(scheme string, host string, port int, path string) *url.URL {
-	u, err := url.Parse(path)
-	// Something is busted with the path, but it's too late to reject it. Pass it along as is.
-	if err != nil {
-		u = &url.URL{
-			Path: path,
-		}
-	}
-	u.Scheme = scheme
-	u.Host = net.JoinHostPort(host, strconv.Itoa(port))
-	return u
 }
 
 type execInContainer struct {

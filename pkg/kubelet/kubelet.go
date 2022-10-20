@@ -110,6 +110,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
+	httpprobe "k8s.io/kubernetes/pkg/probe/http"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
@@ -475,7 +476,20 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			clusterDNS = append(clusterDNS, ip)
 		}
 	}
-	httpClient := &http.Client{}
+
+	// A TLS transport is needed to make HTTPS-based container lifecycle requests,
+	// but we do not have the information necessary to do TLS verification.
+	//
+	// This client must not be modified to include credentials, because it is
+	// critical that credentials not leak from the client to arbitrary hosts.
+	insecureContainerLifecycleHTTPClient := &http.Client{}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentHTTPGetHandlers) {
+		insecureTLSTransport := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		insecureContainerLifecycleHTTPClient.Transport = insecureTLSTransport
+		insecureContainerLifecycleHTTPClient.CheckRedirect = httpprobe.RedirectChecker(false)
+	}
 
 	klet := &Kubelet{
 		hostname:                                hostname,
@@ -625,7 +639,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.podWorkers,
 		kubeDeps.OSInterface,
 		klet,
-		httpClient,
+		insecureContainerLifecycleHTTPClient,
 		imageBackOff,
 		kubeCfg.SerializeImagePulls,
 		float32(kubeCfg.RegistryPullQPS),
