@@ -1021,6 +1021,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 					Type: flowcontrol.PriorityLevelEnablementLimited,
 					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 						NominalConcurrencyShares: 5,
+						LendablePercent:          pointer.Int32(0),
 						LimitResponse: flowcontrol.LimitResponse{
 							Type: flowcontrol.LimitResponseTypeReject,
 						}}},
