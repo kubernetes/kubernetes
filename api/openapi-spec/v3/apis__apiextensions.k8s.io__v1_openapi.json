@@ -283,7 +283,9 @@
               ],
               "default": {}
             },
-            "type": "array"
+            "type": "array",
+            "x-kubernetes-patch-merge-key": "name",
+            "x-kubernetes-patch-strategy": "merge"
           }
         },
         "required": [
