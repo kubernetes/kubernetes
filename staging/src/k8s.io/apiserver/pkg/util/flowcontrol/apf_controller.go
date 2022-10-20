@@ -67,6 +67,27 @@ const timeFmt = "2006-01-02T15:04:05.999"
 // undesired becomes completely unused, all the config objects are
 // read and processed as a whole.
 
+const (
+	// Borrowing among priority levels will be accomplished by periodically
+	// adjusting the current concurrency limits (CurrentCLs);
+	// borrowingAdjustmentPeriod is that period.
+	borrowingAdjustmentPeriod = 10 * time.Second //nolint:golint,unused
+
+	// The input to the borrowing is smoothed seat demand figures.
+	// Every adjustment period, each priority level's smoothed demand is adjusted
+	// based on an envelope of that level's recent seat demand.  The formula is:
+	// SmoothSeatDemand := max( EnvelopeSeatDemand,
+	//                          seatDemandSmoothingCoefficient     * SmoothSeatDemand +
+	//                          (1-seatDemandSmoothingCoefficient) * EnvelopeSeatDemand ).
+	// Qualitatively: this parameter controls the rate at which the smoothed seat demand drifts
+	// down toward the envelope of seat demand while that is lower.
+	// The particular number appearing here has the property that half of the
+	// current smoothed value comes from the smoothed value of 5 minutes ago.
+	// This is a very preliminary guess at a good value and is likely to be tweaked
+	// once we get some experience with borrowing.
+	seatDemandSmoothingCoefficient = 0.977 //nolint:golint,unused
+)
+
 // The funcs in this package follow the naming convention that the suffix
 // "Locked" means the relevant mutex must be locked at the start of each
 // call and will be locked upon return.  For a configController, the
