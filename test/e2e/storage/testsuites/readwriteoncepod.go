@@ -33,7 +33,6 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
-	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -44,8 +43,7 @@ type readWriteOncePodTestSuite struct {
 var _ storageframework.TestSuite = &readWriteOncePodTestSuite{}
 
 type readWriteOncePodTest struct {
-	config        *storageframework.PerTestConfig
-	driverCleanup func()
+	config *storageframework.PerTestConfig
 
 	cs     clientset.Interface
 	volume *storageframework.VolumeResource
@@ -96,7 +94,7 @@ func (t *readWriteOncePodTestSuite) DefineTests(driver storageframework.TestDriv
 
 	init := func() {
 		l = readWriteOncePodTest{}
-		l.config, l.driverCleanup = driver.PrepareTest(f)
+		l.config = driver.PrepareTest(f)
 		l.cs = f.ClientSet
 		l.pods = []*v1.Pod{}
 		l.migrationCheck = newMigrationOpCheck(f.ClientSet, f.ClientConfig(), driverInfo.InTreePluginName)
@@ -114,7 +112,6 @@ func (t *readWriteOncePodTestSuite) DefineTests(driver storageframework.TestDriv
 		err := l.volume.CleanupResource()
 		errs = append(errs, err)
 
-		errs = append(errs, storageutils.TryFunc(l.driverCleanup))
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
 		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}

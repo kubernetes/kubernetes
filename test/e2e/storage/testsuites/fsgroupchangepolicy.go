@@ -96,10 +96,9 @@ func (s *fsGroupChangePolicyTestSuite) SkipUnsupportedTests(driver storageframew
 
 func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
-		config        *storageframework.PerTestConfig
-		driverCleanup func()
-		driver        storageframework.TestDriver
-		resource      *storageframework.VolumeResource
+		config   *storageframework.PerTestConfig
+		driver   storageframework.TestDriver
+		resource *storageframework.VolumeResource
 	}
 	var l local
 
@@ -112,7 +111,7 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		l = local{}
 		l.driver = driver
-		l.config, l.driverCleanup = driver.PrepareTest(f)
+		l.config = driver.PrepareTest(f)
 		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
 		l.resource = storageframework.CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
 	}
@@ -124,11 +123,6 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 				errs = append(errs, err)
 			}
 			l.resource = nil
-		}
-
-		if l.driverCleanup != nil {
-			errs = append(errs, storageutils.TryFunc(l.driverCleanup))
-			l.driverCleanup = nil
 		}
 
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleanup resource")

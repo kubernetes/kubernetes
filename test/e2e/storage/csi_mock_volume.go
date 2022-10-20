@@ -181,8 +181,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 
 		m.driver = drivers.InitMockCSIDriver(driverOpts)
-		config, testCleanup := m.driver.PrepareTest(f)
-		m.testCleanups = append(m.testCleanups, testCleanup)
+		config := m.driver.PrepareTest(f)
 		m.config = config
 		m.provisioner = config.GetUniqueDriverName()
 
@@ -514,7 +513,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 		for _, t := range tests {
 			test := t
-			ginkgo.It(t.name, func() {
+			ginkgo.It(t.name, func(ctx context.Context) {
 				init(testParameters{
 					registerDriver: test.deployClusterRegistrar,
 					podInfo:        test.podInfoOnMount})
@@ -538,7 +537,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				csiInlineVolumesEnabled := test.expectEphemeral
 				if test.expectPodInfo {
 					ginkgo.By("checking for CSIInlineVolumes feature")
-					csiInlineVolumesEnabled, err = testsuites.CSIInlineVolumesEnabled(m.cs, f.Timeouts, f.Namespace.Name)
+					csiInlineVolumesEnabled, err = testsuites.CSIInlineVolumesEnabled(ctx, m.cs, f.Timeouts, f.Namespace.Name)
 					framework.ExpectNoError(err, "failed to test for CSIInlineVolumes")
 				}
 

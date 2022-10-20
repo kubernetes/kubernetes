@@ -84,12 +84,11 @@ var _ = utils.SIGDescribe("[Feature:NodeOutOfServiceVolumeDetach] [Disruptive] [
 			// Install gce pd csi driver
 			ginkgo.By("deploying csi gce-pd driver")
 			driver := drivers.InitGcePDCSIDriver()
-			config, cleanup := driver.PrepareTest(f)
+			config := driver.PrepareTest(f)
 			dDriver, ok := driver.(storageframework.DynamicPVTestDriver)
 			if !ok {
 				e2eskipper.Skipf("csi driver expected DynamicPVTestDriver but got %v", driver)
 			}
-			defer cleanup()
 			ginkgo.By("Creating a gce-pd storage class")
 			sc := dDriver.GetDynamicProvisionStorageClass(config, "")
 			_, err := c.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{})

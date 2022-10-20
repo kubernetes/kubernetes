@@ -19,6 +19,8 @@ package storage
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -31,7 +33,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"time"
 )
 
 var _ = utils.SIGDescribe("Persistent Volume Claim and StorageClass", func() {
@@ -60,7 +61,7 @@ var _ = utils.SIGDescribe("Persistent Volume Claim and StorageClass", func() {
 	})
 
 	ginkgo.Describe("Retroactive StorageClass assignment [Serial][Disruptive][Feature:RetroactiveDefaultStorageClass]", func() {
-		ginkgo.It("should assign default SC to PVCs that have no SC set", func() {
+		ginkgo.It("should assign default SC to PVCs that have no SC set", func(ctx context.Context) {
 
 			// Temporarily set all default storage classes as non-default
 			restoreClasses := temporarilyUnsetDefaultClasses(client)
@@ -81,8 +82,7 @@ var _ = utils.SIGDescribe("Persistent Volume Claim and StorageClass", func() {
 			}(pvc)
 
 			// Create custom default SC
-			storageClass, clearStorageClass := testsuites.SetupStorageClass(client, makeStorageClass(prefixSC))
-			defer clearStorageClass()
+			storageClass := testsuites.SetupStorageClass(ctx, client, makeStorageClass(prefixSC))
 
 			// Wait for PVC to get updated with the new default SC
 			pvc, err = waitForPVCStorageClass(client, namespace, pvc.Name, storageClass.Name, f.Timeouts.ClaimBound)
