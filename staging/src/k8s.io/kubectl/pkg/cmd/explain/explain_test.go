@@ -57,9 +57,9 @@ func TestExplainInvalidArgs(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	opts := explain.NewExplainOptions("kubectl", genericiooptions.NewTestIOStreamsDiscard())
-	cmd := explain.NewCmdExplain("kubectl", tf, genericiooptions.NewTestIOStreamsDiscard())
-	err := opts.Complete(tf, cmd, []string{})
+	flags := explain.NewExplainFlags(genericclioptions.NewTestIOStreamsDiscard())
+
+	opts, err := flags.ToOptions(tf, "kubectl", []string{})
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
@@ -69,7 +69,7 @@ func TestExplainInvalidArgs(t *testing.T) {
 		t.Error("unexpected non-error")
 	}
 
-	err = opts.Complete(tf, cmd, []string{"resource1", "resource2"})
+	opts, err = flags.ToOptions(tf, "kubectl", []string{"resource1", "resource2"})
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
@@ -84,9 +84,9 @@ func TestExplainNotExistResource(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	opts := explain.NewExplainOptions("kubectl", genericiooptions.NewTestIOStreamsDiscard())
-	cmd := explain.NewCmdExplain("kubectl", tf, genericiooptions.NewTestIOStreamsDiscard())
-	err := opts.Complete(tf, cmd, []string{"foo"})
+	flags := explain.NewExplainFlags(genericclioptions.NewTestIOStreamsDiscard())
+
+	opts, err := flags.ToOptions(tf, "kubectl", []string{"foo"})
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}

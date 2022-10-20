@@ -56,7 +56,7 @@ var (
 
 		# Get the documentation of a specific field of a resource
 		kubectl explain pods.spec.containers
-		
+
 		# Get the documentation of resources in different format
 		kubectl explain deployment --output=plaintext-openapiv2`))
 
@@ -64,36 +64,70 @@ var (
 	plaintextOpenAPIV2TemplateName = "plaintext-openapiv2"
 )
 
-type ExplainOptions struct {
-	genericiooptions.IOStreams
-
-	CmdParent  string
+type ExplainFlags struct {
 	APIVersion string
-	Recursive  bool
-
-	args []string
-
-	Mapper        meta.RESTMapper
-	openAPIGetter openapi.OpenAPIResourcesGetter
-
-	// Name of the template to use with the openapiv3 template renderer.
+	// Name of the template to use with the openapiv3 template renderer. If
+	// `EnableOpenAPIV3` is disabled, this does nothing
 	OutputFormat string
-
-	// Client capable of fetching openapi documents from the user's cluster
-	OpenAPIV3Client openapiclient.Client
+	Recursive    bool
+	genericclioptions.IOStreams
 }
 
-func NewExplainOptions(parent string, streams genericiooptions.IOStreams) *ExplainOptions {
-	return &ExplainOptions{
-		IOStreams:    streams,
-		CmdParent:    parent,
+// AddFlags registers flags for a cli
+func (flags *ExplainFlags) AddFlags(cmd *cobra.Command) {
+	cmd.Flags().BoolVar(&flags.Recursive, "recursive", flags.Recursive, "Print the fields of fields (Currently only 1 level deep)")
+	cmd.Flags().StringVar(&flags.APIVersion, "api-version", flags.APIVersion, "Get different explanations for particular API version (API group/version)")
+
+	// Only enable --output as a valid flag if the feature is enabled
+	cmd.Flags().StringVar(&flags.OutputFormat, "output", plaintextTemplateName, "Format in which to render the schema (plaintext, plaintext-openapiv2)")
+}
+
+// NewExplainFlags returns a default ExplainFlags
+func NewExplainFlags(streams genericclioptions.IOStreams) *ExplainFlags {
+	return &ExplainFlags{
 		OutputFormat: plaintextTemplateName,
+		IOStreams:    streams,
 	}
 }
 
+// ToOptions converts from CLI inputs to runtime input
+func (flags *ExplainFlags) ToOptions(f cmdutil.Factory, parent string, args []string) (*ExplainOptions, error) {
+	mapper, err := f.ToRESTMapper()
+	if err != nil {
+		return nil, err
+	}
+
+	schema, err := f.OpenAPISchema()
+	if err != nil {
+		return nil, err
+	}
+
+	// Only openapi v3 needs the discovery client.
+	openAPIV3Client, err := f.OpenAPIV3Client()
+	if err != nil {
+		return nil, err
+	}
+
+	o := &ExplainOptions{
+		CmdParent:       parent,
+		Mapper:          mapper,
+		Schema:          schema,
+		args:            args,
+		IOStreams:       flags.IOStreams,
+		Recursive:       flags.Recursive,
+		APIVersion:      flags.APIVersion,
+		OutputFormat:    plaintextTemplateName,
+		OpenAPIV3Client: openAPIV3Client,
+	}
+
+	return o, nil
+}
+
 // NewCmdExplain returns a cobra command for swagger docs
-func NewCmdExplain(parent string, f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
-	o := NewExplainOptions(parent, streams)
+func NewCmdExplain(parent string, f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	// o := NewExplainOptions(parent, streams)
+
+	flags := NewExplainFlags(streams)
 
 	cmd := &cobra.Command{
 		Use:                   "explain TYPE [--recursive=FALSE|TRUE] [--api-version=api-version-group] [-o|--output=plaintext|plaintext-openapiv2]",
@@ -102,37 +136,16 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericiooptions.IO
 		Long:                  explainLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
 		Example:               explainExamples,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			o, err := flags.ToOptions(f, parent, args)
+			cmdutil.CheckErr(err)
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
-	cmd.Flags().BoolVar(&o.Recursive, "recursive", o.Recursive, "When true, print the name of all the fields recursively. Otherwise, print the available fields with their description.")
-	cmd.Flags().StringVar(&o.APIVersion, "api-version", o.APIVersion, "Use given api-version (group/version) of the resource.")
 
-	// Only enable --output as a valid flag if the feature is enabled
-	cmd.Flags().StringVarP(&o.OutputFormat, "output", "o", plaintextTemplateName, "Format in which to render the schema. Valid values are: (plaintext, plaintext-openapiv2).")
+	flags.AddFlags(cmd)
 
 	return cmd
-}
-
-func (o *ExplainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	var err error
-	o.Mapper, err = f.ToRESTMapper()
-	if err != nil {
-		return err
-	}
-
-	// Only openapi v3 needs the discovery client.
-	o.OpenAPIV3Client, err = f.OpenAPIV3Client()
-	if err != nil {
-		return err
-	}
-
-	// Lazy-load the OpenAPI V2 Resources, so they're not loaded when using OpenAPI V3.
-	o.openAPIGetter = f
-	o.args = args
-	return nil
 }
 
 func (o *ExplainOptions) Validate() error {
@@ -231,4 +244,24 @@ func (o *ExplainOptions) renderOpenAPIV2(
 	}
 
 	return explain.PrintModelDescription(fieldsPath, o.Out, schema, gvk, o.Recursive)
+}
+
+type ExplainOptions struct {
+	genericclioptions.IOStreams
+
+	CmdParent  string
+	APIVersion string
+	Recursive  bool
+
+	args []string
+
+	Mapper meta.RESTMapper
+	Schema openapi.Resources
+
+	// Name of the template to use with the openapiv3 template renderer. If
+	// `EnableOpenAPIV3` is disabled, this does nothing
+	OutputFormat string
+
+	// Client capable of fetching openapi documents from the user's cluster
+	OpenAPIV3Client openapiclient.Client
 }
