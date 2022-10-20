@@ -33,7 +33,6 @@ import (
 	coordinationapiv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
-	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,8 +47,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-helpers/apimachinery/lease"
 	"k8s.io/klog/v2"
-	flowcontrolv1beta1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1"
-	flowcontrolv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
 	"k8s.io/kubernetes/pkg/controlplane/controller/apiserverleasegc"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
 	// RESTStorage installers
@@ -375,15 +372,12 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		coordinationapiv1.SchemeGroupVersion,
 		eventsv1.SchemeGroupVersion,
 		rbacv1.SchemeGroupVersion,
-		flowcontrolv1beta1.SchemeGroupVersion,
-		flowcontrolv1beta2.SchemeGroupVersion,
 		admissionregistrationv1.SchemeGroupVersion,
 	)
 	// disable alpha versions explicitly so we have a full list of what's possible to serve
 	ret.DisableVersions(
 		apiserverinternalv1alpha1.SchemeGroupVersion,
 		rbacv1alpha1.SchemeGroupVersion,
-		flowcontrolv1alpha1.SchemeGroupVersion,
 	)
 
 	return ret

@@ -25,7 +25,6 @@ import (
 	coordinationinstall "k8s.io/kubernetes/pkg/apis/coordination/install"
 	genericcontrolplaneinstall "k8s.io/kubernetes/pkg/apis/core/install/genericcontrolplane"
 	eventsinstall "k8s.io/kubernetes/pkg/apis/events/install"
-	flowcontrolinstall "k8s.io/kubernetes/pkg/apis/flowcontrol/install"
 	rbacinstall "k8s.io/kubernetes/pkg/apis/rbac/install"
 )
 
@@ -36,7 +35,6 @@ func init() {
 	certificatesinstall.Install(genericcontrolplanescheme.Scheme)
 	coordinationinstall.Install(genericcontrolplanescheme.Scheme)
 	rbacinstall.Install(genericcontrolplanescheme.Scheme)
-	flowcontrolinstall.Install(genericcontrolplanescheme.Scheme)
 	eventsinstall.Install(genericcontrolplanescheme.Scheme)
 	admissionregistrationinstall.Install(genericcontrolplanescheme.Scheme)
 }
