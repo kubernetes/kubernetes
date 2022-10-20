@@ -2155,3 +2155,11 @@ func (v *azureFileVolume) DeleteVolume() {
 	err := e2epv.DeleteShare(v.accountName, v.shareName)
 	framework.ExpectNoError(err)
 }
+
+func (a *azureDiskDriver) GetTimeouts() *framework.TimeoutContext {
+	timeouts := framework.NewTimeoutContextWithDefaults()
+	timeouts.PodStart = time.Minute * 15
+	timeouts.PodDelete = time.Minute * 15
+	timeouts.PVDelete = time.Minute * 20
+	return timeouts
+}
