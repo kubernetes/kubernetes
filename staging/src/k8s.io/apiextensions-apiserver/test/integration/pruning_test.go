@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	"go.etcd.io/etcd/client/pkg/v3/transport"
@@ -37,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/dynamic"
@@ -598,6 +599,6 @@ embeddedNested:
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(expected, x) {
-		t.Errorf("unexpected diff: %s", diff.ObjectDiff(expected, x))
+		t.Errorf("unexpected diff: %s", cmp.Diff(expected, x))
 	}
 }
