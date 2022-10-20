@@ -131,6 +131,55 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			framework.ExpectEqual(pod.Spec.Containers[0].Image, image)
 		})
 
+		ginkgo.Context("and the container runtime is temporarily down during pod termination [NodeConformance] [Serial] [Disruptive]", func() {
+			ginkgo.It("the mirror pod should terminate successfully", func(ctx context.Context) {
+				ginkgo.By("delete the static pod")
+				err := deleteStaticPod(podPath, staticPodName, ns)
+				framework.ExpectNoError(err)
+
+				// Note it is important we have a small delay here as we would like to reproduce https://issues.k8s.io/113091 which requires a failure in syncTerminatingPod()
+				// This requires waiting a small period between the static pod being deleted so that syncTerminatingPod() will attempt to run
+				ginkgo.By("sleeping before stopping the container runtime")
+				time.Sleep(2 * time.Second)
+
+				ginkgo.By("stop the container runtime")
+				err = stopContainerRuntime()
+				framework.ExpectNoError(err, "expected no error stopping the container runtime")
+
+				ginkgo.By("waiting for the container runtime to be stopped")
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					_, _, err := getCRIClient()
+					return err
+				}, 2*time.Minute, time.Second*5).ShouldNot(gomega.Succeed())
+
+				ginkgo.By("start the container runtime")
+				err = startContainerRuntime()
+				framework.ExpectNoError(err, "expected no error starting the container runtime")
+				gomega.Consistently(ctx, func(ctx context.Context) error {
+					ginkgo.By(fmt.Sprintf("verifying that the mirror pod (%s/%s) is running", ns, mirrorPodName))
+					err := checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
+					if err != nil {
+						return fmt.Errorf("expected mirror pod (%s/%s) to be running but it was not: %v", ns, mirrorPodName, err)
+					}
+					return nil
+				}, time.Second*30, time.Second*5).Should(gomega.Succeed())
+			})
+
+			ginkgo.AfterEach(func(ctx context.Context) {
+				ginkgo.By("starting the container runtime")
+				err := startContainerRuntime()
+				framework.ExpectNoError(err, "expected no error starting the container runtime")
+				ginkgo.By("waiting for the container runtime to start")
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					_, _, err := getCRIClient()
+					if err != nil {
+						return fmt.Errorf("error getting cri client: %v", err)
+					}
+					return nil
+				}, 2*time.Minute, time.Second*5).Should(gomega.Succeed())
+			})
+		})
+
 		ginkgo.AfterEach(func(ctx context.Context) {
 			ginkgo.By("delete the static pod")
 			err := deleteStaticPod(podPath, staticPodName, ns)
