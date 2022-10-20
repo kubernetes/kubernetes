@@ -45,6 +45,12 @@ import (
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
+const (
+	UpdateNodeStatusFromLister int = iota
+	UpdateNodeStatusFromApiserverCache
+	UpdateNodeStatusFromEtcd
+)
+
 // registerWithAPIServer registers the node with the cluster master. It is safe
 // to call multiple times, but not concurrently (kl.registrationCompleted is
 // not locked).
@@ -432,7 +438,7 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 // syncNodeStatus should be called periodically from a goroutine.
 // It synchronizes node status to master if there is any change or enough time
 // passed from the last sync, registering the kubelet first if necessary.
-func (kl *Kubelet) syncNodeStatus() {
+func (kl *Kubelet) syncNodeStatus(initialSource int) {
 	kl.syncNodeStatusMux.Lock()
 	defer kl.syncNodeStatusMux.Unlock()
 
@@ -443,16 +449,16 @@ func (kl *Kubelet) syncNodeStatus() {
 		// This will exit immediately if it doesn't need to do anything.
 		kl.registerWithAPIServer()
 	}
-	if err := kl.updateNodeStatus(); err != nil {
+	if err := kl.updateNodeStatus(initialSource); err != nil {
 		klog.ErrorS(err, "Unable to update node status")
 	}
 }
 
 // updateNodeStatus updates node status to master with retries if there is any
 // change or enough time passed from the last sync.
-func (kl *Kubelet) updateNodeStatus() error {
-	klog.V(5).InfoS("Updating node status")
-	for i := 0; i < nodeStatusUpdateRetry; i++ {
+func (kl *Kubelet) updateNodeStatus(initialSource int) error {
+	klog.V(5).InfoS("Updating node status", "initialSource", initialSource)
+	for i := initialSource; i < initialSource+nodeStatusUpdateRetry; i++ {
 		if err := kl.tryUpdateNodeStatus(i); err != nil {
 			if i > 0 && kl.onRepeatedHeartbeatFailure != nil {
 				kl.onRepeatedHeartbeatFailure()
@@ -467,18 +473,28 @@ func (kl *Kubelet) updateNodeStatus() error {
 
 // tryUpdateNodeStatus tries to update node status to master if there is any
 // change or enough time passed from the last sync.
-func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
+func (kl *Kubelet) tryUpdateNodeStatus(source int) error {
 	// In large clusters, GET and PUT operations on Node objects coming
 	// from here are the majority of load on apiserver and etcd.
 	// To reduce the load on etcd, we are serving GET operations from
 	// apiserver cache (the data might be slightly delayed but it doesn't
 	// seem to cause more conflict - the delays are pretty small).
 	// If it result in a conflict, all retries are served directly from etcd.
-	opts := metav1.GetOptions{}
-	if tryNumber == 0 {
-		util.FromApiserverCache(&opts)
+	var node *v1.Node
+	var err error
+	if source == UpdateNodeStatusFromLister {
+		node, err = kl.GetNode()
+		// node returned by GetNode() should be treated as read-only.
+		if err == nil && node != nil {
+			node = node.DeepCopy()
+		}
+	} else {
+		opts := metav1.GetOptions{}
+		if source == UpdateNodeStatusFromApiserverCache {
+			util.FromApiserverCache(&opts)
+		}
+		node, err = kl.heartbeatClient.CoreV1().Nodes().Get(context.TODO(), string(kl.nodeName), opts)
 	}
-	node, err := kl.heartbeatClient.CoreV1().Nodes().Get(context.TODO(), string(kl.nodeName), opts)
 	if err != nil {
 		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
 	}

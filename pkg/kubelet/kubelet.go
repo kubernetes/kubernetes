@@ -844,7 +844,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		NodeRef:                          nodeRef,
 		GetPodsFunc:                      klet.GetActivePods,
 		KillPodFunc:                      killPodNow(klet.podWorkers, kubeDeps.Recorder),
-		SyncNodeStatusFunc:               klet.syncNodeStatus,
+		SyncNodeStatusFunc:               func() { klet.syncNodeStatus(UpdateNodeStatusFromApiserverCache) },
 		ShutdownGracePeriodRequested:     kubeCfg.ShutdownGracePeriod.Duration,
 		ShutdownGracePeriodCriticalPods:  kubeCfg.ShutdownGracePeriodCriticalPods.Duration,
 		ShutdownGracePeriodByPodPriority: kubeCfg.ShutdownGracePeriodByPodPriority,
@@ -1455,7 +1455,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 		// Introduce some small jittering to ensure that over time the requests won't start
 		// accumulating at approximately the same time from the set of nodes due to priority and
 		// fairness effect.
-		go wait.JitterUntil(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, 0.04, true, wait.NeverStop)
+		go wait.JitterUntil(func() { kl.syncNodeStatus(UpdateNodeStatusFromApiserverCache) }, kl.nodeStatusUpdateFrequency, 0.04, true, wait.NeverStop)
 		go kl.fastStatusUpdateOnce()
 
 		// start syncing lease
@@ -2459,7 +2459,7 @@ func (kl *Kubelet) fastStatusUpdateOnce() {
 				continue
 			}
 			kl.updateRuntimeUp()
-			kl.syncNodeStatus()
+			kl.syncNodeStatus(UpdateNodeStatusFromApiserverCache)
 			return
 		}
 	}

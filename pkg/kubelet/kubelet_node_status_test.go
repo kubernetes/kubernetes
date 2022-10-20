@@ -164,14 +164,32 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	cases := []struct {
 		desc                string
 		nodeStatusMaxImages int32
+		initialSource       int
+		kubeClientActions   int
 	}{
 		{
 			desc:                "5 image limit",
 			nodeStatusMaxImages: 5,
+			initialSource:       UpdateNodeStatusFromLister,
+			kubeClientActions:   1,
+		},
+		{
+			desc:                "5 image limit",
+			nodeStatusMaxImages: 5,
+			initialSource:       UpdateNodeStatusFromApiserverCache,
+			kubeClientActions:   2,
+		},
+		{
+			desc:                "5 image limit",
+			nodeStatusMaxImages: 5,
+			initialSource:       UpdateNodeStatusFromEtcd,
+			kubeClientActions:   2,
 		},
 		{
 			desc:                "no image limit",
 			nodeStatusMaxImages: -1,
+			initialSource:       UpdateNodeStatusFromApiserverCache,
+			kubeClientActions:   2,
 		},
 	}
 
@@ -189,7 +207,9 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			defer testKubelet.Cleanup()
 			kubelet := testKubelet.kubelet
 			kubelet.nodeStatusMaxImages = tc.nodeStatusMaxImages
-			kubelet.kubeClient = nil // ensure only the heartbeat client is used
+			// Ensure we capture actions on the heartbeat client only.
+			// We don't set it to nil or GetNode() doesn't read from nodeLister.
+			kubelet.kubeClient = &fake.Clientset{}
 			kubelet.containerManager = &localCM{
 				ContainerManager: cm.NewStubContainerManager(),
 				allocatableReservation: v1.ResourceList{
@@ -209,6 +229,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 
 			kubeClient := testKubelet.fakeKubeClient
 			existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
+			kubelet.nodeLister = testNodeLister{[]*v1.Node{&existingNode}}
 			kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
 			machineInfo := &cadvisorapi.MachineInfo{
 				MachineID:      "123",
@@ -290,13 +311,13 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			}
 
 			kubelet.updateRuntimeUp()
-			assert.NoError(t, kubelet.updateNodeStatus())
+			assert.NoError(t, kubelet.updateNodeStatus(tc.initialSource))
 			actions := kubeClient.Actions()
-			require.Len(t, actions, 2)
-			require.True(t, actions[1].Matches("patch", "nodes"))
-			require.Equal(t, actions[1].GetSubresource(), "status")
+			require.Len(t, actions, tc.kubeClientActions)
+			require.True(t, actions[tc.kubeClientActions-1].Matches("patch", "nodes"))
+			require.Equal(t, actions[tc.kubeClientActions-1].GetSubresource(), "status")
 
-			updatedNode, err := applyNodeStatusPatch(&existingNode, actions[1].(core.PatchActionImpl).GetPatch())
+			updatedNode, err := applyNodeStatusPatch(&existingNode, actions[tc.kubeClientActions-1].(core.PatchActionImpl).GetPatch())
 			assert.NoError(t, err)
 			for i, cond := range updatedNode.Status.Conditions {
 				assert.False(t, cond.LastHeartbeatTime.IsZero(), "LastHeartbeatTime for %v condition is zero", cond.Type)
@@ -478,7 +499,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	}
 
 	kubelet.updateRuntimeUp()
-	assert.NoError(t, kubelet.updateNodeStatus())
+	assert.NoError(t, kubelet.updateNodeStatus(UpdateNodeStatusFromApiserverCache))
 
 	actions := kubeClient.Actions()
 	assert.Len(t, actions, 2)
@@ -559,7 +580,7 @@ func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 	}
 
 	// should return an error, but not hang
-	assert.Error(t, kubelet.updateNodeStatus())
+	assert.Error(t, kubelet.updateNodeStatus(UpdateNodeStatusFromApiserverCache))
 
 	// should have attempted multiple times
 	if actualAttempts := atomic.LoadInt64(&attempts); actualAttempts < nodeStatusUpdateRetry {
@@ -681,7 +702,7 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 
 	checkNodeStatus := func(status v1.ConditionStatus, reason string) {
 		kubeClient.ClearActions()
-		assert.NoError(t, kubelet.updateNodeStatus())
+		assert.NoError(t, kubelet.updateNodeStatus(UpdateNodeStatusFromApiserverCache))
 		actions := kubeClient.Actions()
 		require.Len(t, actions, 2)
 		require.True(t, actions[1].Matches("patch", "nodes"))
@@ -787,7 +808,7 @@ func TestUpdateNodeStatusError(t *testing.T) {
 	kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	// No matching node for the kubelet
 	testKubelet.fakeKubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{}}).ReactionChain
-	assert.Error(t, kubelet.updateNodeStatus())
+	assert.Error(t, kubelet.updateNodeStatus(UpdateNodeStatusFromApiserverCache))
 	assert.Len(t, testKubelet.fakeKubeClient.Actions(), nodeStatusUpdateRetry)
 }
 
@@ -911,7 +932,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	// Update node status when node status is created.
 	// Report node status.
 	kubelet.updateRuntimeUp()
-	assert.NoError(t, kubelet.updateNodeStatus())
+	assert.NoError(t, kubelet.updateNodeStatus(UpdateNodeStatusFromApiserverCache))
 
 	actions := kubeClient.Actions()
 	assert.Len(t, actions, 2)
@@ -934,7 +955,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	// Update node status again when nothing is changed (except heartbeat time).
 	// Report node status if it has exceeded the duration of nodeStatusReportFrequency.
 	clock.Step(time.Minute)
-	assert.NoError(t, kubelet.updateNodeStatus())
+	assert.NoError(t, kubelet.updateNodeStatus(UpdateNodeStatusFromApiserverCache))
 
 	// 2 more action (There were 2 actions before).
 	actions = kubeClient.Actions()
@@ -959,7 +980,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	// Update node status again when nothing is changed (except heartbeat time).
 	// Do not report node status if it is within the duration of nodeStatusReportFrequency.
 	clock.Step(10 * time.Second)
-	assert.NoError(t, kubelet.updateNodeStatus())
+	assert.NoError(t, kubelet.updateNodeStatus(UpdateNodeStatusFromApiserverCache))
 
 	// Only 1 more action (There were 4 actions before).
 	actions = kubeClient.Actions()
@@ -977,7 +998,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	newMachineInfo := oldMachineInfo.Clone()
 	newMachineInfo.MemoryCapacity = uint64(newMemoryCapacity)
 	kubelet.setCachedMachineInfo(newMachineInfo)
-	assert.NoError(t, kubelet.updateNodeStatus())
+	assert.NoError(t, kubelet.updateNodeStatus(UpdateNodeStatusFromApiserverCache))
 
 	// 2 more action (There were 5 actions before).
 	actions = kubeClient.Actions()
@@ -1009,7 +1030,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	updatedNode.Spec.PodCIDR = podCIDRs[0]
 	updatedNode.Spec.PodCIDRs = podCIDRs
 	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*updatedNode}}).ReactionChain
-	assert.NoError(t, kubelet.updateNodeStatus())
+	assert.NoError(t, kubelet.updateNodeStatus(UpdateNodeStatusFromApiserverCache))
 	assert.Equal(t, strings.Join(podCIDRs, ","), kubelet.runtimeState.podCIDR(), "Pod CIDR should be updated now")
 	// 2 more action (There were 7 actions before).
 	actions = kubeClient.Actions()
@@ -1022,7 +1043,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	clock.Step(10 * time.Second)
 	assert.Equal(t, strings.Join(podCIDRs, ","), kubelet.runtimeState.podCIDR(), "Pod CIDR should already be updated")
 
-	assert.NoError(t, kubelet.updateNodeStatus())
+	assert.NoError(t, kubelet.updateNodeStatus(UpdateNodeStatusFromApiserverCache))
 	// Only 1 more action (There were 9 actions before).
 	actions = kubeClient.Actions()
 	assert.Len(t, actions, 10)
@@ -1103,7 +1124,7 @@ func TestUpdateNodeStatusAndVolumesInUseWithNodeLease(t *testing.T) {
 			kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*tc.existingNode}}).ReactionChain
 
 			// Execute
-			assert.NoError(t, kubelet.updateNodeStatus())
+			assert.NoError(t, kubelet.updateNodeStatus(UpdateNodeStatusFromApiserverCache))
 
 			// Validate
 			actions := kubeClient.Actions()
@@ -1403,7 +1424,7 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 	}
 
 	kubelet.updateRuntimeUp()
-	assert.NoError(t, kubelet.updateNodeStatus())
+	assert.NoError(t, kubelet.updateNodeStatus(UpdateNodeStatusFromApiserverCache))
 	actions := kubeClient.Actions()
 	require.Len(t, actions, 2)
 	require.True(t, actions[1].Matches("patch", "nodes"))
@@ -2840,7 +2861,7 @@ func TestUpdateNodeAddresses(t *testing.T) {
 					return nil
 				},
 			}
-			assert.NoError(t, kubelet.updateNodeStatus())
+			assert.NoError(t, kubelet.updateNodeStatus(UpdateNodeStatusFromApiserverCache))
 
 			actions := kubeClient.Actions()
 			lastAction := actions[len(actions)-1]
