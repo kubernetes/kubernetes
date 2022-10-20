@@ -31,9 +31,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	httpprobe "k8s.io/kubernetes/pkg/probe/http"
@@ -48,6 +50,7 @@ type handlerRunner struct {
 	httpDoer         kubetypes.HTTPDoer
 	commandRunner    kubecontainer.CommandRunner
 	containerManager podStatusProvider
+	eventRecorder    record.EventRecorder
 }
 
 type podStatusProvider interface {
@@ -55,11 +58,12 @@ type podStatusProvider interface {
 }
 
 // NewHandlerRunner returns a configured lifecycle handler for a container.
-func NewHandlerRunner(httpDoer kubetypes.HTTPDoer, commandRunner kubecontainer.CommandRunner, containerManager podStatusProvider) kubecontainer.HandlerRunner {
+func NewHandlerRunner(httpDoer kubetypes.HTTPDoer, commandRunner kubecontainer.CommandRunner, containerManager podStatusProvider, eventRecorder record.EventRecorder) kubecontainer.HandlerRunner {
 	return &handlerRunner{
 		httpDoer:         httpDoer,
 		commandRunner:    commandRunner,
 		containerManager: containerManager,
+		eventRecorder:    eventRecorder,
 	}
 }
 
@@ -75,7 +79,7 @@ func (hr *handlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod,
 		}
 		return msg, err
 	case handler.HTTPGet != nil:
-		err := hr.runHTTPHandler(pod, container, handler)
+		err := hr.runHTTPHandler(pod, container, handler, hr.eventRecorder)
 		var msg string
 		if err != nil {
 			msg = fmt.Sprintf("HTTP lifecycle hook (%s) for Container %q in Pod %q failed - error: %v", handler.HTTPGet.Path, container.Name, format.Pod(pod), err)
@@ -113,7 +117,7 @@ func resolvePort(portReference intstr.IntOrString, container *v1.Container) (int
 	return -1, fmt.Errorf("couldn't find port: %v in %v", portReference, container)
 }
 
-func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler) error {
+func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, handler *v1.LifecycleHandler, eventRecorder record.EventRecorder) error {
 	host := handler.HTTPGet.Host
 	podIP := host
 	if len(host) == 0 {
@@ -138,8 +142,6 @@ func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 		discardHTTPRespBody(resp)
 
 		if isHTTPResponseError(err) {
-			// TODO: emit an event about the fallback
-			// TODO: increment a metric about the fallback
 			klog.V(1).ErrorS(err, "HTTPS request to lifecycle hook got HTTP response, retrying with HTTP.", "pod", klog.KObj(pod), "host", req.URL.Host)
 
 			req := req.Clone(context.Background())
@@ -149,6 +151,11 @@ func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 
 			// clear err since the fallback succeeded
 			if httpErr == nil {
+				metrics.LifecycleHandlerHTTPFallbacks.Inc()
+				if eventRecorder != nil {
+					// report the fallback with an event
+					eventRecorder.Event(pod, v1.EventTypeWarning, "LifecycleHTTPFallback", fmt.Sprintf("request to HTTPS lifecycle hook %s got HTTP response, retry with HTTP succeeded", req.URL.Host))
+				}
 				err = nil
 			}
 			discardHTTPRespBody(resp)

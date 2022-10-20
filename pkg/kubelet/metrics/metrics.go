@@ -497,6 +497,15 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	LifecycleHandlerHTTPFallbacks = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           "lifecycle_handler_http_fallbacks_total",
+			Help:           "The number of times lifecycle handlers successfully fell back to http from https.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 )
 
 var registerMetrics sync.Once
@@ -558,6 +567,9 @@ func Register(collectors ...metrics.StableCollector) {
 			legacyregistry.MustRegister(GracefulShutdownEndTime)
 		}
 
+		if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentHTTPGetHandlers) {
+			legacyregistry.MustRegister(LifecycleHandlerHTTPFallbacks)
+		}
 	})
 }
 
