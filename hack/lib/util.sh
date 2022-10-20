@@ -603,11 +603,9 @@ function kube::util::list_staging_repos() {
 
 # Determines if docker can be run, failures may simply require that the user be added to the docker group.
 function kube::util::ensure_docker_daemon_connectivity {
-  IFS=" " read -ra DOCKER <<< "${DOCKER_OPTS}"
-  # Expand ${DOCKER[@]} only if it's not unset. This is to work around
-  # Bash 3 issue with unbound variable.
-  DOCKER=(docker ${DOCKER[@]:+"${DOCKER[@]}"})
-  if ! "${DOCKER[@]}" info > /dev/null 2>&1 ; then
+  DOCKER_OPTS=${DOCKER_OPTS:-""}
+  IFS=" " read -ra docker_opts <<< "${DOCKER_OPTS}"
+  if ! docker "${docker_opts[@]:+"${docker_opts[@]}"}" info > /dev/null 2>&1 ; then
     cat <<'EOF' >&2
 Can't connect to 'docker' daemon.  please fix and retry.
 

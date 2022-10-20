@@ -2631,7 +2631,7 @@ function delete-subnetworks() {
       # This value should be kept in sync with number of regions.
       local parallelism=9
       gcloud compute networks subnets list --network="${NETWORK}" --project "${NETWORK_PROJECT}" --format='value(region.basename())' | \
-        xargs -i -P ${parallelism} gcloud --quiet compute networks subnets delete "${NETWORK}" --project "${NETWORK_PROJECT}" --region="{}" || true
+        xargs -I {} -P ${parallelism} gcloud --quiet compute networks subnets delete "${NETWORK}" --project "${NETWORK_PROJECT}" --region="{}" || true
     elif [[ "${CREATE_CUSTOM_NETWORK:-}" == "true" ]]; then
       echo "Deleting custom subnet..."
       gcloud --quiet compute networks subnets delete "${SUBNETWORK}" --project "${NETWORK_PROJECT}" --region="${REGION}" || true
