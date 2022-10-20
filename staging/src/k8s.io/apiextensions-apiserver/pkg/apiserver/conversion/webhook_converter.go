@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -35,7 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
-	utiltrace "k8s.io/utils/trace"
+	"k8s.io/component-base/tracing"
 )
 
 type webhookConverterFactory struct {
@@ -226,6 +228,7 @@ func getConvertedObjectsFromResponse(expectedUID types.UID, response runtime.Obj
 }
 
 func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) (runtime.Object, error) {
+	ctx := context.TODO()
 	// In general, the webhook should not do any defaulting or validation. A special case of that is an empty object
 	// conversion that must result an empty object and practically is the same as nopConverter.
 	// A smoke test in API machinery calls the converter on empty objects. As this case happens consistently
@@ -258,24 +261,23 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 		return out, nil
 	}
 
-	trace := utiltrace.New("Call conversion webhook",
-		utiltrace.Field{"custom-resource-definition", c.name},
-		utiltrace.Field{"desired-api-version", desiredAPIVersion},
-		utiltrace.Field{"object-count", objCount},
-		utiltrace.Field{"UID", requestUID})
+	ctx, span := tracing.Start(ctx, "Call conversion webhook",
+		attribute.String("custom-resource-definition", c.name),
+		attribute.String("desired-api-version", desiredAPIVersion),
+		attribute.Int("object-count", objCount),
+		attribute.String("UID", string(requestUID)))
 	// Only log conversion webhook traces that exceed a 8ms per object limit plus a 50ms request overhead allowance.
 	// The per object limit uses the SLO for conversion webhooks (~4ms per object) plus time to serialize/deserialize
 	// the conversion request on the apiserver side (~4ms per object).
-	defer trace.LogIfLong(time.Duration(50+8*objCount) * time.Millisecond)
+	defer span.End(time.Duration(50+8*objCount) * time.Millisecond)
 
 	// TODO: Figure out if adding one second timeout make sense here.
-	ctx := context.TODO()
 	r := c.restClient.Post().Body(request).Do(ctx)
 	if err := r.Into(response); err != nil {
 		// TODO: Return a webhook specific error to be able to convert it to meta.Status
 		return nil, fmt.Errorf("conversion webhook for %v failed: %v", in.GetObjectKind().GroupVersionKind(), err)
 	}
-	trace.Step("Request completed")
+	span.AddEvent("Request completed")
 
 	convertedObjects, err := getConvertedObjectsFromResponse(requestUID, response)
 	if err != nil {

@@ -27,6 +27,7 @@ import (
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.opentelemetry.io/otel/attribute"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -43,8 +44,8 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
-	utiltrace "k8s.io/utils/trace"
 )
 
 const (
@@ -152,25 +153,26 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 
 // Create implements storage.Interface.Create.
 func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
-	trace := utiltrace.New("Create etcd3",
-		utiltrace.Field{Key: "audit-id", Value: audit.GetAuditIDTruncated(ctx)},
-		utiltrace.Field{Key: "key", Value: key},
-		utiltrace.Field{Key: "type", Value: getTypeName(obj)},
-		utiltrace.Field{Key: "resource", Value: s.groupResourceString},
+	ctx, span := tracing.Start(ctx, "Create etcd3",
+		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
+		attribute.String("key", key),
+		attribute.String("type", getTypeName(obj)),
+		attribute.String("resource", s.groupResourceString),
 	)
-	defer trace.LogIfLong(500 * time.Millisecond)
+	defer span.End(500 * time.Millisecond)
 	if version, err := s.versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
 		return errors.New("resourceVersion should not be set on objects to be created")
 	}
 	if err := s.versioner.PrepareObjectForStorage(obj); err != nil {
 		return fmt.Errorf("PrepareObjectForStorage failed: %v", err)
 	}
-	trace.Step("About to Encode")
+	span.AddEvent("About to Encode")
 	data, err := runtime.Encode(s.codec, obj)
-	trace.Step("Encode finished", utiltrace.Field{Key: "len", Value: len(data)}, utiltrace.Field{Key: "err", Value: err})
 	if err != nil {
+		span.AddEvent("Encode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
 		return err
 	}
+	span.AddEvent("Encode succeeded", attribute.Int("len", len(data)))
 	key = path.Join(s.pathPrefix, key)
 
 	opts, err := s.ttlOpts(ctx, int64(ttl))
@@ -179,10 +181,11 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	}
 
 	newData, err := s.transformer.TransformToStorage(ctx, data, authenticatedDataString(key))
-	trace.Step("TransformToStorage finished", utiltrace.Field{Key: "err", Value: err})
 	if err != nil {
+		span.AddEvent("TransformToStorage failed", attribute.String("err", err.Error()))
 		return storage.NewInternalError(err.Error())
 	}
+	span.AddEvent("TransformToStorage succeeded")
 
 	startTime := time.Now()
 	txnResp, err := s.client.KV.Txn(ctx).If(
@@ -191,10 +194,11 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 		clientv3.OpPut(key, string(newData), opts...),
 	).Commit()
 	metrics.RecordEtcdRequestLatency("create", s.groupResourceString, startTime)
-	trace.Step("Txn call finished", utiltrace.Field{Key: "err", Value: err})
 	if err != nil {
+		span.AddEvent("Txn call failed", attribute.String("err", err.Error()))
 		return err
 	}
+	span.AddEvent("Txn call succeeded")
 
 	if !txnResp.Succeeded {
 		return storage.NewKeyExistsError(key, 0)
@@ -203,8 +207,11 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	if out != nil {
 		putResp := txnResp.Responses[0].GetResponsePut()
 		err = decode(s.codec, s.versioner, data, out, putResp.Header.Revision)
-		trace.Step("decode finished", utiltrace.Field{Key: "len", Value: len(data)}, utiltrace.Field{Key: "err", Value: err})
-		return err
+		if err != nil {
+			span.AddEvent("decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
+			return err
+		}
+		span.AddEvent("decode succeeded", attribute.Int("len", len(data)))
 	}
 	return nil
 }
@@ -331,12 +338,12 @@ func (s *store) conditionalDelete(
 func (s *store) GuaranteedUpdate(
 	ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
 	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
-	trace := utiltrace.New("GuaranteedUpdate etcd3",
-		utiltrace.Field{Key: "audit-id", Value: audit.GetAuditIDTruncated(ctx)},
-		utiltrace.Field{Key: "key", Value: key},
-		utiltrace.Field{Key: "type", Value: getTypeName(destination)},
-		utiltrace.Field{Key: "resource", Value: s.groupResourceString})
-	defer trace.LogIfLong(500 * time.Millisecond)
+	ctx, span := tracing.Start(ctx, "GuaranteedUpdate etcd3",
+		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
+		attribute.String("key", key),
+		attribute.String("type", getTypeName(destination)),
+		attribute.String("resource", s.groupResourceString))
+	defer span.End(500 * time.Millisecond)
 
 	v, err := conversion.EnforcePtr(destination)
 	if err != nil {
@@ -365,7 +372,7 @@ func (s *store) GuaranteedUpdate(
 	if err != nil {
 		return err
 	}
-	trace.Step("initial value restored")
+	span.AddEvent("initial value restored")
 
 	transformContext := authenticatedDataString(key)
 	for {
@@ -414,12 +421,13 @@ func (s *store) GuaranteedUpdate(
 			continue
 		}
 
-		trace.Step("About to Encode")
+		span.AddEvent("About to Encode")
 		data, err := runtime.Encode(s.codec, ret)
-		trace.Step("Encode finished", utiltrace.Field{Key: "len", Value: len(data)}, utiltrace.Field{Key: "err", Value: err})
 		if err != nil {
+			span.AddEvent("Encode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
 			return err
 		}
+		span.AddEvent("Encode succeeded", attribute.Int("len", len(data)))
 		if !origState.stale && bytes.Equal(data, origState.data) {
 			// if we skipped the original Get in this loop, we must refresh from
 			// etcd in order to be sure the data in the store is equivalent to
@@ -442,16 +450,17 @@ func (s *store) GuaranteedUpdate(
 		}
 
 		newData, err := s.transformer.TransformToStorage(ctx, data, transformContext)
-		trace.Step("TransformToStorage finished", utiltrace.Field{Key: "err", Value: err})
 		if err != nil {
+			span.AddEvent("TransformToStorage failed", attribute.String("err", err.Error()))
 			return storage.NewInternalError(err.Error())
 		}
+		span.AddEvent("TransformToStorage succeeded")
 
 		opts, err := s.ttlOpts(ctx, int64(ttl))
 		if err != nil {
 			return err
 		}
-		trace.Step("Transaction prepared")
+		span.AddEvent("Transaction prepared")
 
 		startTime := time.Now()
 		txnResp, err := s.client.KV.Txn(ctx).If(
@@ -462,11 +471,12 @@ func (s *store) GuaranteedUpdate(
 			clientv3.OpGet(key),
 		).Commit()
 		metrics.RecordEtcdRequestLatency("update", s.groupResourceString, startTime)
-		trace.Step("Txn call finished", utiltrace.Field{Key: "err", Value: err})
 		if err != nil {
+			span.AddEvent("Txn call failed", attribute.String("err", err.Error()))
 			return err
 		}
-		trace.Step("Transaction committed")
+		span.AddEvent("Txn call completed")
+		span.AddEvent("Transaction committed")
 		if !txnResp.Succeeded {
 			getResp := (*clientv3.GetResponse)(txnResp.Responses[0].GetResponseRange())
 			klog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", key)
@@ -474,15 +484,19 @@ func (s *store) GuaranteedUpdate(
 			if err != nil {
 				return err
 			}
-			trace.Step("Retry value restored")
+			span.AddEvent("Retry value restored")
 			origStateIsCurrent = true
 			continue
 		}
 		putResp := txnResp.Responses[0].GetResponsePut()
 
 		err = decode(s.codec, s.versioner, data, destination, putResp.Header.Revision)
-		trace.Step("decode finished", utiltrace.Field{Key: "len", Value: len(data)}, utiltrace.Field{Key: "err", Value: err})
-		return err
+		if err != nil {
+			span.AddEvent("decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
+			return err
+		}
+		span.AddEvent("decode succeeded", attribute.Int("len", len(data)))
+		return nil
 	}
 }
 
@@ -528,14 +542,14 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	resourceVersion := opts.ResourceVersion
 	match := opts.ResourceVersionMatch
 	pred := opts.Predicate
-	trace := utiltrace.New(fmt.Sprintf("List(recursive=%v) etcd3", recursive),
-		utiltrace.Field{Key: "audit-id", Value: audit.GetAuditIDTruncated(ctx)},
-		utiltrace.Field{Key: "key", Value: key},
-		utiltrace.Field{Key: "resourceVersion", Value: resourceVersion},
-		utiltrace.Field{Key: "resourceVersionMatch", Value: match},
-		utiltrace.Field{Key: "limit", Value: pred.Limit},
-		utiltrace.Field{Key: "continue", Value: pred.Continue})
-	defer trace.LogIfLong(500 * time.Millisecond)
+	ctx, span := tracing.Start(ctx, fmt.Sprintf("List(recursive=%v) etcd3", recursive),
+		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
+		attribute.String("key", key),
+		attribute.String("resourceVersion", resourceVersion),
+		attribute.String("resourceVersionMatch", string(match)),
+		attribute.Int("limit", int(pred.Limit)),
+		attribute.String("continue", pred.Continue))
+	defer span.End(500 * time.Millisecond)
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
