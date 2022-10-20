@@ -1905,9 +1905,9 @@ func (v *azureFileVolume) DeleteVolume() {
 }
 
 func (a *azureDiskDriver) GetTimeouts() *framework.TimeoutContext {
-	return &framework.TimeoutContext{
-		PodStart:  time.Minute * 15,
-		PodDelete: time.Minute * 15,
-		PVDelete:  time.Minute * 20,
-	}
+	timeouts := framework.NewTimeoutContextWithDefaults()
+	timeouts.PodStart = time.Minute * 15
+	timeouts.PodDelete = time.Minute * 15
+	timeouts.PVDelete = time.Minute * 20
+	return timeouts
 }
