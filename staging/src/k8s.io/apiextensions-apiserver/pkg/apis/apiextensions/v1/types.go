@@ -56,7 +56,9 @@ type CustomResourceDefinitionSpec struct {
 	// by GA > beta > alpha (where GA is a version with no suffix such as beta or alpha), and then by comparing
 	// major version, then minor version. An example sorted list of versions:
 	// v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.
-	Versions []CustomResourceDefinitionVersion `json:"versions" protobuf:"bytes,7,rep,name=versions"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	Versions []CustomResourceDefinitionVersion `json:"versions" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,7,rep,name=versions2"`
 
 	// conversion defines conversion settings for the CRD.
 	// +optional
