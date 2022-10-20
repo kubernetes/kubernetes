@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/volume/util/fs"
 	"k8s.io/utils/clock"
 )
 
@@ -445,6 +446,23 @@ func (p *criStatsProvider) getFsInfo(fsID *runtimeapi.FilesystemIdentifier) *cad
 	mountpoint := fsID.GetMountpoint()
 	fsInfo, err := p.cadvisor.GetDirFsInfo(mountpoint)
 	if err != nil {
+		available, capacity, usage, inodes, inodesFree, _, duErr := fs.Info(mountpoint)
+		if duErr == nil {
+			fsInodes := uint64(inodes)
+			fsInodesFree := uint64(inodesFree)
+			return &cadvisorapiv2.FsInfo{
+				Timestamp:  time.Now(),
+				Mountpoint: mountpoint,
+				Capacity:   uint64(capacity),
+				Available:  uint64(available),
+				Usage:      uint64(usage),
+				Inodes:     &fsInodes,
+				InodesFree: &fsInodesFree,
+			}
+		} else {
+			klog.ErrorS(duErr, "Failed to get filesystem info", "mountpoint", mountpoint)
+		}
+
 		msg := "Failed to get the info of the filesystem with mountpoint"
 		if err == cadvisorfs.ErrNoSuchDevice {
 			klog.V(2).InfoS(msg, "mountpoint", mountpoint, "err", err)
