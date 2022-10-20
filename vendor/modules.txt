@@ -487,7 +487,7 @@ github.com/karrick/godirwalk
 github.com/kcp-dev/apimachinery/pkg/cache
 github.com/kcp-dev/apimachinery/pkg/client
 github.com/kcp-dev/apimachinery/third_party/informers
-# github.com/kcp-dev/client-go v0.0.0-20221019134549-387bce248341 => github.com/kcp-dev/client-go v0.0.0-20221019134549-387bce248341
+# github.com/kcp-dev/client-go v0.0.0-20221019184858-60e56386a574 => github.com/kcp-dev/client-go v0.0.0-20221019184858-60e56386a574
 ## explicit
 github.com/kcp-dev/client-go/clients/clientset/versioned
 github.com/kcp-dev/client-go/clients/clientset/versioned/typed/admissionregistration/v1
@@ -2746,7 +2746,7 @@ sigs.k8s.io/yaml
 # github.com/jung-kurt/gofpdf => github.com/jung-kurt/gofpdf v1.0.3-0.20190309125859-24315acbbda5
 # github.com/karrick/godirwalk => github.com/karrick/godirwalk v1.16.1
 # github.com/kcp-dev/apimachinery => github.com/kcp-dev/apimachinery v0.0.0-20221019133255-9e1e13940519
-# github.com/kcp-dev/client-go => github.com/kcp-dev/client-go v0.0.0-20221019134549-387bce248341
+# github.com/kcp-dev/client-go => github.com/kcp-dev/client-go v0.0.0-20221019184858-60e56386a574
 # github.com/kcp-dev/logicalcluster/v2 => github.com/kcp-dev/logicalcluster/v2 v2.0.0-alpha.1
 # github.com/kisielk/errcheck => github.com/kisielk/errcheck v1.5.0
 # github.com/kisielk/gotool => github.com/kisielk/gotool v1.0.0
