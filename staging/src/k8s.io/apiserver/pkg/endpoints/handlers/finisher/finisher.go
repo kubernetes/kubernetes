@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
 )
 
@@ -70,7 +71,7 @@ func (r *result) Return() (runtime.Object, error) {
 // by a ResultFunc after the request had timed out.
 // timedOutAt is the time the request had been timed out.
 // r is the result returned by the child goroutine.
-type PostTimeoutLoggerFunc func(timedOutAt time.Time, r *result)
+type PostTimeoutLoggerFunc func(ctx context.Context, timedOutAt time.Time, r *result)
 
 const (
 	// how much time the post-timeout receiver goroutine will wait for the sender
@@ -140,7 +141,7 @@ func finishRequest(ctx context.Context, fn ResultFunc, postTimeoutWait time.Dura
 					// we will not wait forever, if we are here then we know that some sender
 					// goroutines are taking longer than postTimeoutWait.
 				}
-				postTimeoutLogger(timedOutAt, result)
+				postTimeoutLogger(ctx, timedOutAt, result)
 			}()
 		}()
 		return nil, errors.NewTimeoutError(fmt.Sprintf("request did not complete within requested timeout - %s", ctx.Err()), 0)
@@ -150,11 +151,16 @@ func finishRequest(ctx context.Context, fn ResultFunc, postTimeoutWait time.Dura
 // logPostTimeoutResult logs a panic or an error from the result that the sender (goroutine that is
 // executing the ResultFunc function) has sent to the receiver after the request had timed out.
 // timedOutAt is the time the request had been timed out
-func logPostTimeoutResult(timedOutAt time.Time, r *result) {
+func logPostTimeoutResult(ctx context.Context, timedOutAt time.Time, r *result) {
+	var verbPath string
+	if info, ok := request.RequestInfoFrom(ctx); ok {
+		verbPath = fmt.Sprintf(" %v %q", info.Verb, info.Path)
+	}
+
 	if r == nil {
 		// we are using r == nil to indicate that the child goroutine never returned a result.
 		metrics.RecordRequestPostTimeout(metrics.PostTimeoutSourceRestHandler, metrics.PostTimeoutHandlerPending)
-		klog.Errorf("FinishRequest: post-timeout activity, waited for %s, child goroutine has not returned yet", time.Since(timedOutAt))
+		klog.Errorf("FinishRequest: post-timeout activity, waited for %s,%s child goroutine has not returned yet", time.Since(timedOutAt), verbPath)
 		return
 	}
 
@@ -170,7 +176,7 @@ func logPostTimeoutResult(timedOutAt time.Time, r *result) {
 	}
 
 	metrics.RecordRequestPostTimeout(metrics.PostTimeoutSourceRestHandler, status)
-	err := fmt.Errorf("FinishRequest: post-timeout activity - time-elapsed: %s, panicked: %t, err: %v, panic-reason: %v",
-		time.Since(timedOutAt), r.reason != nil, r.err, r.reason)
+	err := fmt.Errorf("FinishRequest: post-timeout activity - time-elapsed: %s,%s panicked: %t, err: %v, panic-reason: %v",
+		time.Since(timedOutAt), verbPath, r.reason != nil, r.err, r.reason)
 	utilruntime.HandleError(err)
 }

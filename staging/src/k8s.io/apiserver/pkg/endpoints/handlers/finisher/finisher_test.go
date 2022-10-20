@@ -225,13 +225,13 @@ func TestFinishRequestWithPostTimeoutTracker(t *testing.T) {
 
 			var resultGot *result
 			postTimeoutLoggerCompletedCh := make(chan struct{})
-			decoratedPostTimeoutLogger := func(timedOutAt time.Time, r *result) {
+			decoratedPostTimeoutLogger := func(ctx context.Context, timedOutAt time.Time, r *result) {
 				defer func() {
 					resultGot = r
 					close(postTimeoutLoggerCompletedCh)
 				}()
 
-				logPostTimeoutResult(timedOutAt, r)
+				logPostTimeoutResult(ctx, timedOutAt, r)
 			}
 
 			_, err := finishRequest(ctx, resultFn, test.postTimeoutWait, decoratedPostTimeoutLogger)
