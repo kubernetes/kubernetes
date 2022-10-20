@@ -211,7 +211,7 @@ func ensureRBACPolicy(p *PolicyData, client clientset.Interface) (done bool, err
 			Client:  reconciliation.ClusterRoleModifier{Client: client.RbacV1().ClusterRoles()},
 			Confirm: true,
 		}
-		// ServiceUnavailble error is returned when the API server is blocked by storage version updates
+		// ServiceUnavailable error is returned when the API server is blocked by storage version updates
 		err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
 			result, err := opts.Run()
 			if err != nil {
@@ -241,7 +241,7 @@ func ensureRBACPolicy(p *PolicyData, client clientset.Interface) (done bool, err
 			Client:      reconciliation.ClusterRoleBindingClientAdapter{Client: client.RbacV1().ClusterRoleBindings()},
 			Confirm:     true,
 		}
-		// ServiceUnavailble error is returned when the API server is blocked by storage version updates
+		// ServiceUnavailable error is returned when the API server is blocked by storage version updates
 		err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
 			result, err := opts.Run()
 			if err != nil {
@@ -274,7 +274,7 @@ func ensureRBACPolicy(p *PolicyData, client clientset.Interface) (done bool, err
 				Client:  reconciliation.RoleModifier{Client: client.RbacV1(), NamespaceClient: client.CoreV1().Namespaces()},
 				Confirm: true,
 			}
-			// ServiceUnavailble error is returned when the API server is blocked by storage version updates
+			// ServiceUnavailable error is returned when the API server is blocked by storage version updates
 			err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
 				result, err := opts.Run()
 				if err != nil {
@@ -306,7 +306,7 @@ func ensureRBACPolicy(p *PolicyData, client clientset.Interface) (done bool, err
 				Client:      reconciliation.RoleBindingClientAdapter{Client: client.RbacV1(), NamespaceClient: client.CoreV1().Namespaces()},
 				Confirm:     true,
 			}
-			// ServiceUnavailble error is returned when the API server is blocked by storage version updates
+			// ServiceUnavailable error is returned when the API server is blocked by storage version updates
 			err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
 				result, err := opts.Run()
 				if err != nil {
