@@ -759,6 +759,27 @@ function kube::util::ensure-gnu-sed {
   kube::util::sourced_variable "${SED}"
 }
 
+# kube::util::ensure-gnu-date
+# Determines which date binary is gnu-date on linux/darwin
+#
+# Sets:
+#  DATE: The name of the gnu-date binary
+#
+function kube::util::ensure-gnu-date {
+  # NOTE: the echo below is a workaround to ensure date is executed before the grep.
+  # see: https://github.com/kubernetes/kubernetes/issues/87251
+  date_help="$(LANG=C date --help 2>&1 || true)"
+  if echo "${date_help}" | grep -q "GNU\|BusyBox"; then
+    DATE="date"
+  elif command -v gdate &>/dev/null; then
+    DATE="gdate"
+  else
+    kube::log::error "Failed to find GNU date as date or gdate. If you are on Mac: brew install coreutils." >&2
+    return 1
+  fi
+  kube::util::sourced_variable "${DATE}"
+}
+
 # kube::util::check-file-in-alphabetical-order <file>
 # Check that the file is in alphabetical order
 #
