@@ -572,7 +572,7 @@ kind: CredentialProviderConfig
 apiVersion: kubelet.config.k8s.io/v1beta1
 providers:
   - name: auth-provider-gcp
-    apiVersion: credentialprovider.kubelet.k8s.io/v1beta1
+    apiVersion: credentialprovider.kubelet.k8s.io/v1alpha1
     matchImages:
     - "container.cloud.google.com"
     - "gcr.io"
