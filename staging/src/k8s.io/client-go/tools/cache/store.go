@@ -23,7 +23,6 @@ import (
 	"github.com/kcp-dev/logicalcluster/v2"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/client-go/tools/clusters"
 )
 
 // Store is a generic object storage and processing interface.  A
@@ -113,11 +112,33 @@ func MetaNamespaceKeyFunc(obj interface{}) (string, error) {
 		return "", fmt.Errorf("object has no meta: %v", err)
 	}
 
-	name := clusters.ToClusterAwareKey(logicalcluster.From(metaObj), metaObj.GetName())
+	name := logicalcluster.From(metaObj).String() + "|" + metaObj.GetName()
 	if len(metaObj.GetNamespace()) > 0 {
 		return metaObj.GetNamespace() + "/" + name, nil
 	}
 	return name, nil
+}
+
+// LegacyMetaNamespaceKeyFunc is a convenient default KeyFunc which knows how to make
+// keys for API objects which implement meta.Interface.
+// The key uses the format <namespace>/<name> unless <namespace> is empty, then
+// it's just <name>.
+//
+// TODO: replace key-as-string with a key-as-struct so that this
+// packing/unpacking won't be necessary.
+func LegacyMetaNamespaceKeyFunc(obj interface{}) (string, error) {
+	if key, ok := obj.(ExplicitKey); ok {
+		return string(key), nil
+	}
+	metaObj, err := meta.Accessor(obj)
+	if err != nil {
+		return "", fmt.Errorf("object has no meta: %v", err)
+	}
+
+	if len(metaObj.GetNamespace()) > 0 {
+		return metaObj.GetNamespace() + "/" + metaObj.GetName(), nil
+	}
+	return metaObj.GetName(), nil
 }
 
 // SplitMetaNamespaceKey returns the namespace and name that

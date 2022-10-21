@@ -17,6 +17,7 @@ limitations under the License.
 package genericcontrolplane
 
 import (
+	kcpkubernetesclientset "github.com/kcp-dev/client-go/clients/clientset/versioned"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
@@ -24,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/clientsethack"
 	"k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
@@ -31,7 +33,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	kubeexternalinformers "k8s.io/client-go/informers"
-
 	"k8s.io/kubernetes/pkg/genericcontrolplane/options"
 )
 
@@ -49,12 +50,17 @@ func CreateAPIExtensionsConfig(
 	genericConfig.PostStartHooks = map[string]genericapiserver.PostStartHookConfigEntry{}
 	genericConfig.RESTOptionsGetter = nil
 
+	client, err := kcpkubernetesclientset.NewForConfig(genericConfig.LoopbackClientConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	// override genericConfig.AdmissionControl with apiextensions' scheme,
 	// because apiextensions apiserver should use its own scheme to convert resources.
-	err := commandOptions.Admission.ApplyTo(
+	err = commandOptions.Admission.ApplyTo(
 		&genericConfig,
 		externalInformers,
-		genericConfig.LoopbackClientConfig,
+		clientsethack.Wrap(client),
 		feature.DefaultFeatureGate,
 		pluginInitializers...)
 	if err != nil {

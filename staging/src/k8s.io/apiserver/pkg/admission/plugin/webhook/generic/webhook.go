@@ -33,6 +33,8 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/namespace"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/object"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/rules"
+	"k8s.io/apiserver/pkg/clientsethack"
+	"k8s.io/apiserver/pkg/informerfactoryhack"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -111,24 +113,24 @@ func (a *Webhook) SetServiceResolver(sr webhookutil.ServiceResolver) {
 // SetExternalKubeClientSet implements the WantsExternalKubeInformerFactory interface.
 // It sets external ClientSet for admission plugins that need it
 func (a *Webhook) SetExternalKubeClientSet(client clientset.Interface) {
-	a.namespaceMatcher.Client = client
+	a.namespaceMatcher.Client = clientsethack.Unwrap(client)
 }
 
 // SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
 func (a *Webhook) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	namespaceInformer := f.Core().V1().Namespaces()
+	namespaceInformer := informerfactoryhack.Unwrap(f).Core().V1().Namespaces()
 	a.namespaceMatcher.NamespaceLister = namespaceInformer.Lister()
-	a.hookSource = a.sourceFactory(f)
+	//a.hookSource = a.sourceFactory(f)
 	a.SetReadyFunc(func() bool {
-		return namespaceInformer.Informer().HasSynced() && a.hookSource.HasSynced()
+		return namespaceInformer.Informer().HasSynced()
 	})
 }
 
 // ValidateInitialization implements the InitializationValidator interface.
 func (a *Webhook) ValidateInitialization() error {
-	if a.hookSource == nil {
-		return fmt.Errorf("kubernetes client is not properly setup")
-	}
+	//if a.hookSource == nil {
+	//	return fmt.Errorf("kubernetes client is not properly setup")
+	//}
 	if err := a.namespaceMatcher.Validate(); err != nil {
 		return fmt.Errorf("namespaceMatcher is not properly setup: %v", err)
 	}

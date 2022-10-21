@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
 	"github.com/kcp-dev/logicalcluster/v2"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -40,7 +41,6 @@ import (
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/controller/openapi/builder"
-	"k8s.io/client-go/tools/clusters"
 )
 
 // Controller watches CustomResourceDefinitions and publishes validation schema
@@ -200,25 +200,23 @@ func (c *Controller) processNextWorkItem() bool {
 	return true
 }
 
-func (c *Controller) sync(clusterAndName string) error {
+func (c *Controller) sync(key string) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	crd, err := c.crdLister.Get(clusterAndName)
+	clusterName, _, crdName, err := kcpcache.SplitMetaClusterNamespaceKey(key)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return nil
+	}
+
+	crd, err := c.crdLister.Get(clusterName.String() + "|" + crdName)
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
 	// do we have to remove all specs of this CRD?
 	if errors.IsNotFound(err) || !apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Established) {
-		var clusterName logicalcluster.Name
-		crdName := clusterAndName
-		if crd != nil {
-			clusterName = logicalcluster.From(crd)
-			crdName = crd.Name
-		} else {
-			clusterName, crdName = clusters.SplitClusterAwareKey(clusterAndName)
-		}
 		if !c.removeClusterCrdSpecs(clusterName, crdName) {
 			return nil
 		}
@@ -326,6 +324,6 @@ func (c *Controller) deleteCustomResourceDefinition(obj interface{}) {
 }
 
 func (c *Controller) enqueue(obj *apiextensionsv1.CustomResourceDefinition) {
-	key, _ := cache.MetaNamespaceKeyFunc(obj)
+	key, _ := kcpcache.MetaClusterNamespaceKeyFunc(obj)
 	c.queue.Add(key)
 }

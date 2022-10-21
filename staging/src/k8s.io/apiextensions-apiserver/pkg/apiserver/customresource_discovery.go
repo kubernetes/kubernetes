@@ -32,10 +32,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
 type versionDiscoveryHandler struct {
-	crdLister kcp.ClusterAwareCRDLister
+	crdLister kcp.ClusterAwareCRDClusterLister
 	delegate  http.Handler
 }
 
@@ -47,10 +48,16 @@ func (r *versionDiscoveryHandler) ServeHTTP(w http.ResponseWriter, req *http.Req
 		return
 	}
 
+	clusterName, err := genericapirequest.ClusterNameFrom(req.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	requestedGroup := pathParts[1]
 	requestedVersion := pathParts[2]
 
-	crds, err := r.crdLister.List(req.Context(), labels.Everything())
+	crds, err := r.crdLister.Cluster(clusterName).List(req.Context(), labels.Everything())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -152,7 +159,7 @@ func APIResourcesForGroupVersion(requestedGroup, requestedVersion string, crds [
 }
 
 type groupDiscoveryHandler struct {
-	crdLister kcp.ClusterAwareCRDLister
+	crdLister kcp.ClusterAwareCRDClusterLister
 	delegate  http.Handler
 }
 
@@ -164,12 +171,18 @@ func (r *groupDiscoveryHandler) ServeHTTP(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
+	clusterName, err := genericapirequest.ClusterNameFrom(req.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	apiVersionsForDiscovery := []metav1.GroupVersionForDiscovery{}
 	versionsForDiscoveryMap := map[metav1.GroupVersion]bool{}
 
 	requestedGroup := pathParts[1]
 
-	crds, err := r.crdLister.List(req.Context(), labels.Everything())
+	crds, err := r.crdLister.Cluster(clusterName).List(req.Context(), labels.Everything())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -228,7 +241,7 @@ func (r *groupDiscoveryHandler) ServeHTTP(w http.ResponseWriter, req *http.Reque
 }
 
 type rootDiscoveryHandler struct {
-	crdLister kcp.ClusterAwareCRDLister
+	crdLister kcp.ClusterAwareCRDClusterLister
 	delegate  http.Handler
 }
 
@@ -236,7 +249,12 @@ func (r *rootDiscoveryHandler) Groups(ctx context.Context, _ *http.Request) ([]m
 	apiVersionsForDiscovery := map[string][]metav1.GroupVersionForDiscovery{}
 	versionsForDiscoveryMap := map[string]map[metav1.GroupVersion]bool{}
 
-	crds, err := r.crdLister.List(ctx, labels.Everything())
+	clusterName, err := genericapirequest.ClusterNameFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	crds, err := r.crdLister.Cluster(clusterName).List(ctx, labels.Everything())
 	if err != nil {
 		return []metav1.APIGroup{}, err
 	}

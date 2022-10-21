@@ -22,15 +22,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/kcp-dev/logicalcluster/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/clusters"
 	"k8s.io/utils/lru"
 )
 
@@ -60,10 +57,6 @@ type quotaAccessor struct {
 	// back quota evaluations that touch the same quota doc.  This only works because we can compare etcd resourceVersions
 	// for the same resource as integers.  Before this change: 22 updates with 12 conflicts.  after this change: 15 updates with 0 conflicts
 	updatedQuotas *lru.Cache
-
-	// kcp
-	indexer     cache.Indexer
-	clusterName logicalcluster.Name
 }
 
 // newQuotaAccessor creates an object that conforms to the QuotaAccessor interface to be used to retrieve quota objects.
@@ -111,13 +104,12 @@ func (e *quotaAccessor) checkCache(quota *corev1.ResourceQuota) *corev1.Resource
 }
 
 const (
-	kcpByLogicalClusterAndNamespace                = "kcp-global-byLogicalClusterAndNamespace"
 	kcpClusterScopedQuotaNamespace                 = "admin"
 	kcpExperimentalClusterScopedQuotaAnnotationKey = "experimental.quota.kcp.dev/cluster-scoped"
 )
 
 func (e *quotaAccessor) GetQuotas(namespace string) ([]corev1.ResourceQuota, error) {
-	possibleClusterScopedQuotas, err := e.indexer.ByIndex(kcpByLogicalClusterAndNamespace, clusters.ToClusterAwareKey(e.clusterName, kcpClusterScopedQuotaNamespace))
+	possibleClusterScopedQuotas, err := e.lister.ResourceQuotas(kcpClusterScopedQuotaNamespace).List(labels.Everything())
 	if err != nil {
 		return nil, fmt.Errorf("error getting ResourceQuotas from namespace %q: %w", kcpClusterScopedQuotaNamespace, err)
 	}
@@ -181,7 +173,7 @@ func (e *quotaAccessor) GetQuotas(namespace string) ([]corev1.ResourceQuota, err
 	}
 
 	for i := range possibleClusterScopedQuotas {
-		candidate := possibleClusterScopedQuotas[i].(*corev1.ResourceQuota)
+		candidate := possibleClusterScopedQuotas[i]
 
 		a := candidate.Annotations[kcpExperimentalClusterScopedQuotaAnnotationKey]
 		if a == "" {

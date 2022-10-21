@@ -22,19 +22,17 @@ import (
 	"reflect"
 	"time"
 
+	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
+	kcpkubernetesclientset "github.com/kcp-dev/client-go/clients/clientset/versioned"
+	kcpcorev1informers "github.com/kcp-dev/client-go/clients/informers/core/v1"
+	kcpcorev1listers "github.com/kcp-dev/client-go/clients/listers/core/v1"
 	"github.com/kcp-dev/logicalcluster/v2"
-
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	coreinformers "k8s.io/client-go/informers/core/v1"
-	clientset "k8s.io/client-go/kubernetes"
-	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/clusters"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
@@ -56,14 +54,14 @@ func init() {
 // NewPublisher construct a new controller which would manage the configmap
 // which stores certificates in each namespace. It will make sure certificate
 // configmap exists in each namespace.
-func NewPublisher(cmInformer coreinformers.ConfigMapInformer, nsInformer coreinformers.NamespaceInformer, cl clientset.Interface, rootCA []byte) (*Publisher, error) {
+func NewPublisher(cmInformer kcpcorev1informers.ConfigMapClusterInformer, nsInformer kcpcorev1informers.NamespaceClusterInformer, cl kcpkubernetesclientset.ClusterInterface, rootCA []byte) (*Publisher, error) {
 	e := &Publisher{
 		client: cl,
 		rootCA: rootCA,
 		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "root_ca_cert_publisher"),
 	}
-	if cl.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("root_ca_cert_publisher", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+	if cl.Cluster(logicalcluster.New("fake")).CoreV1().RESTClient().GetRateLimiter() != nil {
+		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("root_ca_cert_publisher", cl.Cluster(logicalcluster.New("fake")).CoreV1().RESTClient().GetRateLimiter()); err != nil {
 			return nil, err
 		}
 	}
@@ -89,13 +87,13 @@ func NewPublisher(cmInformer coreinformers.ConfigMapInformer, nsInformer coreinf
 
 // Publisher manages certificate ConfigMap objects inside Namespaces
 type Publisher struct {
-	client clientset.Interface
+	client kcpkubernetesclientset.ClusterInterface
 	rootCA []byte
 
 	// To allow injection for testing.
 	syncHandler func(ctx context.Context, key string) error
 
-	cmLister       corelisters.ConfigMapLister
+	cmLister       kcpcorev1listers.ConfigMapClusterLister
 	cmListerSynced cache.InformerSynced
 
 	nsListerSynced cache.InformerSynced
@@ -159,7 +157,7 @@ func (c *Publisher) configMapUpdated(_, newObj interface{}) {
 func (c *Publisher) namespaceAdded(obj interface{}) {
 	namespace := obj.(*v1.Namespace)
 
-	key, err := cache.MetaNamespaceKeyFunc(namespace)
+	key, err := kcpcache.MetaClusterNamespaceKeyFunc(namespace)
 	if err != nil {
 		utilruntime.HandleError(err)
 		return
@@ -174,7 +172,7 @@ func (c *Publisher) namespaceUpdated(oldObj interface{}, newObj interface{}) {
 		return
 	}
 
-	key, err := cache.MetaNamespaceKeyFunc(newNamespace)
+	key, err := kcpcache.MetaClusterNamespaceKeyFunc(newNamespace)
 	if err != nil {
 		utilruntime.HandleError(err)
 		return
@@ -215,15 +213,16 @@ func (c *Publisher) syncNamespace(ctx context.Context, key string) (err error) {
 	}()
 
 	// Get the clusterName and name from the key.
-	_, clusterAwareName, err := cache.SplitMetaNamespaceKey(key)
-	clusterName, name := clusters.SplitClusterAwareKey(clusterAwareName)
-
-	clusterAwareConfigMapName := clusters.ToClusterAwareKey(clusterName, RootCACertConfigMapName)
-	cm, err := c.cmLister.ConfigMaps(name).Get(clusterAwareConfigMapName)
+	clusterName, _, name, err := kcpcache.SplitMetaClusterNamespaceKey(key)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return err
+	}
+	cm, err := c.cmLister.Cluster(clusterName).ConfigMaps(name).Get(RootCACertConfigMapName)
 
 	switch {
 	case apierrors.IsNotFound(err):
-		_, err = c.client.CoreV1().ConfigMaps(name).Create(genericapirequest.WithCluster(ctx, genericapirequest.Cluster{Name: clusterName}), &v1.ConfigMap{
+		_, err = c.client.Cluster(clusterName).CoreV1().ConfigMaps(name).Create(ctx, &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        RootCACertConfigMapName,
 				Annotations: map[string]string{DescriptionAnnotation: Description},
@@ -258,7 +257,7 @@ func (c *Publisher) syncNamespace(ctx context.Context, key string) (err error) {
 	}
 	cm.Annotations[DescriptionAnnotation] = Description
 
-	_, err = c.client.CoreV1().ConfigMaps(name).Update(genericapirequest.WithCluster(ctx, genericapirequest.Cluster{Name: clusterName}), cm, metav1.UpdateOptions{})
+	_, err = c.client.Cluster(clusterName).CoreV1().ConfigMaps(name).Update(ctx, cm, metav1.UpdateOptions{})
 	return err
 }
 
@@ -278,10 +277,5 @@ func convertToCM(obj interface{}) (*v1.ConfigMap, error) {
 }
 
 func getNamespaceKey(configmap *v1.ConfigMap) string {
-	clusterName := logicalcluster.From(configmap)
-	if clusterName.Empty() {
-		return ""
-	}
-
-	return clusters.ToClusterAwareKey(clusterName, configmap.GetNamespace())
+	return kcpcache.ToClusterAwareKey(logicalcluster.From(configmap).String(), "", configmap.GetNamespace())
 }

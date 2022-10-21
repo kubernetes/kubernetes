@@ -33,7 +33,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	clientgoinformers "k8s.io/client-go/informers"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator"
 	"k8s.io/kube-openapi/pkg/handler"
@@ -100,7 +99,7 @@ type MiniAggregatorServer struct {
 
 // Complete fills in any fields not set that are required to have valid data.
 // It's mutating the receiver.
-func (cfg *MiniAggregatorConfig) Complete(kubeInformers clientgoinformers.SharedInformerFactory) CompletedMiniAggregatorConfig {
+func (cfg *MiniAggregatorConfig) Complete() CompletedMiniAggregatorConfig {
 	// CRITICAL: to be able to provide our own /openapi/v2 implementation that aggregates
 	// content from multiple servers, we *must* skip OpenAPI installation. Otherwise,
 	// when PrepareRun() is invoked, it will register a handler for /openapi/v2,
@@ -109,7 +108,7 @@ func (cfg *MiniAggregatorConfig) Complete(kubeInformers clientgoinformers.Shared
 
 	return CompletedMiniAggregatorConfig{
 		completedMiniAggregatorConfig: &completedMiniAggregatorConfig{
-			GenericConfig: cfg.GenericConfig.Complete(kubeInformers),
+			GenericConfig: cfg.GenericConfig.Complete(nil),
 		},
 	}
 }

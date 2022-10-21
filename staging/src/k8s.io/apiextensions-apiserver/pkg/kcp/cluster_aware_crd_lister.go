@@ -18,9 +18,16 @@ package kcp
 
 import (
 	"context"
+
+	"github.com/kcp-dev/logicalcluster/v2"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
+
+// ClusterAwareCRDClusterLister knows how to scope down to a ClusterAwareCRDLister for one cluster.
+type ClusterAwareCRDClusterLister interface {
+	Cluster(logicalcluster.Name) ClusterAwareCRDLister
+}
 
 // ClusterAwareCRDLister is a CRD lister that is kcp-specific.
 type ClusterAwareCRDLister interface {

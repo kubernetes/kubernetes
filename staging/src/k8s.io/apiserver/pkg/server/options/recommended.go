@@ -130,11 +130,6 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	if err := o.CoreAPI.ApplyTo(config); err != nil {
 		return err
 	}
-	if initializers, err := o.ExtraAdmissionInitializers(config); err != nil {
-		return err
-	} else if err := o.Admission.ApplyTo(&config.Config, config.SharedInformerFactory, config.ClientConfig, o.FeatureGate, initializers...); err != nil {
-		return err
-	}
 	if feature.DefaultFeatureGate.Enabled(features.APIPriorityAndFairness) {
 		if config.ClientConfig != nil {
 			if config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight <= 0 {

@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
+	"k8s.io/client-go/kubernetes"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
@@ -120,7 +121,12 @@ func (a *AdmissionOptions) ApplyTo(
 		a.GenericAdmission.EnablePlugins, a.GenericAdmission.DisablePlugins = computePluginNames(a.PluginNames, a.GenericAdmission.RecommendedPluginOrder)
 	}
 
-	return a.GenericAdmission.ApplyTo(c, informers, kubeAPIServerClientConfig, features, pluginInitializers...)
+	client, err := kubernetes.NewForConfig(kubeAPIServerClientConfig)
+	if err != nil {
+		return err
+	}
+
+	return a.GenericAdmission.ApplyTo(c, informers, client, features, pluginInitializers...)
 }
 
 // explicitly disable all plugins that are not in the enabled list

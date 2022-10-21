@@ -22,6 +22,10 @@ import (
 	"io"
 	"time"
 
+	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
+	kcpkubernetesclientset "github.com/kcp-dev/client-go/clients/clientset/versioned"
+	kcpkubernetesinformers "github.com/kcp-dev/client-go/clients/informers"
+	kcpcorev1listers "github.com/kcp-dev/client-go/clients/listers/core/v1"
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
@@ -31,12 +35,7 @@ import (
 	utilcache "k8s.io/apimachinery/pkg/util/cache"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/admission/initializer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
-	corelisters "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/tools/clusters"
 	"k8s.io/utils/clock"
 )
 
@@ -64,16 +63,16 @@ func Register(plugins *admission.Plugins) {
 // It enforces life-cycle constraints around a Namespace depending on its Phase
 type Lifecycle struct {
 	*admission.Handler
-	client             kubernetes.Interface
+	client             kcpkubernetesclientset.ClusterInterface
 	immortalNamespaces sets.String
-	namespaceLister    corelisters.NamespaceLister
+	namespaceLister    kcpcorev1listers.NamespaceClusterLister
 	// forceLiveLookupCache holds a list of entries for namespaces that we have a strong reason to believe are stale in our local cache.
 	// if a namespace is in this cache, then we will ignore our local state and always fetch latest from api server.
 	forceLiveLookupCache *utilcache.LRUExpireCache
 }
 
-var _ = initializer.WantsExternalKubeInformerFactory(&Lifecycle{})
-var _ = initializer.WantsExternalKubeClientSet(&Lifecycle{})
+//var _ = initializer.WantsExternalKubeInformerFactory(&Lifecycle{})
+//var _ = initializer.WantsExternalKubeClientSet(&Lifecycle{})
 
 // Admit makes an admission decision based on the request attributes
 func (l *Lifecycle) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
@@ -91,6 +90,7 @@ func (l *Lifecycle) Admit(ctx context.Context, a admission.Attributes, o admissi
 	if err != nil {
 		return errors.NewInternalError(err)
 	}
+	namespaceKey := kcpcache.ToClusterAwareKey(clusterName.String(), "", a.GetName())
 
 	if a.GetKind().GroupKind() == v1.SchemeGroupVersion.WithKind("Namespace").GroupKind() {
 		// if a namespace is deleted, we want to prevent all further creates into it
@@ -98,7 +98,7 @@ func (l *Lifecycle) Admit(ctx context.Context, a admission.Attributes, o admissi
 		// is slow to update, we add the namespace into a force live lookup list to ensure
 		// we are not looking at stale state.
 		if a.GetOperation() == admission.Delete {
-			l.forceLiveLookupCache.Add(clusters.ToClusterAwareKey(clusterName, a.GetName()), true, forceLiveLookupTTL)
+			l.forceLiveLookupCache.Add(namespaceKey, true, forceLiveLookupTTL)
 		}
 		// allow all operations to namespaces
 		return nil
@@ -123,10 +123,7 @@ func (l *Lifecycle) Admit(ctx context.Context, a admission.Attributes, o admissi
 		exists bool
 	)
 
-	namespaceKey := a.GetNamespace()
-	namespaceKey = clusters.ToClusterAwareKey(clusterName, namespaceKey)
-
-	namespace, err := l.namespaceLister.Get(namespaceKey)
+	namespace, err := l.namespaceLister.Cluster(clusterName).Get(a.GetNamespace())
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return errors.NewInternalError(err)
@@ -139,7 +136,7 @@ func (l *Lifecycle) Admit(ctx context.Context, a admission.Attributes, o admissi
 		// give the cache time to observe the namespace before rejecting a create.
 		// this helps when creating a namespace and immediately creating objects within it.
 		time.Sleep(missingNamespaceWait)
-		namespace, err = l.namespaceLister.Get(namespaceKey)
+		namespace, err = l.namespaceLister.Cluster(clusterName).Get(a.GetNamespace())
 		switch {
 		case errors.IsNotFound(err):
 			// no-op
@@ -163,7 +160,7 @@ func (l *Lifecycle) Admit(ctx context.Context, a admission.Attributes, o admissi
 	// refuse to operate on non-existent namespaces
 	if !exists || forceLiveLookup {
 		// as a last resort, make a call directly to storage
-		namespace, err = l.client.CoreV1().Namespaces().Get(genericapirequest.WithCluster(context.TODO(), genericapirequest.Cluster{Name: clusterName}), a.GetNamespace(), metav1.GetOptions{})
+		namespace, err = l.client.Cluster(clusterName).CoreV1().Namespaces().Get(ctx, a.GetNamespace(), metav1.GetOptions{})
 		switch {
 		case errors.IsNotFound(err):
 			return err
@@ -209,14 +206,14 @@ func newLifecycleWithClock(immortalNamespaces sets.String, clock utilcache.Clock
 }
 
 // SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
-func (l *Lifecycle) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+func (l *Lifecycle) SetExternalKubeInformerFactory(f kcpkubernetesinformers.SharedInformerFactory) {
 	namespaceInformer := f.Core().V1().Namespaces()
 	l.namespaceLister = namespaceInformer.Lister()
 	l.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 }
 
 // SetExternalKubeClientSet implements the WantsExternalKubeClientSet interface.
-func (l *Lifecycle) SetExternalKubeClientSet(client kubernetes.Interface) {
+func (l *Lifecycle) SetExternalKubeClientSet(client kcpkubernetesclientset.ClusterInterface) {
 	l.client = client
 }
 

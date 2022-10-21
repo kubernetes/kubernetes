@@ -20,6 +20,11 @@ import (
 	"fmt"
 	"time"
 
+	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
+	kcpkubernetesclientset "github.com/kcp-dev/client-go/clients/clientset/versioned"
+	kcpcorev1informers "github.com/kcp-dev/client-go/clients/informers/core/v1"
+	kcpcorev1listers "github.com/kcp-dev/client-go/clients/listers/core/v1"
+	kcpmetadata "github.com/kcp-dev/client-go/clients/metadata"
 	"github.com/kcp-dev/logicalcluster/v2"
 	"golang.org/x/time/rate"
 
@@ -28,14 +33,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	coreinformers "k8s.io/client-go/informers/core/v1"
-	clientset "k8s.io/client-go/kubernetes"
-	corelisters "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/namespace/deletion"
 
 	"k8s.io/klog/v2"
@@ -54,7 +54,7 @@ const (
 // NamespaceController is responsible for performing actions dependent upon a namespace phase
 type NamespaceController struct {
 	// lister that can list namespaces from a shared cache
-	lister corelisters.NamespaceLister
+	lister kcpcorev1listers.NamespaceClusterLister
 	// returns true when the namespace cache is ready
 	listerSynced cache.InformerSynced
 	// namespaces that have been queued up for processing by workers
@@ -65,10 +65,10 @@ type NamespaceController struct {
 
 // NewNamespaceController creates a new NamespaceController
 func NewNamespaceController(
-	kubeClient clientset.Interface,
-	metadataClient metadata.Interface,
+	kubeClient kcpkubernetesclientset.ClusterInterface,
+	metadataClient kcpmetadata.ClusterInterface,
 	discoverResourcesFn func(clusterName logicalcluster.Name) ([]*metav1.APIResourceList, error),
-	namespaceInformer coreinformers.NamespaceInformer,
+	namespaceInformer kcpcorev1informers.NamespaceClusterInformer,
 	resyncPeriod time.Duration,
 	finalizerToken v1.FinalizerName) *NamespaceController {
 
@@ -78,8 +78,8 @@ func NewNamespaceController(
 		namespacedResourcesDeleter: deletion.NewNamespacedResourcesDeleter(kubeClient.CoreV1().Namespaces(), metadataClient, kubeClient.CoreV1(), discoverResourcesFn, finalizerToken),
 	}
 
-	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("namespace_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
+	if kubeClient != nil && kubeClient.Cluster(logicalcluster.New("fake")).CoreV1().RESTClient().GetRateLimiter() != nil {
+		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("namespace_controller", kubeClient.Cluster(logicalcluster.New("fake")).CoreV1().RESTClient().GetRateLimiter())
 	}
 
 	// configure the namespace informer event handlers
@@ -117,7 +117,7 @@ func nsControllerRateLimiter() workqueue.RateLimiter {
 // enqueueNamespace adds an object to the controller work queue
 // obj could be an *v1.Namespace, or a DeletionFinalStateUnknown item.
 func (nm *NamespaceController) enqueueNamespace(obj interface{}) {
-	key, err := controller.KeyFunc(obj)
+	key, err := kcpcache.MetaClusterNamespaceKeyFunc(obj)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
 		return
@@ -181,7 +181,13 @@ func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 		klog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Since(startTime))
 	}()
 
-	namespace, err := nm.lister.Get(key)
+	clusterName, _, namespaceName, err := kcpcache.SplitMetaClusterNamespaceKey(key)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return err
+	}
+
+	namespace, err := nm.lister.Cluster(clusterName).Get(namespaceName)
 	if errors.IsNotFound(err) {
 		klog.Infof("Namespace has been deleted %v", key)
 		return nil
@@ -190,7 +196,7 @@ func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 		utilruntime.HandleError(fmt.Errorf("Unable to retrieve namespace %v from store: %v", key, err))
 		return err
 	}
-	return nm.namespacedResourcesDeleter.Delete(logicalcluster.From(namespace), namespace.Name)
+	return nm.namespacedResourcesDeleter.Delete(clusterName, namespace.Name)
 }
 
 // Run starts observing the system with the specified number of workers.

@@ -25,34 +25,26 @@ import (
 	"net/url"
 	"time"
 
+	kcpkubernetesclientset "github.com/kcp-dev/client-go/clients/clientset/versioned"
+	kcpkubernetesinformers "github.com/kcp-dev/client-go/clients/informers"
 	"github.com/kcp-dev/logicalcluster/v2"
-
-	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/authorization/union"
+	"k8s.io/apiserver/pkg/clientsethack"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericfeatures "k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/informerfactoryhack"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	"k8s.io/apiserver/pkg/util/feature"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/apiserver/pkg/util/notfoundhandler"
 	"k8s.io/apiserver/pkg/util/openapi"
-	"k8s.io/apiserver/pkg/util/webhook"
-	clientgoinformers "k8s.io/client-go/informers"
-	kubeexternalinformers "k8s.io/client-go/informers"
-	clientgoclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/keyutil"
 	_ "k8s.io/component-base/metrics/prometheus/workqueue"
 	"k8s.io/component-base/version"
-	"k8s.io/klog/v2"
-
 	"k8s.io/kubernetes/pkg/api/genericcontrolplanescheme"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
@@ -62,77 +54,18 @@ import (
 	"k8s.io/kubernetes/pkg/genericcontrolplane/options"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
-)
-
-const Include = "kube-control-plane"
-
-const (
-	etcdRetryLimit    = 60
-	etcdRetryInterval = 1 * time.Second
 )
 
 var LocalAdminCluster = logicalcluster.New("system:admin")
 
-// Run runs the specified APIServer.  This should never exit.
-func Run(options options.CompletedServerRunOptions, stopCh <-chan struct{}) error {
-	// To help debugging, immediately log version
-	klog.Infof("Version: %+v", version.Get())
-
-	genericConfig, storageFactory, err := BuildGenericConfig(options)
-	if err != nil {
-		return err
-	}
-
-	client, err := clientgoclientset.NewForConfig(genericConfig.LoopbackClientConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create loopback client: %v", err)
-	}
-	versionedInformers := clientgoinformers.NewSharedInformerFactory(client, 10*time.Minute)
-
-	apisConfig, err := CreateKubeAPIServerConfig(genericConfig, options, versionedInformers, nil, storageFactory)
-	if err != nil {
-		return err
-	}
-
-	// If additional API servers are added, they should be gated.
-	apiExtensionsConfig, err := CreateAPIExtensionsConfig(
-		*apisConfig.GenericConfig,
-		apisConfig.ExtraConfig.VersionedInformers,
-		nil, // pluginInitializer
-		options,
-		&unimplementedServiceResolver{},
-		webhook.NewDefaultAuthenticationInfoResolverWrapper(
-			nil,
-			apisConfig.GenericConfig.EgressSelector,
-			apisConfig.GenericConfig.LoopbackClientConfig,
-			apisConfig.GenericConfig.TracerProvider,
-		),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create apiextensions-apiserver config: %v", err)
-	}
-
-	miniAggregatorConfig := &aggregator.MiniAggregatorConfig{
-		GenericConfig: apisConfig.GenericConfig,
-	}
-
-	serverChain, err := CreateServerChain(miniAggregatorConfig.Complete(apisConfig.ExtraConfig.VersionedInformers), apisConfig.Complete(), apiExtensionsConfig.Complete())
-	if err != nil {
-		return err
-	}
-
-	return serverChain.MiniAggregator.GenericAPIServer.PrepareRun().Run(stopCh)
-}
-
 type ServerChain struct {
-	CustomResourceDefinitions *apiextensionsapiserver.CustomResourceDefinitions
+	CustomResourceDefinitions *extensionsapiserver.CustomResourceDefinitions
 	GenericControlPlane       *apis.GenericControlPlane
 	MiniAggregator            *aggregator.MiniAggregatorServer
 }
 
 // CreateServerChain creates the apiservers connected via delegation.
-func CreateServerChain(miniAggregatorConfig aggregator.CompletedMiniAggregatorConfig, apisConfig apis.CompletedConfig, apiExtensionConfig apiextensionsapiserver.CompletedConfig) (*ServerChain, error) {
+func CreateServerChain(miniAggregatorConfig aggregator.CompletedMiniAggregatorConfig, apisConfig apis.CompletedConfig, apiExtensionConfig extensionsapiserver.CompletedConfig) (*ServerChain, error) {
 	notFoundHandler := notfoundhandler.New(apisConfig.GenericConfig.Serializer, genericapifilters.NoMuxAndDiscoveryIncompleteKey)
 	apiExtensionsServer, err := apiExtensionConfig.New(genericapiserver.NewEmptyDelegateWithCustomHandler(notFoundHandler))
 	if err != nil {
@@ -160,7 +93,7 @@ func CreateServerChain(miniAggregatorConfig aggregator.CompletedMiniAggregatorCo
 func CreateKubeAPIServerConfig(
 	genericConfig *genericapiserver.Config,
 	o options.CompletedServerRunOptions,
-	versionedInformers kubeexternalinformers.SharedInformerFactory,
+	versionedInformers kcpkubernetesinformers.SharedInformerFactory,
 	additionalPluginInitializers []admission.PluginInitializer,
 	storageFactory *serverstorage.DefaultStorageFactory,
 ) (
@@ -220,28 +153,18 @@ func CreateKubeAPIServerConfig(
 		config.ExtraConfig.ClusterAuthenticationInfo.RequestHeaderUsernameHeaders = requestHeaderConfig.UsernameHeaders
 	}
 
+	client, err := kcpkubernetesclientset.NewForConfig(config.GenericConfig.LoopbackClientConfig)
+	if err != nil {
+		return nil, err
+	}
 	if err := o.ServerRunOptions.Admission.ApplyTo(
 		config.GenericConfig,
-		config.ExtraConfig.VersionedInformers,
-		config.GenericConfig.LoopbackClientConfig,
-		feature.DefaultFeatureGate,
+		informerfactoryhack.Wrap(config.ExtraConfig.VersionedInformers),
+		clientsethack.Wrap(client),
+		utilfeature.DefaultFeatureGate,
 		additionalPluginInitializers...); err != nil {
 		return nil, err
 	}
-
-	// // Load the public keys.
-	// var pubKeys []interface{}
-	// for _, f := range s.Authentication.ServiceAccounts.KeyFiles {
-	// 	keys, err := keyutil.PublicKeysFromFile(f)
-	// 	if err != nil {
-	// 		return nil, nil, nil, fmt.Errorf("failed to parse key file %q: %v", f, err)
-	// 	}
-	// 	pubKeys = append(pubKeys, keys...)
-	// }
-	// // Plumb the required metadata through ExtraConfig.
-	// config.ExtraConfig.ServiceAccountIssuerURL = s.Authentication.ServiceAccounts.Issuers[0]
-	// config.ExtraConfig.ServiceAccountJWKSURI = s.Authentication.ServiceAccounts.JWKSURI
-	// config.ExtraConfig.ServiceAccountPublicKeys = pubKeys
 
 	return config, nil
 }
@@ -252,6 +175,8 @@ func BuildGenericConfig(
 ) (
 	genericConfig *genericapiserver.Config,
 	storageFactory *serverstorage.DefaultStorageFactory,
+	versionedInformers kcpkubernetesinformers.SharedInformerFactory,
+	clientgoExternalClient kcpkubernetesclientset.ClusterInterface,
 	lastErr error,
 ) {
 	genericConfig = genericapiserver.NewConfig(genericcontrolplanescheme.Codecs)
@@ -321,62 +246,19 @@ func BuildGenericConfig(
 
 	kubeClientConfig := genericConfig.LoopbackClientConfig
 	clientutils.EnableMultiCluster(genericConfig.LoopbackClientConfig, genericConfig, "namespaces", "apiservices", "customresourcedefinitions", "clusterroles", "clusterrolebindings", "roles", "rolebindings", "serviceaccounts", "secrets")
-	clientgoExternalClient, err := clientgoclientset.NewForConfig(kubeClientConfig)
+	clientgoExternalClient, err = kcpkubernetesclientset.NewForConfig(kubeClientConfig)
 	if err != nil {
 		lastErr = fmt.Errorf("failed to create real external clientset: %v", err)
 		return
 	}
-	versionedInformers := clientgoinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
+	versionedInformers = kcpkubernetesinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
 
 	// Authentication.ApplyTo requires already applied OpenAPIConfig and EgressSelector if present
 	if lastErr = o.Authentication.ApplyTo(&genericConfig.Authentication, genericConfig.SecureServing, genericConfig.EgressSelector, genericConfig.OpenAPIConfig, genericConfig.OpenAPIV3Config, clientgoExternalClient, versionedInformers); lastErr != nil {
 		return
 	}
 
-	genericConfig.Authorization.Authorizer, genericConfig.RuleResolver, err = BuildAuthorizer(&o.ServerRunOptions, versionedInformers)
-	if err != nil {
-		lastErr = fmt.Errorf("invalid authorization config: %v", err)
-		return
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && o.GenericServerRunOptions.EnablePriorityAndFairness {
-		// TODO(sttts): make BuildPriorityAndFairness take the completed options
-		genericConfig.FlowControl, lastErr = BuildPriorityAndFairness(&o.ServerRunOptions, clientgoExternalClient, versionedInformers)
-	}
-
 	return
-}
-
-// BuildAuthorizer constructs the authorizer
-func BuildAuthorizer(s *options.ServerRunOptions, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, error) {
-	var (
-		authorizers   []authorizer.Authorizer
-		ruleResolvers []authorizer.RuleResolver
-	)
-
-	rbacAuthorizer := rbac.New(
-		&rbac.RoleGetter{Lister: versionedInformers.Rbac().V1().Roles().Lister()},
-		&rbac.RoleBindingLister{Lister: versionedInformers.Rbac().V1().RoleBindings().Lister()},
-		&rbac.ClusterRoleGetter{Lister: versionedInformers.Rbac().V1().ClusterRoles().Lister()},
-		&rbac.ClusterRoleBindingLister{Lister: versionedInformers.Rbac().V1().ClusterRoleBindings().Lister()},
-	)
-	authorizers = append(authorizers, rbacAuthorizer)
-	ruleResolvers = append(ruleResolvers, rbacAuthorizer)
-
-	return union.New(authorizers...), union.NewRuleResolvers(ruleResolvers...), nil
-}
-
-// BuildPriorityAndFairness constructs the guts of the API Priority and Fairness filter
-func BuildPriorityAndFairness(s *options.ServerRunOptions, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) (utilflowcontrol.Interface, error) {
-	if s.GenericServerRunOptions.MaxRequestsInFlight+s.GenericServerRunOptions.MaxMutatingRequestsInFlight <= 0 {
-		return nil, fmt.Errorf("invalid configuration: MaxRequestsInFlight=%d and MaxMutatingRequestsInFlight=%d; they must add up to something positive", s.GenericServerRunOptions.MaxRequestsInFlight, s.GenericServerRunOptions.MaxMutatingRequestsInFlight)
-	}
-	return utilflowcontrol.New(
-		versionedInformer,
-		extclient.FlowcontrolV1beta2(),
-		s.GenericServerRunOptions.MaxRequestsInFlight+s.GenericServerRunOptions.MaxMutatingRequestsInFlight,
-		s.GenericServerRunOptions.RequestTimeout/4,
-	), nil
 }
 
 // unimplementedServiceResolver is a webhook.ServiceResolver that always returns an error.
