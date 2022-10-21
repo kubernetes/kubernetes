@@ -80,7 +80,14 @@ import (
 	"k8s.io/kubectl/pkg/cmd/kustomize"
 )
 
-const kubectlCmdHeaders = "KUBECTL_COMMAND_HEADERS"
+const (
+	kubectlCmdHeaders           = "KUBECTL_COMMAND_HEADERS"
+	kubectlEnableAlphaCmdShadow = "KUBECTL_ENABLE_ALPHA_CMD_SHADOW"
+)
+
+var (
+	shadowingAllowedCommands = []string{"create"}
+)
 
 type KubectlOptions struct {
 	PluginHandler PluginHandler
@@ -113,33 +120,89 @@ func NewDefaultKubectlCommandWithArgs(o KubectlOptions) *cobra.Command {
 	if len(o.Arguments) > 1 {
 		cmdPathPieces := o.Arguments[1:]
 
-		// only look for suitable extension executables if
-		// the specified command does not already exist
-		if _, _, err := cmd.Find(cmdPathPieces); err != nil {
-			// Also check the commands that will be added by Cobra.
-			// These commands are only added once rootCmd.Execute() is called, so we
-			// need to check them explicitly here.
-			var cmdName string // first "non-flag" arguments
-			for _, arg := range cmdPathPieces {
-				if !strings.HasPrefix(arg, "-") {
-					cmdName = arg
-					break
-				}
-			}
+		cmdName := getCommandName(cmdPathPieces)
 
-			switch cmdName {
-			case "help", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
-				// Don't search for a plugin
-			default:
-				if err := HandlePluginCommand(o.PluginHandler, cmdPathPieces); err != nil {
-					fmt.Fprintf(o.IOStreams.ErrOut, "Error: %v\n", err)
-					os.Exit(1)
-				}
+		usePluginExplicitly := false
+		if os.Getenv(kubectlEnableAlphaCmdShadow) == "true" {
+			usePluginExplicitly, cmdPathPieces = pluginUsageForced(cmdPathPieces)
+		}
+
+		cmdExisted := false
+		_, _, err := cmd.Find(cmdPathPieces)
+		if err == nil {
+			cmdExisted = true
+		}
+
+		valid, err := validPluginCommandToExecute(cmdName, usePluginExplicitly, cmdExisted)
+		if err != nil {
+			fmt.Fprint(o.IOStreams.ErrOut, err.Error())
+			return cmd
+		}
+
+		if valid {
+			if err := HandlePluginCommand(o.PluginHandler, cmdPathPieces); err != nil {
+				fmt.Fprintf(o.IOStreams.ErrOut, "Error: %v\n", err)
+				os.Exit(1)
 			}
 		}
 	}
 
 	return cmd
+}
+
+func validPluginCommandToExecute(cmdName string, usePluginExplicitly, commandExisted bool) (bool, error) {
+	// Also check the commands that will be added by Cobra.
+	// These commands are only added once rootCmd.Execute() is called, so we
+	// need to check them explicitly here.
+	if cmdName == "help" || cmdName == cobra.ShellCompRequestCmd || cmdName == cobra.ShellCompNoDescRequestCmd {
+		return false, nil
+	}
+
+	if !usePluginExplicitly {
+		// user does not pass --use-plugin flag
+		// which means that we should run plugin, if command does not exist
+		// or we should run built-in command, if it does.
+		return !commandExisted, nil
+	}
+
+	// command does not exist and we should run as plugin.
+	if !commandExisted {
+		return true, nil
+	}
+
+	for _, cmd := range shadowingAllowedCommands {
+		if cmd == cmdName {
+			return true, nil
+		}
+	}
+
+	return false, fmt.Errorf("Error: %s command is not allowed for shadowing by plugins\n", cmdName)
+}
+
+// pluginUsageForced decides user passed --use-plugin flag or not.
+// If flag is passed, it removes that flag because we don't want to
+// pass this flag to external plugins or builtin commands.
+func pluginUsageForced(cmdPathPieces []string) (bool, []string) {
+	for i, arg := range cmdPathPieces {
+		if arg == "--use-plugin" || arg == "--use-plugin=true" {
+			cmdPathPieces = append(cmdPathPieces[:i], cmdPathPieces[i+1:]...)
+			return true, cmdPathPieces
+		}
+	}
+
+	return false, cmdPathPieces
+}
+
+// getCommandName returns first "non-flag" arguments as
+// command name.
+func getCommandName(cmdPathPieces []string) string {
+	for _, arg := range cmdPathPieces {
+		if !strings.HasPrefix(arg, "-") {
+			return arg
+		}
+	}
+
+	return ""
 }
 
 // PluginHandler is capable of parsing command line arguments
@@ -447,6 +510,11 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	// Stop warning about normalization of flags. That makes it possible to
 	// add the klog flags later.
 	cmds.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
+
+	if os.Getenv(kubectlEnableAlphaCmdShadow) == "true" {
+		cmds.Flags().Bool("use-plugin", false, "If true, external kubectl plugin will be used instead built-in command. Only supports shadowing create command(e.g. kubectl create networkpolicy --use-plugin). This flag is alpha and may change in the future.")
+	}
+
 	return cmds
 }
 

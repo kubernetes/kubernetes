@@ -59,9 +59,11 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 	tests := []struct {
 		name             string
 		args             []string
+		env              string
 		expectPlugin     string
 		expectPluginArgs []string
 		expectError      string
+		expectErrOut     string
 	}{
 		{
 			name:             "test that normal commands are able to be executed, when no plugin overshadows them",
@@ -70,14 +72,35 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 			expectPluginArgs: []string{},
 		},
 		{
+			name:             "test that normal commands are able to be executed, when no plugin overshadows them even when --use-plugin is passed",
+			args:             []string{"kubectl", "get", "foo", "--use-plugin=true"},
+			env:              "true",
+			expectPlugin:     "",
+			expectPluginArgs: []string{},
+			expectErrOut:     "Error: get command is not allowed for shadowing by plugins\n",
+		},
+		{
 			name:             "test that a plugin executable is found based on command args",
 			args:             []string{"kubectl", "foo", "--bar"},
 			expectPlugin:     "plugin/testdata/kubectl-foo",
 			expectPluginArgs: []string{"--bar"},
 		},
 		{
+			name:             "test that a plugin executable is found based on command args even when --use-plugin is passed",
+			args:             []string{"kubectl", "foo", "--bar", "--use-plugin=true"},
+			env:              "true",
+			expectPlugin:     "plugin/testdata/kubectl-foo",
+			expectPluginArgs: []string{"--bar"},
+		},
+		{
 			name: "test that a plugin does not execute over an existing command by the same name",
 			args: []string{"kubectl", "version"},
+		},
+		{
+			name:         "test that a plugin does not execute over an existing command by the same name even if --use-plugin is passed",
+			args:         []string{"kubectl", "version", "--use-plugin"},
+			env:          "true",
+			expectErrOut: "Error: version command is not allowed for shadowing by plugins\n",
 		},
 		// The following tests make sure that commands added by Cobra cannot be shadowed by a plugin
 		// See https://github.com/kubernetes/kubectl/issues/1116
@@ -86,12 +109,27 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 			args: []string{"kubectl", "help"},
 		},
 		{
+			name: "test that a plugin does not execute over Cobra's help command even when --use-plugin is passed",
+			env:  "true",
+			args: []string{"kubectl", "help", "--use-plugin"},
+		},
+		{
 			name: "test that a plugin does not execute over Cobra's __complete command",
 			args: []string{"kubectl", cobra.ShellCompRequestCmd},
 		},
 		{
+			name: "test that a plugin does not execute over Cobra's __complete command even when --use-plugin is passed",
+			env:  "true",
+			args: []string{"kubectl", cobra.ShellCompRequestCmd, "--use-plugin"},
+		},
+		{
 			name: "test that a plugin does not execute over Cobra's __completeNoDesc command",
 			args: []string{"kubectl", cobra.ShellCompNoDescRequestCmd},
+		},
+		{
+			name: "test that a plugin does not execute over Cobra's __completeNoDesc command even when --use-plugin is passed",
+			env:  "true",
+			args: []string{"kubectl", cobra.ShellCompNoDescRequestCmd, "--use-plugin"},
 		},
 		// The following tests make sure that commands added by Cobra cannot be shadowed by a plugin
 		// even when a flag is specified first.  This can happen when using aliases.
@@ -123,6 +161,34 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 		// 	name: "test that a flag with a space does not break Cobra's __completeNoDesc command",
 		// 	args: []string{"kubectl", "--kubeconfig", "/path/to/kubeconfig", cobra.ShellCompNoDescRequestCmd},
 		// },
+		{
+			name:             "test that normal create commands are able to be executed, when no plugin overshadows them",
+			args:             []string{"kubectl", "create", "foo"},
+			expectPlugin:     "",
+			expectPluginArgs: []string{},
+		},
+		{
+			name:             "test that normal create commands are able to be executed, when no plugin overshadows them even when envvar is set",
+			args:             []string{"kubectl", "create", "foo"},
+			env:              "true",
+			expectPlugin:     "",
+			expectPluginArgs: []string{},
+		},
+		{
+			name:             "test that a create plugin executable is found based on command args even when --use-plugin is passed",
+			args:             []string{"kubectl", "create", "foo", "--bar", "--use-plugin=true"},
+			env:              "true",
+			expectPlugin:     "plugin/testdata/kubectl-create-foo",
+			expectPluginArgs: []string{"--bar"},
+		},
+		{
+			name:             "test that normal run commands are able to be executed when --user-plugin is passed because only create is allowed",
+			args:             []string{"kubectl", "run", "foo", "--use-plugin"},
+			env:              "true",
+			expectPlugin:     "",
+			expectPluginArgs: []string{},
+			expectErrOut:     "Error: run command is not allowed for shadowing by plugins\n",
+		},
 	}
 
 	for _, test := range tests {
@@ -130,11 +196,17 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 			pluginsHandler := &testPluginHandler{
 				pluginsDirectory: "plugin/testdata",
 			}
-			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+			ioStreams, _, _, errOut := genericclioptions.NewTestIOStreams()
+
+			os.Setenv(kubectlEnableAlphaCmdShadow, test.env)
 
 			root := NewDefaultKubectlCommandWithArgs(KubectlOptions{PluginHandler: pluginsHandler, Arguments: test.args, IOStreams: ioStreams})
-			if err := root.Execute(); err != nil {
+			if err := root.Execute(); err != nil && len(test.expectErrOut) == 0 {
 				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if errOut.String() != test.expectErrOut {
+				t.Fatalf("unexpected error: expected %q to occur, but got %q", test.expectErrOut, errOut)
 			}
 
 			if pluginsHandler.err != nil && pluginsHandler.err.Error() != test.expectError {
