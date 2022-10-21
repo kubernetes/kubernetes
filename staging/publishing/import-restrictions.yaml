@@ -171,6 +171,7 @@
   - k8s.io/klog
   - k8s.io/kube-openapi
   - k8s.io/utils
+  - k8s.io/kube-aggregator
 
 - baseImportPath: "./vendor/k8s.io/kube-openapi/"
   allowedImports:

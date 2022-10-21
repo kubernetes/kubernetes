@@ -1342,6 +1342,7 @@ k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1
 k8s.io/apiextensions-apiserver/pkg/cmd/server/options
 k8s.io/apiextensions-apiserver/pkg/cmd/server/testing
 k8s.io/apiextensions-apiserver/pkg/controller/apiapproval
+k8s.io/apiextensions-apiserver/pkg/controller/crdregistration
 k8s.io/apiextensions-apiserver/pkg/controller/establish
 k8s.io/apiextensions-apiserver/pkg/controller/finalizer
 k8s.io/apiextensions-apiserver/pkg/controller/nonstructuralschema

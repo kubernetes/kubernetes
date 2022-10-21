@@ -696,6 +696,8 @@ rules:
       branch: master
     - repository: kms
       branch: master
+    - repository: kube-aggregator
+      branch: master
     source:
       branch: master
       dir: staging/src/k8s.io/apiextensions-apiserver
