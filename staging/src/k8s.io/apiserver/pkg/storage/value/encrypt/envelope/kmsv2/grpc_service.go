@@ -39,6 +39,7 @@ const (
 
 // The gRPC implementation for envelope.Service.
 type gRPCService struct {
+	ctx         context.Context
 	kmsClient   kmsapi.KeyManagementServiceClient
 	connection  *grpc.ClientConn
 	callTimeout time.Duration
@@ -53,7 +54,7 @@ func NewGRPCService(ctx context.Context, endpoint string, callTimeout time.Durat
 		return nil, err
 	}
 
-	s := &gRPCService{callTimeout: callTimeout}
+	s := &gRPCService{ctx: ctx, callTimeout: callTimeout}
 	s.connection, err = grpc.Dial(
 		addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -89,7 +90,7 @@ func NewGRPCService(ctx context.Context, endpoint string, callTimeout time.Durat
 
 // Decrypt a given data string to obtain the original byte data.
 func (g *gRPCService) Decrypt(ctx context.Context, uid string, req *DecryptRequest) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, g.callTimeout)
+	ctx, cancel := g.contextWithTimeoutAndChain(ctx)
 	defer cancel()
 
 	request := &kmsapi.DecryptRequest{
@@ -107,7 +108,7 @@ func (g *gRPCService) Decrypt(ctx context.Context, uid string, req *DecryptReque
 
 // Encrypt bytes to a string ciphertext.
 func (g *gRPCService) Encrypt(ctx context.Context, uid string, plaintext []byte) (*EncryptResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, g.callTimeout)
+	ctx, cancel := g.contextWithTimeoutAndChain(ctx)
 	defer cancel()
 
 	request := &kmsapi.EncryptRequest{
@@ -127,7 +128,7 @@ func (g *gRPCService) Encrypt(ctx context.Context, uid string, plaintext []byte)
 
 // Status returns the status of the KMSv2 provider.
 func (g *gRPCService) Status(ctx context.Context) (*StatusResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, g.callTimeout)
+	ctx, cancel := g.contextWithTimeoutAndChain(ctx)
 	defer cancel()
 
 	request := &kmsapi.StatusRequest{}
@@ -136,4 +137,20 @@ func (g *gRPCService) Status(ctx context.Context) (*StatusResponse, error) {
 		return nil, err
 	}
 	return &StatusResponse{Version: response.Version, Healthz: response.Healthz, KeyID: response.KeyId}, nil
+}
+
+func (g *gRPCService) contextWithTimeoutAndChain(ctx context.Context) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithTimeout(ctx, g.callTimeout)
+
+	go func() {
+		select {
+		case <-ctx.Done():
+
+		// service global context was canceled
+		case <-g.ctx.Done():
+			cancel()
+		}
+	}()
+
+	return ctx, cancel
 }

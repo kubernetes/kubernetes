@@ -44,6 +44,7 @@ const (
 
 // The gRPC implementation for envelope.Service.
 type gRPCService struct {
+	ctx            context.Context
 	kmsClient      kmsapi.KeyManagementServiceClient
 	connection     *grpc.ClientConn
 	callTimeout    time.Duration
@@ -60,7 +61,7 @@ func NewGRPCService(ctx context.Context, endpoint string, callTimeout time.Durat
 		return nil, err
 	}
 
-	s := &gRPCService{callTimeout: callTimeout}
+	s := &gRPCService{ctx: ctx, callTimeout: callTimeout}
 	s.connection, err = grpc.Dial(
 		addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -119,7 +120,7 @@ func (g *gRPCService) checkAPIVersion(ctx context.Context) error {
 
 // Decrypt a given data string to obtain the original byte data.
 func (g *gRPCService) Decrypt(cipher []byte) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), g.callTimeout)
+	ctx, cancel := g.contextWithTimeoutAndChain()
 	defer cancel()
 
 	request := &kmsapi.DecryptRequest{Cipher: cipher, Version: kmsapiVersion}
@@ -132,7 +133,7 @@ func (g *gRPCService) Decrypt(cipher []byte) ([]byte, error) {
 
 // Encrypt bytes to a string ciphertext.
 func (g *gRPCService) Encrypt(plain []byte) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), g.callTimeout)
+	ctx, cancel := g.contextWithTimeoutAndChain()
 	defer cancel()
 
 	request := &kmsapi.EncryptRequest{Plain: plain, Version: kmsapiVersion}
@@ -159,4 +160,20 @@ func (g *gRPCService) interceptor(
 	}
 
 	return invoker(ctx, method, req, reply, cc, opts...)
+}
+
+func (g *gRPCService) contextWithTimeoutAndChain() (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithTimeout(context.Background(), g.callTimeout)
+
+	go func() {
+		select {
+		case <-ctx.Done():
+
+		// service global context was canceled
+		case <-g.ctx.Done():
+			cancel()
+		}
+	}()
+
+	return ctx, cancel
 }
