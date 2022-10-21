@@ -18,6 +18,7 @@ package service
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"reflect"
 	"sync"
@@ -39,6 +40,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider/api"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/component-base/featuregate"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
@@ -288,8 +290,15 @@ func (c *Controller) processNextServiceItem(ctx context.Context) bool {
 		return true
 	}
 
-	runtime.HandleError(fmt.Errorf("error processing service %v (will retry): %v", key, err))
-	c.serviceQueue.AddRateLimited(key)
+	var re *api.RetryError
+	if stderrors.As(err, &re) {
+		klog.V(4).Infof("Retrying processing for service %v in %s", key, re.RetryAfter())
+		c.serviceQueue.AddAfter(key, re.RetryAfter())
+	} else {
+		runtime.HandleError(fmt.Errorf("error processing service %v (will retry): %v", key, err))
+		c.serviceQueue.AddRateLimited(key)
+	}
+
 	return true
 }
 
@@ -401,7 +410,7 @@ func (c *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.S
 				klog.V(4).Infof("LoadBalancer for service %s implemented by a different controller %s, Ignoring error", key, c.cloud.ProviderName())
 				return op, nil
 			}
-			return op, fmt.Errorf("failed to ensure load balancer: %v", err)
+			return op, fmt.Errorf("failed to ensure load balancer: %w", err)
 		}
 		if newStatus == nil {
 			return op, fmt.Errorf("service status returned by EnsureLoadBalancer is nil")
