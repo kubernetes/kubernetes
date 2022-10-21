@@ -132,6 +132,11 @@ type ScheduleResult struct {
 	EvaluatedNodes int
 	// The number of nodes out of the evaluated ones that fit the pod.
 	FeasibleNodes int
+
+	// The reason records the failure in scheduling cycle.
+	reason string
+	// The nominating info for scheduling cycle.
+	nominatingInfo *framework.NominatingInfo
 }
 
 // WithComponentConfigVersion sets the component config version to the
@@ -420,7 +425,7 @@ func buildExtenders(extenders []schedulerapi.Extender, profiles []schedulerapi.K
 	return fExtenders, nil
 }
 
-type FailureHandlerFn func(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, err error, reason string, nominatingInfo *framework.NominatingInfo)
+type FailureHandlerFn func(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, err error, reason string, nominatingInfo *framework.NominatingInfo, start time.Time)
 
 func unionedGVKs(m map[framework.ClusterEvent]sets.String) map[framework.GVK]framework.ActionType {
 	gvkMap := make(map[framework.GVK]framework.ActionType)
