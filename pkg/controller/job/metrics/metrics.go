@@ -83,6 +83,18 @@ var (
 			Help:      "The number of finished Pods that are fully tracked",
 		},
 		[]string{"completion_mode", "result"})
+
+	// TerminatedPodsWithTrackingFinalizer records the addition and removal of
+	// terminated pods that have the finalizer batch.kubernetes.io/job-tracking,
+	// regardless of whether they are owned by a Job.
+	TerminatedPodsTrackingFinalizerTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem: JobControllerSubsystem,
+			Name:      "terminated_pods_tracking_finalizer_total",
+			Help: `The number of terminated pods (phase=Failed|Succeeded)
+that have the finalizer batch.kubernetes.io/job-tracking
+The event label can be "add" or "delete".`,
+		}, []string{"event"})
 )
 
 const (
@@ -109,6 +121,11 @@ const (
 
 	Succeeded = "succeeded"
 	Failed    = "failed"
+
+	// Possible values for "event"  label in the terminated_pods_tracking_finalizer
+	// metric.
+	Add    = "add"
+	Delete = "delete"
 )
 
 var registerMetrics sync.Once
@@ -120,5 +137,6 @@ func Register() {
 		legacyregistry.MustRegister(JobSyncNum)
 		legacyregistry.MustRegister(JobFinishedNum)
 		legacyregistry.MustRegister(JobPodsFinished)
+		legacyregistry.MustRegister(TerminatedPodsTrackingFinalizerTotal)
 	})
 }

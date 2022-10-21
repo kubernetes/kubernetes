@@ -20,9 +20,12 @@ import (
 	"fmt"
 	"sync"
 
+	batch "k8s.io/api/batch/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/controller/job/metrics"
 )
 
 // uidSetKeyFunc to parse out the key from a uidSet.
@@ -117,4 +120,33 @@ func (u *uidTrackingExpectations) deleteExpectations(jobKey string) {
 // ControllerExpectations that is aware of deleteKeys.
 func newUIDTrackingExpectations() *uidTrackingExpectations {
 	return &uidTrackingExpectations{store: cache.NewStore(uidSetKeyFunc)}
+}
+
+func hasJobTrackingFinalizer(pod *v1.Pod) bool {
+	for _, fin := range pod.Finalizers {
+		if fin == batch.JobTrackingFinalizer {
+			return true
+		}
+	}
+	return false
+}
+
+func recordFinishedPodWithTrackingFinalizer(oldPod, newPod *v1.Pod) {
+	was := isFinishedPodWithTrackingFinalizer(oldPod)
+	is := isFinishedPodWithTrackingFinalizer(newPod)
+	if was == is {
+		return
+	}
+	var event = metrics.Delete
+	if is {
+		event = metrics.Add
+	}
+	metrics.TerminatedPodsTrackingFinalizerTotal.WithLabelValues(event).Inc()
+}
+
+func isFinishedPodWithTrackingFinalizer(pod *v1.Pod) bool {
+	if pod == nil {
+		return false
+	}
+	return (pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded) && hasJobTrackingFinalizer(pod)
 }
