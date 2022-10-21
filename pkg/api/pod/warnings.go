@@ -252,6 +252,17 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 				}
 			}
 		}
+		// duplicate containers[*].ports
+		if len(c.Ports) > 1 {
+			ports := sets.NewInt64()
+			for i, port := range c.Ports {
+				if ports.Has(int64(port.ContainerPort)) {
+					warnings = append(warnings, fmt.Sprintf("%s: duplicate container port %d", p.Child("ports").Index(i).Child("containerPort"), port.ContainerPort))
+				} else {
+					ports.Insert(int64(port.ContainerPort))
+				}
+			}
+		}
 		return true
 	})
 

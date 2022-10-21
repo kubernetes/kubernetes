@@ -24,7 +24,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	utilpointer "k8s.io/utils/pointer"
 )
 
 func BenchmarkNoWarnings(b *testing.B) {
@@ -597,6 +596,59 @@ func TestWarnings(t *testing.T) {
 				`spec.affinity.podAffinity.preferredDuringSchedulingIgnoredDuringExecution[1].podAffinityTerm.labelSelector: a null labelSelector results in matching no pod`,
 				`spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[1].labelSelector: a null labelSelector results in matching no pod`,
 				`spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[1].podAffinityTerm.labelSelector: a null labelSelector results in matching no pod`,
+			},
+		},
+		{
+			name: "no duplicate container ports",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80},
+					},
+				}},
+			}},
+			expected: []string{},
+		},
+
+		{
+			name: "duplicate container ports",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{{
+					Name: "foo",
+					Ports: []api.ContainerPort{
+						{ContainerPort: 80, HostPort: 80},
+						{ContainerPort: 80, HostPort: 80},
+					},
+				}},
+			}},
+			expected: []string{
+				`spec.containers[0].ports[1].containerPort: duplicate container port 80`,
+			},
+		},
+		{
+			name: "duplicate container ports in two containers",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "foo1",
+						Ports: []api.ContainerPort{
+							{ContainerPort: 80, HostPort: 80},
+							{ContainerPort: 180, HostPort: 80},
+							{ContainerPort: 80, HostPort: 80},
+						},
+					},
+					{
+						Name: "foo",
+						Ports: []api.ContainerPort{
+							{ContainerPort: 80, HostPort: 80},
+							{ContainerPort: 80, HostPort: 80},
+						},
+					}},
+			}},
+			expected: []string{
+				`spec.containers[0].ports[2].containerPort: duplicate container port 80`,
+				`spec.containers[1].ports[1].containerPort: duplicate container port 80`,
 			},
 		},
 	}
