@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -395,5 +396,74 @@ func withResizeStatus(status core.PersistentVolumeClaimResizeStatus) *core.Persi
 		Status: core.PersistentVolumeClaimStatus{
 			ResizeStatus: &status,
 		},
+	}
+}
+
+func TestWarnings(t *testing.T) {
+	testcases := []struct {
+		name     string
+		template *core.PersistentVolumeClaim
+		expected []string
+	}{
+		{
+			name:     "null",
+			template: nil,
+			expected: nil,
+		},
+		{
+			name: "200Mi no warning",
+			template: &core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("200Mi"),
+						},
+					},
+				},
+			},
+			expected: nil,
+		},
+		{
+			name: "200m warning",
+			template: &core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("200m"),
+						},
+					},
+				},
+			},
+			expected: []string{
+				`spec.resources.requests[storage]: fractional byte value "200m" is invalid, must be an integer`,
+			},
+		},
+		{
+			name: "integer no warning",
+			template: &core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("200"),
+						},
+					},
+				},
+			},
+			expected: nil,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run("pvcspec_"+tc.name, func(t *testing.T) {
+			actual := sets.NewString(GetWarningsForPersistentVolumeClaim(tc.template)...)
+			expected := sets.NewString(tc.expected...)
+			for _, missing := range expected.Difference(actual).List() {
+				t.Errorf("missing: %s", missing)
+			}
+			for _, extra := range actual.Difference(expected).List() {
+				t.Errorf("extra: %s", extra)
+			}
+		})
+
 	}
 }
