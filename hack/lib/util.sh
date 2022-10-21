@@ -656,6 +656,7 @@ function kube::util::join {
 #  CFSSL_BIN: The path of the installed cfssl binary
 #  CFSSLJSON_BIN: The path of the installed cfssljson binary
 #
+# shellcheck disable=SC2120 # optional parameters
 function kube::util::ensure-cfssl {
   if command -v cfssl &>/dev/null && command -v cfssljson &>/dev/null; then
     CFSSL_BIN=$(command -v cfssl)

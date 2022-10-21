@@ -150,6 +150,7 @@ kube::build::get_docker_wrapped_binaries() {
 #   KUBE_RSYNC_CONTAINER_NAME
 #   DOCKER_MOUNT_ARGS
 #   LOCAL_OUTPUT_BUILD_CONTEXT
+# shellcheck disable=SC2120 # optional parameters
 function kube::build::verify_prereqs() {
   local -r require_docker=${1:-true}
   kube::log::status "Verifying Prerequisites...."
