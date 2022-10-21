@@ -706,11 +706,7 @@ func formatEndpoints(endpoints *api.Endpoints, ports sets.String) string {
 		}
 	}
 
-	ret := strings.Join(list, ",")
-	if more {
-		return fmt.Sprintf("%s + %d more...", ret, count-max)
-	}
-	return ret
+	return listWithMoreString(list, more, count, max)
 }
 
 func formatDiscoveryPorts(ports []discovery.EndpointPort) string {
@@ -1282,11 +1278,7 @@ func formatHosts(rules []networking.IngressRule) string {
 	if len(list) == 0 {
 		return "*"
 	}
-	ret := strings.Join(list, ",")
-	if more {
-		return fmt.Sprintf("%s + %d more...", ret, len(rules)-max)
-	}
-	return ret
+	return listWithMoreString(list, more, len(rules), max)
 }
 
 func formatPorts(tls []networking.IngressTLS) string {
@@ -2267,11 +2259,7 @@ func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.Met
 		more = true
 	}
 
-	ret := strings.Join(list, ", ")
-	if more {
-		return fmt.Sprintf("%s + %d more...", ret, count-max)
-	}
-	return ret
+	return listWithMoreString(list, more, count, max)
 }
 
 func printHorizontalPodAutoscaler(obj *autoscaling.HorizontalPodAutoscaler, options printers.GenerateOptions) ([]metav1.TableRow, error) {
