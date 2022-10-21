@@ -63,7 +63,9 @@ import (
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/logs"
 	compbasemetrics "k8s.io/component-base/metrics"
+	metricsfeatures "k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/prometheus/slis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	podresourcesapiv1alpha1 "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
@@ -83,6 +85,10 @@ import (
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 )
+
+func init() {
+	utilruntime.Must(metricsfeatures.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+}
 
 const (
 	metricsPath         = "/metrics"
@@ -358,6 +364,9 @@ func (s *Server) InstallDefaultHandlers() {
 		healthz.NamedCheck("syncloop", s.syncLoopHealthCheck),
 	)
 
+	if utilfeature.DefaultFeatureGate.Enabled(metricsfeatures.ComponentSLIs) {
+		slis.SLIMetricsWithReset{}.Install(s.restfulCont)
+	}
 	s.addMetricsBucketMatcher("pods")
 	ws := new(restful.WebService)
 	ws.
