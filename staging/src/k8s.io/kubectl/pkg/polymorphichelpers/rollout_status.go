@@ -133,6 +133,9 @@ func (s *StatefulSetStatusViewer) Status(obj runtime.Unstructured, revision int6
 	if sts.Spec.Replicas != nil && sts.Status.ReadyReplicas < *sts.Spec.Replicas {
 		return fmt.Sprintf("Waiting for %d pods to be ready...\n", *sts.Spec.Replicas-sts.Status.ReadyReplicas), false, nil
 	}
+	if (sts.Spec.Replicas == nil || *sts.Spec.Replicas == 0) && sts.Status.UpdatedReplicas > 0 {
+		return fmt.Sprintf("Waiting for %d pods to be delete...\n", sts.Status.UpdatedReplicas), false, nil
+	}
 	if sts.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType && sts.Spec.UpdateStrategy.RollingUpdate != nil {
 		if sts.Spec.Replicas != nil && sts.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
 			if sts.Status.UpdatedReplicas < (*sts.Spec.Replicas - *sts.Spec.UpdateStrategy.RollingUpdate.Partition) {
