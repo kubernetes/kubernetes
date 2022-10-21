@@ -21,11 +21,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	fuzz "github.com/google/gofuzz"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
-	"k8s.io/apimachinery/pkg/util/diff"
-
-	fuzz "github.com/google/gofuzz"
 )
 
 func TestAsPartialObjectMetadata(t *testing.T) {
@@ -36,7 +35,7 @@ func TestAsPartialObjectMetadata(t *testing.T) {
 		f.Fuzz(m)
 		partial := AsPartialObjectMetadata(m)
 		if !reflect.DeepEqual(&partial.ObjectMeta, m) {
-			t.Fatalf("incomplete partial object metadata: %s", diff.ObjectReflectDiff(&partial.ObjectMeta, m))
+			t.Fatalf("incomplete partial object metadata: %s", cmp.Diff(&partial.ObjectMeta, m))
 		}
 	}
 
@@ -45,7 +44,7 @@ func TestAsPartialObjectMetadata(t *testing.T) {
 		f.Fuzz(&m.ObjectMeta)
 		partial := AsPartialObjectMetadata(m)
 		if !reflect.DeepEqual(&partial.ObjectMeta, &m.ObjectMeta) {
-			t.Fatalf("incomplete partial object metadata: %s", diff.ObjectReflectDiff(&partial.ObjectMeta, &m.ObjectMeta))
+			t.Fatalf("incomplete partial object metadata: %s", cmp.Diff(&partial.ObjectMeta, &m.ObjectMeta))
 		}
 	}
 }
