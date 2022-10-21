@@ -17,6 +17,10 @@ limitations under the License.
 package persistentvolumeclaim
 
 import (
+	"fmt"
+
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
@@ -150,4 +154,20 @@ func allocatedResourcesInUse(oldPVC *core.PersistentVolumeClaim) bool {
 	}
 
 	return false
+}
+
+func GetWarningsForPersistentVolumeClaim(pv *core.PersistentVolumeClaim) []string {
+	if pv == nil {
+		return nil
+	}
+	storageValue := pv.Spec.Resources.Requests[core.ResourceStorage]
+	return warningsForPersistentVolumeClaimResources(field.NewPath("spec").Child("Resources").Child("Requests").Key(core.ResourceStorage.String()), storageValue)
+}
+
+func warningsForPersistentVolumeClaimResources(fieldPath *field.Path, storageValue resource.Quantity) []string {
+	var warnings []string
+	if storageValue.MilliValue()%int64(1000) != int64(0) {
+		warnings = append(warnings, fmt.Sprintf("%s: fractional byte value %q is invalid, must be an integer", fieldPath.String(), storageValue.String()))
+	}
+	return warnings
 }
