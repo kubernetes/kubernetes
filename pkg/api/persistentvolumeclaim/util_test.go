@@ -411,11 +411,14 @@ func TestWarnings(t *testing.T) {
 			expected: nil,
 		},
 		{
-			name: "200Mi no warning",
+			name: "200Mi requests no warning",
 			template: &core.PersistentVolumeClaim{
 				Spec: core.PersistentVolumeClaimSpec{
 					Resources: core.ResourceRequirements{
 						Requests: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("200Mi"),
+						},
+						Limits: core.ResourceList{
 							core.ResourceStorage: resource.MustParse("200Mi"),
 						},
 					},
@@ -431,11 +434,15 @@ func TestWarnings(t *testing.T) {
 						Requests: core.ResourceList{
 							core.ResourceStorage: resource.MustParse("200m"),
 						},
+						Limits: core.ResourceList{
+							core.ResourceStorage: resource.MustParse("100m"),
+						},
 					},
 				},
 			},
 			expected: []string{
 				`spec.resources.requests[storage]: fractional byte value "200m" is invalid, must be an integer`,
+				`spec.resources.limits[storage]: fractional byte value "100m" is invalid, must be an integer`,
 			},
 		},
 		{

@@ -159,13 +159,24 @@ func GetWarningsForPersistentVolumeClaim(pv *core.PersistentVolumeClaim) []strin
 	if pv == nil {
 		return nil
 	}
-	storageValue := pv.Spec.Resources.Requests[core.ResourceStorage]
+
+	return GetWarningsForPersistentVolumeClaimSpec(field.NewPath("spec"), pv.Spec)
+}
+
+func GetWarningsForPersistentVolumeClaimSpec(fieldPath *field.Path, pvSpec core.PersistentVolumeClaimSpec) []string {
+
 	var warnings []string
-	if storageValue.MilliValue()%int64(1000) != int64(0) {
+	requestValue := pvSpec.Resources.Requests[core.ResourceStorage]
+	if requestValue.MilliValue()%int64(1000) != int64(0) {
 		warnings = append(warnings, fmt.Sprintf(
 			"%s: fractional byte value %q is invalid, must be an integer",
-			field.NewPath("spec").Child("resources").Child("requests").Key(core.ResourceStorage.String()),
-			storageValue.String()))
+			fieldPath.Child("resources").Child("requests").Key(core.ResourceStorage.String()), requestValue.String()))
+	}
+	limitValue := pvSpec.Resources.Limits[core.ResourceStorage]
+	if limitValue.MilliValue()%int64(1000) != int64(0) {
+		warnings = append(warnings, fmt.Sprintf(
+			"%s: fractional byte value %q is invalid, must be an integer",
+			fieldPath.Child("resources").Child("limits").Key(core.ResourceStorage.String()), limitValue.String()))
 	}
 	return warnings
 }

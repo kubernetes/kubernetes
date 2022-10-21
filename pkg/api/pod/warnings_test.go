@@ -459,6 +459,36 @@ func TestWarnings(t *testing.T) {
 			},
 			expected: []string{},
 		},
+		{
+			name: "pod with ephemeral volume source 200Mi",
+			template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: api.PodSpec{Volumes: []api.Volume{
+					{Name: "ephemeral-volume", VolumeSource: api.VolumeSource{Ephemeral: &api.EphemeralVolumeSource{
+						VolumeClaimTemplate: &api.PersistentVolumeClaimTemplate{
+							Spec: api.PersistentVolumeClaimSpec{Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{api.ResourceStorage: resource.MustParse("200Mi")}}},
+						},
+					}}}}},
+			},
+			expected: []string{},
+		},
+		{
+			name: "pod with ephemeral volume source 200m",
+			template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: api.PodSpec{Volumes: []api.Volume{
+					{Name: "ephemeral-volume", VolumeSource: api.VolumeSource{Ephemeral: &api.EphemeralVolumeSource{
+						VolumeClaimTemplate: &api.PersistentVolumeClaimTemplate{
+							Spec: api.PersistentVolumeClaimSpec{Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{api.ResourceStorage: resource.MustParse("200m")}}},
+						},
+					}}}}},
+			},
+			expected: []string{
+				`spec.volumes[0].ephemeral.volumeClaimTemplate.spec.resources.requests[storage]: fractional byte value "200m" is invalid, must be an integer`,
+			},
+		},
 	}
 
 	for _, tc := range testcases {
