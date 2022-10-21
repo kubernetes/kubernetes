@@ -141,6 +141,8 @@ func setupTest(t *testing.T) (plugin admission.ValidationInterface, paramTracker
 
 // Gets the last reconciled value in the controller of an object with the same
 // gvk and name as the given object
+//
+// If the object is not found both the error and object will be nil.
 func (c *celAdmissionController) getCurrentObject(obj runtime.Object) (runtime.Object, error) {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
@@ -157,7 +159,8 @@ func (c *celAdmissionController) getCurrentObject(obj runtime.Object) (runtime.O
 		if paramInfo, ok := c.paramsCRDControllers[paramSource]; ok {
 			paramInformer = paramInfo.controller.Informer()
 		} else {
-			return nil, fmt.Errorf("paramSource kind `%v` not known", paramSource.String())
+			// Treat unknown CRD the same as not found
+			return nil, nil
 		}
 
 		// Param type. Just check informer for its GVK
@@ -198,16 +201,19 @@ func waitForReconcile(ctx context.Context, controller *celAdmissionController, o
 		for _, obj := range objects {
 			currentValue, err := controller.getCurrentObject(obj)
 			if err != nil {
-				return false, err
+				return false, fmt.Errorf("error getting current object: %w", err)
+			} else if currentValue == nil {
+				// Object not found, but not an error. Keep waiting.
+				return false, nil
 			}
 
 			objMeta, err := meta.Accessor(obj)
 			if err != nil {
-				return false, err
+				return false, fmt.Errorf("error getting meta accessor for original %T object (%v): %w", obj, obj, err)
 			}
 			valueMeta, err := meta.Accessor(currentValue)
 			if err != nil {
-				return false, err
+				return false, fmt.Errorf("error getting meta accessor for current %T object (%v): %w", currentValue, currentValue, err)
 			}
 
 			if len(objMeta.GetResourceVersion()) == 0 {
