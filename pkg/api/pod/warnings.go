@@ -252,16 +252,33 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 				}
 			}
 		}
-		// duplicate containers[*].ports
-		if len(c.Ports) > 1 {
-			ports := sets.NewInt64()
-			for i, port := range c.Ports {
-				if ports.Has(int64(port.ContainerPort)) {
-					warnings = append(warnings, fmt.Sprintf("%s: duplicate container port %d", p.Child("ports").Index(i).Child("containerPort"), port.ContainerPort))
-				} else {
-					ports.Insert(int64(port.ContainerPort))
+		return true
+	})
+
+	// Accumulate ports across all containers
+	allPorts := map[string]portBlock{}
+	pods.VisitContainersWithPath(podSpec, fieldPath.Child("spec"), func(c *api.Container, fldPath *field.Path) bool {
+		for i, port := range c.Ports {
+			k := fmt.Sprintf("%d/%s", port.ContainerPort, port.Protocol)
+			if other, found := allPorts[k]; found {
+				// Someone else has this protcol+port, but it still might not be a conflict.
+				conflict := false
+
+				// Exact matches are obvious.
+				if port.HostIP == other.port.HostIP && port.HostPort == other.port.HostPort {
+					conflict = true
+				}
+				// Unspecified fields are more subtle.
+				if port.HostPort == 0 || other.port.HostPort == 0 || port.HostIP == "" || other.port.HostIP == "" {
+					conflict = true
+				}
+				if conflict {
+					warnings = append(warnings, fmt.Sprintf("%s: duplicate container port %d/%s, conflicts with %s",
+						fldPath.Child("ports").Index(i), port.ContainerPort, port.Protocol, other.field))
+					continue
 				}
 			}
+			allPorts[k] = portBlock{field: fldPath, port: port}
 		}
 		return true
 	})
@@ -283,6 +300,11 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 	}
 
 	return warnings
+}
+
+type portBlock struct {
+	field *field.Path
+	port  api.ContainerPort
 }
 
 func warningsForPodAffinityTerms(terms []api.PodAffinityTerm, fieldPath *field.Path) []string {
