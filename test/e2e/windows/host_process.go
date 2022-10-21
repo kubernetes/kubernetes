@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -600,6 +601,84 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		gomega.Expect(beforeMetrics.StartedInitContainersErrorCount).To(gomega.BeNumerically("<", afterMetrics.StartedInitContainersErrorCount), "Count of started HostProcess errors init containers should increase")
 	})
 
+	ginkgo.It("container stats validation", func() {
+		ginkgo.By("selecting a Windows node")
+		targetNode, err := findWindowsNode(f)
+		framework.ExpectNoError(err, "Error finding Windows node")
+		framework.Logf("Using node: %v", targetNode.Name)
+
+		ginkgo.By("schedule a pod with a HostProcess container")
+		image := imageutils.GetConfig(imageutils.BusyBox)
+		podName := "host-process-stats-pod"
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: podName,
+			},
+			Spec: v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess:   &trueVar,
+						RunAsUserName: &User_NTAuthorityLocalService,
+					},
+				},
+				HostNetwork: true,
+				Containers: []v1.Container{
+					{
+						Image:   image.GetE2EImage(),
+						Name:    "host-process-stats",
+						Command: []string{"powershell.exe", "-Command", "Write-Host 'Hello'; sleep -Seconds 600"},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+				NodeName:      targetNode.Name,
+			},
+		}
+
+		e2epod.NewPodClient(f).Create(pod)
+
+		ginkgo.By("Waiting for the pod to start running")
+		timeout := 3 * time.Minute
+		e2epod.WaitForPodsRunningReady(f.ClientSet, f.Namespace.Name, 1, 0, timeout, make(map[string]string))
+
+		ginkgo.By("Getting container stats for pod")
+		nodeStats, err := e2ekubelet.GetStatsSummary(f.ClientSet, targetNode.Name)
+		framework.ExpectNoError(err, "Error getting node stats")
+
+		statsChecked := false
+		for _, podStats := range nodeStats.Pods {
+
+			if podStats.PodRef.Namespace != f.Namespace.Name {
+				continue
+			}
+
+			// check various pod stats
+			if *podStats.CPU.UsageCoreNanoSeconds <= 0 {
+				framework.Failf("Pod %s/%s stats report cpu usage equal to %v but should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.CPU.UsageCoreNanoSeconds)
+			}
+			if *podStats.Memory.WorkingSetBytes <= 0 {
+				framework.Failf("Pod %s/%s stats report memory usage equal to %v but should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.CPU.UsageCoreNanoSeconds)
+			}
+
+			for _, containerStats := range podStats.Containers {
+				statsChecked = true
+
+				// check various container stats
+				if *containerStats.CPU.UsageCoreNanoSeconds <= 0 {
+					framework.Failf("Container %s stats report cpu usage equal to %v but should be greater than 0", containerStats.Name, *containerStats.CPU.UsageCoreNanoSeconds)
+				}
+				if *containerStats.Memory.WorkingSetBytes <= 0 {
+					framework.Failf("Container %s stats report memory usage equal to %v but should be greater than 0", containerStats.Name, *containerStats.Memory.WorkingSetBytes)
+				}
+				if *containerStats.Logs.UsedBytes <= 0 {
+					framework.Failf("Container %s stats log usage equal to %v but should be greater than 0", containerStats.Name, *containerStats.Logs.UsedBytes)
+				}
+			}
+		}
+
+		if !statsChecked {
+			framework.Failf("Failed to get stats for pod %s/%s", f.Namespace.Name, podName)
+		}
+	})
 })
 
 func makeTestPodWithVolumeMounts(name string) *v1.Pod {
