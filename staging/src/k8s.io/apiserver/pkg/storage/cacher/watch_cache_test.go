@@ -23,6 +23,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gogo/protobuf/proto"
+
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -34,12 +36,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	"k8s.io/client-go/tools/cache"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
 func makeTestPod(name string, resourceVersion uint64) *v1.Pod {
 	return makeTestPodDetails(name, resourceVersion, "some-node", map[string]string{"k8s-app": "my-app"})
+}
+
+func makeTestPodWithSizedLabel(name string, resourceVersion uint64, labelSize int) *v1.Pod {
+	return makeTestPodDetails(name, resourceVersion, "some-node", map[string]string{
+		"label1": strings.Repeat("a", labelSize),
+	})
 }
 
 func makeTestPodDetails(name string, resourceVersion uint64, nodeName string, labels map[string]string) *v1.Pod {
@@ -62,6 +71,7 @@ func makeTestStoreElement(pod *v1.Pod) *storeElement {
 		Object: pod,
 		Labels: labels.Set(pod.Labels),
 		Fields: fields.Set{"spec.nodeName": pod.Spec.NodeName},
+		Size:   pod.Size(),
 	}
 }
 
@@ -97,6 +107,13 @@ func (w *testWatchCache) getCacheIntervalForEvents(resourceVersion uint64) (*wat
 	return w.getAllEventsSinceLocked(resourceVersion)
 }
 
+func protoSizeFunc(obj runtime.Object) (int, error) {
+	if obj, ok := obj.(proto.Sizer); ok {
+		return obj.Size(), nil
+	}
+	return 0, fmt.Errorf("%T doesn't implement proto.Sizer", obj)
+}
+
 // newTestWatchCache just adds a fake clock.
 func newTestWatchCache(capacity int, indexers *cache.Indexers) *testWatchCache {
 	keyFunc := func(obj runtime.Object) (string, error) {
@@ -111,7 +128,7 @@ func newTestWatchCache(capacity int, indexers *cache.Indexers) *testWatchCache {
 	}
 	versioner := storage.APIObjectVersioner{}
 	mockHandler := func(*watchCacheEvent) {}
-	wc := newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), schema.GroupResource{Resource: "pods"})
+	wc := newWatchCache(keyFunc, protoSizeFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), schema.GroupResource{Resource: "pods"})
 	// To preserve behavior of tests that assume a given capacity,
 	// resize it to th expected size.
 	wc.capacity = capacity
@@ -196,6 +213,61 @@ func TestWatchCacheBasic(t *testing.T) {
 		if !apiequality.Semantic.DeepEqual(expected, items) {
 			t.Errorf("expected %v, got %v", expected, items)
 		}
+	}
+}
+
+func TestWatchCacheStoreSize(t *testing.T) {
+	metrics.Register()
+	store := newTestWatchCache(2, &cache.Indexers{})
+
+	// Test Add/Update/Delete.
+	pod1 := makeTestPodWithSizedLabel("pod1", 1, 100)
+	if err := store.Add(pod1); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	t.Logf("storeSize after adding pod1: %d", store.storeSize)
+
+	if want := pod1.Size(); store.storeSize != want {
+		t.Errorf("unexpected storeSize: got=%d, want=%d", store.storeSize, want)
+	}
+
+	pod1 = makeTestPodWithSizedLabel("pod1", 2, 200)
+	if err := store.Update(pod1); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	t.Logf("storeSize after updating pod1: %d", store.storeSize)
+	if want := pod1.Size(); store.storeSize != want {
+		t.Errorf("unexpected storeSize: got=%d, want=%d", store.storeSize, want)
+	}
+
+	pod2 := makeTestPodWithSizedLabel("pod2", 1, 500)
+	if err := store.Add(pod2); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	t.Logf("storeSize after adding pod2: %d", store.storeSize)
+
+	if want := pod1.Size() + pod2.Size(); store.storeSize != want {
+		t.Errorf("unexpected storeSize: got=%d, want=%d", store.storeSize, want)
+	}
+
+	pod1 = makeTestPod("pod1", 3)
+	if err := store.Delete(pod1); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	t.Logf("storeSize after deleting pod1: %d", store.storeSize)
+	if want := pod2.Size(); store.storeSize != want {
+		t.Errorf("unexpected storeSize: got=%d, want=%d", store.storeSize, want)
+	}
+
+	pod4 := makeTestPodWithSizedLabel("pod4", 7, 1000)
+	pod5 := makeTestPodWithSizedLabel("pod5", 8, 2000)
+	// Test Replace.
+	store.Replace([]interface{}{pod4, pod5}, "8")
+	t.Logf("storeSize after replace: %d", store.storeSize)
+	if want := pod4.Size() + pod5.Size(); store.storeSize != want {
+		t.Errorf("unexpected storeSize: got=%d, want=%d", store.storeSize, want)
 	}
 }
 

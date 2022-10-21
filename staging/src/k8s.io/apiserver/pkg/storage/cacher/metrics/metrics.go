@@ -135,6 +135,17 @@ var (
 		},
 		[]string{"resource"},
 	)
+
+	WatchCacheStoreSize = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "store_size",
+			Help:           "Total estimated size of watch cache's store broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -153,6 +164,7 @@ func Register() {
 		legacyregistry.MustRegister(watchCacheCapacityDecreaseTotal)
 		legacyregistry.MustRegister(WatchCacheCapacity)
 		legacyregistry.MustRegister(WatchCacheInitializations)
+		legacyregistry.MustRegister(WatchCacheStoreSize)
 	})
 }
 

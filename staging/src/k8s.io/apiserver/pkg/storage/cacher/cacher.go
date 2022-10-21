@@ -17,6 +17,7 @@ limitations under the License.
 package cacher
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -384,8 +385,15 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		<-cacher.timer.C
 	}
 
+	sizeFunc := func(obj runtime.Object) (int, error) {
+		w := &bytes.Buffer{}
+		err := config.Codec.Encode(obj, w)
+		return w.Len(), err
+	}
+	klog.V(1).Infof("cacher (%v) is using %s codec to estimate object size", config.GroupResource, config.Codec.Identifier())
+
 	watchCache := newWatchCache(
-		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers, config.Clock, config.GroupResource)
+		config.KeyFunc, sizeFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers, config.Clock, config.GroupResource)
 	listerWatcher := NewCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 

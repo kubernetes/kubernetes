@@ -89,6 +89,7 @@ type storeElement struct {
 	Object runtime.Object
 	Labels labels.Set
 	Fields fields.Set
+	Size   int
 }
 
 func storeElementKey(obj interface{}) (string, error) {
@@ -152,6 +153,9 @@ type watchCache struct {
 	// keyFunc is used to get a key in the underlying storage for a given object.
 	keyFunc func(runtime.Object) (string, error)
 
+	// sizeFunc is used to estimate size for a given object.
+	sizeFunc func(runtime.Object) (int, error)
+
 	// getAttrsFunc is used to get labels and fields of an object.
 	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, error)
 
@@ -169,6 +173,9 @@ type watchCache struct {
 	// It is necessary to effectively allow clients to start watching at now.
 	// NOTE: We assume that <store> is thread-safe.
 	store cache.Indexer
+
+	// storeSize is a sum of estimated size of objects in the watch cache's store.
+	storeSize int
 
 	// ResourceVersion up to which the watchCache is propagated.
 	resourceVersion uint64
@@ -198,6 +205,7 @@ type watchCache struct {
 
 func newWatchCache(
 	keyFunc func(runtime.Object) (string, error),
+	sizeFunc func(runtime.Object) (int, error),
 	eventHandler func(*watchCacheEvent),
 	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, error),
 	versioner storage.Versioner,
@@ -207,6 +215,7 @@ func newWatchCache(
 	wc := &watchCache{
 		capacity:            defaultLowerBoundCapacity,
 		keyFunc:             keyFunc,
+		sizeFunc:            sizeFunc,
 		getAttrsFunc:        getAttrsFunc,
 		cache:               make([]*watchCacheEvent, defaultLowerBoundCapacity),
 		lowerBoundCapacity:  defaultLowerBoundCapacity,
@@ -236,7 +245,13 @@ func (w *watchCache) Add(obj interface{}) error {
 	}
 	event := watch.Event{Type: watch.Added, Object: object}
 
-	f := func(elem *storeElement) error { return w.store.Add(elem) }
+	f := func(elem *storeElement, _ *storeElement) error {
+		if err := w.store.Add(elem); err != nil {
+			return err
+		}
+		w.updateStoreSizeLocked(w.storeSize + elem.Size)
+		return nil
+	}
 	return w.processEvent(event, resourceVersion, f)
 }
 
@@ -248,7 +263,17 @@ func (w *watchCache) Update(obj interface{}) error {
 	}
 	event := watch.Event{Type: watch.Modified, Object: object}
 
-	f := func(elem *storeElement) error { return w.store.Update(elem) }
+	f := func(elem *storeElement, prevElem *storeElement) error {
+		if err := w.store.Update(elem); err != nil {
+			return err
+		}
+		var prevElemSize int
+		if prevElem != nil {
+			prevElemSize = prevElem.Size
+		}
+		w.updateStoreSizeLocked(w.storeSize - prevElemSize + elem.Size)
+		return nil
+	}
 	return w.processEvent(event, resourceVersion, f)
 }
 
@@ -260,7 +285,15 @@ func (w *watchCache) Delete(obj interface{}) error {
 	}
 	event := watch.Event{Type: watch.Deleted, Object: object}
 
-	f := func(elem *storeElement) error { return w.store.Delete(elem) }
+	f := func(elem *storeElement, prevElem *storeElement) error {
+		if err := w.store.Delete(elem); err != nil {
+			return err
+		}
+		if prevElem != nil {
+			w.updateStoreSizeLocked(w.storeSize - prevElem.Size)
+		}
+		return nil
+	}
 	return w.processEvent(event, resourceVersion, f)
 }
 
@@ -278,12 +311,16 @@ func (w *watchCache) objectToVersionedRuntimeObject(obj interface{}) (runtime.Ob
 
 // processEvent is safe as long as there is at most one call to it in flight
 // at any point in time.
-func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, updateFunc func(*storeElement) error) error {
+func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, updateFunc func(*storeElement, *storeElement) error) error {
 	key, err := w.keyFunc(event.Object)
 	if err != nil {
 		return fmt.Errorf("couldn't compute key: %v", err)
 	}
-	elem := &storeElement{Key: key, Object: event.Object}
+	size, err := w.sizeFunc(event.Object)
+	if err != nil {
+		return fmt.Errorf("failed to estimate object size: %v", err)
+	}
+	elem := &storeElement{Key: key, Object: event.Object, Size: size}
 	elem.Labels, elem.Fields, err = w.getAttrsFunc(event.Object)
 	if err != nil {
 		return err
@@ -311,8 +348,9 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		if err != nil {
 			return err
 		}
+		var previousElem *storeElement
 		if exists {
-			previousElem := previous.(*storeElement)
+			previousElem = previous.(*storeElement)
 			wcEvent.PrevObject = previousElem.Object
 			wcEvent.PrevObjLabels = previousElem.Labels
 			wcEvent.PrevObjFields = previousElem.Fields
@@ -322,7 +360,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		w.resourceVersion = resourceVersion
 		defer w.cond.Broadcast()
 
-		return updateFunc(elem)
+		return updateFunc(elem, previousElem)
 	}(); err != nil {
 		return err
 	}
@@ -388,6 +426,16 @@ func (w *watchCache) doCacheResizeLocked(capacity int) {
 	w.cache = newCache
 	metrics.RecordsWatchCacheCapacityChange(w.groupResource.String(), w.capacity, capacity)
 	w.capacity = capacity
+}
+
+// updateStoreSizeLocked updates w.storeSize and propagates the change to the metric.
+func (w *watchCache) updateStoreSizeLocked(storeSize int) {
+	w.storeSize = storeSize
+
+	// The metric call below should be relatively cheap:
+	//  * cost of the WithLabelValues is calculating hash of string + string comparison.
+	//  * cost of the Set is changing atomic value.
+	metrics.WatchCacheStoreSize.WithLabelValues(w.groupResource.String()).Set(float64(storeSize))
 }
 
 func (w *watchCache) UpdateResourceVersion(resourceVersion string) {
@@ -529,6 +577,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	}
 
 	toReplace := make([]interface{}, 0, len(objs))
+	var totalSize int
 	for _, obj := range objs {
 		object, ok := obj.(runtime.Object)
 		if !ok {
@@ -537,6 +586,10 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 		key, err := w.keyFunc(object)
 		if err != nil {
 			return fmt.Errorf("couldn't compute key: %v", err)
+		}
+		size, err := w.sizeFunc(object)
+		if err != nil {
+			return fmt.Errorf("failed to estimate object size: %v", err)
 		}
 		objLabels, objFields, err := w.getAttrsFunc(object)
 		if err != nil {
@@ -547,7 +600,9 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 			Object: object,
 			Labels: objLabels,
 			Fields: objFields,
+			Size:   size,
 		})
+		totalSize += size
 	}
 
 	w.Lock()
@@ -560,6 +615,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	}
 	w.listResourceVersion = version
 	w.resourceVersion = version
+	w.updateStoreSizeLocked(totalSize)
 	if w.onReplace != nil {
 		w.onReplace()
 	}
