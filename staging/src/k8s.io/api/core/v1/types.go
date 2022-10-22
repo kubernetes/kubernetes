@@ -1842,21 +1842,30 @@ type ServiceAccountTokenProjection struct {
 // filesystem.
 type ClusterTrustBundleProjection struct {
 	// Select a single ClusterTrustBundle by object name.  Mutually-exclusive
-	// with SignerName and LabelSelector.
+	// with signerName and labelSelector.
 	// +optional
 	Name *string `json:"name,omitempty" protobuf:"bytes,1,rep,name=name"`
 
 	// Select all ClusterTrustBundles that match this signer name.
-	// Mutually-exclusive with Name.
+	// Mutually-exclusive with name.  The contents of all selected
+	// ClusterTrustBundles will be unified and deduplicated.
 	// +optional
 	SignerName *string `json:"signerName,omitempty" protobuf:"bytes,2,rep,name=signerName"`
 
-	// Select all ClusterTrustBundles that match this label selector.  Must not
-	// be null or empty if SignerName is provided.  Mutually-exclusive with
-	// Name.
-	//
+	// Select all ClusterTrustBundles that match this label selector.  Only has
+	// effect if signerName is set.  Mutually-exclusive with name.  If unset,
+	// interpreted as "match nothing".  If set but empty, interpreted as "match
+	// everything".
 	// +optional
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty" protobuf:"bytes,3,rep,name=labelSelector"`
+
+	// If true, don't block pod startup if the referenced ClusterTrustBundle(s)
+	// aren't available.  If using name, then the named ClusterTrustBundle is
+	// allowed not to exist.  If using signerName, then the combination of
+	// signerName and labelSelector is allowed to match zero
+	// ClusterTrustBundles.
+	// +optional
+	Optional *bool `json:"optional,omitempty"`
 
 	// Relative path from the volume root to write the bundle.
 	Path string `json:"path" protobuf:"bytes,4,rep,name=path"`
@@ -1895,19 +1904,12 @@ type VolumeProjection struct {
 	ServiceAccountToken *ServiceAccountTokenProjection `json:"serviceAccountToken,omitempty" protobuf:"bytes,4,opt,name=serviceAccountToken"`
 
 	// ClusterTrustBundle allows a pod to access the `.spec.trustBundle` field
-	// of a ClusterTrustBundle object in an auto-updating file.
+	// of ClusterTrustBundle objects in an auto-updating file.
 	//
 	// Alpha, gated by the ClusterTrustBundleProjection feature gate.
 	//
 	// ClusterTrustBundle objects can either be selected by name, or by the
 	// combination of signer name and a label selector.
-	//
-	// When selecting by name, the referenced ClusterTrustBundle object must
-	// have an empty spec.signerName field.
-	//
-	// When selecting by signer name, the contents of all ClusterTrustBundle
-	// objects associated with the signer and matching the label will be unified
-	// and deduplicated.
 	//
 	// Kubelet performs aggressive normalization of the PEM contents written
 	// into the pod filesystem.  Esoteric PEM features such as inter-block
@@ -1915,6 +1917,7 @@ type VolumeProjection struct {
 	// The ordering of certificates within the file is arbitrary, and Kubelet
 	// may change the order over time.
 	//
+	// +featureGate=ClusterTrustBundleProjection
 	// +optional
 	ClusterTrustBundle *ClusterTrustBundleProjection `json:"clusterTrustBundle,omitempty" protobuf:"bytes,5,opt,name=clusterTrustBundle"`
 }

@@ -10414,6 +10414,63 @@ func TestValidatePod(t *testing.T) {
 				}},
 			},
 		},
+		"valid ClusterTrustBundlePEM projected volume referring to a CTB by name": {
+			ObjectMeta: metav1.ObjectMeta{Name: "valid-extended", Namespace: "ns"},
+			Spec: core.PodSpec{
+				ServiceAccountName: "some-service-account",
+				Containers:         []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				RestartPolicy:      core.RestartPolicyAlways,
+				DNSPolicy:          core.DNSClusterFirst,
+				Volumes: []core.Volume{
+					{
+						Name: "projected-volume",
+						VolumeSource: core.VolumeSource{
+							Projected: &core.ProjectedVolumeSource{
+								Sources: []core.VolumeProjection{
+									{
+										ClusterTrustBundle: &core.ClusterTrustBundleProjection{
+											Path: "foo-path",
+											Name: utilpointer.String("foo"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"valid ClusterTrustBundlePEM projected volume referring to a CTB by signer name": {
+			ObjectMeta: metav1.ObjectMeta{Name: "valid-extended", Namespace: "ns"},
+			Spec: core.PodSpec{
+				ServiceAccountName: "some-service-account",
+				Containers:         []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				RestartPolicy:      core.RestartPolicyAlways,
+				DNSPolicy:          core.DNSClusterFirst,
+				Volumes: []core.Volume{
+					{
+						Name: "projected-volume",
+						VolumeSource: core.VolumeSource{
+							Projected: &core.ProjectedVolumeSource{
+								Sources: []core.VolumeProjection{
+									{
+										ClusterTrustBundle: &core.ClusterTrustBundleProjection{
+											Path:       "foo-path",
+											SignerName: utilpointer.String("example.com/foo"),
+											LabelSelector: &metav1.LabelSelector{
+												MatchLabels: map[string]string{
+													"version": "live",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 		"ephemeral volume + PVC, no conflict between them": {
 			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
 			Spec: core.PodSpec{
@@ -12021,6 +12078,133 @@ func TestValidatePod(t *testing.T) {
 							},
 						},
 					}},
+				},
+			},
+		},
+		"ClusterTrustBundlePEM projected volume using both byName and bySigner": {
+			expectedError: "only one of name and signerName may be used",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "valid-extended", Namespace: "ns"},
+				Spec: core.PodSpec{
+					ServiceAccountName: "some-service-account",
+					Containers:         []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+					RestartPolicy:      core.RestartPolicyAlways,
+					DNSPolicy:          core.DNSClusterFirst,
+					Volumes: []core.Volume{
+						{
+							Name: "projected-volume",
+							VolumeSource: core.VolumeSource{
+								Projected: &core.ProjectedVolumeSource{
+									Sources: []core.VolumeProjection{
+										{
+											ClusterTrustBundle: &core.ClusterTrustBundleProjection{
+												Path:       "foo-path",
+												SignerName: utilpointer.String("example.com/foo"),
+												LabelSelector: &metav1.LabelSelector{
+													MatchLabels: map[string]string{
+														"version": "live",
+													},
+												},
+												Name: utilpointer.String("foo"),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"ClusterTrustBundlePEM projected volume byName with no name": {
+			expectedError: "must be a valid object name",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "valid-extended", Namespace: "ns"},
+				Spec: core.PodSpec{
+					ServiceAccountName: "some-service-account",
+					Containers:         []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+					RestartPolicy:      core.RestartPolicyAlways,
+					DNSPolicy:          core.DNSClusterFirst,
+					Volumes: []core.Volume{
+						{
+							Name: "projected-volume",
+							VolumeSource: core.VolumeSource{
+								Projected: &core.ProjectedVolumeSource{
+									Sources: []core.VolumeProjection{
+										{
+											ClusterTrustBundle: &core.ClusterTrustBundleProjection{
+												Path: "foo-path",
+												Name: utilpointer.String(""),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"ClusterTrustBundlePEM projected volume bySigner with no signer name": {
+			expectedError: "must be a valid signer name",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "valid-extended", Namespace: "ns"},
+				Spec: core.PodSpec{
+					ServiceAccountName: "some-service-account",
+					Containers:         []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+					RestartPolicy:      core.RestartPolicyAlways,
+					DNSPolicy:          core.DNSClusterFirst,
+					Volumes: []core.Volume{
+						{
+							Name: "projected-volume",
+							VolumeSource: core.VolumeSource{
+								Projected: &core.ProjectedVolumeSource{
+									Sources: []core.VolumeProjection{
+										{
+											ClusterTrustBundle: &core.ClusterTrustBundleProjection{
+												Path:       "foo-path",
+												SignerName: utilpointer.String(""),
+												LabelSelector: &metav1.LabelSelector{
+													MatchLabels: map[string]string{
+														"foo": "bar",
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"ClusterTrustBundlePEM projected volume bySigner with invalid signer name": {
+			expectedError: "must be a fully qualified domain and path of the form",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "valid-extended", Namespace: "ns"},
+				Spec: core.PodSpec{
+					ServiceAccountName: "some-service-account",
+					Containers:         []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+					RestartPolicy:      core.RestartPolicyAlways,
+					DNSPolicy:          core.DNSClusterFirst,
+					Volumes: []core.Volume{
+						{
+							Name: "projected-volume",
+							VolumeSource: core.VolumeSource{
+								Projected: &core.ProjectedVolumeSource{
+									Sources: []core.VolumeProjection{
+										{
+											ClusterTrustBundle: &core.ClusterTrustBundleProjection{
+												Path:       "foo-path",
+												SignerName: utilpointer.String("example.com/foo/invalid"),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},

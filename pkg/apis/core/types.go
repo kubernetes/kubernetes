@@ -1759,6 +1759,29 @@ type ServiceAccountTokenProjection struct {
 	Path string
 }
 
+// ClusterTrustBundleProjection allows a pod to access the
+// `.spec.trustBundle` field of a ClusterTrustBundle object in an auto-updating
+// file.
+type ClusterTrustBundleProjection struct {
+	// Select a single ClusterTrustBundle by object name.   Mutually-exclusive
+	// with SignerName and LabelSelector.
+	Name *string
+
+	// Select all ClusterTrustBundles for this signer that match LabelSelector.
+	// Mutually-exclusive with Name.
+	SignerName *string
+
+	// Select all ClusterTrustBundles that match this LabelSelecotr.
+	// Mutually-exclusive with Name.
+	LabelSelector *metav1.LabelSelector
+
+	// Block pod startup if the selected ClusterTrustBundle(s) aren't available?
+	Optional *bool
+
+	// Relative path from the volume root to write the bundle.
+	Path string
+}
+
 // ProjectedVolumeSource represents a projected volume source
 type ProjectedVolumeSource struct {
 	// list of volume projections
@@ -1784,6 +1807,8 @@ type VolumeProjection struct {
 	ConfigMap *ConfigMapProjection
 	// information about the serviceAccountToken data to project
 	ServiceAccountToken *ServiceAccountTokenProjection
+	// information about the ClusterTrustBundle data to project
+	ClusterTrustBundle *ClusterTrustBundleProjection
 }
 
 // KeyToPath maps a string key to a path within a volume.
