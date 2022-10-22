@@ -210,9 +210,6 @@ func (s *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 					if projSource.ServiceAccountToken != nil {
 						return admission.NewForbidden(a, fmt.Errorf("a mirror pod may not use ServiceAccountToken volume projections"))
 					}
-					if projSource.ClusterTrustBundle != nil {
-						return admission.NewForbidden(a, fmt.Errorf("a mirror pod may not use ClusterTrustBundle volume projections"))
-					}
 				}
 			}
 		}

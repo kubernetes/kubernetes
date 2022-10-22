@@ -1002,18 +1002,14 @@ func dropDisabledClusterTrustBundleProjection(podSpec, oldPodSpec *api.PodSpec) 
 		return
 	}
 
-	for _, v := range podSpec.Volumes {
-		if v.Projected == nil {
+	for i := range podSpec.Volumes {
+		if podSpec.Volumes[i].Projected == nil {
 			continue
 		}
 
-		filteredSources := []api.VolumeProjection{}
-		for _, s := range v.Projected.Sources {
-			if s.ClusterTrustBundle == nil {
-				filteredSources = append(filteredSources, s)
-			}
+		for j := range podSpec.Volumes[i].Projected.Sources {
+			podSpec.Volumes[i].Projected.Sources[j].ClusterTrustBundle = nil
 		}
-		v.Projected.Sources = filteredSources
 	}
 }
 
