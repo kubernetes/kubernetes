@@ -45,7 +45,7 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 		return nil, false, nil
 	}
 	parts := strings.SplitN(auth, " ", 3)
-	if len(parts) < 2 || strings.ToLower(parts[0]) != "bearer" {
+	if len(parts) < 2 || !strings.EqualFold(parts[0], "bearer") {
 		return nil, false, nil
 	}
 
