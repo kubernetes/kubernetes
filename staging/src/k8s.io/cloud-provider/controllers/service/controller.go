@@ -292,10 +292,10 @@ func (c *Controller) processNextServiceItem(ctx context.Context) bool {
 
 	var re *api.RetryError
 	if errors.As(err, &re) {
-		klog.V(4).Infof("Retrying processing for service %v in %s", key, re.RetryAfter())
+		klog.Warningf("error processing service %v (retrying in %s): %v", key, re.RetryAfter(), err)
 		c.serviceQueue.AddAfter(key, re.RetryAfter())
 	} else {
-		runtime.HandleError(fmt.Errorf("error processing service %v (will retry): %v", key, err))
+		runtime.HandleError(fmt.Errorf("error processing service %v (retrying with exponential backoff): %v", key, err))
 		c.serviceQueue.AddRateLimited(key)
 	}
 
