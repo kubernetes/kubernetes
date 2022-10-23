@@ -410,6 +410,7 @@ func (c *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.S
 				klog.V(4).Infof("LoadBalancer for service %s implemented by a different controller %s, Ignoring error", key, c.cloud.ProviderName())
 				return op, nil
 			}
+			// Use %w deliberately so that a returned RetryError can be handled.
 			return op, fmt.Errorf("failed to ensure load balancer: %w", err)
 		}
 		if newStatus == nil {
