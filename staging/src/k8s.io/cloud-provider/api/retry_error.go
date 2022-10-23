@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,10 +16,12 @@ limitations under the License.
 
 package api
 
-import "time"
+import (
+	"time"
+)
 
-// RetryError indicates after what time a service reconciliation should be
-// retried.
+// RetryError indicates that a service reconciliation should be retried after a
+// fixed duration (as opposed to backing off exponentially).
 type RetryError struct {
 	msg        string
 	retryAfter time.Duration
@@ -33,6 +35,7 @@ func NewRetryError(msg string, retryAfter time.Duration) *RetryError {
 	}
 }
 
+// Error shows the details of the retry reason.
 func (re *RetryError) Error() string {
 	return re.msg
 }
