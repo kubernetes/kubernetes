@@ -154,10 +154,14 @@ k8s.io/kubernetes/test/e2e/framework_test.glob..func1.5()
 FAIL: I'm failing.
 
 Full Stack Trace
+k8s.io/kubernetes/test/e2e/framework_test.glob..func1.3.1(...)
+	log_test.go:56
 k8s.io/kubernetes/test/e2e/framework_test.glob..func1.3()
 	log_test.go:57` + commonOutput,
 			Failure: "I'm failing.",
-			Stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.3()
+			Stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.3.1(...)
+	log_test.go:56
+k8s.io/kubernetes/test/e2e/framework_test.glob..func1.3()
 	log_test.go:57`,
 		},
 		output.TestResult{
