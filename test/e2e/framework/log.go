@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"regexp"
-	"runtime"
 	"runtime/debug"
 	"time"
 
@@ -47,7 +46,7 @@ func Failf(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	skip := 1
 	log("FAIL", "%s\n\nFull Stack Trace\n%s", msg, PrunedStack(skip))
-	fail(nowStamp()+": "+msg, skip)
+	ginkgo.Fail(nowStamp()+": "+msg, skip)
 	panic("unreachable")
 }
 
@@ -59,55 +58,7 @@ func Fail(msg string, callerSkip ...int) {
 		skip += callerSkip[0]
 	}
 	log("FAIL", "%s\n\nFull Stack Trace\n%s", msg, PrunedStack(skip))
-	fail(nowStamp()+": "+msg, skip)
-}
-
-// FailurePanic is the value that will be panicked from Fail.
-type FailurePanic struct {
-	Message        string // The failure message passed to Fail
-	Filename       string // The filename that is the source of the failure
-	Line           int    // The line number of the filename that is the source of the failure
-	FullStackTrace string // A full stack trace starting at the source of the failure
-}
-
-const ginkgoFailurePanic = `
-Your test failed.
-Ginkgo panics to prevent subsequent assertions from running.
-Normally Ginkgo rescues this panic so you shouldn't see it.
-But, if you make an assertion in a goroutine, Ginkgo can't capture the panic.
-To circumvent this, you should call
-	defer GinkgoRecover()
-at the top of the goroutine that caused this panic.
-`
-
-// String makes FailurePanic look like the old Ginkgo panic when printed.
-func (FailurePanic) String() string { return ginkgoFailurePanic }
-
-// fail wraps ginkgo.Fail so that it panics with more useful
-// information about the failure. This function will panic with a
-// FailurePanic.
-func fail(message string, callerSkip ...int) {
-	skip := 1
-	if len(callerSkip) > 0 {
-		skip += callerSkip[0]
-	}
-
-	_, file, line, _ := runtime.Caller(skip)
-	fp := FailurePanic{
-		Message:        message,
-		Filename:       file,
-		Line:           line,
-		FullStackTrace: string(PrunedStack(skip)),
-	}
-
-	defer func() {
-		e := recover()
-		if e != nil {
-			panic(fp)
-		}
-	}()
-
-	ginkgo.Fail(message, skip)
+	ginkgo.Fail(nowStamp()+": "+msg, skip)
 }
 
 var codeFilterRE = regexp.MustCompile(`/github.com/onsi/ginkgo/v2/`)
