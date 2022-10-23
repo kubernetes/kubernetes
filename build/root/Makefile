@@ -338,6 +338,21 @@ vet:
 	hack/make-rules/vet.sh $(WHAT)
 endif
 
+define LINT_HELP_INFO
+# Run golangci-lint
+#
+# Example:
+#   make lint
+endef
+.PHONY: lint
+ifeq ($(PRINT_HELP),y)
+lint:
+	echo "$$LINT_HELP_INFO"
+else
+lint:
+	hack/verify-golangci-lint.sh
+endif
+
 define RELEASE_HELP_INFO
 # Build a release
 # Use the 'release-in-a-container' target to build the release when already in
