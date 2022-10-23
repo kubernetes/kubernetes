@@ -1631,7 +1631,7 @@ message Metric {
     int64 timestamp = 2;
     repeated LabelPair labels = 3;
     MetricType metric_type = 4;
-    Int64Value value = 5;
+    UInt64Value value = 5;
 }
 
 message LabelPair {
