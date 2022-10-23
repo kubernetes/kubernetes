@@ -7,14 +7,20 @@ issues:
   max-same-issues: 0
   # Excluding configuration per-path, per-linter, per-text and per-source
   exclude-rules:
-    # exclude ineffassing linter for generated files for conversion
+    # exclude ineffassign linter for generated files for conversion
     - path: conversion\.go
       linters:
         - ineffassign
+    # TODO(oscr) Remove these excluded directories and fix findings. Due to large amount of findings in different components
+    # with different owners it's hard to fix everything in a single pr. This will therefore be done in multiple prs.
+    - path: (pkg/volume/*|test/*|cmd/kubeadm/*|azure/*|pkg/cmd/wait*|request/bearertoken/*|metrics/*|filters/*)
+      linters:
+        - gocritic
 
 linters:
   disable-all: true
   enable: # please keep this alphabetized
+    - gocritic
     - ineffassign
     - logcheck
     - staticcheck
@@ -28,6 +34,10 @@ linters-settings: # please keep this alphabetized
       path: _output/local/bin/logcheck.so
       description: structured logging checker
       original-url: k8s.io/klog/hack/tools
+  gocritic:
+    enabled-checks:
+      - equalFold
+      - boolExprSimplify
   staticcheck:
     checks: [
       "all",
