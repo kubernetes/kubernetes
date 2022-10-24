@@ -108,6 +108,10 @@ type KubeletConfiguration struct {
 	// readOnlyPort is the read-only port for the Kubelet to serve on with
 	// no authentication/authorization (set to 0 to disable)
 	ReadOnlyPort int32
+	// readOnlyBindAddress is the address for the Kubelet to serve on with
+	// no authentication/authorization (set to '0.0.0.0' or '::' to serve on all interfaces and IP families).
+	// Defaults to the value of the Address field if not set.
+	ReadOnlyBindAddress string
 	// volumePluginDir is the full path of the directory in which to search
 	// for additional third party volume plugins.
 	VolumePluginDir string

@@ -255,6 +255,7 @@ var (
 		"Port",
 		"ProtectKernelDefaults",
 		"ProviderID",
+		"ReadOnlyBindAddress",
 		"ReadOnlyPort",
 		"RegisterNode",
 		"RegistryBurst",

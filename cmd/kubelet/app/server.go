@@ -1193,7 +1193,11 @@ func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubele
 		go k.ListenAndServe(kubeCfg, kubeDeps.TLSOptions, kubeDeps.Auth, kubeDeps.TracerProvider)
 	}
 	if kubeCfg.ReadOnlyPort > 0 {
-		go k.ListenAndServeReadOnly(netutils.ParseIPSloppy(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort))
+		bindAddress := netutils.ParseIPSloppy(kubeCfg.Address)
+		if kubeCfg.ReadOnlyBindAddress != "" {
+			bindAddress = netutils.ParseIPSloppy(kubeCfg.ReadOnlyBindAddress)
+		}
+		go k.ListenAndServeReadOnly(bindAddress, uint(kubeCfg.ReadOnlyPort))
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResources) {
 		go k.ListenAndServePodResources()

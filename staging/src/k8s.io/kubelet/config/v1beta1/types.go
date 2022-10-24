@@ -130,6 +130,11 @@ type KubeletConfiguration struct {
 	// Default: 10250
 	// +optional
 	Port int32 `json:"port,omitempty"`
+	// readOnlyBindAddress is the address for the Kubelet to serve on with
+	// no authentication/authorization. Defaults to the value of the Address field if not set.
+	// Default: ""
+	// +optional
+	ReadOnlyBindAddress string `json:"readOnlyBindAddress,omitempty"`
 	// readOnlyPort is the read-only port for the Kubelet to serve on with
 	// no authentication/authorization.
 	// The port number must be between 1 and 65535, inclusive.

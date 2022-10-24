@@ -57316,6 +57316,13 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "int32",
 						},
 					},
+					"readOnlyBindAddress": {
+						SchemaProps: spec.SchemaProps{
+							Description: "readOnlyBindAddress is the address for the Kubelet to serve on with no authentication/authorization. Defaults to the secure serving address if not set. Default: \"\"",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"readOnlyPort": {
 						SchemaProps: spec.SchemaProps{
 							Description: "readOnlyPort is the read-only port for the Kubelet to serve on with no authentication/authorization. The port number must be between 1 and 65535, inclusive. Setting this field to 0 disables the read-only service. Default: 0 (disabled)",
