@@ -201,7 +201,6 @@ func configureTopologyManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguratio
 		newCfg.FeatureGates = make(map[string]bool)
 	}
 
-	newCfg.FeatureGates["CPUManager"] = true
 	newCfg.FeatureGates["TopologyManager"] = true
 
 	// Set the Topology Manager policy
