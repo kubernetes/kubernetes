@@ -23,6 +23,9 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/admissionregistration/v1alpha1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -124,50 +127,71 @@ var (
 			},
 		},
 	}
+	denyBindingWithNoParamRef *v1alpha1.ValidatingAdmissionPolicyBinding = &v1alpha1.ValidatingAdmissionPolicyBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "denybinding.example.com",
+			ResourceVersion: "1",
+		},
+		Spec: v1alpha1.ValidatingAdmissionPolicyBindingSpec{
+			PolicyName: denyPolicy.Name,
+		},
+	}
 )
 
 // Interface which has fake compile and match functionality for use in tests
 // So that we can test the controller without pulling in any CEL functionality
 type fakeCompiler struct {
 	DefaultMatch         bool
-	CompileFuncs         map[string]func(*v1alpha1.ValidatingAdmissionPolicy) (Validator, error)
+	CompileFuncs         map[string]func(*v1alpha1.ValidatingAdmissionPolicy) Validator
 	DefinitionMatchFuncs map[string]func(*v1alpha1.ValidatingAdmissionPolicy, admission.Attributes) bool
 	BindingMatchFuncs    map[string]func(*v1alpha1.ValidatingAdmissionPolicyBinding, admission.Attributes) bool
 }
 
+func (f *fakeCompiler) SetExternalKubeInformerFactory(factory informers.SharedInformerFactory) {
+}
+
+func (f *fakeCompiler) ValidateInitialization() error {
+	return nil
+}
+
+func (f *fakeCompiler) SetExternalKubeClientSet(k kubernetes.Interface) {
+}
+
 var _ ValidatorCompiler = &fakeCompiler{}
 
-// Matches says whether this policy definition matches the provided admission
-// resource request
-func (f *fakeCompiler) DefinitionMatches(definition *v1alpha1.ValidatingAdmissionPolicy, a admission.Attributes) bool {
-	namespace, name := definition.Namespace, definition.Name
-	key := namespace + "/" + name
-	if fun, ok := f.DefinitionMatchFuncs[key]; ok {
-		return fun(definition, a)
-	}
-
-	// Default is match everything
-	return f.DefaultMatch
+func (f *fakeCompiler) HasSynced() bool {
+	return true
 }
 
 // Matches says whether this policy definition matches the provided admission
 // resource request
-func (f *fakeCompiler) BindingMatches(binding *v1alpha1.ValidatingAdmissionPolicyBinding, a admission.Attributes) bool {
-	namespace, name := binding.Namespace, binding.Name
+func (f *fakeCompiler) DefinitionMatches(definition *v1alpha1.ValidatingAdmissionPolicy, a admission.Attributes, o admission.ObjectInterfaces) (bool, error) {
+	namespace, name := definition.Namespace, definition.Name
 	key := namespace + "/" + name
-	if fun, ok := f.BindingMatchFuncs[key]; ok {
-		return fun(binding, a)
+	if fun, ok := f.DefinitionMatchFuncs[key]; ok {
+		return fun(definition, a), nil
 	}
 
 	// Default is match everything
-	return f.DefaultMatch
+	return f.DefaultMatch, nil
+}
+
+// Matches says whether this policy definition matches the provided admission
+// resource request
+func (f *fakeCompiler) BindingMatches(binding *v1alpha1.ValidatingAdmissionPolicyBinding, a admission.Attributes, o admission.ObjectInterfaces) (bool, error) {
+	namespace, name := binding.Namespace, binding.Name
+	key := namespace + "/" + name
+	if fun, ok := f.BindingMatchFuncs[key]; ok {
+		return fun(binding, a), nil
+	}
+
+	// Default is match everything
+	return f.DefaultMatch, nil
 }
 
 func (f *fakeCompiler) Compile(
 	definition *v1alpha1.ValidatingAdmissionPolicy,
-	// Injected RESTMapper to assist with compilation
-	mapper meta.RESTMapper,
-) (Validator, error) {
+) Validator {
 	namespace, name := definition.Namespace, definition.Name
 
 	key := namespace + "/" + name
@@ -175,16 +199,16 @@ func (f *fakeCompiler) Compile(
 		return fun(definition)
 	}
 
-	return nil, fmt.Errorf("no compile func found for %s", key)
+	return nil
 }
 
-func (f *fakeCompiler) RegisterDefinition(definition *v1alpha1.ValidatingAdmissionPolicy, compileFunc func(*v1alpha1.ValidatingAdmissionPolicy) (Validator, error), matchFunc func(*v1alpha1.ValidatingAdmissionPolicy, admission.Attributes) bool) {
+func (f *fakeCompiler) RegisterDefinition(definition *v1alpha1.ValidatingAdmissionPolicy, compileFunc func(*v1alpha1.ValidatingAdmissionPolicy) Validator, matchFunc func(*v1alpha1.ValidatingAdmissionPolicy, admission.Attributes) bool) {
 	namespace, name := definition.Namespace, definition.Name
 	key := namespace + "/" + name
 	if compileFunc != nil {
 
 		if f.CompileFuncs == nil {
-			f.CompileFuncs = make(map[string]func(*v1alpha1.ValidatingAdmissionPolicy) (Validator, error))
+			f.CompileFuncs = make(map[string]func(*v1alpha1.ValidatingAdmissionPolicy) Validator)
 		}
 		f.CompileFuncs[key] = compileFunc
 	}
@@ -258,12 +282,11 @@ func setupTestCommon(t *testing.T, compiler ValidatorCompiler) (plugin admission
 		dynamicClient,
 	).(*celAdmissionController)
 
-	handler, err := NewPlugin()
-	require.NoError(t, err)
+	handler := &celAdmissionPlugin{enabled: true}
 
 	pluginInitializer := NewPluginInitializer(admissionController)
 	pluginInitializer.Initialize(handler)
-	err = admission.ValidateInitialization(handler)
+	err := admission.ValidateInitialization(handler)
 	require.NoError(t, err)
 
 	go admissionController.Run(testContext.Done())
@@ -456,31 +479,18 @@ func TestBasicPolicyDefinitionFailure(t *testing.T) {
 	defer testContextCancel()
 
 	datalock := sync.Mutex{}
-	passedParams := []*unstructured.Unstructured{}
 	numCompiles := 0
 
 	compiler := &fakeCompiler{
 		// Match everything by default
 		DefaultMatch: true,
 	}
-	compiler.RegisterDefinition(denyPolicy, func(policy *v1alpha1.ValidatingAdmissionPolicy) (Validator, error) {
+	compiler.RegisterDefinition(denyPolicy, func(policy *v1alpha1.ValidatingAdmissionPolicy) Validator {
 		datalock.Lock()
 		numCompiles += 1
 		datalock.Unlock()
 
-		return ValidatorFunc(func(a admission.Attributes, params *unstructured.Unstructured) ([]PolicyDecision, error) {
-			datalock.Lock()
-			passedParams = append(passedParams, params)
-			datalock.Unlock()
-
-			// Policy always denies
-			return []PolicyDecision{
-				{
-					Kind:    Deny,
-					Message: "Denied",
-				},
-			}, nil
-		}), nil
+		return testValidator{}
 	}, nil)
 
 	handler, paramTracker, tracker, controller := setupFakeTest(t, compiler)
@@ -499,13 +509,24 @@ func TestBasicPolicyDefinitionFailure(t *testing.T) {
 		testContext,
 		// Object is irrelevant/unchecked for this test. Just test that
 		// the evaluator is executed, and returns a denial
-		attributeRecord(nil, denyBinding, admission.Create),
+		attributeRecord(nil, fakeParams, admission.Create),
 		&admission.RuntimeObjectInterfaces{},
 	)
 
-	require.ErrorContains(t, err, `{"kind":"Deny","message":"Denied"}`)
+	require.ErrorContains(t, err, `Denied`)
+}
 
-	require.Equal(t, []*unstructured.Unstructured{fakeParams}, passedParams)
+type testValidator struct {
+}
+
+func (v testValidator) Validate(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object) ([]policyDecision, error) {
+	// Policy always denies
+	return []policyDecision{
+		{
+			kind:    deny,
+			message: "Denied",
+		},
+	}, nil
 }
 
 // Shows that if a definition does not match the input, it will not be used.
@@ -524,24 +545,12 @@ func TestDefinitionDoesntMatch(t *testing.T) {
 	numCompiles := 0
 
 	compiler.RegisterDefinition(denyPolicy,
-		func(vap *v1alpha1.ValidatingAdmissionPolicy) (Validator, error) {
+		func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
 			datalock.Lock()
 			numCompiles += 1
 			datalock.Unlock()
 
-			return ValidatorFunc(func(a admission.Attributes, params *unstructured.Unstructured) ([]PolicyDecision, error) {
-				datalock.Lock()
-				passedParams = append(passedParams, params)
-				datalock.Unlock()
-
-				// Policy always denies
-				return []PolicyDecision{
-					{
-						Kind:    Deny,
-						Message: "Denied",
-					},
-				}, nil
-			}), nil
+			return testValidator{}
 
 		}, func(vap *v1alpha1.ValidatingAdmissionPolicy, a admission.Attributes) bool {
 			// Match names with even-numbered length
@@ -604,9 +613,8 @@ func TestDefinitionDoesntMatch(t *testing.T) {
 			attributeRecord(
 				nil, matchingParams,
 				admission.Create), &admission.RuntimeObjectInterfaces{}),
-		`{"kind":"Deny","message":"Denied"}`)
+		`Denied`)
 	require.Equal(t, numCompiles, 1)
-	require.Equal(t, passedParams, []*unstructured.Unstructured{fakeParams})
 }
 
 func TestReconfigureBinding(t *testing.T) {
@@ -621,7 +629,6 @@ func TestReconfigureBinding(t *testing.T) {
 	handler, paramTracker, tracker, controller := setupFakeTest(t, compiler)
 
 	datalock := sync.Mutex{}
-	passedParams := []*unstructured.Unstructured{}
 	numCompiles := 0
 
 	fakeParams2 := &unstructured.Unstructured{
@@ -637,24 +644,12 @@ func TestReconfigureBinding(t *testing.T) {
 	}
 
 	compiler.RegisterDefinition(denyPolicy,
-		func(vap *v1alpha1.ValidatingAdmissionPolicy) (Validator, error) {
+		func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
 			datalock.Lock()
 			numCompiles += 1
 			datalock.Unlock()
 
-			return ValidatorFunc(func(a admission.Attributes, params *unstructured.Unstructured) ([]PolicyDecision, error) {
-				datalock.Lock()
-				passedParams = append(passedParams, params)
-				datalock.Unlock()
-
-				// Policy always denies
-				return []PolicyDecision{
-					{
-						Kind:    Deny,
-						Message: "Denied",
-					},
-				}, nil
-			}), nil
+			return testValidator{}
 
 		}, nil)
 
@@ -682,23 +677,21 @@ func TestReconfigureBinding(t *testing.T) {
 			testContext, controller,
 			fakeParams, denyBinding, denyPolicy))
 
-	ar := attributeRecord(nil, denyBinding, admission.Create)
-
 	err := handler.Validate(
 		testContext,
-		attributeRecord(nil, denyBinding, admission.Create),
+		attributeRecord(nil, fakeParams, admission.Create),
 		&admission.RuntimeObjectInterfaces{},
 	)
 
 	// Expect validation to fail for first time due to binding unconditionally
 	// failing
-	require.ErrorContains(t, err, `{"kind":"Deny","message":"Denied"}`, "expect policy validation error")
+	require.ErrorContains(t, err, `Denied`, "expect policy validation error")
 
 	// Expect `Compile` only called once
 	require.Equal(t, 1, numCompiles, "expect `Compile` to be called only once")
 
 	// Show Evaluator was called
-	require.Len(t, passedParams, 1, "expect evaluator is called due to proper configuration")
+	//require.Len(t, passedParams, 1, "expect evaluator is called due to proper configuration")
 
 	// Update the tracker to point at different params
 	require.NoError(t, tracker.Update(bindingsGVR, denyBinding2, ""))
@@ -709,13 +702,13 @@ func TestReconfigureBinding(t *testing.T) {
 
 	err = handler.Validate(
 		testContext,
-		ar,
+		attributeRecord(nil, fakeParams, admission.Create),
 		&admission.RuntimeObjectInterfaces{},
 	)
 
-	require.ErrorContains(t, err, `{"decision":{"kind":"Deny","message":"configuration error: replicas-test2.example.com not found"}`)
+	require.ErrorContains(t, err, `admission policy failed with error: replicas-test2.example.com not found`)
 	require.Equal(t, 1, numCompiles, "expect compile is not called when there is configuration error")
-	require.Len(t, passedParams, 1, "expect evaluator was not called when there is configuration error")
+	//require.Len(t, passedParams, 1, "expect evaluator was not called when there is configuration error")
 
 	// Add the missing params
 	require.NoError(t, paramTracker.Add(fakeParams2))
@@ -726,13 +719,13 @@ func TestReconfigureBinding(t *testing.T) {
 	// Expect validation to now fail again.
 	err = handler.Validate(
 		testContext,
-		ar,
+		attributeRecord(nil, fakeParams, admission.Create),
 		&admission.RuntimeObjectInterfaces{},
 	)
 
 	// Expect validation to fail the third time due to validation failure
-	require.ErrorContains(t, err, `{"kind":"Deny","message":"Denied"}`, "expected a true policy failure, not a configuration error")
-	require.Equal(t, []*unstructured.Unstructured{fakeParams, fakeParams2}, passedParams, "expected call to `Validate` to cause call to evaluator")
+	require.ErrorContains(t, err, `Denied`, "expected a true policy failure, not a configuration error")
+	//require.Equal(t, []*unstructured.Unstructured{fakeParams, fakeParams2}, passedParams, "expected call to `Validate` to cause call to evaluator")
 	require.Equal(t, 2, numCompiles, "expect changing binding causes a recompile")
 }
 
@@ -748,27 +741,14 @@ func TestRemoveDefinition(t *testing.T) {
 	handler, paramTracker, tracker, controller := setupFakeTest(t, compiler)
 
 	datalock := sync.Mutex{}
-	passedParams := []*unstructured.Unstructured{}
 	numCompiles := 0
 
-	compiler.RegisterDefinition(denyPolicy, func(vap *v1alpha1.ValidatingAdmissionPolicy) (Validator, error) {
+	compiler.RegisterDefinition(denyPolicy, func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
 		datalock.Lock()
 		numCompiles += 1
 		datalock.Unlock()
 
-		return ValidatorFunc(func(a admission.Attributes, params *unstructured.Unstructured) ([]PolicyDecision, error) {
-			datalock.Lock()
-			passedParams = append(passedParams, params)
-			datalock.Unlock()
-
-			// Policy always denies
-			return []PolicyDecision{
-				{
-					Kind:    Deny,
-					Message: "Denied",
-				},
-			}, nil
-		}), nil
+		return testValidator{}
 	}, nil)
 
 	require.NoError(t, paramTracker.Add(fakeParams))
@@ -781,16 +761,15 @@ func TestRemoveDefinition(t *testing.T) {
 			testContext, controller,
 			fakeParams, denyBinding, denyPolicy))
 
-	record := attributeRecord(nil, denyBinding, admission.Create)
+	record := attributeRecord(nil, fakeParams, admission.Create)
 	require.ErrorContains(t,
 		handler.Validate(
 			testContext,
 			record,
 			&admission.RuntimeObjectInterfaces{},
 		),
-		`{"kind":"Deny","message":"Denied"}`)
+		`Denied`)
 
-	require.Equal(t, []*unstructured.Unstructured{fakeParams}, passedParams)
 	require.NoError(t, tracker.Delete(definitionsGVR, denyPolicy.Namespace, denyPolicy.Name))
 	require.NoError(t, waitForReconcileDeletion(testContext, controller, denyPolicy))
 
@@ -814,27 +793,14 @@ func TestRemoveBinding(t *testing.T) {
 	handler, paramTracker, tracker, controller := setupFakeTest(t, compiler)
 
 	datalock := sync.Mutex{}
-	passedParams := []*unstructured.Unstructured{}
 	numCompiles := 0
 
-	compiler.RegisterDefinition(denyPolicy, func(vap *v1alpha1.ValidatingAdmissionPolicy) (Validator, error) {
+	compiler.RegisterDefinition(denyPolicy, func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
 		datalock.Lock()
 		numCompiles += 1
 		datalock.Unlock()
 
-		return ValidatorFunc(func(a admission.Attributes, params *unstructured.Unstructured) ([]PolicyDecision, error) {
-			datalock.Lock()
-			passedParams = append(passedParams, params)
-			datalock.Unlock()
-
-			// Policy always denies
-			return []PolicyDecision{
-				{
-					Kind:    Deny,
-					Message: "Denied",
-				},
-			}, nil
-		}), nil
+		return testValidator{}
 	}, nil)
 
 	require.NoError(t, paramTracker.Add(fakeParams))
@@ -847,7 +813,7 @@ func TestRemoveBinding(t *testing.T) {
 			testContext, controller,
 			fakeParams, denyBinding, denyPolicy))
 
-	record := attributeRecord(nil, denyBinding, admission.Create)
+	record := attributeRecord(nil, fakeParams, admission.Create)
 
 	require.ErrorContains(t,
 		handler.Validate(
@@ -855,19 +821,11 @@ func TestRemoveBinding(t *testing.T) {
 			record,
 			&admission.RuntimeObjectInterfaces{},
 		),
-		`{"kind":"Deny","message":"Denied"}`)
+		`Denied`)
 
-	require.Equal(t, []*unstructured.Unstructured{fakeParams}, passedParams)
+	//require.Equal(t, []*unstructured.Unstructured{fakeParams}, passedParams)
 	require.NoError(t, tracker.Delete(bindingsGVR, denyBinding.Namespace, denyBinding.Name))
 	require.NoError(t, waitForReconcileDeletion(testContext, controller, denyBinding))
-
-	require.ErrorContains(t, handler.Validate(
-		testContext,
-		// Object is irrelevant/unchecked for this test. Just test that
-		// the evaluator is executed, and returns a denial
-		record,
-		&admission.RuntimeObjectInterfaces{},
-	), `{"decision":{"kind":"Deny","message":"configuration error: no bindings found"}`)
 }
 
 // Shows that an error is surfaced if a paramSource specified in a binding does
@@ -899,14 +857,14 @@ func TestInvalidParamSourceGVK(t *testing.T) {
 
 	err := handler.Validate(
 		testContext,
-		attributeRecord(nil, denyBinding, admission.Create),
+		attributeRecord(nil, fakeParams, admission.Create),
 		&admission.RuntimeObjectInterfaces{},
 	)
 
 	// expect the specific error to be that the param was not found, not that CRD
 	// is not existing
 	require.ErrorContains(t, err,
-		`{"decision":{"kind":"Deny","message":"configuration error: failed to find resource mapping for param source: 'example.com/v1, Kind=BadParamKind'"}`)
+		`admission policy failed with error: failed to find resource referenced by paramKind: 'example.com/v1, Kind=BadParamKind'`)
 
 	close(passedParams)
 	require.Len(t, passedParams, 0)
@@ -927,24 +885,12 @@ func TestInvalidParamSourceInstanceName(t *testing.T) {
 	passedParams := []*unstructured.Unstructured{}
 	numCompiles := 0
 
-	compiler.RegisterDefinition(denyPolicy, func(vap *v1alpha1.ValidatingAdmissionPolicy) (Validator, error) {
+	compiler.RegisterDefinition(denyPolicy, func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
 		datalock.Lock()
 		numCompiles += 1
 		datalock.Unlock()
 
-		return ValidatorFunc(func(a admission.Attributes, params *unstructured.Unstructured) ([]PolicyDecision, error) {
-			datalock.Lock()
-			passedParams = append(passedParams, params)
-			datalock.Unlock()
-
-			// Policy always denies
-			return []PolicyDecision{
-				{
-					Kind:    Deny,
-					Message: "Denied",
-				},
-			}, nil
-		}), nil
+		return testValidator{}
 	}, nil)
 
 	require.NoError(t, tracker.Create(definitionsGVR, denyPolicy, denyPolicy.Namespace))
@@ -958,14 +904,14 @@ func TestInvalidParamSourceInstanceName(t *testing.T) {
 
 	err := handler.Validate(
 		testContext,
-		attributeRecord(nil, denyBinding, admission.Create),
+		attributeRecord(nil, fakeParams, admission.Create),
 		&admission.RuntimeObjectInterfaces{},
 	)
 
 	// expect the specific error to be that the param was not found, not that CRD
 	// is not existing
 	require.ErrorContains(t, err,
-		`{"decision":{"kind":"Deny","message":"configuration error: replicas-test.example.com not found"}`)
+		`admission policy failed with error: replicas-test.example.com not found`)
 	require.Len(t, passedParams, 0)
 }
 
@@ -984,35 +930,22 @@ func TestEmptyParamSource(t *testing.T) {
 	handler, _, tracker, controller := setupFakeTest(t, compiler)
 
 	datalock := sync.Mutex{}
-	passedParams := []*unstructured.Unstructured{}
 	numCompiles := 0
 
 	// Push some fake
 	noParamSourcePolicy := *denyPolicy
 	noParamSourcePolicy.Spec.ParamKind = nil
 
-	compiler.RegisterDefinition(&noParamSourcePolicy, func(vap *v1alpha1.ValidatingAdmissionPolicy) (Validator, error) {
+	compiler.RegisterDefinition(&noParamSourcePolicy, func(vap *v1alpha1.ValidatingAdmissionPolicy) Validator {
 		datalock.Lock()
 		numCompiles += 1
 		datalock.Unlock()
 
-		return ValidatorFunc(func(a admission.Attributes, params *unstructured.Unstructured) ([]PolicyDecision, error) {
-			datalock.Lock()
-			passedParams = append(passedParams, params)
-			datalock.Unlock()
-
-			// Policy always denies
-			return []PolicyDecision{
-				{
-					Kind:    Deny,
-					Message: "Denied",
-				},
-			}, nil
-		}), nil
+		return testValidator{}
 	}, nil)
 
 	require.NoError(t, tracker.Create(definitionsGVR, &noParamSourcePolicy, noParamSourcePolicy.Namespace))
-	require.NoError(t, tracker.Create(bindingsGVR, denyBinding, denyBinding.Namespace))
+	require.NoError(t, tracker.Create(bindingsGVR, denyBindingWithNoParamRef, denyBindingWithNoParamRef.Namespace))
 
 	// Wait for controller to reconcile given objects
 	require.NoError(t,
@@ -1024,11 +957,10 @@ func TestEmptyParamSource(t *testing.T) {
 		testContext,
 		// Object is irrelevant/unchecked for this test. Just test that
 		// the evaluator is executed, and returns a denial
-		attributeRecord(nil, denyBinding, admission.Create),
+		attributeRecord(nil, fakeParams, admission.Create),
 		&admission.RuntimeObjectInterfaces{},
 	)
 
-	require.ErrorContains(t, err, `{"kind":"Deny","message":"Denied"}`)
+	require.ErrorContains(t, err, `Denied`)
 	require.Equal(t, 1, numCompiles)
-	require.Equal(t, []*unstructured.Unstructured{nil}, passedParams)
 }

@@ -18,7 +18,6 @@ package cel
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 
@@ -31,9 +30,13 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/cel/internal/generic"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 )
+
+var _ CELPolicyEvaluator = &celAdmissionController{}
 
 // celAdmissionController is the top-level controller for admission control using CEL
 // it is responsible for watching policy definitions, bindings, and config param CRDs
@@ -46,11 +49,11 @@ type celAdmissionController struct {
 
 	// dynamicclient used to create informers to watch the param crd types
 	dynamicClient dynamic.Interface
-	restMapper    meta.RESTMapper
+	restMapper    meta.RESTMapper // WantsRESTMapper
 
 	// Provided to the policy's Compile function as an injected dependency to
 	// assist with compiling its expressions to CEL
-	objectConverter ValidatorCompiler
+	validatorCompiler ValidatorCompiler
 
 	// Lock which protects:
 	//	- definitionInfo
@@ -76,6 +79,14 @@ type celAdmissionController struct {
 	// All keys must have at least one dependent binding
 	// All binding names MUST exist as a key bindingInfos
 	definitionsToBindings map[string]sets.String
+}
+
+func (c *celAdmissionController) SetExternalKubeInformerFactory(factory informers.SharedInformerFactory) {
+	c.validatorCompiler.SetExternalKubeInformerFactory(factory)
+}
+
+func (c *celAdmissionController) SetExternalKubeClientSet(k kubernetes.Interface) {
+	c.validatorCompiler.SetExternalKubeClientSet(k)
 }
 
 type definitionInfo struct {
@@ -115,7 +126,7 @@ func NewAdmissionController(
 	policyBindingInformer cache.SharedIndexInformer,
 
 	// Injected Dependencies
-	objectConverter ValidatorCompiler,
+	validatorCompiler ValidatorCompiler,
 	restMapper meta.RESTMapper,
 	dynamicClient dynamic.Interface,
 ) CELPolicyEvaluator {
@@ -125,7 +136,7 @@ func NewAdmissionController(
 		paramsCRDControllers:  make(map[v1alpha1.ParamKind]*paramInfo),
 		definitionsToBindings: make(map[string]sets.String),
 		dynamicClient:         dynamicClient,
-		objectConverter:       objectConverter,
+		validatorCompiler:     validatorCompiler,
 		restMapper:            restMapper,
 	}
 
@@ -187,29 +198,34 @@ func (c *celAdmissionController) Validate(
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
-	var allDecisions []PolicyDecisionWithMetadata = nil
+	var deniedDecisions []policyDecisionWithMetadata
 
 	addConfigError := func(err error, definition *v1alpha1.ValidatingAdmissionPolicy, binding *v1alpha1.ValidatingAdmissionPolicyBinding) {
-		wrappedError := fmt.Errorf("configuration error: %w", err)
-
-		// What is default?
-		policy := v1alpha1.Fail
-		if definition.Spec.FailurePolicy != nil {
+		// we always default the FailurePolicy if it is unset and validate it in API level
+		var policy v1alpha1.FailurePolicyType
+		if definition.Spec.FailurePolicy == nil {
+			policy = v1alpha1.Fail
+		} else {
 			policy = *definition.Spec.FailurePolicy
 		}
 
+		// apply FailurePolicy specified in ValidatingAdmissionPolicy, the default would be Fail
 		switch policy {
 		case v1alpha1.Ignore:
-			klog.Info(wrappedError)
+			if binding == nil {
+				klog.Info("ignored ValidatingAdmissionPolicy %w failure, due to FailurePolicy=Ignore. Error: %w", definition.Name, err)
+			} else {
+				klog.Info("ignored ValidatingAdmissionPolicy %w failure for binding %w, due to FailurePolicy=Ignore. Error: %w", definition.Name, binding.Name, err)
+			}
 			return
 		case v1alpha1.Fail:
-			allDecisions = append(allDecisions, PolicyDecisionWithMetadata{
-				PolicyDecision: PolicyDecision{
-					Kind:    Deny,
-					Message: wrappedError.Error(),
+			deniedDecisions = append(deniedDecisions, policyDecisionWithMetadata{
+				policyDecision: policyDecision{
+					kind:    deny,
+					message: fmt.Errorf("admission policy failed with error: %w", err).Error(),
 				},
-				Definition: definition,
-				Binding:    binding,
+				definition: definition,
+				binding:    binding,
 			})
 		default:
 			utilruntime.HandleError(fmt.Errorf("unrecognized failure policy: '%v'", policy))
@@ -217,7 +233,11 @@ func (c *celAdmissionController) Validate(
 	}
 	for definitionNamespacedName, definitionInfo := range c.definitionInfo {
 		definition := definitionInfo.lastReconciledValue
-		if !c.objectConverter.DefinitionMatches(definition, a) {
+		matches, err := c.validatorCompiler.DefinitionMatches(definition, a, o)
+		if err != nil {
+			return err
+		}
+		if !matches {
 			// Policy definition does not match request
 			continue
 		} else if definitionInfo.configurationError != nil {
@@ -228,8 +248,6 @@ func (c *celAdmissionController) Validate(
 
 		dependentBindings := c.definitionsToBindings[definitionNamespacedName]
 		if len(dependentBindings) == 0 {
-			// Definition has no known bindings yet.
-			addConfigError(errors.New("no bindings found"), definition, nil)
 			continue
 		}
 
@@ -238,29 +256,33 @@ func (c *celAdmissionController) Validate(
 			// be a bindingInfo for it
 			bindingInfo := c.bindingInfos[namespacedBindingName]
 			binding := bindingInfo.lastReconciledValue
-			if !c.objectConverter.BindingMatches(binding, a) {
+			matches, err := c.validatorCompiler.BindingMatches(binding, a, o)
+			if err != nil {
+				return err
+			}
+			if !matches {
 				continue
 			}
 
 			var param *unstructured.Unstructured
 
-			// If definition has no paramsource, always provide nil params to
+			// If definition has no paramKind, always provide nil params to
 			// evaluator. If binding specifies a params to use they are ignored.
 			// Done this way so you can configure params before definition is ready.
-			if paramSource := definition.Spec.ParamKind; paramSource != nil {
+			if paramKind := definition.Spec.ParamKind; paramKind != nil {
 				paramRef := binding.Spec.ParamRef
 				if paramRef == nil {
-					addConfigError(fmt.Errorf("paramSource kind `%v` not specified despite being required by policy definition",
-						paramSource.String()), definition, binding)
-					continue
+					// return error if ValidatingAdmissionPolicyBinding is mis-configured
+					return fmt.Errorf("ValidatingAdmissionPolicyBinding '%s' requires to set paramRef since policyName refers to a ValidatingAdmissionPolicy '%s' containing a paramKind: `%v`",
+						binding.Name, definition.Name, paramKind.String())
 				}
 
 				// Find the params referred by the binding by looking its name up
 				// in our informer for its CRD
-				paramInfo, ok := c.paramsCRDControllers[*paramSource]
+				paramInfo, ok := c.paramsCRDControllers[*paramKind]
 				if !ok {
-					addConfigError(fmt.Errorf("paramSource kind `%v` not known",
-						paramSource.String()), definition, binding)
+					addConfigError(fmt.Errorf("paramKind kind `%v` not known",
+						paramKind.String()), definition, binding)
 					continue
 				}
 
@@ -284,11 +306,18 @@ func (c *celAdmissionController) Validate(
 					utilruntime.HandleError(err)
 					continue
 				}
+			} else {
+				paramRef := binding.Spec.ParamRef
+				if paramRef != nil {
+					// return error if ValidatingAdmissionPolicyBinding is mis-configured
+					return fmt.Errorf("paramRef '%s' should be set in ValidatingAdmissionPolicyBinding '%s' since policyName refers to a ValidatingAdmissionPolicy '%s' does not contain a paramKind",
+						paramRef.String(), binding.Name, definition.Name)
+				}
 			}
 
 			if bindingInfo.validator == nil {
 				// Compile policy definition using binding
-				bindingInfo.validator, err = c.objectConverter.Compile(definition, c.restMapper)
+				bindingInfo.validator = c.validatorCompiler.Compile(definition)
 				if err != nil {
 					// compilation error. Apply failure policy
 					wrappedError := fmt.Errorf("failed to compile CEL expression: %w", err)
@@ -298,22 +327,25 @@ func (c *celAdmissionController) Validate(
 				c.bindingInfos[namespacedBindingName] = bindingInfo
 			}
 
-			decisions, err := bindingInfo.validator.Validate(a, param)
+			decisions, err := bindingInfo.validator.Validate(a, o, param)
 			if err != nil {
 				// runtime error. Apply failure policy
 				wrappedError := fmt.Errorf("failed to evaluate CEL expression: %w", err)
 				addConfigError(wrappedError, definition, binding)
 				continue
 			}
+
 			for _, decision := range decisions {
-				switch decision.Kind {
-				case Admit:
-					// Do nothing
-				case Deny:
-					allDecisions = append(allDecisions, PolicyDecisionWithMetadata{
-						Definition:     definition,
-						Binding:        binding,
-						PolicyDecision: decision,
+				switch decision.kind {
+				case admit:
+					if len(decision.message) != 0 {
+						klog.Info("Ignored ValidatingAdmissionPolicy %w failure for binding %w, due to FailurePolicy=Ignore. Error: %w", definition.Name, binding.Name, decision.message)
+					}
+				case deny:
+					deniedDecisions = append(deniedDecisions, policyDecisionWithMetadata{
+						definition:     definition,
+						binding:        binding,
+						policyDecision: decision,
 					})
 				default:
 					// unrecognized decision. ignore
@@ -322,17 +354,20 @@ func (c *celAdmissionController) Validate(
 		}
 	}
 
-	if len(allDecisions) > 0 {
-		return k8serrors.NewConflict(
-			a.GetResource().GroupResource(), a.GetName(),
-			&PolicyError{
-				Decisions: allDecisions,
-			})
+	if len(deniedDecisions) > 0 {
+		return &policyError{
+			deniedDecisions: deniedDecisions,
+		}
 	}
 
 	return nil
 }
+
 func (c *celAdmissionController) HasSynced() bool {
 	return c.policyBindingController.HasSynced() &&
 		c.policyDefinitionsController.HasSynced()
+}
+
+func (c *celAdmissionController) ValidateInitialization() error {
+	return c.validatorCompiler.ValidateInitialization()
 }

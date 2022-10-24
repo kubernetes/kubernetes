@@ -18,28 +18,28 @@ package admission
 
 import (
 	"io/ioutil"
-	"k8s.io/apiserver/pkg/admission/plugin/cel"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/dynamic"
 	"net/http"
 	"time"
-
-	"k8s.io/klog/v2"
 
 	"go.opentelemetry.io/otel/trace"
 
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/cel"
+	"k8s.io/apiserver/pkg/admission/plugin/cel/matching"
 	webhookinit "k8s.io/apiserver/pkg/admission/plugin/webhook/initializer"
+	"k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	egressselector "k8s.io/apiserver/pkg/server/egressselector"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/dynamic"
 	externalinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
+	"k8s.io/klog/v2"
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 )
 
@@ -94,8 +94,8 @@ func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselec
 		var celAdmissionController = cel.NewAdmissionController(
 			c.ExternalInformers.Admissionregistration().V1alpha1().ValidatingAdmissionPolicies().Informer(),
 			c.ExternalInformers.Admissionregistration().V1alpha1().ValidatingAdmissionPolicyBindings().Informer(),
-			// FIXME: integrate here with Jared's work?
-			nil,
+			&cel.CELValidatorCompiler{
+				Matcher: matching.NewMatcher()},
 			discoveryRESTMapper,
 			dynamicClient,
 		)

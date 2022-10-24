@@ -18,37 +18,33 @@ package cel
 
 import (
 	"k8s.io/api/admissionregistration/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/initializer"
 )
 
-// EvaluatorFunc represents the AND of one or more compiled CEL expression's
-// evaluators `params` may be nil if definition does not specify a paramsource
-type ValidatorFunc func(a admission.Attributes, params *unstructured.Unstructured) ([]PolicyDecision, error)
-
-func (f ValidatorFunc) Validate(a admission.Attributes, params *unstructured.Unstructured) ([]PolicyDecision, error) {
-	return f(a, params)
-}
-
+// Validator defines the func used to validate the cel expressions
 type Validator interface {
-	Validate(a admission.Attributes, params *unstructured.Unstructured) ([]PolicyDecision, error)
+	Validate(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object) ([]policyDecision, error)
 }
 
 // ValidatorCompiler is Dependency Injected into the PolicyDefinition's `Compile`
 // function to assist with converting types and values to/from CEL-typed values.
 type ValidatorCompiler interface {
-	// Matches says whether this policy definition matches the provided admission
-	// resource request
-	DefinitionMatches(definition *v1alpha1.ValidatingAdmissionPolicy, a admission.Attributes) bool
+	initializer.WantsExternalKubeInformerFactory
+	initializer.WantsExternalKubeClientSet
+	admission.InitializationValidator
 
 	// Matches says whether this policy definition matches the provided admission
 	// resource request
-	BindingMatches(definition *v1alpha1.ValidatingAdmissionPolicyBinding, a admission.Attributes) bool
+	DefinitionMatches(definition *v1alpha1.ValidatingAdmissionPolicy, a admission.Attributes, o admission.ObjectInterfaces) (bool, error)
 
+	// Matches says whether this policy definition matches the provided admission
+	// resource request
+	BindingMatches(definition *v1alpha1.ValidatingAdmissionPolicyBinding, a admission.Attributes, o admission.ObjectInterfaces) (bool, error)
+
+	// Compile is used for the cel expression compilation
 	Compile(
 		policy *v1alpha1.ValidatingAdmissionPolicy,
-		// Injected RESTMapper to assist with compilation
-		mapper meta.RESTMapper,
-	) (Validator, error)
+	) Validator
 }
