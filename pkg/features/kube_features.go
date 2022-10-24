@@ -495,6 +495,13 @@ const (
 	// Stop auto-generation of secret-based service account tokens.
 	LegacyServiceAccountTokenNoAutoGeneration featuregate.Feature = "LegacyServiceAccountTokenNoAutoGeneration"
 
+	// owner: @zshihang
+	// kep: http://kep.k8s.io/2800
+	// alpha: v1.25
+	//
+	// Enables tracking of secret-based service account tokens usage.
+	LegacyServiceAccountTokenTracking featuregate.Feature = "LegacyServiceAccountTokenTracking"
+
 	// owner: @jinxu
 	// beta: v1.10
 	// stable: v1.25
@@ -931,6 +938,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	KubeletTracing: {Default: false, PreRelease: featuregate.Alpha},
 
 	LegacyServiceAccountTokenNoAutoGeneration: {Default: true, PreRelease: featuregate.Beta},
+
+	LegacyServiceAccountTokenTracking: {Default: false, PreRelease: featuregate.Alpha},
 
 	LocalStorageCapacityIsolation: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
 
