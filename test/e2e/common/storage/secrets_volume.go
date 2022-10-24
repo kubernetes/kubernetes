@@ -439,8 +439,9 @@ var _ = SIGDescribe("Secrets", func() {
 	ginkgo.It("Should fail non-optional pod creation due to secret object does not exist [Slow]", func(ctx context.Context) {
 		volumeMountPath := "/etc/secret-volumes"
 		podName := "pod-secrets-" + string(uuid.NewUUID())
-		err := createNonOptionalSecretPod(ctx, f, volumeMountPath, podName)
-		framework.ExpectError(err, "created pod %q with non-optional secret in namespace %q", podName, f.Namespace.Name)
+		pod := createNonOptionalSecretPod(ctx, f, volumeMountPath, podName)
+		getPod := e2epod.Get(f.ClientSet, pod)
+		gomega.Consistently(ctx, getPod).WithTimeout(f.Timeouts.PodStart).Should(e2epod.BeInPhase(v1.PodPending))
 	})
 
 	// Secret object defined for the pod, If a key is specified which is not present in the secret,
@@ -449,8 +450,9 @@ var _ = SIGDescribe("Secrets", func() {
 	ginkgo.It("Should fail non-optional pod creation due to the key in the secret object does not exist [Slow]", func(ctx context.Context) {
 		volumeMountPath := "/etc/secret-volumes"
 		podName := "pod-secrets-" + string(uuid.NewUUID())
-		err := createNonOptionalSecretPodWithSecret(ctx, f, volumeMountPath, podName)
-		framework.ExpectError(err, "created pod %q with non-optional secret in namespace %q", podName, f.Namespace.Name)
+		pod := createNonOptionalSecretPodWithSecret(ctx, f, volumeMountPath, podName)
+		getPod := e2epod.Get(f.ClientSet, pod)
+		gomega.Consistently(ctx, getPod).WithTimeout(f.Timeouts.PodStart).Should(e2epod.BeInPhase(v1.PodPending))
 	})
 })
 
@@ -606,7 +608,7 @@ func doSecretE2EWithMapping(ctx context.Context, f *framework.Framework, mode *i
 	e2epodoutput.TestContainerOutputRegexp(ctx, f, "consume secrets", pod, 0, expectedOutput)
 }
 
-func createNonOptionalSecretPod(ctx context.Context, f *framework.Framework, volumeMountPath, podName string) error {
+func createNonOptionalSecretPod(ctx context.Context, f *framework.Framework, volumeMountPath, podName string) *v1.Pod {
 	podLogTimeout := e2epod.GetPodSecretUpdateTimeout(ctx, f.ClientSet)
 	containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 	falseValue := false
@@ -651,10 +653,10 @@ func createNonOptionalSecretPod(ctx context.Context, f *framework.Framework, vol
 	}
 	ginkgo.By("Creating the pod")
 	pod = e2epod.NewPodClient(f).Create(ctx, pod)
-	return e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
+	return pod
 }
 
-func createNonOptionalSecretPodWithSecret(ctx context.Context, f *framework.Framework, volumeMountPath, podName string) error {
+func createNonOptionalSecretPodWithSecret(ctx context.Context, f *framework.Framework, volumeMountPath, podName string) *v1.Pod {
 	podLogTimeout := e2epod.GetPodSecretUpdateTimeout(ctx, f.ClientSet)
 	containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 	falseValue := false
@@ -712,5 +714,5 @@ func createNonOptionalSecretPodWithSecret(ctx context.Context, f *framework.Fram
 	}
 	ginkgo.By("Creating the pod")
 	pod = e2epod.NewPodClient(f).Create(ctx, pod)
-	return e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
+	return pod
 }
