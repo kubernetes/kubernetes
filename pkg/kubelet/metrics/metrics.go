@@ -578,6 +578,8 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(StartedHostProcessContainersErrorsTotal)
 		legacyregistry.MustRegister(RunPodSandboxDuration)
 		legacyregistry.MustRegister(RunPodSandboxErrors)
+		legacyregistry.MustRegister(CPUManagerPinningRequestsTotal)
+		legacyregistry.MustRegister(CPUManagerPinningErrorsTotal)
 
 		for _, collector := range collectors {
 			legacyregistry.CustomMustRegister(collector)
@@ -591,11 +593,6 @@ func Register(collectors ...metrics.StableCollector) {
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentHTTPGetHandlers) {
 			legacyregistry.MustRegister(LifecycleHandlerHTTPFallbacks)
-		}
-
-		if utilfeature.DefaultFeatureGate.Enabled(features.CPUManager) {
-			legacyregistry.MustRegister(CPUManagerPinningRequestsTotal)
-			legacyregistry.MustRegister(CPUManagerPinningErrorsTotal)
 		}
 	})
 }

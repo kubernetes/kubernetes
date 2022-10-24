@@ -31,7 +31,6 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
-	cpumanagerstate "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -130,18 +129,6 @@ func waitForContainerRemoval(containerName, podName, podNS string) {
 	}, 2*time.Minute, 1*time.Second).Should(gomega.BeTrue())
 }
 
-func waitForStateFileCleanedUp() {
-	gomega.Eventually(func() bool {
-		restoredState, err := cpumanagerstate.NewCheckpointState("/var/lib/kubelet", "cpu_manager_state", "static", nil)
-		framework.ExpectNoError(err, "failed to create testing cpumanager state instance")
-		assignments := restoredState.GetCPUAssignments()
-		if len(assignments) == 0 {
-			return true
-		}
-		return false
-	}, 2*time.Minute, 1*time.Second).Should(gomega.BeTrue())
-}
-
 func isHTEnabled() bool {
 	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"Thread(s) per core:\" | cut -d \":\" -f 2").Output()
 	framework.ExpectNoError(err)
@@ -187,7 +174,6 @@ func getCoreSiblingList(cpuRes int64) string {
 
 type cpuManagerKubeletArguments struct {
 	policyName              string
-	enableCPUManager        bool
 	enableCPUManagerOptions bool
 	reservedSystemCPUs      cpuset.CPUSet
 	options                 map[string]string
@@ -198,8 +184,6 @@ func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, ku
 	if newCfg.FeatureGates == nil {
 		newCfg.FeatureGates = make(map[string]bool)
 	}
-
-	newCfg.FeatureGates["CPUManager"] = kubeletArguments.enableCPUManager
 
 	newCfg.FeatureGates["CPUManagerPolicyOptions"] = kubeletArguments.enableCPUManagerOptions
 	newCfg.FeatureGates["CPUManagerPolicyBetaOptions"] = kubeletArguments.enableCPUManagerOptions
@@ -550,7 +534,6 @@ func runCPUManagerTests(f *framework.Framework) {
 		// Enable CPU Manager in the kubelet.
 		newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 			policyName:         string(cpumanager.PolicyStatic),
-			enableCPUManager:   true,
 			reservedSystemCPUs: cpuset.CPUSet{},
 		})
 		updateKubeletConfig(f, newCfg, true)
@@ -611,30 +594,6 @@ func runCPUManagerTests(f *framework.Framework) {
 		err = e2epod.NewPodClient(f).MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
 		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 			pod.Spec.Containers[0].Name, pod.Name)
-
-		ginkgo.By("disable cpu manager in kubelet")
-		newCfg = configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-			policyName:         string(cpumanager.PolicyStatic),
-			enableCPUManager:   false,
-			reservedSystemCPUs: cpuset.CPUSet{},
-		})
-		updateKubeletConfig(f, newCfg, false)
-
-		ginkgo.By("by deleting the pod and waiting for container removal")
-		deletePods(f, []string{pod.Name})
-		waitForContainerRemoval(pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
-
-		ginkgo.By("enable cpu manager in kubelet without delete state file")
-		newCfg = configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-			policyName:         string(cpumanager.PolicyStatic),
-			enableCPUManager:   true,
-			reservedSystemCPUs: cpuset.CPUSet{},
-		})
-		updateKubeletConfig(f, newCfg, false)
-
-		ginkgo.By("wait for the deleted pod to be cleaned up from the state file")
-		waitForStateFileCleanedUp()
-		ginkgo.By("the deleted pod has already been deleted from the state file")
 	})
 
 	ginkgo.It("should assign CPUs as expected with enhanced policy based on strict SMT alignment", func() {
@@ -662,7 +621,6 @@ func runCPUManagerTests(f *framework.Framework) {
 		newCfg := configureCPUManagerInKubelet(oldCfg,
 			&cpuManagerKubeletArguments{
 				policyName:              string(cpumanager.PolicyStatic),
-				enableCPUManager:        true,
 				reservedSystemCPUs:      cpuset.NewCPUSet(0),
 				enableCPUManagerOptions: true,
 				options:                 cpuPolicyOptions,
