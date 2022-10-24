@@ -304,11 +304,11 @@ func TestShortenSuccess(t *testing.T) {
 }
 
 func TestRedactSecrets(t *testing.T) {
-	certFile, _ := ioutil.TempFile("", "")
+	certFile, _ := os.CreateTemp("", "")
 	defer os.Remove(certFile.Name())
-	keyFile, _ := ioutil.TempFile("", "")
+	keyFile, _ := os.CreateTemp("", "")
 	defer os.Remove(keyFile.Name())
-	caFile, _ := ioutil.TempFile("", "")
+	caFile, _ := os.CreateTemp("", "")
 	defer os.Remove(caFile.Name())
 
 	certData := "cert"
