@@ -33,9 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
@@ -1005,14 +1003,11 @@ func (m *ManagerImpl) GetDevices(podUID, containerName string) ResourceDeviceIns
 // depending on whether the node has been recreated. Absence of the checkpoint file strongly indicates the node
 // has been recreated.
 func (m *ManagerImpl) ShouldResetExtendedResourceCapacity() bool {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DevicePlugins) {
-		checkpoints, err := m.checkpointManager.ListCheckpoints()
-		if err != nil {
-			return false
-		}
-		return len(checkpoints) == 0
+	checkpoints, err := m.checkpointManager.ListCheckpoints()
+	if err != nil {
+		return false
 	}
-	return false
+	return len(checkpoints) == 0
 }
 
 func (m *ManagerImpl) setPodPendingAdmission(pod *v1.Pod) {
