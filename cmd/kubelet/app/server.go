@@ -32,16 +32,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coreos/go-systemd/v22/daemon"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/apiserver/pkg/util/daemon"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	otelsdkresource "go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/semconv/v1.12.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -782,8 +782,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		return nil
 	}
 
-	// If systemd is used, notify it that we have started
-	go daemon.SdNotify(false, "READY=1")
+	daemon.AsyncSdNotify()
 
 	select {
 	case <-done:

@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	systemd "github.com/coreos/go-systemd/v22/daemon"
+	"k8s.io/apiserver/pkg/util/daemon"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -641,9 +641,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}, shutdow
 
 	s.RunPostStartHooks(stopCh)
 
-	if _, err := systemd.SdNotify(true, "READY=1\n"); err != nil {
-		klog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
-	}
+	daemon.AsyncSdNotify()
 
 	return stoppedCh, listenerStoppedCh, nil
 }
