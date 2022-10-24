@@ -910,6 +910,7 @@ name | architectures
 - EndpointSlices marked for deletion are now ignored during reconciliation. ([#110484](https://github.com/kubernetes/kubernetes/pull/110484), [@aryan9600](https://github.com/aryan9600)) [SIG Apps and Network]
 - Fixed a kubelet issue that could result in invalid pod status updates to be sent to the api-server where pods would be reported in a terminal phase but also report a ready condition of true in some cases. ([#110479](https://github.com/kubernetes/kubernetes/pull/110479), [@bobbypage](https://github.com/bobbypage)) [SIG Node and Testing]
 - Pods will now post their readiness during termination. ([#110416](https://github.com/kubernetes/kubernetes/pull/110416), [@aojea](https://github.com/aojea)) [SIG Network, Node and Testing]
+- The pod phase lifecycle guarantees that terminal Pods, those whose states are Unready or Succeeded, can not regress and will have all container stopped. Hence, terminal Pods will never be reachable and should not publish their IP addresses on the Endpoints or EndpointSlices, independently of the Service TolerateUnready option. ([#110258](https://github.com/kubernetes/kubernetes/pull/110258), [@robscott](https://github.com/robscott)) [SIG Apps, Network, Node and Testing]
 
 ## Dependencies
 
