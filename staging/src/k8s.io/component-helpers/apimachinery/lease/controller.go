@@ -54,6 +54,7 @@ type controller struct {
 	client                     clientset.Interface
 	leaseClient                coordclientset.LeaseInterface
 	holderIdentity             string
+	leaseName                  string
 	leaseNamespace             string
 	leaseDurationSeconds       int32
 	renewInterval              time.Duration
@@ -80,6 +81,28 @@ func NewController(clock clock.Clock, client clientset.Interface, holderIdentity
 		client:                     client,
 		leaseClient:                leaseClient,
 		holderIdentity:             holderIdentity,
+		leaseName:                  holderIdentity,
+		leaseNamespace:             leaseNamespace,
+		leaseDurationSeconds:       leaseDurationSeconds,
+		renewInterval:              renewInterval,
+		clock:                      clock,
+		onRepeatedHeartbeatFailure: onRepeatedHeartbeatFailure,
+		newLeasePostProcessFunc:    newLeasePostProcessFunc,
+	}
+}
+
+// NewControllerWithLeaseName is a copy of NewController but accepts a leaseName parameter.
+// Use this constructor in cases when the lease name and holder identity should be different.
+func NewControllerWithLeaseName(clock clock.Clock, client clientset.Interface, holderIdentity string, leaseDurationSeconds int32, onRepeatedHeartbeatFailure func(), renewInterval time.Duration, leaseName, leaseNamespace string, newLeasePostProcessFunc ProcessLeaseFunc) Controller {
+	var leaseClient coordclientset.LeaseInterface
+	if client != nil {
+		leaseClient = client.CoordinationV1().Leases(leaseNamespace)
+	}
+	return &controller{
+		client:                     client,
+		leaseClient:                leaseClient,
+		holderIdentity:             holderIdentity,
+		leaseName:                  leaseName,
 		leaseNamespace:             leaseNamespace,
 		leaseDurationSeconds:       leaseDurationSeconds,
 		renewInterval:              renewInterval,
@@ -208,7 +231,7 @@ func (c *controller) newLease(base *coordinationv1.Lease) (*coordinationv1.Lease
 	if base == nil {
 		lease = &coordinationv1.Lease{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      c.holderIdentity,
+				Name:      c.leaseName,
 				Namespace: c.leaseNamespace,
 			},
 			Spec: coordinationv1.LeaseSpec{
