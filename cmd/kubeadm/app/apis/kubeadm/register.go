@@ -39,6 +39,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&InitConfiguration{},
 		&ClusterConfiguration{},
 		&JoinConfiguration{},
+		&ResetConfiguration{},
 	)
 	return nil
 }

@@ -33,6 +33,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&ClusterConfiguration{}, func(obj interface{}) { SetObjectDefaults_ClusterConfiguration(obj.(*ClusterConfiguration)) })
 	scheme.AddTypeDefaultingFunc(&InitConfiguration{}, func(obj interface{}) { SetObjectDefaults_InitConfiguration(obj.(*InitConfiguration)) })
 	scheme.AddTypeDefaultingFunc(&JoinConfiguration{}, func(obj interface{}) { SetObjectDefaults_JoinConfiguration(obj.(*JoinConfiguration)) })
+	scheme.AddTypeDefaultingFunc(&ResetConfiguration{}, func(obj interface{}) { SetObjectDefaults_ResetConfiguration(obj.(*ResetConfiguration)) })
 	return nil
 }
 
@@ -90,4 +91,8 @@ func SetObjectDefaults_JoinConfiguration(in *JoinConfiguration) {
 		SetDefaults_JoinControlPlane(in.ControlPlane)
 		SetDefaults_APIEndpoint(&in.ControlPlane.LocalAPIEndpoint)
 	}
+}
+
+func SetObjectDefaults_ResetConfiguration(in *ResetConfiguration) {
+	SetDefaults_ResetConfiguration(in)
 }

@@ -655,3 +655,11 @@ func ValidateImageRepository(imageRepository string, fldPath *field.Path) field.
 
 	return allErrs
 }
+
+// ValidateResetConfiguration validates a ResetConfiguration object and collects all encountered errors
+func ValidateResetConfiguration(c *kubeadm.ResetConfiguration) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateSocketPath(c.CRISocket, field.NewPath("criSocket"))...)
+	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificatesDir"))...)
+	return allErrs
+}

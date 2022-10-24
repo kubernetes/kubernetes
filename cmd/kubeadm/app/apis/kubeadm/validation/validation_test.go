@@ -1323,3 +1323,22 @@ func TestValidateImageRepository(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateAbsolutePath(t *testing.T) {
+	var tests = []struct {
+		name           string
+		path           string
+		expectedErrors bool
+	}{
+		{name: "valid absolute path", path: "/etc/cert/dir", expectedErrors: false},
+		{name: "relative path", path: "./tmp", expectedErrors: true},
+		{name: "invalid path", path: "foo..", expectedErrors: true},
+	}
+	for _, tc := range tests {
+		actual := ValidateAbsolutePath(tc.path, field.NewPath("certificatesDir"))
+		actualErrors := len(actual) > 0
+		if actualErrors != tc.expectedErrors {
+			t.Errorf("error: validate absolute path: %q\n\texpected: %t\n\t  actual: %t", tc.path, tc.expectedErrors, actualErrors)
+		}
+	}
+}

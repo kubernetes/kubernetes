@@ -353,6 +353,9 @@ const (
 	// JoinConfigurationKind is the string kind value for the JoinConfiguration struct
 	JoinConfigurationKind = "JoinConfiguration"
 
+	// ResetConfigurationKind is the string kind value for the ResetConfiguration struct
+	ResetConfigurationKind = "ResetConfiguration"
+
 	// YAMLDocumentSeparator is the separator for YAML documents
 	// TODO: Find a better place for this constant
 	YAMLDocumentSeparator = "---\n"
