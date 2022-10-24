@@ -26,6 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	pvcutil "k8s.io/kubernetes/pkg/api/persistentvolumeclaim"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
@@ -139,7 +140,11 @@ func (statefulSetStrategy) Validate(ctx context.Context, obj runtime.Object) fie
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (statefulSetStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
 	newStatefulSet := obj.(*apps.StatefulSet)
-	return pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newStatefulSet.Spec.Template, nil)
+	warnings := pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newStatefulSet.Spec.Template, nil)
+	for i, pvc := range newStatefulSet.Spec.VolumeClaimTemplates {
+		warnings = append(warnings, pvcutil.GetWarningsForPersistentVolumeClaimSpec(field.NewPath("spec", "volumeClaimTemplates").Index(i), pvc.Spec)...)
+	}
+	return warnings
 }
 
 // Canonicalize normalizes the object after validation.
@@ -168,6 +173,10 @@ func (statefulSetStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtim
 	if newStatefulSet.Generation != oldStatefulSet.Generation {
 		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newStatefulSet.Spec.Template, &oldStatefulSet.Spec.Template)
 	}
+	for i, pvc := range newStatefulSet.Spec.VolumeClaimTemplates {
+		warnings = append(warnings, pvcutil.GetWarningsForPersistentVolumeClaimSpec(field.NewPath("spec", "volumeClaimTemplates").Index(i).Child("Spec"), pvc.Spec)...)
+	}
+
 	return warnings
 }
 

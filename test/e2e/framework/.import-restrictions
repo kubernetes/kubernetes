@@ -8,6 +8,7 @@ rules:
       - k8s.io/kubernetes/pkg/api/v1/service
       - k8s.io/kubernetes/pkg/api/pod
       - k8s.io/kubernetes/pkg/api/node
+      - k8s.io/kubernetes/pkg/api/persistentvolumeclaim
       - k8s.io/kubernetes/pkg/apis/apps
       - k8s.io/kubernetes/pkg/apis/apps/validation
       - k8s.io/kubernetes/pkg/apis/autoscaling

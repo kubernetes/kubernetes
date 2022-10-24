@@ -86,7 +86,7 @@ func (persistentvolumeclaimStrategy) Validate(ctx context.Context, obj runtime.O
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (persistentvolumeclaimStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return nil
+	return pvcutil.GetWarningsForPersistentVolumeClaim(obj.(*api.PersistentVolumeClaim))
 }
 
 // Canonicalize normalizes the object after validation.
@@ -128,7 +128,7 @@ func (persistentvolumeclaimStrategy) ValidateUpdate(ctx context.Context, obj, ol
 
 // WarningsOnUpdate returns warnings for the given update.
 func (persistentvolumeclaimStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	return pvcutil.GetWarningsForPersistentVolumeClaim(obj.(*api.PersistentVolumeClaim))
 }
 
 func (persistentvolumeclaimStrategy) AllowUnconditionalUpdate() bool {
