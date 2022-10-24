@@ -22,10 +22,10 @@ import (
 	"fmt"
 	"sync"
 
+	"k8s.io/api/admissionregistration/v1alpha1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
@@ -41,8 +41,8 @@ type celAdmissionController struct {
 	// Context under which the controller runs
 	runningContext context.Context
 
-	policyDefinitionsController generic.Controller[PolicyDefinition]
-	policyBindingController     generic.Controller[PolicyBinding]
+	policyDefinitionsController generic.Controller[*v1alpha1.ValidatingAdmissionPolicy]
+	policyBindingController     generic.Controller[*v1alpha1.ValidatingAdmissionPolicyBinding]
 
 	// dynamicclient used to create informers to watch the param crd types
 	dynamicClient dynamic.Interface
@@ -50,7 +50,7 @@ type celAdmissionController struct {
 
 	// Provided to the policy's Compile function as an injected dependency to
 	// assist with compiling its expressions to CEL
-	objectConverter ObjectConverter
+	objectConverter ValidatorCompiler
 
 	// Lock which protects:
 	//	- definitionInfo
@@ -61,7 +61,7 @@ type celAdmissionController struct {
 	mutex sync.RWMutex
 
 	// controller and metadata
-	paramsCRDControllers map[schema.GroupVersionKind]*paramInfo
+	paramsCRDControllers map[v1alpha1.ParamKind]*paramInfo
 
 	// Index for each definition namespace/name, contains all binding
 	// namespace/names known to exist for that definition
@@ -86,16 +86,16 @@ type definitionInfo struct {
 
 	// Last value seen by this controller to be used in policy enforcement
 	// May not be nil
-	lastReconciledValue PolicyDefinition
+	lastReconciledValue *v1alpha1.ValidatingAdmissionPolicy
 }
 
 type bindingInfo struct {
-	// Compiled CEL expression turned into an evaluator
-	evaluator EvaluatorFunc
+	// Compiled CEL expression turned into an validator
+	validator Validator
 
 	// Last value seen by this controller to be used in policy enforcement
 	// May not be nil
-	lastReconciledValue PolicyBinding
+	lastReconciledValue *v1alpha1.ValidatingAdmissionPolicyBinding
 }
 
 type paramInfo struct {
@@ -115,14 +115,14 @@ func NewAdmissionController(
 	policyBindingInformer cache.SharedIndexInformer,
 
 	// Injected Dependencies
-	objectConverter ObjectConverter,
+	objectConverter ValidatorCompiler,
 	restMapper meta.RESTMapper,
 	dynamicClient dynamic.Interface,
 ) CELPolicyEvaluator {
 	c := &celAdmissionController{
 		definitionInfo:        make(map[string]*definitionInfo),
 		bindingInfos:          make(map[string]*bindingInfo),
-		paramsCRDControllers:  make(map[schema.GroupVersionKind]*paramInfo),
+		paramsCRDControllers:  make(map[v1alpha1.ParamKind]*paramInfo),
 		definitionsToBindings: make(map[string]sets.String),
 		dynamicClient:         dynamicClient,
 		objectConverter:       objectConverter,
@@ -130,7 +130,7 @@ func NewAdmissionController(
 	}
 
 	c.policyDefinitionsController = generic.NewController(
-		generic.NewInformer[PolicyDefinition](policyDefinitionsInformer, NewPolicyFrom),
+		generic.NewInformer[*v1alpha1.ValidatingAdmissionPolicy](policyDefinitionsInformer),
 		c.reconcilePolicyDefinition,
 		generic.ControllerOptions{
 			Workers: 1,
@@ -138,7 +138,7 @@ func NewAdmissionController(
 		},
 	)
 	c.policyBindingController = generic.NewController(
-		generic.NewInformer[PolicyBinding](policyBindingInformer, NewBindingFrom),
+		generic.NewInformer[*v1alpha1.ValidatingAdmissionPolicyBinding](policyBindingInformer),
 		c.reconcilePolicyBinding,
 		generic.ControllerOptions{
 			Workers: 1,
@@ -189,13 +189,20 @@ func (c *celAdmissionController) Validate(
 
 	var allDecisions []PolicyDecisionWithMetadata = nil
 
-	addConfigError := func(err error, definition PolicyDefinition, binding PolicyBinding) {
+	addConfigError := func(err error, definition *v1alpha1.ValidatingAdmissionPolicy, binding *v1alpha1.ValidatingAdmissionPolicyBinding) {
 		wrappedError := fmt.Errorf("configuration error: %w", err)
-		switch p := definition.GetFailurePolicy(); p {
-		case Ignore:
+
+		// What is default?
+		policy := v1alpha1.Fail
+		if definition.Spec.FailurePolicy != nil {
+			policy = *definition.Spec.FailurePolicy
+		}
+
+		switch policy {
+		case v1alpha1.Ignore:
 			klog.Info(wrappedError)
 			return
-		case Fail:
+		case v1alpha1.Fail:
 			allDecisions = append(allDecisions, PolicyDecisionWithMetadata{
 				PolicyDecision: PolicyDecision{
 					Kind:    Deny,
@@ -205,12 +212,12 @@ func (c *celAdmissionController) Validate(
 				Binding:    binding,
 			})
 		default:
-			utilruntime.HandleError(fmt.Errorf("unrecognized failure policy: '%v'", p))
+			utilruntime.HandleError(fmt.Errorf("unrecognized failure policy: '%v'", policy))
 		}
 	}
 	for definitionNamespacedName, definitionInfo := range c.definitionInfo {
 		definition := definitionInfo.lastReconciledValue
-		if !definition.Matches(a) {
+		if !c.objectConverter.DefinitionMatches(definition, a) {
 			// Policy definition does not match request
 			continue
 		} else if definitionInfo.configurationError != nil {
@@ -231,7 +238,7 @@ func (c *celAdmissionController) Validate(
 			// be a bindingInfo for it
 			bindingInfo := c.bindingInfos[namespacedBindingName]
 			binding := bindingInfo.lastReconciledValue
-			if !binding.Matches(a) {
+			if !c.objectConverter.BindingMatches(binding, a) {
 				continue
 			}
 
@@ -240,8 +247,13 @@ func (c *celAdmissionController) Validate(
 			// If definition has no paramsource, always provide nil params to
 			// evaluator. If binding specifies a params to use they are ignored.
 			// Done this way so you can configure params before definition is ready.
-			if paramSource := definition.GetParamSource(); paramSource != nil {
-				paramsNamespace, paramsName := binding.GetTargetParams()
+			if paramSource := definition.Spec.ParamKind; paramSource != nil {
+				paramRef := binding.Spec.ParamRef
+				if paramRef == nil {
+					addConfigError(fmt.Errorf("paramSource kind `%v` not specified despite being required by policy definition",
+						paramSource.String()), definition, binding)
+					continue
+				}
 
 				// Find the params referred by the binding by looking its name up
 				// in our informer for its CRD
@@ -252,10 +264,10 @@ func (c *celAdmissionController) Validate(
 					continue
 				}
 
-				if len(paramsNamespace) == 0 {
-					param, err = paramInfo.controller.Informer().Get(paramsName)
+				if len(paramRef.Namespace) == 0 {
+					param, err = paramInfo.controller.Informer().Get(paramRef.Name)
 				} else {
-					param, err = paramInfo.controller.Informer().Namespaced(paramsNamespace).Get(paramsName)
+					param, err = paramInfo.controller.Informer().Namespaced(paramRef.Namespace).Get(paramRef.Name)
 				}
 
 				if err != nil {
@@ -274,9 +286,9 @@ func (c *celAdmissionController) Validate(
 				}
 			}
 
-			if bindingInfo.evaluator == nil {
+			if bindingInfo.validator == nil {
 				// Compile policy definition using binding
-				bindingInfo.evaluator, err = definition.Compile(c.objectConverter, c.restMapper)
+				bindingInfo.validator, err = c.objectConverter.Compile(definition, c.restMapper)
 				if err != nil {
 					// compilation error. Apply failure policy
 					wrappedError := fmt.Errorf("failed to compile CEL expression: %w", err)
@@ -286,7 +298,7 @@ func (c *celAdmissionController) Validate(
 				c.bindingInfos[namespacedBindingName] = bindingInfo
 			}
 
-			decisions, err := bindingInfo.evaluator(a, param)
+			decisions, err := bindingInfo.validator.Validate(a, param)
 			if err != nil {
 				// runtime error. Apply failure policy
 				wrappedError := fmt.Errorf("failed to evaluate CEL expression: %w", err)

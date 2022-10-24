@@ -18,6 +18,9 @@ package cel
 
 import (
 	"fmt"
+	"strings"
+	"sync"
+
 	cel_go "github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
@@ -29,8 +32,6 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	v1 "k8s.io/client-go/listers/core/v1"
-	"strings"
-	"sync"
 )
 
 type MyContext struct {
@@ -78,7 +79,7 @@ func (a *validationActivation) Parent() interpreter.Activation {
 	return nil
 }
 
-func (p ValidatingAdmissionPolicyDefinition) Compile(objectConverter ObjectConverter, mapper meta.RESTMapper) (EvaluatorFunc, error) {
+func (p ValidatingAdmissionPolicyDefinition) Compile(objectConverter ValidatorCompiler, mapper meta.RESTMapper) (EvaluatorFunc, error) {
 	if len(p.Spec.Validations) == 0 {
 		return nil, nil
 	}

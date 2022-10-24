@@ -144,7 +144,7 @@ func setupTest(ctx context.Context, customReconciler func(string, string, runtim
 	}
 
 	myController := generic.NewController(
-		generic.NewInformer[*unstructured.Unstructured](informer, nil),
+		generic.NewInformer[*unstructured.Unstructured](informer),
 		reconciler,
 		generic.ControllerOptions{},
 	)

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/api/admissionregistration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,7 +31,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func (c *celAdmissionController) reconcilePolicyDefinition(namespace, name string, definition PolicyDefinition) error {
+func (c *celAdmissionController) reconcilePolicyDefinition(namespace, name string, definition *v1alpha1.ValidatingAdmissionPolicy) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -43,15 +44,15 @@ func (c *celAdmissionController) reconcilePolicyDefinition(namespace, name strin
 		c.definitionInfo[namespacedName] = info
 	}
 
-	var paramSource *schema.GroupVersionKind
+	var paramSource *v1alpha1.ParamKind
 	if definition != nil {
-		paramSource = definition.GetParamSource()
+		paramSource = definition.Spec.ParamKind
 	}
 
 	// If param source has changed, remove definition as dependent of old params
 	// If there are no more dependents of old param, stop and clean up controller
-	if info.lastReconciledValue != nil && info.lastReconciledValue.GetParamSource() != nil {
-		oldParamSource := *info.lastReconciledValue.GetParamSource()
+	if info.lastReconciledValue != nil && info.lastReconciledValue.Spec.ParamKind != nil {
+		oldParamSource := *info.lastReconciledValue.Spec.ParamKind
 
 		// If we are:
 		//	- switching from having a param to not having a param (includes deletion)
@@ -72,7 +73,7 @@ func (c *celAdmissionController) reconcilePolicyDefinition(namespace, name strin
 	// definition has changed.
 	for key := range c.definitionsToBindings[namespacedName] {
 		bindingInfo := c.bindingInfos[key]
-		bindingInfo.evaluator = nil
+		bindingInfo.validator = nil
 		c.bindingInfos[key] = bindingInfo
 	}
 
@@ -91,12 +92,29 @@ func (c *celAdmissionController) reconcilePolicyDefinition(namespace, name strin
 	}
 
 	// find GVR for params
-	paramsGVR, err := c.restMapper.RESTMapping(paramSource.GroupKind(), paramSource.Version)
+	// Parse param source into a GVK
+
+	paramSourceGV, err := schema.ParseGroupVersion(paramSource.APIVersion)
 	if err != nil {
 		// Failed to resolve. Return error so we retry again (rate limited)
 		// Save a record of this definition with an evaluator that unconditionally
 		//
-		info.configurationError = fmt.Errorf("failed to find resource for param source: '%v'", paramSource.String())
+		info.configurationError = fmt.Errorf("failed to parsed groupversion for param source: '%v'", paramSource.String())
+
+		// Return nil, since this error cannot be resolved by waiting more time
+		return nil
+	}
+
+	paramsGVR, err := c.restMapper.RESTMapping(schema.GroupKind{
+		Group: paramSourceGV.Group,
+		Kind:  paramSource.Kind,
+	}, paramSourceGV.Version)
+
+	if err != nil {
+		// Failed to resolve. Return error so we retry again (rate limited)
+		// Save a record of this definition with an evaluator that unconditionally
+		//
+		info.configurationError = fmt.Errorf("failed to find resource mapping for param source: '%v'", paramSourceGV.WithKind(paramSource.Kind))
 		return info.configurationError
 	}
 
@@ -115,7 +133,7 @@ func (c *celAdmissionController) reconcilePolicyDefinition(namespace, name strin
 		)
 
 		controller := generic.NewController(
-			generic.NewInformer[*unstructured.Unstructured](informer.Informer(), nil),
+			generic.NewInformer[*unstructured.Unstructured](informer.Informer()),
 			c.reconcileParams,
 			generic.ControllerOptions{
 				Workers: 1,
@@ -136,7 +154,7 @@ func (c *celAdmissionController) reconcilePolicyDefinition(namespace, name strin
 	return nil
 }
 
-func (c *celAdmissionController) reconcilePolicyBinding(namespace, name string, binding PolicyBinding) error {
+func (c *celAdmissionController) reconcilePolicyBinding(namespace, name string, binding *v1alpha1.ValidatingAdmissionPolicyBinding) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -152,13 +170,15 @@ func (c *celAdmissionController) reconcilePolicyBinding(namespace, name string, 
 
 	oldNamespacedDefinitionName := ""
 	if info.lastReconciledValue != nil {
-		oldefinitionNamespace, oldefinitionName := info.lastReconciledValue.GetTargetDefinition()
+		// All validating policies are cluster-scoped so have empty namespace
+		oldefinitionNamespace, oldefinitionName := "", info.lastReconciledValue.Spec.PolicyName
 		oldNamespacedDefinitionName = oldefinitionNamespace + "/" + oldefinitionName
 	}
 
 	namespacedDefinitionName := ""
 	if binding != nil {
-		newDefinitionNamespace, newDefinitionName := binding.GetTargetDefinition()
+		// All validating policies are cluster-scoped so have empty namespace
+		newDefinitionNamespace, newDefinitionName := "", binding.Spec.PolicyName
 		namespacedDefinitionName = newDefinitionNamespace + "/" + newDefinitionName
 	}
 
@@ -189,7 +209,7 @@ func (c *celAdmissionController) reconcilePolicyBinding(namespace, name string, 
 	}
 
 	// Remove compiled template for old binding
-	info.evaluator = nil
+	info.validator = nil
 	info.lastReconciledValue = binding
 	return nil
 }

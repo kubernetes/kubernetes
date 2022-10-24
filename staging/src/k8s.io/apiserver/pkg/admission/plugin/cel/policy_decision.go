@@ -19,6 +19,8 @@ package cel
 import (
 	"encoding/json"
 	"fmt"
+
+	"k8s.io/api/admissionregistration/v1alpha1"
 )
 
 type PolicyDecisionKind string
@@ -35,8 +37,8 @@ type PolicyDecision struct {
 
 type PolicyDecisionWithMetadata struct {
 	PolicyDecision `json:"decision"`
-	Definition     PolicyDefinition `json:"definition"`
-	Binding        PolicyBinding    `json:"binding"`
+	Definition     *v1alpha1.ValidatingAdmissionPolicy        `json:"definition"`
+	Binding        *v1alpha1.ValidatingAdmissionPolicyBinding `json:"binding"`
 }
 
 type PolicyError struct {
