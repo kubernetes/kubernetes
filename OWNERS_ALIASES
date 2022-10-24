@@ -183,6 +183,7 @@ aliases:
   # - wgliang
 
   sig-cli-maintainers:
+    - ardaguclu
     - apelisse
     - brianpursley
     - deads2k
@@ -200,8 +201,8 @@ aliases:
   # - monopole
   # - smarterclayton
   sig-cli-reviewers:
+    - ardaguclu
     - brianpursley
-    - dougsland
     - eddiezane
     - KnVerey
     - seans3
