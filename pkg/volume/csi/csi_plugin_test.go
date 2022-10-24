@@ -159,57 +159,6 @@ func TestPluginGetPluginName(t *testing.T) {
 	}
 }
 
-func TestPluginGetFSGroupPolicy(t *testing.T) {
-	defaultPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
-	testCases := []struct {
-		name                  string
-		defined               bool
-		expectedFSGroupPolicy storage.FSGroupPolicy
-	}{
-		{
-			name:                  "no FSGroupPolicy defined, expect default",
-			defined:               false,
-			expectedFSGroupPolicy: storage.ReadWriteOnceWithFSTypeFSGroupPolicy,
-		},
-		{
-			name:                  "File FSGroupPolicy defined, expect File",
-			defined:               true,
-			expectedFSGroupPolicy: storage.FileFSGroupPolicy,
-		},
-		{
-			name:                  "None FSGroupPolicy defined, expected None",
-			defined:               true,
-			expectedFSGroupPolicy: storage.NoneFSGroupPolicy,
-		},
-	}
-	for _, tc := range testCases {
-		t.Logf("testing: %s", tc.name)
-		// Define the driver and set the FSGroupPolicy
-		driver := getTestCSIDriver(testDriver, nil, nil, nil)
-		if tc.defined {
-			driver.Spec.FSGroupPolicy = &tc.expectedFSGroupPolicy
-		} else {
-			driver.Spec.FSGroupPolicy = &defaultPolicy
-		}
-
-		// Create the client and register the resources
-		fakeClient := fakeclient.NewSimpleClientset(driver)
-		plug, tmpDir := newTestPlugin(t, fakeClient)
-		defer os.RemoveAll(tmpDir)
-		registerFakePlugin(testDriver, "endpoint", []string{"1.3.0"}, t)
-
-		// Check to see if we can obtain the CSIDriver, along with examining its FSGroupPolicy
-		fsGroup, err := plug.getFSGroupPolicy(testDriver)
-		if err != nil {
-			t.Fatalf("Error attempting to obtain FSGroupPolicy: %v", err)
-		}
-		if fsGroup != *driver.Spec.FSGroupPolicy {
-			t.Fatalf("FSGroupPolicy doesn't match expected value: %v, %v", fsGroup, tc.expectedFSGroupPolicy)
-		}
-	}
-
-}
-
 func TestPluginGetVolumeName(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)

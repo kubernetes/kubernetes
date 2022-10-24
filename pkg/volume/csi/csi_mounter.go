@@ -67,7 +67,6 @@ type csiMountMgr struct {
 	plugin              *csiPlugin
 	driverName          csiDriverName
 	volumeLifecycleMode storage.VolumeLifecycleMode
-	fsGroupPolicy       storage.FSGroupPolicy
 	volumeID            string
 	specVolumeID        string
 	readOnly            bool
@@ -121,6 +120,11 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	// supports the current volumeLifecycleMode.
 	if err := c.supportsVolumeLifecycleMode(); err != nil {
 		return volumetypes.NewTransientOperationFailure(log("mounter.SetupAt failed to check volume lifecycle mode: %s", err))
+	}
+
+	fsGroupPolicy, err := c.getFSGroupPolicy()
+	if err != nil {
+		return volumetypes.NewTransientOperationFailure(log("mounter.SetupAt failed to check fsGroup policy: %s", err))
 	}
 
 	driverName := c.driverName
@@ -294,7 +298,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		}
 	}
 
-	if !driverSupportsCSIVolumeMountGroup && c.supportsFSGroup(fsType, mounterArgs.FsGroup, c.fsGroupPolicy) {
+	if !driverSupportsCSIVolumeMountGroup && c.supportsFSGroup(fsType, mounterArgs.FsGroup, fsGroupPolicy) {
 		// Driver doesn't support applying FSGroup. Kubelet must apply it instead.
 
 		// fullPluginName helps to distinguish different driver from csi plugin
@@ -439,6 +443,35 @@ func (c *csiMountMgr) supportsFSGroup(fsType string, fsGroup *int64, driverPolic
 
 	klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, unsupported volume type"))
 	return false
+}
+
+// getFSGroupPolicy returns if the CSI driver supports a volume in the given mode.
+// An error indicates that it isn't supported and explains why.
+func (c *csiMountMgr) getFSGroupPolicy() (storage.FSGroupPolicy, error) {
+	// Retrieve CSIDriver. It's not an error if that isn't
+	// possible (we don't have the lister if CSIDriverRegistry is
+	// disabled) or the driver isn't found (CSIDriver is
+	// optional)
+	var csiDriver *storage.CSIDriver
+	driver := string(c.driverName)
+	if c.plugin.csiDriverLister != nil {
+		c, err := c.plugin.getCSIDriver(driver)
+		if err != nil && !apierrors.IsNotFound(err) {
+			// Some internal error.
+			return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, err
+		}
+		csiDriver = c
+	}
+
+	// If the csiDriver isn't defined, return the default behavior
+	if csiDriver == nil {
+		return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, nil
+	}
+	// If the csiDriver exists but the fsGroupPolicy isn't defined, return an error
+	if csiDriver.Spec.FSGroupPolicy == nil || *csiDriver.Spec.FSGroupPolicy == "" {
+		return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, errors.New(log("expected valid fsGroupPolicy, received nil value or empty string"))
+	}
+	return *csiDriver.Spec.FSGroupPolicy, nil
 }
 
 // supportsVolumeMode checks whether the CSI driver supports a volume in the given mode.
