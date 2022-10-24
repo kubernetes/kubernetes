@@ -138,10 +138,12 @@ var (
 	// admissionExemptResources lists objects which are exempt from admission validation/mutation,
 	// only resources exempted from admission processing by API server should be listed here.
 	admissionExemptResources = map[schema.GroupVersionResource]bool{
-		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingwebhookconfigurations"):   true,
-		gvr("admissionregistration.k8s.io", "v1beta1", "validatingwebhookconfigurations"): true,
-		gvr("admissionregistration.k8s.io", "v1", "mutatingwebhookconfigurations"):        true,
-		gvr("admissionregistration.k8s.io", "v1", "validatingwebhookconfigurations"):      true,
+		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingwebhookconfigurations"):      true,
+		gvr("admissionregistration.k8s.io", "v1beta1", "validatingwebhookconfigurations"):    true,
+		gvr("admissionregistration.k8s.io", "v1", "mutatingwebhookconfigurations"):           true,
+		gvr("admissionregistration.k8s.io", "v1", "validatingwebhookconfigurations"):         true,
+		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"):       true,
+		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicybindings"): true,
 	}
 
 	parentResources = map[schema.GroupVersionResource]schema.GroupVersionResource{

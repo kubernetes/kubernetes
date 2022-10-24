@@ -20,9 +20,14 @@ import (
 	"context"
 
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/initializer"
 )
 
 type CELPolicyEvaluator interface {
+	initializer.WantsExternalKubeInformerFactory
+	initializer.WantsExternalKubeClientSet
+	admission.InitializationValidator
+
 	Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error
 	HasSynced() bool
 	Run(stopCh <-chan struct{})

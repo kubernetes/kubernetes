@@ -164,9 +164,6 @@ func buildRequestType() *apiservercel.DeclType {
 type CompilationResult struct {
 	Program cel.Program
 	Error   *apiservercel.Error
-	// If true, the compiled expression contains a reference to the identifier "oldSelf", and its corresponding rule
-	// is implicitly a transition rule.
-	TransitionRule bool
 }
 
 // CompileValidatingPolicyExpression returns a compiled vaalidating policy CEL expression.
@@ -205,7 +202,7 @@ func CompileValidatingPolicyExpression(validationExpression string, hasParams bo
 		}
 	}
 
-	checkedExpr, err := cel.AstToCheckedExpr(ast)
+	_, err = cel.AstToCheckedExpr(ast)
 	if err != nil {
 		// should be impossible since env.Compile returned no issues
 		return CompilationResult{
@@ -213,13 +210,6 @@ func CompileValidatingPolicyExpression(validationExpression string, hasParams bo
 				Type:   apiservercel.ErrorTypeInternal,
 				Detail: "unexpected compilation error: " + err.Error(),
 			},
-		}
-	}
-	var tRule bool
-	for _, ref := range checkedExpr.ReferenceMap {
-		if ref.Name == OldObjectVarName {
-			tRule = true
-			break
 		}
 	}
 	prog, err := env.Program(ast,
@@ -236,7 +226,6 @@ func CompileValidatingPolicyExpression(validationExpression string, hasParams bo
 		}
 	}
 	return CompilationResult{
-		Program:        prog,
-		TransitionRule: tRule,
+		Program: prog,
 	}
 }

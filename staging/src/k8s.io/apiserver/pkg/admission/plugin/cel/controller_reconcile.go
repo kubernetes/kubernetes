@@ -98,8 +98,7 @@ func (c *celAdmissionController) reconcilePolicyDefinition(namespace, name strin
 	if err != nil {
 		// Failed to resolve. Return error so we retry again (rate limited)
 		// Save a record of this definition with an evaluator that unconditionally
-		//
-		info.configurationError = fmt.Errorf("failed to parsed groupversion for param source: '%v'", paramSource.String())
+		info.configurationError = fmt.Errorf("failed to parse apiVersion of paramKind '%v' with error: %w", paramSource.String(), err)
 
 		// Return nil, since this error cannot be resolved by waiting more time
 		return nil
@@ -114,7 +113,7 @@ func (c *celAdmissionController) reconcilePolicyDefinition(namespace, name strin
 		// Failed to resolve. Return error so we retry again (rate limited)
 		// Save a record of this definition with an evaluator that unconditionally
 		//
-		info.configurationError = fmt.Errorf("failed to find resource mapping for param source: '%v'", paramSourceGV.WithKind(paramSource.Kind))
+		info.configurationError = fmt.Errorf("failed to find resource referenced by paramKind: '%v'", paramSourceGV.WithKind(paramSource.Kind))
 		return info.configurationError
 	}
 
@@ -171,8 +170,8 @@ func (c *celAdmissionController) reconcilePolicyBinding(namespace, name string, 
 	oldNamespacedDefinitionName := ""
 	if info.lastReconciledValue != nil {
 		// All validating policies are cluster-scoped so have empty namespace
-		oldefinitionNamespace, oldefinitionName := "", info.lastReconciledValue.Spec.PolicyName
-		oldNamespacedDefinitionName = oldefinitionNamespace + "/" + oldefinitionName
+		olDefinitionNamespace, oldDefinitionName := "", info.lastReconciledValue.Spec.PolicyName
+		oldNamespacedDefinitionName = olDefinitionNamespace + "/" + oldDefinitionName
 	}
 
 	namespacedDefinitionName := ""

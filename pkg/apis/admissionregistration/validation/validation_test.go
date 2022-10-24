@@ -1912,7 +1912,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 			expectedError: `spec.failurePolicy: Unsupported value: "other": supported values: "Fail", "Ignore"`,
 		},
 		{
-			name: "API version is required in ParamSource",
+			name: "API version is required in ParamKind",
 			config: &admissionregistration.ValidatingAdmissionPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "config",
@@ -1932,7 +1932,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 			expectedError: `spec.paramKind.apiVersion: Invalid value: "test.example.com"`,
 		},
 		{
-			name: "API kind is required in ParamSource",
+			name: "API kind is required in ParamKind",
 			config: &admissionregistration.ValidatingAdmissionPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "config",
@@ -1951,7 +1951,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 			expectedError: `spec.paramKind.kind: Required value`,
 		},
 		{
-			name: "API version format in ParamSource",
+			name: "API version format in ParamKind",
 			config: &admissionregistration.ValidatingAdmissionPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "config",
@@ -1971,7 +1971,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 			expectedError: `pec.paramKind.apiVersion: Invalid value: "!!!":`,
 		},
 		{
-			name: "API group format in ParamSource",
+			name: "API group format in ParamKind",
 			config: &admissionregistration.ValidatingAdmissionPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "config",
