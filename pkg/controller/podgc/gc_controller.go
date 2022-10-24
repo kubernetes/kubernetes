@@ -30,16 +30,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
-	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
-	utilpod "k8s.io/kubernetes/pkg/util/pod"
 	"k8s.io/kubernetes/pkg/util/taints"
 )
 
@@ -49,6 +48,9 @@ const (
 	// quarantineTime defines how long Orphaned GC waits for nodes to show up
 	// in an informer before issuing a GET call to check if they are truly gone
 	quarantineTime = 40 * time.Second
+
+	// field manager used to add pod failure condition and change the pod phase
+	fieldManager = "PodGC"
 )
 
 type PodGCController struct {
@@ -236,12 +238,13 @@ func (gcc *PodGCController) gcOrphaned(ctx context.Context, pods []*v1.Pod, node
 			continue
 		}
 		klog.V(2).InfoS("Found orphaned Pod assigned to the Node, deleting.", "pod", klog.KObj(pod), "node", pod.Spec.NodeName)
-		condition := &v1.PodCondition{
-			Type:    v1.AlphaNoCompatGuaranteeDisruptionTarget,
-			Status:  v1.ConditionTrue,
-			Reason:  "DeletionByPodGC",
-			Message: "PodGC: node no longer exists",
-		}
+		condition := corev1apply.PodCondition().
+			WithType(v1.AlphaNoCompatGuaranteeDisruptionTarget).
+			WithStatus(v1.ConditionTrue).
+			WithReason("DeletionByPodGC").
+			WithMessage("PodGC: node no longer exists").
+			WithLastTransitionTime(metav1.Now())
+
 		if err := gcc.markFailedAndDeletePodWithCondition(ctx, pod, condition); err != nil {
 			utilruntime.HandleError(err)
 		} else {
@@ -316,26 +319,57 @@ func (gcc *PodGCController) markFailedAndDeletePod(ctx context.Context, pod *v1.
 	return gcc.markFailedAndDeletePodWithCondition(ctx, pod, nil)
 }
 
-func (gcc *PodGCController) markFailedAndDeletePodWithCondition(ctx context.Context, pod *v1.Pod, condition *v1.PodCondition) error {
+func (gcc *PodGCController) markFailedAndDeletePodWithCondition(ctx context.Context, pod *v1.Pod, condition *corev1apply.PodConditionApplyConfiguration) error {
 	klog.InfoS("PodGC is force deleting Pod", "pod", klog.KRef(pod.Namespace, pod.Name))
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
-		newStatus := pod.Status.DeepCopy()
+
+		// Extact the pod status as PodGC may or may not own the pod phase, if
+		// it owns the phase then we need to send the field back if the condition
+		// is added.
+		podApply, err := corev1apply.ExtractPodStatus(pod, fieldManager)
+		if err != nil {
+			return nil
+		}
+
+		// Set the status in case PodGC does not own any status fields yet
+		if podApply.Status == nil {
+			podApply.WithStatus(corev1apply.PodStatus())
+		}
+
 		updated := false
 		if condition != nil {
-			updated = apipod.UpdatePodCondition(newStatus, condition)
+			updatePodCondition(podApply.Status, condition)
+			updated = true
 		}
 		// Mark the pod as failed - this is especially important in case the pod
 		// is orphaned, in which case the pod would remain in the Running phase
 		// forever as there is no kubelet running to change the phase.
 		if pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
-			newStatus.Phase = v1.PodFailed
+			podApply.Status.WithPhase(v1.PodFailed)
 			updated = true
 		}
 		if updated {
-			if _, _, _, err := utilpod.PatchPodStatus(ctx, gcc.kubeClient, pod.Namespace, pod.Name, pod.UID, pod.Status, *newStatus); err != nil {
+			if _, err := gcc.kubeClient.CoreV1().Pods(pod.Namespace).ApplyStatus(ctx, podApply, metav1.ApplyOptions{FieldManager: fieldManager, Force: true}); err != nil {
 				return err
 			}
 		}
 	}
 	return gcc.kubeClient.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))
+}
+
+func updatePodCondition(podStatusApply *corev1apply.PodStatusApplyConfiguration, condition *corev1apply.PodConditionApplyConfiguration) {
+	if conditionIndex, _ := findPodConditionApplyByType(podStatusApply.Conditions, *condition.Type); conditionIndex < 0 {
+		podStatusApply.WithConditions(condition)
+	} else {
+		podStatusApply.Conditions[conditionIndex] = *condition
+	}
+}
+
+func findPodConditionApplyByType(conditionApplyList []corev1apply.PodConditionApplyConfiguration, cType v1.PodConditionType) (int, *corev1apply.PodConditionApplyConfiguration) {
+	for index, conditionApply := range conditionApplyList {
+		if *conditionApply.Type == cType {
+			return index, &conditionApply
+		}
+	}
+	return -1, nil
 }
