@@ -42,6 +42,6 @@ func (unsupportedContainerManager) Start(_ *v1.Node, _ ActivePodsFunc, _ config.
 	return fmt.Errorf("Container Manager is unsupported in this build")
 }
 
-func NewContainerManager(_ mount.Interface, _ cadvisor.Interface, _ NodeConfig, failSwapOn bool, devicePluginEnabled bool, recorder record.EventRecorder) (ContainerManager, error) {
+func NewContainerManager(_ mount.Interface, _ cadvisor.Interface, _ NodeConfig, failSwapOn bool, recorder record.EventRecorder) (ContainerManager, error) {
 	return &unsupportedContainerManager{}, nil
 }
