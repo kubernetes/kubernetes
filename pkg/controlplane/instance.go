@@ -61,6 +61,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -471,13 +472,18 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			if err != nil {
 				return err
 			}
-			controller := lease.NewController(
+
+			leaseName := m.GenericAPIServer.APIServerID
+			holderIdentity := m.GenericAPIServer.APIServerID + "_" + string(uuid.NewUUID())
+
+			controller := lease.NewControllerWithLeaseName(
 				clock.RealClock{},
 				kubeClient,
-				m.GenericAPIServer.APIServerID,
+				holderIdentity,
 				int32(c.ExtraConfig.IdentityLeaseDurationSeconds),
 				nil,
 				time.Duration(c.ExtraConfig.IdentityLeaseRenewIntervalSeconds)*time.Second,
+				leaseName,
 				metav1.NamespaceSystem,
 				labelAPIServerHeartbeat)
 			go controller.Run(hookContext.StopCh)
