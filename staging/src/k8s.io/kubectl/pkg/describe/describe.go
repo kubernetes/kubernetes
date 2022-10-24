@@ -798,6 +798,12 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 		if len(pod.Status.Message) > 0 {
 			w.Write(LEVEL_0, "Message:\t%s\n", pod.Status.Message)
 		}
+		if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SeccompProfile != nil {
+			w.Write(LEVEL_0, "SeccompProfile:\t%s\n", pod.Spec.SecurityContext.SeccompProfile.Type)
+			if pod.Spec.SecurityContext.SeccompProfile.Type == corev1.SeccompProfileTypeLocalhost {
+				w.Write(LEVEL_0, "LocalhostProfile:\t%s\n", *pod.Spec.SecurityContext.SeccompProfile.LocalhostProfile)
+			}
+		}
 		// remove when .IP field is depreciated
 		w.Write(LEVEL_0, "IP:\t%s\n", pod.Status.PodIP)
 		describePodIPs(pod, w, "")
@@ -1754,6 +1760,12 @@ func describeContainerBasicInfo(container corev1.Container, status corev1.Contai
 		w.Write(LEVEL_2, "Host Ports:\t%s\n", hostPortString)
 	} else {
 		w.Write(LEVEL_2, "Host Port:\t%s\n", stringOrNone(hostPortString))
+	}
+	if container.SecurityContext != nil && container.SecurityContext.SeccompProfile != nil {
+		w.Write(LEVEL_2, "SeccompProfile:\t%s\n", container.SecurityContext.SeccompProfile.Type)
+		if container.SecurityContext.SeccompProfile.Type == corev1.SeccompProfileTypeLocalhost {
+			w.Write(LEVEL_3, "LocalhostProfile:\t%s\n", *container.SecurityContext.SeccompProfile.LocalhostProfile)
+		}
 	}
 }
 

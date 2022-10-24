@@ -5526,3 +5526,144 @@ func TestDescribeTerminalEscape(t *testing.T) {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
+
+func TestDescribeSeccompProfile(t *testing.T) {
+	testLocalhostProfiles := []string{"lauseafoodpod", "tikkamasalaconatiner", "dropshotephemeral"}
+
+	testCases := []struct {
+		name   string
+		pod    *corev1.Pod
+		expect []string
+	}{
+		{
+			name: "podLocalhostSeccomp",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					SecurityContext: &corev1.PodSecurityContext{
+						SeccompProfile: &corev1.SeccompProfile{
+							Type:             corev1.SeccompProfileTypeLocalhost,
+							LocalhostProfile: &testLocalhostProfiles[0],
+						},
+					},
+				},
+			},
+			expect: []string{
+				"SeccompProfile", "Localhost",
+				"LocalhostProfile", testLocalhostProfiles[0],
+			},
+		},
+		{
+			name: "podOther",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					SecurityContext: &corev1.PodSecurityContext{
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
+					},
+				},
+			},
+			expect: []string{
+				"SeccompProfile", "RuntimeDefault",
+			},
+		},
+		{
+			name: "containerLocalhostSeccomp",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							SecurityContext: &corev1.SecurityContext{
+								SeccompProfile: &corev1.SeccompProfile{
+									Type:             corev1.SeccompProfileTypeLocalhost,
+									LocalhostProfile: &testLocalhostProfiles[1],
+								},
+							},
+						},
+					},
+				},
+			},
+			expect: []string{
+				"SeccompProfile", "Localhost",
+				"LocalhostProfile", testLocalhostProfiles[1],
+			},
+		},
+		{
+			name: "containerOther",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							SecurityContext: &corev1.SecurityContext{
+								SeccompProfile: &corev1.SeccompProfile{
+									Type: corev1.SeccompProfileTypeUnconfined,
+								},
+							},
+						},
+					},
+				},
+			},
+			expect: []string{
+				"SeccompProfile", "Unconfined",
+			},
+		},
+		{
+			name: "ephemeralLocalhostSeccomp",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					EphemeralContainers: []corev1.EphemeralContainer{
+						{
+							EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+								SecurityContext: &corev1.SecurityContext{
+									SeccompProfile: &corev1.SeccompProfile{
+										Type:             corev1.SeccompProfileTypeLocalhost,
+										LocalhostProfile: &testLocalhostProfiles[2],
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expect: []string{
+				"SeccompProfile", "Localhost",
+				"LocalhostProfile", testLocalhostProfiles[2],
+			},
+		},
+		{
+			name: "ephemeralOther",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							SecurityContext: &corev1.SecurityContext{
+								SeccompProfile: &corev1.SeccompProfile{
+									Type: corev1.SeccompProfileTypeUnconfined,
+								},
+							},
+						},
+					},
+				},
+			},
+			expect: []string{
+				"SeccompProfile", "Unconfined",
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			fake := fake.NewSimpleClientset(testCase.pod)
+			c := &describeClient{T: t, Interface: fake}
+			d := PodDescriber{c}
+			out, err := d.Describe("", "", DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			for _, expected := range testCase.expect {
+				if !strings.Contains(out, expected) {
+					t.Errorf("expected to find %q in output: %q", expected, out)
+				}
+			}
+		})
+	}
+}
