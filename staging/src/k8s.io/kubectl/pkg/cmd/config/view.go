@@ -134,12 +134,6 @@ func (o ViewOptions) Run() error {
 		return err
 	}
 
-	if !o.RawByteData {
-		if err := clientcmdapi.RedactSecrets(config); err != nil {
-			return err
-		}
-	}
-
 	if o.Minify {
 		if len(o.Context) > 0 {
 			config.CurrentContext = o.Context
@@ -154,6 +148,9 @@ func (o ViewOptions) Run() error {
 			return err
 		}
 	} else if !o.RawByteData {
+		if err := clientcmdapi.RedactSecrets(config); err != nil {
+			return err
+		}
 		clientcmdapi.ShortenConfig(config)
 	}
 
