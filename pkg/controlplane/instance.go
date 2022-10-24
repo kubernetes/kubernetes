@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"reflect"
 	"strconv"
 	"time"
@@ -515,6 +516,14 @@ func labelAPIServerHeartbeat(lease *coordinationapiv1.Lease) error {
 	}
 	// This label indicates that kube-apiserver owns this identity lease object
 	lease.Labels[IdentityLeaseComponentLabelKey] = KubeAPIServer
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+
+	// convenience label to easily map a lease object to a specific apiserver
+	lease.Labels[apiv1.LabelHostname] = hostname
 	return nil
 }
 
