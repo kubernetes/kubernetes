@@ -137,18 +137,20 @@ func (p *criStatsProvider) listPodStats(ctx context.Context, updateCPUNanoCoreUs
 	}
 
 	if p.podAndContainerStatsFromCRI {
-		_, err := p.listPodStatsStrictlyFromCRI(ctx, updateCPUNanoCoreUsage, containerMap, podSandboxMap, &rootFsInfo)
-		if err != nil {
-			s, ok := status.FromError(err)
-			// Legitimate failure, rather than the CRI implementation does not support ListPodSandboxStats.
-			if !ok || s.Code() != codes.Unimplemented {
-				return nil, err
-			}
-			// CRI implementation doesn't support ListPodSandboxStats, warn and fallback.
-			klog.V(5).ErrorS(err,
-				"CRI implementation must be updated to support ListPodSandboxStats if PodAndContainerStatsFromCRI feature gate is enabled. Falling back to populating with cAdvisor; this call will fail in the future.",
-			)
+		result, err := p.listPodStatsStrictlyFromCRI(ctx, updateCPUNanoCoreUsage, containerMap, podSandboxMap, &rootFsInfo)
+		if err == nil {
+			// Call succeeded
+			return result, nil
 		}
+		s, ok := status.FromError(err)
+		// Legitimate failure, rather than the CRI implementation does not support ListPodSandboxStats.
+		if !ok || s.Code() != codes.Unimplemented {
+			return nil, err
+		}
+		// CRI implementation doesn't support ListPodSandboxStats, warn and fallback.
+		klog.V(5).ErrorS(err,
+			"CRI implementation must be updated to support ListPodSandboxStats if PodAndContainerStatsFromCRI feature gate is enabled. Falling back to populating with cAdvisor; this call will fail in the future.",
+		)
 	}
 	return p.listPodStatsPartiallyFromCRI(ctx, updateCPUNanoCoreUsage, containerMap, podSandboxMap, &rootFsInfo)
 }
