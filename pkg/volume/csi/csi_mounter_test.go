@@ -311,20 +311,21 @@ func TestMounterSetUpSimple(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	testCases := []struct {
-		name       string
-		podUID     types.UID
-		mode       storage.VolumeLifecycleMode
-		fsType     string
-		options    []string
-		spec       func(string, []string) *volume.Spec
-		shouldFail bool
+		name                 string
+		podUID               types.UID
+		mode                 storage.VolumeLifecycleMode
+		fsType               string
+		options              []string
+		spec                 func(string, []string) *volume.Spec
+		newMounterShouldFail bool
+		setupShouldFail      bool
 	}{
 		{
-			name:       "setup with ephemeral source",
-			podUID:     types.UID(fmt.Sprintf("%08X", rand.Uint64())),
-			mode:       storage.VolumeLifecycleEphemeral,
-			fsType:     "ext4",
-			shouldFail: true,
+			name:            "setup with ephemeral source",
+			podUID:          types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+			mode:            storage.VolumeLifecycleEphemeral,
+			fsType:          "ext4",
+			setupShouldFail: true,
 			spec: func(fsType string, options []string) *volume.Spec {
 				volSrc := makeTestVol("pv1", testDriver)
 				volSrc.CSI.FSType = &fsType
@@ -352,9 +353,9 @@ func TestMounterSetUpSimple(t *testing.T) {
 			},
 		},
 		{
-			name:       "setup with missing spec",
-			shouldFail: true,
-			spec:       func(fsType string, options []string) *volume.Spec { return nil },
+			name:                 "setup with missing spec",
+			newMounterShouldFail: true,
+			spec:                 func(fsType string, options []string) *volume.Spec { return nil },
 		},
 	}
 
@@ -366,11 +367,11 @@ func TestMounterSetUpSimple(t *testing.T) {
 				&corev1.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
 				volume.VolumeOptions{},
 			)
-			if tc.shouldFail && err != nil {
+			if tc.newMounterShouldFail && err != nil {
 				t.Log(err)
 				return
 			}
-			if !tc.shouldFail && err != nil {
+			if !tc.newMounterShouldFail && err != nil {
 				t.Fatal("unexpected error:", err)
 			}
 			if mounter == nil {
@@ -380,7 +381,7 @@ func TestMounterSetUpSimple(t *testing.T) {
 			csiMounter := mounter.(*csiMountMgr)
 			csiMounter.csiClient = setupClient(t, true)
 
-			if csiMounter.volumeLifecycleMode != storage.VolumeLifecyclePersistent {
+			if csiMounter.volumeLifecycleMode != tc.mode {
 				t.Fatal("unexpected volume mode: ", csiMounter.volumeLifecycleMode)
 			}
 
@@ -392,8 +393,13 @@ func TestMounterSetUpSimple(t *testing.T) {
 			}
 
 			// Mounter.SetUp()
-			if err := csiMounter.SetUp(volume.MounterArgs{}); err != nil {
-				t.Fatalf("mounter.Setup failed: %v", err)
+			err = csiMounter.SetUp(volume.MounterArgs{})
+			if tc.setupShouldFail && err != nil {
+				t.Log(err)
+				return
+			}
+			if !tc.setupShouldFail && err != nil {
+				t.Fatal("unexpected error:", err)
 			}
 
 			// ensure call went all the way

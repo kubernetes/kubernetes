@@ -372,7 +372,6 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 		specVolID  string
 		volHandle  string
 		podUID     types.UID
-		shouldFail bool
 	}{
 		{
 			name:       "construct spec1 from original persistent spec",
@@ -388,13 +387,6 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 			originSpec: volume.NewSpecFromPersistentVolume(makeTestPV("spec2", 20, testDriver, "handle2"), true),
 			podUID:     types.UID(fmt.Sprintf("%08X", rand.Uint64())),
 		},
-		{
-			name:       "construct spec from original volume spec",
-			specVolID:  "volspec",
-			originSpec: volume.NewSpecFromVolume(makeTestVol("spec2", testDriver)),
-			podUID:     types.UID(fmt.Sprintf("%08X", rand.Uint64())),
-			shouldFail: true, // csi inline off
-		},
 	}
 
 	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
@@ -406,11 +398,7 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
 				volume.VolumeOptions{},
 			)
-			if tc.shouldFail && err != nil {
-				t.Log(err)
-				return
-			}
-			if !tc.shouldFail && err != nil {
+			if err != nil {
 				t.Fatal(err)
 			}
 			if mounter == nil {
@@ -617,7 +605,7 @@ func TestPluginNewMounter(t *testing.T) {
 			podUID:              types.UID(fmt.Sprintf("%08X", rand.Uint64())),
 			namespace:           "test-ns2",
 			volumeLifecycleMode: storage.VolumeLifecycleEphemeral,
-			shouldFail:          true, // csi inline not enabled
+			shouldFail:          false, // NewMounter works with disabled inline volumes
 		},
 		{
 			name:       "mounter from no spec provided",
@@ -772,10 +760,6 @@ func TestPluginNewMounterWithInline(t *testing.T) {
 
 				// Some test cases are meant to fail because their input data is broken.
 				shouldFail := test.shouldFail
-				// Others fail if the driver does not support the volume mode.
-				if !containsVolumeMode(supported, test.volumeLifecycleMode) {
-					shouldFail = true
-				}
 				if shouldFail != (err != nil) {
 					t.Fatal("Unexpected error:", err)
 				}

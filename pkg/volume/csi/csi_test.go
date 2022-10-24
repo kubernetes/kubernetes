@@ -43,16 +43,16 @@ func TestCSI_VolumeAll(t *testing.T) {
 	defaultFSGroupPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
 
 	tests := []struct {
-		name         string
-		specName     string
-		driver       string
-		volName      string
-		specFunc     func(specName, driver, volName string) *volume.Spec
-		podFunc      func() *api.Pod
-		isInline     bool
-		shouldFail   bool
-		driverSpec   *storage.CSIDriverSpec
-		watchTimeout time.Duration
+		name                 string
+		specName             string
+		driver               string
+		volName              string
+		specFunc             func(specName, driver, volName string) *volume.Spec
+		podFunc              func() *api.Pod
+		isInline             bool
+		findPluginShouldFail bool
+		driverSpec           *storage.CSIDriverSpec
+		watchTimeout         time.Duration
 	}{
 		{
 			name:     "PersistentVolume",
@@ -102,7 +102,6 @@ func TestCSI_VolumeAll(t *testing.T) {
 				VolumeLifecycleModes: []storage.VolumeLifecycleMode{storage.VolumeLifecycleEphemeral},
 				FSGroupPolicy:        &defaultFSGroupPolicy,
 			},
-			shouldFail: true,
 		},
 		{
 			name:    "ephemeral inline supported",
@@ -169,6 +168,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 				// This means the driver *cannot* handle the inline volume because
 				// the default is "persistent".
 				VolumeLifecycleModes: nil,
+				FSGroupPolicy:        &defaultFSGroupPolicy,
 			},
 		},
 		{
@@ -186,6 +186,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			driverSpec: &storage.CSIDriverSpec{
 				// This means the driver *cannot* handle the inline volume.
 				VolumeLifecycleModes: []storage.VolumeLifecycleMode{storage.VolumeLifecyclePersistent},
+				FSGroupPolicy:        &defaultFSGroupPolicy,
 			},
 		},
 		{
@@ -200,7 +201,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 				podUID := types.UID(fmt.Sprintf("%08X", rand.Uint64()))
 				return &api.Pod{ObjectMeta: meta.ObjectMeta{UID: podUID, Namespace: testns}}
 			},
-			shouldFail: true,
+			findPluginShouldFail: true,
 		},
 		{
 			name:     "incomplete spec",
@@ -214,7 +215,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 				podUID := types.UID(fmt.Sprintf("%08X", rand.Uint64()))
 				return &api.Pod{ObjectMeta: meta.ObjectMeta{UID: podUID, Namespace: testns}}
 			},
-			shouldFail: true,
+			findPluginShouldFail: true,
 		},
 	}
 
@@ -277,7 +278,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			t.Log("csiTest.VolumeAll Attaching volume...")
 			attachPlug, err := attachDetachPlugMgr.FindAttachablePluginBySpec(volSpec)
 			if err != nil {
-				if !test.shouldFail {
+				if !test.findPluginShouldFail {
 					t.Fatalf("csiTest.VolumeAll PluginManager.FindAttachablePluginBySpec failed: %v", err)
 				} else {
 					t.Log("csiTest.VolumeAll failed: ", err)
@@ -398,22 +399,6 @@ func TestCSI_VolumeAll(t *testing.T) {
 			}
 
 			mounter, err := volPlug.NewMounter(volSpec, pod, volume.VolumeOptions{})
-			if test.isInline && (test.driverSpec == nil || !containsVolumeMode(test.driverSpec.VolumeLifecycleModes, storage.VolumeLifecycleEphemeral)) {
-				// This *must* fail because a CSIDriver.Spec.VolumeLifecycleModes entry "ephemeral"
-				// is required.
-				if err == nil || mounter != nil {
-					t.Fatalf("csiTest.VolumeAll volPlugin.NewMounter should have failed for inline volume due to lack of support for inline volumes, got: %+v, %s", mounter, err)
-				}
-				return
-			}
-			if !test.isInline && test.driverSpec != nil && !containsVolumeMode(test.driverSpec.VolumeLifecycleModes, storage.VolumeLifecyclePersistent) {
-				// This *must* fail because a CSIDriver.Spec.VolumeLifecycleModes entry "persistent"
-				// is required when a driver object is available.
-				if err == nil || mounter != nil {
-					t.Fatalf("csiTest.VolumeAll volPlugin.NewMounter should have failed for persistent volume due to lack of support for persistent volumes, got: %+v, %s", mounter, err)
-				}
-				return
-			}
 			if err != nil || mounter == nil {
 				t.Fatalf("csiTest.VolumeAll volPlugin.NewMounter is nil or error: %s", err)
 			}
@@ -427,7 +412,24 @@ func TestCSI_VolumeAll(t *testing.T) {
 			csiMounter.csiClient = csiClient
 			var mounterArgs volume.MounterArgs
 			mounterArgs.FsGroup = fsGroup
-			if err := csiMounter.SetUp(mounterArgs); err != nil {
+			err = csiMounter.SetUp(mounterArgs)
+			if test.isInline && (test.driverSpec == nil || !containsVolumeMode(test.driverSpec.VolumeLifecycleModes, storage.VolumeLifecycleEphemeral)) {
+				// This *must* fail because a CSIDriver.Spec.VolumeLifecycleModes entry "ephemeral"
+				// is required.
+				if err == nil {
+					t.Fatalf("csiTest.VolumeAll volPlugin.NewMounter should have failed for inline volume due to lack of support for inline volumes, got: %+v, %s", mounter, err)
+				}
+				return
+			}
+			if !test.isInline && test.driverSpec != nil && !containsVolumeMode(test.driverSpec.VolumeLifecycleModes, storage.VolumeLifecyclePersistent) {
+				// This *must* fail because a CSIDriver.Spec.VolumeLifecycleModes entry "persistent"
+				// is required when a driver object is available.
+				if err == nil {
+					t.Fatalf("csiTest.VolumeAll volPlugin.NewMounter should have failed for persistent volume due to lack of support for persistent volumes, got: %+v, %s", mounter, err)
+				}
+				return
+			}
+			if err != nil {
 				t.Fatalf("csiTest.VolumeAll mounter.Setup(fsGroup) failed: %s", err)
 			}
 			t.Log("csiTest.VolumeAll mounter.Setup(fsGroup) done OK")
