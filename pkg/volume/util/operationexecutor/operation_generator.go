@@ -908,11 +908,22 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 		return volumetypes.NewOperationContext(nil, nil, migrated)
 	}
 
+	eventRecorderFunc := func(err *error) {
+		if *err != nil {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: types.UID(volumeToUnmount.PodUID),
+				},
+			}
+			og.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedUnmountVolume, (*err).Error())
+		}
+	}
+
 	return volumetypes.GeneratedOperations{
 		OperationName:     "volume_unmount",
 		OperationFunc:     unmountVolumeFunc,
+		EventRecorderFunc: eventRecorderFunc,
 		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(volumePlugin.GetPluginName(), volumeToUnmount.VolumeSpec), "volume_unmount"),
-		EventRecorderFunc: nil, // nil because we do not want to generate event on error
 	}, nil
 }
 
@@ -1360,11 +1371,22 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 		return volumetypes.NewOperationContext(nil, nil, migrated)
 	}
 
+	eventRecorderFunc := func(err *error) {
+		if *err != nil {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: types.UID(volumeToUnmount.PodUID),
+				},
+			}
+			og.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedUnmountVolume, (*err).Error())
+		}
+	}
+
 	return volumetypes.GeneratedOperations{
 		OperationName:     "unmap_volume",
 		OperationFunc:     unmapVolumeFunc,
+		EventRecorderFunc: eventRecorderFunc,
 		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(blockVolumePlugin.GetPluginName(), volumeToUnmount.VolumeSpec), "unmap_volume"),
-		EventRecorderFunc: nil, // nil because we do not want to generate event on error
 	}, nil
 }
 

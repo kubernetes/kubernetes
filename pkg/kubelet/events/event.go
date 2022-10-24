@@ -56,6 +56,7 @@ const (
 	KubeletSetupFailed                   = "KubeletSetupFailed"
 	FailedAttachVolume                   = "FailedAttachVolume"
 	FailedMountVolume                    = "FailedMount"
+	FailedUnmountVolume                  = "FailedUnmount"
 	VolumeResizeFailed                   = "VolumeResizeFailed"
 	VolumeResizeSuccess                  = "VolumeResizeSuccessful"
 	FileSystemResizeFailed               = "FileSystemResizeFailed"
