@@ -157,6 +157,7 @@ if [[ (( "${KUBE_FEATURE_GATES:-}" = *"AllAlpha=true"* ) || ( "${KUBE_FEATURE_GA
 fi
 
 # Optional: set feature gates
+# shellcheck disable=SC2034 # Variables sourced in other scripts.
 FEATURE_GATES=${KUBE_FEATURE_GATES:-}
 
 #Optional: disable the cloud provider no schedule taint for testing.
@@ -305,11 +306,6 @@ if [[ ${KUBE_ENABLE_INSECURE_REGISTRY:-false} = 'true' ]]; then
 fi
 
 if [[ -n "${NODE_ACCELERATORS}" ]]; then
-    if [[ -z "${FEATURE_GATES:-}" ]]; then
-        FEATURE_GATES='DevicePlugins=true'
-    else
-        FEATURE_GATES="${FEATURE_GATES},DevicePlugins=true"
-    fi
     if [[ "${NODE_ACCELERATORS}" =~ .*type=([a-zA-Z0-9-]+).* ]]; then
         NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS},cloud.google.com/gke-accelerator=${BASH_REMATCH[1]}"
     fi
