@@ -17,84 +17,38 @@ limitations under the License.
 package cel
 
 import (
+	"k8s.io/api/admissionregistration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/cel"
-
-	"github.com/google/cel-go/common/types/ref"
 )
 
-type FailurePolicy string
+// EvaluatorFunc represents the AND of one or more compiled CEL expression's
+// evaluators `params` may be nil if definition does not specify a paramsource
+type ValidatorFunc func(a admission.Attributes, params *unstructured.Unstructured) ([]PolicyDecision, error)
 
-const (
-	Fail   FailurePolicy = "Fail"
-	Ignore FailurePolicy = "Ignore"
-)
-
-// Represents the AND of one or more compiled CEL expression's evaluators
-// `params` may be nil if definition does not specify a paramsource
-type EvaluatorFunc func(a admission.Attributes, params *unstructured.Unstructured) ([]PolicyDecision, error)
-
-// Dependency Injected into the PolicyDefinition's `Compile` function to assist
-// with converting types and values to/from CEL-typed values
-type ObjectConverter interface {
-	// Given a GVR, look up the openapi or JSONSchemaProps, structural schema, etc.
-	// and compile it into something that can be used to turn objects into CEL
-	// values
-	DeclForResource(gvr schema.GroupVersionResource) (*cel.DeclType, error)
-
-	// Object may be a typed native object or an unstructured object
-	ValueForObject(value runtime.Object, decl *cel.DeclType) (ref.Val, error)
+func (f ValidatorFunc) Validate(a admission.Attributes, params *unstructured.Unstructured) ([]PolicyDecision, error) {
+	return f(a, params)
 }
 
-// An interface for internal policy binding type. Implemented by mock/testing types,
-// and to be implemented by the public API types once they have completed API review.
-//
-// The interface closely mirrors the format and functionality of the
-// PolicyDefinition proposed in the KEP.
-type PolicyDefinition interface {
-	runtime.Object
+type Validator interface {
+	Validate(a admission.Attributes, params *unstructured.Unstructured) ([]PolicyDecision, error)
+}
 
-	// says whether this policy definition matches the provided admission resource request
-	Matches(a admission.Attributes) bool
+// ValidatorCompiler is Dependency Injected into the PolicyDefinition's `Compile`
+// function to assist with converting types and values to/from CEL-typed values.
+type ValidatorCompiler interface {
+	// Matches says whether this policy definition matches the provided admission
+	// resource request
+	DefinitionMatches(definition *v1alpha1.ValidatingAdmissionPolicy, a admission.Attributes) bool
+
+	// Matches says whether this policy definition matches the provided admission
+	// resource request
+	BindingMatches(definition *v1alpha1.ValidatingAdmissionPolicyBinding, a admission.Attributes) bool
 
 	Compile(
-		// Definition is provided with a converter which may be used by the
-		// return evaluator function to convert objects into CEL-typed objects
-		objectConverter ObjectConverter,
+		policy *v1alpha1.ValidatingAdmissionPolicy,
 		// Injected RESTMapper to assist with compilation
 		mapper meta.RESTMapper,
-	) (EvaluatorFunc, error)
-
-	// GVK for the CRD used as the source of parameters used in the evaluation
-	// of instances of this policy
-	// May return nil if there is no paramsource for this definition.
-	GetParamSource() *schema.GroupVersionKind
-
-	// How an object should be treated during an admission when there is a
-	// configuration error preventing CEL evaluation
-	GetFailurePolicy() FailurePolicy
-}
-
-// An interface for internal policy binding type. Implemented by mock/testing types,
-// and to be implemented by the public API types once they have completed API review.
-//
-// The interface closely mirrors the format and functionality of the
-// PolicyBinding proposed in the KEP.
-type PolicyBinding interface {
-	runtime.Object
-
-	// says whether this policy binding matches the provided admission resource request
-	Matches(a admission.Attributes) bool
-
-	// Namespace/Name of Policy Definition used by this binding.
-	GetTargetDefinition() (namespace, name string)
-
-	// Namespace/Name of instance of TargetDefinition's ParamSource to be provided
-	// to the CEL expressions of the definition during evaluation.
-	// If TargetDefinition has nil ParamSource, this is ignored.
-	GetTargetParams() (namespace, name string)
+	) (Validator, error)
 }
