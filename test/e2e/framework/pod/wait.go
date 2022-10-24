@@ -550,18 +550,12 @@ func WaitForPodRunningInNamespaceSlow(ctx context.Context, c clientset.Interface
 }
 
 // WaitTimeoutForPodRunningInNamespace waits the given timeout duration for the specified pod to become running.
+// It does not need to exist yet when this function gets called and the pod is not expected to be recreated
+// when it succeeds or fails.
 func WaitTimeoutForPodRunningInNamespace(ctx context.Context, c clientset.Interface, podName, namespace string, timeout time.Duration) error {
-	return WaitForPodCondition(ctx, c, namespace, podName, "running", timeout, func(pod *v1.Pod) (bool, error) {
-		switch pod.Status.Phase {
-		case v1.PodRunning:
-			return true, nil
-		case v1.PodFailed:
-			return false, errPodFailed
-		case v1.PodSucceeded:
-			return false, errPodCompleted
-		}
-		return false, nil
-	})
+	return framework.Gomega().Eventually(ctx, framework.RetryNotFound(framework.GetObject(c.CoreV1().Pods(namespace).Get, podName, metav1.GetOptions{}))).
+		WithTimeout(timeout).
+		Should(BeRunningNoRetries())
 }
 
 // WaitForPodRunningInNamespace waits default amount of time (podStartTimeout) for the specified pod to become running.
