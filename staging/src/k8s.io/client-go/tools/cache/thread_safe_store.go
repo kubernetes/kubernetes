@@ -316,7 +316,7 @@ func (c *threadSafeMap) ByIndex(indexName, indexedValue string) ([]interface{}, 
 		return nil, err
 	}
 	list := make([]interface{}, 0, set.Len())
-	for key := range set {
+	for _, key := range set.List() {
 		list = append(list, c.items[key])
 	}
 
@@ -328,21 +328,24 @@ func (c *threadSafeMap) ByIndexes(conds IndexConditions, opts *JointIndexOptions
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	for i, cond := range conds {
+	newConds := make(IndexConditions, len(conds))
+	copy(newConds, conds)
+
+	for i, cond := range newConds {
 		populatedIndex, err := c.storeKeysByIndexCondition(cond)
 		if err != nil {
 			return nil, err
 		}
-		conds[i].indexedResult = populatedIndex
+		newConds[i].indexedResult = populatedIndex
 	}
 
-	set, err := conds.apply(opts)
+	set, err := newConds.apply(opts)
 	if err != nil {
 		return nil, err
 	}
 
 	list := make([]interface{}, 0, set.Len())
-	for key := range set {
+	for _, key := range set.List() {
 		list = append(list, c.items[key])
 	}
 
