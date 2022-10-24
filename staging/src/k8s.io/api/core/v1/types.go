@@ -2658,8 +2658,10 @@ const (
 	// disruption (such as preemption, eviction API or garbage-collection).
 	// The constant is to be renamed once the name is accepted within the KEP-3329.
 	AlphaNoCompatGuaranteeDisruptionTarget PodConditionType = "DisruptionTarget"
-	// ResourceExhausted indicates the pod is about to be deleted due to either
-	// exceeding its ephemeral storage limits or running an OOM killed container.
+	// ResourceExhausted indicates the pod is in the Failed phase or is about to
+	// transition into the Failed phase (and is about to be deleted) due to either:
+	// - exceeding its ephemeral storage limits; or
+	// - running an OOM killed container when the pod's .spec.restartPolicy=Never.
 	// The constant is to be renamed once the name is accepted within the KEP-3329.
 	AlphaNoCompatGuaranteeResourceExhausted = "ResourceExhausted"
 )
