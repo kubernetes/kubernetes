@@ -989,6 +989,43 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 			},
 			requestCount: 1,
 		},
+		{
+			name: "add taint to changed node",
+			nodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:            "node1",
+							ResourceVersion: "1",
+						},
+						Spec: v1.NodeSpec{
+							Taints: []v1.Taint{
+								{Key: "key1", Value: "value1", Effect: "NoSchedule"},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+				AsyncCalls: []func(*testutil.FakeNodeHandler){func(m *testutil.FakeNodeHandler) {
+					if len(m.UpdatedNodes) == 0 {
+						m.UpdatedNodes = append(m.UpdatedNodes, &v1.Node{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:            "node1",
+								ResourceVersion: "2",
+							},
+							Spec: v1.NodeSpec{
+								Taints: []v1.Taint{},
+							}})
+					}
+				}},
+			},
+			nodeName:    "node1",
+			taintsToAdd: []*v1.Taint{{Key: "key2", Value: "value2", Effect: "NoExecute"}},
+			expectedTaints: []v1.Taint{
+				{Key: "key2", Value: "value2", Effect: "NoExecute"},
+			},
+			requestCount: 5,
+		},
 	}
 	for _, test := range tests {
 		err := AddOrUpdateTaintOnNode(context.TODO(), test.nodeHandler, test.nodeName, test.taintsToAdd...)
