@@ -279,8 +279,15 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 		Run: runHelp,
 		// Hook before and after Run initialize and write profiles to disk,
 		// respectively.
-		PersistentPreRunE: func(*cobra.Command, []string) error {
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			rest.SetDefaultWarningHandler(warningHandler)
+
+			if cmd.Name() == cobra.ShellCompRequestCmd {
+				// This is the __complete or __completeNoDesc command which
+				// indicates shell completion has been requested.
+				plugin.SetupPluginCompletion(cmd, args)
+			}
+
 			return initProfiling()
 		},
 		PersistentPostRunE: func(*cobra.Command, []string) error {
