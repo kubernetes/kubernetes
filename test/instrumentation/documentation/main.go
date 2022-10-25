@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"text/template"
 	"time"
@@ -37,7 +38,7 @@ var (
 
 const (
 	templ = `---
-title: Kubernetes Metrics Across Components
+title: Kubernetes Metrics
 content_type: instrumentation
 ---
 
@@ -55,8 +56,8 @@ These are the metrics which are exported in Kubernetes components (i.e. kube-api
 	<tr>
 		<td width="20%">Name</td>
 		<td width="10%">Stability Level</td>
-		<td width="10%">Type</td>
-		<td width="30%">Help</td>
+		<td width="13%">Type</td>
+		<td width="27%">Help</td>
 		<td width="20%">Labels</td>
 		<td width="10%">Const Labels</td>
 	</tr>
@@ -82,6 +83,7 @@ func main() {
 		if err != nil {
 			println("err", err)
 		}
+		sort.Sort(byFQName(metrics))
 		t := template.New("t")
 		t, err := t.Parse(templ)
 		if err != nil {
@@ -127,4 +129,19 @@ type metric struct {
 
 func (m metric) BuildFQName() string {
 	return metrics.BuildFQName(m.Namespace, m.Subsystem, m.Name)
+}
+
+type byFQName []metric
+
+func (ms byFQName) Len() int { return len(ms) }
+func (ms byFQName) Less(i, j int) bool {
+	if ms[i].StabilityLevel < ms[j].StabilityLevel {
+		return true
+	} else if ms[i].StabilityLevel > ms[j].StabilityLevel {
+		return false
+	}
+	return ms[i].BuildFQName() < ms[j].BuildFQName()
+}
+func (ms byFQName) Swap(i, j int) {
+	ms[i], ms[j] = ms[j], ms[i]
 }

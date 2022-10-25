@@ -12,12 +12,6 @@
     certificate is invalid or unused, the value will be +INF.
   type: Gauge
   stabilityLevel: ALPHA
-- name: endpointslices_changed_per_sync
-  subsystem: endpoint_slice_controller
-  help: Number of EndpointSlices changed on each Service sync
-  type: Histogram
-  labels:
-  - topology
 - name: cronjob_job_creation_skew_duration_seconds
   subsystem: cronjob_controller
   help: Time between when a cronjob is scheduled to be run, and when the corresponding
@@ -94,6 +88,13 @@
   - 8192
   - 16384
   - 32768
+- name: endpointslices_changed_per_sync
+  subsystem: endpoint_slice_controller
+  help: Number of EndpointSlices changed on each Service sync
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - topology
 - name: num_endpoint_slices
   subsystem: endpoint_slice_controller
   help: Number of EndpointSlices
@@ -269,22 +270,6 @@
   stabilityLevel: ALPHA
   labels:
   - code
-- name: job_pods_finished_total
-  subsystem: job_controller
-  help: The number of finished Pods that are fully tracked
-  type: Counter
-  labels:
-  - completion_mode
-  - result
-- name: terminated_pods_tracking_finalizer_total
-  subsystem: job_controller
-  help: |-
-    `The number of terminated pods (phase=Failed|Succeeded)
-    that have the finalizer batch.kubernetes.io/job-tracking
-    The event label can be "add" or "delete".`
-  type: Counter
-  labels:
-  - event
 - name: attachdetach_controller_forced_detaches
   help: Number of times the A/D Controller performed a forced detach
   type: Counter
@@ -292,6 +277,14 @@
 - name: job_finished_total
   subsystem: job_controller
   help: The number of finished job
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - completion_mode
+  - result
+- name: job_pods_finished_total
+  subsystem: job_controller
+  help: The number of finished Pods that are fully tracked
   type: Counter
   stabilityLevel: ALPHA
   labels:
@@ -331,6 +324,16 @@
   - action
   - completion_mode
   - result
+- name: terminated_pods_tracking_finalizer_total
+  subsystem: job_controller
+  help: |-
+    `The number of terminated pods (phase=Failed|Succeeded)
+    that have the finalizer batch.kubernetes.io/job-tracking
+    The event label can be "add" or "delete".`
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - event
 - name: evictions_number
   subsystem: node_collector
   help: Number of Node evictions that happened since current instance of NodeController

@@ -89,6 +89,12 @@ func main() {
 	if len(stableMetrics) == 0 {
 		os.Exit(0)
 	}
+	for i, m := range stableMetrics {
+		if m.StabilityLevel == "" {
+			m.StabilityLevel = "ALPHA"
+		}
+		stableMetrics[i] = m
+	}
 	sort.Sort(byFQName(stableMetrics))
 	data, err := yaml.Marshal(stableMetrics)
 	if err != nil {

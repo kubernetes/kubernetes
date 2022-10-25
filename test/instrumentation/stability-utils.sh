@@ -115,7 +115,7 @@ kube::update::documentation::list() {
     exit 1
   fi
   mv -f "$temp_file" "${KUBE_ROOT}/test/instrumentation/testdata/documentation-list.yaml"
-  echo "${green}Updated golden list of stable metrics.${reset}"
+  echo "${green}Updated list of metrics for documentation ${reset}"
 }
 
 kube::update::documentation() {
