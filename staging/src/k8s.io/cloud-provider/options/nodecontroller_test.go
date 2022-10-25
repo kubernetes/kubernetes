@@ -47,11 +47,12 @@ func TestNodeControllerConcurrentNodeSyncsValidation(t *testing.T) {
 		{
 			desc:   "negative value",
 			input:  &NodeControllerOptions{NodeControllerConfiguration: &nodeconfig.NodeControllerConfiguration{ConcurrentNodeSyncs: -5}},
-			expect: []error{fmt.Errorf("node-controller-concurrent-node-syncs must be a positive number")},
+			expect: []error{fmt.Errorf("concurrent-node-syncs must be a positive number")},
 		},
 		{
-			desc:  "non negative value",
-			input: &NodeControllerOptions{NodeControllerConfiguration: &nodeconfig.NodeControllerConfiguration{ConcurrentNodeSyncs: 0}},
+			desc:   "zero value",
+			input:  &NodeControllerOptions{NodeControllerConfiguration: &nodeconfig.NodeControllerConfiguration{ConcurrentNodeSyncs: 0}},
+			expect: []error{fmt.Errorf("concurrent-node-syncs must be a positive number")},
 		},
 		{
 			desc:  "positive value",
