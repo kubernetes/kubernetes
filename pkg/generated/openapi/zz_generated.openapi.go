@@ -4389,7 +4389,7 @@ func schema_k8sio_api_apps_v1_DeploymentStatus(ref common.ReferenceCallback) com
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Represents the latest available observations of a deployment's current state.",
+							Description: "Represents the latest observations of a deployment's current state (described by the observedGeneration). Deployments are given the following conditions automatically: Available is true when the number of available replicas under the deployment's replica sets is greater than the user's defined minimum availability. The minimum availability is controlled by the update strategy - the Recreate strategy has a minimum availability of zero (always Available), and the Rolling strategy defaults to a minimum availability of zero unless replicas is greater than 1, the maxSurge parameter is specified, or maxUnavailable is smaller than the number of replicas. Progressing is true when the deployment is trying to reach minimum availability on a new replica set. Progressing remains true once minimum availability is reached until a new replica set (a revision) is created. ReplicaFailure is true when a replica fails to be created or deleted. Additional conditions may be added by other clients in the system.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{

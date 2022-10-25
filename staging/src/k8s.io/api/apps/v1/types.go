@@ -503,7 +503,18 @@ type DeploymentStatus struct {
 	// +optional
 	UnavailableReplicas int32 `json:"unavailableReplicas,omitempty" protobuf:"varint,5,opt,name=unavailableReplicas"`
 
-	// Represents the latest available observations of a deployment's current state.
+	// Represents the latest observations of a deployment's current state (described by the observedGeneration).
+	// Deployments are given the following conditions automatically:
+	// Available is true when the number of available replicas under the deployment's replica sets is
+	// greater than the user's defined minimum availability. The minimum availability is controlled by the
+	// update strategy - the Recreate strategy has a minimum availability of zero (always Available), and
+	// the Rolling strategy defaults to a minimum availability of zero unless replicas is greater than 1,
+	// the maxSurge parameter is specified, or maxUnavailable is smaller than the number of replicas.
+	// Progressing is true when the deployment is trying to reach minimum availability on a new replica set.
+	// Progressing remains true once minimum availability is reached until a new replica set (a revision) is
+	// created.
+	// ReplicaFailure is true when a replica fails to be created or deleted.
+	// Additional conditions may be added by other clients in the system.
 	// +patchMergeKey=type
 	// +patchStrategy=merge
 	Conditions []DeploymentCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,6,rep,name=conditions"`
@@ -520,12 +531,15 @@ type DeploymentConditionType string
 // These are valid conditions of a deployment.
 const (
 	// Available means the deployment is available, ie. at least the minimum available
-	// replicas required are up and running for at least minReadySeconds.
+	// replicas required are up and running for at least minReadySeconds. A deployment
+	// that allows a minimum availability of zero (such as with the Recreate strategy,
+	// with a replica count of one, or with a maxUnavailable of 100% or up to the
+	// current number of replicas) will be considered available even if no available
+	// replicas exist.
 	DeploymentAvailable DeploymentConditionType = "Available"
 	// Progressing means the deployment is progressing. Progress for a deployment is
-	// considered when a new replica set is created or adopted, and when new pods scale
-	// up or old pods scale down. Progress is not estimated for paused deployments or
-	// when progressDeadlineSeconds is not specified.
+	// considered when a new replica set is created or adopted. Progress is not
+	// estimated for paused deployments or when progressDeadlineSeconds is not specified.
 	DeploymentProgressing DeploymentConditionType = "Progressing"
 	// ReplicaFailure is added in a deployment when one of its pods fails to be created
 	// or deleted.
