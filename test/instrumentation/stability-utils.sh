@@ -105,6 +105,31 @@ kube::update::stablemetrics() {
   echo "${green}Updated golden list of stable metrics.${reset}"
 }
 
+kube::update::documentation::list() {
+  stability_check_setup
+  temp_file=$(mktemp)
+  doCheckStability=$(find_files_to_check | grep -E ".*.go" | grep -v ".*_test.go" | sort | KUBE_ROOT=${KUBE_ROOT} xargs -L 200 go run "test/instrumentation/main.go" "test/instrumentation/decode_metric.go" "test/instrumentation/find_stable_metric.go" "test/instrumentation/error.go" "test/instrumentation/metric.go" --allstabilityclasses -- 1>"${temp_file}")
+
+  if ! $doCheckStability; then
+    echo "${red}!!! updating golden list of metrics has failed! ${reset}" >&2
+    exit 1
+  fi
+  mv -f "$temp_file" "${KUBE_ROOT}/test/instrumentation/testdata/documentation-list.yaml"
+  echo "${green}Updated golden list of stable metrics.${reset}"
+}
+
+kube::update::documentation() {
+  stability_check_setup
+  temp_file=$(mktemp)
+  doUpdateDocs=$(go run "test/instrumentation/documentation/main.go" -- 1>"${temp_file}")
+  if ! $doUpdateDocs; then
+    echo "${red}!!! updating documentation has failed! ${reset}" >&2
+    exit 1
+  fi
+  mv -f "$temp_file" "${KUBE_ROOT}/test/instrumentation/testdata/documentation.md"
+  echo "${green}Updated documentation of metrics.${reset}"
+}
+
 kube::update::test::stablemetrics() {
   stability_check_setup
   temp_file=$(mktemp)

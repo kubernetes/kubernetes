@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,16 +17,95 @@ limitations under the License.
 package main
 
 import (
+	"bytes"
+	"fmt"
+	"os"
+	"strings"
+	"text/template"
+	"time"
+
+	"gopkg.in/yaml.v2"
+
 	"k8s.io/component-base/metrics"
 )
 
-const (
-	counterMetricType    = "Counter"
-	gaugeMetricType      = "Gauge"
-	histogramMetricType  = "Histogram"
-	summaryMetricType    = "Summary"
-	timingRatioHistogram = "TimingRatioHistogram"
+var (
+	GOROOT    string = os.Getenv("GOROOT")
+	GOOS      string = os.Getenv("GOOS")
+	KUBE_ROOT string = os.Getenv("KUBE_ROOT")
 )
+
+const (
+	templ = `---
+title: Kubernetes Metrics Across Components
+content_type: instrumentation
+---
+
+
+## Metrics
+
+These are the metrics which are exported in Kubernetes components (i.e. kube-apiserver, scheduler, kube-controller-manager, kube-proxy, cloud-controller-manager). 
+
+(auto-generated {{.GeneratedDate.Format "2006 Jan 02"}})
+
+### List of Kubernetes Metrics
+
+<table class="table">
+<thead>
+	<tr>
+		<td>Name</td>
+		<td>Stability Level</td>
+		<td>Type</td>
+		<td width="20%">Help</td>
+		<td>Labels</td>
+		<td>Const Labels</td>
+	</tr>
+</thead>
+<tbody>
+{{range $index, $metric := .Metrics}}<tr><td>{{$metric.Name}}</td><td>{{$metric.StabilityLevel}}</td><td>{{$metric.Type}}</td><td>{{$metric.Help}}</td>{{if not $metric.Labels }}<td>None</td>{{else }}<td>{{range $label := $metric.Labels}}<div>{{$label}}</div>{{end}}</td>{{end}}{{if not $metric.ConstLabels }}<td>None</td>{{else }}<td>{{$metric.ConstLabels}}</td>{{end}}</tr>
+{{end}}
+</tbody>
+</table>
+`
+)
+
+type templateData struct {
+	Metrics       []metric
+	GeneratedDate time.Time
+}
+
+func main() {
+	dat, err := os.ReadFile("test/instrumentation/testdata/documentation-list.yaml")
+	if err == nil {
+		metrics := []metric{}
+		err = yaml.Unmarshal(dat, &metrics)
+		if err != nil {
+			println("err", err)
+		}
+		t := template.New("t")
+		t, err := t.Parse(templ)
+		if err != nil {
+			println("err", err)
+		}
+		var tpl bytes.Buffer
+		for i, m := range metrics {
+			m.Help = strings.Join(strings.Split(m.Help, "\n"), " ")
+			metrics[i] = m
+		}
+		data := templateData{
+			Metrics:       metrics,
+			GeneratedDate: time.Now(),
+		}
+		err = t.Execute(&tpl, data)
+		if err != nil {
+			println("err", err)
+		}
+		fmt.Print(tpl.String())
+	} else {
+		fmt.Fprintf(os.Stderr, "%s\n", err)
+	}
+
+}
 
 type metric struct {
 	Name              string              `yaml:"name" json:"name"`
@@ -47,19 +126,4 @@ type metric struct {
 
 func (m metric) buildFQName() string {
 	return metrics.BuildFQName(m.Namespace, m.Subsystem, m.Name)
-}
-
-type byFQName []metric
-
-func (ms byFQName) Len() int { return len(ms) }
-func (ms byFQName) Less(i, j int) bool {
-	if ms[i].StabilityLevel < ms[j].StabilityLevel {
-		return true
-	} else if ms[i].StabilityLevel > ms[j].StabilityLevel {
-		return false
-	}
-	return ms[i].buildFQName() < ms[j].buildFQName()
-}
-func (ms byFQName) Swap(i, j int) {
-	ms[i], ms[j] = ms[j], ms[i]
 }

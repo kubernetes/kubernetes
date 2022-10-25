@@ -41,12 +41,15 @@ const (
 
 var (
 	// env configs
-	GOROOT    string = os.Getenv("GOROOT")
-	GOOS      string = os.Getenv("GOOS")
-	KUBE_ROOT string = os.Getenv("KUBE_ROOT")
+	GOROOT                string = os.Getenv("GOROOT")
+	GOOS                  string = os.Getenv("GOOS")
+	KUBE_ROOT             string = os.Getenv("KUBE_ROOT")
+	ALL_STABILITY_CLASSES bool
 )
 
 func main() {
+
+	flag.BoolVar(&ALL_STABILITY_CLASSES, "allstabilityclasses", false, "use this flag to enable all stability classes")
 	flag.Parse()
 	if len(flag.Args()) < 1 {
 		fmt.Fprintf(os.Stderr, "USAGE: %s <DIR or FILE or '-'> [...]\n", os.Args[0])
