@@ -55,7 +55,7 @@ func (o *NodeControllerOptions) Validate() []error {
 		return nil
 	}
 	var errors []error
-	if o.ConcurrentNodeSyncs < 0 {
+	if o.ConcurrentNodeSyncs <= 0 {
 		errors = append(errors, fmt.Errorf("concurrent-node-syncs must be a positive number"))
 	}
 	return errors
