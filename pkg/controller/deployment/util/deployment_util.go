@@ -435,8 +435,16 @@ func ReplicasAnnotationsNeedUpdate(rs *apps.ReplicaSet, desiredReplicas, maxRepl
 
 // MaxUnavailable returns the maximum unavailable pods a rolling deployment can take.
 func MaxUnavailable(deployment apps.Deployment) int32 {
-	if !IsRollingUpdate(&deployment) || *(deployment.Spec.Replicas) == 0 {
-		return int32(0)
+	switch {
+	case *(deployment.Spec.Replicas) == 0:
+		// no request means we can't take any unavailable
+		return 0
+	case deployment.Spec.Strategy.Type == apps.RecreateDeploymentStrategyType:
+		// the recreate strategy allows all replicas to be unavailable during upgrade
+		return *(deployment.Spec.Replicas)
+	case !IsRollingUpdate(&deployment):
+		// an unknown case
+		return 0
 	}
 	// Error caught by validation
 	_, maxUnavailable, _ := ResolveFenceposts(deployment.Spec.Strategy.RollingUpdate.MaxSurge, deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, *(deployment.Spec.Replicas))
@@ -446,10 +454,10 @@ func MaxUnavailable(deployment apps.Deployment) int32 {
 	return maxUnavailable
 }
 
-// MinAvailable returns the minimum available pods of a given deployment
+// MinAvailable returns the minimum available pods of a given deployment.
 func MinAvailable(deployment *apps.Deployment) int32 {
 	if !IsRollingUpdate(deployment) {
-		return int32(0)
+		return 0
 	}
 	return *(deployment.Spec.Replicas) - MaxUnavailable(*deployment)
 }

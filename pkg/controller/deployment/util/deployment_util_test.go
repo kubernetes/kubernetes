@@ -954,19 +954,26 @@ func TestDeploymentTimedOut(t *testing.T) {
 }
 
 func TestMaxUnavailable(t *testing.T) {
-	deployment := func(replicas int32, maxUnavailable intstr.IntOrString) apps.Deployment {
-		return apps.Deployment{
+	deployment := func(recreate bool, replicas int32, maxUnavailable intstr.IntOrString) apps.Deployment {
+		d := apps.Deployment{
 			Spec: apps.DeploymentSpec{
 				Replicas: func(i int32) *int32 { return &i }(replicas),
-				Strategy: apps.DeploymentStrategy{
-					RollingUpdate: &apps.RollingUpdateDeployment{
-						MaxSurge:       func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(1)),
-						MaxUnavailable: &maxUnavailable,
-					},
-					Type: apps.RollingUpdateDeploymentStrategyType,
-				},
 			},
 		}
+		if recreate {
+			d.Spec.Strategy = apps.DeploymentStrategy{
+				Type: apps.RecreateDeploymentStrategyType,
+			}
+		} else {
+			d.Spec.Strategy = apps.DeploymentStrategy{
+				RollingUpdate: &apps.RollingUpdateDeployment{
+					MaxSurge:       func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(1)),
+					MaxUnavailable: &maxUnavailable,
+				},
+				Type: apps.RollingUpdateDeploymentStrategyType,
+			}
+		}
+		return d
 	}
 	tests := []struct {
 		name       string
@@ -975,48 +982,47 @@ func TestMaxUnavailable(t *testing.T) {
 	}{
 		{
 			name:       "maxUnavailable less than replicas",
-			deployment: deployment(10, intstr.FromInt(5)),
+			deployment: deployment(false, 10, intstr.FromInt(5)),
 			expected:   int32(5),
 		},
 		{
 			name:       "maxUnavailable equal replicas",
-			deployment: deployment(10, intstr.FromInt(10)),
+			deployment: deployment(false, 10, intstr.FromInt(10)),
 			expected:   int32(10),
 		},
 		{
 			name:       "maxUnavailable greater than replicas",
-			deployment: deployment(5, intstr.FromInt(10)),
+			deployment: deployment(false, 5, intstr.FromInt(10)),
 			expected:   int32(5),
 		},
 		{
 			name:       "maxUnavailable with replicas is 0",
-			deployment: deployment(0, intstr.FromInt(10)),
+			deployment: deployment(false, 0, intstr.FromInt(10)),
 			expected:   int32(0),
 		},
 		{
-			name: "maxUnavailable with Recreate deployment strategy",
-			deployment: apps.Deployment{
-				Spec: apps.DeploymentSpec{
-					Strategy: apps.DeploymentStrategy{
-						Type: apps.RecreateDeploymentStrategyType,
-					},
-				},
-			},
-			expected: int32(0),
+			name:       "maxUnavailable with Recreate deployment strategy and 1 replica",
+			deployment: deployment(true, 1, intstr.FromInt(0)),
+			expected:   int32(1),
+		},
+		{
+			name:       "maxUnavailable with Recreate deployment strategy and 2 replicas",
+			deployment: deployment(true, 2, intstr.FromInt(0)),
+			expected:   int32(2),
 		},
 		{
 			name:       "maxUnavailable less than replicas with percents",
-			deployment: deployment(10, intstr.FromString("50%")),
+			deployment: deployment(false, 10, intstr.FromString("50%")),
 			expected:   int32(5),
 		},
 		{
 			name:       "maxUnavailable equal replicas with percents",
-			deployment: deployment(10, intstr.FromString("100%")),
+			deployment: deployment(false, 10, intstr.FromString("100%")),
 			expected:   int32(10),
 		},
 		{
 			name:       "maxUnavailable greater than replicas with percents",
-			deployment: deployment(5, intstr.FromString("100%")),
+			deployment: deployment(false, 5, intstr.FromString("100%")),
 			expected:   int32(5),
 		},
 	}

@@ -19,9 +19,12 @@ package deployment
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
@@ -141,6 +144,13 @@ func newReplicaSet(d *apps.Deployment, name string, replicas int) *apps.ReplicaS
 	}
 }
 
+func setReplicaSetStatus(rs *apps.ReplicaSet, replicas, fullyLabeled, available, ready int32) {
+	rs.Status.Replicas = replicas
+	rs.Status.FullyLabeledReplicas = fullyLabeled
+	rs.Status.AvailableReplicas = available
+	rs.Status.ReadyReplicas = ready
+}
+
 type fixture struct {
 	t testing.TB
 
@@ -152,28 +162,38 @@ type fixture struct {
 
 	// Actions expected to happen on the client. Objects from here are also
 	// preloaded into NewSimpleFake.
-	actions []core.Action
-	objects []runtime.Object
+	actions     []core.Action
+	objectTests []func(runtime.Object)
+	objects     []runtime.Object
 }
 
 func (f *fixture) expectGetDeploymentAction(d *apps.Deployment) {
 	action := core.NewGetAction(schema.GroupVersionResource{Resource: "deployments"}, d.Namespace, d.Name)
 	f.actions = append(f.actions, action)
+	f.objectTests = append(f.objectTests, nil)
 }
 
 func (f *fixture) expectUpdateDeploymentStatusAction(d *apps.Deployment) {
 	action := core.NewUpdateAction(schema.GroupVersionResource{Resource: "deployments"}, d.Namespace, d)
 	action.Subresource = "status"
 	f.actions = append(f.actions, action)
+	f.objectTests = append(f.objectTests, nil)
+}
+
+func (f *fixture) expectUpdateDeploymentStatusActionFunc(d *apps.Deployment, fn func(runtime.Object)) {
+	f.expectUpdateDeploymentStatusAction(d)
+	f.objectTests[len(f.objectTests)-1] = fn
 }
 
 func (f *fixture) expectUpdateDeploymentAction(d *apps.Deployment) {
 	action := core.NewUpdateAction(schema.GroupVersionResource{Resource: "deployments"}, d.Namespace, d)
 	f.actions = append(f.actions, action)
+	f.objectTests = append(f.objectTests, nil)
 }
 
 func (f *fixture) expectCreateRSAction(rs *apps.ReplicaSet) {
 	f.actions = append(f.actions, core.NewCreateAction(schema.GroupVersionResource{Resource: "replicasets"}, rs.Namespace, rs))
+	f.objectTests = append(f.objectTests, nil)
 }
 
 func newFixture(t testing.TB) *fixture {
@@ -243,6 +263,12 @@ func (f *fixture) run_(ctx context.Context, deploymentName string, startInformer
 		if !(expectedAction.Matches(action.GetVerb(), action.GetResource().Resource) && action.GetSubresource() == expectedAction.GetSubresource()) {
 			f.t.Errorf("Expected\n\t%#v\ngot\n\t%#v", expectedAction, action)
 			continue
+		}
+		if fn := f.objectTests[i]; fn != nil {
+			switch t := action.(type) {
+			case core.UpdateAction:
+				fn(t.GetObject())
+			}
 		}
 	}
 
@@ -374,6 +400,190 @@ func TestReentrantRollback(t *testing.T) {
 	f.expectUpdateDeploymentAction(d)
 	// Expect no update on replica sets though
 	f.run(ctx, testutil.GetKey(d, t))
+}
+
+func recreateDeployment(deployments []*apps.Deployment, _ []*apps.ReplicaSet) {
+	d := deployments[0]
+	d.Spec.Strategy.Type = apps.RecreateDeploymentStrategyType
+	d.Spec.Strategy.RollingUpdate = nil
+}
+
+func rollingDeployment(maxUnavailable, maxSurge *intstr.IntOrString) func([]*apps.Deployment, []*apps.ReplicaSet) {
+	return func(deployments []*apps.Deployment, _ []*apps.ReplicaSet) {
+		d := deployments[0]
+		d.Spec.Strategy.Type = apps.RollingUpdateDeploymentStrategyType
+		d.Spec.Strategy.RollingUpdate = &apps.RollingUpdateDeployment{
+			MaxUnavailable: maxUnavailable,
+			MaxSurge:       maxSurge,
+		}
+	}
+}
+
+func TestUpdateConditions(t *testing.T) {
+	type objectsFunc func(t *testing.T) ([]*apps.Deployment, []*apps.ReplicaSet)
+	type wantActionsFunc func(t *testing.T, f *fixture, deployments []*apps.Deployment, replicaSets []*apps.ReplicaSet)
+	type modifierFunc func([]*apps.Deployment, []*apps.ReplicaSet)
+
+	simpleReplicaSetStatusFn := func(specReplicas, replicas, ready, available int32, fns ...modifierFunc) objectsFunc {
+		return func(t *testing.T) ([]*apps.Deployment, []*apps.ReplicaSet) {
+			d := newDeployment("foo", int(specReplicas), nil, nil, nil, map[string]string{"foo": "bar"})
+			d.Annotations = map[string]string{util.RevisionAnnotation: "2"}
+
+			rs1 := newReplicaSet(d, "deploymentrs-new", 1)
+			rs1.Spec.Replicas = &specReplicas
+			rs1.Annotations = map[string]string{util.RevisionAnnotation: "2"}
+			rs1.Spec.Selector.MatchLabels[apps.DefaultDeploymentUniqueLabelKey] = "hash"
+			setReplicaSetStatus(rs1, replicas, replicas, available, ready)
+
+			deployments, replicaSets := []*apps.Deployment{d}, []*apps.ReplicaSet{rs1}
+			for _, fn := range fns {
+				fn(deployments, replicaSets)
+			}
+			return deployments, replicaSets
+		}
+	}
+	expectSimpleDeploymentStatus := func(conditionAvailable bool, replicas, ready, available int32) wantActionsFunc {
+		return func(t *testing.T, f *fixture, deployments []*apps.Deployment, replicaSets []*apps.ReplicaSet) {
+			d := deployments[0].DeepCopy()
+			d.Status.AvailableReplicas = available
+			d.Status.ReadyReplicas = ready
+			d.Status.Replicas = replicas
+			d.Status.UpdatedReplicas = replicas
+			var specReplicas int32
+			for _, rs := range replicaSets {
+				specReplicas += *rs.Spec.Replicas
+			}
+			unavailable := specReplicas - available
+			if unavailable < 0 {
+				unavailable = 0
+			}
+			d.Status.UnavailableReplicas = unavailable
+			switch {
+			case conditionAvailable && d.Status.AvailableReplicas > 0:
+				d.Status.Conditions = []apps.DeploymentCondition{
+					{
+						Type:    apps.DeploymentAvailable,
+						Status:  v1.ConditionTrue,
+						Reason:  "MinimumReplicasAvailable",
+						Message: "Deployment has minimum availability.",
+					},
+				}
+			case conditionAvailable && d.Status.AvailableReplicas == 0:
+				d.Status.Conditions = []apps.DeploymentCondition{
+					{
+						Type:    apps.DeploymentAvailable,
+						Status:  v1.ConditionTrue,
+						Reason:  "MinimumReplicasAvailable",
+						Message: "Deployment specifies minimum availability of zero and has no available replicas.",
+					},
+				}
+			default:
+				d.Status.Conditions = []apps.DeploymentCondition{
+					{
+						Type:    apps.DeploymentAvailable,
+						Status:  v1.ConditionFalse,
+						Reason:  "MinimumReplicasUnavailable",
+						Message: "Deployment does not have minimum availability.",
+					},
+				}
+			}
+			f.expectUpdateDeploymentStatusActionFunc(d, func(got runtime.Object) {
+				opt := cmp.FilterPath(func(p cmp.Path) bool {
+					if p.Index(-2).Type() != reflect.TypeOf(apps.DeploymentCondition{}) {
+						return false
+					}
+					if f, ok := p.Index(-1).(cmp.StructField); !ok || !strings.HasSuffix(f.Name(), "Time") {
+						return false
+					}
+					return true
+				}, cmp.Ignore())
+				if s := cmp.Diff(d, got, opt); len(s) != 0 {
+					f.t.Errorf("Action object mismatch: %v", s)
+				}
+			})
+		}
+	}
+
+	testCases := []struct {
+		name          string
+		objectsFn     objectsFunc
+		wantActionsFn wantActionsFunc
+	}{
+		{
+			name:          "rolling available",
+			objectsFn:     simpleReplicaSetStatusFn(1, 1, 1, 1),
+			wantActionsFn: expectSimpleDeploymentStatus(true, 1, 1, 1),
+		},
+		{
+			name:          "rolling is available when 1 pod unready",
+			objectsFn:     simpleReplicaSetStatusFn(2, 2, 1, 1),
+			wantActionsFn: expectSimpleDeploymentStatus(true, 2, 1, 1),
+		},
+		{
+			name:          "rolling is unavailable when 2 pods unready",
+			objectsFn:     simpleReplicaSetStatusFn(2, 2, 0, 0),
+			wantActionsFn: expectSimpleDeploymentStatus(false, 2, 0, 0),
+		},
+		{
+			name:          "rolling is available when 1 pod unavailable",
+			objectsFn:     simpleReplicaSetStatusFn(2, 2, 2, 1),
+			wantActionsFn: expectSimpleDeploymentStatus(true, 2, 2, 1),
+		},
+		{
+			name:          "rolling is unavailable when all pods unavailable",
+			objectsFn:     simpleReplicaSetStatusFn(2, 2, 2, 0),
+			wantActionsFn: expectSimpleDeploymentStatus(false, 2, 2, 0),
+		},
+		{
+			name:          "recreate is available when all pods unavailable",
+			objectsFn:     simpleReplicaSetStatusFn(2, 2, 2, 0, recreateDeployment),
+			wantActionsFn: expectSimpleDeploymentStatus(true, 2, 2, 0),
+		},
+		{
+			name:          "rolling maxUnavailable=1 is unavailable when all pods unavailable",
+			objectsFn:     simpleReplicaSetStatusFn(2, 2, 2, 0, rollingDeployment(&intstr.IntOrString{IntVal: 1}, nil)),
+			wantActionsFn: expectSimpleDeploymentStatus(false, 2, 2, 0),
+		},
+		{
+			name:          "rolling is available when all pods unready because minAvailable=0",
+			objectsFn:     simpleReplicaSetStatusFn(1, 1, 1, 0),
+			wantActionsFn: expectSimpleDeploymentStatus(true, 1, 1, 0),
+		},
+		{
+			name:          "rolling available when excess pods",
+			objectsFn:     simpleReplicaSetStatusFn(2, 3, 1, 1),
+			wantActionsFn: expectSimpleDeploymentStatus(true, 3, 1, 1),
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			f := newFixture(t)
+
+			var deployments []*apps.Deployment
+			var replicaSets []*apps.ReplicaSet
+			if testCase.objectsFn != nil {
+				deployments, replicaSets = testCase.objectsFn(t)
+			}
+			if len(deployments) < 1 {
+				t.Fatalf("objectsFn must define one deployment")
+			}
+
+			f.dLister = append(f.dLister, deployments...)
+			for _, d := range deployments {
+				f.objects = append(f.objects, d)
+			}
+			f.rsLister = append(f.rsLister, replicaSets...)
+			for _, r := range replicaSets {
+				f.objects = append(f.objects, r)
+			}
+
+			if testCase.wantActionsFn != nil {
+				testCase.wantActionsFn(t, f, deployments, replicaSets)
+			}
+
+			f.run(testutil.GetKey(deployments[0], t))
+		})
+	}
 }
 
 // TestPodDeletionEnqueuesRecreateDeployment ensures that the deletion of a pod
