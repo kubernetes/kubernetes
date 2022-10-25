@@ -35,6 +35,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	utilpointer "k8s.io/utils/pointer"
@@ -1144,6 +1145,169 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage
 			for j, wantPod := range tt.expectedOut {
 				getPod := &out.Items[j]
 				ExpectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), wantPod, getPod)
+			}
+		})
+	}
+}
+
+type PrefixTransformerModifier func(*PrefixTransformer) value.Transformer
+
+type InterfaceWithPrefixTransformer interface {
+	storage.Interface
+
+	UpdatePrefixTransformer(PrefixTransformerModifier) func()
+}
+
+func RunTestGuaranteedUpdate(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer, validation KeyValidation) {
+	key := "/testkey"
+
+	tests := []struct {
+		name                string
+		key                 string
+		ignoreNotFound      bool
+		precondition        *storage.Preconditions
+		expectNotFoundErr   bool
+		expectInvalidObjErr bool
+		expectNoUpdate      bool
+		transformStale      bool
+		hasSelfLink         bool
+	}{{
+		name:                "non-existing key, ignoreNotFound=false",
+		key:                 "/non-existing",
+		ignoreNotFound:      false,
+		precondition:        nil,
+		expectNotFoundErr:   true,
+		expectInvalidObjErr: false,
+		expectNoUpdate:      false,
+	}, {
+		name:                "non-existing key, ignoreNotFound=true",
+		key:                 "/non-existing",
+		ignoreNotFound:      true,
+		precondition:        nil,
+		expectNotFoundErr:   false,
+		expectInvalidObjErr: false,
+		expectNoUpdate:      false,
+	}, {
+		name:                "existing key",
+		key:                 key,
+		ignoreNotFound:      false,
+		precondition:        nil,
+		expectNotFoundErr:   false,
+		expectInvalidObjErr: false,
+		expectNoUpdate:      false,
+	}, {
+		name:                "same data",
+		key:                 key,
+		ignoreNotFound:      false,
+		precondition:        nil,
+		expectNotFoundErr:   false,
+		expectInvalidObjErr: false,
+		expectNoUpdate:      true,
+	}, {
+		name:                "same data, a selfLink",
+		key:                 key,
+		ignoreNotFound:      false,
+		precondition:        nil,
+		expectNotFoundErr:   false,
+		expectInvalidObjErr: false,
+		expectNoUpdate:      true,
+		hasSelfLink:         true,
+	}, {
+		name:                "same data, stale",
+		key:                 key,
+		ignoreNotFound:      false,
+		precondition:        nil,
+		expectNotFoundErr:   false,
+		expectInvalidObjErr: false,
+		expectNoUpdate:      false,
+		transformStale:      true,
+	}, {
+		name:                "UID match",
+		key:                 key,
+		ignoreNotFound:      false,
+		precondition:        storage.NewUIDPreconditions("A"),
+		expectNotFoundErr:   false,
+		expectInvalidObjErr: false,
+		expectNoUpdate:      true,
+	}, {
+		name:                "UID mismatch",
+		key:                 key,
+		ignoreNotFound:      false,
+		precondition:        storage.NewUIDPreconditions("B"),
+		expectNotFoundErr:   false,
+		expectInvalidObjErr: true,
+		expectNoUpdate:      true,
+	}}
+
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key, storeObj := TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
+
+			out := &example.Pod{}
+			name := fmt.Sprintf("foo-%d", i)
+			if tt.expectNoUpdate {
+				name = storeObj.Name
+			}
+
+			if tt.transformStale {
+				revertTransformer := store.UpdatePrefixTransformer(
+					func(transformer *PrefixTransformer) value.Transformer {
+						transformer.stale = true
+						return transformer
+					})
+				defer revertTransformer()
+			}
+
+			version := storeObj.ResourceVersion
+			err := store.GuaranteedUpdate(ctx, tt.key, out, tt.ignoreNotFound, tt.precondition,
+				storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+					if tt.expectNotFoundErr && tt.ignoreNotFound {
+						if pod := obj.(*example.Pod); pod.Name != "" {
+							t.Errorf("%s: expecting zero value, but get=%#v", tt.name, pod)
+						}
+					}
+					pod := *storeObj
+					if tt.hasSelfLink {
+						pod.SelfLink = "testlink"
+					}
+					pod.Name = name
+					return &pod, nil
+				}), nil)
+
+			if tt.expectNotFoundErr {
+				if err == nil || !storage.IsNotFound(err) {
+					t.Errorf("%s: expecting not found error, but get: %v", tt.name, err)
+				}
+				return
+			}
+			if tt.expectInvalidObjErr {
+				if err == nil || !storage.IsInvalidObj(err) {
+					t.Errorf("%s: expecting invalid UID error, but get: %s", tt.name, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("%s: GuaranteedUpdate failed: %v", tt.name, err)
+			}
+			if out.ObjectMeta.Name != name {
+				t.Errorf("%s: pod name want=%s, get=%s", tt.name, name, out.ObjectMeta.Name)
+			}
+			if out.SelfLink != "" {
+				t.Errorf("%s: selfLink should not be set", tt.name)
+			}
+
+			// verify that kv pair is not empty after set and that the underlying data matches expectations
+			validation(ctx, t, key)
+
+			switch tt.expectNoUpdate {
+			case true:
+				if version != out.ResourceVersion {
+					t.Errorf("%s: expect no version change, before=%s, after=%s", tt.name, version, out.ResourceVersion)
+				}
+			case false:
+				if version == out.ResourceVersion {
+					t.Errorf("%s: expect version change, but get the same version=%s", tt.name, version)
+				}
 			}
 		})
 	}
