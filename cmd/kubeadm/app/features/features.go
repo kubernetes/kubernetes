@@ -33,7 +33,7 @@ const (
 	PublicKeysECDSA = "PublicKeysECDSA"
 	// RootlessControlPlane is expected to be in alpha in v1.22
 	RootlessControlPlane = "RootlessControlPlane"
-	// EtcdLearnerMode is expected to be in alpha in v1.26
+	// EtcdLearnerMode is expected to be in alpha in v1.27
 	EtcdLearnerMode = "EtcdLearnerMode"
 )
 

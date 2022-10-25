@@ -60,6 +60,7 @@ type ClusterInterrogator interface {
 	Sync() error
 	ListMembers() ([]Member, error)
 	AddMember(name string, peerAddrs string) ([]Member, error)
+	AddMemberAsLeanerAndPromote(name string, peerAddrs string) ([]Member, error)
 	GetMemberID(peerURL string) (uint64, error)
 	RemoveMember(id uint64) ([]Member, error)
 }
@@ -341,10 +342,20 @@ func (c *Client) RemoveMember(id uint64) ([]Member, error) {
 	return ret, nil
 }
 
-// AddMember notifies an existing etcd cluster that a new member is joining, and
+// AddMember adds a new member into the etcd cluster
+func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
+	return c.addMember(name, peerAddrs, false)
+}
+
+// AddMemberAsLeanerAndPromote adds a new learner member into the etcd cluster and promotes it to a voting member
+func (c *Client) AddMemberAsLeanerAndPromote(name string, peerAddrs string) ([]Member, error) {
+	return c.addMember(name, peerAddrs, true)
+}
+
+// addMember notifies an existing etcd cluster that a new member is joining, and
 // return the updated list of members. If the member has already been added to the
 // cluster, this will return the existing list of etcd members.
-func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
+func (c *Client) addMember(name string, peerAddrs string, isLearner bool) ([]Member, error) {
 	// Parse the peer address, required to add the client URL later to the list
 	// of endpoints for this client. Parsing as a first operation to make sure that
 	// if this fails no member addition is performed on the etcd cluster.
@@ -376,6 +387,21 @@ func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 		defer cancel()
 		var resp *clientv3.MemberAddResponse
+		if isLearner {
+			klog.V(1).Infof("[etcd] Adding etcd member as learner: %016x", peerAddrs)
+			resp, err = cli.MemberAddAsLearner(ctx, []string{peerAddrs})
+			if err == nil {
+				learnerID := resp.Member.ID
+				err = memberPromoteWithRety(ctx, cli, learnerID)
+				if err != nil {
+					lastError = err
+					return false, lastError
+				}
+				respMembers = resp.Members
+				return true, nil
+			}
+		}
+
 		resp, err = cli.MemberAdd(ctx, []string{peerAddrs})
 		if err == nil {
 			respMembers = resp.Members
@@ -425,6 +451,26 @@ func (c *Client) AddMember(name string, peerAddrs string) ([]Member, error) {
 	c.Endpoints = append(c.Endpoints, GetClientURLByIP(parsedPeerAddrs.Hostname()))
 
 	return ret, nil
+}
+
+func memberPromoteWithRety(ctx context.Context, cli *clientv3.Client, learnerID uint64) error {
+	klog.V(1).Infof("[etcd] Promoting a learner as a voting member: %016x", learnerID)
+	err := wait.PollImmediate(5*time.Second, 5*time.Minute, func() (bool, error) {
+		// TODO: warning logs from etcd client should be removed.
+		// The warning logs are printed by etcd client code for several reasons, including
+		// 1. can not promote yet(no synced)
+		// 2. context deadline exceeded
+		// 3. peer URLs already exists
+		// Once the client provides a way to check if the etcd learner is ready to promote, the retry logic can be revisited.
+		_, err := cli.MemberPromote(ctx, learnerID)
+		if err == nil {
+			klog.V(1).Infof("[etcd] The learner was promoted as a voting member: %016x", learnerID)
+			return true, nil
+		}
+		klog.V(4).Infof("[etcd] Promoting the learner %016x failed: %v", learnerID, err)
+		return false, nil
+	})
+	return err
 }
 
 // CheckClusterHealth returns nil for status Up or error for status Down

@@ -251,6 +251,10 @@ func (c fakeTLSEtcdClient) ListMembers() ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
 }
 
+func (c fakeTLSEtcdClient) AddMemberAsLeanerAndPromote(name string, peerAddrs string) ([]etcdutil.Member, error) {
+	return []etcdutil.Member{}, nil
+}
+
 func (c fakeTLSEtcdClient) AddMember(name string, peerAddrs string) ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
 }
@@ -283,6 +287,10 @@ func (c fakePodManifestEtcdClient) CheckClusterHealth() error {
 func (c fakePodManifestEtcdClient) Sync() error { return nil }
 
 func (c fakePodManifestEtcdClient) ListMembers() ([]etcdutil.Member, error) {
+	return []etcdutil.Member{}, nil
+}
+
+func (c fakePodManifestEtcdClient) AddMemberAsLeanerAndPromote(name string, peerAddrs string) ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
 }
 
