@@ -27,8 +27,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
+// LoopControl controls the behavior of the cpu accumulator loop logic
 type LoopControl int
 
+// Possible loop control outcomes
 const (
 	Continue LoopControl = iota
 	Break
