@@ -23,9 +23,9 @@ import (
 	"time"
 
 	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
-	kcpkubernetesclientset "github.com/kcp-dev/client-go/clients/clientset/versioned"
-	kcpcorev1informers "github.com/kcp-dev/client-go/clients/informers/core/v1"
-	kcpcorev1listers "github.com/kcp-dev/client-go/clients/listers/core/v1"
+	kcpkubernetesclientset "github.com/kcp-dev/client-go/kubernetes"
+	kcpcorev1informers "github.com/kcp-dev/client-go/informers/core/v1"
+	kcpcorev1listers "github.com/kcp-dev/client-go/listers/core/v1"
 	kcpthirdpartycache "github.com/kcp-dev/client-go/third_party/k8s.io/client-go/tools/cache"
 	"github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/api/core/v1"

@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
-	kcpkubernetesclientset "github.com/kcp-dev/client-go/clients/clientset/versioned"
-	kcpinformers "github.com/kcp-dev/client-go/clients/informers"
+	kcpkubernetesclientset "github.com/kcp-dev/client-go/kubernetes"
+	kcpinformers "github.com/kcp-dev/client-go/informers"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"

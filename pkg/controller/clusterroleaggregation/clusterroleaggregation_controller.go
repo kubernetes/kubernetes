@@ -23,9 +23,9 @@ import (
 	"time"
 
 	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
-	kcprbacclient "github.com/kcp-dev/client-go/clients/clientset/versioned/typed/rbac/v1"
-	kcprbacinformers "github.com/kcp-dev/client-go/clients/informers/rbac/v1"
-	kcprbaclisters "github.com/kcp-dev/client-go/clients/listers/rbac/v1"
+	kcprbacclient "github.com/kcp-dev/client-go/kubernetes/typed/rbac/v1"
+	kcprbacinformers "github.com/kcp-dev/client-go/informers/rbac/v1"
+	kcprbaclisters "github.com/kcp-dev/client-go/listers/rbac/v1"
 	"github.com/kcp-dev/logicalcluster/v2"
 
 	rbacv1 "k8s.io/api/rbac/v1"

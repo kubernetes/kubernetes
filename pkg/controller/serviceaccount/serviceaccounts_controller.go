@@ -22,9 +22,9 @@ import (
 	"time"
 
 	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
-	kcpkubernetesclientset "github.com/kcp-dev/client-go/clients/clientset/versioned"
-	kcpcorev1informers "github.com/kcp-dev/client-go/clients/informers/core/v1"
-	kcpcorev1listers "github.com/kcp-dev/client-go/clients/listers/core/v1"
+	kcpkubernetesclientset "github.com/kcp-dev/client-go/kubernetes"
+	kcpcorev1informers "github.com/kcp-dev/client-go/informers/core/v1"
+	kcpcorev1listers "github.com/kcp-dev/client-go/listers/core/v1"
 	"github.com/kcp-dev/logicalcluster/v2"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
