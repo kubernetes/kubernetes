@@ -277,19 +277,10 @@ function detect_binary {
     esac
 
     case "$(uname -m)" in
-      x86_64*)
+      x86_64*|i?86_64*|amd64*)
         host_arch=amd64
         ;;
-      i?86_64*)
-        host_arch=amd64
-        ;;
-      amd64*)
-        host_arch=amd64
-        ;;
-      aarch64*)
-        host_arch=arm64
-        ;;
-      arm64*)
+      aarch64*|arm64*)
         host_arch=arm64
         ;;
       arm*)
