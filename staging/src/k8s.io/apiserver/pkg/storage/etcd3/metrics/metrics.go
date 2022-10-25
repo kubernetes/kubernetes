@@ -57,8 +57,9 @@ var (
 	)
 	dbTotalSize = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
-			Name:           "etcd_db_total_size_in_bytes",
-			Help:           "Total size of the etcd database file physically allocated in bytes.",
+			Subsystem:      "apiserver",
+			Name:           "storage_db_total_size_in_bytes",
+			Help:           "Total size of the storage database file physically allocated in bytes.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"endpoint"},
