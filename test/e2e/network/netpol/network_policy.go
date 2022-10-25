@@ -1312,7 +1312,7 @@ var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
 	})
 })
 
-var _ = common.SIGDescribe("Netpol [Feature:SCTPConnectivity][LinuxOnly][Disruptive]", func() {
+var _ = common.SIGDescribe("Netpol [Feature:SCTPConnectivity][LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("sctp-network-policy")
 	f.SkipNamespaceCreation = true
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline

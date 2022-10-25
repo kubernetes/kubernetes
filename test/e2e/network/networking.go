@@ -176,8 +176,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			}
 		})
 
-		// [Disruptive] because it conflicts with tests that call CheckSCTPModuleLoadedOnNodes
-		ginkgo.It("should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive]", func(ctx context.Context) {
+		ginkgo.It("should function for pod-Service: sctp [Feature:SCTPConnectivity]", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableSCTP)
 			ginkgo.By(fmt.Sprintf("dialing(sctp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterSCTPPort))
 			err := config.DialFromTestContainer("sctp", config.ClusterIP, e2enetwork.ClusterSCTPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -219,8 +218,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			}
 		})
 
-		// [Disruptive] because it conflicts with tests that call CheckSCTPModuleLoadedOnNodes
-		ginkgo.It("should function for node-Service: sctp [Feature:SCTPConnectivity][Disruptive]", func(ctx context.Context) {
+		ginkgo.It("should function for node-Service: sctp [Feature:SCTPConnectivity]", func(ctx context.Context) {
 			ginkgo.Skip("Skipping SCTP node to service test until DialFromNode supports SCTP #96482")
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableSCTP)
 			ginkgo.By(fmt.Sprintf("dialing(sctp) %v (node) --> %v:%v (config.clusterIP)", config.NodeIP, config.ClusterIP, e2enetwork.ClusterSCTPPort))
@@ -264,8 +262,7 @@ var _ = common.SIGDescribe("Networking", func() {
 			}
 		})
 
-		// [Disruptive] because it conflicts with tests that call CheckSCTPModuleLoadedOnNodes
-		ginkgo.It("should function for endpoint-Service: sctp [Feature:SCTPConnectivity][Disruptive]", func(ctx context.Context) {
+		ginkgo.It("should function for endpoint-Service: sctp [Feature:SCTPConnectivity]", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableSCTP)
 			ginkgo.By(fmt.Sprintf("dialing(sctp) %v (endpoint) --> %v:%v (config.clusterIP)", config.EndpointPods[0].Name, config.ClusterIP, e2enetwork.ClusterSCTPPort))
 			err := config.DialFromEndpointContainer("sctp", config.ClusterIP, e2enetwork.ClusterSCTPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -635,7 +632,9 @@ var _ = common.SIGDescribe("Networking", func() {
 		framework.ExpectNoError(err, "kubelet did not recreate its iptables rules")
 	})
 
-	ginkgo.It("should allow creating a Pod with an SCTP HostPort [LinuxOnly]", func(ctx context.Context) {
+	// This is [Serial] because it can't run at the same time as the
+	// [Feature:SCTPConnectivity] tests, since they may cause sctp.ko to be loaded.
+	ginkgo.It("should allow creating a Pod with an SCTP HostPort [LinuxOnly] [Serial]", func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
 		framework.ExpectNoError(err)
 		hostExec := utils.NewHostExec(f)

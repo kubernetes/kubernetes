@@ -462,8 +462,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 			}
 		})
 
-		// [Disruptive] because it conflicts with tests that call CheckSCTPModuleLoadedOnNodes
-		ginkgo.It("should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive]", func(ctx context.Context) {
+		ginkgo.It("should function for pod-Service: sctp [Feature:SCTPConnectivity]", func(ctx context.Context) {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack, e2enetwork.EnableSCTP)
 			ginkgo.By(fmt.Sprintf("dialing(sctp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterSCTPPort))
 			err := config.DialFromTestContainer("sctp", config.SecondaryClusterIP, e2enetwork.ClusterSCTPPort, config.MaxTries, 0, config.EndpointHostnames())

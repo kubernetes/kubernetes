@@ -3780,7 +3780,9 @@ var _ = common.SIGDescribe("Services", func() {
 		e2epod.DeletePodOrFail(cs, ns, podname1)
 	})
 
-	ginkgo.It("should allow creating a basic SCTP service with pod and endpoints [LinuxOnly]", func(ctx context.Context) {
+	// These is [Serial] because it can't run at the same time as the
+	// [Feature:SCTPConnectivity] tests, since they may cause sctp.ko to be loaded.
+	ginkgo.It("should allow creating a basic SCTP service with pod and endpoints [LinuxOnly] [Serial]", func(ctx context.Context) {
 		serviceName := "sctp-endpoint-test"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)

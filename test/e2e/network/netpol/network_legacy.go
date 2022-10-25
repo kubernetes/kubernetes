@@ -1686,7 +1686,10 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 			})
 			cleanupServerPodAndService(f, podA, serviceA)
 		})
-		ginkgo.It("should not allow access by TCP when a policy specifies only SCTP [Feature:NetworkPolicy]", func(ctx context.Context) {
+
+		// This is [Serial] because it can't run at the same time as the
+		// [Feature:SCTPConnectivity] tests, since they may cause sctp.ko to be loaded.
+		ginkgo.It("should not allow access by TCP when a policy specifies only SCTP [Feature:NetworkPolicy] [Serial]", func(ctx context.Context) {
 			ginkgo.By("getting the state of the sctp module on nodes")
 			nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 			framework.ExpectNoError(err)
@@ -1729,7 +1732,7 @@ var _ = common.SIGDescribe("NetworkPolicyLegacy [LinuxOnly]", func() {
 	})
 })
 
-var _ = common.SIGDescribe("NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly][Disruptive]", func() {
+var _ = common.SIGDescribe("NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly]", func() {
 	var service *v1.Service
 	var podServer *v1.Pod
 	var podServerLabelSelector string
