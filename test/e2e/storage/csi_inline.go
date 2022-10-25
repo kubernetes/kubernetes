@@ -200,13 +200,6 @@ var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(patchedPod.Annotations["patched"], "true", "patched object should have the applied annotation")
 
-		ginkgo.By("updating")
-		podToUpdate := patchedPod.DeepCopy()
-		podToUpdate.Annotations["updated"] = "true"
-		updatedPod, err := client.Update(context.TODO(), podToUpdate, metav1.UpdateOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedPod.Annotations["updated"], "true", "updated object should have the applied annotation")
-
 		ginkgo.By("deleting")
 		err = client.Delete(context.TODO(), createdPod.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
