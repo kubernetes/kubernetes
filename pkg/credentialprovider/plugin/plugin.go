@@ -435,7 +435,9 @@ func (e *execPlugin) ExecPlugin(ctx context.Context, image string) (*credentialp
 
 func (e *execPlugin) runPlugin(ctx context.Context, cmd *exec.Cmd, image string) error {
 	startTime := time.Now()
-	defer kubeletCredentialProviderPluginDuration.WithLabelValues(e.name).Observe(time.Since(startTime).Seconds())
+	defer func() {
+		kubeletCredentialProviderPluginDuration.WithLabelValues(e.name).Observe(time.Since(startTime).Seconds())
+	}()
 
 	err := cmd.Run()
 	if ctx.Err() != nil {
