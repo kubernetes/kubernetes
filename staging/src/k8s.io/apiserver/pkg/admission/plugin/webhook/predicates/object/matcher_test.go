@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package object
+package object_test
 
 import (
 	"testing"
@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/object"
 )
 
 func TestObjectSelector(t *testing.T) {
@@ -51,7 +52,7 @@ func TestObjectSelector(t *testing.T) {
 			},
 		},
 	}
-	matcher := &Matcher{}
+	matcher := &object.Matcher{}
 	allScopes := v1.AllScopes
 	testcases := []struct {
 		name string
