@@ -174,65 +174,7 @@ func TestGuaranteedUpdateWithTTL(t *testing.T) {
 
 func TestGuaranteedUpdateChecksStoredData(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	key := "/somekey"
-
-	// serialize input into etcd with data that would be normalized by a write - in this case, leading
-	// and trailing whitespace
-	codec := codecs.LegacyCodec(examplev1.SchemeGroupVersion)
-	data, err := runtime.Encode(codec, input)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp, err := store.client.Put(ctx, key, "test! "+string(data)+" ")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// this update should write the canonical value to etcd because the new serialization differs
-	// from the stored serialization
-	input.ResourceVersion = strconv.FormatInt(resp.Header.Revision, 10)
-	out := &example.Pod{}
-	err = store.GuaranteedUpdate(ctx, key, out, true, nil,
-		func(_ runtime.Object, _ storage.ResponseMeta) (runtime.Object, *uint64, error) {
-			return input, nil, nil
-		}, input)
-	if err != nil {
-		t.Fatalf("Update failed: %v", err)
-	}
-	if out.ResourceVersion == strconv.FormatInt(resp.Header.Revision, 10) {
-		t.Errorf("guaranteed update should have updated the serialized data, got %#v", out)
-	}
-
-	lastVersion := out.ResourceVersion
-
-	// this update should not write to etcd because the input matches the stored data
-	input = out
-	out = &example.Pod{}
-	err = store.GuaranteedUpdate(ctx, key, out, true, nil,
-		func(_ runtime.Object, _ storage.ResponseMeta) (runtime.Object, *uint64, error) {
-			return input, nil, nil
-		}, input)
-	if err != nil {
-		t.Fatalf("Update failed: %v", err)
-	}
-	if out.ResourceVersion != lastVersion {
-		t.Errorf("guaranteed update should have short-circuited write, got %#v", out)
-	}
-
-	store.transformer = storagetesting.NewPrefixTransformer([]byte(defaultTestPrefix), true)
-
-	// this update should write to etcd because the transformer reported stale
-	err = store.GuaranteedUpdate(ctx, key, out, true, nil,
-		func(_ runtime.Object, _ storage.ResponseMeta) (runtime.Object, *uint64, error) {
-			return input, nil, nil
-		}, input)
-	if err != nil {
-		t.Fatalf("Update failed: %v", err)
-	}
-	if out.ResourceVersion == lastVersion {
-		t.Errorf("guaranteed update should have written to etcd when transformer reported stale, got %#v", out)
-	}
+	storagetesting.RunTestGuaranteedUpdateChecksStoredData(ctx, t, &storeWithPrefixTransformer{store})
 }
 
 func TestGuaranteedUpdateWithConflict(t *testing.T) {
@@ -247,78 +189,7 @@ func TestGuaranteedUpdateWithSuggestionAndConflict(t *testing.T) {
 
 func TestTransformationFailure(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-
-	preset := []struct {
-		key       string
-		obj       *example.Pod
-		storedObj *example.Pod
-	}{{
-		key: "/one-level/test",
-		obj: &example.Pod{
-			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
-			Spec:       storagetesting.DeepEqualSafePodSpec(),
-		},
-	}, {
-		key: "/two-level/1/test",
-		obj: &example.Pod{
-			ObjectMeta: metav1.ObjectMeta{Name: "baz"},
-			Spec:       storagetesting.DeepEqualSafePodSpec(),
-		},
-	}}
-	for i, ps := range preset[:1] {
-		preset[i].storedObj = &example.Pod{}
-		err := store.Create(ctx, ps.key, ps.obj, preset[:1][i].storedObj, 0)
-		if err != nil {
-			t.Fatalf("Set failed: %v", err)
-		}
-	}
-
-	// create a second resource with an invalid prefix
-	oldTransformer := store.transformer
-	store.transformer = storagetesting.NewPrefixTransformer([]byte("otherprefix!"), false)
-	for i, ps := range preset[1:] {
-		preset[1:][i].storedObj = &example.Pod{}
-		err := store.Create(ctx, ps.key, ps.obj, preset[1:][i].storedObj, 0)
-		if err != nil {
-			t.Fatalf("Set failed: %v", err)
-		}
-	}
-	store.transformer = oldTransformer
-
-	// List should fail
-	var got example.PodList
-	storageOpts := storage.ListOptions{
-		Predicate: storage.Everything,
-		Recursive: true,
-	}
-	if err := store.GetList(ctx, "/", storageOpts, &got); !storage.IsInternalError(err) {
-		t.Errorf("Unexpected error %v", err)
-	}
-
-	// Get should fail
-	if err := store.Get(ctx, preset[1].key, storage.GetOptions{}, &example.Pod{}); !storage.IsInternalError(err) {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	// GuaranteedUpdate without suggestion should return an error
-	if err := store.GuaranteedUpdate(ctx, preset[1].key, &example.Pod{}, false, nil, func(input runtime.Object, res storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
-		return input, nil, nil
-	}, nil); !storage.IsInternalError(err) {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	// GuaranteedUpdate with suggestion should return an error if we don't change the object
-	if err := store.GuaranteedUpdate(ctx, preset[1].key, &example.Pod{}, false, nil, func(input runtime.Object, res storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
-		return input, nil, nil
-	}, preset[1].obj); err == nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
-	// Delete fails with internal error.
-	if err := store.Delete(ctx, preset[1].key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil); !storage.IsInternalError(err) {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if err := store.Get(ctx, preset[1].key, storage.GetOptions{}, &example.Pod{}); !storage.IsInternalError(err) {
-		t.Errorf("Unexpected error: %v", err)
-	}
+	storagetesting.RunTestTransformationFailure(ctx, t, &storeWithPrefixTransformer{store})
 }
 
 func TestList(t *testing.T) {
