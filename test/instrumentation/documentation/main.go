@@ -34,37 +34,46 @@ var (
 	GOROOT    string = os.Getenv("GOROOT")
 	GOOS      string = os.Getenv("GOOS")
 	KUBE_ROOT string = os.Getenv("KUBE_ROOT")
+	funcMap          = template.FuncMap{
+		"ToLower": strings.ToLower,
+	}
 )
 
 const (
 	templ = `---
-title: Kubernetes Metrics
-content_type: instrumentation
+title: Kubernetes Metrics Reference
+content_type: reference
+description: >-
+  Details of the metric data that Kubernetes components export.
 ---
 
 
-## Metrics
+## Metrics (auto-generated {{.GeneratedDate.Format "2006 Jan 02"}})
 
-These are the metrics which are exported in Kubernetes components (i.e. kube-apiserver, scheduler, kube-controller-manager, kube-proxy, cloud-controller-manager). 
-
-(auto-generated {{.GeneratedDate.Format "2006 Jan 02"}})
+This page details the metrics that different Kubernetes components export. You can query the metrics endpoint for these 
+components using an HTTP scrape, and fetch the current metrics data in Prometheus format.
 
 ### List of Kubernetes Metrics
 
-<table class="table">
+<table class="table" caption="This is the list of metrics emitted from core Kubernetes components">
 <thead>
 	<tr>
-		<td width="20%">Name</td>
-		<td width="10%">Stability Level</td>
-		<td width="13%">Type</td>
-		<td width="27%">Help</td>
-		<td width="20%">Labels</td>
-		<td width="10%">Const Labels</td>
+		<th class="metric_name">Name</th>
+		<th class="metric_stability_level">Stability Level</th>
+		<th class="metric_type">Type</th>
+		<th class="metric_help">Help</th>
+		<th class="metric_labels">Labels</th>
+		<th class="metric_const_labels">Const Labels</th>
 	</tr>
 </thead>
 <tbody>
-{{range $index, $metric := .Metrics}}<tr><td>{{with $metric}}{{.BuildFQName}}{{end}}</td><td>{{$metric.StabilityLevel}}</td><td>{{$metric.Type}}</td><td>{{$metric.Help}}</td>{{if not $metric.Labels }}<td>None</td>{{else }}<td>{{range $label := $metric.Labels}}<div>{{$label}}</div>{{end}}</td>{{end}}{{if not $metric.ConstLabels }}<td>None</td>{{else }}<td>{{$metric.ConstLabels}}</td>{{end}}</tr>
-{{end}}
+{{range $index, $metric := .Metrics}}
+<tr class="metric"><td class="metric_name">{{with $metric}}{{.BuildFQName}}{{end}}</td>
+<td class="metric_stability_level" data-stability="{{$metric.StabilityLevel | ToLower}}">{{$metric.StabilityLevel}}</td>
+<td class="metric_type" data-type="{{$metric.Type | ToLower}}">{{$metric.Type}}</td>
+<td class="metric_description">{{$metric.Help}}</td>
+{{if not $metric.Labels }}<td class="metric_labels_varying">None</td>{{else }}<td class="metric_labels_varying">{{range $label := $metric.Labels}}<div class="metric_label">{{$label}}</div>{{end}}</td>{{end}}
+{{if not $metric.ConstLabels }}<td class="metric_labels_constant">None</td>{{else }}<td class="metric_labels_constant">{{$metric.ConstLabels}}</td>{{end}}</tr>{{end}}
 </tbody>
 </table>
 `
@@ -84,7 +93,7 @@ func main() {
 			println("err", err)
 		}
 		sort.Sort(byFQName(metrics))
-		t := template.New("t")
+		t := template.New("t").Funcs(funcMap)
 		t, err := t.Parse(templ)
 		if err != nil {
 			println("err", err)
