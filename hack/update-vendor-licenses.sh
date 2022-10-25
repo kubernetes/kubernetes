@@ -199,12 +199,22 @@ for PACKAGE in ${modules}; do
     continue
   fi
 
-  # if there are no files vendored under this package...
-  if [[ -z "$(find "${DEPS_DIR}/${PACKAGE}" -mindepth 1 -maxdepth 1 -type f)" ]]; then
-    # and we have the same number of submodules as subdirectories...
-    if [[ "$(find "${DEPS_DIR}/${PACKAGE}/" -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq "$(echo "${modules}" | grep -cE "^${PACKAGE}/")" ]]; then
-      echo "Only submodules of ${PACKAGE} are vendored, skipping" >&2
-      continue
+  # if there are no files vendored directly under this package...
+  if [[ -z "$(find "${DEPS_DIR}/${PACKAGE}" -follow -mindepth 1 -maxdepth 1 -type f)" ]]; then
+    # and we have submodules...
+    submodules="$(echo "${modules}" | grep -E "^${PACKAGE}/")"
+    if [[ -n "${submodules}" ]]; then
+      # find all the files beneath this package
+      pushd "${DEPS_DIR}" > /dev/null
+      all_files=$(find "${PACKAGE}" -type f)
+      popd > /dev/null
+      # find files owned by submodules
+      submodule_files=$(echo "${all_files}" | grep -f <(echo "${submodules}"))
+      # if all files are owned by submodules, skip this module
+      if [[ "${all_files}" == "${submodule_files}" ]]; then
+        echo "Only submodules of ${PACKAGE} are vendored, skipping" >&2
+        continue
+      fi
     fi
   fi
 
