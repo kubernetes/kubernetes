@@ -353,7 +353,7 @@ func (d *namespacedResourcesDeleter) listCollection(gvr schema.GroupVersionResou
 		return nil, false, nil
 	}
 
-	partialList, err := d.metadataClient.Resource(gvr).Namespace(namespace).List(context.TODO(), metav1.ListOptions{})
+	partialList, err := d.metadataClient.Resource(gvr).Namespace(namespace).List(context.TODO(), metav1.ListOptions{ResourceVersion: "0"})
 	if err == nil {
 		return partialList, true, nil
 	}
@@ -587,7 +587,7 @@ func (d *namespacedResourcesDeleter) estimateGracefulTerminationForPods(ns strin
 	if podsGetter == nil || reflect.ValueOf(podsGetter).IsNil() {
 		return 0, fmt.Errorf("unexpected: podsGetter is nil. Cannot estimate grace period seconds for pods")
 	}
-	items, err := podsGetter.Pods(ns).List(context.TODO(), metav1.ListOptions{})
+	items, err := podsGetter.Pods(ns).List(context.TODO(), metav1.ListOptions{ResourceVersion: "0"})
 	if err != nil {
 		return 0, err
 	}
