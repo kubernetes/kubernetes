@@ -23,8 +23,8 @@ import (
 	"sync"
 	"time"
 
-	kcpcorev1client "github.com/kcp-dev/client-go/clients/clientset/versioned/typed/core/v1"
-	kcpmetadata "github.com/kcp-dev/client-go/clients/metadata"
+	kcpcorev1client "github.com/kcp-dev/client-go/kubernetes/typed/core/v1"
+	kcpmetadata "github.com/kcp-dev/client-go/metadata"
 	"github.com/kcp-dev/logicalcluster/v2"
 
 	"k8s.io/klog/v2"

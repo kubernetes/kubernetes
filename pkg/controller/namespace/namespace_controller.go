@@ -21,10 +21,10 @@ import (
 	"time"
 
 	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
-	kcpkubernetesclientset "github.com/kcp-dev/client-go/clients/clientset/versioned"
-	kcpcorev1informers "github.com/kcp-dev/client-go/clients/informers/core/v1"
-	kcpcorev1listers "github.com/kcp-dev/client-go/clients/listers/core/v1"
-	kcpmetadata "github.com/kcp-dev/client-go/clients/metadata"
+	kcpkubernetesclientset "github.com/kcp-dev/client-go/kubernetes"
+	kcpcorev1informers "github.com/kcp-dev/client-go/informers/core/v1"
+	kcpcorev1listers "github.com/kcp-dev/client-go/listers/core/v1"
+	kcpmetadata "github.com/kcp-dev/client-go/metadata"
 	"github.com/kcp-dev/logicalcluster/v2"
 	"golang.org/x/time/rate"
 

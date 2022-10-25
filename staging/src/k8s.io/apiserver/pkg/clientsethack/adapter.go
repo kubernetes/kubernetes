@@ -19,7 +19,7 @@ limitations under the License.
 package clientsethack
 
 import (
-	kcpkubernetesclientset "github.com/kcp-dev/client-go/clients/clientset/versioned"
+	kcpkubernetesclientset "github.com/kcp-dev/client-go/kubernetes"
 
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"

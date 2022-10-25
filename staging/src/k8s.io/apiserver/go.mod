@@ -20,7 +20,7 @@ require (
 	github.com/google/uuid v1.1.2
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/kcp-dev/apimachinery v0.0.0-20221019133255-9e1e13940519
-	github.com/kcp-dev/client-go v0.0.0-20221019184858-60e56386a574
+	github.com/kcp-dev/client-go v0.0.0-20221025140308-a18ccea074a6
 	github.com/kcp-dev/logicalcluster/v2 v2.0.0-alpha.1
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021 // indirect
