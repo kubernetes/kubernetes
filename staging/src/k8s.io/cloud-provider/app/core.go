@@ -48,7 +48,7 @@ func startCloudNodeController(ctx context.Context, initContext ControllerInitCon
 		completedConfig.ClientBuilder.ClientOrDie(initContext.ClientName),
 		cloud,
 		completedConfig.ComponentConfig.NodeStatusUpdateFrequency.Duration,
-		completedConfig.ComponentConfig.NodeController.WorkerCount,
+		completedConfig.ComponentConfig.NodeController.ConcurrentNodeSyncs,
 	)
 	if err != nil {
 		klog.Warningf("failed to start cloud node controller: %s", err)
