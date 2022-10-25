@@ -289,6 +289,7 @@ type KubeletConfiguration struct {
 	// serializeImagePulls when enabled, tells the Kubelet to pull images one at a time.
 	SerializeImagePulls bool
 	// Map of signal names to quantities that defines hard eviction thresholds. For example: {"memory.available": "300Mi"}.
+	// Some default signals are Linux only: nodefs.inodesFree
 	EvictionHard map[string]string
 	// Map of signal names to quantities that defines soft eviction thresholds.  For example: {"memory.available": "300Mi"}.
 	EvictionSoft map[string]string

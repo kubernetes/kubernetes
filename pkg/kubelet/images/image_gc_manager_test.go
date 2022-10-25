@@ -462,7 +462,9 @@ func TestFreeSpaceRemoveByLeastRecentlyUsed(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, manager.imageRecordsLen(), 2)
 
-	spaceFreed, err := manager.freeSpace(1024, time.Now())
+	// We're setting the delete time one minute in the future, so the time the image
+	// was first detected and the delete time are different.
+	spaceFreed, err := manager.freeSpace(1024, time.Now().Add(time.Minute))
 	assert := assert.New(t)
 	require.NoError(t, err)
 	assert.EqualValues(1024, spaceFreed)

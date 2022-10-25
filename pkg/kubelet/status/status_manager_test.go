@@ -1319,7 +1319,11 @@ func TestDoNotDeleteMirrorPods(t *testing.T) {
 }
 
 func TestUpdateLastTransitionTime(t *testing.T) {
-	old := metav1.Now()
+	// On Windows, time.Now() is not as precise, which means that 2 consecutive calls may
+	// return the same timestamp. This test expects the old timestamp to be updated with a
+	// newer one, so we set the old timestamp to one second in the past.
+	// See: https://github.com/golang/go/issues/8687
+	old := metav1.NewTime(time.Now().Add(-time.Second))
 	for desc, test := range map[string]struct {
 		condition    *v1.PodCondition
 		oldCondition *v1.PodCondition

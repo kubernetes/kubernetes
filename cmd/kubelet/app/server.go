@@ -351,6 +351,13 @@ func loadConfigFile(name string) (*kubeletconfiginternal.KubeletConfiguration, e
 	if err != nil {
 		return nil, fmt.Errorf(errFmt, name, err)
 	}
+
+	// EvictionHard may be nil if it was not set in kubelet's config file.
+	// EvictionHard can have OS-specific fields, which is why there's no default value for it.
+	// See: https://github.com/kubernetes/kubernetes/pull/110263
+	if kc.EvictionHard == nil {
+		kc.EvictionHard = eviction.DefaultEvictionHard
+	}
 	return kc, err
 }
 

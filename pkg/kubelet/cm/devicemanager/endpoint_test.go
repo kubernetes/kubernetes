@@ -18,6 +18,7 @@ package devicemanager
 
 import (
 	"fmt"
+	"os"
 	"path"
 	"sync"
 	"testing"
@@ -71,7 +72,7 @@ func esocketName() string {
 }
 
 func TestNewEndpoint(t *testing.T) {
-	socket := path.Join("/tmp", esocketName())
+	socket := path.Join(os.TempDir(), esocketName())
 
 	devs := []*pluginapi.Device{
 		{ID: "ADeviceId", Health: pluginapi.Healthy},
@@ -82,7 +83,7 @@ func TestNewEndpoint(t *testing.T) {
 }
 
 func TestRun(t *testing.T) {
-	socket := path.Join("/tmp", esocketName())
+	socket := path.Join(os.TempDir(), esocketName())
 
 	devs := []*pluginapi.Device{
 		{ID: "ADeviceId", Health: pluginapi.Healthy},
@@ -147,7 +148,7 @@ func TestRun(t *testing.T) {
 }
 
 func TestAllocate(t *testing.T) {
-	socket := path.Join("/tmp", esocketName())
+	socket := path.Join(os.TempDir(), esocketName())
 	devs := []*pluginapi.Device{
 		{ID: "ADeviceId", Health: pluginapi.Healthy},
 	}
@@ -200,7 +201,7 @@ func TestAllocate(t *testing.T) {
 }
 
 func TestGetPreferredAllocation(t *testing.T) {
-	socket := path.Join("/tmp", esocketName())
+	socket := path.Join(os.TempDir(), esocketName())
 	callbackCount := 0
 	callbackChan := make(chan int)
 	p, e := esetup(t, []*pluginapi.Device{}, socket, "mock", func(n string, d []pluginapi.Device) {

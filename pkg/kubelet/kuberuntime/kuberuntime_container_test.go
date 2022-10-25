@@ -70,6 +70,7 @@ func TestRemoveContainer(t *testing.T) {
 	fakeOS := m.osInterface.(*containertest.FakeOS)
 	fakeOS.GlobFn = func(pattern, path string) bool {
 		pattern = strings.Replace(pattern, "*", ".*", -1)
+		pattern = strings.Replace(pattern, "\\", "\\\\", -1)
 		return regexp.MustCompile(pattern).MatchString(path)
 	}
 	expectedContainerLogPath := filepath.Join(podLogsRootDirectory, "new_bar_12345678", "foo", "0.log")

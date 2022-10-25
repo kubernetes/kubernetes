@@ -208,9 +208,6 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.SerializeImagePulls == nil {
 		obj.SerializeImagePulls = utilpointer.BoolPtr(true)
 	}
-	if obj.EvictionHard == nil {
-		obj.EvictionHard = DefaultEvictionHard
-	}
 	if obj.EvictionPressureTransitionPeriod == zeroDuration {
 		obj.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 5 * time.Minute}
 	}

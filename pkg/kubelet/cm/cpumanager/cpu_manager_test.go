@@ -627,7 +627,7 @@ func TestCPUManagerGenerate(t *testing.T) {
 			if testCase.isTopologyBroken {
 				machineInfo = &cadvisorapi.MachineInfo{}
 			}
-			sDir, err := os.MkdirTemp("/tmp/", "cpu_manager_test")
+			sDir, err := os.MkdirTemp("", "cpu_manager_test")
 			if err != nil {
 				t.Errorf("cannot create state file: %s", err.Error())
 			}
@@ -1347,7 +1347,7 @@ func TestCPUManagerHandlePolicyOptions(t *testing.T) {
 		t.Run(testCase.description, func(t *testing.T) {
 			machineInfo := &mockedMachineInfo
 			nodeAllocatableReservation := v1.ResourceList{}
-			sDir, err := os.MkdirTemp("/tmp/", "cpu_manager_test")
+			sDir, err := os.MkdirTemp("", "cpu_manager_test")
 			if err != nil {
 				t.Errorf("cannot create state file: %s", err.Error())
 			}

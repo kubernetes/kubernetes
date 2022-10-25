@@ -328,6 +328,7 @@ func TestCompressLog(t *testing.T) {
 	testContent := "test log content"
 	_, err = testFile.Write([]byte(testContent))
 	require.NoError(t, err)
+	testFile.Close()
 
 	testLog := testFile.Name()
 	c := &containerLogManager{osInterface: container.RealOS{}}
@@ -388,6 +389,7 @@ func TestRotateLatestLog(t *testing.T) {
 		}
 		testFile, err := os.CreateTemp(dir, "test-rotate-latest-log")
 		require.NoError(t, err)
+		testFile.Close()
 		defer testFile.Close()
 		testLog := testFile.Name()
 		rotatedLog := fmt.Sprintf("%s.%s", testLog, now.Format(timestampFormat))
