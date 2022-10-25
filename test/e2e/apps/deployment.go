@@ -1395,14 +1395,15 @@ func testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(f *framework.Framew
 	}
 	e2eservice.TestReachableHTTP(lbNameOrAddress, svcPort, timeout)
 
+	expectedNodes, err := jig.GetEndpointNodeNames()
+	framework.ExpectNoError(err)
+
 	framework.Logf("Starting a goroutine to watch the service's endpoints in the background")
 	done := make(chan struct{})
 	failed := make(chan struct{})
 	defer close(done)
 	go func() {
 		defer ginkgo.GinkgoRecover()
-		expectedNodes, err := jig.GetEndpointNodeNames()
-		framework.ExpectNoError(err)
 		// The affinity policy should ensure that before an old pod is
 		// deleted, a new pod will have been created on the same node.
 		// Thus the set of nodes with local endpoints for the service
