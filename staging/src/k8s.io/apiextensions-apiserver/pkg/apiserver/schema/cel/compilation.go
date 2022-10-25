@@ -101,7 +101,10 @@ func getBaseEnv() (*cel.Env, error) {
 // perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit as input.
 func Compile(s *schema.Structural, declType *apiservercel.DeclType, perCallLimit uint64) ([]CompilationResult, error) {
 	t := time.Now()
-	defer metrics.Metrics.ObserveCompilation(time.Since(t))
+	defer func() {
+		metrics.Metrics.ObserveCompilation(time.Since(t))
+	}()
+
 	if len(s.Extensions.XValidations) == 0 {
 		return nil, nil
 	}

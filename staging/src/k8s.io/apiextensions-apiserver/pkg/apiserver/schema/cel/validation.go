@@ -139,7 +139,9 @@ func validator(s *schema.Structural, isResourceRoot bool, declType *cel.DeclType
 // context is passed for supporting context cancellation during cel validation
 func (s *Validator) Validate(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj, oldObj interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
 	t := time.Now()
-	defer metrics.Metrics.ObserveEvaluation(time.Since(t))
+	defer func() {
+		metrics.Metrics.ObserveEvaluation(time.Since(t))
+	}()
 	remainingBudget = costBudget
 	if s == nil || obj == nil {
 		return nil, remainingBudget
