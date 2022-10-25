@@ -31,12 +31,16 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 		Namespace: "default",
 		Name:      "mypod",
 	}
+	ignore := batch.PodFailurePolicyActionIgnore
+	failJob := batch.PodFailurePolicyActionFailJob
+	count := batch.PodFailurePolicyActionCount
 
 	testCases := map[string]struct {
 		podFailurePolicy      *batch.PodFailurePolicy
 		failedPod             *v1.Pod
 		wantJobFailureMessage *string
 		wantCountFailed       bool
+		wantAction            *batch.PodFailurePolicyAction
 	}{
 		"unknown action for rule matching by exit codes - skip rule with unknown action": {
 			podFailurePolicy: &batch.PodFailurePolicy{
@@ -75,6 +79,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 			},
 			wantJobFailureMessage: pointer.String("Container main-container for pod default/mypod failed with exit code 2 matching FailJob rule at index 1"),
 			wantCountFailed:       true,
+			wantAction:            &failJob,
 		},
 		"unknown action for rule matching by pod conditions - skip rule with unknown action": {
 			podFailurePolicy: &batch.PodFailurePolicy{
@@ -113,6 +118,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 			},
 			wantJobFailureMessage: nil,
 			wantCountFailed:       false,
+			wantAction:            &ignore,
 		},
 		"unknown operator - rule with unknown action is skipped for onExitCodes": {
 			podFailurePolicy: &batch.PodFailurePolicy{
@@ -151,6 +157,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 			},
 			wantJobFailureMessage: pointer.String("Container main-container for pod default/mypod failed with exit code 2 matching FailJob rule at index 1"),
 			wantCountFailed:       true,
+			wantAction:            &failJob,
 		},
 		"no policy rules": {
 			podFailurePolicy: nil,
@@ -201,6 +208,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 			},
 			wantJobFailureMessage: nil,
 			wantCountFailed:       false,
+			wantAction:            &ignore,
 		},
 		"FailJob rule matched for exit codes": {
 			podFailurePolicy: &batch.PodFailurePolicy{
@@ -232,6 +240,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 			},
 			wantJobFailureMessage: pointer.String("Container main-container for pod default/mypod failed with exit code 2 matching FailJob rule at index 0"),
 			wantCountFailed:       true,
+			wantAction:            &failJob,
 		},
 		"successful containers are skipped by the rules": {
 			podFailurePolicy: &batch.PodFailurePolicy{
@@ -320,6 +329,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 			},
 			wantJobFailureMessage: pointer.String("Container main-container for pod default/mypod failed with exit code 1 matching FailJob rule at index 0"),
 			wantCountFailed:       true,
+			wantAction:            &failJob,
 		},
 		"second jobfail rule matched for exit codes": {
 			podFailurePolicy: &batch.PodFailurePolicy{
@@ -358,6 +368,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 			},
 			wantJobFailureMessage: pointer.String("Container main-container for pod default/mypod failed with exit code 6 matching FailJob rule at index 1"),
 			wantCountFailed:       true,
+			wantAction:            &failJob,
 		},
 		"count rule matched for exit codes": {
 			podFailurePolicy: &batch.PodFailurePolicy{
@@ -389,6 +400,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 			},
 			wantJobFailureMessage: nil,
 			wantCountFailed:       true,
+			wantAction:            &count,
 		},
 		"ignore rule matched for pod conditions": {
 			podFailurePolicy: &batch.PodFailurePolicy{
@@ -418,6 +430,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 			},
 			wantJobFailureMessage: nil,
 			wantCountFailed:       false,
+			wantAction:            &ignore,
 		},
 		"ignore rule matches by the status=False": {
 			podFailurePolicy: &batch.PodFailurePolicy{
@@ -447,6 +460,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 			},
 			wantJobFailureMessage: nil,
 			wantCountFailed:       false,
+			wantAction:            &ignore,
 		},
 		"ignore rule matches by the status=Unknown": {
 			podFailurePolicy: &batch.PodFailurePolicy{
@@ -476,6 +490,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 			},
 			wantJobFailureMessage: nil,
 			wantCountFailed:       false,
+			wantAction:            &ignore,
 		},
 		"ignore rule does not match when status for pattern is False, but actual True": {
 			podFailurePolicy: &batch.PodFailurePolicy{
@@ -592,6 +607,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 			},
 			wantJobFailureMessage: pointer.String("Pod default/mypod has condition DisruptionTarget matching FailJob rule at index 0"),
 			wantCountFailed:       true,
+			wantAction:            &failJob,
 		},
 		"count rule matched for pod conditions": {
 			podFailurePolicy: &batch.PodFailurePolicy{
@@ -621,6 +637,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 			},
 			wantJobFailureMessage: nil,
 			wantCountFailed:       true,
+			wantAction:            &count,
 		},
 		"no rule matched": {
 			podFailurePolicy: &batch.PodFailurePolicy{
@@ -683,11 +700,12 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 			},
 			wantJobFailureMessage: nil,
 			wantCountFailed:       true,
+			wantAction:            &count,
 		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			jobFailMessage, countFailed := matchPodFailurePolicy(tc.podFailurePolicy, tc.failedPod)
+			jobFailMessage, countFailed, action := matchPodFailurePolicy(tc.podFailurePolicy, tc.failedPod)
 			if tc.wantJobFailureMessage == nil {
 				if jobFailMessage != nil {
 					t.Errorf("Unexpected job fail message. Got: %q", *jobFailMessage)
@@ -701,6 +719,17 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 			}
 			if tc.wantCountFailed != countFailed {
 				t.Errorf("Unexpected count failed. want: %v. got: %v", tc.wantCountFailed, countFailed)
+			}
+			if tc.wantAction == nil {
+				if action != nil {
+					t.Errorf("Unexpected job failure polic action. Got: %q", *action)
+				}
+			} else {
+				if action == nil {
+					t.Errorf("Missing job failure policy action. want: %q", *tc.wantAction)
+				} else if *tc.wantAction != *action {
+					t.Errorf("Unexpected job failure policy action. want: %v. got: %v", tc.wantAction, action)
+				}
 			}
 		})
 	}

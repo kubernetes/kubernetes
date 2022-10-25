@@ -55,10 +55,12 @@ var (
 		},
 		[]string{"completion_mode", "result", "action"},
 	)
-	// JobFinishedNum tracks the number of Jobs that finish. Possible label
-	// values:
+	// JobFinishedNum tracks the number of Jobs that finish. Empty reason label
+	// is used to count successful jobs.
+	// Possible label values:
 	//   completion_mode: Indexed, NonIndexed
 	//   result:          failed, succeeded
+	//   reason:          "BackoffLimitExceeded", "DeadlineExceeded", "PodFailurePolicy", ""
 	JobFinishedNum = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      JobControllerSubsystem,
@@ -66,7 +68,7 @@ var (
 			Help:           "The number of finished job",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"completion_mode", "result"},
+		[]string{"completion_mode", "result", "reason"},
 	)
 
 	// JobPodsFinished records the number of finished Pods that the job controller
@@ -83,6 +85,22 @@ var (
 			Help:      "The number of finished Pods that are fully tracked",
 		},
 		[]string{"completion_mode", "result"})
+
+	// PodFailuresHandledByFailurePolicy records the number of finished Pods
+	// handled by pod failure policy.
+	// Possible label values:
+	//   action: FailJob, Ignore, Count
+	PodFailuresHandledByFailurePolicy = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem: JobControllerSubsystem,
+			Name:      "pod_failures_handled_by_failure_policy_total",
+			Help: `The number of failed Pods handled by failure policy with
+			respect to the failure policy action applied based on the matched
+			rule. Possible values of the action label correspond to the
+			possible values for the failure policy rule action, which are:
+			"FailJob", "Ignore" and "Count".`,
+		},
+		[]string{"action"})
 
 	// TerminatedPodsWithTrackingFinalizer records the addition and removal of
 	// terminated pods that have the finalizer batch.kubernetes.io/job-tracking,
@@ -137,6 +155,7 @@ func Register() {
 		legacyregistry.MustRegister(JobSyncNum)
 		legacyregistry.MustRegister(JobFinishedNum)
 		legacyregistry.MustRegister(JobPodsFinished)
+		legacyregistry.MustRegister(PodFailuresHandledByFailurePolicy)
 		legacyregistry.MustRegister(TerminatedPodsTrackingFinalizerTotal)
 	})
 }

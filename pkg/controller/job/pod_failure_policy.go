@@ -26,42 +26,46 @@ import (
 // matchPodFailurePolicy returns information about matching a given failed pod
 // against the pod failure policy rules. The information is represented as an
 // optional job failure message (present in case the pod matched a 'FailJob'
-// rule) and a boolean indicating if the failure should be counted towards
-// backoffLimit (it should not be counted if the pod matched an 'Ignore' rule).
-func matchPodFailurePolicy(podFailurePolicy *batch.PodFailurePolicy, failedPod *v1.Pod) (*string, bool) {
+// rule), a boolean indicating if the failure should be counted towards
+// backoffLimit (it should not be counted if the pod matched an 'Ignore' rule),
+// and a pointer to the matched pod failure policy action.
+func matchPodFailurePolicy(podFailurePolicy *batch.PodFailurePolicy, failedPod *v1.Pod) (*string, bool, *batch.PodFailurePolicyAction) {
 	if podFailurePolicy == nil {
-		return nil, true
+		return nil, true, nil
 	}
+	ignore := batch.PodFailurePolicyActionIgnore
+	failJob := batch.PodFailurePolicyActionFailJob
+	count := batch.PodFailurePolicyActionCount
 	for index, podFailurePolicyRule := range podFailurePolicy.Rules {
 		if podFailurePolicyRule.OnExitCodes != nil {
 			if containerStatus := matchOnExitCodes(&failedPod.Status, podFailurePolicyRule.OnExitCodes); containerStatus != nil {
 				switch podFailurePolicyRule.Action {
 				case batch.PodFailurePolicyActionIgnore:
-					return nil, false
+					return nil, false, &ignore
 				case batch.PodFailurePolicyActionCount:
-					return nil, true
+					return nil, true, &count
 				case batch.PodFailurePolicyActionFailJob:
 					msg := fmt.Sprintf("Container %s for pod %s/%s failed with exit code %v matching %v rule at index %d",
 						containerStatus.Name, failedPod.Namespace, failedPod.Name, containerStatus.State.Terminated.ExitCode, podFailurePolicyRule.Action, index)
-					return &msg, true
+					return &msg, true, &failJob
 				}
 			}
 		} else if podFailurePolicyRule.OnPodConditions != nil {
 			if podCondition := matchOnPodConditions(&failedPod.Status, podFailurePolicyRule.OnPodConditions); podCondition != nil {
 				switch podFailurePolicyRule.Action {
 				case batch.PodFailurePolicyActionIgnore:
-					return nil, false
+					return nil, false, &ignore
 				case batch.PodFailurePolicyActionCount:
-					return nil, true
+					return nil, true, &count
 				case batch.PodFailurePolicyActionFailJob:
 					msg := fmt.Sprintf("Pod %s/%s has condition %v matching %v rule at index %d",
 						failedPod.Namespace, failedPod.Name, podCondition.Type, podFailurePolicyRule.Action, index)
-					return &msg, true
+					return &msg, true, &failJob
 				}
 			}
 		}
 	}
-	return nil, true
+	return nil, true, nil
 }
 
 func matchOnExitCodes(podStatus *v1.PodStatus, requirement *batch.PodFailurePolicyOnExitCodesRequirement) *v1.ContainerStatus {

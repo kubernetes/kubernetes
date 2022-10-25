@@ -1031,6 +1031,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 	if cleanUncountedPodsWithoutFinalizers(&job.Status, uidsWithFinalizer) {
 		needsFlush = true
 	}
+	podFailureCountByPolicyAction := map[string]int{}
 	for _, pod := range pods {
 		if !hasJobTrackingFinalizer(pod) || expectedRmFinalizers.Has(string(pod.UID)) {
 			continue
@@ -1061,7 +1062,10 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 			ix := getCompletionIndex(pod.Annotations)
 			if !uncounted.failed.Has(string(pod.UID)) && (!isIndexed || (ix != unknownCompletionIndex && ix < int(*job.Spec.Completions))) {
 				if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
-					_, countFailed := matchPodFailurePolicy(job.Spec.PodFailurePolicy, pod)
+					_, countFailed, action := matchPodFailurePolicy(job.Spec.PodFailurePolicy, pod)
+					if action != nil {
+						podFailureCountByPolicyAction[string(*action)] += 1
+					}
 					if countFailed {
 						needsFlush = true
 						uncountedStatus.Failed = append(uncountedStatus.Failed, pod.UID)
@@ -1102,7 +1106,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 		}
 	}
 	var err error
-	if job, needsFlush, err = jm.flushUncountedAndRemoveFinalizers(ctx, job, podsToRemoveFinalizer, uidsWithFinalizer, &oldCounters, needsFlush); err != nil {
+	if job, needsFlush, err = jm.flushUncountedAndRemoveFinalizers(ctx, job, podsToRemoveFinalizer, uidsWithFinalizer, &oldCounters, podFailureCountByPolicyAction, needsFlush); err != nil {
 		return err
 	}
 	jobFinished := jm.enactJobFinished(job, finishedCond)
@@ -1132,7 +1136,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 //
 // Returns whether there are pending changes in the Job status that need to be
 // flushed in subsequent calls.
-func (jm *Controller) flushUncountedAndRemoveFinalizers(ctx context.Context, job *batch.Job, podsToRemoveFinalizer []*v1.Pod, uidsWithFinalizer sets.String, oldCounters *batch.JobStatus, needsFlush bool) (*batch.Job, bool, error) {
+func (jm *Controller) flushUncountedAndRemoveFinalizers(ctx context.Context, job *batch.Job, podsToRemoveFinalizer []*v1.Pod, uidsWithFinalizer sets.String, oldCounters *batch.JobStatus, podFailureCountByPolicyAction map[string]int, needsFlush bool) (*batch.Job, bool, error) {
 	var err error
 	if needsFlush {
 		if job, err = jm.updateStatusHandler(ctx, job); err != nil {
@@ -1143,6 +1147,8 @@ func (jm *Controller) flushUncountedAndRemoveFinalizers(ctx context.Context, job
 		*oldCounters = job.Status
 		needsFlush = false
 	}
+	recordJobPodFailurePolicyActions(job, podFailureCountByPolicyAction)
+
 	jobKey, err := controller.KeyFunc(job)
 	if err != nil {
 		return job, needsFlush, fmt.Errorf("getting job key: %w", err)
@@ -1263,10 +1269,10 @@ func (jm *Controller) recordJobFinished(job *batch.Job, finishedCond *batch.JobC
 			jm.recorder.Event(job, v1.EventTypeWarning, "TooManySucceededPods", "Too many succeeded pods running after completion count reached")
 		}
 		jm.recorder.Event(job, v1.EventTypeNormal, "Completed", "Job completed")
-		metrics.JobFinishedNum.WithLabelValues(completionMode, "succeeded").Inc()
+		metrics.JobFinishedNum.WithLabelValues(completionMode, "succeeded", "").Inc()
 	} else {
 		jm.recorder.Event(job, v1.EventTypeWarning, finishedCond.Reason, finishedCond.Message)
-		metrics.JobFinishedNum.WithLabelValues(completionMode, "failed").Inc()
+		metrics.JobFinishedNum.WithLabelValues(completionMode, "failed", finishedCond.Reason).Inc()
 	}
 	return true
 }
@@ -1345,7 +1351,7 @@ func getFailJobMessage(job *batch.Job, pods []*v1.Pod, uncounted sets.String) *s
 	}
 	for _, p := range pods {
 		if isPodFailed(p, uncounted != nil) {
-			jobFailureMessage, _ := matchPodFailurePolicy(job.Spec.PodFailurePolicy, p)
+			jobFailureMessage, _, _ := matchPodFailurePolicy(job.Spec.PodFailurePolicy, p)
 			if jobFailureMessage != nil {
 				return jobFailureMessage
 			}
@@ -1369,7 +1375,7 @@ func getStatus(job *batch.Job, pods []*v1.Pod, uncounted *uncountedTerminatedPod
 			if !isPodFailed(p, uncounted != nil) {
 				return false
 			}
-			_, countFailed := matchPodFailurePolicy(job.Spec.PodFailurePolicy, p)
+			_, countFailed, _ := matchPodFailurePolicy(job.Spec.PodFailurePolicy, p)
 			return countFailed
 		} else {
 			return isPodFailed(p, uncounted != nil)
@@ -1766,6 +1772,12 @@ func recordJobPodFinished(job *batch.Job, oldCounters batch.JobStatus) {
 	metrics.JobPodsFinished.WithLabelValues(completionMode, metrics.Succeeded).Add(float64(diff))
 	diff = job.Status.Failed - oldCounters.Failed
 	metrics.JobPodsFinished.WithLabelValues(completionMode, metrics.Failed).Add(float64(diff))
+}
+
+func recordJobPodFailurePolicyActions(job *batch.Job, podFailureCountByPolicyAction map[string]int) {
+	for action, count := range podFailureCountByPolicyAction {
+		metrics.PodFailuresHandledByFailurePolicy.WithLabelValues(action).Add(float64(count))
+	}
 }
 
 func countReadyPods(pods []*v1.Pod) int32 {
