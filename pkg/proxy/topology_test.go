@@ -91,6 +91,20 @@ func TestCategorizeEndpoints(t *testing.T) {
 		clusterEndpoints: sets.NewString("10.1.2.3:80", "10.1.2.4:80", "10.1.2.5:80", "10.1.2.6:80"),
 		localEndpoints:   nil,
 	}, {
+		name:         "hints disabled, hints annotation == auto",
+		hintsEnabled: false,
+		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
+		serviceInfo:  &BaseServiceInfo{hintsAnnotation: "auto"},
+		endpoints: []Endpoint{
+			&BaseEndpointInfo{Endpoint: "10.1.2.3:80", ZoneHints: sets.NewString("zone-a"), Ready: true},
+			&BaseEndpointInfo{Endpoint: "10.1.2.4:80", ZoneHints: sets.NewString("zone-b"), Ready: true},
+			&BaseEndpointInfo{Endpoint: "10.1.2.5:80", ZoneHints: sets.NewString("zone-c"), Ready: true},
+			&BaseEndpointInfo{Endpoint: "10.1.2.6:80", ZoneHints: sets.NewString("zone-a"), Ready: true},
+		},
+		clusterEndpoints: sets.NewString("10.1.2.3:80", "10.1.2.4:80", "10.1.2.5:80", "10.1.2.6:80"),
+		localEndpoints:   nil,
+	}, {
+
 		name:         "hints, hints annotation == aUto (wrong capitalization), hints ignored",
 		hintsEnabled: true,
 		nodeLabels:   map[string]string{v1.LabelTopologyZone: "zone-a"},
