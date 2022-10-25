@@ -104,16 +104,16 @@ func (l *LimitRanger) ValidateInitialization() error {
 }
 
 // Admit admits resources into cluster that do not violate any defined LimitRange in the namespace
-func (l *LimitRanger) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (l *LimitRanger) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	return l.runLimitFunc(a, l.actions.MutateLimit)
 }
 
 // Validate admits resources into cluster that do not violate any defined LimitRange in the namespace
-func (l *LimitRanger) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (l *LimitRanger) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	return l.runLimitFunc(a, l.actions.ValidateLimit)
 }
 
-func (l *LimitRanger) runLimitFunc(a admission.Attributes, limitFn func(limitRange *corev1.LimitRange, kind string, obj runtime.Object) error) (err error) {
+func (l *LimitRanger) runLimitFunc(a admission.Attributes, limitFn func(limitRange *corev1.LimitRange, kind string, obj runtime.Object) error) error {
 	if !l.actions.SupportsAttributes(a) {
 		return nil
 	}
