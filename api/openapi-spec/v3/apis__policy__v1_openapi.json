@@ -113,6 +113,10 @@
             ],
             "description": "An eviction is allowed if at least \"minAvailable\" pods selected by \"selector\" will still be available after the eviction, i.e. even in the absence of the evicted pod.  So for example you can prevent all voluntary evictions by specifying \"100%\"."
           },
+          "podHealthyPolicy": {
+            "description": "PodHealthyPolicy defines the criteria for when the disruption controller should consider a pod to be healthy.\n\nIf no policy is specified, the default behavior will be used. It means only pods that are both Running and Ready will be considered healthy by the disruption controller and counted when computing \"disruptionsAllowed\". Pods in the Running phase can be evicted only if the protected application by the PDB is not disrupted.\n\nThis field is alpha-level. The disruption controller uses this field when the feature gate PDBPodHealthyPolicy is enabled (disabled by default).",
+            "type": "string"
+          },
           "selector": {
             "allOf": [
               {

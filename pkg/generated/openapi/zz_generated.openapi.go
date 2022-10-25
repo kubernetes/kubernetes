@@ -38116,6 +38116,13 @@ func schema_k8sio_api_policy_v1_PodDisruptionBudgetSpec(ref common.ReferenceCall
 							Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
 						},
 					},
+					"podHealthyPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PodHealthyPolicy defines the criteria for when the disruption controller should consider a pod to be healthy.\n\nIf no policy is specified, the default behavior will be used. It means only pods that are both Running and Ready will be considered healthy by the disruption controller and counted when computing \"disruptionsAllowed\". Pods in the Running phase can be evicted only if the protected application by the PDB is not disrupted.\n\nThis field is alpha-level. The disruption controller uses this field when the feature gate PDBPodHealthyPolicy is enabled (disabled by default).",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -38551,6 +38558,13 @@ func schema_k8sio_api_policy_v1beta1_PodDisruptionBudgetSpec(ref common.Referenc
 						SchemaProps: spec.SchemaProps{
 							Description: "An eviction is allowed if at most \"maxUnavailable\" pods selected by \"selector\" are unavailable after the eviction, i.e. even in absence of the evicted pod. For example, one can prevent all voluntary evictions by specifying 0. This is a mutually exclusive setting with \"minAvailable\".",
 							Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
+						},
+					},
+					"podHealthyPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PodHealthyPolicy defines the criteria for when the disruption controller should consider a pod to be healthy.\n\nIf no policy is specified, the default behavior will be used. It means only pods that are both Running and Ready will be considered healthy by the disruption controller and counted when computing \"disruptionsAllowed\". Pods in the Running phase can be evicted only if the protected application by the PDB is not disrupted.\n\nThis field is alpha-level. The disruption controller uses this field when the feature gate PDBPodHealthyPolicy is enabled (disabled by default).",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},

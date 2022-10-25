@@ -58,7 +58,7 @@ type PodDisruptionBudgetSpec struct {
 	// by the PDB is not disrupted.
 	//
 	// This field is alpha-level. The disruption controller uses this field when
-	// the featuregate PDBPodHealthyPolicy is enabled (disabled by default).
+	// the feature gate PDBPodHealthyPolicy is enabled (disabled by default).
 	// +optional
 	PodHealthyPolicy PodHealthyPolicy `json:"podHealthyPolicy,omitempty" protobuf:"bytes,4,opt,name=podHealthyPolicy"`
 }
