@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -854,5 +856,104 @@ func TestPersistentVolumeClaimLimitFunc(t *testing.T) {
 		if err == nil {
 			t.Errorf("Expected error for pvc: %s", test.pvc.Name)
 		}
+	}
+}
+
+// TestLimitRanger_GetLimitRangesFixed22422 Fixed Admission controllers can cause unnecessary significant load on apiserver #22422
+func TestLimitRanger_GetLimitRangesFixed22422(t *testing.T) {
+	limitRange := validLimitRangeNoDefaults()
+	limitRanges := []corev1.LimitRange{limitRange}
+
+	var count int64
+	mockClient := &fake.Clientset{}
+
+	unhold := make(chan struct{})
+	mockClient.AddReactor("list", "limitranges", func(action core.Action) (bool, runtime.Object, error) {
+		atomic.AddInt64(&count, 1)
+
+		limitRangeList := &corev1.LimitRangeList{
+			ListMeta: metav1.ListMeta{
+				ResourceVersion: fmt.Sprintf("%d", len(limitRanges)),
+			},
+		}
+		for index, value := range limitRanges {
+			value.ResourceVersion = fmt.Sprintf("%d", index)
+			value.Namespace = action.GetNamespace()
+			limitRangeList.Items = append(limitRangeList.Items, value)
+		}
+		// he always blocking before sending the signal
+		<-unhold
+		return true, limitRangeList, nil
+	})
+
+	handler, _, err := newHandlerForTest(mockClient)
+	if err != nil {
+		t.Errorf("unexpected error initializing handler: %v", err)
+	}
+
+	attributes := admission.NewAttributesRecord(nil, nil, api.Kind("kind").WithVersion("version"), "test", "name", api.Resource("resource").WithVersion("version"), "subresource", admission.Create, &metav1.CreateOptions{}, false, nil)
+
+	attributesTest1 := admission.NewAttributesRecord(nil, nil, api.Kind("kind").WithVersion("version"), "test1", "name", api.Resource("resource").WithVersion("version"), "subresource", admission.Create, &metav1.CreateOptions{}, false, nil)
+
+	wg := sync.WaitGroup{}
+	for i := 0; i < 10; i++ {
+		wg.Add(2)
+		// simulating concurrent calls after a cache failure
+		go func() {
+			defer wg.Done()
+			ret, err := handler.GetLimitRanges(attributes)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			for _, c := range ret {
+				if c.Namespace != attributes.GetNamespace() {
+					t.Errorf("Expected %s namespace, got %s", attributes.GetNamespace(), c.Namespace)
+				}
+			}
+		}()
+
+		// simulation of different namespaces is not a call
+		go func() {
+			defer wg.Done()
+			ret, err := handler.GetLimitRanges(attributesTest1)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			for _, c := range ret {
+				if c.Namespace != attributesTest1.GetNamespace() {
+					t.Errorf("Expected %s namespace, got %s", attributesTest1.GetNamespace(), c.Namespace)
+				}
+			}
+		}()
+	}
+	// unhold all the calls with the same namespace handler.GetLimitRanges(attributes) calls, that have to be aggregated
+	unhold <- struct{}{}
+	go func() {
+		unhold <- struct{}{}
+	}()
+
+	// and here we wait for all the goroutines
+	wg.Wait()
+	// since all the calls with the same namespace will be holded, they must be catched on the singleflight group,
+	// There are two different sets of namespace calls
+	// hence only 2
+	if count != 2 {
+		t.Errorf("Expected 1 limit range, got %d", count)
+	}
+
+	// invalidate the cache
+	handler.liveLookupCache.Remove(attributes.GetNamespace())
+	go func() {
+		// unhold it is blocking until GetLimitRanges is executed
+		unhold <- struct{}{}
+	}()
+	_, err = handler.GetLimitRanges(attributes)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	close(unhold)
+
+	if count != 3 {
+		t.Errorf("Expected 2 limit range, got %d", count)
 	}
 }
