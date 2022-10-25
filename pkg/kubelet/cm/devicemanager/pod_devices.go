@@ -343,11 +343,11 @@ func (pdev *podDevices) getContainerDevices(podUID, contName string) ResourceDev
 		}
 		devicePluginMap := make(map[string]pluginapi.Device)
 		for numaid, devlist := range allocateInfo.deviceIds {
-			for _, devId := range devlist {
+			for _, devID := range devlist {
 				var topology *pluginapi.TopologyInfo
 				if numaid != nodeWithoutTopology {
 					NUMANodes := []*pluginapi.NUMANode{{ID: numaid}}
-					if pDev, ok := devicePluginMap[devId]; ok && pDev.Topology != nil {
+					if pDev, ok := devicePluginMap[devID]; ok && pDev.Topology != nil {
 						if nodes := pDev.Topology.GetNodes(); nodes != nil {
 							NUMANodes = append(NUMANodes, nodes...)
 						}
@@ -356,7 +356,7 @@ func (pdev *podDevices) getContainerDevices(podUID, contName string) ResourceDev
 					// ID and Healthy are not relevant here.
 					topology = &pluginapi.TopologyInfo{Nodes: NUMANodes}
 				}
-				devicePluginMap[devId] = pluginapi.Device{
+				devicePluginMap[devID] = pluginapi.Device{
 					Topology: topology,
 				}
 			}
@@ -372,10 +372,12 @@ type DeviceInstances map[string]pluginapi.Device
 // ResourceDeviceInstances is a mapping resource name -> DeviceInstances
 type ResourceDeviceInstances map[string]DeviceInstances
 
+// NewResourceDeviceInstances returns a new ResourceDeviceInstances
 func NewResourceDeviceInstances() ResourceDeviceInstances {
 	return make(ResourceDeviceInstances)
 }
 
+// Clone returns a clone of ResourceDeviceInstances
 func (rdev ResourceDeviceInstances) Clone() ResourceDeviceInstances {
 	clone := NewResourceDeviceInstances()
 	for resourceName, resourceDevs := range rdev {

@@ -163,6 +163,8 @@ func newManagerImpl(socketPath string, topology []cadvisorapi.Node, topologyAffi
 	return manager, nil
 }
 
+// CleanupPluginDirectory is to remove all existing unix sockets
+// from /var/lib/kubelet/device-plugins on Device Plugin Manager start
 func (m *ManagerImpl) CleanupPluginDirectory(dir string) error {
 	d, err := os.Open(dir)
 	if err != nil {
@@ -200,8 +202,10 @@ func (m *ManagerImpl) CleanupPluginDirectory(dir string) error {
 	return errorsutil.NewAggregate(errs)
 }
 
+// PluginConnected is to connect a plugin to a new endpoint.
+// This is done as part of device plugin registration.
 func (m *ManagerImpl) PluginConnected(resourceName string, p plugin.DevicePlugin) error {
-	options, err := p.Api().GetDevicePluginOptions(context.Background(), &pluginapi.Empty{})
+	options, err := p.API().GetDevicePluginOptions(context.Background(), &pluginapi.Empty{})
 	if err != nil {
 		return fmt.Errorf("failed to get device plugin options: %v", err)
 	}
@@ -215,6 +219,8 @@ func (m *ManagerImpl) PluginConnected(resourceName string, p plugin.DevicePlugin
 	return nil
 }
 
+// PluginDisconnected is to disconnect a plugin from an endpoint.
+// This is done as part of device plugin deregistration.
 func (m *ManagerImpl) PluginDisconnected(resourceName string) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -227,6 +233,10 @@ func (m *ManagerImpl) PluginDisconnected(resourceName string) {
 	m.endpoints[resourceName].e.setStopTime(time.Now())
 }
 
+// PluginListAndWatchReceiver receives ListAndWatchResponse from a device plugin
+// and ensures that an upto date state (e.g. number of devices and device health)
+// is captured. Also, registered device and device to container allocation
+// information is checkpointed to the disk.
 func (m *ManagerImpl) PluginListAndWatchReceiver(resourceName string, resp *pluginapi.ListAndWatchResponse) {
 	var devices []pluginapi.Device
 	for _, d := range resp.Devices {
