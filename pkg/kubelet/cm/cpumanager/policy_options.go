@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )
 
+// Names of the options, as part of the user interface.
 const (
 	FullPCPUsOnlyOption            string = "full-pcpus-only"
 	DistributeCPUsAcrossNUMAOption string = "distribute-cpus-across-numa"
@@ -44,6 +45,8 @@ var (
 	stableOptions = sets.NewString()
 )
 
+// CheckPolicyOptionAvailable verifies if the given option can be used depending on the Feature Gate Settings.
+// returns nil on success, or an error describing the failure on error.
 func CheckPolicyOptionAvailable(option string) error {
 	if !alphaOptions.Has(option) && !betaOptions.Has(option) && !stableOptions.Has(option) {
 		return fmt.Errorf("unknown CPU Manager Policy option: %q", option)
@@ -60,6 +63,7 @@ func CheckPolicyOptionAvailable(option string) error {
 	return nil
 }
 
+// StaticPolicyOptions holds the parsed value of the policy options, ready to be consumed internally.
 type StaticPolicyOptions struct {
 	// flag to enable extra allocation restrictions to avoid
 	// different containers to possibly end up on the same core.
@@ -78,6 +82,7 @@ type StaticPolicyOptions struct {
 	AlignBySocket bool
 }
 
+// NewStaticPolicyOptions creates a StaticPolicyOptions struct from the user configuration.
 func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOptions, error) {
 	opts := StaticPolicyOptions{}
 	for name, value := range policyOptions {
@@ -113,6 +118,7 @@ func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOption
 	return opts, nil
 }
 
+// ValidateStaticPolicyOptions ensures that the requested policy options are compatible with the machine on which the CPUManager is running.
 func ValidateStaticPolicyOptions(opts StaticPolicyOptions, topology *topology.CPUTopology, topologyManager topologymanager.Store) error {
 	if opts.AlignBySocket {
 		// Not compatible with topology manager single-numa-node policy option.
