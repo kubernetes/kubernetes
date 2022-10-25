@@ -384,6 +384,11 @@ func (o *ApplyOptions) Validate() error {
 		return fmt.Errorf("--force cannot be used with --prune")
 	}
 
+	// Currently do not support pruning objects which are server-side applied.
+	if o.Prune && o.ServerSideApply {
+		return fmt.Errorf("--prune is in alpha and doesn't currently work on objects created by server-side apply")
+	}
+
 	return nil
 }
 
