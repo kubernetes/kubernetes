@@ -1410,7 +1410,11 @@ func testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(f *framework.Framew
 		// should remain unchanged.
 		wait.Until(func() {
 			actualNodes, err := jig.GetEndpointNodeNames()
-			framework.ExpectNoError(err)
+			if err != nil {
+				framework.Logf("The previous set of nodes with local endpoints was %v, now the lookup failed: %v", expectedNodes.List(), err)
+				failed <- struct{}{}
+				return
+			}
 			if !actualNodes.Equal(expectedNodes) {
 				framework.Logf("The set of nodes with local endpoints changed; started with %v, now have %v", expectedNodes.List(), actualNodes.List())
 				failed <- struct{}{}
