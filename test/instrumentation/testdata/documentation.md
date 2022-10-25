@@ -15,12 +15,12 @@ These are the metrics which are exported in Kubernetes components (i.e. kube-api
 <table class="table">
 <thead>
 	<tr>
-		<td>Name</td>
-		<td>Stability Level</td>
-		<td>Type</td>
-		<td width="20%">Help</td>
-		<td>Labels</td>
-		<td>Const Labels</td>
+		<td width="20%">Name</td>
+		<td width="12%">Stability Level</td>
+		<td width="12%">Type</td>
+		<td width="30%">Help</td>
+		<td width="13%">Labels</td>
+		<td width="13%">Const Labels</td>
 	</tr>
 </thead>
 <tbody>
