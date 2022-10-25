@@ -82,16 +82,16 @@ func DeepEqualSafePodSpec() example.PodSpec {
 	}
 }
 
-// TestPropogateStore helps propagates store with objects, automates key generation, and returns
+// TestPropagateStore helps propagates store with objects, automates key generation, and returns
 // keys and stored objects.
-func TestPropogateStore(ctx context.Context, t *testing.T, store storage.Interface, obj *example.Pod) (string, *example.Pod) {
+func TestPropagateStore(ctx context.Context, t *testing.T, store storage.Interface, obj *example.Pod) (string, *example.Pod) {
 	// Setup store with a key and grab the output for returning.
 	key := "/testkey"
-	return key, TestPropogateStoreWithKey(ctx, t, store, key, obj)
+	return key, TestPropagateStoreWithKey(ctx, t, store, key, obj)
 }
 
-// TestPropogateStoreWithKey helps propagate store with objects, the given object will be stored at the specified key.
-func TestPropogateStoreWithKey(ctx context.Context, t *testing.T, store storage.Interface, key string, obj *example.Pod) *example.Pod {
+// TestPropagateStoreWithKey helps propagate store with objects, the given object will be stored at the specified key.
+func TestPropagateStoreWithKey(ctx context.Context, t *testing.T, store storage.Interface, key string, obj *example.Pod) *example.Pod {
 	// Setup store with the specified key and grab the output for returning.
 	err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil)
 	if err != nil && !storage.IsNotFound(err) {

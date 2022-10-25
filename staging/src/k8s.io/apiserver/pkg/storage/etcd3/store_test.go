@@ -66,11 +66,6 @@ func newPod() runtime.Object {
 	return &example.Pod{}
 }
 
-func TestCreate(t *testing.T) {
-	ctx, store, etcdClient := testSetup(t)
-	storagetesting.RunTestCreate(ctx, t, store, checkStorageInvariants(etcdClient, store.codec))
-}
-
 func checkStorageInvariants(etcdClient *clientv3.Client, codec runtime.Codec) storagetesting.KeyValidation {
 	return func(ctx context.Context, t *testing.T, key string) {
 		getResp, err := etcdClient.KV.Get(ctx, key)
@@ -92,6 +87,11 @@ func checkStorageInvariants(etcdClient *clientv3.Client, codec runtime.Codec) st
 			t.Errorf("stored output should have empty selfLink")
 		}
 	}
+}
+
+func TestCreate(t *testing.T) {
+	ctx, store, etcdClient := testSetup(t)
+	storagetesting.RunTestCreate(ctx, t, store, checkStorageInvariants(etcdClient, store.codec))
 }
 
 func TestCreateWithTTL(t *testing.T) {
@@ -118,31 +118,6 @@ func TestConditionalDelete(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 	storagetesting.RunTestConditionalDelete(ctx, t, store)
 }
-
-// The following set of Delete tests are testing the logic of adding `suggestion`
-// as a parameter with probably value of the current state.
-// Introducing it for GuaranteedUpdate cause a number of issues, so we're addressing
-// all of those upfront by adding appropriate tests:
-// - https://github.com/kubernetes/kubernetes/pull/35415
-//   [DONE] Lack of tests originally - added TestDeleteWithSuggestion.
-// - https://github.com/kubernetes/kubernetes/pull/40664
-//   [DONE] Irrelevant for delete, as Delete doesn't write data (nor compare it).
-// - https://github.com/kubernetes/kubernetes/pull/47703
-//   [DONE] Irrelevant for delete, because Delete doesn't persist data.
-// - https://github.com/kubernetes/kubernetes/pull/48394/
-//   [DONE] Irrelevant for delete, because Delete doesn't compare data.
-// - https://github.com/kubernetes/kubernetes/pull/43152
-//   [DONE] Added TestDeleteWithSuggestionAndConflict
-// - https://github.com/kubernetes/kubernetes/pull/54780
-//   [DONE] Irrelevant for delete, because Delete doesn't compare data.
-// - https://github.com/kubernetes/kubernetes/pull/58375
-//   [DONE] Irrelevant for delete, because Delete doesn't compare data.
-// - https://github.com/kubernetes/kubernetes/pull/77619
-//   [DONE] Added TestValidateDeletionWithSuggestion for corresponding delete checks.
-// - https://github.com/kubernetes/kubernetes/pull/78713
-//   [DONE] Bug was in getState function which is shared with the new code.
-// - https://github.com/kubernetes/kubernetes/pull/78713
-//   [DONE] Added TestPreconditionalDeleteWithSuggestion
 
 func TestDeleteWithSuggestion(t *testing.T) {
 	ctx, store, _ := testSetup(t)
