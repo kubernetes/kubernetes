@@ -4375,7 +4375,7 @@ var _ = common.SIGDescribe("SCTP [LinuxOnly]", func() {
 		}
 	})
 
-	ginkgo.It("should create a Pod with SCTP HostPort", func(ctx context.Context) {
+	ginkgo.It("should allow creating a Pod with an SCTP HostPort", func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(cs)
 		framework.ExpectNoError(err)
 		hostExec := utils.NewHostExec(f)
@@ -4399,30 +4399,6 @@ var _ = common.SIGDescribe("SCTP [LinuxOnly]", func() {
 			err := cs.CoreV1().Pods(f.Namespace.Name).Delete(ctx, podName, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", podName, f.Namespace.Name)
 		})
-		// wait until host port manager syncs rules
-		cmd := "iptables-save"
-		if framework.TestContext.ClusterIsIPv6() {
-			cmd = "ip6tables-save"
-		}
-		err = wait.PollImmediate(framework.Poll, framework.PollShortTimeout, func() (bool, error) {
-			framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
-			result, err := hostExec.IssueCommandWithResult(cmd, node)
-			if err != nil {
-				framework.Logf("Interrogation of iptables rules failed on node %v", node.Name)
-				return false, nil
-			}
-
-			for _, line := range strings.Split(result, "\n") {
-				if strings.Contains(line, "-p sctp") && strings.Contains(line, "--dport 5060") {
-					return true, nil
-				}
-			}
-			framework.Logf("retrying ... not hostport sctp iptables rules found on node %v", node.Name)
-			return false, nil
-		})
-		if err != nil {
-			framework.Failf("iptables rules are not set for a pod with sctp hostport")
-		}
 		ginkgo.By("validating sctp module is still not loaded")
 		sctpLoadedAtEnd := CheckSCTPModuleLoadedOnNodes(f, nodes)
 		if !sctpLoadedAtStart && sctpLoadedAtEnd {
