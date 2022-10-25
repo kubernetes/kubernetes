@@ -54,15 +54,15 @@ These are the metrics which are exported in Kubernetes components (i.e. kube-api
 <thead>
 	<tr>
 		<td width="20%">Name</td>
-		<td width="12%">Stability Level</td>
-		<td width="12%">Type</td>
+		<td width="10%">Stability Level</td>
+		<td width="10%">Type</td>
 		<td width="30%">Help</td>
-		<td width="13%">Labels</td>
-		<td width="13%">Const Labels</td>
+		<td width="20%">Labels</td>
+		<td width="10%">Const Labels</td>
 	</tr>
 </thead>
 <tbody>
-{{range $index, $metric := .Metrics}}<tr><td>{{$metric.Name}}</td><td>{{$metric.StabilityLevel}}</td><td>{{$metric.Type}}</td><td>{{$metric.Help}}</td>{{if not $metric.Labels }}<td>None</td>{{else }}<td>{{range $label := $metric.Labels}}<div>{{$label}}</div>{{end}}</td>{{end}}{{if not $metric.ConstLabels }}<td>None</td>{{else }}<td>{{$metric.ConstLabels}}</td>{{end}}</tr>
+{{range $index, $metric := .Metrics}}<tr><td>{{with $metric}}{{.BuildFQName}}{{end}}</td><td>{{$metric.StabilityLevel}}</td><td>{{$metric.Type}}</td><td>{{$metric.Help}}</td>{{if not $metric.Labels }}<td>None</td>{{else }}<td>{{range $label := $metric.Labels}}<div>{{$label}}</div>{{end}}</td>{{end}}{{if not $metric.ConstLabels }}<td>None</td>{{else }}<td>{{$metric.ConstLabels}}</td>{{end}}</tr>
 {{end}}
 </tbody>
 </table>
@@ -89,7 +89,8 @@ func main() {
 		}
 		var tpl bytes.Buffer
 		for i, m := range metrics {
-			m.Help = strings.Join(strings.Split(m.Help, "\n"), " ")
+			m.Help = strings.Join(strings.Split(m.Help, "\n"), ", ")
+			_ = m.BuildFQName() // ignore golint error
 			metrics[i] = m
 		}
 		data := templateData{
@@ -124,6 +125,6 @@ type metric struct {
 	ConstLabels       map[string]string   `yaml:"constLabels,omitempty" json:"constLabels,omitempty"`
 }
 
-func (m metric) buildFQName() string {
+func (m metric) BuildFQName() string {
 	return metrics.BuildFQName(m.Namespace, m.Subsystem, m.Name)
 }
