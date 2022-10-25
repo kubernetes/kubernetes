@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	nodeconfig "k8s.io/cloud-provider/controllers/node/config"
@@ -33,7 +35,7 @@ func (o *NodeControllerOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
-	fs.Int32Var(&o.WorkerCount, "node-controller-worker-count", o.WorkerCount, "Number of workers synchronizing node status.")
+	fs.Int32Var(&o.ConcurrentNodeSyncs, "concurrent-node-syncs", o.ConcurrentNodeSyncs, "Number of workers concurrently synchronizing nodes.")
 }
 
 // ApplyTo fills up ServiceController config with options.
@@ -42,7 +44,7 @@ func (o *NodeControllerOptions) ApplyTo(cfg *nodeconfig.NodeControllerConfigurat
 		return nil
 	}
 
-	cfg.WorkerCount = o.WorkerCount
+	cfg.ConcurrentNodeSyncs = o.ConcurrentNodeSyncs
 
 	return nil
 }
@@ -52,6 +54,9 @@ func (o *NodeControllerOptions) Validate() []error {
 	if o == nil {
 		return nil
 	}
-
-	return []error{}
+	var errors []error
+	if o.ConcurrentNodeSyncs < 0 {
+		errors = append(errors, fmt.Errorf("concurrent-node-syncs must be a positive number"))
+	}
+	return errors
 }

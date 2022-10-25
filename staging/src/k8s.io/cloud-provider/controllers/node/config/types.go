@@ -18,6 +18,7 @@ package config
 
 // NodeControllerConfiguration contains elements describing NodeController.
 type NodeControllerConfiguration struct {
-	// WorkerCount is the number of workers that are synchronizing nodes.
-	WorkerCount int32
+	// ConcurrentNodeSyncs is the number of workers
+	// concurrently synchronizing nodes
+	ConcurrentNodeSyncs int32
 }

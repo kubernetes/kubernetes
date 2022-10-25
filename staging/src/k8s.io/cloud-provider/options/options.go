@@ -204,7 +204,7 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent stri
 	// sync back to component config
 	// TODO: find more elegant way than syncing back the values.
 	c.ComponentConfig.NodeStatusUpdateFrequency = o.NodeStatusUpdateFrequency
-	c.ComponentConfig.NodeController.WorkerCount = o.NodeController.WorkerCount
+	c.ComponentConfig.NodeController.ConcurrentNodeSyncs = o.NodeController.ConcurrentNodeSyncs
 
 	return nil
 }

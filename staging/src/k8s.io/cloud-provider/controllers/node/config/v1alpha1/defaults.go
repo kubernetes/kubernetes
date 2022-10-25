@@ -17,7 +17,7 @@ limitations under the License.
 package v1alpha1
 
 func RecommendedDefaultNodeControllerConfiguration(obj *NodeControllerConfiguration) {
-	if obj.WorkerCount <= 0 {
-		obj.WorkerCount = 1
+	if obj.ConcurrentNodeSyncs == 0 {
+		obj.ConcurrentNodeSyncs = 1
 	}
 }

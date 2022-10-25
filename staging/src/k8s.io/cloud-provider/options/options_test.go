@@ -87,7 +87,7 @@ func TestDefaultFlags(t *testing.T) {
 		},
 		NodeController: &NodeControllerOptions{
 			NodeControllerConfiguration: &nodeconfig.NodeControllerConfiguration{
-				WorkerCount: 1,
+				ConcurrentNodeSyncs: 1,
 			},
 		},
 		ServiceController: &ServiceControllerOptions{
@@ -175,7 +175,7 @@ func TestAddFlags(t *testing.T) {
 		"--route-reconciliation-period=30s",
 		"--secure-port=10001",
 		"--use-service-account-credentials=false",
-		"--node-controller-worker-count=5",
+		"--concurrent-node-syncs=5",
 	}
 	err = fs.Parse(args)
 	if err != nil {
@@ -231,7 +231,7 @@ func TestAddFlags(t *testing.T) {
 		},
 		NodeController: &NodeControllerOptions{
 			NodeControllerConfiguration: &nodeconfig.NodeControllerConfiguration{
-				WorkerCount: 5,
+				ConcurrentNodeSyncs: 5,
 			},
 		},
 		ServiceController: &ServiceControllerOptions{
