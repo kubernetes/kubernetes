@@ -76,7 +76,7 @@ require (
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
 	github.com/storageos/go-api v2.2.0+incompatible
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.8.0
 	github.com/vishvananda/netlink v1.1.0
 	github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae // indirect
 	github.com/vmware/govmomi v0.20.3
@@ -411,8 +411,8 @@ replace (
 	github.com/spf13/viper => github.com/spf13/viper v1.8.1
 	github.com/stoewer/go-strcase => github.com/stoewer/go-strcase v1.2.0
 	github.com/storageos/go-api => github.com/storageos/go-api v2.2.0+incompatible
-	github.com/stretchr/objx => github.com/stretchr/objx v0.2.0
-	github.com/stretchr/testify => github.com/stretchr/testify v1.7.0
+	github.com/stretchr/objx => github.com/stretchr/objx v0.4.0
+	github.com/stretchr/testify => github.com/stretchr/testify v1.8.0
 	github.com/subosito/gotenv => github.com/subosito/gotenv v1.2.0
 	github.com/syndtr/gocapability => github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635
 	github.com/tmc/grpc-websocket-proxy => github.com/tmc/grpc-websocket-proxy v0.0.0-20201229170055-e5319fda7802
@@ -447,7 +447,7 @@ replace (
 	go.opentelemetry.io/proto/otlp => go.opentelemetry.io/proto/otlp v0.7.0
 	go.starlark.net => go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5
 	go.uber.org/atomic => go.uber.org/atomic v1.7.0
-	go.uber.org/goleak => go.uber.org/goleak v1.1.10
+	go.uber.org/goleak => go.uber.org/goleak v1.2.0
 	go.uber.org/multierr => go.uber.org/multierr v1.6.0
 	go.uber.org/zap => go.uber.org/zap v1.19.0
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
@@ -484,7 +484,7 @@ replace (
 	gopkg.in/tomb.v1 => gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
 	gopkg.in/warnings.v0 => gopkg.in/warnings.v0 v0.1.1
 	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.4.0
-	gopkg.in/yaml.v3 => gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+	gopkg.in/yaml.v3 => gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/v3 => gotest.tools/v3 v3.0.3
 	honnef.co/go/tools => honnef.co/go/tools v0.0.1-2020.1.4
 	k8s.io/api => ./staging/src/k8s.io/api
@@ -525,7 +525,7 @@ replace (
 	modernc.org/strutil => modernc.org/strutil v1.0.0
 	modernc.org/xc => modernc.org/xc v1.0.0
 	rsc.io/pdf => rsc.io/pdf v0.1.1
-	sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.30
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.33
 	sigs.k8s.io/json => sigs.k8s.io/json v0.0.0-20211020170558-c049b76a60c6
 	sigs.k8s.io/kustomize/api => sigs.k8s.io/kustomize/api v0.10.1
 	sigs.k8s.io/kustomize/cmd/config => sigs.k8s.io/kustomize/cmd/config v0.10.2
