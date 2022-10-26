@@ -17,10 +17,12 @@ limitations under the License.
 package testing
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"path"
 	"reflect"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -32,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/value"
 )
 
 // CreateObj will create a single object using the storage interface.
@@ -79,16 +82,16 @@ func DeepEqualSafePodSpec() example.PodSpec {
 	}
 }
 
-// TestPropogateStore helps propagates store with objects, automates key generation, and returns
+// TestPropagateStore helps propagates store with objects, automates key generation, and returns
 // keys and stored objects.
-func TestPropogateStore(ctx context.Context, t *testing.T, store storage.Interface, obj *example.Pod) (string, *example.Pod) {
+func TestPropagateStore(ctx context.Context, t *testing.T, store storage.Interface, obj *example.Pod) (string, *example.Pod) {
 	// Setup store with a key and grab the output for returning.
 	key := "/testkey"
-	return key, TestPropogateStoreWithKey(ctx, t, store, key, obj)
+	return key, TestPropagateStoreWithKey(ctx, t, store, key, obj)
 }
 
-// TestPropogateStoreWithKey helps propagate store with objects, the given object will be stored at the specified key.
-func TestPropogateStoreWithKey(ctx context.Context, t *testing.T, store storage.Interface, key string, obj *example.Pod) *example.Pod {
+// TestPropagateStoreWithKey helps propagate store with objects, the given object will be stored at the specified key.
+func TestPropagateStoreWithKey(ctx context.Context, t *testing.T, store storage.Interface, key string, obj *example.Pod) *example.Pod {
 	// Setup store with the specified key and grab the output for returning.
 	err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil)
 	if err != nil && !storage.IsNotFound(err) {
@@ -192,4 +195,47 @@ func ResourceVersionNotOlderThan(sentinel string) func(string) error {
 		}
 		return nil
 	}
+}
+
+// PrefixTransformer adds and verifies that all data has the correct prefix on its way in and out.
+type PrefixTransformer struct {
+	prefix []byte
+	stale  bool
+	err    error
+	reads  uint64
+}
+
+func NewPrefixTransformer(prefix []byte, stale bool) *PrefixTransformer {
+	return &PrefixTransformer{
+		prefix: prefix,
+		stale:  stale,
+	}
+}
+
+func (p *PrefixTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
+	atomic.AddUint64(&p.reads, 1)
+	if dataCtx == nil {
+		panic("no context provided")
+	}
+	if !bytes.HasPrefix(data, p.prefix) {
+		return nil, false, fmt.Errorf("value does not have expected prefix %q: %s,", p.prefix, string(data))
+	}
+	return bytes.TrimPrefix(data, p.prefix), p.stale, p.err
+}
+func (p *PrefixTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
+	if dataCtx == nil {
+		panic("no context provided")
+	}
+	if len(data) > 0 {
+		return append(append([]byte{}, p.prefix...), data...), p.err
+	}
+	return data, p.err
+}
+
+func (p *PrefixTransformer) GetReads() uint64 {
+	return atomic.LoadUint64(&p.reads)
+}
+
+func (p *PrefixTransformer) ResetReads() {
+	atomic.StoreUint64(&p.reads, 0)
 }
