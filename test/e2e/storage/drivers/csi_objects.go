@@ -26,11 +26,13 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -96,4 +98,56 @@ func createGCESecrets(client clientset.Interface, ns string) {
 	if !apierrors.IsAlreadyExists(err) {
 		framework.ExpectNoError(err, "Failed to create Secret %v", s.GetName())
 	}
+}
+
+// grantSecretReader creates a Role and RoleBinding in the given namespace
+// granting get and list access to secrets for the given service account.
+func grantSecretReader(
+	client clientset.Interface,
+	ns string,
+	serviceAccountName string,
+	serviceAccountNamespace string) {
+	roleName := "secret-reader"
+	r := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      roleName,
+			Namespace: ns,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{""},
+				Resources: []string{"secrets"},
+				Verbs:     []string{"get", "list"},
+			},
+		},
+	}
+	_, err := client.RbacV1().Roles(ns).Create(context.TODO(), r, metav1.CreateOptions{})
+	if !apierrors.IsAlreadyExists(err) {
+		framework.ExpectNoError(err, "Failed to create Role %v", r.GetName())
+	}
+
+	rb := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "secret-reader",
+			Namespace: ns,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      rbacv1.ServiceAccountKind,
+				Name:      serviceAccountName,
+				Namespace: serviceAccountNamespace,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Kind:     "Role",
+			Name:     roleName,
+			APIGroup: rbacv1.GroupName,
+		},
+	}
+	_, err = client.RbacV1().RoleBindings(ns).Create(context.TODO(), rb, metav1.CreateOptions{})
+	if !apierrors.IsAlreadyExists(err) {
+		framework.ExpectNoError(err, "Failed to create RoleBinding %v", rb.GetName())
+	}
+
+	ginkgo.By(fmt.Sprintf("Created role and rolebinding for ServiceAccount %s/%s granting secret reader in %s", serviceAccountNamespace, serviceAccountName, ns))
 }
