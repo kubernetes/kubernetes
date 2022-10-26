@@ -431,6 +431,17 @@ func ExponentialBackoff(backoff Backoff, condition ConditionFunc) error {
 	return ErrWaitTimeout
 }
 
+// ManagedExponentialBackoff, unlike ExponentialBackoff does not return ErrWaitTimeout.
+// Instead the loop continues indefinitely with Sleep being maxDuration (by Steps or Cap) + Jitter
+func ManagedExponentialBackoff(backoff Backoff, condition ConditionFunc) error {
+	for {
+		if ok, err := runConditionWithCrashProtection(condition); err != nil || ok {
+			return err
+		}
+		time.Sleep(backoff.Step())
+	}
+}
+
 // Poll tries a condition func until it returns true, an error, or the timeout
 // is reached.
 //
@@ -754,4 +765,27 @@ func ExponentialBackoffWithContext(ctx context.Context, backoff Backoff, conditi
 	}
 
 	return ErrWaitTimeout
+}
+
+// ManagedExponentialBackoffWithContext works with a request context and a Backoff. It ensures that the retry wait never
+// exceeds the deadline specified by the request context.
+func ManagedExponentialBackoffWithContext(ctx context.Context, backoff Backoff, condition ConditionFunc) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		if ok, err := runConditionWithCrashProtection(condition); err != nil || ok {
+			return err
+		}
+
+		waitBeforeRetry := backoff.Step()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(waitBeforeRetry):
+		}
+	}
 }

@@ -233,7 +233,6 @@ func TestJitterUntilNegativeFactor(t *testing.T) {
 	if now.Add(3 * time.Second).Before(time.Now()) {
 		t.Errorf("JitterUntil did not returned after predefined period with negative jitter factor when the stop chan was closed inside the func")
 	}
-
 }
 
 func TestExponentialBackoff(t *testing.T) {
@@ -1335,6 +1334,190 @@ func TestPollInternal(t *testing.T) {
 			}
 			if test.attemptsExpected != attempts {
 				t.Errorf("Expected %d invocations, got %d", test.attemptsExpected, attempts)
+			}
+		})
+	}
+}
+
+func TestManagedExponentialBackoff(t *testing.T) {
+	opts := Backoff{Factor: 1.0, Steps: 3}
+
+	// returns immediately on error
+	testErr := fmt.Errorf("some other error")
+	err := ManagedExponentialBackoff(opts, func() (bool, error) {
+		return false, testErr
+	})
+	if err != testErr {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// returns immediately
+	i := 0
+	err = ManagedExponentialBackoff(opts, func() (bool, error) {
+		i++
+		return true, nil
+	})
+	if err != nil || i != 1 {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// more than Steps
+	i, testLimit := 0, opts.Steps+1
+	err = ManagedExponentialBackoff(opts, func() (bool, error) {
+		i++
+		if i > testLimit {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil || i != testLimit+1 {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// more than Duration
+	opts = Backoff{Duration: time.Nanosecond, Factor: 2, Cap: 3 * time.Microsecond}
+
+	i, testLimit = 0, 4
+	err = ManagedExponentialBackoff(opts, func() (done bool, err error) {
+		i++
+		if i > testLimit {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil || i != testLimit+1 {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestManagedExponentialBackoffWithContext(t *testing.T) {
+	noCancel := func(_ int, _ context.CancelFunc) {}
+
+	defaultCallback := func(i int) (bool, error) {
+		if i > 4 { // 5 attempts == assuming infinite
+			return true, nil
+		}
+		return false, nil
+	}
+
+	conditionErr := errors.New("condition failed")
+
+	tests := []struct {
+		name             string
+		steps            int
+		cap              time.Duration
+		cancelFunc       func(attempts int, cancel context.CancelFunc)
+		callback         func(calls int) (bool, error)
+		attemptsExpected int
+		errExpected      error
+	}{
+		{
+			name:             "infinite attempts expected with zero backoff steps",
+			steps:            0,
+			cancelFunc:       noCancel,
+			callback:         defaultCallback,
+			attemptsExpected: 5,
+			errExpected:      nil,
+		},
+		{
+			name:             "infinite attempts expected with any backoff step",
+			steps:            2,
+			cancelFunc:       noCancel,
+			callback:         defaultCallback,
+			attemptsExpected: 5,
+			errExpected:      nil,
+		},
+		{
+			name:             "infinite attempts expected after reaching Cap",
+			cap:              time.Nanosecond,
+			cancelFunc:       noCancel,
+			callback:         defaultCallback,
+			attemptsExpected: 5,
+			errExpected:      nil,
+		},
+		{
+			name:       "condition returns true with single backoff step",
+			steps:      1,
+			cancelFunc: noCancel,
+			callback: func(_ int) (bool, error) {
+				return true, nil
+			},
+			attemptsExpected: 1,
+			errExpected:      nil,
+		},
+		{
+			name:       "condition returns error no further attempts expected",
+			steps:      5,
+			cancelFunc: noCancel,
+			callback: func(_ int) (bool, error) {
+				return true, conditionErr
+			},
+			attemptsExpected: 1,
+			errExpected:      conditionErr,
+		},
+		{
+			name:       "condition returns true after certain attempts with multiple backoff steps",
+			steps:      5,
+			cancelFunc: noCancel,
+			callback: func(attempts int) (bool, error) {
+				if attempts == 3 {
+					return true, nil
+				}
+				return false, nil
+			},
+			attemptsExpected: 3,
+			errExpected:      nil,
+		},
+		{
+			name:  "context already canceled no attempts expected",
+			steps: 5,
+			cancelFunc: func(_ int, cancel context.CancelFunc) {
+				cancel()
+			},
+			callback:         defaultCallback,
+			attemptsExpected: 0,
+			errExpected:      context.Canceled,
+		},
+		{
+			name:  "context canceled after certain attempts", // TODO:
+			steps: 5,
+			cancelFunc: func(attempts int, cancel context.CancelFunc) {
+				if attempts > 2 {
+					cancel()
+				}
+			},
+			callback:         defaultCallback,
+			attemptsExpected: 3,
+			errExpected:      context.Canceled,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			backoff := Backoff{
+				Duration: 1 * time.Millisecond,
+				Factor:   1.0,
+				Cap:      test.cap,
+				Steps:    test.steps,
+			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+
+			attempts := 0
+			test.cancelFunc(attempts, cancel)
+			err := ManagedExponentialBackoffWithContext(ctx, backoff, func() (bool, error) {
+				attempts++
+				b, e := test.callback(attempts)
+				test.cancelFunc(attempts, cancel)
+				return b, e
+			})
+
+			if test.errExpected != err {
+				t.Errorf("expected error: %v but got: %v", test.errExpected, err)
+			}
+
+			if test.attemptsExpected != attempts {
+				t.Errorf("expected attempts count: %d but got: %d", test.attemptsExpected, attempts)
 			}
 		})
 	}
