@@ -253,8 +253,26 @@ func TestListContinuationWithFilter(t *testing.T) {
 	storagetesting.RunTestListContinuationWithFilter(ctx, t, store, validation)
 }
 
+func compactStorage(etcdClient *clientv3.Client) storagetesting.Compaction {
+	return func(ctx context.Context, t *testing.T, resourceVersion string) {
+		versioner := storage.APIObjectVersioner{}
+		rv, err := versioner.ParseResourceVersion(resourceVersion)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := etcdClient.KV.Compact(ctx, int64(rv), clientv3.WithCompactPhysical()); err != nil {
+			t.Fatalf("Unable to compact, %v", err)
+		}
+	}
+}
+
 func TestListInconsistentContinuation(t *testing.T) {
 	ctx, store, client := testSetup(t)
+	compaction := compactStorage(client)
+
+	if compaction == nil {
+		t.Skipf("compaction callback not provided")
+	}
 
 	// Setup storage with the following structure:
 	//  /
@@ -342,15 +360,8 @@ func TestListInconsistentContinuation(t *testing.T) {
 	}
 
 	// compact to latest revision.
-	versioner := storage.APIObjectVersioner{}
 	lastRVString := preset[2].storedObj.ResourceVersion
-	lastRV, err := versioner.ParseResourceVersion(lastRVString)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := client.KV.Compact(ctx, int64(lastRV), clientv3.WithCompactPhysical()); err != nil {
-		t.Fatalf("Unable to compact, %v", err)
-	}
+	compaction(ctx, t, lastRVString)
 
 	// The old continue token should have expired
 	options = storage.ListOptions{
@@ -358,7 +369,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 		Predicate:       pred(0, continueFromSecondItem),
 		Recursive:       true,
 	}
-	err = store.GetList(ctx, "/", options, out)
+	err := store.GetList(ctx, "/", options, out)
 	if err == nil {
 		t.Fatalf("unexpected no error")
 	}

@@ -1410,6 +1410,8 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 	}
 }
 
+type Compaction func(ctx context.Context, t *testing.T, resourceVersion string)
+
 type PrefixTransformerModifier func(*PrefixTransformer) value.Transformer
 
 type InterfaceWithPrefixTransformer interface {

@@ -54,6 +54,8 @@ func TestDeleteTriggerWatch(t *testing.T) {
 // - watch from 0 is able to return events for objects whose previous version has been compacted
 func TestWatchFromZero(t *testing.T) {
 	ctx, store, client := testSetup(t)
+	compaction := compactStorage(client)
+
 	key, storedObj := storagetesting.TestPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}})
 
 	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
@@ -81,6 +83,10 @@ func TestWatchFromZero(t *testing.T) {
 	storagetesting.TestCheckResult(t, watch.Added, w, out)
 	w.Stop()
 
+	if compaction == nil {
+		t.Skip("compaction callback not provided")
+	}
+
 	// Update again
 	out = &example.Pod{}
 	err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
@@ -92,14 +98,7 @@ func TestWatchFromZero(t *testing.T) {
 	}
 
 	// Compact previous versions
-	revToCompact, err := store.versioner.ParseResourceVersion(out.ResourceVersion)
-	if err != nil {
-		t.Fatalf("Error converting %q to an int: %v", storedObj.ResourceVersion, err)
-	}
-	_, err = client.Compact(ctx, int64(revToCompact), clientv3.WithCompactPhysical())
-	if err != nil {
-		t.Fatalf("Error compacting: %v", err)
-	}
+	compaction(ctx, t, out.ResourceVersion)
 
 	// Make sure we can still watch from 0 and receive an ADDED event
 	w, err = store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
