@@ -2450,6 +2450,20 @@
     pod.
   release: v1.19
   file: test/e2e/scheduling/preemption.go
+- testname: CSIInlineVolumes should support Pods with inline volumes
+  codename: '[sig-storage] CSIInlineVolumes should support CSIVolumeSource in Pod
+    API [Conformance]'
+  description: Pod resources with CSIVolumeSource should support create, get, list,
+    patch, and delete operations.
+  release: v1.26
+  file: test/e2e/storage/csi_inline.go
+- testname: CSIInlineVolumes should support ephemeral CSIDrivers
+  codename: '[sig-storage] CSIInlineVolumes should support ephemeral VolumeLifecycleMode
+    in CSIDriver API [Conformance]'
+  description: CSIDriver resources with ephemeral VolumeLifecycleMode should support
+    create, get, list, and delete operations.
+  release: v1.26
+  file: test/e2e/storage/csi_inline.go
 - testname: CSIStorageCapacity API
   codename: '[sig-storage] CSIStorageCapacity  should support CSIStorageCapacities
     API operations [Conformance]'

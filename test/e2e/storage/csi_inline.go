@@ -37,8 +37,13 @@ var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 	f := framework.NewDefaultFramework("csiinlinevolumes")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	// TODO: promote to framework.ConformanceIt
-	ginkgo.It("should support ephemeral VolumeLifecycleMode in CSIDriver API", func() {
+	/*
+		Release: v1.26
+		Testname: CSIInlineVolumes should support ephemeral CSIDrivers
+		Description: CSIDriver resources with ephemeral VolumeLifecycleMode
+		  should support create, get, list, and delete operations.
+	*/
+	framework.ConformanceIt("should support ephemeral VolumeLifecycleMode in CSIDriver API", func() {
 		// Create client
 		client := f.ClientSet.StorageV1().CSIDrivers()
 		defaultFSGroupPolicy := storagev1.ReadWriteOnceWithFSTypeFSGroupPolicy
@@ -117,8 +122,13 @@ var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 		}
 	})
 
-	// TODO: promote to framework.ConformanceIt
-	ginkgo.It("should support CSIVolumeSource in Pod API", func() {
+	/*
+		Release: v1.26
+		Testname: CSIInlineVolumes should support Pods with inline volumes
+		Description: Pod resources with CSIVolumeSource should support
+		  create, get, list, patch, and delete operations.
+	*/
+	framework.ConformanceIt("should support CSIVolumeSource in Pod API", func() {
 		// Create client
 		client := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 
