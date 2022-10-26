@@ -153,7 +153,7 @@ func (c *Controller) Start() {
 
 	// Reconcile during first run removing itself until server is ready.
 	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https")
-	if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err == nil {
+	if err := c.EndpointReconciler.RemoveEndpoints(c.PublicIP, endpointPorts); err == nil {
 		klog.Error("Found stale data, removed previous endpoints on kubernetes service, apiserver didn't exit successfully previously")
 	} else if !storage.IsNotFound(err) {
 		klog.Errorf("Error removing old endpoints from kubernetes service: %v", err)
@@ -210,7 +210,7 @@ func (c *Controller) Stop() {
 		defer close(finishedReconciling)
 		klog.Infof("Shutting down kubernetes service endpoint reconciler")
 		c.EndpointReconciler.StopReconciling()
-		if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err != nil {
+		if err := c.EndpointReconciler.RemoveEndpoints(c.PublicIP, endpointPorts); err != nil {
 			klog.Errorf("Unable to remove endpoints from kubernetes service: %v", err)
 		}
 		c.EndpointReconciler.Destroy()
@@ -271,7 +271,7 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 		return err
 	}
 	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https")
-	if err := c.EndpointReconciler.ReconcileEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts, reconcile); err != nil {
+	if err := c.EndpointReconciler.ReconcileEndpoints(c.PublicIP, endpointPorts, reconcile); err != nil {
 		return err
 	}
 	return nil

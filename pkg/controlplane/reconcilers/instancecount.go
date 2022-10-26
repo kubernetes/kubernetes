@@ -59,7 +59,7 @@ func NewMasterCountEndpointReconciler(masterCount int, epAdapter EndpointsAdapte
 //   - All apiservers MUST know and agree on the number of apiservers expected
 //     to be running (c.masterCount).
 //   - ReconcileEndpoints is called periodically from all apiservers.
-func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
+func (r *masterCountEndpointReconciler) ReconcileEndpoints(ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
 
@@ -67,14 +67,9 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 		return nil
 	}
 
-	e, err := r.epAdapter.Get(metav1.NamespaceDefault, serviceName, metav1.GetOptions{})
+	e, err := r.epAdapter.Get(metav1.GetOptions{})
 	if err != nil {
-		e = &corev1.Endpoints{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      serviceName,
-				Namespace: metav1.NamespaceDefault,
-			},
-		}
+		e = &corev1.Endpoints{}
 	}
 
 	// Don't use the EndpointSliceMirroring controller to mirror this to
@@ -100,7 +95,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 			Addresses: []corev1.EndpointAddress{{IP: ip.String()}},
 			Ports:     endpointPorts,
 		}}
-		klog.Warningf("Resetting endpoints for master service %q to %#v", serviceName, e)
+		klog.Warningf("Resetting endpoints for master service %q to %#v", e.Name, e)
 		_, err = r.epAdapter.Update(e)
 		return err
 	}
@@ -137,16 +132,16 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 		// Reset ports.
 		e.Subsets[0].Ports = endpointPorts
 	}
-	klog.Warningf("Resetting endpoints for master service %q to %v", serviceName, e)
+	klog.Warningf("Resetting endpoints for master service %q to %v", e.Name, e)
 	_, err = r.epAdapter.Update(e)
 	return err
 }
 
-func (r *masterCountEndpointReconciler) RemoveEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort) error {
+func (r *masterCountEndpointReconciler) RemoveEndpoints(ip net.IP, endpointPorts []corev1.EndpointPort) error {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
 
-	e, err := r.epAdapter.Get(metav1.NamespaceDefault, serviceName, metav1.GetOptions{})
+	e, err := r.epAdapter.Get(metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Endpoint doesn't exist

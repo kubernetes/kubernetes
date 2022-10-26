@@ -319,9 +319,9 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			}
 			clientset := fake.NewSimpleClientset(test.initialState...)
 
-			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1())
+			epAdapter := NewEndpointsAdapter(testServiceNamespace, testServiceName, clientset.CoreV1(), clientset.DiscoveryV1())
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
-			err = r.ReconcileEndpoints(testServiceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
+			err = r.ReconcileEndpoints(netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
 			if err != nil {
 				t.Errorf("unexpected error reconciling: %v", err)
 			}
@@ -393,9 +393,9 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				t.Errorf("unexpected error creating keys: %v", err)
 			}
 			clientset := fake.NewSimpleClientset(test.initialState...)
-			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1())
+			epAdapter := NewEndpointsAdapter(testServiceNamespace, testServiceName, clientset.CoreV1(), clientset.DiscoveryV1())
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
-			err = r.ReconcileEndpoints(testServiceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
+			err = r.ReconcileEndpoints(netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
 			if err != nil {
 				t.Errorf("unexpected error reconciling: %v", err)
 			}
@@ -476,9 +476,9 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 				t.Errorf("unexpected error creating keys: %v", err)
 			}
 			clientset := fake.NewSimpleClientset(test.initialState...)
-			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1())
+			epAdapter := NewEndpointsAdapter(testServiceNamespace, testServiceName, clientset.CoreV1(), clientset.DiscoveryV1())
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
-			err = r.RemoveEndpoints(testServiceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts)
+			err = r.RemoveEndpoints(netutils.ParseIPSloppy(test.ip), test.endpointPorts)
 			// if the ip is not on the endpoints, it must return an storage error and stop reconciling
 			if !contains(test.endpointKeys, test.ip) {
 				if !storage.IsNotFound(err) {

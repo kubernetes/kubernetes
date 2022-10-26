@@ -40,26 +40,33 @@ import (
 type EndpointsAdapter struct {
 	endpointClient      corev1client.EndpointsGetter
 	endpointSliceClient discoveryclient.EndpointSlicesGetter
+
+	serviceNamespace string
+	serviceName      string
 }
 
 // NewEndpointsAdapter returns a new EndpointsAdapter.
-func NewEndpointsAdapter(endpointClient corev1client.EndpointsGetter, endpointSliceClient discoveryclient.EndpointSlicesGetter) EndpointsAdapter {
+func NewEndpointsAdapter(serviceNamespace, serviceName string, endpointClient corev1client.EndpointsGetter, endpointSliceClient discoveryclient.EndpointSlicesGetter) EndpointsAdapter {
 	return EndpointsAdapter{
 		endpointClient:      endpointClient,
 		endpointSliceClient: endpointSliceClient,
+
+		serviceNamespace: serviceNamespace,
+		serviceName:      serviceName,
 	}
 }
 
-// Get takes the name and namespace of the Endpoints resource, and returns a
-// corresponding Endpoints object if it exists, and an error if there is any.
-func (adapter *EndpointsAdapter) Get(namespace, name string, getOpts metav1.GetOptions) (*corev1.Endpoints, error) {
-	return adapter.endpointClient.Endpoints(namespace).Get(context.TODO(), name, getOpts)
+// Get returns the Endpoints object if it exists, or an error if there is any.
+func (adapter *EndpointsAdapter) Get(getOpts metav1.GetOptions) (*corev1.Endpoints, error) {
+	return adapter.endpointClient.Endpoints(adapter.serviceNamespace).Get(context.TODO(), adapter.serviceName, getOpts)
 }
 
-// Create accepts a namespace and Endpoints object and creates the Endpoints
-// object and matching EndpointSlice. The created Endpoints object or an error will be
-// returned.
+// Create accepts an Endpoints object, fills in the correct namespace and name, and
+// creates an Endpoints and matching EndpointSlice. The created Endpoints object or an
+// error will be returned.
 func (adapter *EndpointsAdapter) Create(endpoints *corev1.Endpoints) (*corev1.Endpoints, error) {
+	endpoints.Namespace = adapter.serviceNamespace
+	endpoints.Name = adapter.serviceName
 	endpoints, err := adapter.endpointClient.Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
 	if err == nil {
 		err = adapter.EnsureEndpointSliceFromEndpoints(endpoints)
@@ -67,7 +74,7 @@ func (adapter *EndpointsAdapter) Create(endpoints *corev1.Endpoints) (*corev1.En
 	return endpoints, err
 }
 
-// Update accepts a namespace and Endpoints object and updates it and its
+// Update accepts an Endpoints object and updates it and its
 // matching EndpointSlice. The updated Endpoints object or an error will be returned.
 func (adapter *EndpointsAdapter) Update(endpoints *corev1.Endpoints) (*corev1.Endpoints, error) {
 	endpoints, err := adapter.endpointClient.Endpoints(endpoints.Namespace).Update(context.TODO(), endpoints, metav1.UpdateOptions{})
@@ -77,7 +84,7 @@ func (adapter *EndpointsAdapter) Update(endpoints *corev1.Endpoints) (*corev1.En
 	return endpoints, err
 }
 
-// EnsureEndpointSliceFromEndpoints accepts a namespace and Endpoints resource
+// EnsureEndpointSliceFromEndpoints accepts an Endpoints resource
 // and creates or updates a corresponding EndpointSlice. An error will be returned
 // if it fails to sync the EndpointSlice.
 func (adapter *EndpointsAdapter) EnsureEndpointSliceFromEndpoints(endpoints *corev1.Endpoints) error {

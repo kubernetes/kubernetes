@@ -246,7 +246,7 @@ type Instance struct {
 func (c *Config) createMasterCountReconciler() reconcilers.EndpointReconciler {
 	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 	endpointSliceClient := discoveryclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	endpointsAdapter := reconcilers.NewEndpointsAdapter(endpointClient, endpointSliceClient)
+	endpointsAdapter := reconcilers.NewEndpointsAdapter(metav1.NamespaceDefault, kubernetesServiceName, endpointClient, endpointSliceClient)
 
 	return reconcilers.NewMasterCountEndpointReconciler(c.ExtraConfig.MasterCount, endpointsAdapter)
 }
@@ -258,7 +258,7 @@ func (c *Config) createNoneReconciler() reconcilers.EndpointReconciler {
 func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 	endpointSliceClient := discoveryclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	endpointsAdapter := reconcilers.NewEndpointsAdapter(endpointClient, endpointSliceClient)
+	endpointsAdapter := reconcilers.NewEndpointsAdapter(metav1.NamespaceDefault, kubernetesServiceName, endpointClient, endpointSliceClient)
 
 	ttl := c.ExtraConfig.MasterEndpointReconcileTTL
 	config, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("apiServerIPInfo"))

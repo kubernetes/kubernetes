@@ -59,9 +59,9 @@ func TestEndpointsAdapterGet(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			client := fake.NewSimpleClientset(testCase.initialState...)
-			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1())
+			epAdapter := NewEndpointsAdapter(testServiceNamespace, testServiceName, client.CoreV1(), client.DiscoveryV1())
 
-			endpoints, err := epAdapter.Get(testServiceNamespace, testServiceName, metav1.GetOptions{})
+			endpoints, err := epAdapter.Get(metav1.GetOptions{})
 
 			if !apiequality.Semantic.DeepEqual(testCase.expectedError, err) {
 				t.Errorf("Expected error: %v, got: %v", testCase.expectedError, err)
@@ -149,7 +149,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			client := fake.NewSimpleClientset(testCase.initialState...)
-			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1())
+			epAdapter := NewEndpointsAdapter(testServiceNamespace, testServiceName, client.CoreV1(), client.DiscoveryV1())
 
 			endpoints, err := epAdapter.Create(testCase.endpointsParam)
 
@@ -255,7 +255,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			client := fake.NewSimpleClientset(testCase.initialState...)
-			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1())
+			epAdapter := NewEndpointsAdapter(testServiceNamespace, testServiceName, client.CoreV1(), client.DiscoveryV1())
 
 			endpoints, err := epAdapter.Update(testCase.endpointsParam)
 
@@ -365,7 +365,7 @@ func TestEndpointManagerEnsureEndpointSliceFromEndpoints(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			client := fake.NewSimpleClientset(testCase.initialState...)
-			epAdapter := NewEndpointsAdapter(client.CoreV1(), client.DiscoveryV1())
+			epAdapter := NewEndpointsAdapter(testServiceNamespace, testServiceName, client.CoreV1(), client.DiscoveryV1())
 
 			err := epAdapter.EnsureEndpointSliceFromEndpoints(testCase.endpointsParam)
 			if !apiequality.Semantic.DeepEqual(testCase.expectedError, err) {
