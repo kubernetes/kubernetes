@@ -109,7 +109,8 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 		klog.V(1).Infof("[reset] Could not obtain a client set from the kubeconfig file: %s", options.kubeconfigPath)
 	}
 
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors, ignorePreflightErrors(cfg))
+	ignorePreflightErrorsFromCfg := []string{}
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors, ignorePreflightErrorsFromCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -142,13 +143,6 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 		dryRun:                options.dryRun,
 		cleanupTmpDir:         options.cleanupTmpDir,
 	}, nil
-}
-
-func ignorePreflightErrors(cfg *kubeadmapi.InitConfiguration) []string {
-	if cfg == nil {
-		return []string{}
-	}
-	return cfg.NodeRegistration.IgnorePreflightErrors
 }
 
 // AddResetFlags adds reset flags
