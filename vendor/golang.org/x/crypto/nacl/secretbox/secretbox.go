@@ -35,8 +35,8 @@ This package is interoperable with NaCl: https://nacl.cr.yp.to/secretbox.html.
 package secretbox // import "golang.org/x/crypto/nacl/secretbox"
 
 import (
+	"golang.org/x/crypto/internal/poly1305"
 	"golang.org/x/crypto/internal/subtle"
-	"golang.org/x/crypto/poly1305"
 	"golang.org/x/crypto/salsa20/salsa"
 )
 
