@@ -25,3 +25,16 @@ To update the golden test list, you can run:
 ```console
 ./test/instrumentation/test-update.sh
 ```
+
+To update the list of documented metrics (which you need to run first before 
+upgrading the documentation markdown file).
+
+```console
+./test/instrumentation/update-documentation-metrics.sh
+```
+
+To update the documented list of metrics for k8s/website, please run:
+
+```console
+./test/instrumentation/update-documentation.sh
+```
