@@ -20,6 +20,8 @@ package main
 
 import (
 	"os"
+	"runtime/debug"
+	"strings"
 
 	"k8s.io/component-base/cli"
 	_ "k8s.io/component-base/logs/json/register"          // for JSON log format registration
@@ -29,6 +31,17 @@ import (
 )
 
 func main() {
+	if godebug := os.Getenv("GODEBUG"); !strings.Contains(godebug, "x509sha1") {
+		// match go1.17 default behavior on release-1.23
+		// see https://go.dev/doc/go1.18#sha1
+		os.Setenv("GODEBUG", strings.TrimPrefix(godebug+",x509sha1=1", ","))
+	}
+	if os.Getenv("GOGC") == "" {
+		// match go1.17 default GC tuning on release-1.23
+		// see https://github.com/kubernetes/kubernetes/issues/108357#issuecomment-1056901991
+		debug.SetGCPercent(63)
+	}
+
 	command := app.NewAPIServerCommand()
 	code := cli.Run(command)
 	os.Exit(code)
