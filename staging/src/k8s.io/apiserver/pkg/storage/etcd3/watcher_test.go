@@ -49,63 +49,9 @@ func TestDeleteTriggerWatch(t *testing.T) {
 	storagetesting.RunTestDeleteTriggerWatch(ctx, t, store)
 }
 
-// TestWatchFromZero tests that
-// - watch from 0 should sync up and grab the object added before
-// - watch from 0 is able to return events for objects whose previous version has been compacted
 func TestWatchFromZero(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	compaction := compactStorage(client)
-
-	key, storedObj := storagetesting.TestPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}})
-
-	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
-	if err != nil {
-		t.Fatalf("Watch failed: %v", err)
-	}
-	storagetesting.TestCheckResult(t, watch.Added, w, storedObj)
-	w.Stop()
-
-	// Update
-	out := &example.Pod{}
-	err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
-		func(runtime.Object) (runtime.Object, error) {
-			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns", Annotations: map[string]string{"a": "1"}}}, nil
-		}), nil)
-	if err != nil {
-		t.Fatalf("GuaranteedUpdate failed: %v", err)
-	}
-
-	// Make sure when we watch from 0 we receive an ADDED event
-	w, err = store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
-	if err != nil {
-		t.Fatalf("Watch failed: %v", err)
-	}
-	storagetesting.TestCheckResult(t, watch.Added, w, out)
-	w.Stop()
-
-	if compaction == nil {
-		t.Skip("compaction callback not provided")
-	}
-
-	// Update again
-	out = &example.Pod{}
-	err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
-		func(runtime.Object) (runtime.Object, error) {
-			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}}, nil
-		}), nil)
-	if err != nil {
-		t.Fatalf("GuaranteedUpdate failed: %v", err)
-	}
-
-	// Compact previous versions
-	compaction(ctx, t, out.ResourceVersion)
-
-	// Make sure we can still watch from 0 and receive an ADDED event
-	w, err = store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
-	if err != nil {
-		t.Fatalf("Watch failed: %v", err)
-	}
-	storagetesting.TestCheckResult(t, watch.Added, w, out)
+	storagetesting.RunTestWatchFromZero(ctx, t, store, compactStorage(client))
 }
 
 // TestWatchFromNoneZero tests that
