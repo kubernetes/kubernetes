@@ -148,14 +148,14 @@ func NewLeases(config *storagebackend.ConfigForResource, baseKey string, leaseTi
 }
 
 type leaseEndpointReconciler struct {
-	epAdapter             EndpointsAdapter
+	epAdapter             *EndpointsAdapter
 	masterLeases          Leases
 	stopReconcilingCalled atomic.Bool
 	reconcilingLock       sync.Mutex
 }
 
 // NewLeaseEndpointReconciler creates a new LeaseEndpoint reconciler
-func NewLeaseEndpointReconciler(epAdapter EndpointsAdapter, masterLeases Leases) EndpointReconciler {
+func NewLeaseEndpointReconciler(epAdapter *EndpointsAdapter, masterLeases Leases) EndpointReconciler {
 	return &leaseEndpointReconciler{
 		epAdapter:    epAdapter,
 		masterLeases: masterLeases,
@@ -169,7 +169,7 @@ func NewLeaseEndpointReconciler(epAdapter EndpointsAdapter, masterLeases Leases)
 // expire. ReconcileEndpoints will notice that the endpoints object is
 // different from the directory listing, and update the endpoints object
 // accordingly.
-func (r *leaseEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
+func (r *leaseEndpointReconciler) ReconcileEndpoints(ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
 	// reconcile endpoints only if apiserver was not shutdown
 	if r.stopReconcilingCalled.Load() {
 		return nil
@@ -186,13 +186,13 @@ func (r *leaseEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.
 		return err
 	}
 
-	return r.doReconcile(serviceName, endpointPorts, reconcilePorts)
+	return r.doReconcile(endpointPorts, reconcilePorts)
 }
 
 // doReconcile can be called from ReconcileEndpoints() or RemoveEndpoints().
 // it is NOT SAFE to call it from multiple goroutines.
-func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
-	e, err := r.epAdapter.Get(corev1.NamespaceDefault, serviceName, metav1.GetOptions{})
+func (r *leaseEndpointReconciler) doReconcile(endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
+	e, err := r.epAdapter.Get()
 	shouldCreate := false
 	if err != nil {
 		if !errors.IsNotFound(err) {
@@ -207,8 +207,8 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 		shouldCreate = true
 		e = &corev1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      serviceName,
-				Namespace: corev1.NamespaceDefault,
+				Name:      r.epAdapter.serviceName,
+				Namespace: r.epAdapter.serviceNamespace,
 			},
 		}
 	}
@@ -235,7 +235,7 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 	// Next, we compare the current list of endpoints with the list of master IP keys
 	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormatWithLease(e, masterIPs, endpointPorts, reconcilePorts)
 	if !skipMirrorChanged && formatCorrect && ipCorrect && portsCorrect {
-		return r.epAdapter.EnsureEndpointSliceFromEndpoints(corev1.NamespaceDefault, e)
+		return r.epAdapter.EnsureEndpointSliceFromEndpoints(e)
 	}
 
 	if !formatCorrect {
@@ -262,13 +262,13 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 		e.Subsets[0].Ports = endpointPorts
 	}
 
-	klog.Warningf("Resetting endpoints for master service %q to %v", serviceName, masterIPs)
+	klog.Warningf("Resetting endpoints for master service %q to %v", e.Name, masterIPs)
 	if shouldCreate {
-		if _, err = r.epAdapter.Create(corev1.NamespaceDefault, e); errors.IsAlreadyExists(err) {
+		if _, err = r.epAdapter.Create(e); errors.IsAlreadyExists(err) {
 			err = nil
 		}
 	} else {
-		_, err = r.epAdapter.Update(corev1.NamespaceDefault, e)
+		_, err = r.epAdapter.Update(e)
 	}
 	return err
 }
@@ -326,7 +326,7 @@ func checkEndpointSubsetFormatWithLease(e *corev1.Endpoints, expectedIPs []strin
 	return true, ipsCorrect, portsCorrect
 }
 
-func (r *leaseEndpointReconciler) RemoveEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort) error {
+func (r *leaseEndpointReconciler) RemoveEndpoints(ip net.IP, endpointPorts []corev1.EndpointPort) error {
 	// Ensure that there will be no race condition with the ReconcileEndpoints.
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
@@ -335,7 +335,7 @@ func (r *leaseEndpointReconciler) RemoveEndpoints(serviceName string, ip net.IP,
 		return err
 	}
 
-	return r.doReconcile(serviceName, endpointPorts, true)
+	return r.doReconcile(endpointPorts, true)
 }
 
 func (r *leaseEndpointReconciler) StopReconciling() {

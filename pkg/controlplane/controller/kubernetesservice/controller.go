@@ -41,7 +41,8 @@ import (
 )
 
 const (
-	kubernetesServiceName = "kubernetes"
+	KubernetesServiceName      = "kubernetes"
+	KubernetesServiceNamespace = metav1.NamespaceDefault
 )
 
 // Controller is the controller manager for the core bootstrap Kubernetes
@@ -91,7 +92,7 @@ func (c *Controller) Start(stopCh <-chan struct{}) {
 	}
 	// Reconcile during first run removing itself until server is ready.
 	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https")
-	if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err == nil {
+	if err := c.EndpointReconciler.RemoveEndpoints(c.PublicIP, endpointPorts); err == nil {
 		klog.Error("Found stale data, removed previous endpoints on kubernetes service, apiserver didn't exit successfully previously")
 	} else if !storage.IsNotFound(err) {
 		klog.Errorf("Error removing old endpoints from kubernetes service: %v", err)
@@ -127,7 +128,7 @@ func (c *Controller) Stop() {
 		defer close(finishedReconciling)
 		klog.Infof("Shutting down kubernetes service endpoint reconciler")
 		c.EndpointReconciler.StopReconciling()
-		if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err != nil {
+		if err := c.EndpointReconciler.RemoveEndpoints(c.PublicIP, endpointPorts); err != nil {
 			klog.Errorf("Unable to remove endpoints from kubernetes service: %v", err)
 		}
 		c.EndpointReconciler.Destroy()
@@ -165,11 +166,11 @@ func (c *Controller) Run(ch <-chan struct{}) {
 func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 	// Update service & endpoint records.
 	servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.PublicServicePort, c.KubernetesServiceNodePort, "https")
-	if err := c.CreateOrUpdateMasterServiceIfNeeded(kubernetesServiceName, c.ServiceIP, servicePorts, serviceType, reconcile); err != nil {
+	if err := c.CreateOrUpdateMasterServiceIfNeeded(c.ServiceIP, servicePorts, serviceType, reconcile); err != nil {
 		return err
 	}
 	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https")
-	if err := c.EndpointReconciler.ReconcileEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts, reconcile); err != nil {
+	if err := c.EndpointReconciler.ReconcileEndpoints(c.PublicIP, endpointPorts, reconcile); err != nil {
 		return err
 	}
 	return nil
@@ -205,14 +206,14 @@ func createEndpointPortSpec(endpointPort int, endpointPortName string) []corev1.
 
 // CreateOrUpdateMasterServiceIfNeeded will create the specified service if it
 // doesn't already exist.
-func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, serviceIP net.IP, servicePorts []corev1.ServicePort, serviceType corev1.ServiceType, reconcile bool) error {
-	if s, err := c.serviceLister.Services(metav1.NamespaceDefault).Get(serviceName); err == nil {
+func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceIP net.IP, servicePorts []corev1.ServicePort, serviceType corev1.ServiceType, reconcile bool) error {
+	if s, err := c.serviceLister.Services(KubernetesServiceNamespace).Get(KubernetesServiceName); err == nil {
 		// The service already exists.
 		// This path is no executed since 1.17 2a9a9fa, keeping it in case it needs to be revisited
 		if reconcile {
 			if svc, updated := getMasterServiceUpdateIfNeeded(s, servicePorts, serviceType); updated {
-				klog.Warningf("Resetting master service %q to %#v", serviceName, svc)
-				_, err := c.client.CoreV1().Services(metav1.NamespaceDefault).Update(context.TODO(), svc, metav1.UpdateOptions{})
+				klog.Warningf("Resetting master service %q to %#v", svc.Name, svc)
+				_, err := c.client.CoreV1().Services(KubernetesServiceNamespace).Update(context.TODO(), svc, metav1.UpdateOptions{})
 				return err
 			}
 		}
@@ -221,8 +222,8 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 	singleStack := corev1.IPFamilyPolicySingleStack
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceName,
-			Namespace: metav1.NamespaceDefault,
+			Name:      KubernetesServiceName,
+			Namespace: KubernetesServiceNamespace,
 			Labels:    map[string]string{"provider": "kubernetes", "component": "apiserver"},
 		},
 		Spec: corev1.ServiceSpec{
@@ -236,9 +237,9 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 		},
 	}
 
-	_, err := c.client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc, metav1.CreateOptions{})
+	_, err := c.client.CoreV1().Services(KubernetesServiceNamespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	if errors.IsAlreadyExists(err) {
-		return c.CreateOrUpdateMasterServiceIfNeeded(serviceName, serviceIP, servicePorts, serviceType, reconcile)
+		return c.CreateOrUpdateMasterServiceIfNeeded(serviceIP, servicePorts, serviceType, reconcile)
 	}
 	return err
 }

@@ -33,14 +33,14 @@ import (
 // masters. masterCountEndpointReconciler implements EndpointReconciler.
 type masterCountEndpointReconciler struct {
 	masterCount           int
-	epAdapter             EndpointsAdapter
+	epAdapter             *EndpointsAdapter
 	stopReconcilingCalled bool
 	reconcilingLock       sync.Mutex
 }
 
 // NewMasterCountEndpointReconciler creates a new EndpointReconciler that reconciles based on a
 // specified expected number of masters.
-func NewMasterCountEndpointReconciler(masterCount int, epAdapter EndpointsAdapter) EndpointReconciler {
+func NewMasterCountEndpointReconciler(masterCount int, epAdapter *EndpointsAdapter) EndpointReconciler {
 	return &masterCountEndpointReconciler{
 		masterCount: masterCount,
 		epAdapter:   epAdapter,
@@ -59,7 +59,7 @@ func NewMasterCountEndpointReconciler(masterCount int, epAdapter EndpointsAdapte
 //   - All apiservers MUST know and agree on the number of apiservers expected
 //     to be running (c.masterCount).
 //   - ReconcileEndpoints is called periodically from all apiservers.
-func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
+func (r *masterCountEndpointReconciler) ReconcileEndpoints(ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
 
@@ -67,12 +67,12 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 		return nil
 	}
 
-	e, err := r.epAdapter.Get(metav1.NamespaceDefault, serviceName, metav1.GetOptions{})
+	e, err := r.epAdapter.Get()
 	if err != nil {
 		e = &corev1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      serviceName,
-				Namespace: metav1.NamespaceDefault,
+				Name:      r.epAdapter.serviceName,
+				Namespace: r.epAdapter.serviceNamespace,
 			},
 		}
 	}
@@ -87,7 +87,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 			Addresses: []corev1.EndpointAddress{{IP: ip.String()}},
 			Ports:     endpointPorts,
 		}}
-		_, err = r.epAdapter.Create(metav1.NamespaceDefault, e)
+		_, err = r.epAdapter.Create(e)
 		return err
 	}
 
@@ -100,13 +100,13 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 			Addresses: []corev1.EndpointAddress{{IP: ip.String()}},
 			Ports:     endpointPorts,
 		}}
-		klog.Warningf("Resetting endpoints for master service %q to %#v", serviceName, e)
-		_, err = r.epAdapter.Update(metav1.NamespaceDefault, e)
+		klog.Warningf("Resetting endpoints for master service %q to %#v", e.Name, e)
+		_, err = r.epAdapter.Update(e)
 		return err
 	}
 
 	if !skipMirrorChanged && ipCorrect && portsCorrect {
-		return r.epAdapter.EnsureEndpointSliceFromEndpoints(metav1.NamespaceDefault, e)
+		return r.epAdapter.EnsureEndpointSliceFromEndpoints(e)
 	}
 	if !ipCorrect {
 		// We *always* add our own IP address.
@@ -137,16 +137,16 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 		// Reset ports.
 		e.Subsets[0].Ports = endpointPorts
 	}
-	klog.Warningf("Resetting endpoints for master service %q to %v", serviceName, e)
-	_, err = r.epAdapter.Update(metav1.NamespaceDefault, e)
+	klog.Warningf("Resetting endpoints for master service %q to %v", e.Name, e)
+	_, err = r.epAdapter.Update(e)
 	return err
 }
 
-func (r *masterCountEndpointReconciler) RemoveEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort) error {
+func (r *masterCountEndpointReconciler) RemoveEndpoints(ip net.IP, endpointPorts []corev1.EndpointPort) error {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
 
-	e, err := r.epAdapter.Get(metav1.NamespaceDefault, serviceName, metav1.GetOptions{})
+	e, err := r.epAdapter.Get()
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Endpoint doesn't exist
@@ -169,7 +169,7 @@ func (r *masterCountEndpointReconciler) RemoveEndpoints(serviceName string, ip n
 	e.Subsets[0].Addresses = new
 	e.Subsets = endpointsv1.RepackSubsets(e.Subsets)
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		_, err := r.epAdapter.Update(metav1.NamespaceDefault, e)
+		_, err := r.epAdapter.Update(e)
 		return err
 	})
 	return err

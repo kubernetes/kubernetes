@@ -35,8 +35,8 @@ import (
 func TestCreateOrUpdateMasterService(t *testing.T) {
 	singleStack := corev1.IPFamilyPolicySingleStack
 	om := metav1.ObjectMeta{
-		Namespace: metav1.NamespaceDefault,
-		Name:      kubernetesServiceName,
+		Namespace: KubernetesServiceNamespace,
+		Name:      KubernetesServiceName,
 	}
 
 	createTests := []struct {
@@ -73,7 +73,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 			serviceStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 			master.serviceLister = v1listers.NewServiceLister(serviceStore)
 			master.client = fakeClient
-			master.CreateOrUpdateMasterServiceIfNeeded(kubernetesServiceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
+			master.CreateOrUpdateMasterServiceIfNeeded(netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
 			creates := []core.CreateAction{}
 			for _, action := range fakeClient.Actions() {
 				if action.GetVerb() == "create" {
@@ -347,7 +347,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 		t.Run(test.testName, func(t *testing.T) {
 			master := Controller{}
 			fakeClient := fake.NewSimpleClientset(test.service)
-			serviceInformer := v1informers.NewServiceInformer(fakeClient, metav1.NamespaceDefault, 12*time.Hour, cache.Indexers{})
+			serviceInformer := v1informers.NewServiceInformer(fakeClient, KubernetesServiceNamespace, 12*time.Hour, cache.Indexers{})
 			serviceStore := serviceInformer.GetIndexer()
 			err := serviceStore.Add(test.service)
 			if err != nil {
@@ -355,7 +355,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 			}
 			master.serviceLister = v1listers.NewServiceLister(serviceStore)
 			master.client = fakeClient
-			err = master.CreateOrUpdateMasterServiceIfNeeded(kubernetesServiceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, true)
+			err = master.CreateOrUpdateMasterServiceIfNeeded(netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, true)
 			if err != nil {
 				t.Errorf("case %q: unexpected error: %v", test.testName, err)
 			}
@@ -414,7 +414,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 			master := Controller{}
 			fakeClient := fake.NewSimpleClientset(test.service)
 			master.client = fakeClient
-			serviceInformer := v1informers.NewServiceInformer(fakeClient, metav1.NamespaceDefault, 12*time.Hour, cache.Indexers{})
+			serviceInformer := v1informers.NewServiceInformer(fakeClient, KubernetesServiceNamespace, 12*time.Hour, cache.Indexers{})
 			serviceStore := serviceInformer.GetIndexer()
 			err := serviceStore.Add(test.service)
 			if err != nil {
@@ -422,7 +422,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 			}
 			master.serviceLister = v1listers.NewServiceLister(serviceStore)
 
-			err = master.CreateOrUpdateMasterServiceIfNeeded(kubernetesServiceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
+			err = master.CreateOrUpdateMasterServiceIfNeeded(netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
 			if err != nil {
 				t.Errorf("case %q: unexpected error: %v", test.testName, err)
 			}

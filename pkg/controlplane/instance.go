@@ -261,23 +261,15 @@ type Instance struct {
 	ClusterAuthenticationInfo clusterauthenticationtrust.ClusterAuthenticationInfo
 }
 
-func (c *Config) createMasterCountReconciler() reconcilers.EndpointReconciler {
-	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	endpointSliceClient := discoveryclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	endpointsAdapter := reconcilers.NewEndpointsAdapter(endpointClient, endpointSliceClient)
-
+func (c *Config) createMasterCountReconciler(endpointsAdapter *reconcilers.EndpointsAdapter) reconcilers.EndpointReconciler {
 	return reconcilers.NewMasterCountEndpointReconciler(c.ExtraConfig.MasterCount, endpointsAdapter)
 }
 
-func (c *Config) createNoneReconciler() reconcilers.EndpointReconciler {
+func (c *Config) createNoneReconciler(endpointsAdapter *reconcilers.EndpointsAdapter) reconcilers.EndpointReconciler {
 	return reconcilers.NewNoneEndpointReconciler()
 }
 
-func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
-	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	endpointSliceClient := discoveryclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	endpointsAdapter := reconcilers.NewEndpointsAdapter(endpointClient, endpointSliceClient)
-
+func (c *Config) createLeaseReconciler(endpointsAdapter *reconcilers.EndpointsAdapter) reconcilers.EndpointReconciler {
 	ttl := c.ExtraConfig.MasterEndpointReconcileTTL
 	config, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("apiServerIPInfo"))
 	if err != nil {
@@ -292,15 +284,22 @@ func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 }
 
 func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
+	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	endpointSliceClient := discoveryclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	endpointsAdapter := reconcilers.NewEndpointsAdapter(
+		endpointClient, endpointSliceClient,
+		kubernetesservice.KubernetesServiceNamespace,
+		kubernetesservice.KubernetesServiceName)
+
 	klog.Infof("Using reconciler: %v", c.ExtraConfig.EndpointReconcilerType)
 	switch c.ExtraConfig.EndpointReconcilerType {
 	// there are numerous test dependencies that depend on a default controller
 	case reconcilers.MasterCountReconcilerType:
-		return c.createMasterCountReconciler()
+		return c.createMasterCountReconciler(endpointsAdapter)
 	case "", reconcilers.LeaseEndpointReconcilerType:
-		return c.createLeaseReconciler()
+		return c.createLeaseReconciler(endpointsAdapter)
 	case reconcilers.NoneEndpointReconcilerType:
-		return c.createNoneReconciler()
+		return c.createNoneReconciler(endpointsAdapter)
 	default:
 		klog.Fatalf("Reconciler not implemented: %v", c.ExtraConfig.EndpointReconcilerType)
 	}

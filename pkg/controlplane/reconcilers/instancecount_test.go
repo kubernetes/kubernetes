@@ -203,9 +203,10 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 	for _, test := range reconcileTests {
 		t.Run(test.testName, func(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(test.initialState...)
-			epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), fakeClient.DiscoveryV1())
+			epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), fakeClient.DiscoveryV1(),
+				testServiceNamespace, testServiceName)
 			reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
-			err := reconciler.ReconcileEndpoints(testServiceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
+			err := reconciler.ReconcileEndpoints(netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
 			if err != nil {
 				t.Errorf("unexpected error reconciling: %v", err)
 			}
@@ -257,9 +258,10 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 	for _, test := range nonReconcileTests {
 		t.Run(test.testName, func(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(test.initialState...)
-			epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), fakeClient.DiscoveryV1())
+			epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), fakeClient.DiscoveryV1(),
+				testServiceNamespace, testServiceName)
 			reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
-			err := reconciler.ReconcileEndpoints(testServiceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
+			err := reconciler.ReconcileEndpoints(netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
 			if err != nil {
 				t.Errorf("unexpected error reconciling: %v", err)
 			}
@@ -275,12 +277,13 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 func TestEmptySubsets(t *testing.T) {
 	endpoints := makeEndpointsArray(nil, nil)
 	fakeClient := fake.NewSimpleClientset(endpoints...)
-	epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), fakeClient.DiscoveryV1())
+	epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), fakeClient.DiscoveryV1(),
+		testServiceNamespace, testServiceName)
 	reconciler := NewMasterCountEndpointReconciler(1, epAdapter)
 	endpointPorts := []corev1.EndpointPort{
 		{Name: "foo", Port: 8080, Protocol: "TCP"},
 	}
-	err := reconciler.RemoveEndpoints(testServiceName, netutils.ParseIPSloppy("1.2.3.4"), endpointPorts)
+	err := reconciler.RemoveEndpoints(netutils.ParseIPSloppy("1.2.3.4"), endpointPorts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
