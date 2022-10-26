@@ -184,6 +184,8 @@ const (
 	// capacity information for it.
 	CapCapacity Capability = "capacity"
 
+	// anti-capability for drivers that do not support filesystem resizing
+	CapFilesystemResizeNotSupported Capability = "FilesystemResizeNotSupported"
 	// To support ReadWriteOncePod, the following CSI sidecars must be
 	// updated to these versions or greater:
 	// - csi-provisioner:v3.0.0+
