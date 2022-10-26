@@ -202,22 +202,6 @@ func TestListWithoutPaging(t *testing.T) {
 	storagetesting.RunTestListWithoutPaging(ctx, t, store)
 }
 
-type clientRecorder struct {
-	reads uint64
-	clientv3.KV
-}
-
-func (r *clientRecorder) Get(ctx context.Context, key string, opts ...clientv3.OpOption) (*clientv3.GetResponse, error) {
-	atomic.AddUint64(&r.reads, 1)
-	return r.KV.Get(ctx, key, opts...)
-}
-
-func (r *clientRecorder) GetReadsAndReset() uint64 {
-	result := atomic.LoadUint64(&r.reads)
-	atomic.StoreUint64(&r.reads, 0)
-	return result
-}
-
 func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, recorder *clientRecorder) storagetesting.CallsValidation {
 	return func(t *testing.T, pageSize, estimatedProcessedObjects uint64) {
 		if reads := transformer.GetReadsAndReset(); reads != estimatedProcessedObjects {
@@ -249,32 +233,23 @@ func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, 
 }
 
 func TestListContinuation(t *testing.T) {
-	ctx, store, etcdClient := testSetup(t)
-	transformer := store.transformer.(*storagetesting.PrefixTransformer)
-	recorder := &clientRecorder{KV: etcdClient.KV}
-	etcdClient.KV = recorder
-	validation := checkStorageCallsInvariants(transformer, recorder)
-
+	ctx, store, etcdClient := testSetup(t, withRecorder())
+	validation := checkStorageCallsInvariants(
+		store.transformer.(*storagetesting.PrefixTransformer), etcdClient.KV.(*clientRecorder))
 	storagetesting.RunTestListContinuation(ctx, t, store, validation)
 }
 
 func TestListPaginationRareObject(t *testing.T) {
-	ctx, store, etcdClient := testSetup(t)
-	transformer := store.transformer.(*storagetesting.PrefixTransformer)
-	recorder := &clientRecorder{KV: etcdClient.KV}
-	etcdClient.KV = recorder
-	validation := checkStorageCallsInvariants(transformer, recorder)
-
+	ctx, store, etcdClient := testSetup(t, withRecorder())
+	validation := checkStorageCallsInvariants(
+		store.transformer.(*storagetesting.PrefixTransformer), etcdClient.KV.(*clientRecorder))
 	storagetesting.RunTestListPaginationRareObject(ctx, t, store, validation)
 }
 
 func TestListContinuationWithFilter(t *testing.T) {
-	ctx, store, etcdClient := testSetup(t)
-	transformer := store.transformer.(*storagetesting.PrefixTransformer)
-	recorder := &clientRecorder{KV: etcdClient.KV}
-	etcdClient.KV = recorder
-	validation := checkStorageCallsInvariants(transformer, recorder)
-
+	ctx, store, etcdClient := testSetup(t, withRecorder())
+	validation := checkStorageCallsInvariants(
+		store.transformer.(*storagetesting.PrefixTransformer), etcdClient.KV.(*clientRecorder))
 	storagetesting.RunTestListContinuationWithFilter(ctx, t, store, validation)
 }
 
@@ -449,6 +424,20 @@ func newTestTransformer() value.Transformer {
 	return storagetesting.NewPrefixTransformer([]byte(defaultTestPrefix), false)
 }
 
+type clientRecorder struct {
+	reads uint64
+	clientv3.KV
+}
+
+func (r *clientRecorder) Get(ctx context.Context, key string, opts ...clientv3.OpOption) (*clientv3.GetResponse, error) {
+	atomic.AddUint64(&r.reads, 1)
+	return r.KV.Get(ctx, key, opts...)
+}
+
+func (r *clientRecorder) GetReadsAndReset() uint64 {
+	return atomic.SwapUint64(&r.reads, 0)
+}
+
 type setupOptions struct {
 	client        func(*testing.T) *clientv3.Client
 	codec         runtime.Codec
@@ -458,6 +447,8 @@ type setupOptions struct {
 	transformer   value.Transformer
 	pagingEnabled bool
 	leaseConfig   LeaseManagerConfig
+
+	recorderEnabled bool
 }
 
 type setupOption func(*setupOptions)
@@ -508,6 +499,12 @@ func withLeaseConfig(leaseConfig LeaseManagerConfig) setupOption {
 	}
 }
 
+func withRecorder() setupOption {
+	return func(options *setupOptions) {
+		options.recorderEnabled = true
+	}
+}
+
 func withDefaults(options *setupOptions) {
 	options.client = func(t *testing.T) *clientv3.Client {
 		return testserver.RunEtcd(t, nil)
@@ -530,6 +527,9 @@ func testSetup(t *testing.T, opts ...setupOption) (context.Context, *store, *cli
 		opt(&setupOpts)
 	}
 	client := setupOpts.client(t)
+	if setupOpts.recorderEnabled {
+		client.KV = &clientRecorder{KV: client.KV}
+	}
 	store := newStore(
 		client,
 		setupOpts.codec,
