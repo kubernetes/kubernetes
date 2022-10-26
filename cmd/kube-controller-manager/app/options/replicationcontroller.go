@@ -33,7 +33,7 @@ func (o *ReplicationControllerOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
-	fs.Int32Var(&o.ConcurrentRCSyncs, "concurrent_rc_syncs", o.ConcurrentRCSyncs, "The number of replication controllers that are allowed to sync concurrently. Larger number = more responsive replica management, but more CPU (and network) load")
+	fs.Int32Var(&o.ConcurrentRCSyncs, "concurrent-rc-syncs", o.ConcurrentRCSyncs, "The number of replication controllers that are allowed to sync concurrently. Larger number = more responsive replica management, but more CPU (and network) load")
 }
 
 // ApplyTo fills up ReplicationController config with options.
