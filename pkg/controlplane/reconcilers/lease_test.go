@@ -104,7 +104,6 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 
 	reconcileTests := []struct {
 		testName      string
-		serviceName   string
 		ip            string
 		endpointPorts []corev1.EndpointPort
 		endpointKeys  []string
@@ -115,171 +114,146 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 	}{
 		{
 			testName:      "no existing endpoints",
-			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			initialState:  nil,
-			expectCreate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectCreate:  makeEndpointsArray([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			expectLeases:  []string{"1.2.3.4"},
 		},
 		{
 			testName:      "existing endpoints satisfy",
-			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			initialState:  makeEndpointsArray([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			expectLeases:  []string{"1.2.3.4"},
 		},
 		{
 			testName:      "existing endpoints satisfy, no endpointslice",
-			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			initialState: []runtime.Object{
-				makeEndpoints("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+				makeEndpoints([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			},
 			expectCreate: []runtime.Object{
-				makeEndpointSlice("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+				makeEndpointSlice([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			},
 			expectLeases: []string{"1.2.3.4"},
 		},
 		{
 			testName:      "existing endpointslice satisfies, no endpoints",
-			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			initialState: []runtime.Object{
-				makeEndpointSlice("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+				makeEndpointSlice([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			},
 			expectCreate: []runtime.Object{
-				makeEndpoints("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+				makeEndpoints([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			},
 			expectLeases: []string{"1.2.3.4"},
 		},
 		{
 			testName:      "existing endpoints satisfy, endpointslice is wrong",
-			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			initialState: []runtime.Object{
-				makeEndpoints("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
-				makeEndpointSlice("foo", []string{"4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+				makeEndpoints([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+				makeEndpointSlice([]string{"4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			},
 			expectUpdate: []runtime.Object{
-				makeEndpointSlice("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+				makeEndpointSlice([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			},
 			expectLeases: []string{"1.2.3.4"},
 		},
 		{
 			testName:      "existing endpointslice satisfies, endpoints is wrong",
-			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			initialState: []runtime.Object{
-				makeEndpoints("foo", []string{"4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
-				makeEndpointSlice("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+				makeEndpoints([]string{"4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+				makeEndpointSlice([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			},
 			expectUpdate: []runtime.Object{
-				makeEndpoints("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+				makeEndpoints([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			},
 			expectLeases: []string{"1.2.3.4"},
 		},
 		{
 			testName:      "existing endpoints satisfy + refresh existing key",
-			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpointKeys:  []string{"1.2.3.4"},
-			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			initialState:  makeEndpointsArray([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			expectLeases:  []string{"1.2.3.4"},
 		},
 		{
 			testName:      "existing endpoints satisfy but too many",
-			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4", "4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
-			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			initialState:  makeEndpointsArray([]string{"1.2.3.4", "4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:  makeEndpointsArray([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			expectLeases:  []string{"1.2.3.4"},
 		},
 		{
 			testName:      "existing endpoints satisfy but too many + extra masters",
-			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpointKeys:  []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
-			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4", "4.3.2.1", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
-			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			initialState:  makeEndpointsArray([]string{"1.2.3.4", "4.3.2.1", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:  makeEndpointsArray([]string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			expectLeases:  []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
 		},
 		{
 			testName:      "existing endpoints satisfy but too many + extra masters + delete first",
-			serviceName:   "foo",
 			ip:            "4.3.2.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpointKeys:  []string{"4.3.2.1", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
-			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4", "4.3.2.1", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
-			expectUpdate:  makeEndpointsArray("foo", []string{"4.3.2.1", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			initialState:  makeEndpointsArray([]string{"1.2.3.4", "4.3.2.1", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:  makeEndpointsArray([]string{"4.3.2.1", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			expectLeases:  []string{"4.3.2.1", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
 		},
 		{
 			testName:      "existing endpoints current IP missing",
-			serviceName:   "foo",
 			ip:            "4.3.2.2",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpointKeys:  []string{"4.3.2.1"},
-			initialState:  makeEndpointsArray("foo", []string{"4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
-			expectUpdate:  makeEndpointsArray("foo", []string{"4.3.2.1", "4.3.2.2"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			initialState:  makeEndpointsArray([]string{"4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:  makeEndpointsArray([]string{"4.3.2.1", "4.3.2.2"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			expectLeases:  []string{"4.3.2.1", "4.3.2.2"},
 		},
 		{
-			testName:      "existing endpoints wrong name",
-			serviceName:   "foo",
-			ip:            "1.2.3.4",
-			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			initialState:  makeEndpointsArray("bar", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
-			expectCreate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
-			expectLeases:  []string{"1.2.3.4"},
-		},
-		{
 			testName:      "existing endpoints wrong IP",
-			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			initialState:  makeEndpointsArray("foo", []string{"4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
-			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			initialState:  makeEndpointsArray([]string{"4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:  makeEndpointsArray([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			expectLeases:  []string{"1.2.3.4"},
 		},
 		{
 			testName:      "existing endpoints wrong port",
-			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 9090, Protocol: "TCP"}}),
-			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			initialState:  makeEndpointsArray([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 9090, Protocol: "TCP"}}),
+			expectUpdate:  makeEndpointsArray([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			expectLeases:  []string{"1.2.3.4"},
 		},
 		{
 			testName:      "existing endpoints wrong protocol",
-			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
-			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "UDP"}}),
-			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			initialState:  makeEndpointsArray([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "UDP"}}),
+			expectUpdate:  makeEndpointsArray([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			expectLeases:  []string{"1.2.3.4"},
 		},
 		{
 			testName:      "existing endpoints wrong port name",
-			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "baz", Port: 8080, Protocol: "TCP"}},
-			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
-			expectUpdate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "baz", Port: 8080, Protocol: "TCP"}}),
+			initialState:  makeEndpointsArray([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:  makeEndpointsArray([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "baz", Port: 8080, Protocol: "TCP"}}),
 			expectLeases:  []string{"1.2.3.4"},
 		},
 		{
 			testName:      "existing endpoints without skip mirror label",
-			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			initialState: []runtime.Object{
@@ -287,32 +261,31 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 				// skip-mirror label
 				&corev1.Endpoints{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: metav1.NamespaceDefault,
-						Name:      "foo",
+						Namespace: testServiceNamespace,
+						Name:      testServiceName,
 					},
 					Subsets: []corev1.EndpointSubset{{
 						Addresses: []corev1.EndpointAddress{{IP: "1.2.3.4"}},
 						Ports:     []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 					}},
 				},
-				makeEndpointSlice("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+				makeEndpointSlice([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			},
 			expectUpdate: []runtime.Object{
-				makeEndpoints("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+				makeEndpoints([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 				// EndpointSlice does not get updated because it was already correct
 			},
 			expectLeases: []string{"1.2.3.4"},
 		},
 		{
-			testName:    "existing endpoints extra service ports satisfy",
-			serviceName: "foo",
-			ip:          "1.2.3.4",
+			testName: "existing endpoints extra service ports satisfy",
+			ip:       "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{
 				{Name: "foo", Port: 8080, Protocol: "TCP"},
 				{Name: "bar", Port: 1000, Protocol: "TCP"},
 				{Name: "baz", Port: 1010, Protocol: "TCP"},
 			},
-			initialState: makeEndpointsArray("foo", []string{"1.2.3.4"},
+			initialState: makeEndpointsArray([]string{"1.2.3.4"},
 				[]corev1.EndpointPort{
 					{Name: "foo", Port: 8080, Protocol: "TCP"},
 					{Name: "bar", Port: 1000, Protocol: "TCP"},
@@ -322,15 +295,14 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			expectLeases: []string{"1.2.3.4"},
 		},
 		{
-			testName:    "existing endpoints extra service ports missing port",
-			serviceName: "foo",
-			ip:          "1.2.3.4",
+			testName: "existing endpoints extra service ports missing port",
+			ip:       "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{
 				{Name: "foo", Port: 8080, Protocol: "TCP"},
 				{Name: "bar", Port: 1000, Protocol: "TCP"},
 			},
-			initialState: makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
-			expectUpdate: makeEndpointsArray("foo", []string{"1.2.3.4"},
+			initialState: makeEndpointsArray([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate: makeEndpointsArray([]string{"1.2.3.4"},
 				[]corev1.EndpointPort{
 					{Name: "foo", Port: 8080, Protocol: "TCP"},
 					{Name: "bar", Port: 1000, Protocol: "TCP"},
@@ -350,7 +322,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 
 			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1())
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
-			err = r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
+			err = r.ReconcileEndpoints(testServiceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
 			if err != nil {
 				t.Errorf("unexpected error reconciling: %v", err)
 			}
@@ -375,7 +347,6 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 
 	nonReconcileTests := []struct {
 		testName      string
-		serviceName   string
 		ip            string
 		endpointPorts []corev1.EndpointPort
 		endpointKeys  []string
@@ -385,36 +356,33 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 		expectLeases  []string
 	}{
 		{
-			testName:    "existing endpoints extra service ports missing port no update",
-			serviceName: "foo",
-			ip:          "1.2.3.4",
+			testName: "existing endpoints extra service ports missing port no update",
+			ip:       "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{
 				{Name: "foo", Port: 8080, Protocol: "TCP"},
 				{Name: "bar", Port: 1000, Protocol: "TCP"},
 			},
-			initialState: makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			initialState: makeEndpointsArray([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			expectUpdate: nil,
 			expectLeases: []string{"1.2.3.4"},
 		},
 		{
-			testName:    "existing endpoints extra service ports, wrong ports, wrong IP",
-			serviceName: "foo",
-			ip:          "1.2.3.4",
+			testName: "existing endpoints extra service ports, wrong ports, wrong IP",
+			ip:       "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{
 				{Name: "foo", Port: 8080, Protocol: "TCP"},
 				{Name: "bar", Port: 1000, Protocol: "TCP"},
 			},
-			initialState: makeEndpointsArray("foo", []string{"4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
-			expectUpdate: makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			initialState: makeEndpointsArray([]string{"4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate: makeEndpointsArray([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			expectLeases: []string{"1.2.3.4"},
 		},
 		{
 			testName:      "no existing endpoints",
-			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			initialState:  nil,
-			expectCreate:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectCreate:  makeEndpointsArray([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			expectLeases:  []string{"1.2.3.4"},
 		},
 	}
@@ -428,7 +396,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			clientset := fake.NewSimpleClientset(test.initialState...)
 			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1())
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
-			err = r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
+			err = r.ReconcileEndpoints(testServiceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
 			if err != nil {
 				t.Errorf("unexpected error reconciling: %v", err)
 			}
@@ -468,7 +436,6 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 
 	stopTests := []struct {
 		testName         string
-		serviceName      string
 		ip               string
 		endpointPorts    []corev1.EndpointPort
 		endpointKeys     []string
@@ -479,52 +446,47 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 	}{
 		{
 			testName:         "successful remove previous endpoints before apiserver starts",
-			serviceName:      "foo",
 			ip:               "1.2.3.4",
 			endpointPorts:    []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpointKeys:     []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
-			initialState:     makeEndpointsArray("foo", []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
-			expectUpdate:     makeEndpointsArray("foo", []string{"4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			initialState:     makeEndpointsArray([]string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:     makeEndpointsArray([]string{"4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			expectLeases:     []string{"4.3.2.2", "4.3.2.3", "4.3.2.4"},
 			apiServerStartup: true,
 		},
 		{
 			testName:      "successful stop reconciling",
-			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpointKeys:  []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
-			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
-			expectUpdate:  makeEndpointsArray("foo", []string{"4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			initialState:  makeEndpointsArray([]string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:  makeEndpointsArray([]string{"4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			expectLeases:  []string{"4.3.2.2", "4.3.2.3", "4.3.2.4"},
 		},
 		{
 			testName:      "stop reconciling with ip not in endpoint ip list",
-			serviceName:   "foo",
 			ip:            "5.6.7.8",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpointKeys:  []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
-			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			initialState:  makeEndpointsArray([]string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			expectLeases:  []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
 		},
 		{
 			testName:      "endpoint with no subset",
-			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpointKeys:  []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
-			initialState:  makeEndpointsArray("foo", nil, nil),
-			expectUpdate:  makeEndpointsArray("foo", []string{"4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			initialState:  makeEndpointsArray(nil, nil),
+			expectUpdate:  makeEndpointsArray([]string{"4.3.2.2", "4.3.2.3", "4.3.2.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			expectLeases:  []string{"4.3.2.2", "4.3.2.3", "4.3.2.4"},
 		},
 		{
 			testName:      "the last API server was shut down cleanly",
-			serviceName:   "foo",
 			ip:            "1.2.3.4",
 			endpointPorts: []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpointKeys:  []string{"1.2.3.4"},
-			initialState:  makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
-			expectUpdate:  makeEndpointsArray("foo", []string{}, []corev1.EndpointPort{}),
+			initialState:  makeEndpointsArray([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:  makeEndpointsArray([]string{}, []corev1.EndpointPort{}),
 			expectLeases:  []string{},
 		},
 	}
@@ -541,7 +503,7 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			if !test.apiServerStartup {
 				r.StopReconciling()
 			}
-			err = r.RemoveEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts)
+			err = r.RemoveEndpoints(testServiceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts)
 			// if the ip is not on the endpoints, it must return an storage error and stop reconciling
 			if !contains(test.endpointKeys, test.ip) {
 				if !storage.IsNotFound(err) {
@@ -595,7 +557,6 @@ func TestApiserverShutdown(t *testing.T) {
 
 	reconcileTests := []struct {
 		testName                string
-		serviceName             string
 		ip                      string
 		endpointPorts           []corev1.EndpointPort
 		endpointKeys            []string
@@ -606,45 +567,41 @@ func TestApiserverShutdown(t *testing.T) {
 	}{
 		{
 			testName:                "last apiserver shutdown after endpoint reconcile",
-			serviceName:             "foo",
 			ip:                      "1.2.3.4",
 			endpointPorts:           []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpointKeys:            []string{"1.2.3.4"},
-			initialState:            makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
-			expectUpdate:            makeEndpointsArray("foo", []string{}, []corev1.EndpointPort{}),
+			initialState:            makeEndpointsArray([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:            makeEndpointsArray([]string{}, []corev1.EndpointPort{}),
 			expectLeases:            []string{},
 			shutDownBeforeReconcile: false,
 		},
 		{
 			testName:                "last apiserver shutdown before endpoint reconcile",
-			serviceName:             "foo",
 			ip:                      "1.2.3.4",
 			endpointPorts:           []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpointKeys:            []string{"1.2.3.4"},
-			initialState:            makeEndpointsArray("foo", []string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
-			expectUpdate:            makeEndpointsArray("foo", []string{}, []corev1.EndpointPort{}),
+			initialState:            makeEndpointsArray([]string{"1.2.3.4"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:            makeEndpointsArray([]string{}, []corev1.EndpointPort{}),
 			expectLeases:            []string{},
 			shutDownBeforeReconcile: true,
 		},
 		{
 			testName:                "not the last apiserver which was shutdown before endpoint reconcile",
-			serviceName:             "foo",
 			ip:                      "1.2.3.4",
 			endpointPorts:           []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpointKeys:            []string{"1.2.3.4", "4.3.2.1"},
-			initialState:            makeEndpointsArray("foo", []string{"1.2.3.4", "4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
-			expectUpdate:            makeEndpointsArray("foo", []string{"4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			initialState:            makeEndpointsArray([]string{"1.2.3.4", "4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:            makeEndpointsArray([]string{"4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			expectLeases:            []string{"4.3.2.1"},
 			shutDownBeforeReconcile: true,
 		},
 		{
 			testName:                "not the last apiserver which was shutdown after endpoint reconcile",
-			serviceName:             "foo",
 			ip:                      "1.2.3.4",
 			endpointPorts:           []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
 			endpointKeys:            []string{"1.2.3.4", "4.3.2.1"},
-			initialState:            makeEndpointsArray("foo", []string{"1.2.3.4", "4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
-			expectUpdate:            makeEndpointsArray("foo", []string{"4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			initialState:            makeEndpointsArray([]string{"1.2.3.4", "4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
+			expectUpdate:            makeEndpointsArray([]string{"4.3.2.1"}, []corev1.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}}),
 			expectLeases:            []string{"4.3.2.1"},
 			shutDownBeforeReconcile: false,
 		},
@@ -664,25 +621,25 @@ func TestApiserverShutdown(t *testing.T) {
 			if test.shutDownBeforeReconcile {
 				// shutdown apiserver first
 				r.StopReconciling()
-				err = r.RemoveEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts)
+				err = r.RemoveEndpoints(testServiceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts)
 				if err != nil {
 					t.Errorf("unexpected error remove endpoints: %v", err)
 				}
 
 				// reconcile endpoints in another goroutine
-				err = r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
+				err = r.ReconcileEndpoints(testServiceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
 				if err != nil {
 					t.Errorf("unexpected error reconciling: %v", err)
 				}
 			} else {
 				// reconcile endpoints first
-				err = r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
+				err = r.ReconcileEndpoints(testServiceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
 				if err != nil {
 					t.Errorf("unexpected error reconciling: %v", err)
 				}
 
 				r.StopReconciling()
-				err = r.RemoveEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts)
+				err = r.RemoveEndpoints(testServiceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts)
 				if err != nil {
 					t.Errorf("unexpected error remove endpoints: %v", err)
 				}

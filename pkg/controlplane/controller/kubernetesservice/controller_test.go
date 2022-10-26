@@ -34,27 +34,25 @@ import (
 
 func TestCreateOrUpdateMasterService(t *testing.T) {
 	singleStack := corev1.IPFamilyPolicySingleStack
-	ns := metav1.NamespaceDefault
-	om := func(name string) metav1.ObjectMeta {
-		return metav1.ObjectMeta{Namespace: ns, Name: name}
+	om := metav1.ObjectMeta{
+		Namespace: metav1.NamespaceDefault,
+		Name:      kubernetesServiceName,
 	}
 
 	createTests := []struct {
 		testName     string
-		serviceName  string
 		servicePorts []corev1.ServicePort
 		serviceType  corev1.ServiceType
 		expectCreate *corev1.Service // nil means none expected
 	}{
 		{
-			testName:    "service does not exist",
-			serviceName: "foo",
+			testName: "service does not exist",
 			servicePorts: []corev1.ServicePort{
 				{Name: "foo", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
 			},
 			serviceType: corev1.ServiceTypeClusterIP,
 			expectCreate: &corev1.Service{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om,
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{Name: "foo", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
@@ -75,7 +73,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 			serviceStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 			master.serviceLister = v1listers.NewServiceLister(serviceStore)
 			master.client = fakeClient
-			master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
+			master.CreateOrUpdateMasterServiceIfNeeded(kubernetesServiceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
 			creates := []core.CreateAction{}
 			for _, action := range fakeClient.Actions() {
 				if action.GetVerb() == "create" {
@@ -100,21 +98,19 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 
 	reconcileTests := []struct {
 		testName     string
-		serviceName  string
 		servicePorts []corev1.ServicePort
 		serviceType  corev1.ServiceType
 		service      *corev1.Service
 		expectUpdate *corev1.Service // nil means none expected
 	}{
 		{
-			testName:    "service definition wrong port",
-			serviceName: "foo",
+			testName: "service definition wrong port",
 			servicePorts: []corev1.ServicePort{
 				{Name: "foo", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
 			},
 			serviceType: corev1.ServiceTypeClusterIP,
 			service: &corev1.Service{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om,
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{Name: "foo", Port: 8000, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
@@ -126,7 +122,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 				},
 			},
 			expectUpdate: &corev1.Service{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om,
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{Name: "foo", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
@@ -139,15 +135,14 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 			},
 		},
 		{
-			testName:    "service definition missing port",
-			serviceName: "foo",
+			testName: "service definition missing port",
 			servicePorts: []corev1.ServicePort{
 				{Name: "foo", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
 				{Name: "baz", Port: 1000, Protocol: "TCP", TargetPort: intstr.FromInt32(1000)},
 			},
 			serviceType: corev1.ServiceTypeClusterIP,
 			service: &corev1.Service{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om,
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{Name: "foo", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
@@ -159,7 +154,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 				},
 			},
 			expectUpdate: &corev1.Service{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om,
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{Name: "foo", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
@@ -173,14 +168,13 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 			},
 		},
 		{
-			testName:    "service definition incorrect port",
-			serviceName: "foo",
+			testName: "service definition incorrect port",
 			servicePorts: []corev1.ServicePort{
 				{Name: "foo", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
 			},
 			serviceType: corev1.ServiceTypeClusterIP,
 			service: &corev1.Service{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om,
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{Name: "bar", Port: 1000, Protocol: "UDP", TargetPort: intstr.FromInt32(1000)},
@@ -192,7 +186,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 				},
 			},
 			expectUpdate: &corev1.Service{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om,
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{Name: "foo", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
@@ -205,14 +199,13 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 			},
 		},
 		{
-			testName:    "service definition incorrect port name",
-			serviceName: "foo",
+			testName: "service definition incorrect port name",
 			servicePorts: []corev1.ServicePort{
 				{Name: "foo", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
 			},
 			serviceType: corev1.ServiceTypeClusterIP,
 			service: &corev1.Service{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om,
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{Name: "foo", Port: 1000, Protocol: "UDP", TargetPort: intstr.FromInt32(1000)},
@@ -224,7 +217,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 				},
 			},
 			expectUpdate: &corev1.Service{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om,
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{Name: "foo", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
@@ -237,14 +230,13 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 			},
 		},
 		{
-			testName:    "service definition incorrect target port",
-			serviceName: "foo",
+			testName: "service definition incorrect target port",
 			servicePorts: []corev1.ServicePort{
 				{Name: "foo", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
 			},
 			serviceType: corev1.ServiceTypeClusterIP,
 			service: &corev1.Service{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om,
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{Name: "foo", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromInt32(1000)},
@@ -256,7 +248,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 				},
 			},
 			expectUpdate: &corev1.Service{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om,
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{Name: "foo", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
@@ -269,14 +261,13 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 			},
 		},
 		{
-			testName:    "service definition incorrect protocol",
-			serviceName: "foo",
+			testName: "service definition incorrect protocol",
 			servicePorts: []corev1.ServicePort{
 				{Name: "foo", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
 			},
 			serviceType: corev1.ServiceTypeClusterIP,
 			service: &corev1.Service{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om,
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{Name: "foo", Port: 8080, Protocol: "UDP", TargetPort: intstr.FromInt32(8080)},
@@ -288,7 +279,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 				},
 			},
 			expectUpdate: &corev1.Service{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om,
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{Name: "foo", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
@@ -301,14 +292,13 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 			},
 		},
 		{
-			testName:    "service definition has incorrect type",
-			serviceName: "foo",
+			testName: "service definition has incorrect type",
 			servicePorts: []corev1.ServicePort{
 				{Name: "foo", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
 			},
 			serviceType: corev1.ServiceTypeClusterIP,
 			service: &corev1.Service{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om,
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{Name: "foo", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
@@ -320,7 +310,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 				},
 			},
 			expectUpdate: &corev1.Service{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om,
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{Name: "foo", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
@@ -333,14 +323,13 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 			},
 		},
 		{
-			testName:    "service definition satisfies",
-			serviceName: "foo",
+			testName: "service definition satisfies",
 			servicePorts: []corev1.ServicePort{
 				{Name: "foo", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
 			},
 			serviceType: corev1.ServiceTypeClusterIP,
 			service: &corev1.Service{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om,
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{Name: "foo", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
@@ -366,7 +355,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 			}
 			master.serviceLister = v1listers.NewServiceLister(serviceStore)
 			master.client = fakeClient
-			err = master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, true)
+			err = master.CreateOrUpdateMasterServiceIfNeeded(kubernetesServiceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, true)
 			if err != nil {
 				t.Errorf("case %q: unexpected error: %v", test.testName, err)
 			}
@@ -394,21 +383,19 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 
 	nonReconcileTests := []struct {
 		testName     string
-		serviceName  string
 		servicePorts []corev1.ServicePort
 		serviceType  corev1.ServiceType
 		service      *corev1.Service
 		expectUpdate *corev1.Service // nil means none expected
 	}{
 		{
-			testName:    "service definition wrong port, no expected update",
-			serviceName: "foo",
+			testName: "service definition wrong port, no expected update",
 			servicePorts: []corev1.ServicePort{
 				{Name: "foo", Port: 8080, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
 			},
 			serviceType: corev1.ServiceTypeClusterIP,
 			service: &corev1.Service{
-				ObjectMeta: om("foo"),
+				ObjectMeta: om,
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{Name: "foo", Port: 1000, Protocol: "TCP", TargetPort: intstr.FromInt32(1000)},
@@ -435,7 +422,7 @@ func TestCreateOrUpdateMasterService(t *testing.T) {
 			}
 			master.serviceLister = v1listers.NewServiceLister(serviceStore)
 
-			err = master.CreateOrUpdateMasterServiceIfNeeded(test.serviceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
+			err = master.CreateOrUpdateMasterServiceIfNeeded(kubernetesServiceName, netutils.ParseIPSloppy("1.2.3.4"), test.servicePorts, test.serviceType, false)
 			if err != nil {
 				t.Errorf("case %q: unexpected error: %v", test.testName, err)
 			}

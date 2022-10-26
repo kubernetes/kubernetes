@@ -31,18 +31,23 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 )
 
-func makeEndpointsArray(name string, ips []string, ports []corev1.EndpointPort) []runtime.Object {
+const (
+	testServiceNamespace = metav1.NamespaceDefault
+	testServiceName      = "kubernetes"
+)
+
+func makeEndpointsArray(ips []string, ports []corev1.EndpointPort) []runtime.Object {
 	return []runtime.Object{
-		makeEndpoints(name, ips, ports),
-		makeEndpointSlice(name, ips, ports),
+		makeEndpoints(ips, ports),
+		makeEndpointSlice(ips, ports),
 	}
 }
 
-func makeEndpoints(name string, ips []string, ports []corev1.EndpointPort) *corev1.Endpoints {
+func makeEndpoints(ips []string, ports []corev1.EndpointPort) *corev1.Endpoints {
 	endpoints := &corev1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: metav1.NamespaceDefault,
-			Name:      name,
+			Namespace: testServiceNamespace,
+			Name:      testServiceName,
 			Labels: map[string]string{
 				discoveryv1.LabelSkipMirror: "true",
 			},
@@ -60,13 +65,13 @@ func makeEndpoints(name string, ips []string, ports []corev1.EndpointPort) *core
 	return endpoints
 }
 
-func makeEndpointSlice(name string, ips []string, ports []corev1.EndpointPort) *discoveryv1.EndpointSlice {
+func makeEndpointSlice(ips []string, ports []corev1.EndpointPort) *discoveryv1.EndpointSlice {
 	slice := &discoveryv1.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: metav1.NamespaceDefault,
-			Name:      name,
+			Namespace: testServiceNamespace,
+			Name:      testServiceName,
 			Labels: map[string]string{
-				discoveryv1.LabelServiceName: name,
+				discoveryv1.LabelServiceName: testServiceName,
 			},
 		},
 		AddressType: discoveryv1.AddressTypeIPv4,
