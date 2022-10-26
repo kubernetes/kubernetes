@@ -36,10 +36,10 @@ require (
 	go.opentelemetry.io/otel/sdk v0.20.0
 	go.opentelemetry.io/otel/trace v0.20.0
 	go.uber.org/zap v1.19.0
-	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
-	golang.org/x/net v0.0.0-20211209124913-491a49abca63
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210831042530-f4d43177bf5e
+	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
+	golang.org/x/net v0.3.1-0.20221206200815-1e63c2f08a10
+	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
+	golang.org/x/sys v0.3.0
 	google.golang.org/grpc v1.40.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/square/go-jose.v2 v2.2.2

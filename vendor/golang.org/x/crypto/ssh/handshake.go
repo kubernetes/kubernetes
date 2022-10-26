@@ -457,8 +457,15 @@ func (t *handshakeTransport) sendKexInit() error {
 
 	if len(t.hostKeys) > 0 {
 		for _, k := range t.hostKeys {
-			msg.ServerHostKeyAlgos = append(
-				msg.ServerHostKeyAlgos, k.PublicKey().Type())
+			algo := k.PublicKey().Type()
+			switch algo {
+			case KeyAlgoRSA:
+				msg.ServerHostKeyAlgos = append(msg.ServerHostKeyAlgos, []string{SigAlgoRSASHA2512, SigAlgoRSASHA2256, SigAlgoRSA}...)
+			case CertAlgoRSAv01:
+				msg.ServerHostKeyAlgos = append(msg.ServerHostKeyAlgos, []string{CertSigAlgoRSASHA2512v01, CertSigAlgoRSASHA2256v01, CertSigAlgoRSAv01}...)
+			default:
+				msg.ServerHostKeyAlgos = append(msg.ServerHostKeyAlgos, algo)
+			}
 		}
 	} else {
 		msg.ServerHostKeyAlgos = t.hostKeyAlgorithms
@@ -614,8 +621,22 @@ func (t *handshakeTransport) enterKeyExchange(otherInitPacket []byte) error {
 func (t *handshakeTransport) server(kex kexAlgorithm, algs *algorithms, magics *handshakeMagics) (*kexResult, error) {
 	var hostKey Signer
 	for _, k := range t.hostKeys {
-		if algs.hostKey == k.PublicKey().Type() {
+		kt := k.PublicKey().Type()
+		if kt == algs.hostKey {
 			hostKey = k
+		} else if signer, ok := k.(AlgorithmSigner); ok {
+			// Some signature algorithms don't show up as key types
+			// so we have to manually check for a compatible host key.
+			switch kt {
+			case KeyAlgoRSA:
+				if algs.hostKey == SigAlgoRSASHA2256 || algs.hostKey == SigAlgoRSASHA2512 {
+					hostKey = &rsaSigner{signer, algs.hostKey}
+				}
+			case CertAlgoRSAv01:
+				if algs.hostKey == CertSigAlgoRSASHA2256v01 || algs.hostKey == CertSigAlgoRSASHA2512v01 {
+					hostKey = &rsaSigner{signer, certToPrivAlgo(algs.hostKey)}
+				}
+			}
 		}
 	}
 
@@ -634,7 +655,7 @@ func (t *handshakeTransport) client(kex kexAlgorithm, algs *algorithms, magics *
 		return nil, err
 	}
 
-	if err := verifyHostKeySignature(hostKey, result); err != nil {
+	if err := verifyHostKeySignature(hostKey, algs.hostKey, result); err != nil {
 		return nil, err
 	}
 

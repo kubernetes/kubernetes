@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build windows
 // +build windows
 
 // Package mgr can be used to manage Windows service programs.
 // It can be used to install and remove them. It can also start,
 // stop and pause them. The package can query / change current
 // service state and config parameters.
-//
 package mgr
 
 import (
