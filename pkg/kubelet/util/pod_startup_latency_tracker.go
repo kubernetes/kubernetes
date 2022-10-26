@@ -170,7 +170,7 @@ func (p *basicPodStartupLatencyTracker) RecordStatusUpdated(pod *v1.Pod) {
 // ref: https://github.com/kubernetes/community/blob/master/sig-scalability/slos/pod_startup_latency.md
 func hasPodStartedSLO(pod *v1.Pod) bool {
 	for _, cs := range pod.Status.ContainerStatuses {
-		if cs.State.Running.StartedAt.IsZero() {
+		if cs.State.Running == nil || cs.State.Running.StartedAt.IsZero() {
 			return false
 		}
 	}
