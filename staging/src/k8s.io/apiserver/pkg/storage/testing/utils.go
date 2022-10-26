@@ -232,10 +232,6 @@ func (p *PrefixTransformer) TransformToStorage(ctx context.Context, data []byte,
 	return data, p.err
 }
 
-func (p *PrefixTransformer) GetReads() uint64 {
-	return atomic.LoadUint64(&p.reads)
-}
-
-func (p *PrefixTransformer) ResetReads() {
-	atomic.StoreUint64(&p.reads, 0)
+func (p *PrefixTransformer) GetReadsAndReset() uint64 {
+	return atomic.SwapUint64(&p.reads, 0)
 }

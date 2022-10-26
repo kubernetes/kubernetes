@@ -273,13 +273,12 @@ func TestListContinuation(t *testing.T) {
 		t.Fatalf("No continuation token set")
 	}
 	storagetesting.ExpectNoDiff(t, "incorrect first page", []example.Pod{*preset[0].storedObj}, out.Items)
-	if reads := transformer.GetReads(); reads != 1 {
+	if reads := transformer.GetReadsAndReset(); reads != 1 {
 		t.Errorf("unexpected reads: %d", reads)
 	}
 	if recorder.reads != 1 {
 		t.Errorf("unexpected reads: %d", recorder.reads)
 	}
-	transformer.ResetReads()
 	recorder.resetReads()
 
 	continueFromSecondItem := out.Continue
@@ -300,13 +299,12 @@ func TestListContinuation(t *testing.T) {
 	key, rv, err := storage.DecodeContinue(continueFromSecondItem, "/")
 	t.Logf("continue token was %d %s %v", rv, key, err)
 	storagetesting.ExpectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj, *preset[2].storedObj}, out.Items)
-	if reads := transformer.GetReads(); reads != 2 {
+	if reads := transformer.GetReadsAndReset(); reads != 2 {
 		t.Errorf("unexpected reads: %d", reads)
 	}
 	if recorder.reads != 1 {
 		t.Errorf("unexpected reads: %d", recorder.reads)
 	}
-	transformer.ResetReads()
 	recorder.resetReads()
 
 	// limit, should get two more pages
@@ -323,13 +321,12 @@ func TestListContinuation(t *testing.T) {
 		t.Fatalf("No continuation token set")
 	}
 	storagetesting.ExpectNoDiff(t, "incorrect second page", []example.Pod{*preset[1].storedObj}, out.Items)
-	if reads := transformer.GetReads(); reads != 1 {
+	if reads := transformer.GetReadsAndReset(); reads != 1 {
 		t.Errorf("unexpected reads: %d", reads)
 	}
 	if recorder.reads != 1 {
 		t.Errorf("unexpected reads: %d", recorder.reads)
 	}
-	transformer.ResetReads()
 	recorder.resetReads()
 
 	continueFromThirdItem := out.Continue
@@ -347,7 +344,7 @@ func TestListContinuation(t *testing.T) {
 		t.Fatalf("Unexpected continuation token set")
 	}
 	storagetesting.ExpectNoDiff(t, "incorrect third page", []example.Pod{*preset[2].storedObj}, out.Items)
-	if reads := transformer.GetReads(); reads != 1 {
+	if reads := transformer.GetReadsAndReset(); reads != 1 {
 		t.Errorf("unexpected reads: %d", reads)
 	}
 	if recorder.reads != 1 {
@@ -396,7 +393,7 @@ func TestListPaginationRareObject(t *testing.T) {
 	if len(out.Items) != 1 || !reflect.DeepEqual(&out.Items[0], pods[999]) {
 		t.Fatalf("Unexpected first page: %#v", out.Items)
 	}
-	if reads := transformer.GetReads(); reads != uint64(podCount) {
+	if reads := transformer.GetReadsAndReset(); reads != uint64(podCount) {
 		t.Errorf("unexpected reads: %d", reads)
 	}
 	// We expect that kube-apiserver will be increasing page sizes
@@ -491,13 +488,12 @@ func TestListContinuationWithFilter(t *testing.T) {
 		t.Errorf("No continuation token set")
 	}
 	storagetesting.ExpectNoDiff(t, "incorrect first page", []example.Pod{*preset[0].storedObj, *preset[2].storedObj}, out.Items)
-	if reads := transformer.GetReads(); reads != 3 {
+	if reads := transformer.GetReadsAndReset(); reads != 3 {
 		t.Errorf("unexpected reads: %d", reads)
 	}
 	if recorder.reads != 2 {
 		t.Errorf("unexpected reads: %d", recorder.reads)
 	}
-	transformer.ResetReads()
 	recorder.resetReads()
 
 	// the rest of the test does not make sense if the previous call failed
@@ -523,7 +519,7 @@ func TestListContinuationWithFilter(t *testing.T) {
 		t.Errorf("Unexpected continuation token set")
 	}
 	storagetesting.ExpectNoDiff(t, "incorrect second page", []example.Pod{*preset[3].storedObj}, out.Items)
-	if reads := transformer.GetReads(); reads != 1 {
+	if reads := transformer.GetReadsAndReset(); reads != 1 {
 		t.Errorf("unexpected reads: %d", reads)
 	}
 	if recorder.reads != 1 {
