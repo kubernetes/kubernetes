@@ -83,14 +83,17 @@ func createAPIExtensionsConfig(
 		apiextensionsapiserver.Scheme); err != nil {
 		return nil, err
 	}
-
+	crdRESTOptionsGetter, err := apiextensionsoptions.NewCRDRESTOptionsGetter(etcdOptions)
+	if err != nil {
+		return nil, err
+	}
 	apiextensionsConfig := &apiextensionsapiserver.Config{
 		GenericConfig: &genericapiserver.RecommendedConfig{
 			Config:                genericConfig,
 			SharedInformerFactory: externalInformers,
 		},
 		ExtraConfig: apiextensionsapiserver.ExtraConfig{
-			CRDRESTOptionsGetter: apiextensionsoptions.NewCRDRESTOptionsGetter(etcdOptions),
+			CRDRESTOptionsGetter: crdRESTOptionsGetter,
 			MasterCount:          masterCount,
 			AuthResolverWrapper:  authResolverWrapper,
 			ServiceResolver:      serviceResolver,
