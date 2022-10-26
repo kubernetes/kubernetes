@@ -23,12 +23,14 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/apis/config"
 )
 
 func TestStructure(t *testing.T) {
 	firstResourcePath := root.Index(0)
+	cacheSize := int32(1)
 	testCases := []struct {
 		desc string
 		in   *config.EncryptionConfiguration
@@ -161,13 +163,190 @@ func TestStructure(t *testing.T) {
 			},
 			want: field.ErrorList{},
 		},
+		{
+			desc: "duplicate kms v2 config name with kms v1 config",
+			in: &config.EncryptionConfiguration{
+				Resources: []config.ResourceConfiguration{
+					{
+						Resources: []string{"secrets"},
+						Providers: []config.ProviderConfiguration{
+							{
+								KMS: &config.KMSConfiguration{
+									Name:       "foo",
+									Endpoint:   "unix:///tmp/kms-provider-1.socket",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									CacheSize:  &cacheSize,
+									APIVersion: "v1",
+								},
+							},
+							{
+								KMS: &config.KMSConfiguration{
+									Name:       "foo",
+									Endpoint:   "unix:///tmp/kms-provider-2.socket",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									CacheSize:  &cacheSize,
+									APIVersion: "v2",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: field.ErrorList{
+				field.Invalid(firstResourcePath.Child("providers").Index(1).Child("kms").Child("name"),
+					"foo", fmt.Sprintf(duplicateKMSConfigNameErrFmt, "foo")),
+			},
+		},
+		{
+			desc: "duplicate kms v2 config names",
+			in: &config.EncryptionConfiguration{
+				Resources: []config.ResourceConfiguration{
+					{
+						Resources: []string{"secrets"},
+						Providers: []config.ProviderConfiguration{
+							{
+								KMS: &config.KMSConfiguration{
+									Name:       "foo",
+									Endpoint:   "unix:///tmp/kms-provider-1.socket",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									CacheSize:  &cacheSize,
+									APIVersion: "v2",
+								},
+							},
+							{
+								KMS: &config.KMSConfiguration{
+									Name:       "foo",
+									Endpoint:   "unix:///tmp/kms-provider-2.socket",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									CacheSize:  &cacheSize,
+									APIVersion: "v2",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: field.ErrorList{
+				field.Invalid(firstResourcePath.Child("providers").Index(1).Child("kms").Child("name"),
+					"foo", fmt.Sprintf(duplicateKMSConfigNameErrFmt, "foo")),
+			},
+		},
+		{
+			desc: "duplicate kms v2 config name across providers",
+			in: &config.EncryptionConfiguration{
+				Resources: []config.ResourceConfiguration{
+					{
+						Resources: []string{"secrets"},
+						Providers: []config.ProviderConfiguration{
+							{
+								KMS: &config.KMSConfiguration{
+									Name:       "foo",
+									Endpoint:   "unix:///tmp/kms-provider-1.socket",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									CacheSize:  &cacheSize,
+									APIVersion: "v2",
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{"secrets"},
+						Providers: []config.ProviderConfiguration{
+							{
+								KMS: &config.KMSConfiguration{
+									Name:       "foo",
+									Endpoint:   "unix:///tmp/kms-provider-2.socket",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									CacheSize:  &cacheSize,
+									APIVersion: "v2",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: field.ErrorList{
+				field.Invalid(root.Index(1).Child("providers").Index(0).Child("kms").Child("name"),
+					"foo", fmt.Sprintf(duplicateKMSConfigNameErrFmt, "foo")),
+			},
+		},
+		{
+			desc: "duplicate kms config name with v1 and v2 across providers",
+			in: &config.EncryptionConfiguration{
+				Resources: []config.ResourceConfiguration{
+					{
+						Resources: []string{"secrets"},
+						Providers: []config.ProviderConfiguration{
+							{
+								KMS: &config.KMSConfiguration{
+									Name:       "foo",
+									Endpoint:   "unix:///tmp/kms-provider-1.socket",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									CacheSize:  &cacheSize,
+									APIVersion: "v1",
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{"secrets"},
+						Providers: []config.ProviderConfiguration{
+							{
+								KMS: &config.KMSConfiguration{
+									Name:       "foo",
+									Endpoint:   "unix:///tmp/kms-provider-2.socket",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									CacheSize:  &cacheSize,
+									APIVersion: "v2",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: field.ErrorList{
+				field.Invalid(root.Index(1).Child("providers").Index(0).Child("kms").Child("name"),
+					"foo", fmt.Sprintf(duplicateKMSConfigNameErrFmt, "foo")),
+			},
+		},
+		{
+			desc: "duplicate kms v1 config names shouldn't error",
+			in: &config.EncryptionConfiguration{
+				Resources: []config.ResourceConfiguration{
+					{
+						Resources: []string{"secrets"},
+						Providers: []config.ProviderConfiguration{
+							{
+								KMS: &config.KMSConfiguration{
+									Name:       "foo",
+									Endpoint:   "unix:///tmp/kms-provider-1.socket",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									CacheSize:  &cacheSize,
+									APIVersion: "v1",
+								},
+							},
+							{
+								KMS: &config.KMSConfiguration{
+									Name:       "foo",
+									Endpoint:   "unix:///tmp/kms-provider-2.socket",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									CacheSize:  &cacheSize,
+									APIVersion: "v1",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: field.ErrorList{},
+		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
 			got := ValidateEncryptionConfiguration(tt.in)
 			if d := cmp.Diff(tt.want, got); d != "" {
-				t.Fatalf("EncryptionConfiguratoin validation results mismatch (-want +got):\n%s", d)
+				t.Fatalf("EncryptionConfiguration validation results mismatch (-want +got):\n%s", d)
 			}
 		})
 	}
@@ -392,9 +571,10 @@ func TestKMSProviderName(t *testing.T) {
 	nameField := field.NewPath("Resource").Index(0).Child("Provider").Index(0).Child("KMS").Child("name")
 
 	testCases := []struct {
-		desc string
-		in   *config.KMSConfiguration
-		want field.ErrorList
+		desc             string
+		in               *config.KMSConfiguration
+		kmsProviderNames sets.String
+		want             field.ErrorList
 	}{
 		{
 			desc: "valid name",
@@ -415,11 +595,24 @@ func TestKMSProviderName(t *testing.T) {
 				field.Invalid(nameField, "foo:bar", fmt.Sprintf(invalidKMSConfigNameErrFmt, "foo:bar")),
 			},
 		},
+		{
+			desc: "invalid name with : but api version is v1",
+			in:   &config.KMSConfiguration{Name: "foo:bar", APIVersion: "v1"},
+			want: field.ErrorList{},
+		},
+		{
+			desc:             "duplicate name",
+			in:               &config.KMSConfiguration{Name: "foo"},
+			kmsProviderNames: sets.NewString("foo"),
+			want: field.ErrorList{
+				field.Invalid(nameField, "foo", fmt.Sprintf(duplicateKMSConfigNameErrFmt, "foo")),
+			},
+		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
-			got := validateKMSConfigName(tt.in, nameField)
+			got := validateKMSConfigName(tt.in, nameField, tt.kmsProviderNames)
 			if d := cmp.Diff(tt.want, got); d != "" {
 				t.Fatalf("KMS Provider validation mismatch (-want +got):\n%s", d)
 			}
