@@ -306,13 +306,25 @@ func (lim *Limiter) SetBurstAt(now time.Time, newBurst int) {
 // reserveN returns Reservation, not *Reservation, to avoid allocation in AllowN and WaitN.
 func (lim *Limiter) reserveN(now time.Time, n int, maxFutureReserve time.Duration) Reservation {
 	lim.mu.Lock()
+	defer lim.mu.Unlock()
 
 	if lim.limit == Inf {
-		lim.mu.Unlock()
 		return Reservation{
 			ok:        true,
 			lim:       lim,
 			tokens:    n,
+			timeToAct: now,
+		}
+	} else if lim.limit == 0 {
+		var ok bool
+		if lim.burst >= n {
+			ok = true
+			lim.burst -= n
+		}
+		return Reservation{
+			ok:        ok,
+			lim:       lim,
+			tokens:    lim.burst,
 			timeToAct: now,
 		}
 	}
@@ -351,7 +363,6 @@ func (lim *Limiter) reserveN(now time.Time, n int, maxFutureReserve time.Duratio
 		lim.last = last
 	}
 
-	lim.mu.Unlock()
 	return r
 }
 
@@ -377,6 +388,9 @@ func (lim *Limiter) advance(now time.Time) (newNow time.Time, newLast time.Time,
 // durationFromTokens is a unit conversion function from the number of tokens to the duration
 // of time it takes to accumulate them at a rate of limit tokens per second.
 func (limit Limit) durationFromTokens(tokens float64) time.Duration {
+	if limit <= 0 {
+		return InfDuration
+	}
 	seconds := tokens / float64(limit)
 	return time.Duration(float64(time.Second) * seconds)
 }
@@ -384,5 +398,8 @@ func (limit Limit) durationFromTokens(tokens float64) time.Duration {
 // tokensFromDuration is a unit conversion function from a time duration to the number of tokens
 // which could be accumulated during that duration at a rate of limit tokens per second.
 func (limit Limit) tokensFromDuration(d time.Duration) float64 {
+	if limit <= 0 {
+		return 0
+	}
 	return d.Seconds() * float64(limit)
 }
