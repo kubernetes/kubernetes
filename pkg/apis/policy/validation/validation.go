@@ -29,10 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	"k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -77,6 +79,17 @@ func ValidatePodDisruptionBudgetSpec(spec policy.PodDisruptionBudgetSpec, opts P
 	labelSelectorValidationOptions := unversionedvalidation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector}
 
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, labelSelectorValidationOptions, fldPath.Child("selector"))...)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PDBPodHealthyPolicy) {
+		supportedPolicies := sets.NewString(
+			"",
+			string(policy.PodReady),
+			string(policy.PodRunning),
+		)
+		if !supportedPolicies.Has(string(spec.PodHealthyPolicy)) {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("podHealthyPolicy"), spec.PodHealthyPolicy, supportedPolicies.List()))
+		}
+	}
 
 	return allErrs
 }

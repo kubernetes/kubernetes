@@ -617,6 +617,13 @@ const (
 	// Permits kubelet to run with swap enabled
 	NodeSwap featuregate.Feature = "NodeSwap"
 
+	// owner: @mortent, @atiratree, @ravig
+	// kep: http://kep.k8s.io/3018
+	// alpha: v1.26
+	//
+	// Enables PodHealthyPolicy for PodDisruptionBudgets
+	PDBPodHealthyPolicy featuregate.Feature = "PDBPodHealthyPolicy"
+
 	// owner: @haircommander
 	// kep: https://kep.k8s.io/2364
 	// alpha: v1.23
@@ -1034,6 +1041,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	NodeOutOfServiceVolumeDetach: {Default: true, PreRelease: featuregate.Beta},
 
 	NodeSwap: {Default: false, PreRelease: featuregate.Alpha},
+
+	PDBPodHealthyPolicy: {Default: false, PreRelease: featuregate.Alpha},
 
 	PodAndContainerStatsFromCRI: {Default: false, PreRelease: featuregate.Alpha},
 

@@ -28,8 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/pointer"
 )
 
@@ -95,6 +98,85 @@ func TestValidateMinAvailablePodAndMaxUnavailableDisruptionBudgetSpec(t *testing
 	errs := ValidatePodDisruptionBudgetSpec(spec, PodDisruptionBudgetValidationOptions{true}, field.NewPath("foo"))
 	if len(errs) == 0 {
 		t.Errorf("unexpected success for %v", spec)
+	}
+}
+
+func TestValidatePodHealthyPolicyDisruptionBudgetSpec(t *testing.T) {
+	c1 := intstr.FromString("10%")
+	testCases := []struct {
+		name                   string
+		pdbSpec                policy.PodDisruptionBudgetSpec
+		enablePodHealthyPolicy bool
+		expectErr              bool
+	}{
+		{
+			name: "does not validate Invalid PodHealthyPolicy with feature gate off",
+			pdbSpec: policy.PodDisruptionBudgetSpec{
+				MinAvailable:     &c1,
+				PodHealthyPolicy: "Invalid",
+			},
+			enablePodHealthyPolicy: false,
+			expectErr:              false,
+		},
+		{
+			name: "does not validate valid empty PodHealthyPolicy with feature gate off",
+			pdbSpec: policy.PodDisruptionBudgetSpec{
+				MinAvailable:     &c1,
+				PodHealthyPolicy: "",
+			},
+			enablePodHealthyPolicy: false,
+			expectErr:              false,
+		},
+		{
+			name: "does not validate valid PodHealthyPolicy with feature gate off",
+			pdbSpec: policy.PodDisruptionBudgetSpec{
+				MinAvailable:     &c1,
+				PodHealthyPolicy: policy.PodRunning,
+			},
+			enablePodHealthyPolicy: false,
+			expectErr:              false,
+		},
+		{
+			name: "invalid PodHealthyPolicy",
+			pdbSpec: policy.PodDisruptionBudgetSpec{
+				MinAvailable:     &c1,
+				PodHealthyPolicy: "Invalid",
+			},
+			enablePodHealthyPolicy: true,
+			expectErr:              true,
+		},
+		{
+			name: "valid empty PodHealthyPolicy",
+			pdbSpec: policy.PodDisruptionBudgetSpec{
+				MinAvailable:     &c1,
+				PodHealthyPolicy: "",
+			},
+			enablePodHealthyPolicy: true,
+			expectErr:              false,
+		},
+		{
+			name: "valid PodHealthyPolicy",
+			pdbSpec: policy.PodDisruptionBudgetSpec{
+				MinAvailable:     &c1,
+				PodHealthyPolicy: policy.PodRunning,
+			},
+			enablePodHealthyPolicy: true,
+			expectErr:              false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PDBPodHealthyPolicy, tc.enablePodHealthyPolicy)()
+
+			errs := ValidatePodDisruptionBudgetSpec(tc.pdbSpec, PodDisruptionBudgetValidationOptions{true}, field.NewPath("foo"))
+			if len(errs) == 0 && tc.expectErr {
+				t.Errorf("unexpected success for %v", tc.pdbSpec)
+			}
+			if len(errs) != 0 && !tc.expectErr {
+				t.Errorf("unexpected failure for %v", tc.pdbSpec)
+			}
+		})
 	}
 }
 

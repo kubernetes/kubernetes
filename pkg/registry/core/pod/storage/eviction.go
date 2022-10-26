@@ -226,10 +226,33 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 		pdb := &pdbs[0]
 		pdbName = pdb.Name
 
-		// If the pod is not ready, it doesn't count towards healthy and we should not decrement
-		if !podutil.IsPodReady(pod) && pdb.Status.CurrentHealthy >= pdb.Status.DesiredHealthy && pdb.Status.DesiredHealthy > 0 {
-			updateDeletionOptions = true
-			return nil
+		switch {
+		// If the pod healthy policy is not enabled, or no pod healthy policy is specified,
+		// just continue to use the original default behavior.
+		case !feature.DefaultFeatureGate.Enabled(features.PDBPodHealthyPolicy) || pdb.Spec.PodHealthyPolicy == "":
+			// If the pod is not ready, it doesn't count towards currentHealthy and desiredHealthy and we should not decrement disruptionsAllowed,
+			// then application guarded by the PDB is not disrupted at the moment and deleting unready pod will not disrupt it
+			if !podutil.IsPodReady(pod) && pdb.Status.CurrentHealthy >= pdb.Status.DesiredHealthy && pdb.Status.DesiredHealthy > 0 {
+				// make sure the pod status hasn't changed status before we delete
+				updateDeletionOptions = true
+				return nil
+			}
+		case pdb.Spec.PodHealthyPolicy == policyv1.PodReady:
+			// If the pod is not ready, it doesn't count towards currentHealthy and desiredHealthy and we should not decrement disruptionsAllowed.
+			// This can cause inability of the disrupted application to come back up since its perspective running pods can be evicted without consulting the PDB,
+			// this applies to the new pods and also to the pods that have been ready but became unready after.
+			//
+			// If the pod is ready, then it should be guarded by the PDB.
+			if !podutil.IsPodReady(pod) {
+				// make sure the pod status hasn't changed status before we delete
+				updateDeletionOptions = true
+				return nil
+			}
+		case pdb.Spec.PodHealthyPolicy == policyv1.PodRunning:
+			// nothing to do: all running pods should be counted and recognized in the PDB status, so we should decrement disruptionsAllowed.
+			// Pending pods are deleted via the canIgnorePDB check, so we should be left only with Running pods here
+		default:
+			return errors.NewInternalError(fmt.Errorf("invalid PodHealthyPolicy in the %v PodDisruptionBudget, which the eviction subresource does not support", pdbName))
 		}
 
 		refresh := false

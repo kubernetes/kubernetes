@@ -42,7 +42,43 @@ type PodDisruptionBudgetSpec struct {
 	// by specifying 0. This is a mutually exclusive setting with "minAvailable".
 	// +optional
 	MaxUnavailable *intstr.IntOrString
+
+	// PodHealthyPolicy defines the criteria for when the disruption controller
+	// should consider a pod to be healthy.
+	//
+	// If no policy is specified, the default behavior will be used. It means
+	// only pods that are both Running and Ready will be considered healthy by
+	// the disruption controller and counted when computing "disruptionsAllowed".
+	// Pods in the Running phase can be evicted only if the protected application
+	// by the PDB is not disrupted.
+	//
+	// This field is alpha-level. The disruption controller uses this field when
+	// the feature gate PDBPodHealthyPolicy is enabled (disabled by default).
+	// +optional
+	PodHealthyPolicy PodHealthyPolicy
 }
+
+// PodHealthyPolicy defines the policy when a pod are considered healthy and therefore
+// covered by a PodDisruptionBudget.
+type PodHealthyPolicy string
+
+const (
+	// PodReady policy means that only pods that are both Running and Ready
+	// will be considered healthy by the disruption controller and counted
+	// when computing "disruptionsAllowed".
+	// Any pods that are not Ready are considered to already be disrupted and
+	// can be evicted regardless of whether the criteria in a PDB is met.
+	// This means Running pods of a disrupted application might not have a chance
+	// to become Ready.
+	PodReady PodHealthyPolicy = "PodReady"
+
+	// PodRunning policy means that pods that are in the Running phase
+	// will be considered healthy by the disruption controller and counted
+	// when computing "disruptionsAllowed", regardless of whether they are
+	// Ready or not.
+	// Any pods in the Running phase will be subject to the PDB for eviction.
+	PodRunning PodHealthyPolicy = "PodRunning"
+)
 
 // PodDisruptionBudgetStatus represents information about the status of a
 // PodDisruptionBudget. Status may trail the actual state of a system.

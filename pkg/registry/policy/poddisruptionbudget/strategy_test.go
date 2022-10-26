@@ -17,15 +17,166 @@ limitations under the License.
 package poddisruptionbudget
 
 import (
+	"reflect"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/features"
 )
 
+type podHealthyPolicyStrategyTestCase struct {
+	name                                             string
+	enablePodHealthyPolicy                           bool
+	disablePDBPodHealthyPolicyFeatureGateAfterCreate bool
+	podHealthyPolicy                                 policy.PodHealthyPolicy
+	expectedPodHealthyPolicy                         policy.PodHealthyPolicy
+	expectedValidationErr                            bool
+	updatePodHealthyPolicy                           policy.PodHealthyPolicy
+	expectedUpdatePodHealthyPolicy                   policy.PodHealthyPolicy
+	expectedValidationUpdateErr                      bool
+}
+
 func TestPodDisruptionBudgetStrategy(t *testing.T) {
+	tests := map[string]bool{
+		"PodDisruptionBudget strategy with PDBPodHealthyPolicy feature gate disabled": false,
+		"PodDisruptionBudget strategy with PDBPodHealthyPolicy feature gate enabled":  true,
+	}
+
+	for name, enablePodHealthyPolicy := range tests {
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PDBPodHealthyPolicy, enablePodHealthyPolicy)()
+			testPodDisruptionBudgetStrategy(t)
+		})
+	}
+
+	healthyPolicyTests := []podHealthyPolicyStrategyTestCase{
+		{
+			name:                   "PodDisruptionBudget strategy with FeatureGate disabled should remove podHealthyPolicy",
+			enablePodHealthyPolicy: false,
+			podHealthyPolicy:       policy.PodRunning,
+			updatePodHealthyPolicy: policy.PodRunning,
+		},
+		{
+			name:                   "PodDisruptionBudget strategy with FeatureGate disabled should remove invalid podHealthyPolicy",
+			enablePodHealthyPolicy: false,
+			podHealthyPolicy:       "Invalid",
+			updatePodHealthyPolicy: "Invalid",
+		},
+		{
+			name:                   "PodDisruptionBudget strategy with FeatureGate enabled",
+			enablePodHealthyPolicy: true,
+		},
+		{
+			name:                           "PodDisruptionBudget strategy with FeatureGate enabled should respect podHealthyPolicy",
+			enablePodHealthyPolicy:         true,
+			podHealthyPolicy:               policy.PodReady,
+			expectedPodHealthyPolicy:       policy.PodReady,
+			updatePodHealthyPolicy:         policy.PodRunning,
+			expectedUpdatePodHealthyPolicy: policy.PodRunning,
+		},
+		{
+			name:                   "PodDisruptionBudget strategy with FeatureGate enabled should fail invalid podHealthyPolicy",
+			enablePodHealthyPolicy: true,
+			podHealthyPolicy:       "Invalid",
+			expectedValidationErr:  true,
+		},
+		{
+			name:                        "PodDisruptionBudget strategy with FeatureGate enabled should fail invalid podHealthyPolicy when updated",
+			enablePodHealthyPolicy:      true,
+			updatePodHealthyPolicy:      "Invalid",
+			expectedValidationUpdateErr: true,
+		},
+		{
+			name:                   "PodDisruptionBudget strategy with podHealthyPolicy should be preserved when feature gate is disabled",
+			enablePodHealthyPolicy: true,
+			disablePDBPodHealthyPolicyFeatureGateAfterCreate: true,
+			podHealthyPolicy:               policy.PodReady,
+			expectedPodHealthyPolicy:       policy.PodReady,
+			updatePodHealthyPolicy:         policy.PodRunning,
+			expectedUpdatePodHealthyPolicy: policy.PodReady,
+		},
+	}
+
+	for _, tc := range healthyPolicyTests {
+		t.Run(tc.name, func(t *testing.T) {
+			testPodDisruptionBudgetStrategyWithPodHealthyPolicy(t, tc)
+		})
+	}
+}
+
+func testPodDisruptionBudgetStrategyWithPodHealthyPolicy(t *testing.T, tc podHealthyPolicyStrategyTestCase) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PDBPodHealthyPolicy, tc.enablePodHealthyPolicy)()
+	ctx := genericapirequest.NewDefaultContext()
+	if !Strategy.NamespaceScoped() {
+		t.Errorf("PodDisruptionBudget must be namespace scoped")
+	}
+	if Strategy.AllowCreateOnUpdate() {
+		t.Errorf("PodDisruptionBudget should not allow create on update")
+	}
+
+	validSelector := map[string]string{"a": "b"}
+	minAvailable := intstr.FromInt(3)
+	pdb := &policy.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+		Spec: policy.PodDisruptionBudgetSpec{
+			MinAvailable:     &minAvailable,
+			Selector:         &metav1.LabelSelector{MatchLabels: validSelector},
+			PodHealthyPolicy: tc.podHealthyPolicy,
+		},
+	}
+
+	Strategy.PrepareForCreate(ctx, pdb)
+	errs := Strategy.Validate(ctx, pdb)
+	if len(errs) != 0 {
+		if !tc.expectedValidationErr {
+			t.Errorf("Unexpected error validating %v", errs)
+		}
+		return // no point going further when we have invalid PDB
+	}
+	if len(errs) == 0 && tc.expectedValidationErr {
+		t.Errorf("Expected error validating")
+	}
+	if pdb.Spec.PodHealthyPolicy != tc.expectedPodHealthyPolicy {
+		t.Errorf("Unexpected PodHealthyPolicy set: expected %v, got %v", tc.expectedPodHealthyPolicy, pdb.Spec.PodHealthyPolicy)
+	}
+	if tc.disablePDBPodHealthyPolicyFeatureGateAfterCreate {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PDBPodHealthyPolicy, false)()
+	}
+
+	newPdb := &policy.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{Name: pdb.Name, Namespace: pdb.Namespace},
+		Spec:       pdb.Spec,
+	}
+	if len(tc.updatePodHealthyPolicy) > 0 {
+		newPdb.Spec.PodHealthyPolicy = tc.updatePodHealthyPolicy
+	}
+
+	// Nothing in Spec changes: OK
+	Strategy.PrepareForUpdate(ctx, newPdb, pdb)
+	errs = Strategy.ValidateUpdate(ctx, newPdb, pdb)
+
+	if len(errs) != 0 {
+		if !tc.expectedValidationUpdateErr {
+			t.Errorf("Unexpected error updating PodDisruptionBudget %v", errs)
+		}
+		return // no point going further when we have invalid PDB
+	}
+	if len(errs) == 0 && tc.expectedValidationUpdateErr {
+		t.Errorf("Expected error updating PodDisruptionBudget")
+	}
+	if newPdb.Spec.PodHealthyPolicy != tc.expectedUpdatePodHealthyPolicy {
+		t.Errorf("Unexpected PodHealthyPolicy set: expected %v, got %v", tc.expectedUpdatePodHealthyPolicy, newPdb.Spec.PodHealthyPolicy)
+	}
+}
+
+func testPodDisruptionBudgetStrategy(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("PodDisruptionBudget must be namespace scoped")
@@ -208,5 +359,84 @@ func TestPodDisruptionBudgetStatusValidationByApiVersion(t *testing.T) {
 				t.Errorf("Expected validation errors but didn't get any")
 			}
 		})
+	}
+}
+
+func TestDropDisabledFields(t *testing.T) {
+	tests := map[string]struct {
+		oldSpec                *policy.PodDisruptionBudgetSpec
+		newSpec                *policy.PodDisruptionBudgetSpec
+		expectNewSpec          *policy.PodDisruptionBudgetSpec
+		enablePodHealthyPolicy bool
+	}{
+		"disabled clears pod healthy policy": {
+			enablePodHealthyPolicy: false,
+			oldSpec:                nil,
+			newSpec:                specWithPodHealthyPolicy(policy.PodRunning),
+			expectNewSpec:          specWithPodHealthyPolicy(""),
+		},
+		"disabled does not allow updating pod healthy policy": {
+			enablePodHealthyPolicy: false,
+			oldSpec:                specWithPodHealthyPolicy(""),
+			newSpec:                specWithPodHealthyPolicy(policy.PodRunning),
+			expectNewSpec:          specWithPodHealthyPolicy(""),
+		},
+		"disabled preserves old pod healthy policy when both old and new have it": {
+			enablePodHealthyPolicy: false,
+			oldSpec:                specWithPodHealthyPolicy(policy.PodRunning),
+			newSpec:                specWithPodHealthyPolicy(policy.PodRunning),
+			expectNewSpec:          specWithPodHealthyPolicy(policy.PodRunning),
+		},
+		"disabled does not update pod healthy policy": {
+			enablePodHealthyPolicy: false,
+			oldSpec:                specWithPodHealthyPolicy(policy.PodRunning),
+			newSpec:                specWithPodHealthyPolicy(policy.PodRunning),
+			expectNewSpec:          specWithPodHealthyPolicy(policy.PodRunning),
+		},
+		"enabled preserve pod healthy policy": {
+			enablePodHealthyPolicy: true,
+			oldSpec:                nil,
+			newSpec:                specWithPodHealthyPolicy(policy.PodRunning),
+			expectNewSpec:          specWithPodHealthyPolicy(policy.PodRunning),
+		},
+		"enabled allows updating pod healthy policy": {
+			enablePodHealthyPolicy: true,
+			oldSpec:                specWithPodHealthyPolicy(""),
+			newSpec:                specWithPodHealthyPolicy(policy.PodRunning),
+			expectNewSpec:          specWithPodHealthyPolicy(policy.PodRunning),
+		},
+		"enabled preserve pod healthy policy when both old and new have it": {
+			enablePodHealthyPolicy: true,
+			oldSpec:                specWithPodHealthyPolicy(policy.PodRunning),
+			newSpec:                specWithPodHealthyPolicy(policy.PodRunning),
+			expectNewSpec:          specWithPodHealthyPolicy(policy.PodRunning),
+		},
+		"enabled updates pod healthy policy": {
+			enablePodHealthyPolicy: true,
+			oldSpec:                specWithPodHealthyPolicy(policy.PodRunning),
+			newSpec:                specWithPodHealthyPolicy(policy.PodReady),
+			expectNewSpec:          specWithPodHealthyPolicy(policy.PodReady),
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PDBPodHealthyPolicy, tc.enablePodHealthyPolicy)()
+
+			oldSpecBefore := tc.oldSpec.DeepCopy()
+			dropDisabledFields(tc.newSpec, tc.oldSpec)
+			if !reflect.DeepEqual(tc.newSpec, tc.expectNewSpec) {
+				t.Error(cmp.Diff(tc.newSpec, tc.expectNewSpec))
+			}
+			if !reflect.DeepEqual(tc.oldSpec, oldSpecBefore) {
+				t.Error(cmp.Diff(tc.oldSpec, oldSpecBefore))
+			}
+		})
+	}
+}
+
+func specWithPodHealthyPolicy(podHealthyPolicy policy.PodHealthyPolicy) *policy.PodDisruptionBudgetSpec {
+	return &policy.PodDisruptionBudgetSpec{
+		PodHealthyPolicy: podHealthyPolicy,
 	}
 }
