@@ -355,10 +355,12 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(ctx context.Context, cl
 				klog.V(4).Infof("FeatureGate[%s] is enabled, attempting to assign storage class to unbound PersistentVolumeClaim[%s]", features.RetroactiveDefaultStorageClass, claimToClaimKey(claim))
 				updated, err := ctrl.assignDefaultStorageClass(claim)
 				if err != nil {
+					metrics.RecordRetroactiveStorageClassMetric(false)
 					return fmt.Errorf("can't update PersistentVolumeClaim[%q]: %w", claimToClaimKey(claim), err)
 				}
 				if updated {
 					klog.V(4).Infof("PersistentVolumeClaim[%q] update successful, restarting claim sync", claimToClaimKey(claim))
+					metrics.RecordRetroactiveStorageClassMetric(true)
 					return nil
 				}
 			}
