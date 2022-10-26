@@ -276,7 +276,7 @@ func (b *Backoff) Step() time.Duration {
 	duration := b.Duration
 
 	// calculate the next step
-	if b.Factor != 0 {
+	if b.Factor != 0 && b.Steps != 0 {
 		b.Duration = time.Duration(float64(b.Duration) * b.Factor)
 		if b.Cap > 0 && b.Duration > b.Cap {
 			b.Duration = b.Cap
