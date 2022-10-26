@@ -220,10 +220,10 @@ func (rc *reconciler) mountOrAttachVolumes() {
 		volMounted, devicePath, err := rc.actualStateOfWorld.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName, volumeToMount.PersistentVolumeSize, volumeToMount.SELinuxLabel)
 		volumeToMount.DevicePath = devicePath
 		if cache.IsSELinuxMountMismatchError(err) {
-			// TODO: check error message + lower frequency, this can be noisy
-			klog.ErrorS(err, volumeToMount.GenerateErrorDetailed("mount precondition failed, please report this error in https://github.com/kubernetes/enhancements/issues/1710, together with full Pod yaml file", err).Error(), "pod", klog.KObj(volumeToMount.Pod))
-			// TODO: report error better, this may be too noisy
-			rc.desiredStateOfWorld.AddErrorToPod(volumeToMount.PodName, err.Error())
+			// The volume is mounted, but with an unexpected SELinux context.
+			// It will get unmounted in unmountVolumes / unmountDetachDevices and
+			// then removed from actualStateOfWorld.
+			continue
 		} else if cache.IsVolumeNotAttachedError(err) {
 			rc.waitForVolumeAttach(volumeToMount)
 		} else if !volMounted || cache.IsRemountRequiredError(err) {
