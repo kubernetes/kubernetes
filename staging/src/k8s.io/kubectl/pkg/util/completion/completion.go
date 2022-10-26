@@ -198,8 +198,10 @@ func CompGetFromTemplate(template *string, f cmdutil.Factory, namespace string, 
 		}
 		return printer.PrintObj, nil
 	}
+	o.Factory = f
+	o.Args = args
 
-	o.Run(f, cmd, args)
+	o.Run()
 
 	var comps []string
 	resources := strings.Split(buf.String(), " ")
