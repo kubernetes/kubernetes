@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	discoveryfake "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -50,9 +51,11 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/features"
 	clocktesting "k8s.io/utils/clock/testing"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -299,6 +302,7 @@ func newPod(t *testing.T, name string) (*v1.Pod, string) {
 		},
 		Spec: v1.PodSpec{},
 		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
 			Conditions: []v1.PodCondition{
 				{Type: v1.PodReady, Status: v1.ConditionTrue},
 			},
@@ -1537,6 +1541,95 @@ func waitForCacheCount(store cache.Store, n int) error {
 	return wait.Poll(10*time.Millisecond, 10*time.Second, func() (bool, error) {
 		return len(store.List()) == n, nil
 	})
+}
+
+func createPDBWithPolicy(t *testing.T, policyName policy.PodHealthyPolicy) *policy.PodDisruptionBudget {
+	pdb, _ := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(1))
+	pdb.Spec.PodHealthyPolicy = policyName
+	return pdb
+}
+
+func createRunningPodAndReadyPodAndPendingPod(t *testing.T) []*v1.Pod {
+	pod1, _ := newPod(t, "running-1")
+	pod2, _ := newPod(t, "running-and-ready-2")
+	pod1.Status = v1.PodStatus{
+		Phase: v1.PodRunning,
+	}
+	pod3, _ := newPod(t, "scheduled-3")
+	pod3.Status = v1.PodStatus{
+		Phase: v1.PodPending,
+	}
+	return []*v1.Pod{pod1, pod2, pod3}
+}
+
+func TestCountHealthyPods(t *testing.T) {
+	pod1, _ := newPod(t, "running-and-ready-1")
+	pod2, _ := newPod(t, "running-and-ready-2")
+	pdb, _ := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(1))
+	testCases := map[string]struct {
+		pods                    []*v1.Pod
+		pdb                     *policy.PodDisruptionBudget
+		podHealthyEnabled       bool
+		expectedPodHealthyCount int32
+	}{
+		"PodHealthyPolicy disabled: 2 pod in ready state": {
+			pods:                    []*v1.Pod{pod1, pod2},
+			podHealthyEnabled:       false,
+			pdb:                     pdb,
+			expectedPodHealthyCount: 2,
+		},
+		"PodHealthyPolicy disabled: 1 pod in ready state with wrong healthy policy": {
+			pods:                    createRunningPodAndReadyPodAndPendingPod(t),
+			podHealthyEnabled:       false,
+			pdb:                     createPDBWithPolicy(t, policy.PodRunning),
+			expectedPodHealthyCount: 1,
+		},
+		"PodHealthyPolicy enabled but policy not set in PDB spec: 2 pod in ready state": {
+			pods:                    []*v1.Pod{pod1, pod2},
+			podHealthyEnabled:       true,
+			pdb:                     createPDBWithPolicy(t, ""),
+			expectedPodHealthyCount: 2,
+		},
+		"PodHealthyPolicy enabled but policy not set in PDB spec: 1 pod in ready state": {
+			pods:                    createRunningPodAndReadyPodAndPendingPod(t),
+			podHealthyEnabled:       true,
+			pdb:                     createPDBWithPolicy(t, ""),
+			expectedPodHealthyCount: 1,
+		},
+		"PodHealthyPolicy enabled but policy set to Ready: 2 pod in ready state": {
+			pods:                    []*v1.Pod{pod1, pod2},
+			podHealthyEnabled:       true,
+			pdb:                     createPDBWithPolicy(t, policy.PodReady),
+			expectedPodHealthyCount: 2,
+		},
+		"PodHealthyPolicy enabled but policy set to Ready, 1 pod in ready state": {
+			pods:                    createRunningPodAndReadyPodAndPendingPod(t),
+			podHealthyEnabled:       true,
+			pdb:                     createPDBWithPolicy(t, policy.PodReady),
+			expectedPodHealthyCount: 1,
+		},
+		"PodHealthyPolicy enabled but policy set to Running: 2 pod running state": {
+			pods:                    []*v1.Pod{pod1, pod2},
+			podHealthyEnabled:       true,
+			pdb:                     createPDBWithPolicy(t, policy.PodRunning),
+			expectedPodHealthyCount: 2,
+		},
+		"PodHealthyPolicy enabled but policy set to Running, 2 pod in running state": {
+			pods:                    createRunningPodAndReadyPodAndPendingPod(t),
+			podHealthyEnabled:       true,
+			pdb:                     createPDBWithPolicy(t, policy.PodRunning),
+			expectedPodHealthyCount: 2,
+		},
+	}
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PDBPodHealthyPolicy, tc.podHealthyEnabled)()
+			actualPodHealthyCount := countHealthyPods(tc.pods, tc.pdb, nil, time.Now())
+			if actualPodHealthyCount != tc.expectedPodHealthyCount {
+				t.Errorf("expected podhealthy count %v but got %v", tc.expectedPodHealthyCount, actualPodHealthyCount)
+			}
+		})
+	}
 }
 
 // TestMain adds klog flags to make debugging tests easier.

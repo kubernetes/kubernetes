@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
@@ -45,8 +46,10 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/cache"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/disruption"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/integration/util"
@@ -153,7 +156,7 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 		},
 	}
 	for i := 0; i < replicas; i++ {
-		createPod(ctx, t, fmt.Sprintf("pod-%d", i), nsName, map[string]string{"app": "test-crd"}, clientSet, ownerRefs)
+		createPod(ctx, t, fmt.Sprintf("pod-%d", i), nsName, map[string]string{"app": "test-crd"}, clientSet, ownerRefs, true)
 	}
 
 	waitToObservePods(t, informers.Core().V1().Pods().Informer(), 4, v1.PodRunning)
@@ -255,7 +258,7 @@ func TestEmptySelector(t *testing.T) {
 
 			for j := 0; j < replicas; j++ {
 				createPod(ctx, t, fmt.Sprintf("pod-%d", j), nsName, map[string]string{"app": "test-crd"},
-					clientSet, []metav1.OwnerReference{})
+					clientSet, []metav1.OwnerReference{}, true)
 			}
 
 			waitToObservePods(t, informers.Core().V1().Pods().Informer(), 4, v1.PodRunning)
@@ -376,7 +379,7 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 			waitPDBStable(ctx, t, clientSet, 0, nsName, pdbName)
 
 			// Create a pod and wait for it be reach the running phase.
-			createPod(ctx, t, "pod", nsName, map[string]string{}, clientSet, []metav1.OwnerReference{})
+			createPod(ctx, t, "pod", nsName, map[string]string{}, clientSet, []metav1.OwnerReference{}, true)
 			waitToObservePods(t, informers.Core().V1().Pods().Informer(), 1, v1.PodRunning)
 
 			// Then verify that the added pod are picked up by the disruption controller.
@@ -394,7 +397,7 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 	}
 }
 
-func createPod(ctx context.Context, t *testing.T, name, namespace string, labels map[string]string, clientSet clientset.Interface, ownerRefs []metav1.OwnerReference) {
+func createPod(ctx context.Context, t *testing.T, name, namespace string, labels map[string]string, clientSet clientset.Interface, ownerRefs []metav1.OwnerReference, isPodReady bool) {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            name,
@@ -415,7 +418,7 @@ func createPod(ctx context.Context, t *testing.T, name, namespace string, labels
 	if err != nil {
 		t.Error(err)
 	}
-	addPodConditionReady(pod)
+	addPodConditionReady(pod, isPodReady)
 	if _, err := clientSet.CoreV1().Pods(namespace).UpdateStatus(ctx, pod, metav1.UpdateOptions{}); err != nil {
 		t.Error(err)
 	}
@@ -432,13 +435,17 @@ func createNs(ctx context.Context, t *testing.T, name string, clientSet clientse
 	}
 }
 
-func addPodConditionReady(pod *v1.Pod) {
+func addPodConditionReady(pod *v1.Pod, isPodReady bool) {
+	conditionStatus := v1.ConditionFalse
+	if isPodReady {
+		conditionStatus = v1.ConditionTrue
+	}
 	pod.Status = v1.PodStatus{
 		Phase: v1.PodRunning,
 		Conditions: []v1.PodCondition{
 			{
 				Type:   v1.PodReady,
-				Status: v1.ConditionTrue,
+				Status: conditionStatus,
 			},
 		},
 	}
@@ -760,6 +767,105 @@ func TestStalePodDisruption(t *testing.T) {
 				if diff != "" {
 					t.Errorf("Pod has conditions (-want,+got):\n%s", diff)
 				}
+			}
+		})
+	}
+}
+
+func TestPodHealthyPolicy(t *testing.T) {
+	testcases := []struct {
+		name                   string
+		enablePodHealthyPolicy bool
+		podHealthyPolicy       policyv1.PodHealthyPolicy
+		expectedCurrentHealthy int32
+	}{
+		{
+			name:                   "PodHealthyPolicy disabled: 2 healthy pods",
+			enablePodHealthyPolicy: false,
+			podHealthyPolicy:       "",
+			expectedCurrentHealthy: 2,
+		},
+		{
+			name:                   "PodHealthyPolicy enabled but policy not set in PDB spec: 2 healthy pods",
+			enablePodHealthyPolicy: true,
+			podHealthyPolicy:       "",
+			expectedCurrentHealthy: 2,
+		},
+		{
+			name:                   "PodHealthyPolicy enabled but policy set to Ready: 2 healthy pods",
+			enablePodHealthyPolicy: true,
+			podHealthyPolicy:       policyv1.PodReady,
+			expectedCurrentHealthy: 2,
+		},
+		{
+			name:                   "PodHealthyPolicy enabled but policy set to Running: 3 healthy pods",
+			enablePodHealthyPolicy: true,
+			podHealthyPolicy:       policyv1.PodRunning,
+			expectedCurrentHealthy: 3,
+		},
+	}
+
+	for i, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PDBPodHealthyPolicy, tc.enablePodHealthyPolicy)()
+			s, pdbc, informers, clientSet, _, _ := setup(t)
+			defer s.TearDownFn()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			nsName := fmt.Sprintf("pdb-pod-healthy-policy-%d", i)
+			createNs(ctx, t, nsName, clientSet)
+
+			informers.Start(ctx.Done())
+			go pdbc.Run(ctx)
+
+			replicas := 3
+			createPod(ctx, t, "pod-1-ready", nsName, map[string]string{"app": nsName},
+				clientSet, []metav1.OwnerReference{}, true)
+			createPod(ctx, t, "pod-2-ready", nsName, map[string]string{"app": nsName},
+				clientSet, []metav1.OwnerReference{}, true)
+			createPod(ctx, t, "pod-3-running", nsName, map[string]string{"app": nsName},
+				clientSet, []metav1.OwnerReference{}, false)
+			waitToObservePods(t, informers.Core().V1().Pods().Informer(), replicas, v1.PodRunning)
+
+			minAvailable := intstr.FromInt(1)
+			pdbName := "test-pdb"
+			pdb := &policyv1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: pdbName,
+				},
+				Spec: policyv1.PodDisruptionBudgetSpec{
+					MinAvailable:     &minAvailable,
+					PodHealthyPolicy: tc.podHealthyPolicy,
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": nsName},
+					},
+				},
+			}
+			_, err := clientSet.PolicyV1().PodDisruptionBudgets(nsName).Create(ctx, pdb, metav1.CreateOptions{})
+			if err != nil {
+				t.Errorf("Error creating PodDisruptionBudget: %v", err)
+			}
+
+			waitPDBStable(ctx, t, clientSet, tc.expectedCurrentHealthy, nsName, pdbName)
+
+			newPdb, err := clientSet.PolicyV1().PodDisruptionBudgets(nsName).Get(ctx, pdbName, metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("Error getting PodDisruptionBudget: %v", err)
+			}
+
+			if expected, found := tc.expectedCurrentHealthy, newPdb.Status.CurrentHealthy; expected != found {
+				t.Errorf("Expected CurrentHealthy %d, but found %d", expected, found)
+			}
+			if expected, found := int32(minAvailable.IntValue()), newPdb.Status.DesiredHealthy; expected != found {
+				t.Errorf("Expected DesiredHealthy %d, but found %d", expected, found)
+			}
+			if expected, found := int32(replicas), newPdb.Status.ExpectedPods; expected != found {
+				t.Errorf("Expected ExpectedPods %d, but found %d", expected, found)
+			}
+			if expected, found := tc.expectedCurrentHealthy-int32(minAvailable.IntValue()), newPdb.Status.DisruptionsAllowed; expected != found {
+				t.Errorf("Expected DisruptionsAllowed %d, but found %d", expected, found)
 			}
 		})
 	}
