@@ -91,7 +91,7 @@ var (
 
 // NewCmdConfigSet returns a Command instance for 'config set' sub command
 func NewCmdConfigSet(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &setOptions{configAccess: configAccess, jsonPath: false, streams: streams}
+	o := &setOptions{configAccess: configAccess, jsonPath: false, streams: streams}
 
 	cmd := &cobra.Command{
 		Use:                   "set PROPERTY_NAME PROPERTY_VALUE",
@@ -100,72 +100,38 @@ func NewCmdConfigSet(streams genericclioptions.IOStreams, configAccess clientcmd
 		Long:                  setLong,
 		Example:               setExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.complete(cmd))
-			cmdutil.CheckErr(options.run())
-			fmt.Fprintf(options.streams.Out, "Property %q set.\n", options.propertyName)
+			cmdutil.CheckErr(o.complete(cmd))
+			cmdutil.CheckErr(o.validate())
+			cmdutil.CheckErr(o.run())
 		},
 	}
 
-	f := cmd.Flags().VarPF(&options.setRawBytes, "set-raw-bytes", "", "When writing a []byte PROPERTY_VALUE, write the given string directly without base64 decoding.")
+	f := cmd.Flags().VarPF(&o.setRawBytes, "set-raw-bytes", "", "When writing a []byte PROPERTY_VALUE, write the given string directly without base64 decoding.")
 	f.NoOptDefVal = "true"
-	cmd.Flags().BoolVar(&options.deduplicate, "deduplicate", false, "Whether to use deduplicate list of values or not. This flag will also sort the list.")
+	cmd.Flags().BoolVar(&o.deduplicate, "deduplicate", false, "Whether to use deduplicate list of values or not. This flag will also sort the list.")
 
 	return cmd
 }
 
 func (o setOptions) run() error {
-	err := o.validate()
-	if err != nil {
-		return err
-	}
-
 	config, err := o.configAccess.GetStartingConfig()
 	if err != nil {
 		return err
 	}
 
 	if o.jsonPath {
-		// Convert api config to apiv1 config, so we can use jsonpath properly
-		v1Config := &clientcmdapiv1.Config{}
-		if err := clientcmdapiv1.Convert_api_Config_To_v1_Config(config, v1Config, nil); err != nil {
+		config, err = o.modifyConfigWithJSONPath(config)
+		if err != nil {
 			return err
 		}
-
-		if err := modifyConfigJson(v1Config, o.propertyName, o.propertyValue, false, o.setRawBytes.Value(), o.deduplicate); err != nil {
-			return err
-		}
-
-		// Convert the apiv1 config back to an api config to write back out
-		finalConfig := clientcmdapi.NewConfig()
-		if err := clientcmdapiv1.Convert_v1_Config_To_api_Config(v1Config, finalConfig, nil); err != nil {
-			return err
-		}
-		config = finalConfig
 	} else {
-		if _, err := fmt.Fprintln(o.streams.ErrOut, "Warning: usage of dot delimited path for setting config values is deprecated, please use jsonpath syntax instead."); err != nil {
-			return fmt.Errorf("failed to write warning message to user")
-		}
-		steps, err := newNavigationSteps(o.propertyName)
-		if err != nil {
-			return err
-		}
-
-		setRawBytes := false
-		if o.setRawBytes.Provided() {
-			setRawBytes = o.setRawBytes.Value()
-		}
-
-		err = modifyConfig(reflect.ValueOf(config), steps, o.propertyValue, false, setRawBytes)
-		if err != nil {
+		if err = o.modifyConfigLegacy(config); err != nil {
 			return err
 		}
 	}
 
-	if err := clientcmd.ModifyConfig(o.configAccess, *config, false); err != nil {
-		return err
-	}
-
-	return nil
+	fmt.Fprintf(o.streams.Out, "Property %q set.\n", o.propertyName)
+	return clientcmd.ModifyConfig(o.configAccess, *config, false)
 }
 
 func (o *setOptions) complete(cmd *cobra.Command) error {
@@ -180,9 +146,8 @@ func (o *setOptions) complete(cmd *cobra.Command) error {
 	// try to determine if we have a jsonpath from first character of first argument
 	// this should only ever be a { if this is a jsonpath string, if it is not we will try to use the old dot delimited
 	// syntax instead.
-	if string(endingArgs[0][0]) == "{" {
-		o.jsonPath = true
-	}
+	o.jsonPath = string(endingArgs[0][0]) == "{"
+
 	return nil
 }
 
@@ -193,6 +158,41 @@ func (o setOptions) validate() error {
 
 	if len(o.propertyName) == 0 {
 		return errors.New("you must specify a property")
+	}
+
+	return nil
+}
+
+func (o setOptions) modifyConfigWithJSONPath(config *clientcmdapi.Config) (*clientcmdapi.Config, error) {
+	// Convert api config to apiv1 config, so we can use jsonpath properly
+	v1Config := &clientcmdapiv1.Config{}
+	if err := clientcmdapiv1.Convert_api_Config_To_v1_Config(config, v1Config, nil); err != nil {
+		return nil, err
+	}
+
+	if err := modifyConfigJson(v1Config, o.propertyName, o.propertyValue, false, o.setRawBytes.Value(), o.deduplicate); err != nil {
+		return nil, err
+	}
+
+	// Convert the apiv1 config back to an api config to write back out
+	finalConfig := clientcmdapi.NewConfig()
+	if err := clientcmdapiv1.Convert_v1_Config_To_api_Config(v1Config, finalConfig, nil); err != nil {
+		return nil, err
+	}
+
+	return finalConfig, nil
+}
+
+func (o setOptions) modifyConfigLegacy(config *clientcmdapi.Config) error {
+	fmt.Fprintln(o.streams.ErrOut, "Warning: usage of dot delimited path for setting config values is deprecated, please use jsonpath syntax instead.")
+	steps, err := newNavigationSteps(o.propertyName)
+	if err != nil {
+		return err
+	}
+
+	err = modifyConfig(reflect.ValueOf(config), steps, o.propertyValue, false, o.setRawBytes.Value())
+	if err != nil {
+		return err
 	}
 
 	return nil
