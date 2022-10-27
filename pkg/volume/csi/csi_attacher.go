@@ -377,7 +377,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		if err != nil {
 			return errors.New(log("failed to query for SELinuxMount support: %s", err))
 		}
-		if support {
+		if support && deviceMounterArgs.SELinuxLabel != "" {
 			mountOptions = util.AddSELinuxMountOption(mountOptions, deviceMounterArgs.SELinuxLabel)
 		}
 	}
