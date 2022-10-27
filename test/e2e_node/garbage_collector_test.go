@@ -155,7 +155,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 		// Initialize the getContainerNames function to use CRI runtime client.
 		pod.getContainerNames = func() ([]string, error) {
 			relevantContainers := []string{}
-			containers, err := runtime.ListContainers(&runtimeapi.ContainerFilter{
+			containers, err := runtime.ListContainers(context.Background(), &runtimeapi.ContainerFilter{
 				LabelSelector: map[string]string{
 					types.KubernetesPodNameLabel:      pod.podName,
 					types.KubernetesPodNamespaceLabel: f.Namespace.Name,
