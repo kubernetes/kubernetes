@@ -129,33 +129,40 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 		ignoreNotFound    bool
 		expectNotFoundErr bool
 		expectRVTooLarge  bool
-		expectedOut       *example.Pod
+		expectedOut       []*example.Pod
 		rv                string
 	}{{
 		name:              "get existing",
 		key:               key,
 		ignoreNotFound:    false,
 		expectNotFoundErr: false,
-		expectedOut:       storedObj,
+		expectedOut:       []*example.Pod{storedObj},
 	}, {
-		name:        "resource version 0",
-		key:         key,
-		expectedOut: storedObj,
-		rv:          "0",
+		// For RV=0 arbitrarily old version is allowed, including from the moment
+		// when the object didn't yet exist.
+		// As a result, we allow it by setting ignoreNotFound and allowing an empty
+		// object in expectedOut.
+		name:           "resource version 0",
+		key:            key,
+		ignoreNotFound: true,
+		expectedOut:    []*example.Pod{{}, createdObj, storedObj},
+		rv:             "0",
 	}, {
+		// Given that Get with set ResourceVersion is effectively always
+		// NotOlderThan semantic, both versions of object are allowed.
 		name:        "object created resource version",
 		key:         key,
-		expectedOut: storedObj,
+		expectedOut: []*example.Pod{createdObj, storedObj},
 		rv:          createdObj.ResourceVersion,
 	}, {
 		name:        "current object resource version, match=NotOlderThan",
 		key:         key,
-		expectedOut: storedObj,
+		expectedOut: []*example.Pod{storedObj},
 		rv:          fmt.Sprintf("%d", currentRV),
 	}, {
 		name:        "latest resource version",
 		key:         key,
-		expectedOut: storedObj,
+		expectedOut: []*example.Pod{storedObj},
 		rv:          fmt.Sprintf("%d", lastUpdatedCurrentRV),
 	}, {
 		name:             "too high resource version",
@@ -172,7 +179,7 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 		key:               "/non-existing",
 		ignoreNotFound:    true,
 		expectNotFoundErr: false,
-		expectedOut:       &example.Pod{},
+		expectedOut:       []*example.Pod{{}},
 	}}
 
 	for _, tt := range tests {
@@ -194,7 +201,19 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 			if err != nil {
 				t.Fatalf("Get failed: %v", err)
 			}
-			ExpectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), tt.expectedOut, out)
+
+			if len(tt.expectedOut) == 1 {
+				ExpectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), tt.expectedOut[0], out)
+			} else {
+				toInterfaceSlice := func(pods []*example.Pod) []interface{} {
+					result := make([]interface{}, 0, len(pods))
+					for i := range pods {
+						result = append(result, pods[i])
+					}
+					return result
+				}
+				ExpectContains(t, fmt.Sprintf("%s: incorrect pod", tt.name), toInterfaceSlice(tt.expectedOut), out)
+			}
 		})
 	}
 }
@@ -1675,7 +1694,7 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store InterfaceWit
 }
 
 func RunTestGuaranteedUpdate(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer, validation KeyValidation) {
-	key := "/testkey"
+	key := "/foo"
 
 	tests := []struct {
 		name                string

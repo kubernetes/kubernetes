@@ -71,8 +71,8 @@ func init() {
 	utilruntime.Must(examplev1.AddToScheme(scheme))
 }
 
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+// GetPodAttrs returns labels and fields of a given object for filtering purposes.
+func GetPodAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	pod, ok := obj.(*example.Pod)
 	if !ok {
 		return nil, nil, fmt.Errorf("not a pod")
@@ -124,7 +124,7 @@ func newTestCacherWithClock(s storage.Interface, clock clock.Clock) (*cacherstor
 		GroupResource:  schema.GroupResource{Resource: "pods"},
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
-		GetAttrsFunc:   GetAttrs,
+		GetAttrsFunc:   GetPodAttrs,
 		NewFunc:        newPod,
 		NewListFunc:    newPodList,
 		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
@@ -164,37 +164,9 @@ func updatePod(t *testing.T, s storage.Interface, obj, old *example.Pod) *exampl
 }
 
 func TestGet(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
-	defer server.Terminate(t)
-	cacher, _, err := newTestCacher(etcdStorage)
-	if err != nil {
-		t.Fatalf("Couldn't create cacher: %v", err)
-	}
-	defer cacher.Stop()
-
-	podFoo := makeTestPod("foo")
-	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
-
-	// We pass the ResourceVersion from the above Create() operation.
-	result := &example.Pod{}
-	if err := cacher.Get(context.TODO(), "pods/ns/foo", storage.GetOptions{IgnoreNotFound: true, ResourceVersion: fooCreated.ResourceVersion}, result); err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if e, a := *fooCreated, *result; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected: %#v, got: %#v", e, a)
-	}
-
-	if err := cacher.Get(context.TODO(), "pods/ns/bar", storage.GetOptions{ResourceVersion: fooCreated.ResourceVersion, IgnoreNotFound: true}, result); err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	emptyPod := example.Pod{}
-	if e, a := emptyPod, *result; !reflect.DeepEqual(e, a) {
-		t.Errorf("Expected: %#v, got: %#v", e, a)
-	}
-
-	if err := cacher.Get(context.TODO(), "pods/ns/bar", storage.GetOptions{ResourceVersion: fooCreated.ResourceVersion}, result); !storage.IsNotFound(err) {
-		t.Errorf("Unexpected error: %v", err)
-	}
+	ctx, cacher, terminate := testSetup(t)
+	defer terminate()
+	storagetesting.RunTestGet(ctx, t, cacher)
 }
 
 func TestGetListNonRecursive(t *testing.T) {
@@ -961,4 +933,59 @@ func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
 			lastObservedResourceVersion = rv
 		}
 	}
+}
+
+// ===================================================
+// Test-setup related function are following.
+// ===================================================
+
+type tearDownFunc func()
+
+type setupOptions struct {
+	resourcePrefix string
+	keyFunc        func(runtime.Object) (string, error)
+	clock          clock.Clock
+}
+
+type setupOption func(*setupOptions)
+
+func withDefaults(options *setupOptions) {
+	prefix := ""
+
+	options.resourcePrefix = prefix
+	options.keyFunc = func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) }
+	options.clock = clock.RealClock{}
+}
+
+func testSetup(t *testing.T, opts ...setupOption) (context.Context, *cacherstorage.Cacher, tearDownFunc) {
+	setupOpts := setupOptions{}
+	opts = append([]setupOption{withDefaults}, opts...)
+	for _, opt := range opts {
+		opt(&setupOpts)
+	}
+
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
+	config := cacherstorage.Config{
+		Storage:        etcdStorage,
+		Versioner:      storage.APIObjectVersioner{},
+		GroupResource:  schema.GroupResource{Resource: "pods"},
+		ResourcePrefix: setupOpts.resourcePrefix,
+		KeyFunc:        setupOpts.keyFunc,
+		GetAttrsFunc:   GetPodAttrs,
+		NewFunc:        newPod,
+		NewListFunc:    newPodList,
+		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
+		Clock:          setupOpts.clock,
+	}
+	cacher, err := cacherstorage.NewCacherFromConfig(config)
+	if err != nil {
+		t.Fatalf("Failed to initialize cacher: %v", err)
+	}
+	ctx := context.Background()
+	terminate := func() {
+		cacher.Stop()
+		server.Terminate(t)
+	}
+
+	return ctx, cacher, terminate
 }

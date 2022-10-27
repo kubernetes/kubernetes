@@ -86,7 +86,7 @@ func DeepEqualSafePodSpec() example.PodSpec {
 // keys and stored objects.
 func TestPropagateStore(ctx context.Context, t *testing.T, store storage.Interface, obj *example.Pod) (string, *example.Pod) {
 	// Setup store with a key and grab the output for returning.
-	key := "/testkey"
+	key := fmt.Sprintf("/%s/%s", obj.Namespace, obj.Name)
 	return key, TestPropagateStoreWithKey(ctx, t, store, key, obj)
 }
 
@@ -112,6 +112,24 @@ func ExpectNoDiff(t *testing.T, msg string, expected, got interface{}) {
 		} else {
 			t.Errorf("%s:\nexpected: %#v\ngot: %#v", msg, expected, got)
 		}
+	}
+}
+
+func ExpectContains(t *testing.T, msg string, expectedList []interface{}, got interface{}) {
+	t.Helper()
+	for _, expected := range expectedList {
+		if reflect.DeepEqual(expected, got) {
+			return
+		}
+	}
+	if len(expectedList) == 0 {
+		t.Errorf("%s: empty expectedList", msg)
+		return
+	}
+	if diff := cmp.Diff(expectedList[0], got); diff != "" {
+		t.Errorf("%s: differs from all items, with first: %s", msg, diff)
+	} else {
+		t.Errorf("%s: differs from all items, first: %#v\ngot: %#v", msg, expectedList[0], got)
 	}
 }
 
