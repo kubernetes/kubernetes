@@ -40,7 +40,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/apis/core"
-	netutils "k8s.io/utils/net"
 )
 
 func init() {
@@ -349,7 +348,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 
 			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1())
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
-			err = r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
+			err = r.ReconcileEndpoints(test.serviceName, test.ip, test.endpointPorts, true)
 			if err != nil {
 				t.Errorf("unexpected error reconciling: %v", err)
 			}
@@ -427,7 +426,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			clientset := fake.NewSimpleClientset(test.initialState...)
 			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1())
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
-			err = r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
+			err = r.ReconcileEndpoints(test.serviceName, test.ip, test.endpointPorts, false)
 			if err != nil {
 				t.Errorf("unexpected error reconciling: %v", err)
 			}
@@ -514,7 +513,7 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			clientset := fake.NewSimpleClientset(test.initialState...)
 			epAdapter := NewEndpointsAdapter(clientset.CoreV1(), clientset.DiscoveryV1())
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
-			err = r.RemoveEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts)
+			err = r.RemoveEndpoints(test.serviceName, test.ip, test.endpointPorts)
 			// if the ip is not on the endpoints, it must return an storage error and stop reconciling
 			if !contains(test.endpointKeys, test.ip) {
 				if !storage.IsNotFound(err) {

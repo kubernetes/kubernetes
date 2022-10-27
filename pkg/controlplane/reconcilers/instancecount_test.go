@@ -22,7 +22,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
-	netutils "k8s.io/utils/net"
 )
 
 func TestMasterCountEndpointReconciler(t *testing.T) {
@@ -232,7 +231,7 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(test.initialState...)
 			epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), fakeClient.DiscoveryV1())
 			reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
-			err := reconciler.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
+			err := reconciler.ReconcileEndpoints(test.serviceName, test.ip, test.endpointPorts, true)
 			if err != nil {
 				t.Errorf("unexpected error reconciling: %v", err)
 			}
@@ -290,7 +289,7 @@ func TestMasterCountEndpointReconciler(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(test.initialState...)
 			epAdapter := NewEndpointsAdapter(fakeClient.CoreV1(), fakeClient.DiscoveryV1())
 			reconciler := NewMasterCountEndpointReconciler(test.additionalMasters+1, epAdapter)
-			err := reconciler.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
+			err := reconciler.ReconcileEndpoints(test.serviceName, test.ip, test.endpointPorts, false)
 			if err != nil {
 				t.Errorf("unexpected error reconciling: %v", err)
 			}
@@ -311,7 +310,7 @@ func TestEmptySubsets(t *testing.T) {
 	endpointPorts := []corev1.EndpointPort{
 		{Name: "foo", Port: 8080, Protocol: "TCP"},
 	}
-	err := reconciler.RemoveEndpoints("foo", netutils.ParseIPSloppy("1.2.3.4"), endpointPorts)
+	err := reconciler.RemoveEndpoints("foo", "1.2.3.4", endpointPorts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

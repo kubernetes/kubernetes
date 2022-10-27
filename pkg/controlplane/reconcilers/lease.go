@@ -23,7 +23,6 @@ https://github.com/openshift/origin/blob/bb340c5dd5ff72718be86fb194dedc0faed7f4c
 
 import (
 	"fmt"
-	"net"
 	"path"
 	"sync"
 	"time"
@@ -166,7 +165,7 @@ func NewLeaseEndpointReconciler(epAdapter EndpointsAdapter, masterLeases Leases)
 // expire. ReconcileEndpoints will notice that the endpoints object is
 // different from the directory listing, and update the endpoints object
 // accordingly.
-func (r *leaseEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
+func (r *leaseEndpointReconciler) ReconcileEndpoints(serviceName, ip string, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
 
@@ -177,7 +176,7 @@ func (r *leaseEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.
 	// Refresh the TTL on our key, independently of whether any error or
 	// update conflict happens below. This makes sure that at least some of
 	// the masters will add our endpoint.
-	if err := r.masterLeases.UpdateLease(ip.String()); err != nil {
+	if err := r.masterLeases.UpdateLease(ip); err != nil {
 		return err
 	}
 
@@ -312,8 +311,8 @@ func checkEndpointSubsetFormatWithLease(e *corev1.Endpoints, expectedIPs []strin
 	return true, ipsCorrect, portsCorrect
 }
 
-func (r *leaseEndpointReconciler) RemoveEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort) error {
-	if err := r.masterLeases.RemoveLease(ip.String()); err != nil {
+func (r *leaseEndpointReconciler) RemoveEndpoints(serviceName, ip string, endpointPorts []corev1.EndpointPort) error {
+	if err := r.masterLeases.RemoveLease(ip); err != nil {
 		return err
 	}
 

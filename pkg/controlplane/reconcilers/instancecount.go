@@ -18,7 +18,6 @@ limitations under the License.
 package reconcilers
 
 import (
-	"net"
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
@@ -59,7 +58,7 @@ func NewMasterCountEndpointReconciler(masterCount int, epAdapter EndpointsAdapte
 //   - All apiservers MUST know and agree on the number of apiservers expected
 //     to be running (c.masterCount).
 //   - ReconcileEndpoints is called periodically from all apiservers.
-func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
+func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName, ip string, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
 
@@ -84,7 +83,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 	if errors.IsNotFound(err) {
 		// Simply create non-existing endpoints for the service.
 		e.Subsets = []corev1.EndpointSubset{{
-			Addresses: []corev1.EndpointAddress{{IP: ip.String()}},
+			Addresses: []corev1.EndpointAddress{{IP: ip}},
 			Ports:     endpointPorts,
 		}}
 		_, err = r.epAdapter.Create(metav1.NamespaceDefault, e)
@@ -93,11 +92,11 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 
 	// First, determine if the endpoint is in the format we expect (one
 	// subset, ports matching endpointPorts, N IP addresses).
-	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormat(e, ip.String(), endpointPorts, r.masterCount, reconcilePorts)
+	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormat(e, ip, endpointPorts, r.masterCount, reconcilePorts)
 	if !formatCorrect {
 		// Something is egregiously wrong, just re-make the endpoints record.
 		e.Subsets = []corev1.EndpointSubset{{
-			Addresses: []corev1.EndpointAddress{{IP: ip.String()}},
+			Addresses: []corev1.EndpointAddress{{IP: ip}},
 			Ports:     endpointPorts,
 		}}
 		klog.Warningf("Resetting endpoints for master service %q to %#v", serviceName, e)
@@ -110,7 +109,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 	}
 	if !ipCorrect {
 		// We *always* add our own IP address.
-		e.Subsets[0].Addresses = append(e.Subsets[0].Addresses, corev1.EndpointAddress{IP: ip.String()})
+		e.Subsets[0].Addresses = append(e.Subsets[0].Addresses, corev1.EndpointAddress{IP: ip})
 
 		// Lexicographic order is retained by this step.
 		e.Subsets = endpointsv1.RepackSubsets(e.Subsets)
@@ -122,7 +121,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 		if addrs := &e.Subsets[0].Addresses; len(*addrs) > r.masterCount {
 			// addrs is a pointer because we're going to mutate it.
 			for i, addr := range *addrs {
-				if addr.IP == ip.String() {
+				if addr.IP == ip {
 					for len(*addrs) > r.masterCount {
 						// wrap around if necessary.
 						remove := (i + 1) % len(*addrs)
@@ -142,7 +141,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 	return err
 }
 
-func (r *masterCountEndpointReconciler) RemoveEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort) error {
+func (r *masterCountEndpointReconciler) RemoveEndpoints(serviceName, ip string, endpointPorts []corev1.EndpointPort) error {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
 
@@ -162,7 +161,7 @@ func (r *masterCountEndpointReconciler) RemoveEndpoints(serviceName string, ip n
 	// Remove our IP from the list of addresses
 	new := []corev1.EndpointAddress{}
 	for _, addr := range e.Subsets[0].Addresses {
-		if addr.IP != ip.String() {
+		if addr.IP != ip {
 			new = append(new, addr)
 		}
 	}
