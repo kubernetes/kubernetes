@@ -559,10 +559,8 @@ func inconsistentStatus(set *apps.StatefulSet, status *apps.StatefulSetStatus) b
 // to the updateRevision. status's currentRevision is set to updateRevision and its' updateRevision
 // is set to the empty string. status's currentReplicas is set to updateReplicas and its updateReplicas
 // are set to 0.
-func completeRollingUpdate(set *apps.StatefulSet, status *apps.StatefulSetStatus) {
-	if set.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType &&
-		status.UpdatedReplicas == status.Replicas &&
-		status.ReadyReplicas == status.Replicas {
+func completeRollingUpdate(status *apps.StatefulSetStatus) {
+	if status.UpdatedReplicas == status.Replicas && status.ReadyReplicas == status.Replicas {
 		status.CurrentReplicas = status.UpdatedReplicas
 		status.CurrentRevision = status.UpdateRevision
 	}

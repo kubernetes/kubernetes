@@ -665,7 +665,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSetStatus(
 	set *apps.StatefulSet,
 	status *apps.StatefulSetStatus) error {
 	// complete any in progress rolling update if necessary
-	completeRollingUpdate(set, status)
+	completeRollingUpdate(status)
 
 	// if the status is not inconsistent do not perform an update
 	if !inconsistentStatus(set, status) {
