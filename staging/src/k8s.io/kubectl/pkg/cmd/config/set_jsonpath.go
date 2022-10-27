@@ -48,47 +48,49 @@ import (
 // the user will expect to be acted on. To support both of these features we must use several nested loops
 //
 // for:
-//   The first level of the for loop supports traversing all individual path's provided, e.g. each of
-//   {.key1}{.key2}...{.keyn}
 //
-//   for:
-//     The second level of the for loop supports traversing the actual paths within the {}, e.g. '.path.to.key.to.set'
-//     that will get broken up into path, to, key, to, and set.
+//	The first level of the for loop supports traversing all individual path's provided, e.g. each of
+//	{.key1}{.key2}...{.keyn}
 //
-//     for:
-//       The third level of the for loop supports traversing the results of the current step in the jsonpath we are at.
-//       This is only required because we need to support setting properties in the event a filter node returns nothing
-//       which results in the outer results slice having a length of zero.
+//	for:
+//	  The second level of the for loop supports traversing the actual paths within the {}, e.g. '.path.to.key.to.set'
+//	  that will get broken up into path, to, key, to, and set.
 //
-//       for:
-//         The fourth and final level of the for loops supports traversing the actual results which will have the values
-//         that can actually be set. This is where the meat of the logic is.
+//	  for:
+//	    The third level of the for loop supports traversing the results of the current step in the jsonpath we are at.
+//	    This is only required because we need to support setting properties in the event a filter node returns nothing
+//	    which results in the outer results slice having a length of zero.
+//
+//	    for:
+//	      The fourth and final level of the for loops supports traversing the actual results which will have the values
+//	      that can actually be set. This is where the meat of the logic is.
 //
 // Inside the final for loop is a large switch block to handle different types of potential values. These are as
 // follows:
-//   String - This should always be the value gotten by the last node in the jsonpath
-//   Bool - Convert the string input from the user into a bool if we can, then set. this should always be the value
-//          gotten by the last node in the jsonpath
-//   Pointer - This should always be followed by a field node, and unless we are unsetting should never be the last node
-//             in a path. We only need to set anything here if the pointer is zero, so that we get results on the next
-//             step in the jsonpath node list
-//   Struct - Similar to the Pointer case, this node can not be the final node in the jsonpath unless we are unsetting
-//            the value. We do not work on this result and instead only validate that the next node in the path is valid
-//   Map - We have two cases to support for this type.
-//     * [string]string - This needs to make sure the node that returned the map is the second to last node, with the
-//                        last node being the key to set the value to.
-//     * [string][]string - This case supports unsetting the entire map if it is the last node in the list, unsetting a
-//                          specific key in the map if it is the second to last node in the list, or setting a value to
-//                          the map's key
-//   Slice - Similar to Map this type has several subtypes.
-//     * String - Similar to the top level string type, this must be the final node in the list. This case supports
-//                users providing values in a CSV format and will split them and set the strings as desired. This also
-//                supports adding and removing values from existing slices by appending + or - to the end of the list
-//     * Uint8 - Similar to the string type, this must be the final node in the list. This case is specifically for
-//               supporting users setting []byte data and supports setting the data either directly using --set-raw-bytes
-//               or will convert the data for the user if the flag is not provided.
-//     * Struct - This can not be the final node in the list unless we are unsetting the node. We simply pass on this
-//                unless we are unsetting it.
+//
+//	String - This should always be the value gotten by the last node in the jsonpath
+//	Bool - Convert the string input from the user into a bool if we can, then set. this should always be the value
+//	       gotten by the last node in the jsonpath
+//	Pointer - This should always be followed by a field node, and unless we are unsetting should never be the last node
+//	          in a path. We only need to set anything here if the pointer is zero, so that we get results on the next
+//	          step in the jsonpath node list
+//	Struct - Similar to the Pointer case, this node can not be the final node in the jsonpath unless we are unsetting
+//	         the value. We do not work on this result and instead only validate that the next node in the path is valid
+//	Map - We have two cases to support for this type.
+//	  * [string]string - This needs to make sure the node that returned the map is the second to last node, with the
+//	                     last node being the key to set the value to.
+//	  * [string][]string - This case supports unsetting the entire map if it is the last node in the list, unsetting a
+//	                       specific key in the map if it is the second to last node in the list, or setting a value to
+//	                       the map's key
+//	Slice - Similar to Map this type has several subtypes.
+//	  * String - Similar to the top level string type, this must be the final node in the list. This case supports
+//	             users providing values in a CSV format and will split them and set the strings as desired. This also
+//	             supports adding and removing values from existing slices by appending + or - to the end of the list
+//	  * Uint8 - Similar to the string type, this must be the final node in the list. This case is specifically for
+//	            supporting users setting []byte data and supports setting the data either directly using --set-raw-bytes
+//	            or will convert the data for the user if the flag is not provided.
+//	  * Struct - This can not be the final node in the list unless we are unsetting the node. We simply pass on this
+//	             unless we are unsetting it.
 func modifyConfigJson(config *clientcmdapiv1.Config, propertyName, propertyValue string, unset, setRawBytes, deduplicate bool) error {
 	// Create a jsonpath parser to use throughout the function. This one will be used for getting values.
 	jsonPath := jsonpath.New("Value Getter").AllowMissingKeys(true)
