@@ -1574,6 +1574,94 @@ type InterfaceWithPrefixTransformer interface {
 	UpdatePrefixTransformer(PrefixTransformerModifier) func()
 }
 
+func RunTestConsistentList(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer) {
+	nextPod := func(index uint32) (string, *example.Pod) {
+		key := fmt.Sprintf("pod-%d", index)
+		obj := &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: key,
+				Labels: map[string]string{
+					"even": strconv.FormatBool(index%2 == 0),
+				},
+			},
+		}
+		return key, obj
+	}
+
+	transformer := &reproducingTransformer{
+		store:      store,
+		nextObject: nextPod,
+	}
+
+	revertTransformer := store.UpdatePrefixTransformer(
+		func(previousTransformer *PrefixTransformer) value.Transformer {
+			transformer.wrapped = previousTransformer
+			return transformer
+		})
+	defer revertTransformer()
+
+	for i := 0; i < 5; i++ {
+		if err := transformer.createObject(ctx); err != nil {
+			t.Fatalf("failed to create object: %v", err)
+		}
+	}
+
+	getAttrs := func(obj runtime.Object) (labels.Set, fields.Set, error) {
+		pod, ok := obj.(*example.Pod)
+		if !ok {
+			return nil, nil, fmt.Errorf("invalid object")
+		}
+		return labels.Set(pod.Labels), nil, nil
+	}
+	predicate := storage.SelectionPredicate{
+		Label:    labels.Set{"even": "true"}.AsSelector(),
+		GetAttrs: getAttrs,
+		Limit:    4,
+	}
+
+	result1 := example.PodList{}
+	options := storage.ListOptions{
+		Predicate: predicate,
+		Recursive: true,
+	}
+	if err := store.GetList(ctx, "/", options, &result1); err != nil {
+		t.Fatalf("failed to list objects: %v", err)
+	}
+
+	// List objects from the returned resource version.
+	options = storage.ListOptions{
+		Predicate:            predicate,
+		ResourceVersion:      result1.ResourceVersion,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		Recursive:            true,
+	}
+
+	result2 := example.PodList{}
+	if err := store.GetList(ctx, "/", options, &result2); err != nil {
+		t.Fatalf("failed to list objects: %v", err)
+	}
+
+	ExpectNoDiff(t, "incorrect lists", result1, result2)
+
+	// Now also verify the  ResourceVersionMatchNotOlderThan.
+	options.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
+
+	result3 := example.PodList{}
+	if err := store.GetList(ctx, "/", options, &result3); err != nil {
+		t.Fatalf("failed to list objects: %v", err)
+	}
+
+	options.ResourceVersion = result3.ResourceVersion
+	options.ResourceVersionMatch = metav1.ResourceVersionMatchExact
+
+	result4 := example.PodList{}
+	if err := store.GetList(ctx, "/", options, &result4); err != nil {
+		t.Fatalf("failed to list objects: %v", err)
+	}
+
+	ExpectNoDiff(t, "incorrect lists", result3, result4)
+}
+
 func RunTestGuaranteedUpdate(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer, validation KeyValidation) {
 	key := "/testkey"
 
