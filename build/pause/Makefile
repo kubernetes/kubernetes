@@ -40,7 +40,7 @@ ALL_OS_ARCH.windows = $(foreach arch, $(ALL_ARCH.windows), $(foreach osversion, 
 ALL_OS_ARCH = $(foreach os, $(ALL_OS), ${ALL_OS_ARCH.${os}})
 
 CFLAGS = -Os -Wall -Werror -static -DVERSION=v$(TAG)-$(REV)
-KUBE_CROSS_IMAGE ?= k8s.gcr.io/build-image/kube-cross
+KUBE_CROSS_IMAGE ?= registry.k8s.io/build-image/kube-cross
 KUBE_CROSS_VERSION ?= $(shell cat ../build-image/cross/VERSION)
 
 # NOTE(claudiub): The Windows pause image also requires the wincat binary we're compiling for the

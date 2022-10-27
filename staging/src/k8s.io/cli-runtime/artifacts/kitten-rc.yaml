@@ -13,7 +13,7 @@ spec:
         version: kitten
     spec:
       containers:
-      - image: k8s.gcr.io/update-demo:kitten
+      - image: registry.k8s.io/update-demo:kitten
         name: update-demo
         ports:
         - containerPort: 80
