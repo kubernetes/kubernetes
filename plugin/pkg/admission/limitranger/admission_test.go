@@ -867,7 +867,7 @@ func TestLimitRanger_GetLimitRangesFixed22422(t *testing.T) {
 	var count int64
 	mockClient := &fake.Clientset{}
 
-	unhold := make(chan struct{})
+	unhold := make(chan struct{}, 1)
 	mockClient.AddReactor("list", "limitranges", func(action core.Action) (bool, runtime.Object, error) {
 		atomic.AddInt64(&count, 1)
 
@@ -882,7 +882,10 @@ func TestLimitRanger_GetLimitRangesFixed22422(t *testing.T) {
 			limitRangeList.Items = append(limitRangeList.Items, value)
 		}
 		// he always blocking before sending the signal
-		<-unhold
+		// prevent blocking when unexpected calls occur
+		v := <-unhold
+		// pump; make available for any future calls
+		unhold <- v
 		return true, limitRangeList, nil
 	})
 
@@ -926,11 +929,12 @@ func TestLimitRanger_GetLimitRangesFixed22422(t *testing.T) {
 			}
 		}()
 	}
+
+	// Wait for all calls to be singleflight
+	time.Sleep(1 * time.Second)
+
 	// unhold all the calls with the same namespace handler.GetLimitRanges(attributes) calls, that have to be aggregated
 	unhold <- struct{}{}
-	go func() {
-		unhold <- struct{}{}
-	}()
 
 	// and here we wait for all the goroutines
 	wg.Wait()
@@ -938,15 +942,11 @@ func TestLimitRanger_GetLimitRangesFixed22422(t *testing.T) {
 	// There are two different sets of namespace calls
 	// hence only 2
 	if count != 2 {
-		t.Errorf("Expected 1 limit range, got %d", count)
+		t.Errorf("Expected 2 limit range, got %d", count)
 	}
 
 	// invalidate the cache
 	handler.liveLookupCache.Remove(attributes.GetNamespace())
-	go func() {
-		// unhold it is blocking until GetLimitRanges is executed
-		unhold <- struct{}{}
-	}()
 	_, err = handler.GetLimitRanges(attributes)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -954,6 +954,6 @@ func TestLimitRanger_GetLimitRangesFixed22422(t *testing.T) {
 	close(unhold)
 
 	if count != 3 {
-		t.Errorf("Expected 2 limit range, got %d", count)
+		t.Errorf("Expected 3 limit range, got %d", count)
 	}
 }
