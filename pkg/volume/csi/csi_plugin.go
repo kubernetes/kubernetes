@@ -425,51 +425,9 @@ func (p *csiPlugin) NewMounter(
 	}
 	mounter.csiClientGetter.driverName = csiDriverName(driverName)
 
-	// Save volume info in pod dir
 	dir := mounter.GetPath()
-	dataDir := filepath.Dir(dir) // dropoff /mount at end
-
-	if err := os.MkdirAll(dataDir, 0750); err != nil {
-		return nil, errors.New(log("failed to create dir %#v:  %v", dataDir, err))
-	}
-	klog.V(4).Info(log("created path successfully [%s]", dataDir))
-
 	mounter.MetricsProvider = NewMetricsCsi(volumeHandle, dir, csiDriverName(driverName))
-
-	// persist volume info data for teardown
-	node := string(p.host.GetNodeName())
-	volData := map[string]string{
-		volDataKey.specVolID:           spec.Name(),
-		volDataKey.volHandle:           volumeHandle,
-		volDataKey.driverName:          driverName,
-		volDataKey.nodeName:            node,
-		volDataKey.volumeLifecycleMode: string(volumeLifecycleMode),
-	}
-
-	attachID := getAttachmentName(volumeHandle, driverName, node)
-	volData[volDataKey.attachmentID] = attachID
-
-	err = saveVolumeData(dataDir, volDataFileName, volData)
-	defer func() {
-		// Only if there was an error and volume operation was considered
-		// finished, we should remove the directory.
-		if err != nil && volumetypes.IsOperationFinishedError(err) {
-			// attempt to cleanup volume mount dir.
-			if err = removeMountDir(p, dir); err != nil {
-				klog.Error(log("attacher.MountDevice failed to remove mount dir after error [%s]: %v", dir, err))
-			}
-		}
-	}()
-
-	if err != nil {
-		errorMsg := log("csi.NewMounter failed to save volume info data: %v", err)
-		klog.Error(errorMsg)
-
-		return nil, errors.New(errorMsg)
-	}
-
 	klog.V(4).Info(log("mounter created successfully"))
-
 	return mounter, nil
 }
 
