@@ -40,7 +40,7 @@ const (
 	// DefaultCertificatesDir defines default certificate directory
 	DefaultCertificatesDir = "/etc/kubernetes/pki"
 	// DefaultImageRepository defines default image registry
-	// (previously this defaulted to k8s.gcr.io)
+	// (previously this was k8s.gcr.io)
 	DefaultImageRepository = "registry.k8s.io"
 	// DefaultManifestsDir defines default manifests directory
 	DefaultManifestsDir = "/etc/kubernetes/manifests"
