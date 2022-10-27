@@ -1113,7 +1113,7 @@ func (oe *operationExecutor) CheckVolumeExistenceOperation(
 				return false, fmt.Errorf("mounter was not set for a filesystem volume")
 			}
 			if isNotMount, mountCheckErr = mount.IsNotMountPoint(mounter, mountPath); mountCheckErr != nil {
-				return false, fmt.Errorf("could not check whether the volume %q (spec.Name: %q) pod %q (UID: %q) is mounted with: %v",
+				return false, fmt.Errorf("could not check whether the filesystem volume %q (spec.Name: %q) pod %q (UID: %q) is mounted with: %v",
 					uniqueVolumeName,
 					volumeName,
 					podName,

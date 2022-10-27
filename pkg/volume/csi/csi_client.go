@@ -462,7 +462,7 @@ func (c *csiDriverClient) NodeUnstageVolume(ctx context.Context, volID, stagingT
 		return errors.New("missing staging target path")
 	}
 	if c.nodeV1ClientCreator == nil {
-		return errors.New("nodeV1ClientCreate is nil")
+		return errors.New("nodeV1ClientCreator is nil")
 	}
 
 	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
