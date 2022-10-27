@@ -11,6 +11,6 @@ spec:
     spec:
       containers:
       - name: echoheaders-https
-        image: k8s.gcr.io/e2e-test-images/echoserver:2.3
+        image: registry.k8s.io/e2e-test-images/echoserver:2.3
         ports:
         - containerPort: 8080

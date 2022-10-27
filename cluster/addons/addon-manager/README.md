@@ -25,7 +25,7 @@ Otherwise it will be omitted.
 
 #### Images
 
-addon-manager images are pushed to `k8s.gcr.io`. As addon-manager is built for multiple architectures, there is an image per architecture in the format - `k8s.gcr.io/addon-manager/kube-addon-manager-$(ARCH):$(VERSION)`.
+addon-manager images are pushed to `registry.k8s.io`. As addon-manager is built for multiple architectures, there is an image per architecture in the format - `registry.k8s.io/addon-manager/kube-addon-manager-$(ARCH):$(VERSION)`.
 
 #### How to release
 

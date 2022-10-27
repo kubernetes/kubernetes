@@ -646,7 +646,7 @@ type MountedVolume struct {
 	//     name: test-pd
 	//   spec:
 	//     containers:
-	//     - image: k8s.gcr.io/test-webserver
+	//     - image: registry.k8s.io/test-webserver
 	//     	 name: test-container
 	//     	 volumeMounts:
 	//     	 - mountPath: /test-pd
@@ -684,7 +684,7 @@ type MountedVolume struct {
 	//     name: test-pd
 	//   spec:
 	//     containers:
-	//     - image: k8s.gcr.io/test-webserver
+	//     - image: registry.k8s.io/test-webserver
 	//     	 name: test-container
 	//     	 volumeMounts:
 	//     	 - mountPath: /test-pd

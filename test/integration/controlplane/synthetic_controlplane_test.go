@@ -420,7 +420,7 @@ var deploymentApps = `
       "spec": {
         "containers": [{
           "name": "nginx",
-          "image": "k8s.gcr.io/nginx:1.7.9"
+          "image": "registry.k8s.io/nginx:1.7.9"
         }]
       }
     }
