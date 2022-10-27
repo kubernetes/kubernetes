@@ -19,7 +19,6 @@ package v1beta1
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
 	"sync"
@@ -95,7 +94,7 @@ func (s *server) Start() error {
 		return err
 	}
 
-	ln, err := net.Listen("unix", s.SocketPath())
+	ln, err := GetListener(s.SocketPath())
 	if err != nil {
 		klog.ErrorS(err, "Failed to listen to socket while starting device plugin registry")
 		return err
