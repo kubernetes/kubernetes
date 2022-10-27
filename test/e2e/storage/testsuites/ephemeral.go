@@ -135,6 +135,10 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 
 		l = local{}
 
+		if !driver.GetDriverInfo().Capabilities[storageframework.CapOnlineExpansion] {
+			pattern.AllowExpansion = false
+		}
+
 		// Now do the more expensive test initialization.
 		l.config = driver.PrepareTest(f)
 		l.resource = storageframework.CreateVolumeResource(driver, l.config, pattern, e2evolume.SizeRange{})
