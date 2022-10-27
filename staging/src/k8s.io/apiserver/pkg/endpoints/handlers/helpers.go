@@ -20,7 +20,7 @@ import (
 	"net/http"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/audit"
 )
 
 const (
@@ -83,7 +83,7 @@ type lazyAuditID struct {
 
 func (lazy *lazyAuditID) String() string {
 	if lazy.req != nil {
-		return request.GetAuditIDTruncated(lazy.req.Context())
+		return audit.GetAuditIDTruncated(lazy.req.Context())
 	}
 
 	return "unknown"

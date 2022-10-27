@@ -33,7 +33,6 @@ import (
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
 
 	"github.com/google/uuid"
@@ -53,7 +52,7 @@ func NewEventFromRequest(req *http.Request, requestReceivedTimestamp time.Time, 
 		Level:                    level,
 	}
 
-	auditID, found := request.AuditIDFrom(req.Context())
+	auditID, found := AuditIDFrom(req.Context())
 	if !found {
 		auditID = types.UID(uuid.New().String())
 	}

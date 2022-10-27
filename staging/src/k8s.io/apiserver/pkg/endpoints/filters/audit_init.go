@@ -21,28 +21,25 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
-	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/audit"
 
 	"github.com/google/uuid"
 )
 
-// WithAuditID attaches the Audit-ID associated with a request to the context.
+// WithAuditInit initializes the audit context and attaches the Audit-ID associated with a request.
 //
 // a. If the caller does not specify a value for Audit-ID in the request header, we generate a new audit ID
 // b. We echo the Audit-ID value to the caller via the response Header 'Audit-ID'.
-func WithAuditID(handler http.Handler) http.Handler {
-	return withAuditID(handler, func() string {
+func WithAuditInit(handler http.Handler) http.Handler {
+	return withAuditInit(handler, func() string {
 		return uuid.New().String()
 	})
 }
 
-func withAuditID(handler http.Handler, newAuditIDFunc func() string) http.Handler {
-	if newAuditIDFunc == nil {
-		return handler
-	}
-
+func withAuditInit(handler http.Handler, newAuditIDFunc func() string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
+		ctx := audit.WithAuditContext(r.Context())
+		r = r.WithContext(ctx)
 
 		auditID := r.Header.Get(auditinternal.HeaderAuditID)
 		if len(auditID) == 0 {
@@ -50,7 +47,7 @@ func withAuditID(handler http.Handler, newAuditIDFunc func() string) http.Handle
 		}
 
 		// Note: we save the user specified value of the Audit-ID header as is, no truncation is performed.
-		r = r.WithContext(request.WithAuditID(ctx, types.UID(auditID)))
+		audit.WithAuditID(ctx, types.UID(auditID))
 
 		// We echo the Audit-ID in to the response header.
 		// It's not guaranteed Audit-ID http header is sent for all requests.
