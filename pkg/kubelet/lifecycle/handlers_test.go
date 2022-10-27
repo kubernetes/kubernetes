@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -94,7 +95,7 @@ type fakeContainerCommandRunner struct {
 	Msg string
 }
 
-func (f *fakeContainerCommandRunner) RunInContainer(id kubecontainer.ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
+func (f *fakeContainerCommandRunner) RunInContainer(_ context.Context, id kubecontainer.ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
 	f.Cmd = cmd
 	f.ID = id
 	return []byte(f.Msg), f.Err
@@ -113,11 +114,12 @@ func stubPodStatusProvider(podIP string) podStatusProvider {
 
 type podStatusProviderFunc func(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error)
 
-func (f podStatusProviderFunc) GetPodStatus(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
+func (f podStatusProviderFunc) GetPodStatus(_ context.Context, uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
 	return f(uid, name, namespace)
 }
 
 func TestRunHandlerExec(t *testing.T) {
+	ctx := context.Background()
 	fakeCommandRunner := fakeContainerCommandRunner{}
 	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeCommandRunner, nil, nil)
 
@@ -139,7 +141,7 @@ func TestRunHandlerExec(t *testing.T) {
 	pod.ObjectMeta.Name = "podFoo"
 	pod.ObjectMeta.Namespace = "nsFoo"
 	pod.Spec.Containers = []v1.Container{container}
-	_, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+	_, err := handlerRunner.Run(ctx, containerID, &pod, &container, container.Lifecycle.PostStart)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -163,6 +165,7 @@ func (f *fakeHTTP) Do(req *http.Request) (*http.Response, error) {
 }
 
 func TestRunHandlerHttp(t *testing.T) {
+	ctx := context.Background()
 	fakeHTTPGetter := fakeHTTP{}
 	fakePodStatusProvider := stubPodStatusProvider("127.0.0.1")
 	handlerRunner := NewHandlerRunner(&fakeHTTPGetter, &fakeContainerCommandRunner{}, fakePodStatusProvider, nil)
@@ -187,7 +190,7 @@ func TestRunHandlerHttp(t *testing.T) {
 	pod.ObjectMeta.Namespace = "nsFoo"
 	pod.ObjectMeta.UID = "foo-bar-quux"
 	pod.Spec.Containers = []v1.Container{container}
-	_, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+	_, err := handlerRunner.Run(ctx, containerID, &pod, &container, container.Lifecycle.PostStart)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -198,6 +201,7 @@ func TestRunHandlerHttp(t *testing.T) {
 }
 
 func TestRunHandlerHttpWithHeaders(t *testing.T) {
+	ctx := context.Background()
 	fakeHTTPDoer := fakeHTTP{}
 	fakePodStatusProvider := stubPodStatusProvider("127.0.0.1")
 
@@ -225,7 +229,7 @@ func TestRunHandlerHttpWithHeaders(t *testing.T) {
 	pod.ObjectMeta.Name = "podFoo"
 	pod.ObjectMeta.Namespace = "nsFoo"
 	pod.Spec.Containers = []v1.Container{container}
-	_, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+	_, err := handlerRunner.Run(ctx, containerID, &pod, &container, container.Lifecycle.PostStart)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -239,6 +243,7 @@ func TestRunHandlerHttpWithHeaders(t *testing.T) {
 }
 
 func TestRunHandlerHttps(t *testing.T) {
+	ctx := context.Background()
 	fakeHTTPDoer := fakeHTTP{}
 	fakePodStatusProvider := stubPodStatusProvider("127.0.0.1")
 	handlerRunner := NewHandlerRunner(&fakeHTTPDoer, &fakeContainerCommandRunner{}, fakePodStatusProvider, nil)
@@ -266,7 +271,7 @@ func TestRunHandlerHttps(t *testing.T) {
 	t.Run("consistent", func(t *testing.T) {
 		container.Lifecycle.PostStart.HTTPGet.Port = intstr.FromString("70")
 		pod.Spec.Containers = []v1.Container{container}
-		_, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+		_, err := handlerRunner.Run(ctx, containerID, &pod, &container, container.Lifecycle.PostStart)
 
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -280,7 +285,7 @@ func TestRunHandlerHttps(t *testing.T) {
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, false)()
 		container.Lifecycle.PostStart.HTTPGet.Port = intstr.FromString("70")
 		pod.Spec.Containers = []v1.Container{container}
-		_, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+		_, err := handlerRunner.Run(ctx, containerID, &pod, &container, container.Lifecycle.PostStart)
 
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -347,13 +352,14 @@ func TestRunHandlerHTTPPort(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
+			ctx := context.Background()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, tt.FeatureGateEnabled)()
 			fakeHTTPDoer := fakeHTTP{}
 			handlerRunner := NewHandlerRunner(&fakeHTTPDoer, &fakeContainerCommandRunner{}, fakePodStatusProvider, nil)
 
 			container.Lifecycle.PostStart.HTTPGet.Port = tt.Port
 			pod.Spec.Containers = []v1.Container{container}
-			_, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+			_, err := handlerRunner.Run(ctx, containerID, &pod, &container, container.Lifecycle.PostStart)
 
 			if hasError := (err != nil); hasError != tt.ExpectError {
 				t.Errorf("unexpected error: %v", err)
@@ -618,6 +624,7 @@ func TestRunHTTPHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
+			ctx := context.Background()
 			fakePodStatusProvider := stubPodStatusProvider(tt.PodIP)
 
 			container.Lifecycle.PostStart.HTTPGet = tt.HTTPGet
@@ -627,7 +634,7 @@ func TestRunHTTPHandler(t *testing.T) {
 				fakeHTTPDoer := fakeHTTP{}
 				handlerRunner := NewHandlerRunner(&fakeHTTPDoer, &fakeContainerCommandRunner{}, fakePodStatusProvider, nil)
 
-				_, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+				_, err := handlerRunner.Run(ctx, containerID, &pod, &container, container.Lifecycle.PostStart)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -654,6 +661,7 @@ func TestRunHTTPHandler(t *testing.T) {
 }
 
 func TestRunHandlerNil(t *testing.T) {
+	ctx := context.Background()
 	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, nil, nil)
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	podName := "podFoo"
@@ -670,13 +678,14 @@ func TestRunHandlerNil(t *testing.T) {
 	pod.ObjectMeta.Name = podName
 	pod.ObjectMeta.Namespace = podNamespace
 	pod.Spec.Containers = []v1.Container{container}
-	_, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+	_, err := handlerRunner.Run(ctx, containerID, &pod, &container, container.Lifecycle.PostStart)
 	if err == nil {
 		t.Errorf("expect error, but got nil")
 	}
 }
 
 func TestRunHandlerExecFailure(t *testing.T) {
+	ctx := context.Background()
 	expectedErr := fmt.Errorf("invalid command")
 	fakeCommandRunner := fakeContainerCommandRunner{Err: expectedErr, Msg: expectedErr.Error()}
 	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeCommandRunner, nil, nil)
@@ -701,7 +710,7 @@ func TestRunHandlerExecFailure(t *testing.T) {
 	pod.ObjectMeta.Namespace = "nsFoo"
 	pod.Spec.Containers = []v1.Container{container}
 	expectedErrMsg := fmt.Sprintf("Exec lifecycle hook (%s) for Container %q in Pod %q failed - error: %v, message: %q", command, containerName, format.Pod(&pod), expectedErr, expectedErr.Error())
-	msg, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+	msg, err := handlerRunner.Run(ctx, containerID, &pod, &container, container.Lifecycle.PostStart)
 	if err == nil {
 		t.Errorf("expected error: %v", expectedErr)
 	}
@@ -711,6 +720,7 @@ func TestRunHandlerExecFailure(t *testing.T) {
 }
 
 func TestRunHandlerHttpFailure(t *testing.T) {
+	ctx := context.Background()
 	expectedErr := fmt.Errorf("fake http error")
 	expectedResp := http.Response{
 		Body: io.NopCloser(strings.NewReader(expectedErr.Error())),
@@ -740,7 +750,7 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 	pod.ObjectMeta.Namespace = "nsFoo"
 	pod.Spec.Containers = []v1.Container{container}
 	expectedErrMsg := fmt.Sprintf("HTTP lifecycle hook (%s) for Container %q in Pod %q failed - error: %v", "bar", containerName, format.Pod(&pod), expectedErr)
-	msg, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+	msg, err := handlerRunner.Run(ctx, containerID, &pod, &container, container.Lifecycle.PostStart)
 	if err == nil {
 		t.Errorf("expected error: %v", expectedErr)
 	}
@@ -753,6 +763,7 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 }
 
 func TestRunHandlerHttpsFailureFallback(t *testing.T) {
+	ctx := context.Background()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentHTTPGetHandlers, true)()
 
 	// Since prometheus' gatherer is global, other tests may have updated metrics already, so
@@ -803,7 +814,7 @@ func TestRunHandlerHttpsFailureFallback(t *testing.T) {
 	pod.ObjectMeta.Name = "podFoo"
 	pod.ObjectMeta.Namespace = "nsFoo"
 	pod.Spec.Containers = []v1.Container{container}
-	msg, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+	msg, err := handlerRunner.Run(ctx, containerID, &pod, &container, container.Lifecycle.PostStart)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
