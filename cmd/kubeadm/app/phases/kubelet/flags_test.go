@@ -122,11 +122,11 @@ func TestBuildKubeletArgMap(t *testing.T) {
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
 					CRISocket: "unix:///var/run/dockershim.sock",
 				},
-				pauseImage: "registry.k8s.io/pause:3.7",
+				pauseImage: "registry.k8s.io/pause:3.8",
 			},
 			expected: map[string]string{
 				"network-plugin":            "cni",
-				"pod-infra-container-image": "k8s.gcr.io/pause:3.7",
+				"pod-infra-container-image": "registry.k8s.io/pause:3.8",
 			},
 		},
 		{
@@ -151,8 +151,7 @@ func TestBuildKubeletArgMap(t *testing.T) {
 			},
 			expected: map[string]string{
 				"container-runtime":          "remote",
-				"container-runtime-endpoint": "unix:///var/run/containerd/containerd.sock",
-				"pod-infra-container-image":  "registry.k8s.io/pause:3.7",
+				"container-runtime-endpoint": "unix:///var/run/dockershim.sock",
 			},
 		},
 	}

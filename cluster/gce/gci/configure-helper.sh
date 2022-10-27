@@ -3087,7 +3087,7 @@ oom_score = -999
 [plugins."io.containerd.grpc.v1.cri"]
   stream_server_address = "127.0.0.1"
   max_container_log_line_size = ${CONTAINERD_MAX_CONTAINER_LOG_LINE:-262144}
-  sandbox_image = "${CONTAINERD_INFRA_CONTAINER:-"registry.k8s.io/pause:3.7"}"
+  sandbox_image = "${CONTAINERD_INFRA_CONTAINER:-"registry.k8s.io/pause:3.8"}"
 [plugins."io.containerd.grpc.v1.cri".cni]
   bin_dir = "${KUBE_HOME}/bin"
   conf_dir = "/etc/cni/net.d"
@@ -3098,10 +3098,10 @@ oom_score = -999
   runtime_type = "io.containerd.runc.v2"
 [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
   endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
-# Enable registry.k8s.io as the primary mirror for registry.k8s.io
+# Enable registry.k8s.io as the primary mirror for k8s.gcr.io
 # See: https://github.com/kubernetes/k8s.io/issues/3411
-[plugins."io.containerd.grpc.v1.cri".registry.mirrors."registry.k8s.io"]
-  endpoint = ["https://registry.k8s.io", "https://registry.k8s.io",]
+[plugins."io.containerd.grpc.v1.cri".registry.mirrors."k8s.gcr.io"]
+  endpoint = ["https://registry.k8s.io", "https://k8s.gcr.io",]
 EOF
 
   if [[ "${CONTAINER_RUNTIME_TEST_HANDLER:-}" == "true" ]]; then

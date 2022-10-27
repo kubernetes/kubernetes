@@ -110,7 +110,7 @@ dependencies:
     #  match: minimum_go_version=go([0-9]+\.[0-9]+)
 
   - name: "registry.k8s.io/kube-cross: dependents"
-    version: v1.25.0-go1.18.2-bullseye.0
+    version: v1.24.0-go1.18.7-bullseye.0
     refPaths:
     - path: build/build-image/cross/VERSION
 
@@ -140,19 +140,19 @@ dependencies:
       match: configs\[DebianIptables\] = Config{list\.BuildImageRegistry, "debian-iptables", "[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)"}
 
   - name: "registry.k8s.io/go-runner: dependents"
-    version: v2.3.1-go1.18.2-bullseye.0
+    version: v2.3.1-go1.18.7-bullseye.0
     refPaths:
     - path: build/common.sh
       match: __default_go_runner_version=
 
   - name: "registry.k8s.io/pause"
-    version: 3.7
+    version: 3.8
     refPaths:
     - path: build/pause/Makefile
       match: TAG\s*\?=
 
   - name: "registry.k8s.io/pause: dependents"
-    version: 3.7
+    version: 3.8
     refPaths:
     - path: cluster/gce/config-common.sh
       match: registry.k8s.io\/pause:\d+\.\d+
