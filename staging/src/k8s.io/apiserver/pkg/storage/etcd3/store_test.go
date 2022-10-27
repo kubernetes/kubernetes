@@ -269,6 +269,170 @@ func TestListInconsistentContinuation(t *testing.T) {
 	storagetesting.RunTestListInconsistentContinuation(ctx, t, store, compactStorage(client))
 }
 
+func TestCount(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestCount(ctx, t, store)
+}
+
+// =======================================================================
+// Implementation-specific tests are following.
+// The following tests are exercising the details of the implementation
+// not the actual user-facing contract of storage interface.
+// As such, they may focus e.g. on non-functional aspects like performance
+// impact.
+// =======================================================================
+
+func TestPrefix(t *testing.T) {
+	testcases := map[string]string{
+		"custom/prefix":     "/custom/prefix",
+		"/custom//prefix//": "/custom/prefix",
+		"/registry":         "/registry",
+	}
+	for configuredPrefix, effectivePrefix := range testcases {
+		_, store, _ := testSetup(t, withPrefix(configuredPrefix))
+		if store.pathPrefix != effectivePrefix {
+			t.Errorf("configured prefix of %s, expected effective prefix of %s, got %s", configuredPrefix, effectivePrefix, store.pathPrefix)
+		}
+	}
+}
+
+func Test_growSlice(t *testing.T) {
+	type args struct {
+		initialCapacity int
+		initialLen      int
+		v               reflect.Value
+		maxCapacity     int
+		sizes           []int
+	}
+	tests := []struct {
+		name string
+		args args
+		cap  int
+		len  int
+	}{
+		{
+			name: "empty",
+			args: args{v: reflect.ValueOf([]example.Pod{})},
+			cap:  0,
+		},
+		{
+			name: "no sizes",
+			args: args{v: reflect.ValueOf([]example.Pod{}), maxCapacity: 10},
+			cap:  10,
+		},
+		{
+			name: "above maxCapacity",
+			args: args{v: reflect.ValueOf([]example.Pod{}), maxCapacity: 10, sizes: []int{1, 12}},
+			cap:  10,
+		},
+		{
+			name: "takes max",
+			args: args{v: reflect.ValueOf([]example.Pod{}), maxCapacity: 10, sizes: []int{8, 4}},
+			cap:  8,
+		},
+		{
+			name: "with existing capacity above max",
+			args: args{initialCapacity: 12, maxCapacity: 10, sizes: []int{8, 4}},
+			cap:  12,
+		},
+		{
+			name: "with existing capacity below max",
+			args: args{initialCapacity: 5, maxCapacity: 10, sizes: []int{8, 4}},
+			cap:  8,
+		},
+		{
+			name: "with existing capacity and length above max",
+			args: args{initialCapacity: 12, initialLen: 5, maxCapacity: 10, sizes: []int{8, 4}},
+			cap:  12,
+			len:  5,
+		},
+		{
+			name: "with existing capacity and length below max",
+			args: args{initialCapacity: 5, initialLen: 3, maxCapacity: 10, sizes: []int{8, 4}},
+			cap:  8,
+			len:  3,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.args.initialCapacity > 0 {
+				val := make([]example.Pod, tt.args.initialLen, tt.args.initialCapacity)
+				for i := 0; i < tt.args.initialLen; i++ {
+					val[i].Name = fmt.Sprintf("test-%d", i)
+				}
+				tt.args.v = reflect.ValueOf(val)
+			}
+			// reflection requires that the value be addressable in order to call set,
+			// so we must ensure the value we created is available on the heap (not a problem
+			// for normal usage)
+			if !tt.args.v.CanAddr() {
+				x := reflect.New(tt.args.v.Type())
+				x.Elem().Set(tt.args.v)
+				tt.args.v = x.Elem()
+			}
+			growSlice(tt.args.v, tt.args.maxCapacity, tt.args.sizes...)
+			if tt.cap != tt.args.v.Cap() {
+				t.Errorf("Unexpected capacity: got=%d want=%d", tt.args.v.Cap(), tt.cap)
+			}
+			if tt.len != tt.args.v.Len() {
+				t.Errorf("Unexpected length: got=%d want=%d", tt.args.v.Len(), tt.len)
+			}
+			for i := 0; i < tt.args.v.Len(); i++ {
+				nameWanted := fmt.Sprintf("test-%d", i)
+				val := tt.args.v.Index(i).Interface()
+				pod, ok := val.(example.Pod)
+				if !ok || pod.Name != nameWanted {
+					t.Errorf("Unexpected element value: got=%s, want=%s", pod.Name, nameWanted)
+				}
+			}
+		})
+	}
+}
+
+func TestLeaseMaxObjectCount(t *testing.T) {
+	ctx, store, _ := testSetup(t, withLeaseConfig(LeaseManagerConfig{
+		ReuseDurationSeconds: defaultLeaseReuseDurationSeconds,
+		MaxObjectCount:       2,
+	}))
+
+	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	out := &example.Pod{}
+
+	testCases := []struct {
+		key                 string
+		expectAttachedCount int64
+	}{
+		{
+			key:                 "testkey1",
+			expectAttachedCount: 1,
+		},
+		{
+			key:                 "testkey2",
+			expectAttachedCount: 2,
+		},
+		{
+			key: "testkey3",
+			// We assume each time has 1 object attached to the lease
+			// so after granting a new lease, the recorded count is set to 1
+			expectAttachedCount: 1,
+		},
+	}
+
+	for _, tc := range testCases {
+		err := store.Create(ctx, tc.key, obj, out, 120)
+		if err != nil {
+			t.Fatalf("Set failed: %v", err)
+		}
+		if store.leaseManager.leaseAttachedObjectCount != tc.expectAttachedCount {
+			t.Errorf("Lease manager recorded count %v should be %v", store.leaseManager.leaseAttachedObjectCount, tc.expectAttachedCount)
+		}
+	}
+}
+
+// ===================================================
+// Test-setup related function are following.
+// ===================================================
+
 func newTestLeaseManagerConfig() LeaseManagerConfig {
 	cfg := NewDefaultLeaseManagerConfig()
 	// As 30s is the default timeout for testing in global configuration,
@@ -402,113 +566,6 @@ func testSetup(t *testing.T, opts ...setupOption) (context.Context, *store, *cli
 	return ctx, store, client
 }
 
-func TestPrefix(t *testing.T) {
-	testcases := map[string]string{
-		"custom/prefix":     "/custom/prefix",
-		"/custom//prefix//": "/custom/prefix",
-		"/registry":         "/registry",
-	}
-	for configuredPrefix, effectivePrefix := range testcases {
-		_, store, _ := testSetup(t, withPrefix(configuredPrefix))
-		if store.pathPrefix != effectivePrefix {
-			t.Errorf("configured prefix of %s, expected effective prefix of %s, got %s", configuredPrefix, effectivePrefix, store.pathPrefix)
-		}
-	}
-}
-
-func Test_growSlice(t *testing.T) {
-	type args struct {
-		initialCapacity int
-		initialLen      int
-		v               reflect.Value
-		maxCapacity     int
-		sizes           []int
-	}
-	tests := []struct {
-		name string
-		args args
-		cap  int
-		len  int
-	}{
-		{
-			name: "empty",
-			args: args{v: reflect.ValueOf([]example.Pod{})},
-			cap:  0,
-		},
-		{
-			name: "no sizes",
-			args: args{v: reflect.ValueOf([]example.Pod{}), maxCapacity: 10},
-			cap:  10,
-		},
-		{
-			name: "above maxCapacity",
-			args: args{v: reflect.ValueOf([]example.Pod{}), maxCapacity: 10, sizes: []int{1, 12}},
-			cap:  10,
-		},
-		{
-			name: "takes max",
-			args: args{v: reflect.ValueOf([]example.Pod{}), maxCapacity: 10, sizes: []int{8, 4}},
-			cap:  8,
-		},
-		{
-			name: "with existing capacity above max",
-			args: args{initialCapacity: 12, maxCapacity: 10, sizes: []int{8, 4}},
-			cap:  12,
-		},
-		{
-			name: "with existing capacity below max",
-			args: args{initialCapacity: 5, maxCapacity: 10, sizes: []int{8, 4}},
-			cap:  8,
-		},
-		{
-			name: "with existing capacity and length above max",
-			args: args{initialCapacity: 12, initialLen: 5, maxCapacity: 10, sizes: []int{8, 4}},
-			cap:  12,
-			len:  5,
-		},
-		{
-			name: "with existing capacity and length below max",
-			args: args{initialCapacity: 5, initialLen: 3, maxCapacity: 10, sizes: []int{8, 4}},
-			cap:  8,
-			len:  3,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.args.initialCapacity > 0 {
-				val := make([]example.Pod, tt.args.initialLen, tt.args.initialCapacity)
-				for i := 0; i < tt.args.initialLen; i++ {
-					val[i].Name = fmt.Sprintf("test-%d", i)
-				}
-				tt.args.v = reflect.ValueOf(val)
-			}
-			// reflection requires that the value be addressable in order to call set,
-			// so we must ensure the value we created is available on the heap (not a problem
-			// for normal usage)
-			if !tt.args.v.CanAddr() {
-				x := reflect.New(tt.args.v.Type())
-				x.Elem().Set(tt.args.v)
-				tt.args.v = x.Elem()
-			}
-			growSlice(tt.args.v, tt.args.maxCapacity, tt.args.sizes...)
-			if tt.cap != tt.args.v.Cap() {
-				t.Errorf("Unexpected capacity: got=%d want=%d", tt.args.v.Cap(), tt.cap)
-			}
-			if tt.len != tt.args.v.Len() {
-				t.Errorf("Unexpected length: got=%d want=%d", tt.args.v.Len(), tt.len)
-			}
-			for i := 0; i < tt.args.v.Len(); i++ {
-				nameWanted := fmt.Sprintf("test-%d", i)
-				val := tt.args.v.Index(i).Interface()
-				pod, ok := val.(example.Pod)
-				if !ok || pod.Name != nameWanted {
-					t.Errorf("Unexpected element value: got=%s, want=%s", pod.Name, nameWanted)
-				}
-			}
-		})
-	}
-}
-
 // fancyTransformer creates next object on each call to
 // TransformFromStorage call.
 type fancyTransformer struct {
@@ -615,49 +672,4 @@ func TestConsistentList(t *testing.T) {
 	}
 
 	storagetesting.ExpectNoDiff(t, "incorrect lists", result3, result4)
-}
-
-func TestCount(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestCount(ctx, t, store)
-}
-
-func TestLeaseMaxObjectCount(t *testing.T) {
-	ctx, store, _ := testSetup(t, withLeaseConfig(LeaseManagerConfig{
-		ReuseDurationSeconds: defaultLeaseReuseDurationSeconds,
-		MaxObjectCount:       2,
-	}))
-
-	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	out := &example.Pod{}
-
-	testCases := []struct {
-		key                 string
-		expectAttachedCount int64
-	}{
-		{
-			key:                 "testkey1",
-			expectAttachedCount: 1,
-		},
-		{
-			key:                 "testkey2",
-			expectAttachedCount: 2,
-		},
-		{
-			key: "testkey3",
-			// We assume each time has 1 object attached to the lease
-			// so after granting a new lease, the recorded count is set to 1
-			expectAttachedCount: 1,
-		},
-	}
-
-	for _, tc := range testCases {
-		err := store.Create(ctx, tc.key, obj, out, 120)
-		if err != nil {
-			t.Fatalf("Set failed: %v", err)
-		}
-		if store.leaseManager.leaseAttachedObjectCount != tc.expectAttachedCount {
-			t.Errorf("Lease manager recorded count %v should be %v", store.leaseManager.leaseAttachedObjectCount, tc.expectAttachedCount)
-		}
-	}
 }
