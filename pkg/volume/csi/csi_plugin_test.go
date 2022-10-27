@@ -159,57 +159,6 @@ func TestPluginGetPluginName(t *testing.T) {
 	}
 }
 
-func TestPluginGetFSGroupPolicy(t *testing.T) {
-	defaultPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
-	testCases := []struct {
-		name                  string
-		defined               bool
-		expectedFSGroupPolicy storage.FSGroupPolicy
-	}{
-		{
-			name:                  "no FSGroupPolicy defined, expect default",
-			defined:               false,
-			expectedFSGroupPolicy: storage.ReadWriteOnceWithFSTypeFSGroupPolicy,
-		},
-		{
-			name:                  "File FSGroupPolicy defined, expect File",
-			defined:               true,
-			expectedFSGroupPolicy: storage.FileFSGroupPolicy,
-		},
-		{
-			name:                  "None FSGroupPolicy defined, expected None",
-			defined:               true,
-			expectedFSGroupPolicy: storage.NoneFSGroupPolicy,
-		},
-	}
-	for _, tc := range testCases {
-		t.Logf("testing: %s", tc.name)
-		// Define the driver and set the FSGroupPolicy
-		driver := getTestCSIDriver(testDriver, nil, nil, nil)
-		if tc.defined {
-			driver.Spec.FSGroupPolicy = &tc.expectedFSGroupPolicy
-		} else {
-			driver.Spec.FSGroupPolicy = &defaultPolicy
-		}
-
-		// Create the client and register the resources
-		fakeClient := fakeclient.NewSimpleClientset(driver)
-		plug, tmpDir := newTestPlugin(t, fakeClient)
-		defer os.RemoveAll(tmpDir)
-		registerFakePlugin(testDriver, "endpoint", []string{"1.3.0"}, t)
-
-		// Check to see if we can obtain the CSIDriver, along with examining its FSGroupPolicy
-		fsGroup, err := plug.getFSGroupPolicy(testDriver)
-		if err != nil {
-			t.Fatalf("Error attempting to obtain FSGroupPolicy: %v", err)
-		}
-		if fsGroup != *driver.Spec.FSGroupPolicy {
-			t.Fatalf("FSGroupPolicy doesn't match expected value: %v, %v", fsGroup, tc.expectedFSGroupPolicy)
-		}
-	}
-
-}
-
 func TestPluginGetVolumeName(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
@@ -372,7 +321,6 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 		specVolID  string
 		volHandle  string
 		podUID     types.UID
-		shouldFail bool
 	}{
 		{
 			name:       "construct spec1 from original persistent spec",
@@ -388,13 +336,6 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 			originSpec: volume.NewSpecFromPersistentVolume(makeTestPV("spec2", 20, testDriver, "handle2"), true),
 			podUID:     types.UID(fmt.Sprintf("%08X", rand.Uint64())),
 		},
-		{
-			name:       "construct spec from original volume spec",
-			specVolID:  "volspec",
-			originSpec: volume.NewSpecFromVolume(makeTestVol("spec2", testDriver)),
-			podUID:     types.UID(fmt.Sprintf("%08X", rand.Uint64())),
-			shouldFail: true, // csi inline off
-		},
 	}
 
 	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
@@ -406,11 +347,7 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
 				volume.VolumeOptions{},
 			)
-			if tc.shouldFail && err != nil {
-				t.Log(err)
-				return
-			}
-			if !tc.shouldFail && err != nil {
+			if err != nil {
 				t.Fatal(err)
 			}
 			if mounter == nil {
@@ -628,7 +565,7 @@ func TestPluginNewMounter(t *testing.T) {
 			podUID:              types.UID(fmt.Sprintf("%08X", rand.Uint64())),
 			namespace:           "test-ns2",
 			volumeLifecycleMode: storage.VolumeLifecycleEphemeral,
-			shouldFail:          true, // csi inline not enabled
+			shouldFail:          false, // NewMounter works with disabled inline volumes
 		},
 		{
 			name:       "mounter from no spec provided",
@@ -753,10 +690,6 @@ func TestPluginNewMounterWithInline(t *testing.T) {
 
 				// Some test cases are meant to fail because their input data is broken.
 				shouldFail := test.shouldFail
-				// Others fail if the driver does not support the volume mode.
-				if !containsVolumeMode(supported, test.volumeLifecycleMode) {
-					shouldFail = true
-				}
 				if shouldFail != (err != nil) {
 					t.Fatal("Unexpected error:", err)
 				}

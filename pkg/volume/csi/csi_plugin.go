@@ -388,17 +388,6 @@ func (p *csiPlugin) NewMounter(
 		return nil, err
 	}
 
-	// Check CSIDriver.Spec.Mode to ensure that the CSI driver
-	// supports the current volumeLifecycleMode.
-	if err := p.supportsVolumeLifecycleMode(driverName, volumeLifecycleMode); err != nil {
-		return nil, err
-	}
-
-	fsGroupPolicy, err := p.getFSGroupPolicy(driverName)
-	if err != nil {
-		return nil, err
-	}
-
 	k8s := p.host.GetKubeClient()
 	if k8s == nil {
 		return nil, errors.New(log("failed to get a kubernetes client"))
@@ -417,7 +406,6 @@ func (p *csiPlugin) NewMounter(
 		podUID:              pod.UID,
 		driverName:          csiDriverName(driverName),
 		volumeLifecycleMode: volumeLifecycleMode,
-		fsGroupPolicy:       fsGroupPolicy,
 		volumeID:            volumeHandle,
 		specVolumeID:        spec.Name(),
 		readOnly:            readOnly,
@@ -780,49 +768,6 @@ func (p *csiPlugin) getCSIDriver(driver string) (*storage.CSIDriver, error) {
 	return csiDriver, err
 }
 
-// supportsVolumeMode checks whether the CSI driver supports a volume in the given mode.
-// An error indicates that it isn't supported and explains why.
-func (p *csiPlugin) supportsVolumeLifecycleMode(driver string, volumeMode storage.VolumeLifecycleMode) error {
-	// Retrieve CSIDriver. It's not an error if that isn't
-	// possible (we don't have the lister if CSIDriverRegistry is
-	// disabled) or the driver isn't found (CSIDriver is
-	// optional), but then only persistent volumes are supported.
-	var csiDriver *storage.CSIDriver
-	if p.csiDriverLister != nil {
-		c, err := p.getCSIDriver(driver)
-		if err != nil && !apierrors.IsNotFound(err) {
-			// Some internal error.
-			return err
-		}
-		csiDriver = c
-	}
-
-	// The right response depends on whether we have information
-	// about the driver and the volume mode.
-	switch {
-	case csiDriver == nil && volumeMode == storage.VolumeLifecyclePersistent:
-		// No information, but that's okay for persistent volumes (and only those).
-		return nil
-	case csiDriver == nil:
-		return fmt.Errorf("volume mode %q not supported by driver %s (no CSIDriver object)", volumeMode, driver)
-	case containsVolumeMode(csiDriver.Spec.VolumeLifecycleModes, volumeMode):
-		// Explicitly listed.
-		return nil
-	default:
-		return fmt.Errorf("volume mode %q not supported by driver %s (only supports %q)", volumeMode, driver, csiDriver.Spec.VolumeLifecycleModes)
-	}
-}
-
-// containsVolumeMode checks whether the given volume mode is listed.
-func containsVolumeMode(modes []storage.VolumeLifecycleMode, mode storage.VolumeLifecycleMode) bool {
-	for _, m := range modes {
-		if m == mode {
-			return true
-		}
-	}
-	return false
-}
-
 // getVolumeLifecycleMode returns the mode for the specified spec: {persistent|ephemeral}.
 // 1) If mode cannot be determined, it will default to "persistent".
 // 2) If Mode cannot be resolved to either {persistent | ephemeral}, an error is returned
@@ -839,34 +784,6 @@ func (p *csiPlugin) getVolumeLifecycleMode(spec *volume.Spec) (storage.VolumeLif
 		return storage.VolumeLifecycleEphemeral, nil
 	}
 	return storage.VolumeLifecyclePersistent, nil
-}
-
-// getFSGroupPolicy returns if the CSI driver supports a volume in the given mode.
-// An error indicates that it isn't supported and explains why.
-func (p *csiPlugin) getFSGroupPolicy(driver string) (storage.FSGroupPolicy, error) {
-	// Retrieve CSIDriver. It's not an error if that isn't
-	// possible (we don't have the lister if CSIDriverRegistry is
-	// disabled) or the driver isn't found (CSIDriver is
-	// optional)
-	var csiDriver *storage.CSIDriver
-	if p.csiDriverLister != nil {
-		c, err := p.getCSIDriver(driver)
-		if err != nil && !apierrors.IsNotFound(err) {
-			// Some internal error.
-			return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, err
-		}
-		csiDriver = c
-	}
-
-	// If the csiDriver isn't defined, return the default behavior
-	if csiDriver == nil {
-		return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, nil
-	}
-	// If the csiDriver exists but the fsGroupPolicy isn't defined, return an error
-	if csiDriver.Spec.FSGroupPolicy == nil || *csiDriver.Spec.FSGroupPolicy == "" {
-		return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, errors.New(log("expected valid fsGroupPolicy, received nil value or empty string"))
-	}
-	return *csiDriver.Spec.FSGroupPolicy, nil
 }
 
 func (p *csiPlugin) getPublishContext(client clientset.Interface, handle, driver, nodeName string) (map[string]string, error) {
