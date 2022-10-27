@@ -17,6 +17,7 @@ limitations under the License.
 package cacher
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"sort"
@@ -32,9 +33,9 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
-	utiltrace "k8s.io/utils/trace"
 )
 
 const (
@@ -424,7 +425,7 @@ func (w *watchCache) List() []interface{} {
 // waitUntilFreshAndBlock waits until cache is at least as fresh as given <resourceVersion>.
 // NOTE: This function acquired lock and doesn't release it.
 // You HAVE TO explicitly call w.RUnlock() after this function.
-func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *utiltrace.Trace) error {
+func (w *watchCache) waitUntilFreshAndBlock(ctx context.Context, resourceVersion uint64) error {
 	startTime := w.clock.Now()
 
 	// In case resourceVersion is 0, we accept arbitrarily stale result.
@@ -449,9 +450,8 @@ func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *utilt
 	}
 
 	w.RLock()
-	if trace != nil {
-		trace.Step("watchCache locked acquired")
-	}
+	span := tracing.SpanFromContext(ctx)
+	span.AddEvent("watchCache locked acquired")
 	for w.resourceVersion < resourceVersion {
 		if w.clock.Since(startTime) >= blockTimeout {
 			// Request that the client retry after 'resourceVersionTooHighRetrySeconds' seconds.
@@ -459,16 +459,14 @@ func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *utilt
 		}
 		w.cond.Wait()
 	}
-	if trace != nil {
-		trace.Step("watchCache fresh enough")
-	}
+	span.AddEvent("watchCache fresh enough")
 	return nil
 }
 
 // WaitUntilFreshAndList returns list of pointers to `storeElement` objects along
 // with their ResourceVersion and the name of the index, if any, that was used.
-func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, matchValues []storage.MatchValue, trace *utiltrace.Trace) ([]interface{}, uint64, string, error) {
-	err := w.waitUntilFreshAndBlock(resourceVersion, trace)
+func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion uint64, matchValues []storage.MatchValue) ([]interface{}, uint64, string, error) {
+	err := w.waitUntilFreshAndBlock(ctx, resourceVersion)
 	defer w.RUnlock()
 	if err != nil {
 		return nil, 0, "", err
@@ -487,8 +485,8 @@ func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, matchValues [
 }
 
 // WaitUntilFreshAndGet returns a pointers to <storeElement> object.
-func (w *watchCache) WaitUntilFreshAndGet(resourceVersion uint64, key string, trace *utiltrace.Trace) (interface{}, bool, uint64, error) {
-	err := w.waitUntilFreshAndBlock(resourceVersion, trace)
+func (w *watchCache) WaitUntilFreshAndGet(ctx context.Context, resourceVersion uint64, key string) (interface{}, bool, uint64, error) {
+	err := w.waitUntilFreshAndBlock(ctx, resourceVersion)
 	defer w.RUnlock()
 	if err != nil {
 		return nil, false, 0, err

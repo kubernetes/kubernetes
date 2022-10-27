@@ -24,6 +24,8 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,9 +44,9 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
-	utiltrace "k8s.io/utils/trace"
 )
 
 var (
@@ -593,7 +595,7 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 		return err
 	}
 
-	obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(getRV, key, nil)
+	obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(ctx, getRV, key)
 	if err != nil {
 		return err
 	}
@@ -632,9 +634,9 @@ func shouldDelegateList(opts storage.ListOptions) bool {
 	return resourceVersion == "" || hasContinuation || hasLimit || opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact
 }
 
-func (c *Cacher) listItems(listRV uint64, key string, pred storage.SelectionPredicate, trace *utiltrace.Trace, recursive bool) ([]interface{}, uint64, string, error) {
+func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, pred storage.SelectionPredicate, recursive bool) ([]interface{}, uint64, string, error) {
 	if !recursive {
-		obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(listRV, key, trace)
+		obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(ctx, listRV, key)
 		if err != nil {
 			return nil, 0, "", err
 		}
@@ -643,7 +645,7 @@ func (c *Cacher) listItems(listRV uint64, key string, pred storage.SelectionPred
 		}
 		return nil, readResourceVersion, "", nil
 	}
-	return c.watchCache.WaitUntilFreshAndList(listRV, pred.MatcherIndex(), trace)
+	return c.watchCache.WaitUntilFreshAndList(ctx, listRV, pred.MatcherIndex())
 }
 
 // GetList implements storage.Interface
@@ -669,15 +671,15 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		return c.storage.GetList(ctx, key, opts, listObj)
 	}
 
-	trace := utiltrace.New("cacher list",
-		utiltrace.Field{Key: "audit-id", Value: audit.GetAuditIDTruncated(ctx)},
-		utiltrace.Field{Key: "type", Value: c.groupResource.String()})
-	defer trace.LogIfLong(500 * time.Millisecond)
+	ctx, span := tracing.Start(ctx, "cacher list",
+		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
+		attribute.Stringer("type", c.groupResource))
+	defer span.End(500 * time.Millisecond)
 
 	if err := c.ready.wait(); err != nil {
 		return errors.NewServiceUnavailable(err.Error())
 	}
-	trace.Step("Ready")
+	span.AddEvent("Ready")
 
 	// List elements with at least 'listRV' from cache.
 	listPtr, err := meta.GetItemsPtr(listObj)
@@ -693,16 +695,16 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	}
 	filter := filterWithAttrsFunction(key, pred)
 
-	objs, readResourceVersion, indexUsed, err := c.listItems(listRV, key, pred, trace, recursive)
+	objs, readResourceVersion, indexUsed, err := c.listItems(ctx, listRV, key, pred, recursive)
 	if err != nil {
 		return err
 	}
-	trace.Step("Listed items from cache", utiltrace.Field{Key: "count", Value: len(objs)})
+	span.AddEvent("Listed items from cache", attribute.Int("count", len(objs)))
 	if len(objs) > listVal.Cap() && pred.Label.Empty() && pred.Field.Empty() {
 		// Resize the slice appropriately, since we already know that none
 		// of the elements will be filtered out.
 		listVal.Set(reflect.MakeSlice(reflect.SliceOf(c.objectType.Elem()), 0, len(objs)))
-		trace.Step("Resized result")
+		span.AddEvent("Resized result")
 	}
 	for _, obj := range objs {
 		elem, ok := obj.(*storeElement)
@@ -713,7 +715,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object).Elem()))
 		}
 	}
-	trace.Step("Filtered items", utiltrace.Field{Key: "count", Value: listVal.Len()})
+	span.AddEvent("Filtered items", attribute.Int("count", listVal.Len()))
 	if c.versioner != nil {
 		if err := c.versioner.UpdateList(listObj, readResourceVersion, "", nil); err != nil {
 			return err
