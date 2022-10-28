@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/onsi/gomega/format"
 	"github.com/onsi/gomega/types"
 )
 
@@ -146,7 +147,12 @@ func vetActuals(actuals []interface{}, skipIndex int) (bool, string) {
 		if actual != nil {
 			zeroValue := reflect.Zero(reflect.TypeOf(actual)).Interface()
 			if !reflect.DeepEqual(zeroValue, actual) {
-				message := fmt.Sprintf("Unexpected non-nil/non-zero argument at index %d:\n\t<%T>: %#v", i, actual, actual)
+				var message string
+				if err, ok := actual.(error); ok {
+					message = fmt.Sprintf("Unexpected error: %s\n%s", err, format.Object(err, 1))
+				} else {
+					message = fmt.Sprintf("Unexpected non-nil/non-zero argument at index %d:\n\t<%T>: %#v", i, actual, actual)
+				}
 				return false, message
 			}
 		}

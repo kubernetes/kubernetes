@@ -113,7 +113,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		EnableLogsHandler:                 true,
 		EventTTL:                          1 * time.Hour,
 		MasterCount:                       1,
-		EndpointReconcilerType:            reconcilers.LeaseEndpointReconcilerType,
+		EndpointReconcilerType:            string(reconcilers.LeaseEndpointReconcilerType),
 		IdentityLeaseDurationSeconds:      3600,
 		IdentityLeaseRenewIntervalSeconds: 10,
 		KubeletConfig: kubeletclient.KubeletClientConfig{

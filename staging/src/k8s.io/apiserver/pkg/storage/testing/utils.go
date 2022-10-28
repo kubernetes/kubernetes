@@ -235,3 +235,33 @@ func (p *PrefixTransformer) TransformToStorage(ctx context.Context, data []byte,
 func (p *PrefixTransformer) GetReadsAndReset() uint64 {
 	return atomic.SwapUint64(&p.reads, 0)
 }
+
+// reproducingTransformer is a custom test-only transformer used purely
+// for testing consistency.
+// It allows for creating predefined objects on TransformFromStorage operations,
+// which allows for precise in time injection of new objects in the middle of
+// read operations.
+type reproducingTransformer struct {
+	wrapped value.Transformer
+	store   storage.Interface
+
+	index      uint32
+	nextObject func(uint32) (string, *example.Pod)
+}
+
+func (rt *reproducingTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
+	if err := rt.createObject(ctx); err != nil {
+		return nil, false, err
+	}
+	return rt.wrapped.TransformFromStorage(ctx, data, dataCtx)
+}
+
+func (rt *reproducingTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
+	return rt.wrapped.TransformToStorage(ctx, data, dataCtx)
+}
+
+func (rt *reproducingTransformer) createObject(ctx context.Context) error {
+	key, obj := rt.nextObject(atomic.AddUint32(&rt.index, 1))
+	out := &example.Pod{}
+	return rt.store.Create(ctx, key, obj, out, 0)
+}

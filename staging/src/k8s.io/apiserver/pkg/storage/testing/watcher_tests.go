@@ -121,6 +121,62 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 	}
 }
 
+// RunTestWatchFromZero tests that
+// - watch from 0 should sync up and grab the object added before
+// - watch from 0 is able to return events for objects whose previous version has been compacted
+func RunTestWatchFromZero(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction) {
+	key, storedObj := TestPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}})
+
+	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+	TestCheckResult(t, watch.Added, w, storedObj)
+	w.Stop()
+
+	// Update
+	out := &example.Pod{}
+	err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
+		func(runtime.Object) (runtime.Object, error) {
+			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns", Annotations: map[string]string{"a": "1"}}}, nil
+		}), nil)
+	if err != nil {
+		t.Fatalf("GuaranteedUpdate failed: %v", err)
+	}
+
+	// Make sure when we watch from 0 we receive an ADDED event
+	w, err = store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+	TestCheckResult(t, watch.Added, w, out)
+	w.Stop()
+
+	if compaction == nil {
+		t.Skip("compaction callback not provided")
+	}
+
+	// Update again
+	out = &example.Pod{}
+	err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
+		func(runtime.Object) (runtime.Object, error) {
+			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}}, nil
+		}), nil)
+	if err != nil {
+		t.Fatalf("GuaranteedUpdate failed: %v", err)
+	}
+
+	// Compact previous versions
+	compaction(ctx, t, out.ResourceVersion)
+
+	// Make sure we can still watch from 0 and receive an ADDED event
+	w, err = store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+	TestCheckResult(t, watch.Added, w, out)
+}
+
 func RunTestDeleteTriggerWatch(ctx context.Context, t *testing.T, store storage.Interface) {
 	key, storedObj := TestPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})

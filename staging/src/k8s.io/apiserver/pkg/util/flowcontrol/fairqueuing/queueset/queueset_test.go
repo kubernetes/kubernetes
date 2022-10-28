@@ -182,16 +182,18 @@ type uniformScenario struct {
 	counter                                  counter.GoRoutineCounter
 	expectedAverages                         []float64
 	expectedEpochAdvances                    int
+	seatDemandIntegratorSubject              fq.Integrator
 }
 
 func (us uniformScenario) exercise(t *testing.T) {
 	uss := uniformScenarioState{
-		t:               t,
-		uniformScenario: us,
-		startTime:       us.clk.Now(),
-		integrators:     make([]fq.Integrator, len(us.clients)),
-		executions:      make([]int32, len(us.clients)),
-		rejects:         make([]int32, len(us.clients)),
+		t:                         t,
+		uniformScenario:           us,
+		startTime:                 us.clk.Now(),
+		execSeatsIntegrators:      make([]fq.Integrator, len(us.clients)),
+		seatDemandIntegratorCheck: fq.NewNamedIntegrator(us.clk, us.name+"-seatDemandCheck"),
+		executions:                make([]int32, len(us.clients)),
+		rejects:                   make([]int32, len(us.clients)),
 	}
 	for _, uc := range us.clients {
 		uss.doSplit = uss.doSplit || uc.split
@@ -204,7 +206,8 @@ type uniformScenarioState struct {
 	uniformScenario
 	startTime                                                    time.Time
 	doSplit                                                      bool
-	integrators                                                  []fq.Integrator
+	execSeatsIntegrators                                         []fq.Integrator
+	seatDemandIntegratorCheck                                    fq.Integrator
 	failedCount                                                  uint64
 	expectedInqueue, expectedExecuting, expectedConcurrencyInUse string
 	executions, rejects                                          []int32
@@ -216,18 +219,18 @@ func (uss *uniformScenarioState) exercise() {
 		metrics.Reset()
 	}
 	for i, uc := range uss.clients {
-		uss.integrators[i] = fq.NewIntegrator(uss.clk)
+		uss.execSeatsIntegrators[i] = fq.NewNamedIntegrator(uss.clk, fmt.Sprintf("%s client %d execSeats", uss.name, i))
 		fsName := fmt.Sprintf("client%d", i)
 		uss.expectedInqueue = uss.expectedInqueue + fmt.Sprintf(`				apiserver_flowcontrol_current_inqueue_requests{flow_schema=%q,priority_level=%q} 0%s`, fsName, uss.name, "\n")
 		for j := 0; j < uc.nThreads; j++ {
 			ust := uniformScenarioThread{
-				uss:    uss,
-				i:      i,
-				j:      j,
-				nCalls: uc.nCalls,
-				uc:     uc,
-				igr:    uss.integrators[i],
-				fsName: fsName,
+				uss:                 uss,
+				i:                   i,
+				j:                   j,
+				nCalls:              uc.nCalls,
+				uc:                  uc,
+				execSeatsIntegrator: uss.execSeatsIntegrators[i],
+				fsName:              fsName,
 			}
 			ust.start()
 		}
@@ -241,12 +244,12 @@ func (uss *uniformScenarioState) exercise() {
 }
 
 type uniformScenarioThread struct {
-	uss    *uniformScenarioState
-	i, j   int
-	nCalls int
-	uc     uniformClient
-	igr    fq.Integrator
-	fsName string
+	uss                 *uniformScenarioState
+	i, j                int
+	nCalls              int
+	uc                  uniformClient
+	execSeatsIntegrator fq.Integrator
+	fsName              string
 }
 
 func (ust *uniformScenarioThread) start() {
@@ -269,11 +272,15 @@ func (ust *uniformScenarioThread) callK(k int) {
 	if k >= ust.nCalls {
 		return
 	}
+	maxWidth := float64(uint64max(ust.uc.initialSeats, ust.uc.finalSeats))
+	ust.uss.seatDemandIntegratorCheck.Add(maxWidth)
+	returnSeatDemand := func(time.Time) { ust.uss.seatDemandIntegratorCheck.Add(-maxWidth) }
 	req, idle := ust.uss.qs.StartRequest(context.Background(), &fcrequest.WorkEstimate{InitialSeats: ust.uc.initialSeats, FinalSeats: ust.uc.finalSeats, AdditionalLatency: ust.uc.padDuration}, ust.uc.hash, "", ust.fsName, ust.uss.name, []int{ust.i, ust.j, k}, nil)
 	ust.uss.t.Logf("%s: %d, %d, %d got req=%p, idle=%v", ust.uss.clk.Now().Format(nsTimeFmt), ust.i, ust.j, k, req, idle)
 	if req == nil {
 		atomic.AddUint64(&ust.uss.failedCount, 1)
 		atomic.AddInt32(&ust.uss.rejects[ust.i], 1)
+		returnSeatDemand(ust.uss.clk.Now())
 		return
 	}
 	if idle {
@@ -285,11 +292,12 @@ func (ust *uniformScenarioThread) callK(k int) {
 		executed = true
 		execStart := ust.uss.clk.Now()
 		atomic.AddInt32(&ust.uss.executions[ust.i], 1)
-		ust.igr.Add(float64(ust.uc.initialSeats))
+		ust.execSeatsIntegrator.Add(float64(ust.uc.initialSeats))
 		ust.uss.t.Logf("%s: %d, %d, %d executing; width1=%d", execStart.Format(nsTimeFmt), ust.i, ust.j, k, ust.uc.initialSeats)
 		ust.uss.clk.EventAfterDuration(ust.genCallK(k+1), ust.uc.execDuration+ust.uc.thinkDuration)
 		ust.uss.clk.Sleep(ust.uc.execDuration)
-		ust.igr.Add(-float64(ust.uc.initialSeats))
+		ust.execSeatsIntegrator.Add(-float64(ust.uc.initialSeats))
+		ust.uss.clk.EventAfterDuration(returnSeatDemand, ust.uc.padDuration)
 		returnTime = ust.uss.clk.Now()
 	})
 	now := ust.uss.clk.Now()
@@ -297,6 +305,7 @@ func (ust *uniformScenarioThread) callK(k int) {
 	if !executed {
 		atomic.AddUint64(&ust.uss.failedCount, 1)
 		atomic.AddInt32(&ust.uss.rejects[ust.i], 1)
+		returnSeatDemand(ust.uss.clk.Now())
 	} else if now != returnTime {
 		ust.uss.t.Errorf("%s: %d, %d, %d returnTime=%s", now.Format(nsTimeFmt), ust.i, ust.j, k, returnTime.Format(nsTimeFmt))
 	}
@@ -319,7 +328,7 @@ func (uss *uniformScenarioState) evalTo(lim time.Time, last, expectFair bool, ma
 		}
 		sep := uc.thinkDuration
 		demands[i] = float64(nThreads) * float64(uc.initialSeats) * float64(uc.execDuration) / float64(sep+uc.execDuration)
-		averages[i] = uss.integrators[i].Reset().Average
+		averages[i] = uss.execSeatsIntegrators[i].Reset().Average
 	}
 	fairAverages := uss.expectedAverages
 	if fairAverages == nil {
@@ -339,6 +348,25 @@ func (uss *uniformScenarioState) evalTo(lim time.Time, last, expectFair bool, ma
 			uss.t.Errorf("%s client %d last=%v expectFair=%v margin=%v got an Average of %v but the expected average was %v", uss.name, i, last, expectFair, margin, averages[i], expectedAverage)
 		} else {
 			uss.t.Logf("%s client %d last=%v expectFair=%v margin=%v got an Average of %v and the expected average was %v", uss.name, i, last, expectFair, margin, averages[i], expectedAverage)
+		}
+	}
+	if uss.seatDemandIntegratorSubject != nil {
+		checkResults := uss.seatDemandIntegratorCheck.GetResults()
+		subjectResults := uss.seatDemandIntegratorSubject.GetResults()
+		if float64close(subjectResults.Duration, checkResults.Duration) {
+			uss.t.Logf("%s last=%v got duration of %v and expected %v", uss.name, last, subjectResults.Duration, checkResults.Duration)
+		} else {
+			uss.t.Errorf("%s last=%v got duration of %v but expected %v", uss.name, last, subjectResults.Duration, checkResults.Duration)
+		}
+		if got, expected := float64NaNTo0(subjectResults.Average), float64NaNTo0(checkResults.Average); float64close(got, expected) {
+			uss.t.Logf("%s last=%v got SeatDemand average of %v and expected %v", uss.name, last, got, expected)
+		} else {
+			uss.t.Errorf("%s last=%v got SeatDemand average of %v but expected %v", uss.name, last, got, expected)
+		}
+		if got, expected := float64NaNTo0(subjectResults.Deviation), float64NaNTo0(checkResults.Deviation); float64close(got, expected) {
+			uss.t.Logf("%s last=%v got SeatDemand standard deviation of %v and expected %v", uss.name, last, got, expected)
+		} else {
+			uss.t.Errorf("%s last=%v got SeatDemand standard deviation of %v but expected %v", uss.name, last, got, expected)
 		}
 	}
 }
@@ -445,7 +473,7 @@ func TestNoRestraint(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			now := time.Now()
 			clk, counter := testeventclock.NewFake(now, 0, nil)
-			nrc, err := test.NewNoRestraintFactory().BeginConstruction(fq.QueuingConfig{}, newGaugePair(clk), newExecSeatsGauge(clk))
+			nrc, err := test.NewNoRestraintFactory().BeginConstruction(fq.QueuingConfig{}, newGaugePair(clk), newExecSeatsGauge(clk), fq.NewNamedIntegrator(clk, "TestNoRestraint"))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -481,7 +509,8 @@ func TestBaseline(t *testing.T) {
 		HandSize:         3,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk))
+	seatDemandIntegratorSubject := fq.NewNamedIntegrator(clk, "seatDemandSubject")
+	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk), seatDemandIntegratorSubject)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -492,15 +521,16 @@ func TestBaseline(t *testing.T) {
 		clients: []uniformClient{
 			newUniformClient(1001001001, 1, 21, time.Second, 0),
 		},
-		concurrencyLimit:       1,
-		evalDuration:           time.Second * 20,
-		expectedFair:           []bool{true},
-		expectedFairnessMargin: []float64{0},
-		expectAllRequests:      true,
-		evalInqueueMetrics:     true,
-		evalExecutingMetrics:   true,
-		clk:                    clk,
-		counter:                counter,
+		concurrencyLimit:            1,
+		evalDuration:                time.Second * 20,
+		expectedFair:                []bool{true},
+		expectedFairnessMargin:      []float64{0},
+		expectAllRequests:           true,
+		evalInqueueMetrics:          true,
+		evalExecutingMetrics:        true,
+		clk:                         clk,
+		counter:                     counter,
+		seatDemandIntegratorSubject: seatDemandIntegratorSubject,
 	}.exercise(t)
 }
 
@@ -550,7 +580,8 @@ func TestSeparations(t *testing.T) {
 				HandSize:         3,
 				RequestWaitLimit: 10 * time.Minute,
 			}
-			qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk))
+			seatDemandIntegratorSubject := fq.NewNamedIntegrator(clk, caseName+" seatDemandSubject")
+			qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk), seatDemandIntegratorSubject)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -561,16 +592,17 @@ func TestSeparations(t *testing.T) {
 					newUniformClient(1001001001, 1, 25, time.Second, seps.think).pad(seps.finalSeats, seps.pad),
 					newUniformClient(2002002002, 1, 25, time.Second, seps.think).pad(seps.finalSeats, seps.pad),
 				}[:seps.nClients],
-				concurrencyLimit:       seps.conc,
-				evalDuration:           time.Second * 24, // multiple of every period involved, so that margin can be 0 below
-				expectedFair:           []bool{true},
-				expectedFairnessMargin: []float64{0},
-				expectAllRequests:      true,
-				evalInqueueMetrics:     true,
-				evalExecutingMetrics:   true,
-				clk:                    clk,
-				counter:                counter,
-				expectedAverages:       seps.exp,
+				concurrencyLimit:            seps.conc,
+				evalDuration:                time.Second * 24, // multiple of every period involved, so that margin can be 0 below
+				expectedFair:                []bool{true},
+				expectedFairnessMargin:      []float64{0},
+				expectAllRequests:           true,
+				evalInqueueMetrics:          true,
+				evalExecutingMetrics:        true,
+				clk:                         clk,
+				counter:                     counter,
+				expectedAverages:            seps.exp,
+				seatDemandIntegratorSubject: seatDemandIntegratorSubject,
 			}.exercise(t)
 		})
 	}
@@ -589,7 +621,8 @@ func TestUniformFlowsHandSize1(t *testing.T) {
 		HandSize:         1,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk))
+	seatDemandIntegratorSubject := fq.NewNamedIntegrator(clk, "seatDemandSubject")
+	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk), seatDemandIntegratorSubject)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -601,15 +634,16 @@ func TestUniformFlowsHandSize1(t *testing.T) {
 			newUniformClient(1001001001, 8, 20, time.Second, time.Second-1),
 			newUniformClient(2002002002, 8, 20, time.Second, time.Second-1),
 		},
-		concurrencyLimit:       4,
-		evalDuration:           time.Second * 50,
-		expectedFair:           []bool{true},
-		expectedFairnessMargin: []float64{0.01},
-		expectAllRequests:      true,
-		evalInqueueMetrics:     true,
-		evalExecutingMetrics:   true,
-		clk:                    clk,
-		counter:                counter,
+		concurrencyLimit:            4,
+		evalDuration:                time.Second * 50,
+		expectedFair:                []bool{true},
+		expectedFairnessMargin:      []float64{0.01},
+		expectAllRequests:           true,
+		evalInqueueMetrics:          true,
+		evalExecutingMetrics:        true,
+		clk:                         clk,
+		counter:                     counter,
+		seatDemandIntegratorSubject: seatDemandIntegratorSubject,
 	}.exercise(t)
 }
 
@@ -626,7 +660,8 @@ func TestUniformFlowsHandSize3(t *testing.T) {
 		HandSize:         3,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk))
+	seatDemandIntegratorSubject := fq.NewNamedIntegrator(clk, qCfg.Name)
+	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk), seatDemandIntegratorSubject)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -637,15 +672,16 @@ func TestUniformFlowsHandSize3(t *testing.T) {
 			newUniformClient(400900100100, 8, 30, time.Second, time.Second-1),
 			newUniformClient(300900200200, 8, 30, time.Second, time.Second-1),
 		},
-		concurrencyLimit:       4,
-		evalDuration:           time.Second * 60,
-		expectedFair:           []bool{true},
-		expectedFairnessMargin: []float64{0.03},
-		expectAllRequests:      true,
-		evalInqueueMetrics:     true,
-		evalExecutingMetrics:   true,
-		clk:                    clk,
-		counter:                counter,
+		concurrencyLimit:            4,
+		evalDuration:                time.Second * 60,
+		expectedFair:                []bool{true},
+		expectedFairnessMargin:      []float64{0.03},
+		expectAllRequests:           true,
+		evalInqueueMetrics:          true,
+		evalExecutingMetrics:        true,
+		clk:                         clk,
+		counter:                     counter,
+		seatDemandIntegratorSubject: seatDemandIntegratorSubject,
 	}.exercise(t)
 }
 
@@ -662,7 +698,8 @@ func TestDifferentFlowsExpectEqual(t *testing.T) {
 		HandSize:         1,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk))
+	seatDemandIntegratorSubject := fq.NewNamedIntegrator(clk, qCfg.Name)
+	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk), seatDemandIntegratorSubject)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -674,15 +711,16 @@ func TestDifferentFlowsExpectEqual(t *testing.T) {
 			newUniformClient(1001001001, 8, 20, time.Second, time.Second),
 			newUniformClient(2002002002, 7, 30, time.Second, time.Second/2),
 		},
-		concurrencyLimit:       4,
-		evalDuration:           time.Second * 40,
-		expectedFair:           []bool{true},
-		expectedFairnessMargin: []float64{0.01},
-		expectAllRequests:      true,
-		evalInqueueMetrics:     true,
-		evalExecutingMetrics:   true,
-		clk:                    clk,
-		counter:                counter,
+		concurrencyLimit:            4,
+		evalDuration:                time.Second * 40,
+		expectedFair:                []bool{true},
+		expectedFairnessMargin:      []float64{0.01},
+		expectAllRequests:           true,
+		evalInqueueMetrics:          true,
+		evalExecutingMetrics:        true,
+		clk:                         clk,
+		counter:                     counter,
+		seatDemandIntegratorSubject: seatDemandIntegratorSubject,
 	}.exercise(t)
 }
 
@@ -702,7 +740,8 @@ func TestSeatSecondsRollover(t *testing.T) {
 		HandSize:         1,
 		RequestWaitLimit: 40 * Quarter,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk))
+	seatDemandIntegratorSubject := fq.NewNamedIntegrator(clk, qCfg.Name)
+	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk), seatDemandIntegratorSubject)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -714,16 +753,17 @@ func TestSeatSecondsRollover(t *testing.T) {
 			newUniformClient(1001001001, 8, 20, Quarter, Quarter).setInitWidth(500),
 			newUniformClient(2002002002, 7, 30, Quarter, Quarter/2).setInitWidth(500),
 		},
-		concurrencyLimit:       2000,
-		evalDuration:           Quarter * 40,
-		expectedFair:           []bool{true},
-		expectedFairnessMargin: []float64{0.01},
-		expectAllRequests:      true,
-		evalInqueueMetrics:     true,
-		evalExecutingMetrics:   true,
-		clk:                    clk,
-		counter:                counter,
-		expectedEpochAdvances:  8,
+		concurrencyLimit:            2000,
+		evalDuration:                Quarter * 40,
+		expectedFair:                []bool{true},
+		expectedFairnessMargin:      []float64{0.01},
+		expectAllRequests:           true,
+		evalInqueueMetrics:          true,
+		evalExecutingMetrics:        true,
+		clk:                         clk,
+		counter:                     counter,
+		expectedEpochAdvances:       8,
+		seatDemandIntegratorSubject: seatDemandIntegratorSubject,
 	}.exercise(t)
 }
 
@@ -740,7 +780,8 @@ func TestDifferentFlowsExpectUnequal(t *testing.T) {
 		HandSize:         1,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk))
+	seatDemandIntegratorSubject := fq.NewNamedIntegrator(clk, qCfg.Name)
+	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk), seatDemandIntegratorSubject)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -752,15 +793,16 @@ func TestDifferentFlowsExpectUnequal(t *testing.T) {
 			newUniformClient(1001001001, 4, 20, time.Second, time.Second-1),
 			newUniformClient(2002002002, 2, 20, time.Second, time.Second-1),
 		},
-		concurrencyLimit:       3,
-		evalDuration:           time.Second * 20,
-		expectedFair:           []bool{true},
-		expectedFairnessMargin: []float64{0.01},
-		expectAllRequests:      true,
-		evalInqueueMetrics:     true,
-		evalExecutingMetrics:   true,
-		clk:                    clk,
-		counter:                counter,
+		concurrencyLimit:            3,
+		evalDuration:                time.Second * 20,
+		expectedFair:                []bool{true},
+		expectedFairnessMargin:      []float64{0.01},
+		expectAllRequests:           true,
+		evalInqueueMetrics:          true,
+		evalExecutingMetrics:        true,
+		clk:                         clk,
+		counter:                     counter,
+		seatDemandIntegratorSubject: seatDemandIntegratorSubject,
 	}.exercise(t)
 }
 
@@ -777,7 +819,8 @@ func TestDifferentWidths(t *testing.T) {
 		HandSize:         7,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk))
+	seatDemandIntegratorSubject := fq.NewNamedIntegrator(clk, qCfg.Name)
+	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk), seatDemandIntegratorSubject)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -788,15 +831,16 @@ func TestDifferentWidths(t *testing.T) {
 			newUniformClient(10010010010010, 13, 10, time.Second, time.Second-1),
 			newUniformClient(20020020020020, 7, 10, time.Second, time.Second-1).setInitWidth(2),
 		},
-		concurrencyLimit:       6,
-		evalDuration:           time.Second * 20,
-		expectedFair:           []bool{true},
-		expectedFairnessMargin: []float64{0.15},
-		expectAllRequests:      true,
-		evalInqueueMetrics:     true,
-		evalExecutingMetrics:   true,
-		clk:                    clk,
-		counter:                counter,
+		concurrencyLimit:            6,
+		evalDuration:                time.Second * 20,
+		expectedFair:                []bool{true},
+		expectedFairnessMargin:      []float64{0.15},
+		expectAllRequests:           true,
+		evalInqueueMetrics:          true,
+		evalExecutingMetrics:        true,
+		clk:                         clk,
+		counter:                     counter,
+		seatDemandIntegratorSubject: seatDemandIntegratorSubject,
 	}.exercise(t)
 }
 
@@ -813,7 +857,8 @@ func TestTooWide(t *testing.T) {
 		HandSize:         7,
 		RequestWaitLimit: 10 * time.Minute,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk))
+	seatDemandIntegratorSubject := fq.NewNamedIntegrator(clk, qCfg.Name)
+	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk), seatDemandIntegratorSubject)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -827,15 +872,16 @@ func TestTooWide(t *testing.T) {
 			newUniformClient(70070070070070, 15, 21, time.Second, time.Second-1).setInitWidth(2),
 			newUniformClient(90090090090090, 15, 21, time.Second, time.Second-1).setInitWidth(7),
 		},
-		concurrencyLimit:       6,
-		evalDuration:           time.Second * 225,
-		expectedFair:           []bool{true},
-		expectedFairnessMargin: []float64{0.33},
-		expectAllRequests:      true,
-		evalInqueueMetrics:     true,
-		evalExecutingMetrics:   true,
-		clk:                    clk,
-		counter:                counter,
+		concurrencyLimit:            6,
+		evalDuration:                time.Second * 225,
+		expectedFair:                []bool{true},
+		expectedFairnessMargin:      []float64{0.33},
+		expectAllRequests:           true,
+		evalInqueueMetrics:          true,
+		evalExecutingMetrics:        true,
+		clk:                         clk,
+		counter:                     counter,
+		seatDemandIntegratorSubject: seatDemandIntegratorSubject,
 	}.exercise(t)
 }
 
@@ -874,7 +920,8 @@ func TestWindup(t *testing.T) {
 				HandSize:         1,
 				RequestWaitLimit: 10 * time.Minute,
 			}
-			qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk))
+			seatDemandIntegratorSubject := fq.NewNamedIntegrator(clk, qCfg.Name)
+			qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk), seatDemandIntegratorSubject)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -885,15 +932,16 @@ func TestWindup(t *testing.T) {
 					newUniformClient(1001001001, 2, 40, time.Second, -1),
 					newUniformClient(2002002002, 2, 40, time.Second, -1).setSplit(),
 				},
-				concurrencyLimit:       3,
-				evalDuration:           time.Second * 40,
-				expectedFair:           []bool{true, testCase.expectFair2},
-				expectedFairnessMargin: []float64{0.01, testCase.margin2},
-				expectAllRequests:      true,
-				evalInqueueMetrics:     true,
-				evalExecutingMetrics:   true,
-				clk:                    clk,
-				counter:                counter,
+				concurrencyLimit:            3,
+				evalDuration:                time.Second * 40,
+				expectedFair:                []bool{true, testCase.expectFair2},
+				expectedFairnessMargin:      []float64{0.01, testCase.margin2},
+				expectAllRequests:           true,
+				evalInqueueMetrics:          true,
+				evalExecutingMetrics:        true,
+				clk:                         clk,
+				counter:                     counter,
+				seatDemandIntegratorSubject: seatDemandIntegratorSubject,
 			}.exercise(t)
 		})
 	}
@@ -909,7 +957,8 @@ func TestDifferentFlowsWithoutQueuing(t *testing.T) {
 		Name:             "TestDifferentFlowsWithoutQueuing",
 		DesiredNumQueues: 0,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk))
+	seatDemandIntegratorSubject := fq.NewNamedIntegrator(clk, "seatDemandSubject")
+	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk), seatDemandIntegratorSubject)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -921,14 +970,15 @@ func TestDifferentFlowsWithoutQueuing(t *testing.T) {
 			newUniformClient(1001001001, 6, 10, time.Second, 57*time.Millisecond),
 			newUniformClient(2002002002, 4, 15, time.Second, 750*time.Millisecond),
 		},
-		concurrencyLimit:       4,
-		evalDuration:           time.Second * 13,
-		expectedFair:           []bool{false},
-		expectedFairnessMargin: []float64{0.20},
-		evalExecutingMetrics:   true,
-		rejectReason:           "concurrency-limit",
-		clk:                    clk,
-		counter:                counter,
+		concurrencyLimit:            4,
+		evalDuration:                time.Second * 13,
+		expectedFair:                []bool{false},
+		expectedFairnessMargin:      []float64{0.20},
+		evalExecutingMetrics:        true,
+		rejectReason:                "concurrency-limit",
+		clk:                         clk,
+		counter:                     counter,
+		seatDemandIntegratorSubject: seatDemandIntegratorSubject,
 	}.exercise(t)
 }
 
@@ -945,7 +995,8 @@ func TestTimeout(t *testing.T) {
 		HandSize:         1,
 		RequestWaitLimit: 0,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk))
+	seatDemandIntegratorSubject := fq.NewNamedIntegrator(clk, qCfg.Name)
+	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk), seatDemandIntegratorSubject)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -956,15 +1007,16 @@ func TestTimeout(t *testing.T) {
 		clients: []uniformClient{
 			newUniformClient(1001001001, 5, 100, time.Second, time.Second),
 		},
-		concurrencyLimit:       1,
-		evalDuration:           time.Second * 10,
-		expectedFair:           []bool{true},
-		expectedFairnessMargin: []float64{0.01},
-		evalInqueueMetrics:     true,
-		evalExecutingMetrics:   true,
-		rejectReason:           "time-out",
-		clk:                    clk,
-		counter:                counter,
+		concurrencyLimit:            1,
+		evalDuration:                time.Second * 10,
+		expectedFair:                []bool{true},
+		expectedFairnessMargin:      []float64{0.01},
+		evalInqueueMetrics:          true,
+		evalExecutingMetrics:        true,
+		rejectReason:                "time-out",
+		clk:                         clk,
+		counter:                     counter,
+		seatDemandIntegratorSubject: seatDemandIntegratorSubject,
 	}.exercise(t)
 }
 
@@ -996,7 +1048,8 @@ func TestContextCancel(t *testing.T) {
 		HandSize:         1,
 		RequestWaitLimit: 15 * time.Second,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk))
+	seatDemandIntegratorSubject := fq.NewNamedIntegrator(clk, qCfg.Name)
+	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk), seatDemandIntegratorSubject)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1102,7 +1155,7 @@ func TestTotalRequestsExecutingWithPanic(t *testing.T) {
 		DesiredNumQueues: 0,
 		RequestWaitLimit: 15 * time.Second,
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk))
+	qsc, err := qsf.BeginConstruction(qCfg, newGaugePair(clk), newExecSeatsGauge(clk), fq.NewNamedIntegrator(clk, qCfg.Name))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1286,6 +1339,7 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			qs := &queueSet{
 				estimatedServiceDuration: G,
+				seatDemandIntegrator:     fq.NewNamedIntegrator(clock.RealClock{}, "seatDemandSubject"),
 				robinIndex:               test.robinIndex,
 				totSeatsInUse:            test.totSeatsInUse,
 				qCfg:                     fq.QueuingConfig{Name: "TestSelectQueueLocked/" + test.name},
@@ -1359,6 +1413,7 @@ func TestFinishRequestLocked(t *testing.T) {
 				estimatedServiceDuration: time.Second,
 				reqsGaugePair:            newGaugePair(clk),
 				execSeatsGauge:           newExecSeatsGauge(clk),
+				seatDemandIntegrator:     fq.NewNamedIntegrator(clk, "seatDemandSubject"),
 			}
 			queue := &queue{
 				requests: newRequestFIFO(),
@@ -1467,4 +1522,29 @@ func newGaugePair(clk clock.PassiveClock) metrics.RatioedGaugePair {
 
 func newExecSeatsGauge(clk clock.PassiveClock) metrics.RatioedGauge {
 	return metrics.PriorityLevelExecutionSeatsGaugeVec.NewForLabelValuesSafe(0, 1, []string{"test"})
+}
+
+func float64close(x, y float64) bool {
+	x0 := float64NaNTo0(x)
+	y0 := float64NaNTo0(y)
+	diff := math.Abs(x - y)
+	den := math.Max(math.Abs(x0), math.Abs(y0))
+	if den == 0 {
+		return diff < 1e-10
+	}
+	return diff/den < 1e-10
+}
+
+func uint64max(a, b uint64) uint64 {
+	if b > a {
+		return b
+	}
+	return a
+}
+
+func float64NaNTo0(x float64) float64 {
+	if math.IsNaN(x) {
+		return 0
+	}
+	return x
 }
