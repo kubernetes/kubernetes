@@ -26,8 +26,8 @@ var (
 // NewMD5 and NewSHA1.
 func NewHash(h hash.Hash, space UUID, data []byte, version int) UUID {
 	h.Reset()
-	h.Write(space[:])
-	h.Write(data)
+	h.Write(space[:]) //nolint:errcheck
+	h.Write(data)     //nolint:errcheck
 	s := h.Sum(nil)
 	var uuid UUID
 	copy(uuid[:], s)

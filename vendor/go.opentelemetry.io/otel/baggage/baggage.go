@@ -250,8 +250,9 @@ type Member struct {
 	hasData bool
 }
 
-// NewMember returns a new Member from the passed arguments. An error is
-// returned if the created Member would be invalid according to the W3C
+// NewMember returns a new Member from the passed arguments. The key will be
+// used directly while the value will be url decoded after validation. An error
+// is returned if the created Member would be invalid according to the W3C
 // Baggage specification.
 func NewMember(key, value string, props ...Property) (Member, error) {
 	m := Member{
@@ -263,7 +264,11 @@ func NewMember(key, value string, props ...Property) (Member, error) {
 	if err := m.validate(); err != nil {
 		return newInvalidMember(), err
 	}
-
+	decodedValue, err := url.QueryUnescape(value)
+	if err != nil {
+		return newInvalidMember(), fmt.Errorf("%w: %q", errInvalidValue, value)
+	}
+	m.value = decodedValue
 	return m, nil
 }
 
@@ -328,8 +333,9 @@ func parseMember(member string) (Member, error) {
 	return Member{key: key, value: value, properties: props, hasData: true}, nil
 }
 
-// validate ensures m conforms to the W3C Baggage specification, returning an
-// error otherwise.
+// validate ensures m conforms to the W3C Baggage specification.
+// A key is just an ASCII string, but a value must be URL encoded UTF-8,
+// returning an error otherwise.
 func (m Member) validate() error {
 	if !m.hasData {
 		return fmt.Errorf("%w: %q", errInvalidMember, m)
@@ -465,6 +471,7 @@ func (b Baggage) Member(key string) Member {
 		key:        key,
 		value:      v.Value,
 		properties: fromInternalProperties(v.Properties),
+		hasData:    true,
 	}
 }
 
@@ -484,6 +491,7 @@ func (b Baggage) Members() []Member {
 			key:        k,
 			value:      v.Value,
 			properties: fromInternalProperties(v.Properties),
+			hasData:    true,
 		})
 	}
 	return members

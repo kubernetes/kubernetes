@@ -214,7 +214,7 @@ func (i *aiGauge) unwrap() instrument.Asynchronous {
 	return nil
 }
 
-//Sync Instruments.
+// Sync Instruments.
 type sfCounter struct {
 	name string
 	opts []instrument.Option

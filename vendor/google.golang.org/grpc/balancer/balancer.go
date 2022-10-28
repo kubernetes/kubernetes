@@ -244,7 +244,7 @@ type DoneInfo struct {
 	// ServerLoad is the load received from server. It's usually sent as part of
 	// trailing metadata.
 	//
-	// The only supported type now is *orca_v1.LoadReport.
+	// The only supported type now is *orca_v3.LoadReport.
 	ServerLoad interface{}
 }
 

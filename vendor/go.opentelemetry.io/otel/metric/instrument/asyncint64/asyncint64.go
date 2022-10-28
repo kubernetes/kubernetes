@@ -35,7 +35,8 @@ type InstrumentProvider interface {
 
 // Counter is an instrument that records increasing values.
 type Counter interface {
-	// Observe records the state of the instrument.
+	// Observe records the state of the instrument to be x. The value of x is
+	// assumed to be the exact Counter value to record.
 	//
 	// It is only valid to call this within a callback. If called outside of the
 	// registered callback it should have no effect on the instrument, and an
@@ -47,7 +48,8 @@ type Counter interface {
 
 // UpDownCounter is an instrument that records increasing or decreasing values.
 type UpDownCounter interface {
-	// Observe records the state of the instrument.
+	// Observe records the state of the instrument to be x. The value of x is
+	// assumed to be the exact UpDownCounter value to record.
 	//
 	// It is only valid to call this within a callback. If called outside of the
 	// registered callback it should have no effect on the instrument, and an
@@ -59,7 +61,7 @@ type UpDownCounter interface {
 
 // Gauge is an instrument that records independent readings.
 type Gauge interface {
-	// Observe records the state of the instrument.
+	// Observe records the state of the instrument to be x.
 	//
 	// It is only valid to call this within a callback. If called outside of the
 	// registered callback it should have no effect on the instrument, and an

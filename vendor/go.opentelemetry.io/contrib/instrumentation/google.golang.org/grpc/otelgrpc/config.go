@@ -15,14 +15,15 @@
 package otelgrpc // import "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 
 import (
-	"context"
-
-	"google.golang.org/grpc/metadata"
-
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/baggage"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/global"
+	"go.opentelemetry.io/otel/metric/instrument"
+	"go.opentelemetry.io/otel/metric/instrument/syncint64"
+	"go.opentelemetry.io/otel/metric/unit"
 	"go.opentelemetry.io/otel/propagation"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -43,6 +44,10 @@ type config struct {
 	Filter         Filter
 	Propagators    propagation.TextMapPropagator
 	TracerProvider trace.TracerProvider
+	MeterProvider  metric.MeterProvider
+
+	meter             metric.Meter
+	rpcServerDuration syncint64.Histogram
 }
 
 // Option applies an option value for a config.
@@ -55,10 +60,22 @@ func newConfig(opts []Option) *config {
 	c := &config{
 		Propagators:    otel.GetTextMapPropagator(),
 		TracerProvider: otel.GetTracerProvider(),
+		MeterProvider:  global.MeterProvider(),
 	}
 	for _, o := range opts {
 		o.apply(c)
 	}
+
+	c.meter = c.MeterProvider.Meter(
+		instrumentationName,
+		metric.WithInstrumentationVersion(SemVersion()),
+		metric.WithSchemaURL(semconv.SchemaURL),
+	)
+	var err error
+	if c.rpcServerDuration, err = c.meter.SyncInt64().Histogram("rpc.server.duration", instrument.WithUnit(unit.Milliseconds)); err != nil {
+		otel.Handle(err)
+	}
+
 	return c
 }
 
@@ -105,59 +122,16 @@ func WithTracerProvider(tp trace.TracerProvider) Option {
 	return tracerProviderOption{tp: tp}
 }
 
-type metadataSupplier struct {
-	metadata *metadata.MD
-}
+type meterProviderOption struct{ mp metric.MeterProvider }
 
-// assert that metadataSupplier implements the TextMapCarrier interface.
-var _ propagation.TextMapCarrier = &metadataSupplier{}
-
-func (s *metadataSupplier) Get(key string) string {
-	values := s.metadata.Get(key)
-	if len(values) == 0 {
-		return ""
+func (o meterProviderOption) apply(c *config) {
+	if o.mp != nil {
+		c.MeterProvider = o.mp
 	}
-	return values[0]
 }
 
-func (s *metadataSupplier) Set(key string, value string) {
-	s.metadata.Set(key, value)
-}
-
-func (s *metadataSupplier) Keys() []string {
-	out := make([]string, 0, len(*s.metadata))
-	for key := range *s.metadata {
-		out = append(out, key)
-	}
-	return out
-}
-
-// Inject injects correlation context and span context into the gRPC
-// metadata object. This function is meant to be used on outgoing
-// requests.
-func Inject(ctx context.Context, md *metadata.MD, opts ...Option) {
-	c := newConfig(opts)
-	inject(ctx, md, c.Propagators)
-}
-
-func inject(ctx context.Context, md *metadata.MD, propagators propagation.TextMapPropagator) {
-	propagators.Inject(ctx, &metadataSupplier{
-		metadata: md,
-	})
-}
-
-// Extract returns the correlation context and span context that
-// another service encoded in the gRPC metadata object with Inject.
-// This function is meant to be used on incoming requests.
-func Extract(ctx context.Context, md *metadata.MD, opts ...Option) (baggage.Baggage, trace.SpanContext) {
-	c := newConfig(opts)
-	return extract(ctx, md, c.Propagators)
-}
-
-func extract(ctx context.Context, md *metadata.MD, propagators propagation.TextMapPropagator) (baggage.Baggage, trace.SpanContext) {
-	ctx = propagators.Extract(ctx, &metadataSupplier{
-		metadata: md,
-	})
-
-	return baggage.FromContext(ctx), trace.SpanContextFromContext(ctx)
+// WithMeterProvider returns an Option to use the MeterProvider when
+// creating a Meter. If this option is not provide the global MeterProvider will be used.
+func WithMeterProvider(mp metric.MeterProvider) Option {
+	return meterProviderOption{mp: mp}
 }

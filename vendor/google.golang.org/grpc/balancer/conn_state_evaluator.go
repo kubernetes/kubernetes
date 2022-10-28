@@ -34,10 +34,10 @@ type ConnectivityStateEvaluator struct {
 // RecordTransition records state change happening in subConn and based on that
 // it evaluates what aggregated state should be.
 //
-//  - If at least one SubConn in Ready, the aggregated state is Ready;
-//  - Else if at least one SubConn in Connecting, the aggregated state is Connecting;
-//  - Else if at least one SubConn is Idle, the aggregated state is Idle;
-//  - Else if at least one SubConn is TransientFailure (or there are no SubConns), the aggregated state is Transient Failure.
+//   - If at least one SubConn in Ready, the aggregated state is Ready;
+//   - Else if at least one SubConn in Connecting, the aggregated state is Connecting;
+//   - Else if at least one SubConn is Idle, the aggregated state is Idle;
+//   - Else if at least one SubConn is TransientFailure (or there are no SubConns), the aggregated state is Transient Failure.
 //
 // Shutdown is not considered.
 func (cse *ConnectivityStateEvaluator) RecordTransition(oldState, newState connectivity.State) connectivity.State {
@@ -55,7 +55,11 @@ func (cse *ConnectivityStateEvaluator) RecordTransition(oldState, newState conne
 			cse.numIdle += updateVal
 		}
 	}
+	return cse.CurrentState()
+}
 
+// CurrentState returns the current aggregate conn state by evaluating the counters
+func (cse *ConnectivityStateEvaluator) CurrentState() connectivity.State {
 	// Evaluate.
 	if cse.numReady > 0 {
 		return connectivity.Ready

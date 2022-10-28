@@ -11,15 +11,15 @@ require (
 	github.com/google/gnostic v0.5.7-v3refs
 	github.com/google/go-cmp v0.5.9
 	github.com/google/gofuzz v1.1.0
-	github.com/google/uuid v1.1.2
+	github.com/google/uuid v1.3.0
 	github.com/spf13/cobra v1.6.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.0
 	go.etcd.io/etcd/client/pkg/v3 v3.5.5
 	go.etcd.io/etcd/client/v3 v3.5.5
-	go.opentelemetry.io/otel v1.10.0
-	go.opentelemetry.io/otel/trace v1.10.0
-	google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21
+	go.opentelemetry.io/otel v1.11.1
+	go.opentelemetry.io/otel/trace v1.11.1
+	google.golang.org/genproto v0.0.0-20221024153911-1573dae28c9c
 	google.golang.org/grpc v1.51.0-dev.0.20221027215202-2901f263bef4
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/yaml.v2 v2.4.0
@@ -99,7 +99,7 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.10.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.10.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.10.0 // indirect
-	go.opentelemetry.io/otel/metric v0.31.0 // indirect
+	go.opentelemetry.io/otel/metric v0.33.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.10.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
@@ -109,11 +109,11 @@ require (
 	golang.org/x/mod v0.6.0 // indirect
 	golang.org/x/net v0.1.1-0.20221027164007-c63010009c80 // indirect
 	golang.org/x/oauth2 v0.1.1-0.20221027212527-1a77549b81e1 // indirect
-	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
+	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/sys v0.1.0 // indirect
 	golang.org/x/term v0.1.0 // indirect
 	golang.org/x/text v0.4.0 // indirect
-	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
+	golang.org/x/time v0.1.0 // indirect
 	golang.org/x/tools v0.2.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
@@ -125,6 +125,9 @@ require (
 )
 
 replace (
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => github.com/liggitt/opentelemetry-go-contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.36.5-0.20221027221714-25c81eb49c35
+	google.golang.org/api => github.com/liggitt/google-api-go-client v0.101.1-0.20221028054038-b4aad6d92467
+	google.golang.org/grpc => github.com/liggitt/grpc-go v1.51.0-dev.0.20221027215202-2901f263bef4
 	k8s.io/api => ../api
 	k8s.io/apiextensions-apiserver => ../apiextensions-apiserver
 	k8s.io/apimachinery => ../apimachinery
@@ -134,11 +137,3 @@ replace (
 	k8s.io/component-base => ../component-base
 	k8s.io/kms => ../kms
 )
-
-replace google.golang.org/grpc => github.com/liggitt/grpc-go v1.51.0-dev.0.20221027215202-2901f263bef4
-
-replace google.golang.org/api => github.com/liggitt/google-api-go-client v0.101.1-0.20221028054038-b4aad6d92467
-
-replace go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => github.com/liggitt/opentelemetry-go-contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.36.5-0.20221027221714-25c81eb49c35
-
-replace github.com/google/cadvisor => github.com/liggitt/cadvisor v0.45.1-0.20221027232935-03ec2fc20e12
