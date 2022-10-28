@@ -23,9 +23,17 @@
     }
   },
   "status": {
-    "references": [
-      "github.com/go-kit/kit",
-      "github.com/json-iterator/go"
-    ]
+    "unwantedReferences": {
+      "github.com/go-kit/kit": [
+        "github.com/grpc-ecosystem/go-grpc-middleware"
+      ],
+      "github.com/json-iterator/go": [
+        "github.com/prometheus/client_golang",
+        "go.etcd.io/etcd/client/v2",
+        "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
+        "k8s.io/kube-openapi",
+        "sigs.k8s.io/structured-merge-diff/v4"
+      ]
+    }
   }
 }
