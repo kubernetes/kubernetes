@@ -643,6 +643,13 @@ const (
 	// sandbox creation and network configuration completes successfully
 	PodHasNetworkCondition featuregate.Feature = "PodHasNetworkCondition"
 
+	// owner: @Huang-Wei
+	// kep: https://kep.k8s.io/3521
+	// alpha: v1.26
+	//
+	// Enable users to specify when a Pod is ready for scheduling.
+	PodSchedulingReadiness featuregate.Feature = "PodSchedulingReadiness"
+
 	// owner: @liggitt, @tallclair, sig-auth
 	// alpha: v1.22
 	// beta: v1.23
@@ -994,6 +1001,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodDisruptionConditions: {Default: false, PreRelease: featuregate.Alpha},
 
 	PodHasNetworkCondition: {Default: false, PreRelease: featuregate.Alpha},
+
+	PodSchedulingReadiness: {Default: false, PreRelease: featuregate.Alpha},
 
 	PodSecurity: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
