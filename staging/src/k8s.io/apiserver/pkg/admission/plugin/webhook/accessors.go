@@ -22,12 +22,19 @@ import (
 	"k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/namespace"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/object"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
 )
 
 // WebhookAccessor provides a common interface to both mutating and validating webhook types.
 type WebhookAccessor interface {
+	// This accessor provides the methods needed to support matching against webhook
+	// predicates
+	namespace.NamespaceSelectorProvider
+	object.ObjectSelectorProvider
+
 	// GetUID gets a string that uniquely identifies the webhook.
 	GetUID() string
 
@@ -36,10 +43,6 @@ type WebhookAccessor interface {
 
 	// GetRESTClient gets the webhook client
 	GetRESTClient(clientManager *webhookutil.ClientManager) (*rest.RESTClient, error)
-	// GetParsedNamespaceSelector gets the webhook NamespaceSelector field.
-	GetParsedNamespaceSelector() (labels.Selector, error)
-	// GetParsedObjectSelector gets the webhook ObjectSelector field.
-	GetParsedObjectSelector() (labels.Selector, error)
 
 	// GetName gets the webhook Name field. Note that the name is scoped to the webhook
 	// configuration and does not provide a globally unique identity, if a unique identity is

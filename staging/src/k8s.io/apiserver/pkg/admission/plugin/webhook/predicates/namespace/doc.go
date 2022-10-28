@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package object defines the utilities that are used by the webhook plugin to
-// decide if a webhook should run, as long as either the old object or the new
-// object has labels matching the webhook config's objectSelector.
-package object // import "k8s.io/apiserver/pkg/admission/plugin/webhook/object"
+// Package namespace defines the utilities that are used by the webhook
+// plugin to decide if a webhook should be applied to an object based on its
+// namespace.
+package namespace // import "k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/namespace"
