@@ -1,6 +1,7 @@
 { 
   "spec": {
     "unwantedModules": {
+      "cloud.google.com/go": "refer to #113366",
       "cloud.google.com/go/firestore": "db/datastore clients should not be required",
       "github.com/go-bindata/go-bindata": "refer to #99829",
       "github.com/go-kit/kit": "lots of transitive dependencies, see https://github.com/prometheus/common/issues/255",
@@ -24,6 +25,13 @@
   },
   "status": {
     "unwantedReferences": {
+      "cloud.google.com/go": [
+        "github.com/google/cadvisor",
+        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
+        "golang.org/x/oauth2",
+        "google.golang.org/api",
+        "google.golang.org/grpc"
+      ],
       "github.com/go-kit/kit": [
         "github.com/grpc-ecosystem/go-grpc-middleware"
       ],
