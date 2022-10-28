@@ -1963,9 +1963,9 @@ metadata:
 				framework.Failf("failed to list expected event")
 			}
 
-			ginkgo.By("expect not showing any WARNING message")
+			ginkgo.By("expect not showing any WARNING message except timeouts")
 			events = e2ekubectl.RunKubectlOrDie(ns, "alpha", "events", "--types=WARNING", "--for=pod/"+podName)
-			if events != "" {
+			if events != "" && !strings.Contains(events, "timed out") {
 				framework.Failf("unexpected WARNING event fired")
 			}
 		})
