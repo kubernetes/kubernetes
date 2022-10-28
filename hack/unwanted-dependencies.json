@@ -1,4 +1,4 @@
-{ 
+{
   "spec": {
     "unwantedModules": {
       "cloud.google.com/go": "refer to #113366",
@@ -26,11 +26,42 @@
   "status": {
     "unwantedReferences": {
       "cloud.google.com/go": [
-        "github.com/google/cadvisor",
-        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
-        "golang.org/x/oauth2",
-        "google.golang.org/api",
-        "google.golang.org/grpc"
+        "cloud.google.com/go/aiplatform",
+        "cloud.google.com/go/artifactregistry",
+        "cloud.google.com/go/asset",
+        "cloud.google.com/go/assuredworkloads",
+        "cloud.google.com/go/automl",
+        "cloud.google.com/go/bigquery",
+        "cloud.google.com/go/containeranalysis",
+        "cloud.google.com/go/datalabeling",
+        "cloud.google.com/go/datastream",
+        "cloud.google.com/go/dialogflow",
+        "cloud.google.com/go/documentai",
+        "cloud.google.com/go/domains",
+        "cloud.google.com/go/edgecontainer",
+        "cloud.google.com/go/functions",
+        "cloud.google.com/go/gaming",
+        "cloud.google.com/go/gkehub",
+        "cloud.google.com/go/grafeas",
+        "cloud.google.com/go/language",
+        "cloud.google.com/go/lifesciences",
+        "cloud.google.com/go/memcache",
+        "cloud.google.com/go/metastore",
+        "cloud.google.com/go/networkconnectivity",
+        "cloud.google.com/go/networksecurity",
+        "cloud.google.com/go/notebooks",
+        "cloud.google.com/go/osconfig",
+        "cloud.google.com/go/recommendationengine",
+        "cloud.google.com/go/redis",
+        "cloud.google.com/go/retail",
+        "cloud.google.com/go/security",
+        "cloud.google.com/go/securitycenter",
+        "cloud.google.com/go/speech",
+        "cloud.google.com/go/talent",
+        "cloud.google.com/go/videointelligence",
+        "cloud.google.com/go/vision",
+        "cloud.google.com/go/vision/v2",
+        "cloud.google.com/go/workflows"
       ],
       "github.com/go-kit/kit": [
         "github.com/grpc-ecosystem/go-grpc-middleware"
