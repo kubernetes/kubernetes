@@ -265,3 +265,16 @@ func (rt *reproducingTransformer) createObject(ctx context.Context) error {
 	out := &example.Pod{}
 	return rt.store.Create(ctx, key, obj, out, 0)
 }
+
+// failingTransformer is a custom test-only transformer that always returns
+// an error on transforming data from storage.
+type failingTransformer struct {
+}
+
+func (ft *failingTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
+	return nil, false, fmt.Errorf("failed transformation")
+}
+
+func (ft *failingTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
+	return data, nil
+}

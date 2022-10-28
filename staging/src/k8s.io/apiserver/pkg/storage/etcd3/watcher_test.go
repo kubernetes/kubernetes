@@ -27,14 +27,11 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 
-	"k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
-	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
 )
@@ -62,22 +59,8 @@ func TestWatchFromNoneZero(t *testing.T) {
 }
 
 func TestWatchError(t *testing.T) {
-	// this codec fails on decodes, which will bubble up so we can verify the behavior
-	invalidCodec := &testCodec{apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)}
-	ctx, invalidStore, client := testSetup(t, withCodec(invalidCodec))
-	w, err := invalidStore.Watch(ctx, "/abc", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
-	if err != nil {
-		t.Fatalf("Watch failed: %v", err)
-	}
-	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	_, validStore, _ := testSetup(t, withCodec(codec), withClient(client))
-	if err := validStore.GuaranteedUpdate(ctx, "/abc", &example.Pod{}, true, nil, storage.SimpleUpdate(
-		func(runtime.Object) (runtime.Object, error) {
-			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}, nil
-		}), nil); err != nil {
-		t.Fatalf("GuaranteedUpdate failed: %v", err)
-	}
-	storagetesting.TestCheckEventType(t, watch.Error, w)
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestWatchError(ctx, t, &storeWithPrefixTransformer{store})
 }
 
 func TestWatchContextCancel(t *testing.T) {
@@ -88,7 +71,7 @@ func TestWatchContextCancel(t *testing.T) {
 func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 	origCtx, store, _ := testSetup(t)
 	ctx, cancel := context.WithCancel(origCtx)
-	w := store.watcher.createWatchChan(ctx, "/abc", 0, false, false, storage.Everything)
+	w := store.watcher.createWatchChan(ctx, "/abc", 0, false, false, newTestTransformer(), storage.Everything)
 	// make resutlChan and errChan blocking to ensure ordering.
 	w.resultChan = make(chan watch.Event)
 	w.errChan = make(chan error)
@@ -212,12 +195,4 @@ func TestProgressNotify(t *testing.T) {
 		storagetesting.ExpectNoDiff(t, "bookmark event should contain an object with no fields set other than resourceVersion", newPod(), pod)
 		return nil
 	})
-}
-
-type testCodec struct {
-	runtime.Codec
-}
-
-func (c *testCodec) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
-	return nil, nil, errTestingDecode
 }

@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/value"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 )
 
@@ -202,6 +203,39 @@ func RunTestWatchFromNoneZero(ctx context.Context, t *testing.T, store storage.I
 			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}, err
 		}), nil)
 	TestCheckResult(t, watch.Modified, w, out)
+}
+
+func RunTestWatchError(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer) {
+	// Compute the initial resource version from which we can start watching later.
+	list := &example.PodList{}
+	storageOpts := storage.ListOptions{
+		ResourceVersion: "0",
+		Predicate:       storage.Everything,
+		Recursive:       true,
+	}
+	if err := store.GetList(ctx, "/", storageOpts, list); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if err := store.GuaranteedUpdate(ctx, "//foo", &example.Pod{}, true, nil, storage.SimpleUpdate(
+		func(runtime.Object) (runtime.Object, error) {
+			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}, nil
+		}), nil); err != nil {
+		t.Fatalf("GuaranteedUpdate failed: %v", err)
+	}
+
+	// Now trigger watch error by injecting failing transformer.
+	revertTransformer := store.UpdatePrefixTransformer(
+		func(previousTransformer *PrefixTransformer) value.Transformer {
+			return &failingTransformer{}
+		})
+	defer revertTransformer()
+
+	w, err := store.Watch(ctx, "//foo", storage.ListOptions{ResourceVersion: list.ResourceVersion, Predicate: storage.Everything})
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+	TestCheckEventType(t, watch.Error, w)
 }
 
 func RunTestWatchContextCancel(ctx context.Context, t *testing.T, store storage.Interface) {
