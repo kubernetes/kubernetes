@@ -383,7 +383,6 @@ func TestUpdateAnnotations(t *testing.T) {
 func TestAnnotateErrors(t *testing.T) {
 	testCases := map[string]struct {
 		args  []string
-		flags map[string]string
 		errFn func(error) bool
 	}{
 		"no args": {
@@ -430,9 +429,6 @@ func TestAnnotateErrors(t *testing.T) {
 			cmd.SetOut(bufOut)
 			cmd.SetErr(bufOut)
 
-			for k, v := range testCase.flags {
-				cmd.Flags().Set(k, v)
-			}
 			options := NewAnnotateOptions(iostreams)
 			err := options.Complete(tf, cmd, testCase.args)
 			if err == nil {
@@ -443,10 +439,10 @@ func TestAnnotateErrors(t *testing.T) {
 				return
 			}
 			if bufOut.Len() > 0 {
-				t.Errorf("buffer should be empty: %s", string(bufOut.Bytes()))
+				t.Errorf("buffer should be empty: %s", bufOut.String())
 			}
 			if bufErr.Len() > 0 {
-				t.Errorf("buffer should be empty: %s", string(bufErr.Bytes()))
+				t.Errorf("buffer should be empty: %s", bufErr.String())
 			}
 		})
 	}

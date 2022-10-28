@@ -301,7 +301,6 @@ func TestLabelFunc(t *testing.T) {
 func TestLabelErrors(t *testing.T) {
 	testCases := map[string]struct {
 		args  []string
-		flags map[string]string
 		errFn func(error) bool
 	}{
 		"no args": {
@@ -355,9 +354,6 @@ func TestLabelErrors(t *testing.T) {
 			cmd.SetOut(buf)
 			cmd.SetErr(buf)
 
-			for k, v := range testCase.flags {
-				cmd.Flags().Set(k, v)
-			}
 			opts := NewLabelOptions(ioStreams)
 			err := opts.Complete(tf, cmd, testCase.args)
 			if err == nil {
