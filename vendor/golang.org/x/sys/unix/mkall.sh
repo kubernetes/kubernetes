@@ -182,6 +182,24 @@ openbsd_mips64)
 	# API consistent across platforms.
 	mktypes="GOARCH=$GOARCH go tool cgo -godefs -- -fsigned-char"
 	;;
+openbsd_ppc64)
+	mkasm="go run mkasm.go"
+	mkerrors="$mkerrors -m64"
+	mksyscall="go run mksyscall.go -openbsd -libc"
+	mksysctl="go run mksysctl_openbsd.go"
+	# Let the type of C char be signed for making the bare syscall
+	# API consistent across platforms.
+	mktypes="GOARCH=$GOARCH go tool cgo -godefs -- -fsigned-char"
+	;;
+openbsd_riscv64)
+	mkasm="go run mkasm.go"
+	mkerrors="$mkerrors -m64"
+	mksyscall="go run mksyscall.go -openbsd -libc"
+	mksysctl="go run mksysctl_openbsd.go"
+	# Let the type of C char be signed for making the bare syscall
+	# API consistent across platforms.
+	mktypes="GOARCH=$GOARCH go tool cgo -godefs -- -fsigned-char"
+	;;
 solaris_amd64)
 	mksyscall="go run mksyscall_solaris.go"
 	mkerrors="$mkerrors -m64"
@@ -214,11 +232,6 @@ esac
 			if [ "$GOOSARCH" == "aix_ppc64" ]; then
 				# aix/ppc64 script generates files instead of writing to stdin.
 				echo "$mksyscall -tags $GOOS,$GOARCH $syscall_goos $GOOSARCH_in && gofmt -w zsyscall_$GOOSARCH.go && gofmt -w zsyscall_"$GOOSARCH"_gccgo.go && gofmt -w zsyscall_"$GOOSARCH"_gc.go " ;
-			elif [ "$GOOS" == "darwin" ]; then
-			        # 1.12 and later, syscalls via libSystem
-				echo "$mksyscall -tags $GOOS,$GOARCH,go1.12 $syscall_goos $GOOSARCH_in |gofmt >zsyscall_$GOOSARCH.go";
-				# 1.13 and later, syscalls via libSystem (including syscallPtr)
-				echo "$mksyscall -tags $GOOS,$GOARCH,go1.13 syscall_darwin.1_13.go |gofmt >zsyscall_$GOOSARCH.1_13.go";
 			elif [ "$GOOS" == "illumos" ]; then
 			        # illumos code generation requires a --illumos switch
 			        echo "$mksyscall -illumos -tags illumos,$GOARCH syscall_illumos.go |gofmt > zsyscall_illumos_$GOARCH.go";
