@@ -101,12 +101,14 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 			}
 			if action.GetSubresource() == "" {
 				if action.Tracked {
-					// Return an tracked object instead of a newly created one (required for TokenReviews) 
-				   	obj, err := tracker.Get(gvr, ns, objMeta.GetName())
-				    return true, obj, err
-				} else {
-				    err = tracker.Create(gvr, action.GetObject(), ns)
+					// Return an tracked object instead of a newly created one (required for TokenReviews)
+					// for backward compatibility, if no such object, return the created one.
+					obj, err := tracker.Get(gvr, ns, objMeta.GetName())
+					if err == nil {
+						return true, obj, err
+					}
 				}
+				err = tracker.Create(gvr, action.GetObject(), ns)
 			} else {
 				oldObj, getOldObjErr := tracker.Get(gvr, ns, objMeta.GetName())
 				if getOldObjErr != nil {
