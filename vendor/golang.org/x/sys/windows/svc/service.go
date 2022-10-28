@@ -6,7 +6,6 @@
 // +build windows
 
 // Package svc provides everything required to build Windows service.
-//
 package svc
 
 import (

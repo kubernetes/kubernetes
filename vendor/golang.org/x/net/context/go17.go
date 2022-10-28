@@ -32,7 +32,7 @@ var DeadlineExceeded = context.DeadlineExceeded
 // call cancel as soon as the operations running in this Context complete.
 func WithCancel(parent Context) (ctx Context, cancel CancelFunc) {
 	ctx, f := context.WithCancel(parent)
-	return ctx, CancelFunc(f)
+	return ctx, f
 }
 
 // WithDeadline returns a copy of the parent context with the deadline adjusted
@@ -46,7 +46,7 @@ func WithCancel(parent Context) (ctx Context, cancel CancelFunc) {
 // call cancel as soon as the operations running in this Context complete.
 func WithDeadline(parent Context, deadline time.Time) (Context, CancelFunc) {
 	ctx, f := context.WithDeadline(parent, deadline)
-	return ctx, CancelFunc(f)
+	return ctx, f
 }
 
 // WithTimeout returns WithDeadline(parent, time.Now().Add(timeout)).
@@ -54,11 +54,11 @@ func WithDeadline(parent Context, deadline time.Time) (Context, CancelFunc) {
 // Canceling this context releases resources associated with it, so code should
 // call cancel as soon as the operations running in this Context complete:
 //
-// 	func slowOperationWithTimeout(ctx context.Context) (Result, error) {
-// 		ctx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
-// 		defer cancel()  // releases resources if slowOperation completes before timeout elapses
-// 		return slowOperation(ctx)
-// 	}
+//	func slowOperationWithTimeout(ctx context.Context) (Result, error) {
+//		ctx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+//		defer cancel()  // releases resources if slowOperation completes before timeout elapses
+//		return slowOperation(ctx)
+//	}
 func WithTimeout(parent Context, timeout time.Duration) (Context, CancelFunc) {
 	return WithDeadline(parent, time.Now().Add(timeout))
 }
