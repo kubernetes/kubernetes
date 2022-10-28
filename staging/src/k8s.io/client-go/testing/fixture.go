@@ -100,7 +100,13 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 				return true, nil, err
 			}
 			if action.GetSubresource() == "" {
-				err = tracker.Create(gvr, action.GetObject(), ns)
+				if action.Tracked {
+					// Return an tracked object instead of a newly created one (required for TokenReviews) 
+				   	obj, err := tracker.Get(gvr, ns, objMeta.GetName())
+				    return true, obj, err
+				} else {
+				    err = tracker.Create(gvr, action.GetObject(), ns)
+				}
 			} else {
 				oldObj, getOldObjErr := tracker.Get(gvr, ns, objMeta.GetName())
 				if getOldObjErr != nil {

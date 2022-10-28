@@ -111,6 +111,16 @@ func NewCreateAction(resource schema.GroupVersionResource, namespace string, obj
 	return action
 }
 
+func NewRootCreateTrackedAction(resource schema.GroupVersionResource, object runtime.Object) CreateActionImpl {
+    action := CreateActionImpl{}
+	action.Verb = "create"
+    action.Resource = resource
+    action.Object = object
+    action.Tracked = true
+
+    return action
+}
+	
 func NewRootCreateSubresourceAction(resource schema.GroupVersionResource, name, subresource string, object runtime.Object) CreateActionImpl {
 	action := CreateActionImpl{}
 	action.Verb = "create"
@@ -435,6 +445,8 @@ type ActionImpl struct {
 	Verb        string
 	Resource    schema.GroupVersionResource
 	Subresource string
+	// If Tracked, force to return an tracked object (required for TokenReviews) 
+	Tracked     bool
 }
 
 func (a ActionImpl) GetNamespace() string {

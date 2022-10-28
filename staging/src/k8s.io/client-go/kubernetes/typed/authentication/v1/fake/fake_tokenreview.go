@@ -39,7 +39,7 @@ var tokenreviewsKind = schema.GroupVersionKind{Group: "authentication.k8s.io", V
 // Create takes the representation of a tokenReview and creates it.  Returns the server's representation of the tokenReview, and an error, if there is any.
 func (c *FakeTokenReviews) Create(ctx context.Context, tokenReview *v1.TokenReview, opts metav1.CreateOptions) (result *v1.TokenReview, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(tokenreviewsResource, tokenReview), &v1.TokenReview{})
+		Invokes(testing.NewRootCreateTrackedAction(tokenreviewsResource, tokenReview), &v1.TokenReview{})
 	if obj == nil {
 		return nil, err
 	}
