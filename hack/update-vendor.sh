@@ -82,35 +82,19 @@ function ensure_require_replace_directives_for_all_dependencies() {
       | jq -r ".Replace // [] | sort | .[] | select(${replace_filter})" \
       > "${replace_json}"
 
-  # 1a. Ensure replace directives have an explicit require directive
-  jq -r '"-require \(.Old.Path)@\(.New.Version)"' < "${replace_json}" \
-      | xargs -L 100 go mod edit -fmt
-  # 1b. Ensure require directives have a corresponding replace directive pinning a version
-  jq -r '"-replace \(.Path)=\(.Path)@\(.Version)"' < "${require_json}" \
-      | xargs -L 100 go mod edit -fmt
-  jq -r '"-replace \(.Old.Path)=\(.New.Path)@\(.New.Version)"' < "${replace_json}" \
-      | xargs -L 100 go mod edit -fmt
-
-  # 2. Propagate root replace/require directives into staging modules, in case we are downgrading, so they don't bump the root required version back up
+  # Propagate root replace/require directives into staging modules, in case we are downgrading, so they don't bump the root required version back up
   for repo in $(kube::util::list_staging_repos); do
     pushd "staging/src/k8s.io/${repo}" >/dev/null 2>&1
       jq -r '"-require \(.Path)@\(.Version)"' < "${require_json}" \
-          | xargs -L 100 go mod edit -fmt
-      jq -r '"-replace \(.Path)=\(.Path)@\(.Version)"' < "${require_json}" \
           | xargs -L 100 go mod edit -fmt
       jq -r '"-replace \(.Old.Path)=\(.New.Path)@\(.New.Version)"' < "${replace_json}" \
           | xargs -L 100 go mod edit -fmt
     popd >/dev/null 2>&1
   done
 
-  # 3. Add explicit require directives for indirect dependencies
+  # Add explicit require directives for indirect dependencies
   go list -m -json all \
       | jq -r 'select(.Main != true) | select(.Indirect == true) | "-require \(.Path)@\(.Version)"' \
-      | xargs -L 100 go mod edit -fmt
-
-  # 4. Add explicit replace directives pinning dependencies that aren't pinned yet
-  go list -m -json all \
-      | jq -r 'select(.Main != true) | select(.Replace == null)  | "-replace \(.Path)=\(.Path)@\(.Version)"' \
       | xargs -L 100 go mod edit -fmt
 }
 
