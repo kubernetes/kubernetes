@@ -26,6 +26,7 @@ metadata:
     k8s-app: kube-dns
     kubernetes.io/cluster-service: "true"
     kubernetes.io/name: "CoreDNS"
+    app.kubernetes.io/name: "coredns"
   name: kube-dns
   namespace: kube-system
   annotations:
@@ -62,6 +63,7 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: kube-dns
+    app.kubernetes.io/name: "coredns"
 spec:
   replicas: {{ .Replicas }}
   strategy:
@@ -75,6 +77,7 @@ spec:
     metadata:
       labels:
         k8s-app: kube-dns
+        app.kubernetes.io/name: "coredns"
     spec:
       priorityClassName: system-cluster-critical
       serviceAccountName: coredns
