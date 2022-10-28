@@ -14,10 +14,8 @@ require (
 	github.com/onsi/ginkgo v1.14.0 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.0 // indirect
-	golang.org/x/net v0.0.0-20211209124913-491a49abca63 // indirect
-	golang.org/x/sys v0.0.0-20210831042530-f4d43177bf5e // indirect
-	golang.org/x/text v0.3.7 // indirect
-	golang.org/x/tools v0.1.6-0.20210820212750-d4cc65f0b2ff
+	golang.org/x/net v0.1.1-0.20221027164007-c63010009c80 // indirect
+	golang.org/x/tools v0.1.12
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/gengo v0.0.0-20210813121822-485abfe95c7c
 	k8s.io/klog/v2 v2.30.0
@@ -25,4 +23,7 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
 )
 
-replace k8s.io/code-generator => ../code-generator
+replace (
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20220908164124-27713097b956
+	k8s.io/code-generator => ../code-generator
+)

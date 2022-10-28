@@ -20,10 +20,9 @@ func bytes2iovec(bs [][]byte) []Iovec {
 	for i, b := range bs {
 		iovecs[i].SetLen(len(b))
 		if len(b) > 0 {
-			// somehow Iovec.Base on illumos is (*int8), not (*byte)
-			iovecs[i].Base = (*int8)(unsafe.Pointer(&b[0]))
+			iovecs[i].Base = &b[0]
 		} else {
-			iovecs[i].Base = (*int8)(unsafe.Pointer(&_zero))
+			iovecs[i].Base = (*byte)(unsafe.Pointer(&_zero))
 		}
 	}
 	return iovecs
@@ -160,6 +159,14 @@ func (l *Lifreq) SetLifruInt(d int) {
 
 func (l *Lifreq) GetLifruInt() int {
 	return *(*int)(unsafe.Pointer(&l.Lifru[0]))
+}
+
+func (l *Lifreq) SetLifruUint(d uint) {
+	*(*uint)(unsafe.Pointer(&l.Lifru[0])) = d
+}
+
+func (l *Lifreq) GetLifruUint() uint {
+	return *(*uint)(unsafe.Pointer(&l.Lifru[0]))
 }
 
 func IoctlLifreq(fd int, req uint, l *Lifreq) error {

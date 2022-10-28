@@ -734,7 +734,7 @@ func inHeadIM(p *parser) bool {
 	return false
 }
 
-// 12.2.6.4.5.
+// Section 12.2.6.4.5.
 func inHeadNoscriptIM(p *parser) bool {
 	switch p.tok.Type {
 	case DoctypeToken:
