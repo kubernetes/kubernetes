@@ -476,25 +476,11 @@ type setupOptions struct {
 
 type setupOption func(*setupOptions)
 
-func withClient(client *clientv3.Client) setupOption {
-	return func(options *setupOptions) {
-		options.client = func(t *testing.T) *clientv3.Client {
-			return client
-		}
-	}
-}
-
 func withClientConfig(config *embed.Config) setupOption {
 	return func(options *setupOptions) {
 		options.client = func(t *testing.T) *clientv3.Client {
 			return testserver.RunEtcd(t, config)
 		}
-	}
-}
-
-func withCodec(codec runtime.Codec) setupOption {
-	return func(options *setupOptions) {
-		options.codec = codec
 	}
 }
 

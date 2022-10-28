@@ -111,7 +111,7 @@ func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Ob
 		pathPrefix:          path.Join("/", prefix),
 		groupResource:       groupResource,
 		groupResourceString: groupResource.String(),
-		watcher:             newWatcher(c, codec, groupResource, newFunc, versioner, transformer),
+		watcher:             newWatcher(c, codec, groupResource, newFunc, versioner),
 		leaseManager:        newDefaultLeaseManager(c, leaseManagerConfig),
 	}
 	return result
@@ -815,7 +815,7 @@ func (s *store) Watch(ctx context.Context, key string, opts storage.ListOptions)
 		return nil, err
 	}
 	key = path.Join(s.pathPrefix, key)
-	return s.watcher.Watch(ctx, key, int64(rev), opts.Recursive, opts.ProgressNotify, opts.Predicate)
+	return s.watcher.Watch(ctx, key, int64(rev), opts.Recursive, opts.ProgressNotify, s.transformer, opts.Predicate)
 }
 
 func (s *store) getState(ctx context.Context, getResp *clientv3.GetResponse, key string, v reflect.Value, ignoreNotFound bool) (*objState, error) {
