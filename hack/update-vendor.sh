@@ -92,10 +92,8 @@ function ensure_require_replace_directives_for_all_dependencies() {
     popd >/dev/null 2>&1
   done
 
-  # Add explicit require directives for indirect dependencies
-  go list -m -json all \
-      | jq -r 'select(.Main != true) | select(.Indirect == true) | "-require \(.Path)@\(.Version)"' \
-      | xargs -L 100 go mod edit -fmt
+  # tidy to ensure require directives are added for indirect dependencies
+  go mod tidy
 }
 
 function print_go_mod_section() {
