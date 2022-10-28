@@ -363,7 +363,7 @@ func sendmsgN(fd int, iov []Iovec, oob []byte, ptr unsafe.Pointer, salen _Sockle
 	var empty bool
 	if len(oob) > 0 {
 		// send at least one normal byte
-		empty := emptyIovecs(iov)
+		empty = emptyIovecs(iov)
 		if empty {
 			var iova [1]Iovec
 			iova[0].Base = &dummy
