@@ -53,9 +53,9 @@ description: >-
 This page details the metrics that different Kubernetes components export. You can query the metrics endpoint for these 
 components using an HTTP scrape, and fetch the current metrics data in Prometheus format.
 
-### List of Kubernetes Metrics
+### List of Stable Kubernetes Metrics
 
-<table class="table" caption="This is the list of metrics emitted from core Kubernetes components">
+<table class="table" caption="This is the list of STABLE metrics emitted from core Kubernetes components">
 <thead>
 	<tr>
 		<th class="metric_name">Name</th>
@@ -67,7 +67,31 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 	</tr>
 </thead>
 <tbody>
-{{range $index, $metric := .Metrics}}
+{{range $index, $metric := .StableMetrics}}
+<tr class="metric"><td class="metric_name">{{with $metric}}{{.BuildFQName}}{{end}}</td>
+<td class="metric_stability_level" data-stability="{{$metric.StabilityLevel | ToLower}}">{{$metric.StabilityLevel}}</td>
+<td class="metric_type" data-type="{{$metric.Type | ToLower}}">{{$metric.Type}}</td>
+<td class="metric_description">{{$metric.Help}}</td>
+{{if not $metric.Labels }}<td class="metric_labels_varying">None</td>{{else }}<td class="metric_labels_varying">{{range $label := $metric.Labels}}<div class="metric_label">{{$label}}</div>{{end}}</td>{{end}}
+{{if not $metric.ConstLabels }}<td class="metric_labels_constant">None</td>{{else }}<td class="metric_labels_constant">{{$metric.ConstLabels}}</td>{{end}}</tr>{{end}}
+</tbody>
+</table>
+
+### List of Alpha Kubernetes Metrics
+
+<table class="table" caption="This is the list of ALPHA metrics emitted from core Kubernetes components">
+<thead>
+	<tr>
+		<th class="metric_name">Name</th>
+		<th class="metric_stability_level">Stability Level</th>
+		<th class="metric_type">Type</th>
+		<th class="metric_help">Help</th>
+		<th class="metric_labels">Labels</th>
+		<th class="metric_const_labels">Const Labels</th>
+	</tr>
+</thead>
+<tbody>
+{{range $index, $metric := .AlphaMetrics}}
 <tr class="metric"><td class="metric_name">{{with $metric}}{{.BuildFQName}}{{end}}</td>
 <td class="metric_stability_level" data-stability="{{$metric.StabilityLevel | ToLower}}">{{$metric.StabilityLevel}}</td>
 <td class="metric_type" data-type="{{$metric.Type | ToLower}}">{{$metric.Type}}</td>
@@ -80,32 +104,35 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 )
 
 type templateData struct {
-	Metrics       []metric
+	AlphaMetrics  []metric
+	StableMetrics []metric
 	GeneratedDate time.Time
 }
 
 func main() {
 	dat, err := os.ReadFile("test/instrumentation/testdata/documentation-list.yaml")
 	if err == nil {
-		metrics := []metric{}
-		err = yaml.Unmarshal(dat, &metrics)
+		var parsedMetrics []metric
+		err = yaml.Unmarshal(dat, &parsedMetrics)
 		if err != nil {
 			println("err", err)
 		}
-		sort.Sort(byFQName(metrics))
+		sort.Sort(byFQName(parsedMetrics))
 		t := template.New("t").Funcs(funcMap)
 		t, err := t.Parse(templ)
 		if err != nil {
 			println("err", err)
 		}
 		var tpl bytes.Buffer
-		for i, m := range metrics {
+		for i, m := range parsedMetrics {
 			m.Help = strings.Join(strings.Split(m.Help, "\n"), ", ")
 			_ = m.BuildFQName() // ignore golint error
-			metrics[i] = m
+			parsedMetrics[i] = m
 		}
+		sortedMetrics := byStabilityLevel(parsedMetrics)
 		data := templateData{
-			Metrics:       metrics,
+			AlphaMetrics:  sortedMetrics["ALPHA"],
+			StableMetrics: sortedMetrics["STABLE"],
 			GeneratedDate: time.Now(),
 		}
 		err = t.Execute(&tpl, data)
@@ -153,4 +180,15 @@ func (ms byFQName) Less(i, j int) bool {
 }
 func (ms byFQName) Swap(i, j int) {
 	ms[i], ms[j] = ms[j], ms[i]
+}
+
+func byStabilityLevel(ms []metric) map[string][]metric {
+	res := map[string][]metric{}
+	for _, m := range ms {
+		if _, ok := res[m.StabilityLevel]; !ok {
+			res[m.StabilityLevel] = []metric{}
+		}
+		res[m.StabilityLevel] = append(res[m.StabilityLevel], m)
+	}
+	return res
 }

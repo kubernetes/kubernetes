@@ -40,7 +40,7 @@ type noRestraint struct{}
 
 type noRestraintRequest struct{}
 
-func (noRestraintFactory) BeginConstruction(fq.QueuingConfig, metrics.RatioedGaugePair, metrics.RatioedGauge) (fq.QueueSetCompleter, error) {
+func (noRestraintFactory) BeginConstruction(fq.QueuingConfig, metrics.RatioedGaugePair, metrics.RatioedGauge, fq.Integrator) (fq.QueueSetCompleter, error) {
 	return noRestraintCompleter{}, nil
 }
 

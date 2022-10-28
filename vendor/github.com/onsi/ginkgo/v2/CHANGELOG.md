@@ -1,3 +1,25 @@
+## 2.4.0
+
+### Features
+
+- DeferCleanup supports functions with multiple-return values [5e33c75]
+- Add GinkgoLogr (#1067) [bf78c28]
+- Introduction of 'MustPassRepeatedly' decorator (#1051) [047c02f]
+
+### Fixes
+- correcting some typos (#1064) [1403d3c]
+- fix flaky internal_integration interupt specs [2105ba3]
+- Correct busted link in README [be6b5b9]
+
+### Maintenance
+- Bump actions/checkout from 2 to 3 (#1062) [8a2f483]
+- Bump golang.org/x/tools from 0.1.12 to 0.2.0 (#1065) [529c4e8]
+- Bump github/codeql-action from 1 to 2 (#1061) [da09146]
+- Bump actions/setup-go from 2 to 3 (#1060) [918040d]
+- Bump github.com/onsi/gomega from 1.22.0 to 1.22.1 (#1053) [2098e4d]
+- Bump nokogiri from 1.13.8 to 1.13.9 in /docs (#1066) [1d74122]
+- Add GHA to dependabot config [4442772]
+
 ## 2.3.1
 
 ## Fixes
@@ -8,7 +30,7 @@ With this patch release, the ginkgo CLI can now identify a version mismatch and 
 - Ginkgo cli can identify version mismatches and emit a helpful error message [bc4ae2f]
 - further emphasize that a version match is required when running Ginkgo on CI and/or locally [2691dd8]
 
-## Maintenance
+### Maintenance
 - bump gomega to v1.22.0 [822a937]
 
 ## 2.3.0

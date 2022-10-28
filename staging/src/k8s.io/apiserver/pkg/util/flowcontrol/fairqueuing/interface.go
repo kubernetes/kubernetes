@@ -35,7 +35,9 @@ type QueueSetFactory interface {
 	// The RatioedGaugePair observes number of requests,
 	// execution covering just the regular phase.
 	// The RatioedGauge observes number of seats occupied through all phases of execution.
-	BeginConstruction(QueuingConfig, metrics.RatioedGaugePair, metrics.RatioedGauge) (QueueSetCompleter, error)
+	// The Integrator observes the seat demand (executing + queued seats), and
+	// the queueset does not read or reset the Integrator.
+	BeginConstruction(QueuingConfig, metrics.RatioedGaugePair, metrics.RatioedGauge, Integrator) (QueueSetCompleter, error)
 }
 
 // QueueSetCompleter finishes the two-step process of creating or

@@ -53,6 +53,7 @@ func (x *IntegratorResults) Equal(y *IntegratorResults) bool {
 }
 
 type integrator struct {
+	name  string
 	clock clock.PassiveClock
 	sync.Mutex
 	lastTime time.Time
@@ -61,9 +62,10 @@ type integrator struct {
 	min, max float64
 }
 
-// NewIntegrator makes one that uses the given clock
-func NewIntegrator(clock clock.PassiveClock) Integrator {
+// NewNamedIntegrator makes one that uses the given clock and name
+func NewNamedIntegrator(clock clock.PassiveClock, name string) Integrator {
 	return &integrator{
+		name:     name,
 		clock:    clock,
 		lastTime: clock.Now(),
 	}

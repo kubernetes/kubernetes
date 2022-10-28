@@ -26,20 +26,26 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/util/feature"
+	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
-	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
+)
+
+const (
+	// fieldManager used to add pod disruption condition to the victim pods
+	fieldManager = "KubeScheduler"
 )
 
 // Candidate represents a nominated node on which the preemptor can be scheduled,
@@ -351,19 +357,19 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 			waitingPod.Reject(pluginName, "preempted")
 		} else {
 			if feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
-				condition := &v1.PodCondition{
-					Type:    v1.AlphaNoCompatGuaranteeDisruptionTarget,
-					Status:  v1.ConditionTrue,
-					Reason:  "PreemptionByKubeScheduler",
-					Message: "Kube-scheduler: preempting",
-				}
-				newStatus := pod.Status.DeepCopy()
-				if apipod.UpdatePodCondition(newStatus, condition) {
-					if err := util.PatchPodStatus(ctx, cs, victim, newStatus); err != nil {
-						klog.ErrorS(err, "Preparing pod preemption", "pod", klog.KObj(victim), "preemptor", klog.KObj(pod))
-						errCh.SendErrorWithCancel(err, cancel)
-						return
-					}
+				victimPodApply := corev1apply.Pod(victim.Name, victim.Namespace).WithStatus(corev1apply.PodStatus())
+				victimPodApply.Status.WithConditions(corev1apply.PodCondition().
+					WithType(v1.AlphaNoCompatGuaranteeDisruptionTarget).
+					WithStatus(v1.ConditionTrue).
+					WithReason("PreemptionByKubeScheduler").
+					WithMessage(fmt.Sprintf("Kube-scheduler: preempting to accommodate a higher priority pod: %s", klog.KObj(pod))).
+					WithLastTransitionTime(metav1.Now()),
+				)
+
+				if _, err := cs.CoreV1().Pods(victim.Namespace).ApplyStatus(ctx, victimPodApply, metav1.ApplyOptions{FieldManager: fieldManager, Force: true}); err != nil {
+					klog.ErrorS(err, "Preparing pod preemption", "pod", klog.KObj(victim), "preemptor", klog.KObj(pod))
+					errCh.SendErrorWithCancel(err, cancel)
+					return
 				}
 			}
 			if err := util.DeletePod(ctx, cs, victim); err != nil {

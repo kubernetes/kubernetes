@@ -6,14 +6,152 @@ description: >-
 ---
 
 
-## Metrics (auto-generated 2022 Oct 25)
+## Metrics (auto-generated 2022 Oct 27)
 
 This page details the metrics that different Kubernetes components export. You can query the metrics endpoint for these 
-components using an HTTP scrape, and fetch the current metrics data in Prometheus format.
+components using an HTTP scrape, and fetch the metrics in Prometheus format.
 
-### List of Kubernetes Metrics
+### List of Stable Kubernetes Metrics
 
-<table class="table" caption="This is the list of metrics emitted from core Kubernetes components">
+<table class="table" caption="This is the list of STABLE metrics emitted from core Kubernetes components">
+<thead>
+	<tr>
+		<th class="metric_name">Name</th>
+		<th class="metric_stability_level">Stability Level</th>
+		<th class="metric_type">Type</th>
+		<th class="metric_help">Help</th>
+		<th class="metric_labels">Labels</th>
+		<th class="metric_const_labels">Const Labels</th>
+	</tr>
+</thead>
+<tbody>
+
+<tr class="metric"><td class="metric_name">apiserver_admission_controller_admission_duration_seconds</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">Admission controller latency histogram in seconds, identified by name and broken out for each operation and API resource and type (validate or admit).</td>
+<td class="metric_labels_varying"><div class="metric_label">name</div><div class="metric_label">operation</div><div class="metric_label">rejected</div><div class="metric_label">type</div></td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">apiserver_admission_step_admission_duration_seconds</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">Admission sub-step latency histogram in seconds, broken out for each operation and API resource and step type (validate or admit).</td>
+<td class="metric_labels_varying"><div class="metric_label">operation</div><div class="metric_label">rejected</div><div class="metric_label">type</div></td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">apiserver_admission_webhook_admission_duration_seconds</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">Admission webhook latency histogram in seconds, identified by name and broken out for each operation and API resource and type (validate or admit).</td>
+<td class="metric_labels_varying"><div class="metric_label">name</div><div class="metric_label">operation</div><div class="metric_label">rejected</div><div class="metric_label">type</div></td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">apiserver_current_inflight_requests</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="gauge">Gauge</td>
+<td class="metric_description">Maximal number of currently used inflight request limit of this apiserver per request kind in last second.</td>
+<td class="metric_labels_varying"><div class="metric_label">request_kind</div></td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">apiserver_longrunning_requests</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="gauge">Gauge</td>
+<td class="metric_description">Gauge of all active long-running apiserver requests broken out by verb, group, version, resource, scope and component. Not all requests are tracked this way.</td>
+<td class="metric_labels_varying"><div class="metric_label">component</div><div class="metric_label">group</div><div class="metric_label">resource</div><div class="metric_label">scope</div><div class="metric_label">subresource</div><div class="metric_label">verb</div><div class="metric_label">version</div></td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">apiserver_request_duration_seconds</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">Response latency distribution in seconds for each verb, dry run value, group, version, resource, subresource, scope and component.</td>
+<td class="metric_labels_varying"><div class="metric_label">component</div><div class="metric_label">dry_run</div><div class="metric_label">group</div><div class="metric_label">resource</div><div class="metric_label">scope</div><div class="metric_label">subresource</div><div class="metric_label">verb</div><div class="metric_label">version</div></td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">apiserver_request_total</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.</td>
+<td class="metric_labels_varying"><div class="metric_label">code</div><div class="metric_label">component</div><div class="metric_label">dry_run</div><div class="metric_label">group</div><div class="metric_label">resource</div><div class="metric_label">scope</div><div class="metric_label">subresource</div><div class="metric_label">verb</div><div class="metric_label">version</div></td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">apiserver_requested_deprecated_apis</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="gauge">Gauge</td>
+<td class="metric_description">Gauge of deprecated APIs that have been requested, broken out by API group, version, resource, subresource, and removed_release.</td>
+<td class="metric_labels_varying"><div class="metric_label">group</div><div class="metric_label">removed_release</div><div class="metric_label">resource</div><div class="metric_label">subresource</div><div class="metric_label">version</div></td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">apiserver_response_sizes</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">Response size distribution in bytes for each group, version, verb, resource, subresource, scope and component.</td>
+<td class="metric_labels_varying"><div class="metric_label">component</div><div class="metric_label">group</div><div class="metric_label">resource</div><div class="metric_label">scope</div><div class="metric_label">subresource</div><div class="metric_label">verb</div><div class="metric_label">version</div></td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">apiserver_storage_objects</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="gauge">Gauge</td>
+<td class="metric_description">Number of stored objects at the time of last check split by kind.</td>
+<td class="metric_labels_varying"><div class="metric_label">resource</div></td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">node_collector_evictions_total</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Number of Node evictions that happened since current instance of NodeController started.</td>
+<td class="metric_labels_varying"><div class="metric_label">zone</div></td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">scheduler_framework_extension_point_duration_seconds</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">Latency for running all plugins of a specific extension point.</td>
+<td class="metric_labels_varying"><div class="metric_label">extension_point</div><div class="metric_label">profile</div><div class="metric_label">status</div></td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">scheduler_pending_pods</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="gauge">Gauge</td>
+<td class="metric_description">Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods.</td>
+<td class="metric_labels_varying"><div class="metric_label">queue</div></td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">scheduler_pod_scheduling_attempts</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">Number of attempts to successfully schedule a pod.</td>
+<td class="metric_labels_varying">None</td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">scheduler_pod_scheduling_duration_seconds</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">E2e latency for a pod being scheduled which may include multiple scheduling attempts.</td>
+<td class="metric_labels_varying"><div class="metric_label">attempts</div></td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">scheduler_preemption_attempts_total</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Total preemption attempts in the cluster till now</td>
+<td class="metric_labels_varying">None</td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">scheduler_preemption_victims</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">Number of selected preemption victims</td>
+<td class="metric_labels_varying">None</td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">scheduler_queue_incoming_pods_total</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Number of pods added to scheduling queues by event and queue type.</td>
+<td class="metric_labels_varying"><div class="metric_label">event</div><div class="metric_label">queue</div></td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">scheduler_schedule_attempts_total</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Number of attempts to schedule pods, by the result. 'unschedulable' means a pod could not be scheduled, while 'error' means an internal scheduler problem.</td>
+<td class="metric_labels_varying"><div class="metric_label">profile</div><div class="metric_label">result</div></td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">scheduler_scheduling_attempt_duration_seconds</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">Scheduling attempt latency in seconds (scheduling algorithm + binding)</td>
+<td class="metric_labels_varying"><div class="metric_label">profile</div><div class="metric_label">result</div></td>
+<td class="metric_labels_constant">None</td></tr>
+</tbody>
+</table>
+
+### List of Alpha Kubernetes Metrics
+
+<table class="table" caption="This is the list of ALPHA metrics emitted from core Kubernetes components">
 <thead>
 	<tr>
 		<th class="metric_name">Name</th>
@@ -1681,126 +1819,6 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_type" data-type="histogram">Histogram</td>
 <td class="metric_description">How long in seconds processing an item from workqueue takes.</td>
 <td class="metric_labels_varying"><div class="metric_label">name</div></td>
-<td class="metric_labels_constant">None</td></tr>
-<tr class="metric"><td class="metric_name">apiserver_admission_controller_admission_duration_seconds</td>
-<td class="metric_stability_level" data-stability="stable">STABLE</td>
-<td class="metric_type" data-type="histogram">Histogram</td>
-<td class="metric_description">Admission controller latency histogram in seconds, identified by name and broken out for each operation and API resource and type (validate or admit).</td>
-<td class="metric_labels_varying"><div class="metric_label">name</div><div class="metric_label">operation</div><div class="metric_label">rejected</div><div class="metric_label">type</div></td>
-<td class="metric_labels_constant">None</td></tr>
-<tr class="metric"><td class="metric_name">apiserver_admission_step_admission_duration_seconds</td>
-<td class="metric_stability_level" data-stability="stable">STABLE</td>
-<td class="metric_type" data-type="histogram">Histogram</td>
-<td class="metric_description">Admission sub-step latency histogram in seconds, broken out for each operation and API resource and step type (validate or admit).</td>
-<td class="metric_labels_varying"><div class="metric_label">operation</div><div class="metric_label">rejected</div><div class="metric_label">type</div></td>
-<td class="metric_labels_constant">None</td></tr>
-<tr class="metric"><td class="metric_name">apiserver_admission_webhook_admission_duration_seconds</td>
-<td class="metric_stability_level" data-stability="stable">STABLE</td>
-<td class="metric_type" data-type="histogram">Histogram</td>
-<td class="metric_description">Admission webhook latency histogram in seconds, identified by name and broken out for each operation and API resource and type (validate or admit).</td>
-<td class="metric_labels_varying"><div class="metric_label">name</div><div class="metric_label">operation</div><div class="metric_label">rejected</div><div class="metric_label">type</div></td>
-<td class="metric_labels_constant">None</td></tr>
-<tr class="metric"><td class="metric_name">apiserver_current_inflight_requests</td>
-<td class="metric_stability_level" data-stability="stable">STABLE</td>
-<td class="metric_type" data-type="gauge">Gauge</td>
-<td class="metric_description">Maximal number of currently used inflight request limit of this apiserver per request kind in last second.</td>
-<td class="metric_labels_varying"><div class="metric_label">request_kind</div></td>
-<td class="metric_labels_constant">None</td></tr>
-<tr class="metric"><td class="metric_name">apiserver_longrunning_requests</td>
-<td class="metric_stability_level" data-stability="stable">STABLE</td>
-<td class="metric_type" data-type="gauge">Gauge</td>
-<td class="metric_description">Gauge of all active long-running apiserver requests broken out by verb, group, version, resource, scope and component. Not all requests are tracked this way.</td>
-<td class="metric_labels_varying"><div class="metric_label">component</div><div class="metric_label">group</div><div class="metric_label">resource</div><div class="metric_label">scope</div><div class="metric_label">subresource</div><div class="metric_label">verb</div><div class="metric_label">version</div></td>
-<td class="metric_labels_constant">None</td></tr>
-<tr class="metric"><td class="metric_name">apiserver_request_duration_seconds</td>
-<td class="metric_stability_level" data-stability="stable">STABLE</td>
-<td class="metric_type" data-type="histogram">Histogram</td>
-<td class="metric_description">Response latency distribution in seconds for each verb, dry run value, group, version, resource, subresource, scope and component.</td>
-<td class="metric_labels_varying"><div class="metric_label">component</div><div class="metric_label">dry_run</div><div class="metric_label">group</div><div class="metric_label">resource</div><div class="metric_label">scope</div><div class="metric_label">subresource</div><div class="metric_label">verb</div><div class="metric_label">version</div></td>
-<td class="metric_labels_constant">None</td></tr>
-<tr class="metric"><td class="metric_name">apiserver_request_total</td>
-<td class="metric_stability_level" data-stability="stable">STABLE</td>
-<td class="metric_type" data-type="counter">Counter</td>
-<td class="metric_description">Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.</td>
-<td class="metric_labels_varying"><div class="metric_label">code</div><div class="metric_label">component</div><div class="metric_label">dry_run</div><div class="metric_label">group</div><div class="metric_label">resource</div><div class="metric_label">scope</div><div class="metric_label">subresource</div><div class="metric_label">verb</div><div class="metric_label">version</div></td>
-<td class="metric_labels_constant">None</td></tr>
-<tr class="metric"><td class="metric_name">apiserver_requested_deprecated_apis</td>
-<td class="metric_stability_level" data-stability="stable">STABLE</td>
-<td class="metric_type" data-type="gauge">Gauge</td>
-<td class="metric_description">Gauge of deprecated APIs that have been requested, broken out by API group, version, resource, subresource, and removed_release.</td>
-<td class="metric_labels_varying"><div class="metric_label">group</div><div class="metric_label">removed_release</div><div class="metric_label">resource</div><div class="metric_label">subresource</div><div class="metric_label">version</div></td>
-<td class="metric_labels_constant">None</td></tr>
-<tr class="metric"><td class="metric_name">apiserver_response_sizes</td>
-<td class="metric_stability_level" data-stability="stable">STABLE</td>
-<td class="metric_type" data-type="histogram">Histogram</td>
-<td class="metric_description">Response size distribution in bytes for each group, version, verb, resource, subresource, scope and component.</td>
-<td class="metric_labels_varying"><div class="metric_label">component</div><div class="metric_label">group</div><div class="metric_label">resource</div><div class="metric_label">scope</div><div class="metric_label">subresource</div><div class="metric_label">verb</div><div class="metric_label">version</div></td>
-<td class="metric_labels_constant">None</td></tr>
-<tr class="metric"><td class="metric_name">apiserver_storage_objects</td>
-<td class="metric_stability_level" data-stability="stable">STABLE</td>
-<td class="metric_type" data-type="gauge">Gauge</td>
-<td class="metric_description">Number of stored objects at the time of last check split by kind.</td>
-<td class="metric_labels_varying"><div class="metric_label">resource</div></td>
-<td class="metric_labels_constant">None</td></tr>
-<tr class="metric"><td class="metric_name">node_collector_evictions_total</td>
-<td class="metric_stability_level" data-stability="stable">STABLE</td>
-<td class="metric_type" data-type="counter">Counter</td>
-<td class="metric_description">Number of Node evictions that happened since current instance of NodeController started.</td>
-<td class="metric_labels_varying"><div class="metric_label">zone</div></td>
-<td class="metric_labels_constant">None</td></tr>
-<tr class="metric"><td class="metric_name">scheduler_framework_extension_point_duration_seconds</td>
-<td class="metric_stability_level" data-stability="stable">STABLE</td>
-<td class="metric_type" data-type="histogram">Histogram</td>
-<td class="metric_description">Latency for running all plugins of a specific extension point.</td>
-<td class="metric_labels_varying"><div class="metric_label">extension_point</div><div class="metric_label">profile</div><div class="metric_label">status</div></td>
-<td class="metric_labels_constant">None</td></tr>
-<tr class="metric"><td class="metric_name">scheduler_pending_pods</td>
-<td class="metric_stability_level" data-stability="stable">STABLE</td>
-<td class="metric_type" data-type="gauge">Gauge</td>
-<td class="metric_description">Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods.</td>
-<td class="metric_labels_varying"><div class="metric_label">queue</div></td>
-<td class="metric_labels_constant">None</td></tr>
-<tr class="metric"><td class="metric_name">scheduler_pod_scheduling_attempts</td>
-<td class="metric_stability_level" data-stability="stable">STABLE</td>
-<td class="metric_type" data-type="histogram">Histogram</td>
-<td class="metric_description">Number of attempts to successfully schedule a pod.</td>
-<td class="metric_labels_varying">None</td>
-<td class="metric_labels_constant">None</td></tr>
-<tr class="metric"><td class="metric_name">scheduler_pod_scheduling_duration_seconds</td>
-<td class="metric_stability_level" data-stability="stable">STABLE</td>
-<td class="metric_type" data-type="histogram">Histogram</td>
-<td class="metric_description">E2e latency for a pod being scheduled which may include multiple scheduling attempts.</td>
-<td class="metric_labels_varying"><div class="metric_label">attempts</div></td>
-<td class="metric_labels_constant">None</td></tr>
-<tr class="metric"><td class="metric_name">scheduler_preemption_attempts_total</td>
-<td class="metric_stability_level" data-stability="stable">STABLE</td>
-<td class="metric_type" data-type="counter">Counter</td>
-<td class="metric_description">Total preemption attempts in the cluster till now</td>
-<td class="metric_labels_varying">None</td>
-<td class="metric_labels_constant">None</td></tr>
-<tr class="metric"><td class="metric_name">scheduler_preemption_victims</td>
-<td class="metric_stability_level" data-stability="stable">STABLE</td>
-<td class="metric_type" data-type="histogram">Histogram</td>
-<td class="metric_description">Number of selected preemption victims</td>
-<td class="metric_labels_varying">None</td>
-<td class="metric_labels_constant">None</td></tr>
-<tr class="metric"><td class="metric_name">scheduler_queue_incoming_pods_total</td>
-<td class="metric_stability_level" data-stability="stable">STABLE</td>
-<td class="metric_type" data-type="counter">Counter</td>
-<td class="metric_description">Number of pods added to scheduling queues by event and queue type.</td>
-<td class="metric_labels_varying"><div class="metric_label">event</div><div class="metric_label">queue</div></td>
-<td class="metric_labels_constant">None</td></tr>
-<tr class="metric"><td class="metric_name">scheduler_schedule_attempts_total</td>
-<td class="metric_stability_level" data-stability="stable">STABLE</td>
-<td class="metric_type" data-type="counter">Counter</td>
-<td class="metric_description">Number of attempts to schedule pods, by the result. 'unschedulable' means a pod could not be scheduled, while 'error' means an internal scheduler problem.</td>
-<td class="metric_labels_varying"><div class="metric_label">profile</div><div class="metric_label">result</div></td>
-<td class="metric_labels_constant">None</td></tr>
-<tr class="metric"><td class="metric_name">scheduler_scheduling_attempt_duration_seconds</td>
-<td class="metric_stability_level" data-stability="stable">STABLE</td>
-<td class="metric_type" data-type="histogram">Histogram</td>
-<td class="metric_description">Scheduling attempt latency in seconds (scheduling algorithm + binding)</td>
-<td class="metric_labels_varying"><div class="metric_label">profile</div><div class="metric_label">result</div></td>
 <td class="metric_labels_constant">None</td></tr>
 </tbody>
 </table>
