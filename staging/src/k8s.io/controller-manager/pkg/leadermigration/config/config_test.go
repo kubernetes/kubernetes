@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	internal "k8s.io/controller-manager/config"
+	"k8s.io/kubernetes/test/utils"
 )
 
 func TestReadLeaderMigrationConfiguration(t *testing.T) {
@@ -117,7 +118,7 @@ controllerLeaders:
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer os.Remove(configFile.Name())
+			defer utils.RemoveTestFile(t, configFile)
 			err = os.WriteFile(configFile.Name(), []byte(tc.content), os.FileMode(0755))
 			if err != nil {
 				t.Fatal(err)

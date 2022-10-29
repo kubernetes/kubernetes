@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/controller-manager/config"
 	migrationconfig "k8s.io/controller-manager/pkg/leadermigration/config"
+	"k8s.io/kubernetes/test/utils"
 )
 
 func TestLeaderMigrationOptions(t *testing.T) {
@@ -188,7 +189,7 @@ controllerLeaders:
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer os.Remove(configFile.Name())
+				defer utils.RemoveTestFile(t, configFile)
 				err = os.WriteFile(configFile.Name(), []byte(tc.configContent), os.FileMode(0755))
 				if err != nil {
 					t.Fatal(err)
