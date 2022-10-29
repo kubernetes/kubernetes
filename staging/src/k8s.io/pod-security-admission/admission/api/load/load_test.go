@@ -44,6 +44,7 @@ func writeTempFile(t *testing.T, content string) string {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
+		file.Close()
 		os.Remove(file.Name())
 	})
 	if err := ioutil.WriteFile(file.Name(), []byte(content), 0600); err != nil {
