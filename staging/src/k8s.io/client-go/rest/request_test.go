@@ -54,6 +54,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/test/utils"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -306,8 +307,7 @@ func TestRequestBody(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to create temp file")
 	}
-	defer f.Close()
-	os.Remove(f.Name())
+	utils.RemoveTestFile(t, f)
 	r = (&Request{}).Body(f.Name())
 	if r.err == nil || r.body != nil {
 		t.Errorf("should have set err and left body nil: %#v", r)

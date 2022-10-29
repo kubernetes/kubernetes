@@ -23,6 +23,8 @@ import (
 	"testing"
 
 	"sigs.k8s.io/yaml"
+
+	"k8s.io/kubernetes/test/utils"
 )
 
 func newMergedConfig(certFile, certContent, keyFile, keyContent, caFile, caContent string, t *testing.T) Config {
@@ -52,11 +54,11 @@ func newMergedConfig(certFile, certContent, keyFile, keyContent, caFile, caConte
 
 func TestMinifySuccess(t *testing.T) {
 	certFile, _ := os.CreateTemp("", "")
-	defer os.Remove(certFile.Name())
 	keyFile, _ := os.CreateTemp("", "")
-	defer os.Remove(keyFile.Name())
 	caFile, _ := os.CreateTemp("", "")
-	defer os.Remove(caFile.Name())
+	defer func() {
+		utils.RemoveTestFile(t, certFile, keyFile, caFile)
+	}()
 
 	mutatingConfig := newMergedConfig(certFile.Name(), "cert", keyFile.Name(), "key", caFile.Name(), "ca", t)
 
@@ -88,11 +90,11 @@ func TestMinifySuccess(t *testing.T) {
 
 func TestMinifyMissingContext(t *testing.T) {
 	certFile, _ := os.CreateTemp("", "")
-	defer os.Remove(certFile.Name())
 	keyFile, _ := os.CreateTemp("", "")
-	defer os.Remove(keyFile.Name())
 	caFile, _ := os.CreateTemp("", "")
-	defer os.Remove(caFile.Name())
+	defer func() {
+		utils.RemoveTestFile(t, certFile, keyFile, caFile)
+	}()
 
 	mutatingConfig := newMergedConfig(certFile.Name(), "cert", keyFile.Name(), "key", caFile.Name(), "ca", t)
 	mutatingConfig.CurrentContext = "missing"
@@ -106,11 +108,11 @@ func TestMinifyMissingContext(t *testing.T) {
 
 func TestMinifyMissingCluster(t *testing.T) {
 	certFile, _ := os.CreateTemp("", "")
-	defer os.Remove(certFile.Name())
 	keyFile, _ := os.CreateTemp("", "")
-	defer os.Remove(keyFile.Name())
 	caFile, _ := os.CreateTemp("", "")
-	defer os.Remove(caFile.Name())
+	defer func() {
+		utils.RemoveTestFile(t, certFile, keyFile, caFile)
+	}()
 
 	mutatingConfig := newMergedConfig(certFile.Name(), "cert", keyFile.Name(), "key", caFile.Name(), "ca", t)
 	delete(mutatingConfig.Clusters, mutatingConfig.Contexts[mutatingConfig.CurrentContext].Cluster)
@@ -124,11 +126,11 @@ func TestMinifyMissingCluster(t *testing.T) {
 
 func TestMinifyMissingAuthInfo(t *testing.T) {
 	certFile, _ := os.CreateTemp("", "")
-	defer os.Remove(certFile.Name())
 	keyFile, _ := os.CreateTemp("", "")
-	defer os.Remove(keyFile.Name())
 	caFile, _ := os.CreateTemp("", "")
-	defer os.Remove(caFile.Name())
+	defer func() {
+		utils.RemoveTestFile(t, certFile, keyFile, caFile)
+	}()
 
 	mutatingConfig := newMergedConfig(certFile.Name(), "cert", keyFile.Name(), "key", caFile.Name(), "ca", t)
 	delete(mutatingConfig.AuthInfos, mutatingConfig.Contexts[mutatingConfig.CurrentContext].AuthInfo)
@@ -142,11 +144,11 @@ func TestMinifyMissingAuthInfo(t *testing.T) {
 
 func TestFlattenSuccess(t *testing.T) {
 	certFile, _ := os.CreateTemp("", "")
-	defer os.Remove(certFile.Name())
 	keyFile, _ := os.CreateTemp("", "")
-	defer os.Remove(keyFile.Name())
 	caFile, _ := os.CreateTemp("", "")
-	defer os.Remove(caFile.Name())
+	defer func() {
+		utils.RemoveTestFile(t, certFile, keyFile, caFile)
+	}()
 
 	certData := "cert"
 	keyData := "key"
@@ -207,11 +209,16 @@ func TestFlattenSuccess(t *testing.T) {
 
 func Example_minifyAndShorten() {
 	certFile, _ := os.CreateTemp("", "")
-	defer os.Remove(certFile.Name())
 	keyFile, _ := os.CreateTemp("", "")
-	defer os.Remove(keyFile.Name())
 	caFile, _ := os.CreateTemp("", "")
-	defer os.Remove(caFile.Name())
+	defer func() {
+		certFile.Close()
+		keyFile.Close()
+		certFile.Close()
+		os.Remove(certFile.Name())
+		os.Remove(keyFile.Name())
+		os.Remove(caFile.Name())
+	}()
 
 	certData := "cert"
 	keyData := "key"
@@ -247,11 +254,11 @@ func Example_minifyAndShorten() {
 
 func TestShortenSuccess(t *testing.T) {
 	certFile, _ := os.CreateTemp("", "")
-	defer os.Remove(certFile.Name())
 	keyFile, _ := os.CreateTemp("", "")
-	defer os.Remove(keyFile.Name())
 	caFile, _ := os.CreateTemp("", "")
-	defer os.Remove(caFile.Name())
+	defer func() {
+		utils.RemoveTestFile(t, certFile, keyFile, caFile)
+	}()
 
 	certData := "cert"
 	keyData := "key"

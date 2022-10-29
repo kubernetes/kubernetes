@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	restclient "k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/kubernetes/test/utils"
 )
 
 func TestMergoSemantics(t *testing.T) {
@@ -173,16 +174,16 @@ func TestInsecureOverridesCA(t *testing.T) {
 }
 
 func TestCAOverridesCAData(t *testing.T) {
-	file, err := os.CreateTemp("", "my.ca")
+	f, err := os.CreateTemp("", "my.ca")
 	if err != nil {
 		t.Fatalf("could not create tempfile: %v", err)
 	}
-	defer os.Remove(file.Name())
+	defer utils.RemoveTestFile(t, f)
 
 	config := createCAValidTestConfig()
 	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
 		ClusterInfo: clientcmdapi.Cluster{
-			CertificateAuthority: file.Name(),
+			CertificateAuthority: f.Name(),
 		},
 	}, nil)
 
@@ -192,7 +193,7 @@ func TestCAOverridesCAData(t *testing.T) {
 	}
 
 	matchBoolArg(false, actualCfg.Insecure, t)
-	matchStringArg(file.Name(), actualCfg.TLSClientConfig.CAFile, t)
+	matchStringArg(f.Name(), actualCfg.TLSClientConfig.CAFile, t)
 	matchByteArg(nil, actualCfg.TLSClientConfig.CAData, t)
 }
 
@@ -312,7 +313,7 @@ func TestModifyContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer os.Remove(tempPath.Name())
+	defer utils.RemoveTestFile(t, tempPath)
 
 	pathOptions := NewDefaultPathOptions()
 	config := createValidTestConfig()
@@ -498,7 +499,8 @@ func TestBasicTokenFile(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 		return
 	}
-	defer os.Remove(f.Name())
+	defer utils.RemoveTestFile(t, f)
+
 	if err := os.WriteFile(f.Name(), []byte(token), 0644); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 		return
@@ -534,7 +536,8 @@ func TestPrecedenceTokenFile(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 		return
 	}
-	defer os.Remove(f.Name())
+	defer utils.RemoveTestFile(t, f)
+
 	if err := os.WriteFile(f.Name(), []byte(token), 0644); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 		return
@@ -923,7 +926,8 @@ users:
 	if err != nil {
 		t.Error(err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer utils.RemoveTestFile(t, tmpfile)
+
 	if err := os.WriteFile(tmpfile.Name(), []byte(content), 0666); err != nil {
 		t.Error(err)
 	}

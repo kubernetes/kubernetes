@@ -19,6 +19,8 @@ package keyutil
 import (
 	"os"
 	"testing"
+
+	"k8s.io/kubernetes/test/utils"
 )
 
 const (
@@ -118,7 +120,7 @@ func TestReadPrivateKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating tmpfile: %v", err)
 	}
-	defer os.Remove(f.Name())
+	defer utils.RemoveTestFile(t, f)
 
 	if _, err := PrivateKeyFromFile(f.Name()); err == nil {
 		t.Fatalf("Expected error reading key from empty file, got none")
@@ -151,7 +153,7 @@ func TestReadPublicKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating tmpfile: %v", err)
 	}
-	defer os.Remove(f.Name())
+	defer utils.RemoveTestFile(t, f)
 
 	if _, err := PublicKeysFromFile(f.Name()); err == nil {
 		t.Fatalf("Expected error reading keys from empty file, got none")

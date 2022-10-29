@@ -25,6 +25,7 @@ import (
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/kubernetes/test/utils"
 )
 
 func TestConfirmUsableBadInfoButOkConfig(t *testing.T) {
@@ -296,7 +297,7 @@ func TestValidateCleanClusterInfo(t *testing.T) {
 
 func TestValidateCleanWithCAClusterInfo(t *testing.T) {
 	tempFile, _ := os.CreateTemp("", "")
-	defer os.Remove(tempFile.Name())
+	defer utils.RemoveTestFile(t, tempFile)
 
 	config := clientcmdapi.NewConfig()
 	config.Clusters["clean"] = &clientcmdapi.Cluster{
@@ -339,7 +340,7 @@ func TestValidateCertFilesNotFoundAuthInfo(t *testing.T) {
 
 func TestValidateCertDataOverridesFiles(t *testing.T) {
 	tempFile, _ := os.CreateTemp("", "")
-	defer os.Remove(tempFile.Name())
+	defer utils.RemoveTestFile(t, tempFile)
 
 	config := clientcmdapi.NewConfig()
 	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
@@ -359,7 +360,7 @@ func TestValidateCertDataOverridesFiles(t *testing.T) {
 
 func TestValidateCleanCertFilesAuthInfo(t *testing.T) {
 	tempFile, _ := os.CreateTemp("", "")
-	defer os.Remove(tempFile.Name())
+	defer utils.RemoveTestFile(t, tempFile)
 
 	config := clientcmdapi.NewConfig()
 	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
