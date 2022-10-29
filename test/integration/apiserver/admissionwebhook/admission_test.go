@@ -594,8 +594,8 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 			convertedResources[gvr.Resource] = gvr
 			// add an admission rule indicating we can receive this version
 			convertedV1beta1Rules = append(convertedV1beta1Rules, admissionregistrationv1beta1.RuleWithOperations{
-				Operations: []admissionregistrationv1beta1.OperationType{admissionregistrationv1beta1.OperationAll},
-				Rule:       admissionregistrationv1beta1.Rule{APIGroups: []string{gvr.Group}, APIVersions: []string{gvr.Version}, Resources: []string{gvr.Resource}},
+				Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
+				Rule:       admissionregistrationv1.Rule{APIGroups: []string{gvr.Group}, APIVersions: []string{gvr.Version}, Resources: []string{gvr.Resource}},
 			})
 			convertedV1Rules = append(convertedV1Rules, admissionregistrationv1.RuleWithOperations{
 				Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
@@ -1550,8 +1550,8 @@ func createV1beta1ValidationWebhook(etcdClient *clientv3.Client, etcdStoragePref
 					CABundle: localhostCert,
 				},
 				Rules: []admissionregistrationv1beta1.RuleWithOperations{{
-					Operations: []admissionregistrationv1beta1.OperationType{admissionregistrationv1beta1.OperationAll},
-					Rule:       admissionregistrationv1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
+					Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
+					Rule:       admissionregistrationv1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
 				}},
 				FailurePolicy:           &fail,
 				AdmissionReviewVersions: []string{"v1beta1"},
@@ -1603,8 +1603,8 @@ func createV1beta1MutationWebhook(etcdClient *clientv3.Client, etcdStoragePrefix
 					CABundle: localhostCert,
 				},
 				Rules: []admissionregistrationv1beta1.RuleWithOperations{{
-					Operations: []admissionregistrationv1beta1.OperationType{admissionregistrationv1beta1.OperationAll},
-					Rule:       admissionregistrationv1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
+					Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
+					Rule:       admissionregistrationv1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
 				}},
 				FailurePolicy:           &fail,
 				AdmissionReviewVersions: []string{"v1beta1"},

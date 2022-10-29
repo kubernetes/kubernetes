@@ -32,7 +32,6 @@ import (
 func TestDefaultAdmissionPolicy(t *testing.T) {
 	fail := v1alpha1.Fail
 	equivalent := v1alpha1.Equivalent
-	allScopes := v1alpha1.AllScopes
 
 	tests := []struct {
 		name     string
@@ -71,35 +70,6 @@ func TestDefaultAdmissionPolicy(t *testing.T) {
 						NamespaceSelector: &metav1.LabelSelector{},
 						ObjectSelector:    &metav1.LabelSelector{},
 					},
-				},
-			},
-		},
-		{
-			name: "scope=*",
-			original: &v1alpha1.ValidatingAdmissionPolicy{
-				Spec: v1alpha1.ValidatingAdmissionPolicySpec{
-					MatchConstraints: &v1alpha1.MatchResources{
-						ResourceRules: []v1alpha1.NamedRuleWithOperations{{}},
-					},
-				},
-			},
-			expected: &v1alpha1.ValidatingAdmissionPolicy{
-				Spec: v1alpha1.ValidatingAdmissionPolicySpec{
-					MatchConstraints: &v1alpha1.MatchResources{
-						MatchPolicy:       &equivalent,
-						NamespaceSelector: &metav1.LabelSelector{},
-						ObjectSelector:    &metav1.LabelSelector{},
-						ResourceRules: []v1alpha1.NamedRuleWithOperations{
-							{
-								RuleWithOperations: v1alpha1.RuleWithOperations{
-									Rule: v1alpha1.Rule{
-										Scope: &allScopes, // defaulted
-									},
-								},
-							},
-						},
-					},
-					FailurePolicy: &fail,
 				},
 			},
 		},

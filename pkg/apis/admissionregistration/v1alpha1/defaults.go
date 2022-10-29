@@ -26,14 +26,6 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-// SetDefaults_Rule sets defaults for webhook rule
-func SetDefaults_Rule(obj *admissionregistrationv1alpha1.Rule) {
-	if obj.Scope == nil {
-		s := admissionregistrationv1alpha1.AllScopes
-		obj.Scope = &s
-	}
-}
-
 // SetDefaults_ValidatingAdmissionPolicySpec sets defaults for ValidatingAdmissionPolicySpec
 func SetDefaults_ValidatingAdmissionPolicySpec(obj *admissionregistrationv1alpha1.ValidatingAdmissionPolicySpec) {
 	if obj.FailurePolicy == nil {
