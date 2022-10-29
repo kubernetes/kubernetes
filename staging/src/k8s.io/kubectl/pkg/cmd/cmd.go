@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/explain"
 	"k8s.io/kubectl/pkg/cmd/expose"
 	"k8s.io/kubectl/pkg/cmd/get"
+	"k8s.io/kubectl/pkg/cmd/kuberc"
 	"k8s.io/kubectl/pkg/cmd/label"
 	"k8s.io/kubectl/pkg/cmd/logs"
 	"k8s.io/kubectl/pkg/cmd/options"
@@ -106,6 +107,22 @@ func NewDefaultKubectlCommand() *cobra.Command {
 // NewDefaultKubectlCommandWithArgs creates the `kubectl` command with arguments
 func NewDefaultKubectlCommandWithArgs(o KubectlOptions) *cobra.Command {
 	cmd := NewKubectlCommand(o)
+
+	// If the alpha feature of kuberc is enabled then render new command
+	// args using the defined values in the kuberc config file, and
+	// overwrite the args stored in the KubectlOptions object.
+	if os.Getenv("ENABLE_KUBERC") != "" {
+		fmt.Fprintln(o.IOStreams.Out, "kuberc is enabled!")
+		renderedCmdArgs, err := kuberc.ComposeCmdArgs(o.IOStreams, o.Arguments[1:])
+		if err != nil {
+			fmt.Fprintf(o.IOStreams.ErrOut, "Error: %v\n", err)
+			os.Exit(1)
+		}
+
+		cmd.SetArgs(renderedCmdArgs)
+
+		fmt.Fprintf(o.IOStreams.Out, "redered arguments are: \n%v\n", renderedCmdArgs)
+	}
 
 	if o.PluginHandler == nil {
 		return cmd
