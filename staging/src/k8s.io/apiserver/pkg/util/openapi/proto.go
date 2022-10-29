@@ -17,8 +17,6 @@ limitations under the License.
 package openapi
 
 import (
-	"encoding/json"
-
 	openapi_v2 "github.com/google/gnostic/openapiv2"
 
 	"k8s.io/kube-openapi/pkg/util/proto"
@@ -27,7 +25,7 @@ import (
 
 // ToProtoModels builds the proto formatted models from OpenAPI spec
 func ToProtoModels(openAPISpec *spec.Swagger) (proto.Models, error) {
-	specBytes, err := json.MarshalIndent(openAPISpec, " ", " ")
+	specBytes, err := openAPISpec.MarshalNext()
 	if err != nil {
 		return nil, err
 	}
