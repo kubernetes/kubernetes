@@ -24,11 +24,13 @@ package v1beta1
 import (
 	unsafe "unsafe"
 
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	admissionregistration "k8s.io/kubernetes/pkg/apis/admissionregistration"
+	apisadmissionregistrationv1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
 )
 
 func init() {
@@ -146,7 +148,17 @@ func autoConvert_v1beta1_MutatingWebhook_To_admissionregistration_MutatingWebhoo
 	if err := Convert_v1beta1_WebhookClientConfig_To_admissionregistration_WebhookClientConfig(&in.ClientConfig, &out.ClientConfig, s); err != nil {
 		return err
 	}
-	out.Rules = *(*[]admissionregistration.RuleWithOperations)(unsafe.Pointer(&in.Rules))
+	if in.Rules != nil {
+		in, out := &in.Rules, &out.Rules
+		*out = make([]admissionregistration.RuleWithOperations, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_RuleWithOperations_To_admissionregistration_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Rules = nil
+	}
 	out.FailurePolicy = (*admissionregistration.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
 	out.MatchPolicy = (*admissionregistration.MatchPolicyType)(unsafe.Pointer(in.MatchPolicy))
 	out.NamespaceSelector = (*v1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
@@ -168,7 +180,17 @@ func autoConvert_admissionregistration_MutatingWebhook_To_v1beta1_MutatingWebhoo
 	if err := Convert_admissionregistration_WebhookClientConfig_To_v1beta1_WebhookClientConfig(&in.ClientConfig, &out.ClientConfig, s); err != nil {
 		return err
 	}
-	out.Rules = *(*[]v1beta1.RuleWithOperations)(unsafe.Pointer(&in.Rules))
+	if in.Rules != nil {
+		in, out := &in.Rules, &out.Rules
+		*out = make([]v1beta1.RuleWithOperations, len(*in))
+		for i := range *in {
+			if err := Convert_admissionregistration_RuleWithOperations_To_v1beta1_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Rules = nil
+	}
 	out.FailurePolicy = (*v1beta1.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
 	out.MatchPolicy = (*v1beta1.MatchPolicyType)(unsafe.Pointer(in.MatchPolicy))
 	out.NamespaceSelector = (*v1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
@@ -286,7 +308,7 @@ func autoConvert_admissionregistration_Rule_To_v1beta1_Rule(in *admissionregistr
 	out.APIGroups = *(*[]string)(unsafe.Pointer(&in.APIGroups))
 	out.APIVersions = *(*[]string)(unsafe.Pointer(&in.APIVersions))
 	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
-	out.Scope = (*v1beta1.ScopeType)(unsafe.Pointer(in.Scope))
+	out.Scope = (*admissionregistrationv1.ScopeType)(unsafe.Pointer(in.Scope))
 	return nil
 }
 
@@ -297,7 +319,7 @@ func Convert_admissionregistration_Rule_To_v1beta1_Rule(in *admissionregistratio
 
 func autoConvert_v1beta1_RuleWithOperations_To_admissionregistration_RuleWithOperations(in *v1beta1.RuleWithOperations, out *admissionregistration.RuleWithOperations, s conversion.Scope) error {
 	out.Operations = *(*[]admissionregistration.OperationType)(unsafe.Pointer(&in.Operations))
-	if err := Convert_v1beta1_Rule_To_admissionregistration_Rule(&in.Rule, &out.Rule, s); err != nil {
+	if err := apisadmissionregistrationv1.Convert_v1_Rule_To_admissionregistration_Rule(&in.Rule, &out.Rule, s); err != nil {
 		return err
 	}
 	return nil
@@ -309,8 +331,8 @@ func Convert_v1beta1_RuleWithOperations_To_admissionregistration_RuleWithOperati
 }
 
 func autoConvert_admissionregistration_RuleWithOperations_To_v1beta1_RuleWithOperations(in *admissionregistration.RuleWithOperations, out *v1beta1.RuleWithOperations, s conversion.Scope) error {
-	out.Operations = *(*[]v1beta1.OperationType)(unsafe.Pointer(&in.Operations))
-	if err := Convert_admissionregistration_Rule_To_v1beta1_Rule(&in.Rule, &out.Rule, s); err != nil {
+	out.Operations = *(*[]admissionregistrationv1.OperationType)(unsafe.Pointer(&in.Operations))
+	if err := apisadmissionregistrationv1.Convert_admissionregistration_Rule_To_v1_Rule(&in.Rule, &out.Rule, s); err != nil {
 		return err
 	}
 	return nil
@@ -356,7 +378,17 @@ func autoConvert_v1beta1_ValidatingWebhook_To_admissionregistration_ValidatingWe
 	if err := Convert_v1beta1_WebhookClientConfig_To_admissionregistration_WebhookClientConfig(&in.ClientConfig, &out.ClientConfig, s); err != nil {
 		return err
 	}
-	out.Rules = *(*[]admissionregistration.RuleWithOperations)(unsafe.Pointer(&in.Rules))
+	if in.Rules != nil {
+		in, out := &in.Rules, &out.Rules
+		*out = make([]admissionregistration.RuleWithOperations, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_RuleWithOperations_To_admissionregistration_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Rules = nil
+	}
 	out.FailurePolicy = (*admissionregistration.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
 	out.MatchPolicy = (*admissionregistration.MatchPolicyType)(unsafe.Pointer(in.MatchPolicy))
 	out.NamespaceSelector = (*v1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
@@ -377,7 +409,17 @@ func autoConvert_admissionregistration_ValidatingWebhook_To_v1beta1_ValidatingWe
 	if err := Convert_admissionregistration_WebhookClientConfig_To_v1beta1_WebhookClientConfig(&in.ClientConfig, &out.ClientConfig, s); err != nil {
 		return err
 	}
-	out.Rules = *(*[]v1beta1.RuleWithOperations)(unsafe.Pointer(&in.Rules))
+	if in.Rules != nil {
+		in, out := &in.Rules, &out.Rules
+		*out = make([]v1beta1.RuleWithOperations, len(*in))
+		for i := range *in {
+			if err := Convert_admissionregistration_RuleWithOperations_To_v1beta1_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Rules = nil
+	}
 	out.FailurePolicy = (*v1beta1.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
 	out.MatchPolicy = (*v1beta1.MatchPolicyType)(unsafe.Pointer(in.MatchPolicy))
 	out.NamespaceSelector = (*v1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))

@@ -21,6 +21,7 @@ syntax = "proto2";
 
 package k8s.io.api.admissionregistration.v1alpha1;
 
+import "k8s.io/api/admissionregistration/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
@@ -124,6 +125,7 @@ message MatchResources {
 }
 
 // NamedRuleWithOperations is a tuple of Operations and Resources with ResourceNames.
+// +structType=atomic
 message NamedRuleWithOperations {
   // ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.
   // +listType=atomic
@@ -131,6 +133,7 @@ message NamedRuleWithOperations {
   repeated string resourceNames = 1;
 
   // RuleWithOperations is a tuple of Operations and Resources.
+  // +listType=atomic
   optional RuleWithOperations ruleWithOperations = 2;
 }
 
@@ -164,13 +167,11 @@ message ParamRef {
 message Rule {
   // APIGroups is the API groups the resources belong to. '*' is all groups.
   // If '*' is present, the length of the slice must be one.
-  // +listType=atomic
   // Required.
   repeated string apiGroups = 1;
 
   // APIVersions is the API versions the resources belong to. '*' is all versions.
   // If '*' is present, the length of the slice must be one.
-  // +listType=atomic
   // Required.
   repeated string apiVersions = 2;
 
@@ -188,7 +189,6 @@ message Rule {
   // overlap with each other.
   //
   // Depending on the enclosing object, subresources might not be allowed.
-  // +listType=atomic
   // Required.
   repeated string resources = 3;
 
@@ -211,13 +211,12 @@ message RuleWithOperations {
   // Operations is the operations the admission hook cares about - CREATE, UPDATE, DELETE, CONNECT or *
   // for all of those operations and any future admission operations that are added.
   // If '*' is present, the length of the slice must be one.
-  // +listType=atomic
   // Required.
   repeated string operations = 1;
 
   // Rule is embedded, it describes other criteria of the rule, like
   // APIGroups, APIVersions, Resources, etc.
-  optional Rule rule = 2;
+  optional k8s.io.api.admissionregistration.v1.Rule rule = 2;
 }
 
 // ValidatingAdmissionPolicy describes the definition of an admission validation policy that accepts or rejects an object without changing it.

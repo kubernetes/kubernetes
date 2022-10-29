@@ -21,6 +21,7 @@ syntax = "proto2";
 
 package k8s.io.api.admissionregistration.v1beta1;
 
+import "k8s.io/api/admissionregistration/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
@@ -257,7 +258,7 @@ message RuleWithOperations {
 
   // Rule is embedded, it describes other criteria of the rule, like
   // APIGroups, APIVersions, Resources, etc.
-  optional Rule rule = 2;
+  optional k8s.io.api.admissionregistration.v1.Rule rule = 2;
 }
 
 // ServiceReference holds a reference to Service.legacy.k8s.io

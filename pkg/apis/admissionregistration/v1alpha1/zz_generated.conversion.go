@@ -24,11 +24,13 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	admissionregistration "k8s.io/kubernetes/pkg/apis/admissionregistration"
+	apisadmissionregistrationv1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
 )
 
 func init() {
@@ -174,8 +176,28 @@ func RegisterConversions(s *runtime.Scheme) error {
 func autoConvert_v1alpha1_MatchResources_To_admissionregistration_MatchResources(in *v1alpha1.MatchResources, out *admissionregistration.MatchResources, s conversion.Scope) error {
 	out.NamespaceSelector = (*v1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
 	out.ObjectSelector = (*v1.LabelSelector)(unsafe.Pointer(in.ObjectSelector))
-	out.ResourceRules = *(*[]admissionregistration.NamedRuleWithOperations)(unsafe.Pointer(&in.ResourceRules))
-	out.ExcludeResourceRules = *(*[]admissionregistration.NamedRuleWithOperations)(unsafe.Pointer(&in.ExcludeResourceRules))
+	if in.ResourceRules != nil {
+		in, out := &in.ResourceRules, &out.ResourceRules
+		*out = make([]admissionregistration.NamedRuleWithOperations, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha1_NamedRuleWithOperations_To_admissionregistration_NamedRuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.ResourceRules = nil
+	}
+	if in.ExcludeResourceRules != nil {
+		in, out := &in.ExcludeResourceRules, &out.ExcludeResourceRules
+		*out = make([]admissionregistration.NamedRuleWithOperations, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha1_NamedRuleWithOperations_To_admissionregistration_NamedRuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.ExcludeResourceRules = nil
+	}
 	out.MatchPolicy = (*admissionregistration.MatchPolicyType)(unsafe.Pointer(in.MatchPolicy))
 	return nil
 }
@@ -188,8 +210,28 @@ func Convert_v1alpha1_MatchResources_To_admissionregistration_MatchResources(in 
 func autoConvert_admissionregistration_MatchResources_To_v1alpha1_MatchResources(in *admissionregistration.MatchResources, out *v1alpha1.MatchResources, s conversion.Scope) error {
 	out.NamespaceSelector = (*v1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
 	out.ObjectSelector = (*v1.LabelSelector)(unsafe.Pointer(in.ObjectSelector))
-	out.ResourceRules = *(*[]v1alpha1.NamedRuleWithOperations)(unsafe.Pointer(&in.ResourceRules))
-	out.ExcludeResourceRules = *(*[]v1alpha1.NamedRuleWithOperations)(unsafe.Pointer(&in.ExcludeResourceRules))
+	if in.ResourceRules != nil {
+		in, out := &in.ResourceRules, &out.ResourceRules
+		*out = make([]v1alpha1.NamedRuleWithOperations, len(*in))
+		for i := range *in {
+			if err := Convert_admissionregistration_NamedRuleWithOperations_To_v1alpha1_NamedRuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.ResourceRules = nil
+	}
+	if in.ExcludeResourceRules != nil {
+		in, out := &in.ExcludeResourceRules, &out.ExcludeResourceRules
+		*out = make([]v1alpha1.NamedRuleWithOperations, len(*in))
+		for i := range *in {
+			if err := Convert_admissionregistration_NamedRuleWithOperations_To_v1alpha1_NamedRuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.ExcludeResourceRules = nil
+	}
 	out.MatchPolicy = (*v1alpha1.MatchPolicyType)(unsafe.Pointer(in.MatchPolicy))
 	return nil
 }
@@ -286,7 +328,7 @@ func autoConvert_admissionregistration_Rule_To_v1alpha1_Rule(in *admissionregist
 	out.APIGroups = *(*[]string)(unsafe.Pointer(&in.APIGroups))
 	out.APIVersions = *(*[]string)(unsafe.Pointer(&in.APIVersions))
 	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
-	out.Scope = (*v1alpha1.ScopeType)(unsafe.Pointer(in.Scope))
+	out.Scope = (*admissionregistrationv1.ScopeType)(unsafe.Pointer(in.Scope))
 	return nil
 }
 
@@ -297,7 +339,7 @@ func Convert_admissionregistration_Rule_To_v1alpha1_Rule(in *admissionregistrati
 
 func autoConvert_v1alpha1_RuleWithOperations_To_admissionregistration_RuleWithOperations(in *v1alpha1.RuleWithOperations, out *admissionregistration.RuleWithOperations, s conversion.Scope) error {
 	out.Operations = *(*[]admissionregistration.OperationType)(unsafe.Pointer(&in.Operations))
-	if err := Convert_v1alpha1_Rule_To_admissionregistration_Rule(&in.Rule, &out.Rule, s); err != nil {
+	if err := apisadmissionregistrationv1.Convert_v1_Rule_To_admissionregistration_Rule(&in.Rule, &out.Rule, s); err != nil {
 		return err
 	}
 	return nil
@@ -309,8 +351,8 @@ func Convert_v1alpha1_RuleWithOperations_To_admissionregistration_RuleWithOperat
 }
 
 func autoConvert_admissionregistration_RuleWithOperations_To_v1alpha1_RuleWithOperations(in *admissionregistration.RuleWithOperations, out *v1alpha1.RuleWithOperations, s conversion.Scope) error {
-	out.Operations = *(*[]v1alpha1.OperationType)(unsafe.Pointer(&in.Operations))
-	if err := Convert_admissionregistration_Rule_To_v1alpha1_Rule(&in.Rule, &out.Rule, s); err != nil {
+	out.Operations = *(*[]admissionregistrationv1.OperationType)(unsafe.Pointer(&in.Operations))
+	if err := apisadmissionregistrationv1.Convert_admissionregistration_Rule_To_v1_Rule(&in.Rule, &out.Rule, s); err != nil {
 		return err
 	}
 	return nil
@@ -375,7 +417,17 @@ func Convert_admissionregistration_ValidatingAdmissionPolicyBinding_To_v1alpha1_
 
 func autoConvert_v1alpha1_ValidatingAdmissionPolicyBindingList_To_admissionregistration_ValidatingAdmissionPolicyBindingList(in *v1alpha1.ValidatingAdmissionPolicyBindingList, out *admissionregistration.ValidatingAdmissionPolicyBindingList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]admissionregistration.ValidatingAdmissionPolicyBinding)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]admissionregistration.ValidatingAdmissionPolicyBinding, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha1_ValidatingAdmissionPolicyBinding_To_admissionregistration_ValidatingAdmissionPolicyBinding(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -386,7 +438,17 @@ func Convert_v1alpha1_ValidatingAdmissionPolicyBindingList_To_admissionregistrat
 
 func autoConvert_admissionregistration_ValidatingAdmissionPolicyBindingList_To_v1alpha1_ValidatingAdmissionPolicyBindingList(in *admissionregistration.ValidatingAdmissionPolicyBindingList, out *v1alpha1.ValidatingAdmissionPolicyBindingList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1alpha1.ValidatingAdmissionPolicyBinding)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1alpha1.ValidatingAdmissionPolicyBinding, len(*in))
+		for i := range *in {
+			if err := Convert_admissionregistration_ValidatingAdmissionPolicyBinding_To_v1alpha1_ValidatingAdmissionPolicyBinding(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -398,7 +460,15 @@ func Convert_admissionregistration_ValidatingAdmissionPolicyBindingList_To_v1alp
 func autoConvert_v1alpha1_ValidatingAdmissionPolicyBindingSpec_To_admissionregistration_ValidatingAdmissionPolicyBindingSpec(in *v1alpha1.ValidatingAdmissionPolicyBindingSpec, out *admissionregistration.ValidatingAdmissionPolicyBindingSpec, s conversion.Scope) error {
 	out.PolicyName = in.PolicyName
 	out.ParamRef = (*admissionregistration.ParamRef)(unsafe.Pointer(in.ParamRef))
-	out.MatchResources = (*admissionregistration.MatchResources)(unsafe.Pointer(in.MatchResources))
+	if in.MatchResources != nil {
+		in, out := &in.MatchResources, &out.MatchResources
+		*out = new(admissionregistration.MatchResources)
+		if err := Convert_v1alpha1_MatchResources_To_admissionregistration_MatchResources(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.MatchResources = nil
+	}
 	return nil
 }
 
@@ -410,7 +480,15 @@ func Convert_v1alpha1_ValidatingAdmissionPolicyBindingSpec_To_admissionregistrat
 func autoConvert_admissionregistration_ValidatingAdmissionPolicyBindingSpec_To_v1alpha1_ValidatingAdmissionPolicyBindingSpec(in *admissionregistration.ValidatingAdmissionPolicyBindingSpec, out *v1alpha1.ValidatingAdmissionPolicyBindingSpec, s conversion.Scope) error {
 	out.PolicyName = in.PolicyName
 	out.ParamRef = (*v1alpha1.ParamRef)(unsafe.Pointer(in.ParamRef))
-	out.MatchResources = (*v1alpha1.MatchResources)(unsafe.Pointer(in.MatchResources))
+	if in.MatchResources != nil {
+		in, out := &in.MatchResources, &out.MatchResources
+		*out = new(v1alpha1.MatchResources)
+		if err := Convert_admissionregistration_MatchResources_To_v1alpha1_MatchResources(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.MatchResources = nil
+	}
 	return nil
 }
 
@@ -421,7 +499,17 @@ func Convert_admissionregistration_ValidatingAdmissionPolicyBindingSpec_To_v1alp
 
 func autoConvert_v1alpha1_ValidatingAdmissionPolicyList_To_admissionregistration_ValidatingAdmissionPolicyList(in *v1alpha1.ValidatingAdmissionPolicyList, out *admissionregistration.ValidatingAdmissionPolicyList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]admissionregistration.ValidatingAdmissionPolicy)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]admissionregistration.ValidatingAdmissionPolicy, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha1_ValidatingAdmissionPolicy_To_admissionregistration_ValidatingAdmissionPolicy(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -432,7 +520,17 @@ func Convert_v1alpha1_ValidatingAdmissionPolicyList_To_admissionregistration_Val
 
 func autoConvert_admissionregistration_ValidatingAdmissionPolicyList_To_v1alpha1_ValidatingAdmissionPolicyList(in *admissionregistration.ValidatingAdmissionPolicyList, out *v1alpha1.ValidatingAdmissionPolicyList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1alpha1.ValidatingAdmissionPolicy)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1alpha1.ValidatingAdmissionPolicy, len(*in))
+		for i := range *in {
+			if err := Convert_admissionregistration_ValidatingAdmissionPolicy_To_v1alpha1_ValidatingAdmissionPolicy(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -443,7 +541,15 @@ func Convert_admissionregistration_ValidatingAdmissionPolicyList_To_v1alpha1_Val
 
 func autoConvert_v1alpha1_ValidatingAdmissionPolicySpec_To_admissionregistration_ValidatingAdmissionPolicySpec(in *v1alpha1.ValidatingAdmissionPolicySpec, out *admissionregistration.ValidatingAdmissionPolicySpec, s conversion.Scope) error {
 	out.ParamKind = (*admissionregistration.ParamKind)(unsafe.Pointer(in.ParamKind))
-	out.MatchConstraints = (*admissionregistration.MatchResources)(unsafe.Pointer(in.MatchConstraints))
+	if in.MatchConstraints != nil {
+		in, out := &in.MatchConstraints, &out.MatchConstraints
+		*out = new(admissionregistration.MatchResources)
+		if err := Convert_v1alpha1_MatchResources_To_admissionregistration_MatchResources(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.MatchConstraints = nil
+	}
 	out.Validations = *(*[]admissionregistration.Validation)(unsafe.Pointer(&in.Validations))
 	out.FailurePolicy = (*admissionregistration.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
 	return nil
@@ -456,7 +562,15 @@ func Convert_v1alpha1_ValidatingAdmissionPolicySpec_To_admissionregistration_Val
 
 func autoConvert_admissionregistration_ValidatingAdmissionPolicySpec_To_v1alpha1_ValidatingAdmissionPolicySpec(in *admissionregistration.ValidatingAdmissionPolicySpec, out *v1alpha1.ValidatingAdmissionPolicySpec, s conversion.Scope) error {
 	out.ParamKind = (*v1alpha1.ParamKind)(unsafe.Pointer(in.ParamKind))
-	out.MatchConstraints = (*v1alpha1.MatchResources)(unsafe.Pointer(in.MatchConstraints))
+	if in.MatchConstraints != nil {
+		in, out := &in.MatchConstraints, &out.MatchConstraints
+		*out = new(v1alpha1.MatchResources)
+		if err := Convert_admissionregistration_MatchResources_To_v1alpha1_MatchResources(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.MatchConstraints = nil
+	}
 	out.Validations = *(*[]v1alpha1.Validation)(unsafe.Pointer(&in.Validations))
 	out.FailurePolicy = (*v1alpha1.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
 	return nil

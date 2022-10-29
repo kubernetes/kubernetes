@@ -286,6 +286,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: scope
       type:
         scalar: string
+    elementRelationship: atomic
 - name: io.k8s.api.admissionregistration.v1alpha1.ParamKind
   map:
     fields:

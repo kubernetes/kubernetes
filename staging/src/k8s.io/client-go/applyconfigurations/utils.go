@@ -145,8 +145,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &admissionregistrationv1alpha1.ParamKindApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ParamRef"):
 		return &admissionregistrationv1alpha1.ParamRefApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("Rule"):
-		return &admissionregistrationv1alpha1.RuleApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RuleWithOperations"):
 		return &admissionregistrationv1alpha1.RuleWithOperationsApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ValidatingAdmissionPolicy"):
@@ -165,8 +163,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &admissionregistrationv1beta1.MutatingWebhookApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("MutatingWebhookConfiguration"):
 		return &admissionregistrationv1beta1.MutatingWebhookConfigurationApplyConfiguration{}
-	case v1beta1.SchemeGroupVersion.WithKind("Rule"):
-		return &admissionregistrationv1beta1.RuleApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("RuleWithOperations"):
 		return &admissionregistrationv1beta1.RuleWithOperationsApplyConfiguration{}
 	case v1beta1.SchemeGroupVersion.WithKind("ServiceReference"):
