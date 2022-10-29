@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/value"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 )
 
@@ -121,8 +122,64 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 	}
 }
 
+// RunTestWatchFromZero tests that
+// - watch from 0 should sync up and grab the object added before
+// - watch from 0 is able to return events for objects whose previous version has been compacted
+func RunTestWatchFromZero(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction) {
+	key, storedObj := TestPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}})
+
+	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+	TestCheckResult(t, watch.Added, w, storedObj)
+	w.Stop()
+
+	// Update
+	out := &example.Pod{}
+	err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
+		func(runtime.Object) (runtime.Object, error) {
+			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns", Annotations: map[string]string{"a": "1"}}}, nil
+		}), nil)
+	if err != nil {
+		t.Fatalf("GuaranteedUpdate failed: %v", err)
+	}
+
+	// Make sure when we watch from 0 we receive an ADDED event
+	w, err = store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+	TestCheckResult(t, watch.Added, w, out)
+	w.Stop()
+
+	if compaction == nil {
+		t.Skip("compaction callback not provided")
+	}
+
+	// Update again
+	out = &example.Pod{}
+	err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
+		func(runtime.Object) (runtime.Object, error) {
+			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}}, nil
+		}), nil)
+	if err != nil {
+		t.Fatalf("GuaranteedUpdate failed: %v", err)
+	}
+
+	// Compact previous versions
+	compaction(ctx, t, out.ResourceVersion)
+
+	// Make sure we can still watch from 0 and receive an ADDED event
+	w, err = store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+	TestCheckResult(t, watch.Added, w, out)
+}
+
 func RunTestDeleteTriggerWatch(ctx context.Context, t *testing.T, store storage.Interface) {
-	key, storedObj := TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, storedObj := TestPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
@@ -134,7 +191,7 @@ func RunTestDeleteTriggerWatch(ctx context.Context, t *testing.T, store storage.
 }
 
 func RunTestWatchFromNoneZero(ctx context.Context, t *testing.T, store storage.Interface) {
-	key, storedObj := TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, storedObj := TestPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {
@@ -146,6 +203,39 @@ func RunTestWatchFromNoneZero(ctx context.Context, t *testing.T, store storage.I
 			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}, err
 		}), nil)
 	TestCheckResult(t, watch.Modified, w, out)
+}
+
+func RunTestWatchError(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer) {
+	// Compute the initial resource version from which we can start watching later.
+	list := &example.PodList{}
+	storageOpts := storage.ListOptions{
+		ResourceVersion: "0",
+		Predicate:       storage.Everything,
+		Recursive:       true,
+	}
+	if err := store.GetList(ctx, "/", storageOpts, list); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if err := store.GuaranteedUpdate(ctx, "//foo", &example.Pod{}, true, nil, storage.SimpleUpdate(
+		func(runtime.Object) (runtime.Object, error) {
+			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}, nil
+		}), nil); err != nil {
+		t.Fatalf("GuaranteedUpdate failed: %v", err)
+	}
+
+	// Now trigger watch error by injecting failing transformer.
+	revertTransformer := store.UpdatePrefixTransformer(
+		func(previousTransformer *PrefixTransformer) value.Transformer {
+			return &failingTransformer{}
+		})
+	defer revertTransformer()
+
+	w, err := store.Watch(ctx, "//foo", storage.ListOptions{ResourceVersion: list.ResourceVersion, Predicate: storage.Everything})
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+	TestCheckEventType(t, watch.Error, w)
 }
 
 func RunTestWatchContextCancel(ctx context.Context, t *testing.T, store storage.Interface) {
@@ -176,7 +266,7 @@ func RunTestWatchInitializationSignal(ctx context.Context, t *testing.T, store s
 	initSignal := utilflowcontrol.NewInitializationSignal()
 	ctx = utilflowcontrol.WithInitializationSignal(ctx, initSignal)
 
-	key, storedObj := TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, storedObj := TestPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	_, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)

@@ -2252,7 +2252,7 @@ func (fh *FileHandle) Bytes() []byte {
 	if n == 0 {
 		return nil
 	}
-	return (*[1 << 30]byte)(unsafe.Pointer(uintptr(unsafe.Pointer(&fh.fileHandle.Type)) + 4))[:n:n]
+	return unsafe.Slice((*byte)(unsafe.Pointer(uintptr(unsafe.Pointer(&fh.fileHandle.Type))+4)), n)
 }
 
 // NameToHandleAt wraps the name_to_handle_at system call; it obtains
@@ -2368,6 +2368,16 @@ func Setitimer(which ItimerWhich, it Itimerval) (Itimerval, error) {
 	return prev, nil
 }
 
+//sysnb	rtSigprocmask(how int, set *Sigset_t, oldset *Sigset_t, sigsetsize uintptr) (err error) = SYS_RT_SIGPROCMASK
+
+func PthreadSigmask(how int, set, oldset *Sigset_t) error {
+	if oldset != nil {
+		// Explicitly clear in case Sigset_t is larger than _C__NSIG.
+		*oldset = Sigset_t{}
+	}
+	return rtSigprocmask(how, set, oldset, _C__NSIG/8)
+}
+
 /*
  * Unimplemented
  */
@@ -2426,7 +2436,6 @@ func Setitimer(which ItimerWhich, it Itimerval) (Itimerval, error) {
 // RestartSyscall
 // RtSigaction
 // RtSigpending
-// RtSigprocmask
 // RtSigqueueinfo
 // RtSigreturn
 // RtSigsuspend

@@ -134,7 +134,7 @@ func (b *backend) processEvents(ev ...*auditinternal.Event) error {
 		// allow enough time for the serialization/deserialization of audit events, which
 		// contain nested request and response objects plus additional event fields.
 		defer trace.LogIfLong(time.Duration(50+25*len(list.Items)) * time.Millisecond)
-		return b.w.RestClient.Post().Body(&list).Do(context.TODO())
+		return b.w.RestClient.Post().Body(&list).Do(context.Background())
 	}).Error()
 }
 

@@ -52,6 +52,15 @@ type stableMetricFinder struct {
 
 var _ ast.Visitor = (*stableMetricFinder)(nil)
 
+func contains(v metrics.StabilityLevel, a []metrics.StabilityLevel) bool {
+	for _, i := range a {
+		if i == v {
+			return true
+		}
+	}
+	return false
+}
+
 func (f *stableMetricFinder) Visit(node ast.Node) (w ast.Visitor) {
 	switch opts := node.(type) {
 	case *ast.CallExpr:
@@ -76,15 +85,19 @@ func (f *stableMetricFinder) Visit(node ast.Node) (w ast.Visitor) {
 			f.errors = append(f.errors, err)
 			return nil
 		}
-		switch *stabilityLevel {
-		case metrics.STABLE, metrics.BETA:
+		classes := []metrics.StabilityLevel{metrics.STABLE, metrics.BETA}
+		if ALL_STABILITY_CLASSES {
+			classes = append(classes, metrics.ALPHA)
+		}
+		switch {
+		case contains(*stabilityLevel, classes):
 			if f.currentFunctionCall == nil {
 				f.errors = append(f.errors, newDecodeErrorf(opts, errNotDirectCall))
 				return nil
 			}
 			f.stableMetricsFunctionCalls = append(f.stableMetricsFunctionCalls, f.currentFunctionCall)
 			f.currentFunctionCall = nil
-		case metrics.INTERNAL, metrics.ALPHA:
+		default:
 			return nil
 		}
 	default:

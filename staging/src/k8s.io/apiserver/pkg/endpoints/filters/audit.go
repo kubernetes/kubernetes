@@ -44,23 +44,21 @@ func WithAudit(handler http.Handler, sink audit.Sink, policy audit.PolicyRuleEva
 		return handler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		auditContext, err := evaluatePolicyAndCreateAuditEvent(req, policy)
+		ac, err := evaluatePolicyAndCreateAuditEvent(req, policy)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to create audit event: %v", err))
 			responsewriters.InternalError(w, req, errors.New("failed to create audit event"))
 			return
 		}
 
-		ev := auditContext.Event
-		if ev == nil || req.Context() == nil {
+		if ac == nil || ac.Event == nil {
 			handler.ServeHTTP(w, req)
 			return
 		}
-
-		req = req.WithContext(audit.WithAuditContext(req.Context(), auditContext))
+		ev := ac.Event
 
 		ctx := req.Context()
-		omitStages := auditContext.RequestAuditConfig.OmitStages
+		omitStages := ac.RequestAuditConfig.OmitStages
 
 		ev.Stage = auditinternal.StageRequestReceived
 		if processed := processAuditEvent(ctx, sink, ev, omitStages); !processed {
@@ -124,19 +122,23 @@ func WithAudit(handler http.Handler, sink audit.Sink, policy audit.PolicyRuleEva
 // - error if anything bad happened
 func evaluatePolicyAndCreateAuditEvent(req *http.Request, policy audit.PolicyRuleEvaluator) (*audit.AuditContext, error) {
 	ctx := req.Context()
+	ac := audit.AuditContextFrom(ctx)
+	if ac == nil {
+		// Auditing not enabled.
+		return nil, nil
+	}
 
 	attribs, err := GetAuthorizerAttributes(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to GetAuthorizerAttributes: %v", err)
+		return ac, fmt.Errorf("failed to GetAuthorizerAttributes: %v", err)
 	}
 
 	ls := policy.EvaluatePolicyRule(attribs)
 	audit.ObservePolicyLevel(ctx, ls.Level)
+	ac.RequestAuditConfig = ls.RequestAuditConfig
 	if ls.Level == auditinternal.LevelNone {
 		// Don't audit.
-		return &audit.AuditContext{
-			RequestAuditConfig: ls.RequestAuditConfig,
-		}, nil
+		return ac, nil
 	}
 
 	requestReceivedTimestamp, ok := request.ReceivedTimestampFrom(ctx)
@@ -148,10 +150,9 @@ func evaluatePolicyAndCreateAuditEvent(req *http.Request, policy audit.PolicyRul
 		return nil, fmt.Errorf("failed to complete audit event from request: %v", err)
 	}
 
-	return &audit.AuditContext{
-		RequestAuditConfig: ls.RequestAuditConfig,
-		Event:              ev,
-	}, nil
+	ac.Event = ev
+
+	return ac, nil
 }
 
 // writeLatencyToAnnotation writes the latency incurred in different

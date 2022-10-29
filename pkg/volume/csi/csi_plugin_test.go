@@ -159,57 +159,6 @@ func TestPluginGetPluginName(t *testing.T) {
 	}
 }
 
-func TestPluginGetFSGroupPolicy(t *testing.T) {
-	defaultPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
-	testCases := []struct {
-		name                  string
-		defined               bool
-		expectedFSGroupPolicy storage.FSGroupPolicy
-	}{
-		{
-			name:                  "no FSGroupPolicy defined, expect default",
-			defined:               false,
-			expectedFSGroupPolicy: storage.ReadWriteOnceWithFSTypeFSGroupPolicy,
-		},
-		{
-			name:                  "File FSGroupPolicy defined, expect File",
-			defined:               true,
-			expectedFSGroupPolicy: storage.FileFSGroupPolicy,
-		},
-		{
-			name:                  "None FSGroupPolicy defined, expected None",
-			defined:               true,
-			expectedFSGroupPolicy: storage.NoneFSGroupPolicy,
-		},
-	}
-	for _, tc := range testCases {
-		t.Logf("testing: %s", tc.name)
-		// Define the driver and set the FSGroupPolicy
-		driver := getTestCSIDriver(testDriver, nil, nil, nil)
-		if tc.defined {
-			driver.Spec.FSGroupPolicy = &tc.expectedFSGroupPolicy
-		} else {
-			driver.Spec.FSGroupPolicy = &defaultPolicy
-		}
-
-		// Create the client and register the resources
-		fakeClient := fakeclient.NewSimpleClientset(driver)
-		plug, tmpDir := newTestPlugin(t, fakeClient)
-		defer os.RemoveAll(tmpDir)
-		registerFakePlugin(testDriver, "endpoint", []string{"1.3.0"}, t)
-
-		// Check to see if we can obtain the CSIDriver, along with examining its FSGroupPolicy
-		fsGroup, err := plug.getFSGroupPolicy(testDriver)
-		if err != nil {
-			t.Fatalf("Error attempting to obtain FSGroupPolicy: %v", err)
-		}
-		if fsGroup != *driver.Spec.FSGroupPolicy {
-			t.Fatalf("FSGroupPolicy doesn't match expected value: %v, %v", fsGroup, tc.expectedFSGroupPolicy)
-		}
-	}
-
-}
-
 func TestPluginGetVolumeName(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
@@ -372,7 +321,6 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 		specVolID  string
 		volHandle  string
 		podUID     types.UID
-		shouldFail bool
 	}{
 		{
 			name:       "construct spec1 from original persistent spec",
@@ -388,13 +336,6 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 			originSpec: volume.NewSpecFromPersistentVolume(makeTestPV("spec2", 20, testDriver, "handle2"), true),
 			podUID:     types.UID(fmt.Sprintf("%08X", rand.Uint64())),
 		},
-		{
-			name:       "construct spec from original volume spec",
-			specVolID:  "volspec",
-			originSpec: volume.NewSpecFromVolume(makeTestVol("spec2", testDriver)),
-			podUID:     types.UID(fmt.Sprintf("%08X", rand.Uint64())),
-			shouldFail: true, // csi inline off
-		},
 	}
 
 	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
@@ -406,17 +347,19 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
 				volume.VolumeOptions{},
 			)
-			if tc.shouldFail && err != nil {
-				t.Log(err)
-				return
-			}
-			if !tc.shouldFail && err != nil {
+			if err != nil {
 				t.Fatal(err)
 			}
 			if mounter == nil {
 				t.Fatal("failed to create CSI mounter")
 			}
 			csiMounter := mounter.(*csiMountMgr)
+
+			mountPath := filepath.Dir(csiMounter.GetPath())
+			err = prepareVolumeInfoFile(mountPath, plug, tc.originSpec.Name(), csiMounter.volumeID, testDriver, string(csiMounter.volumeLifecycleMode))
+			if err != nil {
+				t.Fatalf("failed to save fake volume info file: %s", err)
+			}
 
 			// rebuild spec
 			spec, err := plug.ConstructVolumeSpec("test-pv", filepath.Dir(csiMounter.GetPath()))
@@ -452,7 +395,6 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 			if spec.Name() != tc.specVolID {
 				t.Errorf("Unexpected spec name constructed %s", spec.Name())
 			}
-
 		})
 	}
 }
@@ -547,6 +489,12 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 			}
 			csiMounter := mounter.(*csiMountMgr)
 
+			mountPath := filepath.Dir(csiMounter.GetPath())
+			err = prepareVolumeInfoFile(mountPath, plug, tc.originSpec.Name(), csiMounter.volumeID, testDriver, string(csiMounter.volumeLifecycleMode))
+			if err != nil {
+				t.Fatalf("failed to save fake volume info file: %s", err)
+			}
+
 			// rebuild spec
 			spec, err := plug.ConstructVolumeSpec("test-pv", filepath.Dir(csiMounter.GetPath()))
 			if err != nil {
@@ -617,7 +565,7 @@ func TestPluginNewMounter(t *testing.T) {
 			podUID:              types.UID(fmt.Sprintf("%08X", rand.Uint64())),
 			namespace:           "test-ns2",
 			volumeLifecycleMode: storage.VolumeLifecycleEphemeral,
-			shouldFail:          true, // csi inline not enabled
+			shouldFail:          false, // NewMounter works with disabled inline volumes
 		},
 		{
 			name:       "mounter from no spec provided",
@@ -671,36 +619,6 @@ func TestPluginNewMounter(t *testing.T) {
 			}
 			if csiMounter.volumeLifecycleMode != test.volumeLifecycleMode {
 				t.Error("unexpected driver mode:", csiMounter.volumeLifecycleMode)
-			}
-
-			// ensure data file is created
-			dataDir := filepath.Dir(mounter.GetPath())
-			dataFile := filepath.Join(dataDir, volDataFileName)
-			if _, err := os.Stat(dataFile); err != nil {
-				if os.IsNotExist(err) {
-					t.Errorf("data file not created %s", dataFile)
-				} else {
-					t.Fatal(err)
-				}
-			}
-			data, err := loadVolumeData(dataDir, volDataFileName)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if data[volDataKey.specVolID] != csiMounter.spec.Name() {
-				t.Error("volume data file unexpected specVolID:", data[volDataKey.specVolID])
-			}
-			if data[volDataKey.volHandle] != csiMounter.volumeID {
-				t.Error("volume data file unexpected volHandle:", data[volDataKey.volHandle])
-			}
-			if data[volDataKey.driverName] != string(csiMounter.driverName) {
-				t.Error("volume data file unexpected driverName:", data[volDataKey.driverName])
-			}
-			if data[volDataKey.nodeName] != string(csiMounter.plugin.host.GetNodeName()) {
-				t.Error("volume data file unexpected nodeName:", data[volDataKey.nodeName])
-			}
-			if data[volDataKey.volumeLifecycleMode] != string(test.volumeLifecycleMode) {
-				t.Error("volume data file unexpected volumeLifecycleMode:", data[volDataKey.volumeLifecycleMode])
 			}
 		})
 	}
@@ -772,10 +690,6 @@ func TestPluginNewMounterWithInline(t *testing.T) {
 
 				// Some test cases are meant to fail because their input data is broken.
 				shouldFail := test.shouldFail
-				// Others fail if the driver does not support the volume mode.
-				if !containsVolumeMode(supported, test.volumeLifecycleMode) {
-					shouldFail = true
-				}
 				if shouldFail != (err != nil) {
 					t.Fatal("Unexpected error:", err)
 				}
@@ -808,36 +722,6 @@ func TestPluginNewMounterWithInline(t *testing.T) {
 				}
 				if csiMounter.volumeLifecycleMode != test.volumeLifecycleMode {
 					t.Error("unexpected driver mode:", csiMounter.volumeLifecycleMode)
-				}
-
-				// ensure data file is created
-				dataDir := filepath.Dir(mounter.GetPath())
-				dataFile := filepath.Join(dataDir, volDataFileName)
-				if _, err := os.Stat(dataFile); err != nil {
-					if os.IsNotExist(err) {
-						t.Errorf("data file not created %s", dataFile)
-					} else {
-						t.Fatal(err)
-					}
-				}
-				data, err := loadVolumeData(dataDir, volDataFileName)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if data[volDataKey.specVolID] != csiMounter.spec.Name() {
-					t.Error("volume data file unexpected specVolID:", data[volDataKey.specVolID])
-				}
-				if data[volDataKey.volHandle] != csiMounter.volumeID {
-					t.Error("volume data file unexpected volHandle:", data[volDataKey.volHandle])
-				}
-				if data[volDataKey.driverName] != string(csiMounter.driverName) {
-					t.Error("volume data file unexpected driverName:", data[volDataKey.driverName])
-				}
-				if data[volDataKey.nodeName] != string(csiMounter.plugin.host.GetNodeName()) {
-					t.Error("volume data file unexpected nodeName:", data[volDataKey.nodeName])
-				}
-				if data[volDataKey.volumeLifecycleMode] != string(csiMounter.volumeLifecycleMode) {
-					t.Error("volume data file unexpected volumeLifecycleMode:", data[volDataKey.volumeLifecycleMode])
 				}
 			})
 		}
