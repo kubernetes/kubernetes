@@ -32,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/kubernetes/test/utils"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 
@@ -192,7 +193,7 @@ func TestFileExistingCheck(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create file: %v", err)
 	}
-	defer os.Remove(f.Name())
+	defer utils.RemoveTestFile(t, f)
 	var tests = []struct {
 		name          string
 		check         FileExistingCheck
@@ -231,7 +232,7 @@ func TestFileAvailableCheck(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create file: %v", err)
 	}
-	defer os.Remove(f.Name())
+	defer utils.RemoveTestFile(t, f)
 	var tests = []struct {
 		name          string
 		check         FileAvailableCheck
@@ -270,7 +271,7 @@ func TestFileContentCheck(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create file: %v", err)
 	}
-	defer os.Remove(f.Name())
+	defer utils.RemoveTestFile(t, f)
 	var tests = []struct {
 		name          string
 		check         FileContentCheck
@@ -458,7 +459,7 @@ func TestConfigRootCAs(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed configRootCAs:\n\texpected: succeed creating temp CA file\n\tactual:%v", err)
 	}
-	defer os.Remove(f.Name())
+	defer utils.RemoveTestFile(t, f)
 	if err := os.WriteFile(f.Name(), []byte(externalEtcdRootCAFileContent), 0644); err != nil {
 		t.Errorf("failed configRootCAs:\n\texpected: succeed writing contents to temp CA file %s\n\tactual:%v", f.Name(), err)
 	}
@@ -487,7 +488,7 @@ func TestConfigCertAndKey(t *testing.T) {
 			err,
 		)
 	}
-	defer os.Remove(certFile.Name())
+	defer utils.RemoveTestFile(t, certFile)
 	if err := os.WriteFile(certFile.Name(), []byte(externalEtcdCertFileContent), 0644); err != nil {
 		t.Errorf(
 			"failed configCertAndKey:\n\texpected: succeed writing contents to temp CertFile file %s\n\tactual:%v",
@@ -503,7 +504,7 @@ func TestConfigCertAndKey(t *testing.T) {
 			err,
 		)
 	}
-	defer os.Remove(keyFile.Name())
+	defer utils.RemoveTestFile(t, keyFile)
 	if err := os.WriteFile(keyFile.Name(), []byte(externalEtcdKeyFileContent), 0644); err != nil {
 		t.Errorf(
 			"failed configCertAndKey:\n\texpected: succeed writing contents to temp KeyFile file %s\n\tactual:%v",

@@ -28,6 +28,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/test/utils"
 )
 
 var testKnownTargets = []string{
@@ -172,7 +173,7 @@ func TestGetPatchSetsForPathMustBeDirectory(t *testing.T) {
 	if err != nil {
 		t.Errorf("error creating temporary file: %v", err)
 	}
-	defer os.Remove(tempFile.Name())
+	defer utils.RemoveTestFile(t, tempFile)
 
 	_, _, _, err = getPatchSetsFromPath(tempFile.Name(), testKnownTargets, io.Discard)
 	var pathErr *os.PathError
