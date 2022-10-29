@@ -37,6 +37,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/keyutil"
+	"k8s.io/kubernetes/test/utils"
 )
 
 func copyFile(src, dst string) (err error) {
@@ -324,7 +325,8 @@ users:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
+	defer utils.RemoveTestFile(t, f)
+
 	os.WriteFile(f.Name(), testData, os.FileMode(0755))
 
 	config, err := loadRESTClientConfig(f.Name())
