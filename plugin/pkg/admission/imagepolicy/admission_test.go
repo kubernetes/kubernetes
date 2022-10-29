@@ -21,12 +21,17 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"testing"
+	"text/template"
 	"time"
 
 	"k8s.io/api/imagepolicy/v1alpha1"
@@ -35,12 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-
-	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"text/template"
+	"k8s.io/kubernetes/test/utils"
 
 	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
 )
@@ -201,7 +201,7 @@ current-context: default
 					return err
 				}
 				p := tempfile.Name()
-				defer os.Remove(p)
+				defer utils.RemoveTestFile(t, tempfile)
 
 				tmpl, err := template.New("test").Parse(tt.kubeConfigTmpl)
 				if err != nil {
@@ -216,7 +216,7 @@ current-context: default
 					return err
 				}
 				pc := tempconfigfile.Name()
-				defer os.Remove(pc)
+				defer utils.RemoveTestFile(t, tempconfigfile)
 
 				configTmpl, err := template.New("testconfig").Parse(defaultConfigTmplJSON)
 				if err != nil {
@@ -358,13 +358,14 @@ func (m *mockService) HTTPStatusCode() int { return m.statusCode }
 
 // newImagePolicyWebhook creates a temporary kubeconfig file from the provided arguments and attempts to load
 // a new newImagePolicyWebhook from it.
-func newImagePolicyWebhook(callbackURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration, defaultAllow bool) (*Plugin, error) {
+func newImagePolicyWebhook(t *testing.T, callbackURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration, defaultAllow bool) (*Plugin, error) {
 	tempfile, err := ioutil.TempFile("", "")
 	if err != nil {
 		return nil, err
 	}
 	p := tempfile.Name()
-	defer os.Remove(p)
+	defer utils.RemoveTestFile(t, tempfile)
+
 	config := v1.Config{
 		Clusters: []v1.NamedCluster{
 			{
@@ -386,7 +387,7 @@ func newImagePolicyWebhook(callbackURL string, clientCert, clientKey, ca []byte,
 		return nil, err
 	}
 	pc := tempconfigfile.Name()
-	defer os.Remove(pc)
+	defer utils.RemoveTestFile(t, tempconfigfile)
 
 	configTmpl, err := template.New("testconfig").Parse(defaultConfigTmplYAML)
 	if err != nil {
@@ -478,7 +479,7 @@ func TestTLSConfig(t *testing.T) {
 			}
 			defer server.Close()
 
-			wh, err := newImagePolicyWebhook(server.URL, tt.clientCert, tt.clientKey, tt.clientCA, -1, false)
+			wh, err := newImagePolicyWebhook(t, server.URL, tt.clientCert, tt.clientKey, tt.clientCA, -1, false)
 			if err != nil {
 				t.Errorf("%s: failed to create client: %v", tt.test, err)
 				return
@@ -559,7 +560,7 @@ func TestWebhookCache(t *testing.T) {
 	defer s.Close()
 
 	// Create an admission controller that caches successful responses.
-	wh, err := newImagePolicyWebhook(s.URL, clientCert, clientKey, caCert, 200, false)
+	wh, err := newImagePolicyWebhook(t, s.URL, clientCert, clientKey, caCert, 200, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -753,7 +754,7 @@ func TestContainerCombinations(t *testing.T) {
 			}
 			defer server.Close()
 
-			wh, err := newImagePolicyWebhook(server.URL, clientCert, clientKey, caCert, 0, false)
+			wh, err := newImagePolicyWebhook(t, server.URL, clientCert, clientKey, caCert, 0, false)
 			if err != nil {
 				t.Errorf("%s: failed to create client: %v", tt.test, err)
 				return
@@ -847,7 +848,7 @@ func TestDefaultAllow(t *testing.T) {
 			}
 			defer server.Close()
 
-			wh, err := newImagePolicyWebhook(server.URL, clientCert, clientKey, caCert, 0, tt.defaultAllow)
+			wh, err := newImagePolicyWebhook(t, server.URL, clientCert, clientKey, caCert, 0, tt.defaultAllow)
 			if err != nil {
 				t.Errorf("%s: failed to create client: %v", tt.test, err)
 				return
@@ -954,7 +955,7 @@ func TestAnnotationFiltering(t *testing.T) {
 			}
 			defer server.Close()
 
-			wh, err := newImagePolicyWebhook(server.URL, clientCert, clientKey, caCert, 0, true)
+			wh, err := newImagePolicyWebhook(t, server.URL, clientCert, clientKey, caCert, 0, true)
 			if err != nil {
 				t.Errorf("%s: failed to create client: %v", tt.test, err)
 				return
@@ -1047,7 +1048,7 @@ func TestReturnedAnnotationAdd(t *testing.T) {
 			}
 			defer server.Close()
 
-			wh, err := newImagePolicyWebhook(server.URL, clientCert, clientKey, caCert, 0, true)
+			wh, err := newImagePolicyWebhook(t, server.URL, clientCert, clientKey, caCert, 0, true)
 			if err != nil {
 				t.Errorf("%s: failed to create client: %v", tt.test, err)
 				return

@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/rest"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils"
 )
 
 const (
@@ -87,7 +88,7 @@ func testWebhookClientAuth(t *testing.T, enableAggregatorRouting bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(kubeConfigFile.Name())
+	defer utils.RemoveTestFile(t, kubeConfigFile)
 
 	if err := os.WriteFile(kubeConfigFile.Name(), []byte(`
 apiVersion: v1
@@ -113,7 +114,7 @@ users:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(admissionConfigFile.Name())
+	defer utils.RemoveTestFile(t, admissionConfigFile)
 
 	if err := os.WriteFile(admissionConfigFile.Name(), []byte(`
 apiVersion: apiserver.k8s.io/v1alpha1

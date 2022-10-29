@@ -268,7 +268,7 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 	if err != nil {
 		t.Fatalf("Failed to create audit policy file: %v", err)
 	}
-	defer os.Remove(policyFile.Name())
+	defer utils.RemoveTestFile(t, policyFile)
 	if _, err := policyFile.Write([]byte(auditPolicy)); err != nil {
 		t.Fatalf("Failed to write audit policy file: %v", err)
 	}
@@ -281,7 +281,7 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 	if err != nil {
 		t.Fatalf("Failed to create audit log file: %v", err)
 	}
-	defer os.Remove(logFile.Name())
+	defer utils.RemoveTestFile(t, logFile)
 
 	s := kubeapiservertesting.StartTestServerOrDie(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
 		"--disable-admission-plugins=ServiceAccount",

@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils"
 )
 
 func TestDynamicClientBuilder(t *testing.T) {
@@ -37,7 +38,7 @@ func TestDynamicClientBuilder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create temp file failed: %v", err)
 	}
-	defer os.RemoveAll(tmpfile.Name())
+	defer utils.RemoveTestFile(t, tmpfile)
 
 	if err = os.WriteFile(tmpfile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
 		t.Fatalf("write file %s failed: %v", tmpfile.Name(), err)

@@ -245,7 +245,7 @@ func runTestWithVersion(t *testing.T, version string) {
 	if err != nil {
 		t.Fatalf("Failed to create audit log file: %v", err)
 	}
-	defer os.Remove(logFile.Name())
+	defer utils.RemoveTestFile(t, logFile)
 
 	// start api server
 	result := kubeapiservertesting.StartTestServerOrDie(t, nil,

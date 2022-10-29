@@ -29,6 +29,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	traceservice "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	"google.golang.org/grpc"
+	"k8s.io/kubernetes/test/utils"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -97,7 +98,7 @@ egressSelections:
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tracingConfigFile.Name())
+	defer utils.RemoveTestFile(t, tracingConfigFile)
 
 	if err := os.WriteFile(tracingConfigFile.Name(), []byte(fmt.Sprintf(`
 apiVersion: apiserver.config.k8s.io/v1alpha1

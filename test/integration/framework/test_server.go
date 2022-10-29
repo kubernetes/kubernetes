@@ -98,6 +98,10 @@ func StartTestServer(t testing.TB, setup TestServerSetup) (client.Interface, *re
 	if err := os.WriteFile(proxyCACertFile.Name(), utils.EncodeCertPEM(proxySigningCert), 0644); err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		proxyCACertFile.Close()
+	}()
+
 	clientSigningKey, err := utils.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
@@ -110,6 +114,9 @@ func StartTestServer(t testing.TB, setup TestServerSetup) (client.Interface, *re
 	if err := os.WriteFile(clientCACertFile.Name(), utils.EncodeCertPEM(clientSigningCert), 0644); err != nil {
 		t.Fatal(err)
 	}
+	defer func() {
+		clientCACertFile.Close()
+	}()
 
 	listener, _, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0", net.ListenConfig{})
 	if err != nil {
@@ -120,7 +127,10 @@ func StartTestServer(t testing.TB, setup TestServerSetup) (client.Interface, *re
 	if err != nil {
 		t.Fatalf("create temp file failed: %v", err)
 	}
-	defer os.RemoveAll(saSigningKeyFile.Name())
+	defer func() {
+		saSigningKeyFile.Close()
+	}()
+
 	if err = os.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
 		t.Fatalf("write file %s failed: %v", saSigningKeyFile.Name(), err)
 	}

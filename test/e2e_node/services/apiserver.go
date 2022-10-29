@@ -79,7 +79,11 @@ func (a *APIServer) Start() error {
 	if err != nil {
 		return fmt.Errorf("create temp file failed: %v", err)
 	}
-	defer os.RemoveAll(saSigningKeyFile.Name())
+	defer func() {
+		saSigningKeyFile.Close()
+		os.RemoveAll(saSigningKeyFile.Name())
+	}()
+
 	if err = os.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
 		return fmt.Errorf("write file %s failed: %v", saSigningKeyFile.Name(), err)
 	}

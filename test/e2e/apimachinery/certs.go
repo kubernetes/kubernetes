@@ -52,6 +52,11 @@ func setupServerCert(namespaceName, serviceName string) *certContext {
 	if err != nil {
 		framework.Failf("Failed to create a temp file for ca cert generation %v", err)
 	}
+	defer func() {
+		caCertFile.Close()
+		os.Remove(caCertFile.Name())
+	}()
+
 	if err := os.WriteFile(caCertFile.Name(), utils.EncodeCertPEM(signingCert), 0644); err != nil {
 		framework.Failf("Failed to write CA cert %v", err)
 	}
@@ -74,6 +79,11 @@ func setupServerCert(namespaceName, serviceName string) *certContext {
 	if err != nil {
 		framework.Failf("Failed to create a temp file for cert generation %v", err)
 	}
+	defer func() {
+		certFile.Close()
+		os.Remove(certFile.Name())
+	}()
+
 	keyFile, err := os.CreateTemp(certDir, "server.key")
 	if err != nil {
 		framework.Failf("Failed to create a temp file for key generation %v", err)
@@ -88,6 +98,11 @@ func setupServerCert(namespaceName, serviceName string) *certContext {
 	if err = os.WriteFile(keyFile.Name(), privateKeyPEM, 0644); err != nil {
 		framework.Failf("Failed to write key file %v", err)
 	}
+	defer func() {
+		keyFile.Close()
+		os.RemoveAll(keyFile.Name())
+	}()
+
 	return &certContext{
 		cert:        utils.EncodeCertPEM(signedCert),
 		key:         privateKeyPEM,

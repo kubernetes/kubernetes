@@ -85,7 +85,11 @@ func getTestWebhookTokenAuth(serverURL string, customDial utilnet.DialFunc) (aut
 	if err != nil {
 		return nil, err
 	}
-	defer os.Remove(kubecfgFile.Name())
+	defer func() {
+		kubecfgFile.Close()
+		os.Remove(kubecfgFile.Name())
+	}()
+
 	config := v1.Config{
 		Clusters: []v1.NamedCluster{
 			{
