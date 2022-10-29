@@ -29,6 +29,6 @@ spec:
               namespaces: []
       containers:
       - name: kubernetes-pause
-        image: registry.k8s.io/pause:latest
+        image: registry.k8s.io/pause:3.8
       - name: app
         image: registry.k8s.io/nginx:test-cmd

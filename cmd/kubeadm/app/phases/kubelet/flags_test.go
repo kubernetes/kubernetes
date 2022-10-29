@@ -123,9 +123,8 @@ func TestBuildKubeletArgMap(t *testing.T) {
 				pauseImage: "registry.k8s.io/pause:3.8",
 			},
 			expected: map[string]string{
-				"container-runtime":          "remote",
-				"container-runtime-endpoint": "unix:///var/run/containerd/containerd.sock",
-				"pod-infra-container-image":  "registry.k8s.io/pause:3.8",
+				"network-plugin":            "cni",
+				"pod-infra-container-image": "registry.k8s.io/pause:3.8",
 			},
 		},
 	}

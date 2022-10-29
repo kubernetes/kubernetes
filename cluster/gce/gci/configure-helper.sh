@@ -3047,7 +3047,7 @@ spec:
   - name: vol
   containers:
   - name: pv-recycler
-    image: registry.k8s.io/debian-base:v2.0.0
+    image: registry.k8s.io/busybox:1.27
     command:
     - /bin/sh
     args:

@@ -15,7 +15,7 @@
 # Build the etcd image
 #
 # Usage:
-# 	[BUNDLED_ETCD_VERSIONS=3.0.17 3.1.20 3.2.32 3.3.17 3.4.18 3.5.4] [REGISTRY=registry.k8s.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
+# 	[BUNDLED_ETCD_VERSIONS=3.0.17 3.1.12 3.2.24 3.3.17 3.4.13 3.5.1] [REGISTRY=registry.k8s.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 #
 # The image contains different etcd versions to simplify
 # upgrades. Thus be careful when removing any versions from here.
@@ -67,19 +67,19 @@ GOARM?=7
 TEMP_DIR:=$(shell mktemp -d)
 
 ifeq ($(ARCH),amd64)
-    BASEIMAGE?=registry.k8s.io/build-image/debian-base:bullseye-v1.2.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base:bullseye-v1.0.0
 endif
 ifeq ($(ARCH),arm)
-    BASEIMAGE?=registry.k8s.io/build-image/debian-base-arm:bullseye-v1.2.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base-arm:bullseye-v1.0.0
 endif
 ifeq ($(ARCH),arm64)
-    BASEIMAGE?=registry.k8s.io/build-image/debian-base-arm64:bullseye-v1.2.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base-arm64:bullseye-v1.0.0
 endif
 ifeq ($(ARCH),ppc64le)
-    BASEIMAGE?=registry.k8s.io/build-image/debian-base-ppc64le:bullseye-v1.2.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base-ppc64le:bullseye-v1.0.0
 endif
 ifeq ($(ARCH),s390x)
-    BASEIMAGE?=registry.k8s.io/build-image/debian-base-s390x:bullseye-v1.2.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base-s390x:bullseye-v1.0.0
 endif
 
 RUNNERIMAGE?=gcr.io/distroless/static:latest
