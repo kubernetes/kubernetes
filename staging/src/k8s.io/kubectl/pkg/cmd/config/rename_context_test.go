@@ -19,13 +19,13 @@ package config
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/kubernetes/test/utils"
 )
 
 const (
@@ -103,8 +103,9 @@ func TestRenameToAlreadyExistingContext(t *testing.T) {
 }
 
 func (test renameContextTest) run(t *testing.T) {
-	fakeKubeFile, _ := ioutil.TempFile(os.TempDir(), "")
-	defer os.Remove(fakeKubeFile.Name())
+	fakeKubeFile, _ := os.CreateTemp(os.TempDir(), "")
+	defer utils.RemoveTestFile(t, fakeKubeFile)
+
 	err := clientcmd.WriteToFile(test.initialConfig, fakeKubeFile.Name())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

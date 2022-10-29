@@ -483,7 +483,7 @@ func (f *TestFactory) Cleanup() {
 	if f.tempConfigFile == nil {
 		return
 	}
-
+	f.tempConfigFile.Close()
 	os.Remove(f.tempConfigFile.Name())
 }
 
