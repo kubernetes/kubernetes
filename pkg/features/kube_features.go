@@ -719,6 +719,7 @@ const (
 	// kep: https://kep.k8s.io/2086
 	// alpha: v1.21
 	// beta: v1.22
+	// GA: v1.26
 	//
 	// Enables node-local routing for Service internal traffic
 	ServiceInternalTrafficPolicy featuregate.Feature = "ServiceInternalTrafficPolicy"
@@ -1016,7 +1017,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ServiceIPStaticSubrange: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
-	ServiceInternalTrafficPolicy: {Default: true, PreRelease: featuregate.Beta},
+	ServiceInternalTrafficPolicy: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	SizeMemoryBackedVolumes: {Default: true, PreRelease: featuregate.Beta},
 

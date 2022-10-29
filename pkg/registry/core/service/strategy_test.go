@@ -26,11 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -153,23 +150,12 @@ func makeServiceWithPorts(ports []api.PortStatus) *api.Service {
 	}
 }
 
-func makeServiceWithInternalTrafficPolicy(policy *api.ServiceInternalTrafficPolicyType) *api.Service {
-	return &api.Service{
-		Spec: api.ServiceSpec{
-			InternalTrafficPolicy: policy,
-		},
-	}
-}
-
 func TestDropDisabledField(t *testing.T) {
-	localInternalTrafficPolicy := api.ServiceInternalTrafficPolicyLocal
-
 	testCases := []struct {
-		name                        string
-		enableInternalTrafficPolicy bool
-		svc                         *api.Service
-		oldSvc                      *api.Service
-		compareSvc                  *api.Service
+		name       string
+		svc        *api.Service
+		oldSvc     *api.Service
+		compareSvc *api.Service
 	}{
 		/* svc.Status.Conditions */
 		{
@@ -221,33 +207,10 @@ func TestDropDisabledField(t *testing.T) {
 			oldSvc:     makeServiceWithPorts([]api.PortStatus{}),
 			compareSvc: makeServiceWithPorts(nil),
 		},
-		/* svc.spec.internalTrafficPolicy */
-		{
-			name:                        "internal traffic policy not enabled, field used in old, not used in new",
-			enableInternalTrafficPolicy: false,
-			svc:                         makeServiceWithInternalTrafficPolicy(nil),
-			oldSvc:                      makeServiceWithInternalTrafficPolicy(&localInternalTrafficPolicy),
-			compareSvc:                  makeServiceWithInternalTrafficPolicy(nil),
-		},
-		{
-			name:                        "internal traffic policy not enabled, field not used in old, used in new",
-			enableInternalTrafficPolicy: false,
-			svc:                         makeServiceWithInternalTrafficPolicy(&localInternalTrafficPolicy),
-			oldSvc:                      makeServiceWithInternalTrafficPolicy(nil),
-			compareSvc:                  makeServiceWithInternalTrafficPolicy(nil),
-		},
-		{
-			name:                        "internal traffic policy enabled, field not used in old, used in new",
-			enableInternalTrafficPolicy: true,
-			svc:                         makeServiceWithInternalTrafficPolicy(&localInternalTrafficPolicy),
-			oldSvc:                      makeServiceWithInternalTrafficPolicy(nil),
-			compareSvc:                  makeServiceWithInternalTrafficPolicy(&localInternalTrafficPolicy),
-		},
 		/* add more tests for other dropped fields as needed */
 	}
 	for _, tc := range testCases {
 		func() {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceInternalTrafficPolicy, tc.enableInternalTrafficPolicy)()
 			old := tc.oldSvc.DeepCopy()
 
 			// to test against user using IPFamily not set on cluster
