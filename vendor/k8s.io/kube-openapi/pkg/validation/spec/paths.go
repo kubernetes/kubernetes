@@ -113,8 +113,11 @@ func (p *Paths) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Deco
 				}
 				p.Paths[k] = pi
 			default:
-				_, err := dec.ReadValue() // skip value
-				return err
+				v, err := dec.ReadValue() // skip value
+				fmt.Println("read value:", v)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	default:
@@ -141,4 +144,15 @@ func (p Paths) MarshalJSON() ([]byte, error) {
 	}
 	concated := swag.ConcatJSON(b1, b2)
 	return concated, nil
+}
+
+func (p Paths) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	m := make(map[string]interface{}, len(p.Extensions)+len(p.Paths))
+	for k, v := range p.Extensions {
+		m[k] = v
+	}
+	for k, v := range p.Paths {
+		m[k] = v
+	}
+	return opts.MarshalNext(enc, m)
 }

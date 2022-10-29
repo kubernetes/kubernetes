@@ -52,6 +52,16 @@ func (t Tag) MarshalJSON() ([]byte, error) {
 	return swag.ConcatJSON(b1, b2), nil
 }
 
+func (t Tag) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	var x struct {
+		Extensions
+		TagProps
+	}
+	x.Extensions = t.Extensions
+	x.TagProps = t.TagProps
+	return opts.MarshalNext(enc, x)
+}
+
 // UnmarshalJSON marshal this from JSON
 func (t *Tag) UnmarshalJSON(data []byte) error {
 	if internal.UseOptimizedJSONUnmarshaling {

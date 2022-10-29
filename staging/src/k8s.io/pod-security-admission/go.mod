@@ -94,7 +94,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/kms v0.0.0 // indirect
-	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280 // indirect
+	k8s.io/kube-openapi v0.0.0-20221106172337-c797efac046a // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.33 // indirect
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
@@ -107,5 +107,6 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
 	k8s.io/kms => ../kms
+	k8s.io/kube-openapi => github.com/apelisse/kube-openapi v0.0.0-20221106172337-c797efac046a
 	k8s.io/pod-security-admission => ../pod-security-admission
 )

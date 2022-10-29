@@ -62,6 +62,43 @@ func (h Header) MarshalJSON() ([]byte, error) {
 	return swag.ConcatJSON(b1, b2, b3, b4), nil
 }
 
+func (h Header) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	type SimpleSchemaOmitZero struct {
+		Type             string      `json:"type,omitempty"`
+		Nullable         bool        `json:"nullable,omitzero"`
+		Format           string      `json:"format,omitempty"`
+		Items            *Items      `json:"items,omitzero"`
+		CollectionFormat string      `json:"collectionFormat,omitempty"`
+		Default          interface{} `json:"default,omitempty"`
+		Example          interface{} `json:"example,omitempty"`
+	}
+	type CommonValidationsOmitZero struct {
+		Maximum          *float64      `json:"maximum,omitempty"`
+		ExclusiveMaximum bool          `json:"exclusiveMaximum,omitzero"`
+		Minimum          *float64      `json:"minimum,omitempty"`
+		ExclusiveMinimum bool          `json:"exclusiveMinimum,omitzero"`
+		MaxLength        *int64        `json:"maxLength,omitempty"`
+		MinLength        *int64        `json:"minLength,omitempty"`
+		Pattern          string        `json:"pattern,omitempty"`
+		MaxItems         *int64        `json:"maxItems,omitempty"`
+		MinItems         *int64        `json:"minItems,omitempty"`
+		UniqueItems      bool          `json:"uniqueItems,omitzero"`
+		MultipleOf       *float64      `json:"multipleOf,omitempty"`
+		Enum             []interface{} `json:"enum,omitempty"`
+	}
+	var x struct {
+		CommonValidationsOmitZero
+		SimpleSchemaOmitZero
+		Extensions
+		HeaderProps
+	}
+	x.CommonValidationsOmitZero = CommonValidationsOmitZero(h.CommonValidations)
+	x.SimpleSchemaOmitZero = SimpleSchemaOmitZero(h.SimpleSchema)
+	x.Extensions = h.Extensions
+	x.HeaderProps = h.HeaderProps
+	return opts.MarshalNext(enc, x)
+}
+
 // UnmarshalJSON unmarshals this header from JSON
 func (h *Header) UnmarshalJSON(data []byte) error {
 	if internal.UseOptimizedJSONUnmarshaling {

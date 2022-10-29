@@ -103,3 +103,15 @@ func (p PathItem) MarshalJSON() ([]byte, error) {
 	concated := swag.ConcatJSON(b3, b4, b5)
 	return concated, nil
 }
+
+func (p PathItem) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	var x struct {
+		Ref string `json:"$ref,omitempty"`
+		Extensions
+		PathItemProps
+	}
+	x.Ref = p.Refable.Ref.String()
+	x.Extensions = p.Extensions
+	x.PathItemProps = p.PathItemProps
+	return opts.MarshalNext(enc, x)
+}

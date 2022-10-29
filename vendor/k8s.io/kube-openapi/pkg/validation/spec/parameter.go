@@ -144,3 +144,50 @@ func (p Parameter) MarshalJSON() ([]byte, error) {
 	}
 	return swag.ConcatJSON(b3, b1, b2, b4, b5), nil
 }
+
+func (p Parameter) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	type ParamPropsOmitZero struct {
+		Description     string  `json:"description,omitempty"`
+		Name            string  `json:"name,omitempty"`
+		In              string  `json:"in,omitempty"`
+		Required        bool    `json:"required,omitzero"`
+		Schema          *Schema `json:"schema,omitzero"`
+		AllowEmptyValue bool    `json:"allowEmptyValue,omitzero"`
+	}
+	type SimpleSchemaOmitZero struct {
+		Type             string      `json:"type,omitempty"`
+		Nullable         bool        `json:"nullable,omitzero"`
+		Format           string      `json:"format,omitempty"`
+		Items            *Items      `json:"items,omitzero"`
+		CollectionFormat string      `json:"collectionFormat,omitempty"`
+		Default          interface{} `json:"default,omitempty"`
+		Example          interface{} `json:"example,omitempty"`
+	}
+	type CommonValidationsOmitZero struct {
+		Maximum          *float64      `json:"maximum,omitempty"`
+		ExclusiveMaximum bool          `json:"exclusiveMaximum,omitzero"`
+		Minimum          *float64      `json:"minimum,omitempty"`
+		ExclusiveMinimum bool          `json:"exclusiveMinimum,omitzero"`
+		MaxLength        *int64        `json:"maxLength,omitempty"`
+		MinLength        *int64        `json:"minLength,omitempty"`
+		Pattern          string        `json:"pattern,omitempty"`
+		MaxItems         *int64        `json:"maxItems,omitempty"`
+		MinItems         *int64        `json:"minItems,omitempty"`
+		UniqueItems      bool          `json:"uniqueItems,omitzero"`
+		MultipleOf       *float64      `json:"multipleOf,omitempty"`
+		Enum             []interface{} `json:"enum,omitempty"`
+	}
+	var x struct {
+		CommonValidationsOmitZero
+		SimpleSchemaOmitZero
+		Extensions
+		ParamPropsOmitZero
+		Ref string `json:"$ref,omitempty"`
+	}
+	x.CommonValidationsOmitZero = CommonValidationsOmitZero(p.CommonValidations)
+	x.SimpleSchemaOmitZero = SimpleSchemaOmitZero(p.SimpleSchema)
+	x.Extensions = p.Extensions
+	x.ParamPropsOmitZero = ParamPropsOmitZero(p.ParamProps)
+	x.Ref = p.Refable.Ref.String()
+	return opts.MarshalNext(enc, x)
+}

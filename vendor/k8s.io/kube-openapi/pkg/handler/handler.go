@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"crypto/sha512"
-	"encoding/json"
 	"fmt"
 	"mime"
 	"net/http"
@@ -117,7 +116,7 @@ func (o *OpenAPIService) UpdateSpec(openapiSpec *spec.Swagger) (err error) {
 	o.rwMutex.Lock()
 	defer o.rwMutex.Unlock()
 	o.jsonCache = o.jsonCache.New(func() ([]byte, error) {
-		return json.Marshal(openapiSpec)
+		return openapiSpec.MarshalNext()
 	})
 	o.protoCache = o.protoCache.New(func() ([]byte, error) {
 		json, err := o.jsonCache.Get()

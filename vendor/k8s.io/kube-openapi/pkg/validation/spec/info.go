@@ -192,6 +192,16 @@ func (i Info) MarshalJSON() ([]byte, error) {
 	return swag.ConcatJSON(b1, b2), nil
 }
 
+func (i Info) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	var x struct {
+		Extensions
+		InfoProps
+	}
+	x.Extensions = i.Extensions
+	x.InfoProps = i.InfoProps
+	return opts.MarshalNext(enc, x)
+}
+
 // UnmarshalJSON marshal this from JSON
 func (i *Info) UnmarshalJSON(data []byte) error {
 	if internal.UseOptimizedJSONUnmarshaling {

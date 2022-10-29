@@ -56,6 +56,16 @@ func (s SecurityScheme) MarshalJSON() ([]byte, error) {
 	return swag.ConcatJSON(b1, b2), nil
 }
 
+func (s SecurityScheme) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	var x struct {
+		Extensions
+		SecuritySchemeProps
+	}
+	x.Extensions = s.Extensions
+	x.SecuritySchemeProps = s.SecuritySchemeProps
+	return opts.MarshalNext(enc, x)
+}
+
 // UnmarshalJSON marshal this from JSON
 func (s *SecurityScheme) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &s.SecuritySchemeProps); err != nil {

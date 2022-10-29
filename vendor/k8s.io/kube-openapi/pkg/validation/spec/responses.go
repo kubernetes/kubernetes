@@ -75,6 +75,23 @@ func (r Responses) MarshalJSON() ([]byte, error) {
 	return concated, nil
 }
 
+func (r Responses) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	type ArbitraryKeys map[string]interface{}
+	var x struct {
+		ArbitraryKeys
+		Default *Response `json:"default,omitempty"`
+	}
+	x.ArbitraryKeys = make(ArbitraryKeys, len(r.Extensions)+len(r.StatusCodeResponses))
+	for k, v := range r.Extensions {
+		x.ArbitraryKeys[k] = v
+	}
+	for k, v := range r.StatusCodeResponses {
+		x.ArbitraryKeys[strconv.Itoa(k)] = v
+	}
+	x.Default = r.Default
+	return opts.MarshalNext(enc, x)
+}
+
 // ResponsesProps describes all responses for an operation.
 // It tells what is the default response and maps all responses with a
 // HTTP status code.

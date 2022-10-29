@@ -100,6 +100,24 @@ func (r Response) MarshalJSON() ([]byte, error) {
 	return swag.ConcatJSON(b1, b2, b3), nil
 }
 
+func (r Response) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	type ResponsePropsOmitZero struct {
+		Description string                 `json:"description,omitempty"`
+		Schema      *Schema                `json:"schema,omitzero"`
+		Headers     map[string]Header      `json:"headers,omitempty"`
+		Examples    map[string]interface{} `json:"examples,omitempty"`
+	}
+	var x struct {
+		Ref string `json:"$ref,omitempty"`
+		Extensions
+		ResponsePropsOmitZero
+	}
+	x.Ref = r.Refable.Ref.String()
+	x.Extensions = r.Extensions
+	x.ResponsePropsOmitZero = ResponsePropsOmitZero(r.ResponseProps)
+	return opts.MarshalNext(enc, x)
+}
+
 // NewResponse creates a new response instance
 func NewResponse() *Response {
 	return new(Response)

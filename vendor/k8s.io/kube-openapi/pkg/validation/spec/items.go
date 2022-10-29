@@ -135,3 +135,40 @@ func (i Items) MarshalJSON() ([]byte, error) {
 	}
 	return swag.ConcatJSON(b4, b3, b1, b2), nil
 }
+
+func (i Items) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	type SimpleSchemaOmitZero struct {
+		Type             string      `json:"type,omitempty"`
+		Nullable         bool        `json:"nullable,omitzero"`
+		Format           string      `json:"format,omitempty"`
+		Items            *Items      `json:"items,omitzero"`
+		CollectionFormat string      `json:"collectionFormat,omitempty"`
+		Default          interface{} `json:"default,omitempty"`
+		Example          interface{} `json:"example,omitempty"`
+	}
+	type CommonValidationsOmitZero struct {
+		Maximum          *float64      `json:"maximum,omitempty"`
+		ExclusiveMaximum bool          `json:"exclusiveMaximum,omitzero"`
+		Minimum          *float64      `json:"minimum,omitempty"`
+		ExclusiveMinimum bool          `json:"exclusiveMinimum,omitzero"`
+		MaxLength        *int64        `json:"maxLength,omitempty"`
+		MinLength        *int64        `json:"minLength,omitempty"`
+		Pattern          string        `json:"pattern,omitempty"`
+		MaxItems         *int64        `json:"maxItems,omitempty"`
+		MinItems         *int64        `json:"minItems,omitempty"`
+		UniqueItems      bool          `json:"uniqueItems,omitzero"`
+		MultipleOf       *float64      `json:"multipleOf,omitempty"`
+		Enum             []interface{} `json:"enum,omitempty"`
+	}
+	var x struct {
+		CommonValidationsOmitZero
+		SimpleSchemaOmitZero
+		Ref string `json:"$ref,omitempty"`
+		Extensions
+	}
+	x.CommonValidationsOmitZero = CommonValidationsOmitZero(i.CommonValidations)
+	x.SimpleSchemaOmitZero = SimpleSchemaOmitZero(i.SimpleSchema)
+	x.Ref = i.Refable.Ref.String()
+	x.Extensions = i.Extensions
+	return opts.MarshalNext(enc, x)
+}

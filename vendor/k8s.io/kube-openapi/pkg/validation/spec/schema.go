@@ -465,6 +465,70 @@ func (s Schema) MarshalJSON() ([]byte, error) {
 	return swag.ConcatJSON(b1, b2, b3, b4, b5, b6), nil
 }
 
+func (s Schema) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	type SchemaPropsOmitZero struct {
+		ID                   string            `json:"id,omitempty"`
+		Ref                  Ref               `json:"-"`
+		Schema               SchemaURL         `json:"-"`
+		Description          string            `json:"description,omitempty"`
+		Type                 StringOrArray     `json:"type,omitzero"`
+		Nullable             bool              `json:"nullable,omitzero"`
+		Format               string            `json:"format,omitempty"`
+		Title                string            `json:"title,omitempty"`
+		Default              interface{}       `json:"default,omitempty"`
+		Maximum              *float64          `json:"maximum,omitempty"`
+		ExclusiveMaximum     bool              `json:"exclusiveMaximum,omitzero"`
+		Minimum              *float64          `json:"minimum,omitempty"`
+		ExclusiveMinimum     bool              `json:"exclusiveMinimum,omitzero"`
+		MaxLength            *int64            `json:"maxLength,omitempty"`
+		MinLength            *int64            `json:"minLength,omitempty"`
+		Pattern              string            `json:"pattern,omitempty"`
+		MaxItems             *int64            `json:"maxItems,omitempty"`
+		MinItems             *int64            `json:"minItems,omitempty"`
+		UniqueItems          bool              `json:"uniqueItems,omitzero"`
+		MultipleOf           *float64          `json:"multipleOf,omitempty"`
+		Enum                 []interface{}     `json:"enum,omitempty"`
+		MaxProperties        *int64            `json:"maxProperties,omitempty"`
+		MinProperties        *int64            `json:"minProperties,omitempty"`
+		Required             []string          `json:"required,omitempty"`
+		Items                *SchemaOrArray    `json:"items,omitzero"`
+		AllOf                []Schema          `json:"allOf,omitempty"`
+		OneOf                []Schema          `json:"oneOf,omitempty"`
+		AnyOf                []Schema          `json:"anyOf,omitempty"`
+		Not                  *Schema           `json:"not,omitzero"`
+		Properties           map[string]Schema `json:"properties,omitempty"`
+		AdditionalProperties *SchemaOrBool     `json:"additionalProperties,omitzero"`
+		PatternProperties    map[string]Schema `json:"patternProperties,omitempty"`
+		Dependencies         Dependencies      `json:"dependencies,omitempty"`
+		AdditionalItems      *SchemaOrBool     `json:"additionalItems,omitzero"`
+		Definitions          Definitions       `json:"definitions,omitempty"`
+	}
+	type SwaggerSchemaPropsOmitZero struct {
+		Discriminator string                 `json:"discriminator,omitempty"`
+		ReadOnly      bool                   `json:"readOnly,omitzero"`
+		ExternalDocs  *ExternalDocumentation `json:"externalDocs,omitzero"`
+		Example       interface{}            `json:"example,omitempty"`
+	}
+	type ArbitraryKeys map[string]interface{}
+	var x struct {
+		ArbitraryKeys
+		SchemaPropsOmitZero
+		SwaggerSchemaPropsOmitZero
+		Ref string `json:"$ref,omitempty"`
+	}
+	x.ArbitraryKeys = make(ArbitraryKeys, len(s.Extensions)+len(s.ExtraProps))
+	for k, v := range s.Extensions {
+		x.ArbitraryKeys[k] = v
+	}
+	for k, v := range s.ExtraProps {
+		x.ArbitraryKeys[k] = v
+	}
+	x.SchemaPropsOmitZero = SchemaPropsOmitZero(s.SchemaProps)
+	x.SwaggerSchemaPropsOmitZero = SwaggerSchemaPropsOmitZero(s.SwaggerSchemaProps)
+	x.Ref = s.Ref.String()
+	return opts.MarshalNext(enc, x)
+}
+
 // UnmarshalJSON marshal this from JSON
 func (s *Schema) UnmarshalJSON(data []byte) error {
 	if internal.UseOptimizedJSONUnmarshaling {

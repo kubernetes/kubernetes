@@ -50,5 +50,6 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
+	k8s.io/kube-openapi => github.com/apelisse/kube-openapi v0.0.0-20221106172337-c797efac046a
 	k8s.io/kubelet => ../kubelet
 )

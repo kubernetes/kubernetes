@@ -46,6 +46,21 @@ func (s Swagger) MarshalJSON() ([]byte, error) {
 	return swag.ConcatJSON(b1, b2), nil
 }
 
+func (s Swagger) MarshalNext() ([]byte, error) {
+	return jsonv2.Marshal(s)
+}
+
+// MarshalJSON marshals this swagger structure to json
+func (s Swagger) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	var x struct {
+		Extensions
+		SwaggerProps
+	}
+	x.Extensions = s.Extensions
+	x.SwaggerProps = s.SwaggerProps
+	return opts.MarshalNext(enc, x)
+}
+
 // UnmarshalJSON unmarshals a swagger spec from json
 func (s *Swagger) UnmarshalJSON(data []byte) error {
 	if internal.UseOptimizedJSONUnmarshaling {
@@ -136,6 +151,18 @@ func (s SchemaOrBool) MarshalJSON() ([]byte, error) {
 	return jsTrue, nil
 }
 
+// MarshalJSON convert this object to JSON
+func (s SchemaOrBool) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	if s.Schema != nil {
+		return opts.MarshalNext(enc, s.Schema)
+	}
+
+	if s.Schema == nil && !s.Allows {
+		return enc.WriteToken(jsonv2.False)
+	}
+	return enc.WriteToken(jsonv2.True)
+}
+
 // UnmarshalJSON converts this bool or schema object from a JSON structure
 func (s *SchemaOrBool) UnmarshalJSON(data []byte) error {
 	if internal.UseOptimizedJSONUnmarshaling {
@@ -192,6 +219,17 @@ func (s SchemaOrStringArray) MarshalJSON() ([]byte, error) {
 		return json.Marshal(s.Schema)
 	}
 	return []byte("null"), nil
+}
+
+// MarshalJSON converts this schema object or array into JSON structure
+func (s SchemaOrStringArray) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	if len(s.Property) > 0 {
+		return opts.MarshalNext(enc, s.Property)
+	}
+	if s.Schema != nil {
+		return opts.MarshalNext(enc, s.Schema)
+	}
+	return enc.WriteToken(jsonv2.Null)
 }
 
 // UnmarshalJSON converts this schema object or array from a JSON structure
@@ -351,6 +389,14 @@ func (s SchemaOrArray) MarshalJSON() ([]byte, error) {
 		return json.Marshal(s.Schemas)
 	}
 	return json.Marshal(s.Schema)
+}
+
+// MarshalJSON converts this schema object or array into JSON structure
+func (s SchemaOrArray) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	if len(s.Schemas) > 0 {
+		return opts.MarshalNext(enc, s.Schemas)
+	}
+	return opts.MarshalNext(enc, s.Schema)
 }
 
 // UnmarshalJSON converts this schema object or array from a JSON structure

@@ -36,7 +36,7 @@ type OperationProps struct {
 	Summary      string                 `json:"summary,omitempty"`
 	ExternalDocs *ExternalDocumentation `json:"externalDocs,omitempty"`
 	ID           string                 `json:"operationId,omitempty"`
-	Deprecated   bool                   `json:"deprecated,omitempty"`
+	Deprecated   bool                   `json:"deprecated,omitempty,omitzero"`
 	Security     []map[string][]string  `json:"security,omitempty"`
 	Parameters   []Parameter            `json:"parameters,omitempty"`
 	Responses    *Responses             `json:"responses,omitempty"`
@@ -117,4 +117,28 @@ func (o Operation) MarshalJSON() ([]byte, error) {
 	}
 	concated := swag.ConcatJSON(b1, b2)
 	return concated, nil
+}
+
+func (o Operation) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+	type OperationPropsOmitZero struct {
+		Description  string                 `json:"description,omitempty"`
+		Consumes     []string               `json:"consumes,omitempty"`
+		Produces     []string               `json:"produces,omitempty"`
+		Schemes      []string               `json:"schemes,omitempty"`
+		Tags         []string               `json:"tags,omitempty"`
+		Summary      string                 `json:"summary,omitempty"`
+		ExternalDocs *ExternalDocumentation `json:"externalDocs,omitzero"`
+		ID           string                 `json:"operationId,omitempty"`
+		Deprecated   bool                   `json:"deprecated,omitempty,omitzero"`
+		Security     []map[string][]string  `json:"security,omitempty"`
+		Parameters   []Parameter            `json:"parameters,omitempty"`
+		Responses    *Responses             `json:"responses,omitzero"`
+	}
+	var x struct {
+		Extensions
+		OperationPropsOmitZero
+	}
+	x.Extensions = o.Extensions
+	x.OperationPropsOmitZero = OperationPropsOmitZero(o.OperationProps)
+	return opts.MarshalNext(enc, x)
 }
