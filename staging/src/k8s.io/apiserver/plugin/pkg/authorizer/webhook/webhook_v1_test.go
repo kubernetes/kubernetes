@@ -42,6 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
+	"k8s.io/kubernetes/test/utils"
 )
 
 var testRetryBackoff = wait.Backoff{
@@ -180,12 +181,12 @@ current-context: default
 	for _, tt := range tests {
 		// Use a closure so defer statements trigger between loop iterations.
 		err := func() error {
-			tempfile, err := ioutil.TempFile("", "")
+			tempfile, err := os.CreateTemp("", "")
 			if err != nil {
 				return err
 			}
 			p := tempfile.Name()
-			defer os.Remove(p)
+			defer utils.RemoveTestFile(t, tempfile)
 
 			tmpl, err := template.New("test").Parse(tt.configTmpl)
 			if err != nil {

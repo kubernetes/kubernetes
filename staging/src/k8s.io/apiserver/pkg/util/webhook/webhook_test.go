@@ -722,6 +722,7 @@ func newKubeConfigFile(config v1.Config) (string, error) {
 		return "", fmt.Errorf("unable to write the Kubernetes client configuration to disk: %v", err)
 	}
 
+	configFile.Close()
 	return configFile.Name(), nil
 }
 
