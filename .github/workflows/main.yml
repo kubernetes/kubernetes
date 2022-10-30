@@ -1,0 +1,31 @@
+name: 'Setup Go environment'
+description: 'Setup a Go environment and add it to the PATH'
+author: 'GitHub'
+inputs:
+  go-version:
+    description: 'The Go version to download (if necessary) and use. Supports semver spec and ranges.'
+  go-version-file:
+    description: 'Path to the go.mod file.'
+  check-latest:
+    description: 'Set this option to true if you want the action to always check for the latest available version that satisfies the version spec'
+    default: false
+  token:
+    description: Used to pull node distributions from go-versions.  Since there's a default, this is typically not supplied by the user.
+    default: ${{ github.token }}
+  cache:
+    description: Used to specify whether caching is needed. Set to true, if you'd like to enable caching.
+    default: false
+  cache-dependency-path:
+    description: 'Used to specify the path to a dependency file - go.sum'
+  architecture:
+    description: 'Target architecture for Go to use. Examples: x86, x64. Will use system architecture by default.'
+outputs:
+  go-version:
+    description: 'The installed Go version. Useful when given a version range as input.'  
+  cache-hit: 
+    description: 'A boolean value to indicate if a cache was hit'
+runs:
+  using: 'node16'
+  main: 'dist/setup/index.js'
+  post: 'dist/cache-save/index.js'
+  post-if: success()
