@@ -383,7 +383,15 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 		framework.Logf("Namespace %q now has labels, %#v", ns, updatedNamespace.Labels)
 	})
 
-	ginkgo.It("should apply a finalizer to a Namespace", func() {
+	/*
+		Release: v1.26
+		Testname: Namespace, apply finalizer to a namespace
+		Description: Attempt to create a Namespace which MUST be succeed.
+		Updating the namespace with a fake finalizer MUST succeed. The
+		fake finalizer MUST be found. Removing the fake finalizer from
+		the namespace MUST succeed and MUST NOT be found.
+	*/
+	framework.ConformanceIt("should apply a finalizer to a Namespace", func() {
 
 		fakeFinalizer := v1.FinalizerName("e2e.example.com/fakeFinalizer")
 		var updatedNamespace *v1.Namespace

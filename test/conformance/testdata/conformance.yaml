@@ -384,6 +384,14 @@
     MUST cause pods created by that RC to be orphaned.
   release: v1.9
   file: test/e2e/apimachinery/garbage_collector.go
+- testname: Namespace, apply finalizer to a namespace
+  codename: '[sig-api-machinery] Namespaces [Serial] should apply a finalizer to a
+    Namespace [Conformance]'
+  description: Attempt to create a Namespace which MUST be succeed. Updating the namespace
+    with a fake finalizer MUST succeed. The fake finalizer MUST be found. Removing
+    the fake finalizer from the namespace MUST succeed and MUST NOT be found.
+  release: v1.26
+  file: test/e2e/apimachinery/namespace.go
 - testname: Namespace, apply update to a namespace
   codename: '[sig-api-machinery] Namespaces [Serial] should apply an update to a Namespace
     [Conformance]'
