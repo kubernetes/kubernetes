@@ -205,8 +205,8 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 		}.IsConditionMet, nil
 	}
 	if strings.HasPrefix(condition, "jsonpath=") {
-		splitStr := strings.Split(condition, "=")
-		if len(splitStr) != 3 {
+		splitStr, err := parseJSONPathCondition(condition)
+		if err != nil {
 			return nil, fmt.Errorf("jsonpath wait format must be --for=jsonpath='{.status.readyReplicas}'=3")
 		}
 		jsonPathExp, jsonPathCond, err := processJSONPathInput(splitStr[1], splitStr[2])
@@ -225,6 +225,24 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 	}
 
 	return nil, fmt.Errorf("unrecognized condition: %q", condition)
+}
+
+// parseJSONPathCondition is a specialized string split function that only splits on the first
+// and last equal sign, so that the expression in the middle part can contain equal signs
+func parseJSONPathCondition(condition string) ([]string, error) {
+	firstEqual := strings.Index(condition, "=")
+	if firstEqual == -1 {
+		return nil, fmt.Errorf("first equal not found")
+	}
+	lastEqual := strings.LastIndex(condition, "=")
+	if lastEqual == -1 || lastEqual == firstEqual {
+		return nil, fmt.Errorf("last equal not found")
+	}
+	return []string{
+		condition[:firstEqual],
+		condition[firstEqual+1 : lastEqual],
+		condition[lastEqual+1:],
+	}, nil
 }
 
 // newJSONPathParser will create a new JSONPath parser based on the jsonPathExpression

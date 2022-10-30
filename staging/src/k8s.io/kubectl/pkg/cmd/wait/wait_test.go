@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -1058,6 +1059,17 @@ func TestWaitForDifferentJSONPathExpression(t *testing.T) {
 			expectedErr: None,
 		},
 		{
+			name: "expression containing equal sign",
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+				fakeClient.PrependReactor("list", "theresource", listReactionfunc)
+				return fakeClient
+			},
+			jsonPathExp:  "{.status.conditions[?(.type==\"Ready\")].status}",
+			jsonPathCond: "True",
+			expectedErr:  None,
+		},
+		{
 			name: "compare boolean JSONPath entry wrong value",
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
 				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
@@ -1460,6 +1472,51 @@ func TestWaitForJSONPathCondition(t *testing.T) {
 				if !strings.Contains(err.Error(), test.expectedErr) {
 					t.Fatalf("expected %q, got %q", test.expectedErr, err.Error())
 				}
+			}
+		})
+	}
+}
+
+func TestParseJSONPathCondition(t *testing.T) {
+	testCases := []struct {
+		name           string
+		condition      string
+		expectedResult []string
+		expectedError  string
+	}{
+		{
+			name:      "JSONPath expression without equal",
+			condition: `jsonpath='{.status.phase}'=Running`,
+			expectedResult: []string{
+				"jsonpath",
+				`'{.status.phase}'`,
+				"Running",
+			},
+		},
+		{
+			name:      "JSONPath expression with equal",
+			condition: `jsonpath='{.status.containerStatuses[?(.name=="foo")].ready}'=True`,
+			expectedResult: []string{
+				"jsonpath",
+				`'{.status.containerStatuses[?(.name=="foo")].ready}'`,
+				"True",
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := parseJSONPathCondition(tc.condition)
+			if err != nil {
+				if len(tc.expectedError) == 0 {
+					t.Fatalf("Unexpected error: %v", err)
+				} else if err.Error() != tc.expectedError {
+					t.Fatalf("Wrong error: expected %q, got %q", tc.expectedError, err.Error())
+				}
+			} else if len(tc.expectedError) > 0 {
+				t.Fatalf("Unexpected non-error: expected %q", tc.expectedError)
+			}
+			if !cmp.Equal(tc.expectedResult, result) {
+				t.Fatalf("Wrong result: expected %v, got %v", tc.expectedResult, result)
 			}
 		})
 	}
