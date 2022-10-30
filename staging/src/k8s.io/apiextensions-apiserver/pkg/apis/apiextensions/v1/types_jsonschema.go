@@ -164,10 +164,6 @@ type JSONSchemaProps struct {
 
 	// x-kubernetes-validations describes a list of validation rules written in the CEL expression language.
 	// This field is an alpha-level. Using this field requires the feature gate `CustomResourceValidationExpressions` to be enabled.
-	// +patchMergeKey=rule
-	// +patchStrategy=merge
-	// +listType=map
-	// +listMapKey=rule
 	XValidations ValidationRules `json:"x-kubernetes-validations,omitempty" patchStrategy:"merge" patchMergeKey:"rule" protobuf:"bytes,44,rep,name=xKubernetesValidations"`
 }
 
