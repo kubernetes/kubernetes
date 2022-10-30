@@ -104,12 +104,14 @@ func runCleanupNode(c workflow.RunData) error {
 	}
 
 	if r.CleanupImages() {
-		klog.V(1).Info("[reset] Cleaning up container images")
-		if err := cleanupImages(utilsexec.New(), r.CRISocketPath()); err != nil {
-			klog.Warningf("[reset] Failed to clean up container images: %v\n", err)
+		if !r.DryRun() {
+			klog.V(1).Info("[reset] Cleaning up container images")
+			if err := cleanupImages(utilsexec.New(), r.CRISocketPath()); err != nil {
+				klog.Warningf("[reset] Failed to clean up container images: %v\n", err)
+			}
+		} else {
+			fmt.Println("[reset] Would clean up container images")
 		}
-	} else {
-		fmt.Println("[reset] Would clean up container images")
 	}
 
 	// Remove contents from the config and pki directories
