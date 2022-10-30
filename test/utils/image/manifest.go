@@ -125,7 +125,7 @@ var (
 		GcAuthenticatedRegistry:  "gcr.io/authenticated-image-pulling",
 		PromoterE2eRegistry:      "registry.k8s.io/e2e-test-images",
 		BuildImageRegistry:       "registry.k8s.io/build-image",
-		InvalidRegistry:          "invalid.registry.k8s.io/invalid",
+		InvalidRegistry:          "invalid.com/invalid",
 		GcEtcdRegistry:           "registry.k8s.io",
 		GcRegistry:               "registry.k8s.io",
 		SigStorageRegistry:       "registry.k8s.io/sig-storage",
