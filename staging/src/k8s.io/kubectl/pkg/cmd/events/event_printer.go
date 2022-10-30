@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/duration"
+	"k8s.io/cli-runtime/pkg/printers"
 )
 
 // EventPrinter stores required fields to be used for
@@ -72,10 +73,11 @@ func (ep *EventPrinter) printOneEvent(w io.Writer, e corev1.Event) {
 	}
 	fmt.Fprintf(w, "%s\t%s\t%s\t%s/%s\t%v\n",
 		interval,
-		e.Type,
-		e.Reason,
-		e.InvolvedObject.Kind, e.InvolvedObject.Name,
-		strings.TrimSpace(e.Message),
+		printers.EscapeTerminal(e.Type),
+		printers.EscapeTerminal(e.Reason),
+		printers.EscapeTerminal(e.InvolvedObject.Kind),
+		printers.EscapeTerminal(e.InvolvedObject.Name),
+		printers.EscapeTerminal(strings.TrimSpace(e.Message)),
 	)
 }
 
