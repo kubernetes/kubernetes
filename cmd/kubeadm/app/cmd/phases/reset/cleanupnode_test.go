@@ -235,3 +235,27 @@ func TestRemoveContainers(t *testing.T) {
 
 	removeContainers(&fexec, "unix:///var/run/crio/crio.sock")
 }
+
+func TestRemoveImages(t *testing.T) {
+	fcmd := fakeexec.FakeCmd{
+		CombinedOutputScript: []fakeexec.FakeAction{
+			func() ([]byte, []byte, error) { return []byte("id1\nid2"), nil, nil },
+			func() ([]byte, []byte, error) { return []byte(""), nil, nil },
+			func() ([]byte, []byte, error) { return []byte(""), nil, nil },
+			func() ([]byte, []byte, error) { return []byte(""), nil, nil },
+			func() ([]byte, []byte, error) { return []byte(""), nil, nil },
+		},
+	}
+	fexec := fakeexec.FakeExec{
+		CommandScript: []fakeexec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
+	}
+
+	cleanupImages(&fexec, "unix:///var/run/crio/crio.sock")
+}

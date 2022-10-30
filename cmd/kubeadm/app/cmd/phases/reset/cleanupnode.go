@@ -48,6 +48,7 @@ func NewCleanupNodePhase() workflow.Phase {
 		InheritFlags: []string{
 			options.CertificatesDir,
 			options.NodeCRISocket,
+			options.CleanupImages,
 			options.CleanupTmpDir,
 			options.DryRun,
 		},
@@ -102,6 +103,15 @@ func runCleanupNode(c workflow.RunData) error {
 		fmt.Println("[reset] Would remove Kubernetes-managed containers")
 	}
 
+	if r.CleanupImages() {
+		klog.V(1).Info("[reset] Cleaning up container images")
+		if err := cleanupImages(utilsexec.New(), r.CRISocketPath()); err != nil {
+			klog.Warningf("[reset] Failed to clean up container images: %v\n", err)
+		}
+	} else {
+		fmt.Println("[reset] Would clean up container images")
+	}
+
 	// Remove contents from the config and pki directories
 	if certsDir != kubeadmapiv1.DefaultCertificatesDir {
 		klog.Warningf("[reset] WARNING: Cleaning a non-default certificates directory: %q\n", certsDir)
@@ -152,6 +162,15 @@ func removeContainers(execer utilsexec.Interface, criSocketPath string) error {
 		return err
 	}
 	return containerRuntime.RemoveContainers(containers)
+}
+
+func cleanupImages(execer utilsexec.Interface, criSocketPath string) error {
+	containerRuntime, err := utilruntime.NewContainerRuntime(execer, criSocketPath)
+	if err != nil {
+		return err
+	}
+	images := []string{"--all"}
+	return containerRuntime.RemoveImages(images)
 }
 
 // resetConfigDir is used to cleanup the files in the folder defined in dirsToClean.

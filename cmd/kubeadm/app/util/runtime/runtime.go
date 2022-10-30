@@ -44,6 +44,7 @@ type ContainerRuntime interface {
 	RemoveContainers(containers []string) error
 	PullImage(image string) error
 	ImageExists(image string) (bool, error)
+	RemoveImages(images []string) error
 }
 
 // CRIRuntime is a struct that interfaces with the CRI
@@ -142,6 +143,29 @@ func (runtime *CRIRuntime) PullImage(image string) error {
 func (runtime *CRIRuntime) ImageExists(image string) (bool, error) {
 	err := runtime.crictl("inspecti", image).Run()
 	return err == nil, nil
+}
+
+// RemoveImages removes container images
+func (runtime *CRIRuntime) RemoveImages(images []string) error {
+	errs := []error{}
+	for _, image := range images {
+		var lastErr error
+		for i := 0; i < constants.RemoveImageRetry; i++ {
+			klog.V(5).Infof("Attempting to remove image %v", image)
+			out, err := runtime.crictl("rmi", image).CombinedOutput()
+			if err != nil {
+				lastErr = errors.Wrapf(err, "failed to remove image %s: output: %s", image, string(out))
+				continue
+			}
+			lastErr = nil
+			break
+		}
+
+		if lastErr != nil {
+			errs = append(errs, lastErr)
+		}
+	}
+	return errorsutil.NewAggregate(errs)
 }
 
 // detectCRISocketImpl is separated out only for test purposes, DON'T call it directly, use DetectCRISocket instead

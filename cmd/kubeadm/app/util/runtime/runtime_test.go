@@ -296,6 +296,48 @@ func TestImageExists(t *testing.T) {
 	}
 }
 
+func TestRemoveImages(t *testing.T) {
+	fakeOK := func() ([]byte, []byte, error) { return nil, nil, nil }
+	fakeErr := func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} }
+	fcmd := fakeexec.FakeCmd{
+		CombinedOutputScript: []fakeexec.FakeAction{
+			fakeErr, fakeErr, fakeErr, fakeErr, fakeOK, fakeErr, fakeErr, fakeErr, fakeErr, fakeOK,
+			fakeErr, fakeErr, fakeErr, fakeErr, fakeErr, fakeErr, fakeErr, fakeErr, fakeErr, fakeErr,
+		},
+	}
+	execer := fakeexec.FakeExec{
+		CommandScript: genFakeActions(&fcmd, len(fcmd.CombinedOutputScript)),
+		LookPathFunc:  func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
+	}
+
+	cases := []struct {
+		name      string
+		criSocket string
+		images    []string
+		isError   bool
+	}{
+		{"valid: remove containers using CRI", "unix:///var/run/crio/crio.sock", []string{"image_1", "image_2"}, false},
+		{"invalid: CRI rmi failure", "unix:///var/run/crio/crio.sock", []string{"image_1", "image_2"}, true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			runtime, err := NewContainerRuntime(&execer, tc.criSocket)
+			if err != nil {
+				t.Fatalf("unexpected NewContainerRuntime error: %v, criSocket: %s", err, tc.criSocket)
+			}
+
+			err = runtime.RemoveImages(tc.images)
+			if !tc.isError && err != nil {
+				t.Errorf("unexpected RemoveImages errors: %v, criSocket: %s, images: %v", err, tc.criSocket, tc.images)
+			}
+			if tc.isError && err == nil {
+				t.Errorf("unexpected RemoveImages success, criSocket: %s, images: %v", tc.criSocket, tc.images)
+			}
+		})
+	}
+}
+
 func TestIsExistingSocket(t *testing.T) {
 	// this test is not expected to work on Windows
 	if runtime.GOOS == "windows" {

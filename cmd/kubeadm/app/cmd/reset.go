@@ -66,6 +66,7 @@ type resetOptions struct {
 	ignorePreflightErrors []string
 	kubeconfigPath        string
 	dryRun                bool
+	cleanupImages         bool
 	cleanupTmpDir         bool
 }
 
@@ -81,6 +82,7 @@ type resetData struct {
 	outputWriter          io.Writer
 	cfg                   *kubeadmapi.InitConfiguration
 	dryRun                bool
+	cleanupImages         bool
 	cleanupTmpDir         bool
 }
 
@@ -90,6 +92,7 @@ func newResetOptions() *resetOptions {
 		certificatesDir: kubeadmapiv1.DefaultCertificatesDir,
 		forceReset:      false,
 		kubeconfigPath:  kubeadmconstants.GetAdminKubeConfigPath(),
+		cleanupImages:   false,
 		cleanupTmpDir:   false,
 	}
 }
@@ -141,6 +144,7 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 		outputWriter:          out,
 		cfg:                   cfg,
 		dryRun:                options.dryRun,
+		cleanupImages:         options.cleanupImages,
 		cleanupTmpDir:         options.cleanupTmpDir,
 	}, nil
 }
@@ -158,6 +162,10 @@ func AddResetFlags(flagSet *flag.FlagSet, resetOptions *resetOptions) {
 	flagSet.BoolVar(
 		&resetOptions.dryRun, options.DryRun, resetOptions.dryRun,
 		"Don't apply any changes; just output what would be done.",
+	)
+	flagSet.BoolVar(
+		&resetOptions.cleanupImages, options.CleanupImages, resetOptions.cleanupImages,
+		"Cleaning up all container images.",
 	)
 	flagSet.BoolVar(
 		&resetOptions.cleanupTmpDir, options.CleanupTmpDir, resetOptions.cleanupTmpDir,
@@ -221,6 +229,11 @@ func (r *resetData) Cfg() *kubeadmapi.InitConfiguration {
 // DryRun returns the dryRun flag.
 func (r *resetData) DryRun() bool {
 	return r.dryRun
+}
+
+// CleanupImages returns the cleanupImages flag.
+func (r *resetData) CleanupImages() bool {
+	return r.cleanupImages
 }
 
 // CleanupTmpDir returns the cleanupTmpDir flag.
