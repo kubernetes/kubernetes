@@ -115,7 +115,7 @@ func DoHTTPProbe(req *http.Request, client GetHTTPInterface) (probe.Result, stri
 		return probe.Success, body, nil
 	}
 	klog.V(4).Infof("Probe failed for %s with request headers %v, response body: %v", url.String(), headers, body)
-	return probe.Failure, fmt.Sprintf("HTTP probe failed with statuscode: %d", res.StatusCode), nil
+	return probe.Failure, fmt.Sprintf("HTTP probe failed with statuscode: %d, Response body: %s", res.StatusCode, body), nil
 }
 
 // RedirectChecker returns a function that can be used to check HTTP redirects.
