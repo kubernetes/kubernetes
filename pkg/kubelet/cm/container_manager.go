@@ -134,10 +134,10 @@ type NodeConfig struct {
 	ProtectKernelDefaults bool
 	NodeAllocatableConfig
 	QOSReserved                             map[v1.ResourceName]int64
-	ExperimentalCPUManagerPolicy            string
-	ExperimentalCPUManagerPolicyOptions     map[string]string
+	CPUManagerPolicy                        string
+	CPUManagerPolicyOptions                 map[string]string
 	ExperimentalTopologyManagerScope        string
-	ExperimentalCPUManagerReconcilePeriod   time.Duration
+	CPUManagerReconcilePeriod               time.Duration
 	ExperimentalMemoryManagerPolicy         string
 	ExperimentalMemoryManagerReservedMemory []kubeletconfig.MemoryReservation
 	ExperimentalPodPidsLimit                int64
