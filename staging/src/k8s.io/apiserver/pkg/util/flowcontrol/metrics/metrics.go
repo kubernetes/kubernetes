@@ -529,11 +529,6 @@ func AddRequestConcurrencyInUse(priorityLevel, flowSchema string, delta int) {
 	apiserverRequestConcurrencyInUse.WithLabelValues(priorityLevel, flowSchema).Add(float64(delta))
 }
 
-// UpdateSharedConcurrencyLimit updates the value for the concurrency limit in flow control
-func UpdateSharedConcurrencyLimit(priorityLevel string, limit int) {
-	apiserverRequestConcurrencyLimit.WithLabelValues(priorityLevel).Set(float64(limit))
-}
-
 // AddReject increments the # of rejected requests for flow control
 func AddReject(ctx context.Context, priorityLevel, flowSchema, reason string) {
 	apiserverRejectedRequestsTotal.WithContext(ctx).WithLabelValues(priorityLevel, flowSchema, reason).Add(1)
@@ -585,19 +580,19 @@ func AddDispatchWithNoAccommodation(priorityLevel, flowSchema string) {
 }
 
 func SetPriorityLevelConfiguration(priorityLevel string, nominalCL, minCL, maxCL int) {
+	apiserverRequestConcurrencyLimit.WithLabelValues(priorityLevel).Set(float64(nominalCL))
 	apiserverNominalConcurrencyLimits.WithLabelValues(priorityLevel).Set(float64(nominalCL))
 	apiserverMinimumConcurrencyLimits.WithLabelValues(priorityLevel).Set(float64(minCL))
 	apiserverMaximumConcurrencyLimits.WithLabelValues(priorityLevel).Set(float64(maxCL))
 }
 
-func NotePriorityLevelConcurrencyAdjustment(priorityLevel string, seatDemandHWM, seatDemandAvg, seatDemandStdev, seatDemandSmoothed float64 /* TODO: seatDemandTarget float64, currentCL int */) {
+func NotePriorityLevelConcurrencyAdjustment(priorityLevel string, seatDemandHWM, seatDemandAvg, seatDemandStdev, seatDemandSmoothed, seatDemandTarget float64, currentCL int) {
 	apiserverSeatDemandHighWatermarks.WithLabelValues(priorityLevel).Set(seatDemandHWM)
 	apiserverSeatDemandAverages.WithLabelValues(priorityLevel).Set(seatDemandAvg)
 	apiserverSeatDemandStandardDeviations.WithLabelValues(priorityLevel).Set(seatDemandStdev)
 	apiserverSeatDemandSmootheds.WithLabelValues(priorityLevel).Set(seatDemandSmoothed)
-	// TODO: the following once new API is available
-	// apiserverSeatDemandTargets.WithLabelValues(priorityLevel).Set(seatDemandTarget)
-	// apiserverCurrentConcurrencyLimits.WithLabelValues(priorityLevel).Set(currentCL)
+	apiserverSeatDemandTargets.WithLabelValues(priorityLevel).Set(seatDemandTarget)
+	apiserverCurrentConcurrencyLimits.WithLabelValues(priorityLevel).Set(float64(currentCL))
 }
 
 func SetFairFrac(fairFrac float64) {

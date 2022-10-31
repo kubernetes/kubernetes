@@ -1527,12 +1527,9 @@ func newExecSeatsGauge(clk clock.PassiveClock) metrics.RatioedGauge {
 func float64close(x, y float64) bool {
 	x0 := float64NaNTo0(x)
 	y0 := float64NaNTo0(y)
-	diff := math.Abs(x - y)
+	diff := math.Abs(x0 - y0)
 	den := math.Max(math.Abs(x0), math.Abs(y0))
-	if den == 0 {
-		return diff < 1e-10
-	}
-	return diff/den < 1e-10
+	return den == 0 || diff/den < 1e-10
 }
 
 func uint64max(a, b uint64) uint64 {

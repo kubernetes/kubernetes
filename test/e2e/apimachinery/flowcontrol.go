@@ -43,7 +43,7 @@ import (
 )
 
 const (
-	requestConcurrencyLimitMetricName = "apiserver_flowcontrol_request_concurrency_limit"
+	nominalConcurrencyLimitMetricName = "apiserver_flowcontrol_nominal_limit_seats"
 	priorityLevelLabelName            = "priority_level"
 )
 
@@ -146,7 +146,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 
 		ginkgo.By("getting request concurrency from metrics")
 		for i := range clients {
-			realConcurrency, err := getPriorityLevelConcurrency(f.ClientSet, clients[i].priorityLevelName)
+			realConcurrency, err := getPriorityLevelNominalConcurrency(f.ClientSet, clients[i].priorityLevelName)
 			framework.ExpectNoError(err)
 			clients[i].concurrency = int32(float64(realConcurrency) * clients[i].concurrencyMultiplier)
 			if clients[i].concurrency < 1 {
@@ -219,7 +219,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 		}
 
 		framework.Logf("getting real concurrency")
-		realConcurrency, err := getPriorityLevelConcurrency(f.ClientSet, priorityLevelName)
+		realConcurrency, err := getPriorityLevelNominalConcurrency(f.ClientSet, priorityLevelName)
 		framework.ExpectNoError(err)
 		for i := range clients {
 			clients[i].concurrency = int32(float64(realConcurrency) * clients[i].concurrencyMultiplier)
@@ -280,7 +280,7 @@ func createPriorityLevel(f *framework.Framework, priorityLevelName string, nomin
 	}
 }
 
-func getPriorityLevelConcurrency(c clientset.Interface, priorityLevelName string) (int32, error) {
+func getPriorityLevelNominalConcurrency(c clientset.Interface, priorityLevelName string) (int32, error) {
 	resp, err := c.CoreV1().RESTClient().Get().RequestURI("/metrics").DoRaw(context.TODO())
 	if err != nil {
 		return 0, err
@@ -299,7 +299,7 @@ func getPriorityLevelConcurrency(c clientset.Interface, priorityLevelName string
 			return 0, err
 		}
 		for _, metric := range v {
-			if string(metric.Metric[model.MetricNameLabel]) != requestConcurrencyLimitMetricName {
+			if string(metric.Metric[model.MetricNameLabel]) != nominalConcurrencyLimitMetricName {
 				continue
 			}
 			if string(metric.Metric[priorityLevelLabelName]) != priorityLevelName {
@@ -376,7 +376,7 @@ func waitForSteadyState(f *framework.Framework, flowSchemaName string, priorityL
 			// hasn't been achieved.
 			return false, nil
 		}
-		_, err = getPriorityLevelConcurrency(f.ClientSet, priorityLevelName)
+		_, err = getPriorityLevelNominalConcurrency(f.ClientSet, priorityLevelName)
 		if err != nil {
 			if err == errPriorityLevelNotFound {
 				return false, nil
