@@ -2486,7 +2486,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_Validation(ref common.Refer
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Reason represents a machine-readable description of why this validation failed. If this is the first validation in the list to fail, this reason, as well as the corresponding HTTP response code, are used in the HTTP response to the client. If not set, StatusReasonInvalid is used in the response to the client.",
+							Description: "Reason represents a machine-readable description of why this validation failed. If this is the first validation in the list to fail, this reason, as well as the corresponding HTTP response code, are used in the HTTP response to the client. The currently supported reasons are: \"Unauthorized\", \"Forbidden\", \"Invalid\", \"RequestEntityTooLarge\". If not set, StatusReasonInvalid is used in the response to the client.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
