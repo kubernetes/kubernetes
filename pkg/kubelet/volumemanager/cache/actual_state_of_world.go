@@ -1185,7 +1185,7 @@ type seLinuxMountMismatchError struct {
 
 func (err seLinuxMountMismatchError) Error() string {
 	return fmt.Sprintf(
-		"volumeName %q is already mounted to a different pod with a different SELinux label",
+		"waiting for unmount of volume %q, because it is already mounted to a different pod with a different SELinux label",
 		err.volumeName)
 }
 

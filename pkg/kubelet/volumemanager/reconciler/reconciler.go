@@ -223,6 +223,7 @@ func (rc *reconciler) mountOrAttachVolumes() {
 			// The volume is mounted, but with an unexpected SELinux context.
 			// It will get unmounted in unmountVolumes / unmountDetachDevices and
 			// then removed from actualStateOfWorld.
+			rc.desiredStateOfWorld.AddErrorToPod(volumeToMount.PodName, err.Error())
 			continue
 		} else if cache.IsVolumeNotAttachedError(err) {
 			rc.waitForVolumeAttach(volumeToMount)
