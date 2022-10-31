@@ -43983,16 +43983,6 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 						},
 					},
 					"x-kubernetes-validations": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"rule",
-								},
-								"x-kubernetes-list-type":       "map",
-								"x-kubernetes-patch-merge-key": "rule",
-								"x-kubernetes-patch-strategy":  "merge",
-							},
-						},
 						SchemaProps: spec.SchemaProps{
 							Description: "x-kubernetes-validations describes a list of validation rules written in the CEL expression language. This field is an alpha-level. Using this field requires the feature gate `CustomResourceValidationExpressions` to be enabled.",
 							Type:        []string{"array"},
