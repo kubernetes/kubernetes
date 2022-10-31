@@ -86,7 +86,7 @@ func WithTracing(handler http.Handler, tp oteltrace.TracerProvider, serviceName 
 // Example usage:
 // tp := NewProvider(...)
 // config, _ := rest.InClusterConfig()
-// config.Wrap(WrapperFor(&tp))
+// config.Wrap(WrapperFor(tp))
 // kubeclient, _ := clientset.NewForConfig(config)
 func WrapperFor(tp oteltrace.TracerProvider) transport.WrapperFunc {
 	return func(rt http.RoundTripper) http.RoundTripper {
