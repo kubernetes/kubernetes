@@ -25,6 +25,7 @@ import (
 	"go/token"
 	"io"
 	"reflect"
+	"regexp"
 	"strings"
 )
 
@@ -60,24 +61,40 @@ func fmtRawDoc(rawDoc string) string {
 		}
 	}
 
-	// Ignore all lines after ---
-	rawDoc = strings.Split(rawDoc, "---")[0]
+	var isPrevLinePartOfListOrTable bool
+	isPrevLinePartOfListOrTable = false
 
+out:
 	for _, line := range strings.Split(rawDoc, "\n") {
 		line = strings.TrimRight(line, " ")
 		leading := strings.TrimLeft(line, " ")
+		horizontalLineRegex := regexp.MustCompile("^---$")
 		switch {
+		case horizontalLineRegex.Match([]byte(line)): // Ignore all lines after "^---$"
+			delPrevChar()
+			break out
 		case len(line) == 0: // Keep paragraphs
 			delPrevChar()
 			buffer.WriteString("\n\n")
 		case strings.HasPrefix(leading, "TODO"): // Ignore one line TODOs
 		case strings.HasPrefix(leading, "+"): // Ignore instructions to the generators
 		default:
-			if strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
+			orderedListRegex := regexp.MustCompile("^[0-9]+\\. ")
+			if strings.HasPrefix(line, "-") || strings.HasPrefix(line, "*") || orderedListRegex.Match([]byte(line)) || strings.HasPrefix(line, "|") { // Unordered/Ordered list items, or table
 				delPrevChar()
 				line = "\n" + line + "\n" // Replace it with newline. This is useful when we have a line with: "Example:\n\tJSON-someting..."
+				isPrevLinePartOfListOrTable = true
+			} else if strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
+				delPrevChar()
+				line = "\n" + line + "\n" // Replace it with newline. This is useful when we have a line with: "Example:\n\tJSON-someting..."
+				isPrevLinePartOfListOrTable = true
 			} else {
-				line += " "
+				if isPrevLinePartOfListOrTable == true {
+					line = "\n" + line + " "
+					isPrevLinePartOfListOrTable = false
+				} else {
+					line += " "
+				}
 			}
 			buffer.WriteString(line)
 		}
