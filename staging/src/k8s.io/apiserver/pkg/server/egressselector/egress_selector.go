@@ -245,6 +245,7 @@ func (d *dialerCreator) createDialer() utilnet.DialFunc {
 		trace := utiltrace.New(fmt.Sprintf("Proxy via %s protocol over %s", d.options.protocol, d.options.transport), utiltrace.Field{Key: "address", Value: addr})
 		defer trace.LogIfLong(500 * time.Millisecond)
 		start := egressmetrics.Metrics.Clock().Now()
+		egressmetrics.Metrics.ObserveDialStart(d.options.protocol, d.options.transport)
 		proxier, err := d.connector.connect(ctx)
 		if err != nil {
 			egressmetrics.Metrics.ObserveDialFailure(d.options.protocol, d.options.transport, egressmetrics.StageConnect)
