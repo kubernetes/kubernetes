@@ -17,6 +17,7 @@ limitations under the License.
 package storageversion
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"sync"
@@ -150,7 +151,7 @@ func (s *defaultManager) UpdateStorageVersions(kubeAPIServerClientConfig *rest.C
 
 		servedVersions := r.ServedVersions
 
-		if err := updateStorageVersionFor(sc, serverID, gr, r.EncodingVersion, decodableVersions, servedVersions); err != nil {
+		if err := UpdateStorageVersionFor(context.TODO(), sc, serverID, gr, r.EncodingVersion, decodableVersions, servedVersions, nil, false); err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to update storage version for %v: %v", r.GroupResource, err))
 			s.recordStatusFailure(&r, err)
 			hasFailure = true
