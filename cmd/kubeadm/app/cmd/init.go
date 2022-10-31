@@ -76,7 +76,7 @@ type initData struct {
 	dryRun                  bool
 	kubeconfigDir           string
 	kubeconfigPath          string
-	ignorePreflightErrors   sets.String
+	ignorePreflightErrors   sets.Set[string]
 	certificatesDir         string
 	dryRunDir               string
 	externalCA              bool
@@ -307,7 +307,7 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 		return nil, err
 	}
 	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
-	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
+	cfg.NodeRegistration.IgnorePreflightErrors = sets.List(ignorePreflightErrorsSet)
 
 	// override node name from the command line option
 	if options.externalInitCfg.NodeRegistration.Name != "" {
@@ -416,7 +416,7 @@ func (d *initData) SkipTokenPrint() bool {
 }
 
 // IgnorePreflightErrors returns the IgnorePreflightErrors flag.
-func (d *initData) IgnorePreflightErrors() sets.String {
+func (d *initData) IgnorePreflightErrors() sets.Set[string] {
 	return d.ignorePreflightErrors
 }
 

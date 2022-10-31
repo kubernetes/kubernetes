@@ -61,7 +61,7 @@ type nodeData struct {
 	isControlPlaneNode    bool
 	client                clientset.Interface
 	patchesDir            string
-	ignorePreflightErrors sets.String
+	ignorePreflightErrors sets.Set[string]
 	kubeConfigPath        string
 	outputWriter          io.Writer
 }
@@ -151,8 +151,7 @@ func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions, out io
 		return nil, err
 	}
 	// Also set the union of pre-flight errors to JoinConfiguration, to provide a consistent view of the runtime configuration:
-	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
-
+	cfg.NodeRegistration.IgnorePreflightErrors = sets.List(ignorePreflightErrorsSet)
 	return &nodeData{
 		etcdUpgrade:           options.etcdUpgrade,
 		renewCerts:            options.renewCerts,
@@ -203,7 +202,7 @@ func (d *nodeData) PatchesDir() string {
 }
 
 // IgnorePreflightErrors returns the list of preflight errors to ignore.
-func (d *nodeData) IgnorePreflightErrors() sets.String {
+func (d *nodeData) IgnorePreflightErrors() sets.Set[string] {
 	return d.ignorePreflightErrors
 }
 

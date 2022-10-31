@@ -54,7 +54,7 @@ func (c CoreDNSCheck) Check() (warnings, errors []error) {
 }
 
 // RunCoreDNSMigrationCheck initializes checks related to CoreDNS migration.
-func RunCoreDNSMigrationCheck(client clientset.Interface, ignorePreflightErrors sets.String) error {
+func RunCoreDNSMigrationCheck(client clientset.Interface, ignorePreflightErrors sets.Set[string]) error {
 	migrationChecks := []preflight.Checker{
 		&CoreDNSCheck{
 			name:   "CoreDNSUnsupportedPlugins",

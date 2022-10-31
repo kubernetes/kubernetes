@@ -892,7 +892,7 @@ func (MemCheck) Name() string {
 // The boolean flag 'isSecondaryControlPlane' controls whether we are running checks in a --join-control-plane scenario.
 // The boolean flag 'downloadCerts' controls whether we should skip checks on certificates because we are downloading them.
 // If the flag is set to true we should skip checks already executed by RunJoinNodeChecks.
-func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String, isSecondaryControlPlane bool, downloadCerts bool) error {
+func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.Set[string], isSecondaryControlPlane bool, downloadCerts bool) error {
 	if !isSecondaryControlPlane {
 		// First, check if we're root separately from the other preflight checks and fail fast
 		if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
@@ -972,7 +972,7 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 }
 
 // RunJoinNodeChecks executes all individual, applicable to node checks.
-func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfiguration, ignorePreflightErrors sets.String) error {
+func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfiguration, ignorePreflightErrors sets.Set[string]) error {
 	// First, check if we're root separately from the other preflight checks and fail fast
 	if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
 		return err
@@ -1049,7 +1049,7 @@ func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kub
 }
 
 // RunRootCheckOnly initializes checks slice of structs and call RunChecks
-func RunRootCheckOnly(ignorePreflightErrors sets.String) error {
+func RunRootCheckOnly(ignorePreflightErrors sets.Set[string]) error {
 	checks := []Checker{
 		IsPrivilegedUserCheck{},
 	}
@@ -1058,7 +1058,7 @@ func RunRootCheckOnly(ignorePreflightErrors sets.String) error {
 }
 
 // RunPullImagesCheck will pull images kubeadm needs if they are not found on the system
-func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String) error {
+func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.Set[string]) error {
 	containerRuntime, err := utilruntime.NewContainerRuntime(utilsexec.New(), cfg.NodeRegistration.CRISocket)
 	if err != nil {
 		return &Error{Msg: err.Error()}
@@ -1072,7 +1072,7 @@ func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigur
 
 // RunChecks runs each check, displays it's warnings/errors, and once all
 // are processed will exit if any errors occurred.
-func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.String) error {
+func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.Set[string]) error {
 	var errsBuffer bytes.Buffer
 
 	for _, c := range checks {
@@ -1099,7 +1099,7 @@ func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.String
 }
 
 // setHasItemOrAll is helper function that return true if item is present in the set (case insensitive) or special key 'all' is present
-func setHasItemOrAll(s sets.String, item string) bool {
+func setHasItemOrAll(s sets.Set[string], item string) bool {
 	if s.Has("all") || s.Has(strings.ToLower(item)) {
 		return true
 	}

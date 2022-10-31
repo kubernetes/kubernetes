@@ -236,14 +236,14 @@ func TestNewJoinData(t *testing.T) {
 				options.IgnorePreflightErrors: "a,b",
 				options.FileDiscovery:         "https://foo", //required only to pass discovery validation
 			},
-			validate: expectedJoinIgnorePreflightErrors(sets.NewString("a", "b")),
+			validate: expectedJoinIgnorePreflightErrors(sets.New("a", "b")),
 		},
 		{
 			name: "pre-flights errors from JoinConfiguration only",
 			flags: map[string]string{
 				options.CfgPath: configFilePath,
 			},
-			validate: expectedJoinIgnorePreflightErrors(sets.NewString("c", "d")),
+			validate: expectedJoinIgnorePreflightErrors(sets.New("c", "d")),
 		},
 		{
 			name: "pre-flights errors from both CLI args and JoinConfiguration",
@@ -251,7 +251,7 @@ func TestNewJoinData(t *testing.T) {
 				options.CfgPath:               configFilePath,
 				options.IgnorePreflightErrors: "a,b",
 			},
-			validate: expectedJoinIgnorePreflightErrors(sets.NewString("a", "b", "c", "d")),
+			validate: expectedJoinIgnorePreflightErrors(sets.New("a", "b", "c", "d")),
 		},
 		{
 			name: "warn if --control-plane flag is not set",
@@ -315,13 +315,13 @@ func TestNewJoinData(t *testing.T) {
 	}
 }
 
-func expectedJoinIgnorePreflightErrors(expected sets.String) func(t *testing.T, data *joinData) {
+func expectedJoinIgnorePreflightErrors(expected sets.Set[string]) func(t *testing.T, data *joinData) {
 	return func(t *testing.T, data *joinData) {
 		if !expected.Equal(data.ignorePreflightErrors) {
-			t.Errorf("Invalid ignore preflight errors. Expected: %v. Actual: %v", expected.List(), data.ignorePreflightErrors.List())
+			t.Errorf("Invalid ignore preflight errors. Expected: %v. Actual: %v", sets.List(expected), sets.List(data.ignorePreflightErrors))
 		}
 		if !expected.HasAll(data.cfg.NodeRegistration.IgnorePreflightErrors...) {
-			t.Errorf("Invalid ignore preflight errors in JoinConfiguration. Expected: %v. Actual: %v", expected.List(), data.cfg.NodeRegistration.IgnorePreflightErrors)
+			t.Errorf("Invalid ignore preflight errors in JoinConfiguration. Expected: %v. Actual: %v", sets.List(expected), data.cfg.NodeRegistration.IgnorePreflightErrors)
 		}
 	}
 }
