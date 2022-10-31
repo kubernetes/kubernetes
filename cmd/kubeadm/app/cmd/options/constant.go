@@ -149,7 +149,7 @@ const (
 	// Print the addon manifests to STDOUT instead of installing them.
 	PrintManifest = "print-manifest"
 
-	// CleanupImages flag instruct kubeadm to cleaning up all container images
+	// CleanupImages flag indicates whether reset will cleanup all container images
 	CleanupImages = "cleanup-images"
 
 	// CleanupTmpDir flag indicates whether reset will cleanup the tmp dir

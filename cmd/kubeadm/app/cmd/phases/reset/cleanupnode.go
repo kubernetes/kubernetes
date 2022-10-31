@@ -171,6 +171,7 @@ func cleanupImages(execer utilsexec.Interface, criSocketPath string) error {
 	if err != nil {
 		return err
 	}
+	// crictl rmi --all
 	images := []string{"--all"}
 	return containerRuntime.RemoveImages(images)
 }

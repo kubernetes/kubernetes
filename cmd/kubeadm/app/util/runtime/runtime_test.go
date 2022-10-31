@@ -301,8 +301,9 @@ func TestRemoveImages(t *testing.T) {
 	fakeErr := func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} }
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeAction{
-			fakeErr, fakeErr, fakeErr, fakeErr, fakeOK, fakeErr, fakeErr, fakeErr, fakeErr, fakeOK,
-			fakeErr, fakeErr, fakeErr, fakeErr, fakeErr, fakeErr, fakeErr, fakeErr, fakeErr, fakeErr,
+			// If the remove fails, it will be retried 5 times (see RemoveImageRetry in constants/constants.go)
+			fakeErr, fakeErr, fakeErr, fakeErr, fakeOK, fakeErr, fakeErr, fakeErr, fakeErr, fakeOK, // Test case 1
+			fakeErr, fakeErr, fakeErr, fakeErr, fakeErr, fakeErr, fakeErr, fakeErr, fakeErr, fakeErr, // Test case 2
 		},
 	}
 	execer := fakeexec.FakeExec{
@@ -316,8 +317,8 @@ func TestRemoveImages(t *testing.T) {
 		images    []string
 		isError   bool
 	}{
-		{"valid: remove containers using CRI", "unix:///var/run/crio/crio.sock", []string{"image_1", "image_2"}, false},
-		{"invalid: CRI rmi failure", "unix:///var/run/crio/crio.sock", []string{"image_1", "image_2"}, true},
+		{"valid: remove containers using CRI", "unix:///var/run/crio/crio.sock", []string{"image_1", "image_2"}, false}, // Test case 1
+		{"invalid: CRI rmi failure", "unix:///var/run/crio/crio.sock", []string{"image_1", "image_2"}, true},            // Test case 2
 	}
 
 	for _, tc := range cases {

@@ -220,7 +220,7 @@ const (
 	PullImageRetry = 5
 	// RemoveContainerRetry specifies how many times ContainerRuntime retries when removing container failed
 	RemoveContainerRetry = 5
-	// RemoveImageRetry specifies how many times ContainerRuntime retries when removing image failed
+	// RemoveImageRetry specifies how many times ContainerRuntime retries when removing container image failed
 	RemoveImageRetry = 5
 
 	// DefaultControlPlaneTimeout specifies the default control plane (actually API Server) timeout for use by kubeadm
