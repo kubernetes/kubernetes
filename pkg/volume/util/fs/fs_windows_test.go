@@ -47,6 +47,12 @@ func TestDiskUsage(t *testing.T) {
 		t.Fatalf("TestDiskUsage failed: %s", err.Error())
 	}
 
+	// File creation is not atomic. If we're calculating the DiskUsage before the data is flushed,
+	// we'd get zeroes for sizes, and fail with this error:
+	// TestDiskUsage failed: expected 0, got -1
+	tmpfile1.Sync()
+	tmpfile2.Sync()
+
 	dirInfo1, err := os.Lstat(dir1)
 	if err != nil {
 		t.Fatalf("TestDiskUsage failed: %s", err.Error())
