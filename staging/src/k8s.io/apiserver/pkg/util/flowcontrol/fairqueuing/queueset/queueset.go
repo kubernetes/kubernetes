@@ -63,7 +63,7 @@ type queueSetCompleter struct {
 	factory              *queueSetFactory
 	reqsGaugePair        metrics.RatioedGaugePair
 	execSeatsGauge       metrics.RatioedGauge
-	seatDemandIntegrator fq.Integrator
+	seatDemandIntegrator metrics.Gauge
 	theSet               *queueSet
 	qCfg                 fq.QueuingConfig
 	dealer               *shufflesharding.Dealer
@@ -94,7 +94,7 @@ type queueSet struct {
 
 	execSeatsGauge metrics.RatioedGauge // for all phases of execution
 
-	seatDemandIntegrator fq.Integrator
+	seatDemandIntegrator metrics.Gauge
 
 	promiseFactory promiseFactory
 
@@ -163,7 +163,7 @@ func newTestableQueueSetFactory(c eventclock.Interface, promiseFactoryFactory pr
 	}
 }
 
-func (qsf *queueSetFactory) BeginConstruction(qCfg fq.QueuingConfig, reqsGaugePair metrics.RatioedGaugePair, execSeatsGauge metrics.RatioedGauge, seatDemandIntegrator fq.Integrator) (fq.QueueSetCompleter, error) {
+func (qsf *queueSetFactory) BeginConstruction(qCfg fq.QueuingConfig, reqsGaugePair metrics.RatioedGaugePair, execSeatsGauge metrics.RatioedGauge, seatDemandIntegrator metrics.Gauge) (fq.QueueSetCompleter, error) {
 	dealer, err := checkConfig(qCfg)
 	if err != nil {
 		return nil, err
