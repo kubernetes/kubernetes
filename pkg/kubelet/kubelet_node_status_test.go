@@ -1134,6 +1134,159 @@ func TestUpdateNodeStatusAndVolumesInUseWithNodeLease(t *testing.T) {
 	}
 }
 
+func TestFastStatusUpdateOnce(t *testing.T) {
+	tests := []struct {
+		name            string
+		beforeMarkReady int
+		beforeNextReady int
+		beforeTimeout   int
+		wantCalls       int
+		patchFailures   int
+		wantPatches     int
+	}{
+		{
+			name:            "timeout after third loop",
+			beforeMarkReady: 9,
+			beforeNextReady: 9,
+			beforeTimeout:   2,
+			wantCalls:       3,
+		},
+		{
+			name:            "already ready on third loop",
+			beforeMarkReady: 9,
+			beforeNextReady: 1,
+			beforeTimeout:   9,
+			wantCalls:       2,
+		},
+		{
+			name:            "turns ready on third loop",
+			beforeMarkReady: 2,
+			beforeNextReady: 9,
+			beforeTimeout:   9,
+			wantCalls:       3,
+			wantPatches:     1,
+		},
+		{
+			name:            "turns ready on second loop then first patch fails",
+			beforeMarkReady: 1,
+			beforeNextReady: 9,
+			beforeTimeout:   9,
+			wantCalls:       3,
+			patchFailures:   1,
+			wantPatches:     2,
+		},
+		{
+			name:            "turns ready on second loop then all patches fail",
+			beforeMarkReady: 1,
+			beforeNextReady: 9,
+			beforeTimeout:   9,
+			wantCalls:       nodeStatusUpdateRetry + 2,
+			patchFailures:   nodeStatusUpdateRetry + 2,
+			wantPatches:     nodeStatusUpdateRetry + 1,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+			// Ensure we capture actions on the heartbeat client only.
+			// We don't set it to nil or GetNode() doesn't read from nodeLister.
+			kubelet.kubeClient = &fake.Clientset{}
+			kubeClient := testKubelet.fakeKubeClient
+
+			node := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: string(kubelet.nodeName),
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:    v1.NodeReady,
+							Status:  v1.ConditionFalse,
+							Reason:  "NotReady",
+							Message: "Node not ready",
+						},
+					},
+				},
+			}
+
+			nodeLister := testNodeLister{[]*v1.Node{node.DeepCopy()}}
+			kubelet.nodeLister = nodeLister
+
+			callCount := 0
+			// The original node status functions turn the node ready.
+			nodeStatusFuncs := kubelet.setNodeStatusFuncs
+			kubelet.setNodeStatusFuncs = []func(context.Context, *v1.Node) error{func(ctx context.Context, node *v1.Node) error {
+				assert.False(t, kubelet.containerRuntimeReadyExpected)
+				callCount++
+				var lastErr error
+				if callCount > tc.beforeMarkReady {
+					for _, f := range nodeStatusFuncs {
+						if err := f(ctx, node); err != nil {
+							lastErr = err
+						}
+					}
+				}
+				if callCount > tc.beforeNextReady {
+					nodeLister.nodes[0].Status.Conditions[0].Status = v1.ConditionTrue
+				}
+				if callCount > tc.beforeTimeout {
+					testKubelet.fakeClock.Step(nodeReadyGracePeriod)
+				}
+				return lastErr
+			}}
+
+			patchCount := 0
+			kubeClient.AddReactor("patch", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+				assert.False(t, kubelet.containerRuntimeReadyExpected)
+				patchCount++
+				if patchCount > tc.patchFailures {
+					return false, nil, nil
+				}
+				return true, nil, fmt.Errorf("try again")
+			})
+
+			kubelet.fastStatusUpdateOnce()
+
+			assert.True(t, kubelet.containerRuntimeReadyExpected)
+			assert.Equal(t, tc.wantCalls, callCount)
+			assert.Equal(t, tc.wantPatches, patchCount)
+
+			actions := kubeClient.Actions()
+			if tc.wantPatches == 0 {
+				require.Len(t, actions, 0)
+				return
+			}
+
+			// patch, get, patch, get, patch, ... up to initial patch + nodeStatusUpdateRetry patches
+			require.Len(t, actions, 2*tc.wantPatches-1)
+
+			for i, action := range actions {
+				if i%2 == 1 {
+					require.IsType(t, core.GetActionImpl{}, action)
+					continue
+				}
+
+				require.IsType(t, core.PatchActionImpl{}, action)
+				patchAction := action.(core.PatchActionImpl)
+
+				updatedNode, err := applyNodeStatusPatch(node, patchAction.GetPatch())
+				require.NoError(t, err)
+				seenNodeReady := false
+				for _, c := range updatedNode.Status.Conditions {
+					if c.Type == v1.NodeReady {
+						assert.Equal(t, v1.ConditionTrue, c.Status)
+						seenNodeReady = true
+					}
+				}
+				assert.True(t, seenNodeReady)
+			}
+		})
+	}
+}
+
 func TestRegisterWithApiServer(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()

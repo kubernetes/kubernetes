@@ -28,7 +28,6 @@ import (
 	"path/filepath"
 	sysruntime "runtime"
 	"sort"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -127,6 +126,10 @@ const (
 
 	// nodeStatusUpdateRetry specifies how many times kubelet retries when posting node status failed.
 	nodeStatusUpdateRetry = 5
+
+	// nodeReadyGracePeriod is the period to allow for before fast status update is
+	// terminated and container runtime not being ready is logged without verbosity guard.
+	nodeReadyGracePeriod = 120 * time.Second
 
 	// DefaultContainerLogsDir is the location of container logs.
 	DefaultContainerLogsDir = "/var/log/containers"
@@ -1063,6 +1066,12 @@ type Kubelet struct {
 	// used for generating ContainerStatus.
 	reasonCache *ReasonCache
 
+	// containerRuntimeReadyExpected indicates whether container runtime being ready is expected
+	// so errors are logged without verbosity guard, to avoid excessive error logs at node startup.
+	// It's false during the node initialization period of nodeReadyGracePeriod, and after that
+	// it's set to true by fastStatusUpdateOnce when it exits.
+	containerRuntimeReadyExpected bool
+
 	// nodeStatusUpdateFrequency specifies how often kubelet computes node status. If node lease
 	// feature is not enabled, it is also the frequency that kubelet posts node status to master.
 	// In that case, be cautious when changing the constant, it must work with nodeMonitorGracePeriod
@@ -1085,15 +1094,15 @@ type Kubelet struct {
 	lastStatusReportTime time.Time
 
 	// syncNodeStatusMux is a lock on updating the node status, because this path is not thread-safe.
-	// This lock is used by Kubelet.syncNodeStatus function and shouldn't be used anywhere else.
+	// This lock is used by Kubelet.syncNodeStatus and Kubelet.fastNodeStatusUpdate functions and shouldn't be used anywhere else.
 	syncNodeStatusMux sync.Mutex
 
 	// updatePodCIDRMux is a lock on updating pod CIDR, because this path is not thread-safe.
-	// This lock is used by Kubelet.syncNodeStatus function and shouldn't be used anywhere else.
+	// This lock is used by Kubelet.updatePodCIDR function and shouldn't be used anywhere else.
 	updatePodCIDRMux sync.Mutex
 
 	// updateRuntimeMux is a lock on updating runtime, because this path is not thread-safe.
-	// This lock is used by Kubelet.updateRuntimeUp function and shouldn't be used anywhere else.
+	// This lock is used by Kubelet.updateRuntimeUp and Kubelet.fastNodeStatusUpdate functions and shouldn't be used anywhere else.
 	updateRuntimeMux sync.Mutex
 
 	// nodeLeaseController claims and renews the node lease for this Kubelet
@@ -1502,6 +1511,12 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	go kl.volumeManager.Run(kl.sourcesReady, wait.NeverStop)
 
 	if kl.kubeClient != nil {
+		// Start two go-routines to update the status.
+		//
+		// The first will report to the apiserver every nodeStatusUpdateFrequency and is aimed to provide regular status intervals,
+		// while the second is used to provide a more timely status update during initialization and runs an one-shot update to the apiserver
+		// once the node becomes ready, then exits afterwards.
+		//
 		// Introduce some small jittering to ensure that over time the requests won't start
 		// accumulating at approximately the same time from the set of nodes due to priority and
 		// fairness effect.
@@ -2435,9 +2450,13 @@ func (kl *Kubelet) updateRuntimeUp() {
 	}
 	// Periodically log the whole runtime status for debugging.
 	klog.V(4).InfoS("Container runtime status", "status", s)
+	klogErrorS := klog.ErrorS
+	if !kl.containerRuntimeReadyExpected {
+		klogErrorS = klog.V(4).ErrorS
+	}
 	networkReady := s.GetRuntimeCondition(kubecontainer.NetworkReady)
 	if networkReady == nil || !networkReady.Status {
-		klog.ErrorS(nil, "Container runtime network not ready", "networkReady", networkReady)
+		klogErrorS(nil, "Container runtime network not ready", "networkReady", networkReady)
 		kl.runtimeState.setNetworkState(fmt.Errorf("container runtime network not ready: %v", networkReady))
 	} else {
 		// Set nil if the container runtime network is ready.
@@ -2447,7 +2466,7 @@ func (kl *Kubelet) updateRuntimeUp() {
 	runtimeReady := s.GetRuntimeCondition(kubecontainer.RuntimeReady)
 	// If RuntimeReady is not set or is false, report an error.
 	if runtimeReady == nil || !runtimeReady.Status {
-		klog.ErrorS(nil, "Container runtime not ready", "runtimeReady", runtimeReady)
+		klogErrorS(nil, "Container runtime not ready", "runtimeReady", runtimeReady)
 		kl.runtimeState.setRuntimeState(fmt.Errorf("container runtime not ready: %v", runtimeReady))
 		return
 	}
@@ -2502,31 +2521,25 @@ func (kl *Kubelet) cleanUpContainersInPod(podID types.UID, exitedContainerID str
 	}
 }
 
-// fastStatusUpdateOnce starts a loop that checks the internal node indexer cache for when a CIDR
-// is applied  and tries to update pod CIDR immediately. After pod CIDR is updated it fires off
-// a runtime update and a node status update. Function returns after one successful node status update.
+// fastStatusUpdateOnce starts a loop that checks if the current state of kubelet + container runtime
+// would be able to turn the node ready, and sync the ready state to the apiserver as soon as possible.
+// Function returns after the node status update after such event, or when the node is already ready.
 // Function is executed only during Kubelet start which improves latency to ready node by updating
-// pod CIDR, runtime status and node statuses ASAP.
+// kubelet state, runtime status and node statuses ASAP.
 func (kl *Kubelet) fastStatusUpdateOnce() {
 	ctx := context.Background()
-	for {
-		time.Sleep(100 * time.Millisecond)
-		node, err := kl.GetNode()
-		if err != nil {
-			klog.ErrorS(err, "Error getting node")
-			continue
+	start := kl.clock.Now()
+	stopCh := make(chan struct{})
+
+	// Keep trying to make fast node status update until either timeout is reached or an update is successful.
+	wait.Until(func() {
+		// fastNodeStatusUpdate returns true when it succeeds or when the grace period has expired
+		// (status was not updated within nodeReadyGracePeriod and the second argument below gets true),
+		// then we close the channel and abort the loop.
+		if kl.fastNodeStatusUpdate(ctx, kl.clock.Since(start) >= nodeReadyGracePeriod) {
+			close(stopCh)
 		}
-		if len(node.Spec.PodCIDRs) != 0 {
-			podCIDRs := strings.Join(node.Spec.PodCIDRs, ",")
-			if _, err := kl.updatePodCIDR(ctx, podCIDRs); err != nil {
-				klog.ErrorS(err, "Pod CIDR update failed", "CIDR", podCIDRs)
-				continue
-			}
-			kl.updateRuntimeUp()
-			kl.syncNodeStatus()
-			return
-		}
-	}
+	}, 100*time.Millisecond, stopCh)
 }
 
 // CheckpointContainer tries to checkpoint a container. The parameters are used to

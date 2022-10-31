@@ -429,6 +429,85 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 	return node, nil
 }
 
+// fastNodeStatusUpdate is a "lightweight" version of syncNodeStatus which doesn't hit the
+// apiserver except for the final run, to be called by fastStatusUpdateOnce in each loop.
+// It holds the same lock as syncNodeStatus and is thread-safe when called concurrently with
+// syncNodeStatus. Its return value indicates whether the loop running it should exit
+// (final run), and it also sets kl.containerRuntimeReadyExpected.
+func (kl *Kubelet) fastNodeStatusUpdate(ctx context.Context, timeout bool) (completed bool) {
+	kl.syncNodeStatusMux.Lock()
+	defer func() {
+		kl.syncNodeStatusMux.Unlock()
+
+		if completed {
+			// containerRuntimeReadyExpected is read by updateRuntimeUp().
+			// Not going for a more granular mutex as this path runs only once.
+			kl.updateRuntimeMux.Lock()
+			defer kl.updateRuntimeMux.Unlock()
+			kl.containerRuntimeReadyExpected = true
+		}
+	}()
+
+	if timeout {
+		klog.ErrorS(nil, "Node not becoming ready in time after startup")
+		return true
+	}
+
+	originalNode, err := kl.GetNode()
+	if err != nil {
+		klog.ErrorS(err, "Error getting the current node from lister")
+		return false
+	}
+
+	readyIdx, originalNodeReady := nodeutil.GetNodeCondition(&originalNode.Status, v1.NodeReady)
+	if readyIdx == -1 {
+		klog.ErrorS(nil, "Node does not have NodeReady condition", "originalNode", originalNode)
+		return false
+	}
+
+	if originalNodeReady.Status == v1.ConditionTrue {
+		return true
+	}
+
+	// This is in addition to the regular syncNodeStatus logic so we can get the container runtime status earlier.
+	// This function itself has a mutex and it doesn't recursively call fastNodeStatusUpdate or syncNodeStatus.
+	kl.updateRuntimeUp()
+
+	node, changed := kl.updateNode(ctx, originalNode)
+
+	if !changed {
+		// We don't do markVolumesFromNode(node) here and leave it to the regular syncNodeStatus().
+		return false
+	}
+
+	readyIdx, nodeReady := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady)
+	if readyIdx == -1 {
+		klog.ErrorS(nil, "Node does not have NodeReady condition", "node", node)
+		return false
+	}
+
+	if nodeReady.Status == v1.ConditionFalse {
+		return false
+	}
+
+	klog.InfoS("Fast updating node status as it just became ready")
+	if _, err := kl.patchNodeStatus(originalNode, node); err != nil {
+		// The originalNode is probably stale, but we know that the current state of kubelet would turn
+		// the node to be ready. Retry using syncNodeStatus() which fetches from the apiserver.
+		klog.ErrorS(err, "Error updating node status, will retry with syncNodeStatus")
+
+		// The reversed kl.syncNodeStatusMux.Unlock/Lock() below to allow kl.syncNodeStatus() execution.
+		kl.syncNodeStatusMux.Unlock()
+		kl.syncNodeStatus()
+		// This lock action is unnecessary if we add a flag to check in the defer before unlocking it,
+		// but having it here makes the logic a bit easier to read.
+		kl.syncNodeStatusMux.Lock()
+	}
+
+	// We don't do markVolumesFromNode(node) here and leave it to the regular syncNodeStatus().
+	return true
+}
+
 // syncNodeStatus should be called periodically from a goroutine.
 // It synchronizes node status to master if there is any change or enough time
 // passed from the last sync, registering the kubelet first if necessary.
