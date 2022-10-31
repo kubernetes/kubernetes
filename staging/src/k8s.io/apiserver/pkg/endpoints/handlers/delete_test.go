@@ -19,6 +19,8 @@ package handlers
 import (
 	"context"
 	"io"
+	"net/http"
+	"strings"
 	"testing"
 
 	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
@@ -28,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	auditapis "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/utils/pointer"
 )
 
@@ -127,6 +130,75 @@ func TestDeleteResourceAuditLogRequestObject(t *testing.T) {
 			} else {
 				if !test.ok {
 					t.Errorf("expect err but got nil")
+				}
+			}
+		})
+	}
+}
+
+func TestDeleteCollection(t *testing.T) {
+	req := &http.Request{
+		Header: http.Header{},
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	fakeCorev1GroupVersion := schema.GroupVersion{
+		Group:   "",
+		Version: "v1",
+	}
+	fakeCorev1Scheme := runtime.NewScheme()
+	fakeCorev1Scheme.AddKnownTypes(fakeCorev1GroupVersion, &metav1.DeleteOptions{})
+	fakeCorev1Codec := serializer.NewCodecFactory(fakeCorev1Scheme)
+
+	tests := []struct {
+		name         string
+		codecFactory serializer.CodecFactory
+		data         []byte
+		expectErr    string
+	}{
+		//  for issue: https://github.com/kubernetes/kubernetes/issues/111985
+		{
+			name:         "decode '{}' to metav1.DeleteOptions with fakeCorev1Codecs",
+			codecFactory: fakeCorev1Codec,
+			data:         []byte("{}"),
+			expectErr:    "no kind \"DeleteOptions\" is registered",
+		},
+		{
+			name:         "decode '{}' to metav1.DeleteOptions with metainternalversionscheme.Codecs",
+			codecFactory: metainternalversionscheme.Codecs,
+			data:         []byte("{}"),
+			expectErr:    "",
+		},
+		{
+			name:         "decode versioned (corev1) DeleteOptions with metainternalversionscheme.Codecs",
+			codecFactory: metainternalversionscheme.Codecs,
+			data:         []byte(`{"apiVersion":"v1","kind":"DeleteOptions","gracePeriodSeconds":123}`),
+			expectErr:    "",
+		},
+		{
+			name:         "decode versioned (foo) DeleteOptions with metainternalversionscheme.Codecs",
+			codecFactory: metainternalversionscheme.Codecs,
+			data:         []byte(`{"apiVersion":"foo/v1","kind":"DeleteOptions","gracePeriodSeconds":123}`),
+			expectErr:    "",
+		},
+	}
+
+	defaultGVK := metav1.SchemeGroupVersion.WithKind("DeleteOptions")
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			s, err := negotiation.NegotiateInputSerializer(req, false, test.codecFactory)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			options := &metav1.DeleteOptions{}
+			_, _, err = metainternalversionscheme.Codecs.DecoderToVersion(s.Serializer, defaultGVK.GroupVersion()).Decode(test.data, &defaultGVK, options)
+			if test.expectErr != "" {
+				if err == nil {
+					t.Fatalf("expect %s but got nil", test.expectErr)
+				}
+				if !strings.Contains(err.Error(), test.expectErr) {
+					t.Fatalf("expect %s but got %s", test.expectErr, err.Error())
 				}
 			}
 		})
