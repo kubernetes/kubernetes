@@ -19,6 +19,7 @@ package job
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -706,30 +707,14 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			jobFailMessage, countFailed, action := matchPodFailurePolicy(tc.podFailurePolicy, tc.failedPod)
-			if tc.wantJobFailureMessage == nil {
-				if jobFailMessage != nil {
-					t.Errorf("Unexpected job fail message. Got: %q", *jobFailMessage)
-				}
-			} else {
-				if jobFailMessage == nil {
-					t.Errorf("Missing job fail message. want: %q", *tc.wantJobFailureMessage)
-				} else if *tc.wantJobFailureMessage != *jobFailMessage {
-					t.Errorf("Unexpected job fail message. want: %q. got: %q", *tc.wantJobFailureMessage, *jobFailMessage)
-				}
+			if diff := cmp.Diff(tc.wantJobFailureMessage, jobFailMessage); diff != "" {
+				t.Errorf("Unexpected job failure message: %s", diff)
 			}
 			if tc.wantCountFailed != countFailed {
 				t.Errorf("Unexpected count failed. want: %v. got: %v", tc.wantCountFailed, countFailed)
 			}
-			if tc.wantAction == nil {
-				if action != nil {
-					t.Errorf("Unexpected job failure polic action. Got: %q", *action)
-				}
-			} else {
-				if action == nil {
-					t.Errorf("Missing job failure policy action. want: %q", *tc.wantAction)
-				} else if *tc.wantAction != *action {
-					t.Errorf("Unexpected job failure policy action. want: %v. got: %v", tc.wantAction, action)
-				}
+			if diff := cmp.Diff(tc.wantAction, action); diff != "" {
+				t.Errorf("Unexpected failure policy action: %s", diff)
 			}
 		})
 	}
