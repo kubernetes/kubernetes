@@ -1248,3 +1248,68 @@ func TestGetDeploymentsForReplicaSet(t *testing.T) {
 	}
 
 }
+func generateRSWithAnnotationKey(annotationKey string, revision string) apps.ReplicaSet {
+	return apps.ReplicaSet{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:         randomUID(),
+			Name:        names.SimpleNameGenerator.GenerateName("replicaset"),
+			Labels:      map[string]string{"foo": "bar"},
+			Annotations: map[string]string{annotationKey: revision},
+		},
+	}
+}
+
+func TestGetIntFromAnnotation(t *testing.T) {
+	rs1 := generateRSWithAnnotationKey(DesiredReplicasAnnotation, "1")
+	rs2 := generateRSWithAnnotationKey(DesiredReplicasAnnotation, "a")
+	rs3 := generateRSWithAnnotationKey(MaxReplicasAnnotation, "3")
+	rs4 := generateRSWithAnnotationKey(MaxReplicasAnnotation, "a")
+
+	tests := []struct {
+		name           string
+		replicaSet     *apps.ReplicaSet
+		annotationKey  string
+		expectRevision int32
+		expectResult   bool
+	}{
+		{
+			name:           "replicaSet'annotationKey is DesiredReplicasAnnotation and it is a valid value",
+			replicaSet:     &rs1,
+			annotationKey:  DesiredReplicasAnnotation,
+			expectRevision: 1,
+			expectResult:   true,
+		},
+		{
+			name:           "replicaSet'annotationKey is DesiredReplicasAnnotation and it is a invalid value",
+			replicaSet:     &rs2,
+			annotationKey:  DesiredReplicasAnnotation,
+			expectRevision: 0,
+			expectResult:   false,
+		},
+		{
+			name:           "replicaSet'annotationKey is MaxReplicasAnnotation and it is a valid value",
+			replicaSet:     &rs3,
+			annotationKey:  MaxReplicasAnnotation,
+			expectRevision: 3,
+			expectResult:   true,
+		},
+		{
+			name:           "replicaSet'annotationKey is MaxReplicasAnnotation and it is a invalid value",
+			replicaSet:     &rs4,
+			annotationKey:  MaxReplicasAnnotation,
+			expectRevision: 0,
+			expectResult:   false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			res, ok := getIntFromAnnotation(test.replicaSet, test.annotationKey)
+			if res != test.expectRevision {
+				t.Errorf("The expected version is %d, but the actual version is %d\n", test.expectRevision, res)
+			}
+			if ok != test.expectResult {
+				t.Errorf("The expected result is %t, but the actual version is %t\n", test.expectResult, ok)
+			}
+		})
+	}
+}
