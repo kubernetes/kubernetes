@@ -1123,3 +1123,11 @@ func (m *kubeGenericRuntimeManager) UpdatePodCIDR(ctx context.Context, podCIDR s
 func (m *kubeGenericRuntimeManager) CheckpointContainer(ctx context.Context, options *runtimeapi.CheckpointContainerRequest) error {
 	return m.runtimeService.CheckpointContainer(ctx, options)
 }
+
+func (m *kubeGenericRuntimeManager) ListMetricDescriptors(ctx context.Context) ([]*runtimeapi.MetricDescriptor, error) {
+	return m.runtimeService.ListMetricDescriptors(ctx)
+}
+
+func (m *kubeGenericRuntimeManager) ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error) {
+	return m.runtimeService.ListPodSandboxMetrics(ctx)
+}
