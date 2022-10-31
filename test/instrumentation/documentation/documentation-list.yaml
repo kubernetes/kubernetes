@@ -281,6 +281,7 @@
   stabilityLevel: ALPHA
   labels:
   - completion_mode
+  - reason
   - result
 - name: job_pods_finished_total
   subsystem: job_controller
@@ -324,6 +325,16 @@
   - action
   - completion_mode
   - result
+- name: pod_failures_handled_by_failure_policy_total
+  subsystem: job_controller
+  help: "`The number of failed Pods handled by failure policy with\n\t\t\trespect
+    to the failure policy action applied based on the matched\n\t\t\trule. Possible
+    values of the action label correspond to the\n\t\t\tpossible values for the failure
+    policy rule action, which are:\n\t\t\t\"FailJob\", \"Ignore\" and \"Count\".`"
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - action
 - name: terminated_pods_tracking_finalizer_total
   subsystem: job_controller
   help: |-
@@ -547,6 +558,16 @@
   help: Counter of certificate renewal errors.
   type: Counter
   stabilityLevel: ALPHA
+- name: retroactive_storageclass_errors_total
+  help: Total number of failed retroactive StorageClass assignments to persistent
+    volume claim
+  type: Counter
+  stabilityLevel: ALPHA
+- name: retroactive_storageclass_total
+  help: Total number of retroactive StorageClass assignments to persistent volume
+    claim
+  type: Counter
+  stabilityLevel: ALPHA
 - name: volume_operation_total_errors
   help: Total volume operation errors
   type: Counter
@@ -584,6 +605,16 @@
   - 4
   - 8
   - 16
+- name: cpu_manager_pinning_errors_total
+  subsystem: kubelet
+  help: The number of cpu core allocations which required pinning failed.
+  type: Counter
+  stabilityLevel: ALPHA
+- name: cpu_manager_pinning_requests_total
+  subsystem: kubelet
+  help: The number of cpu core allocations which required pinning.
+  type: Counter
+  stabilityLevel: ALPHA
 - name: device_plugin_alloc_duration_seconds
   subsystem: kubelet
   help: Duration in seconds to serve a device plugin Allocation request. Broken down
@@ -1727,6 +1758,52 @@
   - 4.096
   - 8.192
   - 16.384
+- name: check_duration_seconds
+  subsystem: validating_admission_policy
+  namespace: apiserver
+  help: Validation admission latency for individual validation expressions in seconds,
+    labeled by policy and param resource, further including binding, state and enforcement
+    action taken.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - enforcement_action
+  - params
+  - policy
+  - policy_binding
+  - state
+  - validation_expression
+  buckets:
+  - 5e-07
+  - 0.001
+  - 0.01
+  - 0.1
+  - 1
+- name: check_total
+  subsystem: validating_admission_policy
+  namespace: apiserver
+  help: Validation admission policy check total, labeled by policy and param resource,
+    and further identified by binding, validation expression, enforcement action taken,
+    and state.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - enforcement_action
+  - params
+  - policy
+  - policy_binding
+  - state
+  - validation_expression
+- name: definition_total
+  subsystem: validating_admission_policy
+  namespace: apiserver
+  help: Validation admission policy count total, labeled by state and enforcement
+    action.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - enforcement_action
+  - state
 - name: step_admission_duration_seconds_summary
   subsystem: admission
   namespace: apiserver
@@ -2736,6 +2813,13 @@
   help: Total number of failed data encryption key(DEK) generation operations.
   type: Counter
   stabilityLevel: ALPHA
+- name: storage_db_total_size_in_bytes
+  subsystem: apiserver
+  help: Total size of the storage database file physically allocated in bytes.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - endpoint
 - name: envelope_transformation_cache_misses_total
   subsystem: storage
   namespace: apiserver
@@ -2855,12 +2939,6 @@
   stabilityLevel: ALPHA
   labels:
   - resource
-- name: etcd_db_total_size_in_bytes
-  help: Total size of the etcd database file physically allocated in bytes.
-  type: Gauge
-  stabilityLevel: ALPHA
-  labels:
-  - endpoint
 - name: etcd_lease_object_counts
   help: Number of objects attached to a single etcd lease.
   type: Histogram

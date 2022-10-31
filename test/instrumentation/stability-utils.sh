@@ -114,7 +114,7 @@ kube::update::documentation::list() {
     echo "${red}!!! updating golden list of metrics has failed! ${reset}" >&2
     exit 1
   fi
-  mv -f "$temp_file" "${KUBE_ROOT}/test/instrumentation/testdata/documentation-list.yaml"
+  mv -f "$temp_file" "${KUBE_ROOT}/test/instrumentation/documentation/documentation-list.yaml"
   echo "${green}Updated list of metrics for documentation ${reset}"
 }
 
@@ -126,7 +126,7 @@ kube::update::documentation() {
     echo "${red}!!! updating documentation has failed! ${reset}" >&2
     exit 1
   fi
-  mv -f "$temp_file" "${KUBE_ROOT}/test/instrumentation/testdata/documentation.md"
+  mv -f "$temp_file" "${KUBE_ROOT}/test/instrumentation/documentation/documentation.md"
   echo "${green}Updated documentation of metrics.${reset}"
 }
 

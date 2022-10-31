@@ -110,7 +110,7 @@ type templateData struct {
 }
 
 func main() {
-	dat, err := os.ReadFile("test/instrumentation/testdata/documentation-list.yaml")
+	dat, err := os.ReadFile("test/instrumentation/documentation/documentation-list.yaml")
 	if err == nil {
 		var parsedMetrics []metric
 		err = yaml.Unmarshal(dat, &parsedMetrics)

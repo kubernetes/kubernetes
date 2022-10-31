@@ -6,10 +6,10 @@ description: >-
 ---
 
 
-## Metrics (auto-generated 2022 Oct 27)
+## Metrics (auto-generated 2022 Oct 31)
 
 This page details the metrics that different Kubernetes components export. You can query the metrics endpoint for these 
-components using an HTTP scrape, and fetch the metrics in Prometheus format.
+components using an HTTP scrape, and fetch the current metrics data in Prometheus format.
 
 ### List of Stable Kubernetes Metrics
 
@@ -554,6 +554,12 @@ components using an HTTP scrape, and fetch the metrics in Prometheus format.
 <td class="metric_description">Total number of failed data encryption key(DEK) generation operations.</td>
 <td class="metric_labels_varying">None</td>
 <td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">apiserver_storage_db_total_size_in_bytes</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="gauge">Gauge</td>
+<td class="metric_description">Total size of the storage database file physically allocated in bytes.</td>
+<td class="metric_labels_varying"><div class="metric_label">endpoint</div></td>
+<td class="metric_labels_constant">None</td></tr>
 <tr class="metric"><td class="metric_name">apiserver_storage_envelope_transformation_cache_misses_total</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="counter">Counter</td>
@@ -607,6 +613,24 @@ components using an HTTP scrape, and fetch the metrics in Prometheus format.
 <td class="metric_type" data-type="counter">Counter</td>
 <td class="metric_description">Number of requests dropped with 'TLS handshake error from' error</td>
 <td class="metric_labels_varying">None</td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">apiserver_validating_admission_policy_check_duration_seconds</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">Validation admission latency for individual validation expressions in seconds, labeled by policy and param resource, further including binding, state and enforcement action taken.</td>
+<td class="metric_labels_varying"><div class="metric_label">enforcement_action</div><div class="metric_label">params</div><div class="metric_label">policy</div><div class="metric_label">policy_binding</div><div class="metric_label">state</div><div class="metric_label">validation_expression</div></td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">apiserver_validating_admission_policy_check_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Validation admission policy check total, labeled by policy and param resource, and further identified by binding, validation expression, enforcement action taken, and state.</td>
+<td class="metric_labels_varying"><div class="metric_label">enforcement_action</div><div class="metric_label">params</div><div class="metric_label">policy</div><div class="metric_label">policy_binding</div><div class="metric_label">state</div><div class="metric_label">validation_expression</div></td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">apiserver_validating_admission_policy_definition_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Validation admission policy count total, labeled by state and enforcement action.</td>
+<td class="metric_labels_varying"><div class="metric_label">enforcement_action</div><div class="metric_label">state</div></td>
 <td class="metric_labels_constant">None</td></tr>
 <tr class="metric"><td class="metric_name">apiserver_watch_cache_events_dispatched_total</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
@@ -914,12 +938,6 @@ components using an HTTP scrape, and fetch the metrics in Prometheus format.
 <td class="metric_description">Number of etcd bookmarks (progress notify events) split by kind.</td>
 <td class="metric_labels_varying"><div class="metric_label">resource</div></td>
 <td class="metric_labels_constant">None</td></tr>
-<tr class="metric"><td class="metric_name">etcd_db_total_size_in_bytes</td>
-<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
-<td class="metric_type" data-type="gauge">Gauge</td>
-<td class="metric_description">Total size of the etcd database file physically allocated in bytes.</td>
-<td class="metric_labels_varying"><div class="metric_label">endpoint</div></td>
-<td class="metric_labels_constant">None</td></tr>
 <tr class="metric"><td class="metric_name">etcd_lease_object_counts</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="histogram">Histogram</td>
@@ -966,7 +984,7 @@ components using an HTTP scrape, and fetch the metrics in Prometheus format.
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="counter">Counter</td>
 <td class="metric_description">The number of finished job</td>
-<td class="metric_labels_varying"><div class="metric_label">completion_mode</div><div class="metric_label">result</div></td>
+<td class="metric_labels_varying"><div class="metric_label">completion_mode</div><div class="metric_label">reason</div><div class="metric_label">result</div></td>
 <td class="metric_labels_constant">None</td></tr>
 <tr class="metric"><td class="metric_name">job_controller_job_pods_finished_total</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
@@ -985,6 +1003,12 @@ components using an HTTP scrape, and fetch the metrics in Prometheus format.
 <td class="metric_type" data-type="counter">Counter</td>
 <td class="metric_description">The number of job syncs</td>
 <td class="metric_labels_varying"><div class="metric_label">action</div><div class="metric_label">completion_mode</div><div class="metric_label">result</div></td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">job_controller_pod_failures_handled_by_failure_policy_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">`The number of failed Pods handled by failure policy with, 			respect to the failure policy action applied based on the matched, 			rule. Possible values of the action label correspond to the, 			possible values for the failure policy rule action, which are:, 			"FailJob", "Ignore" and "Count".`</td>
+<td class="metric_labels_varying"><div class="metric_label">action</div></td>
 <td class="metric_labels_constant">None</td></tr>
 <tr class="metric"><td class="metric_name">job_controller_terminated_pods_tracking_finalizer_total</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
@@ -1062,6 +1086,18 @@ components using an HTTP scrape, and fetch the metrics in Prometheus format.
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="histogram">Histogram</td>
 <td class="metric_description">The number of containers per pod.</td>
+<td class="metric_labels_varying">None</td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">kubelet_cpu_manager_pinning_errors_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">The number of cpu core allocations which required pinning failed.</td>
+<td class="metric_labels_varying">None</td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">kubelet_cpu_manager_pinning_requests_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">The number of cpu core allocations which required pinning.</td>
 <td class="metric_labels_varying">None</td>
 <td class="metric_labels_constant">None</td></tr>
 <tr class="metric"><td class="metric_name">kubelet_device_plugin_alloc_duration_seconds</td>
@@ -1585,6 +1621,18 @@ components using an HTTP scrape, and fetch the metrics in Prometheus format.
 <td class="metric_type" data-type="histogram">Histogram</td>
 <td class="metric_description">Response size in bytes. Broken down by verb and host.</td>
 <td class="metric_labels_varying"><div class="metric_label">host</div><div class="metric_label">verb</div></td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">retroactive_storageclass_errors_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Total number of failed retroactive StorageClass assignments to persistent volume claim</td>
+<td class="metric_labels_varying">None</td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">retroactive_storageclass_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Total number of retroactive StorageClass assignments to persistent volume claim</td>
+<td class="metric_labels_varying">None</td>
 <td class="metric_labels_constant">None</td></tr>
 <tr class="metric"><td class="metric_name">root_ca_cert_publisher_sync_duration_seconds</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
