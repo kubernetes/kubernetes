@@ -307,11 +307,15 @@ clean:
 	hack/make-rules/clean.sh
 endif
 
+
 # TODO(thockin): Remove this in v1.29.
 .PHONY: generated_files
 generated_files:
 	echo "'make generated_files' is deprecated.  Please use hack/update-codegen.sh instead."
+ifneq ($(PRINT_HELP), y)
 	false
+endif
+
 
 define VET_HELP_INFO
 # Run 'go vet'.
