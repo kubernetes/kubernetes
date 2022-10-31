@@ -126,7 +126,7 @@ func (plugin *rbdPlugin) SupportsBulkVolumeVerification() bool {
 }
 
 func (plugin *rbdPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
-	return false, nil
+	return true, nil
 }
 
 func (plugin *rbdPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
@@ -782,8 +782,9 @@ type rbd struct {
 	mounter  *mount.SafeFormatAndMount
 	exec     utilexec.Interface
 	// Utility interface that provides API calls to the provider to attach/detach disks.
-	manager                diskManager
-	volume.MetricsProvider `json:"-"`
+	manager                   diskManager
+	volume.MetricsProvider    `json:"-"`
+	mountedWithSELinuxContext bool
 }
 
 var _ volume.Volume = &rbd{}
@@ -837,7 +838,7 @@ func (rbd *rbd) GetAttributes() volume.Attributes {
 	return volume.Attributes{
 		ReadOnly:       rbd.ReadOnly,
 		Managed:        !rbd.ReadOnly,
-		SELinuxRelabel: true,
+		SELinuxRelabel: !rbd.mountedWithSELinuxContext,
 	}
 }
 
@@ -853,6 +854,11 @@ func (b *rbdMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 		klog.Errorf("rbd: failed to setup at %s %v", dir, err)
 		return err
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		// The volume must have been mounted in MountDevice with -o context.
+		b.mountedWithSELinuxContext = mounterArgs.SELinuxLabel != ""
+	}
+
 	klog.V(3).Infof("rbd: successfully setup at %s", dir)
 	return err
 }
