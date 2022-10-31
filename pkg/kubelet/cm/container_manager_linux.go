@@ -311,9 +311,9 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 
 	// Initialize CPU manager
 	cm.cpuManager, err = cpumanager.NewManager(
-		nodeConfig.ExperimentalCPUManagerPolicy,
-		nodeConfig.ExperimentalCPUManagerPolicyOptions,
-		nodeConfig.ExperimentalCPUManagerReconcilePeriod,
+		nodeConfig.CPUManagerPolicy,
+		nodeConfig.CPUManagerPolicyOptions,
+		nodeConfig.CPUManagerReconcilePeriod,
 		machineInfo,
 		nodeConfig.NodeAllocatableConfig.ReservedSystemCPUs,
 		cm.GetNodeAllocatableReservation(),
