@@ -201,7 +201,7 @@ type IngressRule struct {
 	// Requests will be matched against the Host field in the following way:
 	// 1. If Host is precise, the request matches this rule if the http host header is equal to Host.
 	// 2. If Host is a wildcard, then the request matches this rule if the http host header
-	// is to equal to the suffix (removing the first label) of the wildcard rule.
+	//    is to equal to the suffix (removing the first label) of the wildcard rule.
 	// +optional
 	Host string `json:"host,omitempty" protobuf:"bytes,1,opt,name=host"`
 	// IngressRuleValue represents a rule to route requests for this IngressRule.
@@ -220,9 +220,9 @@ type IngressRule struct {
 type IngressRuleValue struct {
 	//TODO:
 	// 1. Consider renaming this resource and the associated rules so they
-	// aren't tied to Ingress. They can be used to route intra-cluster traffic.
+	//    aren't tied to Ingress. They can be used to route intra-cluster traffic.
 	// 2. Consider adding fields for ingress-type specific global options
-	// usable by a loadbalancer, like http keep-alive.
+	//    usable by a loadbalancer, like http keep-alive.
 
 	// +optional
 	HTTP *HTTPIngressRuleValue `json:"http,omitempty" protobuf:"bytes,1,opt,name=http"`
