@@ -230,6 +230,7 @@ type Validation struct {
 	// If this is the first validation in the list to fail, this reason, as well as the
 	// corresponding HTTP response code, are used in the
 	// HTTP response to the client.
+	// The currently supported reasons are: "Unauthorized", "Forbidden", "Invalid", "RequestEntityTooLarge".
 	// If not set, StatusReasonInvalid is used in the response to the client.
 	// +optional
 	Reason *metav1.StatusReason
