@@ -581,7 +581,7 @@ func (v testValidator) Validate(a admission.Attributes, o admission.ObjectInterf
 	// Policy always denies
 	return []policyDecision{
 		{
-			kind:    deny,
+			action:  actionDeny,
 			message: "Denied",
 		},
 	}, nil
