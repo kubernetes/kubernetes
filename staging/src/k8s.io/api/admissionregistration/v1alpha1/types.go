@@ -348,23 +348,9 @@ type NamedRuleWithOperations struct {
 	// +optional
 	ResourceNames []string `json:"resourceNames,omitempty" protobuf:"bytes,1,rep,name=resourceNames"`
 	// RuleWithOperations is a tuple of Operations and Resources.
-	// +listType=atomic
 	RuleWithOperations `json:",inline" protobuf:"bytes,2,opt,name=ruleWithOperations"`
 }
 
 // RuleWithOperations is a tuple of Operations and Resources. It is recommended to make
 // sure that all the tuple expansions are valid.
 type RuleWithOperations v1.RuleWithOperations
-
-// OperationType specifies an operation for a request.
-// +enum
-type OperationType string
-
-// The constants should be kept in sync with those defined in k8s.io/kubernetes/pkg/admission/interface.go.
-const (
-	OperationAll OperationType = "*"
-	Create       OperationType = "CREATE"
-	Update       OperationType = "UPDATE"
-	Delete       OperationType = "DELETE"
-	Connect      OperationType = "CONNECT"
-)

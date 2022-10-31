@@ -452,18 +452,6 @@ const (
 // sure that all the tuple expansions are valid.
 type RuleWithOperations v1.RuleWithOperations
 
-// OperationType specifies an operation for a request.
-type OperationType string
-
-// The constants should be kept in sync with those defined in k8s.io/kubernetes/pkg/admission/interface.go.
-const (
-	OperationAll OperationType = "*"
-	Create       OperationType = "CREATE"
-	Update       OperationType = "UPDATE"
-	Delete       OperationType = "DELETE"
-	Connect      OperationType = "CONNECT"
-)
-
 // WebhookClientConfig contains the information to make a TLS
 // connection with the webhook
 type WebhookClientConfig struct {
