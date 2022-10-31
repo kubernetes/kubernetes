@@ -236,7 +236,7 @@ func TestRemoveContainers(t *testing.T) {
 	removeContainers(&fexec, "unix:///var/run/crio/crio.sock")
 }
 
-func TestRemoveImages(t *testing.T) {
+func TestCleanupImages(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeAction{
 			func() ([]byte, []byte, error) { return []byte("id1\nid2"), nil, nil },
