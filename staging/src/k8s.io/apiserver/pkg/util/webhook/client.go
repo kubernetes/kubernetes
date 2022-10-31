@@ -21,6 +21,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpgrpc"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/semconv"
+	oteltrace "go.opentelemetry.io/otel/trace"
+	tracing "k8s.io/component-base/tracing"
+	tracingapi "k8s.io/component-base/tracing/api/v1"
 	"net"
 	"net/url"
 	"strconv"
@@ -124,6 +130,7 @@ func (cm *ClientManager) HookClient(cc ClientConfig) (*rest.RESTClient, error) {
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("## HookClient")
 	if client, ok := cm.cache.Get(string(cacheKey)); ok {
 		return client.(*rest.RESTClient), nil
 	}
@@ -153,6 +160,11 @@ func (cm *ClientManager) HookClient(cc ClientConfig) (*rest.RESTClient, error) {
 			x509MissingSANCounter,
 			x509InsecureSHA1Counter,
 		))
+		tp, err := newFakeTracerProvider(context.Background())
+		if err != nil {
+			fmt.Println("## error", err)
+		}
+		cfg.Wrap(tracing.WrapperFor(tp))
 
 		client, err := rest.UnversionedRESTClientFor(cfg)
 		if err == nil {
@@ -227,4 +239,30 @@ func (cm *ClientManager) HookClient(cc ClientConfig) (*rest.RESTClient, error) {
 	cfg.APIPath = u.Path
 
 	return complete(cfg)
+}
+
+func newFakeTracerProvider(ctx context.Context) (oteltrace.TracerProvider, error) {
+	fmt.Println("## newFakeTracerProvider")
+	/* if s.KubeletConfiguration.Tracing == nil {
+		return oteltrace.NewNoopTracerProvider(), nil
+	} */
+	samplingRate := int32(1000000)
+	// tracingConfig := &tracingapi.TracingConfiguration{SamplingRatePerMillion: &samplingRate}
+	// hostname, err := nodeutil.GetHostname(s.HostnameOverride)
+	hostname := "hostname-mut-webhook-aug-4"
+	componentKubelet := "component-mut-webhook-aug-4"
+	resourceOpts := []resource.Option{
+		resource.WithAttributes(
+			semconv.ServiceNameKey.String(componentKubelet),
+			semconv.ServiceInstanceIDKey.String(hostname),
+		),
+	}
+	endpoint := "127.0.0.1:4317"
+	opts := []otlpgrpc.Option{}
+	opts = append(opts, otlpgrpc.WithEndpoint(endpoint))
+	tracingConfig := tracingapi.TracingConfiguration{
+		Endpoint:               &endpoint,
+		SamplingRatePerMillion: &samplingRate,
+	}
+	return tracing.NewProvider(ctx, &tracingConfig, opts, resourceOpts)
 }
