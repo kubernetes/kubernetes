@@ -4289,6 +4289,15 @@ func ValidatePodCreate(pod *core.Pod, opts PodValidationOptions) field.ErrorList
 	}
 	allErrs = append(allErrs, validateSeccompAnnotationsAndFields(pod.ObjectMeta, &pod.Spec, fldPath)...)
 
+	// for backwards compatibility, we add this non-negative validation about spec.TerminationGracePeriodSeconds here,
+	// instead of in `validatePodMetadataAndSpec`. Because if we add this validation in `validatePodMetadataAndSpec`,
+	// then for those already created pods, if their TerminationGracePeriodSeconds are negative, it would encounter
+	// unexpected validation errors in update request. Thus, we only validate create request, and it is immutable in
+	// update request (ps: allow it to be set to 1 if it was previously negative)
+	if pod.Spec.TerminationGracePeriodSeconds != nil {
+		allErrs = append(allErrs, ValidateNonnegativeField(*pod.Spec.TerminationGracePeriodSeconds, fldPath.Child("TerminationGracePeriodSeconds"))...)
+	}
+
 	return allErrs
 }
 

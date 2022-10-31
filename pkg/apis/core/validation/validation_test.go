@@ -9764,6 +9764,8 @@ func TestValidatePod(t *testing.T) {
 		})
 	}
 
+	negativeTerminationGracePeriodSeconds := int64(-1)
+
 	errorCases := map[string]struct {
 		spec          core.Pod
 		expectedError string
@@ -9776,6 +9778,18 @@ func TestValidatePod(t *testing.T) {
 					RestartPolicy: core.RestartPolicyAlways,
 					DNSPolicy:     core.DNSClusterFirst,
 					Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				},
+			},
+		},
+		"bad terminationGracePeriodSeconds": {
+			expectedError: "spec.TerminationGracePeriodSeconds",
+			spec: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"},
+				Spec: core.PodSpec{
+					TerminationGracePeriodSeconds: &negativeTerminationGracePeriodSeconds,
+					RestartPolicy:                 core.RestartPolicyAlways,
+					DNSPolicy:                     core.DNSClusterFirst,
+					Containers:                    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 				},
 			},
 		},
