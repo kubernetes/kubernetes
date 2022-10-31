@@ -696,7 +696,9 @@ const (
 	RotateKubeletServerCertificate featuregate.Feature = "RotateKubeletServerCertificate"
 
 	// owner: @saschagrunert
+	// kep: https://kep.k8s.io/2413
 	// alpha: v1.22
+	// beta: v1.25
 	//
 	// Enables the use of `RuntimeDefault` as the default seccomp profile for all workloads.
 	SeccompDefault featuregate.Feature = "SeccompDefault"
