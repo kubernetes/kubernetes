@@ -23,15 +23,11 @@ import (
 	"testing"
 	"time"
 
-	storagetesting "k8s.io/apiserver/pkg/storage/testing"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
+	storagetesting "k8s.io/apiserver/pkg/storage/testing"
+
 )
 
 func TestWatch(t *testing.T) {
@@ -90,32 +86,7 @@ func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 
 func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
 	ctx, store, _ := testSetup(t)
-
-	key, storedObj := storagetesting.TestPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
-
-	watchCtx, _ := context.WithTimeout(ctx, wait.ForeverTestTimeout)
-	w, err := store.Watch(watchCtx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
-	if err != nil {
-		t.Fatalf("Watch failed: %v", err)
-	}
-
-	deletedObj := &example.Pod{}
-	if err := store.Delete(ctx, key, deletedObj, &storage.Preconditions{}, storage.ValidateAllObjectFunc, nil); err != nil {
-		t.Fatalf("Delete failed: %v", err)
-	}
-
-	// Verify that ResourceVersion has changed on deletion.
-	if storedObj.ResourceVersion == deletedObj.ResourceVersion {
-		t.Fatalf("ResourceVersion didn't changed on deletion: %s", deletedObj.ResourceVersion)
-	}
-
-	select {
-	case event := <-w.ResultChan():
-		watchedDeleteObj := event.Object.(*example.Pod)
-		if e, a := deletedObj.ResourceVersion, watchedDeleteObj.ResourceVersion; e != a {
-			t.Errorf("Unexpected resource version: %v, expected %v", a, e)
-		}
-	}
+	storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, store)
 }
 
 func TestWatchInitializationSignal(t *testing.T) {
@@ -128,43 +99,5 @@ func TestProgressNotify(t *testing.T) {
 	clusterConfig.ExperimentalWatchProgressNotifyInterval = time.Second
 	ctx, store, _ := testSetup(t, withClientConfig(clusterConfig))
 
-	key := "/somekey"
-	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}}
-	out := &example.Pod{}
-	if err := store.Create(ctx, key, input, out, 0); err != nil {
-		t.Fatalf("Create failed: %v", err)
-	}
-	validateResourceVersion := storagetesting.ResourceVersionNotOlderThan(out.ResourceVersion)
-
-	opts := storage.ListOptions{
-		ResourceVersion: out.ResourceVersion,
-		Predicate:       storage.Everything,
-		ProgressNotify:  true,
-	}
-	w, err := store.Watch(ctx, key, opts)
-	if err != nil {
-		t.Fatalf("Watch failed: %v", err)
-	}
-
-	// when we send a bookmark event, the client expects the event to contain an
-	// object of the correct type, but with no fields set other than the resourceVersion
-	storagetesting.TestCheckResultFunc(t, watch.Bookmark, w, func(object runtime.Object) error {
-		// first, check that we have the correct resource version
-		obj, ok := object.(metav1.Object)
-		if !ok {
-			return fmt.Errorf("got %T, not metav1.Object", object)
-		}
-		if err := validateResourceVersion(obj.GetResourceVersion()); err != nil {
-			return err
-		}
-
-		// then, check that we have the right type and content
-		pod, ok := object.(*example.Pod)
-		if !ok {
-			return fmt.Errorf("got %T, not *example.Pod", object)
-		}
-		pod.ResourceVersion = ""
-		storagetesting.ExpectNoDiff(t, "bookmark event should contain an object with no fields set other than resourceVersion", newPod(), pod)
-		return nil
-	})
+	storagetesting.RunOptionalTestProgressNotify(ctx, t, store)
 }
