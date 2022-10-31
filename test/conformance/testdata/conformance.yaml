@@ -428,6 +428,20 @@
     MUST now include the new Label.
   release: v1.18
   file: test/e2e/apimachinery/namespace.go
+- testname: ResourceQuota, apply changes to a ResourceQuota status
+  codename: '[sig-api-machinery] ResourceQuota should apply changes to a resourcequota
+    status [Conformance]'
+  description: Attempt to create a ResourceQuota for CPU and Memory quota limits.
+    Creation MUST be successful. Updating the hard status values MUST succeed and
+    the new values MUST be found. The reported hard status values MUST equal the spec
+    hard values. Patching the spec hard values MUST succeed and the new values MUST
+    be found. Patching the hard status values MUST succeed. The reported hard status
+    values MUST equal the new spec hard values. Getting the /status MUST succeed and
+    the reported hard status values MUST equal the spec hard values. Repatching the
+    hard status values MUST succeed. The spec spec MUST NOT be changed when patching
+    /status.
+  release: v1.26
+  file: test/e2e/apimachinery/resource_quota.go
 - testname: ResourceQuota, update and delete
   codename: '[sig-api-machinery] ResourceQuota should be able to update and delete
     ResourceQuota. [Conformance]'

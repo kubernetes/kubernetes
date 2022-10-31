@@ -992,7 +992,22 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		}
 	})
 
-	ginkgo.It("should apply changes to a resourcequota status", func() {
+	/*
+		Release: v1.26
+		Testname: ResourceQuota, apply changes to a ResourceQuota status
+		Description: Attempt to create a ResourceQuota for CPU and Memory
+		quota limits. Creation MUST be successful. Updating the hard
+		status values MUST succeed and the new values MUST be found. The
+		reported hard status values MUST equal the spec hard values.
+		Patching the spec hard values MUST succeed and the new values MUST
+		be found. Patching the hard status values MUST succeed. The
+		reported hard status values MUST equal the new spec hard values.
+		Getting the /status MUST succeed and the reported hard status
+		values MUST equal the spec hard values. Repatching the hard status
+		values MUST succeed. The spec spec MUST NOT be changed when
+		patching /status.
+	*/
+	framework.ConformanceIt("should apply changes to a resourcequota status", func() {
 		ns := f.Namespace.Name
 		rqClient := f.ClientSet.CoreV1().ResourceQuotas(ns)
 		rqName := "e2e-rq-status-" + utilrand.String(5)
