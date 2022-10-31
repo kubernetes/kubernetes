@@ -27,7 +27,6 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
-
 )
 
 func TestWatch(t *testing.T) {
@@ -62,6 +61,32 @@ func TestWatchContextCancel(t *testing.T) {
 	storagetesting.RunTestWatchContextCancel(ctx, t, store)
 }
 
+func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, store)
+}
+
+func TestWatchInitializationSignal(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestWatchInitializationSignal(ctx, t, store)
+}
+
+func TestProgressNotify(t *testing.T) {
+	clusterConfig := testserver.NewTestConfig(t)
+	clusterConfig.ExperimentalWatchProgressNotifyInterval = time.Second
+	ctx, store, _ := testSetup(t, withClientConfig(clusterConfig))
+
+	storagetesting.RunOptionalTestProgressNotify(ctx, t, store)
+}
+
+// =======================================================================
+// Implementation-specific tests are following.
+// The following tests are exercising the details of the implementation
+// not the actual user-facing contract of storage interface.
+// As such, they may focus e.g. on non-functional aspects like performance
+// impact.
+// =======================================================================
+
 func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 	origCtx, store, _ := testSetup(t)
 	ctx, cancel := context.WithCancel(origCtx)
@@ -82,22 +107,4 @@ func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 	w.errChan <- fmt.Errorf("some error")
 	cancel()
 	wg.Wait()
-}
-
-func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, store)
-}
-
-func TestWatchInitializationSignal(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestWatchInitializationSignal(ctx, t, store)
-}
-
-func TestProgressNotify(t *testing.T) {
-	clusterConfig := testserver.NewTestConfig(t)
-	clusterConfig.ExperimentalWatchProgressNotifyInterval = time.Second
-	ctx, store, _ := testSetup(t, withClientConfig(clusterConfig))
-
-	storagetesting.RunOptionalTestProgressNotify(ctx, t, store)
 }
