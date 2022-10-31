@@ -86,6 +86,10 @@ const (
 	// Metrics to track ephemeral container usage by this kubelet
 	ManagedEphemeralContainersKey = "managed_ephemeral_containers"
 
+	// Metrics to track the CPU manager behavior
+	CPUManagerPinningRequestsTotalKey = "cpu_manager_pinning_requests_total"
+	CPUManagerPinningErrorsTotalKey   = "cpu_manager_pinning_errors_total"
+
 	// Values used in metric labels
 	Container          = "container"
 	InitContainer      = "init_container"
@@ -506,6 +510,26 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	// CPUManagerPinningRequestsTotal tracks the number of times the pod spec will cause the cpu manager to pin cores
+	CPUManagerPinningRequestsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           CPUManagerPinningRequestsTotalKey,
+			Help:           "The number of cpu core allocations which required pinning.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// CPUManagerPinningErrorsTotal tracks the number of times the pod spec required the cpu manager to pin cores, but the allocation failed
+	CPUManagerPinningErrorsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           CPUManagerPinningErrorsTotalKey,
+			Help:           "The number of cpu core allocations which required pinning failed.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 )
 
 var registerMetrics sync.Once
@@ -569,6 +593,11 @@ func Register(collectors ...metrics.StableCollector) {
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentHTTPGetHandlers) {
 			legacyregistry.MustRegister(LifecycleHandlerHTTPFallbacks)
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.CPUManager) {
+			legacyregistry.MustRegister(CPUManagerPinningRequestsTotal)
+			legacyregistry.MustRegister(CPUManagerPinningErrorsTotal)
 		}
 	})
 }
