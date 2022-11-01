@@ -200,6 +200,15 @@ func TestMounterSetUp(t *testing.T) {
 			enableSELinuxFeatureGate: true,
 			expectedVolumeContext:    nil,
 		},
+		{
+			name:                     "should not include selinux mount options, if feature gate is enabled, driver supports it, but Pod does not have it",
+			driver:                   "supports_selinux",
+			seLinuxLabel:             "",
+			expectedSELinuxContext:   "", // especially make sure the volume plugin does not use -o context="", that is an invalid value
+			volumeContext:            nil,
+			enableSELinuxFeatureGate: true,
+			expectedVolumeContext:    nil,
+		},
 	}
 
 	noPodMountInfo := false

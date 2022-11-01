@@ -259,7 +259,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		if err != nil {
 			return errors.New(log("failed to query for SELinuxMount support: %s", err))
 		}
-		if support {
+		if support && mounterArgs.SELinuxLabel != "" {
 			mountOptions = util.AddSELinuxMountOption(mountOptions, mounterArgs.SELinuxLabel)
 			selinuxLabelMount = true
 		}
