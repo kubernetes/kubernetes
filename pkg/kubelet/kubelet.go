@@ -550,24 +550,26 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	var secretManager secret.Manager
 	var configMapManager configmap.Manager
-	switch kubeCfg.ConfigMapAndSecretChangeDetectionStrategy {
-	case kubeletconfiginternal.WatchChangeDetectionStrategy:
-		secretManager = secret.NewWatchingSecretManager(kubeDeps.KubeClient, klet.resyncInterval)
-		configMapManager = configmap.NewWatchingConfigMapManager(kubeDeps.KubeClient, klet.resyncInterval)
-	case kubeletconfiginternal.TTLCacheChangeDetectionStrategy:
-		secretManager = secret.NewCachingSecretManager(
-			kubeDeps.KubeClient, manager.GetObjectTTLFromNodeFunc(klet.GetNode))
-		configMapManager = configmap.NewCachingConfigMapManager(
-			kubeDeps.KubeClient, manager.GetObjectTTLFromNodeFunc(klet.GetNode))
-	case kubeletconfiginternal.GetChangeDetectionStrategy:
-		secretManager = secret.NewSimpleSecretManager(kubeDeps.KubeClient)
-		configMapManager = configmap.NewSimpleConfigMapManager(kubeDeps.KubeClient)
-	default:
-		return nil, fmt.Errorf("unknown configmap and secret manager mode: %v", kubeCfg.ConfigMapAndSecretChangeDetectionStrategy)
-	}
+	if klet.kubeClient != nil {
+		switch kubeCfg.ConfigMapAndSecretChangeDetectionStrategy {
+		case kubeletconfiginternal.WatchChangeDetectionStrategy:
+			secretManager = secret.NewWatchingSecretManager(klet.kubeClient, klet.resyncInterval)
+			configMapManager = configmap.NewWatchingConfigMapManager(klet.kubeClient, klet.resyncInterval)
+		case kubeletconfiginternal.TTLCacheChangeDetectionStrategy:
+			secretManager = secret.NewCachingSecretManager(
+				klet.kubeClient, manager.GetObjectTTLFromNodeFunc(klet.GetNode))
+			configMapManager = configmap.NewCachingConfigMapManager(
+				klet.kubeClient, manager.GetObjectTTLFromNodeFunc(klet.GetNode))
+		case kubeletconfiginternal.GetChangeDetectionStrategy:
+			secretManager = secret.NewSimpleSecretManager(klet.kubeClient)
+			configMapManager = configmap.NewSimpleConfigMapManager(klet.kubeClient)
+		default:
+			return nil, fmt.Errorf("unknown configmap and secret manager mode: %v", kubeCfg.ConfigMapAndSecretChangeDetectionStrategy)
+		}
 
-	klet.secretManager = secretManager
-	klet.configMapManager = configMapManager
+		klet.secretManager = secretManager
+		klet.configMapManager = configMapManager
+	}
 
 	if klet.experimentalHostUserNamespaceDefaulting {
 		klog.InfoS("Experimental host user namespace defaulting is enabled")
