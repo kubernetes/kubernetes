@@ -133,7 +133,6 @@ type joinOptions struct {
 	controlPlane          bool
 	ignorePreflightErrors []string
 	externalcfg           *kubeadmapiv1.JoinConfiguration
-	joinControlPlane      *kubeadmapiv1.JoinControlPlane
 	patchesDir            string
 	dryRun                bool
 }
@@ -210,7 +209,7 @@ func newCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 		Args: cobra.MaximumNArgs(1),
 	}
 
-	addJoinConfigFlags(cmd.Flags(), joinOptions.externalcfg, joinOptions.joinControlPlane)
+	addJoinConfigFlags(cmd.Flags(), joinOptions.externalcfg)
 	addJoinOtherFlags(cmd.Flags(), joinOptions)
 
 	joinRunner.AppendPhase(phases.NewPreflightPhase())
@@ -241,22 +240,22 @@ func newCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 }
 
 // addJoinConfigFlags adds join flags bound to the config to the specified flagset
-func addJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1.JoinConfiguration, jcp *kubeadmapiv1.JoinControlPlane) {
+func addJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1.JoinConfiguration) {
 	flagSet.StringVar(
 		&cfg.NodeRegistration.Name, options.NodeName, cfg.NodeRegistration.Name,
 		`Specify the node name.`,
 	)
 	flagSet.StringVar(
-		&jcp.CertificateKey, options.CertificateKey, jcp.CertificateKey,
+		&cfg.ControlPlane.CertificateKey, options.CertificateKey, cfg.ControlPlane.CertificateKey,
 		"Use this key to decrypt the certificate secrets uploaded by init.",
 	)
 	// add control plane endpoint flags to the specified flagset
 	flagSet.StringVar(
-		&jcp.LocalAPIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, jcp.LocalAPIEndpoint.AdvertiseAddress,
+		&cfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, cfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress,
 		"If the node should host a new control plane instance, the IP address the API Server will advertise it's listening on. If not set the default network interface will be used.",
 	)
 	flagSet.Int32Var(
-		&jcp.LocalAPIEndpoint.BindPort, options.APIServerBindPort, jcp.LocalAPIEndpoint.BindPort,
+		&cfg.ControlPlane.LocalAPIEndpoint.BindPort, options.APIServerBindPort, cfg.ControlPlane.LocalAPIEndpoint.BindPort,
 		"If the node should host a new control plane instance, the port for the API Server to bind to.",
 	)
 	// adds bootstrap token specific discovery flags to the specified flagset
@@ -325,8 +324,7 @@ func newJoinOptions() *joinOptions {
 	kubeadmapiv1.SetDefaults_JoinControlPlane(joinControlPlane)
 
 	return &joinOptions{
-		externalcfg:      externalcfg,
-		joinControlPlane: joinControlPlane,
+		externalcfg: externalcfg,
 	}
 }
 
@@ -371,9 +369,6 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		opt.externalcfg.Discovery.BootstrapToken.APIServerEndpoint = args[0]
 	}
 
-	// Include the JoinControlPlane with user flags
-	opt.externalcfg.ControlPlane = opt.joinControlPlane
-
 	// If not passing --control-plane, unset the ControlPlane object
 	if !opt.controlPlane {
 		// Use a defaulted JoinControlPlane object to detect if the user has passed
@@ -388,7 +383,7 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 			options.APIServerBindPort,
 		}
 
-		if *opt.joinControlPlane != *defaultJCP {
+		if *opt.externalcfg.ControlPlane != *defaultJCP {
 			klog.Warningf("[preflight] WARNING: --%s is also required when passing control-plane "+
 				"related flags such as [%s]", options.ControlPlane, strings.Join(joinControlPlaneFlags, ", "))
 		}
