@@ -52,23 +52,30 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-const (
-	configFile               = "config/performance-config.yaml"
-	createNodesOpcode        = "createNodes"
-	createNamespacesOpcode   = "createNamespaces"
-	createPodsOpcode         = "createPods"
-	createPodSetsOpcode      = "createPodSets"
-	churnOpcode              = "churn"
-	barrierOpcode            = "barrier"
-	sleepOpcode              = "sleep"
-	extensionPointsLabelName = "extension_point"
+type operationCode string
 
+const (
+	createNodesOpcode      operationCode = "createNodes"
+	createNamespacesOpcode operationCode = "createNamespaces"
+	createPodsOpcode       operationCode = "createPods"
+	createPodSetsOpcode    operationCode = "createPodSets"
+	churnOpcode            operationCode = "churn"
+	barrierOpcode          operationCode = "barrier"
+	sleepOpcode            operationCode = "sleep"
+)
+
+const (
 	// Two modes supported in "churn" operator.
 
 	// Recreate creates a number of API objects and then delete them, and repeat the iteration.
 	Recreate = "recreate"
 	// Create continuously create API objects without deleting them.
 	Create = "create"
+)
+
+const (
+	configFile               = "config/performance-config.yaml"
+	extensionPointsLabelName = "extension_point"
 )
 
 var (
@@ -253,7 +260,7 @@ func isValidParameterizable(val string) bool {
 // createNodesOp defines an op where nodes are created as a part of a workload.
 type createNodesOp struct {
 	// Must be "createNodes".
-	Opcode string
+	Opcode operationCode
 	// Number of nodes to create. Parameterizable through CountParam.
 	Count int
 	// Template parameter for Count.
@@ -297,7 +304,7 @@ func (cno createNodesOp) patchParams(w *workload) (realOp, error) {
 // createNamespacesOp defines an op for creating namespaces
 type createNamespacesOp struct {
 	// Must be "createNamespaces".
-	Opcode string
+	Opcode operationCode
 	// Name prefix of the Namespace. The format is "<prefix>-<number>", where number is
 	// between 0 and count-1.
 	Prefix string
@@ -341,7 +348,7 @@ func (cmo createNamespacesOp) patchParams(w *workload) (realOp, error) {
 // continue asynchronously.
 type createPodsOp struct {
 	// Must be "createPods".
-	Opcode string
+	Opcode operationCode
 	// Number of pods to schedule. Parameterizable through CountParam.
 	Count int
 	// Template parameter for Count.
@@ -400,7 +407,7 @@ func (cpo createPodsOp) patchParams(w *workload) (realOp, error) {
 // createPodSetsOp defines an op where a set of createPodsOp is created each in a unique namespace.
 type createPodSetsOp struct {
 	// Must be "createPodSets".
-	Opcode string
+	Opcode operationCode
 	// Number of sets to create.
 	Count int
 	// Template parameter for Count.
@@ -442,7 +449,7 @@ func (cpso createPodSetsOp) patchParams(w *workload) (realOp, error) {
 // churnOp defines an op where services are created as a part of a workload.
 type churnOp struct {
 	// Must be "churnOp".
-	Opcode string
+	Opcode operationCode
 	// Value must be one of the followings:
 	// - recreate. In this mode, API objects will be created for N cycles, and then
 	//   deleted in the next N cycles. N is specified by the "Number" field.
@@ -493,7 +500,7 @@ func (co churnOp) patchParams(w *workload) (realOp, error) {
 // were scheduled with SkipWaitToCompletion set to true.
 type barrierOp struct {
 	// Must be "barrier".
-	Opcode string
+	Opcode operationCode
 	// Namespaces to block on. Empty array or not specifying this field signifies
 	// that the barrier should block on all namespaces.
 	Namespaces []string
@@ -518,14 +525,14 @@ func (bo barrierOp) patchParams(w *workload) (realOp, error) {
 // This is useful in simulating workloads that require some sort of time-based synchronisation.
 type sleepOp struct {
 	// Must be "sleep".
-	Opcode string
+	Opcode operationCode
 	// duration of sleep.
 	Duration time.Duration
 }
 
 func (so *sleepOp) UnmarshalJSON(data []byte) (err error) {
 	var tmp struct {
-		Opcode   string
+		Opcode   operationCode
 		Duration string
 	}
 	if err = json.Unmarshal(data, &tmp); err != nil {
