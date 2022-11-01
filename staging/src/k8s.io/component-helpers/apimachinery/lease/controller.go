@@ -72,28 +72,7 @@ type controller struct {
 }
 
 // NewController constructs and returns a controller
-func NewController(clock clock.Clock, client clientset.Interface, holderIdentity string, leaseDurationSeconds int32, onRepeatedHeartbeatFailure func(), renewInterval time.Duration, leaseNamespace string, newLeasePostProcessFunc ProcessLeaseFunc) Controller {
-	var leaseClient coordclientset.LeaseInterface
-	if client != nil {
-		leaseClient = client.CoordinationV1().Leases(leaseNamespace)
-	}
-	return &controller{
-		client:                     client,
-		leaseClient:                leaseClient,
-		holderIdentity:             holderIdentity,
-		leaseName:                  holderIdentity,
-		leaseNamespace:             leaseNamespace,
-		leaseDurationSeconds:       leaseDurationSeconds,
-		renewInterval:              renewInterval,
-		clock:                      clock,
-		onRepeatedHeartbeatFailure: onRepeatedHeartbeatFailure,
-		newLeasePostProcessFunc:    newLeasePostProcessFunc,
-	}
-}
-
-// NewControllerWithLeaseName is a copy of NewController but accepts a leaseName parameter.
-// Use this constructor in cases when the lease name and holder identity should be different.
-func NewControllerWithLeaseName(clock clock.Clock, client clientset.Interface, holderIdentity string, leaseDurationSeconds int32, onRepeatedHeartbeatFailure func(), renewInterval time.Duration, leaseName, leaseNamespace string, newLeasePostProcessFunc ProcessLeaseFunc) Controller {
+func NewController(clock clock.Clock, client clientset.Interface, holderIdentity string, leaseDurationSeconds int32, onRepeatedHeartbeatFailure func(), renewInterval time.Duration, leaseName, leaseNamespace string, newLeasePostProcessFunc ProcessLeaseFunc) Controller {
 	var leaseClient coordclientset.LeaseInterface
 	if client != nil {
 		leaseClient = client.CoordinationV1().Leases(leaseNamespace)
@@ -174,7 +153,7 @@ func (c *controller) backoffEnsureLease() (*coordinationv1.Lease, bool) {
 // ensureLease creates the lease if it does not exist. Returns the lease and
 // a bool (true if this call created the lease), or any error that occurs.
 func (c *controller) ensureLease() (*coordinationv1.Lease, bool, error) {
-	lease, err := c.leaseClient.Get(context.TODO(), c.holderIdentity, metav1.GetOptions{})
+	lease, err := c.leaseClient.Get(context.TODO(), c.leaseName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		// lease does not exist, create it.
 		leaseToCreate, err := c.newLease(nil)

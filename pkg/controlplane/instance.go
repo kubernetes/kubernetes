@@ -476,7 +476,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			leaseName := m.GenericAPIServer.APIServerID
 			holderIdentity := m.GenericAPIServer.APIServerID + "_" + string(uuid.NewUUID())
 
-			controller := lease.NewControllerWithLeaseName(
+			controller := lease.NewController(
 				clock.RealClock{},
 				kubeClient,
 				holderIdentity,

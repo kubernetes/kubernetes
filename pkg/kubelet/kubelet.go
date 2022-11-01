@@ -833,6 +833,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeCfg.NodeLeaseDurationSeconds,
 		klet.onRepeatedHeartbeatFailure,
 		renewInterval,
+		string(klet.nodeName),
 		v1.NamespaceNodeLease,
 		util.SetNodeOwnerFunc(klet.heartbeatClient, string(klet.nodeName)))
 
