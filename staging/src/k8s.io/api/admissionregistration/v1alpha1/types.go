@@ -23,7 +23,7 @@ import (
 
 // Rule is a tuple of APIGroups, APIVersion, and Resources.It is recommended
 // to make sure that all the tuple expansions are valid.
-type Rule v1.Rule
+type Rule = v1.Rule
 
 // ScopeType specifies a scope for a Rule.
 // +enum
@@ -353,4 +353,17 @@ type NamedRuleWithOperations struct {
 
 // RuleWithOperations is a tuple of Operations and Resources. It is recommended to make
 // sure that all the tuple expansions are valid.
-type RuleWithOperations v1.RuleWithOperations
+type RuleWithOperations = v1.RuleWithOperations
+
+// OperationType specifies an operation for a request.
+// +enum
+type OperationType = v1.OperationType
+
+// The constants should be kept in sync with those defined in k8s.io/kubernetes/pkg/admission/interface.go.
+const (
+	OperationAll OperationType = v1.OperationAll
+	Create       OperationType = v1.Create
+	Update       OperationType = v1.Update
+	Delete       OperationType = v1.Delete
+	Connect      OperationType = v1.Connect
+)

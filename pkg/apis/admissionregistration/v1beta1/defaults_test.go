@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1_test
 
 import (
+	v1 "k8s.io/api/admissionregistration/v1"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -35,6 +36,7 @@ func TestDefaultAdmissionWebhook(t *testing.T) {
 	exact := v1beta1.Exact
 	never := v1beta1.NeverReinvocationPolicy
 	thirty := int32(30)
+	allScopes := v1.AllScopes
 	unknown := v1beta1.SideEffectClassUnknown
 
 	tests := []struct {
@@ -66,6 +68,52 @@ func TestDefaultAdmissionWebhook(t *testing.T) {
 			},
 			expected: &v1beta1.MutatingWebhookConfiguration{
 				Webhooks: []v1beta1.MutatingWebhook{{
+					FailurePolicy:           &ignore,
+					MatchPolicy:             &exact,
+					ReinvocationPolicy:      &never,
+					TimeoutSeconds:          &thirty,
+					NamespaceSelector:       &metav1.LabelSelector{},
+					ObjectSelector:          &metav1.LabelSelector{},
+					SideEffects:             &unknown,
+					AdmissionReviewVersions: []string{"v1beta1"},
+				}},
+			},
+		},
+		{
+			name: "scope=*",
+			original: &v1beta1.MutatingWebhookConfiguration{
+				Webhooks: []v1beta1.MutatingWebhook{{
+					Rules: []v1beta1.RuleWithOperations{{}},
+				}},
+			},
+			expected: &v1beta1.MutatingWebhookConfiguration{
+				Webhooks: []v1beta1.MutatingWebhook{{
+					Rules: []v1beta1.RuleWithOperations{{Rule: v1beta1.Rule{
+						Scope: &allScopes, // defaulted
+					}}},
+					FailurePolicy:           &ignore,
+					MatchPolicy:             &exact,
+					ReinvocationPolicy:      &never,
+					TimeoutSeconds:          &thirty,
+					NamespaceSelector:       &metav1.LabelSelector{},
+					ObjectSelector:          &metav1.LabelSelector{},
+					SideEffects:             &unknown,
+					AdmissionReviewVersions: []string{"v1beta1"},
+				}},
+			},
+		},
+		{
+			name: "scope=*",
+			original: &v1beta1.MutatingWebhookConfiguration{
+				Webhooks: []v1beta1.MutatingWebhook{{
+					Rules: []v1beta1.RuleWithOperations{{}},
+				}},
+			},
+			expected: &v1beta1.MutatingWebhookConfiguration{
+				Webhooks: []v1beta1.MutatingWebhook{{
+					Rules: []v1beta1.RuleWithOperations{{Rule: v1beta1.Rule{
+						Scope: &allScopes, // defaulted
+					}}},
 					FailurePolicy:           &ignore,
 					MatchPolicy:             &exact,
 					ReinvocationPolicy:      &never,
