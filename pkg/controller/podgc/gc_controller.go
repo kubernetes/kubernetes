@@ -76,6 +76,9 @@ func NewPodGC(ctx context.Context, kubeClient clientset.Interface, podInformer c
 // This function is only intended for integration tests
 func NewPodGCInternal(ctx context.Context, kubeClient clientset.Interface, podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int, gcCheckPeriod, quarantineTime time.Duration) *PodGCController {
+	// Register prometheus metrics
+	Register()
+
 	gcc := &PodGCController{
 		kubeClient:             kubeClient,
 		terminatedPodThreshold: terminatedPodThreshold,
@@ -173,9 +176,11 @@ func (gcc *PodGCController) gcTerminating(ctx context.Context, pods []*v1.Pod) {
 		wait.Add(1)
 		go func(pod *v1.Pod) {
 			defer wait.Done()
+			deletingPodsTotal.WithLabelValues().Inc()
 			if err := gcc.markFailedAndDeletePod(ctx, pod); err != nil {
 				// ignore not founds
 				utilruntime.HandleError(err)
+				deletingPodsErrorTotal.WithLabelValues().Inc()
 			}
 		}(terminatingPods[i])
 	}
