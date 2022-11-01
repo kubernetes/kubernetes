@@ -149,7 +149,7 @@ func getPersistentVolumeClaimRetentionPolicy(set *apps.StatefulSet) apps.Statefu
 // claimOwnerMatchesSetAndPod returns false if the ownerRefs of the claim are not set consistently with the
 // PVC deletion policy for the StatefulSet.
 func claimOwnerMatchesSetAndPod(claim *v1.PersistentVolumeClaim, set *apps.StatefulSet, pod *v1.Pod) bool {
-	policy := set.Spec.PersistentVolumeClaimRetentionPolicy
+	policy := getPersistentVolumeClaimRetentionPolicy(set)
 	const retain = apps.RetainPersistentVolumeClaimRetentionPolicyType
 	const delete = apps.DeletePersistentVolumeClaimRetentionPolicyType
 	switch {
@@ -211,7 +211,7 @@ func updateClaimOwnerRefForSetAndPod(claim *v1.PersistentVolumeClaim, set *apps.
 	updateMeta(&podMeta, "Pod")
 	setMeta := set.TypeMeta
 	updateMeta(&setMeta, "StatefulSet")
-	policy := set.Spec.PersistentVolumeClaimRetentionPolicy
+	policy := getPersistentVolumeClaimRetentionPolicy(set)
 	const retain = apps.RetainPersistentVolumeClaimRetentionPolicyType
 	const delete = apps.DeletePersistentVolumeClaimRetentionPolicyType
 	switch {

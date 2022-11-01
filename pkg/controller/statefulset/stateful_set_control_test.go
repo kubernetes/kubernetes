@@ -123,6 +123,8 @@ func runTestOverPVCRetentionPolicies(t *testing.T, testName string, testFn func(
 			WhenScaled:  apps.DeletePersistentVolumeClaimRetentionPolicyType,
 			WhenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
 		},
+		// tests the case when no policy is set.
+		nil,
 	} {
 		subtestName := pvcDeletePolicyString(policy) + "/StatefulSetAutoDeletePVCEnabled"
 		if testName != "" {
@@ -136,6 +138,9 @@ func runTestOverPVCRetentionPolicies(t *testing.T, testName string, testFn func(
 }
 
 func pvcDeletePolicyString(policy *apps.StatefulSetPersistentVolumeClaimRetentionPolicy) string {
+	if policy == nil {
+		return "nullPolicy"
+	}
 	const retain = apps.RetainPersistentVolumeClaimRetentionPolicyType
 	const delete = apps.DeletePersistentVolumeClaimRetentionPolicyType
 	switch {
