@@ -26,11 +26,11 @@ import (
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	admissionregistration "k8s.io/kubernetes/pkg/apis/admissionregistration"
-	apisadmissionregistrationv1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
+	v1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
 )
 
 func init() {
@@ -67,26 +67,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*admissionregistration.MutatingWebhookConfigurationList)(nil), (*v1beta1.MutatingWebhookConfigurationList)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_admissionregistration_MutatingWebhookConfigurationList_To_v1beta1_MutatingWebhookConfigurationList(a.(*admissionregistration.MutatingWebhookConfigurationList), b.(*v1beta1.MutatingWebhookConfigurationList), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.Rule)(nil), (*admissionregistration.Rule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_Rule_To_admissionregistration_Rule(a.(*v1beta1.Rule), b.(*admissionregistration.Rule), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*admissionregistration.Rule)(nil), (*v1beta1.Rule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_admissionregistration_Rule_To_v1beta1_Rule(a.(*admissionregistration.Rule), b.(*v1beta1.Rule), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.RuleWithOperations)(nil), (*admissionregistration.RuleWithOperations)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_RuleWithOperations_To_admissionregistration_RuleWithOperations(a.(*v1beta1.RuleWithOperations), b.(*admissionregistration.RuleWithOperations), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*admissionregistration.RuleWithOperations)(nil), (*v1beta1.RuleWithOperations)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_admissionregistration_RuleWithOperations_To_v1beta1_RuleWithOperations(a.(*admissionregistration.RuleWithOperations), b.(*v1beta1.RuleWithOperations), scope)
 	}); err != nil {
 		return err
 	}
@@ -152,7 +132,7 @@ func autoConvert_v1beta1_MutatingWebhook_To_admissionregistration_MutatingWebhoo
 		in, out := &in.Rules, &out.Rules
 		*out = make([]admissionregistration.RuleWithOperations, len(*in))
 		for i := range *in {
-			if err := Convert_v1beta1_RuleWithOperations_To_admissionregistration_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := v1.Convert_v1_RuleWithOperations_To_admissionregistration_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}
@@ -161,8 +141,8 @@ func autoConvert_v1beta1_MutatingWebhook_To_admissionregistration_MutatingWebhoo
 	}
 	out.FailurePolicy = (*admissionregistration.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
 	out.MatchPolicy = (*admissionregistration.MatchPolicyType)(unsafe.Pointer(in.MatchPolicy))
-	out.NamespaceSelector = (*v1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
-	out.ObjectSelector = (*v1.LabelSelector)(unsafe.Pointer(in.ObjectSelector))
+	out.NamespaceSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
+	out.ObjectSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.ObjectSelector))
 	out.SideEffects = (*admissionregistration.SideEffectClass)(unsafe.Pointer(in.SideEffects))
 	out.TimeoutSeconds = (*int32)(unsafe.Pointer(in.TimeoutSeconds))
 	out.AdmissionReviewVersions = *(*[]string)(unsafe.Pointer(&in.AdmissionReviewVersions))
@@ -182,9 +162,9 @@ func autoConvert_admissionregistration_MutatingWebhook_To_v1beta1_MutatingWebhoo
 	}
 	if in.Rules != nil {
 		in, out := &in.Rules, &out.Rules
-		*out = make([]v1beta1.RuleWithOperations, len(*in))
+		*out = make([]admissionregistrationv1.RuleWithOperations, len(*in))
 		for i := range *in {
-			if err := Convert_admissionregistration_RuleWithOperations_To_v1beta1_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := v1.Convert_admissionregistration_RuleWithOperations_To_v1_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}
@@ -193,8 +173,8 @@ func autoConvert_admissionregistration_MutatingWebhook_To_v1beta1_MutatingWebhoo
 	}
 	out.FailurePolicy = (*v1beta1.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
 	out.MatchPolicy = (*v1beta1.MatchPolicyType)(unsafe.Pointer(in.MatchPolicy))
-	out.NamespaceSelector = (*v1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
-	out.ObjectSelector = (*v1.LabelSelector)(unsafe.Pointer(in.ObjectSelector))
+	out.NamespaceSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
+	out.ObjectSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.ObjectSelector))
 	out.SideEffects = (*v1beta1.SideEffectClass)(unsafe.Pointer(in.SideEffects))
 	out.TimeoutSeconds = (*int32)(unsafe.Pointer(in.TimeoutSeconds))
 	out.AdmissionReviewVersions = *(*[]string)(unsafe.Pointer(&in.AdmissionReviewVersions))
@@ -291,63 +271,11 @@ func Convert_admissionregistration_MutatingWebhookConfigurationList_To_v1beta1_M
 	return autoConvert_admissionregistration_MutatingWebhookConfigurationList_To_v1beta1_MutatingWebhookConfigurationList(in, out, s)
 }
 
-func autoConvert_v1beta1_Rule_To_admissionregistration_Rule(in *v1beta1.Rule, out *admissionregistration.Rule, s conversion.Scope) error {
-	out.APIGroups = *(*[]string)(unsafe.Pointer(&in.APIGroups))
-	out.APIVersions = *(*[]string)(unsafe.Pointer(&in.APIVersions))
-	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
-	out.Scope = (*admissionregistration.ScopeType)(unsafe.Pointer(in.Scope))
-	return nil
-}
-
-// Convert_v1beta1_Rule_To_admissionregistration_Rule is an autogenerated conversion function.
-func Convert_v1beta1_Rule_To_admissionregistration_Rule(in *v1beta1.Rule, out *admissionregistration.Rule, s conversion.Scope) error {
-	return autoConvert_v1beta1_Rule_To_admissionregistration_Rule(in, out, s)
-}
-
-func autoConvert_admissionregistration_Rule_To_v1beta1_Rule(in *admissionregistration.Rule, out *v1beta1.Rule, s conversion.Scope) error {
-	out.APIGroups = *(*[]string)(unsafe.Pointer(&in.APIGroups))
-	out.APIVersions = *(*[]string)(unsafe.Pointer(&in.APIVersions))
-	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
-	out.Scope = (*admissionregistrationv1.ScopeType)(unsafe.Pointer(in.Scope))
-	return nil
-}
-
-// Convert_admissionregistration_Rule_To_v1beta1_Rule is an autogenerated conversion function.
-func Convert_admissionregistration_Rule_To_v1beta1_Rule(in *admissionregistration.Rule, out *v1beta1.Rule, s conversion.Scope) error {
-	return autoConvert_admissionregistration_Rule_To_v1beta1_Rule(in, out, s)
-}
-
-func autoConvert_v1beta1_RuleWithOperations_To_admissionregistration_RuleWithOperations(in *v1beta1.RuleWithOperations, out *admissionregistration.RuleWithOperations, s conversion.Scope) error {
-	out.Operations = *(*[]admissionregistration.OperationType)(unsafe.Pointer(&in.Operations))
-	if err := apisadmissionregistrationv1.Convert_v1_Rule_To_admissionregistration_Rule(&in.Rule, &out.Rule, s); err != nil {
-		return err
-	}
-	return nil
-}
-
-// Convert_v1beta1_RuleWithOperations_To_admissionregistration_RuleWithOperations is an autogenerated conversion function.
-func Convert_v1beta1_RuleWithOperations_To_admissionregistration_RuleWithOperations(in *v1beta1.RuleWithOperations, out *admissionregistration.RuleWithOperations, s conversion.Scope) error {
-	return autoConvert_v1beta1_RuleWithOperations_To_admissionregistration_RuleWithOperations(in, out, s)
-}
-
-func autoConvert_admissionregistration_RuleWithOperations_To_v1beta1_RuleWithOperations(in *admissionregistration.RuleWithOperations, out *v1beta1.RuleWithOperations, s conversion.Scope) error {
-	out.Operations = *(*[]admissionregistrationv1.OperationType)(unsafe.Pointer(&in.Operations))
-	if err := apisadmissionregistrationv1.Convert_admissionregistration_Rule_To_v1_Rule(&in.Rule, &out.Rule, s); err != nil {
-		return err
-	}
-	return nil
-}
-
-// Convert_admissionregistration_RuleWithOperations_To_v1beta1_RuleWithOperations is an autogenerated conversion function.
-func Convert_admissionregistration_RuleWithOperations_To_v1beta1_RuleWithOperations(in *admissionregistration.RuleWithOperations, out *v1beta1.RuleWithOperations, s conversion.Scope) error {
-	return autoConvert_admissionregistration_RuleWithOperations_To_v1beta1_RuleWithOperations(in, out, s)
-}
-
 func autoConvert_v1beta1_ServiceReference_To_admissionregistration_ServiceReference(in *v1beta1.ServiceReference, out *admissionregistration.ServiceReference, s conversion.Scope) error {
 	out.Namespace = in.Namespace
 	out.Name = in.Name
 	out.Path = (*string)(unsafe.Pointer(in.Path))
-	if err := v1.Convert_Pointer_int32_To_int32(&in.Port, &out.Port, s); err != nil {
+	if err := metav1.Convert_Pointer_int32_To_int32(&in.Port, &out.Port, s); err != nil {
 		return err
 	}
 	return nil
@@ -362,7 +290,7 @@ func autoConvert_admissionregistration_ServiceReference_To_v1beta1_ServiceRefere
 	out.Namespace = in.Namespace
 	out.Name = in.Name
 	out.Path = (*string)(unsafe.Pointer(in.Path))
-	if err := v1.Convert_int32_To_Pointer_int32(&in.Port, &out.Port, s); err != nil {
+	if err := metav1.Convert_int32_To_Pointer_int32(&in.Port, &out.Port, s); err != nil {
 		return err
 	}
 	return nil
@@ -382,7 +310,7 @@ func autoConvert_v1beta1_ValidatingWebhook_To_admissionregistration_ValidatingWe
 		in, out := &in.Rules, &out.Rules
 		*out = make([]admissionregistration.RuleWithOperations, len(*in))
 		for i := range *in {
-			if err := Convert_v1beta1_RuleWithOperations_To_admissionregistration_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := v1.Convert_v1_RuleWithOperations_To_admissionregistration_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}
@@ -391,8 +319,8 @@ func autoConvert_v1beta1_ValidatingWebhook_To_admissionregistration_ValidatingWe
 	}
 	out.FailurePolicy = (*admissionregistration.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
 	out.MatchPolicy = (*admissionregistration.MatchPolicyType)(unsafe.Pointer(in.MatchPolicy))
-	out.NamespaceSelector = (*v1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
-	out.ObjectSelector = (*v1.LabelSelector)(unsafe.Pointer(in.ObjectSelector))
+	out.NamespaceSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
+	out.ObjectSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.ObjectSelector))
 	out.SideEffects = (*admissionregistration.SideEffectClass)(unsafe.Pointer(in.SideEffects))
 	out.TimeoutSeconds = (*int32)(unsafe.Pointer(in.TimeoutSeconds))
 	out.AdmissionReviewVersions = *(*[]string)(unsafe.Pointer(&in.AdmissionReviewVersions))
@@ -411,9 +339,9 @@ func autoConvert_admissionregistration_ValidatingWebhook_To_v1beta1_ValidatingWe
 	}
 	if in.Rules != nil {
 		in, out := &in.Rules, &out.Rules
-		*out = make([]v1beta1.RuleWithOperations, len(*in))
+		*out = make([]admissionregistrationv1.RuleWithOperations, len(*in))
 		for i := range *in {
-			if err := Convert_admissionregistration_RuleWithOperations_To_v1beta1_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := v1.Convert_admissionregistration_RuleWithOperations_To_v1_RuleWithOperations(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}
@@ -422,8 +350,8 @@ func autoConvert_admissionregistration_ValidatingWebhook_To_v1beta1_ValidatingWe
 	}
 	out.FailurePolicy = (*v1beta1.FailurePolicyType)(unsafe.Pointer(in.FailurePolicy))
 	out.MatchPolicy = (*v1beta1.MatchPolicyType)(unsafe.Pointer(in.MatchPolicy))
-	out.NamespaceSelector = (*v1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
-	out.ObjectSelector = (*v1.LabelSelector)(unsafe.Pointer(in.ObjectSelector))
+	out.NamespaceSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
+	out.ObjectSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.ObjectSelector))
 	out.SideEffects = (*v1beta1.SideEffectClass)(unsafe.Pointer(in.SideEffects))
 	out.TimeoutSeconds = (*int32)(unsafe.Pointer(in.TimeoutSeconds))
 	out.AdmissionReviewVersions = *(*[]string)(unsafe.Pointer(&in.AdmissionReviewVersions))
