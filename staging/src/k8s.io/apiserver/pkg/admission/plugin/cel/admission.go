@@ -24,10 +24,7 @@ import (
 	"time"
 
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/features"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/featuregate"
 )
@@ -58,14 +55,10 @@ func Register(plugins *admission.Plugins) {
 ////////////////////////////////////////////////////////////////////////////////
 
 type celAdmissionPlugin struct {
-	evaluator         CELPolicyEvaluator
-	enabled           bool
-	client            kubernetes.Interface
-	namespaceInformer informers.SharedInformerFactory
+	evaluator CELPolicyEvaluator
+	enabled   bool
 }
 
-var _ initializer.WantsExternalKubeInformerFactory = &celAdmissionPlugin{}
-var _ initializer.WantsExternalKubeClientSet = &celAdmissionPlugin{}
 var _ WantsCELPolicyEvaluator = &celAdmissionPlugin{}
 var _ admission.InitializationValidator = &celAdmissionPlugin{}
 var _ admission.ValidationInterface = &celAdmissionPlugin{}
@@ -77,26 +70,6 @@ func NewPlugin() (admission.Interface, error) {
 
 func (c *celAdmissionPlugin) SetCELPolicyEvaluator(evaluator CELPolicyEvaluator) {
 	c.evaluator = evaluator
-	if c.client != nil {
-		c.evaluator.SetExternalKubeClientSet(c.client)
-	}
-	if c.namespaceInformer != nil {
-		c.evaluator.SetExternalKubeInformerFactory(c.namespaceInformer)
-	}
-}
-
-func (c *celAdmissionPlugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	c.namespaceInformer = f
-	if c.evaluator != nil {
-		c.evaluator.SetExternalKubeInformerFactory(f)
-	}
-}
-
-func (c *celAdmissionPlugin) SetExternalKubeClientSet(client kubernetes.Interface) {
-	c.client = client
-	if c.evaluator != nil {
-		c.evaluator.SetExternalKubeClientSet(client)
-	}
 }
 
 // Once clientset and informer factory are provided, creates and starts the admission controller
@@ -107,11 +80,6 @@ func (c *celAdmissionPlugin) ValidateInitialization() error {
 	if c.evaluator == nil {
 		return errors.New("CELPolicyEvaluator not injected")
 	}
-
-	if err := c.evaluator.ValidateInitialization(); err != nil {
-		return err
-	}
-
 	return nil
 }
 

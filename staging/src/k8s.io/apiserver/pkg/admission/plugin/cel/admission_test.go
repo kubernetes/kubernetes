@@ -23,9 +23,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
-
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/admissionregistration/v1alpha1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -145,16 +142,6 @@ type fakeCompiler struct {
 	CompileFuncs         map[string]func(*v1alpha1.ValidatingAdmissionPolicy) Validator
 	DefinitionMatchFuncs map[string]func(*v1alpha1.ValidatingAdmissionPolicy, admission.Attributes) bool
 	BindingMatchFuncs    map[string]func(*v1alpha1.ValidatingAdmissionPolicyBinding, admission.Attributes) bool
-}
-
-func (f *fakeCompiler) SetExternalKubeInformerFactory(factory informers.SharedInformerFactory) {
-}
-
-func (f *fakeCompiler) ValidateInitialization() error {
-	return nil
-}
-
-func (f *fakeCompiler) SetExternalKubeClientSet(k kubernetes.Interface) {
 }
 
 var _ ValidatorCompiler = &fakeCompiler{}

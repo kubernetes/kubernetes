@@ -20,7 +20,6 @@ import (
 	"k8s.io/api/admissionregistration/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/admission/initializer"
 )
 
 // Validator defines the func used to validate the cel expressions
@@ -31,10 +30,6 @@ type Validator interface {
 // ValidatorCompiler is Dependency Injected into the PolicyDefinition's `Compile`
 // function to assist with converting types and values to/from CEL-typed values.
 type ValidatorCompiler interface {
-	initializer.WantsExternalKubeInformerFactory
-	initializer.WantsExternalKubeClientSet
-	admission.InitializationValidator
-
 	// Matches says whether this policy definition matches the provided admission
 	// resource request
 	DefinitionMatches(definition *v1alpha1.ValidatingAdmissionPolicy, a admission.Attributes, o admission.ObjectInterfaces) (bool, error)

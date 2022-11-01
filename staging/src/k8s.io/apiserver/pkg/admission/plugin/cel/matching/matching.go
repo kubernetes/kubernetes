@@ -23,7 +23,6 @@ import (
 	"k8s.io/api/admissionregistration/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/client-go/kubernetes"
 	listersv1 "k8s.io/client-go/listers/core/v1"
 
@@ -31,8 +30,6 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/object"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/rules"
 )
-
-var _ initializer.WantsExternalKubeClientSet = &Matcher{}
 
 type MatchCriteria interface {
 	namespace.NamespaceSelectorProvider
@@ -46,19 +43,17 @@ type Matcher struct {
 	objectMatcher    *object.Matcher
 }
 
-func NewMatcher() *Matcher {
+func NewMatcher(
+	namespaceLister listersv1.NamespaceLister,
+	client kubernetes.Interface,
+) *Matcher {
 	return &Matcher{
-		namespaceMatcher: &namespace.Matcher{},
-		objectMatcher:    &object.Matcher{},
+		namespaceMatcher: &namespace.Matcher{
+			NamespaceLister: namespaceLister,
+			Client:          client,
+		},
+		objectMatcher: &object.Matcher{},
 	}
-}
-
-func (m *Matcher) SetNamespaceLister(lister listersv1.NamespaceLister) {
-	m.namespaceMatcher.NamespaceLister = lister
-}
-
-func (m *Matcher) SetExternalKubeClientSet(client kubernetes.Interface) {
-	m.namespaceMatcher.Client = client
 }
 
 func (m *Matcher) ValidateInitialization() error {
