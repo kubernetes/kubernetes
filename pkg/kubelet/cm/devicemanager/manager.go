@@ -564,14 +564,14 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 		return false
 	}
 
-	// Allocates from reusableDevices list first.
-	if allocateRemainingFrom(reusableDevices) {
-		return allocated, nil
-	}
-
 	// Needs to allocate additional devices.
 	if m.allocatedDevices[resource] == nil {
 		m.allocatedDevices[resource] = sets.NewString()
+	}
+
+	// Allocates from reusableDevices list first.
+	if allocateRemainingFrom(reusableDevices) {
+		return allocated, nil
 	}
 
 	// Gets Devices in use.
