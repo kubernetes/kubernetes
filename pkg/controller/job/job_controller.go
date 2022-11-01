@@ -714,17 +714,13 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 
 	var expectedRmFinalizers sets.String
 	var uncounted *uncountedTerminatedPods
-	if trackingUncountedPods(&job) {
+	if hasJobTrackingAnnotation(&job) {
 		klog.V(4).InfoS("Tracking uncounted Pods with pod finalizers", "job", klog.KObj(&job))
 		if job.Status.UncountedTerminatedPods == nil {
 			job.Status.UncountedTerminatedPods = &batch.UncountedTerminatedPods{}
 		}
 		uncounted = newUncountedTerminatedPods(*job.Status.UncountedTerminatedPods)
 		expectedRmFinalizers = jm.finalizerExpectations.getExpectedUIDs(key)
-	} else if patch := removeTrackingAnnotationPatch(&job); patch != nil {
-		if err := jm.patchJobHandler(ctx, &job, patch); err != nil {
-			return false, fmt.Errorf("removing tracking finalizer from job %s: %w", key, err)
-		}
 	}
 
 	// Check the expectations of the job before counting active pods, otherwise a new pod can sneak in
@@ -1476,7 +1472,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, activePods 
 		if isIndexedJob(job) {
 			addCompletionIndexEnvVariables(podTemplate)
 		}
-		if trackingUncountedPods(job) {
+		if hasJobTrackingAnnotation(job) {
 			podTemplate.Finalizers = appendJobCompletionFinalizerIfNotFound(podTemplate.Finalizers)
 		}
 
@@ -1635,10 +1631,6 @@ func getCompletionMode(job *batch.Job) string {
 	return string(batch.NonIndexedCompletion)
 }
 
-func trackingUncountedPods(job *batch.Job) bool {
-	return feature.DefaultFeatureGate.Enabled(features.JobTrackingWithFinalizers) && hasJobTrackingAnnotation(job)
-}
-
 func hasJobTrackingAnnotation(job *batch.Job) bool {
 	if job.Annotations == nil {
 		return false
@@ -1663,21 +1655,6 @@ func removeTrackingFinalizerPatch(pod *v1.Pod) []byte {
 	patch := map[string]interface{}{
 		"metadata": map[string]interface{}{
 			"$deleteFromPrimitiveList/finalizers": []string{batch.JobTrackingFinalizer},
-		},
-	}
-	patchBytes, _ := json.Marshal(patch)
-	return patchBytes
-}
-
-func removeTrackingAnnotationPatch(job *batch.Job) []byte {
-	if !hasJobTrackingAnnotation(job) {
-		return nil
-	}
-	patch := map[string]interface{}{
-		"metadata": map[string]interface{}{
-			"annotations": map[string]interface{}{
-				batch.JobTrackingFinalizer: nil,
-			},
 		},
 	}
 	patchBytes, _ := json.Marshal(patch)

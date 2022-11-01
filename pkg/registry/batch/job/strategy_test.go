@@ -184,6 +184,30 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 				},
 			},
 		},
+		"add tracking annotation back": {
+			job: batch.Job{
+				ObjectMeta: getValidObjectMetaWithAnnotations(0, map[string]string{batchv1.JobTrackingFinalizer: ""}),
+				Spec: batch.JobSpec{
+					Selector:         validSelector,
+					Template:         validPodTemplateSpec,
+					PodFailurePolicy: podFailurePolicy,
+				},
+			},
+			updatedJob: batch.Job{
+				ObjectMeta: getValidObjectMeta(0),
+				Spec: batch.JobSpec{
+					Selector: validSelector,
+					Template: validPodTemplateSpec,
+				},
+			},
+			wantJob: batch.Job{
+				ObjectMeta: getValidObjectMetaWithAnnotations(1, map[string]string{batchv1.JobTrackingFinalizer: ""}),
+				Spec: batch.JobSpec{
+					Selector: validSelector,
+					Template: validPodTemplateSpec,
+				},
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -279,24 +303,6 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 
 // TODO(#111514): refactor by spliting into dedicated test functions
 func TestJobStrategy(t *testing.T) {
-	cases := map[string]struct {
-		trackingWithFinalizersEnabled bool
-	}{
-		"features disabled": {},
-		"new job tracking enabled": {
-			trackingWithFinalizersEnabled: true,
-		},
-	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobTrackingWithFinalizers, tc.trackingWithFinalizersEnabled)()
-			testJobStrategy(t)
-		})
-	}
-}
-
-func testJobStrategy(t *testing.T) {
-	trackingWithFinalizersEnabled := utilfeature.DefaultFeatureGate.Enabled(features.JobTrackingWithFinalizers)
 	ctx := genericapirequest.NewDefaultContext()
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("Job must be namespace scoped")
@@ -356,9 +362,9 @@ func testJobStrategy(t *testing.T) {
 	if job.Spec.CompletionMode == nil {
 		t.Errorf("Job should allow setting .spec.completionMode")
 	}
-	wantAnnotations := map[string]string{"foo": "bar"}
-	if trackingWithFinalizersEnabled {
-		wantAnnotations[batchv1.JobTrackingFinalizer] = ""
+	wantAnnotations := map[string]string{
+		"foo":                        "bar",
+		batchv1.JobTrackingFinalizer: "",
 	}
 	if diff := cmp.Diff(wantAnnotations, job.Annotations); diff != "" {
 		t.Errorf("Job has annotations (-want,+got):\n%s", diff)
@@ -405,9 +411,8 @@ func testJobStrategy(t *testing.T) {
 	if updatedJob.Generation != 2 {
 		t.Errorf("expected Generation=2, got %d", updatedJob.Generation)
 	}
-	wantAnnotations = make(map[string]string)
-	if trackingWithFinalizersEnabled {
-		wantAnnotations[batchv1.JobTrackingFinalizer] = ""
+	wantAnnotations = map[string]string{
+		batchv1.JobTrackingFinalizer: "",
 	}
 	if diff := cmp.Diff(wantAnnotations, updatedJob.Annotations); diff != "" {
 		t.Errorf("Job has annotations (-want,+got):\n%s", diff)
@@ -416,17 +421,6 @@ func testJobStrategy(t *testing.T) {
 	errs = Strategy.ValidateUpdate(ctx, updatedJob, job)
 	if len(errs) == 0 {
 		t.Errorf("Expected a validation error")
-	}
-
-	// Ensure going from legacy tracking Job to tracking with finalizers is
-	// disallowed.
-	job = job.DeepCopy()
-	job.Annotations = nil
-	updatedJob = job.DeepCopy()
-	updatedJob.Annotations = map[string]string{batch.JobTrackingFinalizer: ""}
-	errs = Strategy.ValidateUpdate(ctx, updatedJob, job)
-	if len(errs) != 1 {
-		t.Errorf("Expected update validation error")
 	}
 
 	// Test updating suspend false->true and nil-> true when the feature gate is
@@ -475,7 +469,6 @@ func TestJobStrategyValidateUpdate(t *testing.T) {
 		job                                *batch.Job
 		update                             func(*batch.Job)
 		wantErrs                           field.ErrorList
-		trackingWithFinalizersEnabled      bool
 		mutableSchedulingDirectivesEnabled bool
 	}{
 		"update parallelism": {
@@ -518,7 +511,7 @@ func TestJobStrategyValidateUpdate(t *testing.T) {
 				{Type: field.ErrorTypeInvalid, Field: "spec.completions"},
 			},
 		},
-		"adding tracking annotation disallowed, gate disabled": {
+		"adding tracking annotation disallowed": {
 			job: &batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            "myjob",
@@ -540,30 +533,7 @@ func TestJobStrategyValidateUpdate(t *testing.T) {
 				{Type: field.ErrorTypeForbidden, Field: "metadata.annotations[batch.kubernetes.io/job-tracking]"},
 			},
 		},
-		"adding tracking annotation disallowed, gate enabled": {
-			job: &batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "myjob",
-					Namespace:       metav1.NamespaceDefault,
-					ResourceVersion: "0",
-					Annotations:     map[string]string{"foo": "bar"},
-				},
-				Spec: batch.JobSpec{
-					Selector:       validSelector,
-					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
-				},
-			},
-			update: func(job *batch.Job) {
-				job.Annotations[batch.JobTrackingFinalizer] = ""
-			},
-			wantErrs: field.ErrorList{
-				{Type: field.ErrorTypeForbidden, Field: "metadata.annotations[batch.kubernetes.io/job-tracking]"},
-			},
-			trackingWithFinalizersEnabled: true,
-		},
-		"preserving tracking annotation, feature disabled": {
+		"preserving tracking annotation": {
 			job: &batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            "myjob",
@@ -683,7 +653,6 @@ func TestJobStrategyValidateUpdate(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobTrackingWithFinalizers, tc.trackingWithFinalizersEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobMutableNodeSchedulingDirectives, tc.mutableSchedulingDirectivesEnabled)()
 			newJob := tc.job.DeepCopy()
 			tc.update(newJob)
