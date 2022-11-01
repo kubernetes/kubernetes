@@ -367,6 +367,12 @@ func (hns hns) deleteLoadBalancer(hnsID string) error {
 	}
 
 	err = lb.Delete()
+	if err != nil {
+		// There is a bug in Windows Server 2019, that can cause the delete call to fail sometimes. We retry one more time.
+		// TODO: The logic in syncProxyRules  should be rewritten in the future to better stage and handle a call like this failing using the policyApplied fields.
+		klog.V(1).ErrorS(err, "Error deleting Hns loadbalancer policy resource. Attempting one more time...", "loadBalancer", lb)
+		return lb.Delete()
+	}
 	return err
 }
 
