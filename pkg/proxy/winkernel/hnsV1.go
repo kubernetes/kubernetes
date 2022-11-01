@@ -256,10 +256,16 @@ func (hns hnsV1) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 		klog.V(3).InfoS("DSR is not supported in V1. Using non DSR instead")
 	}
 	var id loadBalancerIdentifier
+	// Compute hash from backends (endpoint IDs)
+	hash, err := hashEndpointInfos(endpoints)
+	if err != nil || hash == [20]byte{} {
+		klog.V(2).ErrorS(err, "Error hashing endpoints", "endpoints", endpoints)
+		return nil, err
+	}
 	if len(vip) > 0 {
-		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsCount: len(endpoints)}
+		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsHash: hash}
 	} else {
-		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, endpointsCount: len(endpoints)}
+		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, endpointsHash: hash}
 	}
 
 	if lb, found := previousLoadBalancers[id]; found {

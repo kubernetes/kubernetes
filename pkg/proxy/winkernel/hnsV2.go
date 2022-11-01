@@ -239,7 +239,7 @@ func (hns hnsV2) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancer
 	for _, lb := range lbs {
 		portMap := lb.PortMappings[0]
 		// Compute hash from backends (endpoint IDs)
-		hash, err := hashEndpoints(lb.HostComputeEndpoints)
+		hash, err := hashEndpointIds(lb.HostComputeEndpoints)
 		if err != nil {
 			klog.V(2).ErrorS(err, "Error hashing endpoints", "policy", lb)
 			return nil, err
@@ -262,8 +262,8 @@ func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 	var id loadBalancerIdentifier
 	vips := []string{}
 	// Compute hash from backends (endpoint IDs)
-	hash, err := hashEndpoints(endpoints)
-	if err != nil {
+	hash, err := hashEndpointInfos(endpoints)
+	if err != nil || hash == [20]byte{} {
 		klog.V(2).ErrorS(err, "Error hashing endpoints", "endpoints", endpoints)
 		return nil, err
 	}
@@ -354,33 +354,51 @@ func (hns hnsV2) deleteLoadBalancer(hnsID string) error {
 	}
 
 	err = lb.Delete()
+	if err != nil {
+		// There is a bug in Windows Server 2019, that can cause the delete call to fail sometimes. We retry one more time.
+		// TODO: The logic in syncProxyRules  should be rewritten in the future to better stage and handle a call like this failing using the policyApplied fields.
+		klog.V(1).ErrorS(err, "Error deleting Hns loadbalancer policy resource. Attempting one more time...", "loadBalancer", lb)
+		return lb.Delete()
+	}
 	return err
 }
 
-// Calculates a hash from the given endpoint IDs.
-func hashEndpoints[T string | endpointsInfo](endpoints []T) (hash [20]byte, err error) {
+func hashEndpointIds(endpoints []string) (hash [20]byte, err error) {
+	hash = [20]byte{}
+	for _, ep := range endpoints {
+		hash, err = hashNextEndpoint(ep, hash)
+		if err != nil {
+			return [20]byte{}, err
+		}
+	}
+	return
+}
+
+func hashEndpointInfos(endpoints []endpointsInfo) (hash [20]byte, err error) {
 	var id string
-	// Recover in case something goes wrong. Return error and null byte array.
+	for _, ep := range endpoints {
+		id = ep.hnsID
+		hash, err = hashNextEndpoint(id, hash)
+		if err != nil {
+			return [20]byte{}, err
+		}
+	}
+	return
+}
+
+func hashNextEndpoint(endpointId string, hashIn [20]byte) (hashOut [20]byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = r.(error)
-			hash = [20]byte{}
+			hashOut = [20]byte{}
 		}
 	}()
 
-	// Iterate over endpoints, compute hash
-	for _, ep := range endpoints {
-		switch x := any(ep).(type) {
-		case endpointsInfo:
-			id = x.hnsID
-		case string:
-			id = x
-		}
-		if len(id) > 0 {
-			// We XOR the hashes of endpoints, since they are an unordered set.
-			// This can cause collisions, but is sufficient since we are using other keys to identify the load balancer.
-			hash = xor(hash, sha1.Sum(([]byte(id))))
-		}
+	if len(endpointId) > 0 {
+		sha1 := sha1.Sum(([]byte(endpointId)))
+		// We XOR the hashes of endpoints, since they are an unordered set.
+		// This can cause collisions, but is sufficient since we are using other keys to identify the load balancer.
+		hashOut = xor(hashIn, sha1)
 	}
 	return
 }
