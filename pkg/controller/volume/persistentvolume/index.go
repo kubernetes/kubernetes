@@ -84,6 +84,7 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 	// Searches are performed against a set of access modes, so we can attempt
 	// not only the exact matching modes but also potential matches (the GCEPD
 	// example above).
+	//根据AccessModes筛选pv
 	allPossibleModes := pvIndex.allPossibleMatchingAccessModes(claim.Spec.AccessModes)
 
 	for _, modes := range allPossibleModes {

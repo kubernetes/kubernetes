@@ -678,6 +678,7 @@ func (dc *DeploymentController) syncDeployment(ctx context.Context, key string) 
 	case apps.RecreateDeploymentStrategyType:
 		return dc.rolloutRecreate(ctx, d, rsList, podMap)
 	case apps.RollingUpdateDeploymentStrategyType:
+		//会创建新的rs. 
 		return dc.rolloutRolling(ctx, d, rsList)
 	}
 	return fmt.Errorf("unexpected deployment strategy type: %s", d.Spec.Strategy.Type)

@@ -265,6 +265,7 @@ func (ctrl *PersistentVolumeController) updateClaim(ctx context.Context, claim *
 	if !new {
 		return
 	}
+	//核心逻辑
 	err = ctrl.syncClaim(ctx, claim)
 	if err != nil {
 		if errors.IsConflict(err) {
@@ -504,6 +505,7 @@ func (ctrl *PersistentVolumeController) volumeWorker(ctx context.Context) {
 		if err == nil {
 			// The volume still exists in informer cache, the event must have
 			// been add/update/sync
+			//核心逻辑.
 			ctrl.updateVolume(ctx, volume)
 			return false
 		}

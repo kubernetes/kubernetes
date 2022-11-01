@@ -156,6 +156,7 @@ func NewDaemonSetsController(
 		crControl: controller.RealControllerRevisionControl{
 			KubeClient: kubeClient,
 		},
+		//最多一次性能创建多少.
 		burstReplicas: BurstReplicas,
 		expectations:  controller.NewControllerExpectations(),
 		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "daemonset"),
@@ -746,6 +747,7 @@ func (dsc *DaemonSetsController) getDaemonPods(ctx context.Context, ds *apps.Dae
 // Note that returned Pods are pointers to objects in the cache.
 // If you want to modify one, you need to deep-copy it first.
 func (dsc *DaemonSetsController) getNodesToDaemonPods(ctx context.Context, ds *apps.DaemonSet) (map[string][]*v1.Pod, error) {
+	//ds 的label 与 pod label对应.
 	claimedPods, err := dsc.getDaemonPods(ctx, ds)
 	if err != nil {
 		return nil, err
@@ -1110,6 +1112,7 @@ func storeDaemonSetStatus(
 
 func (dsc *DaemonSetsController) updateDaemonSetStatus(ctx context.Context, ds *apps.DaemonSet, nodeList []*v1.Node, hash string, updateObservedGen bool) error {
 	klog.V(4).Infof("Updating daemon set status")
+	//获取node上pod ds集合.
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ctx, ds)
 	if err != nil {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
@@ -1159,6 +1162,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ctx context.Context, ds *
 	}
 
 	// Resync the DaemonSet after MinReadySeconds as a last line of defense to guard against clock-skew.
+	//ready != available , 等一段时间重新入队.
 	if ds.Spec.MinReadySeconds > 0 && numberReady != numberAvailable {
 		dsc.enqueueDaemonSetAfter(ds, time.Duration(ds.Spec.MinReadySeconds)*time.Second)
 	}
@@ -1213,22 +1217,27 @@ func (dsc *DaemonSetsController) syncDaemonSet(ctx context.Context, key string) 
 	// DaemonSet history doesn't own DaemonSet pods. We cannot reliably
 	// calculate the status of a DaemonSet being deleted. Therefore, return
 	// here without updating status for the DaemonSet being deleted.
+	//如果删除, 直接返回
 	if ds.DeletionTimestamp != nil {
 		return nil
 	}
 
 	// Construct histories of the DaemonSet, and get the hash of current history
+	//找到历史记录.
 	cur, old, err := dsc.constructHistory(ctx, ds)
 	if err != nil {
 		return fmt.Errorf("failed to construct revisions of DaemonSet: %v", err)
 	}
 	hash := cur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 
+	//不满足, 则更新状态.
 	if !dsc.expectations.SatisfiedExpectations(dsKey) {
 		// Only update status. Don't raise observedGeneration since controller didn't process object of that generation.
 		return dsc.updateDaemonSetStatus(ctx, ds, nodeList, hash, false)
 	}
 
+	//如果满足, 判断是否需要管理. 调谐
+	
 	err = dsc.manage(ctx, ds, nodeList, hash)
 	if err != nil {
 		return err
@@ -1263,6 +1272,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(ctx context.Context, key string) 
 //     Returns true when a daemonset should continue running on a node if a daemonset pod is already
 //     running on that node.
 func NodeShouldRunDaemonPod(node *v1.Node, ds *apps.DaemonSet) (bool, bool) {
+	//这里传递node.Name到pod中. 所以fitsNodeName肯定是true的.
 	pod := NewPod(ds, node.Name)
 
 	// If the daemon set specifies a node name, check that it matches with node.Name.
@@ -1271,12 +1281,14 @@ func NodeShouldRunDaemonPod(node *v1.Node, ds *apps.DaemonSet) (bool, bool) {
 	}
 
 	taints := node.Spec.Taints
+	//pod检查node affinity 和 容忍性. 不能匹配NoExecute和NoSchedule
 	fitsNodeName, fitsNodeAffinity, fitsTaints := predicates(pod, node, taints)
 	if !fitsNodeName || !fitsNodeAffinity {
 		return false, false
 	}
 
 	if !fitsTaints {
+		//如果有不能容忍的污点, 判断污点是否为NoExecute.
 		// Scheduled daemon pods should continue running if they tolerate NoExecute taint.
 		_, hasUntoleratedTaint := v1helper.FindMatchingUntoleratedTaint(taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
 			return t.Effect == v1.TaintEffectNoExecute

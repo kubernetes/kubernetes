@@ -82,6 +82,7 @@ var (
 	// represents which NodeConditionType under which ConditionStatus should be
 	// tainted with which TaintKey
 	// for certain NodeConditionType, there are multiple {ConditionStatus,TaintKey} pairs
+	// node condition应该给node添加哪些taint.
 	nodeConditionToTaintKeyStatusMap = map[v1.NodeConditionType]map[v1.ConditionStatus]string{
 		v1.NodeReady: {
 			v1.ConditionFalse:   v1.TaintNodeNotReady,
@@ -101,6 +102,7 @@ var (
 		},
 	}
 
+	//taint 对应哪些node的 condition.
 	taintKeyToNodeConditionMap = map[string]v1.NodeConditionType{
 		v1.TaintNodeNotReady:           v1.NodeReady,
 		v1.TaintNodeUnreachable:        v1.NodeReady,
@@ -608,6 +610,7 @@ func (nc *Controller) doNodeProcessingPassWorker(ctx context.Context) {
 	}
 }
 
+//处理NoSchedule 的taint
 func (nc *Controller) doNoScheduleTaintingPass(ctx context.Context, nodeName string) error {
 	node, err := nc.nodeLister.Get(nodeName)
 	if err != nil {
@@ -639,8 +642,10 @@ func (nc *Controller) doNoScheduleTaintingPass(ctx context.Context, nodeName str
 	}
 
 	// Get exist taints of node.
+	//获取已经存在的taint. 过滤NoExecute
 	nodeTaints := taintutils.TaintSetFilter(node.Spec.Taints, func(t *v1.Taint) bool {
 		// only NoSchedule taints are candidates to be compared with "taints" later
+		//如果已经存在且不为NoSchedule
 		if t.Effect != v1.TaintEffectNoSchedule {
 			return false
 		}
@@ -761,8 +766,13 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// classifyNodes classifies the allNodes to three categories:
+	//   1. added: the nodes that in 'allNodes', but not in 'knownNodeSet'
+	//   2. deleted: the nodes that in 'knownNodeSet', but not in 'allNodes'
+	//   3. newZoneRepresentatives: the nodes that in both 'knownNodeSet' and 'allNodes', but no zone states
 	added, deleted, newZoneRepresentatives := nc.classifyNodes(nodes)
 
+	//将node添加到zone中
 	for i := range newZoneRepresentatives {
 		nc.addPodEvictorForNewZone(newZoneRepresentatives[i])
 	}
@@ -792,6 +802,8 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 		var currentReadyCondition *v1.NodeCondition
 		node := nodes[i].DeepCopy()
 		if err := wait.PollImmediate(retrySleepTime, retrySleepTime*scheduler.NodeHealthUpdateRetry, func() (bool, error) {
+			//尝试更新节点的状态.
+			//observedReadyCondition currnetReadyCondition + 空白时假设的readyCondition
 			gracePeriod, observedReadyCondition, currentReadyCondition, err = nc.tryUpdateNodeHealth(ctx, node)
 			if err == nil {
 				return true, nil
@@ -827,6 +839,7 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 				continue
 			}
 			if nc.runTaintManager {
+				//根据最新的状态, 更新节点的taint
 				nc.processTaintBaseEviction(ctx, node, &observedReadyCondition)
 			} else {
 				if err := nc.processNoTaintBaseEviction(ctx, node, &observedReadyCondition, gracePeriod, pods); err != nil {
@@ -834,6 +847,7 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 				}
 			}
 
+			//sync.map读取
 			_, needsRetry := nc.nodesToRetry.Load(node.Name)
 			switch {
 			case currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue:
@@ -861,12 +875,14 @@ func (nc *Controller) processTaintBaseEviction(ctx context.Context, node *v1.Nod
 	switch observedReadyCondition.Status {
 	case v1.ConditionFalse:
 		// We want to update the taint straight away if Node is already tainted with the UnreachableTaint
+		//如果之前condition为unknown, 直接替换标签.
 		if taintutils.TaintExists(node.Spec.Taints, UnreachableTaintTemplate) {
 			taintToAdd := *NotReadyTaintTemplate
 			if !controllerutil.SwapNodeControllerTaint(ctx, nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{UnreachableTaintTemplate}, node) {
 				klog.Errorf("Failed to instantly swap UnreachableTaint to NotReadyTaint. Will try again in the next cycle.")
 			}
 		} else if nc.markNodeForTainting(node, v1.ConditionFalse) {
+			//如果false, 直接添加到 noexeceute的队列中
 			klog.V(2).Infof("Node %v is NotReady as of %v. Adding it to the Taint queue.",
 				node.Name,
 				decisionTimestamp,
@@ -874,6 +890,7 @@ func (nc *Controller) processTaintBaseEviction(ctx context.Context, node *v1.Nod
 		}
 	case v1.ConditionUnknown:
 		// We want to update the taint straight away if Node is already tainted with the UnreachableTaint
+		//如果之前condition为false, 直接替换标签.
 		if taintutils.TaintExists(node.Spec.Taints, NotReadyTaintTemplate) {
 			taintToAdd := *UnreachableTaintTemplate
 			if !controllerutil.SwapNodeControllerTaint(ctx, nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{NotReadyTaintTemplate}, node) {
@@ -1063,6 +1080,7 @@ func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (t
 		nodeHealth.probeTimestamp = nc.now()
 	}
 
+	//如果probe时间 + graceperiod < 当前, 超时, 更新为unknown
 	if nc.now().After(nodeHealth.probeTimestamp.Add(gracePeriod)) {
 		// NodeReady condition or lease was last set longer ago than gracePeriod, so
 		// update it to Unknown (regardless of its current value) in the master.
@@ -1229,6 +1247,7 @@ func (nc *Controller) podUpdated(oldPod, newPod *v1.Pod) {
 	}
 }
 
+//处理监听的pod.
 func (nc *Controller) doPodProcessingWorker(ctx context.Context) {
 	for {
 		obj, shutdown := nc.podUpdateQueue.Get()
@@ -1295,6 +1314,7 @@ func (nc *Controller) processPod(ctx context.Context, podItem podUpdateItem) {
 		}
 	}
 
+	//如果node的condition 不为ready, 则标记pod.
 	if currentReadyCondition.Status != v1.ConditionTrue {
 		if err := controllerutil.MarkPodsNotReady(ctx, nc.kubeClient, nc.recorder, pods, nodeName); err != nil {
 			klog.Warningf("Unable to mark pod %+v NotReady on node %v: %v.", podItem, nodeName, err)

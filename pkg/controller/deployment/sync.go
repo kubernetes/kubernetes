@@ -332,13 +332,14 @@ func (dc *DeploymentController) scale(ctx context.Context, deployment *apps.Depl
 			return nil
 		}
 		//最新的rs进行扩容缩容.
+		//更新rs的副本数量.
 		_, _, err := dc.scaleReplicaSetAndRecordEvent(ctx, activeOrLatest, *(deployment.Spec.Replicas), deployment)
 		return err
 	}
 
 	// If the new replica set is saturated, old replica sets should be fully scaled down.
 	// This case handles replica set adoption during a saturated new replica set.
-	//如果有多个rs存在pod. 则判断最新的rs达到期望副本.
+	//如果有rs存在pod. 则判断最新的rs达到期望副本.
 	if deploymentutil.IsSaturated(deployment, newRS) {
 		//如果最新的rs已经达到期望了, 则缩容旧rs.
 		for _, old := range controller.FilterActiveReplicaSets(oldRSs) {
@@ -352,7 +353,9 @@ func (dc *DeploymentController) scale(ctx context.Context, deployment *apps.Depl
 	// There are old replica sets with pods and the new replica set is not saturated.
 	// We need to proportionally scale all replica sets (new and old) in case of a
 	// rolling deployment.
-	//旧的副本还有pod, 新的rs 还没有到达期望.
+	//旧的副本中还有pod, 新的rs 还没有到达期望.
+	//考虑是否正在rollingupdate
+	//如果在rolling update中, 则有多个rs有活动的pods, 则等比例处理
 	if deploymentutil.IsRollingUpdate(deployment) {
 		//获取所有有pod 的rs
 		allRSs := controller.FilterActiveReplicaSets(append(oldRSs, newRS))

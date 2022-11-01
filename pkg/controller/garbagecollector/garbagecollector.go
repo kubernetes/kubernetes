@@ -597,7 +597,9 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 		deps := item.getDependents()
 		for _, dep := range deps {
 			//如果子节点正在删除.当前节点并没有标记删除, 则将block=False.
+			//这种场景说明有循环依赖
 			if dep.isDeletingDependents() {
+
 				// this circle detection has false positives, we need to
 				// apply a more rigorous detection if this turns out to be a
 				// problem.

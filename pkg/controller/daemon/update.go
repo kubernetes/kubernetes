@@ -46,6 +46,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 	if err != nil {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
 	}
+	//返回最大数量和最大不可用数量.
 	maxSurge, maxUnavailable, err := dsc.updatedDesiredNodeCounts(ds, nodeList, nodeToDaemonPods)
 	if err != nil {
 		return fmt.Errorf("couldn't get unavailable numbers: %v", err)
@@ -65,6 +66,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 	// * The number of new pods that are unavailable must be less than maxUnavailable
 	// * A node with an available old pod is a candidate for deletion if it does not violate other invariants
 	//
+	//如果maxSurge==0 删除pod至unavailable pods数量.
 	if maxSurge == 0 {
 		var numUnavailable int
 		var allowedReplacementPods []string
@@ -79,9 +81,11 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 			}
 			switch {
 			case oldPod == nil && newPod == nil, oldPod != nil && newPod != nil:
+				//如果都不存在, 或者同时存在. 不可用数量 + 1.正在升级过程中视为不可用.
 				// the manage loop will handle creating or deleting the appropriate pod, consider this unavailable
 				numUnavailable++
 			case newPod != nil:
+				//如果新的pod没有available, 则视为不可用.
 				// this pod is up to date, check its availability
 				if !podutil.IsPodAvailable(newPod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}) {
 					// an unavailable new pod is counted against maxUnavailable
@@ -89,14 +93,17 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 				}
 			default:
 				// this pod is old, it is an update candidate
+				//只有旧pod.
 				switch {
 				case !podutil.IsPodAvailable(oldPod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}):
+					//旧pod并没有available
 					// the old pod isn't available, so it needs to be replaced
 					klog.V(5).Infof("DaemonSet %s/%s pod %s on node %s is out of date and not available, allowing replacement", ds.Namespace, ds.Name, oldPod.Name, nodeName)
 					// record the replacement
 					if allowedReplacementPods == nil {
 						allowedReplacementPods = make([]string, 0, len(nodeToDaemonPods))
 					}
+					//需要替换的pod
 					allowedReplacementPods = append(allowedReplacementPods, oldPod.Name)
 				case numUnavailable >= maxUnavailable:
 					// no point considering any other candidates
@@ -107,6 +114,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 					if candidatePodsToDelete == nil {
 						candidatePodsToDelete = make([]string, 0, maxUnavailable)
 					}
+					//正常逻辑 需要被删除替换的pod
 					candidatePodsToDelete = append(candidatePodsToDelete, oldPod.Name)
 				}
 			}
@@ -121,6 +129,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 		if max := len(candidatePodsToDelete); remainingUnavailable > max {
 			remainingUnavailable = max
 		}
+		//首先删除需要替换的pod(只有旧pod, 还是unavailable)
 		oldPodsToDelete := append(allowedReplacementPods, candidatePodsToDelete[:remainingUnavailable]...)
 
 		return dsc.syncNodes(ctx, ds, oldPodsToDelete, nil, hash)
@@ -213,10 +222,12 @@ func findUpdatedPodsOnNode(ds *apps.DaemonSet, podsOnNode []*v1.Pod, hash string
 		if pod.DeletionTimestamp != nil {
 			continue
 		}
+		//获取当前ds 的generation 在annotations中.
 		generation, err := util.GetTemplateGeneration(ds)
 		if err != nil {
 			generation = nil
 		}
+		//判断是否为最新的版本的pod
 		if util.IsPodUpdated(pod, hash, generation) {
 			if newPod != nil {
 				return nil, nil, false
@@ -255,6 +266,7 @@ func (dsc *DaemonSetsController) constructHistory(ctx context.Context, ds *apps.
 		}
 		// Compare histories with ds to separate cur and old history
 		found := false
+		//通过判断历史patch是否一致.
 		found, err = Match(ds, history)
 		if err != nil {
 			return nil, nil, err
@@ -528,10 +540,13 @@ func (dsc *DaemonSetsController) updatedDesiredNodeCounts(ds *apps.DaemonSet, no
 	var desiredNumberScheduled int
 	for i := range nodeList {
 		node := nodeList[i]
+		//判断pod是否应该运行, 或者继续运行在节点上.
+		//这里只需要判断是否需要运行. 有不能容忍的污点或者affinity就不能运行.
 		wantToRun, _ := NodeShouldRunDaemonPod(node, ds)
 		if !wantToRun {
 			continue
 		}
+		//如果应该运行节点数量.
 		desiredNumberScheduled++
 
 		if _, exists := nodeToDaemonPods[node.Name]; !exists {
@@ -539,11 +554,13 @@ func (dsc *DaemonSetsController) updatedDesiredNodeCounts(ds *apps.DaemonSet, no
 		}
 	}
 
+	//获取ds中最大不可用的pod.
 	maxUnavailable, err := util.UnavailableCount(ds, desiredNumberScheduled)
 	if err != nil {
 		return -1, -1, fmt.Errorf("invalid value for MaxUnavailable: %v", err)
 	}
 
+	//获取超过的最大数量.
 	maxSurge, err := util.SurgeCount(ds, desiredNumberScheduled)
 	if err != nil {
 		return -1, -1, fmt.Errorf("invalid value for MaxSurge: %v", err)

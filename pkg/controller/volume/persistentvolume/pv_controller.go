@@ -345,6 +345,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(ctx context.Context, cl
 			klog.V(2).Infof("synchronizing unbound PersistentVolumeClaim[%s]: Error finding PV for claim: %v", claimToClaimKey(claim), err)
 			return fmt.Errorf("error finding PV for claim %q: %w", claimToClaimKey(claim), err)
 		}
+		//如果找不到, 根据动态绑定storage class处理.
 		if volume == nil {
 			klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: no volume found", claimToClaimKey(claim))
 			// No PV could be found
@@ -581,6 +582,7 @@ func (ctrl *PersistentVolumeController) syncVolume(ctx context.Context, volume *
 		if err != nil {
 			return err
 		}
+		//缓存中找不到对应的pvc, 从api中获取对象.
 		if !found {
 			// If the PV was created by an external PV provisioner or
 			// bound by external PV binder (e.g. kube-scheduler), it's
@@ -637,7 +639,8 @@ func (ctrl *PersistentVolumeController) syncVolume(ctx context.Context, volume *
 				}
 			}
 		}
-
+		
+		//如果pvc被删除了.
 		if claim == nil {
 			// If we get into this block, the claim must have been deleted;
 			// NOTE: reclaimVolume may either release the PV back into the pool or
@@ -655,6 +658,7 @@ func (ctrl *PersistentVolumeController) syncVolume(ctx context.Context, volume *
 					return err
 				}
 			}
+			//根据pv的策略进行处理.
 			if err = ctrl.reclaimVolume(volume); err != nil {
 				// Release failed, we will fall back into the same condition
 				// in the next call to this method
@@ -703,7 +707,9 @@ func (ctrl *PersistentVolumeController) syncVolume(ctx context.Context, volume *
 			}
 			return nil
 		} else {
+			//如果pvc的volumename不等于volumeName
 			// Volume is bound to a claim, but the claim is bound elsewhere
+			//动态绑定, 且是删除策略. 则更新为release.
 			if metav1.HasAnnotation(volume.ObjectMeta, storagehelpers.AnnDynamicallyProvisioned) && volume.Spec.PersistentVolumeReclaimPolicy == v1.PersistentVolumeReclaimDelete {
 				// This volume was dynamically provisioned for this claim. The
 				// claim got bound elsewhere, and thus this volume is not
