@@ -74,11 +74,12 @@ type Selector interface {
 	RequiresExactMatch(label string) (value string, found bool)
 }
 
-var everythingSelector Selector = internalSelector{}
+// Sharing this saves 1 alloc per use; this is safe because it's immutable.
+var sharedEverythingSelector Selector = internalSelector{}
 
 // Everything returns a selector that matches all labels.
 func Everything() Selector {
-	return everythingSelector
+	return sharedEverythingSelector
 }
 
 type nothingSelector struct{}
@@ -93,11 +94,12 @@ func (n nothingSelector) RequiresExactMatch(label string) (value string, found b
 	return "", false
 }
 
-var internalNothingSelector Selector = nothingSelector{}
+// Sharing this saves 1 alloc per use; this is safe because it's immutable.
+var sharedNothingSelector Selector = nothingSelector{}
 
 // Nothing returns a selector that matches no labels
 func Nothing() Selector {
-	return internalNothingSelector
+	return sharedNothingSelector
 }
 
 // NewSelector returns a nil selector
