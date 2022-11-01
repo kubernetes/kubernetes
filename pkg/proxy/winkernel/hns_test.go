@@ -302,15 +302,20 @@ func TestGetLoadBalancerExisting(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	// We populate this to ensure we test for getting existing load balancer
-	id := loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: serviceVip, endpointsCount: len(Endpoints)}
-	lbs[id] = &loadBalancerInfo{hnsID: LoadBalancer.Id}
-
 	endpoint := &endpointsInfo{
 		ip:    Endpoint.IpConfigurations[0].IpAddress,
 		hnsID: Endpoint.Id,
 	}
 	endpoints := []endpointsInfo{*endpoint}
+	hash, err := hashEndpoints(endpoints)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// We populate this to ensure we test for getting existing load balancer
+	id := loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: serviceVip, endpointsHash: hash}
+	lbs[id] = &loadBalancerInfo{hnsID: LoadBalancer.Id}
+
 	lb, err := hns.getLoadBalancer(endpoints, loadBalancerFlags{}, sourceVip, serviceVip, protocol, internalPort, externalPort, lbs)
 
 	if err != nil {

@@ -97,11 +97,11 @@ type loadBalancerInfo struct {
 }
 
 type loadBalancerIdentifier struct {
-	protocol       uint16
-	internalPort   uint16
-	externalPort   uint16
-	vip            string
-	endpointsCount int
+	protocol      uint16
+	internalPort  uint16
+	externalPort  uint16
+	vip           string
+	endpointsHash [20]byte
 }
 
 type loadBalancerFlags struct {
@@ -153,7 +153,6 @@ func newHostNetworkService() (HostNetworkService, hcn.SupportedFeatures) {
 	} else {
 		panic("Windows HNS Api V2 required. This version of windows does not support API V2")
 	}
-
 	return h, supportedFeatures
 }
 
