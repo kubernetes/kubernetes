@@ -18,6 +18,56 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+run_legacy_discovery_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace
+  kube::log::status "Testing Legacy (V1) Discovery"
+
+  DISCOVERY_DIR="${KUBE_TEMP}/.kube/cache/discovery/${API_HOST}_${SECURE_API_PORT}"
+  DISCOVERY_GROUPS_FILE="${DISCOVERY_DIR}/servergroups.json"
+
+  # Ensures discovery /api and /apis has been downloaded and cached.
+  kubectl get pods
+  kubectl get nodes
+
+  kube::log::status "legacy cached discovery file -- searching for groups"
+  kube::log::status "legacy cached discovery file: ${DISCOVERY_GROUPS_FILE}"
+  if ! grep -q "apiregistration.k8s.io" "${DISCOVERY_GROUPS_FILE}"; then
+    kube::log::status "apiregistration.k8s.io group missing; legacy cached discovery file"
+    exit 1
+  fi
+  if ! grep -q "apps" "$DISCOVERY_DIR/servergroups.json"; then
+    kube::log::status "apps group missing; legacy cached discovery file"
+    exit 1
+  fi
+  if ! grep -q "autoscaling" "$DISCOVERY_DIR/servergroups.json"; then
+    kube::log::status "autoscaling group missing; legacy cached discovery file"
+    exit 1
+  fi
+  if ! grep -q "batch" "$DISCOVERY_DIR/servergroups.json"; then
+    kube::log::status "batch group missing; legacy cached discovery file"
+    exit 1
+  fi
+  if ! grep -q "extensions" "$DISCOVERY_DIR/servergroups.json"; then
+    kube::log::status "extensions group missing; legacy cached discovery file"
+    exit 1
+  fi
+  if ! grep -q "certificates.k8s.io" "$DISCOVERY_DIR/servergroups.json"; then
+    kube::log::status "certificates.k8s.io group missing; legacy cached discovery file"
+    exit 1
+  fi
+  if ! grep -q "node.k8s.io" "$DISCOVERY_DIR/servergroups.json"; then
+    kube::log::status "node.k8s.io group missing; legacy cached discovery file"
+    exit 1
+  fi
+  kube::log::status "legacy cached discovery file -- all groups found"
+
+  set +o nounset
+  set +o errexit
+}
+
 run_RESTMapper_evaluation_tests() {
   set -o nounset
   set -o errexit

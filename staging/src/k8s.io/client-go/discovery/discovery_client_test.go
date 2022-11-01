@@ -104,7 +104,11 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
+		if req.Header.Get("Accept") == acceptV2Beta1 {
+			w.WriteHeader(http.StatusNotAcceptable)
+		} else {
+			w.WriteHeader(http.StatusOK)
+		}
 		w.Write(output)
 	}))
 	defer server.Close()
@@ -123,7 +127,11 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 func TestGetServerGroupsWithBrokenServer(t *testing.T) {
 	for _, statusCode := range []int{http.StatusNotFound, http.StatusForbidden} {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			w.WriteHeader(statusCode)
+			if req.Header.Get("Accept") == acceptV2Beta1 {
+				w.WriteHeader(http.StatusNotAcceptable)
+			} else {
+				w.WriteHeader(statusCode)
+			}
 		}))
 		defer server.Close()
 		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
@@ -156,8 +164,7 @@ func TestGetServerResourcesWithV1Server(t *testing.T) {
 				},
 			}
 		default:
-			w.WriteHeader(http.StatusNotFound)
-			return
+			obj = &metav1.APIVersions{}
 		}
 		output, err := json.Marshal(obj)
 		if err != nil {
@@ -165,7 +172,11 @@ func TestGetServerResourcesWithV1Server(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
+		if req.Header.Get("Accept") == acceptV2Beta1 && req.URL.Path == "/apis" {
+			w.WriteHeader(http.StatusNotAcceptable)
+		} else {
+			w.WriteHeader(http.StatusOK)
+		}
 		w.Write(output)
 	}))
 	defer server.Close()
@@ -348,7 +359,11 @@ func TestGetServerResourcesForGroupVersion(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
+		if req.Header.Get("Accept") == acceptV2Beta1 {
+			w.WriteHeader(http.StatusNotAcceptable)
+		} else {
+			w.WriteHeader(http.StatusOK)
+		}
 		w.Write(output)
 	}))
 	defer server.Close()
@@ -749,7 +764,11 @@ func TestServerPreferredResources(t *testing.T) {
 					return
 				}
 				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusOK)
+				if req.Header.Get("Accept") == acceptV2Beta1 {
+					w.WriteHeader(http.StatusNotAcceptable)
+				} else {
+					w.WriteHeader(http.StatusOK)
+				}
 				w.Write(output)
 			},
 		},
@@ -791,7 +810,11 @@ func TestServerPreferredResources(t *testing.T) {
 					return
 				}
 				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusOK)
+				if req.Header.Get("Accept") == acceptV2Beta1 {
+					w.WriteHeader(http.StatusNotAcceptable)
+				} else {
+					w.WriteHeader(http.StatusOK)
+				}
 				w.Write(output)
 			},
 		},
@@ -886,7 +909,11 @@ func TestServerPreferredResourcesRetries(t *testing.T) {
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
+			if req.Header.Get("Accept") == acceptV2Beta1 {
+				w.WriteHeader(http.StatusNotAcceptable)
+			} else {
+				w.WriteHeader(http.StatusOK)
+			}
 			w.Write(output)
 		}
 	}
@@ -966,6 +993,9 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 			response: func(w http.ResponseWriter, req *http.Request) {
 				var list interface{}
 				switch req.URL.Path {
+				case "/apis":
+					// Empty list
+					list = &metav1.APIResourceList{}
 				case "/api/v1":
 					list = &stable
 				case "/api":
@@ -985,7 +1015,11 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 					return
 				}
 				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusOK)
+				if req.Header.Get("Accept") == acceptV2Beta1 {
+					w.WriteHeader(http.StatusNotAcceptable)
+				} else {
+					w.WriteHeader(http.StatusOK)
+				}
 				w.Write(output)
 			},
 			expected: map[schema.GroupVersionResource]struct{}{
@@ -1028,7 +1062,11 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 					return
 				}
 				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusOK)
+				if req.Header.Get("Accept") == acceptV2Beta1 {
+					w.WriteHeader(http.StatusNotAcceptable)
+				} else {
+					w.WriteHeader(http.StatusOK)
+				}
 				w.Write(output)
 			},
 			expected: map[schema.GroupVersionResource]struct{}{
@@ -1071,7 +1109,11 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 					return
 				}
 				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusOK)
+				if req.Header.Get("Accept") == acceptV2Beta1 {
+					w.WriteHeader(http.StatusNotAcceptable)
+				} else {
+					w.WriteHeader(http.StatusOK)
+				}
 				w.Write(output)
 			},
 			expected: map[schema.GroupVersionResource]struct{}{

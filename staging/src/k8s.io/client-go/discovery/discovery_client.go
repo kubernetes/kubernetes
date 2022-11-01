@@ -31,6 +31,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	openapi_v2 "github.com/google/gnostic/openapiv2"
 
+	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -55,6 +56,14 @@ const (
 
 	// defaultBurst is the default burst to be used with the discovery client's token bucket rate limiter
 	defaultBurst = 300
+
+	// discovery versions: v1 = legacy, v2beta1 = aggregated, none = not retrieved yet
+	versionNone    = "none"
+	versionV1      = "v1"
+	versionV2Beta1 = "v2beta1"
+
+	acceptV1      = "application/json"
+	acceptV2Beta1 = acceptV1 + ";" + "g=discovery.k8s.io,v=v2beta1,as=APIGroupDiscoveryList"
 )
 
 // DiscoveryInterface holds the methods that discover server-supported API groups,
@@ -137,6 +146,147 @@ type DiscoveryClient struct {
 	restClient restclient.Interface
 
 	LegacyPrefix string
+
+	// Cache groups and resources along with the discovery version.
+	// TODO(seans3): Add lock/mutex here if needed for cache.
+	lock          sync.RWMutex
+	version       string
+	groups        *metav1.APIGroupList
+	resourcesByGV map[string]*metav1.APIResourceList
+}
+
+// Returns true if the discovery client has already retrieved the discovery
+// groups (resources will also be downloaded if discovery is "aggregated"); false otherwise.
+func (d *DiscoveryClient) isCached() bool {
+	return d.version != versionNone
+}
+
+// Returns true of the discovery version negotiated with the
+// api server is "v2beta1" or greater; false otherwise.
+func (d *DiscoveryClient) isAggregated() bool {
+	return d.version == versionV2Beta1
+}
+
+// Returns all the stored discovery groups; empty slice if
+// the groups haven't been cached yet.
+func (d *DiscoveryClient) allGroups() []*metav1.APIGroup {
+	groups := []*metav1.APIGroup{}
+	if d.groups != nil {
+		for _, group := range d.groups.Groups {
+			groups = append(groups, &group)
+		}
+	}
+	return groups
+}
+
+// Returns all the stored discovery resources; empty slice if
+// the resources haven't been cached yet.
+func (d *DiscoveryClient) allResources() []*metav1.APIResourceList {
+	resources := []*metav1.APIResourceList{}
+	if d.resourcesByGV != nil {
+		for _, resourceList := range d.resourcesByGV {
+			resources = append(resources, resourceList)
+		}
+	}
+	return resources
+}
+
+// Returns all the stored "preferred" resources (highest priority
+// version); empty slice if resources haven't been cached yet.
+func (d *DiscoveryClient) preferredResources() []*metav1.APIResourceList {
+	resources := []*metav1.APIResourceList{}
+	if d.groups == nil || d.resourcesByGV == nil {
+		return resources
+	}
+	for _, group := range d.groups.Groups {
+		gv := group.PreferredVersion.GroupVersion
+		if resourceList, found := d.resourcesByGV[gv]; found {
+			resources = append(resources, resourceList)
+		}
+	}
+	return resources
+}
+
+// Returns all the stored "preferred" resources (highest priority
+// version); empty slice if resources haven't been cached yet.
+func (d *DiscoveryClient) preferredNamespacedResources() []*metav1.APIResourceList {
+	filteredResources := []*metav1.APIResourceList{}
+	for _, resourceList := range d.preferredResources() {
+		filteredResourceList := metav1.APIResourceList{}
+		for _, resource := range resourceList.APIResources {
+			if resource.Namespaced {
+				filteredResourceList.APIResources = append(filteredResourceList.APIResources, resource)
+			}
+		}
+		filteredResources = append(filteredResources, &filteredResourceList)
+	}
+	return filteredResources
+}
+
+// Stores the discovery groups. If "aggregated" discovery, resources stored also.
+// TODO(seans3): Need to figure out the mutex strategy here (if needed).
+func (d *DiscoveryClient) cacheDiscovery() error {
+	if d.isCached() {
+		return nil
+	}
+	gdl := apidiscoveryv2beta1.APIGroupDiscoveryList{}
+	body, err := d.restClient.Get().AbsPath("/apis").SetHeader("Accept", acceptV2Beta1).Do(context.TODO()).Raw()
+	// TODO(seans3): Is the "not acceptable" error how content negotiation works? I have not
+	// seen a way to get the http response content-type header (or any response header).
+	if err != nil && errors.IsNotAcceptable(err) {
+		return d.retrieveV1Discovery()
+	}
+	// to be compatible with a v1.0 server, if it's a 403 or 404 -- ignore.
+	// TODO(seans3): Do we still need this check to be compatible with v1.0?
+	if err != nil && !errors.IsNotFound(err) && !errors.IsForbidden(err) {
+		return err
+	}
+	if err = json.Unmarshal(body, &gdl); err != nil {
+		return err
+	}
+	groups, resources := parseDiscoveryV2Beta1(gdl)
+	d.lock.Lock()
+	d.version = versionV2Beta1
+	d.groups = groups
+	d.resourcesByGV = resources
+	d.lock.Unlock()
+	return nil
+}
+
+func (d *DiscoveryClient) retrieveV1Discovery() error {
+	groupList := metav1.APIGroupList{}
+	body, err := d.restClient.Get().AbsPath("/apis").SetHeader("Accept", acceptV1).Do(context.TODO()).Raw()
+	if err != nil && !errors.IsNotFound(err) && !errors.IsForbidden(err) {
+		return err
+	}
+	// to be compatible with a v1.0 server, if it's a 403 or 404, ignore and return whatever we will get from /api
+	// TODO(seans3): Not sure we need to stay compatible with v1.0 anymore.
+	if err != nil && (errors.IsNotFound(err) || errors.IsForbidden(err)) {
+		groupList = metav1.APIGroupList{}
+	} else {
+		if err = json.Unmarshal(body, &groupList); err != nil {
+			return err
+		}
+	}
+	// Get the groupVersions exposed at /api
+	v := &metav1.APIVersions{}
+	err = d.restClient.Get().AbsPath(d.LegacyPrefix).Do(context.TODO()).Into(v)
+	apiGroup := metav1.APIGroup{}
+	if err == nil && len(v.Versions) != 0 {
+		apiGroup = apiVersionsToAPIGroup(v)
+	}
+	if err != nil && !errors.IsNotFound(err) && !errors.IsForbidden(err) {
+		return err
+	}
+	// prepend the group retrieved from /api to the list if not empty
+	if len(v.Versions) != 0 {
+		groupList.Groups = append([]metav1.APIGroup{apiGroup}, groupList.Groups...)
+	}
+	d.lock.Lock()
+	d.version = versionV1
+	d.groups = &groupList
+	d.lock.Unlock()
+	return nil
 }
 
 // Convert metav1.APIVersions to metav1.APIGroup. APIVersions is used by legacy v1, so
@@ -158,34 +308,9 @@ func apiVersionsToAPIGroup(apiVersions *metav1.APIVersions) (apiGroup metav1.API
 
 // ServerGroups returns the supported groups, with information like supported versions and the
 // preferred version.
-func (d *DiscoveryClient) ServerGroups() (apiGroupList *metav1.APIGroupList, err error) {
-	// Get the groupVersions exposed at /api
-	v := &metav1.APIVersions{}
-	err = d.restClient.Get().AbsPath(d.LegacyPrefix).Do(context.TODO()).Into(v)
-	apiGroup := metav1.APIGroup{}
-	if err == nil && len(v.Versions) != 0 {
-		apiGroup = apiVersionsToAPIGroup(v)
-	}
-	if err != nil && !errors.IsNotFound(err) && !errors.IsForbidden(err) {
-		return nil, err
-	}
-
-	// Get the groupVersions exposed at /apis
-	apiGroupList = &metav1.APIGroupList{}
-	err = d.restClient.Get().AbsPath("/apis").Do(context.TODO()).Into(apiGroupList)
-	if err != nil && !errors.IsNotFound(err) && !errors.IsForbidden(err) {
-		return nil, err
-	}
-	// to be compatible with a v1.0 server, if it's a 403 or 404, ignore and return whatever we got from /api
-	if err != nil && (errors.IsNotFound(err) || errors.IsForbidden(err)) {
-		apiGroupList = &metav1.APIGroupList{}
-	}
-
-	// prepend the group retrieved from /api to the list if not empty
-	if len(v.Versions) != 0 {
-		apiGroupList.Groups = append([]metav1.APIGroup{apiGroup}, apiGroupList.Groups...)
-	}
-	return apiGroupList, nil
+func (d *DiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
+	err := d.cacheDiscovery()
+	return d.groups, err
 }
 
 // ServerResourcesForGroupVersion returns the supported resources for a group and version.
@@ -215,6 +340,13 @@ func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (r
 
 // ServerGroupsAndResources returns the supported resources for all groups and versions.
 func (d *DiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+	err := d.cacheDiscovery()
+	if err != nil {
+		return nil, nil, err
+	}
+	if d.isAggregated() {
+		return d.allGroups(), d.allResources(), nil
+	}
 	return withRetries(defaultRetries, func() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
 		return ServerGroupsAndResources(d)
 	})
@@ -374,6 +506,13 @@ func fetchGroupVersionResources(d DiscoveryInterface, apiGroups *metav1.APIGroup
 // ServerPreferredResources returns the supported resources with the version preferred by the
 // server.
 func (d *DiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
+	err := d.cacheDiscovery()
+	if err != nil {
+		return nil, err
+	}
+	if d.isAggregated() {
+		return d.preferredResources(), nil
+	}
 	_, rs, err := withRetries(defaultRetries, func() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
 		rs, err := ServerPreferredResources(d)
 		return nil, rs, err
@@ -384,6 +523,13 @@ func (d *DiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList,
 // ServerPreferredNamespacedResources returns the supported namespaced resources with the
 // version preferred by the server.
 func (d *DiscoveryClient) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
+	err := d.cacheDiscovery()
+	if err != nil {
+		return nil, err
+	}
+	if d.isAggregated() {
+		return d.preferredNamespacedResources(), nil
+	}
 	return ServerPreferredNamespacedResources(d)
 }
 
@@ -500,7 +646,7 @@ func NewDiscoveryClientForConfigAndClient(c *restclient.Config, httpClient *http
 		return nil, err
 	}
 	client, err := restclient.UnversionedRESTClientForConfigAndClient(&config, httpClient)
-	return &DiscoveryClient{restClient: client, LegacyPrefix: "/api"}, err
+	return &DiscoveryClient{restClient: client, LegacyPrefix: "/api", version: versionNone}, err
 }
 
 // NewDiscoveryClientForConfigOrDie creates a new DiscoveryClient for the given config. If
@@ -516,7 +662,7 @@ func NewDiscoveryClientForConfigOrDie(c *restclient.Config) *DiscoveryClient {
 
 // NewDiscoveryClient returns a new DiscoveryClient for the given RESTClient.
 func NewDiscoveryClient(c restclient.Interface) *DiscoveryClient {
-	return &DiscoveryClient{restClient: c, LegacyPrefix: "/api"}
+	return &DiscoveryClient{restClient: c, LegacyPrefix: "/api", version: versionNone}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

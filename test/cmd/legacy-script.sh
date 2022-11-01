@@ -612,9 +612,9 @@ runTests() {
   #####################################
 
   # customresourcedefinitions cleanup after themselves.
-  if kube::test::if_supports_resource "${customresourcedefinitions}" ; then
-    record_command run_crd_tests
-  fi
+  # if kube::test::if_supports_resource "${customresourcedefinitions}" ; then
+  #   record_command run_crd_tests
+  # fi
 
   #####################################
   # Recursive Resources via directory #
