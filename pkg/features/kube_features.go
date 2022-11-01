@@ -781,6 +781,7 @@ const (
 	// owner: @kerthcet
 	// kep: https://kep.k8s.io/3094
 	// alpha: v1.25
+	// beta: v1.26
 	//
 	// Allow users to specify whether to take nodeAffinity/nodeTaint into consideration when
 	// calculating pod topology spread skew.
@@ -1012,7 +1013,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	WindowsHostProcessContainers: {Default: true, PreRelease: featuregate.Beta},
 
-	NodeInclusionPolicyInPodTopologySpread: {Default: false, PreRelease: featuregate.Alpha},
+	NodeInclusionPolicyInPodTopologySpread: {Default: true, PreRelease: featuregate.Beta},
 
 	SELinuxMountReadWriteOncePod: {Default: false, PreRelease: featuregate.Alpha},
 
