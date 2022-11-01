@@ -30,8 +30,6 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/cel/internal/generic"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 )
@@ -79,14 +77,6 @@ type celAdmissionController struct {
 	// All keys must have at least one dependent binding
 	// All binding names MUST exist as a key bindingInfos
 	definitionsToBindings map[string]sets.String
-}
-
-func (c *celAdmissionController) SetExternalKubeInformerFactory(factory informers.SharedInformerFactory) {
-	c.validatorCompiler.SetExternalKubeInformerFactory(factory)
-}
-
-func (c *celAdmissionController) SetExternalKubeClientSet(k kubernetes.Interface) {
-	c.validatorCompiler.SetExternalKubeClientSet(k)
 }
 
 type definitionInfo struct {
@@ -366,8 +356,4 @@ func (c *celAdmissionController) Validate(
 func (c *celAdmissionController) HasSynced() bool {
 	return c.policyBindingController.HasSynced() &&
 		c.policyDefinitionsController.HasSynced()
-}
-
-func (c *celAdmissionController) ValidateInitialization() error {
-	return c.validatorCompiler.ValidateInitialization()
 }

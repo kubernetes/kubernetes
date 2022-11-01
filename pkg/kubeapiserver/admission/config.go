@@ -17,6 +17,7 @@ limitations under the License.
 package admission
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -90,12 +91,20 @@ func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselec
 			return nil, nil, err
 		}
 
+		matcher := matching.NewMatcher(
+			c.ExternalInformers.Core().V1().Namespaces().Lister(),
+			clientset,
+		)
+
+		if err := matcher.ValidateInitialization(); err != nil {
+			return nil, nil, fmt.Errorf("failed to initializer cel admission matcher: %w", err)
+		}
+
 		// Create CEL admission controller
 		var celAdmissionController = cel.NewAdmissionController(
 			c.ExternalInformers.Admissionregistration().V1alpha1().ValidatingAdmissionPolicies().Informer(),
 			c.ExternalInformers.Admissionregistration().V1alpha1().ValidatingAdmissionPolicyBindings().Informer(),
-			&cel.CELValidatorCompiler{
-				Matcher: matching.NewMatcher()},
+			&cel.CELValidatorCompiler{Matcher: matcher},
 			discoveryRESTMapper,
 			dynamicClient,
 		)

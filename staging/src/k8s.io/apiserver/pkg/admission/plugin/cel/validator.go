@@ -32,8 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/cel/matching"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
 )
 
 var _ ValidatorCompiler = &CELValidatorCompiler{}
@@ -61,16 +59,6 @@ func (m *matchCriteria) GetMatchResources() v1alpha1.MatchResources {
 // CELValidatorCompiler implement the interface ValidatorCompiler.
 type CELValidatorCompiler struct {
 	Matcher *matching.Matcher
-}
-
-// SetExternalKubeInformerFactory registers the namespaceLister into Matcher.
-func (c *CELValidatorCompiler) SetExternalKubeInformerFactory(factory informers.SharedInformerFactory) {
-	c.Matcher.SetNamespaceLister(factory.Core().V1().Namespaces().Lister())
-}
-
-// SetExternalKubeClientSet registers client into Matcher
-func (c *CELValidatorCompiler) SetExternalKubeClientSet(client kubernetes.Interface) {
-	c.Matcher.SetExternalKubeClientSet(client)
 }
 
 // DefinitionMatches returns whether this ValidatingAdmissionPolicy matches the provided admission resource request
