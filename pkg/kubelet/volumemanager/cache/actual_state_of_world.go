@@ -817,15 +817,11 @@ func (asw *actualStateOfWorld) PodExistsInVolume(podName volumetypes.UniquePodNa
 		return false, "", newVolumeNotAttachedError(volumeName)
 	}
 
+	// The volume exists, check its SELinux context mount option
 	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
-		if volumeObj.seLinuxMountContext != nil {
-			// The volume is mounted, check its SELinux context mount option
-			if *volumeObj.seLinuxMountContext != seLinuxLabel {
-				fullErr := newSELinuxMountMismatchError(volumeName)
-				if util.VolumeSupportsSELinuxMount(volumeObj.spec) {
-					return false, volumeObj.devicePath, fullErr
-				}
-			}
+		if volumeObj.seLinuxMountContext != nil && *volumeObj.seLinuxMountContext != seLinuxLabel {
+			fullErr := newSELinuxMountMismatchError(volumeName)
+			return false, volumeObj.devicePath, fullErr
 		}
 	}
 
