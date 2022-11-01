@@ -67,10 +67,10 @@ const (
 const (
 	// Two modes supported in "churn" operator.
 
-	// Recreate creates a number of API objects and then delete them, and repeat the iteration.
-	Recreate = "recreate"
 	// Create continuously create API objects without deleting them.
 	Create = "create"
+	// Recreate creates a number of API objects and then delete them, and repeat the iteration.
+	Recreate = "recreate"
 )
 
 const (
@@ -91,16 +91,18 @@ var (
 	}
 )
 
-// testCase defines a set of test cases that intend to test the performance of
+// testCase defines a set of test cases that intends to test the performance of
 // similar workloads of varying sizes with shared overall settings such as
 // feature gates and metrics collected.
 type testCase struct {
 	// Name of the testCase.
 	Name string
-	// Feature gates to set before running the test. Optional.
+	// Feature gates to set before running the test.
+	// Optional
 	FeatureGates map[featuregate.Feature]bool
-	// List of metrics to collect. Optional, defaults to
+	// List of metrics to collect. Defaults to
 	// defaultMetricsCollectorConfig if unspecified.
+	// Optional
 	MetricsCollectorConfig *metricsCollectorConfig
 	// Template for sequence of ops that each workload must follow. Each op will
 	// be executed serially one after another. Each element of the list must be
@@ -110,8 +112,9 @@ type testCase struct {
 	Workloads []*workload
 	// SchedulerConfigFile is the path of scheduler configuration
 	SchedulerConfigFile string
-	// Default path to spec file describing the pods to create. Optional.
+	// Default path to spec file describing the pods to create.
 	// This path can be overridden in createPodsOp by setting PodTemplatePath .
+	// Optional
 	DefaultPodTemplatePath *string
 }
 
@@ -265,10 +268,12 @@ type createNodesOp struct {
 	Count int
 	// Template parameter for Count.
 	CountParam string
-	// Path to spec file describing the nodes to create. Optional.
+	// Path to spec file describing the nodes to create.
+	// Optional
 	NodeTemplatePath *string
-	// At most one of the following strategies can be defined. Optional, defaults
+	// At most one of the following strategies can be defined. Defaults
 	// to TrivialNodePrepareStrategy if unspecified.
+	// Optional
 	NodeAllocatableStrategy  *testutils.NodeAllocatableStrategy
 	LabelNodePrepareStrategy *testutils.LabelNodePrepareStrategy
 	UniqueNodeLabelStrategy  *testutils.UniqueNodeLabelStrategy
@@ -312,7 +317,8 @@ type createNamespacesOp struct {
 	Count int
 	// Template parameter for Count. Takes precedence over Count if both set.
 	CountParam string
-	// Path to spec file describing the Namespaces to create. Optional.
+	// Path to spec file describing the Namespaces to create.
+	// Optional
 	NamespaceTemplatePath *string
 }
 
@@ -357,16 +363,20 @@ type createPodsOp struct {
 	// Optional. Both CollectMetrics and SkipWaitToCompletion cannot be true at
 	// the same time for a particular createPodsOp.
 	CollectMetrics bool
-	// Namespace the pods should be created in. Optional, defaults to a unique
+	// Namespace the pods should be created in. Defaults to a unique
 	// namespace of the format "namespace-<number>".
+	// Optional
 	Namespace *string
-	// Path to spec file describing the pods to schedule. Optional.
+	// Path to spec file describing the pods to schedule.
 	// If nil, DefaultPodTemplatePath will be used.
+	// Optional
 	PodTemplatePath *string
-	// Whether or not to wait for all pods in this op to get scheduled. Optional,
-	// defaults to false.
+	// Whether or not to wait for all pods in this op to get scheduled.
+	// Defaults to false if not specified.
+	// Optional
 	SkipWaitToCompletion bool
-	// Persistent volume settings for the pods to be scheduled. Optional.
+	// Persistent volume settings for the pods to be scheduled.
+	// Optional
 	PersistentVolumeTemplatePath      *string
 	PersistentVolumeClaimTemplatePath *string
 }
@@ -404,7 +414,7 @@ func (cpo createPodsOp) patchParams(w *workload) (realOp, error) {
 	return &cpo, (&cpo).isValid(false)
 }
 
-// createPodSetsOp defines an op where a set of createPodsOp is created each in a unique namespace.
+// createPodSetsOp defines an op where a set of createPodsOps is created in each unique namespace.
 type createPodSetsOp struct {
 	// Must be "createPodSets".
 	Opcode operationCode
@@ -461,8 +471,9 @@ type churnOp struct {
 	Number int
 	// Intervals of churning. Defaults to 500 millisecond.
 	IntervalMilliseconds int64
-	// Namespace the churning objects should be created in. Optional, defaults to a unique
+	// Namespace the churning objects should be created in. Defaults to a unique
 	// namespace of the format "namespace-<number>".
+	// Optional
 	Namespace *string
 	// Path of API spec files.
 	TemplatePaths []string
@@ -822,7 +833,26 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 			ticker := time.NewTicker(time.Duration(interval) * time.Millisecond)
 			defer ticker.Stop()
 
-			if concreteOp.Mode == Recreate {
+			switch concreteOp.Mode {
+			case Create:
+				go func() {
+					count, threshold := 0, concreteOp.Number
+					if threshold == 0 {
+						threshold = math.MaxInt32
+					}
+					for count < threshold {
+						select {
+						case <-ticker.C:
+							for i := range churnFns {
+								churnFns[i]("")
+							}
+							count++
+						case <-ctx.Done():
+							return
+						}
+					}
+				}()
+			case Recreate:
 				go func() {
 					retVals := make([][]string, len(churnFns))
 					// For each churn function, instantiate a slice of strings with length "concreteOp.Number".
@@ -836,24 +866,6 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 						case <-ticker.C:
 							for i := range churnFns {
 								retVals[i][count%concreteOp.Number] = churnFns[i](retVals[i][count%concreteOp.Number])
-							}
-							count++
-						case <-ctx.Done():
-							return
-						}
-					}
-				}()
-			} else if concreteOp.Mode == Create {
-				go func() {
-					count, threshold := 0, concreteOp.Number
-					if threshold == 0 {
-						threshold = math.MaxInt32
-					}
-					for count < threshold {
-						select {
-						case <-ticker.C:
-							for i := range churnFns {
-								churnFns[i]("")
 							}
 							count++
 						case <-ctx.Done():
@@ -1039,7 +1051,7 @@ func getUnstructuredFromFile(path string) (*unstructured.Unstructured, *schema.G
 func getTestCases(path string) ([]*testCase, error) {
 	testCases := make([]*testCase, 0)
 	if err := getSpecFromFile(&path, &testCases); err != nil {
-		return nil, fmt.Errorf("parsing test cases: %w", err)
+		return nil, fmt.Errorf("parsing test cases error: %w", err)
 	}
 	return testCases, nil
 }
