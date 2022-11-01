@@ -65,7 +65,7 @@ func (persistentvolumeclaimStrategy) GetResetFields() map[fieldpath.APIVersion]*
 func (persistentvolumeclaimStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pvc := obj.(*api.PersistentVolumeClaim)
 	pvc.Status = api.PersistentVolumeClaimStatus{}
-	pvcutil.DropDisabledFields(&pvc.Spec)
+	pvcutil.DropDisabledFields(&pvc.Spec, nil)
 
 	// For data sources, we need to do 2 things to implement KEP 1495
 
@@ -103,7 +103,7 @@ func (persistentvolumeclaimStrategy) PrepareForUpdate(ctx context.Context, obj, 
 	oldPvc := old.(*api.PersistentVolumeClaim)
 	newPvc.Status = oldPvc.Status
 
-	pvcutil.DropDisabledFields(&newPvc.Spec)
+	pvcutil.DropDisabledFields(&newPvc.Spec, &oldPvc.Spec)
 
 	// We need to use similar logic to PrepareForCreate here both to preserve backwards
 	// compatibility with the old behavior (ignoring of garbage dataSources at both create
