@@ -342,7 +342,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		}
 		testConfig := storageframework.ConvertTestConfig(l.config)
 		dc := l.config.Framework.DynamicClient
-		dataSource := prepareSnapshotDataSourceForProvisioning(ctx, f, testConfig, l.config, pattern, l.cs, dc, resource.Pvc, resource.Sc, sDriver, pattern.VolMode, expectedContent)
+		dataSourceRef := prepareSnapshotDataSourceForProvisioning(ctx, f, testConfig, l.config, pattern, l.cs, dc, resource.Pvc, resource.Sc, sDriver, pattern.VolMode, expectedContent)
 
 		// Create 2nd PVC for testing
 		pvc2 := &v1.PersistentVolumeClaim{
@@ -353,7 +353,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		}
 		resource.Pvc.Spec.DeepCopyInto(&pvc2.Spec)
 		pvc2.Spec.VolumeName = ""
-		pvc2.Spec.DataSource = dataSource
+		pvc2.Spec.DataSourceRef = dataSourceRef
 
 		pvc2, err := l.cs.CoreV1().PersistentVolumeClaims(pvc2.Namespace).Create(context.TODO(), pvc2, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
@@ -386,7 +386,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		l.resources = append(l.resources, resource)
 		pvcs := []*v1.PersistentVolumeClaim{resource.Pvc}
 		testConfig := storageframework.ConvertTestConfig(l.config)
-		dataSource := preparePVCDataSourceForProvisioning(ctx, f, testConfig, l.cs, resource.Pvc, resource.Sc, pattern.VolMode, expectedContent)
+		dataSourceRef := preparePVCDataSourceForProvisioning(ctx, f, testConfig, l.cs, resource.Pvc, resource.Sc, pattern.VolMode, expectedContent)
 
 		// Create 2nd PVC for testing
 		pvc2 := &v1.PersistentVolumeClaim{
@@ -397,7 +397,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 		}
 		resource.Pvc.Spec.DeepCopyInto(&pvc2.Spec)
 		pvc2.Spec.VolumeName = ""
-		pvc2.Spec.DataSource = dataSource
+		pvc2.Spec.DataSourceRef = dataSourceRef
 
 		pvc2, err := l.cs.CoreV1().PersistentVolumeClaims(pvc2.Namespace).Create(context.TODO(), pvc2, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
