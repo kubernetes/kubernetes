@@ -412,19 +412,19 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_labels_constant">None</td></tr>
 <tr class="metric"><td class="metric_name">apiserver_flowcontrol_priority_level_request_utilization</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
-<td class="metric_type" data-type=""></td>
+<td class="metric_type" data-type="timingratiohistogram">TimingRatioHistogram</td>
 <td class="metric_description">Observations, at the end of every nanosecond, of number of requests (as a fraction of the relevant limit) waiting or in any stage of execution (but only initial stage for WATCHes)</td>
 <td class="metric_labels_varying"><div class="metric_label">phase</div><div class="metric_label">priority_level</div></td>
 <td class="metric_labels_constant">None</td></tr>
 <tr class="metric"><td class="metric_name">apiserver_flowcontrol_priority_level_seat_utilization</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
-<td class="metric_type" data-type=""></td>
+<td class="metric_type" data-type="timingratiohistogram">TimingRatioHistogram</td>
 <td class="metric_description">Observations, at the end of every nanosecond, of utilization of seats for any stage of execution (but only initial stage for WATCHes)</td>
 <td class="metric_labels_varying"><div class="metric_label">priority_level</div></td>
 <td class="metric_labels_constant">map[phase:executing]</td></tr>
 <tr class="metric"><td class="metric_name">apiserver_flowcontrol_read_vs_write_current_requests</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
-<td class="metric_type" data-type=""></td>
+<td class="metric_type" data-type="timingratiohistogram">TimingRatioHistogram</td>
 <td class="metric_description">Observations, at the end of every nanosecond, of the number of requests (as a fraction of the relevant limit) waiting or in regular stage of execution</td>
 <td class="metric_labels_varying"><div class="metric_label">phase</div><div class="metric_label">request_kind</div></td>
 <td class="metric_labels_constant">None</td></tr>

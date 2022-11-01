@@ -2775,6 +2775,7 @@
   help: Observations, at the end of every nanosecond, of number of requests (as a
     fraction of the relevant limit) waiting or in any stage of execution (but only
     initial stage for WATCHes)
+  type: TimingRatioHistogram
   stabilityLevel: ALPHA
   labels:
   - phase
@@ -2795,6 +2796,7 @@
   namespace: apiserver
   help: Observations, at the end of every nanosecond, of utilization of seats for
     any stage of execution (but only initial stage for WATCHes)
+  type: TimingRatioHistogram
   stabilityLevel: ALPHA
   labels:
   - priority_level
@@ -2819,6 +2821,7 @@
   namespace: apiserver
   help: Observations, at the end of every nanosecond, of the number of requests (as
     a fraction of the relevant limit) waiting or in regular stage of execution
+  type: TimingRatioHistogram
   stabilityLevel: ALPHA
   labels:
   - phase
