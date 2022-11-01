@@ -146,6 +146,9 @@ func (c *metricDecoder) decodeDesc(ce *ast.CallExpr) (metric, error) {
 	}
 	m.ConstLabels = cLabels
 	sl, err := decodeStabilityLevel(ce.Args[4], "metrics")
+	if err != nil {
+		return *m, newDecodeErrorf(ce, "can't decode stability level")
+	}
 	if sl != nil {
 		m.StabilityLevel = string(*sl)
 	}
@@ -189,7 +192,24 @@ func (c *metricDecoder) decodeString(expr ast.Expr) (*string, error) {
 				return &n, nil
 			}
 		}
-
+	case *ast.SelectorExpr:
+		s, ok := e.X.(*ast.Ident)
+		if !ok {
+			return nil, newDecodeErrorf(e, errExprNotIdent, e.X)
+		}
+		variableExpr, found := c.variables[strings.Join([]string{s.Name, e.Sel.Name}, ".")]
+		if !found {
+			return nil, newDecodeErrorf(e, errBadImportedVariableAttribute)
+		}
+		bl, ok := variableExpr.(*ast.BasicLit)
+		if !ok {
+			return nil, newDecodeErrorf(e, errNonStringAttribute)
+		}
+		value, err := stringValue(bl)
+		if err != nil {
+			return nil, newDecodeErrorf(e, err.Error())
+		}
+		return &value, nil
 	}
 	return nil, fmt.Errorf("can't decode string")
 }
@@ -819,29 +839,11 @@ func (c *metricDecoder) decodeBuildFQNameArguments(fc *ast.CallExpr) (string, st
 	}
 	strArgs := make([]string, len(fc.Args))
 	for i, elt := range fc.Args {
-		switch arg := elt.(type) {
-		case *ast.BasicLit:
-			if arg.Kind != token.STRING {
-				return "", "", "", newDecodeErrorf(fc, "can't decode fq name args")
-			}
-			strArgs[i] = strings.Trim(arg.Value, `"`)
-		case *ast.Ident:
-			s, err := c.decodeString(arg)
-			if err != nil {
-				return "", "", "", newDecodeErrorf(fc, "can't decode fq name args")
-			}
-			strArgs[i] = *s
-		case *ast.SelectorExpr:
-			id, ok := arg.X.(*ast.Ident)
-			expr, ok := c.variables[id.Name+"."+arg.Sel.Name]
-			if ok {
-				s, err := c.decodeString(expr)
-				if err != nil {
-					return "", "", "", newDecodeErrorf(fc, "can't decode fq name args")
-				}
-				strArgs[i] = *s
-			}
+		s, err := c.decodeString(elt)
+		if err != nil || s == nil {
+			return "", "", "", newDecodeErrorf(fc, err.Error())
 		}
+		strArgs[i] = *s
 	}
 	return strArgs[0], strArgs[1], strArgs[2], nil
 }
