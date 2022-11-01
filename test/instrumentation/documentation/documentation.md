@@ -13,7 +13,7 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 
 ### List of Stable Kubernetes Metrics
 
-<table class="table" caption="This is the list of STABLE metrics emitted from core Kubernetes components">
+<table class="table metrics" caption="This is the list of STABLE metrics emitted from core Kubernetes components">
 <thead>
 	<tr>
 		<th class="metric_name">Name</th>
@@ -151,7 +151,7 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 
 ### List of Alpha Kubernetes Metrics
 
-<table class="table" caption="This is the list of ALPHA metrics emitted from core Kubernetes components">
+<table class="table metrics" caption="This is the list of ALPHA metrics emitted from core Kubernetes components">
 <thead>
 	<tr>
 		<th class="metric_name">Name</th>

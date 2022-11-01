@@ -25,4 +25,5 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/test/instrumentation/stability-utils.sh"
 
+kube::update::documentation::list
 kube::update::documentation

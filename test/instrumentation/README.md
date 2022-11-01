@@ -26,8 +26,7 @@ To update the golden test list, you can run:
 ./test/instrumentation/test-update.sh
 ```
 
-To update the list of documented metrics (which you need to run first before 
-upgrading the documentation markdown file).
+To update the list of documented metrics, please run:
 
 ```console
 ./test/instrumentation/update-documentation-metrics.sh
