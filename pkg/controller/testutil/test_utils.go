@@ -152,7 +152,7 @@ func (m *FakeNodeHandler) Get(ctx context.Context, name string, opts metav1.GetO
 			return &nodeCopy, nil
 		}
 	}
-	return nil, nil
+	return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "nodes"}, name)
 }
 
 func (m *FakeNodeHandler) runAsyncCalls() {
