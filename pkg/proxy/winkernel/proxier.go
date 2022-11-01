@@ -783,7 +783,7 @@ func CleanupLeftovers() (encounteredError bool) {
 func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint) {
 	klog.V(3).InfoS("Service cleanup", "serviceInfo", svcInfo)
 	// Skip the svcInfo.policyApplied check to remove all the policies
-	svcInfo.deleteAllHnsLoadBalancerPolicy()
+	svcInfo.deleteLoadBalancerPolicy()
 	// Cleanup Endpoints references
 	for _, ep := range endpoints {
 		epInfo, ok := ep.(*endpointsInfo)
@@ -798,25 +798,46 @@ func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint) {
 	svcInfo.policyApplied = false
 }
 
-func (svcInfo *serviceInfo) deleteAllHnsLoadBalancerPolicy() {
+func (svcInfo *serviceInfo) deleteLoadBalancerPolicy() {
 	// Remove the Hns Policy corresponding to this service
 	hns := svcInfo.hns
-	hns.deleteLoadBalancer(svcInfo.hnsID)
-	svcInfo.hnsID = ""
+	if err := hns.deleteLoadBalancer(svcInfo.hnsID); err != nil {
+		klog.V(1).ErrorS(err, "Error deleting Hns loadbalancer policy resource.", "hnsID", svcInfo.hnsID, "ClusterIP", svcInfo.ClusterIP())
+	} else {
+		// On successful delete, remove hnsId
+		svcInfo.hnsID = ""
+	}
 
-	hns.deleteLoadBalancer(svcInfo.nodePorthnsID)
-	svcInfo.nodePorthnsID = ""
+	if err := hns.deleteLoadBalancer(svcInfo.nodePorthnsID); err != nil {
+		klog.V(1).ErrorS(err, "Error deleting Hns NodePort policy resource.", "hnsID", svcInfo.nodePorthnsID, "NodePort", svcInfo.NodePort())
+	} else {
+		// On successful delete, remove hnsId
+		svcInfo.nodePorthnsID = ""
+	}
 
 	for _, externalIP := range svcInfo.externalIPs {
-		hns.deleteLoadBalancer(externalIP.hnsID)
-		externalIP.hnsID = ""
+		if err := hns.deleteLoadBalancer(externalIP.hnsID); err != nil {
+			klog.V(1).ErrorS(err, "Error deleting Hns ExternalIP policy resource.", "hnsID", externalIP.hnsID, "IP", externalIP.ip)
+		} else {
+			// On successful delete, remove hnsId
+			externalIP.hnsID = ""
+		}
 	}
 	for _, lbIngressIP := range svcInfo.loadBalancerIngressIPs {
-		hns.deleteLoadBalancer(lbIngressIP.hnsID)
-		lbIngressIP.hnsID = ""
+		if err := hns.deleteLoadBalancer(lbIngressIP.hnsID); err != nil {
+			klog.V(1).ErrorS(err, "Error deleting Hns IngressIP policy resource.", "hnsID", lbIngressIP.hnsID, "IP", lbIngressIP.ip)
+		} else {
+			// On successful delete, remove hnsId
+			lbIngressIP.hnsID = ""
+		}
+
 		if lbIngressIP.healthCheckHnsID != "" {
-			hns.deleteLoadBalancer(lbIngressIP.healthCheckHnsID)
-			lbIngressIP.healthCheckHnsID = ""
+			if err := hns.deleteLoadBalancer(lbIngressIP.healthCheckHnsID); err != nil {
+				klog.V(1).ErrorS(err, "Error deleting Hns IngressIP HealthCheck policy resource.", "hnsID", lbIngressIP.healthCheckHnsID, "IP", lbIngressIP.ip)
+			} else {
+				// On successful delete, remove hnsId
+				lbIngressIP.healthCheckHnsID = ""
+			}
 		}
 	}
 }

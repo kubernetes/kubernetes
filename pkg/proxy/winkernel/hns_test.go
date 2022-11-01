@@ -37,6 +37,7 @@ const (
 	gatewayAddress    = "192.168.1.1"
 	epMacAddress      = "00-11-22-33-44-55"
 	epIpAddress       = "192.168.1.3"
+	epIpAddressB      = "192.168.1.4"
 	epIpAddressRemote = "192.168.2.3"
 	epPaAddress       = "10.0.0.3"
 	protocol          = 6
@@ -455,6 +456,80 @@ func mustTestNetwork(t *testing.T) *hcn.HostComputeNetwork {
 		t.Fatal("test network was nil without error")
 	}
 	return network
+}
+
+func TestHashEndpoints(t *testing.T) {
+	Network := mustTestNetwork(t)
+	// Create endpoint A
+	ipConfigA := &hcn.IpConfig{
+		IpAddress: epIpAddress,
+	}
+	endpointASpec := &hcn.HostComputeEndpoint{
+		IpConfigurations: []hcn.IpConfig{*ipConfigA},
+		MacAddress:       epMacAddress,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+	}
+	endpointA, err := Network.CreateEndpoint(endpointASpec)
+	if err != nil {
+		t.Error(err)
+	}
+	endpointInfoA := &endpointsInfo{
+		ip:    endpointA.IpConfigurations[0].IpAddress,
+		hnsID: endpointA.Id,
+	}
+	// Create Endpoint B
+	ipConfigB := &hcn.IpConfig{
+		IpAddress: epIpAddressB,
+	}
+	endpointBSpec := &hcn.HostComputeEndpoint{
+		IpConfigurations: []hcn.IpConfig{*ipConfigB},
+		MacAddress:       epMacAddress,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+	}
+	endpointB, err := Network.CreateEndpoint(endpointBSpec)
+	if err != nil {
+		t.Error(err)
+	}
+	endpointInfoB := &endpointsInfo{
+		ip:    endpointB.IpConfigurations[0].IpAddress,
+		hnsID: endpointB.Id,
+	}
+	endpoints := []endpointsInfo{*endpointInfoA, *endpointInfoB}
+	endpointsReverse := []endpointsInfo{*endpointInfoB, *endpointInfoA}
+	h1, err := hashEndpoints(endpoints)
+	if err != nil {
+		t.Error(err)
+	} else if len(h1) < 1 {
+		t.Error("HashEndpoints failed for endpoints", endpoints)
+	}
+
+	h2, err := hashEndpoints(endpointsReverse)
+	if err != nil {
+		t.Error(err)
+	}
+	if h1 != h2 {
+		t.Errorf("%x does not match %x", h1, h2)
+	}
+
+	// Clean up
+	err = endpointA.Delete()
+	if err != nil {
+		t.Error(err)
+	}
+	err = endpointB.Delete()
+	if err != nil {
+		t.Error(err)
+	}
+	err = Network.Delete()
+	if err != nil {
+		t.Error(err)
+	}
 }
 
 func createTestNetwork() (*hcn.HostComputeNetwork, error) {
