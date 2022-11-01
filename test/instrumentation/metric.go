@@ -26,6 +26,7 @@ const (
 	histogramMetricType  = "Histogram"
 	summaryMetricType    = "Summary"
 	timingRatioHistogram = "TimingRatioHistogram"
+	customType           = "Custom"
 )
 
 type metric struct {
