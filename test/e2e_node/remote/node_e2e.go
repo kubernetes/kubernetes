@@ -87,15 +87,6 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 	return nil
 }
 
-// prependCOSMounterFlag prepends the flag for setting the GCI mounter path to
-// args and returns the result.
-func prependCOSMounterFlag(args, host, workspace string) (string, error) {
-	klog.V(2).Infof("GCI/COS node and GCI/COS mounter both detected, modifying --experimental-mounter-path accordingly")
-	mounterPath := filepath.Join(workspace, "mounter")
-	args = fmt.Sprintf("--kubelet-flags=--experimental-mounter-path=%s ", mounterPath) + args
-	return args, nil
-}
-
 // prependMemcgNotificationFlag prepends the flag for enabling memcg
 // notification to args and returns the result.
 func prependMemcgNotificationFlag(args string) string {
@@ -124,8 +115,7 @@ func osSpecificActions(args, host, workspace string) (string, error) {
 		return args, setKubeletSELinuxLabels(host, workspace)
 	case strings.Contains(output, "gci"), strings.Contains(output, "cos"):
 		args = prependMemcgNotificationFlag(args)
-		args = prependGCPCredentialProviderFlag(args, workspace)
-		return prependCOSMounterFlag(args, host, workspace)
+		return prependGCPCredentialProviderFlag(args, workspace), nil
 	case strings.Contains(output, "ubuntu"):
 		args = prependGCPCredentialProviderFlag(args, workspace)
 		return prependMemcgNotificationFlag(args), nil
