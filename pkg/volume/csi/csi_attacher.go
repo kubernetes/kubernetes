@@ -144,6 +144,11 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 }
 
 func (c *csiAttacher) WaitForAttach(spec *volume.Spec, _ string, pod *v1.Pod, timeout time.Duration) (string, error) {
+	if spec == nil {
+		klog.Error(log("attacher.WaitForAttach missing volume.Spec"))
+		return "", errors.New("missing spec")
+	}
+
 	source, err := getPVSourceFromSpec(spec)
 	if err != nil {
 		return "", errors.New(log("attacher.WaitForAttach failed to extract CSI volume source: %v", err))
