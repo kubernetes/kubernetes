@@ -23,6 +23,9 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+
 	"github.com/stretchr/testify/require"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -133,6 +136,16 @@ type fakeCompiler struct {
 	CompileFuncs         map[string]func(*v1alpha1.ValidatingAdmissionPolicy) (Validator, error)
 	DefinitionMatchFuncs map[string]func(*v1alpha1.ValidatingAdmissionPolicy, admission.Attributes) bool
 	BindingMatchFuncs    map[string]func(*v1alpha1.ValidatingAdmissionPolicyBinding, admission.Attributes) bool
+}
+
+func (f *fakeCompiler) SetExternalKubeInformerFactory(factory informers.SharedInformerFactory) {
+}
+
+func (f *fakeCompiler) ValidateInitialization() error {
+	return nil
+}
+
+func (f *fakeCompiler) SetExternalKubeClientSet(k kubernetes.Interface) {
 }
 
 var _ ValidatorCompiler = &fakeCompiler{}
@@ -260,12 +273,11 @@ func setupTestCommon(t *testing.T, compiler ValidatorCompiler) (plugin admission
 		dynamicClient,
 	).(*celAdmissionController)
 
-	handler, err := NewPlugin()
-	require.NoError(t, err)
+	handler := &celAdmissionPlugin{enabled: true, inspectedFeatureGates: true}
 
 	pluginInitializer := NewPluginInitializer(admissionController)
 	pluginInitializer.Initialize(handler)
-	err = admission.ValidateInitialization(handler)
+	err := admission.ValidateInitialization(handler)
 	require.NoError(t, err)
 
 	go admissionController.Run(testContext.Done())

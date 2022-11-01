@@ -19,6 +19,7 @@ package cel
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/initializer"
 	v1alpha1 "k8s.io/apiserver/pkg/admission/plugin/cel/internal/v1alpha1stub"
 )
 
@@ -29,6 +30,9 @@ type Validator interface {
 // ValidatorCompiler is Dependency Injected into the PolicyDefinition's `Compile`
 // function to assist with converting types and values to/from CEL-typed values.
 type ValidatorCompiler interface {
+	initializer.WantsExternalKubeInformerFactory
+	initializer.WantsExternalKubeClientSet
+	admission.InitializationValidator
 
 	// Matches says whether this policy definition matches the provided admission
 	// resource request
