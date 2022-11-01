@@ -19,7 +19,7 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -32,7 +32,7 @@ import (
 )
 
 var testTypeConverter = func() TypeConverter {
-	data, err := ioutil.ReadFile(filepath.Join("testdata", "swagger.json"))
+	data, err := os.ReadFile(filepath.Join("testdata", "swagger.json"))
 	if err != nil {
 		panic(err)
 	}

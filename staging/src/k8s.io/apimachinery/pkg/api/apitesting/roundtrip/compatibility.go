@@ -333,11 +333,11 @@ func (c *CompatibilityTestOptions) encode(t *testing.T, obj runtime.Object) (jso
 
 func read(dir string, gvk schema.GroupVersionKind, suffix string, usedFiles sets.String) (json, yaml, proto []byte, err error) {
 	jsonFilename := makeName(gvk) + suffix + ".json"
-	actualJSON, jsonErr := ioutil.ReadFile(filepath.Join(dir, jsonFilename))
+	actualJSON, jsonErr := os.ReadFile(filepath.Join(dir, jsonFilename))
 	yamlFilename := makeName(gvk) + suffix + ".yaml"
-	actualYAML, yamlErr := ioutil.ReadFile(filepath.Join(dir, yamlFilename))
+	actualYAML, yamlErr := os.ReadFile(filepath.Join(dir, yamlFilename))
 	protoFilename := makeName(gvk) + suffix + ".pb"
-	actualProto, protoErr := ioutil.ReadFile(filepath.Join(dir, protoFilename))
+	actualProto, protoErr := os.ReadFile(filepath.Join(dir, protoFilename))
 	if usedFiles != nil {
 		usedFiles.Insert(jsonFilename)
 		usedFiles.Insert(yamlFilename)

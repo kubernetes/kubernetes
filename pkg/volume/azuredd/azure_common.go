@@ -179,7 +179,7 @@ func (handler *osIOHandler) Readlink(name string) (string, error) {
 }
 
 func (handler *osIOHandler) ReadFile(filename string) ([]byte, error) {
-	return ioutil.ReadFile(filename)
+	return os.ReadFile(filename)
 }
 
 func getDiskController(host volume.VolumeHost) (DiskController, error) {

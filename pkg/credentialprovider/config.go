@@ -108,7 +108,7 @@ func ReadDockercfgFile(searchPaths []string) (cfg DockerConfig, err error) {
 			continue
 		}
 		klog.V(4).Infof("looking for .dockercfg at %s", absDockerConfigFileLocation)
-		contents, err := ioutil.ReadFile(absDockerConfigFileLocation)
+		contents, err := os.ReadFile(absDockerConfigFileLocation)
 		if os.IsNotExist(err) {
 			continue
 		}
@@ -160,7 +160,7 @@ func ReadDockerConfigJSONFile(searchPaths []string) (cfg DockerConfig, err error
 func ReadSpecificDockerConfigJSONFile(filePath string) (cfg DockerConfig, err error) {
 	var contents []byte
 
-	if contents, err = ioutil.ReadFile(filePath); err != nil {
+	if contents, err = os.ReadFile(filePath); err != nil {
 		return nil, err
 	}
 	return readDockerConfigJSONFileFromBytes(contents)

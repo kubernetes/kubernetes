@@ -137,7 +137,7 @@ func testFixtureFile(t *testing.T, dir, name string, pod *corev1.Pod) string {
 	pod = pod.DeepCopy()
 	pod.Name = name
 
-	expectedYAML, _ := ioutil.ReadFile(filename)
+	expectedYAML, _ := os.ReadFile(filename)
 
 	jsonData, err := runtime.Encode(scheme.Codecs.LegacyCodec(corev1.SchemeGroupVersion), pod)
 	if err != nil {
