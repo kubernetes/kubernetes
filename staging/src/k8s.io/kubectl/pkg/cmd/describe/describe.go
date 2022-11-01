@@ -72,7 +72,7 @@ var (
 // DescribeFlags directly reflect the information that CLI is gathering via flags. They will be converted to Options,
 // which reflect the runtime requirements for the command.
 type DescribeFlags struct {
-	Factory           cmdutil.Factory
+	RESTClientGetter  genericclioptions.RESTClientGetter
 	Selector          string
 	AllNamespaces     bool
 	FilenameOptions   *resource.FilenameOptions
@@ -81,10 +81,10 @@ type DescribeFlags struct {
 }
 
 // NewDescribeFlags returns a default DescribeFlags
-func NewDescribeFlags(f cmdutil.Factory, streams genericclioptions.IOStreams) *DescribeFlags {
+func NewDescribeFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *DescribeFlags {
 	return &DescribeFlags{
-		Factory:         f,
-		FilenameOptions: &resource.FilenameOptions{},
+		RESTClientGetter: restClientGetter,
+		FilenameOptions:  &resource.FilenameOptions{},
 		DescriberSettings: &describe.DescriberSettings{
 			ShowEvents: true,
 			ChunkSize:  cmdutil.DefaultChunkSize,
@@ -103,10 +103,10 @@ func (flags *DescribeFlags) AddFlags(cmd *cobra.Command) {
 }
 
 // ToOptions converts from CLI inputs to runtime input
-func (flags *DescribeFlags) ToOptions(parent string, args []string) (*DescribeOptions, error) {
+func (flags *DescribeFlags) ToOptions(f cmdutil.Factory, parent string, args []string) (*DescribeOptions, error) {
 
 	var err error
-	namespace, enforceNamespace, err := flags.Factory.ToRawKubeConfigLoader().Namespace()
+	namespace, enforceNamespace, err := flags.RESTClientGetter.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return nil, err
 	}
@@ -116,20 +116,20 @@ func (flags *DescribeFlags) ToOptions(parent string, args []string) (*DescribeOp
 	}
 
 	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(flags.FilenameOptions.Filenames, flags.FilenameOptions.Kustomize) {
-		return nil, fmt.Errorf("You must specify the type of resource to describe. %s\n", cmdutil.SuggestAPIResources(parent))
+		return nil, fmt.Errorf("you must specify the type of resource to describe. %s\n", cmdutil.SuggestAPIResources(parent))
 	}
 
 	builderArgs := args
 
 	describer := func(mapping *meta.RESTMapping) (describe.ResourceDescriber, error) {
-		return describe.DescriberFn(flags.Factory, mapping)
+		return describe.DescriberFn(flags.RESTClientGetter, mapping)
 	}
 
 	o := &DescribeOptions{
 		Selector:          flags.Selector,
 		Namespace:         namespace,
 		Describer:         describer,
-		NewBuilder:        flags.Factory.NewBuilder,
+		NewBuilder:        f.NewBuilder,
 		BuilderArgs:       builderArgs,
 		EnforceNamespace:  enforceNamespace,
 		AllNamespaces:     flags.AllNamespaces,
@@ -152,7 +152,7 @@ func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericclioptions.
 		Example:               describeExample,
 		ValidArgsFunction:     completion.ResourceTypeAndNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
-			o, err := flags.ToOptions(parent, args)
+			o, err := flags.ToOptions(f, parent, args)
 			cmdutil.CheckErr(err)
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
