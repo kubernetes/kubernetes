@@ -184,8 +184,8 @@ github.com/cilium/ebpf/internal
 github.com/cilium/ebpf/internal/btf
 github.com/cilium/ebpf/internal/unix
 github.com/cilium/ebpf/link
-# github.com/container-storage-interface/spec v1.6.0
-## explicit; go 1.16
+# github.com/container-storage-interface/spec v1.7.0
+## explicit; go 1.18
 github.com/container-storage-interface/spec/lib/go/csi
 # github.com/containerd/cgroups v1.0.1
 ## explicit; go 1.13
