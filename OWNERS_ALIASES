@@ -235,7 +235,6 @@ aliases:
     - dchen1107
     - derekwaynecarr
     - dims
-    - ehashman
     - feiskyer
     - mtaufen
     - sjenning
@@ -440,7 +439,6 @@ aliases:
     - derekwaynecarr
     - tallclair
     - yujuhong
-    - ehashman
   sig-scalability-approvers:
     - marseel
     - mborsz
