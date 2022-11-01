@@ -285,6 +285,7 @@ var newETCD3Client = func(c storagebackend.TransportConfig) (*clientv3.Client, e
 	}
 
 	cfg := clientv3.Config{
+		AutoSyncInterval:     c.AutoSyncInterval,
 		DialTimeout:          dialTimeout,
 		DialKeepAliveTime:    keepaliveTime,
 		DialKeepAliveTimeout: keepaliveTimeout,

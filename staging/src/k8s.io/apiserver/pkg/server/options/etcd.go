@@ -166,6 +166,11 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&s.StorageConfig.Transport.ServerList, "etcd-servers", s.StorageConfig.Transport.ServerList,
 		"List of etcd servers to connect with (scheme://ip:port), comma separated.")
 
+	fs.DurationVar(&s.StorageConfig.Transport.AutoSyncInterval, "etcd-auto-sync-interval", s.StorageConfig.Transport.AutoSyncInterval, ""+
+		"The interval (in seconds) at which to update etcd endpoints to the latest members as reported by the cluster. "+
+		"Do not enable if the API server has a different network view of the etcd cluster members than the etcd cluster reports "+
+		"(for example, if accessing etcd via a load-balancer). Disabled when set to 0.")
+
 	fs.StringVar(&s.StorageConfig.Prefix, "etcd-prefix", s.StorageConfig.Prefix,
 		"The prefix to prepend to all resource paths in etcd.")
 
