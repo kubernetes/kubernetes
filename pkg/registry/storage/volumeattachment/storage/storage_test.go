@@ -200,3 +200,11 @@ func TestEtcdStatusUpdate(t *testing.T) {
 		t.Errorf("objects differ: %v", diff.ObjectDiff(attachmentOut.Status, attachmentIn.Status))
 	}
 }
+
+func TestSingularName(t *testing.T) {
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := "volumeattachment"
+	registrytest.AssertSingularName(t, storage, expected)
+}

@@ -167,7 +167,17 @@ func (r *REST) ResourceLocation(ctx context.Context, id string) (*url.URL, http.
 	return node.ResourceLocation(r, r.connection, r.proxyTransport, ctx, id)
 }
 
+// Implement ShortNamesProvider
+var _ rest.ShortNamesProvider = &REST{}
+
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"no"}
+}
+
+var _ rest.SingularNameProvider = &REST{}
+
+// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
+func (r *REST) SingularName() string {
+	return "node"
 }

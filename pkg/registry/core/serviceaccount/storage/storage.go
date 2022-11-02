@@ -84,3 +84,10 @@ var _ rest.ShortNamesProvider = &REST{}
 func (r *REST) ShortNames() []string {
 	return []string{"sa"}
 }
+
+var _ rest.SingularNameProvider = &REST{}
+
+// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
+func (r *REST) SingularName() string {
+	return "serviceaccount"
+}

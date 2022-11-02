@@ -67,6 +67,13 @@ func (r *REST) ShortNames() []string {
 	return []string{"pc"}
 }
 
+var _ rest.SingularNameProvider = &REST{}
+
+// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
+func (r *REST) SingularName() string {
+	return "priorityclass"
+}
+
 // Delete ensures that system priority classes are not deleted.
 func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	for _, spc := range schedulingapiv1.SystemPriorityClasses() {

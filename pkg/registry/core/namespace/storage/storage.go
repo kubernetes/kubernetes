@@ -291,6 +291,13 @@ func (r *REST) ShortNames() []string {
 	return []string{"ns"}
 }
 
+var _ rest.SingularNameProvider = &REST{}
+
+// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
+func (r *REST) SingularName() string {
+	return "namespace"
+}
+
 var _ rest.StorageVersionProvider = &REST{}
 
 func (r *REST) StorageVersion() runtime.GroupVersioner {

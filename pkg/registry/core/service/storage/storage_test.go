@@ -279,6 +279,14 @@ func TestGenericCategories(t *testing.T) {
 	registrytest.AssertCategories(t, storage, expected)
 }
 
+func TestSingularName(t *testing.T) {
+	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := "service"
+	registrytest.AssertSingularName(t, storage, expected)
+}
+
 //
 // Tests of internal functions
 //

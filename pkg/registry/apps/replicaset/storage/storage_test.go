@@ -399,6 +399,14 @@ func TestCategories(t *testing.T) {
 	registrytest.AssertCategories(t, storage.ReplicaSet, expected)
 }
 
+func TestSingularName(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.ReplicaSet.Store.DestroyFunc()
+	expected := "replicaset"
+	registrytest.AssertSingularName(t, storage.ReplicaSet, expected)
+}
+
 func TestScalePatchErrors(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)

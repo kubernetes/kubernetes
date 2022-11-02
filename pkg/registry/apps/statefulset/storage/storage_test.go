@@ -199,6 +199,14 @@ func TestCategories(t *testing.T) {
 	registrytest.AssertCategories(t, storage.StatefulSet, expected)
 }
 
+func TestSingularName(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.StatefulSet.Store.DestroyFunc()
+	expected := "statefulset"
+	registrytest.AssertSingularName(t, storage.StatefulSet, expected)
+}
+
 func TestShortNames(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)

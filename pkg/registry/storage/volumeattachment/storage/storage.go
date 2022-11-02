@@ -73,6 +73,13 @@ func NewStorage(optsGetter generic.RESTOptionsGetter) (*VolumeAttachmentStorage,
 	}, nil
 }
 
+var _ rest.SingularNameProvider = &REST{}
+
+// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
+func (r *REST) SingularName() string {
+	return "volumeattachment"
+}
+
 // StatusREST implements the REST endpoint for changing the status of a VolumeAttachment
 type StatusREST struct {
 	store *genericregistry.Store

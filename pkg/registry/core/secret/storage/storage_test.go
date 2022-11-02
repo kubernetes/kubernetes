@@ -143,3 +143,11 @@ func TestWatch(t *testing.T) {
 		},
 	)
 }
+
+func TestSingularName(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := "secret"
+	registrytest.AssertSingularName(t, storage, expected)
+}

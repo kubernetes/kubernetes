@@ -51,3 +51,10 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 
 	return &REST{store}, nil
 }
+
+var _ rest.SingularNameProvider = &REST{}
+
+// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
+func (r *REST) SingularName() string {
+	return "role"
+}

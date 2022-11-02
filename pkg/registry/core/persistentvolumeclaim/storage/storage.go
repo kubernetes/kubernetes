@@ -77,6 +77,13 @@ func (r *REST) ShortNames() []string {
 	return []string{"pvc"}
 }
 
+var _ rest.SingularNameProvider = &REST{}
+
+// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
+func (r *REST) SingularName() string {
+	return "persistentvolumeclaim"
+}
+
 // defaultOnRead sets interlinked fields that were not previously set on read.
 // We can't do this in the normal defaulting path because that same logic
 // applies on Get, Create, and Update, but we need to distinguish between them.

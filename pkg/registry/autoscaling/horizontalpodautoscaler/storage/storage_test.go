@@ -176,6 +176,14 @@ func TestCategories(t *testing.T) {
 	registrytest.AssertCategories(t, storage, expected)
 }
 
+func TestSingularName(t *testing.T) {
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := "horizontalpodautoscaler"
+	registrytest.AssertSingularName(t, storage, expected)
+}
+
 func TestUpdateStatus(t *testing.T) {
 	storage, statusStorage, server := newStorage(t)
 	defer server.Terminate(t)

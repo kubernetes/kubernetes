@@ -73,6 +73,13 @@ func (r *REST) ShortNames() []string {
 	return []string{"pv"}
 }
 
+var _ rest.SingularNameProvider = &REST{}
+
+// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
+func (r *REST) SingularName() string {
+	return "persistentvolume"
+}
+
 // StatusREST implements the REST endpoint for changing the status of a persistentvolume.
 type StatusREST struct {
 	store *genericregistry.Store

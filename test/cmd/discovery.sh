@@ -55,7 +55,7 @@ run_assert_short_name_tests() {
   output_message=$(kubectl get --raw=/api/v1)
 
   ## test if a short name is exported during discovery
-  kube::test::if_has_string "${output_message}" '{"name":"configmaps","singularName":"","namespaced":true,"kind":"ConfigMap","verbs":\["create","delete","deletecollection","get","list","patch","update","watch"\],"shortNames":\["cm"\],"storageVersionHash":'
+  kube::test::if_has_string "${output_message}" '{"name":"configmaps","singularName":"configmap","namespaced":true,"kind":"ConfigMap","verbs":\["create","delete","deletecollection","get","list","patch","update","watch"\],"shortNames":\["cm"\],"storageVersionHash":'
 
   # check that there is no pod with the name test-crd-example
   output_message=$(kubectl get pod)

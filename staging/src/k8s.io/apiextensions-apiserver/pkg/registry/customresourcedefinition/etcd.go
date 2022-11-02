@@ -79,6 +79,13 @@ func (r *REST) Categories() []string {
 	return []string{"api-extensions"}
 }
 
+var _ rest.SingularNameProvider = &REST{}
+
+// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
+func (r *REST) SingularName() string {
+	return "customresourcedefinition"
+}
+
 // Delete adds the CRD finalizer to the list
 func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	obj, err := r.Get(ctx, name, &metav1.GetOptions{})

@@ -208,3 +208,11 @@ func TestShortNames(t *testing.T) {
 	expected := []string{"pv"}
 	registrytest.AssertShortNames(t, storage, expected)
 }
+
+func TestSingularName(t *testing.T) {
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := "persistentvolume"
+	registrytest.AssertSingularName(t, storage, expected)
+}

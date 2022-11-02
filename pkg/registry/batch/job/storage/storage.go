@@ -96,6 +96,13 @@ func (r *REST) Categories() []string {
 	return []string{"all"}
 }
 
+var _ rest.SingularNameProvider = &REST{}
+
+// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
+func (r *REST) SingularName() string {
+	return "job"
+}
+
 func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	//nolint:staticcheck // SA1019 backwards compatibility
 	//nolint: staticcheck

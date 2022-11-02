@@ -153,6 +153,13 @@ func (r *REST) Categories() []string {
 	return []string{"all"}
 }
 
+var _ rest.SingularNameProvider = &REST{}
+
+// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
+func (r *REST) SingularName() string {
+	return "service"
+}
+
 // Destroy cleans up everything on shutdown.
 func (r *REST) Destroy() {
 	r.Store.Destroy()

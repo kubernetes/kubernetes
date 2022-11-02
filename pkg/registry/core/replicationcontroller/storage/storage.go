@@ -122,6 +122,13 @@ func (r *REST) Categories() []string {
 	return []string{"all"}
 }
 
+var _ rest.SingularNameProvider = &REST{}
+
+// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
+func (r *REST) SingularName() string {
+	return "replicationcontroller"
+}
+
 // StatusREST implements the REST endpoint for changing the status of a replication controller
 type StatusREST struct {
 	store *genericregistry.Store

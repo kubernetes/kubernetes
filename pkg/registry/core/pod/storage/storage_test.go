@@ -1274,3 +1274,11 @@ func TestCategories(t *testing.T) {
 	expected := []string{"all"}
 	registrytest.AssertCategories(t, storage, expected)
 }
+
+func TestSingularName(t *testing.T) {
+	storage, _, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	expected := "pod"
+	registrytest.AssertSingularName(t, storage, expected)
+}
