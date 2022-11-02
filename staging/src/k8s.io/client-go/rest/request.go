@@ -1288,6 +1288,14 @@ func (r Result) StatusCode(statusCode *int) Result {
 	return r
 }
 
+// ContentType returns the "Content-Type" response header into the passed
+// string, returning the Result for possible chaining. (Only valid if no
+// error code was returned.)
+func (r Result) ContentType(contentType *string) Result {
+	*contentType = r.contentType
+	return r
+}
+
 // Into stores the result into obj, if possible. If obj is nil it is ignored.
 // If the returned object is of type Status and has .Status != StatusSuccess, the
 // additional information in Status will be used to enrich the error.
