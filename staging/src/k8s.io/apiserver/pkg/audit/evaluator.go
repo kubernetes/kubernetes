@@ -25,6 +25,9 @@ import (
 // a given request. PolicyRuleEvaluator evaluates the audit policy against the
 // authorizer attributes and returns a RequestAuditConfig that applies to the request.
 type RequestAuditConfig struct {
+	// Level at which the request is being audited at
+	Level audit.Level
+
 	// OmitStages is the stages that need to be omitted from being audited.
 	OmitStages []audit.Stage
 
@@ -33,21 +36,10 @@ type RequestAuditConfig struct {
 	OmitManagedFields bool
 }
 
-// RequestAuditConfigWithLevel includes Level at which the request is being audited.
-// PolicyRuleEvaluator evaluates the audit configuration for a request
-// against the authorizer attributes and returns an RequestAuditConfigWithLevel
-// that applies to the request.
-type RequestAuditConfigWithLevel struct {
-	RequestAuditConfig
-
-	// Level at which the request is being audited at
-	Level audit.Level
-}
-
 // PolicyRuleEvaluator exposes methods for evaluating the policy rules.
 type PolicyRuleEvaluator interface {
 	// EvaluatePolicyRule evaluates the audit policy of the apiserver against
 	// the given authorizer attributes and returns the audit configuration that
 	// is applicable to the given equest.
-	EvaluatePolicyRule(authorizer.Attributes) RequestAuditConfigWithLevel
+	EvaluatePolicyRule(authorizer.Attributes) RequestAuditConfig
 }

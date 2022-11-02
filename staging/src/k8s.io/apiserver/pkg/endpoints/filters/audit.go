@@ -133,10 +133,10 @@ func evaluatePolicyAndCreateAuditEvent(req *http.Request, policy audit.PolicyRul
 		return ac, fmt.Errorf("failed to GetAuthorizerAttributes: %v", err)
 	}
 
-	ls := policy.EvaluatePolicyRule(attribs)
-	audit.ObservePolicyLevel(ctx, ls.Level)
-	ac.RequestAuditConfig = ls.RequestAuditConfig
-	if ls.Level == auditinternal.LevelNone {
+	rac := policy.EvaluatePolicyRule(attribs)
+	audit.ObservePolicyLevel(ctx, rac.Level)
+	ac.RequestAuditConfig = rac
+	if rac.Level == auditinternal.LevelNone {
 		// Don't audit.
 		return ac, nil
 	}
@@ -145,7 +145,7 @@ func evaluatePolicyAndCreateAuditEvent(req *http.Request, policy audit.PolicyRul
 	if !ok {
 		requestReceivedTimestamp = time.Now()
 	}
-	ev, err := audit.NewEventFromRequest(req, requestReceivedTimestamp, ls.Level, attribs)
+	ev, err := audit.NewEventFromRequest(req, requestReceivedTimestamp, rac.Level, attribs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to complete audit event from request: %v", err)
 	}
