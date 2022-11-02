@@ -38,9 +38,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/events"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
@@ -163,6 +165,7 @@ type Proxier struct {
 	// updating iptables with some partial data after kube-proxy restart.
 	endpointSlicesSynced bool
 	servicesSynced       bool
+	needFullSync         bool
 	initialized          int32
 	syncRunner           *async.BoundedFrequencyRunner // governs calls to syncProxyRules
 	syncPeriod           time.Duration
@@ -298,7 +301,7 @@ func NewProxier(ipt utiliptables.Interface,
 	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, time.Hour, burstSyncs)
 
 	go ipt.Monitor(kubeProxyCanaryChain, []utiliptables.Table{utiliptables.TableMangle, utiliptables.TableNAT, utiliptables.TableFilter},
-		proxier.syncProxyRules, syncPeriod, wait.NeverStop)
+		proxier.forceSyncProxyRules, syncPeriod, wait.NeverStop)
 
 	if ipt.HasRandomFully() {
 		klog.V(2).InfoS("Iptables supports --random-fully", "ipFamily", ipt.Protocol())
@@ -539,7 +542,7 @@ func (proxier *Proxier) OnServiceSynced() {
 	proxier.mu.Unlock()
 
 	// Sync unconditionally - this is called once per lifetime.
-	proxier.syncProxyRules()
+	proxier.forceSyncProxyRules()
 }
 
 // OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
@@ -575,7 +578,7 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 	proxier.mu.Unlock()
 
 	// Sync unconditionally - this is called once per lifetime.
-	proxier.syncProxyRules()
+	proxier.forceSyncProxyRules()
 }
 
 // OnNodeAdd is called whenever creation of new node object
@@ -596,6 +599,7 @@ func (proxier *Proxier) OnNodeAdd(node *v1.Node) {
 	for k, v := range node.Labels {
 		proxier.nodeLabels[k] = v
 	}
+	proxier.needFullSync = true
 	proxier.mu.Unlock()
 	klog.V(4).InfoS("Updated proxier node labels", "labels", node.Labels)
 
@@ -620,6 +624,7 @@ func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
 	for k, v := range node.Labels {
 		proxier.nodeLabels[k] = v
 	}
+	proxier.needFullSync = true
 	proxier.mu.Unlock()
 	klog.V(4).InfoS("Updated proxier node labels", "labels", node.Labels)
 
@@ -636,6 +641,7 @@ func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
 	}
 	proxier.mu.Lock()
 	proxier.nodeLabels = nil
+	proxier.needFullSync = true
 	proxier.mu.Unlock()
 
 	proxier.Sync()
@@ -769,6 +775,17 @@ func (proxier *Proxier) appendServiceCommentLocked(args []string, svcName string
 	return append(args, "-m", "comment", "--comment", svcName)
 }
 
+// Called by the iptables.Monitor, and in response to topology changes; this calls
+// syncProxyRules() and tells it to resync all services, regardless of whether the
+// Service or Endpoints/EndpointSlice objects themselves have changed
+func (proxier *Proxier) forceSyncProxyRules() {
+	proxier.mu.Lock()
+	proxier.needFullSync = true
+	proxier.mu.Unlock()
+
+	proxier.syncProxyRules()
+}
+
 // This is where all of the iptables-save/restore calls happen.
 // The only other iptables rules are those that are setup in iptablesInit()
 // This assumes proxier.mu is NOT held
@@ -789,9 +806,12 @@ func (proxier *Proxier) syncProxyRules() {
 		klog.V(2).InfoS("SyncProxyRules complete", "elapsed", time.Since(start))
 	}()
 
-	// We assume that if this was called, we really want to sync them,
-	// even if nothing changed in the meantime. In other words, callers are
-	// responsible for detecting no-op changes and not calling this function.
+	tryPartialSync := !proxier.needFullSync && utilfeature.DefaultFeatureGate.Enabled(features.MinimizeIPTablesRestore)
+	var serviceChanged, endpointsChanged sets.String
+	if tryPartialSync {
+		serviceChanged = proxier.serviceChanges.PendingChanges()
+		endpointsChanged = proxier.endpointsChanges.PendingChanges()
+	}
 	serviceUpdateResult := proxier.serviceMap.Update(proxier.serviceChanges)
 	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
 
@@ -826,6 +846,13 @@ func (proxier *Proxier) syncProxyRules() {
 		if !success {
 			klog.InfoS("Sync failed", "retryingTime", proxier.syncPeriod)
 			proxier.syncRunner.RetryAfter(proxier.syncPeriod)
+			if tryPartialSync {
+				metrics.IptablesPartialRestoreFailuresTotal.Inc()
+			}
+			// proxier.serviceChanges and proxier.endpointChanges have already
+			// been flushed, so we've lost the state needed to be able to do
+			// a partial sync.
+			proxier.needFullSync = true
 		}
 	}()
 
@@ -1184,6 +1211,13 @@ func (proxier *Proxier) syncProxyRules() {
 			)
 		}
 
+		// If the SVC/SVL/EXT/FW/SEP chains have not changed since the last sync
+		// then we can omit them from the restore input. (We have already marked
+		// them in activeNATChains, so they won't get deleted.)
+		if tryPartialSync && !serviceChanged.Has(svcName.NamespacedName.String()) && !endpointsChanged.Has(svcName.NamespacedName.String()) {
+			continue
+		}
+
 		// Set up internal traffic handling.
 		if hasInternalEndpoints {
 			args = append(args[:0],
@@ -1479,6 +1513,7 @@ func (proxier *Proxier) syncProxyRules() {
 		return
 	}
 	success = true
+	proxier.needFullSync = false
 
 	for name, lastChangeTriggerTimes := range endpointUpdateResult.LastChangeTriggerTimes {
 		for _, lastChangeTriggerTime := range lastChangeTriggerTimes {

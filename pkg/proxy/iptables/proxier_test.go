@@ -1343,8 +1343,10 @@ func getLine() int {
 }
 
 // assertIPTablesRulesEqual asserts that the generated rules in result match the rules in
-// expected, ignoring irrelevant ordering differences.
-func assertIPTablesRulesEqual(t *testing.T, line int, expected, result string) {
+// expected, ignoring irrelevant ordering differences. By default this also checks the
+// rules for consistency (eg, no jumps to chains that aren't defined), but that can be
+// disabled by passing false for checkConsistency if you are passing a partial set of rules.
+func assertIPTablesRulesEqual(t *testing.T, line int, checkConsistency bool, expected, result string) {
 	expected = strings.TrimLeft(expected, " \t\n")
 
 	result, err := sortIPTablesRules(strings.TrimLeft(result, " \t\n"))
@@ -1360,9 +1362,11 @@ func assertIPTablesRulesEqual(t *testing.T, line int, expected, result string) {
 		t.Errorf("rules do not match%s:\ndiff:\n%s\nfull result:\n```\n%s```", lineStr, diff, result)
 	}
 
-	err = checkIPTablesRuleJumps(expected)
-	if err != nil {
-		t.Fatalf("%s", err)
+	if checkConsistency {
+		err = checkIPTablesRuleJumps(expected)
+		if err != nil {
+			t.Fatalf("%s%s", err, lineStr)
+		}
 	}
 }
 
@@ -2037,7 +2041,7 @@ func TestOverallIPTablesRulesWithMultipleServices(t *testing.T) {
 		COMMIT
 		`)
 
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	natRulesMetric, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)))
 	if err != nil {
@@ -2099,7 +2103,7 @@ func TestClusterIPReject(t *testing.T) {
 		COMMIT
 		`)
 
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
 		{
@@ -2182,7 +2186,7 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.180.0.1:80" -j KUBE-SEP-SXIVWICOYRO3J4NJ
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
 		{
@@ -2303,7 +2307,7 @@ func TestLoadBalancer(t *testing.T) {
 		COMMIT
 		`)
 
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
 		{
@@ -2491,7 +2495,7 @@ func TestNodePort(t *testing.T) {
 		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.180.0.1:80" -j KUBE-SEP-SXIVWICOYRO3J4NJ
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
 		{
@@ -2586,7 +2590,7 @@ func TestHealthCheckNodePort(t *testing.T) {
 		COMMIT
 		`)
 
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
 		{
@@ -2648,7 +2652,7 @@ func TestMasqueradeRule(t *testing.T) {
 		} else {
 			expected = fmt.Sprintf(expectedFmt, "")
 		}
-		assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+		assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 	}
 }
 
@@ -2704,7 +2708,7 @@ func TestExternalIPsReject(t *testing.T) {
 		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
 		{
@@ -2813,7 +2817,7 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 		-A KUBE-SVL-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.180.2.1:80" -j KUBE-SEP-ZX7GRIZKSNUQ3LAJ
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
 		{
@@ -2921,7 +2925,7 @@ func TestNonLocalExternalIPs(t *testing.T) {
 		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.180.2.1:80" -j KUBE-SEP-ZX7GRIZKSNUQ3LAJ
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
 		{
@@ -2994,7 +2998,7 @@ func TestNodePortReject(t *testing.T) {
 		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
 		{
@@ -3086,7 +3090,7 @@ func TestLoadBalancerReject(t *testing.T) {
 		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
 		{
@@ -3219,7 +3223,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 		-A KUBE-SVL-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.180.2.1:80" -j KUBE-SEP-ZX7GRIZKSNUQ3LAJ
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, getLine(), ipt, testNodeIP, []packetFlowTest{
 		{
@@ -3395,7 +3399,7 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 
 	fp.syncProxyRules()
 
-	assertIPTablesRulesEqual(t, line, expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, line, true, expected, fp.iptablesData.String())
 
 	runPacketFlowTests(t, line, ipt, testNodeIP, []packetFlowTest{
 		{
@@ -4742,7 +4746,7 @@ func TestEndpointSliceE2E(t *testing.T) {
 
 	fp.OnEndpointSliceAdd(endpointSlice)
 	fp.syncProxyRules()
-	assertIPTablesRulesEqual(t, getLine(), expectedIPTablesWithSlice, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expectedIPTablesWithSlice, fp.iptablesData.String())
 
 	fp.OnEndpointSliceDelete(endpointSlice)
 	fp.syncProxyRules()
@@ -5345,7 +5349,7 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 
 			fp.OnEndpointSliceAdd(endpointSlice)
 			fp.syncProxyRules()
-			assertIPTablesRulesEqual(t, tc.line, tc.expectedIPTablesWithSlice, fp.iptablesData.String())
+			assertIPTablesRulesEqual(t, tc.line, true, tc.expectedIPTablesWithSlice, fp.iptablesData.String())
 			runPacketFlowTests(t, tc.line, ipt, testNodeIP, tc.flowTests)
 
 			fp.OnEndpointSliceDelete(endpointSlice)
@@ -6122,14 +6126,14 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 
 			fp.OnEndpointSliceAdd(testcase.endpointslice)
 			fp.syncProxyRules()
-			assertIPTablesRulesEqual(t, testcase.line, testcase.expectedIPTables, fp.iptablesData.String())
+			assertIPTablesRulesEqual(t, testcase.line, true, testcase.expectedIPTables, fp.iptablesData.String())
 			runPacketFlowTests(t, testcase.line, ipt, testNodeIP, testcase.flowTests)
 
 			fp.OnEndpointSliceDelete(testcase.endpointslice)
 			fp.syncProxyRules()
 			if testcase.noUsableEndpoints {
 				// Deleting the EndpointSlice should have had no effect
-				assertIPTablesRulesEqual(t, testcase.line, testcase.expectedIPTables, fp.iptablesData.String())
+				assertIPTablesRulesEqual(t, testcase.line, true, testcase.expectedIPTables, fp.iptablesData.String())
 			} else {
 				assertIPTablesRulesNotEqual(t, testcase.line, testcase.expectedIPTables, fp.iptablesData.String())
 			}
@@ -6868,14 +6872,14 @@ func TestEndpointSliceWithTerminatingEndpointsTrafficPolicyCluster(t *testing.T)
 
 			fp.OnEndpointSliceAdd(testcase.endpointslice)
 			fp.syncProxyRules()
-			assertIPTablesRulesEqual(t, testcase.line, testcase.expectedIPTables, fp.iptablesData.String())
+			assertIPTablesRulesEqual(t, testcase.line, true, testcase.expectedIPTables, fp.iptablesData.String())
 			runPacketFlowTests(t, testcase.line, ipt, testNodeIP, testcase.flowTests)
 
 			fp.OnEndpointSliceDelete(testcase.endpointslice)
 			fp.syncProxyRules()
 			if testcase.noUsableEndpoints {
 				// Deleting the EndpointSlice should have had no effect
-				assertIPTablesRulesEqual(t, testcase.line, testcase.expectedIPTables, fp.iptablesData.String())
+				assertIPTablesRulesEqual(t, testcase.line, true, testcase.expectedIPTables, fp.iptablesData.String())
 			} else {
 				assertIPTablesRulesNotEqual(t, testcase.line, testcase.expectedIPTables, fp.iptablesData.String())
 			}
@@ -7487,6 +7491,8 @@ func countEndpointsAndComments(iptablesData string, matchEndpoint string) (strin
 }
 
 func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MinimizeIPTablesRestore, true)()
+
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	fp.masqueradeAll = true
@@ -7578,6 +7584,22 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 		}}
 	}))
 	fp.syncProxyRules()
+
+	firstEndpoint, numEndpoints, numComments = countEndpointsAndComments(fp.iptablesData.String(), "203.0.113.4")
+	assert.Equal(t, "-A KUBE-SEP-RUVVH7YV3PHQBDOS -m tcp -p tcp -j DNAT --to-destination 203.0.113.4:8081", firstEndpoint)
+	// syncProxyRules will only have output the endpoints for svc3, since the others
+	// didn't change (and syncProxyRules doesn't automatically do a full resync when you
+	// cross the largeClusterEndpointsThreshold).
+	if numEndpoints != 3 {
+		t.Errorf("Found wrong number of endpoints on partial resync: expected %d, got %d", 3, numEndpoints)
+	}
+	if numComments != 0 {
+		t.Errorf("numComments (%d) != 0 after partial resync when numEndpoints (%d) > threshold (%d)", numComments, expectedEndpoints+3, largeClusterEndpointsThreshold)
+	}
+
+	// Now force a full resync and confirm that it rewrites the older services with
+	// no comments as well.
+	fp.forceSyncProxyRules()
 	expectedEndpoints += 3
 
 	firstEndpoint, numEndpoints, numComments = countEndpointsAndComments(fp.iptablesData.String(), "10.0.0.0")
@@ -7614,12 +7636,12 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 		}}
 	}))
 	fp.syncProxyRules()
-	expectedEndpoints += 1
 
 	svc4Endpoint, numEndpoints, _ := countEndpointsAndComments(fp.iptablesData.String(), "10.4.0.1")
 	assert.Equal(t, "-A KUBE-SEP-SU5STNODRYEWJAUF -m tcp -p tcp -j DNAT --to-destination 10.4.0.1:8082", svc4Endpoint, "svc4 endpoint was not created")
-	if numEndpoints != expectedEndpoints {
-		t.Errorf("Found wrong number of endpoints after svc4 creation: expected %d, got %d", expectedEndpoints, numEndpoints)
+	// should only sync svc4
+	if numEndpoints != 1 {
+		t.Errorf("Found wrong number of endpoints after svc4 creation: expected %d, got %d", 1, numEndpoints)
 	}
 
 	// In large-cluster mode, if we delete a service, it will not re-sync its chains
@@ -7627,12 +7649,12 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 	fp.lastIPTablesCleanup = time.Now()
 	fp.OnServiceDelete(svc4)
 	fp.syncProxyRules()
-	expectedEndpoints -= 1
 
 	svc4Endpoint, numEndpoints, _ = countEndpointsAndComments(fp.iptablesData.String(), "10.4.0.1")
 	assert.Equal(t, "", svc4Endpoint, "svc4 endpoint was still created!")
-	if numEndpoints != expectedEndpoints {
-		t.Errorf("Found wrong number of endpoints after service deletion: expected %d, got %d", expectedEndpoints, numEndpoints)
+	// should only sync svc4, and shouldn't output its endpoints
+	if numEndpoints != 0 {
+		t.Errorf("Found wrong number of endpoints after service deletion: expected %d, got %d", 0, numEndpoints)
 	}
 	assert.NotContains(t, fp.iptablesData.String(), "-X ", "iptables data unexpectedly contains chain deletions")
 
@@ -7642,17 +7664,27 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 
 	svc4Endpoint, numEndpoints, _ = countEndpointsAndComments(fp.iptablesData.String(), "10.4.0.1")
 	assert.Equal(t, "", svc4Endpoint, "svc4 endpoint was still created!")
-	if numEndpoints != expectedEndpoints {
-		t.Errorf("Found wrong number of endpoints after delayed resync: expected %d, got %d", expectedEndpoints, numEndpoints)
+	if numEndpoints != 0 {
+		t.Errorf("Found wrong number of endpoints after delayed resync: expected %d, got %d", 0, numEndpoints)
 	}
 	assert.Contains(t, fp.iptablesData.String(), "-X KUBE-SVC-EBDQOQU5SJFXRIL3", "iptables data does not contain chain deletion")
 	assert.Contains(t, fp.iptablesData.String(), "-X KUBE-SEP-SU5STNODRYEWJAUF", "iptables data does not contain endpoint deletions")
+
+	// force a full sync and count
+	fp.forceSyncProxyRules()
+	_, numEndpoints, _ = countEndpointsAndComments(fp.iptablesData.String(), "10.0.0.0")
+	if numEndpoints != expectedEndpoints {
+		t.Errorf("Found wrong number of endpoints: expected %d, got %d", expectedEndpoints, numEndpoints)
+	}
 }
 
 // Test calling syncProxyRules() multiple times with various changes
 func TestSyncProxyRulesRepeated(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MinimizeIPTablesRestore, true)()
+
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
+	metrics.RegisterMetrics()
 
 	// Create initial state
 	var svc2 *v1.Service
@@ -7744,9 +7776,10 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.0.1.1:80" -j KUBE-SEP-SNQ3ZNILQDEJNDQO
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
-	// Add a new service and its endpoints
+	// Add a new service and its endpoints. (This will only sync the SVC and SEP rules
+	// for the new service, not the existing ones.)
 	makeServiceMap(fp,
 		makeTestService("ns3", "svc3", func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeClusterIP
@@ -7792,11 +7825,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-MARK-MASQ - [0:0]
 		:KUBE-POSTROUTING - [0:0]
 		:KUBE-SEP-BSWRHOQ77KEXZLNL - [0:0]
-		:KUBE-SEP-SNQ3ZNILQDEJNDQO - [0:0]
-		:KUBE-SEP-UHEGFW77JX3KXTOV - [0:0]
-		:KUBE-SVC-2VJB64SDSIJUP5T6 - [0:0]
 		:KUBE-SVC-X27LE4BHSL4DOUIK - [0:0]
-		:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
 		-A KUBE-SERVICES -m comment --comment "ns2/svc2:p8080 cluster IP" -m tcp -p tcp -d 172.30.0.42 --dport 8080 -j KUBE-SVC-2VJB64SDSIJUP5T6
 		-A KUBE-SERVICES -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 -j KUBE-SVC-X27LE4BHSL4DOUIK
@@ -7807,21 +7836,13 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 		-A KUBE-SEP-BSWRHOQ77KEXZLNL -m comment --comment ns3/svc3:p80 -s 10.0.3.1 -j KUBE-MARK-MASQ
 		-A KUBE-SEP-BSWRHOQ77KEXZLNL -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.3.1:80
-		-A KUBE-SEP-SNQ3ZNILQDEJNDQO -m comment --comment ns1/svc1:p80 -s 10.0.1.1 -j KUBE-MARK-MASQ
-		-A KUBE-SEP-SNQ3ZNILQDEJNDQO -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
-		-A KUBE-SEP-UHEGFW77JX3KXTOV -m comment --comment ns2/svc2:p8080 -s 10.0.2.1 -j KUBE-MARK-MASQ
-		-A KUBE-SEP-UHEGFW77JX3KXTOV -m comment --comment ns2/svc2:p8080 -m tcp -p tcp -j DNAT --to-destination 10.0.2.1:8080
-		-A KUBE-SVC-2VJB64SDSIJUP5T6 -m comment --comment "ns2/svc2:p8080 cluster IP" -m tcp -p tcp -d 172.30.0.42 --dport 8080 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
-		-A KUBE-SVC-2VJB64SDSIJUP5T6 -m comment --comment "ns2/svc2:p8080 -> 10.0.2.1:8080" -j KUBE-SEP-UHEGFW77JX3KXTOV
 		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
 		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 -> 10.0.3.1:80" -j KUBE-SEP-BSWRHOQ77KEXZLNL
-		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
-		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.0.1.1:80" -j KUBE-SEP-SNQ3ZNILQDEJNDQO
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
-	// Delete a service
+	// Delete a service. (Won't update the other services.)
 	fp.OnServiceDelete(svc2)
 	fp.syncProxyRules()
 
@@ -7841,12 +7862,8 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-MARK-MASQ - [0:0]
 		:KUBE-POSTROUTING - [0:0]
-		:KUBE-SEP-BSWRHOQ77KEXZLNL - [0:0]
-		:KUBE-SEP-SNQ3ZNILQDEJNDQO - [0:0]
 		:KUBE-SEP-UHEGFW77JX3KXTOV - [0:0]
 		:KUBE-SVC-2VJB64SDSIJUP5T6 - [0:0]
-		:KUBE-SVC-X27LE4BHSL4DOUIK - [0:0]
-		:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
 		-A KUBE-SERVICES -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 -j KUBE-SVC-X27LE4BHSL4DOUIK
 		-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
@@ -7854,23 +7871,18 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
-		-A KUBE-SEP-BSWRHOQ77KEXZLNL -m comment --comment ns3/svc3:p80 -s 10.0.3.1 -j KUBE-MARK-MASQ
-		-A KUBE-SEP-BSWRHOQ77KEXZLNL -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.3.1:80
-		-A KUBE-SEP-SNQ3ZNILQDEJNDQO -m comment --comment ns1/svc1:p80 -s 10.0.1.1 -j KUBE-MARK-MASQ
-		-A KUBE-SEP-SNQ3ZNILQDEJNDQO -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
-		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
-		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 -> 10.0.3.1:80" -j KUBE-SEP-BSWRHOQ77KEXZLNL
-		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
-		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.0.1.1:80" -j KUBE-SEP-SNQ3ZNILQDEJNDQO
 		-X KUBE-SEP-UHEGFW77JX3KXTOV
 		-X KUBE-SVC-2VJB64SDSIJUP5T6
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
-	// Add a service, sync, then add its endpoints
+	// Add a service, sync, then add its endpoints. (The first sync will be a no-op other
+	// than adding the REJECT rule. The second sync will create the new service.)
+	var svc4 *v1.Service
 	makeServiceMap(fp,
 		makeTestService("ns4", "svc4", func(svc *v1.Service) {
+			svc4 = svc
 			svc.Spec.Type = v1.ServiceTypeClusterIP
 			svc.Spec.ClusterIP = "172.30.0.44"
 			svc.Spec.Ports = []v1.ServicePort{{
@@ -7898,10 +7910,6 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-MARK-MASQ - [0:0]
 		:KUBE-POSTROUTING - [0:0]
-		:KUBE-SEP-BSWRHOQ77KEXZLNL - [0:0]
-		:KUBE-SEP-SNQ3ZNILQDEJNDQO - [0:0]
-		:KUBE-SVC-X27LE4BHSL4DOUIK - [0:0]
-		:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
 		-A KUBE-SERVICES -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 -j KUBE-SVC-X27LE4BHSL4DOUIK
 		-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
@@ -7909,17 +7917,9 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
-		-A KUBE-SEP-BSWRHOQ77KEXZLNL -m comment --comment ns3/svc3:p80 -s 10.0.3.1 -j KUBE-MARK-MASQ
-		-A KUBE-SEP-BSWRHOQ77KEXZLNL -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.3.1:80
-		-A KUBE-SEP-SNQ3ZNILQDEJNDQO -m comment --comment ns1/svc1:p80 -s 10.0.1.1 -j KUBE-MARK-MASQ
-		-A KUBE-SEP-SNQ3ZNILQDEJNDQO -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
-		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
-		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 -> 10.0.3.1:80" -j KUBE-SEP-BSWRHOQ77KEXZLNL
-		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
-		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.0.1.1:80" -j KUBE-SEP-SNQ3ZNILQDEJNDQO
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice("ns4", "svc4", 1, func(eps *discovery.EndpointSlice) {
@@ -7952,11 +7952,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-MARK-MASQ - [0:0]
 		:KUBE-POSTROUTING - [0:0]
 		:KUBE-SEP-AYCN5HPXMIRJNJXU - [0:0]
-		:KUBE-SEP-BSWRHOQ77KEXZLNL - [0:0]
-		:KUBE-SEP-SNQ3ZNILQDEJNDQO - [0:0]
 		:KUBE-SVC-4SW47YFZTEDKD3PK - [0:0]
-		:KUBE-SVC-X27LE4BHSL4DOUIK - [0:0]
-		:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
 		-A KUBE-SERVICES -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 -j KUBE-SVC-X27LE4BHSL4DOUIK
 		-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 172.30.0.44 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
@@ -7967,21 +7963,14 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
 		-A KUBE-SEP-AYCN5HPXMIRJNJXU -m comment --comment ns4/svc4:p80 -s 10.0.4.1 -j KUBE-MARK-MASQ
 		-A KUBE-SEP-AYCN5HPXMIRJNJXU -m comment --comment ns4/svc4:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.4.1:80
-		-A KUBE-SEP-BSWRHOQ77KEXZLNL -m comment --comment ns3/svc3:p80 -s 10.0.3.1 -j KUBE-MARK-MASQ
-		-A KUBE-SEP-BSWRHOQ77KEXZLNL -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.3.1:80
-		-A KUBE-SEP-SNQ3ZNILQDEJNDQO -m comment --comment ns1/svc1:p80 -s 10.0.1.1 -j KUBE-MARK-MASQ
-		-A KUBE-SEP-SNQ3ZNILQDEJNDQO -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
 		-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 172.30.0.44 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
 		-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 -> 10.0.4.1:80" -j KUBE-SEP-AYCN5HPXMIRJNJXU
-		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
-		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 -> 10.0.3.1:80" -j KUBE-SEP-BSWRHOQ77KEXZLNL
-		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
-		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.0.1.1:80" -j KUBE-SEP-SNQ3ZNILQDEJNDQO
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
-	// Change an endpoint of an existing service
+	// Change an endpoint of an existing service. This will cause its SVC and SEP
+	// chains to be rewritten.
 	eps3update := eps3.DeepCopy()
 	eps3update.Endpoints[0].Addresses[0] = "10.0.3.2"
 	fp.OnEndpointSliceUpdate(eps3, eps3update)
@@ -8003,13 +7992,9 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-MARK-MASQ - [0:0]
 		:KUBE-POSTROUTING - [0:0]
-		:KUBE-SEP-AYCN5HPXMIRJNJXU - [0:0]
 		:KUBE-SEP-BSWRHOQ77KEXZLNL - [0:0]
 		:KUBE-SEP-DKCFIS26GWF2WLWC - [0:0]
-		:KUBE-SEP-SNQ3ZNILQDEJNDQO - [0:0]
-		:KUBE-SVC-4SW47YFZTEDKD3PK - [0:0]
 		:KUBE-SVC-X27LE4BHSL4DOUIK - [0:0]
-		:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
 		-A KUBE-SERVICES -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 -j KUBE-SVC-X27LE4BHSL4DOUIK
 		-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 172.30.0.44 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
@@ -8018,24 +8003,16 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
-		-A KUBE-SEP-AYCN5HPXMIRJNJXU -m comment --comment ns4/svc4:p80 -s 10.0.4.1 -j KUBE-MARK-MASQ
-		-A KUBE-SEP-AYCN5HPXMIRJNJXU -m comment --comment ns4/svc4:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.4.1:80
 		-A KUBE-SEP-DKCFIS26GWF2WLWC -m comment --comment ns3/svc3:p80 -s 10.0.3.2 -j KUBE-MARK-MASQ
 		-A KUBE-SEP-DKCFIS26GWF2WLWC -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.3.2:80
-		-A KUBE-SEP-SNQ3ZNILQDEJNDQO -m comment --comment ns1/svc1:p80 -s 10.0.1.1 -j KUBE-MARK-MASQ
-		-A KUBE-SEP-SNQ3ZNILQDEJNDQO -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
-		-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 172.30.0.44 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
-		-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 -> 10.0.4.1:80" -j KUBE-SEP-AYCN5HPXMIRJNJXU
 		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
 		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 -> 10.0.3.2:80" -j KUBE-SEP-DKCFIS26GWF2WLWC
-		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
-		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.0.1.1:80" -j KUBE-SEP-SNQ3ZNILQDEJNDQO
 		-X KUBE-SEP-BSWRHOQ77KEXZLNL
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
-	// Add an endpoint to a service
+	// Add an endpoint to a service. This will cause its SVC and SEP chains to be rewritten.
 	eps3update2 := eps3update.DeepCopy()
 	eps3update2.Endpoints = append(eps3update2.Endpoints, discovery.Endpoint{Addresses: []string{"10.0.3.3"}})
 	fp.OnEndpointSliceUpdate(eps3update, eps3update2)
@@ -8057,13 +8034,9 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-SERVICES - [0:0]
 		:KUBE-MARK-MASQ - [0:0]
 		:KUBE-POSTROUTING - [0:0]
-		:KUBE-SEP-AYCN5HPXMIRJNJXU - [0:0]
 		:KUBE-SEP-DKCFIS26GWF2WLWC - [0:0]
 		:KUBE-SEP-JVVZVJ7BSEPPRNBS - [0:0]
-		:KUBE-SEP-SNQ3ZNILQDEJNDQO - [0:0]
-		:KUBE-SVC-4SW47YFZTEDKD3PK - [0:0]
 		:KUBE-SVC-X27LE4BHSL4DOUIK - [0:0]
-		:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
 		-A KUBE-SERVICES -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 -j KUBE-SVC-X27LE4BHSL4DOUIK
 		-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 172.30.0.44 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
@@ -8072,26 +8045,95 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
-		-A KUBE-SEP-AYCN5HPXMIRJNJXU -m comment --comment ns4/svc4:p80 -s 10.0.4.1 -j KUBE-MARK-MASQ
-		-A KUBE-SEP-AYCN5HPXMIRJNJXU -m comment --comment ns4/svc4:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.4.1:80
 		-A KUBE-SEP-DKCFIS26GWF2WLWC -m comment --comment ns3/svc3:p80 -s 10.0.3.2 -j KUBE-MARK-MASQ
 		-A KUBE-SEP-DKCFIS26GWF2WLWC -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.3.2:80
 		-A KUBE-SEP-JVVZVJ7BSEPPRNBS -m comment --comment ns3/svc3:p80 -s 10.0.3.3 -j KUBE-MARK-MASQ
 		-A KUBE-SEP-JVVZVJ7BSEPPRNBS -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.3.3:80
-		-A KUBE-SEP-SNQ3ZNILQDEJNDQO -m comment --comment ns1/svc1:p80 -s 10.0.1.1 -j KUBE-MARK-MASQ
-		-A KUBE-SEP-SNQ3ZNILQDEJNDQO -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
-		-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 172.30.0.44 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
-		-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 -> 10.0.4.1:80" -j KUBE-SEP-AYCN5HPXMIRJNJXU
 		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
 		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 -> 10.0.3.2:80" -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-DKCFIS26GWF2WLWC
 		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 -> 10.0.3.3:80" -j KUBE-SEP-JVVZVJ7BSEPPRNBS
-		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
-		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.0.1.1:80" -j KUBE-SEP-SNQ3ZNILQDEJNDQO
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
-	// Sync with no new changes...
+	// Sync with no new changes... This will not rewrite any SVC or SEP chains
+	fp.syncProxyRules()
+
+	expected = dedent.Dedent(`
+		*filter
+		:KUBE-NODEPORTS - [0:0]
+		:KUBE-SERVICES - [0:0]
+		:KUBE-EXTERNAL-SERVICES - [0:0]
+		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
+		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+		COMMIT
+		*nat
+		:KUBE-NODEPORTS - [0:0]
+		:KUBE-SERVICES - [0:0]
+		:KUBE-MARK-MASQ - [0:0]
+		:KUBE-POSTROUTING - [0:0]
+		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+		-A KUBE-SERVICES -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 -j KUBE-SVC-X27LE4BHSL4DOUIK
+		-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 172.30.0.44 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
+		-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+		COMMIT
+		`)
+	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
+
+	// Now force a partial resync error and ensure that it recovers correctly
+	if fp.needFullSync {
+		t.Fatalf("Proxier unexpectedly already needs a full sync?")
+	}
+	prFailures, err := testutil.GetCounterMetricValue(metrics.IptablesPartialRestoreFailuresTotal)
+	if err != nil {
+		t.Fatalf("Could not get partial restore failures metric: %v", err)
+	}
+	if prFailures != 0.0 {
+		t.Errorf("Already did a partial resync? Something failed earlier!")
+	}
+
+	// Add a rule jumping from svc3's service chain to svc4's endpoint, then try to
+	// delete svc4. This will fail because the partial resync won't rewrite svc3's
+	// rules and so the partial restore would leave a dangling jump from there to
+	// svc4's endpoint. The proxier will then queue a full resync in response to the
+	// partial resync failure, and the full resync will succeed (since it will rewrite
+	// svc3's rules as well).
+	//
+	// This is an absurd scenario, but it has to be; partial resync failures are
+	// supposed to be impossible; if we knew of any non-absurd scenario that would
+	// cause such a failure, then that would be a bug and we would fix it.
+	if _, err := fp.iptables.ChainExists(utiliptables.TableNAT, utiliptables.Chain("KUBE-SEP-AYCN5HPXMIRJNJXU")); err != nil {
+		t.Fatalf("svc4's endpoint chain unexpected already does not exist!")
+	}
+	if _, err := fp.iptables.EnsureRule(utiliptables.Append, utiliptables.TableNAT, utiliptables.Chain("KUBE-SVC-X27LE4BHSL4DOUIK"), "-j", "KUBE-SEP-AYCN5HPXMIRJNJXU"); err != nil {
+		t.Fatalf("Could not add bad iptables rule: %v", err)
+	}
+
+	fp.OnServiceDelete(svc4)
+	fp.syncProxyRules()
+
+	if _, err := fp.iptables.ChainExists(utiliptables.TableNAT, utiliptables.Chain("KUBE-SEP-AYCN5HPXMIRJNJXU")); err != nil {
+		t.Errorf("svc4's endpoint chain was successfully deleted despite dangling references!")
+	}
+	if !fp.needFullSync {
+		t.Errorf("Proxier did not fail on previous partial resync?")
+	}
+	updatedPRFailures, err := testutil.GetCounterMetricValue(metrics.IptablesPartialRestoreFailuresTotal)
+	if err != nil {
+		t.Errorf("Could not get partial restore failures metric: %v", err)
+	}
+	if updatedPRFailures != prFailures+1.0 {
+		t.Errorf("Partial restore failures metric was not incremented after failed partial resync (expected %.02f, got %.02f)", prFailures+1.0, updatedPRFailures)
+	}
+
+	// On retry we should do a full resync, which should succeed (and delete svc4)
 	fp.syncProxyRules()
 
 	expected = dedent.Dedent(`
@@ -8119,30 +8161,27 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
 		-A KUBE-SERVICES -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 -j KUBE-SVC-X27LE4BHSL4DOUIK
-		-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 172.30.0.44 --dport 80 -j KUBE-SVC-4SW47YFZTEDKD3PK
 		-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
 		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
-		-A KUBE-SEP-AYCN5HPXMIRJNJXU -m comment --comment ns4/svc4:p80 -s 10.0.4.1 -j KUBE-MARK-MASQ
-		-A KUBE-SEP-AYCN5HPXMIRJNJXU -m comment --comment ns4/svc4:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.4.1:80
 		-A KUBE-SEP-DKCFIS26GWF2WLWC -m comment --comment ns3/svc3:p80 -s 10.0.3.2 -j KUBE-MARK-MASQ
 		-A KUBE-SEP-DKCFIS26GWF2WLWC -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.3.2:80
 		-A KUBE-SEP-JVVZVJ7BSEPPRNBS -m comment --comment ns3/svc3:p80 -s 10.0.3.3 -j KUBE-MARK-MASQ
 		-A KUBE-SEP-JVVZVJ7BSEPPRNBS -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.3.3:80
 		-A KUBE-SEP-SNQ3ZNILQDEJNDQO -m comment --comment ns1/svc1:p80 -s 10.0.1.1 -j KUBE-MARK-MASQ
 		-A KUBE-SEP-SNQ3ZNILQDEJNDQO -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
-		-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 cluster IP" -m tcp -p tcp -d 172.30.0.44 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
-		-A KUBE-SVC-4SW47YFZTEDKD3PK -m comment --comment "ns4/svc4:p80 -> 10.0.4.1:80" -j KUBE-SEP-AYCN5HPXMIRJNJXU
 		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
 		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 -> 10.0.3.2:80" -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-DKCFIS26GWF2WLWC
 		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 -> 10.0.3.3:80" -j KUBE-SEP-JVVZVJ7BSEPPRNBS
 		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
 		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.0.1.1:80" -j KUBE-SEP-SNQ3ZNILQDEJNDQO
+		-X KUBE-SEP-AYCN5HPXMIRJNJXU
+		-X KUBE-SVC-4SW47YFZTEDKD3PK
 		COMMIT
 		`)
-	assertIPTablesRulesEqual(t, getLine(), expected, fp.iptablesData.String())
+	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 }
 
 func TestNoEndpointsMetric(t *testing.T) {

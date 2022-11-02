@@ -564,6 +564,10 @@ func TestServiceMapUpdateHeadless(t *testing.T) {
 	)
 
 	// Headless service should be ignored
+	pending := fp.serviceChanges.PendingChanges()
+	if pending.Len() != 0 {
+		t.Errorf("expected 0 pending service changes, got %d", pending.Len())
+	}
 	result := fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 0 {
 		t.Errorf("expected service map length 0, got %d", len(fp.serviceMap))
@@ -591,6 +595,10 @@ func TestUpdateServiceTypeExternalName(t *testing.T) {
 		}),
 	)
 
+	pending := fp.serviceChanges.PendingChanges()
+	if pending.Len() != 0 {
+		t.Errorf("expected 0 pending service changes, got %d", pending.Len())
+	}
 	result := fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 0 {
 		t.Errorf("expected service map length 0, got %v", fp.serviceMap)
@@ -651,6 +659,18 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	for i := range services {
 		fp.addService(services[i])
 	}
+
+	pending := fp.serviceChanges.PendingChanges()
+	for i := range services {
+		name := services[i].Namespace + "/" + services[i].Name
+		if !pending.Has(name) {
+			t.Errorf("expected pending change for %q", name)
+		}
+	}
+	if pending.Len() != len(services) {
+		t.Errorf("expected %d pending service changes, got %d", len(services), pending.Len())
+	}
+
 	result := fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 8 {
 		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
@@ -684,6 +704,10 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	fp.deleteService(services[2])
 	fp.deleteService(services[3])
 
+	pending = fp.serviceChanges.PendingChanges()
+	if pending.Len() != 4 {
+		t.Errorf("expected 4 pending service changes, got %d", pending.Len())
+	}
 	result = fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 1 {
 		t.Errorf("expected service map length 1, got %v", fp.serviceMap)
@@ -733,6 +757,10 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 
 	fp.addService(servicev1)
 
+	pending := fp.serviceChanges.PendingChanges()
+	if pending.Len() != 1 {
+		t.Errorf("expected 1 pending service change, got %d", pending.Len())
+	}
 	result := fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
@@ -747,6 +775,10 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 
 	// Change service to load-balancer
 	fp.updateService(servicev1, servicev2)
+	pending = fp.serviceChanges.PendingChanges()
+	if pending.Len() != 1 {
+		t.Errorf("expected 1 pending service change, got %d", pending.Len())
+	}
 	result = fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
@@ -761,6 +793,10 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	// No change; make sure the service map stays the same and there are
 	// no health-check changes
 	fp.updateService(servicev2, servicev2)
+	pending = fp.serviceChanges.PendingChanges()
+	if pending.Len() != 0 {
+		t.Errorf("expected 0 pending service changes, got %d", pending.Len())
+	}
 	result = fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
@@ -774,6 +810,10 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 
 	// And back to ClusterIP
 	fp.updateService(servicev2, servicev1)
+	pending = fp.serviceChanges.PendingChanges()
+	if pending.Len() != 1 {
+		t.Errorf("expected 1 pending service change, got %d", pending.Len())
+	}
 	result = fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.serviceMap)

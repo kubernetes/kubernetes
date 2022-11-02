@@ -126,6 +126,17 @@ var (
 		},
 	)
 
+	// IptablesPartialRestoreFailuresTotal is the number of iptables *partial* restore
+	// failures (resulting in a fall back to a full restore) that the proxy has seen.
+	IptablesPartialRestoreFailuresTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_iptables_partial_restore_failures_total",
+			Help:           "Cumulative proxy iptables partial restore failures",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
 	// IptablesRulesTotal is the number of iptables rules that the iptables proxy installs.
 	IptablesRulesTotal = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
@@ -177,6 +188,7 @@ func RegisterMetrics() {
 		legacyregistry.MustRegister(ServiceChangesTotal)
 		legacyregistry.MustRegister(IptablesRulesTotal)
 		legacyregistry.MustRegister(IptablesRestoreFailuresTotal)
+		legacyregistry.MustRegister(IptablesPartialRestoreFailuresTotal)
 		legacyregistry.MustRegister(SyncProxyRulesLastQueuedTimestamp)
 		legacyregistry.MustRegister(SyncProxyRulesNoLocalEndpointsTotal)
 	})
