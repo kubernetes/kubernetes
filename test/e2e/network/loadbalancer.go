@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2ekubesystem "k8s.io/kubernetes/test/e2e/framework/kubesystem"
@@ -57,7 +56,6 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var cs clientset.Interface
-	serviceLBNames := []string{}
 	var subnetPrefix []string
 	var err error
 
@@ -71,12 +69,6 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		if ginkgo.CurrentSpecReport().Failed() {
 			DescribeSvc(f.Namespace.Name)
 		}
-		for _, lb := range serviceLBNames {
-			framework.Logf("cleaning load balancer resource for %s", lb)
-			e2eservice.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
-		}
-		//reset serviceLBNames
-		serviceLBNames = []string{}
 	})
 
 	ginkgo.It("should be able to change the type and ports of a TCP service [Slow]", func() {
@@ -154,13 +146,12 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		}
 
 		ginkgo.By("changing the TCP service to type=LoadBalancer")
-		tcpService, err = tcpJig.UpdateService(func(s *v1.Service) {
+		_, err = tcpJig.UpdateService(func(s *v1.Service) {
 			s.Spec.LoadBalancerIP = requestedIP // will be "" if not applicable
 			s.Spec.Type = v1.ServiceTypeLoadBalancer
 		})
 		framework.ExpectNoError(err)
 
-		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(tcpService))
 		ginkgo.By("waiting for the TCP service to have a load balancer")
 		// Wait for the load balancer to be created asynchronously
 		tcpService, err = tcpJig.WaitForLoadBalancer(loadBalancerCreateTimeout)
@@ -360,12 +351,10 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		framework.Logf("Allocated static load balancer IP: %s", requestedIP)
 
 		ginkgo.By("changing the UDP service to type=LoadBalancer")
-		udpService, err = udpJig.UpdateService(func(s *v1.Service) {
+		_, err = udpJig.UpdateService(func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeLoadBalancer
 		})
 		framework.ExpectNoError(err)
-
-		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(udpService))
 
 		// Do this as early as possible, which overrides the `defer` above.
 		// This is mostly out of fear of leaking the IP in a timeout case
@@ -917,14 +906,13 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		}
 
 		ginkgo.By("changing the TCP service to type=LoadBalancer")
-		tcpService, err = tcpJig.UpdateService(func(s *v1.Service) {
+		_, err = tcpJig.UpdateService(func(s *v1.Service) {
 			s.Spec.LoadBalancerIP = requestedIP // will be "" if not applicable
 			s.Spec.Type = v1.ServiceTypeLoadBalancer
 			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(false)
 		})
 		framework.ExpectNoError(err)
 
-		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(tcpService))
 		ginkgo.By("waiting for the TCP service to have a load balancer")
 		// Wait for the load balancer to be created asynchronously
 		tcpService, err = tcpJig.WaitForLoadBalancer(loadBalancerCreateTimeout)
@@ -989,7 +977,6 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 	var loadBalancerCreateTimeout time.Duration
 
 	var cs clientset.Interface
-	serviceLBNames := []string{}
 	var subnetPrefix []string
 	var err error
 
@@ -1007,12 +994,6 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 		if ginkgo.CurrentSpecReport().Failed() {
 			DescribeSvc(f.Namespace.Name)
 		}
-		for _, lb := range serviceLBNames {
-			framework.Logf("cleaning load balancer resource for %s", lb)
-			e2eservice.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
-		}
-		//reset serviceLBNames
-		serviceLBNames = []string{}
 	})
 
 	ginkgo.It("should work for type=LoadBalancer", func() {
@@ -1022,7 +1003,6 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 
 		svc, err := jig.CreateOnlyLocalLoadBalancerService(loadBalancerCreateTimeout, true, nil)
 		framework.ExpectNoError(err)
-		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(svc))
 		healthCheckNodePort := int(svc.Spec.HealthCheckNodePort)
 		if healthCheckNodePort == 0 {
 			framework.Failf("Service HealthCheck NodePort was not allocated")
@@ -1114,7 +1094,6 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 
 			})
 		framework.ExpectNoError(err)
-		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(svc))
 		defer func() {
 			err = jig.ChangeServiceType(v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
 			framework.ExpectNoError(err)
@@ -1181,7 +1160,6 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 
 		svc, err := jig.CreateOnlyLocalLoadBalancerService(loadBalancerCreateTimeout, true, nil)
 		framework.ExpectNoError(err)
-		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(svc))
 		defer func() {
 			err = jig.ChangeServiceType(v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
 			framework.ExpectNoError(err)
@@ -1245,7 +1223,6 @@ var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 
 		svc, err := jig.CreateOnlyLocalLoadBalancerService(loadBalancerCreateTimeout, true, nil)
 		framework.ExpectNoError(err)
-		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(svc))
 		defer func() {
 			err = jig.ChangeServiceType(v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
 			framework.ExpectNoError(err)
