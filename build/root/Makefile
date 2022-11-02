@@ -380,9 +380,14 @@ define RELEASE_IMAGES_HELP_INFO
 #
 # Args:
 #   KUBE_BUILD_CONFORMANCE: Whether to build conformance testing image as well. Set to 'n' to skip.
+#   DBG: If set to "1", build with optimizations disabled for easier debugging. Any other value is ignored.
 #
 # Example:
 #   make release-images
+#   make release-images DBG=1
+#     Note: Specify DBG=1 for building unstripped binaries, which allows you to use code debugging
+#           tools like delve. When DBG is unspecified, it defaults to "-s -w" which strips debug
+#           information.
 endef
 .PHONY: release-images
 ifeq ($(PRINT_HELP),y)
@@ -424,9 +429,14 @@ define QUICK_RELEASE_IMAGES_HELP_INFO
 # Args:
 #   KUBE_FASTBUILD: Whether to cross-compile for other architectures. Set to 'false' to do so.
 #   KUBE_BUILD_CONFORMANCE: Whether to build conformance testing image as well. Set to 'y' to do so.
+#   DBG: If set to "1", build with optimizations disabled for easier debugging. Any other value is ignored.
 #
 # Example:
 #   make quick-release-images
+#   make quick-release-images DBG=1
+#     Note: Specify DBG=1 for building unstripped binaries, which allows you to use code debugging
+#           tools like delve. When DBG is unspecified, it defaults to "-s -w" which strips debug
+#           information.
 endef
 .PHONY: quick-release-images
 ifeq ($(PRINT_HELP),y)
