@@ -419,8 +419,8 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 	}
 }
 
-func isContainerRunning(ctx context.Context, id string, r internalapi.RuntimeService) (bool, error) {
-	resp, err := r.ContainerStatus(ctx, id, false)
+func isContainerRunning(id string, r internalapi.RuntimeService) (bool, error) {
+	resp, err := r.ContainerStatus(id, false)
 	if err != nil {
 		return false, err
 	}
@@ -443,7 +443,7 @@ func isContainerRunning(ctx context.Context, id string, r internalapi.RuntimeSer
 // the error is error happens during waiting new logs.
 func waitLogs(ctx context.Context, id string, w *fsnotify.Watcher, runtimeService internalapi.RuntimeService) (bool, bool, error) {
 	// no need to wait if the pod is not running
-	if running, err := isContainerRunning(ctx, id, runtimeService); !running {
+	if running, err := isContainerRunning(id, runtimeService); !running {
 		return false, false, err
 	}
 	errRetry := 5

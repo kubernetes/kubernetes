@@ -17,7 +17,6 @@ limitations under the License.
 package stats
 
 import (
-	"context"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -100,7 +99,6 @@ func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {
 }
 
 func TestCadvisorListPodStats(t *testing.T) {
-	ctx := context.Background()
 	const (
 		namespace0 = "test0"
 		namespace2 = "test2"
@@ -240,7 +238,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 	mockCadvisor.EXPECT().ImagesFsInfo().Return(imagefs, nil)
 
 	mockRuntime := containertest.NewMockRuntime(mockCtrl)
-	mockRuntime.EXPECT().ImageStats(ctx).Return(&kubecontainer.ImageStats{TotalStorageBytes: 123}, nil).AnyTimes()
+	mockRuntime.EXPECT().ImageStats().Return(&kubecontainer.ImageStats{TotalStorageBytes: 123}, nil).AnyTimes()
 
 	ephemeralVolumes := []statsapi.VolumeStats{getPodVolumeStats(seedEphemeralVolume1, "ephemeralVolume1"),
 		getPodVolumeStats(seedEphemeralVolume2, "ephemeralVolume2")}
@@ -263,7 +261,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 	resourceAnalyzer := &fakeResourceAnalyzer{podVolumeStats: volumeStats}
 
 	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, nil, mockRuntime, mockStatus, NewFakeHostStatsProvider())
-	pods, err := p.ListPodStats(ctx)
+	pods, err := p.ListPodStats()
 	assert.NoError(t, err)
 
 	assert.Equal(t, 4, len(pods))
@@ -337,7 +335,6 @@ func TestCadvisorListPodStats(t *testing.T) {
 }
 
 func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
-	ctx := context.Background()
 	const (
 		namespace0 = "test0"
 		namespace2 = "test2"
@@ -431,7 +428,7 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 	resourceAnalyzer := &fakeResourceAnalyzer{podVolumeStats: volumeStats}
 
 	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, nil, nil, nil, NewFakeHostStatsProvider())
-	pods, err := p.ListPodCPUAndMemoryStats(ctx)
+	pods, err := p.ListPodCPUAndMemoryStats()
 	assert.NoError(t, err)
 
 	assert.Equal(t, 3, len(pods))
@@ -503,7 +500,6 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 }
 
 func TestCadvisorImagesFsStats(t *testing.T) {
-	ctx := context.Background()
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	var (
@@ -517,10 +513,10 @@ func TestCadvisorImagesFsStats(t *testing.T) {
 	)
 
 	mockCadvisor.EXPECT().ImagesFsInfo().Return(imageFsInfo, nil)
-	mockRuntime.EXPECT().ImageStats(ctx).Return(imageStats, nil)
+	mockRuntime.EXPECT().ImageStats().Return(imageStats, nil)
 
 	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider())
-	stats, err := provider.ImageFsStats(ctx)
+	stats, err := provider.ImageFsStats()
 	assert.NoError(err)
 
 	assert.Equal(imageFsInfo.Timestamp, stats.Time.Time)
@@ -533,7 +529,6 @@ func TestCadvisorImagesFsStats(t *testing.T) {
 }
 
 func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
-	ctx := context.Background()
 	const (
 		namespace0 = "test0"
 	)
@@ -618,7 +613,7 @@ func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
 	mockCadvisor.EXPECT().ImagesFsInfo().Return(imagefs, nil)
 
 	mockRuntime := containertest.NewMockRuntime(mockCtrl)
-	mockRuntime.EXPECT().ImageStats(ctx).Return(&kubecontainer.ImageStats{TotalStorageBytes: 123}, nil).AnyTimes()
+	mockRuntime.EXPECT().ImageStats().Return(&kubecontainer.ImageStats{TotalStorageBytes: 123}, nil).AnyTimes()
 
 	volumeStats := serverstats.PodVolumeStats{}
 	p0Time := metav1.Now()
@@ -628,7 +623,7 @@ func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
 	resourceAnalyzer := &fakeResourceAnalyzer{podVolumeStats: volumeStats}
 
 	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, nil, mockRuntime, mockStatus, NewFakeHostStatsProviderWithData(fakeStats, fakeOS))
-	pods, err := p.ListPodStats(ctx)
+	pods, err := p.ListPodStats()
 	assert.NoError(t, err)
 
 	assert.Equal(t, 1, len(pods))

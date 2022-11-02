@@ -424,7 +424,7 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 		}
 	}
 
-	kl.setNodeStatus(ctx, node)
+	kl.setNodeStatus(node)
 
 	return node, nil
 }
@@ -435,7 +435,6 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 func (kl *Kubelet) syncNodeStatus() {
 	kl.syncNodeStatusMux.Lock()
 	defer kl.syncNodeStatusMux.Unlock()
-	ctx := context.Background()
 
 	if kl.kubeClient == nil || kl.heartbeatClient == nil {
 		return
@@ -444,17 +443,17 @@ func (kl *Kubelet) syncNodeStatus() {
 		// This will exit immediately if it doesn't need to do anything.
 		kl.registerWithAPIServer()
 	}
-	if err := kl.updateNodeStatus(ctx); err != nil {
+	if err := kl.updateNodeStatus(); err != nil {
 		klog.ErrorS(err, "Unable to update node status")
 	}
 }
 
 // updateNodeStatus updates node status to master with retries if there is any
 // change or enough time passed from the last sync.
-func (kl *Kubelet) updateNodeStatus(ctx context.Context) error {
+func (kl *Kubelet) updateNodeStatus() error {
 	klog.V(5).InfoS("Updating node status")
 	for i := 0; i < nodeStatusUpdateRetry; i++ {
-		if err := kl.tryUpdateNodeStatus(ctx, i); err != nil {
+		if err := kl.tryUpdateNodeStatus(i); err != nil {
 			if i > 0 && kl.onRepeatedHeartbeatFailure != nil {
 				kl.onRepeatedHeartbeatFailure()
 			}
@@ -468,7 +467,7 @@ func (kl *Kubelet) updateNodeStatus(ctx context.Context) error {
 
 // tryUpdateNodeStatus tries to update node status to master if there is any
 // change or enough time passed from the last sync.
-func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, tryNumber int) error {
+func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	// In large clusters, GET and PUT operations on Node objects coming
 	// from here are the majority of load on apiserver and etcd.
 	// To reduce the load on etcd, we are serving GET operations from
@@ -479,7 +478,7 @@ func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, tryNumber int) error
 	if tryNumber == 0 {
 		util.FromApiserverCache(&opts)
 	}
-	node, err := kl.heartbeatClient.CoreV1().Nodes().Get(ctx, string(kl.nodeName), opts)
+	node, err := kl.heartbeatClient.CoreV1().Nodes().Get(context.TODO(), string(kl.nodeName), opts)
 	if err != nil {
 		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
 	}
@@ -495,7 +494,7 @@ func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, tryNumber int) error
 		// node.Spec.PodCIDR being non-empty. We also need to know if pod CIDR is
 		// actually changed.
 		podCIDRs := strings.Join(node.Spec.PodCIDRs, ",")
-		if podCIDRChanged, err = kl.updatePodCIDR(ctx, podCIDRs); err != nil {
+		if podCIDRChanged, err = kl.updatePodCIDR(podCIDRs); err != nil {
 			klog.ErrorS(err, "Error updating pod CIDR")
 		}
 	}
@@ -519,7 +518,7 @@ func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, tryNumber int) error
 		areRequiredLabelsNotPresent = true
 	}
 
-	kl.setNodeStatus(ctx, node)
+	kl.setNodeStatus(node)
 
 	now := kl.clock.Now()
 	if now.Before(kl.lastStatusReportTime.Add(kl.nodeStatusReportFrequency)) {
@@ -571,7 +570,7 @@ func (kl *Kubelet) recordEvent(eventType, event, message string) {
 }
 
 // record if node schedulable change.
-func (kl *Kubelet) recordNodeSchedulableEvent(ctx context.Context, node *v1.Node) error {
+func (kl *Kubelet) recordNodeSchedulableEvent(node *v1.Node) error {
 	kl.lastNodeUnschedulableLock.Lock()
 	defer kl.lastNodeUnschedulableLock.Unlock()
 	if kl.lastNodeUnschedulable != node.Spec.Unschedulable {
@@ -589,10 +588,10 @@ func (kl *Kubelet) recordNodeSchedulableEvent(ctx context.Context, node *v1.Node
 // any fields that are currently set.
 // TODO(madhusudancs): Simplify the logic for setting node conditions and
 // refactor the node status condition code out to a different file.
-func (kl *Kubelet) setNodeStatus(ctx context.Context, node *v1.Node) {
+func (kl *Kubelet) setNodeStatus(node *v1.Node) {
 	for i, f := range kl.setNodeStatusFuncs {
 		klog.V(5).InfoS("Setting node status condition code", "position", i, "node", klog.KObj(node))
-		if err := f(ctx, node); err != nil {
+		if err := f(node); err != nil {
 			klog.ErrorS(err, "Failed to set some node status fields", "node", klog.KObj(node))
 		}
 	}
@@ -611,7 +610,7 @@ func (kl *Kubelet) getLastObservedNodeAddresses() []v1.NodeAddress {
 
 // defaultNodeStatusFuncs is a factory that generates the default set of
 // setNodeStatus funcs
-func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) error {
+func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 	// if cloud is not nil, we expect the cloud resource sync manager to exist
 	var nodeAddressesFunc func() ([]v1.NodeAddress, error)
 	if kl.cloud != nil {
@@ -621,7 +620,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) er
 	if kl.appArmorValidator != nil {
 		validateHostFunc = kl.appArmorValidator.ValidateHost
 	}
-	var setters []func(ctx context.Context, n *v1.Node) error
+	var setters []func(n *v1.Node) error
 	setters = append(setters,
 		nodestatus.NodeAddress(kl.nodeIPs, kl.nodeIPValidator, kl.hostname, kl.hostnameOverridden, kl.externalCloudProvider, kl.cloud, nodeAddressesFunc),
 		nodestatus.MachineInfo(string(kl.nodeName), kl.maxPods, kl.podsPerCore, kl.GetCachedMachineInfo, kl.containerManager.GetCapacity,

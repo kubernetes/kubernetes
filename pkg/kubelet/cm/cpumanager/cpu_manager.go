@@ -17,7 +17,6 @@ limitations under the License.
 package cpumanager
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"sync"
@@ -43,7 +42,7 @@ import (
 type ActivePodsFunc func() []*v1.Pod
 
 type runtimeService interface {
-	UpdateContainerResources(ctx context.Context, id string, resources *runtimeapi.ContainerResources) error
+	UpdateContainerResources(id string, resources *runtimeapi.ContainerResources) error
 }
 
 type policyName string
@@ -402,7 +401,6 @@ func (m *manager) removeStaleState() {
 }
 
 func (m *manager) reconcileState() (success []reconciledContainer, failure []reconciledContainer) {
-	ctx := context.Background()
 	success = []reconciledContainer{}
 	failure = []reconciledContainer{}
 
@@ -471,7 +469,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 			lcset := m.lastUpdateState.GetCPUSetOrDefault(string(pod.UID), container.Name)
 			if !cset.Equals(lcset) {
 				klog.V(4).InfoS("ReconcileState: updating container", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID, "cpuSet", cset)
-				err = m.updateContainerCPUSet(ctx, containerID, cset)
+				err = m.updateContainerCPUSet(containerID, cset)
 				if err != nil {
 					klog.ErrorS(err, "ReconcileState: failed to update container", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID, "cpuSet", cset)
 					failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
@@ -510,13 +508,12 @@ func findContainerStatusByName(status *v1.PodStatus, name string) (*v1.Container
 	return nil, fmt.Errorf("unable to find status for container with name %v in pod status (it may not be running)", name)
 }
 
-func (m *manager) updateContainerCPUSet(ctx context.Context, containerID string, cpus cpuset.CPUSet) error {
+func (m *manager) updateContainerCPUSet(containerID string, cpus cpuset.CPUSet) error {
 	// TODO: Consider adding a `ResourceConfigForContainer` helper in
 	// helpers_linux.go similar to what exists for pods.
 	// It would be better to pass the full container resources here instead of
 	// this patch-like partial resources.
 	return m.containerRuntime.UpdateContainerResources(
-		ctx,
 		containerID,
 		&runtimeapi.ContainerResources{
 			Linux: &runtimeapi.LinuxContainerResources{

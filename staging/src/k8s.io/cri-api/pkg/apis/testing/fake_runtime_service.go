@@ -17,7 +17,6 @@ limitations under the License.
 package testing
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"sync"
@@ -163,7 +162,7 @@ func NewFakeRuntimeService() *FakeRuntimeService {
 }
 
 // Version returns version information from the FakeRuntimeService.
-func (r *FakeRuntimeService) Version(_ context.Context, apiVersion string) (*runtimeapi.VersionResponse, error) {
+func (r *FakeRuntimeService) Version(apiVersion string) (*runtimeapi.VersionResponse, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -181,7 +180,7 @@ func (r *FakeRuntimeService) Version(_ context.Context, apiVersion string) (*run
 }
 
 // Status returns runtime status of the FakeRuntimeService.
-func (r *FakeRuntimeService) Status(_ context.Context, verbose bool) (*runtimeapi.StatusResponse, error) {
+func (r *FakeRuntimeService) Status(verbose bool) (*runtimeapi.StatusResponse, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -194,7 +193,7 @@ func (r *FakeRuntimeService) Status(_ context.Context, verbose bool) (*runtimeap
 }
 
 // RunPodSandbox emulates the run of the pod sandbox in the FakeRuntimeService.
-func (r *FakeRuntimeService) RunPodSandbox(_ context.Context, config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error) {
+func (r *FakeRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -247,7 +246,7 @@ func (r *FakeRuntimeService) RunPodSandbox(_ context.Context, config *runtimeapi
 }
 
 // StopPodSandbox emulates the stop of pod sandbox in the FakeRuntimeService.
-func (r *FakeRuntimeService) StopPodSandbox(_ context.Context, podSandboxID string) error {
+func (r *FakeRuntimeService) StopPodSandbox(podSandboxID string) error {
 	r.Lock()
 	defer r.Unlock()
 
@@ -266,7 +265,7 @@ func (r *FakeRuntimeService) StopPodSandbox(_ context.Context, podSandboxID stri
 }
 
 // RemovePodSandbox emulates removal of the pod sadbox in the FakeRuntimeService.
-func (r *FakeRuntimeService) RemovePodSandbox(_ context.Context, podSandboxID string) error {
+func (r *FakeRuntimeService) RemovePodSandbox(podSandboxID string) error {
 	r.Lock()
 	defer r.Unlock()
 
@@ -282,7 +281,7 @@ func (r *FakeRuntimeService) RemovePodSandbox(_ context.Context, podSandboxID st
 }
 
 // PodSandboxStatus returns pod sandbox status from the FakeRuntimeService.
-func (r *FakeRuntimeService) PodSandboxStatus(_ context.Context, podSandboxID string, verbose bool) (*runtimeapi.PodSandboxStatusResponse, error) {
+func (r *FakeRuntimeService) PodSandboxStatus(podSandboxID string, verbose bool) (*runtimeapi.PodSandboxStatusResponse, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -301,7 +300,7 @@ func (r *FakeRuntimeService) PodSandboxStatus(_ context.Context, podSandboxID st
 }
 
 // ListPodSandbox returns the list of pod sandboxes in the FakeRuntimeService.
-func (r *FakeRuntimeService) ListPodSandbox(_ context.Context, filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error) {
+func (r *FakeRuntimeService) ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -339,7 +338,7 @@ func (r *FakeRuntimeService) ListPodSandbox(_ context.Context, filter *runtimeap
 }
 
 // PortForward emulates the set up of port forward in the FakeRuntimeService.
-func (r *FakeRuntimeService) PortForward(context.Context, *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
+func (r *FakeRuntimeService) PortForward(*runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -352,7 +351,7 @@ func (r *FakeRuntimeService) PortForward(context.Context, *runtimeapi.PortForwar
 }
 
 // CreateContainer emulates container creation in the FakeRuntimeService.
-func (r *FakeRuntimeService) CreateContainer(_ context.Context, podSandboxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (r *FakeRuntimeService) CreateContainer(podSandboxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -386,7 +385,7 @@ func (r *FakeRuntimeService) CreateContainer(_ context.Context, podSandboxID str
 }
 
 // StartContainer emulates start of a container in the FakeRuntimeService.
-func (r *FakeRuntimeService) StartContainer(_ context.Context, containerID string) error {
+func (r *FakeRuntimeService) StartContainer(containerID string) error {
 	r.Lock()
 	defer r.Unlock()
 
@@ -408,7 +407,7 @@ func (r *FakeRuntimeService) StartContainer(_ context.Context, containerID strin
 }
 
 // StopContainer emulates stop of a container in the FakeRuntimeService.
-func (r *FakeRuntimeService) StopContainer(_ context.Context, containerID string, timeout int64) error {
+func (r *FakeRuntimeService) StopContainer(containerID string, timeout int64) error {
 	r.Lock()
 	defer r.Unlock()
 
@@ -432,7 +431,7 @@ func (r *FakeRuntimeService) StopContainer(_ context.Context, containerID string
 }
 
 // RemoveContainer emulates remove of a container in the FakeRuntimeService.
-func (r *FakeRuntimeService) RemoveContainer(_ context.Context, containerID string) error {
+func (r *FakeRuntimeService) RemoveContainer(containerID string) error {
 	r.Lock()
 	defer r.Unlock()
 
@@ -448,7 +447,7 @@ func (r *FakeRuntimeService) RemoveContainer(_ context.Context, containerID stri
 }
 
 // ListContainers returns the list of containers in the FakeRuntimeService.
-func (r *FakeRuntimeService) ListContainers(_ context.Context, filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
+func (r *FakeRuntimeService) ListContainers(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -491,7 +490,7 @@ func (r *FakeRuntimeService) ListContainers(_ context.Context, filter *runtimeap
 }
 
 // ContainerStatus returns the container status given the container ID in FakeRuntimeService.
-func (r *FakeRuntimeService) ContainerStatus(_ context.Context, containerID string, verbose bool) (*runtimeapi.ContainerStatusResponse, error) {
+func (r *FakeRuntimeService) ContainerStatus(containerID string, verbose bool) (*runtimeapi.ContainerStatusResponse, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -510,7 +509,7 @@ func (r *FakeRuntimeService) ContainerStatus(_ context.Context, containerID stri
 }
 
 // UpdateContainerResources returns the container resource in the FakeRuntimeService.
-func (r *FakeRuntimeService) UpdateContainerResources(context.Context, string, *runtimeapi.ContainerResources) error {
+func (r *FakeRuntimeService) UpdateContainerResources(string, *runtimeapi.ContainerResources) error {
 	r.Lock()
 	defer r.Unlock()
 
@@ -519,7 +518,7 @@ func (r *FakeRuntimeService) UpdateContainerResources(context.Context, string, *
 }
 
 // ExecSync emulates the sync execution of a command in a container in the FakeRuntimeService.
-func (r *FakeRuntimeService) ExecSync(_ context.Context, containerID string, cmd []string, timeout time.Duration) (stdout []byte, stderr []byte, err error) {
+func (r *FakeRuntimeService) ExecSync(containerID string, cmd []string, timeout time.Duration) (stdout []byte, stderr []byte, err error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -529,7 +528,7 @@ func (r *FakeRuntimeService) ExecSync(_ context.Context, containerID string, cmd
 }
 
 // Exec emulates the execution of a command in a container in the FakeRuntimeService.
-func (r *FakeRuntimeService) Exec(context.Context, *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
+func (r *FakeRuntimeService) Exec(*runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -542,7 +541,7 @@ func (r *FakeRuntimeService) Exec(context.Context, *runtimeapi.ExecRequest) (*ru
 }
 
 // Attach emulates the attach request in the FakeRuntimeService.
-func (r *FakeRuntimeService) Attach(_ context.Context, req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
+func (r *FakeRuntimeService) Attach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -555,7 +554,7 @@ func (r *FakeRuntimeService) Attach(_ context.Context, req *runtimeapi.AttachReq
 }
 
 // UpdateRuntimeConfig emulates the update of a runtime config for the FakeRuntimeService.
-func (r *FakeRuntimeService) UpdateRuntimeConfig(_ context.Context, runtimeCOnfig *runtimeapi.RuntimeConfig) error {
+func (r *FakeRuntimeService) UpdateRuntimeConfig(runtimeCOnfig *runtimeapi.RuntimeConfig) error {
 	r.Lock()
 	defer r.Unlock()
 
@@ -575,7 +574,7 @@ func (r *FakeRuntimeService) SetFakeContainerStats(containerStats []*runtimeapi.
 }
 
 // ContainerStats returns the container stats in the FakeRuntimeService.
-func (r *FakeRuntimeService) ContainerStats(_ context.Context, containerID string) (*runtimeapi.ContainerStats, error) {
+func (r *FakeRuntimeService) ContainerStats(containerID string) (*runtimeapi.ContainerStats, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -592,7 +591,7 @@ func (r *FakeRuntimeService) ContainerStats(_ context.Context, containerID strin
 }
 
 // ListContainerStats returns the list of all container stats given the filter in the FakeRuntimeService.
-func (r *FakeRuntimeService) ListContainerStats(_ context.Context, filter *runtimeapi.ContainerStatsFilter) ([]*runtimeapi.ContainerStats, error) {
+func (r *FakeRuntimeService) ListContainerStats(filter *runtimeapi.ContainerStatsFilter) ([]*runtimeapi.ContainerStats, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -636,7 +635,7 @@ func (r *FakeRuntimeService) SetFakePodSandboxStats(podStats []*runtimeapi.PodSa
 }
 
 // PodSandboxStats returns the sandbox stats in the FakeRuntimeService.
-func (r *FakeRuntimeService) PodSandboxStats(_ context.Context, podSandboxID string) (*runtimeapi.PodSandboxStats, error) {
+func (r *FakeRuntimeService) PodSandboxStats(podSandboxID string) (*runtimeapi.PodSandboxStats, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -653,7 +652,7 @@ func (r *FakeRuntimeService) PodSandboxStats(_ context.Context, podSandboxID str
 }
 
 // ListPodSandboxStats returns the list of all pod sandbox stats given the filter in the FakeRuntimeService.
-func (r *FakeRuntimeService) ListPodSandboxStats(_ context.Context, filter *runtimeapi.PodSandboxStatsFilter) ([]*runtimeapi.PodSandboxStats, error) {
+func (r *FakeRuntimeService) ListPodSandboxStats(filter *runtimeapi.PodSandboxStatsFilter) ([]*runtimeapi.PodSandboxStats, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -683,7 +682,7 @@ func (r *FakeRuntimeService) ListPodSandboxStats(_ context.Context, filter *runt
 }
 
 // ReopenContainerLog emulates call to the reopen container log in the FakeRuntimeService.
-func (r *FakeRuntimeService) ReopenContainerLog(_ context.Context, containerID string) error {
+func (r *FakeRuntimeService) ReopenContainerLog(containerID string) error {
 	r.Lock()
 	defer r.Unlock()
 
@@ -697,7 +696,7 @@ func (r *FakeRuntimeService) ReopenContainerLog(_ context.Context, containerID s
 }
 
 // CheckpointContainer emulates call to checkpoint a container in the FakeRuntimeService.
-func (r *FakeRuntimeService) CheckpointContainer(_ context.Context, options *runtimeapi.CheckpointContainerRequest) error {
+func (r *FakeRuntimeService) CheckpointContainer(options *runtimeapi.CheckpointContainerRequest) error {
 	r.Lock()
 	defer r.Unlock()
 

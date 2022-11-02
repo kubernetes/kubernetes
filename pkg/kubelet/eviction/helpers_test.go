@@ -17,7 +17,6 @@ limitations under the License.
 package eviction
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -1186,11 +1185,11 @@ type fakeSummaryProvider struct {
 	result *statsapi.Summary
 }
 
-func (f *fakeSummaryProvider) Get(ctx context.Context, updateStats bool) (*statsapi.Summary, error) {
+func (f *fakeSummaryProvider) Get(updateStats bool) (*statsapi.Summary, error) {
 	return f.result, nil
 }
 
-func (f *fakeSummaryProvider) GetCPUAndMemoryStats(ctx context.Context) (*statsapi.Summary, error) {
+func (f *fakeSummaryProvider) GetCPUAndMemoryStats() (*statsapi.Summary, error) {
 	return f.result, nil
 }
 

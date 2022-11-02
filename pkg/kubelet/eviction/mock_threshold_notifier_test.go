@@ -21,7 +21,6 @@ limitations under the License.
 package eviction
 
 import (
-	context "context"
 	reflect "reflect"
 	time "time"
 
@@ -130,18 +129,18 @@ func (m *MockDiskInfoProvider) EXPECT() *MockDiskInfoProviderMockRecorder {
 }
 
 // HasDedicatedImageFs mocks base method.
-func (m *MockDiskInfoProvider) HasDedicatedImageFs(ctx context.Context) (bool, error) {
+func (m *MockDiskInfoProvider) HasDedicatedImageFs() (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HasDedicatedImageFs", ctx)
+	ret := m.ctrl.Call(m, "HasDedicatedImageFs")
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // HasDedicatedImageFs indicates an expected call of HasDedicatedImageFs.
-func (mr *MockDiskInfoProviderMockRecorder) HasDedicatedImageFs(ctx interface{}) *gomock.Call {
+func (mr *MockDiskInfoProviderMockRecorder) HasDedicatedImageFs() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasDedicatedImageFs", reflect.TypeOf((*MockDiskInfoProvider)(nil).HasDedicatedImageFs), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasDedicatedImageFs", reflect.TypeOf((*MockDiskInfoProvider)(nil).HasDedicatedImageFs))
 }
 
 // MockImageGC is a mock of ImageGC interface.
@@ -168,17 +167,17 @@ func (m *MockImageGC) EXPECT() *MockImageGCMockRecorder {
 }
 
 // DeleteUnusedImages mocks base method.
-func (m *MockImageGC) DeleteUnusedImages(ctx context.Context) error {
+func (m *MockImageGC) DeleteUnusedImages() error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteUnusedImages", ctx)
+	ret := m.ctrl.Call(m, "DeleteUnusedImages")
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteUnusedImages indicates an expected call of DeleteUnusedImages.
-func (mr *MockImageGCMockRecorder) DeleteUnusedImages(ctx interface{}) *gomock.Call {
+func (mr *MockImageGCMockRecorder) DeleteUnusedImages() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUnusedImages", reflect.TypeOf((*MockImageGC)(nil).DeleteUnusedImages), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUnusedImages", reflect.TypeOf((*MockImageGC)(nil).DeleteUnusedImages))
 }
 
 // MockContainerGC is a mock of ContainerGC interface.
@@ -205,17 +204,17 @@ func (m *MockContainerGC) EXPECT() *MockContainerGCMockRecorder {
 }
 
 // DeleteAllUnusedContainers mocks base method.
-func (m *MockContainerGC) DeleteAllUnusedContainers(ctx context.Context) error {
+func (m *MockContainerGC) DeleteAllUnusedContainers() error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteAllUnusedContainers", ctx)
+	ret := m.ctrl.Call(m, "DeleteAllUnusedContainers")
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteAllUnusedContainers indicates an expected call of DeleteAllUnusedContainers.
-func (mr *MockContainerGCMockRecorder) DeleteAllUnusedContainers(ctx interface{}) *gomock.Call {
+func (mr *MockContainerGCMockRecorder) DeleteAllUnusedContainers() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAllUnusedContainers", reflect.TypeOf((*MockContainerGC)(nil).DeleteAllUnusedContainers), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAllUnusedContainers", reflect.TypeOf((*MockContainerGC)(nil).DeleteAllUnusedContainers))
 }
 
 // MockCgroupNotifier is a mock of CgroupNotifier interface.

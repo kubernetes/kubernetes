@@ -191,8 +191,8 @@ func (kl *Kubelet) GetPods() []*v1.Pod {
 // container runtime cache. This function converts kubecontainer.Pod to
 // v1.Pod, so only the fields that exist in both kubecontainer.Pod and
 // v1.Pod are considered meaningful.
-func (kl *Kubelet) GetRunningPods(ctx context.Context) ([]*v1.Pod, error) {
-	pods, err := kl.runtimeCache.GetPods(ctx)
+func (kl *Kubelet) GetRunningPods() ([]*v1.Pod, error) {
+	pods, err := kl.runtimeCache.GetPods()
 	if err != nil {
 		return nil, err
 	}

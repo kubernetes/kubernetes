@@ -16,13 +16,11 @@ limitations under the License.
 
 package logs
 
-import "context"
-
 type containerLogManagerStub struct{}
 
 func (*containerLogManagerStub) Start() {}
 
-func (*containerLogManagerStub) Clean(ctx context.Context, containerID string) error {
+func (*containerLogManagerStub) Clean(containerID string) error {
 	return nil
 }
 

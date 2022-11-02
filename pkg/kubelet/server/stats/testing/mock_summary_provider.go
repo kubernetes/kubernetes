@@ -21,7 +21,6 @@ limitations under the License.
 package testing
 
 import (
-	context "context"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -52,31 +51,31 @@ func (m *MockSummaryProvider) EXPECT() *MockSummaryProviderMockRecorder {
 }
 
 // Get mocks base method.
-func (m *MockSummaryProvider) Get(ctx context.Context, updateStats bool) (*v1alpha1.Summary, error) {
+func (m *MockSummaryProvider) Get(updateStats bool) (*v1alpha1.Summary, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", ctx, updateStats)
+	ret := m.ctrl.Call(m, "Get", updateStats)
 	ret0, _ := ret[0].(*v1alpha1.Summary)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Get indicates an expected call of Get.
-func (mr *MockSummaryProviderMockRecorder) Get(ctx, updateStats interface{}) *gomock.Call {
+func (mr *MockSummaryProviderMockRecorder) Get(updateStats interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockSummaryProvider)(nil).Get), ctx, updateStats)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockSummaryProvider)(nil).Get), updateStats)
 }
 
 // GetCPUAndMemoryStats mocks base method.
-func (m *MockSummaryProvider) GetCPUAndMemoryStats(ctx context.Context) (*v1alpha1.Summary, error) {
+func (m *MockSummaryProvider) GetCPUAndMemoryStats() (*v1alpha1.Summary, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetCPUAndMemoryStats", ctx)
+	ret := m.ctrl.Call(m, "GetCPUAndMemoryStats")
 	ret0, _ := ret[0].(*v1alpha1.Summary)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetCPUAndMemoryStats indicates an expected call of GetCPUAndMemoryStats.
-func (mr *MockSummaryProviderMockRecorder) GetCPUAndMemoryStats(ctx interface{}) *gomock.Call {
+func (mr *MockSummaryProviderMockRecorder) GetCPUAndMemoryStats() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCPUAndMemoryStats", reflect.TypeOf((*MockSummaryProvider)(nil).GetCPUAndMemoryStats), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCPUAndMemoryStats", reflect.TypeOf((*MockSummaryProvider)(nil).GetCPUAndMemoryStats))
 }
