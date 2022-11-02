@@ -148,7 +148,7 @@ func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVol
 // - Windows pod contains a hostProcess container
 func shouldMountHostsFile(pod *v1.Pod, podIPs []string) bool {
 	shouldMount := len(podIPs) > 0
-	if runtime.GOOS == "windows" && utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostProcessContainers) {
+	if runtime.GOOS == "windows" {
 		return shouldMount && !kubecontainer.HasWindowsHostProcessContainer(pod)
 	}
 	return shouldMount

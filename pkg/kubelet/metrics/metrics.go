@@ -574,10 +574,8 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(StartedPodsErrorsTotal)
 		legacyregistry.MustRegister(StartedContainersTotal)
 		legacyregistry.MustRegister(StartedContainersErrorsTotal)
-		if utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostProcessContainers) {
-			legacyregistry.MustRegister(StartedHostProcessContainersTotal)
-			legacyregistry.MustRegister(StartedHostProcessContainersErrorsTotal)
-		}
+		legacyregistry.MustRegister(StartedHostProcessContainersTotal)
+		legacyregistry.MustRegister(StartedHostProcessContainersErrorsTotal)
 		legacyregistry.MustRegister(RunPodSandboxDuration)
 		legacyregistry.MustRegister(RunPodSandboxErrors)
 

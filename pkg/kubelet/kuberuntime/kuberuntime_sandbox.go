@@ -25,10 +25,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	runtimeutil "k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -237,13 +235,6 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxWindowsConfig(pod *v1.Pod)
 	// If all of the containers in a pod are HostProcess containers, set the pod's HostProcess field
 	// explicitly because the container runtime requires this information at sandbox creation time.
 	if kubecontainer.HasWindowsHostProcessContainer(pod) {
-		// Pods containing HostProcess containers should fail to schedule if feature is not
-		// enabled instead of trying to schedule containers as regular containers as stated in
-		// PRR review.
-		if !utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostProcessContainers) {
-			return nil, fmt.Errorf("pod contains HostProcess containers but feature 'WindowsHostProcessContainers' is not enabled")
-		}
-
 		// At present Windows all containers in a Windows pod must be HostProcess containers
 		// and HostNetwork is required to be set.
 		if !kubecontainer.AllContainersAreWindowsHostProcess(pod) {

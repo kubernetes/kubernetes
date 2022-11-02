@@ -790,6 +790,7 @@ const (
 	// owner: @marosset
 	// alpha: v1.22
 	// beta: v1.23
+	// GA: v1.26
 	//
 	// Enables support for 'HostProcess' containers on Windows nodes.
 	WindowsHostProcessContainers featuregate.Feature = "WindowsHostProcessContainers"
@@ -1030,7 +1031,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	WinOverlay: {Default: true, PreRelease: featuregate.Beta},
 
-	WindowsHostProcessContainers: {Default: true, PreRelease: featuregate.Beta},
+	WindowsHostProcessContainers: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	NodeInclusionPolicyInPodTopologySpread: {Default: false, PreRelease: featuregate.Alpha},
 

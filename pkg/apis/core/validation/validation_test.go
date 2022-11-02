@@ -12304,7 +12304,6 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 
 	// Some tests use Windows host pods as an example of fields that might
 	// conflict between an ephemeral container and the rest of the pod.
-	opts := PodValidationOptions{AllowWindowsHostProcessField: true}
 	capabilities.SetForTests(capabilities.Capabilities{
 		AllowPrivileged: true,
 	})
@@ -12628,7 +12627,7 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		errs := ValidatePodEphemeralContainersUpdate(tc.new, tc.old, opts)
+		errs := ValidatePodEphemeralContainersUpdate(tc.new, tc.old, PodValidationOptions{})
 		if tc.err == "" {
 			if len(errs) != 0 {
 				t.Errorf("unexpected invalid for test: %s\nErrors returned: %+v\nLocal diff of test objects (-old +new):\n%s", tc.name, errs, cmp.Diff(tc.old, tc.new))
@@ -20855,78 +20854,12 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 	testCases := []struct {
 		name            string
 		expectError     bool
-		featureEnabled  bool
 		allowPrivileged bool
 		podSpec         *core.PodSpec
 	}{
 		{
-			name:            "Spec with feature disabled and pod-wide HostProcess=false and should not validate",
-			expectError:     true,
-			featureEnabled:  false,
-			allowPrivileged: true,
-			podSpec: &core.PodSpec{
-				SecurityContext: &core.PodSecurityContext{
-					WindowsOptions: &core.WindowsSecurityContextOptions{
-						HostProcess: &falseVar,
-					},
-				},
-				Containers: []core.Container{{
-					Name: containerName,
-				}},
-			},
-		},
-		{
-			name:            "Spec with feature disabled and pod-wide HostProcess=nil set should valildate",
-			expectError:     false,
-			featureEnabled:  false,
-			allowPrivileged: true,
-			podSpec: &core.PodSpec{
-				SecurityContext: &core.PodSecurityContext{
-					WindowsOptions: &core.WindowsSecurityContextOptions{
-						HostProcess: nil,
-					},
-				},
-				Containers: []core.Container{{
-					Name: containerName,
-				}},
-			},
-		},
-		{
-			name:            "Spec with feature disabled and container setting HostProcess=true should not valildate",
-			expectError:     true,
-			featureEnabled:  false,
-			allowPrivileged: true,
-			podSpec: &core.PodSpec{
-				Containers: []core.Container{{
-					Name: containerName,
-					SecurityContext: &core.SecurityContext{
-						WindowsOptions: &core.WindowsSecurityContextOptions{
-							HostProcess: &trueVar,
-						},
-					},
-				}},
-			},
-		},
-		{
-			name:            "Spec with feature disabled and init container setting HostProcess=true should not valildate",
-			expectError:     true,
-			featureEnabled:  false,
-			allowPrivileged: true,
-			podSpec: &core.PodSpec{
-				InitContainers: []core.Container{{
-					Name: containerName,
-					SecurityContext: &core.SecurityContext{
-						WindowsOptions: &core.WindowsSecurityContextOptions{
-							HostProcess: &trueVar,
-						},
-					},
-				}},
-			},
-		},
-		{
 			name:            "Spec with feature enabled, pod-wide HostProcess=true, and HostNetwork unset should not validate",
 			expectError:     true,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -20942,7 +20875,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Spec with feature enabled, pod-wide HostProcess=ture, and HostNetwork set should validate",
 			expectError:     false,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -20959,7 +20891,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Spec with feature enabled, pod-wide HostProcess=ture, HostNetwork set, and containers setting HostProcess=true should validate",
 			expectError:     false,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -20989,7 +20920,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Spec with feature enabled, pod-wide HostProcess=nil, HostNetwork set, and all containers setting HostProcess=true should validate",
 			expectError:     false,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -21016,7 +20946,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Pods with feature enabled, some containers setting HostProcess=true, and others setting HostProcess=false should not validate",
 			expectError:     true,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -21043,7 +20972,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Spec with feature enabled, some containers setting HostProcess=true, and other leaving HostProcess unset should not validate",
 			expectError:     true,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -21065,7 +20993,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Spec with feature enabled, pod-wide HostProcess=true, some containers setting HostProcess=true, and init containers setting HostProcess=false should not validate",
 			expectError:     true,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -21095,7 +21022,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Spec with feature enabled, pod-wide HostProcess=true, some containers setting HostProcess=true, and others setting HostProcess=false should not validate",
 			expectError:     true,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -21126,7 +21052,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Spec with feature enabled, pod-wide HostProcess=true, some containers setting HostProcess=true, and others leaving HostProcess=nil should validate",
 			expectError:     false,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -21151,7 +21076,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Spec with feature enabled, pod-wide HostProcess=false, some contaienrs setting HostProccess=true should not validate",
 			expectError:     true,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -21176,7 +21100,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Pod's HostProcess set to true but all containers override to false should not validate",
 			expectError:     true,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -21198,7 +21121,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Valid HostProcess pod should spec should not validate if allowPrivileged is not set",
 			expectError:     true,
-			featureEnabled:  true,
 			allowPrivileged: false,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -21217,7 +21139,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Non-HostProcess ephemeral container in HostProcess pod should not validate",
 			expectError:     true,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -21243,7 +21164,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "HostProcess ephemeral container in HostProcess pod should validate",
 			expectError:     false,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -21263,7 +21183,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Non-HostProcess ephemeral container in Non-HostProcess pod should validate",
 			expectError:     false,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				Containers: []core.Container{{
@@ -21283,7 +21202,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "HostProcess ephemeral container in Non-HostProcess pod should not validate",
 			expectError:     true,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				Containers: []core.Container{{
@@ -21304,15 +21222,12 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostProcessContainers, testCase.featureEnabled)()
-
-			opts := PodValidationOptions{AllowWindowsHostProcessField: testCase.featureEnabled}
 
 			capabilities.SetForTests(capabilities.Capabilities{
 				AllowPrivileged: testCase.allowPrivileged,
 			})
 
-			errs := validateWindowsHostProcessPod(testCase.podSpec, field.NewPath("spec"), opts)
+			errs := validateWindowsHostProcessPod(testCase.podSpec, field.NewPath("spec"))
 			if testCase.expectError && len(errs) == 0 {
 				t.Errorf("Unexpected success")
 			}
