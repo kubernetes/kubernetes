@@ -358,12 +358,8 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 func CreateGinkgoConfig() (types.SuiteConfig, types.ReporterConfig) {
 	// fetch the current config
 	suiteConfig, reporterConfig := ginkgo.GinkgoConfiguration()
-	// Turn on EmitSpecProgress to get spec progress (especially on interrupt)
-	suiteConfig.EmitSpecProgress = true
 	// Randomize specs as well as suites
 	suiteConfig.RandomizeAllSpecs = true
-	// Turn on verbose by default to get spec names
-	reporterConfig.Verbose = true
 	// Disable skipped tests unless they are explicitly requested.
 	if len(suiteConfig.FocusStrings) == 0 && len(suiteConfig.SkipStrings) == 0 {
 		suiteConfig.SkipStrings = []string{`\[Flaky\]|\[Feature:.+\]`}
