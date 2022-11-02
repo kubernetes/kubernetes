@@ -268,6 +268,9 @@ func (f *Framework) dumpNamespaceInfo() {
 	if !TestContext.DumpLogsOnFailure {
 		return
 	}
+	if f.DumpAllNamespaceInfo == nil {
+		return
+	}
 	ginkgo.By("dump namespace information after failure", func() {
 		if !f.SkipNamespaceCreation {
 			for _, ns := range f.namespacesToDelete {
