@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	k8stesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
@@ -1908,6 +1909,7 @@ func TestReconcileTopology(t *testing.T) {
 // Test Helpers
 
 func newReconciler(client *fake.Clientset, nodes []*corev1.Node, maxEndpointsPerSlice int32) *reconciler {
+	eventRecorder := record.NewFakeRecorder(10)
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	nodeInformer := informerFactory.Core().V1().Nodes()
 	indexer := nodeInformer.Informer().GetIndexer()
@@ -1921,6 +1923,7 @@ func newReconciler(client *fake.Clientset, nodes []*corev1.Node, maxEndpointsPer
 		maxEndpointsPerSlice: maxEndpointsPerSlice,
 		endpointSliceTracker: endpointsliceutil.NewEndpointSliceTracker(),
 		metricsCache:         metrics.NewCache(maxEndpointsPerSlice),
+		eventRecorder:        eventRecorder,
 	}
 }
 

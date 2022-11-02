@@ -164,6 +164,7 @@ func NewController(podInformer coreinformers.PodInformer,
 		endpointSliceTracker: c.endpointSliceTracker,
 		metricsCache:         endpointslicemetrics.NewCache(maxEndpointsPerSlice),
 		topologyCache:        c.topologyCache,
+		eventRecorder:        c.eventRecorder,
 	}
 
 	return c
