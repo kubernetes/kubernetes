@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -4692,70 +4691,6 @@ URL:	http://localhost
 			if strings.Contains(output, test.unexpected) {
 				t.Errorf("Didn't expect to find %q in: %q", test.unexpected, output)
 			}
-		}
-	}
-}
-
-func TestDescribePodSecurityPolicy(t *testing.T) {
-	expected := []string{
-		"Name:\\s*mypsp",
-		"Allow Privileged:\\s*false",
-		"Allow Privilege Escalation:\\s*false",
-		"Default Add Capabilities:\\s*<none>",
-		"Required Drop Capabilities:\\s*<none>",
-		"Allowed Capabilities:\\s*<none>",
-		"Allowed Volume Types:\\s*<none>",
-		"Allowed Unsafe Sysctls:\\s*kernel\\.\\*,net\\.ipv4.ip_local_port_range",
-		"Forbidden Sysctls:\\s*net\\.ipv4\\.ip_default_ttl",
-		"Allow Host Network:\\s*false",
-		"Allow Host Ports:\\s*<none>",
-		"Allow Host PID:\\s*false",
-		"Allow Host IPC:\\s*false",
-		"Read Only Root Filesystem:\\s*false",
-		"SELinux Context Strategy: RunAsAny",
-		"User:\\s*<none>",
-		"Role:\\s*<none>",
-		"Type:\\s*<none>",
-		"Level:\\s*<none>",
-		"Run As User Strategy: RunAsAny",
-		"FSGroup Strategy: RunAsAny",
-		"Supplemental Groups Strategy: RunAsAny",
-	}
-
-	falseVal := false
-	fake := fake.NewSimpleClientset(&policyv1beta1.PodSecurityPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "mypsp",
-		},
-		Spec: policyv1beta1.PodSecurityPolicySpec{
-			AllowPrivilegeEscalation: &falseVal,
-			AllowedUnsafeSysctls:     []string{"kernel.*", "net.ipv4.ip_local_port_range"},
-			ForbiddenSysctls:         []string{"net.ipv4.ip_default_ttl"},
-			SELinux: policyv1beta1.SELinuxStrategyOptions{
-				Rule: policyv1beta1.SELinuxStrategyRunAsAny,
-			},
-			RunAsUser: policyv1beta1.RunAsUserStrategyOptions{
-				Rule: policyv1beta1.RunAsUserStrategyRunAsAny,
-			},
-			FSGroup: policyv1beta1.FSGroupStrategyOptions{
-				Rule: policyv1beta1.FSGroupStrategyRunAsAny,
-			},
-			SupplementalGroups: policyv1beta1.SupplementalGroupsStrategyOptions{
-				Rule: policyv1beta1.SupplementalGroupsStrategyRunAsAny,
-			},
-		},
-	})
-
-	c := &describeClient{T: t, Namespace: "", Interface: fake}
-	d := PodSecurityPolicyDescriber{c}
-	out, err := d.Describe("", "mypsp", DescriberSettings{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	for _, item := range expected {
-		if matched, _ := regexp.MatchString(item, out); !matched {
-			t.Errorf("Expected to find %q in: %q", item, out)
 		}
 	}
 }
