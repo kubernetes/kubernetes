@@ -970,6 +970,8 @@ func ParseToRequirements(selector string, opts ...field.PathOption) ([]Requireme
 // Set.AsSelectorPreValidated (which copies the input Set), this type simply wraps the underlying
 // Set. As a result, it is substantially more efficient, but requires the caller to not mutate the
 // Set.
+// None of the Selector methods mutate the underlying Set, but Add() and Requirements() convert to the
+// less optimized version.
 type SetSelector Set
 
 func (s SetSelector) Matches(labels Labels) bool {
@@ -994,14 +996,14 @@ func (s SetSelector) String() string {
 	sort.Strings(keys)
 	b := strings.Builder{}
 	for i, key := range keys {
-		last := i == len(keys)-1
 		v := s[key]
+		b.Grow(len(key) + 2 + len(v))
+		if i != 0 {
+			b.WriteString(",")
+		}
 		b.WriteString(key)
 		b.WriteString("=")
 		b.WriteString(v)
-		if !last {
-			b.WriteString(",")
-		}
 	}
 	return b.String()
 }
@@ -1028,16 +1030,7 @@ func (s SetSelector) RequiresExactMatch(label string) (value string, found bool)
 }
 
 func (s SetSelector) toFullSelector() Selector {
-	if s == nil || len(s) == 0 {
-		return internalSelector{}
-	}
-	requirements := make([]Requirement, 0, len(s))
-	for label, value := range s {
-		requirements = append(requirements, Requirement{key: label, operator: selection.Equals, strValues: []string{value}})
-	}
-	// sort to have deterministic string representation
-	sort.Sort(ByKey(requirements))
-	return internalSelector(requirements)
+	return SelectorFromValidatedSet(Set(s))
 }
 
 var _ Selector = SetSelector{}
