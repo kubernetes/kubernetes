@@ -297,9 +297,10 @@ func (s *SpdyRoundTripper) proxyAuth(proxyURL *url.URL) string {
 	if proxyURL == nil || proxyURL.User == nil {
 		return ""
 	}
-	credentials := proxyURL.User.String()
-	encodedAuth := base64.StdEncoding.EncodeToString([]byte(credentials))
-	return fmt.Sprintf("Basic %s", encodedAuth)
+	username := proxyURL.User.Username()
+	password, _ := proxyURL.User.Password()
+	auth := username + ":" + password
+	return "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
 }
 
 // RoundTrip executes the Request and upgrades it. After a successful upgrade,
