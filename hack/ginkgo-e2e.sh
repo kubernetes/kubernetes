@@ -192,7 +192,7 @@ esac
 # Move Ginkgo arguments that are understood by the suite when not using
 # the CLI.
 suite_args=()
-if [ "${E2E_TEST_DEBUG_TOOL}" != "ginkgo" ]; then
+if [ "${E2E_TEST_DEBUG_TOOL:-ginkgo}" != "ginkgo" ]; then
   for arg in "${ginkgo_args[@]}"; do
     suite_args+=("--ginkgo.${arg#--}")
   done
