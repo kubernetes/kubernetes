@@ -394,6 +394,34 @@ func TestValidate(t *testing.T) {
 			},
 		},
 		{
+			name: "test message for failed validation",
+			policy: getValidPolicy([]v1alpha1.Validation{
+				{
+					Expression: "oldObject == null",
+					Reason:     forbiddenReason,
+					Message:    "old object should be present",
+				},
+			}, hasParamKind, nil),
+			attributes: newValidAttribute(true),
+			params:     configMapParams,
+			policyDecisions: []policyDecision{
+				generatedDecision(deny, "old object should be present", metav1.StatusReasonForbidden),
+			},
+		},
+		{
+			name: "test runtime error",
+			policy: getValidPolicy([]v1alpha1.Validation{
+				{
+					Expression: "oldObject.x == 100",
+				},
+			}, hasParamKind, nil),
+			attributes: newValidAttribute(true),
+			params:     configMapParams,
+			policyDecisions: []policyDecision{
+				generatedDecision(deny, "resulted in error", ""),
+			},
+		},
+		{
 			name: "test against crd param",
 			policy: getValidPolicy([]v1alpha1.Validation{
 				{
