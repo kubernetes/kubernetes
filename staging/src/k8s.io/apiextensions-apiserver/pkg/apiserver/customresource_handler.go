@@ -87,13 +87,10 @@ import (
 )
 
 const (
-	// If the StorageVersionAPI feature gate is enabled, after a CRD storage
-	// (a.k.a. serving info) is created, the API server will block CR write
-	// requests that hit this storage until the corresponding storage
-	// version update gets processed by the storage version manager.
-	// The API server will unblock CR write requests if the storage version
-	// update takes longer than storageVersionUpdateTimeout after the
-	// storage is created.
+	// storageVersionUpdateTimeout is the maximum duration of time writes to a custom resource
+	// will block while waiting for an update to the StorageVersion API. When the timeout
+	// is reached, writes to the custom resource will be unblocked regardless of what version is
+	// published by the StorageVersion API.
 	storageVersionUpdateTimeout = 15 * time.Second
 )
 
@@ -142,11 +139,10 @@ type crdHandler struct {
 	// 0 means no limit.
 	maxRequestBodyBytes int64
 
-	// storageVersionManager manages CRD StorageVersion updates.
-	// NOTE: since we want StorageVersion updates happen in the same order
-	// as the CRD spec updates / underlying storage changes, one must hold
-	// customStorageLock when calling methods in storageVersionManager, to
-	// make sure the updates get queued up in the right order.
+	// storageVersionManager is used to enqueue and process StorageVersion API updates for a CRD.
+	// storageVersionMananger must always be accessed while holding customStorageLock to ensure
+	// storage version updates are queued stictly alongside any changes to the CRD specification or
+	// the internal CRD storage map.
 	storageVersionManager storageversion.Manager
 }
 
@@ -180,49 +176,43 @@ type crdInfo struct {
 
 	waitGroup *utilwaitgroup.SafeWaitGroup
 
-	// storageVersionUpdate holds information about the storage version
-	// update issued when the crdInfo was created. The API server uses the
-	// information to decide whether a CR write request should be allowed,
-	// rejected, or blocked.
+	// storageVersionUpdate contains the done channel and timeout duration
+	// when blocking CRD writes on a pending StorageVersion update.
 	storageVersionUpdate *storageVersionUpdate
 }
 
+// waitForStorageVersionUpdate blocks on a channel that closes once
+// the StorageVersion API for a CRD is updated. Otherwise it returns
+// when the request context is cancelled or when storageVersionUpdateTimeout
+// has been reached.
 func (i *crdInfo) waitForStorageVersionUpdate(ctx context.Context) error {
-	// StorageVersionAPI feature gate is disabled
+	// storageVersionUpdate is nil when the StorageVersionAPI feature gate is disabled.
 	if i.storageVersionUpdate == nil {
 		return nil
 	}
 
-	// NOTE: currently the graceful CRD deletion waits 1s for in-flight requests
-	// to register themselves to the wait group. Ideally the storage version update should
-	// not cause the requests to miss the 1s window; otherwise the requests may
-	// fail ungracefully (e.g. it may happen if the CRD was deleted immediately after the
-	// first CR request establishes the underlying storage).
 	select {
-	case <-i.storageVersionUpdate.processedCh:
+	case <-i.storageVersionUpdate.doneCh:
 		return nil
 	case <-ctx.Done():
-		return fmt.Errorf("aborted waiting for CRD storage version update: %v", ctx.Err())
+		return fmt.Errorf("aborted waiting for custom resource storage version update: %v", ctx.Err())
 	// Unblock the requests if the storage version update takes a long time, otherwise
 	// CR requests may stack up and overwhelm the API server.
-	// TODO(roycaihw): benchmark the storage version update latency to adjust the timeout.
-	case <-time.After(i.storageVersionUpdate.timeout.Sub(time.Now())):
-		return fmt.Errorf("timeout waiting for CRD storage version update")
+	case <-time.After(time.Until(i.storageVersionUpdate.timeout)):
+		return fmt.Errorf("timeout waiting for custom resource storage version update")
 	}
-	return nil
 }
 
-// storageVersionUpdate holds information about a storage version update,
-// indicating whether the update gets processed, or timed-out.
+// storageVersionUpdate represents a single storage version update for a CRD.
 type storageVersionUpdate struct {
-	// processedCh is closed by the storage version manager after the
-	// storage version update gets processed (either succeeded or failed).
+	// doneCh is closed by the storage version manager after the
+	// storage version update is complete (either succeeded or failed).
 	// The API server will unblock and allow CR write requests if this
 	// channel is closed.
-	processedCh <-chan struct{}
-	// timeout is the time when the API server will unblock and allow CR
-	// write requests even if the storage version update hasn't been
-	// processed.
+	doneCh <-chan struct{}
+	// timeout is the duration in which apiserver will block write requests
+	// to the CR waiting for a storage version update. Once reached, apiserver
+	// will unblock write requests regardless of the storage version update.
 	timeout time.Time
 }
 
@@ -587,6 +577,7 @@ func (r *crdHandler) createCustomResourceDefinition(obj interface{}) {
 			crd.Name)
 		return
 	}
+
 	// Tear down the old storage
 	var tearDownFinishedCh <-chan struct{}
 	if found {
@@ -1123,11 +1114,11 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 
 	if r.storageVersionManager != nil {
 		// spawn storage version update in background and use channels to make handlers wait
-		processedCh := make(chan struct{})
-		r.storageVersionManager.EnqueueStorageVersionUpdate(crd, nil, processedCh)
+		doneCh := make(chan struct{})
+		r.storageVersionManager.EnqueueStorageVersionUpdate(crd, nil, doneCh)
 		ret.storageVersionUpdate = &storageVersionUpdate{
-			processedCh: processedCh,
-			timeout:     time.Now().Add(storageVersionUpdateTimeout),
+			doneCh:  doneCh,
+			timeout: time.Now().Add(storageVersionUpdateTimeout),
 		}
 	}
 

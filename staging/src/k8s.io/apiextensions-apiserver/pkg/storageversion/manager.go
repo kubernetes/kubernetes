@@ -48,14 +48,14 @@ const (
 type Manager interface {
 	// EnqueueStorageVersionUpdate queues a StorageVesrion update for the given
 	// CRD and returns immediately. Optionally, the caller may specify a
-	// non-nil waitCh and/or a non-nil processedCh.
+	// non-nil waitCh and/or a non-nil doneCh.
 	// A non-nil waitCh will block the StorageVersion update until waitCh is
 	// closed.
-	// The manager will close the non-nil processedCh if it finished
+	// The manager will close the non-nil doneCh if it finished
 	// processing the StorageVersion update (note that the update can either
 	// succeeded or failed).
 	EnqueueStorageVersionUpdate(crd *apiextensionsv1.CustomResourceDefinition,
-		waitCh <-chan struct{}, processedCh chan<- struct{})
+		waitCh <-chan struct{}, doneCh chan<- struct{})
 	// TeardownFor aborts all pending updates for the given CRD UID, and
 	// stops the corresponding goroutine.
 	TeardownFor(uid types.UID)
@@ -67,7 +67,7 @@ type update struct {
 	// If non-nil, wait for the channel to be closed before processing the update.
 	waitCh <-chan struct{}
 	// If non-nil, close the channel after the update process is finished.
-	processedCh chan<- struct{}
+	doneCh chan<- struct{}
 }
 
 // updateQueue is a queue of StorageVersion updates. Upon creation, a goroutine
@@ -100,6 +100,7 @@ type manager struct {
 	// StorageVersion objects.
 	client genericstorageversion.Client
 	// apiserverID is the ID of the apiserver that invokes this manager.
+	// The ID is used when setting the holder identity in the StorageVersion object.
 	apiserverID string
 }
 
@@ -112,16 +113,16 @@ func NewManager(client genericstorageversion.Client, apiserverID string) Manager
 	}
 }
 
-// EnqueueStorageVersionUpdate queues a StorageVesrion update for the given
+// EnqueueStorageVersionUpdate queues a StorageVersion update for the given
 // CRD and returns immediately. Optionally, the caller may specify a
-// non-nil waitCh and/or a non-nil processedCh.
+// non-nil waitCh and/or a non-nil doneCh.
 // A non-nil waitCh will block the StorageVersion update until waitCh is
 // closed.
-// The manager will close the non-nil processedCh if it finished
+// The manager will close the non-nil doneCh if it finished
 // processing the StorageVersion update (note that the update can either
 // succeeded or failed).
 func (m *manager) EnqueueStorageVersionUpdate(crd *apiextensionsv1.CustomResourceDefinition,
-	waitCh <-chan struct{}, processedCh chan<- struct{}) {
+	waitCh <-chan struct{}, doneCh chan<- struct{}) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	q := m.getOrCreateUpdateQueueLocked(crd.UID)
@@ -134,22 +135,22 @@ func (m *manager) EnqueueStorageVersionUpdate(crd *apiextensionsv1.CustomResourc
 		// graduates to beta/GA
 		klog.V(2).Infof("Skipping the storage version update for CRD with UID %v due to the queue being full (queue size: %v).",
 			crd.UID, updateQueueBufferSize)
-		if processedCh != nil {
-			close(processedCh)
+		if doneCh != nil {
+			close(doneCh)
 		}
 		return
 	}
 	// m.lock ensures we won't write to a closed queue.
 	q <- &update{
-		crd:         crd,
-		waitCh:      waitCh,
-		processedCh: processedCh,
+		crd:    crd,
+		waitCh: waitCh,
+		doneCh: doneCh,
 	}
 }
 
-// getOrCreateUpdateQueueLocked returns the channel for the given UID, or create a new
-// one and a new goroutine if necessary. The goroutine keeps processing updates
-// until the channel is closed. The caller should hold the manager's lock.
+// getOrCreateUpdateQueueLocked returns the queue channel for the given UID,
+// or creates a new one if necessary. A newly created queue will also run a goroutine
+// to process updates until doneCh is closed. The caller should hold the manager's lock.
 func (m *manager) getOrCreateUpdateQueueLocked(uid types.UID) chan<- *update {
 	if queue, ok := m.updateQueues[uid]; ok {
 		return queue.q
@@ -171,41 +172,40 @@ func (m *manager) getOrCreateUpdateQueueLocked(uid types.UID) chan<- *update {
 				m.TeardownFor(uid)
 			}
 		}()
-		for update := range queue {
+		for q := range queue {
 			select {
 			case <-ctx.Done():
 				// The queue was cancelled. Abort the update.
-				if update.processedCh != nil {
-					close(update.processedCh)
+				if q.doneCh != nil {
+					close(q.doneCh)
 				}
 				continue
 			default:
 			}
 
 			// TODO(roycaihw): there are two types of updates:
-			//   1) the ones with nil processedCh, requested by
+			//   1) the ones with nil doneCh, requested by
 			//      watch events handler
-			//   2) the ones with non-nil processedCh, requested
+			//   2) the ones with non-nil doneCh, requested
 			//      by newly-created CRD storage
 			// An update of type 1) can be merged with a consecutive update,
 			// where the latter update's storage version is honored, and both
 			// updates' waitChs get evaluated.
-			if update.waitCh != nil {
-				<-update.waitCh
+			if q.waitCh != nil {
+				<-q.waitCh
 			}
-			if err := m.updateCRDStorageVersion(ctx, update.crd); err != nil {
+			if err := m.updateCRDStorageVersion(ctx, q.crd); err != nil {
 				utilruntime.HandleError(err)
 			}
-			if update.processedCh != nil {
-				close(update.processedCh)
+			if q.doneCh != nil {
+				close(q.doneCh)
 			}
 		}
 	}()
 	return queue
 }
 
-// TeardownFor closes the channel for the given UID. It ensures that we don't
-// leak goroutines.
+// TeardownFor closes the queue for a given CRD by UID.
 func (m *manager) TeardownFor(uid types.UID) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -229,6 +229,7 @@ func (m *manager) TeardownFor(uid types.UID) {
 	}
 }
 
+// updateCRDStorageVersion issues an update to the StorageVersion object for a CRD.
 func (m *manager) updateCRDStorageVersion(ctx context.Context, crd *apiextensionsv1.CustomResourceDefinition) error {
 	gr := schema.GroupResource{
 		Group:    crd.Spec.Group,
