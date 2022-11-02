@@ -214,7 +214,11 @@ func (u *udsGRPCConnector) connect(_ context.Context) (proxier, error) {
 	// we cannot use ctx just for dialing and control the connection lifetime separately.
 	// See https://github.com/kubernetes-sigs/apiserver-network-proxy/issues/357.
 	tunnelCtx := context.TODO()
-	tunnel, err := client.CreateSingleUseGrpcTunnel(tunnelCtx, udsName, dialOption, grpc.WithInsecure())
+	tunnel, err := client.CreateSingleUseGrpcTunnel(tunnelCtx, udsName, dialOption,
+		grpc.WithBlock(),
+		grpc.WithReturnConnectionError(),
+		grpc.WithTimeout(30*time.Second), // matches http.DefaultTransport dial timeout
+		grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
