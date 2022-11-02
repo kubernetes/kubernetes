@@ -216,6 +216,9 @@ func (u *udsGRPCConnector) connect(_ context.Context) (proxier, error) {
 	// See https://github.com/kubernetes-sigs/apiserver-network-proxy/issues/357.
 	tunnelCtx := context.TODO()
 	tunnel, err := client.CreateSingleUseGrpcTunnel(tunnelCtx, udsName, dialOption,
+		grpc.WithBlock(),
+		grpc.WithReturnConnectionError(),
+		grpc.WithTimeout(30*time.Second), // matches http.DefaultTransport dial timeout
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
