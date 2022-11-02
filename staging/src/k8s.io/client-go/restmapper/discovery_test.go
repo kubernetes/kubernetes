@@ -255,13 +255,13 @@ func TestDeferredDiscoveryRESTMapper_CacheMiss(t *testing.T) {
 		Version:  "v1",
 		Resource: "foo",
 	})
-	//assert.NoError(err)
+	assert.Error(err)
 	assert.True(cdc.fresh, "should be fresh after a cache-miss")
 	assert.Equal(cdc.invalidateCalls, 1, "should have called Invalidate() once")
 	//assert.Equal(gvk.Kind, "Foo")
 	assert.Equal(gvk.Kind, gvk.Kind)
 
-	gvk, err = m.KindFor(schema.GroupVersionResource{
+	gvk, _ = m.KindFor(schema.GroupVersionResource{
 		Group:    "a",
 		Version:  "v1",
 		Resource: "foo",
