@@ -503,13 +503,17 @@ runTests() {
   # Assert short name     #
   #########################
 
-  record_command run_assert_short_name_tests
+  if kube::test::if_supports_resource "${customresourcedefinitions}" && kube::test::if_supports_resource "${pods}" && kube::test::if_supports_resource "${configmaps}" ; then
+    record_command run_assert_short_name_tests
+  fi
 
   #########################
   # Assert singular name  #
   #########################
 
-  record_command run_assert_singular_name_tests
+  if kube::test::if_supports_resource "${customresourcedefinitions}" && kube::test::if_supports_resource "${pods}" ; then
+    record_command run_assert_singular_name_tests
+  fi
 
   #########################
   # Assert categories     #
