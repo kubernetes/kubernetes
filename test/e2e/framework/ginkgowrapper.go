@@ -52,7 +52,13 @@ func IgnoreNotFound(in any) any {
 // locations by passing the result as additional parameter to a
 // BeforeEach/AfterEach/DeferCleanup/It/etc.
 func AnnotatedLocation(annotation string) types.CodeLocation {
-	codeLocation := types.NewCodeLocation(1)
+	return AnnotatedLocationWithOffset(annotation, 1)
+}
+
+// AnnotatedLocationWithOffset skips additional call stack levels. With 0 as offset
+// it is identical to [AnnotatedLocation].
+func AnnotatedLocationWithOffset(annotation string, offset int) types.CodeLocation {
+	codeLocation := types.NewCodeLocation(offset + 1)
 	codeLocation.FileName = path.Base(codeLocation.FileName)
 	codeLocation = types.NewCustomCodeLocation(annotation + " | " + codeLocation.String())
 	return codeLocation
