@@ -809,12 +809,92 @@
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
                 }
@@ -900,12 +980,92 @@
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
                 }
@@ -920,12 +1080,92 @@
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
                 }
@@ -940,12 +1180,92 @@
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
                 }
@@ -1027,12 +1347,92 @@
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
                 }
@@ -1047,12 +1447,92 @@
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
                 }
@@ -1067,12 +1547,92 @@
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
                 }
@@ -1154,12 +1714,92 @@
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
                 }
@@ -1174,12 +1814,92 @@
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
                 }
@@ -1194,12 +1914,92 @@
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
                 }
@@ -1281,12 +2081,92 @@
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
                 }
@@ -1301,12 +2181,92 @@
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
                 }
@@ -1321,12 +2281,92 @@
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReview"
                 }

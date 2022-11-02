@@ -473,12 +473,92 @@
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
                 }
@@ -554,12 +634,92 @@
                   "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
                 }
@@ -574,12 +734,92 @@
                   "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
                 }
@@ -594,12 +834,92 @@
                   "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.authentication.v1.TokenReview"
                 }

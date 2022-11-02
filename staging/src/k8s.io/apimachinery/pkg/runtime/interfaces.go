@@ -149,6 +149,10 @@ type SerializerInfo struct {
 	// StreamSerializer, if set, describes the streaming serialization format
 	// for this media type.
 	StreamSerializer *StreamSerializerInfo
+
+	// convert is a request to alter the type of object returned by the server from the
+	// normal response
+	Converts []schema.GroupVersionKind
 }
 
 // StreamSerializerInfo contains information about a specific stream serialization format

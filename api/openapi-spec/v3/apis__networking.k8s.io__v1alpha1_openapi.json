@@ -1340,12 +1340,92 @@
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
                 }
@@ -1484,12 +1564,92 @@
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
                 }
@@ -1605,6 +1765,36 @@
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDRList"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDRList"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDRList"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDRList"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDRList"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDRList"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDRList"
+                }
+              },
               "application/json;stream=watch": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDRList"
@@ -1615,12 +1805,62 @@
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDRList"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDRList"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDRList"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDRList"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDRList"
+                }
+              },
               "application/vnd.kubernetes.protobuf;stream=watch": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDRList"
                 }
               },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDRList"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDRList"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDRList"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDRList"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDRList"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDRList"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDRList"
                 }
@@ -1702,12 +1942,92 @@
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
@@ -1722,12 +2042,92 @@
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
@@ -1742,12 +2142,92 @@
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
@@ -1829,12 +2309,92 @@
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
                 }
@@ -1849,12 +2409,92 @@
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
                 }
@@ -1887,12 +2527,92 @@
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
@@ -2008,12 +2728,92 @@
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
@@ -2028,12 +2828,92 @@
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
@@ -2104,12 +2984,92 @@
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
@@ -2124,12 +3084,92 @@
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ClusterCIDR"
                 }
@@ -2164,6 +3204,36 @@
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
               "application/json;stream=watch": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
@@ -2174,12 +3244,62 @@
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
               "application/vnd.kubernetes.protobuf;stream=watch": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
                 }
               },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
                 }
@@ -2306,6 +3426,36 @@
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
               "application/json;stream=watch": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
@@ -2316,12 +3466,62 @@
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
               "application/vnd.kubernetes.protobuf;stream=watch": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
                 }
               },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
                 }

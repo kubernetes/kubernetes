@@ -20,6 +20,7 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -302,7 +303,7 @@ func BenchmarkNegotiateMediaTypeOptions(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		options, _ := NegotiateMediaTypeOptions(header, accepted, DefaultEndpointRestrictions)
-		if options.Accepted != accepted[1] {
+		if !reflect.DeepEqual(options.Accepted, accepted[1]) {
 			b.Errorf("Unexpected result")
 		}
 	}

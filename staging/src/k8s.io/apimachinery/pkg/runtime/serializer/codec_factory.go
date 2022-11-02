@@ -20,6 +20,8 @@ import (
 	"mime"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -47,6 +49,7 @@ type serializerType struct {
 
 	Framer           runtime.Framer
 	StreamSerializer runtime.Serializer
+	Converts         []schema.GroupVersionKind
 }
 
 func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory, options CodecFactoryOptions) []serializerType {
@@ -63,6 +66,38 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory, option
 
 		Framer:           json.Framer,
 		StreamSerializer: jsonSerializer,
+		Converts: []schema.GroupVersionKind{
+			{
+				Kind:    "Table",
+				Group:   metav1beta1.SchemeGroupVersion.Group,
+				Version: metav1beta1.SchemeGroupVersion.Version,
+			},
+			{
+				Kind:    "PartialObjectMetadata",
+				Group:   metav1beta1.SchemeGroupVersion.Group,
+				Version: metav1beta1.SchemeGroupVersion.Version,
+			},
+			{
+				Kind:    "PartialObjectMetadataList",
+				Group:   metav1beta1.SchemeGroupVersion.Group,
+				Version: metav1beta1.SchemeGroupVersion.Version,
+			},
+			{
+				Kind:    "Table",
+				Group:   metav1.SchemeGroupVersion.Group,
+				Version: metav1.SchemeGroupVersion.Version,
+			},
+			{
+				Kind:    "PartialObjectMetadata",
+				Group:   metav1.SchemeGroupVersion.Group,
+				Version: metav1.SchemeGroupVersion.Version,
+			},
+			{
+				Kind:    "PartialObjectMetadataList",
+				Group:   metav1.SchemeGroupVersion.Group,
+				Version: metav1.SchemeGroupVersion.Version,
+			},
+		},
 	}
 	if options.Pretty {
 		jsonSerializerType.PrettySerializer = json.NewSerializerWithOptions(
@@ -97,6 +132,38 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory, option
 			EncodesAsText:      true,
 			Serializer:         yamlSerializer,
 			StrictSerializer:   strictYAMLSerializer,
+			Converts: []schema.GroupVersionKind{
+				{
+					Kind:    "Table",
+					Group:   metav1beta1.SchemeGroupVersion.Group,
+					Version: metav1beta1.SchemeGroupVersion.Version,
+				},
+				{
+					Kind:    "PartialObjectMetadata",
+					Group:   metav1beta1.SchemeGroupVersion.Group,
+					Version: metav1beta1.SchemeGroupVersion.Version,
+				},
+				{
+					Kind:    "PartialObjectMetadataList",
+					Group:   metav1beta1.SchemeGroupVersion.Group,
+					Version: metav1beta1.SchemeGroupVersion.Version,
+				},
+				{
+					Kind:    "Table",
+					Group:   metav1.SchemeGroupVersion.Group,
+					Version: metav1.SchemeGroupVersion.Version,
+				},
+				{
+					Kind:    "PartialObjectMetadata",
+					Group:   metav1.SchemeGroupVersion.Group,
+					Version: metav1.SchemeGroupVersion.Version,
+				},
+				{
+					Kind:    "PartialObjectMetadataList",
+					Group:   metav1.SchemeGroupVersion.Group,
+					Version: metav1.SchemeGroupVersion.Version,
+				},
+			},
 		},
 		{
 			AcceptContentTypes: []string{runtime.ContentTypeProtobuf},
@@ -109,6 +176,28 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory, option
 
 			Framer:           protobuf.LengthDelimitedFramer,
 			StreamSerializer: protoRawSerializer,
+			Converts: []schema.GroupVersionKind{
+				{
+					Kind:    "PartialObjectMetadata",
+					Group:   metav1beta1.SchemeGroupVersion.Group,
+					Version: metav1beta1.SchemeGroupVersion.Version,
+				},
+				{
+					Kind:    "PartialObjectMetadataList",
+					Group:   metav1beta1.SchemeGroupVersion.Group,
+					Version: metav1beta1.SchemeGroupVersion.Version,
+				},
+				{
+					Kind:    "PartialObjectMetadata",
+					Group:   metav1.SchemeGroupVersion.Group,
+					Version: metav1.SchemeGroupVersion.Version,
+				},
+				{
+					Kind:    "PartialObjectMetadataList",
+					Group:   metav1.SchemeGroupVersion.Group,
+					Version: metav1.SchemeGroupVersion.Version,
+				},
+			},
 		},
 	}
 
@@ -203,6 +292,7 @@ func newCodecFactory(scheme *runtime.Scheme, serializers []serializerType) Codec
 				Serializer:       d.Serializer,
 				PrettySerializer: d.PrettySerializer,
 				StrictSerializer: d.StrictSerializer,
+				Converts:         d.Converts,
 			}
 
 			mediaType, _, err := mime.ParseMediaType(info.MediaType)

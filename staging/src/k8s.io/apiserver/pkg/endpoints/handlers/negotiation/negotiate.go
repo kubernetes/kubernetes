@@ -17,6 +17,7 @@ limitations under the License.
 package negotiation
 
 import (
+	"fmt"
 	"mime"
 	"net/http"
 	"strconv"
@@ -32,9 +33,20 @@ import (
 func MediaTypesForSerializer(ns runtime.NegotiatedSerializer) (mediaTypes, streamMediaTypes []string) {
 	for _, info := range ns.SupportedMediaTypes() {
 		mediaTypes = append(mediaTypes, info.MediaType)
+		if info.Converts != nil {
+			for _, convert := range info.Converts {
+				mediaTypes = append(mediaTypes, fmt.Sprintf("%s;as=%s;g=%s;v=%s", info.MediaType, convert.Kind, convert.Group, convert.Version))
+			}
+		}
 		if info.StreamSerializer != nil {
 			// stream=watch is the existing mime-type parameter for watch
 			streamMediaTypes = append(streamMediaTypes, info.MediaType+";stream=watch")
+			if info.Converts != nil && info.MediaType == "application" &&
+				(info.MediaTypeSubType == "json" || info.MediaTypeSubType == "yaml") {
+				for _, convert := range info.Converts {
+					streamMediaTypes = append(streamMediaTypes, fmt.Sprintf("%s;as=%s;g=%s;v=%s", info.MediaType+";stream=watch", convert.Kind, convert.Group, convert.Version))
+				}
+			}
 		}
 	}
 	return mediaTypes, streamMediaTypes

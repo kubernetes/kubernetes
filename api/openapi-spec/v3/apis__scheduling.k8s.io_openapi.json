@@ -132,12 +132,92 @@
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
                 }
               },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+                }
+              },
+              "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+                }
+              },
+              "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+                }
+              },
+              "application/json;as=Table;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+                }
+              },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
                 }
               },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+                }
+              },
+              "application/vnd.kubernetes.protobuf;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+                }
+              },
               "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+                }
+              },
+              "application/yaml;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1beta1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
+                }
+              },
+              "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIGroup"
                 }

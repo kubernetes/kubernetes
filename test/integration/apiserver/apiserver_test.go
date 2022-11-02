@@ -1914,7 +1914,7 @@ func TestTransform(t *testing.T) {
 					t.Fatal(err)
 				}
 				// TODO: this should be a more specific error
-				if err.Error() != "only the following media types are accepted: application/json, application/yaml, application/vnd.kubernetes.protobuf" {
+				if !strings.Contains(err.Error(), "only the following media types are accepted") {
 					t.Fatal(err)
 				}
 			},
@@ -2170,7 +2170,7 @@ func TestTransform(t *testing.T) {
 					t.Fatal(err)
 				}
 				// TODO: this should be a more specific error
-				if err.Error() != "only the following media types are accepted: application/json, application/yaml, application/vnd.kubernetes.protobuf" {
+				if !strings.Contains(err.Error(), "only the following media types are accepted") {
 					t.Fatal(err)
 				}
 			},
