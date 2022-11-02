@@ -704,8 +704,6 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			return err
 		}
 
-		devicePluginEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DevicePlugins)
-
 		var cpuManagerPolicyOptions map[string]string
 		if utilfeature.DefaultFeatureGate.Enabled(features.CPUManager) {
 			if utilfeature.DefaultFeatureGate.Enabled(features.CPUManagerPolicyOptions) {
@@ -751,7 +749,6 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				ExperimentalTopologyManagerScope:        s.TopologyManagerScope,
 			},
 			s.FailSwapOn,
-			devicePluginEnabled,
 			kubeDeps.Recorder)
 
 		if err != nil {

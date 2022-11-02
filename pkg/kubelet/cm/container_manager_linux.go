@@ -194,7 +194,7 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 // TODO(vmarmol): Add limits to the system containers.
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
-func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, devicePluginEnabled bool, recorder record.EventRecorder) (ContainerManager, error) {
+func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder) (ContainerManager, error) {
 	subsystems, err := GetCgroupSubsystems()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
@@ -298,16 +298,12 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		cm.topologyManager = topologymanager.NewFakeManager()
 	}
 
-	klog.InfoS("Creating device plugin manager", "devicePluginEnabled", devicePluginEnabled)
-	if devicePluginEnabled {
-		cm.deviceManager, err = devicemanager.NewManagerImpl(machineInfo.Topology, cm.topologyManager)
-		cm.topologyManager.AddHintProvider(cm.deviceManager)
-	} else {
-		cm.deviceManager, err = devicemanager.NewManagerStub()
-	}
+	klog.InfoS("Creating device plugin manager")
+	cm.deviceManager, err = devicemanager.NewManagerImpl(machineInfo.Topology, cm.topologyManager)
 	if err != nil {
 		return nil, err
 	}
+	cm.topologyManager.AddHintProvider(cm.deviceManager)
 
 	// Initialize CPU manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
