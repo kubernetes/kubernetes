@@ -29,6 +29,9 @@ type KubeProxyIPTablesConfiguration struct {
 	MasqueradeBit *int32 `json:"masqueradeBit"`
 	// masqueradeAll tells kube-proxy to SNAT everything if using the pure iptables proxy mode.
 	MasqueradeAll bool `json:"masqueradeAll"`
+	// LocalhostNodePorts tells kube-proxy to allow service NodePorts to be accessed via
+	// localhost (iptables mode only)
+	LocalhostNodePorts *bool `json:"localhostNodePorts"`
 	// syncPeriod is the period that iptables rules are refreshed (e.g. '5s', '1m',
 	// '2h22m').  Must be greater than 0.
 	SyncPeriod metav1.Duration `json:"syncPeriod"`

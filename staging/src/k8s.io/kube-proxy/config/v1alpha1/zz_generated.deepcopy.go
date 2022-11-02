@@ -135,6 +135,11 @@ func (in *KubeProxyIPTablesConfiguration) DeepCopyInto(out *KubeProxyIPTablesCon
 		*out = new(int32)
 		**out = **in
 	}
+	if in.LocalhostNodePorts != nil {
+		in, out := &in.LocalhostNodePorts, &out.LocalhostNodePorts
+		*out = new(bool)
+		**out = **in
+	}
 	out.SyncPeriod = in.SyncPeriod
 	out.MinSyncPeriod = in.MinSyncPeriod
 	return
