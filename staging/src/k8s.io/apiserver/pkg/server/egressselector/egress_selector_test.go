@@ -201,6 +201,16 @@ func TestMetrics(t *testing.T) {
 		metrics      []string
 		want         string
 	}{
+		"connect to proxy server start": {
+			connectorErr: true,
+			proxierErr:   true,
+			metrics:      []string{"apiserver_egress_dialer_dial_start_total"},
+			want: `
+	# HELP apiserver_egress_dialer_dial_start_total [ALPHA] Dial starts, labeled by the protocol (http-connect or grpc) and transport (tcp or uds).
+	# TYPE apiserver_egress_dialer_dial_start_total counter
+	apiserver_egress_dialer_dial_start_total{protocol="fake_protocol",transport="fake_transport"} 1
+`,
+		},
 		"connect to proxy server error": {
 			connectorErr: true,
 			proxierErr:   false,
