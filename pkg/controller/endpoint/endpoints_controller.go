@@ -175,8 +175,9 @@ func (e *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer e.queue.ShutDown()
 
-	klog.Infof("Starting endpoint controller")
-	defer klog.Infof("Shutting down endpoint controller")
+	logger := klog.LoggerWithName(klog.FromContext(ctx), "Endpoint")
+	logger.Info("Starting controller", "controller", "endpoint")
+	defer logger.Info("Shutting down controller", "controller", "endpoint")
 
 	if !cache.WaitForNamedCacheSync("endpoint", ctx.Done(), e.podsSynced, e.servicesSynced, e.endpointsSynced) {
 		return
@@ -332,37 +333,39 @@ func (e *Controller) processNextWorkItem(ctx context.Context) bool {
 	defer e.queue.Done(eKey)
 
 	err := e.syncService(ctx, eKey.(string))
-	e.handleErr(err, eKey)
+	e.handleErr(ctx, err, eKey)
 
 	return true
 }
 
-func (e *Controller) handleErr(err error, key interface{}) {
+func (e *Controller) handleErr(ctx context.Context, err error, key interface{}) {
 	if err == nil {
 		e.queue.Forget(key)
 		return
 	}
 
+	logger := klog.FromContext(ctx)
 	ns, name, keyErr := cache.SplitMetaNamespaceKey(key.(string))
 	if keyErr != nil {
-		klog.ErrorS(err, "Failed to split meta namespace cache key", "key", key)
+		logger.Error(err, "Failed to split meta namespace cache key", "cacheKey", key)
 	}
 
 	if e.queue.NumRequeues(key) < maxRetries {
-		klog.V(2).InfoS("Error syncing endpoints, retrying", "service", klog.KRef(ns, name), "err", err)
+		logger.V(2).Info("Error syncing endpoints, retrying", "service", klog.KRef(ns, name), "err", err)
 		e.queue.AddRateLimited(key)
 		return
 	}
 
-	klog.Warningf("Dropping service %q out of the queue: %v", key, err)
+	logger.Info("Dropping service out of the queue", "service", key, "err", err)
 	e.queue.Forget(key)
 	utilruntime.HandleError(err)
 }
 
 func (e *Controller) syncService(ctx context.Context, key string) error {
+	logger := klog.FromContext(ctx)
 	startTime := time.Now()
 	defer func() {
-		klog.V(4).Infof("Finished syncing service %q endpoints. (%v)", key, time.Since(startTime))
+		logger.V(4).Info("Finished syncing service endpoints.", "service", key, "spendTime", time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -394,7 +397,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 		return nil
 	}
 
-	klog.V(5).Infof("About to update endpoints for service %q", key)
+	logger.V(5).Info("About to update endpoints for service", "service", key)
 	pods, err := e.podLister.Pods(service.Namespace).List(labels.Set(service.Spec.Selector).AsSelectorPreValidated())
 	if err != nil {
 		// Since we're getting stuff from a local cache, it is
@@ -417,11 +420,11 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 
 	for _, pod := range pods {
 		if len(pod.Status.PodIP) == 0 {
-			klog.V(5).Infof("Failed to find an IP for pod %s/%s", pod.Namespace, pod.Name)
+			logger.V(5).Info("Failed to find an IP for pod", "namespace", pod.Namespace, "podName", pod.Name)
 			continue
 		}
 		if !tolerateUnreadyEndpoints && pod.DeletionTimestamp != nil {
-			klog.V(5).Infof("Pod is being deleted %s/%s", pod.Namespace, pod.Name)
+			logger.V(5).Info("Pod is being deleted", "namespace", pod.Namespace, "podName", pod.Name)
 			continue
 		}
 
@@ -429,7 +432,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 		if err != nil {
 			// this will happen, if the cluster runs with some nodes configured as dual stack and some as not
 			// such as the case of an upgrade..
-			klog.V(2).Infof("failed to find endpoint for service:%v with ClusterIP:%v on pod:%v with error:%v", service.Name, service.Spec.ClusterIP, pod.Name, err)
+			logger.V(2).Info("failed to find endpoint for service with ClusterIP on pod with error", "service", service.Name, "ClusterIP", service.Spec.ClusterIP, "podName", pod.Name, "err", err)
 			continue
 		}
 
@@ -441,7 +444,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 		// Allow headless service not to have ports.
 		if len(service.Spec.Ports) == 0 {
 			if service.Spec.ClusterIP == api.ClusterIPNone {
-				subsets, totalReadyEps, totalNotReadyEps = addEndpointSubset(subsets, pod, epa, nil, tolerateUnreadyEndpoints)
+				subsets, totalReadyEps, totalNotReadyEps = addEndpointSubset(ctx, subsets, pod, epa, nil, tolerateUnreadyEndpoints)
 				// No need to repack subsets for headless service without ports.
 			}
 		} else {
@@ -449,13 +452,13 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 				servicePort := &service.Spec.Ports[i]
 				portNum, err := podutil.FindPort(pod, servicePort)
 				if err != nil {
-					klog.V(4).Infof("Failed to find port for service %s/%s: %v", service.Namespace, service.Name, err)
+					logger.V(4).Info("Failed to find port for service", "namespace", service.Namespace, "serviceName", service.Name, "err", err)
 					continue
 				}
 				epp := endpointPortFromServicePort(servicePort, portNum)
 
 				var readyEps, notReadyEps int
-				subsets, readyEps, notReadyEps = addEndpointSubset(subsets, pod, epa, epp, tolerateUnreadyEndpoints)
+				subsets, readyEps, notReadyEps = addEndpointSubset(ctx, subsets, pod, epa, epp, tolerateUnreadyEndpoints)
 				totalReadyEps = totalReadyEps + readyEps
 				totalNotReadyEps = totalNotReadyEps + notReadyEps
 			}
@@ -495,7 +498,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 		endpointutil.EndpointSubsetsEqualIgnoreResourceVersion(currentEndpoints.Subsets, subsets) &&
 		apiequality.Semantic.DeepEqual(compareLabels, service.Labels) &&
 		capacityAnnotationSetCorrectly(currentEndpoints.Annotations, currentEndpoints.Subsets) {
-		klog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
+		logger.V(5).Info("endpoints are equal for service, skipping update", "namespace", service.Namespace, "serviceName", service.Name)
 		return nil
 	}
 	newEndpoints := currentEndpoints.DeepCopy()
@@ -528,7 +531,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 		newEndpoints.Labels = utillabels.CloneAndRemoveLabel(newEndpoints.Labels, v1.IsHeadlessService)
 	}
 
-	klog.V(4).Infof("Update endpoints for %v/%v, ready: %d not ready: %d", service.Namespace, service.Name, totalReadyEps, totalNotReadyEps)
+	logger.V(4).Info("Update endpoints for service", "namespace", service.Namespace, "serviceName", service.Name, "readyEpsNum", totalReadyEps, "notReadyEpsNum", totalNotReadyEps)
 	if createEndpoints {
 		// No previous endpoints, create them
 		_, err = e.client.CoreV1().Endpoints(service.Namespace).Create(ctx, newEndpoints, metav1.CreateOptions{})
@@ -542,7 +545,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 			// 1. namespace is terminating, endpoint creation is not allowed by default.
 			// 2. policy is misconfigured, in which case no service would function anywhere.
 			// Given the frequency of 1, we log at a lower level.
-			klog.V(5).Infof("Forbidden from creating endpoints: %v", err)
+			logger.V(5).Info("Forbidden from creating endpoints", "err", err)
 
 			// If the namespace is terminating, creates will continue to fail. Simply drop the item.
 			if errors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
@@ -591,7 +594,7 @@ func (e *Controller) checkLeftoverEndpoints() {
 	}
 }
 
-func addEndpointSubset(subsets []v1.EndpointSubset, pod *v1.Pod, epa v1.EndpointAddress,
+func addEndpointSubset(ctx context.Context, subsets []v1.EndpointSubset, pod *v1.Pod, epa v1.EndpointAddress,
 	epp *v1.EndpointPort, tolerateUnreadyEndpoints bool) ([]v1.EndpointSubset, int, int) {
 	var readyEps int
 	var notReadyEps int
@@ -606,7 +609,7 @@ func addEndpointSubset(subsets []v1.EndpointSubset, pod *v1.Pod, epa v1.Endpoint
 		})
 		readyEps++
 	} else if shouldPodBeInEndpoints(pod) {
-		klog.V(5).Infof("Pod is out of service: %s/%s", pod.Namespace, pod.Name)
+		klog.FromContext(ctx).V(5).Info("Pod is out of service", "namespace", pod.Namespace, "podName", pod.Name)
 		subsets = append(subsets, v1.EndpointSubset{
 			NotReadyAddresses: []v1.EndpointAddress{epa},
 			Ports:             ports,
