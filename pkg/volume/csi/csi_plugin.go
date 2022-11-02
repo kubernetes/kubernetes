@@ -644,7 +644,20 @@ func (p *csiPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
 		return false, nil
 	}
 
-	// Persistent volumes support device mount.
+	csiDriverName := spec.PersistentVolume.Spec.CSI.Driver
+	csiDriver, err := p.csiDriverLister.Get(csiDriverName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			klog.V(2).InfoS("plugin.CanDeviceMount try to get CSIDriver, but CSIDriver does not exist", "csiDriverName", csiDriverName)
+			// Don't skip mount device if CSIDriver does not exist
+			return true, nil
+		}
+		klog.V(2).InfoS("plugin.CanDeviceMount failed to get CSIDriver", "csiDriverName", csiDriverName)
+		return false, err
+	}
+	if csiDriver.Spec.AttachRequired != nil && *csiDriver.Spec.AttachRequired == false {
+		return false, nil
+	}
 	return true, nil
 }
 
