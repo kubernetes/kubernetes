@@ -24,11 +24,13 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
@@ -1540,10 +1542,11 @@ var (
 
 func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 	tests := []struct {
-		name   string
-		init   func(kubernetes.Interface, string) error
-		pod    *testutils.PausePodConfig
-		update func(kubernetes.Interface, string) error
+		name                   string
+		init                   func(kubernetes.Interface, string) error
+		pod                    *testutils.PausePodConfig
+		update                 func(kubernetes.Interface, string) error
+		enableReadWriteOncePod bool
 	}{
 		{
 			name: "node gets added",
@@ -1687,9 +1690,76 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 				return nil
 			},
 		},
+		{
+			name: "scheduled pod uses read-write-once-pod pvc",
+			init: func(cs kubernetes.Interface, ns string) error {
+				_, err := createNode(cs, st.MakeNode().Name("node").Obj())
+				if err != nil {
+					return fmt.Errorf("cannot create node: %v", err)
+				}
+
+				storage := v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}
+				volType := v1.HostPathDirectoryOrCreate
+				pv, err := testutils.CreatePV(cs, st.MakePersistentVolume().
+					Name("pv-with-read-write-once-pod").
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
+					Capacity(storage.Requests).
+					HostPathVolumeSource(&v1.HostPathVolumeSource{Path: "/mnt", Type: &volType}).
+					Obj())
+				if err != nil {
+					return fmt.Errorf("cannot create pv: %v", err)
+				}
+				pvc, err := testutils.CreatePVC(cs, st.MakePersistentVolumeClaim().
+					Name("pvc-with-read-write-once-pod").
+					Namespace(ns).
+					// Annotation and volume name required for PVC to be considered bound.
+					Annotation(volume.AnnBindCompleted, "true").
+					VolumeName(pv.Name).
+					AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
+					Resources(storage).
+					Obj())
+				if err != nil {
+					return fmt.Errorf("cannot create pvc: %v", err)
+				}
+
+				pod := initPausePod(&testutils.PausePodConfig{
+					Name:      "pod-to-be-deleted",
+					Namespace: ns,
+					Volumes: []v1.Volume{{
+						Name: "volume",
+						VolumeSource: v1.VolumeSource{
+							PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+								ClaimName: pvc.Name,
+							},
+						},
+					}},
+				})
+				if _, err := createPausePod(cs, pod); err != nil {
+					return fmt.Errorf("cannot create pod: %v", err)
+				}
+				return nil
+			},
+			pod: &testutils.PausePodConfig{
+				Name: "pod-to-take-over-pvc",
+				Volumes: []v1.Volume{{
+					Name: "volume",
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "pvc-with-read-write-once-pod",
+						},
+					},
+				}},
+			},
+			update: func(cs kubernetes.Interface, ns string) error {
+				return deletePod(cs, "pod-to-be-deleted", ns)
+			},
+			enableReadWriteOncePod: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, tt.enableReadWriteOncePod)()
+
 			testCtx := initTest(t, "scheduler-informer")
 			defer testutils.CleanupTest(t, testCtx)
 
