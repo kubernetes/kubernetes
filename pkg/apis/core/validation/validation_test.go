@@ -2440,40 +2440,45 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			oldPvc:                 nil,
 			enableReadWriteOncePod: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:             true,
-				EnableRecoverFromExpansionFailure: false,
+				AllowReadWriteOncePod:                true,
+				EnableRecoverFromExpansionFailure:    false,
+				EnableRetroactiveDefaultStorageClass: true,
 			},
 		},
 		"rwop allowed because feature enabled": {
 			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOnce}),
 			enableReadWriteOncePod: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:             true,
-				EnableRecoverFromExpansionFailure: false,
+				AllowReadWriteOncePod:                true,
+				EnableRecoverFromExpansionFailure:    false,
+				EnableRetroactiveDefaultStorageClass: true,
 			},
 		},
 		"rwop not allowed because not used and feature disabled": {
 			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOnce}),
 			enableReadWriteOncePod: false,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:             false,
-				EnableRecoverFromExpansionFailure: false,
+				AllowReadWriteOncePod:                false,
+				EnableRecoverFromExpansionFailure:    false,
+				EnableRetroactiveDefaultStorageClass: true,
 			},
 		},
 		"rwop allowed because used and feature enabled": {
 			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOncePod}),
 			enableReadWriteOncePod: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:             true,
-				EnableRecoverFromExpansionFailure: false,
+				AllowReadWriteOncePod:                true,
+				EnableRecoverFromExpansionFailure:    false,
+				EnableRetroactiveDefaultStorageClass: true,
 			},
 		},
 		"rwop allowed because used and feature disabled": {
 			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOncePod}),
 			enableReadWriteOncePod: false,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:             true,
-				EnableRecoverFromExpansionFailure: false,
+				AllowReadWriteOncePod:                true,
+				EnableRecoverFromExpansionFailure:    false,
+				EnableRetroactiveDefaultStorageClass: true,
 			},
 		},
 	}
