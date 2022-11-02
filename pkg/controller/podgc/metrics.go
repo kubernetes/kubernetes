@@ -25,8 +25,8 @@ import (
 
 const (
 	podGCController   = "pod_gc_collector"
-	deletingPods      = "deleting_pods_total"
-	deletingPodsError = "deleting_pods_error_total"
+	deletingPods      = "force_delete_pods_total"
+	deletingPodsError = "force_delete_pod_errors_total"
 )
 
 var (

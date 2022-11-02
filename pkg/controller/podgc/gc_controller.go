@@ -68,6 +68,11 @@ type PodGCController struct {
 	quarantineTime         time.Duration
 }
 
+func init() {
+	// Register prometheus metrics
+	Register()
+}
+
 func NewPodGC(ctx context.Context, kubeClient clientset.Interface, podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int) *PodGCController {
 	return NewPodGCInternal(ctx, kubeClient, podInformer, nodeInformer, terminatedPodThreshold, gcCheckPeriod, quarantineTime)
@@ -76,9 +81,6 @@ func NewPodGC(ctx context.Context, kubeClient clientset.Interface, podInformer c
 // This function is only intended for integration tests
 func NewPodGCInternal(ctx context.Context, kubeClient clientset.Interface, podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int, gcCheckPeriod, quarantineTime time.Duration) *PodGCController {
-	// Register prometheus metrics
-	Register()
-
 	gcc := &PodGCController{
 		kubeClient:             kubeClient,
 		terminatedPodThreshold: terminatedPodThreshold,
