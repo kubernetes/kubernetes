@@ -399,7 +399,7 @@
       measurePods: 500
 # This test case always seems to fail.
 # https://github.com/kubernetes/kubernetes/issues/108308
-# 
+#
 #  - name: 5000Nodes
 #    params:
 #      initNodes: 5000
@@ -427,7 +427,7 @@
       measurePods: 500
 # This test case always seems to fail.
 # https://github.com/kubernetes/kubernetes/issues/108308
-# 
+#
 #  - name: 5000Nodes
 #    params:
 #      initNodes: 5000
@@ -630,3 +630,31 @@
       initNamespaces: 100
       measurePods: 1000
 
+- name: SchedulingWithNodeInclusionPolicy
+  featureGates:
+    NodeInclusionPolicyInPodTopologySpread: true
+  defaultPodTemplatePath: config/pod-with-node-inclusion-policy.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $normalNodes
+    uniqueNodeLabelStrategy:
+      labelKey: kubernetes.io/hostname
+  - opcode: createNodes
+    nodeTemplatePath: config/node-with-taint.yaml
+    countParam: $taintNodes
+    uniqueNodeLabelStrategy:
+      labelKey: kubernetes.io/hostname
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+  workloads:
+  - name: 500Nodes
+    params:
+      taintNodes: 100
+      normalNodes: 400
+      measurePods: 400
+  - name: 5000Nodes
+    params:
+      taintNodes: 1000
+      normalNodes: 4000
+      measurePods: 4000
