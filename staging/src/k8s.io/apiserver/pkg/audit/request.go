@@ -43,14 +43,18 @@ const (
 	userAgentTruncateSuffix = "...TRUNCATED"
 )
 
-func NewEventFromRequest(req *http.Request, requestReceivedTimestamp time.Time, level auditinternal.Level, attribs authorizer.Attributes) (*auditinternal.Event, error) {
-	ev := &auditinternal.Event{
-		RequestReceivedTimestamp: metav1.NewMicroTime(requestReceivedTimestamp),
-		Verb:                     attribs.GetVerb(),
-		RequestURI:               req.URL.RequestURI(),
-		UserAgent:                maybeTruncateUserAgent(req),
-		Level:                    level,
+func LogRequestMetadata(ctx context.Context, req *http.Request, requestReceivedTimestamp time.Time, level auditinternal.Level, attribs authorizer.Attributes) {
+	ac := AuditContextFrom(ctx)
+	if !ac.Enabled() {
+		return
 	}
+	ev := &ac.Event
+
+	ev.RequestReceivedTimestamp = metav1.NewMicroTime(requestReceivedTimestamp)
+	ev.Verb = attribs.GetVerb()
+	ev.RequestURI = req.URL.RequestURI()
+	ev.UserAgent = maybeTruncateUserAgent(req)
+	ev.Level = level
 
 	auditID, found := AuditIDFrom(req.Context())
 	if !found {
@@ -84,10 +88,6 @@ func NewEventFromRequest(req *http.Request, requestReceivedTimestamp time.Time, 
 			APIVersion:  attribs.GetAPIVersion(),
 		}
 	}
-
-	addAuditAnnotationsFrom(req.Context(), ev)
-
-	return ev, nil
 }
 
 // LogImpersonatedUser fills in the impersonated user attributes into an audit event.

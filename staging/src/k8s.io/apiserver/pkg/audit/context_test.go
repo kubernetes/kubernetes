@@ -38,19 +38,12 @@ func TestAddAuditAnnotation(t *testing.T) {
 		assert.Len(t, annotations, numAnnotations)
 	}
 	noopValidator := func(_ *testing.T, _ context.Context) {}
-	preEventValidator := func(t *testing.T, ctx context.Context) {
-		ev := auditinternal.Event{
-			Level: auditinternal.LevelMetadata,
-		}
-		addAuditAnnotationsFrom(ctx, &ev)
+	eventValidator := func(t *testing.T, ctx context.Context) {
+		ev := AuditContextFrom(ctx).Event
 		expectAnnotations(t, ev.Annotations)
 	}
-	postEventValidator := func(t *testing.T, ctx context.Context) {
-		ev := AuditEventFrom(ctx)
-		expectAnnotations(t, ev.Annotations)
-	}
-	postEventEmptyValidator := func(t *testing.T, ctx context.Context) {
-		ev := AuditEventFrom(ctx)
+	eventEmptyValidator := func(t *testing.T, ctx context.Context) {
+		ev := AuditContextFrom(ctx).Event
 		assert.Empty(t, ev.Annotations)
 	}
 
@@ -63,17 +56,13 @@ func TestAddAuditAnnotation(t *testing.T) {
 		ctx:         context.Background(),
 		validator:   noopValidator,
 	}, {
-		description: "empty audit context",
-		ctx:         WithAuditContext(context.Background()),
-		validator:   preEventValidator,
-	}, {
 		description: "with metadata level",
 		ctx:         withAuditContextAndLevel(context.Background(), auditinternal.LevelMetadata),
-		validator:   postEventValidator,
+		validator:   eventValidator,
 	}, {
 		description: "with none level",
 		ctx:         withAuditContextAndLevel(context.Background(), auditinternal.LevelNone),
-		validator:   postEventEmptyValidator,
+		validator:   eventEmptyValidator,
 	}}
 
 	for _, test := range tests {
@@ -93,25 +82,9 @@ func TestAddAuditAnnotation(t *testing.T) {
 	}
 }
 
-func TestLogAnnotation(t *testing.T) {
-	ev := &auditinternal.Event{
-		Level:   auditinternal.LevelMetadata,
-		AuditID: "fake id",
-	}
-	logAnnotation(ev, "foo", "bar")
-	logAnnotation(ev, "foo", "baz")
-	assert.Equal(t, "bar", ev.Annotations["foo"], "audit annotation should not be overwritten.")
-
-	logAnnotation(ev, "qux", "")
-	logAnnotation(ev, "qux", "baz")
-	assert.Equal(t, "", ev.Annotations["qux"], "audit annotation should not be overwritten.")
-}
-
 func withAuditContextAndLevel(ctx context.Context, l auditinternal.Level) context.Context {
 	ctx = WithAuditContext(ctx)
 	ac := AuditContextFrom(ctx)
-	ac.Event = &auditinternal.Event{
-		Level: l,
-	}
+	ac.RequestAuditConfig.Level = l
 	return ctx
 }

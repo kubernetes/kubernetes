@@ -285,11 +285,6 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		// confirm that we can set an audit annotation in a handler before WithAudit
 		audit.AddAuditAnnotation(req.Context(), "pandas", "are awesome")
 
-		// confirm that trying to use the audit event directly would never work
-		if ae := audit.AuditEventFrom(req.Context()); ae != nil {
-			t.Errorf("expected nil audit event, got %v", ae)
-		}
-
 		return &authenticator.Response{User: &user.DefaultInfo{}}, true, nil
 	})
 	backend := &testBackend{}
