@@ -27,9 +27,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	restclient "k8s.io/client-go/rest"
-	spdy "k8s.io/client-go/transport/spdy"
+	"k8s.io/client-go/transport/spdy"
 )
 
 // StreamOptions holds information pertaining to the current streaming session:
@@ -161,14 +160,20 @@ func (e *streamExecutor) StreamWithContext(ctx context.Context, options StreamOp
 	}
 	defer conn.Close()
 
+	panicChan := make(chan any, 1)
 	errorChan := make(chan error, 1)
 	go func() {
-		defer runtime.HandleCrash()
-		defer close(errorChan)
+		defer func() {
+			if p := recover(); p != nil {
+				panicChan <- p
+			}
+		}()
 		errorChan <- streamer.stream(conn)
 	}()
 
 	select {
+	case p := <-panicChan:
+		panic(p)
 	case err := <-errorChan:
 		return err
 	case <-ctx.Done():
