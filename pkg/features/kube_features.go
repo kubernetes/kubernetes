@@ -950,7 +950,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	KubeletTracing: {Default: false, PreRelease: featuregate.Alpha},
 
-	LegacyServiceAccountTokenNoAutoGeneration: {Default: true, PreRelease: featuregate.Beta},
+	LegacyServiceAccountTokenNoAutoGeneration: {Default: true, PreRelease: featuregate.GA},
 
 	LegacyServiceAccountTokenTracking: {Default: false, PreRelease: featuregate.Alpha},
 
