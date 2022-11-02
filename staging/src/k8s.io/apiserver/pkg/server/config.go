@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -30,7 +31,6 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/google/uuid"
-	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -68,6 +68,7 @@ import (
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/prometheus/slis"
+	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -140,7 +141,7 @@ type Config struct {
 	ExternalAddress string
 
 	// TracerProvider can provide a tracer, which records spans for distributed tracing.
-	TracerProvider oteltrace.TracerProvider
+	TracerProvider tracing.TracerProvider
 
 	//===========================================================================
 	// Fields you probably don't care about changing
@@ -377,7 +378,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 
 		APIServerID:           id,
 		StorageVersionManager: storageversion.NewDefaultManager(),
-		TracerProvider:        oteltrace.NewNoopTracerProvider(),
+		TracerProvider:        tracing.NewNoopTracerProvider(),
 	}
 }
 
@@ -787,6 +788,11 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		}
 		s.AddHealthChecks(delegateCheck)
 	}
+	s.RegisterDestroyFunc(func() {
+		if err := c.Config.TracerProvider.Shutdown(context.Background()); err != nil {
+			klog.Errorf("failed to shut down tracer provider: %v", err)
+		}
+	})
 
 	s.listedPathProvider = routes.ListedPathProviders{s.listedPathProvider, delegationTarget}
 
