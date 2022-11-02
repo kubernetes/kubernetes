@@ -20,7 +20,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/base64"
 	"io"
 	"net"
 	"net/http"
@@ -291,6 +290,16 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 			serverStatusCode:       http.StatusSwitchingProtocols,
 			shouldError:            false,
 		},
+		"proxied valid https, proxy auth with chars that percent escape -> valid https": {
+			serverFunc:             httpsServerValidHostname(t),
+			proxyServerFunc:        httpsServerValidHostname(t),
+			proxyAuth:              url.UserPassword("proxy user", "proxypasswd%"),
+			clientTLS:              &tls.Config{RootCAs: localhostPool},
+			serverConnectionHeader: "Upgrade",
+			serverUpgradeHeader:    "SPDY/3.1",
+			serverStatusCode:       http.StatusSwitchingProtocols,
+			shouldError:            false,
+		},
 	}
 
 	for k, testCase := range testCases {
@@ -400,18 +409,19 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 				}
 			}
 
-			var expectedProxyAuth string
 			if testCase.proxyAuth != nil {
-				encodedCredentials := base64.StdEncoding.EncodeToString([]byte(testCase.proxyAuth.String()))
-				expectedProxyAuth = "Basic " + encodedCredentials
-			}
-			if len(expectedProxyAuth) == 0 && proxyCalledWithAuth {
+				expectedUsername := testCase.proxyAuth.Username()
+				expectedPassword, _ := testCase.proxyAuth.Password()
+				username, password, ok := (&http.Request{Header: http.Header{"Authorization": []string{proxyCalledWithAuthHeader}}}).BasicAuth()
+				if !ok {
+					t.Fatalf("invalid proxy auth header %s", proxyCalledWithAuthHeader)
+				}
+				if username != expectedUsername || password != expectedPassword {
+					t.Fatalf("expected proxy auth \"%s:%s\", got \"%s:%s\"", expectedUsername, expectedPassword, username, password)
+				}
+			} else if proxyCalledWithAuth {
 				t.Fatalf("proxy authorization unexpected, got %q", proxyCalledWithAuthHeader)
 			}
-			if proxyCalledWithAuthHeader != expectedProxyAuth {
-				t.Fatalf("expected to see a call to the proxy with credentials %q, got %q", testCase.proxyAuth, proxyCalledWithAuthHeader)
-			}
-
 		})
 	}
 }
