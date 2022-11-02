@@ -278,7 +278,7 @@ func TestValidateNamespace(t *testing.T) {
 			expectAllowed:    true,
 			expectListPods:   false,
 			expectWarnings: []string{
-				`namespace "test" is exempt from Pod Security, and the policy (enforce=restricted:latest, warn=restricted:latest) will be ignored`,
+				`namespace "test" is exempt from Pod Security, and the policy (enforce=restricted:latest) will be ignored`,
 			},
 		},
 		{
@@ -1180,7 +1180,7 @@ func TestExemptNamespaceWarning(t *testing.T) {
 			api.EnforceLevelLabel: string(api.LevelBaseline),
 		},
 		expectWarning:         true,
-		expectWarningContains: "(enforce=baseline:latest, warn=baseline:latest)",
+		expectWarningContains: "(enforce=baseline:latest)",
 	}, {
 		name: "warn-on-warn",
 		labels: map[string]string{
@@ -1206,7 +1206,7 @@ func TestExemptNamespaceWarning(t *testing.T) {
 		},
 		defaultPolicy:         baselinePolicy,
 		expectWarning:         true,
-		expectWarningContains: "(enforce=baseline:v1.23, audit=baseline:v1.23, warn=baseline:latest)",
+		expectWarningContains: "(warn=baseline:latest)",
 	}}
 
 	const (
@@ -1228,7 +1228,7 @@ func TestExemptNamespaceWarning(t *testing.T) {
 			policy, err := api.PolicyToEvaluate(labels, defaultPolicy)
 			require.NoError(t, err.ToAggregate())
 
-			warning := a.exemptNamespaceWarning(test.name, policy)
+			warning := a.exemptNamespaceWarning(test.name, policy, labels)
 			if !test.expectWarning {
 				assert.Empty(t, warning)
 				return

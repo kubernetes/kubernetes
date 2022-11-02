@@ -161,35 +161,6 @@ func (p *Policy) String() string {
 	return fmt.Sprintf("enforce=%#v, audit=%#v, warn=%#v", p.Enforce, p.Audit, p.Warn)
 }
 
-// CompactString prints a minimalist representation of the policy that excludes any privileged
-// levels.
-func (p *Policy) CompactString() string {
-	sb := strings.Builder{}
-	if p.Enforce.Level != LevelPrivileged {
-		sb.WriteString("enforce=")
-		sb.WriteString(p.Enforce.String())
-	}
-	if p.Audit.Level != LevelPrivileged {
-		if sb.Len() > 0 {
-			sb.WriteString(", ")
-		}
-		sb.WriteString("audit=")
-		sb.WriteString(p.Audit.String())
-	}
-	if p.Warn.Level != LevelPrivileged {
-		if sb.Len() > 0 {
-			sb.WriteString(", ")
-		}
-		sb.WriteString("warn=")
-		sb.WriteString(p.Warn.String())
-	}
-	if sb.Len() == 0 {
-		// All modes were privileged, just output "privileged".
-		return string(LevelPrivileged)
-	}
-	return sb.String()
-}
-
 // Equivalent determines whether two policies are functionally equivalent. Policies are considered
 // equivalent if all 3 modes are considered equivalent.
 func (p *Policy) Equivalent(other *Policy) bool {

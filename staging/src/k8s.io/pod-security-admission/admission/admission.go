@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -250,7 +251,7 @@ func (a *Admission) ValidateNamespace(ctx context.Context, attrs api.Attributes)
 			return invalidResponse(attrs, newErrs)
 		}
 		if a.exemptNamespace(attrs.GetNamespace()) {
-			if warning := a.exemptNamespaceWarning(namespace.Name, newPolicy); warning != "" {
+			if warning := a.exemptNamespaceWarning(namespace.Name, newPolicy, namespace.Labels); warning != "" {
 				response := allowedResponse()
 				response.Warnings = append(response.Warnings, warning)
 				return response
@@ -293,7 +294,7 @@ func (a *Admission) ValidateNamespace(ctx context.Context, attrs api.Attributes)
 			return sharedAllowedResponse
 		}
 		if a.exemptNamespace(attrs.GetNamespace()) {
-			if warning := a.exemptNamespaceWarning(namespace.Name, newPolicy); warning != "" {
+			if warning := a.exemptNamespaceWarning(namespace.Name, newPolicy, namespace.Labels); warning != "" {
 				response := allowedResponse()
 				response.Warnings = append(response.Warnings, warning)
 				return response
@@ -736,11 +737,39 @@ func containsString(needle string, haystack []string) bool {
 
 // exemptNamespaceWarning returns a non-empty warning message if the exempt namespace has a
 // non-privileged policy and sets pod security labels.
-func (a *Admission) exemptNamespaceWarning(exemptNamespace string, policy api.Policy) string {
+func (a *Admission) exemptNamespaceWarning(exemptNamespace string, policy api.Policy, nsLabels map[string]string) string {
 	if policy.FullyPrivileged() || policy.Equivalent(&a.defaultPolicy) {
 		return ""
 	}
 
+	// Build a compact representation of the policy, only printing non-privileged modes that have
+	// been explicitly set.
+	sb := strings.Builder{}
+	_, hasEnforceLevel := nsLabels[api.EnforceLevelLabel]
+	_, hasEnforceVersion := nsLabels[api.EnforceVersionLabel]
+	if policy.Enforce.Level != api.LevelPrivileged && (hasEnforceLevel || hasEnforceVersion) {
+		sb.WriteString("enforce=")
+		sb.WriteString(policy.Enforce.String())
+	}
+	_, hasAuditLevel := nsLabels[api.AuditLevelLabel]
+	_, hasAuditVersion := nsLabels[api.AuditVersionLabel]
+	if policy.Audit.Level != api.LevelPrivileged && (hasAuditLevel || hasAuditVersion) {
+		if sb.Len() > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString("audit=")
+		sb.WriteString(policy.Audit.String())
+	}
+	_, hasWarnLevel := nsLabels[api.WarnLevelLabel]
+	_, hasWarnVersion := nsLabels[api.WarnVersionLabel]
+	if policy.Warn.Level != api.LevelPrivileged && (hasWarnLevel || hasWarnVersion) {
+		if sb.Len() > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString("warn=")
+		sb.WriteString(policy.Warn.String())
+	}
+
 	return fmt.Sprintf("namespace %q is exempt from Pod Security, and the policy (%s) will be ignored",
-		exemptNamespace, policy.CompactString())
+		exemptNamespace, sb.String())
 }
