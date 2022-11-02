@@ -17,6 +17,7 @@ limitations under the License.
 package eviction
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -67,7 +68,7 @@ type mockDiskInfoProvider struct {
 }
 
 // HasDedicatedImageFs returns the mocked value
-func (m *mockDiskInfoProvider) HasDedicatedImageFs() (bool, error) {
+func (m *mockDiskInfoProvider) HasDedicatedImageFs(_ context.Context) (bool, error) {
 	return m.dedicatedImageFs, nil
 }
 
@@ -81,7 +82,7 @@ type mockDiskGC struct {
 }
 
 // DeleteUnusedImages returns the mocked values.
-func (m *mockDiskGC) DeleteUnusedImages() error {
+func (m *mockDiskGC) DeleteUnusedImages(_ context.Context) error {
 	m.imageGCInvoked = true
 	if m.summaryAfterGC != nil && m.fakeSummaryProvider != nil {
 		m.fakeSummaryProvider.result = m.summaryAfterGC
@@ -90,7 +91,7 @@ func (m *mockDiskGC) DeleteUnusedImages() error {
 }
 
 // DeleteAllUnusedContainers returns the mocked value
-func (m *mockDiskGC) DeleteAllUnusedContainers() error {
+func (m *mockDiskGC) DeleteAllUnusedContainers(_ context.Context) error {
 	m.containerGCInvoked = true
 	if m.summaryAfterGC != nil && m.fakeSummaryProvider != nil {
 		m.fakeSummaryProvider.result = m.summaryAfterGC

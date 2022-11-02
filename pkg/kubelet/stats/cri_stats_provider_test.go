@@ -17,6 +17,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -84,6 +85,7 @@ const (
 )
 
 func TestCRIListPodStats(t *testing.T) {
+	ctx := context.Background()
 	var (
 		imageFsMountpoint = "/test/mount/point"
 		unknownMountpoint = "/unknown/mount/point"
@@ -238,7 +240,7 @@ func TestCRIListPodStats(t *testing.T) {
 		false,
 	)
 
-	stats, err := provider.ListPodStats()
+	stats, err := provider.ListPodStats(ctx)
 	assert := assert.New(t)
 	assert.NoError(err)
 	assert.Equal(4, len(stats))
@@ -323,6 +325,7 @@ func TestCRIListPodStats(t *testing.T) {
 }
 
 func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
+	ctx := context.Background()
 
 	var (
 		imageFsMountpoint = "/test/mount/point"
@@ -435,7 +438,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 		false,
 	)
 
-	stats, err := provider.ListPodCPUAndMemoryStats()
+	stats, err := provider.ListPodCPUAndMemoryStats(ctx)
 	assert := assert.New(t)
 	assert.NoError(err)
 	assert.Equal(5, len(stats))
@@ -532,6 +535,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 }
 
 func TestCRIImagesFsStats(t *testing.T) {
+	ctx := context.Background()
 	var (
 		imageFsMountpoint = "/test/mount/point"
 		imageFsInfo       = getTestFsInfo(2000)
@@ -565,7 +569,7 @@ func TestCRIImagesFsStats(t *testing.T) {
 		false,
 	)
 
-	stats, err := provider.ImageFsStats()
+	stats, err := provider.ImageFsStats(ctx)
 	assert := assert.New(t)
 	assert.NoError(err)
 

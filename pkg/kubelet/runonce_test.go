@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
@@ -52,6 +53,7 @@ import (
 )
 
 func TestRunOnce(t *testing.T) {
+	ctx := context.Background()
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
@@ -168,7 +170,7 @@ func TestRunOnce(t *testing.T) {
 			},
 		},
 	}
-	results, err := kb.runOnce(pods, time.Millisecond)
+	results, err := kb.runOnce(ctx, pods, time.Millisecond)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

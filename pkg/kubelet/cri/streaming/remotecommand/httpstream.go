@@ -70,9 +70,9 @@ func NewOptions(req *http.Request) (*Options, error) {
 	}, nil
 }
 
-// context contains the connection and streams used when
+// connectionContext contains the connection and streams used when
 // forwarding an attach or execute session into a container.
-type context struct {
+type connectionContext struct {
 	conn         io.Closer
 	stdinStream  io.ReadCloser
 	stdoutStream io.WriteCloser
@@ -102,8 +102,8 @@ func waitStreamReply(replySent <-chan struct{}, notify chan<- struct{}, stop <-c
 	}
 }
 
-func createStreams(req *http.Request, w http.ResponseWriter, opts *Options, supportedStreamProtocols []string, idleTimeout, streamCreationTimeout time.Duration) (*context, bool) {
-	var ctx *context
+func createStreams(req *http.Request, w http.ResponseWriter, opts *Options, supportedStreamProtocols []string, idleTimeout, streamCreationTimeout time.Duration) (*connectionContext, bool) {
+	var ctx *connectionContext
 	var ok bool
 	if wsstream.IsWebSocketRequest(req) {
 		ctx, ok = createWebSocketStreams(req, w, opts, idleTimeout)
@@ -122,7 +122,7 @@ func createStreams(req *http.Request, w http.ResponseWriter, opts *Options, supp
 	return ctx, true
 }
 
-func createHTTPStreamStreams(req *http.Request, w http.ResponseWriter, opts *Options, supportedStreamProtocols []string, idleTimeout, streamCreationTimeout time.Duration) (*context, bool) {
+func createHTTPStreamStreams(req *http.Request, w http.ResponseWriter, opts *Options, supportedStreamProtocols []string, idleTimeout, streamCreationTimeout time.Duration) (*connectionContext, bool) {
 	protocol, err := httpstream.Handshake(req, w, supportedStreamProtocols)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -194,7 +194,7 @@ func createHTTPStreamStreams(req *http.Request, w http.ResponseWriter, opts *Opt
 type protocolHandler interface {
 	// waitForStreams waits for the expected streams or a timeout, returning a
 	// remoteCommandContext if all the streams were received, or an error if not.
-	waitForStreams(streams <-chan streamAndReply, expectedStreams int, expired <-chan time.Time) (*context, error)
+	waitForStreams(streams <-chan streamAndReply, expectedStreams int, expired <-chan time.Time) (*connectionContext, error)
 	// supportsTerminalResizing returns true if the protocol handler supports terminal resizing
 	supportsTerminalResizing() bool
 }
@@ -204,8 +204,8 @@ type protocolHandler interface {
 // the process' exit code.
 type v4ProtocolHandler struct{}
 
-func (*v4ProtocolHandler) waitForStreams(streams <-chan streamAndReply, expectedStreams int, expired <-chan time.Time) (*context, error) {
-	ctx := &context{}
+func (*v4ProtocolHandler) waitForStreams(streams <-chan streamAndReply, expectedStreams int, expired <-chan time.Time) (*connectionContext, error) {
+	ctx := &connectionContext{}
 	receivedStreams := 0
 	replyChan := make(chan struct{})
 	stop := make(chan struct{})
@@ -255,8 +255,8 @@ func (*v4ProtocolHandler) supportsTerminalResizing() bool { return true }
 // v3ProtocolHandler implements the V3 protocol version for streaming command execution.
 type v3ProtocolHandler struct{}
 
-func (*v3ProtocolHandler) waitForStreams(streams <-chan streamAndReply, expectedStreams int, expired <-chan time.Time) (*context, error) {
-	ctx := &context{}
+func (*v3ProtocolHandler) waitForStreams(streams <-chan streamAndReply, expectedStreams int, expired <-chan time.Time) (*connectionContext, error) {
+	ctx := &connectionContext{}
 	receivedStreams := 0
 	replyChan := make(chan struct{})
 	stop := make(chan struct{})
@@ -306,8 +306,8 @@ func (*v3ProtocolHandler) supportsTerminalResizing() bool { return true }
 // v2ProtocolHandler implements the V2 protocol version for streaming command execution.
 type v2ProtocolHandler struct{}
 
-func (*v2ProtocolHandler) waitForStreams(streams <-chan streamAndReply, expectedStreams int, expired <-chan time.Time) (*context, error) {
-	ctx := &context{}
+func (*v2ProtocolHandler) waitForStreams(streams <-chan streamAndReply, expectedStreams int, expired <-chan time.Time) (*connectionContext, error) {
+	ctx := &connectionContext{}
 	receivedStreams := 0
 	replyChan := make(chan struct{})
 	stop := make(chan struct{})
@@ -354,8 +354,8 @@ func (*v2ProtocolHandler) supportsTerminalResizing() bool { return false }
 // v1ProtocolHandler implements the V1 protocol version for streaming command execution.
 type v1ProtocolHandler struct{}
 
-func (*v1ProtocolHandler) waitForStreams(streams <-chan streamAndReply, expectedStreams int, expired <-chan time.Time) (*context, error) {
-	ctx := &context{}
+func (*v1ProtocolHandler) waitForStreams(streams <-chan streamAndReply, expectedStreams int, expired <-chan time.Time) (*connectionContext, error) {
+	ctx := &connectionContext{}
 	receivedStreams := 0
 	replyChan := make(chan struct{})
 	stop := make(chan struct{})

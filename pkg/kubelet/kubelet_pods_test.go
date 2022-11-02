@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -298,6 +299,7 @@ fd00::6	podFoo.domainFoo	podFoo
 }
 
 func TestRunInContainerNoSuchPod(t *testing.T) {
+	ctx := context.Background()
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -308,6 +310,7 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 	podNamespace := "nsFoo"
 	containerName := "containerFoo"
 	output, err := kubelet.RunInContainer(
+		ctx,
 		kubecontainer.GetPodFullName(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: podNamespace}}),
 		"",
 		containerName,
@@ -317,6 +320,7 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 }
 
 func TestRunInContainer(t *testing.T) {
+	ctx := context.Background()
 	for _, testError := range []error{nil, errors.New("bar")} {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 		defer testKubelet.Cleanup()
@@ -342,7 +346,7 @@ func TestRunInContainer(t *testing.T) {
 			}},
 		}
 		cmd := []string{"ls"}
-		actualOutput, err := kubelet.RunInContainer("podFoo_nsFoo", "", "containerFoo", cmd)
+		actualOutput, err := kubelet.RunInContainer(ctx, "podFoo_nsFoo", "", "containerFoo", cmd)
 		assert.Equal(t, containerID, fakeCommandRunner.ContainerID, "(testError=%v) ID", testError)
 		assert.Equal(t, cmd, fakeCommandRunner.Cmd, "(testError=%v) command", testError)
 		// this isn't 100% foolproof as a bug in a real CommandRunner where it fails to copy to stdout/stderr wouldn't be caught by this test
@@ -2962,6 +2966,7 @@ func TestGetExec(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.description, func(t *testing.T) {
+			ctx := context.Background()
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kubelet := testKubelet.kubelet
@@ -2983,7 +2988,7 @@ func TestGetExec(t *testing.T) {
 			kubelet.containerRuntime = fakeRuntime
 			kubelet.streamingRuntime = fakeRuntime
 
-			redirect, err := kubelet.GetExec(tc.podFullName, podUID, tc.container, tc.command, remotecommand.Options{})
+			redirect, err := kubelet.GetExec(ctx, tc.podFullName, podUID, tc.container, tc.command, remotecommand.Options{})
 			if tc.expectError {
 				assert.Error(t, err, description)
 			} else {
@@ -3016,6 +3021,7 @@ func TestGetPortForward(t *testing.T) {
 	}}
 
 	for _, tc := range testcases {
+		ctx := context.Background()
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 		defer testKubelet.Cleanup()
 		kubelet := testKubelet.kubelet
@@ -3037,7 +3043,7 @@ func TestGetPortForward(t *testing.T) {
 		kubelet.containerRuntime = fakeRuntime
 		kubelet.streamingRuntime = fakeRuntime
 
-		redirect, err := kubelet.GetPortForward(tc.podName, podNamespace, podUID, portforward.V4Options{})
+		redirect, err := kubelet.GetPortForward(ctx, tc.podName, podNamespace, podUID, portforward.V4Options{})
 		if tc.expectError {
 			assert.Error(t, err, description)
 		} else {
@@ -3086,6 +3092,7 @@ func TestHasHostMountPVC(t *testing.T) {
 	}
 
 	run := func(t *testing.T, v testcase) {
+		ctx := context.Background()
 		testKubelet := newTestKubelet(t, false)
 		defer testKubelet.Cleanup()
 		pod := &v1.Pod{
@@ -3134,7 +3141,7 @@ func TestHasHostMountPVC(t *testing.T) {
 			return true, volumeToReturn, v.pvError
 		})
 
-		actual := testKubelet.kubelet.hasHostMountPVC(pod)
+		actual := testKubelet.kubelet.hasHostMountPVC(ctx, pod)
 		if actual != v.expected {
 			t.Errorf("expected %t but got %t", v.expected, actual)
 		}
