@@ -216,7 +216,33 @@ func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (r
 // ServerGroupsAndResources returns the supported resources for all groups and versions.
 func (d *DiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
 	return withRetries(defaultRetries, func() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
-		return ServerGroupsAndResources(d)
+		sgs, err := d.ServerGroups()
+		if sgs == nil {
+			return nil, nil, err
+		}
+		resultGroups := []*metav1.APIGroup{}
+		for i := range sgs.Groups {
+			resultGroups = append(resultGroups, &sgs.Groups[i])
+		}
+
+		groupVersionResources, failedGroups := fetchGroupVersionResources(d, sgs)
+
+		// order results by group/version discovery order
+		result := []*metav1.APIResourceList{}
+		for _, apiGroup := range sgs.Groups {
+			for _, version := range apiGroup.Versions {
+				gv := schema.GroupVersion{Group: apiGroup.Name, Version: version.Version}
+				if resources, ok := groupVersionResources[gv]; ok {
+					result = append(result, resources)
+				}
+			}
+		}
+
+		if len(failedGroups) == 0 {
+			return resultGroups, result, nil
+		}
+
+		return resultGroups, result, &ErrGroupDiscoveryFailed{Groups: failedGroups}
 	})
 }
 
@@ -241,97 +267,6 @@ func (e *ErrGroupDiscoveryFailed) Error() string {
 func IsGroupDiscoveryFailedError(err error) bool {
 	_, ok := err.(*ErrGroupDiscoveryFailed)
 	return err != nil && ok
-}
-
-func ServerGroupsAndResources(d DiscoveryInterface) ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
-	sgs, err := d.ServerGroups()
-	if sgs == nil {
-		return nil, nil, err
-	}
-	resultGroups := []*metav1.APIGroup{}
-	for i := range sgs.Groups {
-		resultGroups = append(resultGroups, &sgs.Groups[i])
-	}
-
-	groupVersionResources, failedGroups := fetchGroupVersionResources(d, sgs)
-
-	// order results by group/version discovery order
-	result := []*metav1.APIResourceList{}
-	for _, apiGroup := range sgs.Groups {
-		for _, version := range apiGroup.Versions {
-			gv := schema.GroupVersion{Group: apiGroup.Name, Version: version.Version}
-			if resources, ok := groupVersionResources[gv]; ok {
-				result = append(result, resources)
-			}
-		}
-	}
-
-	if len(failedGroups) == 0 {
-		return resultGroups, result, nil
-	}
-
-	return resultGroups, result, &ErrGroupDiscoveryFailed{Groups: failedGroups}
-}
-
-// ServerPreferredResources uses the provided discovery interface to look up preferred resources
-func ServerPreferredResources(d DiscoveryInterface) ([]*metav1.APIResourceList, error) {
-	serverGroupList, err := d.ServerGroups()
-	if err != nil {
-		return nil, err
-	}
-
-	groupVersionResources, failedGroups := fetchGroupVersionResources(d, serverGroupList)
-
-	result := []*metav1.APIResourceList{}
-	grVersions := map[schema.GroupResource]string{}                         // selected version of a GroupResource
-	grAPIResources := map[schema.GroupResource]*metav1.APIResource{}        // selected APIResource for a GroupResource
-	gvAPIResourceLists := map[schema.GroupVersion]*metav1.APIResourceList{} // blueprint for a APIResourceList for later grouping
-
-	for _, apiGroup := range serverGroupList.Groups {
-		for _, version := range apiGroup.Versions {
-			groupVersion := schema.GroupVersion{Group: apiGroup.Name, Version: version.Version}
-
-			apiResourceList, ok := groupVersionResources[groupVersion]
-			if !ok {
-				continue
-			}
-
-			// create empty list which is filled later in another loop
-			emptyAPIResourceList := metav1.APIResourceList{
-				GroupVersion: version.GroupVersion,
-			}
-			gvAPIResourceLists[groupVersion] = &emptyAPIResourceList
-			result = append(result, &emptyAPIResourceList)
-
-			for i := range apiResourceList.APIResources {
-				apiResource := &apiResourceList.APIResources[i]
-				if strings.Contains(apiResource.Name, "/") {
-					continue
-				}
-				gv := schema.GroupResource{Group: apiGroup.Name, Resource: apiResource.Name}
-				if _, ok := grAPIResources[gv]; ok && version.Version != apiGroup.PreferredVersion.Version {
-					// only override with preferred version
-					continue
-				}
-				grVersions[gv] = version.Version
-				grAPIResources[gv] = apiResource
-			}
-		}
-	}
-
-	// group selected APIResources according to GroupVersion into APIResourceLists
-	for groupResource, apiResource := range grAPIResources {
-		version := grVersions[groupResource]
-		groupVersion := schema.GroupVersion{Group: groupResource.Group, Version: version}
-		apiResourceList := gvAPIResourceLists[groupVersion]
-		apiResourceList.APIResources = append(apiResourceList.APIResources, *apiResource)
-	}
-
-	if len(failedGroups) == 0 {
-		return result, nil
-	}
-
-	return result, &ErrGroupDiscoveryFailed{Groups: failedGroups}
 }
 
 // fetchServerResourcesForGroupVersions uses the discovery client to fetch the resources for the specified groups in parallel.
@@ -375,8 +310,63 @@ func fetchGroupVersionResources(d DiscoveryInterface, apiGroups *metav1.APIGroup
 // server.
 func (d *DiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	_, rs, err := withRetries(defaultRetries, func() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
-		rs, err := ServerPreferredResources(d)
-		return nil, rs, err
+		serverGroupList, err := d.ServerGroups()
+		if err != nil {
+			return nil, nil, err
+		}
+
+		groupVersionResources, failedGroups := fetchGroupVersionResources(d, serverGroupList)
+
+		result := []*metav1.APIResourceList{}
+		grVersions := map[schema.GroupResource]string{}                         // selected version of a GroupResource
+		grAPIResources := map[schema.GroupResource]*metav1.APIResource{}        // selected APIResource for a GroupResource
+		gvAPIResourceLists := map[schema.GroupVersion]*metav1.APIResourceList{} // blueprint for a APIResourceList for later grouping
+
+		for _, apiGroup := range serverGroupList.Groups {
+			for _, version := range apiGroup.Versions {
+				groupVersion := schema.GroupVersion{Group: apiGroup.Name, Version: version.Version}
+
+				apiResourceList, ok := groupVersionResources[groupVersion]
+				if !ok {
+					continue
+				}
+
+				// create empty list which is filled later in another loop
+				emptyAPIResourceList := metav1.APIResourceList{
+					GroupVersion: version.GroupVersion,
+				}
+				gvAPIResourceLists[groupVersion] = &emptyAPIResourceList
+				result = append(result, &emptyAPIResourceList)
+
+				for i := range apiResourceList.APIResources {
+					apiResource := &apiResourceList.APIResources[i]
+					if strings.Contains(apiResource.Name, "/") {
+						continue
+					}
+					gv := schema.GroupResource{Group: apiGroup.Name, Resource: apiResource.Name}
+					if _, ok := grAPIResources[gv]; ok && version.Version != apiGroup.PreferredVersion.Version {
+						// only override with preferred version
+						continue
+					}
+					grVersions[gv] = version.Version
+					grAPIResources[gv] = apiResource
+				}
+			}
+		}
+
+		// group selected APIResources according to GroupVersion into APIResourceLists
+		for groupResource, apiResource := range grAPIResources {
+			version := grVersions[groupResource]
+			groupVersion := schema.GroupVersion{Group: groupResource.Group, Version: version}
+			apiResourceList := gvAPIResourceLists[groupVersion]
+			apiResourceList.APIResources = append(apiResourceList.APIResources, *apiResource)
+		}
+
+		if len(failedGroups) == 0 {
+			return nil, result, nil
+		}
+
+		return nil, result, &ErrGroupDiscoveryFailed{Groups: failedGroups}
 	})
 	return rs, err
 }
@@ -384,12 +374,7 @@ func (d *DiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList,
 // ServerPreferredNamespacedResources returns the supported namespaced resources with the
 // version preferred by the server.
 func (d *DiscoveryClient) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
-	return ServerPreferredNamespacedResources(d)
-}
-
-// ServerPreferredNamespacedResources uses the provided discovery interface to look up preferred namespaced resources
-func ServerPreferredNamespacedResources(d DiscoveryInterface) ([]*metav1.APIResourceList, error) {
-	all, err := ServerPreferredResources(d)
+	all, err := d.ServerPreferredResources()
 	return FilteredBy(ResourcePredicateFunc(func(groupVersion string, r *metav1.APIResource) bool {
 		return r.Namespaced
 	}), all), err
