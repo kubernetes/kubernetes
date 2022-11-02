@@ -252,10 +252,11 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 	// theoretically possible for endpoints of one address type to be assigned
 	// hints while another endpoints of another address type are not.
 	si := &topologycache.SliceInfo{
-		ServiceKey: fmt.Sprintf("%s/%s", service.Namespace, service.Name),
-		ToCreate:   slicesToCreate,
-		ToUpdate:   slicesToUpdate,
-		Unchanged:  unchangedSlices(existingSlices, slicesToUpdate, slicesToDelete),
+		ServiceKey:  fmt.Sprintf("%s/%s", service.Namespace, service.Name),
+		AddressType: addressType,
+		ToCreate:    slicesToCreate,
+		ToUpdate:    slicesToUpdate,
+		Unchanged:   unchangedSlices(existingSlices, slicesToUpdate, slicesToDelete),
 	}
 
 	if r.topologyCache != nil && hintsEnabled(service.Annotations) {
