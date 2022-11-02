@@ -15,7 +15,7 @@
 # Build the etcd image
 #
 # Usage:
-# 	[BUNDLED_ETCD_VERSIONS=3.0.17 3.1.12 3.2.24 3.3.17 3.4.13 3.5.0] [REGISTRY=k8s.gcr.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
+# 	[BUNDLED_ETCD_VERSIONS=3.0.17 3.1.12 3.2.24 3.3.17 3.4.13 3.5.0] [REGISTRY=registry.k8s.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 #
 # The image contains different etcd versions to simplify
 # upgrades. Thus be careful when removing any versions from here.
@@ -36,14 +36,14 @@ LATEST_ETCD_VERSION?=3.5.0
 # for each revision of this image at that etcd version.
 REVISION?=0
 
-# IMAGE_TAG Uniquely identifies k8s.gcr.io/etcd docker image with a tag of the form "<etcd-version>-<revision>".
+# IMAGE_TAG Uniquely identifies registry.k8s.io/etcd docker image with a tag of the form "<etcd-version>-<revision>".
 IMAGE_TAG=$(LATEST_ETCD_VERSION)-$(REVISION)
 
 ARCH?=amd64
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
-# Image should be pulled from k8s.gcr.io, which will auto-detect
+# Image should be pulled from registry.k8s.io, which will auto-detect
 # region (us, eu, asia, ...) and pull from the closest.
-REGISTRY?=k8s.gcr.io
+REGISTRY?=registry.k8s.io
 # Images should be pushed to staging-k8s.gcr.io.
 PUSH_REGISTRY?=staging-k8s.gcr.io
 
@@ -67,19 +67,19 @@ GOARM?=7
 TEMP_DIR:=$(shell mktemp -d)
 
 ifeq ($(ARCH),amd64)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base:buster-v1.9.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base:buster-v1.9.0
 endif
 ifeq ($(ARCH),arm)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm:buster-v1.9.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base-arm:buster-v1.9.0
 endif
 ifeq ($(ARCH),arm64)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm64:buster-v1.9.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base-arm64:buster-v1.9.0
 endif
 ifeq ($(ARCH),ppc64le)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-ppc64le:buster-v1.9.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base-ppc64le:buster-v1.9.0
 endif
 ifeq ($(ARCH),s390x)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-s390x:buster-v1.9.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base-s390x:buster-v1.9.0
 endif
 
 RUNNERIMAGE?=gcr.io/distroless/static:latest
@@ -176,8 +176,8 @@ unit-test:
 	docker run --rm --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
 		/bin/bash -c "CGO_ENABLED=0 go test -v k8s.io/kubernetes/cluster/images/etcd/migrate"
 
-# Integration tests require both a golang build environment and all the etcd binaries from a `k8s.gcr.io/etcd` image (`/usr/local/bin/etcd-<version>`, ...).
-# Since the `k8s.gcr.io/etcd` image is for runtime only and does not have a build golang environment, we create a new docker image to run integration tests
+# Integration tests require both a golang build environment and all the etcd binaries from a `registry.k8s.io/etcd` image (`/usr/local/bin/etcd-<version>`, ...).
+# Since the `registry.k8s.io/etcd` image is for runtime only and does not have a build golang environment, we create a new docker image to run integration tests
 # with.
 build-integration-test-image: build
 	cp -r $(TEMP_DIR) $(TEMP_DIR)_integration_test

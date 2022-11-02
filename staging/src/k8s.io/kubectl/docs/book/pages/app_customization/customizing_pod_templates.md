@@ -282,7 +282,7 @@ spec:
     spec:
       containers:
       - name: test-container
-        image: k8s.gcr.io/busybox
+        image: registry.k8s.io/busybox
         command: [ "/bin/sh" ]
         # Use the ConfigMap Environment Variables in the Command
         args: ["-c", "echo $(SPECIAL_LEVEL_KEY) $(SPECIAL_TYPE_KEY)" ]
@@ -328,7 +328,7 @@ spec:
         app: nginx
     spec:
       containers:
-      - image: k8s.gcr.io/busybox
+      - image: registry.k8s.io/busybox
         name: test-container
         command:
         - /bin/sh

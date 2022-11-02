@@ -4,7 +4,7 @@ metadata:
   name: selinuxoptions1
 spec:
   containers:
-  - image: k8s.gcr.io/pause
+  - image: registry.k8s.io/pause
     name: container1
     securityContext:
       allowPrivilegeEscalation: false
@@ -15,7 +15,7 @@ spec:
         level: somevalue
         type: container_init_t
   initContainers:
-  - image: k8s.gcr.io/pause
+  - image: registry.k8s.io/pause
     name: initcontainer1
     securityContext:
       allowPrivilegeEscalation: false

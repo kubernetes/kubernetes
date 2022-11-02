@@ -245,7 +245,7 @@ metadata:
   name: testpod
 spec:
   containers:
-    - image: k8s.gcr.io/busybox
+    - image: registry.k8s.io/busybox
 `,
 			false,
 		},
@@ -262,7 +262,7 @@ spec:
   "spec": {
     "containers": [
       {
-        "image": "k8s.gcr.io/busybox"
+        "image": "registry.k8s.io/busybox"
       }
     ]
   }
@@ -278,7 +278,7 @@ kind: Pod
 metadata:
   name: testpod
 spec:
-  - image: k8s.gcr.io/busybox
+  - image: registry.k8s.io/busybox
 `,
 			true,
 		},

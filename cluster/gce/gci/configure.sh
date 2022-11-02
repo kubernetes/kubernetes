@@ -407,12 +407,12 @@ function install-kube-manifests {
   echo "Downloading k8s manifests tar"
   download-or-bust "${manifests_tar_hash}" "${manifests_tar_urls[@]}"
   tar xzf "${KUBE_HOME}/${manifests_tar}" -C "${dst_dir}" --overwrite
-  local -r kube_addon_registry="${KUBE_ADDON_REGISTRY:-k8s.gcr.io}"
-  if [[ "${kube_addon_registry}" != "k8s.gcr.io" ]]; then
+  local -r kube_addon_registry="${KUBE_ADDON_REGISTRY:-registry.k8s.io}"
+  if [[ "${kube_addon_registry}" != "registry.k8s.io" ]]; then
     find "${dst_dir}" \(-name '*.yaml' -or -name '*.yaml.in'\) -print0 | \
-      xargs -0 sed -ri "s@(image:\s.*)k8s.gcr.io@\1${kube_addon_registry}@"
+      xargs -0 sed -ri "s@(image:\s.*)registry.k8s.io@\1${kube_addon_registry}@"
     find "${dst_dir}" \(-name '*.manifest' -or -name '*.json'\) -print0 | \
-      xargs -0 sed -ri "s@(image\":\s+\")k8s.gcr.io@\1${kube_addon_registry}@"
+      xargs -0 sed -ri "s@(image\":\s+\")registry.k8s.io@\1${kube_addon_registry}@"
   fi
   cp "${dst_dir}/kubernetes/gci-trusty/gci-configure-helper.sh" "${KUBE_BIN}/configure-helper.sh"
   cp "${dst_dir}/kubernetes/gci-trusty/configure-kubeapiserver.sh" "${KUBE_BIN}/configure-kubeapiserver.sh"

@@ -25,7 +25,7 @@ export
 # Get without building to populate module cache
 # Then, get with OS/ARCH-specific env to build
 bin:
-	docker run --rm -i -v "${TARGET}:${TARGET}:Z" k8s.gcr.io/build-image/kube-cross:${KUBE_CROSS_VERSION} \
+	docker run --rm -i -v "${TARGET}:${TARGET}:Z" registry.k8s.io/build-image/kube-cross:${KUBE_CROSS_VERSION} \
 		/bin/bash -c "\
 			mkdir -p /go/src /go/bin && \
 			GO111MODULE=on go get -d k8s.io/sample-apiserver@v0.17.0 && \

@@ -86,7 +86,7 @@ func checkIPTables() (err error) {
 // checkPublicGCR checks the access to the public Google Container Registry by
 // pulling the busybox image.
 func checkPublicGCR() error {
-	const image = "k8s.gcr.io/busybox"
+	const image = "registry.k8s.io/busybox"
 	output, err := runCommand("docker", "images", "-q", image)
 	if err != nil {
 		return err
@@ -195,7 +195,7 @@ func checkDockerNetworkClient() error {
 // within a container and accessing it from outside.
 func checkDockerNetworkServer() error {
 	const (
-		imageName     = "k8s.gcr.io/nginx:1.7.9"
+		imageName     = "registry.k8s.io/nginx:1.7.9"
 		hostAddr      = "127.0.0.1"
 		hostPort      = "8088"
 		containerPort = "80"

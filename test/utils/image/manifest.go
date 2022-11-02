@@ -92,18 +92,18 @@ var (
 	initRegistry = RegistryList{
 		GcAuthenticatedRegistry:  "gcr.io/authenticated-image-pulling",
 		E2eRegistry:              "gcr.io/kubernetes-e2e-test-images",
-		PromoterE2eRegistry:      "k8s.gcr.io/e2e-test-images",
-		BuildImageRegistry:       "k8s.gcr.io/build-image",
+		PromoterE2eRegistry:      "registry.k8s.io/e2e-test-images",
+		BuildImageRegistry:       "registry.k8s.io/build-image",
 		InvalidRegistry:          "invalid.com/invalid",
-		GcEtcdRegistry:           "k8s.gcr.io",
-		GcRegistry:               "k8s.gcr.io",
-		SigStorageRegistry:       "k8s.gcr.io/sig-storage",
+		GcEtcdRegistry:           "registry.k8s.io",
+		GcRegistry:               "registry.k8s.io",
+		SigStorageRegistry:       "registry.k8s.io/sig-storage",
 		PrivateRegistry:          "gcr.io/k8s-authenticated-test",
 		SampleRegistry:           "gcr.io/google-samples",
 		GcrReleaseRegistry:       "gcr.io/gke-release",
 		MicrosoftRegistry:        "mcr.microsoft.com",
 		DockerLibraryRegistry:    "docker.io/library",
-		CloudProviderGcpRegistry: "k8s.gcr.io/cloud-provider-gcp",
+		CloudProviderGcpRegistry: "registry.k8s.io/cloud-provider-gcp",
 	}
 
 	registry = initReg()
