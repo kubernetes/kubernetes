@@ -97,7 +97,7 @@ func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion stri
 
 // ServerGroupsAndResources returns the supported groups and resources for all groups and versions.
 func (d *CachedDiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
-	return discovery.ServerGroupsAndResources(d)
+	return d.delegate.ServerGroupsAndResources()
 }
 
 // ServerGroups returns the supported groups, with information like supported versions and the
@@ -219,13 +219,13 @@ func (d *CachedDiscoveryClient) RESTClient() restclient.Interface {
 // ServerPreferredResources returns the supported resources with the version preferred by the
 // server.
 func (d *CachedDiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
-	return discovery.ServerPreferredResources(d)
+	return d.delegate.ServerPreferredResources()
 }
 
 // ServerPreferredNamespacedResources returns the supported namespaced resources with the
 // version preferred by the server.
 func (d *CachedDiscoveryClient) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
-	return discovery.ServerPreferredNamespacedResources(d)
+	return d.delegate.ServerPreferredNamespacedResources()
 }
 
 // ServerVersion retrieves and parses the server's version (git version).

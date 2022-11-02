@@ -112,7 +112,7 @@ func (d *memCacheClient) ServerResourcesForGroupVersion(groupVersion string) (*m
 
 // ServerGroupsAndResources returns the groups and supported resources for all groups and versions.
 func (d *memCacheClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
-	return discovery.ServerGroupsAndResources(d)
+	return d.delegate.ServerGroupsAndResources()
 }
 
 func (d *memCacheClient) ServerGroups() (*metav1.APIGroupList, error) {
@@ -131,11 +131,11 @@ func (d *memCacheClient) RESTClient() restclient.Interface {
 }
 
 func (d *memCacheClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
-	return discovery.ServerPreferredResources(d)
+	return d.delegate.ServerPreferredResources()
 }
 
 func (d *memCacheClient) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
-	return discovery.ServerPreferredNamespacedResources(d)
+	return d.delegate.ServerPreferredNamespacedResources()
 }
 
 func (d *memCacheClient) ServerVersion() (*version.Info, error) {
