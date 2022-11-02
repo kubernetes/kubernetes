@@ -439,19 +439,19 @@ func (r *crdHandler) serveResource(w http.ResponseWriter, req *http.Request, req
 			time.Sleep(2 * time.Second)
 		}
 
-		if err := crdInfo.waitForStorageVersionUpdate(req.Context()); err != nil {
-			err := apierrors.NewServiceUnavailable(err.Error())
-			responsewriters.ErrorNegotiated(err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
-			return nil
-		}
-		// Get the latest CRD to make sure it's not terminating or deleted
-		crd, err := r.crdLister.Get(crdName)
-		if err != nil || crd.UID != crdUID || terminating {
+		if terminating {
 			err := apierrors.NewMethodNotSupported(schema.GroupResource{Group: requestInfo.APIGroup, Resource: requestInfo.Resource}, requestInfo.Verb)
 			err.ErrStatus.Message = fmt.Sprintf("%v not allowed while custom resource definition is terminating", requestInfo.Verb)
 			responsewriters.ErrorNegotiated(err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
 			return nil
 		}
+
+		if err := crdInfo.waitForStorageVersionUpdate(req.Context()); err != nil {
+			err := apierrors.NewServiceUnavailable(err.Error())
+			responsewriters.ErrorNegotiated(err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
+			return nil
+		}
+
 		return handlers.CreateResource(storage, requestScope, r.admission)
 	case "update":
 		if err := crdInfo.waitForStorageVersionUpdate(req.Context()); err != nil {
