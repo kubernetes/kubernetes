@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
@@ -91,7 +92,10 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 			client:        &fake,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		scaled, err := controller.reconcileNewReplicaSet(context.TODO(), allRSs, newRS, deployment)
+		_, ctx := ktesting.NewTestContext(t)
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		scaled, err := controller.reconcileNewReplicaSet(ctx, allRSs, newRS, deployment)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -197,8 +201,8 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 			client:        &fakeClientset,
 			eventRecorder: &record.FakeRecorder{},
 		}
-
-		scaled, err := controller.reconcileOldReplicaSets(context.TODO(), allRSs, oldRSs, newRS, deployment)
+		_, ctx := ktesting.NewTestContext(t)
+		scaled, err := controller.reconcileOldReplicaSets(ctx, allRSs, oldRSs, newRS, deployment)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -266,7 +270,8 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 			client:        &fakeClientset,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		_, cleanupCount, err := controller.cleanupUnhealthyReplicas(context.TODO(), oldRSs, deployment, int32(test.maxCleanupCount))
+		_, ctx := ktesting.NewTestContext(t)
+		_, cleanupCount, err := controller.cleanupUnhealthyReplicas(ctx, oldRSs, deployment, int32(test.maxCleanupCount))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -340,7 +345,8 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 			client:        &fakeClientset,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		scaled, err := controller.scaleDownOldReplicaSetsForRollingUpdate(context.TODO(), allRSs, oldRSs, deployment)
+		_, ctx := ktesting.NewTestContext(t)
+		scaled, err := controller.scaleDownOldReplicaSetsForRollingUpdate(ctx, allRSs, oldRSs, deployment)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue

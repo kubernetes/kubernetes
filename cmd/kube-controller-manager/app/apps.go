@@ -74,7 +74,9 @@ func startReplicaSetController(ctx context.Context, controllerContext Controller
 }
 
 func startDeploymentController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+	ctx = klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "deployment"))
 	dc, err := deployment.NewDeploymentController(
+		ctx,
 		controllerContext.InformerFactory.Apps().V1().Deployments(),
 		controllerContext.InformerFactory.Apps().V1().ReplicaSets(),
 		controllerContext.InformerFactory.Core().V1().Pods(),

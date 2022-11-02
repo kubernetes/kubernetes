@@ -103,7 +103,7 @@ func newDeployment(name, ns string, replicas int32) *apps.Deployment {
 }
 
 // dcSetup sets up necessities for Deployment integration test, including control plane, apiserver, informers, and clientset
-func dcSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, *replicaset.ReplicaSetController, *deployment.DeploymentController, informers.SharedInformerFactory, clientset.Interface) {
+func dcSetup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFunc, *replicaset.ReplicaSetController, *deployment.DeploymentController, informers.SharedInformerFactory, clientset.Interface) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 	logger, _ := ktesting.NewTestContext(t)
@@ -117,6 +117,7 @@ func dcSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, *replicaset.Repli
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "deployment-informers")), resyncPeriod)
 
 	dc, err := deployment.NewDeploymentController(
+		ctx,
 		informers.Apps().V1().Deployments(),
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
