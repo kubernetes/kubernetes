@@ -24,16 +24,14 @@ import (
 )
 
 const (
-	podGCController   = "pod_gc_collector"
-	deletingPods      = "force_delete_pods_total"
-	deletingPodsError = "force_delete_pod_errors_total"
+	podGCController = "pod_gc_collector"
 )
 
 var (
 	deletingPodsTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      podGCController,
-			Name:           deletingPods,
+			Name:           "force_delete_pods_total",
 			Help:           "Number of pods that are being forcefully deleted since the Pod GC Controller started.",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -42,7 +40,7 @@ var (
 	deletingPodsErrorTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      podGCController,
-			Name:           deletingPodsError,
+			Name:           "force_delete_pod_errors_total",
 			Help:           "Number of errors encountered when forcefully deleting the pods since the Pod GC Controller started.",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -53,7 +51,7 @@ var (
 var registerMetrics sync.Once
 
 // Register the metrics that are to be monitored.
-func Register() {
+func RegisterMetrics() {
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(deletingPodsTotal)
 		legacyregistry.MustRegister(deletingPodsErrorTotal)

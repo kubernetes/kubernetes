@@ -70,7 +70,7 @@ type PodGCController struct {
 
 func init() {
 	// Register prometheus metrics
-	Register()
+	RegisterMetrics()
 }
 
 func NewPodGC(ctx context.Context, kubeClient clientset.Interface, podInformer coreinformers.PodInformer,
