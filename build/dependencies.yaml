@@ -168,15 +168,15 @@ dependencies:
       match: validTmplOut\s+=
     - path: cmd/kubeadm/app/util/template_test.go
       match: doNothing\s+=
+    - path: cmd/kubelet/app/options/container_runtime.go
+      match: defaultPodSandboxImageVersion\s+=
+    - path: pkg/kubelet/dockershim/docker_sandbox.go
+      match: registry.k8s.io\/pause:\d+\.\d+
 
   - name: "k8s.gcr.io/pause: dependents"
     version: 3.6
     refPaths:
-    - path: cmd/kubelet/app/options/container_runtime.go
-      match: defaultPodSandboxImageVersion\s+=
     - path: hack/testdata/pod-with-precision.json
-      match: k8s.gcr.io\/pause:\d+\.\d+
-    - path: pkg/kubelet/dockershim/docker_sandbox.go
       match: k8s.gcr.io\/pause:\d+\.\d+
     - path: staging/src/k8s.io/kubectl/testdata/set/multi-resource-yaml.yaml
       match: k8s.gcr.io\/pause:\d+\.\d+
