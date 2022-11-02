@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,13 +21,16 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	"path/filepath"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	volumepkg "k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	utilpath "k8s.io/utils/path"
@@ -115,22 +118,6 @@ func getDeviceMountPath(gvi *globalVolumeInfo) (string, error) {
 	}
 }
 
-func (rc *reconciler) markVolumeState(volume *reconstructedVolume, volumeState operationexecutor.VolumeMountState) error {
-	markVolumeOpts := operationexecutor.MarkVolumeOpts{
-		PodName:             volume.podName,
-		PodUID:              types.UID(volume.podName),
-		VolumeName:          volume.volumeName,
-		Mounter:             volume.mounter,
-		BlockVolumeMapper:   volume.blockVolumeMapper,
-		OuterVolumeSpecName: volume.outerVolumeSpecName,
-		VolumeGidVolume:     volume.volumeGidValue,
-		VolumeSpec:          volume.volumeSpec,
-		VolumeMountState:    volumeState,
-	}
-	err := rc.actualStateOfWorld.MarkVolumeAsMounted(markVolumeOpts)
-	return err
-}
-
 // getVolumesFromPodDir scans through the volumes directories under the given pod directory.
 // It returns a list of pod volume information including pod's uid, volume's plugin name, mount path,
 // and volume spec name.
@@ -187,4 +174,147 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 	}
 	klog.V(4).InfoS("Get volumes from pod directory", "path", podDir, "volumes", volumes)
 	return volumes, nil
+}
+
+// Reconstruct volume data structure by reading the pod's volume directories
+func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume, error) {
+	// plugin initializations
+	plugin, err := rc.volumePluginMgr.FindPluginByName(volume.pluginName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create pod object
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: types.UID(volume.podName),
+		},
+	}
+	mapperPlugin, err := rc.volumePluginMgr.FindMapperPluginByName(volume.pluginName)
+	if err != nil {
+		return nil, err
+	}
+	if volume.volumeMode == v1.PersistentVolumeBlock && mapperPlugin == nil {
+		return nil, fmt.Errorf("could not find block volume plugin %q (spec.Name: %q) pod %q (UID: %q)", volume.pluginName, volume.volumeSpecName, volume.podName, pod.UID)
+	}
+
+	reconstructed, err := rc.operationExecutor.ReconstructVolumeOperation(
+		volume.volumeMode,
+		plugin,
+		mapperPlugin,
+		pod.UID,
+		volume.podName,
+		volume.volumeSpecName,
+		volume.volumePath,
+		volume.pluginName)
+	if err != nil {
+		return nil, err
+	}
+	volumeSpec := reconstructed.Spec
+
+	// We have to find the plugins by volume spec (NOT by plugin name) here
+	// in order to correctly reconstruct ephemeral volume types.
+	// Searching by spec checks whether the volume is actually attachable
+	// (i.e. has a PV) whereas searching by plugin name can only tell whether
+	// the plugin supports attachable volumes.
+	attachablePlugin, err := rc.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+	if err != nil {
+		return nil, err
+	}
+	deviceMountablePlugin, err := rc.volumePluginMgr.FindDeviceMountablePluginBySpec(volumeSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	var uniqueVolumeName v1.UniqueVolumeName
+	if attachablePlugin != nil || deviceMountablePlugin != nil {
+		uniqueVolumeName, err = util.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		uniqueVolumeName = util.GetUniqueVolumeNameFromSpecWithPod(volume.podName, plugin, volumeSpec)
+	}
+
+	var volumeMapper volumepkg.BlockVolumeMapper
+	var volumeMounter volumepkg.Mounter
+	var deviceMounter volumepkg.DeviceMounter
+	// Path to the mount or block device to check
+	var checkPath string
+
+	if volume.volumeMode == v1.PersistentVolumeBlock {
+		var newMapperErr error
+		volumeMapper, newMapperErr = mapperPlugin.NewBlockVolumeMapper(
+			volumeSpec,
+			pod,
+			volumepkg.VolumeOptions{})
+		if newMapperErr != nil {
+			return nil, fmt.Errorf(
+				"reconstructVolume.NewBlockVolumeMapper failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
+				uniqueVolumeName,
+				volumeSpec.Name(),
+				volume.podName,
+				pod.UID,
+				newMapperErr)
+		}
+		mapDir, linkName := volumeMapper.GetPodDeviceMapPath()
+		checkPath = filepath.Join(mapDir, linkName)
+	} else {
+		var err error
+		volumeMounter, err = plugin.NewMounter(
+			volumeSpec,
+			pod,
+			volumepkg.VolumeOptions{})
+		if err != nil {
+			return nil, fmt.Errorf(
+				"reconstructVolume.NewMounter failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
+				uniqueVolumeName,
+				volumeSpec.Name(),
+				volume.podName,
+				pod.UID,
+				err)
+		}
+		checkPath = volumeMounter.GetPath()
+		if deviceMountablePlugin != nil {
+			deviceMounter, err = deviceMountablePlugin.NewDeviceMounter()
+			if err != nil {
+				return nil, fmt.Errorf("reconstructVolume.NewDeviceMounter failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
+					uniqueVolumeName,
+					volumeSpec.Name(),
+					volume.podName,
+					pod.UID,
+					err)
+			}
+		}
+	}
+
+	// Check existence of mount point for filesystem volume or symbolic link for block volume
+	isExist, checkErr := rc.operationExecutor.CheckVolumeExistenceOperation(volumeSpec, checkPath, volumeSpec.Name(), rc.mounter, uniqueVolumeName, volume.podName, pod.UID, attachablePlugin)
+	if checkErr != nil {
+		return nil, checkErr
+	}
+	// If mount or symlink doesn't exist, volume reconstruction should be failed
+	if !isExist {
+		return nil, fmt.Errorf("volume: %q is not mounted", uniqueVolumeName)
+	}
+
+	reconstructedVolume := &reconstructedVolume{
+		volumeName: uniqueVolumeName,
+		podName:    volume.podName,
+		volumeSpec: volumeSpec,
+		// volume.volumeSpecName is actually InnerVolumeSpecName. It will not be used
+		// for volume cleanup.
+		// in case pod is added back to desired state, outerVolumeSpecName will be updated from dsw information.
+		// See issue #103143 and its fix for details.
+		outerVolumeSpecName: volume.volumeSpecName,
+		pod:                 pod,
+		deviceMounter:       deviceMounter,
+		volumeGidValue:      "",
+		// devicePath is updated during updateStates() by checking node status's VolumesAttached data.
+		// TODO: get device path directly from the volume mount path.
+		devicePath:        "",
+		mounter:           volumeMounter,
+		blockVolumeMapper: volumeMapper,
+	}
+	return reconstructedVolume, nil
 }
