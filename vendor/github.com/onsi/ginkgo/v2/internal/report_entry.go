@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"reflect"
 	"time"
 
 	"github.com/onsi/ginkgo/v2/types"
@@ -13,20 +12,20 @@ func NewReportEntry(name string, cl types.CodeLocation, args ...interface{}) (Re
 	out := ReportEntry{
 		Visibility: types.ReportEntryVisibilityAlways,
 		Name:       name,
-		Time:       time.Now(),
 		Location:   cl,
+		Time:       time.Now(),
 	}
 	var didSetValue = false
 	for _, arg := range args {
-		switch reflect.TypeOf(arg) {
-		case reflect.TypeOf(types.ReportEntryVisibilityAlways):
-			out.Visibility = arg.(types.ReportEntryVisibility)
-		case reflect.TypeOf(types.CodeLocation{}):
-			out.Location = arg.(types.CodeLocation)
-		case reflect.TypeOf(Offset(0)):
-			out.Location = types.NewCodeLocation(2 + int(arg.(Offset)))
-		case reflect.TypeOf(out.Time):
-			out.Time = arg.(time.Time)
+		switch x := arg.(type) {
+		case types.ReportEntryVisibility:
+			out.Visibility = x
+		case types.CodeLocation:
+			out.Location = x
+		case Offset:
+			out.Location = types.NewCodeLocation(2 + int(x))
+		case time.Time:
+			out.Time = x
 		default:
 			if didSetValue {
 				return ReportEntry{}, types.GinkgoErrors.TooManyReportEntryValues(out.Location, arg)

@@ -30,6 +30,8 @@ type DefaultReporter struct {
 	specDenoter  string
 	retryDenoter string
 	formatter    formatter.Formatter
+
+	runningInParallel bool
 }
 
 func NewDefaultReporterUnderTest(conf types.ReporterConfig, writer io.Writer) *DefaultReporter {
@@ -97,230 +99,10 @@ func (r *DefaultReporter) SuiteWillBegin(report types.Report) {
 	}
 }
 
-func (r *DefaultReporter) WillRun(report types.SpecReport) {
-	if r.conf.Verbosity().LT(types.VerbosityLevelVerbose) || report.State.Is(types.SpecStatePending|types.SpecStateSkipped) {
-		return
-	}
-
-	r.emitDelimiter()
-	indentation := uint(0)
-	if report.LeafNodeType.Is(types.NodeTypesForSuiteLevelNodes) {
-		r.emitBlock(r.f("{{bold}}[%s] %s{{/}}", report.LeafNodeType.String(), report.LeafNodeText))
-	} else {
-		if len(report.ContainerHierarchyTexts) > 0 {
-			r.emitBlock(r.cycleJoin(report.ContainerHierarchyTexts, " "))
-			indentation = 1
-		}
-		line := r.fi(indentation, "{{bold}}%s{{/}}", report.LeafNodeText)
-		labels := report.Labels()
-		if len(labels) > 0 {
-			line += r.f(" {{coral}}[%s]{{/}}", strings.Join(labels, ", "))
-		}
-		r.emitBlock(line)
-	}
-	r.emitBlock(r.fi(indentation, "{{gray}}%s{{/}}", report.LeafNodeLocation))
-}
-
-func (r *DefaultReporter) DidRun(report types.SpecReport) {
-	v := r.conf.Verbosity()
-	var header, highlightColor string
-	includeRuntime, emitGinkgoWriterOutput, stream, denoter := true, true, false, r.specDenoter
-	succinctLocationBlock := v.Is(types.VerbosityLevelSuccinct)
-
-	hasGW := report.CapturedGinkgoWriterOutput != ""
-	hasStd := report.CapturedStdOutErr != ""
-	hasEmittableReports := report.ReportEntries.HasVisibility(types.ReportEntryVisibilityAlways) || (report.ReportEntries.HasVisibility(types.ReportEntryVisibilityFailureOrVerbose) && (!report.Failure.IsZero() || v.GTE(types.VerbosityLevelVerbose)))
-
-	if report.LeafNodeType.Is(types.NodeTypesForSuiteLevelNodes) {
-		denoter = fmt.Sprintf("[%s]", report.LeafNodeType)
-	}
-
-	highlightColor = r.highlightColorForState(report.State)
-
-	switch report.State {
-	case types.SpecStatePassed:
-		succinctLocationBlock = v.LT(types.VerbosityLevelVerbose)
-		emitGinkgoWriterOutput = (r.conf.AlwaysEmitGinkgoWriter || v.GTE(types.VerbosityLevelVerbose)) && hasGW
-		if report.LeafNodeType.Is(types.NodeTypesForSuiteLevelNodes) {
-			if v.GTE(types.VerbosityLevelVerbose) || hasStd || hasEmittableReports {
-				header = fmt.Sprintf("%s PASSED", denoter)
-			} else {
-				return
-			}
-		} else {
-			header, stream = denoter, true
-			if report.NumAttempts > 1 && report.MaxFlakeAttempts > 1 {
-				header, stream = fmt.Sprintf("%s [FLAKEY TEST - TOOK %d ATTEMPTS TO PASS]", r.retryDenoter, report.NumAttempts), false
-			}
-			if report.RunTime > r.conf.SlowSpecThreshold {
-				header, stream = fmt.Sprintf("%s [SLOW TEST]", header), false
-			}
-		}
-		if hasStd || emitGinkgoWriterOutput || hasEmittableReports {
-			stream = false
-		}
-	case types.SpecStatePending:
-		includeRuntime, emitGinkgoWriterOutput = false, false
-		if v.Is(types.VerbosityLevelSuccinct) {
-			header, stream = "P", true
-		} else {
-			header, succinctLocationBlock = "P [PENDING]", v.LT(types.VerbosityLevelVeryVerbose)
-		}
-	case types.SpecStateSkipped:
-		if report.Failure.Message != "" || v.Is(types.VerbosityLevelVeryVerbose) {
-			header = "S [SKIPPED]"
-		} else {
-			header, stream = "S", true
-		}
-	case types.SpecStateFailed:
-		header = fmt.Sprintf("%s [FAILED]", denoter)
-	case types.SpecStateTimedout:
-		header = fmt.Sprintf("%s [TIMEDOUT]", denoter)
-	case types.SpecStatePanicked:
-		header = fmt.Sprintf("%s! [PANICKED]", denoter)
-	case types.SpecStateInterrupted:
-		header = fmt.Sprintf("%s! [INTERRUPTED]", denoter)
-	case types.SpecStateAborted:
-		header = fmt.Sprintf("%s! [ABORTED]", denoter)
-	}
-
-	if report.State.Is(types.SpecStateFailureStates) && report.MaxMustPassRepeatedly > 1 {
-		header, stream = fmt.Sprintf("%s DURING REPETITION #%d", header, report.NumAttempts), false
-	}
-	// Emit stream and return
-	if stream {
-		r.emit(r.f(highlightColor + header + "{{/}}"))
-		return
-	}
-
-	// Emit header
-	r.emitDelimiter()
-	if includeRuntime {
-		header = r.f("%s [%.3f seconds]", header, report.RunTime.Seconds())
-	}
-	r.emitBlock(r.f(highlightColor + header + "{{/}}"))
-
-	// Emit Code Location Block
-	r.emitBlock(r.codeLocationBlock(report, highlightColor, succinctLocationBlock, false))
-
-	//Emit Stdout/Stderr Output
-	if hasStd {
-		r.emitBlock("\n")
-		r.emitBlock(r.fi(1, "{{gray}}Begin Captured StdOut/StdErr Output >>{{/}}"))
-		r.emitBlock(r.fi(2, "%s", report.CapturedStdOutErr))
-		r.emitBlock(r.fi(1, "{{gray}}<< End Captured StdOut/StdErr Output{{/}}"))
-	}
-
-	//Emit Captured GinkgoWriter Output
-	if emitGinkgoWriterOutput && hasGW {
-		r.emitBlock("\n")
-		r.emitGinkgoWriterOutput(1, report.CapturedGinkgoWriterOutput, 0)
-	}
-
-	if hasEmittableReports {
-		r.emitBlock("\n")
-		r.emitBlock(r.fi(1, "{{gray}}Begin Report Entries >>{{/}}"))
-		reportEntries := report.ReportEntries.WithVisibility(types.ReportEntryVisibilityAlways)
-		if !report.Failure.IsZero() || v.GTE(types.VerbosityLevelVerbose) {
-			reportEntries = report.ReportEntries.WithVisibility(types.ReportEntryVisibilityAlways, types.ReportEntryVisibilityFailureOrVerbose)
-		}
-		for _, entry := range reportEntries {
-			r.emitBlock(r.fi(2, "{{bold}}"+entry.Name+"{{gray}} - %s @ %s{{/}}", entry.Location, entry.Time.Format(types.GINKGO_TIME_FORMAT)))
-			if representation := entry.StringRepresentation(); representation != "" {
-				r.emitBlock(r.fi(3, representation))
-			}
-		}
-		r.emitBlock(r.fi(1, "{{gray}}<< End Report Entries{{/}}"))
-	}
-
-	// Emit Failure Message
-	if !report.Failure.IsZero() {
-		r.emitBlock("\n")
-		r.EmitFailure(1, report.State, report.Failure, false)
-	}
-
-	if len(report.AdditionalFailures) > 0 {
-		if v.GTE(types.VerbosityLevelVerbose) {
-			r.emitBlock("\n")
-			r.emitBlock(r.fi(1, "{{bold}}There were additional failures detected after the initial failure:{{/}}"))
-			for i, additionalFailure := range report.AdditionalFailures {
-				r.EmitFailure(2, additionalFailure.State, additionalFailure.Failure, true)
-				if i < len(report.AdditionalFailures)-1 {
-					r.emitBlock(r.fi(2, "{{gray}}%s{{/}}", strings.Repeat("-", 10)))
-				}
-			}
-		} else {
-			r.emitBlock("\n")
-			r.emitBlock(r.fi(1, "{{bold}}There were additional failures detected after the initial failure.  Here's a summary - for full details run Ginkgo in verbose mode:{{/}}"))
-			for _, additionalFailure := range report.AdditionalFailures {
-				r.emitBlock(r.fi(2, r.highlightColorForState(additionalFailure.State)+"[%s]{{/}} in [%s] at %s",
-					r.humanReadableState(additionalFailure.State),
-					additionalFailure.Failure.FailureNodeType,
-					additionalFailure.Failure.Location,
-				))
-			}
-
-		}
-	}
-
-	r.emitDelimiter()
-}
-
-func (r *DefaultReporter) highlightColorForState(state types.SpecState) string {
-	switch state {
-	case types.SpecStatePassed:
-		return "{{green}}"
-	case types.SpecStatePending:
-		return "{{yellow}}"
-	case types.SpecStateSkipped:
-		return "{{cyan}}"
-	case types.SpecStateFailed:
-		return "{{red}}"
-	case types.SpecStateTimedout:
-		return "{{orange}}"
-	case types.SpecStatePanicked:
-		return "{{magenta}}"
-	case types.SpecStateInterrupted:
-		return "{{orange}}"
-	case types.SpecStateAborted:
-		return "{{coral}}"
-	default:
-		return "{{gray}}"
-	}
-}
-
-func (r *DefaultReporter) humanReadableState(state types.SpecState) string {
-	return strings.ToUpper(state.String())
-}
-
-func (r *DefaultReporter) EmitFailure(indent uint, state types.SpecState, failure types.Failure, includeState bool) {
-	highlightColor := r.highlightColorForState(state)
-	if includeState {
-		r.emitBlock(r.fi(indent, highlightColor+"[%s]{{/}}", r.humanReadableState(state)))
-	}
-	r.emitBlock(r.fi(indent, highlightColor+"%s{{/}}", failure.Message))
-	r.emitBlock(r.fi(indent, highlightColor+"In {{bold}}[%s]{{/}}"+highlightColor+" at: {{bold}}%s{{/}}\n", failure.FailureNodeType, failure.Location))
-	if failure.ForwardedPanic != "" {
-		r.emitBlock("\n")
-		r.emitBlock(r.fi(indent, highlightColor+"%s{{/}}", failure.ForwardedPanic))
-	}
-
-	if r.conf.FullTrace || failure.ForwardedPanic != "" {
-		r.emitBlock("\n")
-		r.emitBlock(r.fi(indent, highlightColor+"Full Stack Trace{{/}}"))
-		r.emitBlock(r.fi(indent+1, "%s", failure.Location.FullStackTrace))
-	}
-
-	if !failure.ProgressReport.IsZero() {
-		r.emitBlock("\n")
-		r.emitProgressReport(indent, false, failure.ProgressReport)
-	}
-}
-
 func (r *DefaultReporter) SuiteDidEnd(report types.Report) {
 	failures := report.SpecReports.WithState(types.SpecStateFailureStates)
 	if len(failures) > 0 {
-		r.emitBlock("\n\n")
+		r.emitBlock("\n")
 		if len(failures) > 1 {
 			r.emitBlock(r.f("{{red}}{{bold}}Summarizing %d Failures:{{/}}", len(failures)))
 		} else {
@@ -338,7 +120,7 @@ func (r *DefaultReporter) SuiteDidEnd(report types.Report) {
 			case types.SpecStateInterrupted:
 				highlightColor, heading = "{{orange}}", "[INTERRUPTED]"
 			}
-			locationBlock := r.codeLocationBlock(specReport, highlightColor, true, true)
+			locationBlock := r.codeLocationBlock(specReport, highlightColor, false, true)
 			r.emitBlock(r.fi(1, highlightColor+"%s{{/}} %s", heading, locationBlock))
 		}
 	}
@@ -387,14 +169,271 @@ func (r *DefaultReporter) SuiteDidEnd(report types.Report) {
 	}
 }
 
+func (r *DefaultReporter) WillRun(report types.SpecReport) {
+	v := r.conf.Verbosity()
+	if v.LT(types.VerbosityLevelVerbose) || report.State.Is(types.SpecStatePending|types.SpecStateSkipped) || report.RunningInParallel {
+		return
+	}
+
+	r.emitDelimiter(0)
+	r.emitBlock(r.f(r.codeLocationBlock(report, "{{/}}", v.Is(types.VerbosityLevelVeryVerbose), false)))
+}
+
+func (r *DefaultReporter) DidRun(report types.SpecReport) {
+	v := r.conf.Verbosity()
+	inParallel := report.RunningInParallel
+
+	header := r.specDenoter
+	if report.LeafNodeType.Is(types.NodeTypesForSuiteLevelNodes) {
+		header = fmt.Sprintf("[%s]", report.LeafNodeType)
+	}
+	highlightColor := r.highlightColorForState(report.State)
+
+	// have we already been streaming the timeline?
+	timelineHasBeenStreaming := v.GTE(types.VerbosityLevelVerbose) && !inParallel
+
+	// should we show the timeline?
+	var timeline types.Timeline
+	showTimeline := !timelineHasBeenStreaming && (v.GTE(types.VerbosityLevelVerbose) || report.Failed())
+	if showTimeline {
+		timeline = report.Timeline().WithoutHiddenReportEntries()
+		keepVeryVerboseSpecEvents := v.Is(types.VerbosityLevelVeryVerbose) ||
+			(v.Is(types.VerbosityLevelVerbose) && r.conf.ShowNodeEvents) ||
+			(report.Failed() && r.conf.ShowNodeEvents)
+		if !keepVeryVerboseSpecEvents {
+			timeline = timeline.WithoutVeryVerboseSpecEvents()
+		}
+		if len(timeline) == 0 && report.CapturedGinkgoWriterOutput == "" {
+			// the timeline is completely empty - don't show it
+			showTimeline = false
+		}
+		if v.LT(types.VerbosityLevelVeryVerbose) && report.CapturedGinkgoWriterOutput == "" && len(timeline) > 0 {
+			//if we aren't -vv and the timeline only has a single failure, don't show it as it will appear at the end of the report
+			failure, isFailure := timeline[0].(types.Failure)
+			if isFailure && (len(timeline) == 1 || (len(timeline) == 2 && failure.AdditionalFailure != nil)) {
+				showTimeline = false
+			}
+		}
+	}
+
+	// should we have a separate section for always-visible reports?
+	showSeparateVisibilityAlwaysReportsSection := !timelineHasBeenStreaming && !showTimeline && report.ReportEntries.HasVisibility(types.ReportEntryVisibilityAlways)
+
+	// should we have a separate section for captured stdout/stderr
+	showSeparateStdSection := inParallel && (report.CapturedStdOutErr != "")
+
+	// given all that - do we have any actual content to show? or are we a single denoter in a stream?
+	reportHasContent := v.Is(types.VerbosityLevelVeryVerbose) || showTimeline || showSeparateVisibilityAlwaysReportsSection || showSeparateStdSection || report.Failed() || (v.Is(types.VerbosityLevelVerbose) && !report.State.Is(types.SpecStateSkipped))
+
+	// should we show a runtime?
+	includeRuntime := !report.State.Is(types.SpecStateSkipped|types.SpecStatePending) || (report.State.Is(types.SpecStateSkipped) && report.Failure.Message != "")
+
+	// should we show the codelocation block?
+	showCodeLocation := !timelineHasBeenStreaming || !report.State.Is(types.SpecStatePassed)
+
+	switch report.State {
+	case types.SpecStatePassed:
+		if report.LeafNodeType.Is(types.NodeTypesForSuiteLevelNodes) && !reportHasContent {
+			return
+		}
+		if report.LeafNodeType.Is(types.NodeTypesForSuiteLevelNodes) {
+			header = fmt.Sprintf("%s PASSED", header)
+		}
+		if report.NumAttempts > 1 && report.MaxFlakeAttempts > 1 {
+			header, reportHasContent = fmt.Sprintf("%s [FLAKEY TEST - TOOK %d ATTEMPTS TO PASS]", r.retryDenoter, report.NumAttempts), true
+		}
+	case types.SpecStatePending:
+		header = "P"
+		if v.GT(types.VerbosityLevelSuccinct) {
+			header, reportHasContent = "P [PENDING]", true
+		}
+	case types.SpecStateSkipped:
+		header = "S"
+		if v.Is(types.VerbosityLevelVeryVerbose) || (v.Is(types.VerbosityLevelVerbose) && report.Failure.Message != "") {
+			header, reportHasContent = "S [SKIPPED]", true
+		}
+	default:
+		header = fmt.Sprintf("%s [%s]", header, r.humanReadableState(report.State))
+		if report.MaxMustPassRepeatedly > 1 {
+			header = fmt.Sprintf("%s DURING REPETITION #%d", header, report.NumAttempts)
+		}
+	}
+
+	// If we have no content to show, jsut emit the header and return
+	if !reportHasContent {
+		r.emit(r.f(highlightColor + header + "{{/}}"))
+		return
+	}
+
+	if includeRuntime {
+		header = r.f("%s [%.3f seconds]", header, report.RunTime.Seconds())
+	}
+
+	// Emit header
+	if !timelineHasBeenStreaming {
+		r.emitDelimiter(0)
+	}
+	r.emitBlock(r.f(highlightColor + header + "{{/}}"))
+	if showCodeLocation {
+		r.emitBlock(r.codeLocationBlock(report, highlightColor, v.Is(types.VerbosityLevelVeryVerbose), false))
+	}
+
+	//Emit Stdout/Stderr Output
+	if showSeparateStdSection {
+		r.emitBlock("\n")
+		r.emitBlock(r.fi(1, "{{gray}}Captured StdOut/StdErr Output >>{{/}}"))
+		r.emitBlock(r.fi(1, "%s", report.CapturedStdOutErr))
+		r.emitBlock(r.fi(1, "{{gray}}<< Captured StdOut/StdErr Output{{/}}"))
+	}
+
+	if showSeparateVisibilityAlwaysReportsSection {
+		r.emitBlock("\n")
+		r.emitBlock(r.fi(1, "{{gray}}Report Entries >>{{/}}"))
+		for _, entry := range report.ReportEntries.WithVisibility(types.ReportEntryVisibilityAlways) {
+			r.emitReportEntry(1, entry)
+		}
+		r.emitBlock(r.fi(1, "{{gray}}<< Report Entries{{/}}"))
+	}
+
+	if showTimeline {
+		r.emitBlock("\n")
+		r.emitBlock(r.fi(1, "{{gray}}Timeline >>{{/}}"))
+		r.emitTimeline(1, report, timeline)
+		r.emitBlock(r.fi(1, "{{gray}}<< Timeline{{/}}"))
+	}
+
+	// Emit Failure Message
+	if !report.Failure.IsZero() && !v.Is(types.VerbosityLevelVeryVerbose) {
+		r.emitBlock("\n")
+		r.emitFailure(1, report.State, report.Failure, true)
+		if len(report.AdditionalFailures) > 0 {
+			r.emitBlock(r.fi(1, "\nThere were {{bold}}{{red}}additional failures{{/}} detected.  To view them in detail run {{bold}}ginkgo -vv{{/}}"))
+		}
+	}
+
+	r.emitDelimiter(0)
+}
+
+func (r *DefaultReporter) highlightColorForState(state types.SpecState) string {
+	switch state {
+	case types.SpecStatePassed:
+		return "{{green}}"
+	case types.SpecStatePending:
+		return "{{yellow}}"
+	case types.SpecStateSkipped:
+		return "{{cyan}}"
+	case types.SpecStateFailed:
+		return "{{red}}"
+	case types.SpecStateTimedout:
+		return "{{orange}}"
+	case types.SpecStatePanicked:
+		return "{{magenta}}"
+	case types.SpecStateInterrupted:
+		return "{{orange}}"
+	case types.SpecStateAborted:
+		return "{{coral}}"
+	default:
+		return "{{gray}}"
+	}
+}
+
+func (r *DefaultReporter) humanReadableState(state types.SpecState) string {
+	return strings.ToUpper(state.String())
+}
+
+func (r *DefaultReporter) emitTimeline(indent uint, report types.SpecReport, timeline types.Timeline) {
+	isVeryVerbose := r.conf.Verbosity().Is(types.VerbosityLevelVeryVerbose)
+	gw := report.CapturedGinkgoWriterOutput
+	cursor := 0
+	for _, entry := range timeline {
+		tl := entry.GetTimelineLocation()
+		if tl.Offset < len(gw) {
+			r.emit(r.fi(indent, "%s", gw[cursor:tl.Offset]))
+			cursor = tl.Offset
+		} else if cursor < len(gw) {
+			r.emit(r.fi(indent, "%s", gw[cursor:]))
+			cursor = len(gw)
+		}
+		switch x := entry.(type) {
+		case types.Failure:
+			if isVeryVerbose {
+				r.emitFailure(indent, report.State, x, false)
+			} else {
+				r.emitShortFailure(indent, report.State, x)
+			}
+		case types.AdditionalFailure:
+			if isVeryVerbose {
+				r.emitFailure(indent, x.State, x.Failure, true)
+			} else {
+				r.emitShortFailure(indent, x.State, x.Failure)
+			}
+		case types.ReportEntry:
+			r.emitReportEntry(indent, x)
+		case types.ProgressReport:
+			r.emitProgressReport(indent, false, x)
+		case types.SpecEvent:
+			if isVeryVerbose || !x.IsOnlyVisibleAtVeryVerbose() || r.conf.ShowNodeEvents {
+				r.emitSpecEvent(indent, x, isVeryVerbose)
+			}
+		}
+	}
+	if cursor < len(gw) {
+		r.emit(r.fi(indent, "%s", gw[cursor:]))
+	}
+}
+
+func (r *DefaultReporter) EmitFailure(state types.SpecState, failure types.Failure) {
+	if r.conf.Verbosity().Is(types.VerbosityLevelVerbose) {
+		r.emitShortFailure(1, state, failure)
+	} else if r.conf.Verbosity().Is(types.VerbosityLevelVeryVerbose) {
+		r.emitFailure(1, state, failure, true)
+	}
+}
+
+func (r *DefaultReporter) emitShortFailure(indent uint, state types.SpecState, failure types.Failure) {
+	r.emitBlock(r.fi(indent, r.highlightColorForState(state)+"[%s]{{/}} in [%s] - %s {{gray}}@ %s{{/}}",
+		r.humanReadableState(state),
+		failure.FailureNodeType,
+		failure.Location,
+		failure.TimelineLocation.Time.Format(types.GINKGO_TIME_FORMAT),
+	))
+}
+
+func (r *DefaultReporter) emitFailure(indent uint, state types.SpecState, failure types.Failure, includeAdditionalFailure bool) {
+	highlightColor := r.highlightColorForState(state)
+	r.emitBlock(r.fi(indent, highlightColor+"[%s] %s{{/}}", r.humanReadableState(state), failure.Message))
+	r.emitBlock(r.fi(indent, highlightColor+"In {{bold}}[%s]{{/}}"+highlightColor+" at: {{bold}}%s{{/}} {{gray}}@ %s{{/}}\n", failure.FailureNodeType, failure.Location, failure.TimelineLocation.Time.Format(types.GINKGO_TIME_FORMAT)))
+	if failure.ForwardedPanic != "" {
+		r.emitBlock("\n")
+		r.emitBlock(r.fi(indent, highlightColor+"%s{{/}}", failure.ForwardedPanic))
+	}
+
+	if r.conf.FullTrace || failure.ForwardedPanic != "" {
+		r.emitBlock("\n")
+		r.emitBlock(r.fi(indent, highlightColor+"Full Stack Trace{{/}}"))
+		r.emitBlock(r.fi(indent+1, "%s", failure.Location.FullStackTrace))
+	}
+
+	if !failure.ProgressReport.IsZero() {
+		r.emitBlock("\n")
+		r.emitProgressReport(indent, false, failure.ProgressReport)
+	}
+
+	if failure.AdditionalFailure != nil && includeAdditionalFailure {
+		r.emitBlock("\n")
+		r.emitFailure(indent, failure.AdditionalFailure.State, failure.AdditionalFailure.Failure, true)
+	}
+}
+
 func (r *DefaultReporter) EmitProgressReport(report types.ProgressReport) {
-	r.emitDelimiter()
+	r.emitDelimiter(1)
 
 	if report.RunningInParallel {
-		r.emit(r.f("{{coral}}Progress Report for Ginkgo Process #{{bold}}%d{{/}}\n", report.ParallelProcess))
+		r.emit(r.fi(1, "{{coral}}Progress Report for Ginkgo Process #{{bold}}%d{{/}}\n", report.ParallelProcess))
 	}
-	r.emitProgressReport(0, true, report)
-	r.emitDelimiter()
+	shouldEmitGW := report.RunningInParallel || r.conf.Verbosity().LT(types.VerbosityLevelVerbose)
+	r.emitProgressReport(1, shouldEmitGW, report)
+	r.emitDelimiter(1)
 }
 
 func (r *DefaultReporter) emitProgressReport(indent uint, emitGinkgoWriterOutput bool, report types.ProgressReport) {
@@ -409,7 +448,7 @@ func (r *DefaultReporter) emitProgressReport(indent uint, emitGinkgoWriterOutput
 			r.emit(" ")
 			subjectIndent = 0
 		}
-		r.emit(r.fi(subjectIndent, "{{bold}}{{orange}}%s{{/}} (Spec Runtime: %s)\n", report.LeafNodeText, report.Time.Sub(report.SpecStartTime).Round(time.Millisecond)))
+		r.emit(r.fi(subjectIndent, "{{bold}}{{orange}}%s{{/}} (Spec Runtime: %s)\n", report.LeafNodeText, report.Time().Sub(report.SpecStartTime).Round(time.Millisecond)))
 		r.emit(r.fi(indent+1, "{{gray}}%s{{/}}\n", report.LeafNodeLocation))
 		indent += 1
 	}
@@ -419,12 +458,12 @@ func (r *DefaultReporter) emitProgressReport(indent uint, emitGinkgoWriterOutput
 			r.emit(r.f(" {{bold}}{{orange}}%s{{/}}", report.CurrentNodeText))
 		}
 
-		r.emit(r.f(" (Node Runtime: %s)\n", report.Time.Sub(report.CurrentNodeStartTime).Round(time.Millisecond)))
+		r.emit(r.f(" (Node Runtime: %s)\n", report.Time().Sub(report.CurrentNodeStartTime).Round(time.Millisecond)))
 		r.emit(r.fi(indent+1, "{{gray}}%s{{/}}\n", report.CurrentNodeLocation))
 		indent += 1
 	}
 	if report.CurrentStepText != "" {
-		r.emit(r.fi(indent, "At {{bold}}{{orange}}[By Step] %s{{/}} (Step Runtime: %s)\n", report.CurrentStepText, report.Time.Sub(report.CurrentStepStartTime).Round(time.Millisecond)))
+		r.emit(r.fi(indent, "At {{bold}}{{orange}}[By Step] %s{{/}} (Step Runtime: %s)\n", report.CurrentStepText, report.Time().Sub(report.CurrentStepStartTime).Round(time.Millisecond)))
 		r.emit(r.fi(indent+1, "{{gray}}%s{{/}}\n", report.CurrentStepLocation))
 		indent += 1
 	}
@@ -433,9 +472,19 @@ func (r *DefaultReporter) emitProgressReport(indent uint, emitGinkgoWriterOutput
 		indent -= 1
 	}
 
-	if emitGinkgoWriterOutput && report.CapturedGinkgoWriterOutput != "" && (report.RunningInParallel || r.conf.Verbosity().LT(types.VerbosityLevelVerbose)) {
+	if emitGinkgoWriterOutput && report.CapturedGinkgoWriterOutput != "" {
 		r.emit("\n")
-		r.emitGinkgoWriterOutput(indent, report.CapturedGinkgoWriterOutput, 10)
+		r.emitBlock(r.fi(indent, "{{gray}}Begin Captured GinkgoWriter Output >>{{/}}"))
+		limit, lines := 10, strings.Split(report.CapturedGinkgoWriterOutput, "\n")
+		if len(lines) <= limit {
+			r.emitBlock(r.fi(indent+1, "%s", report.CapturedGinkgoWriterOutput))
+		} else {
+			r.emitBlock(r.fi(indent+1, "{{gray}}...{{/}}"))
+			for _, line := range lines[len(lines)-limit-1:] {
+				r.emitBlock(r.fi(indent+1, "%s", line))
+			}
+		}
+		r.emitBlock(r.fi(indent, "{{gray}}<< End Captured GinkgoWriter Output{{/}}"))
 	}
 
 	if !report.SpecGoroutine().IsZero() {
@@ -471,22 +520,48 @@ func (r *DefaultReporter) emitProgressReport(indent uint, emitGinkgoWriterOutput
 	}
 }
 
-func (r *DefaultReporter) emitGinkgoWriterOutput(indent uint, output string, limit int) {
-	r.emitBlock(r.fi(indent, "{{gray}}Begin Captured GinkgoWriter Output >>{{/}}"))
-	if limit == 0 {
-		r.emitBlock(r.fi(indent+1, "%s", output))
-	} else {
-		lines := strings.Split(output, "\n")
-		if len(lines) <= limit {
-			r.emitBlock(r.fi(indent+1, "%s", output))
-		} else {
-			r.emitBlock(r.fi(indent+1, "{{gray}}...{{/}}"))
-			for _, line := range lines[len(lines)-limit-1:] {
-				r.emitBlock(r.fi(indent+1, "%s", line))
-			}
-		}
+func (r *DefaultReporter) EmitReportEntry(entry types.ReportEntry) {
+	if r.conf.Verbosity().LT(types.VerbosityLevelVerbose) || entry.Visibility == types.ReportEntryVisibilityNever {
+		return
 	}
-	r.emitBlock(r.fi(indent, "{{gray}}<< End Captured GinkgoWriter Output{{/}}"))
+	r.emitReportEntry(1, entry)
+}
+
+func (r *DefaultReporter) emitReportEntry(indent uint, entry types.ReportEntry) {
+	r.emitBlock(r.fi(indent, "{{bold}}"+entry.Name+"{{gray}} - %s @ %s{{/}}", entry.Location, entry.Time.Format(types.GINKGO_TIME_FORMAT)))
+	if representation := entry.StringRepresentation(); representation != "" {
+		r.emitBlock(r.fi(indent+1, representation))
+	}
+}
+
+func (r *DefaultReporter) EmitSpecEvent(event types.SpecEvent) {
+	v := r.conf.Verbosity()
+	if v.Is(types.VerbosityLevelVeryVerbose) || (v.Is(types.VerbosityLevelVerbose) && (r.conf.ShowNodeEvents || !event.IsOnlyVisibleAtVeryVerbose())) {
+		r.emitSpecEvent(1, event, r.conf.Verbosity().Is(types.VerbosityLevelVeryVerbose))
+	}
+}
+
+func (r *DefaultReporter) emitSpecEvent(indent uint, event types.SpecEvent, includeLocation bool) {
+	location := ""
+	if includeLocation {
+		location = fmt.Sprintf("- %s ", event.CodeLocation.String())
+	}
+	switch event.SpecEventType {
+	case types.SpecEventInvalid:
+		return
+	case types.SpecEventByStart:
+		r.emitBlock(r.fi(indent, "{{bold}}STEP:{{/}} %s {{gray}}%s@ %s{{/}}", event.Message, location, event.TimelineLocation.Time.Format(types.GINKGO_TIME_FORMAT)))
+	case types.SpecEventByEnd:
+		r.emitBlock(r.fi(indent, "{{bold}}END STEP:{{/}} %s {{gray}}%s@ %s (%s){{/}}", event.Message, location, event.TimelineLocation.Time.Format(types.GINKGO_TIME_FORMAT), event.Duration.Round(time.Millisecond)))
+	case types.SpecEventNodeStart:
+		r.emitBlock(r.fi(indent, "> Enter {{bold}}[%s]{{/}} %s {{gray}}%s@ %s{{/}}", event.NodeType.String(), event.Message, location, event.TimelineLocation.Time.Format(types.GINKGO_TIME_FORMAT)))
+	case types.SpecEventNodeEnd:
+		r.emitBlock(r.fi(indent, "< Exit {{bold}}[%s]{{/}} %s {{gray}}%s@ %s (%s){{/}}", event.NodeType.String(), event.Message, location, event.TimelineLocation.Time.Format(types.GINKGO_TIME_FORMAT), event.Duration.Round(time.Millisecond)))
+	case types.SpecEventSpecRepeat:
+		r.emitBlock(r.fi(indent, "\n{{bold}}Attempt #%d {{green}}Passed{{/}}{{bold}}.  Repeating %s{{/}} {{gray}}@ %s{{/}}\n\n", event.Attempt, r.retryDenoter, event.TimelineLocation.Time.Format(types.GINKGO_TIME_FORMAT)))
+	case types.SpecEventSpecRetry:
+		r.emitBlock(r.fi(indent, "\n{{bold}}Attempt #%d {{red}}Failed{{/}}{{bold}}.  Retrying %s{{/}} {{gray}}@ %s{{/}}\n\n", event.Attempt, r.retryDenoter, event.TimelineLocation.Time.Format(types.GINKGO_TIME_FORMAT)))
+	}
 }
 
 func (r *DefaultReporter) emitGoroutines(indent uint, goroutines ...types.Goroutine) {
@@ -563,11 +638,11 @@ func (r *DefaultReporter) emitBlock(s string) {
 	}
 }
 
-func (r *DefaultReporter) emitDelimiter() {
+func (r *DefaultReporter) emitDelimiter(indent uint) {
 	if r.lastEmissionWasDelimiter {
 		return
 	}
-	r.emitBlock(r.f("{{gray}}%s{{/}}", strings.Repeat("-", 30)))
+	r.emitBlock(r.fi(indent, "{{gray}}%s{{/}}", strings.Repeat("-", 30)))
 	r.lastEmissionWasDelimiter = true
 }
 
@@ -584,13 +659,14 @@ func (r *DefaultReporter) cycleJoin(elements []string, joiner string) string {
 	return r.formatter.CycleJoin(elements, joiner, []string{"{{/}}", "{{gray}}"})
 }
 
-func (r *DefaultReporter) codeLocationBlock(report types.SpecReport, highlightColor string, succinct bool, usePreciseFailureLocation bool) string {
+func (r *DefaultReporter) codeLocationBlock(report types.SpecReport, highlightColor string, veryVerbose bool, usePreciseFailureLocation bool) string {
 	texts, locations, labels := []string{}, []types.CodeLocation{}, [][]string{}
 	texts, locations, labels = append(texts, report.ContainerHierarchyTexts...), append(locations, report.ContainerHierarchyLocations...), append(labels, report.ContainerHierarchyLabels...)
+
 	if report.LeafNodeType.Is(types.NodeTypesForSuiteLevelNodes) {
 		texts = append(texts, r.f("[%s] %s", report.LeafNodeType, report.LeafNodeText))
 	} else {
-		texts = append(texts, report.LeafNodeText)
+		texts = append(texts, r.f(report.LeafNodeText))
 	}
 	labels = append(labels, report.LeafNodeLabels)
 	locations = append(locations, report.LeafNodeLocation)
@@ -600,24 +676,58 @@ func (r *DefaultReporter) codeLocationBlock(report types.SpecReport, highlightCo
 		failureLocation = report.Failure.Location
 	}
 
+	highlightIndex := -1
 	switch report.Failure.FailureNodeContext {
 	case types.FailureNodeAtTopLevel:
-		texts = append([]string{r.f(highlightColor+"{{bold}}TOP-LEVEL [%s]{{/}}", report.Failure.FailureNodeType)}, texts...)
+		texts = append([]string{fmt.Sprintf("TOP-LEVEL [%s]", report.Failure.FailureNodeType)}, texts...)
 		locations = append([]types.CodeLocation{failureLocation}, locations...)
 		labels = append([][]string{{}}, labels...)
+		highlightIndex = 0
 	case types.FailureNodeInContainer:
 		i := report.Failure.FailureNodeContainerIndex
-		texts[i] = r.f(highlightColor+"{{bold}}%s [%s]{{/}}", texts[i], report.Failure.FailureNodeType)
+		texts[i] = fmt.Sprintf("%s [%s]", texts[i], report.Failure.FailureNodeType)
 		locations[i] = failureLocation
+		highlightIndex = i
 	case types.FailureNodeIsLeafNode:
 		i := len(texts) - 1
-		texts[i] = r.f(highlightColor+"{{bold}}[%s] %s{{/}}", report.LeafNodeType, report.LeafNodeText)
+		texts[i] = fmt.Sprintf("[%s] %s", report.LeafNodeType, report.LeafNodeText)
 		locations[i] = failureLocation
+		highlightIndex = i
+	default:
+		//there is no failure, so we highlight the leaf ndoe
+		highlightIndex = len(texts) - 1
 	}
 
 	out := ""
-	if succinct {
-		out += r.f("%s", r.cycleJoin(texts, " "))
+	if veryVerbose {
+		for i := range texts {
+			if i == highlightIndex {
+				out += r.fi(uint(i), highlightColor+"{{bold}}%s{{/}}", texts[i])
+			} else {
+				out += r.fi(uint(i), "%s", texts[i])
+			}
+			if len(labels[i]) > 0 {
+				out += r.f(" {{coral}}[%s]{{/}}", strings.Join(labels[i], ", "))
+			}
+			out += "\n"
+			out += r.fi(uint(i), "{{gray}}%s{{/}}\n", locations[i])
+		}
+	} else {
+		for i := range texts {
+			style := "{{/}}"
+			if i%2 == 1 {
+				style = "{{gray}}"
+			}
+			if i == highlightIndex {
+				style = highlightColor + "{{bold}}"
+			}
+			out += r.f(style+"%s", texts[i])
+			if i < len(texts)-1 {
+				out += " "
+			} else {
+				out += r.f("{{/}}")
+			}
+		}
 		flattenedLabels := report.Labels()
 		if len(flattenedLabels) > 0 {
 			out += r.f(" {{coral}}[%s]{{/}}", strings.Join(flattenedLabels, ", "))
@@ -626,17 +736,15 @@ func (r *DefaultReporter) codeLocationBlock(report types.SpecReport, highlightCo
 		if usePreciseFailureLocation {
 			out += r.f("{{gray}}%s{{/}}", failureLocation)
 		} else {
-			out += r.f("{{gray}}%s{{/}}", locations[len(locations)-1])
-		}
-	} else {
-		for i := range texts {
-			out += r.fi(uint(i), "%s", texts[i])
-			if len(labels[i]) > 0 {
-				out += r.f(" {{coral}}[%s]{{/}}", strings.Join(labels[i], ", "))
+			leafLocation := locations[len(locations)-1]
+			if (report.Failure.FailureNodeLocation != types.CodeLocation{}) && (report.Failure.FailureNodeLocation != leafLocation) {
+				out += r.fi(1, highlightColor+"[%s]{{/}} {{gray}}%s{{/}}\n", report.Failure.FailureNodeType, report.Failure.FailureNodeLocation)
+				out += r.fi(1, "{{gray}}[%s] %s{{/}}", report.LeafNodeType, leafLocation)
+			} else {
+				out += r.f("{{gray}}%s{{/}}", leafLocation)
 			}
-			out += "\n"
-			out += r.fi(uint(i), "{{gray}}%s{{/}}\n", locations[i])
 		}
+
 	}
 	return out
 }

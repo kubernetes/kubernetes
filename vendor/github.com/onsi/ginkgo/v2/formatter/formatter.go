@@ -50,6 +50,15 @@ func NewWithNoColorBool(noColor bool) Formatter {
 }
 
 func New(colorMode ColorMode) Formatter {
+	getColor := func(color, defaultEscapeCode string) string {
+		color = strings.ToUpper(strings.ReplaceAll(color, "-", "_"))
+		envVar := fmt.Sprintf("GINKGO_CLI_COLOR_%s", color)
+		if escapeCode := os.Getenv(envVar); escapeCode != "" {
+			return escapeCode
+		}
+		return defaultEscapeCode
+	}
+
 	f := Formatter{
 		ColorMode: colorMode,
 		colors: map[string]string{
@@ -57,18 +66,18 @@ func New(colorMode ColorMode) Formatter {
 			"bold":      "\x1b[1m",
 			"underline": "\x1b[4m",
 
-			"red":          "\x1b[38;5;9m",
-			"orange":       "\x1b[38;5;214m",
-			"coral":        "\x1b[38;5;204m",
-			"magenta":      "\x1b[38;5;13m",
-			"green":        "\x1b[38;5;10m",
-			"dark-green":   "\x1b[38;5;28m",
-			"yellow":       "\x1b[38;5;11m",
-			"light-yellow": "\x1b[38;5;228m",
-			"cyan":         "\x1b[38;5;14m",
-			"gray":         "\x1b[38;5;243m",
-			"light-gray":   "\x1b[38;5;246m",
-			"blue":         "\x1b[38;5;12m",
+			"red":          getColor("red", "\x1b[38;5;9m"),
+			"orange":       getColor("orange", "\x1b[38;5;214m"),
+			"coral":        getColor("coral", "\x1b[38;5;204m"),
+			"magenta":      getColor("magenta", "\x1b[38;5;13m"),
+			"green":        getColor("green", "\x1b[38;5;10m"),
+			"dark-green":   getColor("dark-green", "\x1b[38;5;28m"),
+			"yellow":       getColor("yellow", "\x1b[38;5;11m"),
+			"light-yellow": getColor("light-yellow", "\x1b[38;5;228m"),
+			"cyan":         getColor("cyan", "\x1b[38;5;14m"),
+			"gray":         getColor("gray", "\x1b[38;5;243m"),
+			"light-gray":   getColor("light-gray", "\x1b[38;5;246m"),
+			"blue":         getColor("blue", "\x1b[38;5;12m"),
 		},
 	}
 	colors := []string{}
