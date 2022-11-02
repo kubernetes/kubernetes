@@ -4869,7 +4869,7 @@ func schema_k8sio_api_apps_v1_StatefulSetOrdinals(ref common.ReferenceCallback) 
 				Properties: map[string]spec.Schema{
 					"start": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Start is the number representing the first index that is used to represent replica ordinals. Defaults to 0. If set, replica ordinals will be numbered [.spec.ordinals.start, .spec.ordinals.start - .spec.replicas).",
+							Description: "start is the number representing the first replica's index. It may be used to number replicas from an alternate index (eg: 1-indexed) over the default 0-indexed names, or to orchestrate progressive movement of replicas from one StatefulSet to another. If set, replica indices will be in the range:\n  [.spec.ordinals.start, .spec.ordinals.start + .spec.replicas).\nIf unset, defaults to 0. Replica indices will be in the range:\n  [0, .spec.replicas).",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -4993,7 +4993,7 @@ func schema_k8sio_api_apps_v1_StatefulSetSpec(ref common.ReferenceCallback) comm
 					},
 					"ordinals": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Ordinals controls how the stateful set creates pod and persistent volume claim names. The default behavior assigns a number starting with zero and incremented by one for each additional replica requested. This requires the StatefulSetSlice feature gate to be enabled, which is alpha.",
+							Description: "ordinals controls the numbering of replica indices in a StatefulSet. A StatefulSet will create pods with the format <statefulsetname>-<podindex>. For example, a pod in a StatefulSet named \"web\" with index number \"3\" would be named \"web-3\". The default ordinals behavior assigns a \"0\" index to the first replica and increments the index by one for each additional replica requested. Using the ordinals field requires the StatefulSetStartOrdinal feature gate to be enabled, which is alpha.",
 							Ref:         ref("k8s.io/api/apps/v1.StatefulSetOrdinals"),
 						},
 					},
@@ -6004,7 +6004,7 @@ func schema_k8sio_api_apps_v1beta1_StatefulSetOrdinals(ref common.ReferenceCallb
 				Properties: map[string]spec.Schema{
 					"start": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Start is the number representing the first index that is used to represent replica ordinals. Defaults to 0. If set, replica ordinals will be numbered [.spec.ordinals.start, .spec.ordinals.start - .spec.replicas).",
+							Description: "start is the number representing the first replica's index. It may be used to number replicas from an alternate index (eg: 1-indexed) over the default 0-indexed names, or to orchestrate progressive movement of replicas from one StatefulSet to another. If set, replica indices will be in the range:\n  [.spec.ordinals.start, .spec.ordinals.start + .spec.replicas).\nIf unset, defaults to 0. Replica indices will be in the range:\n  [0, .spec.replicas).",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -6128,7 +6128,7 @@ func schema_k8sio_api_apps_v1beta1_StatefulSetSpec(ref common.ReferenceCallback)
 					},
 					"ordinals": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Ordinals controls how the stateful set creates pod and persistent volume claim names. The default behavior assigns a number starting with zero and incremented by one for each additional replica requested. This requires the StatefulSetSlice feature gate to be enabled, which is alpha.",
+							Description: "ordinals controls the numbering of replica indices in a StatefulSet. A StatefulSet will create pods with the format <statefulsetname>-<podindex>. For example, a pod in a StatefulSet named \"web\" with index number \"3\" would be named \"web-3\". The default ordinals behavior assigns a \"0\" index to the first replica and increments the index by one for each additional replica requested. Using the ordinals field requires the StatefulSetStartOrdinal feature gate to be enabled, which is alpha.",
 							Ref:         ref("k8s.io/api/apps/v1beta1.StatefulSetOrdinals"),
 						},
 					},
@@ -7688,7 +7688,7 @@ func schema_k8sio_api_apps_v1beta2_StatefulSetOrdinals(ref common.ReferenceCallb
 				Properties: map[string]spec.Schema{
 					"start": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Start is the number representing the first index that is used to represent replica ordinals. Defaults to 0. If set, replica ordinals will be numbered [.spec.ordinals.start, .spec.ordinals.start - .spec.replicas).",
+							Description: "start is the number representing the first replica's index. It may be used to number replicas from an alternate index (eg: 1-indexed) over the default 0-indexed names, or to orchestrate progressive movement of replicas from one StatefulSet to another. If set, replica indices will be in the range:\n  [.spec.ordinals.start, .spec.ordinals.start + .spec.replicas).\nIf unset, defaults to 0. Replica indices will be in the range:\n  [0, .spec.replicas).",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -7812,7 +7812,7 @@ func schema_k8sio_api_apps_v1beta2_StatefulSetSpec(ref common.ReferenceCallback)
 					},
 					"ordinals": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Ordinals controls how the stateful set creates pod and persistent volume claim names. The default behavior assigns a number starting with zero and incremented by one for each additional replica requested. This requires the StatefulSetSlice feature gate to be enabled, which is alpha.",
+							Description: "ordinals controls the numbering of replica indices in a StatefulSet. A StatefulSet will create pods with the format <statefulsetname>-<podindex>. For example, a pod in a StatefulSet named \"web\" with index number \"3\" would be named \"web-3\". The default ordinals behavior assigns a \"0\" index to the first replica and increments the index by one for each additional replica requested. Using the ordinals field requires the StatefulSetStartOrdinal feature gate to be enabled, which is alpha.",
 							Ref:         ref("k8s.io/api/apps/v1beta2.StatefulSetOrdinals"),
 						},
 					},

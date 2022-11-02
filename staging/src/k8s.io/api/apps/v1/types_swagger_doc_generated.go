@@ -326,7 +326,7 @@ func (StatefulSetList) SwaggerDoc() map[string]string {
 
 var map_StatefulSetOrdinals = map[string]string{
 	"":      "StatefulSetOrdinals describes the policy used for replica ordinal assignment in this StatefulSet.",
-	"start": "Start is the number representing the first index that is used to represent replica ordinals. Defaults to 0. If set, replica ordinals will be numbered [.spec.ordinals.start, .spec.ordinals.start - .spec.replicas).",
+	"start": "start is the number representing the first replica's index. It may be used to number replicas from an alternate index (eg: 1-indexed) over the default 0-indexed names, or to orchestrate progressive movement of replicas from one StatefulSet to another. If set, replica indices will be in the range:\n  [.spec.ordinals.start, .spec.ordinals.start + .spec.replicas).\nIf unset, defaults to 0. Replica indices will be in the range:\n  [0, .spec.replicas).",
 }
 
 func (StatefulSetOrdinals) SwaggerDoc() map[string]string {
@@ -355,7 +355,7 @@ var map_StatefulSetSpec = map[string]string{
 	"revisionHistoryLimit":                 "revisionHistoryLimit is the maximum number of revisions that will be maintained in the StatefulSet's revision history. The revision history consists of all revisions not represented by a currently applied StatefulSetSpec version. The default value is 10.",
 	"minReadySeconds":                      "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
 	"persistentVolumeClaimRetentionPolicy": "persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent volume claims created from volumeClaimTemplates. By default, all persistent volume claims are created as needed and retained until manually deleted. This policy allows the lifecycle to be altered, for example by deleting persistent volume claims when their stateful set is deleted, or when their pod is scaled down. This requires the StatefulSetAutoDeletePVC feature gate to be enabled, which is alpha.  +optional",
-	"ordinals":                             "Ordinals controls how the stateful set creates pod and persistent volume claim names. The default behavior assigns a number starting with zero and incremented by one for each additional replica requested. This requires the StatefulSetSlice feature gate to be enabled, which is alpha.",
+	"ordinals":                             "ordinals controls the numbering of replica indices in a StatefulSet. A StatefulSet will create pods with the format <statefulsetname>-<podindex>. For example, a pod in a StatefulSet named \"web\" with index number \"3\" would be named \"web-3\". The default ordinals behavior assigns a \"0\" index to the first replica and increments the index by one for each additional replica requested. Using the ordinals field requires the StatefulSetStartOrdinal feature gate to be enabled, which is alpha.",
 }
 
 func (StatefulSetSpec) SwaggerDoc() map[string]string {

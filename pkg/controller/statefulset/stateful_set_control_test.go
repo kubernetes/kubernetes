@@ -564,7 +564,7 @@ func emptyInvaraints(set *apps.StatefulSet, om *fakeObjectManager) error {
 }
 
 func TestStatefulSetControlWithStartOrdinal(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetSlice, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)()
 
 	simpleSetFn := func() *apps.StatefulSet {
 		statefulSet := newStatefulSet(3)

@@ -770,7 +770,7 @@ const (
 	// alpha: v1.26
 	//
 	// Enables a StatefulSet to start from an arbitrary non zero ordinal
-	StatefulSetSlice featuregate.Feature = "StatefulSetSlice"
+	StatefulSetStartOrdinal featuregate.Feature = "StatefulSetStartOrdinal"
 
 	// owner: @robscott
 	// kep: https://kep.k8s.io/2433
@@ -1081,7 +1081,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	StatefulSetMinReadySeconds: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
 
-	StatefulSetSlice: {Default: false, PreRelease: featuregate.Alpha},
+	StatefulSetStartOrdinal: {Default: false, PreRelease: featuregate.Alpha},
 
 	TopologyAwareHints: {Default: true, PreRelease: featuregate.Beta},
 

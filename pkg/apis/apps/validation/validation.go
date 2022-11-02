@@ -130,7 +130,7 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetStartOrdinal) {
 		if spec.Ordinals != nil {
 			replicaStartOrdinal := spec.Ordinals.Start
 			allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(replicaStartOrdinal), fldPath.Child("ordinals.start"))...)
@@ -185,13 +185,13 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet, op
 	newStatefulSetClone.Spec.Template = oldStatefulSet.Spec.Template               // +k8s:verify-mutation:reason=clone
 	newStatefulSetClone.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy   // +k8s:verify-mutation:reason=clone
 	newStatefulSetClone.Spec.MinReadySeconds = oldStatefulSet.Spec.MinReadySeconds // +k8s:verify-mutation:reason=clone
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetStartOrdinal) {
 		newStatefulSetClone.Spec.Ordinals = oldStatefulSet.Spec.Ordinals // +k8s:verify-mutation:reason=clone
 	}
 
 	newStatefulSetClone.Spec.PersistentVolumeClaimRetentionPolicy = oldStatefulSet.Spec.PersistentVolumeClaimRetentionPolicy // +k8s:verify-mutation:reason=clone
 	if !apiequality.Semantic.DeepEqual(newStatefulSetClone.Spec, oldStatefulSet.Spec) {
-		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetSlice) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetStartOrdinal) {
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'ordinals', 'template', 'updateStrategy', 'persistentVolumeClaimRetentionPolicy' and 'minReadySeconds' are forbidden"))
 		} else {
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'template', 'updateStrategy', 'persistentVolumeClaimRetentionPolicy' and 'minReadySeconds' are forbidden"))

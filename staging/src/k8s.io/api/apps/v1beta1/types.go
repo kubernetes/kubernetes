@@ -207,10 +207,14 @@ type StatefulSetPersistentVolumeClaimRetentionPolicy struct {
 // StatefulSetOrdinals describes the policy used for replica ordinal assignment
 // in this StatefulSet.
 type StatefulSetOrdinals struct {
-	// Start is the number representing the first index that is used to represent
-	// replica ordinals. Defaults to 0.
-	// If set, replica ordinals will be numbered in the range:
-	// [.spec.ordinals.start, .spec.ordinals.start + .spec.replicas).
+	// start is the number representing the first replica's index. It may be used
+	// to number replicas from an alternate index (eg: 1-indexed) over the default
+	// 0-indexed names, or to orchestrate progressive movement of replicas from
+	// one StatefulSet to another.
+	// If set, replica indices will be in the range:
+	//   [.spec.ordinals.start, .spec.ordinals.start + .spec.replicas).
+	// If unset, defaults to 0. Replica indices will be in the range:
+	//   [0, .spec.replicas).
 	// +optional
 	Start int32 `json:"start" protobuf:"varint,1,opt,name=start"`
 }
@@ -288,11 +292,13 @@ type StatefulSetSpec struct {
 	// +optional
 	PersistentVolumeClaimRetentionPolicy *StatefulSetPersistentVolumeClaimRetentionPolicy `json:"persistentVolumeClaimRetentionPolicy,omitempty" protobuf:"bytes,10,opt,name=persistentVolumeClaimRetentionPolicy"`
 
-	// Ordinals controls how the stateful set creates pod and persistent volume
-	// claim names.
-	// The default behavior assigns a number starting with zero and incremented by
-	// one for each additional replica requested. This requires the
-	// StatefulSetSlice feature gate to be enabled, which is alpha.
+	// ordinals controls the numbering of replica indices in a StatefulSet. A
+	// StatefulSet will create pods with the format <statefulsetname>-<podindex>.
+	// For example, a pod in a StatefulSet named "web" with index number "3" would
+	// be named "web-3". The default ordinals behavior assigns a "0" index to the
+	// first replica and increments the index by one for each additional replica
+	// requested. Using the ordinals field requires the StatefulSetStartOrdinal
+	// feature gate to be enabled, which is alpha.
 	// +optional
 	Ordinals *StatefulSetOrdinals `json:"ordinals,omitempty" protobuf:"bytes,11,opt,name=ordinals"`
 }

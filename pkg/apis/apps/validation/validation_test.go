@@ -86,7 +86,7 @@ func TestValidateStatefulSet(t *testing.T) {
 
 	const enableStatefulSetAutoDeletePVC = "[enable StatefulSetAutoDeletePVC]"
 
-	const enableStatefulSetSlice = "[enable StatefulSetSlice]"
+	const enableStatefulSetStartOrdinal = "[enable StatefulSetStartOrdinal]"
 
 	type testCase struct {
 		name string
@@ -196,7 +196,7 @@ func TestValidateStatefulSet(t *testing.T) {
 			},
 		},
 		{
-			name: "ordinals.start positive value " + enableStatefulSetSlice,
+			name: "ordinals.start positive value " + enableStatefulSetStartOrdinal,
 			set: apps.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
@@ -652,7 +652,7 @@ func TestValidateStatefulSet(t *testing.T) {
 			},
 		},
 		{
-			name: "invalid ordinals.start " + enableStatefulSetSlice,
+			name: "invalid ordinals.start " + enableStatefulSetStartOrdinal,
 			set: apps.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
 				Spec: apps.StatefulSetSpec{
@@ -684,8 +684,8 @@ func TestValidateStatefulSet(t *testing.T) {
 			if strings.Contains(name, enableStatefulSetAutoDeletePVC) {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
 			}
-			if strings.Contains(name, enableStatefulSetSlice) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetSlice, true)()
+			if strings.Contains(name, enableStatefulSetStartOrdinal) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)()
 			}
 
 			errs := ValidateStatefulSet(&testCase.set, pod.GetValidationOptionsFromPodTemplate(&testCase.set.Spec.Template, nil))

@@ -328,14 +328,29 @@ func getMaxUnavailable(maxUnavailable int) *int {
 	return &maxUnavailable
 }
 
+func createOrdinalsWithStart(start int) *apps.StatefulSetOrdinals {
+	return &apps.StatefulSetOrdinals{
+		Start: int32(start),
+	}
+}
+
+func makeStatefulSetWithStatefulSetOrdinals(ordinals *apps.StatefulSetOrdinals) *apps.StatefulSet {
+	return &apps.StatefulSet{
+		Spec: apps.StatefulSetSpec{
+			Ordinals: ordinals,
+		},
+	}
+}
+
 // TestDropStatefulSetDisabledFields tests if the drop functionality is working fine or not
 func TestDropStatefulSetDisabledFields(t *testing.T) {
 	testCases := []struct {
-		name                 string
-		enableMaxUnavailable bool
-		ss                   *apps.StatefulSet
-		oldSS                *apps.StatefulSet
-		expectedSS           *apps.StatefulSet
+		name                          string
+		enableMaxUnavailable          bool
+		enableStatefulSetStartOrdinal bool
+		ss                            *apps.StatefulSet
+		oldSS                         *apps.StatefulSet
+		expectedSS                    *apps.StatefulSet
 	}{
 		{
 			name:       "set minReadySeconds, no update",
@@ -388,11 +403,39 @@ func TestDropStatefulSetDisabledFields(t *testing.T) {
 			ss:                   makeStatefulSetWithMaxUnavailable(getMaxUnavailable(1)),
 			oldSS:                makeStatefulSetWithMaxUnavailable(getMaxUnavailable(3)),
 			expectedSS:           makeStatefulSetWithMaxUnavailable(getMaxUnavailable(1)),
+		}, {
+			name:                          "StatefulSetStartOrdinal disabled, ordinals in use in new only",
+			enableStatefulSetStartOrdinal: false,
+			ss:                            makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2)),
+			oldSS:                         nil,
+			expectedSS:                    makeStatefulSetWithStatefulSetOrdinals(nil),
+		},
+		{
+			name:                          "StatefulSetStartOrdinal disabled, ordinals in use in both old and new",
+			enableStatefulSetStartOrdinal: false,
+			ss:                            makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2)),
+			oldSS:                         makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(1)),
+			expectedSS:                    makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2)),
+		},
+		{
+			name:                          "StatefulSetStartOrdinal enabled, ordinals in use in new only",
+			enableStatefulSetStartOrdinal: true,
+			ss:                            makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2)),
+			oldSS:                         nil,
+			expectedSS:                    makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2)),
+		},
+		{
+			name:                          "StatefulSetStartOrdinal enabled, ordinals in use in both old and new",
+			enableStatefulSetStartOrdinal: true,
+			ss:                            makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2)),
+			oldSS:                         makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(1)),
+			expectedSS:                    makeStatefulSetWithStatefulSetOrdinals(createOrdinalsWithStart(2)),
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, tc.enableMaxUnavailable)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, tc.enableStatefulSetStartOrdinal)()
 			old := tc.oldSS.DeepCopy()
 
 			dropStatefulSetDisabledFields(tc.ss, tc.oldSS)
