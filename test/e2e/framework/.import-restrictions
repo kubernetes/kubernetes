@@ -193,9 +193,6 @@ rules:
       - k8s.io/kubernetes/pkg/scheduler/profile
       - k8s.io/kubernetes/pkg/scheduler/testing
       - k8s.io/kubernetes/pkg/security/apparmor
-      - k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp
-      - k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl
-      - k8s.io/kubernetes/pkg/security/podsecuritypolicy/util
       - k8s.io/kubernetes/pkg/securitycontext
       - k8s.io/kubernetes/pkg/serviceaccount
       - k8s.io/kubernetes/pkg/util/async
