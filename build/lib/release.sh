@@ -134,7 +134,7 @@ function kube::release::package_client_tarballs() {
   for platform_long in "${long_platforms[@]}"; do
     local platform
     local platform_tag
-    platform=${platform_long##${LOCAL_OUTPUT_BINPATH}/} # Strip LOCAL_OUTPUT_BINPATH
+    platform=${platform_long##"${LOCAL_OUTPUT_BINPATH}"/} # Strip LOCAL_OUTPUT_BINPATH
     platform_tag=${platform/\//-} # Replace a "/" for a "-"
     kube::log::status "Starting tarball: client $platform_tag"
 
