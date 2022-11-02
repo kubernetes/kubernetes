@@ -240,10 +240,6 @@ const (
 // podSyncStatus tracks per-pod transitions through the three phases of pod
 // worker sync (setup, terminating, terminated).
 type podSyncStatus struct {
-	// ctx is the context that is associated with the current pod sync.
-	ctx context.Context
-	// cancelFn if set is expected to cancel the current sync*Pod operation.
-	cancelFn context.CancelFunc
 	// working is true if a pod worker is currently in a sync method.
 	working bool
 	// fullname of the pod
@@ -627,23 +623,19 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 	}
 
 	// check for a transition to terminating
-	var becameTerminating bool
 	if !status.IsTerminationRequested() {
 		switch {
 		case isRuntimePod:
 			klog.V(4).InfoS("Pod is orphaned and must be torn down", "pod", klog.KObj(pod), "podUID", pod.UID)
 			status.deleted = true
 			status.terminatingAt = now
-			becameTerminating = true
 		case pod.DeletionTimestamp != nil:
 			klog.V(4).InfoS("Pod is marked for graceful deletion, begin teardown", "pod", klog.KObj(pod), "podUID", pod.UID)
 			status.deleted = true
 			status.terminatingAt = now
-			becameTerminating = true
 		case pod.Status.Phase == v1.PodFailed, pod.Status.Phase == v1.PodSucceeded:
 			klog.V(4).InfoS("Pod is in a terminal phase (success/failed), begin teardown", "pod", klog.KObj(pod), "podUID", pod.UID)
 			status.terminatingAt = now
-			becameTerminating = true
 		case options.UpdateType == kubetypes.SyncPodKill:
 			if options.KillPodOptions != nil && options.KillPodOptions.Evict {
 				klog.V(4).InfoS("Pod is being evicted by the kubelet, begin teardown", "pod", klog.KObj(pod), "podUID", pod.UID)
@@ -652,13 +644,11 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 				klog.V(4).InfoS("Pod is being removed by the kubelet, begin teardown", "pod", klog.KObj(pod), "podUID", pod.UID)
 			}
 			status.terminatingAt = now
-			becameTerminating = true
 		}
 	}
 
 	// once a pod is terminating, all updates are kills and the grace period can only decrease
 	var workType PodWorkType
-	var wasGracePeriodShortened bool
 	switch {
 	case status.IsTerminated():
 		// A terminated pod may still be waiting for cleanup - if we receive a runtime pod kill request
@@ -691,9 +681,8 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 			status.statusPostTerminating = append(status.statusPostTerminating, fn)
 		}
 
-		gracePeriod, gracePeriodShortened := calculateEffectiveGracePeriod(status, pod, options.KillPodOptions)
+		gracePeriod := calculateEffectiveGracePeriod(status, pod, options.KillPodOptions)
 
-		wasGracePeriodShortened = gracePeriodShortened
 		status.gracePeriod = gracePeriod
 		// always set the grace period for syncTerminatingPod so we don't have to recalculate,
 		// will never be zero.
@@ -770,17 +759,11 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 
 	// always sync the most recent data
 	p.lastUndeliveredWorkUpdate[pod.UID] = work
-
-	if (becameTerminating || wasGracePeriodShortened) && status.cancelFn != nil {
-		klog.V(3).InfoS("Cancelling current pod sync", "pod", klog.KObj(pod), "podUID", pod.UID, "updateType", work.WorkType)
-		status.cancelFn()
-		return
-	}
 }
 
 // calculateEffectiveGracePeriod sets the initial grace period for a newly terminating pod or allows a
 // shorter grace period to be provided, returning the desired value.
-func calculateEffectiveGracePeriod(status *podSyncStatus, pod *v1.Pod, options *KillPodOptions) (int64, bool) {
+func calculateEffectiveGracePeriod(status *podSyncStatus, pod *v1.Pod, options *KillPodOptions) int64 {
 	// enforce the restriction that a grace period can only decrease and track whatever our value is,
 	// then ensure a calculated value is passed down to lower levels
 	gracePeriod := status.gracePeriod
@@ -807,7 +790,7 @@ func calculateEffectiveGracePeriod(status *podSyncStatus, pod *v1.Pod, options *
 	if gracePeriod < 1 {
 		gracePeriod = 1
 	}
-	return gracePeriod, status.gracePeriod != 0 && status.gracePeriod != gracePeriod
+	return gracePeriod
 }
 
 // allowPodStart tries to start the pod and returns true if allowed, otherwise
@@ -878,6 +861,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan podWork) {
 	var lastSyncTime time.Time
 	var podStarted bool
 	for update := range podUpdates {
+		ctx := context.Background()
 		pod := update.Options.Pod
 
 		// Decide whether to start the pod. If the pod was terminated prior to the pod being allowed
@@ -929,8 +913,6 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan podWork) {
 				p.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedSync, "error determining status: %v", err)
 				return err
 			}
-
-			ctx := p.contextForWorker(pod.UID)
 
 			// Take the appropriate action (illegal phases are prevented by UpdatePod)
 			switch {
@@ -1194,23 +1176,6 @@ func (p *podWorkers) completeWorkQueueNext(uid types.UID) {
 	} else {
 		p.podSyncStatuses[uid].working = false
 	}
-}
-
-// contextForWorker returns or initializes the appropriate context for a known
-// worker. If the current context is expired, it is reset. If no worker is
-// present, no context is returned.
-func (p *podWorkers) contextForWorker(uid types.UID) context.Context {
-	p.podLock.Lock()
-	defer p.podLock.Unlock()
-
-	status, ok := p.podSyncStatuses[uid]
-	if !ok {
-		return nil
-	}
-	if status.ctx == nil || status.ctx.Err() == context.Canceled {
-		status.ctx, status.cancelFn = context.WithCancel(context.Background())
-	}
-	return status.ctx
 }
 
 // SyncKnownPods will purge any fully terminated pods that are not in the desiredPods
