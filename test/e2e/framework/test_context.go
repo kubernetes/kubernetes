@@ -549,8 +549,8 @@ func writeJUnitReport(report ginkgo.Report) {
 	trimmedReport.SpecReports = nil
 	for _, specReport := range report.SpecReports {
 		// Remove details for any spec that hasn't failed. In Prow,
-		// the test output captured in build-log.txt has all of this
-		// information, so we don't need it in the XML.
+		// jobs that use ginkgo-e2e.sh will dump the full
+		// information into ginkgo_report.xml/json.
 		if specReport.State != types.SpecStateFailed {
 			specReport.CapturedGinkgoWriterOutput = ""
 			specReport.CapturedStdOutErr = ""
