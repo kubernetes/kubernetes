@@ -135,6 +135,76 @@ func (i *storeIndex) addIndexers(newIndexers Indexers) error {
 	return nil
 }
 
+// updateIndices modifies the objects location in the managed indexes:
+// - for create you must provide only the newObj
+// - for update you must provide both the oldObj and the newObj
+// - for delete you must provide only the oldObj
+// updateIndices must be called from a function that already has a lock on the cache
+func (i *storeIndex) updateIndices(oldObj interface{}, newObj interface{}, key string) {
+	var oldIndexValues, indexValues []string
+	var err error
+	for name, indexFunc := range i.indexers {
+		if oldObj != nil {
+			oldIndexValues, err = indexFunc(oldObj)
+		} else {
+			oldIndexValues = oldIndexValues[:0]
+		}
+		if err != nil {
+			panic(fmt.Errorf("unable to calculate an index entry for key %q on index %q: %v", key, name, err))
+		}
+
+		if newObj != nil {
+			indexValues, err = indexFunc(newObj)
+		} else {
+			indexValues = indexValues[:0]
+		}
+		if err != nil {
+			panic(fmt.Errorf("unable to calculate an index entry for key %q on index %q: %v", key, name, err))
+		}
+
+		index := i.indices[name]
+		if index == nil {
+			index = Index{}
+			i.indices[name] = index
+		}
+
+		if len(indexValues) == 1 && len(oldIndexValues) == 1 && indexValues[0] == oldIndexValues[0] {
+			// We optimize for the most common case where indexFunc returns a single value which has not been changed
+			continue
+		}
+
+		for _, value := range oldIndexValues {
+			i.deleteKeyFromIndex(key, value, index)
+		}
+		for _, value := range indexValues {
+			i.addKeyToIndex(key, value, index)
+		}
+	}
+}
+
+func (i *storeIndex) addKeyToIndex(key, indexValue string, index Index) {
+	set := index[indexValue]
+	if set == nil {
+		set = sets.String{}
+		index[indexValue] = set
+	}
+	set.Insert(key)
+}
+
+func (i *storeIndex) deleteKeyFromIndex(key, indexValue string, index Index) {
+	set := index[indexValue]
+	if set == nil {
+		return
+	}
+	set.Delete(key)
+	// If we don't delete the set when zero, indices with high cardinality
+	// short lived resources can cause memory to increase over time from
+	// unused empty sets. See `kubernetes/kubernetes/issues/84959`.
+	if len(set) == 0 {
+		delete(index, indexValue)
+	}
+}
+
 // threadSafeMap implements ThreadSafeStore
 type threadSafeMap struct {
 	lock  sync.RWMutex
@@ -274,76 +344,6 @@ func (c *threadSafeMap) AddIndexers(newIndexers Indexers) error {
 	}
 
 	return c.index.addIndexers(newIndexers)
-}
-
-// updateIndices modifies the objects location in the managed indexes:
-// - for create you must provide only the newObj
-// - for update you must provide both the oldObj and the newObj
-// - for delete you must provide only the oldObj
-// updateIndices must be called from a function that already has a lock on the cache
-func (i *storeIndex) updateIndices(oldObj interface{}, newObj interface{}, key string) {
-	var oldIndexValues, indexValues []string
-	var err error
-	for name, indexFunc := range i.indexers {
-		if oldObj != nil {
-			oldIndexValues, err = indexFunc(oldObj)
-		} else {
-			oldIndexValues = oldIndexValues[:0]
-		}
-		if err != nil {
-			panic(fmt.Errorf("unable to calculate an index entry for key %q on index %q: %v", key, name, err))
-		}
-
-		if newObj != nil {
-			indexValues, err = indexFunc(newObj)
-		} else {
-			indexValues = indexValues[:0]
-		}
-		if err != nil {
-			panic(fmt.Errorf("unable to calculate an index entry for key %q on index %q: %v", key, name, err))
-		}
-
-		index := i.indices[name]
-		if index == nil {
-			index = Index{}
-			i.indices[name] = index
-		}
-
-		if len(indexValues) == 1 && len(oldIndexValues) == 1 && indexValues[0] == oldIndexValues[0] {
-			// We optimize for the most common case where indexFunc returns a single value which has not been changed
-			continue
-		}
-
-		for _, value := range oldIndexValues {
-			i.deleteKeyFromIndex(key, value, index)
-		}
-		for _, value := range indexValues {
-			i.addKeyToIndex(key, value, index)
-		}
-	}
-}
-
-func (i *storeIndex) addKeyToIndex(key, indexValue string, index Index) {
-	set := index[indexValue]
-	if set == nil {
-		set = sets.String{}
-		index[indexValue] = set
-	}
-	set.Insert(key)
-}
-
-func (i *storeIndex) deleteKeyFromIndex(key, indexValue string, index Index) {
-	set := index[indexValue]
-	if set == nil {
-		return
-	}
-	set.Delete(key)
-	// If we don't delete the set when zero, indices with high cardinality
-	// short lived resources can cause memory to increase over time from
-	// unused empty sets. See `kubernetes/kubernetes/issues/84959`.
-	if len(set) == 0 {
-		delete(index, indexValue)
-	}
 }
 
 func (c *threadSafeMap) Resync() error {
