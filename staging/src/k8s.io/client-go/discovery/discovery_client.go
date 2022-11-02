@@ -156,25 +156,41 @@ func apiVersionsToAPIGroup(apiVersions *metav1.APIVersions) (apiGroup metav1.API
 	return
 }
 
-// ServerGroups returns the supported groups, with information like supported versions and the
-// preferred version.
-func (d *DiscoveryClient) ServerGroups() (apiGroupList *metav1.APIGroupList, err error) {
+// Returns the discovery groups, and (if new aggregated discovery format) the resources.
+func (d *DiscoveryClient) groupsAndMaybeResources() (*metav1.APIGroupList, []*metav1.APIResourceList, error) {
+	groups, resourcesByGV, err := d.groupsAndMaybeGVResources()
+	if err != nil {
+		return nil, nil, err
+	}
+	if resourcesByGV == nil {
+		return groups, nil, nil
+	}
+	resources := []*metav1.APIResourceList{}
+	for _, resourceList := range resourcesByGV {
+		resources = append(resources, resourceList)
+	}
+	return groups, resources, nil
+}
+
+// Returns the discovery groups, and (if new aggregated discovery format) the resources
+// keyed by group/version.
+func (d *DiscoveryClient) groupsAndMaybeGVResources() (*metav1.APIGroupList, map[schema.GroupVersion]*metav1.APIResourceList, error) {
 	// Get the groupVersions exposed at /api
 	v := &metav1.APIVersions{}
-	err = d.restClient.Get().AbsPath(d.LegacyPrefix).Do(context.TODO()).Into(v)
+	err := d.restClient.Get().AbsPath(d.LegacyPrefix).Do(context.TODO()).Into(v)
 	apiGroup := metav1.APIGroup{}
 	if err == nil && len(v.Versions) != 0 {
 		apiGroup = apiVersionsToAPIGroup(v)
 	}
 	if err != nil && !errors.IsNotFound(err) && !errors.IsForbidden(err) {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Get the groupVersions exposed at /apis
-	apiGroupList = &metav1.APIGroupList{}
+	apiGroupList := &metav1.APIGroupList{}
 	err = d.restClient.Get().AbsPath("/apis").Do(context.TODO()).Into(apiGroupList)
 	if err != nil && !errors.IsNotFound(err) && !errors.IsForbidden(err) {
-		return nil, err
+		return nil, nil, err
 	}
 	// to be compatible with a v1.0 server, if it's a 403 or 404, ignore and return whatever we got from /api
 	if err != nil && (errors.IsNotFound(err) || errors.IsForbidden(err)) {
@@ -185,7 +201,14 @@ func (d *DiscoveryClient) ServerGroups() (apiGroupList *metav1.APIGroupList, err
 	if len(v.Versions) != 0 {
 		apiGroupList.Groups = append([]metav1.APIGroup{apiGroup}, apiGroupList.Groups...)
 	}
-	return apiGroupList, nil
+	return apiGroupList, nil, nil
+}
+
+// ServerGroups returns the supported groups, with information like supported versions and the
+// preferred version.
+func (d *DiscoveryClient) ServerGroups() (apiGroupList *metav1.APIGroupList, err error) {
+	groups, _, err := d.groupsAndMaybeResources()
+	return groups, err
 }
 
 // ServerResourcesForGroupVersion returns the supported resources for a group and version.
@@ -216,13 +239,16 @@ func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (r
 // ServerGroupsAndResources returns the supported resources for all groups and versions.
 func (d *DiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
 	return withRetries(defaultRetries, func() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
-		sgs, err := d.ServerGroups()
+		sgs, resources, err := d.groupsAndMaybeResources()
 		if sgs == nil {
 			return nil, nil, err
 		}
 		resultGroups := []*metav1.APIGroup{}
 		for i := range sgs.Groups {
 			resultGroups = append(resultGroups, &sgs.Groups[i])
+		}
+		if resources != nil {
+			return resultGroups, resources, err
 		}
 
 		groupVersionResources, failedGroups := fetchGroupVersionResources(d, sgs)
@@ -310,12 +336,18 @@ func fetchGroupVersionResources(d DiscoveryInterface, apiGroups *metav1.APIGroup
 // server.
 func (d *DiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	_, rs, err := withRetries(defaultRetries, func() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
-		serverGroupList, err := d.ServerGroups()
+		serverGroupList, gvResources, err := d.groupsAndMaybeGVResources()
 		if err != nil {
 			return nil, nil, err
 		}
 
-		groupVersionResources, failedGroups := fetchGroupVersionResources(d, serverGroupList)
+		groupVersionResources := map[schema.GroupVersion]*metav1.APIResourceList{}
+		failedGroups := map[schema.GroupVersion]error{}
+		if gvResources != nil {
+			groupVersionResources = gvResources
+		} else {
+			groupVersionResources, failedGroups = fetchGroupVersionResources(d, serverGroupList)
+		}
 
 		result := []*metav1.APIResourceList{}
 		grVersions := map[schema.GroupResource]string{}                         // selected version of a GroupResource
