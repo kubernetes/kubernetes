@@ -506,6 +506,12 @@ runTests() {
   record_command run_assert_short_name_tests
 
   #########################
+  # Assert singular name  #
+  #########################
+
+  record_command run_assert_singular_name_tests
+
+  #########################
   # Assert categories     #
   #########################
 
