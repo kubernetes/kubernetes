@@ -264,7 +264,7 @@ func TestGetPodTopologyHintsWithPolicyOptions(t *testing.T) {
 	testPod2 := makePod("fakePod", "fakeContainer", "41", "41")
 	testContainer2 := &testPod1.Spec.Containers[0]
 
-	cpu_set_across_socket, _ := cpuset.Parse("0-28,40-57")
+	cpuSetAcrossSocket, _ := cpuset.Parse("0-28,40-57")
 
 	m0001, _ := bitmask.NewBitMask(0)
 	m0011, _ := bitmask.NewBitMask(0, 1)
@@ -376,7 +376,7 @@ func TestGetPodTopologyHintsWithPolicyOptions(t *testing.T) {
 			description:   "AlignBySocket:true Preferred hints are spread across socket since 2 sockets are required",
 			pod:           *testPod2,
 			container:     *testContainer2,
-			defaultCPUSet: cpu_set_across_socket,
+			defaultCPUSet: cpuSetAcrossSocket,
 			topology:      topoDualSocketMultiNumaPerSocketHT,
 			policyOptions: map[string]string{AlignBySocketOption: "true"},
 			expectedHints: []topologymanager.TopologyHint{
