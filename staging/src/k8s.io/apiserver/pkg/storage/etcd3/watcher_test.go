@@ -23,8 +23,6 @@ import (
 	"testing"
 	"time"
 
-	"go.etcd.io/etcd/api/v3/mvccpb"
-	clientv3 "go.etcd.io/etcd/client/v3"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,7 +70,7 @@ func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 	origCtx, store, _ := testSetup(t)
 	ctx, cancel := context.WithCancel(origCtx)
 	w := store.watcher.createWatchChan(ctx, "/abc", 0, false, false, newTestTransformer(), storage.Everything)
-	// make resutlChan and errChan blocking to ensure ordering.
+	// make resultChan and errChan blocking to ensure ordering.
 	w.resultChan = make(chan watch.Event)
 	w.errChan = make(chan error)
 	// The event flow goes like:
@@ -91,57 +89,31 @@ func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 }
 
 func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
-	ctx, store, client := testSetup(t)
+	ctx, store, _ := testSetup(t)
+
 	key, storedObj := storagetesting.TestPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
-	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
+	watchCtx, _ := context.WithTimeout(ctx, wait.ForeverTestTimeout)
+	w, err := store.Watch(watchCtx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	rv, err := storage.APIObjectVersioner{}.ObjectResourceVersion(storedObj)
-	if err != nil {
-		t.Fatalf("failed to parse resourceVersion on stored object: %v", err)
-	}
-	etcdW := client.Watch(ctx, key, clientv3.WithRev(int64(rv)))
 
-	if err := store.Delete(ctx, key, &example.Pod{}, &storage.Preconditions{}, storage.ValidateAllObjectFunc, nil); err != nil {
+	deletedObj := &example.Pod{}
+	if err := store.Delete(ctx, key, deletedObj, &storage.Preconditions{}, storage.ValidateAllObjectFunc, nil); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	var e watch.Event
-	watchCtx, _ := context.WithTimeout(ctx, wait.ForeverTestTimeout)
+	// Verify that ResourceVersion has changed on deletion.
+	if storedObj.ResourceVersion == deletedObj.ResourceVersion {
+		t.Fatalf("ResourceVersion didn't changed on deletion: %s", deletedObj.ResourceVersion)
+	}
+
 	select {
-	case e = <-w.ResultChan():
-	case <-watchCtx.Done():
-		t.Fatalf("timed out waiting for watch event")
-	}
-	deletedRV, err := deletedRevision(watchCtx, etcdW)
-	if err != nil {
-		t.Fatalf("did not see delete event in raw watch: %v", err)
-	}
-	watchedDeleteObj := e.Object.(*example.Pod)
-
-	watchedDeleteRev, err := store.versioner.ParseResourceVersion(watchedDeleteObj.ResourceVersion)
-	if err != nil {
-		t.Fatalf("ParseWatchResourceVersion failed: %v", err)
-	}
-	if int64(watchedDeleteRev) != deletedRV {
-		t.Errorf("Object from delete event have version: %v, should be the same as etcd delete's mod rev: %d",
-			watchedDeleteRev, deletedRV)
-	}
-}
-
-func deletedRevision(ctx context.Context, watch <-chan clientv3.WatchResponse) (int64, error) {
-	for {
-		select {
-		case <-ctx.Done():
-			return 0, ctx.Err()
-		case wres := <-watch:
-			for _, evt := range wres.Events {
-				if evt.Type == mvccpb.DELETE && evt.Kv != nil {
-					return evt.Kv.ModRevision, nil
-				}
-			}
+	case event := <-w.ResultChan():
+		watchedDeleteObj := event.Object.(*example.Pod)
+		if e, a := deletedObj.ResourceVersion, watchedDeleteObj.ResourceVersion; e != a {
+			t.Errorf("Unexpected resource version: %v, expected %v", a, e)
 		}
 	}
 }

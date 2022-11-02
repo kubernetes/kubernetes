@@ -225,14 +225,20 @@ func RunTestUnconditionalDelete(ctx context.Context, t *testing.T, store storage
 			err := store.Delete(ctx, tt.key, out, nil, storage.ValidateAllObjectFunc, nil)
 			if tt.expectNotFoundErr {
 				if err == nil || !storage.IsNotFound(err) {
-					t.Errorf("%s: expecting not found error, but get: %s", tt.name, err)
+					t.Errorf("expecting not found error, but get: %s", err)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("%s: Delete failed: %v", tt.name, err)
+				t.Fatalf("Delete failed: %v", err)
 			}
-			ExpectNoDiff(t, fmt.Sprintf("%s: incorrect pod:", tt.name), tt.expectedObj, out)
+			// We expect the resource version of the returned object to be
+			// updated compared to the last existing object.
+			if storedObj.ResourceVersion == out.ResourceVersion {
+				t.Errorf("expecting resource version to be updated, but get: %s", out.ResourceVersion)
+			}
+			out.ResourceVersion = storedObj.ResourceVersion
+			ExpectNoDiff(t, "incorrect pod:", tt.expectedObj, out)
 		})
 	}
 }
@@ -260,14 +266,20 @@ func RunTestConditionalDelete(ctx context.Context, t *testing.T, store storage.I
 			err := store.Delete(ctx, key, out, tt.precondition, storage.ValidateAllObjectFunc, nil)
 			if tt.expectInvalidObjErr {
 				if err == nil || !storage.IsInvalidObj(err) {
-					t.Errorf("%s: expecting invalid UID error, but get: %s", tt.name, err)
+					t.Errorf("expecting invalid UID error, but get: %s", err)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("%s: Delete failed: %v", tt.name, err)
+				t.Fatalf("Delete failed: %v", err)
 			}
-			ExpectNoDiff(t, fmt.Sprintf("%s: incorrect pod", tt.name), storedObj, out)
+			// We expect the resource version of the returned object to be
+			// updated compared to the last existing object.
+			if storedObj.ResourceVersion == out.ResourceVersion {
+				t.Errorf("expecting resource version to be updated, but get: %s", out.ResourceVersion)
+			}
+			out.ResourceVersion = storedObj.ResourceVersion
+			ExpectNoDiff(t, "incorrect pod:", storedObj, out)
 			key, storedObj = TestPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
 		})
 	}
