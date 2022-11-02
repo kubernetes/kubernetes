@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"errors"
 	"fmt"
 	"go/ast"
 	"go/token"
@@ -165,23 +164,15 @@ func (c *metricDecoder) decodeDesc(ce *ast.CallExpr) (metric, error) {
 func (c *metricDecoder) decodeString(expr ast.Expr) (*string, error) {
 	switch e := expr.(type) {
 	case *ast.BasicLit:
-		s, err := stringValue(e)
-		return &s, err
-	case *ast.Ident:
-		variableExpr, found := c.variables[e.Name]
-		if !found {
-			return nil, fmt.Errorf("can't decode string")
+		value, err := stringValue(e)
+		if err != nil {
+			return nil, err
 		}
-		bl, ok := variableExpr.(*ast.BasicLit)
-		if !ok {
-			return nil, fmt.Errorf("can't decode string")
-		}
-		v, err := stringValue(bl)
-		return &v, err
+		return &value, nil
 	case *ast.CallExpr:
 		firstArg, secondArg, thirdArg, err := c.decodeBuildFQNameArguments(e)
 		if err != nil {
-			return nil, err
+			return nil, newDecodeErrorf(expr, errNonStringAttribute)
 		}
 		se, ok := e.Fun.(*ast.SelectorExpr)
 		if ok {
@@ -192,22 +183,70 @@ func (c *metricDecoder) decodeString(expr ast.Expr) (*string, error) {
 				return &n, nil
 			}
 		}
-	case *ast.SelectorExpr:
-		s, ok := e.X.(*ast.Ident)
-		if !ok {
-			return nil, newDecodeErrorf(e, errExprNotIdent, e.X)
-		}
-		variableExpr, found := c.variables[strings.Join([]string{s.Name, e.Sel.Name}, ".")]
+	case *ast.Ident:
+		variableExpr, found := c.variables[e.Name]
 		if !found {
-			return nil, newDecodeErrorf(e, errBadImportedVariableAttribute)
+			return nil, newDecodeErrorf(expr, errBadVariableAttribute)
 		}
 		bl, ok := variableExpr.(*ast.BasicLit)
 		if !ok {
-			return nil, newDecodeErrorf(e, errNonStringAttribute)
+			return nil, newDecodeErrorf(expr, errNonStringAttribute)
 		}
 		value, err := stringValue(bl)
 		if err != nil {
-			return nil, newDecodeErrorf(e, err.Error())
+			return nil, err
+		}
+		return &value, nil
+	case *ast.SelectorExpr:
+		s, ok := e.X.(*ast.Ident)
+		if !ok {
+			return nil, newDecodeErrorf(expr, errExprNotIdent, e.X)
+		}
+		variableExpr, found := c.variables[strings.Join([]string{s.Name, e.Sel.Name}, ".")]
+		if !found {
+			return nil, newDecodeErrorf(expr, errBadImportedVariableAttribute)
+		}
+		bl, ok := variableExpr.(*ast.BasicLit)
+		if !ok {
+			return nil, newDecodeErrorf(expr, errNonStringAttribute)
+		}
+		value, err := stringValue(bl)
+		if err != nil {
+			return nil, err
+		}
+		return &value, nil
+	case *ast.BinaryExpr:
+		var binaryExpr *ast.BinaryExpr
+		binaryExpr = e
+		var okay bool
+		var value string
+		okay = true
+
+		for okay {
+			yV, okay := binaryExpr.Y.(*ast.BasicLit)
+			if !okay {
+				return nil, newDecodeErrorf(expr, errNonStringAttribute)
+			}
+			yVal, err := stringValue(yV)
+			if err != nil {
+				return nil, newDecodeErrorf(expr, errNonStringAttribute)
+			}
+			value = fmt.Sprintf("%s%s", yVal, value)
+			x, okay := binaryExpr.X.(*ast.BinaryExpr)
+			if !okay {
+				// should be basicLit
+				xV, okay := binaryExpr.X.(*ast.BasicLit)
+				if !okay {
+					return nil, newDecodeErrorf(expr, errNonStringAttribute)
+				}
+				xVal, err := stringValue(xV)
+				if err != nil {
+					return nil, newDecodeErrorf(expr, errNonStringAttribute)
+				}
+				value = fmt.Sprintf("%s%s", xVal, value)
+				break
+			}
+			binaryExpr = x
 		}
 		return &value, nil
 	}
@@ -297,36 +336,7 @@ func (c *metricDecoder) decodeLabels(expr ast.Expr) ([]string, error) {
 			cl = cl2
 		}
 	}
-	labels := make([]string, len(cl.Elts))
-	for i, el := range cl.Elts {
-		v, ok := el.(*ast.Ident)
-		if ok {
-			variableExpr, found := c.variables[v.Name]
-			if !found {
-				return nil, newDecodeErrorf(expr, errBadVariableAttribute)
-			}
-			bl, ok := variableExpr.(*ast.BasicLit)
-			if !ok {
-				return nil, newDecodeErrorf(expr, errNonStringAttribute)
-			}
-			value, err := stringValue(bl)
-			if err != nil {
-				return nil, err
-			}
-			labels[i] = value
-			continue
-		}
-		bl, ok := el.(*ast.BasicLit)
-		if !ok {
-			return nil, errors.New(errLabels)
-		}
-		value, err := stringValue(bl)
-		if err != nil {
-			return nil, err
-		}
-		labels[i] = value
-	}
-	return labels, nil
+	return c.decodeLabelsFromArray(cl.Elts)
 }
 
 func (c *metricDecoder) decodeOpts(expr ast.Expr) (metric, error) {
@@ -353,77 +363,11 @@ func (c *metricDecoder) decodeOpts(expr ast.Expr) (metric, error) {
 		case "Namespace", "Subsystem", "Name", "Help", "DeprecatedVersion":
 			var value string
 			var err error
-			switch v := kv.Value.(type) {
-			case *ast.BasicLit:
-				value, err = stringValue(v)
-				if err != nil {
-					return m, err
-				}
-			case *ast.Ident:
-				variableExpr, found := c.variables[v.Name]
-				if !found {
-					return m, newDecodeErrorf(expr, errBadVariableAttribute)
-				}
-				bl, ok := variableExpr.(*ast.BasicLit)
-				if !ok {
-					return m, newDecodeErrorf(expr, errNonStringAttribute)
-				}
-				value, err = stringValue(bl)
-				if err != nil {
-					return m, err
-				}
-			case *ast.SelectorExpr:
-				s, ok := v.X.(*ast.Ident)
-				if !ok {
-					return m, newDecodeErrorf(expr, errExprNotIdent, v.X)
-				}
-				variableExpr, found := c.variables[strings.Join([]string{s.Name, v.Sel.Name}, ".")]
-				if !found {
-					return m, newDecodeErrorf(expr, errBadImportedVariableAttribute)
-				}
-				bl, ok := variableExpr.(*ast.BasicLit)
-				if !ok {
-					return m, newDecodeErrorf(expr, errNonStringAttribute)
-				}
-				value, err = stringValue(bl)
-				if err != nil {
-					return m, err
-				}
-			case *ast.BinaryExpr:
-				var binaryExpr *ast.BinaryExpr
-				binaryExpr = v
-				var okay bool
-				okay = true
-
-				for okay {
-					yV, okay := binaryExpr.Y.(*ast.BasicLit)
-					if !okay {
-						return m, newDecodeErrorf(expr, errNonStringAttribute)
-					}
-					yVal, err := stringValue(yV)
-					if err != nil {
-						return m, newDecodeErrorf(expr, errNonStringAttribute)
-					}
-					value = fmt.Sprintf("%s%s", yVal, value)
-					x, okay := binaryExpr.X.(*ast.BinaryExpr)
-					if !okay {
-						// should be basicLit
-						xV, okay := binaryExpr.X.(*ast.BasicLit)
-						if !okay {
-							return m, newDecodeErrorf(expr, errNonStringAttribute)
-						}
-						xVal, err := stringValue(xV)
-						if err != nil {
-							return m, newDecodeErrorf(expr, errNonStringAttribute)
-						}
-						value = fmt.Sprintf("%s%s", xVal, value)
-						break
-					}
-					binaryExpr = x
-				}
-			default:
-				return m, newDecodeErrorf(expr, errNonStringAttribute)
+			s, err := c.decodeString(kv.Value)
+			if err != nil {
+				return m, newDecodeErrorf(expr, err.Error())
 			}
+			value = *s
 			switch key {
 			case "Namespace":
 				m.Namespace = value

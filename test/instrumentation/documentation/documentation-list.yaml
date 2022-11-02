@@ -1363,6 +1363,11 @@
   help: Cumulative proxy rules Endpoint changes
   type: Counter
   stabilityLevel: ALPHA
+- name: sync_proxy_rules_iptables_partial_restore_failures_total
+  subsystem: kubeproxy
+  help: Cumulative proxy iptables partial restore failures
+  type: Counter
+  stabilityLevel: ALPHA
 - name: sync_proxy_rules_iptables_restore_failures_total
   subsystem: kubeproxy
   help: Cumulative proxy iptables restore failures
@@ -2246,6 +2251,16 @@
   labels:
   - protocol
   - stage
+  - transport
+- name: dial_start_total
+  subsystem: egress_dialer
+  namespace: apiserver
+  help: Dial starts, labeled by the protocol (http-connect or grpc) and transport
+    (tcp or uds).
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - protocol
   - transport
 - name: request_aborts_total
   subsystem: apiserver
