@@ -191,13 +191,17 @@ func (v *CELValidator) Validate(a admission.Attributes, o admission.ObjectInterf
 		params:    paramsVal,
 		request:   requestVal.Object,
 	}
+
 	var f v1alpha1.FailurePolicyType
 	if v.policy.Spec.FailurePolicy == nil {
 		f = v1alpha1.Fail
 	} else {
 		f = *v.policy.Spec.FailurePolicy
 	}
+
 	for i, compilationResult := range v.compilationResults {
+		validation := v.policy.Spec.Validations[i]
+
 		var policyDecision = &decisions[i]
 
 		if compilationResult.Error != nil {
@@ -207,22 +211,26 @@ func (v *CELValidator) Validate(a admission.Attributes, o admission.ObjectInterf
 		}
 		if compilationResult.Program == nil {
 			policyDecision.kind = policyDecisionKindForError(f)
-			policyDecision.message = fmt.Sprintf("compilation result is nil")
+			policyDecision.message = "unexpected internal error compiling expression"
 			continue
 		}
 		evalResult, _, err := compilationResult.Program.Eval(va)
 		if err != nil {
 			policyDecision.kind = policyDecisionKindForError(f)
-			policyDecision.message = fmt.Sprintf("failed expression: %v, with evaluation error: %v", v.policy.Spec.Validations[i].Expression, err)
+			policyDecision.message = fmt.Sprintf("expression '%v' resulted in error: %v", v.policy.Spec.Validations[i].Expression, err)
 		} else if evalResult != celtypes.True {
 			policyDecision.kind = policyDecisionKindForError(f)
-			reason := v.policy.Spec.Validations[i].Reason
-			if reason == nil {
+			if validation.Reason == nil {
 				policyDecision.reason = metav1.StatusReasonInvalid
 			} else {
-				policyDecision.reason = *reason
+				policyDecision.reason = *validation.Reason
 			}
-			policyDecision.message = fmt.Sprintf("failed expression: %v", v.policy.Spec.Validations[i].Expression)
+			if len(validation.Message) > 0 {
+				policyDecision.message = validation.Message
+			} else {
+				policyDecision.message = fmt.Sprintf("failed expression: %v", v.policy.Spec.Validations[i].Expression)
+			}
+
 		} else {
 			policyDecision.kind = admit
 		}

@@ -65,16 +65,19 @@ func (p *policyError) Status() metav1.Status {
 	if len(deniedDecision.reason) == 0 {
 		deniedDecision.reason = metav1.StatusReasonInvalid
 	}
-	bindingName := ""
+	var bindingName, message string
 	if deniedDecision.binding != nil {
 		bindingName = deniedDecision.binding.Name
+		message = fmt.Sprintf("ValidatingAdmissionPolicy '%s' with binding '%s' denied request: %s", deniedDecision.definition.Name, bindingName, deniedDecision.message)
+	} else {
+		message = fmt.Sprintf("ValidatingAdmissionPolicy '%s' '%s' denied request: %s", deniedDecision.definition.Name, bindingName, deniedDecision.message)
 	}
 
 	return metav1.Status{
 		Status:  metav1.StatusFailure,
 		Code:    reasonToCode(deniedDecision.reason),
 		Reason:  deniedDecision.reason,
-		Message: fmt.Sprintf("ValidatingAdmissionPolicy '%s' with binding '%s' failed: %s", deniedDecision.definition.Name, bindingName, deniedDecision.message),
+		Message: message,
 	}
 }
 

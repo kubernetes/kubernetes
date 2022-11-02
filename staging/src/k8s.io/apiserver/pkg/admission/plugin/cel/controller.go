@@ -212,7 +212,7 @@ func (c *celAdmissionController) Validate(
 			deniedDecisions = append(deniedDecisions, policyDecisionWithMetadata{
 				policyDecision: policyDecision{
 					kind:    deny,
-					message: fmt.Errorf("admission policy failed with error: %w", err).Error(),
+					message: fmt.Errorf("failed to configure policy: %w", err).Error(),
 				},
 				definition: definition,
 				binding:    binding,
