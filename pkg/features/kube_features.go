@@ -198,14 +198,6 @@ const (
 	// Normalize HttpGet URL and Header passing for lifecycle handlers with probers.
 	ConsistentHTTPGetHandlers featuregate.Feature = "ConsistentHTTPGetHandlers"
 
-	// owner: @jiahuif
-	// alpha: v1.21
-	// beta:  v1.22
-	// GA:    v1.24
-	//
-	// Enables Leader Migration for kube-controller-manager and cloud-controller-manager
-	ControllerManagerLeaderMigration featuregate.Feature = "ControllerManagerLeaderMigration"
-
 	// owner: @deejross, @soltysh
 	// kep: https://kep.k8s.io/3140
 	// alpha: v1.24
@@ -866,8 +858,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ContainerCheckpoint: {Default: false, PreRelease: featuregate.Alpha},
 
 	ConsistentHTTPGetHandlers: {Default: true, PreRelease: featuregate.GA},
-
-	ControllerManagerLeaderMigration: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
 	CronJobTimeZone: {Default: true, PreRelease: featuregate.Beta},
 

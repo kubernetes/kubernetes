@@ -17,12 +17,10 @@ limitations under the License.
 package leadermigration
 
 import (
-	"k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/controller-manager/pkg/features"
 	_ "k8s.io/controller-manager/pkg/features/register"
 )
 
 // FeatureEnabled tells if leader migration is enabled through the feature gate.
 func FeatureEnabled() bool {
-	return feature.DefaultMutableFeatureGate.Enabled(features.ControllerManagerLeaderMigration)
+	return true
 }
