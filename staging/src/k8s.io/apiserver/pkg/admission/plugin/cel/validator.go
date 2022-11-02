@@ -191,7 +191,12 @@ func (v *CELValidator) Validate(a admission.Attributes, o admission.ObjectInterf
 		params:    paramsVal,
 		request:   requestVal.Object,
 	}
-	f := *v.policy.Spec.FailurePolicy
+	var f v1alpha1.FailurePolicyType
+	if v.policy.Spec.FailurePolicy == nil {
+		f = v1alpha1.Fail
+	} else {
+		f = *v.policy.Spec.FailurePolicy
+	}
 	for i, compilationResult := range v.compilationResults {
 		var policyDecision = &decisions[i]
 
