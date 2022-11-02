@@ -477,7 +477,7 @@ aliases:
     - logicalhan
   feature-approvers:
     - andrewsykim # Cloud Provider
-    - brancz # Instrumentation
+    - logicalhan # Instrumentation
     - ahg-g # Scheduling
     - caseydavenport # Network
     - dcbw # Network
