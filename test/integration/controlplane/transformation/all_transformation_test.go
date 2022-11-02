@@ -95,7 +95,7 @@ resources:
         secret: c2VjcmV0IGlzIHNlY3VyZQ==
 `
 
-	test, err := newTransformTest(t, encryptionConfig)
+	test, err := newTransformTest(t, encryptionConfig, false)
 	if err != nil {
 		t.Fatalf("failed to start Kube API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}

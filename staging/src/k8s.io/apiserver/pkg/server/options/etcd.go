@@ -43,8 +43,9 @@ import (
 type EtcdOptions struct {
 	// The value of Paging on StorageConfig will be overridden by the
 	// calculated feature gate value.
-	StorageConfig                    storagebackend.Config
-	EncryptionProviderConfigFilepath string
+	StorageConfig                           storagebackend.Config
+	EncryptionProviderConfigFilepath        string
+	EncryptionProviderConfigAutomaticReload bool
 
 	EtcdServersOverrides []string
 
@@ -117,6 +118,10 @@ func (s *EtcdOptions) Validate() []error {
 
 	}
 
+	if len(s.EncryptionProviderConfigFilepath) == 0 && s.EncryptionProviderConfigAutomaticReload {
+		allErrors = append(allErrors, fmt.Errorf("--encryption-provider-config-automatic-reload must be set with --encryption-provider-config"))
+	}
+
 	return allErrors
 }
 
@@ -181,6 +186,10 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.EncryptionProviderConfigFilepath, "encryption-provider-config", s.EncryptionProviderConfigFilepath,
 		"The file containing configuration for encryption providers to be used for storing secrets in etcd")
 
+	fs.BoolVar(&s.EncryptionProviderConfigAutomaticReload, "encryption-provider-config-automatic-reload", s.EncryptionProviderConfigAutomaticReload,
+		"Determines if the file set by --encryption-provider-config should be automatically reloaded if the disk contents change. "+
+			"Setting this to true disables the ability to uniquely identify distinct KMS plugins via the API server healthz endpoints.")
+
 	fs.DurationVar(&s.StorageConfig.CompactionInterval, "etcd-compaction-interval", s.StorageConfig.CompactionInterval,
 		"The interval of compaction requests. If 0, the compaction request from apiserver is disabled.")
 
@@ -213,7 +222,7 @@ func (s *EtcdOptions) Complete(storageObjectCountTracker flowcontrolrequest.Stor
 	}
 
 	if len(s.EncryptionProviderConfigFilepath) != 0 {
-		transformerOverrides, kmsPluginHealthzChecks, err := encryptionconfig.LoadEncryptionConfig(s.EncryptionProviderConfigFilepath, stopCh)
+		transformerOverrides, kmsPluginHealthzChecks, err := encryptionconfig.LoadEncryptionConfig(s.EncryptionProviderConfigFilepath, s.EncryptionProviderConfigAutomaticReload, stopCh)
 		if err != nil {
 			return err
 		}
