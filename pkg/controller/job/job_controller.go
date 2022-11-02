@@ -1230,7 +1230,7 @@ func (jm *Controller) removeTrackingFinalizerFromPods(ctx context.Context, jobKe
 					}
 					if !apierrors.IsNotFound(err) {
 						errCh <- err
-						utilruntime.HandleError(err)
+						utilruntime.HandleError(fmt.Errorf("removing tracking finalizer: %w", err))
 						return
 					}
 				}
