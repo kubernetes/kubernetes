@@ -341,7 +341,7 @@ func (d *DiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList,
 			return nil, nil, err
 		}
 
-		groupVersionResources := map[schema.GroupVersion]*metav1.APIResourceList{}
+		var groupVersionResources map[schema.GroupVersion]*metav1.APIResourceList
 		failedGroups := map[schema.GroupVersion]error{}
 		if gvResources != nil {
 			groupVersionResources = gvResources
