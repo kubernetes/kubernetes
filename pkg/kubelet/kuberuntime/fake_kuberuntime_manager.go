@@ -17,7 +17,6 @@ limitations under the License.
 package kuberuntime
 
 import (
-	"context"
 	"net/http"
 	"time"
 
@@ -84,7 +83,6 @@ func (f *fakePodStateProvider) ShouldPodContentBeRemoved(uid types.UID) bool {
 }
 
 func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageService internalapi.ImageManagerService, machineInfo *cadvisorapi.MachineInfo, osInterface kubecontainer.OSInterface, runtimeHelper kubecontainer.RuntimeHelper, keyring credentialprovider.DockerKeyring) (*kubeGenericRuntimeManager, error) {
-	ctx := context.Background()
 	recorder := &record.FakeRecorder{}
 	logManager, err := logs.NewContainerLogManager(runtimeService, osInterface, "1", 2)
 	if err != nil {
@@ -109,7 +107,7 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		memoryThrottlingFactor: 0.8,
 	}
 
-	typedVersion, err := runtimeService.Version(ctx, kubeRuntimeAPIVersion)
+	typedVersion, err := runtimeService.Version(kubeRuntimeAPIVersion)
 	if err != nil {
 		return nil, err
 	}

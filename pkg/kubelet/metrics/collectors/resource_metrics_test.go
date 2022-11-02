@@ -17,7 +17,6 @@ limitations under the License.
 package collectors
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -358,9 +357,8 @@ func TestCollectResourceMetrics(t *testing.T) {
 	for _, test := range tests {
 		tc := test
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
 			provider := summaryprovidertest.NewMockSummaryProvider(mockCtrl)
-			provider.EXPECT().GetCPUAndMemoryStats(ctx).Return(tc.summary, tc.summaryErr).AnyTimes()
+			provider.EXPECT().GetCPUAndMemoryStats().Return(tc.summary, tc.summaryErr).AnyTimes()
 			collector := NewResourceMetricsCollector(provider)
 
 			if err := testutil.CustomCollectAndCompare(collector, strings.NewReader(tc.expectedMetrics), interestedMetrics...); err != nil {

@@ -17,7 +17,6 @@ limitations under the License.
 package portforward
 
 import (
-	"context"
 	"io"
 	"net/http"
 	"time"
@@ -31,7 +30,7 @@ import (
 // in a pod.
 type PortForwarder interface {
 	// PortForwarder copies data between a data stream and a port in a pod.
-	PortForward(ctx context.Context, name string, uid types.UID, port int32, stream io.ReadWriteCloser) error
+	PortForward(name string, uid types.UID, port int32, stream io.ReadWriteCloser) error
 }
 
 // ServePortForward handles a port forwarding request.  A single request is

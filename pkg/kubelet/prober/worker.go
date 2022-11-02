@@ -17,7 +17,6 @@ limitations under the License.
 package prober
 
 import (
-	"context"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -149,7 +148,6 @@ func newWorker(
 
 // run periodically probes the container.
 func (w *worker) run() {
-	ctx := context.Background()
 	probeTickerPeriod := time.Duration(w.spec.PeriodSeconds) * time.Second
 
 	// If kubelet restarted the probes could be started in rapid succession.
@@ -177,7 +175,7 @@ func (w *worker) run() {
 	}()
 
 probeLoop:
-	for w.doProbe(ctx) {
+	for w.doProbe() {
 		// Wait for next probe tick.
 		select {
 		case <-w.stopCh:
@@ -200,7 +198,7 @@ func (w *worker) stop() {
 
 // doProbe probes the container once and records the result.
 // Returns whether the worker should continue.
-func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
+func (w *worker) doProbe() (keepGoing bool) {
 	defer func() { recover() }() // Actually eat panics (HandleCrash takes care of logging)
 	defer runtime.HandleCrash(func(_ interface{}) { keepGoing = true })
 
@@ -286,7 +284,7 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	}
 
 	// Note, exec probe does NOT have access to pod environment variables or downward API
-	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
+	result, err := w.probeManager.prober.probe(w.probeType, w.pod, status, w.container, w.containerID)
 	if err != nil {
 		// Prober error, throw away the result.
 		return true

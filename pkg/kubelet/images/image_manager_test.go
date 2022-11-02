@@ -17,7 +17,6 @@ limitations under the License.
 package images
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -197,11 +196,10 @@ func TestParallelPuller(t *testing.T) {
 		puller, fakeClock, fakeRuntime, container := pullerTestEnv(c, useSerializedEnv)
 
 		t.Run(c.testName, func(t *testing.T) {
-			ctx := context.Background()
 			for _, expected := range c.expected {
 				fakeRuntime.CalledFunctions = nil
 				fakeClock.Step(time.Second)
-				_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil)
+				_, _, err := puller.EnsureImageExists(pod, container, nil, nil)
 				fakeRuntime.AssertCalls(expected.calls)
 				assert.Equal(t, expected.err, err)
 			}
@@ -225,11 +223,10 @@ func TestSerializedPuller(t *testing.T) {
 		puller, fakeClock, fakeRuntime, container := pullerTestEnv(c, useSerializedEnv)
 
 		t.Run(c.testName, func(t *testing.T) {
-			ctx := context.Background()
 			for _, expected := range c.expected {
 				fakeRuntime.CalledFunctions = nil
 				fakeClock.Step(time.Second)
-				_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil)
+				_, _, err := puller.EnsureImageExists(pod, container, nil, nil)
 				fakeRuntime.AssertCalls(expected.calls)
 				assert.Equal(t, expected.err, err)
 			}
@@ -286,12 +283,11 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 	fakeClock.Step(time.Second)
 
 	t.Run(c.testName, func(t *testing.T) {
-		ctx := context.Background()
-		_, _, err := puller.EnsureImageExists(ctx, pod, container, nil, nil)
+		_, _, err := puller.EnsureImageExists(pod, container, nil, nil)
 		fakeRuntime.AssertCalls(c.expected[0].calls)
 		assert.Equal(t, c.expected[0].err, err, "tick=%d", 0)
 
-		images, _ := fakeRuntime.ListImages(ctx)
+		images, _ := fakeRuntime.ListImages()
 		assert.Equal(t, 1, len(images), "ListImages() count")
 
 		image := images[0]

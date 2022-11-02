@@ -18,7 +18,6 @@ package prober
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -133,7 +132,6 @@ func TestGetTCPAddrParts(t *testing.T) {
 }
 
 func TestProbe(t *testing.T) {
-	ctx := context.Background()
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "foobar"}
 
 	execProbe := &v1.Probe{
@@ -236,7 +234,7 @@ func TestProbe(t *testing.T) {
 				prober.exec = fakeExecProber{test.execResult, nil}
 			}
 
-			result, err := prober.probe(ctx, probeType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
+			result, err := prober.probe(probeType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
 			if test.expectError && err == nil {
 				t.Errorf("[%s] Expected probe error but no error was returned.", testID)
 			}
@@ -250,7 +248,7 @@ func TestProbe(t *testing.T) {
 			if len(test.expectCommand) > 0 {
 				prober.exec = execprobe.New()
 				prober.runner = &containertest.FakeContainerCommandRunner{}
-				_, err := prober.probe(ctx, probeType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
+				_, err := prober.probe(probeType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
 				if err != nil {
 					t.Errorf("[%s] Didn't expect probe error but got: %v", testID, err)
 					continue
@@ -264,7 +262,6 @@ func TestProbe(t *testing.T) {
 }
 
 func TestNewExecInContainer(t *testing.T) {
-	ctx := context.Background()
 	limit := 1024
 	tenKilobyte := strings.Repeat("logs-123", 128*10)
 
@@ -306,7 +303,7 @@ func TestNewExecInContainer(t *testing.T) {
 		container := v1.Container{}
 		containerID := kubecontainer.ContainerID{Type: "docker", ID: "containerID"}
 		cmd := []string{"/foo", "bar"}
-		exec := prober.newExecInContainer(ctx, container, containerID, cmd, 0)
+		exec := prober.newExecInContainer(container, containerID, cmd, 0)
 
 		var dataBuffer bytes.Buffer
 		writer := ioutils.LimitWriter(&dataBuffer, int64(limit))

@@ -17,7 +17,6 @@ limitations under the License.
 package collectors
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -33,7 +32,6 @@ func newUint64Pointer(i uint64) *uint64 {
 }
 
 func TestVolumeStatsCollector(t *testing.T) {
-	ctx := context.Background()
 	// Fixed metadata on type and help text. We prepend this to every expected
 	// output so we only have to modify a single place when doing adjustments.
 	const metadata = `
@@ -146,15 +144,14 @@ func TestVolumeStatsCollector(t *testing.T) {
 	defer mockCtrl.Finish()
 	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
 
-	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).AnyTimes()
-	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(ctx).Return(podStats, nil).AnyTimes()
+	mockStatsProvider.EXPECT().ListPodStats().Return(podStats, nil).AnyTimes()
+	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage().Return(podStats, nil).AnyTimes()
 	if err := testutil.CustomCollectAndCompare(&volumeStatsCollector{statsProvider: mockStatsProvider}, strings.NewReader(want), metrics...); err != nil {
 		t.Errorf("unexpected collecting result:\n%s", err)
 	}
 }
 
 func TestVolumeStatsCollectorWithNullVolumeStatus(t *testing.T) {
-	ctx := context.Background()
 	// Fixed metadata on type and help text. We prepend this to every expected
 	// output so we only have to modify a single place when doing adjustments.
 	const metadata = `
@@ -234,8 +231,8 @@ func TestVolumeStatsCollectorWithNullVolumeStatus(t *testing.T) {
 	defer mockCtrl.Finish()
 	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
 
-	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).AnyTimes()
-	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(ctx).Return(podStats, nil).AnyTimes()
+	mockStatsProvider.EXPECT().ListPodStats().Return(podStats, nil).AnyTimes()
+	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage().Return(podStats, nil).AnyTimes()
 	if err := testutil.CustomCollectAndCompare(&volumeStatsCollector{statsProvider: mockStatsProvider}, strings.NewReader(want), metrics...); err != nil {
 		t.Errorf("unexpected collecting result:\n%s", err)
 	}

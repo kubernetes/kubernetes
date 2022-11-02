@@ -466,7 +466,7 @@ func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) string {
 
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
 // the container runtime to set parameters for launching a container.
-func (kl *Kubelet) GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) (*kubecontainer.RunContainerOptions, func(), error) {
+func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) (*kubecontainer.RunContainerOptions, func(), error) {
 	opts, err := kl.containerManager.GetResources(pod, container)
 	if err != nil {
 		return nil, nil, err
@@ -519,7 +519,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod,
 
 	// only do this check if the experimental behavior is enabled, otherwise allow it to default to false
 	if kl.experimentalHostUserNamespaceDefaulting {
-		opts.EnableHostUserNamespace = kl.enableHostUserNamespace(ctx, pod)
+		opts.EnableHostUserNamespace = kl.enableHostUserNamespace(pod)
 	}
 
 	return opts, cleanupAction, nil
@@ -854,9 +854,9 @@ func containerResourceRuntimeValue(fs *v1.ResourceFieldSelector, pod *v1.Pod, co
 // killPod instructs the container runtime to kill the pod. This method requires that
 // the pod status contains the result of the last syncPod, otherwise it may fail to
 // terminate newly created containers and sandboxes.
-func (kl *Kubelet) killPod(ctx context.Context, pod *v1.Pod, p kubecontainer.Pod, gracePeriodOverride *int64) error {
+func (kl *Kubelet) killPod(pod *v1.Pod, p kubecontainer.Pod, gracePeriodOverride *int64) error {
 	// Call the container runtime KillPod method which stops all known running containers of the pod
-	if err := kl.containerRuntime.KillPod(ctx, pod, p, gracePeriodOverride); err != nil {
+	if err := kl.containerRuntime.KillPod(pod, p, gracePeriodOverride); err != nil {
 		return err
 	}
 	if err := kl.containerManager.UpdateQOSCgroups(); err != nil {
@@ -1054,7 +1054,7 @@ func (kl *Kubelet) deleteOrphanedMirrorPods() {
 // is executing which means no new pods can appear.
 // NOTE: This function is executed by the main sync loop, so it
 // should not contain any blocking calls.
-func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
+func (kl *Kubelet) HandlePodCleanups() error {
 	// The kubelet lacks checkpointing, so we need to introspect the set of pods
 	// in the cgroup tree prior to inspecting the set of pods in our pod manager.
 	// this ensures our view of the cgroup tree does not mistakenly observe pods
@@ -1118,7 +1118,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 
 	// Terminate any pods that are observed in the runtime but not
 	// present in the list of known running pods from config.
-	runningRuntimePods, err := kl.runtimeCache.GetPods(ctx)
+	runningRuntimePods, err := kl.runtimeCache.GetPods()
 	if err != nil {
 		klog.ErrorS(err, "Error listing containers")
 		return err
@@ -1156,7 +1156,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	// in the cache. We need to bypass the cache to get the latest set of
 	// running pods to clean up the volumes.
 	// TODO: Evaluate the performance impact of bypassing the runtime cache.
-	runningRuntimePods, err = kl.containerRuntime.GetPods(ctx, false)
+	runningRuntimePods, err = kl.containerRuntime.GetPods(false)
 	if err != nil {
 		klog.ErrorS(err, "Error listing containers")
 		return err
@@ -1876,8 +1876,8 @@ func (kl *Kubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
 
 // findContainer finds and returns the container with the given pod ID, full name, and container name.
 // It returns nil if not found.
-func (kl *Kubelet) findContainer(ctx context.Context, podFullName string, podUID types.UID, containerName string) (*kubecontainer.Container, error) {
-	pods, err := kl.containerRuntime.GetPods(ctx, false)
+func (kl *Kubelet) findContainer(podFullName string, podUID types.UID, containerName string) (*kubecontainer.Container, error) {
+	pods, err := kl.containerRuntime.GetPods(false)
 	if err != nil {
 		return nil, err
 	}
@@ -1889,8 +1889,8 @@ func (kl *Kubelet) findContainer(ctx context.Context, podFullName string, podUID
 }
 
 // RunInContainer runs a command in a container, returns the combined stdout, stderr as an array of bytes
-func (kl *Kubelet) RunInContainer(ctx context.Context, podFullName string, podUID types.UID, containerName string, cmd []string) ([]byte, error) {
-	container, err := kl.findContainer(ctx, podFullName, podUID, containerName)
+func (kl *Kubelet) RunInContainer(podFullName string, podUID types.UID, containerName string, cmd []string) ([]byte, error) {
+	container, err := kl.findContainer(podFullName, podUID, containerName)
 	if err != nil {
 		return nil, err
 	}
@@ -1898,24 +1898,24 @@ func (kl *Kubelet) RunInContainer(ctx context.Context, podFullName string, podUI
 		return nil, fmt.Errorf("container not found (%q)", containerName)
 	}
 	// TODO(tallclair): Pass a proper timeout value.
-	return kl.runner.RunInContainer(ctx, container.ID, cmd, 0)
+	return kl.runner.RunInContainer(container.ID, cmd, 0)
 }
 
 // GetExec gets the URL the exec will be served from, or nil if the Kubelet will serve it.
-func (kl *Kubelet) GetExec(ctx context.Context, podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error) {
-	container, err := kl.findContainer(ctx, podFullName, podUID, containerName)
+func (kl *Kubelet) GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error) {
+	container, err := kl.findContainer(podFullName, podUID, containerName)
 	if err != nil {
 		return nil, err
 	}
 	if container == nil {
 		return nil, fmt.Errorf("container not found (%q)", containerName)
 	}
-	return kl.streamingRuntime.GetExec(ctx, container.ID, cmd, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, streamOpts.TTY)
+	return kl.streamingRuntime.GetExec(container.ID, cmd, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, streamOpts.TTY)
 }
 
 // GetAttach gets the URL the attach will be served from, or nil if the Kubelet will serve it.
-func (kl *Kubelet) GetAttach(ctx context.Context, podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error) {
-	container, err := kl.findContainer(ctx, podFullName, podUID, containerName)
+func (kl *Kubelet) GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error) {
+	container, err := kl.findContainer(podFullName, podUID, containerName)
 	if err != nil {
 		return nil, err
 	}
@@ -1936,12 +1936,12 @@ func (kl *Kubelet) GetAttach(ctx context.Context, podFullName string, podUID typ
 	}
 	tty := containerSpec.TTY
 
-	return kl.streamingRuntime.GetAttach(ctx, container.ID, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, tty)
+	return kl.streamingRuntime.GetAttach(container.ID, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, tty)
 }
 
 // GetPortForward gets the URL the port-forward will be served from, or nil if the Kubelet will serve it.
-func (kl *Kubelet) GetPortForward(ctx context.Context, podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error) {
-	pods, err := kl.containerRuntime.GetPods(ctx, false)
+func (kl *Kubelet) GetPortForward(podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error) {
+	pods, err := kl.containerRuntime.GetPods(false)
 	if err != nil {
 		return nil, err
 	}
@@ -1954,7 +1954,7 @@ func (kl *Kubelet) GetPortForward(ctx context.Context, podName, podNamespace str
 		return nil, fmt.Errorf("pod not found (%q)", podFullName)
 	}
 
-	return kl.streamingRuntime.GetPortForward(ctx, podName, podNamespace, podUID, portForwardOpts.Ports)
+	return kl.streamingRuntime.GetPortForward(podName, podNamespace, podUID, portForwardOpts.Ports)
 }
 
 // cleanupOrphanedPodCgroups removes cgroups that should no longer exist.
@@ -1995,9 +1995,9 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(pcm cm.PodContainerManager, cgroupP
 // NOTE: when if a container shares any namespace with another container it must also share the user namespace
 // or it will not have the correct capabilities in the namespace.  This means that host user namespace
 // is enabled per pod, not per container.
-func (kl *Kubelet) enableHostUserNamespace(ctx context.Context, pod *v1.Pod) bool {
+func (kl *Kubelet) enableHostUserNamespace(pod *v1.Pod) bool {
 	if kubecontainer.HasPrivilegedContainer(pod) || hasHostNamespace(pod) ||
-		hasHostVolume(pod) || hasNonNamespacedCapability(pod) || kl.hasHostMountPVC(ctx, pod) {
+		hasHostVolume(pod) || hasNonNamespacedCapability(pod) || kl.hasHostMountPVC(pod) {
 		return true
 	}
 	return false
@@ -2037,7 +2037,7 @@ func hasHostNamespace(pod *v1.Pod) bool {
 }
 
 // hasHostMountPVC returns true if a PVC is referencing a HostPath volume.
-func (kl *Kubelet) hasHostMountPVC(ctx context.Context, pod *v1.Pod) bool {
+func (kl *Kubelet) hasHostMountPVC(pod *v1.Pod) bool {
 	for _, volume := range pod.Spec.Volumes {
 		pvcName := ""
 		switch {
@@ -2048,13 +2048,13 @@ func (kl *Kubelet) hasHostMountPVC(ctx context.Context, pod *v1.Pod) bool {
 		default:
 			continue
 		}
-		pvc, err := kl.kubeClient.CoreV1().PersistentVolumeClaims(pod.Namespace).Get(ctx, pvcName, metav1.GetOptions{})
+		pvc, err := kl.kubeClient.CoreV1().PersistentVolumeClaims(pod.Namespace).Get(context.TODO(), pvcName, metav1.GetOptions{})
 		if err != nil {
 			klog.InfoS("Unable to retrieve pvc", "pvc", klog.KRef(pod.Namespace, pvcName), "err", err)
 			continue
 		}
 		if pvc != nil {
-			referencedVolume, err := kl.kubeClient.CoreV1().PersistentVolumes().Get(ctx, pvc.Spec.VolumeName, metav1.GetOptions{})
+			referencedVolume, err := kl.kubeClient.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, metav1.GetOptions{})
 			if err != nil {
 				klog.InfoS("Unable to retrieve pv", "pvName", pvc.Spec.VolumeName, "err", err)
 				continue

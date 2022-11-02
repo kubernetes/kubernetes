@@ -17,7 +17,6 @@ limitations under the License.
 package nodestatus
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -513,7 +512,6 @@ func TestNodeAddress(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ctx := context.Background()
 			// testCase setup
 			existingNode := &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
@@ -555,7 +553,7 @@ func TestNodeAddress(t *testing.T) {
 				nodeAddressesFunc)
 
 			// call setter on existing node
-			err := setter(ctx, existingNode)
+			err := setter(existingNode)
 			if err != nil && !testCase.shouldError {
 				t.Fatalf("unexpected error: %v", err)
 			} else if err != nil && testCase.shouldError {
@@ -600,7 +598,6 @@ func TestNodeAddress_NoCloudProvider(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ctx := context.Background()
 			// testCase setup
 			existingNode := &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Annotations: make(map[string]string)},
@@ -627,7 +624,7 @@ func TestNodeAddress_NoCloudProvider(t *testing.T) {
 				nodeAddressesFunc)
 
 			// call setter on existing node
-			err := setter(ctx, existingNode)
+			err := setter(existingNode)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -1052,7 +1049,6 @@ func TestMachineInfo(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := context.Background()
 			machineInfoFunc := func() (*cadvisorapiv1.MachineInfo, error) {
 				return tc.machineInfo, tc.machineInfoError
 			}
@@ -1079,7 +1075,7 @@ func TestMachineInfo(t *testing.T) {
 			setter := MachineInfo(nodeName, tc.maxPods, tc.podsPerCore, machineInfoFunc, capacityFunc,
 				devicePluginResourceCapacityFunc, nodeAllocatableReservationFunc, recordEventFunc, tc.disableLocalStorageCapacityIsolation)
 			// call setter on node
-			if err := setter(ctx, tc.node); err != nil {
+			if err := setter(tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// check expected node
@@ -1157,20 +1153,19 @@ func TestVersionInfo(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := context.Background()
 			versionInfoFunc := func() (*cadvisorapiv1.VersionInfo, error) {
 				return tc.versionInfo, tc.versionInfoError
 			}
 			runtimeTypeFunc := func() string {
 				return tc.runtimeType
 			}
-			runtimeVersionFunc := func(_ context.Context) (kubecontainer.Version, error) {
+			runtimeVersionFunc := func() (kubecontainer.Version, error) {
 				return tc.runtimeVersion, tc.runtimeVersionError
 			}
 			// construct setter
 			setter := VersionInfo(versionInfoFunc, runtimeTypeFunc, runtimeVersionFunc)
 			// call setter on node
-			err := setter(ctx, tc.node)
+			err := setter(tc.node)
 			require.Equal(t, tc.expectError, err)
 			// check expected node
 			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectNode, tc.node),
@@ -1234,7 +1229,6 @@ func TestImages(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := context.Background()
 			imageListFunc := func() ([]kubecontainer.Image, error) {
 				// today, imageListFunc is expected to return a sorted list,
 				// but we may choose to sort in the setter at some future point
@@ -1246,7 +1240,7 @@ func TestImages(t *testing.T) {
 			setter := Images(tc.maxImages, imageListFunc)
 			// call setter on node
 			node := &v1.Node{}
-			err := setter(ctx, node)
+			err := setter(node)
 			require.Equal(t, tc.expectError, err)
 			// check expected node, image list should be reset to empty when there is an error
 			expectNode := &v1.Node{}
@@ -1414,7 +1408,6 @@ func TestReadyCondition(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := context.Background()
 			runtimeErrorsFunc := func() error {
 				return tc.runtimeErrors
 			}
@@ -1440,7 +1433,7 @@ func TestReadyCondition(t *testing.T) {
 			// construct setter
 			setter := ReadyCondition(nowFunc, runtimeErrorsFunc, networkErrorsFunc, storageErrorsFunc, tc.appArmorValidateHostFunc, cmStatusFunc, nodeShutdownErrorsFunc, recordEventFunc, !tc.disableLocalStorageCapacityIsolation)
 			// call setter on node
-			if err := setter(ctx, tc.node); err != nil {
+			if err := setter(tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// check expected condition
@@ -1548,7 +1541,6 @@ func TestMemoryPressureCondition(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := context.Background()
 			events := []testEvent{}
 			recordEventFunc := func(eventType, event string) {
 				events = append(events, testEvent{
@@ -1562,7 +1554,7 @@ func TestMemoryPressureCondition(t *testing.T) {
 			// construct setter
 			setter := MemoryPressureCondition(nowFunc, pressureFunc, recordEventFunc)
 			// call setter on node
-			if err := setter(ctx, tc.node); err != nil {
+			if err := setter(tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// check expected condition
@@ -1670,7 +1662,6 @@ func TestPIDPressureCondition(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := context.Background()
 			events := []testEvent{}
 			recordEventFunc := func(eventType, event string) {
 				events = append(events, testEvent{
@@ -1684,7 +1675,7 @@ func TestPIDPressureCondition(t *testing.T) {
 			// construct setter
 			setter := PIDPressureCondition(nowFunc, pressureFunc, recordEventFunc)
 			// call setter on node
-			if err := setter(ctx, tc.node); err != nil {
+			if err := setter(tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// check expected condition
@@ -1792,7 +1783,6 @@ func TestDiskPressureCondition(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := context.Background()
 			events := []testEvent{}
 			recordEventFunc := func(eventType, event string) {
 				events = append(events, testEvent{
@@ -1806,7 +1796,7 @@ func TestDiskPressureCondition(t *testing.T) {
 			// construct setter
 			setter := DiskPressureCondition(nowFunc, pressureFunc, recordEventFunc)
 			// call setter on node
-			if err := setter(ctx, tc.node); err != nil {
+			if err := setter(tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// check expected condition
@@ -1853,7 +1843,6 @@ func TestVolumesInUse(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := context.Background()
 			syncedFunc := func() bool {
 				return tc.synced
 			}
@@ -1863,7 +1852,7 @@ func TestVolumesInUse(t *testing.T) {
 			// construct setter
 			setter := VolumesInUse(syncedFunc, volumesInUseFunc)
 			// call setter on node
-			if err := setter(ctx, tc.node); err != nil {
+			if err := setter(tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// check expected volumes
@@ -1919,7 +1908,6 @@ func TestVolumeLimits(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			ctx := context.Background()
 			volumePluginListFunc := func() []volume.VolumePluginWithAttachLimits {
 				return tc.volumePluginList
 			}
@@ -1927,7 +1915,7 @@ func TestVolumeLimits(t *testing.T) {
 			setter := VolumeLimits(volumePluginListFunc)
 			// call setter on node
 			node := &v1.Node{}
-			if err := setter(ctx, node); err != nil {
+			if err := setter(node); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// check expected node

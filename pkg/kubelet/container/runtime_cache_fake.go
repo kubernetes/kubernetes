@@ -16,8 +16,6 @@ limitations under the License.
 
 package container
 
-import "context"
-
 // TestRuntimeCache embeds runtimeCache with some additional methods for testing.
 // It must be declared in the container package to have visibility to runtimeCache.
 // It cannot be in a "..._test.go" file in order for runtime_cache_test.go to have cross-package visibility to it.
@@ -30,7 +28,7 @@ type TestRuntimeCache struct {
 func (r *TestRuntimeCache) UpdateCacheWithLock() error {
 	r.Lock()
 	defer r.Unlock()
-	return r.updateCache(context.Background())
+	return r.updateCache()
 }
 
 // GetCachedPods returns the cached pods.
