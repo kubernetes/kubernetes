@@ -22,57 +22,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 )
 
 // TODO: move to reconstruct.go and remove old code there.
-
-// TODO: Replace Run() when SELinuxMountReadWriteOncePod is GA
-func (rc *reconciler) runNew(stopCh <-chan struct{}) {
-	rc.reconstructVolumes()
-	klog.InfoS("Reconciler: start to sync state")
-	wait.Until(rc.reconcileNew, rc.loopSleepDuration, stopCh)
-}
-
-func (rc *reconciler) reconcileNew() {
-	readyToUnmount := rc.readyToUnmount()
-	if readyToUnmount {
-		// Unmounts are triggered before mounts so that a volume that was
-		// referenced by a pod that was deleted and is now referenced by another
-		// pod is unmounted from the first pod before being mounted to the new
-		// pod.
-		rc.unmountVolumes()
-	}
-
-	// Next we mount required volumes. This function could also trigger
-	// attach if kubelet is responsible for attaching volumes.
-	// If underlying PVC was resized while in-use then this function also handles volume
-	// resizing.
-	rc.mountOrAttachVolumes()
-
-	// Unmount volumes only when DSW and ASW are fully populated to prevent unmounting a volume
-	// that is still needed, but it did not reach DSW yet.
-	if readyToUnmount {
-		// Ensure devices that should be detached/unmounted are detached/unmounted.
-		rc.unmountDetachDevices()
-
-		// Clean up any orphan volumes that failed reconstruction.
-		rc.cleanOrphanVolumes()
-	}
-
-	if len(rc.volumesNeedDevicePath) != 0 {
-		rc.updateReconstructedDevicePaths()
-	}
-
-	if len(rc.volumesNeedReportedInUse) != 0 && rc.populatorHasAddedPods() {
-		// Once DSW is populated, mark all reconstructed as reported in node.status,
-		// so they can proceed with MountDevice / SetUp.
-		rc.desiredStateOfWorld.MarkVolumesReportedInUse(rc.volumesNeedReportedInUse)
-		rc.volumesNeedReportedInUse = nil
-	}
-}
 
 // readyToUnmount returns true when reconciler can start unmounting volumes.
 func (rc *reconciler) readyToUnmount() bool {
