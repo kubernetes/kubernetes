@@ -274,6 +274,13 @@
   help: Number of times the A/D Controller performed a forced detach
   type: Counter
   stabilityLevel: ALPHA
+- name: attachdetach_controller_total_volumes
+  help: Number of volumes in A/D Controller
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - plugin_name
+  - state
 - name: job_finished_total
   subsystem: job_controller
   help: The number of finished job
@@ -459,6 +466,13 @@
   - 2
   - 4
   - 8
+- name: storage_count_attachable_volumes_in_use
+  help: Measure number of volumes in use
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - node
+  - volume_plugin
 - name: job_deletion_duration_seconds
   subsystem: ttl_after_finished_controller
   help: The time it took to delete the job since it became eligible for deletion
@@ -558,6 +572,37 @@
   help: Counter of certificate renewal errors.
   type: Counter
   stabilityLevel: ALPHA
+- name: pv_collector_bound_pv_count
+  help: Gauge measuring number of persistent volume currently bound
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - storage_class
+- name: pv_collector_bound_pvc_count
+  help: Gauge measuring number of persistent volume claim currently bound
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - namespace
+- name: pv_collector_total_pv_count
+  help: Gauge measuring total number of persistent volumes
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - plugin_name
+  - volume_mode
+- name: pv_collector_unbound_pv_count
+  help: Gauge measuring number of persistent volume currently unbound
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - storage_class
+- name: pv_collector_unbound_pvc_count
+  help: Gauge measuring number of persistent volume claim currently unbound
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - namespace
 - name: retroactive_storageclass_errors_total
   help: Total number of failed retroactive StorageClass assignments to persistent
     volume claim
@@ -575,6 +620,30 @@
   labels:
   - operation_name
   - plugin_name
+- name: container_cpu_usage_seconds_total
+  help: Cumulative cpu time consumed by the container in core-seconds
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - container
+  - pod
+  - namespace
+- name: container_memory_working_set_bytes
+  help: Current working set of the container in bytes
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - container
+  - pod
+  - namespace
+- name: container_start_time_seconds
+  help: Start time of the container since unix epoch in seconds
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - container
+  - pod
+  - namespace
 - name: cgroup_manager_duration_seconds
   subsystem: kubelet
   help: Duration in seconds for cgroup manager operations. Broken down by method.
@@ -594,6 +663,15 @@
   - 2.5
   - 5
   - 10
+- name: kubelet_container_log_filesystem_used_bytes
+  help: Bytes used by the container's logs on the filesystem.
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - uid
+  - namespace
+  - pod
+  - container
 - name: containers_per_pod_count
   subsystem: kubelet
   help: The number of containers per pod.
@@ -1044,6 +1122,85 @@
   - 2.5
   - 5
   - 10
+- name: kubelet_volume_stats_available_bytes
+  help: Number of available bytes in the volume
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - namespace
+  - persistentvolumeclaim
+- name: kubelet_volume_stats_capacity_bytes
+  help: Capacity in bytes of the volume
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - namespace
+  - persistentvolumeclaim
+- name: kubelet_volume_stats_health_status_abnormal
+  help: Abnormal volume health status. The count is either 1 or 0. 1 indicates the
+    volume is unhealthy, 0 indicates volume is healthy
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - namespace
+  - persistentvolumeclaim
+- name: kubelet_volume_stats_inodes
+  help: Maximum number of inodes in the volume
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - namespace
+  - persistentvolumeclaim
+- name: kubelet_volume_stats_inodes_free
+  help: Number of free inodes in the volume
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - namespace
+  - persistentvolumeclaim
+- name: kubelet_volume_stats_inodes_used
+  help: Number of used inodes in the volume
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - namespace
+  - persistentvolumeclaim
+- name: kubelet_volume_stats_used_bytes
+  help: Number of used bytes in the volume
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - namespace
+  - persistentvolumeclaim
+- name: node_cpu_usage_seconds_total
+  help: Cumulative cpu time consumed by the node in core-seconds
+  type: Custom
+  stabilityLevel: ALPHA
+- name: node_memory_working_set_bytes
+  help: Current working set of the node in bytes
+  type: Custom
+  stabilityLevel: ALPHA
+- name: plugin_manager_total_plugins
+  help: Number of plugins in Plugin Manager
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - socket_path
+  - state
+- name: pod_cpu_usage_seconds_total
+  help: Cumulative cpu time consumed by the pod in core-seconds
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - pod
+  - namespace
+- name: pod_memory_working_set_bytes
+  help: Current working set of the pod in bytes
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - pod
+  - namespace
 - name: probe_duration_seconds
   subsystem: prober
   help: Duration in seconds for a probe response.
@@ -1067,6 +1224,10 @@
   - pod_uid
   - probe_type
   - result
+- name: scrape_error
+  help: 1 if there was an error while getting container metrics, 0 otherwise
+  type: Custom
+  stabilityLevel: ALPHA
 - name: csr_honored_duration_total
   subsystem: certificates_registry
   namespace: apiserver
@@ -1284,6 +1445,13 @@
     mount -o context option.
   type: Gauge
   stabilityLevel: ALPHA
+- name: volume_manager_total_volumes
+  help: Number of volumes in Volume Manager
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - plugin_name
+  - state
 - name: allocated_ips
   subsystem: clusterip_allocator
   namespace: kube_apiserver
@@ -1334,6 +1502,34 @@
   stabilityLevel: ALPHA
   labels:
   - usage
+- name: kube_pod_resource_limit
+  help: Resources limit for workloads on the cluster, broken down by pod. This shows
+    the resource usage the scheduler and kubelet expect per pod for resources along
+    with the unit for the resource if any.
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - namespace
+  - pod
+  - node
+  - scheduler
+  - priority
+  - resource
+  - unit
+- name: kube_pod_resource_request
+  help: Resources requested by workloads on the cluster, broken down by pod. This
+    shows the resource usage the scheduler and kubelet expect per pod for resources
+    along with the unit for the resource if any.
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - namespace
+  - pod
+  - node
+  - scheduler
+  - priority
+  - resource
+  - unit
 - name: e2e_scheduling_duration_seconds
   subsystem: scheduler
   help: E2e scheduling latency in seconds (scheduling algorithm + binding). This metric
@@ -2579,6 +2775,7 @@
   help: Observations, at the end of every nanosecond, of number of requests (as a
     fraction of the relevant limit) waiting or in any stage of execution (but only
     initial stage for WATCHes)
+  type: TimingRatioHistogram
   stabilityLevel: ALPHA
   labels:
   - phase
@@ -2599,6 +2796,7 @@
   namespace: apiserver
   help: Observations, at the end of every nanosecond, of utilization of seats for
     any stage of execution (but only initial stage for WATCHes)
+  type: TimingRatioHistogram
   stabilityLevel: ALPHA
   labels:
   - priority_level
@@ -2623,6 +2821,7 @@
   namespace: apiserver
   help: Observations, at the end of every nanosecond, of the number of requests (as
     a fraction of the relevant limit) waiting or in regular stage of execution
+  type: TimingRatioHistogram
   stabilityLevel: ALPHA
   labels:
   - phase
@@ -3332,6 +3531,13 @@
   stabilityLevel: ALPHA
   labels:
   - reason
+- name: aggregator_unavailable_apiservice
+  help: Gauge of APIServices which are marked as unavailable broken down by APIService
+    name.
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - name
 - name: aggregator_unavailable_apiservice_total
   help: Counter of APIServices which are marked as unavailable broken down by APIService
     name and reason.
@@ -3489,6 +3695,14 @@
   stabilityLevel: ALPHA
   labels:
   - operation
+- name: cloudprovider_vsphere_vcenter_versions
+  help: Versions for connected vSphere vCenters
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - hostname
+  - version
+  - build
 - name: get_token_count
   help: Counter of total Token() requests to the alternate token source
   type: Counter

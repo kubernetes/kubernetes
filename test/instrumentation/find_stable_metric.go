@@ -64,7 +64,30 @@ func contains(v metrics.StabilityLevel, a []metrics.StabilityLevel) bool {
 func (f *stableMetricFinder) Visit(node ast.Node) (w ast.Visitor) {
 	switch opts := node.(type) {
 	case *ast.CallExpr:
-		f.currentFunctionCall = opts
+		if se, ok := opts.Fun.(*ast.SelectorExpr); ok {
+			if se.Sel.Name == "NewDesc" {
+				sl, _ := decodeStabilityLevel(opts.Args[4], "metrics")
+				if sl != nil {
+					classes := []metrics.StabilityLevel{metrics.STABLE, metrics.BETA}
+					if ALL_STABILITY_CLASSES {
+						classes = append(classes, metrics.ALPHA)
+					}
+					switch {
+					case contains(*sl, classes):
+						f.stableMetricsFunctionCalls = append(f.stableMetricsFunctionCalls, opts)
+						f.currentFunctionCall = nil
+					default:
+						return nil
+					}
+				}
+
+			} else {
+				f.currentFunctionCall = opts
+			}
+
+		} else {
+			f.currentFunctionCall = opts
+		}
 	case *ast.CompositeLit:
 		se, ok := opts.Type.(*ast.SelectorExpr)
 		if !ok {
