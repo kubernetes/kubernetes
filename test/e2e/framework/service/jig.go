@@ -1070,7 +1070,7 @@ func (j *TestJig) CreateSCTPServiceWithPort(tweak func(svc *v1.Service), port in
 
 // CreateLoadBalancerServiceWaitForClusterIPOnly creates a loadbalancer service and waits
 // for it to acquire a cluster IP
-func (j *TestJig) CreateLoadBalancerServiceWaitForClusterIPOnly(timeout time.Duration, tweak func(svc *v1.Service)) (*v1.Service, error) {
+func (j *TestJig) CreateLoadBalancerServiceWaitForClusterIPOnly(tweak func(svc *v1.Service)) (*v1.Service, error) {
 	ginkgo.By("creating a service " + j.Namespace + "/" + j.Name + " with type=LoadBalancer")
 	svc := j.newServiceTemplate(v1.ProtocolTCP, 80)
 	svc.Spec.Type = v1.ServiceTypeLoadBalancer
@@ -1079,24 +1079,10 @@ func (j *TestJig) CreateLoadBalancerServiceWaitForClusterIPOnly(timeout time.Dur
 	if tweak != nil {
 		tweak(svc)
 	}
-	_, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
+	result, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create LoadBalancer Service %q: %v", svc.Name, err)
 	}
 
-	ginkgo.By("waiting for cluster IP for loadbalancer service " + j.Namespace + "/" + j.Name)
-	return j.WaitForLoadBalancerClusterIP(timeout)
-}
-
-// WaitForLoadBalancerClusterIP waits the given LoadBalancer service to have a ClusterIP, or returns an error after the given timeout
-func (j *TestJig) WaitForLoadBalancerClusterIP(timeout time.Duration) (*v1.Service, error) {
-	framework.Logf("Waiting up to %v for LoadBalancer service %q to have a ClusterIP", timeout, j.Name)
-	service, err := j.waitForCondition(timeout, "have a ClusterIP", func(svc *v1.Service) bool {
-		return len(svc.Spec.ClusterIP) > 0
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return j.sanityCheckService(service, v1.ServiceTypeLoadBalancer)
+	return j.sanityCheckService(result, v1.ServiceTypeLoadBalancer)
 }
