@@ -78,7 +78,6 @@ func InstrumentRoundTripperCounter(counter *prometheus.CounterVec, next http.Rou
 				1,
 				rtOpts.getExemplarFn(r.Context()),
 			)
-			counter.With(labels(code, method, r.Method, resp.StatusCode, rtOpts.extraMethods...)).Inc()
 		}
 		return resp, err
 	}
