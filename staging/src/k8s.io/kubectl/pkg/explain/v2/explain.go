@@ -43,7 +43,7 @@ func PrintModelDescription(
 
 // Factored out for testability
 func printModelDescriptionWithGenerator(
-	generator *generator,
+	generator Generator,
 	fieldsPath []string,
 	w io.Writer,
 	client openapi.Client,
