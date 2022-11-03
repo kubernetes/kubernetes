@@ -34,7 +34,7 @@ import (
 // the config has no custom TLS options, http.DefaultTransport is returned.
 type tlsTransportCache struct {
 	mu         sync.Mutex
-	transports map[tlsCacheKey]*http.Transport
+	transports map[tlsCacheKey]http.RoundTripper
 }
 
 // DialerStopCh is stop channel that is passed down to dynamic cert dialer.
@@ -44,7 +44,7 @@ var DialerStopCh = wait.NeverStop
 
 const idleConnsPerHost = 25
 
-var tlsCache = &tlsTransportCache{transports: make(map[tlsCacheKey]*http.Transport)}
+var tlsCache = &tlsTransportCache{transports: make(map[tlsCacheKey]http.RoundTripper)}
 
 type tlsCacheKey struct {
 	insecure           bool
@@ -121,14 +121,23 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		proxy = config.Proxy
 	}
 
-	transport := utilnet.SetTransportDefaults(&http.Transport{
+	h1tr := &http.Transport{
 		Proxy:               proxy,
 		TLSHandshakeTimeout: 10 * time.Second,
 		TLSClientConfig:     tlsConfig,
 		MaxIdleConnsPerHost: idleConnsPerHost,
 		DialContext:         dial,
 		DisableCompression:  config.DisableCompression,
-	})
+	}
+	h2tr := h1tr.Clone()
+
+	utilnet.SetOldTransportDefaults(h1tr)
+	utilnet.SetTransportDefaults(h2tr)
+
+	transport := &upgradeAwareTransport{
+		h1: h1tr,
+		h2: h2tr,
+	}
 
 	if canCache {
 		// Cache a single transport for these options
@@ -136,6 +145,21 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 	}
 
 	return transport, nil
+}
+
+type upgradeAwareTransport struct {
+	h1, h2 http.RoundTripper
+}
+
+func (tr *upgradeAwareTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if v := req.Header.Get("Upgrade"); v != "" {
+		return tr.h1.RoundTrip(req)
+	}
+	return tr.h2.RoundTrip(req)
+}
+
+func (tr *upgradeAwareTransport) WrappedRoundTripper() http.RoundTripper {
+	return tr.h2
 }
 
 // tlsConfigKey returns a unique key for tls.Config objects returned from TLSConfigFor
