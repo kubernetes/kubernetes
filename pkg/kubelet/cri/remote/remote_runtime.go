@@ -113,9 +113,6 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, t
 // validateServiceConnection tries to connect to the remote runtime service by
 // using the CRI v1 API version and fails if that's not possible.
 func (r *remoteRuntimeService) validateServiceConnection(ctx context.Context, conn *grpc.ClientConn, endpoint string) error {
-	ctx, cancel := context.WithTimeout(ctx, r.timeout)
-	defer cancel()
-
 	klog.V(4).InfoS("Validating the CRI v1 API runtime version")
 	r.runtimeClient = runtimeapi.NewRuntimeServiceClient(conn)
 

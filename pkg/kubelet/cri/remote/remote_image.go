@@ -90,9 +90,6 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration, tp 
 // validateServiceConnection tries to connect to the remote image service by
 // using the CRI v1 API version and fails if that's not possible.
 func (r *remoteImageService) validateServiceConnection(ctx context.Context, conn *grpc.ClientConn, endpoint string) error {
-	ctx, cancel := context.WithTimeout(ctx, r.timeout)
-	defer cancel()
-
 	klog.V(4).InfoS("Validating the CRI v1 API image version")
 	r.imageClient = runtimeapi.NewImageServiceClient(conn)
 
