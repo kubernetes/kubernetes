@@ -121,10 +121,10 @@ type OperationGenerator interface {
 	GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, podsDir string) (volumetypes.GeneratedOperations, error)
 
 	// Generates the AttachVolume function needed to perform attach of a volume plugin
-	GenerateAttachVolumeFunc(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) volumetypes.GeneratedOperations
+	GenerateAttachVolumeFunc(logger klog.Logger, volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) volumetypes.GeneratedOperations
 
 	// Generates the DetachVolume function needed to perform the detach of a volume plugin
-	GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
+	GenerateDetachVolumeFunc(logger klog.Logger, volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
 
 	// Generates the VolumesAreAttached function needed to verify if volume plugins are attached
 	GenerateVolumesAreAttachedFunc(attachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
@@ -133,7 +133,7 @@ type OperationGenerator interface {
 	GenerateUnmountDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter hostutil.HostUtils) (volumetypes.GeneratedOperations, error)
 
 	// Generates the function needed to check if the attach_detach controller has attached the volume plugin
-	GenerateVerifyControllerAttachedVolumeFunc(volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
+	GenerateVerifyControllerAttachedVolumeFunc(logger klog.Logger, volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
 
 	// Generates the MapVolume function needed to perform the map of a volume plugin
 	GenerateMapVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error)
@@ -348,6 +348,7 @@ func (og *operationGenerator) GenerateBulkVolumeVerifyFunc(
 }
 
 func (og *operationGenerator) GenerateAttachVolumeFunc(
+	logger klog.Logger,
 	volumeToAttach VolumeToAttach,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) volumetypes.GeneratedOperations {
 
@@ -378,6 +379,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 				uncertainNode = derr.CurrentNode
 			}
 			addErr := actualStateOfWorld.MarkVolumeAsUncertain(
+				logger,
 				volumeToAttach.VolumeName,
 				volumeToAttach.VolumeSpec,
 				uncertainNode)
@@ -399,7 +401,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 
 		// Update actual state of world
 		addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
-			v1.UniqueVolumeName(""), volumeToAttach.VolumeSpec, volumeToAttach.NodeName, devicePath)
+			logger, v1.UniqueVolumeName(""), volumeToAttach.VolumeSpec, volumeToAttach.NodeName, devicePath)
 		if addVolumeNodeErr != nil {
 			// On failure, return error. Caller will log and retry.
 			eventErr, detailedErr := volumeToAttach.GenerateError("AttachVolume.MarkVolumeAsAttached failed", addVolumeNodeErr)
@@ -447,6 +449,7 @@ func (og *operationGenerator) GetCSITranslator() InTreeToCSITranslator {
 }
 
 func (og *operationGenerator) GenerateDetachVolumeFunc(
+	logger klog.Logger,
 	volumeToDetach AttachedVolume,
 	verifySafeToDetach bool,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
@@ -505,7 +508,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 		if err != nil {
 			// On failure, add volume back to ReportAsAttached list
 			actualStateOfWorld.AddVolumeToReportAsAttached(
-				volumeToDetach.VolumeName, volumeToDetach.NodeName)
+				logger, volumeToDetach.VolumeName, volumeToDetach.NodeName)
 			eventErr, detailedErr := volumeToDetach.GenerateError("DetachVolume.Detach failed", err)
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 		}
@@ -1501,6 +1504,7 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 }
 
 func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
+	logger klog.Logger,
 	volumeToMount VolumeToMount,
 	nodeName types.NodeName,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
@@ -1548,13 +1552,13 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 			// updated accordingly.
 
 			addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
-				volumeToMount.VolumeName, volumeToMount.VolumeSpec, nodeName, "" /* devicePath */)
+				logger, volumeToMount.VolumeName, volumeToMount.VolumeSpec, nodeName, "" /* devicePath */)
 			if addVolumeNodeErr != nil {
 				// On failure, return error. Caller will log and retry.
 				eventErr, detailedErr := volumeToMount.GenerateError("VerifyControllerAttachedVolume.MarkVolumeAsAttachedByUniqueVolumeName failed", addVolumeNodeErr)
 				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 			}
-			actualStateOfWorld.InitializeClaimSize(volumeToMount.VolumeName, claimSize)
+			actualStateOfWorld.InitializeClaimSize(logger, volumeToMount.VolumeName, claimSize)
 			return volumetypes.NewOperationContext(nil, nil, migrated)
 		}
 
@@ -1588,14 +1592,14 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 		for _, attachedVolume := range node.Status.VolumesAttached {
 			if attachedVolume.Name == volumeToMount.VolumeName {
 				addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
-					v1.UniqueVolumeName(""), volumeToMount.VolumeSpec, nodeName, attachedVolume.DevicePath)
+					logger, v1.UniqueVolumeName(""), volumeToMount.VolumeSpec, nodeName, attachedVolume.DevicePath)
 				klog.InfoS(volumeToMount.GenerateMsgDetailed("Controller attach succeeded", fmt.Sprintf("device path: %q", attachedVolume.DevicePath)), "pod", klog.KObj(volumeToMount.Pod))
 				if addVolumeNodeErr != nil {
 					// On failure, return error. Caller will log and retry.
 					eventErr, detailedErr := volumeToMount.GenerateError("VerifyControllerAttachedVolume.MarkVolumeAsAttached failed", addVolumeNodeErr)
 					return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 				}
-				actualStateOfWorld.InitializeClaimSize(volumeToMount.VolumeName, claimSize)
+				actualStateOfWorld.InitializeClaimSize(logger, volumeToMount.VolumeName, claimSize)
 				return volumetypes.NewOperationContext(nil, nil, migrated)
 			}
 		}

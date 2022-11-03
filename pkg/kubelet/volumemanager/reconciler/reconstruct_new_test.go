@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
@@ -205,7 +206,7 @@ func TestCleanOrphanVolumes(t *testing.T) {
 			rc, fakePlugin := getReconciler(tmpKubeletDir, t, mountPaths)
 			rcInstance, _ := rc.(*reconciler)
 			rcInstance.volumesFailedReconstruction = tc.volumesFailedReconstruction
-
+			logger, _ := ktesting.NewTestContext(t)
 			for _, tpodInfo := range tc.podInfos {
 				pod := getInlineFakePod(tpodInfo.podName, tpodInfo.podUID, tpodInfo.outerVolumeName, tpodInfo.innerVolumeName)
 				volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
@@ -215,7 +216,7 @@ func TestCleanOrphanVolumes(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Error adding volume %s to dsow: %v", volumeSpec.Name(), err)
 				}
-				rcInstance.actualStateOfWorld.MarkVolumeAsAttached(volumeName, volumeSpec, nodeName, "")
+				rcInstance.actualStateOfWorld.MarkVolumeAsAttached(logger, volumeName, volumeSpec, nodeName, "")
 			}
 
 			// Act
@@ -324,7 +325,8 @@ func TestReconstructVolumesMount(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error adding volume %s to dsow: %v", volumeSpec.Name(), err)
 			}
-			rcInstance.actualStateOfWorld.MarkVolumeAsAttached(volumeName, volumeSpec, nodeName, "")
+			logger, _ := ktesting.NewTestContext(t)
+			rcInstance.actualStateOfWorld.MarkVolumeAsAttached(logger, volumeName, volumeSpec, nodeName, "")
 
 			rcInstance.populatorHasAddedPods = func() bool {
 				// Mark DSW populated to allow unmounting of volumes.
