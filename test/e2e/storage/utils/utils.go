@@ -133,7 +133,8 @@ func TestKubeletRestartsAndRestoresMap(c clientset.Interface, f *framework.Frame
 // TestVolumeUnmountsFromDeletedPodWithForceOption tests that a volume unmounts if the client pod was deleted while the kubelet was down.
 // forceDelete is true indicating whether the pod is forcefully deleted.
 // checkSubpath is true indicating whether the subpath should be checked.
-func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, forceDelete bool, checkSubpath bool) {
+// If secondPod is set, it is started when kubelet is down to check that the volume is usable while the old pod is being deleted and the new pod is starting.
+func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, forceDelete bool, checkSubpath bool, secondPod *v1.Pod) {
 	nodeIP, err := getHostAddress(c, clientPod)
 	framework.ExpectNoError(err)
 	nodeIP = nodeIP + ":22"
@@ -152,12 +153,24 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 		framework.ExpectEqual(result.Code, 0, fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
 	}
 
+	ginkgo.By("Writing to the volume.")
+	path := "/mnt/volume1"
+	byteLen := 64
+	seed := time.Now().UTC().UnixNano()
+	CheckWriteToPath(f, clientPod, v1.PersistentVolumeFilesystem, false, path, byteLen, seed)
+
 	// This command is to make sure kubelet is started after test finishes no matter it fails or not.
 	defer func() {
 		KubeletCommand(KStart, c, clientPod)
 	}()
 	ginkgo.By("Stopping the kubelet.")
 	KubeletCommand(KStop, c, clientPod)
+
+	if secondPod != nil {
+		ginkgo.By("Starting the second pod")
+		_, err = c.CoreV1().Pods(clientPod.Namespace).Create(context.TODO(), secondPod, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "when starting the second pod")
+	}
 
 	ginkgo.By(fmt.Sprintf("Deleting Pod %q", clientPod.Name))
 	if forceDelete {
@@ -180,6 +193,29 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 		time.Sleep(30 * time.Second)
 	}
 
+	if secondPod != nil {
+		ginkgo.By("Waiting for the second pod.")
+		err = e2epod.WaitForPodRunningInNamespace(c, secondPod)
+		framework.ExpectNoError(err, "while waiting for the second pod Running")
+
+		ginkgo.By("Getting the second pod uuid.")
+		secondPod, err := c.CoreV1().Pods(secondPod.Namespace).Get(context.TODO(), secondPod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "getting the second UID")
+
+		ginkgo.By("Expecting the volume mount to be found in the second pod.")
+		result, err := e2essh.SSH(fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", secondPod.UID), nodeIP, framework.TestContext.Provider)
+		e2essh.LogResult(result)
+		framework.ExpectNoError(err, "Encountered SSH error when checking the second pod.")
+		framework.ExpectEqual(result.Code, 0, fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
+
+		ginkgo.By("Testing that written file is accessible in the second pod.")
+		CheckReadFromPath(f, secondPod, v1.PersistentVolumeFilesystem, false, path, byteLen, seed)
+		err = c.CoreV1().Pods(secondPod.Namespace).Delete(context.TODO(), secondPod.Name, metav1.DeleteOptions{})
+		framework.ExpectNoError(err, "when deleting the second pod")
+		err = e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, secondPod.Name, f.Namespace.Name, f.Timeouts.PodDelete)
+		framework.ExpectNoError(err, "when waiting for the second pod to disappear")
+	}
+
 	ginkgo.By("Expecting the volume mount not to be found.")
 	result, err = e2essh.SSH(fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
 	e2essh.LogResult(result)
@@ -195,16 +231,17 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 		gomega.Expect(result.Stdout).To(gomega.BeEmpty(), "Expected grep stdout to be empty (i.e. no subpath mount found).")
 		framework.Logf("Subpath volume unmounted on node %s", clientPod.Spec.NodeName)
 	}
+
 }
 
 // TestVolumeUnmountsFromDeletedPod tests that a volume unmounts if the client pod was deleted while the kubelet was down.
 func TestVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod) {
-	TestVolumeUnmountsFromDeletedPodWithForceOption(c, f, clientPod, false, false)
+	TestVolumeUnmountsFromDeletedPodWithForceOption(c, f, clientPod, false, false, nil)
 }
 
 // TestVolumeUnmountsFromForceDeletedPod tests that a volume unmounts if the client pod was forcefully deleted while the kubelet was down.
 func TestVolumeUnmountsFromForceDeletedPod(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod) {
-	TestVolumeUnmountsFromDeletedPodWithForceOption(c, f, clientPod, true, false)
+	TestVolumeUnmountsFromDeletedPodWithForceOption(c, f, clientPod, true, false, nil)
 }
 
 // TestVolumeUnmapsFromDeletedPodWithForceOption tests that a volume unmaps if the client pod was deleted while the kubelet was down.
