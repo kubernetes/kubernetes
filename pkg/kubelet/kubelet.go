@@ -1533,7 +1533,10 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 // This operation writes all events that are dispatched in order to provide
 // the most accurate information possible about an error situation to aid debugging.
 // Callers should not write an event if this operation returns an error.
-func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (isTerminal bool, err error) {
+func (kl *Kubelet) syncPod(_ context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (isTerminal bool, err error) {
+	// TODO(#113606): connect this with the incoming context parameter, which comes from the pod worker.
+	// Currently, using that context causes test failures.
+	ctx := context.TODO()
 	klog.V(4).InfoS("syncPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
 	defer func() {
 		klog.V(4).InfoS("syncPod exit", "pod", klog.KObj(pod), "podUID", pod.UID, "isTerminal", isTerminal)
@@ -1775,7 +1778,10 @@ func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType
 // syncTerminatingPod is expected to terminate all running containers in a pod. Once this method
 // returns without error, the pod's local state can be safely cleaned up. If runningPod is passed,
 // we perform no status updates.
-func (kl *Kubelet) syncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, runningPod *kubecontainer.Pod, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
+func (kl *Kubelet) syncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, runningPod *kubecontainer.Pod, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
+	// TODO(#113606): connect this with the incoming context parameter, which comes from the pod worker.
+	// Currently, using that context causes test failures.
+	ctx := context.Background()
 	klog.V(4).InfoS("syncTerminatingPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
 	defer klog.V(4).InfoS("syncTerminatingPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
 
