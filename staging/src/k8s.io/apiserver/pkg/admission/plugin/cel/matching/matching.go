@@ -38,11 +38,13 @@ type MatchCriteria interface {
 	GetMatchResources() v1alpha1.MatchResources
 }
 
+// Matcher decides if a request matches against matchCriteria
 type Matcher struct {
 	namespaceMatcher *namespace.Matcher
 	objectMatcher    *object.Matcher
 }
 
+// NewMatcher initialize the matcher with dependencies requires
 func NewMatcher(
 	namespaceLister listersv1.NamespaceLister,
 	client kubernetes.Interface,
@@ -56,6 +58,7 @@ func NewMatcher(
 	}
 }
 
+// ValidateInitialization verify if the matcher is ready before use
 func (m *Matcher) ValidateInitialization() error {
 	if err := m.namespaceMatcher.Validate(); err != nil {
 		return fmt.Errorf("namespaceMatcher is not properly setup: %v", err)
@@ -63,7 +66,7 @@ func (m *Matcher) ValidateInitialization() error {
 	return nil
 }
 
-func (m *Matcher) Matches(attr admission.Attributes, o admission.ObjectInterfaces, criteria MatchCriteria) (bool, error) {
+func (m *Matcher) Matches(attr admission.Attributes, o admission.ObjectInterfaces, criteria MatchCriteria, isBinding bool) (bool, error) {
 	matches, err := m.namespaceMatcher.MatchNamespaceSelector(criteria, attr)
 	if err != nil {
 		return false, err
@@ -84,6 +87,10 @@ func (m *Matcher) Matches(attr admission.Attributes, o admission.ObjectInterface
 	matchPolicy := matchResources.MatchPolicy
 	if matchesResourceRules(matchResources.ExcludeResourceRules, matchPolicy, attr, o) {
 		return false, nil
+	}
+
+	if isBinding && matchResources.ResourceRules == nil {
+		return true, nil
 	}
 
 	if !matchesResourceRules(matchResources.ResourceRules, matchPolicy, attr, o) {
