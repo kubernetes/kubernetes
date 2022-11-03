@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
@@ -257,16 +257,16 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	switch update.Op {
 	case kubetypes.ADD, kubetypes.UPDATE, kubetypes.DELETE:
 		if update.Op == kubetypes.ADD {
-			klog.V(4).InfoS("Adding new pods from source", "source", source, "pods", klog.KObjs(update.Pods))
+			klog.V(4).InfoS("Adding new pods from source", "source", source, "pods", klog.KObjSlice(update.Pods))
 		} else if update.Op == kubetypes.DELETE {
-			klog.V(4).InfoS("Gracefully deleting pods from source", "source", source, "pods", klog.KObjs(update.Pods))
+			klog.V(4).InfoS("Gracefully deleting pods from source", "source", source, "pods", klog.KObjSlice(update.Pods))
 		} else {
-			klog.V(4).InfoS("Updating pods from source", "source", source, "pods", klog.KObjs(update.Pods))
+			klog.V(4).InfoS("Updating pods from source", "source", source, "pods", klog.KObjSlice(update.Pods))
 		}
 		updatePodsFunc(update.Pods, pods, pods)
 
 	case kubetypes.REMOVE:
-		klog.V(4).InfoS("Removing pods from source", "source", source, "pods", klog.KObjs(update.Pods))
+		klog.V(4).InfoS("Removing pods from source", "source", source, "pods", klog.KObjSlice(update.Pods))
 		for _, value := range update.Pods {
 			if existing, found := pods[value.UID]; found {
 				// this is a delete

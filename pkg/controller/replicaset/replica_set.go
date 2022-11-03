@@ -231,10 +231,8 @@ func (rsc *ReplicaSetController) getReplicaSetsWithSameController(rs *apps.Repli
 		relatedRSs = append(relatedRSs, obj.(*apps.ReplicaSet))
 	}
 
-	// The if check is used to avoid the overhead for the KObjs call, see
-	// https://github.com/kubernetes/kubernetes/issues/106945.
 	if klogV := klog.V(2); klogV.Enabled() {
-		klogV.InfoS("Found related ReplicaSets", "replicaSet", klog.KObj(rs), "relatedReplicaSets", klog.KObjs(relatedRSs))
+		klogV.InfoS("Found related ReplicaSets", "replicaSet", klog.KObj(rs), "relatedReplicaSets", klog.KObjSlice(relatedRSs))
 	}
 
 	return relatedRSs
@@ -802,7 +800,7 @@ func (rsc *ReplicaSetController) getIndirectlyRelatedPods(rs *apps.ReplicaSet) (
 			relatedPods = append(relatedPods, pod)
 		}
 	}
-	klog.V(4).InfoS("Found related pods", "kind", rsc.Kind, "object", klog.KObj(rs), "pods", klog.KObjs(relatedPods))
+	klog.V(4).InfoS("Found related pods", "kind", rsc.Kind, "object", klog.KObj(rs), "pods", klog.KObjSlice(relatedPods))
 	return relatedPods, nil
 }
 

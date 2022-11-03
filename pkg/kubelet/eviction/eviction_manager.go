@@ -197,7 +197,7 @@ func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePod
 	go func() {
 		for {
 			if evictedPods := m.synchronize(diskInfoProvider, podFunc); evictedPods != nil {
-				klog.InfoS("Eviction manager: pods evicted, waiting for pod to be cleaned up", "pods", klog.KObjs(evictedPods))
+				klog.InfoS("Eviction manager: pods evicted, waiting for pod to be cleaned up", "pods", klog.KObjSlice(evictedPods))
 				m.waitForPodsCleanup(podCleanedUpFunc, evictedPods)
 			} else {
 				time.Sleep(monitoringInterval)
@@ -366,7 +366,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	// rank the running pods for eviction for the specified resource
 	rank(activePods, statsFunc)
 
-	klog.InfoS("Eviction manager: pods ranked for eviction", "pods", klog.KObjs(activePods))
+	klog.InfoS("Eviction manager: pods ranked for eviction", "pods", klog.KObjSlice(activePods))
 
 	//record age of metrics for met thresholds that we are using for evictions.
 	for _, t := range thresholds {
@@ -401,7 +401,7 @@ func (m *managerImpl) waitForPodsCleanup(podCleanedUpFunc PodCleanedUpFunc, pods
 	for {
 		select {
 		case <-timeout.C():
-			klog.InfoS("Eviction manager: timed out waiting for pods to be cleaned up", "pods", klog.KObjs(pods))
+			klog.InfoS("Eviction manager: timed out waiting for pods to be cleaned up", "pods", klog.KObjSlice(pods))
 			return
 		case <-ticker.C():
 			for i, pod := range pods {
@@ -409,7 +409,7 @@ func (m *managerImpl) waitForPodsCleanup(podCleanedUpFunc PodCleanedUpFunc, pods
 					break
 				}
 				if i == len(pods)-1 {
-					klog.InfoS("Eviction manager: pods successfully cleaned up", "pods", klog.KObjs(pods))
+					klog.InfoS("Eviction manager: pods successfully cleaned up", "pods", klog.KObjSlice(pods))
 					return
 				}
 			}
