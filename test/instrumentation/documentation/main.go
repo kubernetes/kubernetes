@@ -25,6 +25,7 @@ import (
 	"text/template"
 	"time"
 
+	flag "github.com/spf13/pflag"
 	"gopkg.in/yaml.v2"
 
 	"k8s.io/component-base/metrics"
@@ -47,9 +48,10 @@ description: >-
   Details of the metric data that Kubernetes components export.
 ---
 
+## Metrics (v{{.GeneratedVersion}})
 
-## Metrics (auto-generated {{.GeneratedDate.Format "2006 Jan 02"}})
-
+<!-- (auto-generated {{.GeneratedDate.Format "2006 Jan 02"}}) -->
+<!-- (auto-generated v{{.GeneratedVersion}}) -->
 This page details the metrics that different Kubernetes components export. You can query the metrics endpoint for these 
 components using an HTTP scrape, and fetch the current metrics data in Prometheus format.
 
@@ -64,6 +66,7 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 		<th class="metric_help">Help</th>
 		<th class="metric_labels">Labels</th>
 		<th class="metric_const_labels">Const Labels</th>
+		<th class="metric_deprecated_version">Deprecated Version</th>
 	</tr>
 </thead>
 <tbody>
@@ -72,8 +75,9 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_stability_level" data-stability="{{$metric.StabilityLevel | ToLower}}">{{$metric.StabilityLevel}}</td>
 <td class="metric_type" data-type="{{$metric.Type | ToLower}}">{{$metric.Type}}</td>
 <td class="metric_description">{{$metric.Help}}</td>
-{{if not $metric.Labels }}<td class="metric_labels_varying">None</td>{{else }}<td class="metric_labels_varying">{{range $label := $metric.Labels}}<div class="metric_label">{{$label}}</div>{{end}}</td>{{end}}
-{{if not $metric.ConstLabels }}<td class="metric_labels_constant">None</td>{{else }}<td class="metric_labels_constant">{{$metric.ConstLabels}}</td>{{end}}</tr>{{end}}
+{{if not $metric.Labels }}<td class="metric_labels_varying"></td>{{else }}<td class="metric_labels_varying">{{range $label := $metric.Labels}}<div class="metric_label">{{$label}}</div>{{end}}</td>{{end}}
+{{if not $metric.ConstLabels }}<td class="metric_labels_constant"></td>{{else }}<td class="metric_labels_constant">{{range $key, $value := $metric.ConstLabels}}<div class="metric_label">{{$key}}:{{$value}}</div>{{end}}</td>{{end}}
+{{if not $metric.DeprecatedVersion }}<td class="metric_deprecated_version"></td>{{else }}<td class="metric_deprecated_version">{{$metric.DeprecatedVersion}}</td>{{end}}</tr>{{end}}
 </tbody>
 </table>
 
@@ -88,6 +92,7 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 		<th class="metric_help">Help</th>
 		<th class="metric_labels">Labels</th>
 		<th class="metric_const_labels">Const Labels</th>
+		<th class="metric_deprecated_version">Deprecated Version</th>
 	</tr>
 </thead>
 <tbody>
@@ -96,20 +101,28 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_stability_level" data-stability="{{$metric.StabilityLevel | ToLower}}">{{$metric.StabilityLevel}}</td>
 <td class="metric_type" data-type="{{$metric.Type | ToLower}}">{{$metric.Type}}</td>
 <td class="metric_description">{{$metric.Help}}</td>
-{{if not $metric.Labels }}<td class="metric_labels_varying">None</td>{{else }}<td class="metric_labels_varying">{{range $label := $metric.Labels}}<div class="metric_label">{{$label}}</div>{{end}}</td>{{end}}
-{{if not $metric.ConstLabels }}<td class="metric_labels_constant">None</td>{{else }}<td class="metric_labels_constant">{{$metric.ConstLabels}}</td>{{end}}</tr>{{end}}
+{{if not $metric.Labels }}<td class="metric_labels_varying"></td>{{else }}<td class="metric_labels_varying">{{range $label := $metric.Labels}}<div class="metric_label">{{$label}}</div>{{end}}</td>{{end}}
+{{if not $metric.ConstLabels }}<td class="metric_labels_constant"></td>{{else }}<td class="metric_labels_constant">{{range $key, $value := $metric.ConstLabels}}<div class="metric_label">{{$key}}:{{$value}}</div>{{end}}</td>{{end}}
+{{if not $metric.DeprecatedVersion }}<td class="metric_deprecated_version"></td>{{else }}<td class="metric_deprecated_version">{{$metric.DeprecatedVersion}}</td>{{end}}</tr>{{end}}
 </tbody>
 </table>
 `
 )
 
 type templateData struct {
-	AlphaMetrics  []metric
-	StableMetrics []metric
-	GeneratedDate time.Time
+	AlphaMetrics     []metric
+	StableMetrics    []metric
+	GeneratedDate    time.Time
+	GeneratedVersion string
 }
 
 func main() {
+	var major string
+	var minor string
+	flag.StringVar(&major, "major", "", "k8s major version")
+	flag.StringVar(&minor, "minor", "", "k8s minor version")
+	println(major, minor)
+	flag.Parse()
 	dat, err := os.ReadFile("test/instrumentation/documentation/documentation-list.yaml")
 	if err == nil {
 		var parsedMetrics []metric
@@ -131,9 +144,10 @@ func main() {
 		}
 		sortedMetrics := byStabilityLevel(parsedMetrics)
 		data := templateData{
-			AlphaMetrics:  sortedMetrics["ALPHA"],
-			StableMetrics: sortedMetrics["STABLE"],
-			GeneratedDate: time.Now(),
+			AlphaMetrics:     sortedMetrics["ALPHA"],
+			StableMetrics:    sortedMetrics["STABLE"],
+			GeneratedDate:    time.Now(),
+			GeneratedVersion: fmt.Sprintf("%v.%v", major, parseMinor(minor)),
 		}
 		err = t.Execute(&tpl, data)
 		if err != nil {
@@ -191,4 +205,8 @@ func byStabilityLevel(ms []metric) map[string][]metric {
 		res[m.StabilityLevel] = append(res[m.StabilityLevel], m)
 	}
 	return res
+}
+
+func parseMinor(m string) string {
+	return strings.Trim(m, `+`)
 }

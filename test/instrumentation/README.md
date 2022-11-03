@@ -37,3 +37,16 @@ To update the documented list of metrics for k8s/website, please run:
 ```console
 ./test/instrumentation/update-documentation.sh
 ```
+
+Then you need to copy the output to the appropriate website directory. Please
+define the directory in which the website repo lives in an env variable like so:
+
+```shell
+export WEBSITE_ROOT=<path to website root>
+```
+
+And then from the root of the k8s/k8s repository, please run this command:
+
+```shell
+cp ./test/instrumentation/documentation/documentation.md $WEBSITE_ROOT/content/en/docs/reference/instrumentation/metrics.md
+```

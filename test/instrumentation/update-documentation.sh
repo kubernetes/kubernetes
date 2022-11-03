@@ -24,6 +24,12 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/test/instrumentation/stability-utils.sh"
+source "${KUBE_ROOT}/hack/lib/version.sh"
 
+# extract version env variables so we can pass them in
+kube::version::get_version_vars
+
+# update the documented list of metrics
 kube::update::documentation::list
-kube::update::documentation
+# now write the actual documentation file
+kube::update::documentation $KUBE_GIT_MAJOR $KUBE_GIT_MINOR

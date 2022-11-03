@@ -287,31 +287,11 @@ func (c *metricDecoder) decodeMetricVecForTimingRatioHistogram(call *ast.CallExp
 func (c *metricDecoder) decodeLabelsFromArray(exprs []ast.Expr) ([]string, error) {
 	retval := []string{}
 	for _, e := range exprs {
-		id, ok := e.(*ast.Ident)
-		if !ok {
-			if bl, ok := e.(*ast.BasicLit); ok {
-				v, err := stringValue(bl)
-				if err != nil {
-					return nil, err
-				}
-				retval = append(retval, v)
-				continue
-			}
-			return nil, newDecodeErrorf(e, errInvalidNewMetricCall)
+		v, err := c.decodeString(e)
+		if err != nil || v == nil {
+			return nil, newDecodeErrorf(e, errNonStringAttribute)
 		}
-		variableExpr, found := c.variables[id.Name]
-		if !found {
-			return nil, newDecodeErrorf(e, "couldn't find variable for labels")
-		}
-		bl, ok := variableExpr.(*ast.BasicLit)
-		if !ok {
-			return nil, newDecodeErrorf(e, "couldn't interpret variable for labels")
-		}
-		v, err := stringValue(bl)
-		if err != nil {
-			return nil, err
-		}
-		retval = append(retval, v)
+		retval = append(retval, *v)
 	}
 
 	return retval, nil
@@ -652,9 +632,7 @@ func (c *metricDecoder) decodeInt64(expr ast.Expr) (int64, error) {
 					return i, err2
 				}
 			}
-
 		}
-
 	case *ast.CallExpr:
 		_, ok := v.Fun.(*ast.SelectorExpr)
 		if !ok {
