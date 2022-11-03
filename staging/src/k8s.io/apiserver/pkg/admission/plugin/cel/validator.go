@@ -63,18 +63,18 @@ type CELValidatorCompiler struct {
 }
 
 // DefinitionMatches returns whether this ValidatingAdmissionPolicy matches the provided admission resource request
-func (c *CELValidatorCompiler) DefinitionMatches(definition *v1alpha1.ValidatingAdmissionPolicy, a admission.Attributes, o admission.ObjectInterfaces) (bool, error) {
+func (c *CELValidatorCompiler) DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicy) (bool, error) {
 	criteria := matchCriteria{constraints: definition.Spec.MatchConstraints}
-	return c.Matcher.Matches(&criteria, a, o)
+	return c.Matcher.Matches(a, o, &criteria)
 }
 
 // BindingMatches returns whether this ValidatingAdmissionPolicyBinding matches the provided admission resource request
-func (c *CELValidatorCompiler) BindingMatches(binding *v1alpha1.ValidatingAdmissionPolicyBinding, a admission.Attributes, o admission.ObjectInterfaces) (bool, error) {
+func (c *CELValidatorCompiler) BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, binding *v1alpha1.ValidatingAdmissionPolicyBinding) (bool, error) {
 	if binding.Spec.MatchResources == nil {
 		return true, nil
 	}
 	criteria := matchCriteria{constraints: binding.Spec.MatchResources}
-	return c.Matcher.Matches(&criteria, a, o)
+	return c.Matcher.Matches(a, o, &criteria)
 }
 
 // ValidateInitialization checks if Matcher is initialized.

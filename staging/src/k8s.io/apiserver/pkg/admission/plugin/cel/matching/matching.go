@@ -63,7 +63,7 @@ func (m *Matcher) ValidateInitialization() error {
 	return nil
 }
 
-func (m *Matcher) Matches(criteria MatchCriteria, attr admission.Attributes, o admission.ObjectInterfaces) (bool, error) {
+func (m *Matcher) Matches(attr admission.Attributes, o admission.ObjectInterfaces, criteria MatchCriteria) (bool, error) {
 	matches, err := m.namespaceMatcher.MatchNamespaceSelector(criteria, attr)
 	if err != nil {
 		return false, err

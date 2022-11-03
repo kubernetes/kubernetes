@@ -18,9 +18,10 @@ package matching
 
 import (
 	"fmt"
-	v1 "k8s.io/api/admissionregistration/v1"
 	"strings"
 	"testing"
+
+	v1 "k8s.io/api/admissionregistration/v1"
 
 	"k8s.io/api/admissionregistration/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -427,7 +428,7 @@ func TestMatcher(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			matches, err := a.Matches(&fakeCriteria{matchResources: *testcase.criteria}, testcase.attrs, interfaces)
+			matches, err := a.Matches(testcase.attrs, interfaces, &fakeCriteria{matchResources: *testcase.criteria})
 			if err != nil {
 				if len(testcase.expectErr) == 0 {
 					t.Fatal(err)
@@ -531,7 +532,7 @@ func BenchmarkMatcher(b *testing.B) {
 	matcher := &Matcher{namespaceMatcher: &namespace.Matcher{NamespaceLister: namespaceLister}, objectMatcher: &object.Matcher{}}
 
 	for i := 0; i < b.N; i++ {
-		matcher.Matches(criteria, attrs, interfaces)
+		matcher.Matches(attrs, interfaces, criteria)
 	}
 }
 
@@ -601,7 +602,7 @@ func BenchmarkShouldCallHookWithComplexRule(b *testing.B) {
 	matcher := &Matcher{namespaceMatcher: &namespace.Matcher{NamespaceLister: namespaceLister}, objectMatcher: &object.Matcher{}}
 
 	for i := 0; i < b.N; i++ {
-		matcher.Matches(criteria, attrs, interfaces)
+		matcher.Matches(attrs, interfaces, criteria)
 	}
 }
 
@@ -676,6 +677,6 @@ func BenchmarkShouldCallHookWithComplexSelectorAndRule(b *testing.B) {
 	matcher := &Matcher{namespaceMatcher: &namespace.Matcher{NamespaceLister: namespaceLister}, objectMatcher: &object.Matcher{}}
 
 	for i := 0; i < b.N; i++ {
-		matcher.Matches(criteria, attrs, interfaces)
+		matcher.Matches(attrs, interfaces, criteria)
 	}
 }

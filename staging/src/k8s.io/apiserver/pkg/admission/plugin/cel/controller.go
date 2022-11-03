@@ -223,7 +223,7 @@ func (c *celAdmissionController) Validate(
 	}
 	for definitionNamespacedName, definitionInfo := range c.definitionInfo {
 		definition := definitionInfo.lastReconciledValue
-		matches, err := c.validatorCompiler.DefinitionMatches(definition, a, o)
+		matches, err := c.validatorCompiler.DefinitionMatches(a, o, definition)
 		if err != nil {
 			return err
 		}
@@ -246,7 +246,7 @@ func (c *celAdmissionController) Validate(
 			// be a bindingInfo for it
 			bindingInfo := c.bindingInfos[namespacedBindingName]
 			binding := bindingInfo.lastReconciledValue
-			matches, err := c.validatorCompiler.BindingMatches(binding, a, o)
+			matches, err := c.validatorCompiler.BindingMatches(a, o, binding)
 			if err != nil {
 				return err
 			}

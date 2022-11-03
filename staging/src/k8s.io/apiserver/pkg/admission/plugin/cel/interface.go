@@ -32,11 +32,11 @@ type Validator interface {
 type ValidatorCompiler interface {
 	// Matches says whether this policy definition matches the provided admission
 	// resource request
-	DefinitionMatches(definition *v1alpha1.ValidatingAdmissionPolicy, a admission.Attributes, o admission.ObjectInterfaces) (bool, error)
+	DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicy) (bool, error)
 
 	// Matches says whether this policy definition matches the provided admission
 	// resource request
-	BindingMatches(definition *v1alpha1.ValidatingAdmissionPolicyBinding, a admission.Attributes, o admission.ObjectInterfaces) (bool, error)
+	BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicyBinding) (bool, error)
 
 	// Compile is used for the cel expression compilation
 	Compile(

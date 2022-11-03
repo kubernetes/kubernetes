@@ -152,7 +152,7 @@ func (f *fakeCompiler) HasSynced() bool {
 
 // Matches says whether this policy definition matches the provided admission
 // resource request
-func (f *fakeCompiler) DefinitionMatches(definition *v1alpha1.ValidatingAdmissionPolicy, a admission.Attributes, o admission.ObjectInterfaces) (bool, error) {
+func (f *fakeCompiler) DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicy) (bool, error) {
 	namespace, name := definition.Namespace, definition.Name
 	key := namespace + "/" + name
 	if fun, ok := f.DefinitionMatchFuncs[key]; ok {
@@ -165,7 +165,7 @@ func (f *fakeCompiler) DefinitionMatches(definition *v1alpha1.ValidatingAdmissio
 
 // Matches says whether this policy definition matches the provided admission
 // resource request
-func (f *fakeCompiler) BindingMatches(binding *v1alpha1.ValidatingAdmissionPolicyBinding, a admission.Attributes, o admission.ObjectInterfaces) (bool, error) {
+func (f *fakeCompiler) BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, binding *v1alpha1.ValidatingAdmissionPolicyBinding) (bool, error) {
 	namespace, name := binding.Namespace, binding.Name
 	key := namespace + "/" + name
 	if fun, ok := f.BindingMatchFuncs[key]; ok {
