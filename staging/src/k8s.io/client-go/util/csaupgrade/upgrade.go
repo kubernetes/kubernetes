@@ -26,9 +26,7 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
-const csaAnnotationName = "kubectl.kubernetes.io/last-applied-configuration"
 
-var csaAnnotationFieldSet = fieldpath.NewSet(fieldpath.MakePathOrDie("metadata", "annotations", csaAnnotationName))
 
 // Upgrades the Manager information for fields managed with client-side-apply (CSA)
 // Prepares fields owned by `csaManager` for 'Update' operations for use now
@@ -107,12 +105,8 @@ func UpgradeManagedFields(
 			entry.Subresource == "")
 	})
 
-	// Wipe out last-applied-configuration annotation if it exists
-	annotations := accessor.GetAnnotations()
-	delete(annotations, csaAnnotationName)
 
 	// Commit changes to object
-	accessor.SetAnnotations(annotations)
 	accessor.SetManagedFields(filteredManagers)
 
 	return nil
@@ -153,10 +147,6 @@ func unionManagerIntoIndex(entries []metav1.ManagedFieldsEntry, targetIndex int,
 
 		combinedFieldSet = combinedFieldSet.Union(&csaFieldSet)
 	}
-
-	// Ensure that the resultant fieldset does not include the
-	// last applied annotation
-	combinedFieldSet = combinedFieldSet.Difference(csaAnnotationFieldSet)
 
 	// Encode the fields back to the serialized format
 	err = encodeManagedFieldsEntrySet(&entries[targetIndex], *combinedFieldSet)
