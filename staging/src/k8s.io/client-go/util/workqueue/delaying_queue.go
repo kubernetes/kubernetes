@@ -31,6 +31,9 @@ type DelayingInterface interface {
 	Interface
 	// AddAfter adds an item to the workqueue after the indicated duration has passed
 	AddAfter(item interface{}, duration time.Duration)
+	// ForgetDelayed removes an item that is waiting to be added to workqueue
+	// after previously specified delay by AddAfter
+	ForgetDelayed(item interface{})
 }
 
 // NewDelayingQueue constructs a new workqueue with delayed queuing ability.
@@ -59,12 +62,12 @@ func NewDelayingQueueWithCustomClock(clock clock.WithTicker, name string) Delayi
 
 func newDelayingQueue(clock clock.WithTicker, q Interface, name string) *delayingType {
 	ret := &delayingType{
-		Interface:       q,
-		clock:           clock,
-		heartbeat:       clock.NewTicker(maxWait),
-		stopCh:          make(chan struct{}),
-		waitingForAddCh: make(chan *waitFor, 1000),
-		metrics:         newRetryMetrics(name),
+		Interface:    q,
+		clock:        clock,
+		heartbeat:    clock.NewTicker(maxWait),
+		stopCh:       make(chan struct{}),
+		waitingForCh: make(chan *waitFor, 1000),
+		metrics:      newRetryMetrics(name),
 	}
 
 	go ret.waitingLoop()
@@ -86,8 +89,8 @@ type delayingType struct {
 	// heartbeat ensures we wait no more than maxWait before firing
 	heartbeat clock.Ticker
 
-	// waitingForAddCh is a buffered channel that feeds waitingForAdd
-	waitingForAddCh chan *waitFor
+	// waitingForCh is a buffered channel that feeds waitFor to the waiting loop
+	waitingForCh chan *waitFor
 
 	// metrics counts the number of retries
 	metrics retryMetrics
@@ -98,7 +101,8 @@ type waitFor struct {
 	data    t
 	readyAt time.Time
 	// index in the priority queue (heap)
-	index int
+	index  int
+	forget bool
 }
 
 // waitForPriorityQueue implements a priority queue for waitFor items.
@@ -176,7 +180,22 @@ func (q *delayingType) AddAfter(item interface{}, duration time.Duration) {
 	select {
 	case <-q.stopCh:
 		// unblock if ShutDown() is called
-	case q.waitingForAddCh <- &waitFor{data: item, readyAt: q.clock.Now().Add(duration)}:
+	case q.waitingForCh <- &waitFor{data: item, readyAt: q.clock.Now().Add(duration)}:
+	}
+}
+
+// ForgetDelayed removes an item that is waiting to be added to workqueue
+// after previously given delay by AddAfter
+func (q *delayingType) ForgetDelayed(item interface{}) {
+	// don't continue if we're already shutting down
+	if q.ShuttingDown() {
+		return
+	}
+
+	select {
+	case <-q.stopCh:
+		// unblock if ShutDown() is called
+	case q.waitingForCh <- &waitFor{data: item, forget: true}:
 	}
 }
 
@@ -240,8 +259,10 @@ func (q *delayingType) waitingLoop() {
 		case <-nextReadyAt:
 			// continue the loop, which will add ready items
 
-		case waitEntry := <-q.waitingForAddCh:
-			if waitEntry.readyAt.After(q.clock.Now()) {
+		case waitEntry := <-q.waitingForCh:
+			if waitEntry.forget {
+				forget(waitingForQueue, waitingEntryByData, waitEntry)
+			} else if waitEntry.readyAt.After(q.clock.Now()) {
 				insert(waitingForQueue, waitingEntryByData, waitEntry)
 			} else {
 				q.Add(waitEntry.data)
@@ -250,8 +271,10 @@ func (q *delayingType) waitingLoop() {
 			drained := false
 			for !drained {
 				select {
-				case waitEntry := <-q.waitingForAddCh:
-					if waitEntry.readyAt.After(q.clock.Now()) {
+				case waitEntry := <-q.waitingForCh:
+					if waitEntry.forget {
+						forget(waitingForQueue, waitingEntryByData, waitEntry)
+					} else if waitEntry.readyAt.After(q.clock.Now()) {
 						insert(waitingForQueue, waitingEntryByData, waitEntry)
 					} else {
 						q.Add(waitEntry.data)
@@ -279,4 +302,13 @@ func insert(q *waitForPriorityQueue, knownEntries map[t]*waitFor, entry *waitFor
 
 	heap.Push(q, entry)
 	knownEntries[entry.data] = entry
+}
+
+// forget removes the entry from the priority queue
+func forget(q *waitForPriorityQueue, knownEntries map[t]*waitFor, entry *waitFor) {
+	existing, exists := knownEntries[entry.data]
+	if exists {
+		heap.Remove(q, existing.index)
+		delete(knownEntries, entry.data)
+	}
 }

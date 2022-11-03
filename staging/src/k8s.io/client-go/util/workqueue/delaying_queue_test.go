@@ -212,6 +212,87 @@ func TestCopyShifting(t *testing.T) {
 	}
 }
 
+func TestRemoval(t *testing.T) {
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	q := NewDelayingQueueWithCustomClock(fakeClock, "")
+
+	first := "foo"
+	second := "bar"
+	third := "baz"
+
+	q.AddAfter(first, 1*time.Second)
+	q.AddAfter(second, 500*time.Millisecond)
+	q.AddAfter(third, 250*time.Millisecond)
+	if err := waitForWaitingQueueToFill(q); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	if q.Len() != 0 {
+		t.Errorf("should not have added")
+	}
+
+	q.ForgetDelayed(second)
+
+	fakeClock.Step(300 * time.Millisecond)
+	if err := waitForAdded(q, 1); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	actualFirst, _ := q.Get()
+	q.Done(actualFirst)
+	if !reflect.DeepEqual(actualFirst, third) {
+		t.Errorf("expected %v, got %v", third, actualFirst)
+	}
+
+	fakeClock.Step(2 * time.Second)
+	if err := waitForAdded(q, 1); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	actualSecond, _ := q.Get()
+	q.Done(actualSecond)
+	if !reflect.DeepEqual(actualSecond, first) {
+		t.Errorf("expected %v, got %v", first, actualSecond)
+	}
+
+	if q.Len() != 0 {
+		t.Errorf("should not have added")
+	}
+
+	// add again
+	q.AddAfter(first, 1*time.Second)
+	q.AddAfter(second, 500*time.Millisecond)
+	q.AddAfter(third, 250*time.Millisecond)
+	if err := waitForWaitingQueueToFill(q); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	if q.Len() != 0 {
+		t.Errorf("should not have added")
+	}
+
+	q.ForgetDelayed(third)
+
+	fakeClock.Step(2 * time.Second)
+
+	if err := waitForAdded(q, 2); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	actualFirst, _ = q.Get()
+	q.Done(actualFirst)
+	if !reflect.DeepEqual(actualFirst, second) {
+		t.Errorf("expected %v, got %v", second, actualFirst)
+	}
+	actualSecond, _ = q.Get()
+	q.Done(actualSecond)
+	if !reflect.DeepEqual(actualSecond, first) {
+		t.Errorf("expected %v, got %v", first, actualSecond)
+	}
+
+	if q.Len() != 0 {
+		t.Errorf("should not have added")
+	}
+}
+
 func BenchmarkDelayingQueue_AddAfter(b *testing.B) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	q := NewDelayingQueueWithCustomClock(fakeClock, "")
@@ -241,7 +322,7 @@ func waitForAdded(q DelayingInterface, depth int) error {
 
 func waitForWaitingQueueToFill(q DelayingInterface) error {
 	return wait.Poll(1*time.Millisecond, 10*time.Second, func() (done bool, err error) {
-		if len(q.(*delayingType).waitingForAddCh) == 0 {
+		if len(q.(*delayingType).waitingForCh) == 0 {
 			return true, nil
 		}
 

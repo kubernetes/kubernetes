@@ -28,22 +28,22 @@ func TestRateLimitingQueue(t *testing.T) {
 	queue := NewRateLimitingQueue(limiter).(*rateLimitingType)
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	delayingQueue := &delayingType{
-		Interface:       New(),
-		clock:           fakeClock,
-		heartbeat:       fakeClock.NewTicker(maxWait),
-		stopCh:          make(chan struct{}),
-		waitingForAddCh: make(chan *waitFor, 1000),
-		metrics:         newRetryMetrics(""),
+		Interface:    New(),
+		clock:        fakeClock,
+		heartbeat:    fakeClock.NewTicker(maxWait),
+		stopCh:       make(chan struct{}),
+		waitingForCh: make(chan *waitFor, 1000),
+		metrics:      newRetryMetrics(""),
 	}
 	queue.DelayingInterface = delayingQueue
 
 	queue.AddRateLimited("one")
-	waitEntry := <-delayingQueue.waitingForAddCh
+	waitEntry := <-delayingQueue.waitingForCh
 	if e, a := 1*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	queue.AddRateLimited("one")
-	waitEntry = <-delayingQueue.waitingForAddCh
+	waitEntry = <-delayingQueue.waitingForCh
 	if e, a := 2*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
@@ -52,12 +52,12 @@ func TestRateLimitingQueue(t *testing.T) {
 	}
 
 	queue.AddRateLimited("two")
-	waitEntry = <-delayingQueue.waitingForAddCh
+	waitEntry = <-delayingQueue.waitingForCh
 	if e, a := 1*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	queue.AddRateLimited("two")
-	waitEntry = <-delayingQueue.waitingForAddCh
+	waitEntry = <-delayingQueue.waitingForCh
 	if e, a := 2*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
@@ -67,7 +67,7 @@ func TestRateLimitingQueue(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	queue.AddRateLimited("one")
-	waitEntry = <-delayingQueue.waitingForAddCh
+	waitEntry = <-delayingQueue.waitingForCh
 	if e, a := 1*time.Millisecond, waitEntry.readyAt.Sub(fakeClock.Now()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
