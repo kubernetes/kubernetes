@@ -66,7 +66,7 @@ func (p *policyError) Status() metav1.Status {
 		bindingName = deniedDecision.binding.Name
 		message = fmt.Sprintf("ValidatingAdmissionPolicy '%s' with binding '%s' denied request: %s", deniedDecision.definition.Name, bindingName, deniedDecision.message)
 	} else {
-		message = fmt.Sprintf("ValidatingAdmissionPolicy '%s' '%s' denied request: %s", deniedDecision.definition.Name, bindingName, deniedDecision.message)
+		message = fmt.Sprintf("ValidatingAdmissionPolicy '%s' denied request: %s", deniedDecision.definition.Name, deniedDecision.message)
 	}
 
 	return metav1.Status{
