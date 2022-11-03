@@ -42,7 +42,7 @@ discovery:
 controlPlane:
   certificateKey: c39a18bae4a72e71b178661f437363da218a3efb83ddb03f1cd91d9ae1da41bd
 nodeRegistration:
-  criSocket: /run/containerd/containerd.sock
+  criSocket: unix:///var/run/containerd/containerd.sock
   name: someName
   ignorePreflightErrors:
     - c

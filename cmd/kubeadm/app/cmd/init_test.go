@@ -36,7 +36,7 @@ localAPIEndpoint:
 bootstrapTokens:
 - token: "abcdef.0123456789abcdef"
 nodeRegistration:
-  criSocket: /run/containerd/containerd.sock
+  criSocket: unix:///var/run/containerd/containerd.sock
   name: someName
   ignorePreflightErrors:
     - c
