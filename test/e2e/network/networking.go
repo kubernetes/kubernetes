@@ -29,10 +29,12 @@ import (
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/network/common"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -631,5 +633,36 @@ var _ = common.SIGDescribe("Networking", func() {
 			e2essh.LogResult(result)
 		}
 		framework.ExpectNoError(err, "kubelet did not recreate its iptables rules")
+	})
+
+	ginkgo.It("should allow creating a Pod with an SCTP HostPort [LinuxOnly]", func(ctx context.Context) {
+		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
+		hostExec := utils.NewHostExec(f)
+		ginkgo.DeferCleanup(hostExec.Cleanup)
+
+		ginkgo.By("getting the state of the sctp module on the selected node")
+		nodes := &v1.NodeList{}
+		nodes.Items = append(nodes.Items, *node)
+		sctpLoadedAtStart := CheckSCTPModuleLoadedOnNodes(f, nodes)
+
+		ginkgo.By("creating a pod with hostport on the selected node")
+		podName := "hostport"
+		ports := []v1.ContainerPort{{Protocol: v1.ProtocolSCTP, ContainerPort: 5060, HostPort: 5060}}
+		podSpec := e2epod.NewAgnhostPod(f.Namespace.Name, podName, nil, nil, ports)
+		nodeSelection := e2epod.NodeSelection{Name: node.Name}
+		e2epod.SetNodeSelection(&podSpec.Spec, nodeSelection)
+
+		ginkgo.By(fmt.Sprintf("Launching the pod on node %v", node.Name))
+		e2epod.NewPodClient(f).CreateSync(podSpec)
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, podName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", podName, f.Namespace.Name)
+		})
+		ginkgo.By("validating sctp module is still not loaded")
+		sctpLoadedAtEnd := CheckSCTPModuleLoadedOnNodes(f, nodes)
+		if !sctpLoadedAtStart && sctpLoadedAtEnd {
+			framework.Failf("The state of the sctp module has changed due to the test case")
+		}
 	})
 })
