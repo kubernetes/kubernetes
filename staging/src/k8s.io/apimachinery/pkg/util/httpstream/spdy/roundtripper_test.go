@@ -323,7 +323,9 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 				t.Fatalf("error creating request: %s", err)
 			}
 
-			spdyTransport := NewRoundTripper(testCase.clientTLS)
+			tr := server.Client().Transport.(*http.Transport).Clone()
+			tr.TLSClientConfig = testCase.clientTLS
+			spdyTransport := NewRoundTripper(tr)
 
 			var proxierCalled bool
 			var proxyCalledWithHost string
@@ -343,7 +345,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 
 				proxy := testCase.proxyServerFunc(proxyHandler)
 
-				spdyTransport.proxier = func(proxierReq *http.Request) (*url.URL, error) {
+				tr.Proxy = func(proxierReq *http.Request) (*url.URL, error) {
 					proxierCalled = true
 					proxyURL, err := url.Parse(proxy.URL)
 					if err != nil {
@@ -542,7 +544,9 @@ func TestRoundTripSocks5AndNewConnection(t *testing.T) {
 				t.Fatalf("error creating request: %s", err)
 			}
 
-			spdyTransport := NewRoundTripper(testCase.clientTLS)
+			tr := server.Client().Transport.(*http.Transport).Clone()
+			tr.TLSClientConfig = testCase.clientTLS
+			spdyTransport := NewRoundTripper(tr)
 			var proxierCalled bool
 			var proxyCalledWithHost string
 
@@ -594,7 +598,7 @@ func TestRoundTripSocks5AndNewConnection(t *testing.T) {
 					t.Errorf("ServeConn error: %s", err)
 				}
 			}(testCase.shouldError)
-			spdyTransport.proxier = func(proxierReq *http.Request) (*url.URL, error) {
+			tr.Proxy = func(proxierReq *http.Request) (*url.URL, error) {
 				proxierCalled = true
 				return &url.URL{
 					Scheme: "socks5",
@@ -702,9 +706,9 @@ func TestRoundTripPassesContextToDialer(t *testing.T) {
 			cancel()
 			req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 			require.NoError(t, err)
-			spdyTransport := NewRoundTripper(&tls.Config{})
-			_, err = spdyTransport.Dial(req)
-			assert.EqualError(t, err, "dial tcp 127.0.0.1:1233: operation was canceled")
+			spdyTransport := NewRoundTripper(http.DefaultTransport)
+			_, err = spdyTransport.RoundTrip(req)
+			assert.EqualError(t, err, "context canceled")
 		})
 	}
 }

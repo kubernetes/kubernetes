@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -968,10 +967,6 @@ func TestServeExecInContainerIdleTimeout(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	upgradeRoundTripper.Dialer = &net.Dialer{
-		Deadline: time.Now().Add(60 * time.Second),
-		Timeout:  60 * time.Second,
-	}
 	conn, err := upgradeRoundTripper.NewConnection(resp)
 	if err != nil {
 		t.Fatalf("Unexpected error creating streaming connection: %s", err)
@@ -1121,9 +1116,6 @@ func testExecAttach(t *testing.T, verb string) {
 			resp, err = c.Do(makeReq(t, "POST", url, "v4.channel.k8s.io"))
 			require.NoError(t, err, "POSTing")
 			defer resp.Body.Close()
-
-			_, err = io.ReadAll(resp.Body)
-			assert.NoError(t, err, "reading response body")
 
 			require.Equal(t, test.responseStatusCode, resp.StatusCode, "response status")
 			if test.responseStatusCode != http.StatusSwitchingProtocols {

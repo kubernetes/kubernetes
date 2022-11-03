@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"time"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
@@ -35,19 +34,12 @@ type Upgrader interface {
 
 // RoundTripperFor returns a round tripper and upgrader to use with SPDY.
 func RoundTripperFor(config *restclient.Config) (http.RoundTripper, Upgrader, error) {
-	tlsConfig, err := restclient.TLSConfigFor(config)
+	tr, err := restclient.TransportFor(config)
 	if err != nil {
 		return nil, nil, err
 	}
-	proxy := http.ProxyFromEnvironment
-	if config.Proxy != nil {
-		proxy = config.Proxy
-	}
-	upgradeRoundTripper := spdy.NewRoundTripperWithConfig(spdy.RoundTripperConfig{
-		TLS:        tlsConfig,
-		Proxier:    proxy,
-		PingPeriod: time.Second * 5,
-	})
+
+	upgradeRoundTripper := spdy.NewRoundTripper(tr)
 	wrapper, err := restclient.HTTPWrappersForConfig(config, upgradeRoundTripper)
 	if err != nil {
 		return nil, nil, err
@@ -94,7 +86,6 @@ func Negotiate(upgrader Upgrader, client *http.Client, req *http.Request, protoc
 	if err != nil {
 		return nil, "", fmt.Errorf("error sending request: %v", err)
 	}
-	defer resp.Body.Close()
 	conn, err := upgrader.NewConnection(resp)
 	if err != nil {
 		return nil, "", err
