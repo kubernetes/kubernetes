@@ -37,8 +37,13 @@ func PrintModelDescription(
 	recursive bool,
 	outputFormat string,
 ) error {
+	generator := NewGenerator()
+	if err := registerBuiltinTemplates(generator); err != nil {
+		return fmt.Errorf("error parsing builtin templates. Please file a bug on GitHub: %w", err)
+	}
+
 	return printModelDescriptionWithGenerator(
-		NewGenerator(), fieldsPath, w, client, gvr, recursive, outputFormat)
+		generator, fieldsPath, w, client, gvr, recursive, outputFormat)
 }
 
 // Factored out for testability
