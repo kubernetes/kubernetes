@@ -40,9 +40,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against pod disruption budgets.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &policyapi.PodDisruptionBudget{} },
-		NewListFunc:              func() runtime.Object { return &policyapi.PodDisruptionBudgetList{} },
-		DefaultQualifiedResource: policyapi.Resource("poddisruptionbudgets"),
+		NewFunc:                   func() runtime.Object { return &policyapi.PodDisruptionBudget{} },
+		NewListFunc:               func() runtime.Object { return &policyapi.PodDisruptionBudgetList{} },
+		DefaultQualifiedResource:  policyapi.Resource("poddisruptionbudgets"),
+		SingularQualifiedResource: policyapi.Resource("poddisruptionbudget"),
 
 		CreateStrategy:      poddisruptionbudget.Strategy,
 		UpdateStrategy:      poddisruptionbudget.Strategy,
@@ -65,13 +66,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"pdb"}
-}
-
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "poddisruptionbudget"
 }
 
 // StatusREST implements the REST endpoint for changing the status of an podDisruptionBudget.
@@ -109,4 +103,10 @@ func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 
 func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	return r.store.ConvertToTable(ctx, object, tableOptions)
+}
+
+var _ rest.SingularNameProvider = &StatusREST{}
+
+func (r *StatusREST) GetSingularName() string {
+	return r.store.GetSingularName()
 }

@@ -198,14 +198,6 @@ func TestShortNames(t *testing.T) {
 	registrytest.AssertShortNames(t, storage, expected)
 }
 
-func TestSingularName(t *testing.T) {
-	storage, _, server := newStorage(t)
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-	expected := "networkpolicy"
-	registrytest.AssertSingularName(t, storage, expected)
-}
-
 func TestStatusUpdate(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NetworkPolicyStatus, true)()
 	storage, statusStorage, server := newStorage(t)

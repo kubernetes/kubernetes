@@ -40,9 +40,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against replication controllers.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &networking.Ingress{} },
-		NewListFunc:              func() runtime.Object { return &networking.IngressList{} },
-		DefaultQualifiedResource: networking.Resource("ingresses"),
+		NewFunc:                   func() runtime.Object { return &networking.Ingress{} },
+		NewListFunc:               func() runtime.Object { return &networking.IngressList{} },
+		DefaultQualifiedResource:  networking.Resource("ingresses"),
+		SingularQualifiedResource: networking.Resource("ingress"),
 
 		CreateStrategy:      ingress.Strategy,
 		UpdateStrategy:      ingress.Strategy,
@@ -68,13 +69,6 @@ var _ rest.ShortNamesProvider = &REST{}
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"ing"}
-}
-
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "ingress"
 }
 
 // StatusREST implements the REST endpoint for changing the status of an ingress
@@ -112,4 +106,10 @@ func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 
 func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	return r.store.ConvertToTable(ctx, object, tableOptions)
+}
+
+var _ rest.SingularNameProvider = &StatusREST{}
+
+func (r *StatusREST) GetSingularName() string {
+	return r.store.GetSingularName()
 }

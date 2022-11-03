@@ -30,10 +30,11 @@ func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) (*reg
 	strategy := NewStrategy(scheme)
 
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &wardle.Fischer{} },
-		NewListFunc:              func() runtime.Object { return &wardle.FischerList{} },
-		PredicateFunc:            MatchFischer,
-		DefaultQualifiedResource: wardle.Resource("fischers"),
+		NewFunc:                   func() runtime.Object { return &wardle.Fischer{} },
+		NewListFunc:               func() runtime.Object { return &wardle.FischerList{} },
+		PredicateFunc:             MatchFischer,
+		DefaultQualifiedResource:  wardle.Resource("fischers"),
+		SingularQualifiedResource: wardle.Resource("fischer"),
 
 		CreateStrategy: strategy,
 		UpdateStrategy: strategy,

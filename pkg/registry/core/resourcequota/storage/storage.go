@@ -40,9 +40,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against resource quotas.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &api.ResourceQuota{} },
-		NewListFunc:              func() runtime.Object { return &api.ResourceQuotaList{} },
-		DefaultQualifiedResource: api.Resource("resourcequotas"),
+		NewFunc:                   func() runtime.Object { return &api.ResourceQuota{} },
+		NewListFunc:               func() runtime.Object { return &api.ResourceQuotaList{} },
+		DefaultQualifiedResource:  api.Resource("resourcequotas"),
+		SingularQualifiedResource: api.Resource("resourcequota"),
 
 		CreateStrategy:      resourcequota.Strategy,
 		UpdateStrategy:      resourcequota.Strategy,
@@ -70,13 +71,6 @@ var _ rest.ShortNamesProvider = &REST{}
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"quota"}
-}
-
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "resourcequota"
 }
 
 // StatusREST implements the REST endpoint for changing the status of a resourcequota.
@@ -114,4 +108,10 @@ func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 
 func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	return r.store.ConvertToTable(ctx, object, tableOptions)
+}
+
+var _ rest.SingularNameProvider = &StatusREST{}
+
+func (r *StatusREST) GetSingularName() string {
+	return r.store.GetSingularName()
 }

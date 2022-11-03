@@ -86,10 +86,11 @@ func NewREST(
 	proxyTransport http.RoundTripper) (*REST, *StatusREST, *svcreg.ProxyREST, error) {
 
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &api.Service{} },
-		NewListFunc:              func() runtime.Object { return &api.ServiceList{} },
-		DefaultQualifiedResource: api.Resource("services"),
-		ReturnDeletedObject:      true,
+		NewFunc:                   func() runtime.Object { return &api.Service{} },
+		NewListFunc:               func() runtime.Object { return &api.ServiceList{} },
+		DefaultQualifiedResource:  api.Resource("services"),
+		SingularQualifiedResource: api.Resource("service"),
+		ReturnDeletedObject:       true,
 
 		CreateStrategy:      svcreg.Strategy,
 		UpdateStrategy:      svcreg.Strategy,
@@ -153,13 +154,6 @@ func (r *REST) Categories() []string {
 	return []string{"all"}
 }
 
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "service"
-}
-
 // Destroy cleans up everything on shutdown.
 func (r *REST) Destroy() {
 	r.Store.Destroy()
@@ -200,6 +194,12 @@ func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, 
 // GetResetFields implements rest.ResetFieldsStrategy
 func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return r.store.GetResetFields()
+}
+
+var _ rest.SingularNameProvider = &StatusREST{}
+
+func (r *StatusREST) GetSingularName() string {
+	return r.store.GetSingularName()
 }
 
 // We have a lot of functions that take a pair of "before" and "after" or

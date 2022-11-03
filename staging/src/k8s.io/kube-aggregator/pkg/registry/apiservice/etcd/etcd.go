@@ -41,10 +41,11 @@ type REST struct {
 func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) *REST {
 	strategy := apiservice.NewStrategy(scheme)
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &apiregistration.APIService{} },
-		NewListFunc:              func() runtime.Object { return &apiregistration.APIServiceList{} },
-		PredicateFunc:            apiservice.MatchAPIService,
-		DefaultQualifiedResource: apiregistration.Resource("apiservices"),
+		NewFunc:                   func() runtime.Object { return &apiregistration.APIService{} },
+		NewListFunc:               func() runtime.Object { return &apiregistration.APIServiceList{} },
+		PredicateFunc:             apiservice.MatchAPIService,
+		DefaultQualifiedResource:  apiregistration.Resource("apiservices"),
+		SingularQualifiedResource: apiregistration.Resource("apiservice"),
 
 		CreateStrategy:      strategy,
 		UpdateStrategy:      strategy,
@@ -168,4 +169,8 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 // GetResetFields implements rest.ResetFieldsStrategy
 func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return r.store.GetResetFields()
+}
+
+func (r *StatusREST) GetSingularName() string {
+	return r.store.GetSingularName()
 }

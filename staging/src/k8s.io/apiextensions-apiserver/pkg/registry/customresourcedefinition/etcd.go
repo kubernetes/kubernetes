@@ -43,10 +43,11 @@ func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) (*RES
 	strategy := NewStrategy(scheme)
 
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &apiextensions.CustomResourceDefinition{} },
-		NewListFunc:              func() runtime.Object { return &apiextensions.CustomResourceDefinitionList{} },
-		PredicateFunc:            MatchCustomResourceDefinition,
-		DefaultQualifiedResource: apiextensions.Resource("customresourcedefinitions"),
+		NewFunc:                   func() runtime.Object { return &apiextensions.CustomResourceDefinition{} },
+		NewListFunc:               func() runtime.Object { return &apiextensions.CustomResourceDefinitionList{} },
+		PredicateFunc:             MatchCustomResourceDefinition,
+		DefaultQualifiedResource:  apiextensions.Resource("customresourcedefinitions"),
+		SingularQualifiedResource: apiextensions.Resource("customresourcedefinition"),
 
 		CreateStrategy:      strategy,
 		UpdateStrategy:      strategy,
@@ -77,13 +78,6 @@ var _ rest.CategoriesProvider = &REST{}
 // Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
 func (r *REST) Categories() []string {
 	return []string{"api-extensions"}
-}
-
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "customresourcedefinition"
 }
 
 // Delete adds the CRD finalizer to the list
@@ -223,4 +217,10 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 // GetResetFields implements rest.ResetFieldsStrategy
 func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return r.store.GetResetFields()
+}
+
+var _ rest.SingularNameProvider = &StatusREST{}
+
+func (r *StatusREST) GetSingularName() string {
+	return r.store.GetSingularName()
 }

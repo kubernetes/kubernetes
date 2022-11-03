@@ -42,7 +42,8 @@ func NewREST(optsGetter generic.RESTOptionsGetter, ttl uint64) (*REST, error) {
 		TTLFunc: func(runtime.Object, uint64, bool) (uint64, error) {
 			return ttl, nil
 		},
-		DefaultQualifiedResource: api.Resource("events"),
+		DefaultQualifiedResource:  api.Resource("events"),
+		SingularQualifiedResource: api.Resource("event"),
 
 		CreateStrategy: event.Strategy,
 		UpdateStrategy: event.Strategy,
@@ -63,11 +64,4 @@ var _ rest.ShortNamesProvider = &REST{}
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"ev"}
-}
-
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "event"
 }

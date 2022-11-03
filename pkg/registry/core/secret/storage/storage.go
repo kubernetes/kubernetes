@@ -20,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
-	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/printers"
@@ -37,10 +36,11 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against secrets.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &api.Secret{} },
-		NewListFunc:              func() runtime.Object { return &api.SecretList{} },
-		PredicateFunc:            secret.Matcher,
-		DefaultQualifiedResource: api.Resource("secrets"),
+		NewFunc:                   func() runtime.Object { return &api.Secret{} },
+		NewListFunc:               func() runtime.Object { return &api.SecretList{} },
+		PredicateFunc:             secret.Matcher,
+		DefaultQualifiedResource:  api.Resource("secrets"),
+		SingularQualifiedResource: api.Resource("secret"),
 
 		CreateStrategy: secret.Strategy,
 		UpdateStrategy: secret.Strategy,
@@ -57,11 +57,4 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 		return nil, err
 	}
 	return &REST{store}, nil
-}
-
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "secret"
 }

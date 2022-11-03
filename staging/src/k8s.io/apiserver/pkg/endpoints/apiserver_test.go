@@ -372,6 +372,10 @@ func (storage *SimpleRESTStorage) ConvertToTable(ctx context.Context, obj runtim
 	return rest.NewDefaultTableConvertor(schema.GroupResource{Resource: "simple"}).ConvertToTable(ctx, obj, tableOptions)
 }
 
+func (storate *SimpleRESTStorage) GetSingularName() string {
+	return "simple"
+}
+
 func (storage *SimpleRESTStorage) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	result := &genericapitesting.SimpleList{
@@ -575,6 +579,10 @@ func (s *ConnecterRESTStorage) NewConnectOptions() (runtime.Object, bool, string
 	return s.emptyConnectOptions, false, ""
 }
 
+func (s *ConnecterRESTStorage) GetSingularName() string {
+	return "simple"
+}
+
 type MetadataRESTStorage struct {
 	*SimpleRESTStorage
 	types []string
@@ -617,6 +625,10 @@ type GetWithOptionsRootRESTStorage struct {
 	*SimpleTypedStorage
 	optionsReceived runtime.Object
 	takesPath       string
+}
+
+func (r *GetWithOptionsRootRESTStorage) GetSingularName() string {
+	return "simple"
 }
 
 func (r *GetWithOptionsRootRESTStorage) NamespaceScoped() bool {
@@ -685,6 +697,10 @@ func (storage *SimpleTypedStorage) Get(ctx context.Context, id string, options *
 
 func (storage *SimpleTypedStorage) checkContext(ctx context.Context) {
 	storage.actualNamespace, storage.namespacePresent = request.NamespaceFrom(ctx)
+}
+
+func (storage *SimpleTypedStorage) GetSingularName() string {
+	return "simple"
 }
 
 func bodyOrDie(response *http.Response) string {
@@ -821,6 +837,10 @@ func (UnimplementedRESTStorage) New() runtime.Object {
 }
 
 func (UnimplementedRESTStorage) Destroy() {
+}
+
+func (UnimplementedRESTStorage) GetSingularName() string {
+	return ""
 }
 
 // TestUnimplementedRESTStorage ensures that if a rest.Storage does not implement a given
@@ -4287,6 +4307,10 @@ func (storage *SimpleXGSubresourceRESTStorage) Delete(ctx context.Context, name 
 
 func (storage *SimpleXGSubresourceRESTStorage) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
 	return storage.itemGVK
+}
+
+func (storage *SimpleXGSubresourceRESTStorage) GetSingularName() string {
+	return "simple"
 }
 
 func TestXGSubresource(t *testing.T) {

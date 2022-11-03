@@ -36,9 +36,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against storage classes.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &storageapi.StorageClass{} },
-		NewListFunc:              func() runtime.Object { return &storageapi.StorageClassList{} },
-		DefaultQualifiedResource: storageapi.Resource("storageclasses"),
+		NewFunc:                   func() runtime.Object { return &storageapi.StorageClass{} },
+		NewListFunc:               func() runtime.Object { return &storageapi.StorageClassList{} },
+		DefaultQualifiedResource:  storageapi.Resource("storageclasses"),
+		SingularQualifiedResource: storageapi.Resource("storageclass"),
 
 		CreateStrategy:      storageclass.Strategy,
 		UpdateStrategy:      storageclass.Strategy,
@@ -61,11 +62,4 @@ var _ rest.ShortNamesProvider = &REST{}
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"sc"}
-}
-
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "storageclass"
 }

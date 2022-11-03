@@ -92,7 +92,7 @@ type CategoriesProvider interface {
 // SingularNameProvider returns singular name of resources. This is used by kubectl discovery to have singular
 // name representation of resources. In case of shortcut conflicts(with CRD shortcuts) singular name should always map to this resource.
 type SingularNameProvider interface {
-	SingularName() string
+	GetSingularName() string
 }
 
 // GroupVersionKindProvider is used to specify a particular GroupVersionKind to discovery.  This is used for polymorphic endpoints

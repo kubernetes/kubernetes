@@ -41,9 +41,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against service accounts.
 func NewREST(optsGetter generic.RESTOptionsGetter, issuer token.TokenGenerator, auds authenticator.Audiences, max time.Duration, podStorage, secretStorage *genericregistry.Store, extendExpiration bool) (*REST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &api.ServiceAccount{} },
-		NewListFunc:              func() runtime.Object { return &api.ServiceAccountList{} },
-		DefaultQualifiedResource: api.Resource("serviceaccounts"),
+		NewFunc:                   func() runtime.Object { return &api.ServiceAccount{} },
+		NewListFunc:               func() runtime.Object { return &api.ServiceAccountList{} },
+		DefaultQualifiedResource:  api.Resource("serviceaccounts"),
+		SingularQualifiedResource: api.Resource("serviceaccount"),
 
 		CreateStrategy:      serviceaccount.Strategy,
 		UpdateStrategy:      serviceaccount.Strategy,
@@ -83,11 +84,4 @@ var _ rest.ShortNamesProvider = &REST{}
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"sa"}
-}
-
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "serviceaccount"
 }

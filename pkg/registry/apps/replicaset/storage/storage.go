@@ -86,10 +86,11 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against ReplicaSet.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &apps.ReplicaSet{} },
-		NewListFunc:              func() runtime.Object { return &apps.ReplicaSetList{} },
-		PredicateFunc:            replicaset.MatchReplicaSet,
-		DefaultQualifiedResource: apps.Resource("replicasets"),
+		NewFunc:                   func() runtime.Object { return &apps.ReplicaSet{} },
+		NewListFunc:               func() runtime.Object { return &apps.ReplicaSetList{} },
+		PredicateFunc:             replicaset.MatchReplicaSet,
+		DefaultQualifiedResource:  apps.Resource("replicasets"),
+		SingularQualifiedResource: apps.Resource("replicaset"),
 
 		CreateStrategy:      replicaset.Strategy,
 		UpdateStrategy:      replicaset.Strategy,
@@ -124,13 +125,6 @@ var _ rest.CategoriesProvider = &REST{}
 // Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
 func (r *REST) Categories() []string {
 	return []string{"all"}
-}
-
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "replicaset"
 }
 
 // StatusREST implements the REST endpoint for changing the status of a ReplicaSet
@@ -168,6 +162,12 @@ func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 
 func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	return r.store.ConvertToTable(ctx, object, tableOptions)
+}
+
+var _ rest.SingularNameProvider = &StatusREST{}
+
+func (r *StatusREST) GetSingularName() string {
+	return r.store.GetSingularName()
 }
 
 // ScaleREST implements a Scale for ReplicaSet.
@@ -242,6 +242,12 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 
 func (r *ScaleREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	return r.store.ConvertToTable(ctx, object, tableOptions)
+}
+
+var _ rest.SingularNameProvider = &ScaleREST{}
+
+func (r *ScaleREST) GetSingularName() string {
+	return r.store.GetSingularName()
 }
 
 func toScaleCreateValidation(f rest.ValidateObjectFunc) rest.ValidateObjectFunc {

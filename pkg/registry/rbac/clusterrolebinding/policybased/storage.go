@@ -127,3 +127,9 @@ func (s *Storage) Update(ctx context.Context, name string, obj rest.UpdatedObjec
 
 	return s.StandardStorage.Update(ctx, name, nonEscalatingInfo, createValidation, updateValidation, forceAllowCreate, options)
 }
+
+var _ rest.SingularNameProvider = &Storage{}
+
+func (s *Storage) GetSingularName() string {
+	return "clusterrolebinding"
+}

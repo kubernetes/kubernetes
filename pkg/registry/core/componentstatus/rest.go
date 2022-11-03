@@ -58,6 +58,12 @@ func (rs *REST) New() runtime.Object {
 	return &api.ComponentStatus{}
 }
 
+var _ rest.SingularNameProvider = &REST{}
+
+func (rs *REST) GetSingularName() string {
+	return "componentstatus"
+}
+
 // Destroy cleans up resources on shutdown.
 func (r *REST) Destroy() {
 	// Given no underlying store, we don't destroy anything

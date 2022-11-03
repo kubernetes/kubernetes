@@ -40,9 +40,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against CronJobs.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &batch.CronJob{} },
-		NewListFunc:              func() runtime.Object { return &batch.CronJobList{} },
-		DefaultQualifiedResource: batch.Resource("cronjobs"),
+		NewFunc:                   func() runtime.Object { return &batch.CronJob{} },
+		NewListFunc:               func() runtime.Object { return &batch.CronJobList{} },
+		DefaultQualifiedResource:  batch.Resource("cronjobs"),
+		SingularQualifiedResource: batch.Resource("cronjob"),
 
 		CreateStrategy:      cronjob.Strategy,
 		UpdateStrategy:      cronjob.Strategy,
@@ -74,13 +75,6 @@ func (r *REST) Categories() []string {
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"cj"}
-}
-
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "cronjob"
 }
 
 // StatusREST implements the REST endpoint for changing the status of a resourcequota.
@@ -118,4 +112,10 @@ func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 
 func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	return r.store.ConvertToTable(ctx, object, tableOptions)
+}
+
+var _ rest.SingularNameProvider = &StatusREST{}
+
+func (r *StatusREST) GetSingularName() string {
+	return r.store.GetSingularName()
 }

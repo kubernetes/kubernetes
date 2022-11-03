@@ -41,10 +41,11 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against persistent volume claims.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &api.PersistentVolumeClaim{} },
-		NewListFunc:              func() runtime.Object { return &api.PersistentVolumeClaimList{} },
-		PredicateFunc:            persistentvolumeclaim.MatchPersistentVolumeClaim,
-		DefaultQualifiedResource: api.Resource("persistentvolumeclaims"),
+		NewFunc:                   func() runtime.Object { return &api.PersistentVolumeClaim{} },
+		NewListFunc:               func() runtime.Object { return &api.PersistentVolumeClaimList{} },
+		PredicateFunc:             persistentvolumeclaim.MatchPersistentVolumeClaim,
+		DefaultQualifiedResource:  api.Resource("persistentvolumeclaims"),
+		SingularQualifiedResource: api.Resource("persistentvolumeclaim"),
 
 		CreateStrategy:      persistentvolumeclaim.Strategy,
 		UpdateStrategy:      persistentvolumeclaim.Strategy,
@@ -75,13 +76,6 @@ var _ rest.ShortNamesProvider = &REST{}
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"pvc"}
-}
-
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "persistentvolumeclaim"
 }
 
 // defaultOnRead sets interlinked fields that were not previously set on read.
@@ -159,4 +153,10 @@ func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 
 func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	return r.store.ConvertToTable(ctx, object, tableOptions)
+}
+
+var _ rest.SingularNameProvider = &StatusREST{}
+
+func (r *StatusREST) GetSingularName() string {
+	return r.store.GetSingularName()
 }

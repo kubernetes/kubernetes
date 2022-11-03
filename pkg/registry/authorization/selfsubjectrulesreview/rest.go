@@ -95,6 +95,12 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 	return ret, nil
 }
 
+var _ rest.SingularNameProvider = &REST{}
+
+func (r *REST) GetSingularName() string {
+	return "selfsubjectrulesreview"
+}
+
 func getResourceRules(infos []authorizer.ResourceRuleInfo) []authorizationapi.ResourceRule {
 	rules := make([]authorizationapi.ResourceRule, len(infos))
 	for i, info := range infos {

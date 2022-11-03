@@ -59,10 +59,11 @@ type FinalizeREST struct {
 // NewREST returns a RESTStorage object that will work against namespaces.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *FinalizeREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &api.Namespace{} },
-		NewListFunc:              func() runtime.Object { return &api.NamespaceList{} },
-		PredicateFunc:            namespace.MatchNamespace,
-		DefaultQualifiedResource: api.Resource("namespaces"),
+		NewFunc:                   func() runtime.Object { return &api.Namespace{} },
+		NewListFunc:               func() runtime.Object { return &api.NamespaceList{} },
+		PredicateFunc:             namespace.MatchNamespace,
+		DefaultQualifiedResource:  api.Resource("namespaces"),
+		SingularQualifiedResource: api.Resource("namespace"),
 
 		CreateStrategy:      namespace.Strategy,
 		UpdateStrategy:      namespace.Strategy,
@@ -92,6 +93,12 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 
 func (r *REST) NamespaceScoped() bool {
 	return r.store.NamespaceScoped()
+}
+
+var _ rest.SingularNameProvider = &REST{}
+
+func (r *REST) GetSingularName() string {
+	return r.store.GetSingularName()
 }
 
 func (r *REST) New() runtime.Object {
@@ -291,13 +298,6 @@ func (r *REST) ShortNames() []string {
 	return []string{"ns"}
 }
 
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "namespace"
-}
-
 var _ rest.StorageVersionProvider = &REST{}
 
 func (r *REST) StorageVersion() runtime.GroupVersioner {
@@ -339,6 +339,12 @@ func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, 
 	return r.store.ConvertToTable(ctx, object, tableOptions)
 }
 
+var _ rest.SingularNameProvider = &StatusREST{}
+
+func (r *StatusREST) GetSingularName() string {
+	return r.store.GetSingularName()
+}
+
 func (r *FinalizeREST) New() runtime.Object {
 	return r.store.New()
 }
@@ -359,4 +365,10 @@ func (r *FinalizeREST) Update(ctx context.Context, name string, objInfo rest.Upd
 // GetResetFields implements rest.ResetFieldsStrategy
 func (r *FinalizeREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return r.store.GetResetFields()
+}
+
+var _ rest.SingularNameProvider = &FinalizeREST{}
+
+func (r *FinalizeREST) GetSingularName() string {
+	return r.store.GetSingularName()
 }

@@ -2339,12 +2339,13 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 	}
 
 	return destroyFunc, &Store{
-		NewFunc:                  func() runtime.Object { return &example.Pod{} },
-		NewListFunc:              func() runtime.Object { return &example.PodList{} },
-		DefaultQualifiedResource: example.Resource("pods"),
-		CreateStrategy:           strategy,
-		UpdateStrategy:           strategy,
-		DeleteStrategy:           strategy,
+		NewFunc:                   func() runtime.Object { return &example.Pod{} },
+		NewListFunc:               func() runtime.Object { return &example.PodList{} },
+		DefaultQualifiedResource:  example.Resource("pods"),
+		SingularQualifiedResource: example.Resource("pod"),
+		CreateStrategy:            strategy,
+		UpdateStrategy:            strategy,
+		DeleteStrategy:            strategy,
 		KeyRootFunc: func(ctx context.Context) string {
 			return podPrefix
 		},

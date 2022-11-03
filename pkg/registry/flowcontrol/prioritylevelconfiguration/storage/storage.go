@@ -46,9 +46,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against priority level configuration.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &flowcontrol.PriorityLevelConfiguration{} },
-		NewListFunc:              func() runtime.Object { return &flowcontrol.PriorityLevelConfigurationList{} },
-		DefaultQualifiedResource: flowcontrol.Resource("prioritylevelconfigurations"),
+		NewFunc:                   func() runtime.Object { return &flowcontrol.PriorityLevelConfiguration{} },
+		NewListFunc:               func() runtime.Object { return &flowcontrol.PriorityLevelConfigurationList{} },
+		DefaultQualifiedResource:  flowcontrol.Resource("prioritylevelconfigurations"),
+		SingularQualifiedResource: flowcontrol.Resource("prioritylevelconfiguration"),
 
 		CreateStrategy:      prioritylevelconfiguration.Strategy,
 		UpdateStrategy:      prioritylevelconfiguration.Strategy,
@@ -106,4 +107,10 @@ func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 
 func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	return r.store.ConvertToTable(ctx, object, tableOptions)
+}
+
+var _ rest.SingularNameProvider = &StatusREST{}
+
+func (r *StatusREST) GetSingularName() string {
+	return r.store.GetSingularName()
 }

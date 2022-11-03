@@ -46,9 +46,10 @@ type REST struct {
 // NewStorage returns a RESTStorage object that will work against VolumeAttachments
 func NewStorage(optsGetter generic.RESTOptionsGetter) (*VolumeAttachmentStorage, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &storageapi.VolumeAttachment{} },
-		NewListFunc:              func() runtime.Object { return &storageapi.VolumeAttachmentList{} },
-		DefaultQualifiedResource: storageapi.Resource("volumeattachments"),
+		NewFunc:                   func() runtime.Object { return &storageapi.VolumeAttachment{} },
+		NewListFunc:               func() runtime.Object { return &storageapi.VolumeAttachmentList{} },
+		DefaultQualifiedResource:  storageapi.Resource("volumeattachments"),
+		SingularQualifiedResource: storageapi.Resource("volumeattachment"),
 
 		CreateStrategy:      volumeattachment.Strategy,
 		UpdateStrategy:      volumeattachment.Strategy,
@@ -71,13 +72,6 @@ func NewStorage(optsGetter generic.RESTOptionsGetter) (*VolumeAttachmentStorage,
 		VolumeAttachment: &REST{store},
 		Status:           &StatusREST{store: &statusStore},
 	}, nil
-}
-
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "volumeattachment"
 }
 
 // StatusREST implements the REST endpoint for changing the status of a VolumeAttachment
@@ -117,4 +111,10 @@ func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 
 func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	return r.store.ConvertToTable(ctx, object, tableOptions)
+}
+
+var _ rest.SingularNameProvider = &StatusREST{}
+
+func (r *StatusREST) GetSingularName() string {
+	return r.store.GetSingularName()
 }

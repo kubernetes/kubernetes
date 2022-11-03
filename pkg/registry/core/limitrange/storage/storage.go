@@ -33,9 +33,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against limit ranges.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &api.LimitRange{} },
-		NewListFunc:              func() runtime.Object { return &api.LimitRangeList{} },
-		DefaultQualifiedResource: api.Resource("limitranges"),
+		NewFunc:                   func() runtime.Object { return &api.LimitRange{} },
+		NewListFunc:               func() runtime.Object { return &api.LimitRangeList{} },
+		DefaultQualifiedResource:  api.Resource("limitranges"),
+		SingularQualifiedResource: api.Resource("limitrange"),
 
 		CreateStrategy: limitrange.Strategy,
 		UpdateStrategy: limitrange.Strategy,
@@ -57,11 +58,4 @@ var _ rest.ShortNamesProvider = &REST{}
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"limits"}
-}
-
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "limitrange"
 }

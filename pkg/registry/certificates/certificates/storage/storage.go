@@ -40,9 +40,10 @@ type REST struct {
 // NewREST returns a registry which will store CertificateSigningRequest in the given helper.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *ApprovalREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &certificates.CertificateSigningRequest{} },
-		NewListFunc:              func() runtime.Object { return &certificates.CertificateSigningRequestList{} },
-		DefaultQualifiedResource: certificates.Resource("certificatesigningrequests"),
+		NewFunc:                   func() runtime.Object { return &certificates.CertificateSigningRequest{} },
+		NewListFunc:               func() runtime.Object { return &certificates.CertificateSigningRequestList{} },
+		DefaultQualifiedResource:  certificates.Resource("certificatesigningrequests"),
+		SingularQualifiedResource: certificates.Resource("certificatesigningrequest"),
 
 		CreateStrategy:      csrregistry.Strategy,
 		UpdateStrategy:      csrregistry.Strategy,
@@ -77,13 +78,6 @@ var _ rest.ShortNamesProvider = &REST{}
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"csr"}
-}
-
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "certificatesigningrequest"
 }
 
 // StatusREST implements the REST endpoint for changing the status of a CSR.
@@ -123,6 +117,12 @@ func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, 
 	return r.store.ConvertToTable(ctx, object, tableOptions)
 }
 
+var _ rest.SingularNameProvider = &StatusREST{}
+
+func (r *StatusREST) GetSingularName() string {
+	return r.store.GetSingularName()
+}
+
 var _ = rest.Patcher(&StatusREST{})
 
 // ApprovalREST implements the REST endpoint for changing the approval state of a CSR.
@@ -156,6 +156,12 @@ func (r *ApprovalREST) Update(ctx context.Context, name string, objInfo rest.Upd
 // GetResetFields implements rest.ResetFieldsStrategy
 func (r *ApprovalREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return r.store.GetResetFields()
+}
+
+var _ rest.SingularNameProvider = &ApprovalREST{}
+
+func (r *ApprovalREST) GetSingularName() string {
+	return r.store.GetSingularName()
 }
 
 var _ = rest.Patcher(&ApprovalREST{})

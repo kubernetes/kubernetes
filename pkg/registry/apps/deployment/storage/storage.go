@@ -92,9 +92,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against deployments.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *RollbackREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &apps.Deployment{} },
-		NewListFunc:              func() runtime.Object { return &apps.DeploymentList{} },
-		DefaultQualifiedResource: apps.Resource("deployments"),
+		NewFunc:                   func() runtime.Object { return &apps.Deployment{} },
+		NewListFunc:               func() runtime.Object { return &apps.DeploymentList{} },
+		DefaultQualifiedResource:  apps.Resource("deployments"),
+		SingularQualifiedResource: apps.Resource("deployment"),
 
 		CreateStrategy:      deployment.Strategy,
 		UpdateStrategy:      deployment.Strategy,
@@ -128,13 +129,6 @@ var _ rest.CategoriesProvider = &REST{}
 // Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
 func (r *REST) Categories() []string {
 	return []string{"all"}
-}
-
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "deployment"
 }
 
 // StatusREST implements the REST endpoint for changing the status of a deployment
@@ -174,6 +168,12 @@ func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, 
 	return r.store.ConvertToTable(ctx, object, tableOptions)
 }
 
+var _ rest.SingularNameProvider = &StatusREST{}
+
+func (r *StatusREST) GetSingularName() string {
+	return r.store.GetSingularName()
+}
+
 // RollbackREST implements the REST endpoint for initiating the rollback of a deployment
 type RollbackREST struct {
 	store *genericregistry.Store
@@ -202,6 +202,12 @@ func (r *RollbackREST) New() runtime.Object {
 func (r *RollbackREST) Destroy() {
 	// Given that underlying store is shared with REST,
 	// we don't destroy it here explicitly.
+}
+
+var _ rest.SingularNameProvider = &RollbackREST{}
+
+func (r *RollbackREST) GetSingularName() string {
+	return r.store.GetSingularName()
 }
 
 var _ = rest.NamedCreater(&RollbackREST{})
@@ -346,6 +352,12 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 
 func (r *ScaleREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	return r.store.ConvertToTable(ctx, object, tableOptions)
+}
+
+var _ rest.SingularNameProvider = &ScaleREST{}
+
+func (r *ScaleREST) GetSingularName() string {
+	return r.store.GetSingularName()
 }
 
 func toScaleCreateValidation(f rest.ValidateObjectFunc) rest.ValidateObjectFunc {

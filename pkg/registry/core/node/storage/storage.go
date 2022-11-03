@@ -93,13 +93,20 @@ func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, 
 	return r.store.ConvertToTable(ctx, object, tableOptions)
 }
 
+var _ rest.SingularNameProvider = &StatusREST{}
+
+func (r *StatusREST) GetSingularName() string {
+	return r.store.GetSingularName()
+}
+
 // NewStorage returns a NodeStorage object that will work against nodes.
 func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client.KubeletClientConfig, proxyTransport http.RoundTripper) (*NodeStorage, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &api.Node{} },
-		NewListFunc:              func() runtime.Object { return &api.NodeList{} },
-		PredicateFunc:            node.MatchNode,
-		DefaultQualifiedResource: api.Resource("nodes"),
+		NewFunc:                   func() runtime.Object { return &api.Node{} },
+		NewListFunc:               func() runtime.Object { return &api.NodeList{} },
+		PredicateFunc:             node.MatchNode,
+		DefaultQualifiedResource:  api.Resource("nodes"),
+		SingularQualifiedResource: api.Resource("node"),
 
 		CreateStrategy:      node.Strategy,
 		UpdateStrategy:      node.Strategy,
@@ -173,11 +180,4 @@ var _ rest.ShortNamesProvider = &REST{}
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"no"}
-}
-
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "node"
 }

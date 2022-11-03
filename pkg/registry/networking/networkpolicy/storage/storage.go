@@ -41,9 +41,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against NetworkPolicies.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &networkingapi.NetworkPolicy{} },
-		NewListFunc:              func() runtime.Object { return &networkingapi.NetworkPolicyList{} },
-		DefaultQualifiedResource: networkingapi.Resource("networkpolicies"),
+		NewFunc:                   func() runtime.Object { return &networkingapi.NetworkPolicy{} },
+		NewListFunc:               func() runtime.Object { return &networkingapi.NetworkPolicyList{} },
+		DefaultQualifiedResource:  networkingapi.Resource("networkpolicies"),
+		SingularQualifiedResource: networkingapi.Resource("networkpolicy"),
 
 		CreateStrategy:      networkpolicy.Strategy,
 		UpdateStrategy:      networkpolicy.Strategy,
@@ -70,13 +71,6 @@ var _ rest.ShortNamesProvider = &REST{}
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"netpol"}
-}
-
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "networkpolicy"
 }
 
 // StatusREST implements the REST endpoint for changing the status of an ingress
@@ -110,4 +104,10 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 // GetResetFields implements rest.ResetFieldsStrategy
 func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return r.store.GetResetFields()
+}
+
+var _ rest.SingularNameProvider = &StatusREST{}
+
+func (r *StatusREST) GetSingularName() string {
+	return r.store.GetSingularName()
 }

@@ -40,9 +40,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against DaemonSets.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &apps.DaemonSet{} },
-		NewListFunc:              func() runtime.Object { return &apps.DaemonSetList{} },
-		DefaultQualifiedResource: apps.Resource("daemonsets"),
+		NewFunc:                   func() runtime.Object { return &apps.DaemonSet{} },
+		NewListFunc:               func() runtime.Object { return &apps.DaemonSetList{} },
+		DefaultQualifiedResource:  apps.Resource("daemonsets"),
+		SingularQualifiedResource: apps.Resource("daemonset"),
 
 		CreateStrategy:      daemonset.Strategy,
 		UpdateStrategy:      daemonset.Strategy,
@@ -76,13 +77,6 @@ var _ rest.CategoriesProvider = &REST{}
 // Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
 func (r *REST) Categories() []string {
 	return []string{"all"}
-}
-
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "daemonset"
 }
 
 // StatusREST implements the REST endpoint for changing the status of a daemonset
@@ -120,4 +114,10 @@ func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 
 func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	return r.store.ConvertToTable(ctx, object, tableOptions)
+}
+
+var _ rest.SingularNameProvider = &StatusREST{}
+
+func (r *StatusREST) GetSingularName() string {
+	return r.store.GetSingularName()
 }

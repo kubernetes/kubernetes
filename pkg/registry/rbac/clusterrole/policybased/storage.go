@@ -124,3 +124,9 @@ func (s *Storage) Update(ctx context.Context, name string, obj rest.UpdatedObjec
 func hasAggregationRule(clusterRole *rbac.ClusterRole) bool {
 	return clusterRole.AggregationRule != nil && len(clusterRole.AggregationRule.ClusterRoleSelectors) > 0
 }
+
+var _ rest.SingularNameProvider = &Storage{}
+
+func (s *Storage) GetSingularName() string {
+	return "clusterrole"
+}

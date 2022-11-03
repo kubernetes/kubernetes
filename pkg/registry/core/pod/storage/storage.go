@@ -73,10 +73,11 @@ type REST struct {
 func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter) (PodStorage, error) {
 
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &api.Pod{} },
-		NewListFunc:              func() runtime.Object { return &api.PodList{} },
-		PredicateFunc:            registrypod.MatchPod,
-		DefaultQualifiedResource: api.Resource("pods"),
+		NewFunc:                   func() runtime.Object { return &api.Pod{} },
+		NewListFunc:               func() runtime.Object { return &api.PodList{} },
+		PredicateFunc:             registrypod.MatchPod,
+		DefaultQualifiedResource:  api.Resource("pods"),
+		SingularQualifiedResource: api.Resource("pod"),
 
 		CreateStrategy:      registrypod.Strategy,
 		UpdateStrategy:      registrypod.Strategy,
@@ -142,13 +143,6 @@ func (r *REST) Categories() []string {
 	return []string{"all"}
 }
 
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "pod"
-}
-
 // BindingREST implements the REST endpoint for binding pods to nodes when etcd is in use.
 type BindingREST struct {
 	store *genericregistry.Store
@@ -168,6 +162,12 @@ func (r *BindingREST) New() runtime.Object {
 func (r *BindingREST) Destroy() {
 	// Given that underlying store is shared with REST,
 	// we don't destroy it here explicitly.
+}
+
+var _ rest.SingularNameProvider = &BindingREST{}
+
+func (r *BindingREST) GetSingularName() string {
+	return r.store.GetSingularName()
 }
 
 var _ = rest.NamedCreater(&BindingREST{})
@@ -286,6 +286,12 @@ func (r *LegacyBindingREST) Destroy() {
 	// we don't destroy it here explicitly.
 }
 
+var _ rest.SingularNameProvider = &LegacyBindingREST{}
+
+func (r *LegacyBindingREST) GetSingularName() string {
+	return r.bindingRest.GetSingularName()
+}
+
 // Create ensures a pod is bound to a specific host.
 func (r *LegacyBindingREST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (out runtime.Object, err error) {
 	metadata, err := meta.Accessor(obj)
@@ -332,6 +338,12 @@ func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, 
 	return r.store.ConvertToTable(ctx, object, tableOptions)
 }
 
+var _ rest.SingularNameProvider = &StatusREST{}
+
+func (r *StatusREST) GetSingularName() string {
+	return r.store.GetSingularName()
+}
+
 // EphemeralContainersREST implements the REST endpoint for adding EphemeralContainers
 type EphemeralContainersREST struct {
 	store *genericregistry.Store
@@ -360,4 +372,10 @@ func (r *EphemeralContainersREST) Update(ctx context.Context, name string, objIn
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+var _ rest.SingularNameProvider = &EphemeralContainersREST{}
+
+func (r *EphemeralContainersREST) GetSingularName() string {
+	return r.store.GetSingularName()
 }

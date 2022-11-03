@@ -36,9 +36,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against endpoints.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &api.Endpoints{} },
-		NewListFunc:              func() runtime.Object { return &api.EndpointsList{} },
-		DefaultQualifiedResource: api.Resource("endpoints"),
+		NewFunc:                   func() runtime.Object { return &api.Endpoints{} },
+		NewListFunc:               func() runtime.Object { return &api.EndpointsList{} },
+		DefaultQualifiedResource:  api.Resource("endpoints"),
+		SingularQualifiedResource: api.Resource("endpoint"),
 
 		CreateStrategy: endpoint.Strategy,
 		UpdateStrategy: endpoint.Strategy,
@@ -59,11 +60,4 @@ var _ rest.ShortNamesProvider = &REST{}
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"ep"}
-}
-
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "endpoint"
 }

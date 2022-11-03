@@ -1080,9 +1080,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if categoriesProvider, ok := storage.(rest.CategoriesProvider); ok {
 		apiResource.Categories = categoriesProvider.Categories()
 	}
-	if singularNameProvider, ok := storage.(rest.SingularNameProvider); ok {
-		apiResource.SingularName = singularNameProvider.SingularName()
+	singularNameProvider, ok := storage.(rest.SingularNameProvider)
+	if !ok {
+		return nil, nil, fmt.Errorf("resource %s must implement SingularNameProvider", resource)
 	}
+	apiResource.SingularName = singularNameProvider.GetSingularName()
+
 	if gvkProvider, ok := storage.(rest.GroupVersionKindProvider); ok {
 		gvk := gvkProvider.GroupVersionKind(a.group.GroupVersion)
 		apiResource.Group = gvk.Group

@@ -133,3 +133,9 @@ func (r *LogREST) OverrideMetricsVerb(oldVerb string) (newVerb string) {
 
 	return
 }
+
+var _ rest.SingularNameProvider = &LogREST{}
+
+func (r *LogREST) GetSingularName() string {
+	return r.Store.GetSingularName()
+}

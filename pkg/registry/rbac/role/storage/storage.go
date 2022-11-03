@@ -33,9 +33,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against Role objects.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &rbac.Role{} },
-		NewListFunc:              func() runtime.Object { return &rbac.RoleList{} },
-		DefaultQualifiedResource: rbac.Resource("roles"),
+		NewFunc:                   func() runtime.Object { return &rbac.Role{} },
+		NewListFunc:               func() runtime.Object { return &rbac.RoleList{} },
+		DefaultQualifiedResource:  rbac.Resource("roles"),
+		SingularQualifiedResource: rbac.Resource("role"),
 
 		CreateStrategy: role.Strategy,
 		UpdateStrategy: role.Strategy,
@@ -50,11 +51,4 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	}
 
 	return &REST{store}, nil
-}
-
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "role"
 }

@@ -46,9 +46,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against flow schemas.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &flowcontrol.FlowSchema{} },
-		NewListFunc:              func() runtime.Object { return &flowcontrol.FlowSchemaList{} },
-		DefaultQualifiedResource: flowcontrol.Resource("flowschemas"),
+		NewFunc:                   func() runtime.Object { return &flowcontrol.FlowSchema{} },
+		NewListFunc:               func() runtime.Object { return &flowcontrol.FlowSchemaList{} },
+		DefaultQualifiedResource:  flowcontrol.Resource("flowschemas"),
+		SingularQualifiedResource: flowcontrol.Resource("flowschema"),
 
 		CreateStrategy:      flowschema.Strategy,
 		UpdateStrategy:      flowschema.Strategy,
@@ -106,4 +107,10 @@ func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 
 func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	return r.store.ConvertToTable(ctx, object, tableOptions)
+}
+
+var _ rest.SingularNameProvider = &StatusREST{}
+
+func (r *StatusREST) GetSingularName() string {
+	return r.store.GetSingularName()
 }

@@ -37,10 +37,11 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work with ConfigMap objects.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &api.ConfigMap{} },
-		NewListFunc:              func() runtime.Object { return &api.ConfigMapList{} },
-		PredicateFunc:            configmap.Matcher,
-		DefaultQualifiedResource: api.Resource("configmaps"),
+		NewFunc:                   func() runtime.Object { return &api.ConfigMap{} },
+		NewListFunc:               func() runtime.Object { return &api.ConfigMapList{} },
+		PredicateFunc:             configmap.Matcher,
+		DefaultQualifiedResource:  api.Resource("configmaps"),
+		SingularQualifiedResource: api.Resource("configmap"),
 
 		CreateStrategy: configmap.Strategy,
 		UpdateStrategy: configmap.Strategy,
@@ -65,11 +66,4 @@ var _ rest.ShortNamesProvider = &REST{}
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"cm"}
-}
-
-var _ rest.SingularNameProvider = &REST{}
-
-// SingularName implements the SingularNameProvider interfaces. This returns singular name of core resource.
-func (r *REST) SingularName() string {
-	return "configmap"
 }
