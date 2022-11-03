@@ -13335,8 +13335,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.InternalTrafficPolicy = nil
 			},
-			featureGates: []featuregate.Feature{features.ServiceInternalTrafficPolicy},
-			numErrs:      1,
+			numErrs: 1,
 		},
 		{
 			name: "internalTrafficPolicy field nil when type is ExternalName",
@@ -13345,8 +13344,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.Type = core.ServiceTypeExternalName
 				s.Spec.ExternalName = "foo.bar.com"
 			},
-			featureGates: []featuregate.Feature{features.ServiceInternalTrafficPolicy},
-			numErrs:      0,
+			numErrs: 0,
 		},
 		{
 			// Typically this should fail validation, but in v1.22 we have existing clusters
@@ -13360,8 +13358,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.Type = core.ServiceTypeExternalName
 				s.Spec.ExternalName = "foo.bar.com"
 			},
-			featureGates: []featuregate.Feature{features.ServiceInternalTrafficPolicy},
-			numErrs:      0,
+			numErrs: 0,
 		},
 		{
 			name: "invalid internalTraffic field",

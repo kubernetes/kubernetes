@@ -5275,34 +5275,10 @@ func TestInternalTrafficPolicyE2E(t *testing.T) {
 				},
 			},
 		},
-		{
-			name:                  "Local internalTrafficPolicy is ignored when feature gate is off",
-			line:                  getLine(),
-			internalTrafficPolicy: &local,
-			featureGateOn:         false,
-			endpoints: []endpoint{
-				{"10.0.1.1", testHostname},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
-			},
-			expectEndpointRule:        false,
-			expectedIPTablesWithSlice: clusterExpectedIPTables,
-			flowTests: []packetFlowTest{
-				{
-					name:     "pod to ClusterIP hits all endpoints",
-					sourceIP: "10.0.0.2",
-					destIP:   "172.30.1.1",
-					destPort: 80,
-					output:   "10.0.1.1:80, 10.0.1.2:80, 10.0.1.3:80",
-					masq:     false,
-				},
-			},
-		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceInternalTrafficPolicy, tc.featureGateOn)()
 			ipt := iptablestest.NewFake()
 			fp := NewFakeProxier(ipt)
 			fp.OnServiceSynced()
@@ -7434,8 +7410,6 @@ func TestInternalExternalMasquerade(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceInternalTrafficPolicy, true)()
-
 			ipt := iptablestest.NewFake()
 			fp := NewFakeProxier(ipt)
 			fp.masqueradeAll = tc.masqueradeAll
@@ -8274,7 +8248,6 @@ func TestNoEndpointsMetric(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceInternalTrafficPolicy, true)()
 			ipt := iptablestest.NewFake()
 			fp := NewFakeProxier(ipt)
 			fp.OnServiceSynced()

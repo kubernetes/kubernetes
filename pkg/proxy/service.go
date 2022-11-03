@@ -30,9 +30,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 )
@@ -158,14 +156,9 @@ func (bsvcPortInfo *BaseServicePortInfo) UsesLocalEndpoints() bool {
 }
 
 func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, service *v1.Service) *BaseServicePortInfo {
-	externalPolicyLocal := false
-	if apiservice.ExternalPolicyLocal(service) {
-		externalPolicyLocal = true
-	}
-	internalPolicyLocal := false
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
-		internalPolicyLocal = apiservice.InternalPolicyLocal(service)
-	}
+	externalPolicyLocal := apiservice.ExternalPolicyLocal(service)
+	internalPolicyLocal := apiservice.InternalPolicyLocal(service)
+
 	var stickyMaxAgeSeconds int
 	if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
 		// Kube-apiserver side guarantees SessionAffinityConfig won't be nil when session affinity type is ClientIP
