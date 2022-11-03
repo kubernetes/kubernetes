@@ -55,6 +55,7 @@ type Controller struct {
 	serviceCIDR          *net.IPNet
 	secondaryServiceCIDR *net.IPNet
 	kubeClient           clientset.Interface
+	eventBroadcaster     record.EventBroadcaster
 	// Method for easy mocking in unittest.
 	lookupIP func(host string) ([]net.IP, error)
 
@@ -84,15 +85,6 @@ func NewNodeIpamController(
 		klog.Fatalf("kubeClient is nil when starting Controller")
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
-
-	klog.Infof("Sending events to api server.")
-	eventBroadcaster.StartRecordingToSink(
-		&v1core.EventSinkImpl{
-			Interface: kubeClient.CoreV1().Events(""),
-		})
-
 	// Cloud CIDR allocator does not rely on clusterCIDR or nodeCIDRMaskSize for allocation.
 	if allocatorType != ipam.CloudAllocatorType {
 		if len(clusterCIDRs) == 0 {
@@ -110,6 +102,7 @@ func NewNodeIpamController(
 	ic := &Controller{
 		cloud:                cloud,
 		kubeClient:           kubeClient,
+		eventBroadcaster:     record.NewBroadcaster(),
 		lookupIP:             net.LookupIP,
 		clusterCIDRs:         clusterCIDRs,
 		serviceCIDR:          serviceCIDR,
@@ -145,6 +138,11 @@ func NewNodeIpamController(
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
 func (nc *Controller) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+
+	// Start event processing pipeline.
+	nc.eventBroadcaster.StartStructuredLogging(0)
+	nc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: nc.kubeClient.CoreV1().Events("")})
+	defer nc.eventBroadcaster.Shutdown()
 
 	klog.Infof("Starting ipam controller")
 	defer klog.Infof("Shutting down ipam controller")
