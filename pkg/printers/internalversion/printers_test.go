@@ -979,8 +979,8 @@ func TestPrintIngress(t *testing.T) {
 			},
 		},
 		Status: networking.IngressStatus{
-			LoadBalancer: api.LoadBalancerStatus{
-				Ingress: []api.LoadBalancerIngress{
+			LoadBalancer: networking.IngressLoadBalancerStatus{
+				Ingress: []networking.IngressLoadBalancerIngress{
 					{
 						IP:       "2.3.4.5",
 						Hostname: "localhost.localdomain",

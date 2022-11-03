@@ -1243,11 +1243,31 @@ func printIngress(obj *networking.Ingress, options printers.GenerateOptions) ([]
 		className = *obj.Spec.IngressClassName
 	}
 	hosts := formatHosts(obj.Spec.Rules)
-	address := loadBalancerStatusStringer(obj.Status.LoadBalancer, options.Wide)
+	address := ingressLoadBalancerStatusStringer(obj.Status.LoadBalancer, options.Wide)
 	ports := formatPorts(obj.Spec.TLS)
 	createTime := translateTimestampSince(obj.CreationTimestamp)
 	row.Cells = append(row.Cells, obj.Name, className, hosts, address, ports, createTime)
 	return []metav1.TableRow{row}, nil
+}
+
+// ingressLoadBalancerStatusStringer behaves mostly like a string interface and converts the given status to a string.
+// `wide` indicates whether the returned value is meant for --o=wide output. If not, it's clipped to 16 bytes.
+func ingressLoadBalancerStatusStringer(s networking.IngressLoadBalancerStatus, wide bool) string {
+	ingress := s.Ingress
+	result := sets.NewString()
+	for i := range ingress {
+		if ingress[i].IP != "" {
+			result.Insert(ingress[i].IP)
+		} else if ingress[i].Hostname != "" {
+			result.Insert(ingress[i].Hostname)
+		}
+	}
+
+	r := strings.Join(result.List(), ",")
+	if !wide && len(r) > loadBalancerWidth {
+		r = r[0:(loadBalancerWidth-3)] + "..."
+	}
+	return r
 }
 
 func printIngressList(list *networking.IngressList, options printers.GenerateOptions) ([]metav1.TableRow, error) {

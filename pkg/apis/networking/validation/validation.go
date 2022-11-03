@@ -319,7 +319,29 @@ func ValidateIngressSpec(spec *networking.IngressSpec, fldPath *field.Path, opts
 // ValidateIngressStatusUpdate tests if required fields in the Ingress are set when updating status.
 func ValidateIngressStatusUpdate(ingress, oldIngress *networking.Ingress) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&ingress.ObjectMeta, &oldIngress.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, apivalidation.ValidateLoadBalancerStatus(&ingress.Status.LoadBalancer, field.NewPath("status", "loadBalancer"))...)
+	allErrs = append(allErrs, ValidateIngressLoadBalancerStatus(&ingress.Status.LoadBalancer, field.NewPath("status", "loadBalancer"))...)
+	return allErrs
+}
+
+// ValidateLIngressoadBalancerStatus validates required fields on an IngressLoadBalancerStatus
+func ValidateIngressLoadBalancerStatus(status *networking.IngressLoadBalancerStatus, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, ingress := range status.Ingress {
+		idxPath := fldPath.Child("ingress").Index(i)
+		if len(ingress.IP) > 0 {
+			if isIP := (netutils.ParseIPSloppy(ingress.IP) != nil); !isIP {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("ip"), ingress.IP, "must be a valid IP address"))
+			}
+		}
+		if len(ingress.Hostname) > 0 {
+			for _, msg := range validation.IsDNS1123Subdomain(ingress.Hostname) {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("hostname"), ingress.Hostname, msg))
+			}
+			if isIP := (netutils.ParseIPSloppy(ingress.Hostname) != nil); isIP {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("hostname"), ingress.Hostname, "must be a DNS name, not an IP address"))
+			}
+		}
+	}
 	return allErrs
 }
 

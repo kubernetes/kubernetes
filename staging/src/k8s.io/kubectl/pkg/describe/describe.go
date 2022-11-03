@@ -2645,7 +2645,7 @@ func (i *IngressDescriber) describeIngressV1(ing *networkingv1.Ingress, events *
 		w.Write(LEVEL_0, "Name:\t%v\n", ing.Name)
 		printLabelsMultiline(w, "Labels", ing.Labels)
 		w.Write(LEVEL_0, "Namespace:\t%v\n", ing.Namespace)
-		w.Write(LEVEL_0, "Address:\t%v\n", loadBalancerStatusStringer(ing.Status.LoadBalancer, true))
+		w.Write(LEVEL_0, "Address:\t%v\n", ingressLoadBalancerStatusStringerV1(ing.Status.LoadBalancer, true))
 		ingressClassName := "<none>"
 		if ing.Spec.IngressClassName != nil {
 			ingressClassName = *ing.Spec.IngressClassName
@@ -2697,7 +2697,7 @@ func (i *IngressDescriber) describeIngressV1beta1(ing *networkingv1beta1.Ingress
 		w.Write(LEVEL_0, "Name:\t%v\n", ing.Name)
 		printLabelsMultiline(w, "Labels", ing.Labels)
 		w.Write(LEVEL_0, "Namespace:\t%v\n", ing.Namespace)
-		w.Write(LEVEL_0, "Address:\t%v\n", loadBalancerStatusStringer(ing.Status.LoadBalancer, true))
+		w.Write(LEVEL_0, "Address:\t%v\n", ingressLoadBalancerStatusStringerV1beta1(ing.Status.LoadBalancer, true))
 		ingressClassName := "<none>"
 		if ing.Spec.IngressClassName != nil {
 			ingressClassName = *ing.Spec.IngressClassName
@@ -5580,9 +5580,29 @@ func findNodeRoles(node *corev1.Node) []string {
 	return roles.List()
 }
 
-// loadBalancerStatusStringer behaves mostly like a string interface and converts the given status to a string.
+// ingressLoadBalancerStatusStringerV1 behaves mostly like a string interface and converts the given status to a string.
 // `wide` indicates whether the returned value is meant for --o=wide output. If not, it's clipped to 16 bytes.
-func loadBalancerStatusStringer(s corev1.LoadBalancerStatus, wide bool) string {
+func ingressLoadBalancerStatusStringerV1(s networkingv1.IngressLoadBalancerStatus, wide bool) string {
+	ingress := s.Ingress
+	result := sets.NewString()
+	for i := range ingress {
+		if ingress[i].IP != "" {
+			result.Insert(ingress[i].IP)
+		} else if ingress[i].Hostname != "" {
+			result.Insert(ingress[i].Hostname)
+		}
+	}
+
+	r := strings.Join(result.List(), ",")
+	if !wide && len(r) > LoadBalancerWidth {
+		r = r[0:(LoadBalancerWidth-3)] + "..."
+	}
+	return r
+}
+
+// ingressLoadBalancerStatusStringerV1beta1 behaves mostly like a string interface and converts the given status to a string.
+// `wide` indicates whether the returned value is meant for --o=wide output. If not, it's clipped to 16 bytes.
+func ingressLoadBalancerStatusStringerV1beta1(s networkingv1beta1.IngressLoadBalancerStatus, wide bool) string {
 	ingress := s.Ingress
 	result := sets.NewString()
 	for i := range ingress {
