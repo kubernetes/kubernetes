@@ -100,7 +100,7 @@ func TestNewInitData(t *testing.T) {
 			},
 		},
 		{
-			name: "--cri-socket and --node-name flags override config from file",
+			name: "--node-name flags override config from file",
 			flags: map[string]string{
 				options.CfgPath:  configFilePath,
 				options.NodeName: "anotherName",
