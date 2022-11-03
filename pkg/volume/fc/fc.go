@@ -283,10 +283,25 @@ func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volum
 			FC: &v1.FCVolumeSource{WWIDs: wwids, Lun: &lun, TargetWWNs: wwns},
 		},
 	}
+
+	var mountContext string
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		kvh, ok := plugin.host.(volume.KubeletVolumeHost)
+		if !ok {
+			return volume.ReconstructedVolume{}, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
+		}
+		hu := kvh.GetHostUtil()
+		mountContext, err = hu.GetSELinuxMountContext(mountPath)
+		if err != nil {
+			return volume.ReconstructedVolume{}, err
+		}
+	}
+
 	klog.V(5).Infof("ConstructVolumeSpec: TargetWWNs: %v, Lun: %v, WWIDs: %v",
 		fcVolume.VolumeSource.FC.TargetWWNs, *fcVolume.VolumeSource.FC.Lun, fcVolume.VolumeSource.FC.WWIDs)
 	return volume.ReconstructedVolume{
-		Spec: volume.NewSpecFromVolume(fcVolume),
+		Spec:                volume.NewSpecFromVolume(fcVolume),
+		SELinuxMountContext: mountContext,
 	}, nil
 }
 

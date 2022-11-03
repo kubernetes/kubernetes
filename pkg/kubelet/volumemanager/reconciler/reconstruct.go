@@ -160,7 +160,6 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*gl
 				klog.ErrorS(err, "Could not find device mount path for volume", "volumeName", gvl.volumeName)
 				continue
 			}
-			// TODO(jsafrane): add reconstructed SELinux context
 			err = rc.actualStateOfWorld.MarkDeviceAsMounted(gvl.volumeName, gvl.devicePath, deviceMountPath, "")
 			if err != nil {
 				klog.ErrorS(err, "Could not mark device is mounted to actual state of world", "volume", gvl.volumeName)

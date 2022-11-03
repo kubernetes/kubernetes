@@ -112,6 +112,7 @@ func (rc *reconciler) updateStatesNew(reconstructedVolumes map[v1.UniqueVolumeNa
 			klog.ErrorS(err, "Could not add volume information to actual state of world", "volumeName", gvl.volumeName)
 			continue
 		}
+		var seLinuxMountContext string
 		for _, volume := range gvl.podVolumes {
 			markVolumeOpts := operationexecutor.MarkVolumeOpts{
 				PodName:             volume.podName,
@@ -123,6 +124,7 @@ func (rc *reconciler) updateStatesNew(reconstructedVolumes map[v1.UniqueVolumeNa
 				VolumeGidVolume:     volume.volumeGidValue,
 				VolumeSpec:          volume.volumeSpec,
 				VolumeMountState:    operationexecutor.VolumeMountUncertain,
+				SELinuxMountContext: volume.seLinuxMountContext,
 			}
 
 			_, err = rc.actualStateOfWorld.CheckAndMarkVolumeAsUncertainViaReconstruction(markVolumeOpts)
@@ -130,7 +132,8 @@ func (rc *reconciler) updateStatesNew(reconstructedVolumes map[v1.UniqueVolumeNa
 				klog.ErrorS(err, "Could not add pod to volume information to actual state of world", "pod", klog.KObj(volume.pod))
 				continue
 			}
-			klog.V(2).InfoS("Volume is marked as uncertain and added into the actual state", "pod", klog.KObj(volume.pod), "podName", volume.podName, "volumeName", volume.volumeName)
+			seLinuxMountContext = volume.seLinuxMountContext
+			klog.V(2).InfoS("Volume is marked as uncertain and added into the actual state", "pod", klog.KObj(volume.pod), "podName", volume.podName, "volumeName", volume.volumeName, "seLinuxMountContext", volume.seLinuxMountContext)
 		}
 		// If the volume has device to mount, we mark its device as uncertain.
 		if gvl.deviceMounter != nil || gvl.blockVolumeMapper != nil {
@@ -139,7 +142,7 @@ func (rc *reconciler) updateStatesNew(reconstructedVolumes map[v1.UniqueVolumeNa
 				klog.ErrorS(err, "Could not find device mount path for volume", "volumeName", gvl.volumeName)
 				continue
 			}
-			err = rc.actualStateOfWorld.MarkDeviceAsUncertain(gvl.volumeName, gvl.devicePath, deviceMountPath, "")
+			err = rc.actualStateOfWorld.MarkDeviceAsUncertain(gvl.volumeName, gvl.devicePath, deviceMountPath, seLinuxMountContext)
 			if err != nil {
 				klog.ErrorS(err, "Could not mark device is uncertain to actual state of world", "volumeName", gvl.volumeName, "deviceMountPath", deviceMountPath)
 				continue

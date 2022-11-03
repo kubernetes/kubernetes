@@ -56,6 +56,7 @@ type reconstructedVolume struct {
 	mounter             volumepkg.Mounter
 	deviceMounter       volumepkg.DeviceMounter
 	blockVolumeMapper   volumepkg.BlockVolumeMapper
+	seLinuxMountContext string
 }
 
 // globalVolumeInfo stores reconstructed volume information
@@ -211,6 +212,9 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 		return nil, err
 	}
 	volumeSpec := reconstructed.Spec
+	if volumeSpec == nil {
+		return nil, fmt.Errorf("failed to reconstruct volume for plugin %q (spec.Name: %q) pod %q (UID: %q): got nil", volume.pluginName, volume.volumeSpecName, volume.podName, pod.UID)
+	}
 
 	// We have to find the plugins by volume spec (NOT by plugin name) here
 	// in order to correctly reconstruct ephemeral volume types.
@@ -312,9 +316,10 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 		volumeGidValue:      "",
 		// devicePath is updated during updateStates() by checking node status's VolumesAttached data.
 		// TODO: get device path directly from the volume mount path.
-		devicePath:        "",
-		mounter:           volumeMounter,
-		blockVolumeMapper: volumeMapper,
+		devicePath:          "",
+		mounter:             volumeMounter,
+		blockVolumeMapper:   volumeMapper,
+		seLinuxMountContext: reconstructed.SELinuxMountContext,
 	}
 	return reconstructedVolume, nil
 }

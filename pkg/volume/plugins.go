@@ -573,7 +573,11 @@ type VolumeConfig struct {
 // ReconstructedVolume contains information about a volume reconstructed by
 // ConstructVolumeSpec().
 type ReconstructedVolume struct {
+	// Spec is the volume spec of a mounted volume
 	Spec *Spec
+	// SELinuxMountContext is value of -o context=XYZ mount option.
+	// If empty, no such mount option is used.
+	SELinuxMountContext string
 }
 
 // NewSpecFromVolume creates an Spec from an v1.Volume

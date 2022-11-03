@@ -60,7 +60,7 @@ var (
 	testAccount = "test-service-account"
 )
 
-func prepareVolumeInfoFile(mountPath string, plug *csiPlugin, specVolumeName, volumeID, driverName, lifecycleMode string) error {
+func prepareVolumeInfoFile(mountPath string, plug *csiPlugin, specVolumeName, volumeID, driverName, lifecycleMode, seLinuxMountContext string) error {
 	nodeName := string(plug.host.GetNodeName())
 	volData := map[string]string{
 		volDataKey.specVolID:           specVolumeName,
@@ -69,6 +69,7 @@ func prepareVolumeInfoFile(mountPath string, plug *csiPlugin, specVolumeName, vo
 		volDataKey.nodeName:            nodeName,
 		volDataKey.attachmentID:        getAttachmentName(volumeID, driverName, nodeName),
 		volDataKey.volumeLifecycleMode: lifecycleMode,
+		volDataKey.seLinuxMountContext: seLinuxMountContext,
 	}
 	if err := os.MkdirAll(mountPath, 0755); err != nil {
 		return fmt.Errorf("failed to create dir for volume info file: %s", err)
