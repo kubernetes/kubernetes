@@ -17,7 +17,7 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -406,8 +406,11 @@ type DeploymentSpec struct {
 
 	// The maximum time in seconds for a deployment to make progress before it
 	// is considered to be failed. The deployment controller will continue to
-	// process failed deployments and a condition with a ProgressDeadlineExceeded
-	// reason will be surfaced in the deployment status. Note that progress will
+	// process failed deployments, but setting this field will ensure a Progressing
+	// condition exists on the deployment. The condition will be True unless a
+	// deployment spec update is not reflected in all replica sets within the
+	// specified deadline. The reason of the condition will be
+	// ProgressDeadlineExceeded in that case. Note that progress will
 	// not be estimated during the time a deployment is paused. Defaults to 600s.
 	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty" protobuf:"varint,9,opt,name=progressDeadlineSeconds"`
 }
@@ -506,13 +509,15 @@ type DeploymentStatus struct {
 	// Represents the latest observations of a deployment's current state (described by the observedGeneration).
 	// Deployments are given the following conditions automatically:
 	// Available is true when the number of available replicas under the deployment's replica sets is
-	// greater than the user's defined minimum availability. The minimum availability is controlled by the
-	// update strategy - the Recreate strategy has a minimum availability of zero (always Available), and
+	// greater than the user's defined minimum availability. A deployment that allows a minimum availability
+	// of zero will be considered Available even if no available replicas exist, so you should only rely on
+	// the Available condition if your minimum availability is non-zero.  The minimum availability is controlled
+	// by the update strategy - the Recreate strategy has a minimum availability of zero (always Available), and
 	// the Rolling strategy defaults to a minimum availability of zero unless replicas is greater than 1,
 	// the maxSurge parameter is specified, or maxUnavailable is smaller than the number of replicas.
-	// Progressing is true when the deployment is trying to reach minimum availability on a new replica set.
-	// Progressing remains true once minimum availability is reached until a new replica set (a revision) is
-	// created.
+	// Progressing is present when progressDeadlineSeconds is set and will be true if the deployment is
+	// fully up-to-date or we have not yet hit the deadline to reach minimum readiness on the new replica
+	// set, and false otherwise.
 	// ReplicaFailure is true when a replica fails to be created or deleted.
 	// Additional conditions may be added by other clients in the system.
 	// +patchMergeKey=type
@@ -532,14 +537,17 @@ type DeploymentConditionType string
 const (
 	// Available means the deployment is available, ie. at least the minimum available
 	// replicas required are up and running for at least minReadySeconds. A deployment
-	// that allows a minimum availability of zero (such as with the Recreate strategy,
-	// with a replica count of one, or with a maxUnavailable of 100% or up to the
-	// current number of replicas) will be considered available even if no available
-	// replicas exist.
+	// that allows a minimum availability of zero will be considered available even if
+	// no available replicas exist. A deployment will have a minimum availability of
+	// zero when using the Recreate strategy, or when setting maxUnavailable in
+	// RollingUpdate deployments greater than or equal to the number of replicas, or
+	// when a RollingUpdate deployment has only one replica and any non-zero
+	// maxUnavailable value.
 	DeploymentAvailable DeploymentConditionType = "Available"
-	// Progressing means the deployment is progressing. Progress for a deployment is
-	// considered when a new replica set is created or adopted. Progress is not
-	// estimated for paused deployments or when progressDeadlineSeconds is not specified.
+	// Progressing is added to deployments when progressDeadlineSeconds is set, and will
+	// be true if the deployment is fully up-to-date or we have not yet hit the deadline
+	// to reach minimum readiness on the new replica set, and false otherwise. Progress
+	// is not estimated for paused deployments is not specified.
 	DeploymentProgressing DeploymentConditionType = "Progressing"
 	// ReplicaFailure is added in a deployment when one of its pods fails to be created
 	// or deleted.
