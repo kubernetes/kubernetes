@@ -209,10 +209,16 @@ func (c *celAdmissionController) Validate(
 			}
 			return
 		case v1alpha1.Fail:
+			var message string
+			if binding == nil {
+				message = fmt.Errorf("failed to configure policy: %w", err).Error()
+			} else {
+				message = fmt.Errorf("failed to configure binding: %w", err).Error()
+			}
 			deniedDecisions = append(deniedDecisions, policyDecisionWithMetadata{
 				policyDecision: policyDecision{
 					kind:    deny,
-					message: fmt.Errorf("failed to configure policy: %w", err).Error(),
+					message: message,
 				},
 				definition: definition,
 				binding:    binding,
@@ -263,7 +269,7 @@ func (c *celAdmissionController) Validate(
 				paramRef := binding.Spec.ParamRef
 				if paramRef == nil {
 					// return error if ValidatingAdmissionPolicyBinding is mis-configured
-					return fmt.Errorf("ValidatingAdmissionPolicyBinding '%s' requires to set paramRef since policyName refers to a ValidatingAdmissionPolicy '%s' containing a paramKind: `%v`",
+					return fmt.Errorf("ValidatingAdmissionPolicyBinding '%s' requires paramRef since policyName refers to a ValidatingAdmissionPolicy '%s' with paramKind: `%v`",
 						binding.Name, definition.Name, paramKind.String())
 				}
 
@@ -300,8 +306,8 @@ func (c *celAdmissionController) Validate(
 				paramRef := binding.Spec.ParamRef
 				if paramRef != nil {
 					// return error if ValidatingAdmissionPolicyBinding is mis-configured
-					return fmt.Errorf("paramRef '%s' should be set in ValidatingAdmissionPolicyBinding '%s' since policyName refers to a ValidatingAdmissionPolicy '%s' does not contain a paramKind",
-						paramRef.String(), binding.Name, definition.Name)
+					return fmt.Errorf("ValidatingAdmissionPolicyBinding '%s' is not allowed to set paramRef to '%s' since policyName refers to a ValidatingAdmissionPolicy '%s' which has no paramKind",
+						binding.Name, paramRef.String(), definition.Name)
 				}
 			}
 
