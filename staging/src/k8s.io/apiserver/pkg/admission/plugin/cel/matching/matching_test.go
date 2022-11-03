@@ -453,6 +453,26 @@ func TestMatcher(t *testing.T) {
 			expectMatches: false,
 			isBinding:     true,
 		},
+		{
+			name: "specific rules, match miss for isBinding",
+			criteria: &v1alpha1.MatchResources{
+				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector:    &metav1.LabelSelector{},
+				ResourceRules: []v1alpha1.NamedRuleWithOperations{{
+					RuleWithOperations: v1alpha1.RuleWithOperations{
+						Operations: []v1.OperationType{"*"},
+						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
+					},
+				}, {
+					RuleWithOperations: v1alpha1.RuleWithOperations{
+						Operations: []v1.OperationType{"*"},
+						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
+					},
+				}}},
+			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches: false,
+			isBinding:     true,
+		},
 	}
 
 	for _, testcase := range testcases {
