@@ -253,6 +253,14 @@ func TestValidate(t *testing.T) {
 			},
 		},
 	}
+	podObject := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: corev1.PodSpec{
+			NodeName: "testnode",
+		},
+	}
 
 	cases := []struct {
 		name            string
@@ -268,7 +276,7 @@ func TestValidate(t *testing.T) {
 					Expression: "has(object.subsets) && object.subsets.size() < 2",
 				},
 			}, nil, nil),
-			attributes: newValidAttribute(false),
+			attributes: newValidAttribute(nil, false),
 			policyDecisions: []policyDecision{
 				generatedDecision(admit, "", ""),
 			},
@@ -283,7 +291,7 @@ func TestValidate(t *testing.T) {
 					Expression: "object != null",
 				},
 			}, nil, nil),
-			attributes: newValidAttribute(false),
+			attributes: newValidAttribute(nil, false),
 			policyDecisions: []policyDecision{
 				generatedDecision(admit, "", ""),
 				generatedDecision(admit, "", ""),
@@ -294,7 +302,7 @@ func TestValidate(t *testing.T) {
 			policy: getValidPolicy([]v1alpha1.Validation{
 				{Expression: "request.operation == 'CREATE'"},
 			}, nil, nil),
-			attributes: newValidAttribute(false),
+			attributes: newValidAttribute(nil, false),
 			policyDecisions: []policyDecision{
 				generatedDecision(admit, "", ""),
 			},
@@ -304,7 +312,7 @@ func TestValidate(t *testing.T) {
 			policy: getValidPolicy([]v1alpha1.Validation{
 				{Expression: "request.namespace != params.data.fakeString"},
 			}, hasParamKind, nil),
-			attributes: newValidAttribute(false),
+			attributes: newValidAttribute(nil, false),
 			params:     configMapParams,
 			policyDecisions: []policyDecision{
 				generatedDecision(admit, "", ""),
@@ -315,7 +323,7 @@ func TestValidate(t *testing.T) {
 			policy: getValidPolicy([]v1alpha1.Validation{
 				{Expression: "object.subsets.size() > 2"},
 			}, hasParamKind, ignorePolicy),
-			attributes: newValidAttribute(false),
+			attributes: newValidAttribute(nil, false),
 			params: &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
@@ -338,7 +346,7 @@ func TestValidate(t *testing.T) {
 					Expression: "object.subsets.size() > 2",
 				},
 			}, hasParamKind, ignorePolicy),
-			attributes: newValidAttribute(false),
+			attributes: newValidAttribute(nil, false),
 			params:     configMapParams,
 			policyDecisions: []policyDecision{
 				generatedDecision(admit, "", ""),
@@ -355,7 +363,7 @@ func TestValidate(t *testing.T) {
 					Expression: "object.subsets.size() > 2",
 				},
 			}, hasParamKind, nil),
-			attributes: newValidAttribute(false),
+			attributes: newValidAttribute(nil, false),
 			params:     configMapParams,
 			policyDecisions: []policyDecision{
 				generatedDecision(deny, "failed expression: oldObject != null", metav1.StatusReasonInvalid),
@@ -372,7 +380,7 @@ func TestValidate(t *testing.T) {
 					Expression: "object == null",
 				},
 			}, hasParamKind, nil),
-			attributes: newValidAttribute(true),
+			attributes: newValidAttribute(nil, true),
 			params:     configMapParams,
 			policyDecisions: []policyDecision{
 				generatedDecision(admit, "", ""),
@@ -387,7 +395,7 @@ func TestValidate(t *testing.T) {
 					Reason:     forbiddenReason,
 				},
 			}, hasParamKind, nil),
-			attributes: newValidAttribute(true),
+			attributes: newValidAttribute(nil, true),
 			params:     configMapParams,
 			policyDecisions: []policyDecision{
 				generatedDecision(deny, "failed expression: oldObject == null", metav1.StatusReasonForbidden),
@@ -402,7 +410,7 @@ func TestValidate(t *testing.T) {
 					Message:    "old object should be present",
 				},
 			}, hasParamKind, nil),
-			attributes: newValidAttribute(true),
+			attributes: newValidAttribute(nil, true),
 			params:     configMapParams,
 			policyDecisions: []policyDecision{
 				generatedDecision(deny, "old object should be present", metav1.StatusReasonForbidden),
@@ -415,7 +423,7 @@ func TestValidate(t *testing.T) {
 					Expression: "oldObject.x == 100",
 				},
 			}, hasParamKind, nil),
-			attributes: newValidAttribute(true),
+			attributes: newValidAttribute(nil, true),
 			params:     configMapParams,
 			policyDecisions: []policyDecision{
 				generatedDecision(deny, "resulted in error", ""),
@@ -428,7 +436,7 @@ func TestValidate(t *testing.T) {
 					Expression: "object.subsets.size() < params.spec.testSize",
 				},
 			}, hasParamKind, nil),
-			attributes: newValidAttribute(false),
+			attributes: newValidAttribute(nil, false),
 			params:     crdParams,
 			policyDecisions: []policyDecision{
 				generatedDecision(admit, "", ""),
@@ -444,7 +452,7 @@ func TestValidate(t *testing.T) {
 					Expression: "object.subsets.size() > params.spec.testSize",
 				},
 			}, hasParamKind, nil),
-			attributes: newValidAttribute(false),
+			attributes: newValidAttribute(nil, false),
 			params:     crdParams,
 			policyDecisions: []policyDecision{
 				generatedDecision(deny, "compilation error: compilation failed: ERROR: <input>:1:6: Syntax error:", ""),
@@ -461,11 +469,24 @@ func TestValidate(t *testing.T) {
 					Expression: "object.subsets.size() > params.spec.testSize",
 				},
 			}, hasParamKind, ignorePolicy),
-			attributes: newValidAttribute(false),
+			attributes: newValidAttribute(nil, false),
 			params:     crdParams,
 			policyDecisions: []policyDecision{
 				generatedDecision(admit, "compilation error: compilation failed: ERROR:", ""),
 				generatedDecision(deny, "failed expression: object.subsets.size() > params.spec.testSize", metav1.StatusReasonInvalid),
+			},
+		},
+		{
+			name: "test pod",
+			policy: getValidPolicy([]v1alpha1.Validation{
+				{
+					Expression: "object.spec.nodeName == 'testnode'",
+				},
+			}, nil, nil),
+			attributes: newValidAttribute(&podObject, false),
+			params:     crdParams,
+			policyDecisions: []policyDecision{
+				generatedDecision(admit, "", ""),
 			},
 		},
 	}
@@ -502,18 +523,20 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-func newValidAttribute(isDelete bool) admission.Attributes {
-	var object runtime.Object
+func newValidAttribute(object runtime.Object, isDelete bool) admission.Attributes {
 	var oldObject runtime.Object
 	if !isDelete {
-		object = &corev1.Endpoints{
-			Subsets: []corev1.EndpointSubset{
-				{
-					Addresses: []corev1.EndpointAddress{{IP: "127.0.0.0"}},
+		if object == nil {
+			object = &corev1.Endpoints{
+				Subsets: []corev1.EndpointSubset{
+					{
+						Addresses: []corev1.EndpointAddress{{IP: "127.0.0.0"}},
+					},
 				},
-			},
+			}
 		}
 	} else {
+		object = nil
 		oldObject = &corev1.Endpoints{
 			Subsets: []corev1.EndpointSubset{
 				{

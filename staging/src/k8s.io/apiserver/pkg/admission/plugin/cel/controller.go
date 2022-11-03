@@ -308,12 +308,6 @@ func (c *celAdmissionController) Validate(
 			if bindingInfo.validator == nil {
 				// Compile policy definition using binding
 				bindingInfo.validator = c.validatorCompiler.Compile(definition)
-				if err != nil {
-					// compilation error. Apply failure policy
-					wrappedError := fmt.Errorf("failed to compile CEL expression: %w", err)
-					addConfigError(wrappedError, definition, binding)
-					continue
-				}
 				c.bindingInfos[namespacedBindingName] = bindingInfo
 			}
 
