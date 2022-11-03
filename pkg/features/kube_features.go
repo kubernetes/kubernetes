@@ -602,6 +602,7 @@ const (
 	// owner: @xing-yang @sonasingh46
 	// kep: https://kep.k8s.io/2268
 	// alpha: v1.24
+	// beta: v1.26
 	//
 	// Allow pods to failover to a different node in case of non graceful node shutdown
 	NodeOutOfServiceVolumeDetach featuregate.Feature = "NodeOutOfServiceVolumeDetach"
@@ -982,7 +983,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	NetworkPolicyStatus: {Default: false, PreRelease: featuregate.Alpha},
 
-	NodeOutOfServiceVolumeDetach: {Default: false, PreRelease: featuregate.Alpha},
+	NodeOutOfServiceVolumeDetach: {Default: true, PreRelease: featuregate.Beta},
 
 	NodeSwap: {Default: false, PreRelease: featuregate.Alpha},
 
