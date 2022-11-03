@@ -113,12 +113,12 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 						expectObj = prevObj
 						expectObj.ResourceVersion = out.ResourceVersion
 					}
-					TestCheckResult(t, watchTest.watchType, w, expectObj)
+					testCheckResult(t, watchTest.watchType, w, expectObj)
 				}
 				prevObj = out
 			}
 			w.Stop()
-			TestCheckStop(t, w)
+			testCheckStop(t, w)
 		})
 	}
 }
@@ -127,13 +127,13 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 // - watch from 0 should sync up and grab the object added before
 // - watch from 0 is able to return events for objects whose previous version has been compacted
 func RunTestWatchFromZero(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction) {
-	key, storedObj := TestPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}})
+	key, storedObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}})
 
 	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	TestCheckResult(t, watch.Added, w, storedObj)
+	testCheckResult(t, watch.Added, w, storedObj)
 	w.Stop()
 
 	// Update
@@ -151,7 +151,7 @@ func RunTestWatchFromZero(ctx context.Context, t *testing.T, store storage.Inter
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	TestCheckResult(t, watch.Added, w, out)
+	testCheckResult(t, watch.Added, w, out)
 	w.Stop()
 
 	if compaction == nil {
@@ -176,11 +176,11 @@ func RunTestWatchFromZero(ctx context.Context, t *testing.T, store storage.Inter
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	TestCheckResult(t, watch.Added, w, out)
+	testCheckResult(t, watch.Added, w, out)
 }
 
 func RunTestDeleteTriggerWatch(ctx context.Context, t *testing.T, store storage.Interface) {
-	key, storedObj := TestPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
@@ -188,11 +188,11 @@ func RunTestDeleteTriggerWatch(ctx context.Context, t *testing.T, store storage.
 	if err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
-	TestCheckEventType(t, watch.Deleted, w)
+	testCheckEventType(t, watch.Deleted, w)
 }
 
 func RunTestWatchFromNoneZero(ctx context.Context, t *testing.T, store storage.Interface) {
-	key, storedObj := TestPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {
@@ -203,7 +203,7 @@ func RunTestWatchFromNoneZero(ctx context.Context, t *testing.T, store storage.I
 		func(runtime.Object) (runtime.Object, error) {
 			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}, err
 		}), nil)
-	TestCheckResult(t, watch.Modified, w, out)
+	testCheckResult(t, watch.Modified, w, out)
 }
 
 func RunTestWatchError(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer) {
@@ -236,7 +236,7 @@ func RunTestWatchError(ctx context.Context, t *testing.T, store InterfaceWithPre
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	TestCheckEventType(t, watch.Error, w)
+	testCheckEventType(t, watch.Error, w)
 }
 
 func RunTestWatchContextCancel(ctx context.Context, t *testing.T, store storage.Interface) {
@@ -263,7 +263,7 @@ func RunTestWatchContextCancel(ctx context.Context, t *testing.T, store storage.
 }
 
 func RunTestWatchDeleteEventObjectHaveLatestRV(ctx context.Context, t *testing.T, store storage.Interface) {
-	key, storedObj := TestPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	watchCtx, _ := context.WithTimeout(ctx, wait.ForeverTestTimeout)
 	w, err := store.Watch(watchCtx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
@@ -295,7 +295,7 @@ func RunTestWatchInitializationSignal(ctx context.Context, t *testing.T, store s
 	initSignal := utilflowcontrol.NewInitializationSignal()
 	ctx = utilflowcontrol.WithInitializationSignal(ctx, initSignal)
 
-	key, storedObj := TestPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	key, storedObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	_, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
@@ -315,7 +315,7 @@ func RunOptionalTestProgressNotify(ctx context.Context, t *testing.T, store stor
 	if err := store.Create(ctx, key, input, out, 0); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
-	validateResourceVersion := ResourceVersionNotOlderThan(out.ResourceVersion)
+	validateResourceVersion := resourceVersionNotOlderThan(out.ResourceVersion)
 
 	opts := storage.ListOptions{
 		ResourceVersion: out.ResourceVersion,
@@ -329,7 +329,7 @@ func RunOptionalTestProgressNotify(ctx context.Context, t *testing.T, store stor
 
 	// when we send a bookmark event, the client expects the event to contain an
 	// object of the correct type, but with no fields set other than the resourceVersion
-	TestCheckResultFunc(t, watch.Bookmark, w, func(object runtime.Object) error {
+	testCheckResultFunc(t, watch.Bookmark, w, func(object runtime.Object) error {
 		// first, check that we have the correct resource version
 		obj, ok := object.(metav1.Object)
 		if !ok {
