@@ -37,10 +37,6 @@ type policyDecision struct {
 	reason  metav1.StatusReason
 }
 
-func (p policyDecision) IsError() bool {
-	return p.kind == deny
-}
-
 type policyDecisionWithMetadata struct {
 	policyDecision
 	definition *v1alpha1.ValidatingAdmissionPolicy
