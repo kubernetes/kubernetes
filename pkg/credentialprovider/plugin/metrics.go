@@ -24,8 +24,8 @@ import (
 )
 
 const (
-	kubeletCredentialProviderPluginErrorsKey   = "kubelet_credential_provider_plugin_errors"
-	kubeletCredentialProviderPluginDurationKey = "kubelet_credential_provider_plugin_duration"
+	kubeletCredentialProviderPluginErrorsKey   = "credential_provider_plugin_errors"
+	kubeletCredentialProviderPluginDurationKey = "credential_provider_plugin_duration"
 	KubeletSubsystem                           = "kubelet"
 )
 
@@ -59,6 +59,5 @@ func registerMetrics() {
 	registerOnce.Do(func() {
 		legacyregistry.MustRegister(kubeletCredentialProviderPluginErrors)
 		legacyregistry.MustRegister(kubeletCredentialProviderPluginDuration)
-
 	})
 }
