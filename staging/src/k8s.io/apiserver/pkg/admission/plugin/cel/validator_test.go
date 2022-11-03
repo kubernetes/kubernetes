@@ -17,10 +17,11 @@ limitations under the License.
 package cel
 
 import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"strings"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/stretchr/testify/require"
 
@@ -282,6 +283,18 @@ func TestValidate(t *testing.T) {
 			},
 		},
 		{
+			name: "valid syntax for metadata",
+			policy: getValidPolicy([]v1alpha1.Validation{
+				{
+					Expression: "object.metadata.name == 'endpoints1'",
+				},
+			}, nil, nil),
+			attributes: newValidAttribute(false),
+			policyDecisions: []policyDecision{
+				generatedDecision(admit, "", ""),
+			},
+		},
+		{
 			name: "valid syntax for oldObject",
 			policy: getValidPolicy([]v1alpha1.Validation{
 				{
@@ -528,6 +541,9 @@ func newValidAttribute(object runtime.Object, isDelete bool) admission.Attribute
 	if !isDelete {
 		if object == nil {
 			object = &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "endpoints1",
+				},
 				Subsets: []corev1.EndpointSubset{
 					{
 						Addresses: []corev1.EndpointAddress{{IP: "127.0.0.0"}},

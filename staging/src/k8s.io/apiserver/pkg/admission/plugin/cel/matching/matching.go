@@ -100,6 +100,7 @@ func (m *Matcher) Matches(attr admission.Attributes, o admission.ObjectInterface
 	return true, nil
 }
 
+// TODO: for equivalent matching, this needs to return what GVk was matched
 func matchesResourceRules(namedRules []v1alpha1.NamedRuleWithOperations, matchPolicy *v1alpha1.MatchPolicyType, attr admission.Attributes, o admission.ObjectInterfaces) bool {
 	for _, namedRule := range namedRules {
 		rule := v1.RuleWithOperations(namedRule.RuleWithOperations)

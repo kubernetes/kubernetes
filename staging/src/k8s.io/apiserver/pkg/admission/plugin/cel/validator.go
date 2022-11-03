@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/cel/matching"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 )
 
 var _ ValidatorCompiler = &CELValidatorCompiler{}
@@ -165,15 +166,20 @@ func policyDecisionKindForError(f v1alpha1.FailurePolicyType) policyDecisionKind
 // Each PolicyDecision will have a decision and a message.
 // policyDecision.message will be empty if the decision is allowed and no error met.
 func (v *CELValidator) Validate(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object) ([]policyDecision, error) {
+	// TODO: pass in the GVK found by MatchType: Equivalent matching and pass it to NewVerionsedAttributes.
 	// TODO: replace unstructured with ref.Val for CEL variables when native type support is available
 
 	decisions := make([]policyDecision, len(v.compilationResults))
 	var err error
-	oldObjectVal, err := objectToResolveVal(a.GetOldObject())
+	versionedAttr, err := generic.NewVersionedAttributes(a, a.GetKind(), o)
 	if err != nil {
 		return nil, err
 	}
-	objectVal, err := objectToResolveVal(a.GetObject())
+	oldObjectVal, err := objectToResolveVal(versionedAttr.VersionedOldObject)
+	if err != nil {
+		return nil, err
+	}
+	objectVal, err := objectToResolveVal(versionedAttr.VersionedObject)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +187,7 @@ func (v *CELValidator) Validate(a admission.Attributes, o admission.ObjectInterf
 	if err != nil {
 		return nil, err
 	}
-	request := createAdmissionRequest(a)
+	request := createAdmissionRequest(versionedAttr.Attributes)
 	requestVal, err := convertObjectToUnstructured(request)
 	if err != nil {
 		return nil, err
