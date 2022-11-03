@@ -30,7 +30,33 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
+// Finds all managed fields owners of the given operation type which owns all of
+// the fields in the given set
+//
+// If there is an error decoding one of the fieldsets for any reason, it is ignored
+// and assumed not to match the query.
+func FindFieldsOwners(
+	managedFields []metav1.ManagedFieldsEntry,
+	operation metav1.ManagedFieldsOperationType,
+	fields *fieldpath.Set,
+) []metav1.ManagedFieldsEntry {
+	var result []metav1.ManagedFieldsEntry
+	for _, entry := range managedFields {
+		if entry.Operation != operation {
+			continue
+		}
 
+		fieldSet, err := decodeManagedFieldsEntrySet(entry)
+		if err != nil {
+			continue
+		}
+
+		if fields.Difference(&fieldSet).Empty() {
+			result = append(result, entry)
+		}
+	}
+	return result
+}
 
 // Upgrades the Manager information for fields managed with client-side-apply (CSA)
 // Prepares fields owned by `csaManager` for 'Update' operations for use now

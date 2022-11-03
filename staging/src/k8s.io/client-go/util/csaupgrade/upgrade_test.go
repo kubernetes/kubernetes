@@ -29,7 +29,264 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/util/csaupgrade"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
+
+func TestFindOwners(t *testing.T) {
+	testCases := []struct {
+		Name              string
+		ManagedFieldsYAML string
+		Operation         metav1.ManagedFieldsOperationType
+		Fields            *fieldpath.Set
+		Expectation       []string
+	}{
+		{
+			// Field a root field path owner
+			Name: "Basic",
+			ManagedFieldsYAML: `
+      managedFields:
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:data:
+            .: {}
+            f:key: {}
+            f:legacy: {}
+          f:metadata:
+            f:annotations:
+              .: {}
+              f:kubectl.kubernetes.io/last-applied-configuration: {}
+        manager: kubectl-client-side-apply
+        operation: Update
+        time: "2022-08-22T23:08:23Z"
+      `,
+			Operation:   metav1.ManagedFieldsOperationUpdate,
+			Fields:      fieldpath.NewSet(fieldpath.MakePathOrDie("data")),
+			Expectation: []string{"kubectl-client-side-apply"},
+		},
+		{
+			// Find a fieldpath nested inside another field
+			Name: "Nested",
+			ManagedFieldsYAML: `
+      managedFields:
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:data:
+            .: {}
+            f:key: {}
+            f:legacy: {}
+          f:metadata:
+            f:annotations:
+              .: {}
+              f:kubectl.kubernetes.io/last-applied-configuration: {}
+        manager: kubectl-client-side-apply
+        operation: Update
+        time: "2022-08-22T23:08:23Z"
+      `,
+			Operation:   metav1.ManagedFieldsOperationUpdate,
+			Fields:      fieldpath.NewSet(fieldpath.MakePathOrDie("metadata", "annotations", "kubectl.kubernetes.io/last-applied-configuration")),
+			Expectation: []string{"kubectl-client-side-apply"},
+		},
+		{
+			// Search for an operaiton/fieldpath combination that is not found on both
+			// axes
+			Name: "NotFound",
+			ManagedFieldsYAML: `
+      managedFields:
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:data:
+            .: {}
+            f:key: {}
+            f:legacy: {}
+          f:metadata:
+            f:annotations:
+              .: {}
+              f:kubectl.kubernetes.io/last-applied-configuration: {}
+        manager: kubectl
+        operation: Apply
+        time: "2022-08-23T23:08:23Z"
+      `,
+			Operation:   metav1.ManagedFieldsOperationUpdate,
+			Fields:      fieldpath.NewSet(fieldpath.MakePathOrDie("metadata", "annotations", "kubectl.kubernetes.io/last-applied-configuration")),
+			Expectation: []string{},
+		},
+		{
+			// Test using apply operation
+			Name: "ApplyOperation",
+			ManagedFieldsYAML: `
+      managedFields:
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:data:
+            .: {}
+            f:key: {}
+            f:legacy: {}
+          f:metadata:
+            f:annotations:
+              .: {}
+              f:kubectl.kubernetes.io/last-applied-configuration: {}
+        manager: kubectl
+        operation: Apply
+        time: "2022-08-23T23:08:23Z"
+      `,
+			Operation:   metav1.ManagedFieldsOperationApply,
+			Fields:      fieldpath.NewSet(fieldpath.MakePathOrDie("metadata", "annotations", "kubectl.kubernetes.io/last-applied-configuration")),
+			Expectation: []string{"kubectl"},
+		},
+		{
+			// Of multiple field managers, match a single one
+			Name: "OneOfMultiple",
+			ManagedFieldsYAML: `
+      managedFields:
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:metadata:
+            f:annotations:
+              .: {}
+              f:kubectl.kubernetes.io/last-applied-configuration: {}
+        manager: kubectl-client-side-apply
+        operation: Update
+        time: "2022-08-23T23:08:23Z"
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:data:
+            .: {}
+            f:key: {}
+            f:legacy: {}
+        manager: kubectl
+        operation: Apply
+        time: "2022-08-23T23:08:23Z"
+      `,
+			Operation:   metav1.ManagedFieldsOperationUpdate,
+			Fields:      fieldpath.NewSet(fieldpath.MakePathOrDie("metadata", "annotations", "kubectl.kubernetes.io/last-applied-configuration")),
+			Expectation: []string{"kubectl-client-side-apply"},
+		},
+		{
+			// have multiple field managers, and match more than one but not all of them
+			Name: "ManyOfMultiple",
+			ManagedFieldsYAML: `
+      managedFields:
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:metadata:
+            f:annotations:
+              .: {}
+              f:kubectl.kubernetes.io/last-applied-configuration: {}
+        manager: kubectl-client-side-apply
+        operation: Update
+        time: "2022-08-23T23:08:23Z"
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:metadata:
+            f:annotations:
+              .: {}
+              f:kubectl.kubernetes.io/last-applied-configuration: {}
+          f:data:
+            .: {}
+            f:key: {}
+            f:legacy: {}
+        manager: kubectl
+        operation: Apply
+        time: "2022-08-23T23:08:23Z"
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:metadata:
+            f:annotations:
+              .: {}
+              f:kubectl.kubernetes.io/last-applied-configuration: {}
+        manager: kubectl-client-side-apply2
+        operation: Update
+        time: "2022-08-23T23:08:23Z"
+      `,
+			Operation:   metav1.ManagedFieldsOperationUpdate,
+			Fields:      fieldpath.NewSet(fieldpath.MakePathOrDie("metadata", "annotations", "kubectl.kubernetes.io/last-applied-configuration")),
+			Expectation: []string{"kubectl-client-side-apply", "kubectl-client-side-apply2"},
+		},
+		{
+			// Test with multiple fields to match against
+			Name: "BasicMultipleFields",
+			ManagedFieldsYAML: `
+      managedFields:
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:metadata:
+            f:annotations:
+              .: {}
+              f:kubectl.kubernetes.io/last-applied-configuration: {}
+          f:data:
+            .: {}
+            f:key: {}
+            f:legacy: {}
+        manager: kubectl-client-side-apply
+        operation: Update
+        time: "2022-08-23T23:08:23Z"
+      `,
+			Operation: metav1.ManagedFieldsOperationUpdate,
+			Fields: fieldpath.NewSet(
+				fieldpath.MakePathOrDie("data", "key"),
+				fieldpath.MakePathOrDie("metadata", "annotations", "kubectl.kubernetes.io/last-applied-configuration"),
+			),
+			Expectation: []string{"kubectl-client-side-apply"},
+		},
+		{
+			// Test with multiplle fields but the manager is missing one of the fields
+			// requested so it does not match
+			Name: "MissingOneField",
+			ManagedFieldsYAML: `
+      managedFields:
+      - apiVersion: v1
+        fieldsType: FieldsV1
+        fieldsV1:
+          f:metadata:
+            f:annotations:
+              .: {}
+              f:kubectl.kubernetes.io/last-applied-configuration: {}
+          f:data:
+            .: {}
+            f:legacy: {}
+        manager: kubectl-client-side-apply
+        operation: Update
+        time: "2022-08-23T23:08:23Z"
+      `,
+			Operation: metav1.ManagedFieldsOperationUpdate,
+			Fields: fieldpath.NewSet(
+				fieldpath.MakePathOrDie("data", "key"),
+				fieldpath.MakePathOrDie("metadata", "annotations", "kubectl.kubernetes.io/last-applied-configuration"),
+			),
+			Expectation: []string{},
+		},
+	}
+	for _, tcase := range testCases {
+		t.Run(tcase.Name, func(t *testing.T) {
+			var entries struct {
+				ManagedFields []metav1.ManagedFieldsEntry `json:"managedFields"`
+			}
+			err := yaml.Unmarshal([]byte(tcase.ManagedFieldsYAML), &entries)
+			require.NoError(t, err)
+
+			result := csaupgrade.FindFieldsOwners(entries.ManagedFields, tcase.Operation, tcase.Fields)
+
+			// Compare owner names since they uniquely identify the selected entries
+			// (given that the operation is provided)
+			ownerNames := []string{}
+			for _, entry := range result {
+				ownerNames = append(ownerNames, entry.Manager)
+				require.Equal(t, tcase.Operation, entry.Operation)
+			}
+			require.ElementsMatch(t, tcase.Expectation, ownerNames)
+		})
+	}
+}
 
 func TestUpgradeCSA(t *testing.T) {
 
