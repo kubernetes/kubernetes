@@ -32,18 +32,6 @@ import (
 )
 
 func TestLeastAllocatedScoringStrategy(t *testing.T) {
-	defaultResources := []config.ResourceSpec{
-		{Name: string(v1.ResourceCPU), Weight: 1},
-		{Name: string(v1.ResourceMemory), Weight: 1},
-	}
-
-	extendedRes := "abc.com/xyz"
-	extendedResourceLeastAllocatedSet := []config.ResourceSpec{
-		{Name: string(v1.ResourceCPU), Weight: 1},
-		{Name: string(v1.ResourceMemory), Weight: 1},
-		{Name: extendedRes, Weight: 1},
-	}
-
 	tests := []struct {
 		name           string
 		requestedPod   *v1.Pod
@@ -347,7 +335,7 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000", v1.ResourceName(extendedRes): "4"}).Obj(),
 			},
 			expectedScores: []framework.NodeScore{{Name: "node1", Score: 50}, {Name: "node2", Score: 50}},
-			resources:      extendedResourceLeastAllocatedSet,
+			resources:      extendedResourceSet,
 		},
 		{
 			// Honor extended resource if the pod requests.
@@ -368,7 +356,7 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 			},
 			existingPods:   nil,
 			expectedScores: []framework.NodeScore{{Name: "node1", Score: 50}, {Name: "node2", Score: 60}},
-			resources:      extendedResourceLeastAllocatedSet,
+			resources:      extendedResourceSet,
 		},
 	}
 

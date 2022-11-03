@@ -32,17 +32,6 @@ import (
 )
 
 func TestMostAllocatedScoringStrategy(t *testing.T) {
-	defaultResources := []config.ResourceSpec{
-		{Name: string(v1.ResourceCPU), Weight: 1},
-		{Name: string(v1.ResourceMemory), Weight: 1},
-	}
-	extendedRes := "abc.com/xyz"
-	extendedResourceLeastAllocatedSet := []config.ResourceSpec{
-		{Name: string(v1.ResourceCPU), Weight: 1},
-		{Name: string(v1.ResourceMemory), Weight: 1},
-		{Name: extendedRes, Weight: 1},
-	}
-
 	tests := []struct {
 		name           string
 		requestedPod   *v1.Pod
@@ -75,7 +64,7 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 			// Node1 scores on 0-MaxNodeScore scale
 			// CPU Score: (3000 * MaxNodeScore) / 4000 = 75
 			// Memory Score: (5000 * MaxNodeScore) / 10000 = 50
-			// Node1 Score: (75 + 50) / 2 = 6
+			// Node1 Score: (75 + 50) / 2 = 62
 			// Node2 scores on 0-MaxNodeScore scale
 			// CPU Score: (3000 * MaxNodeScore) / 6000 = 50
 			// Memory Score: (5000 * MaxNodeScore) / 10000 = 50
@@ -301,7 +290,7 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000"}).Obj(),
 				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000", v1.ResourceName(extendedRes): "4"}).Obj(),
 			},
-			resources:      extendedResourceLeastAllocatedSet,
+			resources:      extendedResourceSet,
 			existingPods:   nil,
 			expectedScores: []framework.NodeScore{{Name: "node1", Score: 50}, {Name: "node2", Score: 50}},
 		},
@@ -322,7 +311,7 @@ func TestMostAllocatedScoringStrategy(t *testing.T) {
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000", v1.ResourceName(extendedRes): "4"}).Obj(),
 				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{"cpu": "6000", "memory": "10000", v1.ResourceName(extendedRes): "10"}).Obj(),
 			},
-			resources:      extendedResourceLeastAllocatedSet,
+			resources:      extendedResourceSet,
 			existingPods:   nil,
 			expectedScores: []framework.NodeScore{{Name: "node1", Score: 50}, {Name: "node2", Score: 40}},
 		},
