@@ -34,7 +34,7 @@ import (
 )
 
 // updateReplicaSetStatus attempts to update the Status.Replicas of the given ReplicaSet, with a single GET/PUT retry.
-func updateReplicaSetStatus(c appsclient.ReplicaSetInterface, rs *apps.ReplicaSet, newStatus apps.ReplicaSetStatus) (*apps.ReplicaSet, error) {
+func updateReplicaSetStatus(c appsclient.ReplicaSetInterface, rs *apps.ReplicaSet, newStatus apps.ReplicaSetStatus) error {
 	// This is the steady state. It happens when the ReplicaSet doesn't have any expectations, since
 	// we do a periodic relist every 30s. If the generations differ but the replicas are
 	// the same, a caller might've resized to the same replica count.
@@ -44,7 +44,7 @@ func updateReplicaSetStatus(c appsclient.ReplicaSetInterface, rs *apps.ReplicaSe
 		rs.Status.AvailableReplicas == newStatus.AvailableReplicas &&
 		rs.Generation == rs.Status.ObservedGeneration &&
 		reflect.DeepEqual(rs.Status.Conditions, newStatus.Conditions) {
-		return rs, nil
+		return nil
 	}
 
 	// Save the generation number we acted on, otherwise we might wrongfully indicate
@@ -54,7 +54,6 @@ func updateReplicaSetStatus(c appsclient.ReplicaSetInterface, rs *apps.ReplicaSe
 	newStatus.ObservedGeneration = rs.Generation
 
 	var getErr, updateErr error
-	var updatedRS *apps.ReplicaSet
 	for i, rs := 0, rs; ; i++ {
 		klog.V(4).Infof(fmt.Sprintf("Updating status for %v: %s/%s, ", rs.Kind, rs.Namespace, rs.Name) +
 			fmt.Sprintf("replicas %d->%d (need %d), ", rs.Status.Replicas, newStatus.Replicas, *(rs.Spec.Replicas)) +
@@ -64,9 +63,9 @@ func updateReplicaSetStatus(c appsclient.ReplicaSetInterface, rs *apps.ReplicaSe
 			fmt.Sprintf("sequence No: %v->%v", rs.Status.ObservedGeneration, newStatus.ObservedGeneration))
 
 		rs.Status = newStatus
-		updatedRS, updateErr = c.UpdateStatus(context.TODO(), rs, metav1.UpdateOptions{})
+		_, updateErr = c.UpdateStatus(context.TODO(), rs, metav1.UpdateOptions{})
 		if updateErr == nil {
-			return updatedRS, nil
+			return nil
 		}
 		// Stop retrying if we exceed statusUpdateRetries - the replicaSet will be requeued with a rate limit.
 		if i >= statusUpdateRetries {
@@ -76,14 +75,15 @@ func updateReplicaSetStatus(c appsclient.ReplicaSetInterface, rs *apps.ReplicaSe
 		if rs, getErr = c.Get(context.TODO(), rs.Name, metav1.GetOptions{}); getErr != nil {
 			// If the GET fails we can't trust status.Replicas anymore. This error
 			// is bound to be more interesting than the update failure.
-			return nil, getErr
+			return getErr
 		}
 	}
 
-	return nil, updateErr
+	return updateErr
 }
 
-func calculateStatus(rs *apps.ReplicaSet, filteredPods []*v1.Pod, manageReplicasErr error) apps.ReplicaSetStatus {
+func calculateStatus(rs *apps.ReplicaSet, filteredPods []*v1.Pod, manageReplicasErr error) (apps.ReplicaSetStatus, []*v1.Pod) {
+	var readyUnavailablePods []*v1.Pod
 	newStatus := rs.Status
 	// Count the number of pods that have labels matching the labels of the pod
 	// template of the replica set, the matching pods may have more
@@ -102,6 +102,8 @@ func calculateStatus(rs *apps.ReplicaSet, filteredPods []*v1.Pod, manageReplicas
 			readyReplicasCount++
 			if podutil.IsPodAvailable(pod, rs.Spec.MinReadySeconds, metav1.Now()) {
 				availableReplicasCount++
+			} else {
+				readyUnavailablePods = append(readyUnavailablePods, pod)
 			}
 		}
 	}
@@ -124,7 +126,7 @@ func calculateStatus(rs *apps.ReplicaSet, filteredPods []*v1.Pod, manageReplicas
 	newStatus.FullyLabeledReplicas = int32(fullyLabeledReplicasCount)
 	newStatus.ReadyReplicas = int32(readyReplicasCount)
 	newStatus.AvailableReplicas = int32(availableReplicasCount)
-	return newStatus
+	return newStatus, readyUnavailablePods
 }
 
 // NewReplicaSetCondition creates a new replicaset condition.

@@ -29,6 +29,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -157,6 +158,7 @@ func runControllerAndInformers(t *testing.T, rm *replicaset.ReplicaSetController
 	informers.Start(ctx.Done())
 	waitToObservePods(t, informers.Core().V1().Pods().Informer(), podNum)
 	go rm.Run(ctx, 5)
+
 	return cancelFn
 }
 
@@ -304,7 +306,7 @@ func setPodsReadyCondition(t *testing.T, clientSet clientset.Interface, pods *v1
 		readyPods = 0
 		for i := range pods.Items {
 			pod := &pods.Items[i]
-			if podutil.IsPodReady(pod) {
+			if podutil.IsPodReady(pod) && conditionStatus == v1.ConditionTrue {
 				readyPods++
 				continue
 			}
@@ -891,6 +893,217 @@ func TestReadyAndAvailableReplicas(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("Failed to verify number of Replicas, ReadyReplicas and AvailableReplicas of rs %s to be as expected: %v", rs.Name, err)
 	}
+}
+
+// TestAvailableReplicasWithUnstableReadyCondition tests that replica set correctly updates AvailableReplicas
+// in minReadySeconds time when pods are struggling to become ready.
+// Each test takes approximately 10s to run.
+func TestAvailableReplicasWithUnstableReadyCondition(t *testing.T) {
+	tests := []struct {
+		name                  string
+		replicas              int32
+		minReadySeconds       int
+		setupPods             func(t *testing.T, c clientset.Interface, ns *v1.Namespace) error
+		expectedReplicas      int32
+		expectedReadyReplicas int32
+		expectedAvailable     func(runDuration time.Duration, minReadySeconds int) (expectedAvailable sets.Set[int32], done bool)
+	}{
+		{
+			name:            "pod 3 becoming available  and struggling to become ready (unready -> ready -> unready -> ready)",
+			minReadySeconds: 5,
+			replicas:        3,
+			setupPods: func(t *testing.T, c clientset.Interface, ns *v1.Namespace) error {
+				podClient := c.CoreV1().Pods(ns.Name)
+				pods := getPods(t, podClient, labelMap())
+
+				// Separate 3 pods into their own list
+				firstPodList := &v1.PodList{Items: pods.Items[:1]}
+				secondPodList := &v1.PodList{Items: pods.Items[1:2]}
+				thirdPodList := &v1.PodList{Items: pods.Items[2:]}
+
+				// First pod: Running, but not Ready
+				setPodsReadyCondition(t, c, firstPodList, v1.ConditionFalse, time.Now())
+				// Second pod Running but not Ready
+				setPodsReadyCondition(t, c, secondPodList, v1.ConditionFalse, time.Now())
+				// Third pod: Running and Ready, but not Available
+				// will register available check in 5 seconds
+				setPodsReadyCondition(t, c, thirdPodList, v1.ConditionTrue, time.Now())
+				// Remove the third pod readiness after 1 second. This should not be larger than the minReadySeconds
+				// to make sure the pod is still waiting to be evaluated
+				time.Sleep(1 * time.Second)
+				pod, err := podClient.Get(context.TODO(), thirdPodList.Items[0].Name, metav1.GetOptions{})
+				if err != nil {
+					return fmt.Errorf("failed to obtain pod %s: %v", pod.Name, err)
+				}
+				thirdPodList.Items[0] = *pod
+				setPodsReadyCondition(t, c, thirdPodList, v1.ConditionFalse, time.Now())
+				// Make the third pod ready again. This should not be larger than the minReadySeconds - the previous sleep
+				time.Sleep(1 * time.Second)
+				// total of 2s delay is picked precisely not to fit into the replicas set last attempt against clock skew, check availability window (in previous implementation)
+
+				pod, err = podClient.Get(context.TODO(), thirdPodList.Items[0].Name, metav1.GetOptions{})
+				if err != nil {
+					return fmt.Errorf("failed to obtain pod %s: %v", pod.Name, err)
+				}
+				thirdPodList.Items[0] = *pod
+				// should register available check in 5 seconds
+				setPodsReadyCondition(t, c, thirdPodList, v1.ConditionTrue, time.Now())
+				return nil
+			},
+			expectedReplicas:      3,
+			expectedReadyReplicas: 1,
+			expectedAvailable: func(runDuration time.Duration, minReadySeconds int) (expectedAvailable sets.Set[int32], done bool) {
+				skewDelay := 1 * time.Second
+				transitionTime := 1 * time.Second
+				waitForTransition := skewDelay + transitionTime
+				thirdPodTimeoutToAvailable := time.Duration(minReadySeconds) * time.Second
+
+				switch {
+				case runDuration < thirdPodTimeoutToAvailable:
+					expectedAvailable = sets.New[int32](0)
+				// [5, 7]
+				case runDuration <= thirdPodTimeoutToAvailable+waitForTransition:
+					expectedAvailable = sets.New[int32](0, 1) // transition
+				// (7, 8)
+				default:
+					expectedAvailable = sets.New[int32](1) // transition complete
+					done = true
+				}
+				return expectedAvailable, done
+			},
+		},
+		{
+			name:            "pod 2 becoming available, pod 3 becoming available with a delay",
+			minReadySeconds: 5,
+			replicas:        3,
+			setupPods: func(t *testing.T, c clientset.Interface, ns *v1.Namespace) error {
+				podClient := c.CoreV1().Pods(ns.Name)
+				pods := getPods(t, podClient, labelMap())
+
+				// Separate 3 pods into their own list
+				firstPodList := &v1.PodList{Items: pods.Items[:1]}
+				secondPodList := &v1.PodList{Items: pods.Items[1:2]}
+				thirdPodList := &v1.PodList{Items: pods.Items[2:]}
+
+				// First pod: Running, but not Ready
+				setPodsReadyCondition(t, c, firstPodList, v1.ConditionFalse, time.Now())
+				// Second pod Running and Ready, but not Available
+				// will register available check in 5 seconds
+				setPodsReadyCondition(t, c, secondPodList, v1.ConditionTrue, time.Now())
+				// Delay the third pod readiness for 2 seconds. This should not be larger than the minReadySeconds
+				// to make sure the second pod is still waiting to be evaluated
+				//
+				// total of 2s delay is picked precisely not to fit into the replicas set last attempt against clock skew, check availability window (in previous implementation)
+				time.Sleep(2 * time.Second) // same value used in expectedAvailable()
+				// Third pod: Running and Ready, but not Available
+				// will register available check in 5 seconds
+				setPodsReadyCondition(t, c, thirdPodList, v1.ConditionTrue, time.Now())
+				return nil
+			},
+			expectedReplicas:      3,
+			expectedReadyReplicas: 2,
+			expectedAvailable: func(runDuration time.Duration, minReadySeconds int) (expectedAvailable sets.Set[int32], done bool) {
+				thirdPodStartDelay := 2 * time.Second // same value used in setupPods
+				skewDelay := 1 * time.Second
+				transitionTime := 1 * time.Second
+				waitForTransition := skewDelay + transitionTime
+				secondPodTimeoutToAvailable := time.Duration(minReadySeconds)*time.Second - thirdPodStartDelay
+				thirdPodTimeoutToAvailable := time.Duration(minReadySeconds) * time.Second
+				switch {
+				// (0, 2)
+				case runDuration < secondPodTimeoutToAvailable:
+					expectedAvailable = sets.New[int32](0)
+				// [2, 4]
+				case runDuration <= secondPodTimeoutToAvailable+waitForTransition:
+					expectedAvailable = sets.New[int32](0, 1) // transition
+				// (4, 5)
+				case runDuration < thirdPodTimeoutToAvailable:
+					expectedAvailable = sets.New[int32](1) // transition complete
+				// [5, 7]
+				case runDuration <= thirdPodTimeoutToAvailable+waitForTransition:
+					expectedAvailable = sets.New[int32](1, 2) // transition
+				// (7, 8)
+				default:
+					expectedAvailable = sets.New[int32](2) // transition complete
+					done = true
+				}
+				return expectedAvailable, done
+			},
+		},
+	}
+
+	for i, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			closeFn, rm, informers, c := rmSetup(t)
+			defer closeFn()
+			ns := framework.CreateNamespaceOrDie(c, fmt.Sprintf("test-available-replicas-unstable-ready-%d", i), t)
+			defer framework.DeleteNamespaceOrDie(c, ns, t)
+			stopControllers := runControllerAndInformers(t, rm, informers, 0)
+			defer stopControllers()
+
+			rs := newRS("rs", ns.Name, int(tc.replicas))
+
+			rs.Spec.MinReadySeconds = int32(tc.minReadySeconds)
+			rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
+			rs = rss[0]
+			waitRSStable(t, c, rs)
+
+			// verify no pod is ready
+			if rs.Status.ReadyReplicas != 0 {
+				t.Fatalf("Unexpected .Status.ReadyReplicas: Expected 0, got %d", rs.Status.ReadyReplicas)
+			}
+
+			// verify no pod is available
+			if rs.Status.AvailableReplicas != 0 {
+				t.Fatalf("Unexpected .Status.AvailableReplicas: Expected 0, got %d", rs.Status.AvailableReplicas)
+			}
+
+			podClient := c.CoreV1().Pods(ns.Name)
+			pods := getPods(t, podClient, labelMap())
+			if len(pods.Items) != int(tc.expectedReplicas) {
+				t.Fatalf("invalid len(pods): Expected  %d, got %d", tc.expectedReplicas, len(pods.Items))
+			}
+
+			rsClient := c.AppsV1().ReplicaSets(ns.Name)
+
+			err := tc.setupPods(t, c, ns)
+			if err != nil {
+				t.Fatalf("could not setup pods: %v", err)
+			}
+
+			start := time.Now()
+			err = wait.PollImmediate(interval, timeout, func() (bool, error) {
+				newRS, err := rsClient.Get(context.TODO(), rs.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+
+				runDuration := time.Since(start)
+				expectedAvailable, done := tc.expectedAvailable(runDuration, tc.minReadySeconds)
+
+				if !expectedAvailable.Has(newRS.Status.AvailableReplicas) {
+					return false, fmt.Errorf("failed to verify number of AvailableReplicas of rs %s at run duration %v: expected %v, got %d",
+						rs.Name, runDuration, expectedAvailable.UnsortedList(), newRS.Status.AvailableReplicas)
+				}
+				return done, nil
+			})
+			if err != nil {
+				t.Fatalf("failed to verify AvailableReplicas transitions: %v", err)
+			}
+
+			newRS, err := rsClient.Get(context.TODO(), rs.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Failed to obtain rs %s: %v", newRS.Name, err)
+			}
+			if newRS.Status.Replicas != tc.expectedReplicas {
+				t.Fatalf("Failed to verify number of Replicas of rs %s: expected %d, got %d", rs.Name, tc.expectedReplicas, newRS.Status.Replicas)
+			}
+			if newRS.Status.ReadyReplicas != tc.expectedReadyReplicas {
+				t.Fatalf("Failed to verify number of ReadyReplicas of rs %s: expected %d, got %d", rs.Name, tc.expectedReadyReplicas, newRS.Status.ReadyReplicas)
+			}
+		})
+	}
+
 }
 
 func TestRSScaleSubresource(t *testing.T) {

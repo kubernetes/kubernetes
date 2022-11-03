@@ -113,6 +113,9 @@ type ReplicaSetController struct {
 
 	// Controllers that need to be synced
 	queue workqueue.RateLimitingInterface
+
+	// Pods added to this queue will be checked if they were available for minReadySeconds
+	availabilityCheckQueue workqueue.RateLimitingInterface
 }
 
 // NewReplicaSetController configures a replica set controller with the specified event recorder
@@ -139,13 +142,14 @@ func NewBaseController(rsInformer appsinformers.ReplicaSetInformer, podInformer 
 	gvk schema.GroupVersionKind, metricOwnerName, queueName string, podControl controller.PodControlInterface, eventBroadcaster record.EventBroadcaster) *ReplicaSetController {
 
 	rsc := &ReplicaSetController{
-		GroupVersionKind: gvk,
-		kubeClient:       kubeClient,
-		podControl:       podControl,
-		eventBroadcaster: eventBroadcaster,
-		burstReplicas:    burstReplicas,
-		expectations:     controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
-		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), queueName),
+		GroupVersionKind:       gvk,
+		kubeClient:             kubeClient,
+		podControl:             podControl,
+		eventBroadcaster:       eventBroadcaster,
+		burstReplicas:          burstReplicas,
+		expectations:           controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
+		queue:                  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), queueName),
+		availabilityCheckQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("%s_availability_check", queueName)),
 	}
 
 	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -197,6 +201,8 @@ func (rsc *ReplicaSetController) Run(ctx context.Context, workers int) {
 
 	defer rsc.queue.ShutDown()
 
+	defer rsc.availabilityCheckQueue.ShutDown()
+
 	controllerName := strings.ToLower(rsc.Kind)
 	klog.Infof("Starting %v controller", controllerName)
 	defer klog.Infof("Shutting down %v controller", controllerName)
@@ -208,6 +214,8 @@ func (rsc *ReplicaSetController) Run(ctx context.Context, workers int) {
 	for i := 0; i < workers; i++ {
 		go wait.UntilWithContext(ctx, rsc.worker, time.Second)
 	}
+
+	go wait.UntilWithContext(ctx, rsc.availabilityCheckWorker, time.Second)
 
 	<-ctx.Done()
 }
@@ -285,16 +293,6 @@ func (rsc *ReplicaSetController) enqueueRS(rs *apps.ReplicaSet) {
 	rsc.queue.Add(key)
 }
 
-func (rsc *ReplicaSetController) enqueueRSAfter(rs *apps.ReplicaSet, duration time.Duration) {
-	key, err := controller.KeyFunc(rs)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", rs, err))
-		return
-	}
-
-	rsc.queue.AddAfter(key, duration)
-}
-
 func (rsc *ReplicaSetController) addRS(obj interface{}) {
 	rs := obj.(*apps.ReplicaSet)
 	klog.V(4).Infof("Adding %s %s/%s", rsc.Kind, rs.Namespace, rs.Name)
@@ -364,6 +362,24 @@ func (rsc *ReplicaSetController) deleteRS(obj interface{}) {
 	rsc.expectations.DeleteExpectations(key)
 
 	rsc.queue.Add(key)
+}
+
+func (rsc *ReplicaSetController) forgetAvailabilityCheck(pod *v1.Pod) {
+	key, err := controller.KeyFunc(pod)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("availability check: couldn't get key for object %#v: %v", pod, err))
+		return
+	}
+	rsc.availabilityCheckQueue.ForgetDelayed(key)
+}
+
+func (rsc *ReplicaSetController) enqueueAvailabilityCheckAfter(pod *v1.Pod, duration time.Duration) {
+	key, err := controller.KeyFunc(pod)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("availability check: couldn't get key for object %#v: %v", pod, err))
+		return
+	}
+	rsc.availabilityCheckQueue.AddAfter(key, duration)
 }
 
 // When a pod is created, enqueue the replica set that manages it and update its expectations.
@@ -457,13 +473,22 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 		// having its status updated with the newly available replica. For now, we can fake the
 		// update by resyncing the controller MinReadySeconds after the it is requeued because
 		// a Pod transitioned to Ready.
+		// Each pod guards its own availability update, so we first add it to availabilityCheckQueue
+		// after MinReadySeconds has passed, which in turn will trigger the replica set queue.
 		// Note that this still suffers from #29229, we are just moving the problem one level
 		// "closer" to kubelet (from the deployment to the replica set controller).
 		if !podutil.IsPodReady(oldPod) && podutil.IsPodReady(curPod) && rs.Spec.MinReadySeconds > 0 {
 			klog.V(2).Infof("%v %q will be enqueued after %ds for availability check", rsc.Kind, rs.Name, rs.Spec.MinReadySeconds)
+			// Forget the potential pending availability check as just enqueuing the pod will not override it.
+			rsc.forgetAvailabilityCheck(curPod)
 			// Add a second to avoid milliseconds skew in AddAfter.
 			// See https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133 for more info.
-			rsc.enqueueRSAfter(rs, (time.Duration(rs.Spec.MinReadySeconds)*time.Second)+time.Second)
+			rsc.enqueueAvailabilityCheckAfter(curPod, (time.Duration(rs.Spec.MinReadySeconds)*time.Second)+time.Second)
+			return
+		}
+		// forget the potential pending availability check if the pod lost its readiness
+		if podutil.IsPodReady(oldPod) && !podutil.IsPodReady(curPod) && rs.Spec.MinReadySeconds > 0 {
+			rsc.forgetAvailabilityCheck(curPod)
 		}
 		return
 	}
@@ -521,6 +546,10 @@ func (rsc *ReplicaSetController) deletePod(obj interface{}) {
 	klog.V(4).Infof("Pod %s/%s deleted through %v, timestamp %+v: %#v.", pod.Namespace, pod.Name, utilruntime.GetCaller(), pod.DeletionTimestamp, pod)
 	rsc.expectations.DeletionObserved(rsKey, controller.PodKey(pod))
 	rsc.queue.Add(rsKey)
+	// forget the potential pending availability check
+	if rs.Spec.MinReadySeconds > 0 {
+		rsc.forgetAvailabilityCheck(pod)
+	}
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
@@ -547,6 +576,63 @@ func (rsc *ReplicaSetController) processNextWorkItem(ctx context.Context) bool {
 	rsc.queue.AddRateLimited(key)
 
 	return true
+}
+
+// availabilityCheckWorker runs a worker thread that just dequeues items, processes them, and marks them done.
+// It enforces that the syncAvailabilityCheck is never invoked concurrently with the same key.
+func (rsc *ReplicaSetController) availabilityCheckWorker(ctx context.Context) {
+	for rsc.processNextAvailabilityCheckWorkItem(ctx) {
+	}
+}
+
+func (rsc *ReplicaSetController) processNextAvailabilityCheckWorkItem(ctx context.Context) bool {
+	key, quit := rsc.availabilityCheckQueue.Get()
+	if quit {
+		return false
+	}
+	defer rsc.availabilityCheckQueue.Done(key)
+
+	err := rsc.syncAvailabilityCheck(ctx, key.(string))
+	if err == nil {
+		rsc.availabilityCheckQueue.Forget(key)
+		return true
+	}
+
+	utilruntime.HandleError(fmt.Errorf("availability check sync %q failed with %v", key, err))
+	rsc.availabilityCheckQueue.AddRateLimited(key)
+
+	return true
+}
+
+// syncAvailabilityCheck will sync the Pod and add its replica set to the queue for an availability check.
+// This function is not meant to be invoked concurrently with the same key.
+func (rsc *ReplicaSetController) syncAvailabilityCheck(ctx context.Context, key string) error {
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		return err
+	}
+	pod, err := rsc.podLister.Pods(namespace).Get(name)
+	if apierrors.IsNotFound(err) {
+		// should be handled by the replica set queue
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	curControllerRef := metav1.GetControllerOf(pod)
+	if curControllerRef == nil {
+		// orphaned pod should be handled by updatePod function
+		return nil
+	}
+	rs := rsc.resolveControllerRef(pod.Namespace, curControllerRef)
+	if rs == nil {
+		return nil
+	}
+
+	klog.V(4).Infof("Pod %s: checking availability, objectMeta %+v.", pod.Name, pod.ObjectMeta)
+	rsc.enqueueRS(rs)
+	return nil
 }
 
 // manageReplicas checks and updates replicas for the given ReplicaSet.
@@ -706,20 +792,21 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 		manageReplicasErr = rsc.manageReplicas(ctx, filteredPods, rs)
 	}
 	rs = rs.DeepCopy()
-	newStatus := calculateStatus(rs, filteredPods, manageReplicasErr)
+	newStatus, readyUnavailablePods := calculateStatus(rs, filteredPods, manageReplicasErr)
 
 	// Always updates status as pods come up or die.
-	updatedRS, err := updateReplicaSetStatus(rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace), rs, newStatus)
+	err = updateReplicaSetStatus(rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace), rs, newStatus)
 	if err != nil {
 		// Multiple things could lead to this update failing. Requeuing the replica set ensures
 		// Returning an error causes a requeue without forcing a hotloop
 		return err
 	}
-	// Resync the ReplicaSet after MinReadySeconds as a last line of defense to guard against clock-skew.
-	if manageReplicasErr == nil && updatedRS.Spec.MinReadySeconds > 0 &&
-		updatedRS.Status.ReadyReplicas == *(updatedRS.Spec.Replicas) &&
-		updatedRS.Status.AvailableReplicas != *(updatedRS.Spec.Replicas) {
-		rsc.queue.AddAfter(key, time.Duration(updatedRS.Spec.MinReadySeconds)*time.Second)
+	// Resync the Pods after MinReadySeconds as a last line of defense to guard against clock-skew.
+	for _, pod := range readyUnavailablePods {
+		// Schedule pod for availability check only in case there is none pending at the moment (it will not override the old check).
+		// Add a second to avoid milliseconds skew in AddAfter.
+		// See https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133 for more info.
+		rsc.enqueueAvailabilityCheckAfter(pod, (time.Duration(rs.Spec.MinReadySeconds)*time.Second)+time.Second)
 	}
 	return manageReplicasErr
 }

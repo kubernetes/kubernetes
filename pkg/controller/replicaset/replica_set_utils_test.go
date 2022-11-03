@@ -35,12 +35,14 @@ func TestCalculateStatus(t *testing.T) {
 	fullyLabelledRS := newReplicaSet(2, fullLabelMap)
 	longMinReadySecondsRS := newReplicaSet(1, fullLabelMap)
 	longMinReadySecondsRS.Spec.MinReadySeconds = 3600
+	longMinReadySecondsPod := newPod("pod1", longMinReadySecondsRS, v1.PodRunning, nil, true)
 
 	rsStatusTests := []struct {
-		name                     string
-		replicaset               *apps.ReplicaSet
-		filteredPods             []*v1.Pod
-		expectedReplicaSetStatus apps.ReplicaSetStatus
+		name                         string
+		replicaset                   *apps.ReplicaSet
+		filteredPods                 []*v1.Pod
+		expectedReplicaSetStatus     apps.ReplicaSetStatus
+		expectedReadyUnavailablePods []*v1.Pod
 	}{
 		{
 			"1 fully labelled pod",
@@ -54,6 +56,7 @@ func TestCalculateStatus(t *testing.T) {
 				ReadyReplicas:        1,
 				AvailableReplicas:    1,
 			},
+			nil,
 		},
 		{
 			"1 not fully labelled pod",
@@ -67,6 +70,7 @@ func TestCalculateStatus(t *testing.T) {
 				ReadyReplicas:        1,
 				AvailableReplicas:    1,
 			},
+			nil,
 		},
 		{
 			"2 fully labelled pods",
@@ -81,6 +85,7 @@ func TestCalculateStatus(t *testing.T) {
 				ReadyReplicas:        2,
 				AvailableReplicas:    2,
 			},
+			nil,
 		},
 		{
 			"2 not fully labelled pods",
@@ -95,6 +100,7 @@ func TestCalculateStatus(t *testing.T) {
 				ReadyReplicas:        2,
 				AvailableReplicas:    2,
 			},
+			nil,
 		},
 		{
 			"1 fully labelled pod, 1 not fully labelled pod",
@@ -109,6 +115,7 @@ func TestCalculateStatus(t *testing.T) {
 				ReadyReplicas:        2,
 				AvailableReplicas:    2,
 			},
+			nil,
 		},
 		{
 			"1 non-ready pod",
@@ -122,12 +129,13 @@ func TestCalculateStatus(t *testing.T) {
 				ReadyReplicas:        0,
 				AvailableReplicas:    0,
 			},
+			nil,
 		},
 		{
 			"1 ready but non-available pod",
 			longMinReadySecondsRS,
 			[]*v1.Pod{
-				newPod("pod1", longMinReadySecondsRS, v1.PodRunning, nil, true),
+				longMinReadySecondsPod,
 			},
 			apps.ReplicaSetStatus{
 				Replicas:             1,
@@ -135,14 +143,22 @@ func TestCalculateStatus(t *testing.T) {
 				ReadyReplicas:        1,
 				AvailableReplicas:    0,
 			},
+			[]*v1.Pod{
+				longMinReadySecondsPod,
+			},
 		},
 	}
 
 	for _, test := range rsStatusTests {
-		replicaSetStatus := calculateStatus(test.replicaset, test.filteredPods, nil)
-		if !reflect.DeepEqual(replicaSetStatus, test.expectedReplicaSetStatus) {
-			t.Errorf("%s: unexpected replicaset status: expected %v, got %v", test.name, test.expectedReplicaSetStatus, replicaSetStatus)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			replicaSetStatus, readyUnavailablePods := calculateStatus(test.replicaset, test.filteredPods, nil)
+			if !reflect.DeepEqual(replicaSetStatus, test.expectedReplicaSetStatus) {
+				t.Errorf("unexpected replicaset status: expected %v, got %v", test.expectedReplicaSetStatus, replicaSetStatus)
+			}
+			if !reflect.DeepEqual(readyUnavailablePods, test.expectedReadyUnavailablePods) {
+				t.Errorf("unexpected ready unavailable pods: expected %v, got %v", test.expectedReadyUnavailablePods, readyUnavailablePods)
+			}
+		})
 	}
 }
 
@@ -234,13 +250,16 @@ func TestCalculateStatusConditions(t *testing.T) {
 	}
 
 	for _, test := range rsStatusConditionTests {
-		replicaSetStatus := calculateStatus(test.replicaset, test.filteredPods, test.manageReplicasErr)
+		replicaSetStatus, readyUnavailablePods := calculateStatus(test.replicaset, test.filteredPods, test.manageReplicasErr)
 		// all test cases have at most 1 status condition
 		if len(replicaSetStatus.Conditions) > 0 {
 			test.expectedReplicaSetConditions[0].LastTransitionTime = replicaSetStatus.Conditions[0].LastTransitionTime
 		}
 		if !reflect.DeepEqual(replicaSetStatus.Conditions, test.expectedReplicaSetConditions) {
 			t.Errorf("%s: unexpected replicaset status: expected %v, got %v", test.name, test.expectedReplicaSetConditions, replicaSetStatus.Conditions)
+		}
+		if len(readyUnavailablePods) != 0 {
+			t.Errorf("unexpected number of ready unavailable pods: expected %d, got %d", 0, len(readyUnavailablePods))
 		}
 	}
 }
