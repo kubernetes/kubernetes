@@ -27,6 +27,7 @@ import (
 	nodeapi "k8s.io/kubernetes/pkg/api/node"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/pods"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
 func GetWarningsForPod(ctx context.Context, pod, oldPod *api.Pod) []string {
@@ -201,6 +202,14 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 	}
 	if value, ok := podSpec.Overhead[api.ResourceEphemeralStorage]; ok && value.MilliValue()%int64(1000) != int64(0) {
 		warnings = append(warnings, fmt.Sprintf("%s: fractional byte value %q is invalid, must be an integer", fieldPath.Child("spec", "overhead").Key(string(api.ResourceEphemeralStorage)), value.String()))
+	}
+
+	// critical pod set ephemeral-storage limits, cannot eviction pods when resource usage exceeds limit
+	for _, container := range podSpec.Containers {
+		if container.Resources.Limits != nil && container.Resources.Limits.StorageEphemeral() != nil &&
+			podSpec.Priority != nil && *podSpec.Priority >= scheduling.SystemCriticalPriority {
+			warnings = append(warnings, fmt.Sprintf("critical pod set ephemeral-storage limits no effect for %s container", container.Name))
+		}
 	}
 
 	// use of pod seccomp annotation without accompanying field
