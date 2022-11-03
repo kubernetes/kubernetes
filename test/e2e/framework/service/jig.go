@@ -1030,6 +1030,8 @@ func (j *TestJig) CheckServiceReachability(svc *v1.Service, pod *v1.Pod) error {
 		return j.checkNodePortServiceReachability(svc, pod)
 	case v1.ServiceTypeExternalName:
 		return j.checkExternalServiceReachability(svc, pod)
+	case v1.ServiceTypeLoadBalancer:
+		return j.checkClusterIPServiceReachability(svc, pod)
 	default:
 		return fmt.Errorf("unsupported service type \"%s\" to verify service reachability for \"%s\" service. This may due to diverse implementation of the service type", svcType, svc.Name)
 	}
@@ -1064,4 +1066,23 @@ func (j *TestJig) CreateSCTPServiceWithPort(tweak func(svc *v1.Service), port in
 		return nil, fmt.Errorf("failed to create SCTP Service %q: %v", svc.Name, err)
 	}
 	return j.sanityCheckService(result, svc.Spec.Type)
+}
+
+// CreateLoadBalancerServiceWaitForClusterIPOnly creates a loadbalancer service and waits
+// for it to acquire a cluster IP
+func (j *TestJig) CreateLoadBalancerServiceWaitForClusterIPOnly(tweak func(svc *v1.Service)) (*v1.Service, error) {
+	ginkgo.By("creating a service " + j.Namespace + "/" + j.Name + " with type=LoadBalancer")
+	svc := j.newServiceTemplate(v1.ProtocolTCP, 80)
+	svc.Spec.Type = v1.ServiceTypeLoadBalancer
+	// We need to turn affinity off for our LB distribution tests
+	svc.Spec.SessionAffinity = v1.ServiceAffinityNone
+	if tweak != nil {
+		tweak(svc)
+	}
+	result, err := j.Client.CoreV1().Services(j.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create LoadBalancer Service %q: %v", svc.Name, err)
+	}
+
+	return j.sanityCheckService(result, v1.ServiceTypeLoadBalancer)
 }

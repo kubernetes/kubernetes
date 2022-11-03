@@ -381,6 +381,59 @@ func Test_UpdateLoadBalancerWithLoadBalancerClass(t *testing.T) {
 	}
 }
 
+// Test_ServiceLoadBalancerMixedProtocolSetup tests that a LoadBalancer Service with different protocol values
+// can be created.
+func Test_ServiceLoadBalancerMixedProtocolSetup(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client, err := clientset.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	ns := framework.CreateNamespaceOrDie(client, "test-service-mixed-protocols", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	controller, cloud, informer := newServiceController(t, client)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informer.Start(ctx.Done())
+	go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
+
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-123",
+		},
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{
+				{
+					Name:     "tcpport",
+					Port:     int32(53),
+					Protocol: corev1.ProtocolTCP,
+				},
+				{
+					Name:     "udpport",
+					Port:     int32(53),
+					Protocol: corev1.ProtocolUDP,
+				},
+			},
+		},
+	}
+
+	_, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating test service: %v", err)
+	}
+
+	time.Sleep(5 * time.Second) // sleep 5 second to wait for the service controller reconcile
+	if len(cloud.Calls) == 0 {
+		t.Errorf("expected cloud provider calls to create load balancer")
+	}
+}
+
 func newServiceController(t *testing.T, client *clientset.Clientset) (*servicecontroller.Controller, *fakecloud.Cloud, informers.SharedInformerFactory) {
 	cloud := &fakecloud.Cloud{}
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
