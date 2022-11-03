@@ -1025,9 +1025,7 @@ golang.org/x/net/http/httpguts
 golang.org/x/net/http2
 golang.org/x/net/http2/hpack
 golang.org/x/net/idna
-golang.org/x/net/internal/socks
 golang.org/x/net/internal/timeseries
-golang.org/x/net/proxy
 golang.org/x/net/trace
 golang.org/x/net/websocket
 # golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b
