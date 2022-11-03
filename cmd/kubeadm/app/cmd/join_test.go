@@ -24,9 +24,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -205,6 +211,37 @@ func TestNewJoinData(t *testing.T) {
 			name: "Pass with config from file",
 			flags: map[string]string{
 				options.CfgPath: configFilePath,
+			},
+			validate: func(t *testing.T, data *joinData) {
+				validData := &joinData{
+					cfg: &kubeadmapi.JoinConfiguration{
+						TypeMeta: metav1.TypeMeta{Kind: "", APIVersion: ""},
+						NodeRegistration: kubeadmapi.NodeRegistrationOptions{
+							Name:                  "somename",
+							CRISocket:             "unix:///var/run/containerd/containerd.sock",
+							IgnorePreflightErrors: []string{"c", "d"},
+							ImagePullPolicy:       "IfNotPresent",
+							Taints:                []v1.Taint{{Key: "node-role.kubernetes.io/control-plane", Effect: "NoSchedule"}},
+						},
+						CACertPath: kubeadmapiv1.DefaultCACertPath,
+						Discovery: kubeadmapi.Discovery{
+							BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
+								Token:                    "abcdef.0123456789abcdef",
+								APIServerEndpoint:        "1.2.3.4:6443",
+								UnsafeSkipCAVerification: true,
+							},
+							TLSBootstrapToken: "abcdef.0123456789abcdef",
+							Timeout:           &metav1.Duration{Duration: kubeadmapiv1.DefaultDiscoveryTimeout},
+						},
+						ControlPlane: &kubeadmapi.JoinControlPlane{
+							CertificateKey: "c39a18bae4a72e71b178661f437363da218a3efb83ddb03f1cd91d9ae1da41bd",
+						},
+					},
+					ignorePreflightErrors: sets.New("c", "d"),
+				}
+				if diff := cmp.Diff(validData, data, cmp.AllowUnexported(joinData{}), cmpopts.IgnoreFields(joinData{}, "client", "initCfg", "cfg.ControlPlane.LocalAPIEndpoint")); diff != "" {
+					t.Fatalf("newJoinData returned data (-want,+got):\n%s", diff)
+				}
 			},
 		},
 		{

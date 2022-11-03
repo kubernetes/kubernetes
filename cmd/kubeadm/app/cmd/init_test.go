@@ -22,10 +22,16 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	v1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 var testInitConfig = fmt.Sprintf(`---
@@ -98,6 +104,39 @@ func TestNewInitData(t *testing.T) {
 			flags: map[string]string{
 				options.CfgPath: configFilePath,
 			},
+			validate: func(t *testing.T, data *initData) {
+				validData := &initData{
+					certificatesDir:       kubeadmapiv1.DefaultCertificatesDir,
+					kubeconfigPath:        constants.GetAdminKubeConfigPath(),
+					kubeconfigDir:         constants.KubernetesDir,
+					ignorePreflightErrors: sets.New("c", "d"),
+					cfg: &kubeadmapi.InitConfiguration{
+						NodeRegistration: kubeadmapi.NodeRegistrationOptions{
+							Name:                  "somename",
+							CRISocket:             "unix:///var/run/containerd/containerd.sock",
+							IgnorePreflightErrors: []string{"c", "d"},
+							ImagePullPolicy:       "IfNotPresent",
+						},
+						LocalAPIEndpoint: kubeadmapi.APIEndpoint{
+							AdvertiseAddress: "1.2.3.4",
+							BindPort:         6443,
+						},
+						BootstrapTokens: []v1.BootstrapToken{
+							{
+								Token:  &v1.BootstrapTokenString{ID: "abcdef", Secret: "0123456789abcdef"},
+								Usages: []string{"signing", "authentication"},
+								TTL: &metav1.Duration{
+									Duration: constants.DefaultTokenDuration,
+								},
+								Groups: []string{"system:bootstrappers:kubeadm:default-node-token"},
+							},
+						},
+					},
+				}
+				if diff := cmp.Diff(validData, data, cmp.AllowUnexported(initData{}), cmpopts.IgnoreFields(initData{}, "client", "cfg.ClusterConfiguration", "cfg.NodeRegistration.Taints")); diff != "" {
+					t.Fatalf("newInitData returned data (-want,+got):\n%s", diff)
+				}
+			},
 		},
 		{
 			name: "--node-name flags override config from file",
@@ -164,7 +203,6 @@ func TestNewInitData(t *testing.T) {
 			if err == nil && tc.expectError {
 				t.Fatal("newInitData didn't return error when expected")
 			}
-
 			// exec additional validation on the returned value
 			if tc.validate != nil {
 				tc.validate(t, data)
