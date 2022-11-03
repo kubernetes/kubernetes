@@ -36,6 +36,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
@@ -134,7 +135,9 @@ func SetTransportDefaults(t *http.Transport) *http.Transport {
 	if s := os.Getenv("DISABLE_HTTP2"); len(s) > 0 {
 		klog.Info("HTTP2 has been explicitly disabled")
 	} else if allowsHTTP2(t) {
-		if err := configureHTTP2Transport(t); err != nil {
+		var err error
+		t, err = configureHTTP2Transport(t)
+		if err != nil {
 			klog.Warningf("Transport failed http2 configuration: %v", err)
 		}
 	}
@@ -171,11 +174,28 @@ func pingTimeoutSeconds() int {
 	return ret
 }
 
-func configureHTTP2Transport(t *http.Transport) error {
-	t2, err := http2.ConfigureTransports(t)
+func configureHTTP2Transport(tInner *http.Transport) (*http.Transport, error) {
+	// We want to clone the original transport and disable HTTP/2 on the clone.  Per
+	// godoc, if TLSNextProto is not nil, HTTP/2 support is not enabled.  Hence, we
+	// do this dance with save/restore.
+	innerTLSNextProto := tInner.TLSNextProto
+	tInner.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
+	tOuter := tInner.Clone()
+	tInner.TLSNextProto = innerTLSNextProto
+
+	// Now that we have an outer transport same as incoming but without HTTP/2, we
+	// configure HTTP/2 on inner and set it to handle "https" on the outer.
+	t2, err := http2.ConfigureTransports(tInner)
 	if err != nil {
-		return err
+		return nil, err
 	}
+
+	// Because the stdlib transport tries to send upgrades over HTTP/2, we wrap
+	// it in our own h2RoundTripper which returns http.ErrSkipAltProtocol on
+	// upgrade requests. This causes the tOuter transport to handle the request
+	// (which only does HTTP/1.1_
+	tOuter.RegisterProtocol("https", h2RoundTripper{tInner})
+
 	// The following enables the HTTP/2 connection health check added in
 	// https://github.com/golang/net/pull/55. The health check detects and
 	// closes broken transport layer connections. Without the health check,
@@ -186,7 +206,20 @@ func configureHTTP2Transport(t *http.Transport) error {
 	// https://github.com/kubernetes/kubernetes/issues/87615.
 	t2.ReadIdleTimeout = time.Duration(readIdleTimeoutSeconds()) * time.Second
 	t2.PingTimeout = time.Duration(pingTimeoutSeconds()) * time.Second
-	return nil
+	return tOuter, nil
+}
+
+// h2RoundTripper is a RoundTripper which only tries to complete the request if
+// it's not an upgrade request, otherwise returns http.ErrSkipAltProtocol.
+type h2RoundTripper struct{ *http.Transport }
+
+func (rt h2RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	isUpgrade := httpguts.HeaderValuesContainsToken(req.Header.Values("Connection"), "Upgrade") &&
+		len(req.Header.Values("Upgrade")) > 0
+	if isUpgrade {
+		return nil, http.ErrSkipAltProtocol
+	}
+	return rt.Transport.RoundTrip(req)
 }
 
 func allowsHTTP2(t *http.Transport) bool {

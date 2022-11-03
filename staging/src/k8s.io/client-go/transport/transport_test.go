@@ -314,7 +314,7 @@ func TestNew(t *testing.T) {
 				},
 			},
 			Err:          false,
-			TLS:          true,
+			TLS:          false,
 			TLSCert:      false,
 			TLSErr:       false,
 			Default:      false,
