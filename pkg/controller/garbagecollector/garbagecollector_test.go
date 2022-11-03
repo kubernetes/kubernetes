@@ -2758,6 +2758,9 @@ func (t *trackingWorkqueue) Done(item interface{}) {
 func (t *trackingWorkqueue) Forget(item interface{}) {
 	t.limiter.Forget(item)
 }
+func (t *trackingWorkqueue) ForgetDelayed(item interface{}) {
+	t.limiter.ForgetDelayed(item)
+}
 func (t *trackingWorkqueue) NumRequeues(item interface{}) int {
 	return 0
 }

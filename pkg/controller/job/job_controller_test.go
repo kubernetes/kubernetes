@@ -3813,6 +3813,11 @@ func (f *fakeRateLimitingQueue) AddAfter(item interface{}, duration time.Duratio
 	f.duration = duration
 }
 
+func (f *fakeRateLimitingQueue) ForgetDelayed(item interface{}) {
+	f.item = nil
+	f.duration = 0
+}
+
 func TestJobBackoff(t *testing.T) {
 	job := newJob(1, 1, 1, batch.NonIndexedCompletion)
 	oldPod := newPod(fmt.Sprintf("pod-%v", rand.String(10)), job)
