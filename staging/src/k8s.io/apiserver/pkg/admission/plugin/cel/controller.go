@@ -19,6 +19,7 @@ package cel
 import (
 	"context"
 	"fmt"
+	"k8s.io/apiserver/pkg/admission/plugin/cel/matching"
 	"sync"
 
 	"k8s.io/api/admissionregistration/v1alpha1"
@@ -30,7 +31,8 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/cel/internal/generic"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 )
 
@@ -47,7 +49,7 @@ type celAdmissionController struct {
 
 	// dynamicclient used to create informers to watch the param crd types
 	dynamicClient dynamic.Interface
-	restMapper    meta.RESTMapper // WantsRESTMapper
+	restMapper    meta.RESTMapper
 
 	// Provided to the policy's Compile function as an injected dependency to
 	// assist with compiling its expressions to CEL
@@ -111,15 +113,16 @@ type paramInfo struct {
 }
 
 func NewAdmissionController(
-	// Informers
-	policyDefinitionsInformer cache.SharedIndexInformer,
-	policyBindingInformer cache.SharedIndexInformer,
-
 	// Injected Dependencies
-	validatorCompiler ValidatorCompiler,
+	informerFactory informers.SharedInformerFactory,
+	client kubernetes.Interface,
 	restMapper meta.RESTMapper,
 	dynamicClient dynamic.Interface,
 ) CELPolicyEvaluator {
+	matcher := matching.NewMatcher(informerFactory.Core().V1().Namespaces().Lister(), client)
+	validatorCompiler := &CELValidatorCompiler{
+		Matcher: matcher,
+	}
 	c := &celAdmissionController{
 		definitionInfo:        make(map[string]*definitionInfo),
 		bindingInfos:          make(map[string]*bindingInfo),
@@ -131,7 +134,8 @@ func NewAdmissionController(
 	}
 
 	c.policyDefinitionsController = generic.NewController(
-		generic.NewInformer[*v1alpha1.ValidatingAdmissionPolicy](policyDefinitionsInformer),
+		generic.NewInformer[*v1alpha1.ValidatingAdmissionPolicy](
+			informerFactory.Admissionregistration().V1alpha1().ValidatingAdmissionPolicies().Informer()),
 		c.reconcilePolicyDefinition,
 		generic.ControllerOptions{
 			Workers: 1,
@@ -139,7 +143,8 @@ func NewAdmissionController(
 		},
 	)
 	c.policyBindingController = generic.NewController(
-		generic.NewInformer[*v1alpha1.ValidatingAdmissionPolicyBinding](policyBindingInformer),
+		generic.NewInformer[*v1alpha1.ValidatingAdmissionPolicyBinding](
+			informerFactory.Admissionregistration().V1alpha1().ValidatingAdmissionPolicyBindings().Informer()),
 		c.reconcilePolicyBinding,
 		generic.ControllerOptions{
 			Workers: 1,
@@ -350,4 +355,8 @@ func (c *celAdmissionController) Validate(
 func (c *celAdmissionController) HasSynced() bool {
 	return c.policyBindingController.HasSynced() &&
 		c.policyDefinitionsController.HasSynced()
+}
+
+func (c *celAdmissionController) ValidateInitialization() error {
+	return c.validatorCompiler.ValidateInitialization()
 }

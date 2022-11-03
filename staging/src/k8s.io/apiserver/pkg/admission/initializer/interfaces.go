@@ -20,6 +20,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	quota "k8s.io/apiserver/pkg/quota/v1"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
@@ -66,5 +67,10 @@ type WantsDrainedNotification interface {
 //	}
 type WantsFeatures interface {
 	InspectFeatureGates(featuregate.FeatureGate)
+	admission.InitializationValidator
+}
+
+type WantsDynamicClient interface {
+	SetDynamicClient(dynamic.Interface)
 	admission.InitializationValidator
 }

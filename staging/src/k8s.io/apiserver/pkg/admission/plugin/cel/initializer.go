@@ -18,11 +18,13 @@ package cel
 
 import (
 	"context"
-
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
 )
 
 type CELPolicyEvaluator interface {
+	admission.InitializationValidator
+
 	Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error
 	HasSynced() bool
 	Run(stopCh <-chan struct{})
@@ -30,27 +32,27 @@ type CELPolicyEvaluator interface {
 
 // NewPluginInitializer creates a plugin initializer which dependency injects a
 // singleton cel admission controller into the plugins which desire it
-func NewPluginInitializer(validator CELPolicyEvaluator) *PluginInitializer {
-	return &PluginInitializer{validator: validator}
-}
-
-// WantsCELPolicyEvaluator gives the ability to have the shared
-// CEL Admission Controller dependency injected at initialization-time.
-type WantsCELPolicyEvaluator interface {
-	SetCELPolicyEvaluator(CELPolicyEvaluator)
+func NewPluginInitializer(restMapper meta.RESTMapper) admission.PluginInitializer {
+	return &pluginInitializer{
+		restMapper: restMapper,
+	}
 }
 
 // PluginInitializer is used for initialization of the webhook admission plugin.
-type PluginInitializer struct {
-	validator CELPolicyEvaluator
+type pluginInitializer struct {
+	restMapper meta.RESTMapper
 }
 
-var _ admission.PluginInitializer = &PluginInitializer{}
+var _ admission.PluginInitializer = &pluginInitializer{}
+
+type WantsRESTMapper interface {
+	SetRESTMapper(meta.RESTMapper)
+}
 
 // Initialize checks the initialization interfaces implemented by each plugin
 // and provide the appropriate initialization data
-func (i *PluginInitializer) Initialize(plugin admission.Interface) {
-	if wants, ok := plugin.(WantsCELPolicyEvaluator); ok {
-		wants.SetCELPolicyEvaluator(i.validator)
+func (i *pluginInitializer) Initialize(plugin admission.Interface) {
+	if wants, ok := plugin.(WantsRESTMapper); ok {
+		wants.SetRESTMapper(i.restMapper)
 	}
 }

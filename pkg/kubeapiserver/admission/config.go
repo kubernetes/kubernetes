@@ -17,7 +17,6 @@ limitations under the License.
 package admission
 
 import (
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -27,7 +26,6 @@ import (
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
-	"k8s.io/apiserver/pkg/admission/plugin/cel/matching"
 	webhookinit "k8s.io/apiserver/pkg/admission/plugin/webhook/initializer"
 	"k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -35,7 +33,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
-	"k8s.io/client-go/dynamic"
 	externalinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -86,38 +83,10 @@ func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselec
 	initializers := []admission.PluginInitializer{webhookPluginInitializer, kubePluginInitializer}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CELValidatingAdmission) {
-		dynamicClient, err := dynamic.NewForConfig(c.LoopbackClientConfig)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		matcher := matching.NewMatcher(
-			c.ExternalInformers.Core().V1().Namespaces().Lister(),
-			clientset,
-		)
-
-		if err := matcher.ValidateInitialization(); err != nil {
-			return nil, nil, fmt.Errorf("failed to initializer cel admission matcher: %w", err)
-		}
-
-		// Create CEL admission controller
-		var celAdmissionController = cel.NewAdmissionController(
-			c.ExternalInformers.Admissionregistration().V1alpha1().ValidatingAdmissionPolicies().Informer(),
-			c.ExternalInformers.Admissionregistration().V1alpha1().ValidatingAdmissionPolicyBindings().Informer(),
-			&cel.CELValidatorCompiler{Matcher: matcher},
-			discoveryRESTMapper,
-			dynamicClient,
-		)
-		celAdmissionPluginInitializer := cel.NewPluginInitializer(celAdmissionController)
+		celAdmissionPluginInitializer := cel.NewPluginInitializer(discoveryRESTMapper)
 		initializers = append(initializers, celAdmissionPluginInitializer)
 
-		hookDelegate := admissionPostStartHook
-		admissionPostStartHook = func(context genericapiserver.PostStartHookContext) error {
-			go celAdmissionController.Run(context.StopCh)
-			return hookDelegate(context)
-		}
 	}
 
 	return initializers, admissionPostStartHook, nil
-
 }

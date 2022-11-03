@@ -30,6 +30,8 @@ type Validator interface {
 // ValidatorCompiler is Dependency Injected into the PolicyDefinition's `Compile`
 // function to assist with converting types and values to/from CEL-typed values.
 type ValidatorCompiler interface {
+	admission.InitializationValidator
+
 	// Matches says whether this policy definition matches the provided admission
 	// resource request
 	DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicy) (bool, error)

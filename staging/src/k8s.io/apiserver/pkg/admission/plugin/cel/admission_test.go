@@ -33,13 +33,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
-
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/cel/internal/generic"
+	"k8s.io/apiserver/pkg/features"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-base/featuregate"
 )
 
 var (
@@ -150,6 +152,10 @@ func (f *fakeCompiler) HasSynced() bool {
 	return true
 }
 
+func (f *fakeCompiler) ValidateInitialization() error {
+	return nil
+}
+
 // Matches says whether this policy definition matches the provided admission
 // resource request
 func (f *fakeCompiler) DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicy) (bool, error) {
@@ -238,46 +244,33 @@ func setupTestCommon(t *testing.T, compiler ValidatorCompiler) (plugin admission
 	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme)
 	tracker := clienttesting.NewObjectTracker(scheme, codecs.UniversalDecoder())
 
-	// Set up fake informers that return instances of mock Policy definitoins
-	// and mock policy bindings
-	definitionInformer := cache.NewSharedIndexInformer(&cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return tracker.List(definitionsGVR, definitionGVK, "")
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return tracker.Watch(definitionsGVR, "")
-		},
-	}, &v1alpha1.ValidatingAdmissionPolicy{}, 30*time.Second, nil)
-
-	bindingInformer := cache.NewSharedIndexInformer(&cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return tracker.List(bindingsGVR, bindingGVK, "")
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return tracker.Watch(bindingsGVR, "")
-		},
-	}, &v1alpha1.ValidatingAdmissionPolicyBinding{}, 30*time.Second, nil)
-
-	go definitionInformer.Run(testContext.Done())
-	go bindingInformer.Run(testContext.Done())
-
-	admissionController := NewAdmissionController(
-		definitionInformer,
-		bindingInformer,
-		compiler,
-		fakeRestMapper,
-		dynamicClient,
-	).(*celAdmissionController)
+	fakeClient := fake.NewSimpleClientset()
+	fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, time.Second)
+	featureGate := featuregate.NewFeatureGate()
+	err := featureGate.Add(map[featuregate.Feature]featuregate.FeatureSpec{
+		features.CELValidatingAdmission: featuregate.FeatureSpec{
+			Default: true, PreRelease: featuregate.Alpha}})
+	if err != nil {
+		// FIXME: handle error.
+		panic("Unexpected error")
+	}
+	err = featureGate.SetFromMap(map[string]bool{string(features.CELValidatingAdmission): true})
+	if err != nil {
+		// FIXME: handle error.
+		panic("Unexpected error.")
+	}
 
 	handler := &celAdmissionPlugin{enabled: true}
 
-	pluginInitializer := NewPluginInitializer(admissionController)
+	pluginInitializer := NewPluginInitializer(fakeRestMapper)
 	pluginInitializer.Initialize(handler)
-	err := admission.ValidateInitialization(handler)
+	genericInitializer := initializer.New(fakeClient, fakeInformerFactory, nil, featureGate, testContext.Done(), dynamicClient)
+	genericInitializer.Initialize(handler)
+	err = admission.ValidateInitialization(handler)
 	require.NoError(t, err)
+	require.True(t, handler.enabled)
 
-	go admissionController.Run(testContext.Done())
-	return handler, dynamicClient.Tracker(), tracker, admissionController
+	return handler, dynamicClient.Tracker(), tracker, handler.evaluator.(*celAdmissionController)
 }
 
 // Gets the last reconciled value in the controller of an object with the same

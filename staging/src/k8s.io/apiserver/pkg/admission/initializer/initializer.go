@@ -19,6 +19,7 @@ package initializer
 import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
@@ -30,6 +31,7 @@ type pluginInitializer struct {
 	authorizer        authorizer.Authorizer
 	featureGates      featuregate.FeatureGate
 	stopCh            <-chan struct{}
+	dynamicClient     dynamic.Interface
 }
 
 // New creates an instance of admission plugins initializer.
@@ -41,6 +43,7 @@ func New(
 	authz authorizer.Authorizer,
 	featureGates featuregate.FeatureGate,
 	stopCh <-chan struct{},
+	dynamicClient dynamic.Interface,
 ) pluginInitializer {
 	return pluginInitializer{
 		externalClient:    extClientset,
@@ -48,6 +51,7 @@ func New(
 		authorizer:        authz,
 		featureGates:      featureGates,
 		stopCh:            stopCh,
+		dynamicClient:     dynamicClient,
 	}
 }
 
@@ -74,6 +78,10 @@ func (i pluginInitializer) Initialize(plugin admission.Interface) {
 
 	if wants, ok := plugin.(WantsAuthorizer); ok {
 		wants.SetAuthorizer(i.authorizer)
+	}
+
+	if wants, ok := plugin.(WantsDynamicClient); ok {
+		wants.SetDynamicClient(i.dynamicClient)
 	}
 }
 

@@ -21,10 +21,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/client-go/dynamic"
 	"time"
 
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/featuregate"
 )
@@ -57,9 +62,21 @@ func Register(plugins *admission.Plugins) {
 type celAdmissionPlugin struct {
 	evaluator CELPolicyEvaluator
 	enabled   bool
+
+	// Injected Dependencies
+	informerFactory informers.SharedInformerFactory
+	client          kubernetes.Interface
+	restMapper      meta.RESTMapper
+	dynamicClient   dynamic.Interface
+	stopCh          <-chan struct{}
 }
 
-var _ WantsCELPolicyEvaluator = &celAdmissionPlugin{}
+var _ initializer.WantsExternalKubeInformerFactory = &celAdmissionPlugin{}
+var _ initializer.WantsExternalKubeClientSet = &celAdmissionPlugin{}
+var _ WantsRESTMapper = &celAdmissionPlugin{}
+var _ initializer.WantsDynamicClient = &celAdmissionPlugin{}
+var _ initializer.WantsDrainedNotification = &celAdmissionPlugin{}
+
 var _ admission.InitializationValidator = &celAdmissionPlugin{}
 var _ admission.ValidationInterface = &celAdmissionPlugin{}
 
@@ -68,19 +85,57 @@ func NewPlugin() (admission.Interface, error) {
 	return result, nil
 }
 
-func (c *celAdmissionPlugin) SetCELPolicyEvaluator(evaluator CELPolicyEvaluator) {
-	c.evaluator = evaluator
+func (c *celAdmissionPlugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	c.informerFactory = f
 }
 
-// Once clientset and informer factory are provided, creates and starts the admission controller
+func (c *celAdmissionPlugin) SetExternalKubeClientSet(client kubernetes.Interface) {
+	c.client = client
+}
+
+func (c *celAdmissionPlugin) SetRESTMapper(mapper meta.RESTMapper) {
+	c.restMapper = mapper
+}
+
+func (c *celAdmissionPlugin) SetDynamicClient(client dynamic.Interface) {
+	c.dynamicClient = client
+}
+
+func (c *celAdmissionPlugin) SetDrainedNotification(stopCh <-chan struct{}) {
+	c.stopCh = stopCh
+}
+
+// ValidateInitialization - once clientset and informer factory are provided, creates and starts the admission controller
 func (c *celAdmissionPlugin) ValidateInitialization() error {
 	if !c.enabled {
 		return nil
 	}
-	if c.evaluator == nil {
-		return errors.New("CELPolicyEvaluator not injected")
+	if c.informerFactory == nil {
+		return errors.New("missing informer factory")
 	}
+	if c.client == nil {
+		return errors.New("missing kubernetes client")
+	}
+	if c.restMapper == nil {
+		return errors.New("missing rest mapper")
+	}
+	if c.dynamicClient == nil {
+		return errors.New("missing dynamic client")
+	}
+	if c.stopCh == nil {
+		return errors.New("missing stop channel")
+	}
+	c.evaluator = NewAdmissionController(c.informerFactory, c.client, c.restMapper, c.dynamicClient)
+	if err := c.evaluator.ValidateInitialization(); err != nil {
+		return err
+	}
+
+	c.initController()
 	return nil
+}
+
+func (c *celAdmissionPlugin) initController() {
+	go c.evaluator.Run(c.stopCh)
 }
 
 func (c *celAdmissionPlugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {

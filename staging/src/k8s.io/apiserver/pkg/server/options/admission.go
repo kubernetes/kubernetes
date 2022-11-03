@@ -18,6 +18,7 @@ package options
 
 import (
 	"fmt"
+	"k8s.io/client-go/dynamic"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -146,7 +147,11 @@ func (a *AdmissionOptions) ApplyTo(
 	if err != nil {
 		return err
 	}
-	genericInitializer := initializer.New(clientset, informers, c.Authorization.Authorizer, features, c.DrainedNotify())
+	dynamicClient, err := dynamic.NewForConfig(c.LoopbackClientConfig)
+	if err != nil {
+		return err
+	}
+	genericInitializer := initializer.New(clientset, informers, c.Authorization.Authorizer, features, c.DrainedNotify(), dynamicClient)
 	initializersChain := admission.PluginInitializers{genericInitializer}
 	initializersChain = append(initializersChain, pluginInitializers...)
 
