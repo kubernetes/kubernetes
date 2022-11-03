@@ -17,6 +17,7 @@ limitations under the License.
 package streaming
 
 import (
+	"context"
 	"crypto/tls"
 	"io"
 	"net/http"
@@ -355,7 +356,7 @@ func runRemoteCommandTest(t *testing.T, commandType string) {
 			Stderr: stderrW,
 			Tty:    false,
 		}
-		require.NoError(t, exec.Stream(opts))
+		require.NoError(t, exec.StreamWithContext(context.Background(), opts))
 	}()
 
 	go func() {
