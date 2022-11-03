@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller/job/metrics"
 )
 
@@ -52,6 +53,7 @@ func TestUIDTrackingExpectations(t *testing.T) {
 		},
 	}
 	expectations := newUIDTrackingExpectations()
+	_, ctx := ktesting.NewTestContext(t)
 
 	// Insert first round of keys in parallel.
 
@@ -89,7 +91,7 @@ func TestUIDTrackingExpectations(t *testing.T) {
 		for _, uid := range track.firstRound {
 			uid := uid
 			go func() {
-				expectations.finalizerRemovalObserved(track.job, uid)
+				expectations.finalizerRemovalObserved(ctx, track.job, uid)
 				wg.Done()
 			}()
 		}
@@ -114,8 +116,9 @@ func TestUIDTrackingExpectations(t *testing.T) {
 			t.Errorf("Unexpected keys for job %s (-want,+got):\n%s", track.job, diff)
 		}
 	}
+
 	for _, track := range tracks {
-		expectations.deleteExpectations(track.job)
+		expectations.deleteExpectations(ctx, track.job)
 		uids := expectations.getSet(track.job)
 		if uids != nil {
 			t.Errorf("Wanted expectations for job %s to be cleared, but they were not", track.job)

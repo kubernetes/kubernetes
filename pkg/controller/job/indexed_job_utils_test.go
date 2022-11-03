@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/pointer"
 )
@@ -219,6 +220,7 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, tc.trackingWithFinalizers)()
 			job := &batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
@@ -237,7 +239,7 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 			for _, p := range pods {
 				p.Finalizers = append(p.Finalizers, batch.JobTrackingFinalizer)
 			}
-			gotStatusIntervals, gotIntervals := calculateSucceededIndexes(job, pods)
+			gotStatusIntervals, gotIntervals := calculateSucceededIndexes(ctx, job, pods)
 			if diff := cmp.Diff(tc.wantStatusIntervals, gotStatusIntervals); diff != "" {
 				t.Errorf("Unexpected completed indexes from status (-want,+got):\n%s", diff)
 			}

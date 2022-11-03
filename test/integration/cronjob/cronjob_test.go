@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clientbatchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/cronjob"
 	"k8s.io/kubernetes/pkg/controller/job"
@@ -51,7 +52,8 @@ func setup(t *testing.T) (kubeapiservertesting.TearDownFunc, *cronjob.Controller
 	if err != nil {
 		t.Fatalf("Error creating CronJob controller: %v", err)
 	}
-	jc := job.NewController(informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), clientSet)
+	_, ctx := ktesting.NewTestContext(t)
+	jc := job.NewController(ctx, informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), clientSet)
 
 	return server.TearDownFn, cjc, jc, informerSet, clientSet
 }

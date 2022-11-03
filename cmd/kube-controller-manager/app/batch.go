@@ -30,6 +30,7 @@ import (
 
 func startJobController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	go job.NewController(
+		ctx,
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Batch().V1().Jobs(),
 		controllerContext.ClientBuilder.ClientOrDie("job-controller"),

@@ -17,6 +17,7 @@ limitations under the License.
 package job
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strconv"
@@ -51,11 +52,11 @@ type orderedIntervals []interval
 // The old list is solely based off .status.completedIndexes, but returns an
 // empty list if this Job is not tracked with finalizers. The new list includes
 // the indexes that succeeded since the last sync.
-func calculateSucceededIndexes(job *batch.Job, pods []*v1.Pod) (orderedIntervals, orderedIntervals) {
+func calculateSucceededIndexes(ctx context.Context, job *batch.Job, pods []*v1.Pod) (orderedIntervals, orderedIntervals) {
 	var prevIntervals orderedIntervals
 	withFinalizers := trackingUncountedPods(job)
 	if withFinalizers {
-		prevIntervals = succeededIndexesFromJob(job)
+		prevIntervals = succeededIndexesFromJob(ctx, job)
 	}
 	newSucceeded := sets.NewInt()
 	for _, p := range pods {
@@ -152,20 +153,21 @@ func (oi orderedIntervals) has(ix int) bool {
 	return oi[hi].First <= ix
 }
 
-func succeededIndexesFromJob(job *batch.Job) orderedIntervals {
+func succeededIndexesFromJob(ctx context.Context, job *batch.Job) orderedIntervals {
 	if job.Status.CompletedIndexes == "" {
 		return nil
 	}
 	var result orderedIntervals
 	var lastInterval *interval
 	completions := int(*job.Spec.Completions)
+	logger := klog.FromContext(ctx)
 	for _, intervalStr := range strings.Split(job.Status.CompletedIndexes, ",") {
 		limitsStr := strings.Split(intervalStr, "-")
 		var inter interval
 		var err error
 		inter.First, err = strconv.Atoi(limitsStr[0])
 		if err != nil {
-			klog.InfoS("Corrupted completed indexes interval, ignoring", "job", klog.KObj(job), "interval", intervalStr, "err", err)
+			logger.Info("Corrupted completed indexes interval, ignoring", "job", klog.KObj(job), "interval", intervalStr, "err", err)
 			continue
 		}
 		if inter.First >= completions {
@@ -174,7 +176,7 @@ func succeededIndexesFromJob(job *batch.Job) orderedIntervals {
 		if len(limitsStr) > 1 {
 			inter.Last, err = strconv.Atoi(limitsStr[1])
 			if err != nil {
-				klog.InfoS("Corrupted completed indexes interval, ignoring", "job", klog.KObj(job), "interval", intervalStr, "err", err)
+				logger.Info("Corrupted completed indexes interval, ignoring", "job", klog.KObj(job), "interval", intervalStr, "err", err)
 				continue
 			}
 			if inter.Last >= completions {

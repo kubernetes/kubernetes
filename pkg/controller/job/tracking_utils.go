@@ -17,6 +17,7 @@ limitations under the License.
 package job
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -94,12 +95,12 @@ func (u *uidTrackingExpectations) expectFinalizersRemoved(jobKey string, deleted
 }
 
 // FinalizerRemovalObserved records the given deleteKey as a deletion, for the given job.
-func (u *uidTrackingExpectations) finalizerRemovalObserved(jobKey, deleteKey string) {
+func (u *uidTrackingExpectations) finalizerRemovalObserved(ctx context.Context, jobKey, deleteKey string) {
 	uids := u.getSet(jobKey)
 	if uids != nil {
 		uids.Lock()
 		if uids.set.Has(deleteKey) {
-			klog.V(4).InfoS("Observed tracking finalizer removed", "job", jobKey, "podUID", deleteKey)
+			klog.FromContext(ctx).V(4).Info("Observed tracking finalizer removed", "job", jobKey, "podUID", deleteKey)
 			uids.set.Delete(deleteKey)
 		}
 		uids.Unlock()
@@ -107,11 +108,11 @@ func (u *uidTrackingExpectations) finalizerRemovalObserved(jobKey, deleteKey str
 }
 
 // DeleteExpectations deletes the UID set.
-func (u *uidTrackingExpectations) deleteExpectations(jobKey string) {
+func (u *uidTrackingExpectations) deleteExpectations(ctx context.Context, jobKey string) {
 	set := u.getSet(jobKey)
 	if set != nil {
 		if err := u.store.Delete(set); err != nil {
-			klog.ErrorS(err, "Could not delete tracking annotation UID expectations", "job", jobKey)
+			klog.FromContext(ctx).Error(err, "Could not delete tracking annotation UID expectations", "job", jobKey)
 		}
 	}
 }
