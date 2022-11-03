@@ -87,7 +87,7 @@ func (c *controller[T]) Run(ctx context.Context) error {
 	enqueue := func(obj interface{}) {
 		var key string
 		var err error
-		if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
+		if key, err = cache.DeletionHandlingMetaNamespaceKeyFunc(obj); err != nil {
 			utilruntime.HandleError(err)
 			return
 		}
@@ -185,7 +185,7 @@ func (c *controller[T]) HasSynced() bool {
 
 func (c *controller[T]) runWorker() {
 	for {
-		obj, shutdown := c.queue.Get()
+		key, shutdown := c.queue.Get()
 		if shutdown {
 			return
 		}
@@ -221,9 +221,9 @@ func (c *controller[T]) runWorker() {
 			// Finally, if no error occurs we Forget this item so it is allowed
 			// to be re-enqueued without a long rate limit
 			c.queue.Forget(obj)
-			klog.Infof("Successfully synced '%s'", key)
+			klog.Infof("successfully synced '%s'", key)
 			return nil
-		}(obj)
+		}(key)
 
 		if err != nil {
 			utilruntime.HandleError(err)

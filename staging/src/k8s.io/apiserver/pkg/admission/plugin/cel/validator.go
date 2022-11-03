@@ -241,11 +241,11 @@ func (v *CELValidator) Validate(a admission.Attributes, o admission.ObjectInterf
 }
 
 func createAdmissionRequest(attr admission.Attributes) *admissionv1.AdmissionRequest {
+	// FIXME: how to get resource GVK, GVR and subresource?
 	gvk := attr.GetKind()
 	gvr := attr.GetResource()
 	subresource := attr.GetSubresource()
 
-	// FIXME: how to get resource GVK, GVR and subresource?
 	requestGVK := attr.GetKind()
 	requestGVR := attr.GetResource()
 	requestSubResource := attr.GetSubresource()

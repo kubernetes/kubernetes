@@ -291,9 +291,9 @@ func (c *celAdmissionController) Validate(
 					// Apply failure policy
 					addConfigError(err, definition, binding)
 
-					if k8serrors.IsNotFound(err) {
-						// Param doesnt exist yet?
-						// Maybe just have to wait a bit.
+					if k8serrors.IsInvalid(err) {
+						// Param mis-configured
+						// require to set paramRef.namespace for namespaced resource and unset paramRef.namespace for cluster scoped resource
 						continue
 					}
 
@@ -328,7 +328,7 @@ func (c *celAdmissionController) Validate(
 				switch decision.kind {
 				case admit:
 					if len(decision.message) != 0 {
-						klog.Info("Ignored ValidatingAdmissionPolicy %w failure for binding %w, due to FailurePolicy=Ignore. Error: %w", definition.Name, binding.Name, decision.message)
+						klog.Info("ignored ValidatingAdmissionPolicy %w failure for binding %w, due to FailurePolicy=Ignore. Error: %w", definition.Name, binding.Name, decision.message)
 					}
 				case deny:
 					deniedDecisions = append(deniedDecisions, policyDecisionWithMetadata{
@@ -337,7 +337,8 @@ func (c *celAdmissionController) Validate(
 						policyDecision: decision,
 					})
 				default:
-					// unrecognized decision. ignore
+					return fmt.Errorf("unrecognized evaluation decision '%s' for ValidatingAdmissionPolicyBinding '%s' with ValidatingAdmissionPolicy '%s'",
+						decision.kind, binding.Name, definition.Name)
 				}
 			}
 		}

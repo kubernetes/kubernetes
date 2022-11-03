@@ -178,11 +178,9 @@ func (c *celAdmissionPlugin) Validate(
 }
 
 func isPolicyResource(attr admission.Attributes) bool {
-	gvk := attr.GetKind()
-	if gvk.Group == "admissionregistration.k8s.io" {
-		if gvk.Kind == "ValidatingAdmissionPolicy" || gvk.Kind == "ValidatingAdmissionPolicyBinding" {
-			return true
-		}
+	gvk := attr.GetResource()
+	if gvk.Resource == "ValidatingAdmissionPolicy" || gvk.Resource == "ValidatingAdmissionPolicyBinding" {
+		return true
 	}
 	return false
 }

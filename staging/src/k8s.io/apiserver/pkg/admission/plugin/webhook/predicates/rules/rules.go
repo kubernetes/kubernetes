@@ -116,9 +116,9 @@ func (r *Matcher) resource() bool {
 	return false
 }
 
-// IsConfigurationResource determines if an admission.Attributes object is describing
+// IsExemptAdmissionConfigurationResource determines if an admission.Attributes object is describing
 // the admission of a ValidatingWebhookConfiguration or a MutatingWebhookConfiguration or a ValidatingAdmissionPolicy or a ValidatingAdmissionPolicyBinding
-func IsConfigurationResource(attr admission.Attributes) bool {
+func IsExemptAdmissionConfigurationResource(attr admission.Attributes) bool {
 	gvk := attr.GetKind()
 	if gvk.Group == "admissionregistration.k8s.io" {
 		if gvk.Kind == "ValidatingWebhookConfiguration" || gvk.Kind == "MutatingWebhookConfiguration" || gvk.Kind == "ValidatingAdmissionPolicy" || gvk.Kind == "ValidatingAdmissionPolicyBinding" {
