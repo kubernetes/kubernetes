@@ -108,7 +108,7 @@ func TestNewInitData(t *testing.T) {
 			validate: func(t *testing.T, data *initData) {
 				// validate that node-name is overwritten
 				if data.cfg.NodeRegistration.Name != "anotherName" {
-					t.Errorf("Invalid NodeRegistration.Name")
+					t.Error("Invalid NodeRegistration.Name")
 				}
 			},
 		},
@@ -162,7 +162,7 @@ func TestNewInitData(t *testing.T) {
 				t.Fatalf("newInitData returned unexpected error: %v", err)
 			}
 			if err == nil && tc.expectError {
-				t.Fatalf("newInitData didn't return error when expected")
+				t.Fatal("newInitData didn't return error when expected")
 			}
 
 			// exec additional validation on the returned value

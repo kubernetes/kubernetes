@@ -104,7 +104,7 @@ func TestNewJoinData(t *testing.T) {
 			validate: func(t *testing.T, data *joinData) {
 				// validate that file discovery settings are set into join data
 				if data.cfg.Discovery.File == nil || data.cfg.Discovery.File.KubeConfigPath != "https://foo" {
-					t.Errorf("Invalid data.cfg.Discovery.File")
+					t.Error("Invalid data.cfg.Discovery.File")
 				}
 			},
 		},
@@ -121,7 +121,7 @@ func TestNewJoinData(t *testing.T) {
 					data.cfg.Discovery.BootstrapToken.APIServerEndpoint != "1.2.3.4:6443" || //only first arg should be kept as APIServerEndpoint
 					data.cfg.Discovery.BootstrapToken.Token != "abcdef.0123456789abcdef" ||
 					data.cfg.Discovery.BootstrapToken.UnsafeSkipCAVerification != true {
-					t.Errorf("Invalid data.cfg.Discovery.BootstrapToken")
+					t.Error("Invalid data.cfg.Discovery.BootstrapToken")
 				}
 			},
 		},
@@ -137,7 +137,7 @@ func TestNewJoinData(t *testing.T) {
 				if data.cfg.Discovery.TLSBootstrapToken != "abcdef.0123456789abcdef" ||
 					data.cfg.Discovery.BootstrapToken == nil ||
 					data.cfg.Discovery.BootstrapToken.Token != "abcdef.0123456789abcdef" {
-					t.Errorf("Invalid TLSBootstrapToken or BootstrapToken.Token")
+					t.Error("Invalid TLSBootstrapToken or BootstrapToken.Token")
 				}
 			},
 		},
@@ -155,7 +155,7 @@ func TestNewJoinData(t *testing.T) {
 				if data.cfg.Discovery.TLSBootstrapToken != "abcdef.0123456789abcdef" ||
 					data.cfg.Discovery.BootstrapToken == nil ||
 					data.cfg.Discovery.BootstrapToken.Token != "defghi.0123456789defghi" {
-					t.Errorf("Invalid TLSBootstrapToken or BootstrapToken.Token")
+					t.Error("Invalid TLSBootstrapToken or BootstrapToken.Token")
 				}
 			},
 		},
@@ -172,7 +172,7 @@ func TestNewJoinData(t *testing.T) {
 				if data.cfg.ControlPlane == nil ||
 					data.cfg.ControlPlane.LocalAPIEndpoint.AdvertiseAddress != "1.2.3.4" ||
 					data.cfg.ControlPlane.LocalAPIEndpoint.BindPort != 1234 {
-					t.Errorf("Invalid ControlPlane")
+					t.Error("Invalid ControlPlane")
 				}
 			},
 		},
@@ -187,7 +187,7 @@ func TestNewJoinData(t *testing.T) {
 			validate: func(t *testing.T, data *joinData) {
 				// validate that control plane attributes are unset in join data
 				if data.cfg.ControlPlane != nil {
-					t.Errorf("Invalid ControlPlane")
+					t.Error("Invalid ControlPlane")
 				}
 			},
 			expectWarn: true,
@@ -216,7 +216,7 @@ func TestNewJoinData(t *testing.T) {
 			validate: func(t *testing.T, data *joinData) {
 				// validate that node-name is overwritten
 				if data.cfg.NodeRegistration.Name != "anotherName" {
-					t.Errorf("Invalid NodeRegistration.Name")
+					t.Error("Invalid NodeRegistration.Name")
 				}
 			},
 		},
@@ -304,7 +304,7 @@ func TestNewJoinData(t *testing.T) {
 				t.Fatalf("newJoinData returned unexpected error: %v", err)
 			}
 			if err == nil && tc.expectError {
-				t.Fatalf("newJoinData didn't return error when expected")
+				t.Fatal("newJoinData didn't return error when expected")
 			}
 
 			// exec additional validation on the returned value
