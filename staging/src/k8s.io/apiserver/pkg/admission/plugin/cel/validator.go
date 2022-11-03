@@ -19,6 +19,7 @@ package cel
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	celtypes "github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/interpreter"
@@ -219,16 +220,16 @@ func (v *CELValidator) Validate(a admission.Attributes, o admission.ObjectInterf
 			policyDecision.kind = policyDecisionKindForError(f)
 			policyDecision.message = fmt.Sprintf("expression '%v' resulted in error: %v", v.policy.Spec.Validations[i].Expression, err)
 		} else if evalResult != celtypes.True {
-			policyDecision.kind = policyDecisionKindForError(f)
+			policyDecision.kind = deny
 			if validation.Reason == nil {
 				policyDecision.reason = metav1.StatusReasonInvalid
 			} else {
 				policyDecision.reason = *validation.Reason
 			}
 			if len(validation.Message) > 0 {
-				policyDecision.message = validation.Message
+				policyDecision.message = strings.TrimSpace(validation.Message)
 			} else {
-				policyDecision.message = fmt.Sprintf("failed expression: %v", v.policy.Spec.Validations[i].Expression)
+				policyDecision.message = fmt.Sprintf("failed expression: %v", strings.TrimSpace(validation.Expression))
 			}
 
 		} else {

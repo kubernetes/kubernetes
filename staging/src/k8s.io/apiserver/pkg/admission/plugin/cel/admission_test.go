@@ -693,7 +693,7 @@ func TestReconfigureBinding(t *testing.T) {
 		&admission.RuntimeObjectInterfaces{},
 	)
 
-	require.ErrorContains(t, err, `admission policy failed with error: replicas-test2.example.com not found`)
+	require.ErrorContains(t, err, `failed to configure policy: replicas-test2.example.com not found`)
 	require.Equal(t, 1, numCompiles, "expect compile is not called when there is configuration error")
 	//require.Len(t, passedParams, 1, "expect evaluator was not called when there is configuration error")
 
@@ -851,7 +851,7 @@ func TestInvalidParamSourceGVK(t *testing.T) {
 	// expect the specific error to be that the param was not found, not that CRD
 	// is not existing
 	require.ErrorContains(t, err,
-		`admission policy failed with error: failed to find resource referenced by paramKind: 'example.com/v1, Kind=BadParamKind'`)
+		`failed to configure policy: failed to find resource referenced by paramKind: 'example.com/v1, Kind=BadParamKind'`)
 
 	close(passedParams)
 	require.Len(t, passedParams, 0)
@@ -898,7 +898,7 @@ func TestInvalidParamSourceInstanceName(t *testing.T) {
 	// expect the specific error to be that the param was not found, not that CRD
 	// is not existing
 	require.ErrorContains(t, err,
-		`admission policy failed with error: replicas-test.example.com not found`)
+		`failed to configure policy: replicas-test.example.com not found`)
 	require.Len(t, passedParams, 0)
 }
 

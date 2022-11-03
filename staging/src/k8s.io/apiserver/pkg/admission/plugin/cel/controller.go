@@ -345,11 +345,9 @@ func (c *celAdmissionController) Validate(
 	}
 
 	if len(deniedDecisions) > 0 {
-		return k8serrors.NewConflict(
-			a.GetResource().GroupResource(), a.GetName(),
-			&policyError{
-				deniedDecisions: deniedDecisions,
-			})
+		return &policyError{
+			deniedDecisions: deniedDecisions,
+		}
 	}
 
 	return nil

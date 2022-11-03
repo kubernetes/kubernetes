@@ -325,7 +325,7 @@ func TestValidate(t *testing.T) {
 				},
 			},
 			policyDecisions: []policyDecision{
-				generatedDecision(admit, "failed expression: object.subsets.size() > 2", metav1.StatusReasonInvalid),
+				generatedDecision(deny, "failed expression: object.subsets.size() > 2", metav1.StatusReasonInvalid),
 			},
 		},
 		{
@@ -342,7 +342,7 @@ func TestValidate(t *testing.T) {
 			params:     configMapParams,
 			policyDecisions: []policyDecision{
 				generatedDecision(admit, "", ""),
-				generatedDecision(admit, "failed expression: object.subsets.size() > 2", metav1.StatusReasonInvalid),
+				generatedDecision(deny, "failed expression: object.subsets.size() > 2", metav1.StatusReasonInvalid),
 			},
 		},
 		{
@@ -465,7 +465,7 @@ func TestValidate(t *testing.T) {
 			params:     crdParams,
 			policyDecisions: []policyDecision{
 				generatedDecision(admit, "compilation error: compilation failed: ERROR:", ""),
-				generatedDecision(admit, "failed expression: object.subsets.size() > params.spec.testSize", metav1.StatusReasonInvalid),
+				generatedDecision(deny, "failed expression: object.subsets.size() > params.spec.testSize", metav1.StatusReasonInvalid),
 			},
 		},
 	}

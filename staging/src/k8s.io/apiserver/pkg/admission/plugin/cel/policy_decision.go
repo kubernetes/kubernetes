@@ -37,10 +37,6 @@ type policyDecision struct {
 	reason  metav1.StatusReason
 }
 
-func (p policyDecision) IsError() bool {
-	return p.kind == deny
-}
-
 type policyDecisionWithMetadata struct {
 	policyDecision
 	definition *v1alpha1.ValidatingAdmissionPolicy
@@ -70,7 +66,7 @@ func (p *policyError) Status() metav1.Status {
 		bindingName = deniedDecision.binding.Name
 		message = fmt.Sprintf("ValidatingAdmissionPolicy '%s' with binding '%s' denied request: %s", deniedDecision.definition.Name, bindingName, deniedDecision.message)
 	} else {
-		message = fmt.Sprintf("ValidatingAdmissionPolicy '%s' '%s' denied request: %s", deniedDecision.definition.Name, bindingName, deniedDecision.message)
+		message = fmt.Sprintf("ValidatingAdmissionPolicy '%s' denied request: %s", deniedDecision.definition.Name, deniedDecision.message)
 	}
 
 	return metav1.Status{
