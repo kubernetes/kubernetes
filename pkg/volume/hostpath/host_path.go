@@ -252,11 +252,6 @@ func (b *hostPathMounter) SetUp(mounterArgs volume.MounterArgs) error {
 	}
 }
 
-// SetUpAt does not make sense for host paths - probably programmer error.
-func (b *hostPathMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
-	return fmt.Errorf("SetUpAt() does not make sense for host paths")
-}
-
 func (b *hostPathMounter) GetPath() string {
 	return b.path
 }
