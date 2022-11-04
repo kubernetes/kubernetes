@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
@@ -59,7 +58,6 @@ var (
 		}
 		return res
 	}()
-	codecs    serializer.CodecFactory = serializer.NewCodecFactory(scheme)
 	paramsGVK schema.GroupVersionKind = schema.GroupVersionKind{
 		Group:   "example.com",
 		Version: "v1",
@@ -247,7 +245,7 @@ func setupTestCommon(t *testing.T, compiler ValidatorCompiler) (plugin admission
 	fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, time.Second)
 	featureGate := featuregate.NewFeatureGate()
 	err := featureGate.Add(map[featuregate.Feature]featuregate.FeatureSpec{
-		features.CELValidatingAdmission: featuregate.FeatureSpec{
+		features.CELValidatingAdmission: {
 			Default: true, PreRelease: featuregate.Alpha}})
 	if err != nil {
 		// FIXME: handle error.
