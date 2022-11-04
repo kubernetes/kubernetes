@@ -175,6 +175,13 @@ func TestGetListNonRecursive(t *testing.T) {
 	storagetesting.RunTestGetListNonRecursive(ctx, t, cacher)
 }
 
+// FIXME:
+func TestListXXX(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t)
+	defer terminate()
+	storagetesting.RunTestList(ctx, t, cacher)
+}
+
 func TestList(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
