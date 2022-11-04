@@ -66,42 +66,49 @@ func (m *Matcher) ValidateInitialization() error {
 	return nil
 }
 
-func (m *Matcher) Matches(attr admission.Attributes, o admission.ObjectInterfaces, criteria MatchCriteria, isBinding bool) (bool, error) {
+func (m *Matcher) Matches(attr admission.Attributes, o admission.ObjectInterfaces, criteria MatchCriteria, isBinding bool) (bool, schema.GroupVersionKind, error) {
 	matches, err := m.namespaceMatcher.MatchNamespaceSelector(criteria, attr)
 	if err != nil {
-		return false, err
+		return false, schema.GroupVersionKind{}, err
 	}
 	if !matches {
-		return false, nil
+		return false, schema.GroupVersionKind{}, nil
 	}
 
 	matches, err = m.objectMatcher.MatchObjectSelector(criteria, attr)
 	if err != nil {
-		return false, err
+		return false, schema.GroupVersionKind{}, err
 	}
 	if !matches {
-		return false, nil
+		return false, schema.GroupVersionKind{}, nil
 	}
 
 	matchResources := criteria.GetMatchResources()
 	matchPolicy := matchResources.MatchPolicy
-	if matchesResourceRules(matchResources.ExcludeResourceRules, matchPolicy, attr, o) {
-		return false, nil
+	isMatch, _, matchErr := matchesResourceRules(matchResources.ExcludeResourceRules, matchPolicy, attr, o)
+	if matchErr != nil {
+		return false, schema.GroupVersionKind{}, matchErr
+	}
+	if isMatch {
+		return false, schema.GroupVersionKind{}, nil
 	}
 
 	if isBinding && matchResources.ResourceRules == nil {
-		return true, nil
+		return true, attr.GetKind(), nil
+	}
+	isMatch, matchKind, matchErr := matchesResourceRules(matchResources.ResourceRules, matchPolicy, attr, o)
+	if matchErr != nil {
+		return false, schema.GroupVersionKind{}, matchErr
+	}
+	if !isMatch {
+		return false, schema.GroupVersionKind{}, nil
 	}
 
-	if !matchesResourceRules(matchResources.ResourceRules, matchPolicy, attr, o) {
-		return false, nil
-	}
-
-	return true, nil
+	return true, matchKind, nil
 }
 
-// TODO: for equivalent matching, this needs to return what GVk was matched
-func matchesResourceRules(namedRules []v1alpha1.NamedRuleWithOperations, matchPolicy *v1alpha1.MatchPolicyType, attr admission.Attributes, o admission.ObjectInterfaces) bool {
+func matchesResourceRules(namedRules []v1alpha1.NamedRuleWithOperations, matchPolicy *v1alpha1.MatchPolicyType, attr admission.Attributes, o admission.ObjectInterfaces) (bool, schema.GroupVersionKind, error) {
+	matchKind := attr.GetKind()
 	for _, namedRule := range namedRules {
 		rule := v1.RuleWithOperations(namedRule.RuleWithOperations)
 		ruleMatcher := rules.Matcher{
@@ -113,14 +120,14 @@ func matchesResourceRules(namedRules []v1alpha1.NamedRuleWithOperations, matchPo
 		}
 		// an empty name list always matches
 		if len(namedRule.ResourceNames) == 0 {
-			return true
+			return true, matchKind, nil
 		}
 		// TODO: GetName() can return an empty string if the user is relying on
 		// the API server to generate the name... figure out what to do for this edge case
 		name := attr.GetName()
 		for _, matchedName := range namedRule.ResourceNames {
 			if name == matchedName {
-				return true
+				return true, matchKind, nil
 			}
 		}
 	}
@@ -128,7 +135,7 @@ func matchesResourceRules(namedRules []v1alpha1.NamedRuleWithOperations, matchPo
 	// if match policy is undefined or exact, don't perform fuzzy matching
 	// note that defaulting to fuzzy matching is set by the API
 	if matchPolicy == nil || *matchPolicy == v1alpha1.Exact {
-		return false
+		return false, schema.GroupVersionKind{}, nil
 	}
 
 	attrWithOverride := &attrWithResourceOverride{Attributes: attr}
@@ -148,22 +155,26 @@ func matchesResourceRules(namedRules []v1alpha1.NamedRuleWithOperations, matchPo
 			if !m.Matches() {
 				continue
 			}
+			matchKind = o.GetEquivalentResourceMapper().KindFor(equivalent, attr.GetSubresource())
+			if matchKind.Empty() {
+				return false, schema.GroupVersionKind{}, fmt.Errorf("unable to convert to %v: unknown kind", equivalent)
+			}
 			// an empty name list always matches
 			if len(namedRule.ResourceNames) == 0 {
-				return true
+				return true, matchKind, nil
 			}
+
 			// TODO: GetName() can return an empty string if the user is relying on
 			// the API server to generate the name... figure out what to do for this edge case
 			name := attr.GetName()
 			for _, matchedName := range namedRule.ResourceNames {
 				if name == matchedName {
-					return true
+					return true, matchKind, nil
 				}
 			}
-
 		}
 	}
-	return false
+	return false, schema.GroupVersionKind{}, nil
 }
 
 type attrWithResourceOverride struct {

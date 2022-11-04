@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/cel/matching"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
@@ -64,7 +65,7 @@ type CELValidatorCompiler struct {
 }
 
 // DefinitionMatches returns whether this ValidatingAdmissionPolicy matches the provided admission resource request
-func (c *CELValidatorCompiler) DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicy) (bool, error) {
+func (c *CELValidatorCompiler) DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionKind, error) {
 	criteria := matchCriteria{constraints: definition.Spec.MatchConstraints}
 	return c.Matcher.Matches(a, o, &criteria, false)
 }
@@ -75,7 +76,8 @@ func (c *CELValidatorCompiler) BindingMatches(a admission.Attributes, o admissio
 		return true, nil
 	}
 	criteria := matchCriteria{constraints: binding.Spec.MatchResources}
-	return c.Matcher.Matches(a, o, &criteria, true)
+	isMatch, _, err := c.Matcher.Matches(a, o, &criteria, true)
+	return isMatch, err
 }
 
 // ValidateInitialization checks if Matcher is initialized.
@@ -165,13 +167,12 @@ func policyDecisionKindForError(f v1alpha1.FailurePolicyType) policyDecisionKind
 // An error will be returned if failed to convert the object/oldObject/params/request to unstructured.
 // Each PolicyDecision will have a decision and a message.
 // policyDecision.message will be empty if the decision is allowed and no error met.
-func (v *CELValidator) Validate(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object) ([]policyDecision, error) {
-	// TODO: pass in the GVK found by MatchType: Equivalent matching and pass it to NewVerionsedAttributes.
+func (v *CELValidator) Validate(a admission.Attributes, o admission.ObjectInterfaces, versionedParams runtime.Object, matchKind schema.GroupVersionKind) ([]policyDecision, error) {
 	// TODO: replace unstructured with ref.Val for CEL variables when native type support is available
 
 	decisions := make([]policyDecision, len(v.compilationResults))
 	var err error
-	versionedAttr, err := generic.NewVersionedAttributes(a, a.GetKind(), o)
+	versionedAttr, err := generic.NewVersionedAttributes(a, matchKind, o)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +184,7 @@ func (v *CELValidator) Validate(a admission.Attributes, o admission.ObjectInterf
 	if err != nil {
 		return nil, err
 	}
-	paramsVal, err := objectToResolveVal(params)
+	paramsVal, err := objectToResolveVal(versionedParams)
 	if err != nil {
 		return nil, err
 	}

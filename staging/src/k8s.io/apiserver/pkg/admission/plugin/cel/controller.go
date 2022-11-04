@@ -234,7 +234,7 @@ func (c *celAdmissionController) Validate(
 	}
 	for definitionNamespacedName, definitionInfo := range c.definitionInfo {
 		definition := definitionInfo.lastReconciledValue
-		matches, err := c.validatorCompiler.DefinitionMatches(a, o, definition)
+		matches, matchKind, err := c.validatorCompiler.DefinitionMatches(a, o, definition)
 		if err != nil {
 			return err
 		}
@@ -322,7 +322,7 @@ func (c *celAdmissionController) Validate(
 				c.bindingInfos[namespacedBindingName] = bindingInfo
 			}
 
-			decisions, err := bindingInfo.validator.Validate(a, o, param)
+			decisions, err := bindingInfo.validator.Validate(a, o, param, matchKind)
 			if err != nil {
 				// runtime error. Apply failure policy
 				wrappedError := fmt.Errorf("failed to evaluate CEL expression: %w", err)

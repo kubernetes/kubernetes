@@ -289,7 +289,7 @@ func TestValidate(t *testing.T) {
 					Expression: "object.metadata.name == 'endpoints1'",
 				},
 			}, nil, nil),
-			attributes: newValidAttribute(false),
+			attributes: newValidAttribute(nil, false),
 			policyDecisions: []policyDecision{
 				generatedDecision(admit, "", ""),
 			},
@@ -515,8 +515,7 @@ func TestValidate(t *testing.T) {
 			CompilationResults := validator.(*CELValidator).compilationResults
 			require.Equal(t, len(validations), len(CompilationResults))
 
-			// TODO: construct objectInterface for testing
-			policyResults, err := validator.Validate(tc.attributes, nil, tc.params)
+			policyResults, err := validator.Validate(tc.attributes, newObjectInterfacesForTest(), tc.params, tc.attributes.GetKind())
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -534,6 +533,13 @@ func TestValidate(t *testing.T) {
 			}
 		})
 	}
+}
+
+// newObjectInterfacesForTest returns an ObjectInterfaces appropriate for test cases in this file.
+func newObjectInterfacesForTest() admission.ObjectInterfaces {
+	scheme := runtime.NewScheme()
+	corev1.AddToScheme(scheme)
+	return admission.NewObjectInterfacesFromScheme(scheme)
 }
 
 func newValidAttribute(object runtime.Object, isDelete bool) admission.Attributes {

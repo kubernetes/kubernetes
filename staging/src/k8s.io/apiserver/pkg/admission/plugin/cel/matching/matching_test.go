@@ -90,8 +90,9 @@ func TestMatcher(t *testing.T) {
 		criteria *v1alpha1.MatchResources
 		attrs    admission.Attributes
 
-		expectMatches bool
-		expectErr     string
+		expectMatches   bool
+		expectMatchKind *schema.GroupVersionKind
+		expectErr       string
 
 		isBinding bool
 	}{
@@ -112,8 +113,9 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectMatches: true,
+			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches:   true,
+			expectMatchKind: &schema.GroupVersionKind{"apps", "v1", "Deployment"},
 		},
 		{
 			name: "specific rules, prefer exact match",
@@ -136,8 +138,9 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectMatches: true,
+			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches:   true,
+			expectMatchKind: &schema.GroupVersionKind{"apps", "v1", "Deployment"},
 		},
 		{
 			name: "specific rules, match miss",
@@ -195,8 +198,9 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectMatches: true,
+			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches:   true,
+			expectMatchKind: &schema.GroupVersionKind{"extensions", "v1beta1", "Deployment"},
 		},
 		{
 			name: "specific rules, equivalent match, prefer apps",
@@ -215,8 +219,9 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectMatches: true,
+			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches:   true,
+			expectMatchKind: &schema.GroupVersionKind{"apps", "v1beta1", "Deployment"},
 		},
 
 		{
@@ -240,8 +245,9 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectMatches: true,
+			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches:   true,
+			expectMatchKind: &schema.GroupVersionKind{"autoscaling", "v1", "Scale"},
 		},
 		{
 			name: "specific rules, subresource match miss",
@@ -299,8 +305,9 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectMatches: true,
+			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches:   true,
+			expectMatchKind: &schema.GroupVersionKind{"extensions", "v1beta1", "Scale"},
 		},
 		{
 			name: "specific rules, subresource equivalent match, prefer apps",
@@ -319,8 +326,9 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectMatches: true,
+			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches:   true,
+			expectMatchKind: &schema.GroupVersionKind{"apps", "v1beta1", "Scale"},
 		},
 		{
 			name: "specific rules, prefer exact match and name match",
@@ -334,8 +342,9 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectMatches: true,
+			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches:   true,
+			expectMatchKind: &schema.GroupVersionKind{"autoscaling", "v1", "Scale"},
 		},
 		{
 			name: "specific rules, prefer exact match and name match miss",
@@ -365,8 +374,9 @@ func TestMatcher(t *testing.T) {
 						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
 					},
 				}}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectMatches: true,
+			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches:   true,
+			expectMatchKind: &schema.GroupVersionKind{"autoscaling", "v1", "Scale"},
 		},
 		{
 			name: "specific rules, subresource equivalent match, prefer extensions and name match miss",
@@ -402,8 +412,9 @@ func TestMatcher(t *testing.T) {
 					},
 				}},
 			},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectMatches: true,
+			attrs:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectMatches:   true,
+			expectMatchKind: &schema.GroupVersionKind{"autoscaling", "v1", "Scale"},
 		},
 		{
 			name: "exclude resource miss on match",
@@ -477,7 +488,7 @@ func TestMatcher(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			matches, err := a.Matches(testcase.attrs, interfaces, &fakeCriteria{matchResources: *testcase.criteria}, testcase.isBinding)
+			matches, matchKind, err := a.Matches(testcase.attrs, interfaces, &fakeCriteria{matchResources: *testcase.criteria}, testcase.isBinding)
 			if err != nil {
 				if len(testcase.expectErr) == 0 {
 					t.Fatal(err)
@@ -488,6 +499,11 @@ func TestMatcher(t *testing.T) {
 				return
 			} else if len(testcase.expectErr) > 0 {
 				t.Fatalf("expected error %q, got no error", testcase.expectErr)
+			}
+			if testcase.expectMatchKind != nil {
+				if *testcase.expectMatchKind != matchKind {
+					t.Fatalf("expected matchKind %v, got %v", testcase.expectMatchKind, matchKind)
+				}
 			}
 
 			if matches != testcase.expectMatches {

@@ -19,12 +19,15 @@ package cel
 import (
 	"k8s.io/api/admissionregistration/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 )
 
 // Validator defines the func used to validate the cel expressions
+// matchKind provides the GroupVersionKind that the object should be
+// validated by CEL expressions as.
 type Validator interface {
-	Validate(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object) ([]policyDecision, error)
+	Validate(a admission.Attributes, o admission.ObjectInterfaces, versionedParams runtime.Object, matchKind schema.GroupVersionKind) ([]policyDecision, error)
 }
 
 // ValidatorCompiler is Dependency Injected into the PolicyDefinition's `Compile`
@@ -34,7 +37,7 @@ type ValidatorCompiler interface {
 
 	// Matches says whether this policy definition matches the provided admission
 	// resource request
-	DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicy) (bool, error)
+	DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionKind, error)
 
 	// Matches says whether this policy definition matches the provided admission
 	// resource request

@@ -158,15 +158,15 @@ func (f *fakeCompiler) ValidateInitialization() error {
 
 // Matches says whether this policy definition matches the provided admission
 // resource request
-func (f *fakeCompiler) DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicy) (bool, error) {
+func (f *fakeCompiler) DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionKind, error) {
 	namespace, name := definition.Namespace, definition.Name
 	key := namespace + "/" + name
 	if fun, ok := f.DefinitionMatchFuncs[key]; ok {
-		return fun(definition, a), nil
+		return fun(definition, a), schema.GroupVersionKind{}, nil
 	}
 
 	// Default is match everything
-	return f.DefaultMatch, nil
+	return f.DefaultMatch, schema.GroupVersionKind{}, nil
 }
 
 // Matches says whether this policy definition matches the provided admission
@@ -499,7 +499,7 @@ func TestBasicPolicyDefinitionFailure(t *testing.T) {
 type testValidator struct {
 }
 
-func (v testValidator) Validate(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object) ([]policyDecision, error) {
+func (v testValidator) Validate(a admission.Attributes, o admission.ObjectInterfaces, params runtime.Object, matchKind schema.GroupVersionKind) ([]policyDecision, error) {
 	// Policy always denies
 	return []policyDecision{
 		{
@@ -686,7 +686,7 @@ func TestReconfigureBinding(t *testing.T) {
 		&admission.RuntimeObjectInterfaces{},
 	)
 
-	require.ErrorContains(t, err, `failed to configure policy: replicas-test2.example.com not found`)
+	require.ErrorContains(t, err, `failed to configure binding: replicas-test2.example.com not found`)
 	require.Equal(t, 1, numCompiles, "expect compile is not called when there is configuration error")
 	//require.Len(t, passedParams, 1, "expect evaluator was not called when there is configuration error")
 
@@ -891,7 +891,7 @@ func TestInvalidParamSourceInstanceName(t *testing.T) {
 	// expect the specific error to be that the param was not found, not that CRD
 	// is not existing
 	require.ErrorContains(t, err,
-		`failed to configure policy: replicas-test.example.com not found`)
+		`failed to configure binding: replicas-test.example.com not found`)
 	require.Len(t, passedParams, 0)
 }
 
