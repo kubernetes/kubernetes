@@ -19,8 +19,10 @@ package server
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"net"
 	"net/http"
+	"os"
 	goruntime "runtime"
 	"runtime/debug"
 	"sort"
@@ -328,7 +330,14 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 	defaultHealthChecks := []healthz.HealthChecker{healthz.PingHealthz, healthz.LogHealthz}
 	var id string
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) {
-		id = "kube-apiserver-" + uuid.New().String()
+		hostname, err := os.Hostname()
+		if err != nil {
+			klog.Fatalf("error getting hostname for apiserver identity: %v", err)
+		}
+
+		h := fnv.New32a()
+		h.Write([]byte(hostname))
+		id = "kube-apiserver-" + fmt.Sprint(h.Sum32())
 	}
 	lifecycleSignals := newLifecycleSignals()
 

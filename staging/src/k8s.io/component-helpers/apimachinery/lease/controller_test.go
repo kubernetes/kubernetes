@@ -59,6 +59,7 @@ func TestNewNodeLease(t *testing.T) {
 			desc: "nil base without node",
 			controller: &controller{
 				client:               fake.NewSimpleClientset(),
+				leaseName:            node.Name,
 				holderIdentity:       node.Name,
 				leaseDurationSeconds: 10,
 				clock:                fakeClock,
@@ -80,6 +81,7 @@ func TestNewNodeLease(t *testing.T) {
 			desc: "nil base with node",
 			controller: &controller{
 				client:               fake.NewSimpleClientset(node),
+				leaseName:            node.Name,
 				holderIdentity:       node.Name,
 				leaseDurationSeconds: 10,
 				clock:                fakeClock,

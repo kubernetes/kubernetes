@@ -18,11 +18,14 @@ package controlplane
 
 import (
 	"context"
-	"strings"
+	"fmt"
+	"hash/fnv"
+	"os"
 	"testing"
 	"time"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -40,6 +43,12 @@ const (
 	testLeaseName = "apiserver-lease-test"
 )
 
+func expectedAPIServerIdentity(hostname string) string {
+	h := fnv.New32a()
+	h.Write([]byte(hostname))
+	return "kube-apiserver-" + fmt.Sprint(h.Sum32())
+}
+
 func TestCreateLeaseOnStart(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)()
 	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
@@ -48,6 +57,11 @@ func TestCreateLeaseOnStart(t *testing.T) {
 	kubeclient, err := kubernetes.NewForConfig(result.ClientConfig)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		t.Fatalf("Unexpected error getting apiserver hostname: %v", err)
 	}
 
 	t.Logf(`Waiting the kube-apiserver Lease to be created`)
@@ -59,10 +73,25 @@ func TestCreateLeaseOnStart(t *testing.T) {
 		if err != nil {
 			return false, err
 		}
-		if leases != nil && len(leases.Items) == 1 && strings.HasPrefix(leases.Items[0].Name, "kube-apiserver-") {
-			return true, nil
+
+		if leases == nil {
+			return false, nil
 		}
-		return false, nil
+
+		if len(leases.Items) != 1 {
+			return false, nil
+		}
+
+		lease := leases.Items[0]
+		if lease.Name != expectedAPIServerIdentity(hostname) {
+			return false, fmt.Errorf("unexpected apiserver identity, got: %v, expected: %v", lease.Name, expectedAPIServerIdentity(hostname))
+		}
+
+		if lease.Labels[corev1.LabelHostname] != hostname {
+			return false, fmt.Errorf("unexpected hostname label, got: %v, expected: %v", lease.Labels[corev1.LabelHostname], hostname)
+		}
+
+		return true, nil
 	}); err != nil {
 		t.Fatalf("Failed to see the kube-apiserver lease: %v", err)
 	}
