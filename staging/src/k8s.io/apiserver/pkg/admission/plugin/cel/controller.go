@@ -70,17 +70,22 @@ type celAdmissionController struct {
 
 	// Index for each definition namespace/name, contains all binding
 	// namespace/names known to exist for that definition
-	definitionInfo map[string]*definitionInfo
+	definitionInfo map[namespacedName]*definitionInfo
 
 	// Index for each bindings namespace/name. Contains compiled templates
 	// for the binding depending on the policy/param combination.
-	bindingInfos map[string]*bindingInfo
+	bindingInfos map[namespacedName]*bindingInfo
 
 	// Map from namespace/name of a definition to a set of namespace/name
 	// of bindings which depend on it.
 	// All keys must have at least one dependent binding
 	// All binding names MUST exist as a key bindingInfos
-	definitionsToBindings map[string]sets.String
+	definitionsToBindings map[namespacedName]sets.Set[namespacedName]
+}
+
+// namespaceName is used as a key in definitionInfo and bindingInfos
+type namespacedName struct {
+	namespace, name string
 }
 
 type definitionInfo struct {
@@ -111,7 +116,7 @@ type paramInfo struct {
 	stop func()
 
 	// Policy Definitions which refer to this param CRD
-	dependentDefinitions sets.String
+	dependentDefinitions sets.Set[namespacedName]
 }
 
 func NewAdmissionController(
@@ -126,10 +131,10 @@ func NewAdmissionController(
 		Matcher: matcher,
 	}
 	c := &celAdmissionController{
-		definitionInfo:        make(map[string]*definitionInfo),
-		bindingInfos:          make(map[string]*bindingInfo),
+		definitionInfo:        make(map[namespacedName]*definitionInfo),
+		bindingInfos:          make(map[namespacedName]*bindingInfo),
 		paramsCRDControllers:  make(map[v1alpha1.ParamKind]*paramInfo),
-		definitionsToBindings: make(map[string]sets.String),
+		definitionsToBindings: make(map[namespacedName]sets.Set[namespacedName]),
 		dynamicClient:         dynamicClient,
 		validatorCompiler:     validatorCompiler,
 		restMapper:            restMapper,

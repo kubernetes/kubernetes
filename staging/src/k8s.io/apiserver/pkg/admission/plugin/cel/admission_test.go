@@ -319,16 +319,16 @@ func (c *celAdmissionController) getCurrentObject(obj runtime.Object) (runtime.O
 
 		return item, nil
 	case *v1alpha1.ValidatingAdmissionPolicyBinding:
-		namespacedName := accessor.GetNamespace() + "/" + accessor.GetName()
-		info, ok := c.bindingInfos[namespacedName]
+		nn := getNamespaceName(accessor.GetNamespace(), accessor.GetName())
+		info, ok := c.bindingInfos[nn]
 		if !ok {
 			return nil, nil
 		}
 
 		return info.lastReconciledValue, nil
 	case *v1alpha1.ValidatingAdmissionPolicy:
-		namespacedName := accessor.GetNamespace() + "/" + accessor.GetName()
-		info, ok := c.definitionInfo[namespacedName]
+		nn := getNamespaceName(accessor.GetNamespace(), accessor.GetName())
+		info, ok := c.definitionInfo[nn]
 		if !ok {
 			return nil, nil
 		}

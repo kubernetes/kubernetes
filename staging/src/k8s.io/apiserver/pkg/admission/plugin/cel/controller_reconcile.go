@@ -35,13 +35,12 @@ func (c *celAdmissionController) reconcilePolicyDefinition(namespace, name strin
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	// Namespace for policydefinition is empty. Leaving usage here for compatibility
-	// with future NamespacedPolicyDefinition
-	namespacedName := namespace + "/" + name
-	info, ok := c.definitionInfo[namespacedName]
+	// Namespace for policydefinition is empty.
+	nn := getNamespaceName(namespace, name)
+	info, ok := c.definitionInfo[nn]
 	if !ok {
 		info = &definitionInfo{}
-		c.definitionInfo[namespacedName] = info
+		c.definitionInfo[nn] = info
 	}
 
 	var paramSource *v1alpha1.ParamKind
@@ -60,7 +59,7 @@ func (c *celAdmissionController) reconcilePolicyDefinition(namespace, name strin
 		// we remove dependency on the controller.
 		if paramSource == nil || *paramSource != oldParamSource {
 			if oldParamInfo, ok := c.paramsCRDControllers[oldParamSource]; ok {
-				oldParamInfo.dependentDefinitions.Delete(namespacedName)
+				oldParamInfo.dependentDefinitions.Delete(nn)
 				if len(oldParamInfo.dependentDefinitions) == 0 {
 					oldParamInfo.stop()
 					delete(c.paramsCRDControllers, oldParamSource)
@@ -71,14 +70,14 @@ func (c *celAdmissionController) reconcilePolicyDefinition(namespace, name strin
 
 	// Reset all previously compiled evaluators in case something relevant in
 	// definition has changed.
-	for key := range c.definitionsToBindings[namespacedName] {
+	for key := range c.definitionsToBindings[nn] {
 		bindingInfo := c.bindingInfos[key]
 		bindingInfo.validator.Store(nil)
 		c.bindingInfos[key] = bindingInfo
 	}
 
 	if definition == nil {
-		delete(c.definitionInfo, namespacedName)
+		delete(c.definitionInfo, nn)
 		return nil
 	}
 
@@ -143,7 +142,7 @@ func (c *celAdmissionController) reconcilePolicyDefinition(namespace, name strin
 		c.paramsCRDControllers[*paramSource] = &paramInfo{
 			controller:           controller,
 			stop:                 instanceCancel,
-			dependentDefinitions: sets.NewString(namespacedName),
+			dependentDefinitions: sets.New(nn),
 		}
 
 		go informer.Informer().Run(instanceContext.Done())
@@ -160,32 +159,30 @@ func (c *celAdmissionController) reconcilePolicyBinding(namespace, name string, 
 	// Namespace for PolicyBinding is empty. In the future a namespaced binding
 	// may be added
 	// https://github.com/kubernetes/enhancements/blob/bf5c3c81ea2081d60c1dc7c832faa98479e06209/keps/sig-api-machinery/3488-cel-admission-control/README.md?plain=1#L1042
-	namespacedName := namespace + "/" + name
-	info, ok := c.bindingInfos[namespacedName]
+	nn := getNamespaceName(namespace, name)
+	info, ok := c.bindingInfos[nn]
 	if !ok {
 		info = &bindingInfo{}
-		c.bindingInfos[namespacedName] = info
+		c.bindingInfos[nn] = info
 	}
 
-	oldNamespacedDefinitionName := ""
+	var oldNamespacedDefinitionName namespacedName
 	if info.lastReconciledValue != nil {
 		// All validating policies are cluster-scoped so have empty namespace
-		olDefinitionNamespace, oldDefinitionName := "", info.lastReconciledValue.Spec.PolicyName
-		oldNamespacedDefinitionName = olDefinitionNamespace + "/" + oldDefinitionName
+		oldNamespacedDefinitionName = getNamespaceName("", info.lastReconciledValue.Spec.PolicyName)
 	}
 
-	namespacedDefinitionName := ""
+	var namespacedDefinitionName namespacedName
 	if binding != nil {
 		// All validating policies are cluster-scoped so have empty namespace
-		newDefinitionNamespace, newDefinitionName := "", binding.Spec.PolicyName
-		namespacedDefinitionName = newDefinitionNamespace + "/" + newDefinitionName
+		namespacedDefinitionName = getNamespaceName("", binding.Spec.PolicyName)
 	}
 
 	// Remove record of binding from old definition if the referred policy
 	// has changed
 	if oldNamespacedDefinitionName != namespacedDefinitionName {
 		if dependentBindings, ok := c.definitionsToBindings[oldNamespacedDefinitionName]; ok {
-			dependentBindings.Delete(namespacedName)
+			dependentBindings.Delete(nn)
 
 			// if there are no more dependent bindings, remove knowledge of the
 			// definition altogether
@@ -196,15 +193,15 @@ func (c *celAdmissionController) reconcilePolicyBinding(namespace, name string, 
 	}
 
 	if binding == nil {
-		delete(c.bindingInfos, namespacedName)
+		delete(c.bindingInfos, nn)
 		return nil
 	}
 
 	// Add record of binding to new definition
 	if dependentBindings, ok := c.definitionsToBindings[namespacedDefinitionName]; ok {
-		dependentBindings.Insert(namespacedName)
+		dependentBindings.Insert(nn)
 	} else {
-		c.definitionsToBindings[namespacedDefinitionName] = sets.NewString(namespacedName)
+		c.definitionsToBindings[namespacedDefinitionName] = sets.New(nn)
 	}
 
 	// Remove compiled template for old binding
@@ -219,4 +216,11 @@ func (c *celAdmissionController) reconcileParams(namespace, name string, params 
 	// reconcile loops instead of lazily so we can add compiler errors / type
 	// checker errors to the status of the resources.
 	return nil
+}
+
+func getNamespaceName(namespace, name string) namespacedName {
+	return namespacedName{
+		namespace: namespace,
+		name:      name,
+	}
 }
