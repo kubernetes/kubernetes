@@ -228,7 +228,6 @@ type seatDemandStats struct {
 	avg           float64
 	stdDev        float64
 	highWatermark float64
-	envelope      float64
 	smoothed      float64
 }
 
@@ -237,7 +236,6 @@ func newSeatDemandStats(val float64) seatDemandStats {
 		avg:           val,
 		stdDev:        0,
 		highWatermark: val,
-		envelope:      val,
 		smoothed:      val,
 	}
 }
@@ -247,7 +245,6 @@ func (stats *seatDemandStats) update(obs fq.IntegratorResults) {
 	stats.stdDev = obs.Deviation
 	stats.highWatermark = obs.Max
 	envelope := obs.Average + obs.Deviation
-	stats.envelope = envelope
 	stats.smoothed = math.Max(envelope, seatDemandSmoothingCoefficient*stats.smoothed+(1-seatDemandSmoothingCoefficient)*envelope)
 }
 
