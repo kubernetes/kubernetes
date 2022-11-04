@@ -93,8 +93,6 @@ func TestMatcher(t *testing.T) {
 		expectMatches   bool
 		expectMatchKind *schema.GroupVersionKind
 		expectErr       string
-
-		isBinding bool
 	}{
 		{
 			name:          "no rules (just write)",
@@ -438,7 +436,7 @@ func TestMatcher(t *testing.T) {
 			expectMatches: false,
 		},
 		{
-			name: "bindingMatch treat empty ResourceRules as match",
+			name: "treat empty ResourceRules as match",
 			criteria: &v1alpha1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
@@ -451,10 +449,9 @@ func TestMatcher(t *testing.T) {
 			},
 			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: true,
-			isBinding:     true,
 		},
 		{
-			name: "bindingMatch treat non-empty ResourceRules as no match",
+			name: "treat non-empty ResourceRules as no match",
 			criteria: &v1alpha1.MatchResources{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
@@ -462,33 +459,12 @@ func TestMatcher(t *testing.T) {
 			},
 			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectMatches: false,
-			isBinding:     true,
-		},
-		{
-			name: "specific rules, match miss for isBinding",
-			criteria: &v1alpha1.MatchResources{
-				NamespaceSelector: &metav1.LabelSelector{},
-				ObjectSelector:    &metav1.LabelSelector{},
-				ResourceRules: []v1alpha1.NamedRuleWithOperations{{
-					RuleWithOperations: v1alpha1.RuleWithOperations{
-						Operations: []v1.OperationType{"*"},
-						Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
-					},
-				}, {
-					RuleWithOperations: v1alpha1.RuleWithOperations{
-						Operations: []v1.OperationType{"*"},
-						Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
-					},
-				}}},
-			attrs:         admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectMatches: false,
-			isBinding:     true,
 		},
 	}
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			matches, matchKind, err := a.Matches(testcase.attrs, interfaces, &fakeCriteria{matchResources: *testcase.criteria}, testcase.isBinding)
+			matches, matchKind, err := a.Matches(testcase.attrs, interfaces, &fakeCriteria{matchResources: *testcase.criteria})
 			if err != nil {
 				if len(testcase.expectErr) == 0 {
 					t.Fatal(err)
@@ -597,7 +573,7 @@ func BenchmarkMatcher(b *testing.B) {
 	matcher := &Matcher{namespaceMatcher: &namespace.Matcher{NamespaceLister: namespaceLister}, objectMatcher: &object.Matcher{}}
 
 	for i := 0; i < b.N; i++ {
-		matcher.Matches(attrs, interfaces, criteria, false)
+		matcher.Matches(attrs, interfaces, criteria)
 	}
 }
 
@@ -667,7 +643,7 @@ func BenchmarkShouldCallHookWithComplexRule(b *testing.B) {
 	matcher := &Matcher{namespaceMatcher: &namespace.Matcher{NamespaceLister: namespaceLister}, objectMatcher: &object.Matcher{}}
 
 	for i := 0; i < b.N; i++ {
-		matcher.Matches(attrs, interfaces, criteria, false)
+		matcher.Matches(attrs, interfaces, criteria)
 	}
 }
 
@@ -742,6 +718,6 @@ func BenchmarkShouldCallHookWithComplexSelectorAndRule(b *testing.B) {
 	matcher := &Matcher{namespaceMatcher: &namespace.Matcher{NamespaceLister: namespaceLister}, objectMatcher: &object.Matcher{}}
 
 	for i := 0; i < b.N; i++ {
-		matcher.Matches(attrs, interfaces, criteria, false)
+		matcher.Matches(attrs, interfaces, criteria)
 	}
 }

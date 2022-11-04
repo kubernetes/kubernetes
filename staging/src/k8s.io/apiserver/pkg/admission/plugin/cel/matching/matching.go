@@ -66,7 +66,7 @@ func (m *Matcher) ValidateInitialization() error {
 	return nil
 }
 
-func (m *Matcher) Matches(attr admission.Attributes, o admission.ObjectInterfaces, criteria MatchCriteria, isBinding bool) (bool, schema.GroupVersionKind, error) {
+func (m *Matcher) Matches(attr admission.Attributes, o admission.ObjectInterfaces, criteria MatchCriteria) (bool, schema.GroupVersionKind, error) {
 	matches, err := m.namespaceMatcher.MatchNamespaceSelector(criteria, attr)
 	if err != nil {
 		return false, schema.GroupVersionKind{}, err
@@ -93,7 +93,7 @@ func (m *Matcher) Matches(attr admission.Attributes, o admission.ObjectInterface
 		return false, schema.GroupVersionKind{}, nil
 	}
 
-	if isBinding && matchResources.ResourceRules == nil {
+	if len(matchResources.ResourceRules) == 0 {
 		return true, attr.GetKind(), nil
 	}
 	isMatch, matchKind, matchErr := matchesResourceRules(matchResources.ResourceRules, matchPolicy, attr, o)

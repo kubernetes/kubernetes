@@ -67,7 +67,7 @@ type CELValidatorCompiler struct {
 // DefinitionMatches returns whether this ValidatingAdmissionPolicy matches the provided admission resource request
 func (c *CELValidatorCompiler) DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition *v1alpha1.ValidatingAdmissionPolicy) (bool, schema.GroupVersionKind, error) {
 	criteria := matchCriteria{constraints: definition.Spec.MatchConstraints}
-	return c.Matcher.Matches(a, o, &criteria, false)
+	return c.Matcher.Matches(a, o, &criteria)
 }
 
 // BindingMatches returns whether this ValidatingAdmissionPolicyBinding matches the provided admission resource request
@@ -76,7 +76,7 @@ func (c *CELValidatorCompiler) BindingMatches(a admission.Attributes, o admissio
 		return true, nil
 	}
 	criteria := matchCriteria{constraints: binding.Spec.MatchResources}
-	isMatch, _, err := c.Matcher.Matches(a, o, &criteria, true)
+	isMatch, _, err := c.Matcher.Matches(a, o, &criteria)
 	return isMatch, err
 }
 

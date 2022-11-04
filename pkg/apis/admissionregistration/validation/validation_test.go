@@ -2040,6 +2040,49 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 			expectedError: `spec.matchConstraints: Required value`,
 		},
 		{
+			name: "matchConstraints.resourceRules is required",
+			config: &admissionregistration.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "config",
+				},
+				Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+					Validations: []admissionregistration.Validation{
+						{
+							Expression: "object.x < 100",
+						},
+					},
+					MatchConstraints: &admissionregistration.MatchResources{},
+				},
+			},
+			expectedError: `spec.matchConstraints.resourceRules: Required value`,
+		},
+		{
+			name: "matchConstraints.resourceRules has at least one explicit rule",
+			config: &admissionregistration.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "config",
+				},
+				Spec: admissionregistration.ValidatingAdmissionPolicySpec{
+					Validations: []admissionregistration.Validation{
+						{
+							Expression: "object.x < 100",
+						},
+					},
+					MatchConstraints: &admissionregistration.MatchResources{
+						ResourceRules: []admissionregistration.NamedRuleWithOperations{
+							{
+								RuleWithOperations: admissionregistration.RuleWithOperations{
+									Rule: admissionregistration.Rule{},
+								},
+								ResourceNames: []string{"/./."},
+							},
+						},
+					},
+				},
+			},
+			expectedError: `spec.matchConstraints.resourceRules[0].apiVersions: Required value`,
+		},
+		{
 			name: "expression is required",
 			config: &admissionregistration.ValidatingAdmissionPolicy{
 				ObjectMeta: metav1.ObjectMeta{

@@ -552,6 +552,10 @@ func validateValidatingAdmissionPolicySpec(spec *admissionregistration.Validatin
 		allErrors = append(allErrors, field.Required(fldPath.Child("matchConstraints"), ""))
 	} else {
 		allErrors = append(allErrors, validateMatchResources(spec.MatchConstraints, fldPath.Child("matchConstraints"))...)
+		// at least one resourceRule must be defined to provide type information
+		if len(spec.MatchConstraints.ResourceRules) == 0 {
+			allErrors = append(allErrors, field.Required(fldPath.Child("matchConstraints", "resourceRules"), ""))
+		}
 	}
 	if len(spec.Validations) == 0 {
 		allErrors = append(allErrors, field.Required(fldPath.Child("validations"), ""))
