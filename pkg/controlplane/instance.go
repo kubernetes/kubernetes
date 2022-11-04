@@ -121,6 +121,12 @@ const (
 	//   1. the lease is an identity lease (different from leader election leases)
 	//   2. which component owns this lease
 	IdentityLeaseComponentLabelKey = "k8s.io/component"
+	// identityLeaseDurationSeconds is the duration of kube-apiserver lease in seconds
+	identityLeaseDurationSeconds = 3600
+	// identityLeaseRenewIntervalSeconds is the interval of kube-apiserver renewing its lease in seconds
+	identityLeaseRenewIntervalSeconds = 10
+	// identityLeaseGCPeriod is the interval which the lease GC controller checks for expired leases
+	identityLeaseGCPeriod = 3600 * time.Second
 	// KubeAPIServer defines variable used internally when referring to kube-apiserver component
 	KubeAPIServer = "kube-apiserver"
 	// KubeAPIServerIdentityLeaseLabelSelector selects kube-apiserver identity leases
@@ -192,9 +198,6 @@ type ExtraConfig struct {
 	ServiceAccountPublicKeys []interface{}
 
 	VersionedInformers informers.SharedInformerFactory
-
-	IdentityLeaseDurationSeconds      int
-	IdentityLeaseRenewIntervalSeconds int
 
 	// RepairServicesInterval interval used by the repair loops for
 	// the Services NodePort and ClusterIP resources
@@ -480,9 +483,9 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 				clock.RealClock{},
 				kubeClient,
 				holderIdentity,
-				int32(c.ExtraConfig.IdentityLeaseDurationSeconds),
+				identityLeaseDurationSeconds,
 				nil,
-				time.Duration(c.ExtraConfig.IdentityLeaseRenewIntervalSeconds)*time.Second,
+				identityLeaseRenewIntervalSeconds*time.Second,
 				leaseName,
 				metav1.NamespaceSystem,
 				labelAPIServerHeartbeat)
@@ -496,7 +499,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			}
 			go apiserverleasegc.NewAPIServerLeaseGC(
 				kubeClient,
-				time.Duration(c.ExtraConfig.IdentityLeaseDurationSeconds)*time.Second,
+				identityLeaseGCPeriod,
 				metav1.NamespaceSystem,
 				KubeAPIServerIdentityLeaseLabelSelector,
 			).Run(hookContext.StopCh)
