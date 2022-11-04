@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -38,7 +37,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elazarl/goproxy"
 	openapi_v2 "github.com/google/gnostic/openapiv2"
 
 	"sigs.k8s.io/yaml"
@@ -52,6 +50,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -472,8 +471,12 @@ var _ = SIGDescribe("Kubectl client", func() {
 				framework.Failf("--host variable must be set to the full URI to the api server on e2e run.")
 			}
 
-			ginkgo.By("Starting goproxy")
-			testSrv, proxyLogs := startLocalProxy()
+			ginkgo.By("Starting http_proxy")
+			var proxyLogs bytes.Buffer
+			testSrv := httptest.NewServer(utilnettesting.NewHTTPProxyHandler(ginkgo.GinkgoT(), func(req *http.Request) bool {
+				fmt.Fprintf(&proxyLogs, "Accepting %s to %s\n", req.Method, req.Host)
+				return true
+			}))
 			defer testSrv.Close()
 			proxyAddr := testSrv.URL
 
@@ -2258,14 +2261,6 @@ func newBlockingReader(s string) (io.Reader, io.Closer, error) {
 	}
 	w.Write([]byte(s))
 	return r, w, nil
-}
-
-func startLocalProxy() (srv *httptest.Server, logs *bytes.Buffer) {
-	logs = &bytes.Buffer{}
-	p := goproxy.NewProxyHttpServer()
-	p.Verbose = true
-	p.Logger = log.New(logs, "", 0)
-	return httptest.NewServer(p), logs
 }
 
 // createApplyCustomResource asserts that given CustomResource be created and applied
