@@ -120,6 +120,35 @@ func (m *podContainerManagerImpl) GetPodContainerName(pod *v1.Pod) (CgroupName, 
 	return cgroupName, cgroupfsName
 }
 
+func (m *podContainerManagerImpl) GetPodCgroupMemoryUsage(pod *v1.Pod) (uint64, error) {
+	podCgroupName, _ := m.GetPodContainerName(pod)
+	memUsage, err := m.cgroupManager.MemoryUsage(podCgroupName)
+	if err != nil {
+		return 0, err
+	}
+	return uint64(memUsage), nil
+}
+
+func (m *podContainerManagerImpl) GetPodCgroupMemoryConfig(pod *v1.Pod) (uint64, error) {
+	podCgroupName, _ := m.GetPodContainerName(pod)
+	return m.cgroupManager.GetCgroupMemoryConfig(podCgroupName)
+}
+
+func (m *podContainerManagerImpl) GetPodCgroupCpuConfig(pod *v1.Pod) (int64, uint64, uint64, error) {
+	podCgroupName, _ := m.GetPodContainerName(pod)
+	return m.cgroupManager.GetCgroupCpuConfig(podCgroupName)
+}
+
+func (m *podContainerManagerImpl) SetPodCgroupMemoryConfig(pod *v1.Pod, memoryLimit int64) error {
+	podCgroupName, _ := m.GetPodContainerName(pod)
+	return m.cgroupManager.SetCgroupMemoryConfig(podCgroupName, memoryLimit)
+}
+
+func (m *podContainerManagerImpl) SetPodCgroupCpuConfig(pod *v1.Pod, cpuQuota *int64, cpuPeriod, cpuShares *uint64) error {
+	podCgroupName, _ := m.GetPodContainerName(pod)
+	return m.cgroupManager.SetCgroupCpuConfig(podCgroupName, cpuQuota, cpuPeriod, cpuShares)
+}
+
 // Kill one process ID
 func (m *podContainerManagerImpl) killOnePid(pid int) error {
 	// os.FindProcess never returns an error on POSIX
@@ -321,4 +350,24 @@ func (m *podContainerManagerNoop) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 
 func (m *podContainerManagerNoop) IsPodCgroup(cgroupfs string) (bool, types.UID) {
 	return false, types.UID("")
+}
+
+func (m *podContainerManagerNoop) GetPodCgroupMemoryUsage(_ *v1.Pod) (uint64, error) {
+	return 0, nil
+}
+
+func (m *podContainerManagerNoop) GetPodCgroupMemoryConfig(_ *v1.Pod) (uint64, error) {
+	return 0, nil
+}
+
+func (m *podContainerManagerNoop) GetPodCgroupCpuConfig(_ *v1.Pod) (int64, uint64, uint64, error) {
+	return 0, 0, 0, nil
+}
+
+func (m *podContainerManagerNoop) SetPodCgroupMemoryConfig(_ *v1.Pod, _ int64) error {
+	return nil
+}
+
+func (m *podContainerManagerNoop) SetPodCgroupCpuConfig(_ *v1.Pod, _ *int64, _, _ *uint64) error {
+	return nil
 }

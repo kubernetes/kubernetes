@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -556,4 +557,87 @@ func (m *cgroupManagerImpl) MemoryUsage(name CgroupName) (int64, error) {
 	}
 	val, err := fscommon.GetCgroupParamUint(path, file)
 	return int64(val), err
+}
+
+// Get the memory limit in bytes applied to the cgroup
+func (m *cgroupManagerImpl) GetCgroupMemoryConfig(name CgroupName) (uint64, error) {
+	cgroupPaths := m.buildCgroupPaths(name)
+	cgroupMemoryPath, found := cgroupPaths["memory"]
+	if !found {
+		return 0, fmt.Errorf("failed to build memory cgroup fs path for cgroup %v", name)
+	}
+	memLimit, err := fscommon.GetCgroupParamUint(cgroupMemoryPath, "memory.limit_in_bytes")
+	if err != nil {
+		return 0, fmt.Errorf("failed to get memory.limit_in_bytes for cgroup %v: %v", name, err)
+	}
+	return memLimit, nil
+}
+
+// Get the cpu quota, cpu period, and cpu shares applied to the cgroup
+func (m *cgroupManagerImpl) GetCgroupCpuConfig(name CgroupName) (int64, uint64, uint64, error) {
+	cgroupPaths := m.buildCgroupPaths(name)
+	cgroupCpuPath, found := cgroupPaths["cpu"]
+	if !found {
+		return 0, 0, 0, fmt.Errorf("failed to build CPU cgroup fs path for cgroup %v", name)
+	}
+	cpuQuotaStr, errQ := fscommon.GetCgroupParamString(cgroupCpuPath, "cpu.cfs_quota_us")
+	if errQ != nil {
+		return 0, 0, 0, fmt.Errorf("failed to read CPU quota for cgroup %v: %v", name, errQ)
+	}
+	cpuQuota, errInt := strconv.ParseInt(cpuQuotaStr, 10, 64)
+	if errInt != nil {
+		return 0, 0, 0, fmt.Errorf("failed to convert CPU quota as integer for cgroup %v: %v", name, errInt)
+	}
+	cpuPeriod, errP := fscommon.GetCgroupParamUint(cgroupCpuPath, "cpu.cfs_period_us")
+	if errP != nil {
+		return 0, 0, 0, fmt.Errorf("failed to read CPU period for cgroup %v: %v", name, errP)
+	}
+	cpuShares, errS := fscommon.GetCgroupParamUint(cgroupCpuPath, "cpu.shares")
+	if errP != nil {
+		return 0, 0, 0, fmt.Errorf("failed to read CPU shares for cgroup %v: %v", name, errS)
+	}
+	return cpuQuota, cpuPeriod, cpuShares, nil
+}
+
+// Set the memory limit in bytes applied to the cgroup
+func (m *cgroupManagerImpl) SetCgroupMemoryConfig(name CgroupName, memoryLimit int64) error {
+	cgroupPaths := m.buildCgroupPaths(name)
+	cgroupMemoryPath, found := cgroupPaths["memory"]
+	if !found {
+		return fmt.Errorf("failed to build memory cgroup fs path for cgroup %v", name)
+	}
+	memLimit := strconv.FormatInt(memoryLimit, 10)
+	if err := os.WriteFile(filepath.Join(cgroupMemoryPath, "memory.limit_in_bytes"), []byte(memLimit), 0700); err != nil {
+		return fmt.Errorf("failed to write %v to %v: %v", memLimit, cgroupMemoryPath, err)
+	}
+	return nil
+}
+
+// Set the cpu quota, cpu period, and cpu shares applied to the cgroup
+func (m *cgroupManagerImpl) SetCgroupCpuConfig(name CgroupName, cpuQuota *int64, cpuPeriod, cpuShares *uint64) error {
+	var cpuQuotaStr, cpuPeriodStr, cpuSharesStr string
+	cgroupPaths := m.buildCgroupPaths(name)
+	cgroupCpuPath, found := cgroupPaths["cpu"]
+	if !found {
+		return fmt.Errorf("failed to build cpu cgroup fs path for cgroup %v", name)
+	}
+	if cpuQuota != nil {
+		cpuQuotaStr = strconv.FormatInt(*cpuQuota, 10)
+		if err := os.WriteFile(filepath.Join(cgroupCpuPath, "cpu.cfs_quota_us"), []byte(cpuQuotaStr), 0700); err != nil {
+			return fmt.Errorf("failed to write %v to %v: %v", cpuQuotaStr, cgroupCpuPath, err)
+		}
+	}
+	if cpuPeriod != nil {
+		cpuPeriodStr = strconv.FormatUint(*cpuPeriod, 10)
+		if err := os.WriteFile(filepath.Join(cgroupCpuPath, "cpu.cfs_period_us"), []byte(cpuPeriodStr), 0700); err != nil {
+			return fmt.Errorf("failed to write %v to %v: %v", cpuPeriodStr, cgroupCpuPath, err)
+		}
+	}
+	if cpuShares != nil {
+		cpuSharesStr = strconv.FormatUint(*cpuShares, 10)
+		if err := os.WriteFile(filepath.Join(cgroupCpuPath, "cpu.shares"), []byte(cpuSharesStr), 0700); err != nil {
+			return fmt.Errorf("failed to write %v to %v: %v", cpuSharesStr, cgroupCpuPath, err)
+		}
+	}
+	return nil
 }

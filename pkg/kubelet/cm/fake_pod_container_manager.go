@@ -104,3 +104,38 @@ func (m *FakePodContainerManager) IsPodCgroup(cgroupfs string) (bool, types.UID)
 	m.CalledFunctions = append(m.CalledFunctions, "IsPodCgroup")
 	return false, types.UID("")
 }
+
+func (cm *FakePodContainerManager) GetPodCgroupMemoryUsage(_ *v1.Pod) (uint64, error) {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "GetPodCgroupMemoryUsage")
+	return 0, nil
+}
+
+func (cm *FakePodContainerManager) GetPodCgroupMemoryConfig(_ *v1.Pod) (uint64, error) {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "GetPodCgroupMemoryConfig")
+	return 0, nil
+}
+
+func (cm *FakePodContainerManager) GetPodCgroupCpuConfig(_ *v1.Pod) (int64, uint64, uint64, error) {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "GetPodCgroupCpuConfig")
+	return 0, 0, 0, nil
+}
+
+func (cm *FakePodContainerManager) SetPodCgroupMemoryConfig(_ *v1.Pod, _ int64) error {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "SetPodCgroupMemoryConfig")
+	return nil
+}
+
+func (cm *FakePodContainerManager) SetPodCgroupCpuConfig(_ *v1.Pod, _ *int64, _, _ *uint64) error {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "SetPodCgroupCpuConfig")
+	return nil
+}

@@ -95,6 +95,22 @@ func (cm *containerManagerStub) GetDevicePluginResourceCapacity() (v1.ResourceLi
 	return cm.extendedPluginResources, cm.extendedPluginResources, []string{}
 }
 
+func (m *podContainerManagerStub) GetPodCgroupMemoryConfig(_ *v1.Pod) (uint64, error) {
+	return 0, nil
+}
+
+func (m *podContainerManagerStub) GetPodCgroupCpuConfig(_ *v1.Pod) (int64, uint64, uint64, error) {
+	return 0, 0, 0, nil
+}
+
+func (m *podContainerManagerStub) SetPodCgroupMemoryConfig(_ *v1.Pod, _ int64) error {
+	return nil
+}
+
+func (m *podContainerManagerStub) SetPodCgroupCpuConfig(_ *v1.Pod, _ *int64, _, _ *uint64) error {
+	return nil
+}
+
 func (cm *containerManagerStub) NewPodContainerManager() PodContainerManager {
 	return &podContainerManagerStub{}
 }
