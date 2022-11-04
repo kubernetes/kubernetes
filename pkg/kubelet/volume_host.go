@@ -261,7 +261,7 @@ func (kvh *kubeletVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.
 		return kvh.secretManager.GetSecret
 	}
 	return func(namespace, name string) (*v1.Secret, error) {
-		return nil, fmt.Errorf("not supported")
+		return nil, fmt.Errorf("not supported due to running kubelet in standalone mode")
 	}
 }
 
@@ -270,7 +270,7 @@ func (kvh *kubeletVolumeHost) GetConfigMapFunc() func(namespace, name string) (*
 		return kvh.configMapManager.GetConfigMap
 	}
 	return func(namespace, name string) (*v1.ConfigMap, error) {
-		return nil, fmt.Errorf("not supported")
+		return nil, fmt.Errorf("not supported due to running kubelet in standalone mode")
 	}
 }
 
