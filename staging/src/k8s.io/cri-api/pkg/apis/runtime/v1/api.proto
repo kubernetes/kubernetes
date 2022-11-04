@@ -945,9 +945,6 @@ message WindowsContainerSecurityContext {
 
     // Indicates whether a container is to be run as a HostProcess container.
     bool host_process = 3;
-
-    // Configurations for the sandbox's namespaces.
-    WindowsNamespaceOption namespace_options = 4;
 }
 
 // WindowsContainerConfig contains platform-specific configuration for
