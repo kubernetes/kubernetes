@@ -67,6 +67,10 @@ func TestReconstructVolumes(t *testing.T) {
 				if len(volumes) != 1 {
 					return fmt.Errorf("expected 1 uncertain volume in asw got %d", len(volumes))
 				}
+				// The volume should be marked as reconstructed in ASW
+				if reconstructed := rcInstance.actualStateOfWorld.IsVolumeReconstructed("fake-plugin/pvc-abcdef", "pod1"); !reconstructed {
+					t.Errorf("expected volume to be marked as reconstructed, got %v", reconstructed)
+				}
 				return nil
 			},
 		},
@@ -251,4 +255,131 @@ func verifyTearDownCalls(plugin *volumetesting.FakeVolumePlugin, expected int) e
 		}
 	}
 	return fmt.Errorf("expected TearDown calls %d, got %d", expected, actualCallCount)
+}
+
+func TestReconstructVolumesMount(t *testing.T) {
+	// This test checks volume reconstruction + subsequent failed mount.
+	// Since the volume is reconstructed, it must be marked as uncertain
+	// even after a final SetUp error, see https://github.com/kubernetes/kubernetes/issues/96635
+	// and https://github.com/kubernetes/kubernetes/pull/110670.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+
+	tests := []struct {
+		name        string
+		volumePath  string
+		expectMount bool
+	}{
+		{
+			name:       "reconstructed volume is mounted",
+			volumePath: path.Join("pod1uid", "volumes", "fake-plugin", "volumename"),
+
+			expectMount: true,
+		},
+		{
+			name: "reconstructed volume fails to mount",
+			// FailOnSetupVolumeName: MountDevice succeeds, SetUp fails
+			volumePath:  path.Join("pod1uid", "volumes", "fake-plugin", volumetesting.FailOnSetupVolumeName),
+			expectMount: false,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpKubeletDir, err := os.MkdirTemp("", "")
+			if err != nil {
+				t.Fatalf("can't make a temp directory for kubeletPods: %v", err)
+			}
+			defer os.RemoveAll(tmpKubeletDir)
+
+			// create kubelet pod directory
+			tmpKubeletPodDir := filepath.Join(tmpKubeletDir, "pods")
+			os.MkdirAll(tmpKubeletPodDir, 0755)
+
+			// create pod and volume directories so as reconciler can find them.
+			vp := filepath.Join(tmpKubeletPodDir, tc.volumePath)
+			mountPaths := []string{vp}
+			os.MkdirAll(vp, 0755)
+
+			rc, fakePlugin := getReconciler(tmpKubeletDir, t, mountPaths)
+			rcInstance, _ := rc.(*reconciler)
+
+			// Act 1 - reconstruction
+			rcInstance.reconstructVolumes()
+
+			// Assert 1 - the volume is Uncertain
+			mountedPods := rcInstance.actualStateOfWorld.GetMountedVolumes()
+			if len(mountedPods) != 0 {
+				t.Errorf("expected 0 mounted volumes, got %+v", mountedPods)
+			}
+			allPods := rcInstance.actualStateOfWorld.GetAllMountedVolumes()
+			if len(allPods) != 1 {
+				t.Errorf("expected 1 uncertain volume in asw, got %+v", allPods)
+			}
+
+			// Arrange 2 - populate DSW
+			outerName := filepath.Base(tc.volumePath)
+			pod := getInlineFakePod("pod1", "pod1uid", outerName, outerName)
+			volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
+			podName := util.GetUniquePodName(pod)
+			volumeName, err := rcInstance.desiredStateOfWorld.AddPodToVolume(
+				podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* SELinuxContext */)
+			if err != nil {
+				t.Fatalf("Error adding volume %s to dsow: %v", volumeSpec.Name(), err)
+			}
+			rcInstance.actualStateOfWorld.MarkVolumeAsAttached(volumeName, volumeSpec, nodeName, "")
+
+			rcInstance.populatorHasAddedPods = func() bool {
+				// Mark DSW populated to allow unmounting of volumes.
+				return true
+			}
+			// Mark devices paths as reconciled to allow unmounting of volumes.
+			rcInstance.volumesNeedDevicePath = nil
+
+			// Act 2 - reconcile once
+			rcInstance.reconcileNew()
+
+			// Assert 2
+			// MountDevice was attempted
+			var lastErr error
+			err = retryWithExponentialBackOff(testOperationBackOffDuration, func() (bool, error) {
+				// MountDevice should always be called and succeed
+				if err := volumetesting.VerifyMountDeviceCallCount(1, fakePlugin); err != nil {
+					lastErr = err
+					return false, nil
+				}
+				return true, nil
+			})
+			if err != nil {
+				t.Errorf("Error waiting for volumes to get mounted: %s: %s", err, lastErr)
+			}
+
+			if tc.expectMount {
+				// The volume should be fully mounted
+				waitForMount(t, fakePlugin, volumeName, rcInstance.actualStateOfWorld)
+				// SetUp was called and succeeded
+				if err := volumetesting.VerifySetUpCallCount(1, fakePlugin); err != nil {
+					t.Errorf("Expected SetUp() to be called, got %s", err)
+				}
+			} else {
+				// The test does not expect any change in ASW, yet it needs to wait for volume operations to finish
+				err = retryWithExponentialBackOff(testOperationBackOffDuration, func() (bool, error) {
+					return !rcInstance.operationExecutor.IsOperationPending(volumeName, "pod1uid", nodeName), nil
+				})
+				if err != nil {
+					t.Errorf("Error waiting for operation to get finished: %s", err)
+				}
+				// The volume is uncertain
+				mountedPods := rcInstance.actualStateOfWorld.GetMountedVolumes()
+				if len(mountedPods) != 0 {
+					t.Errorf("expected 0 mounted volumes after reconcile, got %+v", mountedPods)
+				}
+				allPods := rcInstance.actualStateOfWorld.GetAllMountedVolumes()
+				if len(allPods) != 1 {
+					t.Errorf("expected 1 mounted or uncertain volumes after reconcile, got %+v", allPods)
+				}
+			}
+
+			// Unmount was *not* attempted in any case
+			verifyTearDownCalls(fakePlugin, 0)
+		})
+	}
 }

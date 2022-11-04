@@ -124,7 +124,8 @@ func (rc *reconciler) updateStatesNew(reconstructedVolumes map[v1.UniqueVolumeNa
 				VolumeSpec:          volume.volumeSpec,
 				VolumeMountState:    operationexecutor.VolumeMountUncertain,
 			}
-			err = rc.actualStateOfWorld.MarkVolumeMountAsUncertain(markVolumeOpts)
+
+			_, err = rc.actualStateOfWorld.CheckAndMarkVolumeAsUncertainViaReconstruction(markVolumeOpts)
 			if err != nil {
 				klog.ErrorS(err, "Could not add pod to volume information to actual state of world", "pod", klog.KObj(volume.pod))
 				continue
@@ -179,7 +180,7 @@ func (rc *reconciler) updateReconstructedDevicePaths() {
 	node, fetchErr := rc.kubeClient.CoreV1().Nodes().Get(context.TODO(), string(rc.nodeName), metav1.GetOptions{})
 	if fetchErr != nil {
 		// This may repeat few times per second until kubelet is able to read its own status for the first time.
-		klog.ErrorS(fetchErr, "Failed to get Node status to reconstruct device paths")
+		klog.V(2).ErrorS(fetchErr, "Failed to get Node status to reconstruct device paths")
 		return
 	}
 
