@@ -588,7 +588,7 @@ func TestCleanSubPaths(t *testing.T) {
 				return mounts, nil
 			},
 			unmount: func(mountpath string) error {
-				err := filepath.Walk(mountpath, func(path string, info os.FileInfo, _ error) error {
+				err := filepath.WalkDir(mountpath, func(path string, info os.FileInfo, _ error) error {
 					if path == mountpath {
 						// Skip top level directory
 						return nil

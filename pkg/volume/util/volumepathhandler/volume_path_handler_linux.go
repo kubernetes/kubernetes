@@ -157,7 +157,7 @@ func getLoopDeviceFromSysfs(path string) (string, error) {
 func (v VolumePathHandler) FindGlobalMapPathUUIDFromPod(pluginDir, mapPath string, podUID types.UID) (string, error) {
 	var globalMapPathUUID string
 	// Find symbolic link named pod uuid under plugin dir
-	err := filepath.Walk(pluginDir, func(path string, fi os.FileInfo, err error) error {
+	err := filepath.WalkDir(pluginDir, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}

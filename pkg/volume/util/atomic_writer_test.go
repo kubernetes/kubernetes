@@ -796,7 +796,7 @@ func checkVolumeContents(targetDir, tcName string, payload map[string]FileProjec
 				t.Errorf("Unable to read symlink %v: %v", p, err)
 				continue
 			}
-			if err := filepath.Walk(filepath.Join(targetDir, actual), visitor); err != nil {
+			if err := filepath.WalkDir(filepath.Join(targetDir, actual), visitor); err != nil {
 				t.Errorf("%v: unexpected error walking directory: %v", tcName, err)
 			}
 		}

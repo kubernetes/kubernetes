@@ -116,7 +116,7 @@ func (fs *DefaultFs) ReadDir(dirname string) ([]os.DirEntry, error) {
 
 // Walk via filepath.Walk
 func (fs *DefaultFs) Walk(root string, walkFn filepath.WalkFunc) error {
-	return filepath.Walk(fs.prefix(root), walkFn)
+	return filepath.WalkDir(fs.prefix(root), walkFn)
 }
 
 // defaultFile implements File using same-named functions from "os"

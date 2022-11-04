@@ -331,7 +331,7 @@ func (w *AtomicWriter) pathsToRemove(payload map[string]FileProjection, oldTsDir
 		return nil
 	}
 
-	err := filepath.Walk(oldTsDir, visitor)
+	err := filepath.WalkDir(oldTsDir, visitor)
 	if os.IsNotExist(err) {
 		return nil, nil
 	} else if err != nil {

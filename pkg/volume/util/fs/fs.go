@@ -100,7 +100,7 @@ func DiskUsage(path string) (UsageInfo, error) {
 	// dedupedInode stores inodes that could be duplicates (nlink > 1)
 	dedupedInodes := make(map[uint64]struct{})
 
-	err = filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+	err = filepath.WalkDir(path, func(path string, info os.FileInfo, err error) error {
 		// ignore files that have been deleted after directory was read
 		if os.IsNotExist(err) {
 			return nil

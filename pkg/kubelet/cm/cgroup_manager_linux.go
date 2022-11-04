@@ -518,7 +518,7 @@ func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 		// Walk through the pod cgroup directory to check if
 		// container cgroups haven't been GCed yet. Get attached processes to
 		// all such unwanted containers under the pod cgroup
-		if err = filepath.Walk(dir, visitor); err != nil {
+		if err = filepath.WalkDir(dir, visitor); err != nil {
 			klog.V(4).InfoS("Cgroup manager encountered error scanning pids for directory", "path", dir, "err", err)
 		}
 	}
