@@ -77,11 +77,15 @@ func DeepEqualSafePodSpec() example.PodSpec {
 	}
 }
 
+func computePodKey(obj *example.Pod) string {
+	return fmt.Sprintf("/%s/%s", obj.Namespace, obj.Name)
+}
+
 // testPropagateStore helps propagates store with objects, automates key generation, and returns
 // keys and stored objects.
 func testPropagateStore(ctx context.Context, t *testing.T, store storage.Interface, obj *example.Pod) (string, *example.Pod) {
 	// Setup store with a key and grab the output for returning.
-	key := fmt.Sprintf("/%s/%s", obj.Namespace, obj.Name)
+	key := computePodKey(obj)
 
 	// Setup store with the specified key and grab the output for returning.
 	err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil)
