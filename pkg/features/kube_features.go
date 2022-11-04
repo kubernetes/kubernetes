@@ -222,9 +222,10 @@ const (
 	// DaemonSets allow workloads to maintain availability during update per node
 	DaemonSetUpdateSurge featuregate.Feature = "DaemonSetUpdateSurge"
 
-	// owner: @gnufied, @verult
+	// owner: @gnufied, @verult, @bertinatto
 	// alpha: v1.22
 	// beta: v1.23
+	// GA: v1.26
 	// If supported by the CSI driver, delegates the role of applying FSGroup to
 	// the driver by passing FSGroup through the NodeStageVolume and
 	// NodePublishVolume calls.
@@ -888,7 +889,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	DaemonSetUpdateSurge: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
 
-	DelegateFSGroupToCSIDriver: {Default: true, PreRelease: featuregate.Beta},
+	DelegateFSGroupToCSIDriver: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	DevicePlugins: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.26
 
