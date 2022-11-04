@@ -110,8 +110,9 @@ type testCase struct {
 	WorkloadTemplate []op
 	// List of workloads to run under this testCase.
 	Workloads []*workload
-	// SchedulerConfigFile is the path of scheduler configuration
-	SchedulerConfigFile string
+	// SchedulerConfigPath is the path of scheduler configuration
+	// Optional
+	SchedulerConfigPath *string
 	// Default path to spec file describing the pods to create.
 	// This path can be overridden in createPodsOp by setting PodTemplatePath .
 	// Optional
@@ -645,8 +646,8 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 	defer cancel()
 	var cfg *config.KubeSchedulerConfiguration
 	var err error
-	if len(tc.SchedulerConfigFile) != 0 {
-		cfg, err = loadSchedulerConfig(tc.SchedulerConfigFile)
+	if tc.SchedulerConfigPath != nil {
+		cfg, err = loadSchedulerConfig(*tc.SchedulerConfigPath)
 		if err != nil {
 			b.Fatalf("error loading scheduler config file: %v", err)
 		}
