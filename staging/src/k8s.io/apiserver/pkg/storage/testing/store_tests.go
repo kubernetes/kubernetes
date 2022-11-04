@@ -184,7 +184,10 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 	}}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			out := &example.Pod{}
 			err := store.Get(ctx, tt.key, storage.GetOptions{IgnoreNotFound: tt.ignoreNotFound, ResourceVersion: tt.rv}, out)
 			if tt.expectNotFoundErr {
@@ -1091,12 +1094,11 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage
 		rv:                   "0",
 		rvMatch:              metav1.ResourceVersionMatchNotOlderThan,
 	}, {
-		name:                 "existing key, resourceVersion=previous, resourceVersionMatch=notOlderThan",
-		key:                  key,
-		pred:                 storage.Everything,
-		expectedAlternatives: [][]example.Pod{{*prevStoredObj}, {*storedObj}},
-		rv:                   fmt.Sprintf("%d", prevRV),
-		rvMatch:              metav1.ResourceVersionMatchNotOlderThan,
+		name:        "existing key, resourceVersion=current",
+		key:         key,
+		pred:        storage.Everything,
+		expectedOut: []example.Pod{*storedObj},
+		rv:          fmt.Sprintf("%d", currentRV),
 	}, {
 		name:        "existing key, resourceVersion=current, resourceVersionMatch=notOlderThan",
 		key:         key,
@@ -1105,11 +1107,12 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage
 		rv:          fmt.Sprintf("%d", currentRV),
 		rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 	}, {
-		name:        "existing key, resourceVersion=current",
-		key:         key,
-		pred:        storage.Everything,
-		expectedOut: []example.Pod{*storedObj},
-		rv:          fmt.Sprintf("%d", currentRV),
+		name:                 "existing key, resourceVersion=previous, resourceVersionMatch=notOlderThan",
+		key:                  key,
+		pred:                 storage.Everything,
+		expectedAlternatives: [][]example.Pod{{*prevStoredObj}, {*storedObj}},
+		rv:                   fmt.Sprintf("%d", prevRV),
+		rvMatch:              metav1.ResourceVersionMatchNotOlderThan,
 	}, {
 		name:        "existing key, resourceVersion=current, resourceVersionMatch=exact",
 		key:         key,
@@ -1151,7 +1154,10 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage
 	}}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			out := &example.PodList{}
 			storageOpts := storage.ListOptions{
 				ResourceVersion:      tt.rv,

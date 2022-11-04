@@ -165,13 +165,13 @@ func updatePod(t *testing.T, s storage.Interface, obj, old *example.Pod) *exampl
 
 func TestGet(t *testing.T) {
 	ctx, cacher, terminate := testSetup(t)
-	defer terminate()
+	t.Cleanup(terminate)
 	storagetesting.RunTestGet(ctx, t, cacher)
 }
 
 func TestGetListNonRecursive(t *testing.T) {
 	ctx, cacher, terminate := testSetup(t)
-	defer terminate()
+	t.Cleanup(terminate)
 	storagetesting.RunTestGetListNonRecursive(ctx, t, cacher)
 }
 
