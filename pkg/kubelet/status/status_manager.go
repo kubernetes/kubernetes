@@ -75,6 +75,8 @@ type manager struct {
 	// apiStatusVersions must only be accessed from the sync thread.
 	apiStatusVersions map[kubetypes.MirrorPodUID]uint64
 	podDeletionSafety PodDeletionSafetyProvider
+
+	podStartupLatencyHelper PodStartupLatencyStateHelper
 }
 
 // PodStatusProvider knows how to provide status for a pod. It's intended to be used by other components
@@ -91,6 +93,11 @@ type PodDeletionSafetyProvider interface {
 	PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bool
 	// PodCouldHaveRunningContainers returns true if the pod could have running containers.
 	PodCouldHaveRunningContainers(pod *v1.Pod) bool
+}
+
+type PodStartupLatencyStateHelper interface {
+	RecordStatusUpdated(pod *v1.Pod)
+	DeletePodStartupState(podUID types.UID)
 }
 
 // Manager is the Source of truth for kubelet pod status, and should be kept up-to-date with
@@ -124,14 +131,15 @@ type Manager interface {
 const syncPeriod = 10 * time.Second
 
 // NewManager returns a functional Manager.
-func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager, podDeletionSafety PodDeletionSafetyProvider) Manager {
+func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager, podDeletionSafety PodDeletionSafetyProvider, podStartupLatencyHelper PodStartupLatencyStateHelper) Manager {
 	return &manager{
-		kubeClient:        kubeClient,
-		podManager:        podManager,
-		podStatuses:       make(map[types.UID]versionedPodStatus),
-		podStatusChannel:  make(chan podStatusSyncRequest, 1000), // Buffer up to 1000 statuses
-		apiStatusVersions: make(map[kubetypes.MirrorPodUID]uint64),
-		podDeletionSafety: podDeletionSafety,
+		kubeClient:              kubeClient,
+		podManager:              podManager,
+		podStatuses:             make(map[types.UID]versionedPodStatus),
+		podStatusChannel:        make(chan podStatusSyncRequest, 1000), // Buffer up to 1000 statuses
+		apiStatusVersions:       make(map[kubetypes.MirrorPodUID]uint64),
+		podDeletionSafety:       podDeletionSafety,
+		podStartupLatencyHelper: podStartupLatencyHelper,
 	}
 }
 
@@ -599,6 +607,7 @@ func (m *manager) deletePodStatus(uid types.UID) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 	delete(m.podStatuses, uid)
+	m.podStartupLatencyHelper.DeletePodStartupState(uid)
 }
 
 // TODO(filipg): It'd be cleaner if we can do this without signal from user.
@@ -710,6 +719,8 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	} else {
 		klog.V(3).InfoS("Status for pod updated successfully", "pod", klog.KObj(pod), "statusVersion", status.version, "status", mergedStatus)
 		pod = newPod
+		// We pass a new object (result of API call which contains updated ResourceVersion)
+		m.podStartupLatencyHelper.RecordStatusUpdated(pod)
 	}
 
 	// measure how long the status update took to propagate from generation to update on the server

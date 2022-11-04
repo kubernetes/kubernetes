@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
+	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/utils/exec"
 )
@@ -105,10 +106,11 @@ func setTestProbe(pod *v1.Pod, probeType probeType, probeSpec v1.Probe) {
 
 func newTestManager() *manager {
 	podManager := kubepod.NewBasicPodManager(nil, nil, nil)
+	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
 	// Add test pod to pod manager, so that status manager can get the pod from pod manager if needed.
 	podManager.AddPod(getTestPod())
 	m := NewManager(
-		status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}),
+		status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker),
 		results.NewManager(),
 		results.NewManager(),
 		results.NewManager(),

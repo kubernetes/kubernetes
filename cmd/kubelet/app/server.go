@@ -99,6 +99,7 @@ import (
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
+	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/pkg/util/flock"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -749,6 +750,10 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		if err != nil {
 			return err
 		}
+	}
+
+	if kubeDeps.PodStartupLatencyTracker == nil {
+		kubeDeps.PodStartupLatencyTracker = kubeletutil.NewPodStartupLatencyTracker()
 	}
 
 	// TODO(vmarmol): Do this through container config.

@@ -222,28 +222,29 @@ type Dependencies struct {
 	Options []Option
 
 	// Injected Dependencies
-	Auth                 server.AuthInterface
-	CAdvisorInterface    cadvisor.Interface
-	Cloud                cloudprovider.Interface
-	ContainerManager     cm.ContainerManager
-	EventClient          v1core.EventsGetter
-	HeartbeatClient      clientset.Interface
-	OnHeartbeatFailure   func()
-	KubeClient           clientset.Interface
-	Mounter              mount.Interface
-	HostUtil             hostutil.HostUtils
-	OOMAdjuster          *oom.OOMAdjuster
-	OSInterface          kubecontainer.OSInterface
-	PodConfig            *config.PodConfig
-	ProbeManager         prober.Manager
-	Recorder             record.EventRecorder
-	Subpather            subpath.Interface
-	TracerProvider       trace.TracerProvider
-	VolumePlugins        []volume.VolumePlugin
-	DynamicPluginProber  volume.DynamicPluginProber
-	TLSOptions           *server.TLSOptions
-	RemoteRuntimeService internalapi.RuntimeService
-	RemoteImageService   internalapi.ImageManagerService
+	Auth                     server.AuthInterface
+	CAdvisorInterface        cadvisor.Interface
+	Cloud                    cloudprovider.Interface
+	ContainerManager         cm.ContainerManager
+	EventClient              v1core.EventsGetter
+	HeartbeatClient          clientset.Interface
+	OnHeartbeatFailure       func()
+	KubeClient               clientset.Interface
+	Mounter                  mount.Interface
+	HostUtil                 hostutil.HostUtils
+	OOMAdjuster              *oom.OOMAdjuster
+	OSInterface              kubecontainer.OSInterface
+	PodConfig                *config.PodConfig
+	ProbeManager             prober.Manager
+	Recorder                 record.EventRecorder
+	Subpather                subpath.Interface
+	TracerProvider           trace.TracerProvider
+	VolumePlugins            []volume.VolumePlugin
+	DynamicPluginProber      volume.DynamicPluginProber
+	TLSOptions               *server.TLSOptions
+	RemoteRuntimeService     internalapi.RuntimeService
+	RemoteImageService       internalapi.ImageManagerService
+	PodStartupLatencyTracker util.PodStartupLatencyTracker
 	// remove it after cadvisor.UsingLegacyCadvisorStats dropped.
 	useLegacyCadvisorStats bool
 }
@@ -261,7 +262,7 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 	}
 
 	// source of all configuration
-	cfg := config.NewPodConfig(config.PodConfigNotificationIncremental, kubeDeps.Recorder)
+	cfg := config.NewPodConfig(config.PodConfigNotificationIncremental, kubeDeps.Recorder, kubeDeps.PodStartupLatencyTracker)
 
 	// TODO:  it needs to be replaced by a proper context in the future
 	ctx := context.TODO()
@@ -593,7 +594,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	mirrorPodClient := kubepod.NewBasicMirrorClient(klet.kubeClient, string(nodeName), nodeLister)
 	klet.podManager = kubepod.NewBasicPodManager(mirrorPodClient, secretManager, configMapManager)
 
-	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
+	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker)
 
 	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration, kubeDeps.Recorder)
 
@@ -657,6 +658,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeCfg.MemorySwap.SwapBehavior,
 		kubeDeps.ContainerManager.GetNodeAllocatableAbsolute,
 		*kubeCfg.MemoryThrottlingFactor,
+		kubeDeps.PodStartupLatencyTracker,
 	)
 	if err != nil {
 		return nil, err

@@ -194,6 +194,7 @@ func NewKubeGenericRuntimeManager(
 	memorySwapBehavior string,
 	getNodeAllocatable func() v1.ResourceList,
 	memoryThrottlingFactor float64,
+	podPullingTimeRecorder images.ImagePodPullingTimeRecorder,
 ) (KubeGenericRuntime, error) {
 	runtimeService = newInstrumentedRuntimeService(runtimeService)
 	imageService = newInstrumentedImageManagerService(imageService)
@@ -264,7 +265,8 @@ func NewKubeGenericRuntimeManager(
 		imageBackOff,
 		serializeImagePulls,
 		imagePullQPS,
-		imagePullBurst)
+		imagePullBurst,
+		podPullingTimeRecorder)
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(insecureContainerLifecycleHTTPClient, kubeRuntimeManager, kubeRuntimeManager, recorder)
 	kubeRuntimeManager.containerGC = newContainerGC(runtimeService, podStateProvider, kubeRuntimeManager)
 	kubeRuntimeManager.podStateProvider = podStateProvider
