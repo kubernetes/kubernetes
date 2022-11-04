@@ -239,7 +239,7 @@ func NewProxier(ipt utiliptables.Interface,
 	if localhostNodePorts && utilproxy.ContainsIPv4Loopback(nodePortAddresses) {
 		// Set the route_localnet sysctl we need for exposing NodePorts on loopback addresses
 		// Refer to https://issues.k8s.io/90259
-		klog.InfoS("Setting route_localnet=1 to allows nodePort services can be accessed via localhost. You can set flag '--iptables-localhost-nodeports' to false  or use nodePortAddresses (--nodeport-addresses) to filter loopback addresses to change this")
+		klog.InfoS("Setting route_localnet=1 to allow node-ports on localhost; to change this either disable iptables.localhostNodePorts (--iptables-localhost-nodeports) or set nodePortAddresses (--nodeport-addresses) to filter loopback addresses")
 		if err := utilproxy.EnsureSysctl(sysctl, sysctlRouteLocalnet, 1); err != nil {
 			return nil, err
 		}
