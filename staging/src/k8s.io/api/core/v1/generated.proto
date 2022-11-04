@@ -3353,6 +3353,13 @@ message PodReadinessGate {
   optional string conditionType = 1;
 }
 
+// PodSchedulingGate is associated to a Pod to guard its scheduling.
+message PodSchedulingGate {
+  // Name of the scheduling gate.
+  // Each scheduling gate must have a unique name field.
+  optional string name = 1;
+}
+
 // PodSecurityContext holds pod-level security attributes and common container settings.
 // Some fields are also present in container.securityContext.  Field values of
 // container.securityContext take precedence over field values of PodSecurityContext.
@@ -3747,6 +3754,17 @@ message PodSpec {
   // +k8s:conversion-gen=false
   // +optional
   optional bool hostUsers = 37;
+
+  // SchedulingGates is an opaque list of values that if specified will block scheduling the pod.
+  // More info:  https://git.k8s.io/enhancements/keps/sig-scheduling/3521-pod-scheduling-readiness.
+  //
+  // This is an alpha-level feature enabled by PodSchedulingReadiness feature gate.
+  // +optional
+  // +patchMergeKey=name
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
+  repeated PodSchedulingGate schedulingGates = 38;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual

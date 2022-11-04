@@ -35,9 +35,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	utilpointer "k8s.io/utils/pointer"
 
@@ -258,6 +261,72 @@ func TestGetPodQOS(t *testing.T) {
 		if actual != testCase.expected {
 			t.Errorf("[%d]: invalid qos pod %s, expected: %s, actual: %s", id, testCase.pod.Name, testCase.expected, actual)
 		}
+	}
+}
+
+func TestWaitingForGatesCondition(t *testing.T) {
+	tests := []struct {
+		name           string
+		pod            *api.Pod
+		featureEnabled bool
+		want           api.PodCondition
+	}{
+		{
+			name:           "pod without .spec.schedulingGates, feature disabled",
+			pod:            &api.Pod{},
+			featureEnabled: false,
+			want:           api.PodCondition{},
+		},
+		{
+			name:           "pod without .spec.schedulingGates, feature enabled",
+			pod:            &api.Pod{},
+			featureEnabled: true,
+			want:           api.PodCondition{},
+		},
+		{
+			name: "pod with .spec.schedulingGates, feature disabled",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					SchedulingGates: []api.PodSchedulingGate{{Name: "foo"}},
+				},
+			},
+			featureEnabled: false,
+			want:           api.PodCondition{},
+		},
+		{
+			name: "pod with .spec.schedulingGates, feature enabled",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					SchedulingGates: []api.PodSchedulingGate{{Name: "foo"}},
+				},
+			},
+			featureEnabled: true,
+			want: api.PodCondition{
+				Type:    api.PodScheduled,
+				Status:  api.ConditionFalse,
+				Reason:  api.PodReasonSchedulingGated,
+				Message: "Scheduling is blocked due to non-empty scheduling gates",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodSchedulingReadiness, tt.featureEnabled)()
+
+			Strategy.PrepareForCreate(genericapirequest.NewContext(), tt.pod)
+			var got api.PodCondition
+			for _, condition := range tt.pod.Status.Conditions {
+				if condition.Type == api.PodScheduled {
+					got = condition
+					break
+				}
+			}
+
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
+			}
+		})
 	}
 }
 

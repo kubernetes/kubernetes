@@ -184,6 +184,7 @@ INFO: Unexpected error: wait for pod pending-pod running:
                     SetHostnameAsFQDN: nil,
                     OS: nil,
                     HostUsers: nil,
+                    SchedulingGates: nil,
                 },
                 Status: {
                     Phase: "",

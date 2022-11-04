@@ -18,6 +18,7 @@ package storage
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -41,7 +42,10 @@ import (
 	apiserverstorage "k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -742,6 +746,77 @@ func TestEtcdCreateWithConflict(t *testing.T) {
 	_, err = bindingStorage.Create(ctx, binding.Name, &binding, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err == nil || !errors.IsConflict(err) {
 		t.Fatalf("expected resource conflict error, not: %v", err)
+	}
+}
+
+func TestEtcdCreateWithSchedulingGates(t *testing.T) {
+	tests := []struct {
+		name            string
+		featureEnabled  bool
+		schedulingGates []api.PodSchedulingGate
+		wantErr         error
+	}{
+		{
+			name:           "pod with non-nil schedulingGates, feature disabled",
+			featureEnabled: false,
+			schedulingGates: []api.PodSchedulingGate{
+				{Name: "foo"},
+				{Name: "bar"},
+			},
+			wantErr: nil,
+		},
+		{
+			name:           "pod with non-nil schedulingGates, feature enabled",
+			featureEnabled: true,
+			schedulingGates: []api.PodSchedulingGate{
+				{Name: "foo"},
+				{Name: "bar"},
+			},
+			wantErr: goerrors.New(`Operation cannot be fulfilled on pods/binding "foo": pod foo has non-empty .spec.schedulingGates`),
+		},
+		{
+			name:            "pod with nil schedulingGates, feature disabled",
+			featureEnabled:  false,
+			schedulingGates: nil,
+			wantErr:         nil,
+		},
+		{
+			name:            "pod with nil schedulingGates, feature enabled",
+			featureEnabled:  true,
+			schedulingGates: nil,
+			wantErr:         nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodSchedulingReadiness, tt.featureEnabled)()
+			storage, bindingStorage, _, server := newStorage(t)
+			defer server.Terminate(t)
+			defer storage.Store.DestroyFunc()
+			ctx := genericapirequest.NewDefaultContext()
+
+			pod := validNewPod()
+			pod.Spec.SchedulingGates = tt.schedulingGates
+			if _, err := storage.Create(ctx, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			_, err := bindingStorage.Create(ctx, "foo", &api.Binding{
+				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault, Name: "foo"},
+				Target:     api.ObjectReference{Name: "machine"},
+			}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if tt.wantErr == nil {
+				if err != nil {
+					t.Errorf("Want nil err, but got %v", err)
+				}
+			} else {
+				if err == nil {
+					t.Errorf("Want %v, but got nil err", tt.wantErr)
+				} else if tt.wantErr.Error() != err.Error() {
+					t.Errorf("Want %v, but got %v", tt.wantErr, err)
+				}
+			}
+		})
 	}
 }
 

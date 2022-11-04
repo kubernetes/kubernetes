@@ -5725,6 +5725,13 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: io.k8s.api.core.v1.PodSchedulingGate
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.core.v1.PodSecurityContext
   map:
     fields:
@@ -5881,6 +5888,14 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: schedulerName
       type:
         scalar: string
+    - name: schedulingGates
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.PodSchedulingGate
+          elementRelationship: associative
+          keys:
+          - name
     - name: securityContext
       type:
         namedType: io.k8s.api.core.v1.PodSecurityContext

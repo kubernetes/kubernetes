@@ -703,7 +703,7 @@ func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
 		Namespace: "default",
 	}
 
-	//longSecretRef refers to the secretRefs which are validated with IsDNS1123Subdomain
+	// longSecretRef refers to the secretRefs which are validated with IsDNS1123Subdomain
 	longSecretName := "key-name.example.com"
 	longSecretRef := &core.SecretReference{
 		Name:      longSecretName,
@@ -10794,6 +10794,91 @@ func TestValidatePod(t *testing.T) {
 	}
 }
 
+func TestValidatePodCreateWithSchedulingGates(t *testing.T) {
+	applyEssentials := func(pod *core.Pod) {
+		pod.Spec.Containers = []core.Container{
+			{Name: "con", Image: "pause", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+		}
+		pod.Spec.RestartPolicy = core.RestartPolicyAlways
+		pod.Spec.DNSPolicy = core.DNSClusterFirst
+	}
+	fldPath := field.NewPath("spec")
+
+	tests := []struct {
+		name            string
+		pod             *core.Pod
+		featureEnabled  bool
+		wantFieldErrors field.ErrorList
+	}{
+		{
+			name: "create a Pod with nodeName and schedulingGates, feature disabled",
+			pod: &core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "ns"},
+				Spec: core.PodSpec{
+					NodeName: "node",
+					SchedulingGates: []core.PodSchedulingGate{
+						{Name: "foo"},
+					},
+				},
+			},
+			featureEnabled:  false,
+			wantFieldErrors: nil,
+		},
+		{
+			name: "create a Pod with nodeName and schedulingGates, feature enabled",
+			pod: &core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "ns"},
+				Spec: core.PodSpec{
+					NodeName: "node",
+					SchedulingGates: []core.PodSchedulingGate{
+						{Name: "foo"},
+					},
+				},
+			},
+			featureEnabled:  true,
+			wantFieldErrors: []*field.Error{field.Forbidden(fldPath.Child("nodeName"), "cannot be set until all schedulingGates have been cleared")},
+		},
+		{
+			name: "create a Pod with schedulingGates, feature disabled",
+			pod: &core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "ns"},
+				Spec: core.PodSpec{
+					SchedulingGates: []core.PodSchedulingGate{
+						{Name: "foo"},
+					},
+				},
+			},
+			featureEnabled:  false,
+			wantFieldErrors: nil,
+		},
+		{
+			name: "create a Pod with schedulingGates, feature enabled",
+			pod: &core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "ns"},
+				Spec: core.PodSpec{
+					SchedulingGates: []core.PodSchedulingGate{
+						{Name: "foo"},
+					},
+				},
+			},
+			featureEnabled:  true,
+			wantFieldErrors: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodSchedulingReadiness, tt.featureEnabled)()
+
+			applyEssentials(tt.pod)
+			errs := ValidatePodCreate(tt.pod, PodValidationOptions{})
+			if diff := cmp.Diff(tt.wantFieldErrors, errs); diff != "" {
+				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestValidatePodUpdate(t *testing.T) {
 	var (
 		activeDeadlineSecondsZero     = int64(0)
@@ -11697,6 +11782,54 @@ func TestValidatePodUpdate(t *testing.T) {
 			},
 			err:  "Forbidden: pod updates may not change fields other than ",
 			test: "update pod spec OS to a valid value, featuregate disabled",
+		},
+		{
+			new: core.Pod{
+				Spec: core.PodSpec{
+					SchedulingGates: []core.PodSchedulingGate{{Name: "foo"}},
+				},
+			},
+			old:  core.Pod{},
+			err:  "Forbidden: only deletion is allowed, but found new scheduling gate 'foo'",
+			test: "update pod spec schedulingGates: add new scheduling gate",
+		},
+		{
+			new: core.Pod{
+				Spec: core.PodSpec{
+					SchedulingGates: []core.PodSchedulingGate{{Name: "bar"}},
+				},
+			},
+			old: core.Pod{
+				Spec: core.PodSpec{
+					SchedulingGates: []core.PodSchedulingGate{{Name: "foo"}},
+				},
+			},
+			err:  "Forbidden: only deletion is allowed, but found new scheduling gate 'bar'",
+			test: "update pod spec schedulingGates: mutating an existing scheduling gate",
+		},
+		{
+			new: core.Pod{
+				Spec: core.PodSpec{
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			old: core.Pod{
+				Spec: core.PodSpec{
+					SchedulingGates: []core.PodSchedulingGate{{Name: "foo"}, {Name: "bar"}},
+				},
+			},
+			err:  "Forbidden: only deletion is allowed, but found new scheduling gate 'baz'",
+			test: "update pod spec schedulingGates: mutating an existing scheduling gate along with deletion",
+		},
+		{
+			new: core.Pod{},
+			old: core.Pod{
+				Spec: core.PodSpec{
+					SchedulingGates: []core.PodSchedulingGate{{Name: "foo"}},
+				},
+			},
+			err:  "",
+			test: "update pod spec schedulingGates: legal deletion",
 		},
 	}
 	for _, test := range tests {
@@ -18481,6 +18614,7 @@ func TestValidateOSFields(t *testing.T) {
 		"RestartPolicy",
 		"RuntimeClassName",
 		"SchedulerName",
+		"SchedulingGates[*].Name",
 		"SecurityContext.RunAsNonRoot",
 		"ServiceAccountName",
 		"SetHostnameAsFQDN",
@@ -18514,6 +18648,71 @@ func TestValidateOSFields(t *testing.T) {
 				"or add it to the osSpecificFields set, as appropriate:\n%s",
 				strings.Join(unexpected.List(), "\n"))
 		}
+	}
+}
+
+func TestValidateSchedulingGates(t *testing.T) {
+	fieldPath := field.NewPath("field")
+
+	tests := []struct {
+		name            string
+		schedulingGates []core.PodSchedulingGate
+		wantFieldErrors field.ErrorList
+	}{
+		{
+			name:            "nil gates",
+			schedulingGates: nil,
+			wantFieldErrors: field.ErrorList{},
+		},
+		{
+			name: "empty string in gates",
+			schedulingGates: []core.PodSchedulingGate{
+				{Name: "foo"},
+				{Name: ""},
+			},
+			wantFieldErrors: []*field.Error{field.Required(fieldPath.Index(1), "must not be empty")},
+		},
+		{
+			name: "legal gates",
+			schedulingGates: []core.PodSchedulingGate{
+				{Name: "foo"},
+				{Name: "bar"},
+			},
+			wantFieldErrors: field.ErrorList{},
+		},
+		{
+			name: "duplicated gates (single duplication)",
+			schedulingGates: []core.PodSchedulingGate{
+				{Name: "foo"},
+				{Name: "bar"},
+				{Name: "bar"},
+			},
+			wantFieldErrors: []*field.Error{field.Duplicate(fieldPath.Index(2), "bar")},
+		},
+		{
+			name: "duplicated gates (multiple duplications)",
+			schedulingGates: []core.PodSchedulingGate{
+				{Name: "foo"},
+				{Name: "bar"},
+				{Name: "foo"},
+				{Name: "baz"},
+				{Name: "foo"},
+				{Name: "bar"},
+			},
+			wantFieldErrors: field.ErrorList{
+				field.Duplicate(fieldPath.Index(2), "foo"),
+				field.Duplicate(fieldPath.Index(4), "foo"),
+				field.Duplicate(fieldPath.Index(5), "bar"),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := validateSchedulingGates(tt.schedulingGates, fieldPath)
+			if diff := cmp.Diff(tt.wantFieldErrors, errs); diff != "" {
+				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
+			}
+		})
 	}
 }
 
@@ -18661,7 +18860,7 @@ func TestValidateSecurityContext(t *testing.T) {
 		}
 	}
 
-	//setup data
+	// setup data
 	allSettings := fullValidSC()
 	noCaps := fullValidSC()
 	noCaps.Capabilities = nil

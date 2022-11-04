@@ -291,7 +291,7 @@ type PersistentVolume struct {
 	// +optional
 	metav1.ObjectMeta
 
-	//Spec defines a persistent volume owned by the cluster
+	// Spec defines a persistent volume owned by the cluster
 	// +optional
 	Spec PersistentVolumeSpec
 
@@ -1977,10 +1977,10 @@ type EnvFromSource struct {
 	// +optional
 	Prefix string
 	// The ConfigMap to select from.
-	//+optional
+	// +optional
 	ConfigMapRef *ConfigMapEnvSource
 	// The Secret to select from.
-	//+optional
+	// +optional
 	SecretRef *SecretEnvSource
 }
 
@@ -2428,6 +2428,9 @@ const (
 	// PodReasonUnschedulable reason in PodScheduled PodCondition means that the scheduler
 	// can't schedule the pod right now, for example due to insufficient resources in the cluster.
 	PodReasonUnschedulable = "Unschedulable"
+	// PodReasonSchedulingGated reason in PodScheduled PodCondition means that the scheduler
+	// skips scheduling the pod because one or more scheduling gates are still present.
+	PodReasonSchedulingGated = "SchedulingGated"
 	// ContainersReady indicates whether all containers in the pod are ready.
 	ContainersReady PodConditionType = "ContainersReady"
 	// AlphaNoCompatGuaranteeDisruptionTarget indicates the pod is about to be deleted due to a
@@ -2502,7 +2505,7 @@ const (
 // over a set of nodes; that is, it represents the OR of the selectors represented
 // by the node selector terms.
 type NodeSelector struct {
-	//Required. A list of node selector terms. The terms are ORed.
+	// Required. A list of node selector terms. The terms are ORed.
 	NodeSelectorTerms []NodeSelectorTerm
 }
 
@@ -2997,6 +3000,12 @@ type PodSpec struct {
 	// - spec.containers[*].securityContext.runAsGroup
 	// +optional
 	OS *PodOS
+	// SchedulingGates is an opaque list of values that if specified will block scheduling the pod.
+	// More info:  https://git.k8s.io/enhancements/keps/sig-scheduling/3521-pod-scheduling-readiness.
+	//
+	// This is an alpha-level feature enabled by PodSchedulingReadiness feature gate.
+	// +optional
+	SchedulingGates []PodSchedulingGate
 }
 
 // OSName is the set of OS'es that can be used in OS.
@@ -3015,6 +3024,13 @@ type PodOS struct {
 	// https://github.com/opencontainers/runtime-spec/blob/master/config.md#platform-specific-configuration
 	// Clients should expect to handle additional values and treat unrecognized values in this field as os: null
 	Name OSName
+}
+
+// PodSchedulingGate is associated to a Pod to guard its scheduling.
+type PodSchedulingGate struct {
+	// Name of the scheduling gate.
+	// Each scheduling gate must have a unique name field.
+	Name string
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
@@ -3494,7 +3510,7 @@ type ReplicationControllerSpec struct {
 	// insufficient replicas are detected. This reference is ignored if a Template is set.
 	// Must be set before converting to a versioned API object
 	// +optional
-	//TemplateRef *ObjectReference
+	// TemplateRef *ObjectReference
 
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected. Internally, this takes precedence over a
@@ -4829,7 +4845,7 @@ type ObjectReference struct {
 
 // LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.
 type LocalObjectReference struct {
-	//TODO: Add other useful fields.  apiVersion, kind, uid?
+	// TODO: Add other useful fields.  apiVersion, kind, uid?
 	Name string
 }
 

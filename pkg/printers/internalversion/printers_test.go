@@ -1502,6 +1502,24 @@ func TestPrintPod(t *testing.T) {
 			},
 			[]metav1.TableRow{{Cells: []interface{}{"test14", "2/2", "Running", "9 (5d ago)", "<unknown>"}}},
 		},
+		{
+			// Test PodScheduled condition with reason WaitingForGates
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test15"},
+				Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
+				Status: api.PodStatus{
+					Phase: "podPhase",
+					Conditions: []api.PodCondition{
+						{
+							Type:   api.PodScheduled,
+							Status: api.ConditionFalse,
+							Reason: api.PodReasonSchedulingGated,
+						},
+					},
+				},
+			},
+			[]metav1.TableRow{{Cells: []interface{}{"test15", "0/2", api.PodReasonSchedulingGated, "0", "<unknown>"}}},
+		},
 	}
 
 	for i, test := range tests {
