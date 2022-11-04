@@ -776,7 +776,7 @@ func TestEndpointsEqualBeyondHash(t *testing.T) {
 				Zone:      utilpointer.StringPtr("zone-1"),
 				NodeName:  utilpointer.StringPtr("node-1"),
 			},
-			expected: true,
+			expected: false,
 		},
 		{
 			name: "Serving condition changed from false to true",

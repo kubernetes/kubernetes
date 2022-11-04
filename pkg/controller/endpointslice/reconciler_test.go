@@ -32,18 +32,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	k8stesting "k8s.io/client-go/testing"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
 	"k8s.io/kubernetes/pkg/controller/endpointslice/topologycache"
 	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
-	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -119,17 +116,20 @@ func TestReconcile1Pod(t *testing.T) {
 		expectedEndpoint         discovery.Endpoint
 		expectedLabels           map[string]string
 		expectedEndpointPerSlice map[discovery.AddressType][]discovery.Endpoint
-		terminatingGateEnabled   bool
 	}{
 		"no-family-service": {
 			service: noFamilyService,
 			expectedEndpointPerSlice: map[discovery.AddressType][]discovery.Endpoint{
 				discovery.AddressTypeIPv4: {
 					{
-						Addresses:  []string{"1.2.3.4"},
-						Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-						Zone:       utilpointer.StringPtr("us-central1-a"),
-						NodeName:   utilpointer.StringPtr("node-1"),
+						Addresses: []string{"1.2.3.4"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						Zone:     utilpointer.StringPtr("us-central1-a"),
+						NodeName: utilpointer.StringPtr("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -144,29 +144,6 @@ func TestReconcile1Pod(t *testing.T) {
 			},
 		},
 		"ipv4": {
-			service: svcv4,
-			expectedEndpointPerSlice: map[discovery.AddressType][]discovery.Endpoint{
-				discovery.AddressTypeIPv4: {
-					{
-						Addresses:  []string{"1.2.3.4"},
-						Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-						Zone:       utilpointer.StringPtr("us-central1-a"),
-						NodeName:   utilpointer.StringPtr("node-1"),
-						TargetRef: &corev1.ObjectReference{
-							Kind:      "Pod",
-							Namespace: namespace,
-							Name:      "pod1",
-						},
-					},
-				},
-			},
-			expectedLabels: map[string]string{
-				discovery.LabelManagedBy:   controllerName,
-				discovery.LabelServiceName: "foo",
-				corev1.IsHeadlessService:   "",
-			},
-		},
-		"ipv4-with-terminating-gate-enabled": {
 			service: svcv4,
 			expectedEndpointPerSlice: map[discovery.AddressType][]discovery.Endpoint{
 				discovery.AddressTypeIPv4: {
@@ -192,17 +169,20 @@ func TestReconcile1Pod(t *testing.T) {
 				discovery.LabelServiceName: "foo",
 				corev1.IsHeadlessService:   "",
 			},
-			terminatingGateEnabled: true,
 		},
 		"ipv4-clusterip": {
 			service: svcv4ClusterIP,
 			expectedEndpointPerSlice: map[discovery.AddressType][]discovery.Endpoint{
 				discovery.AddressTypeIPv4: {
 					{
-						Addresses:  []string{"1.2.3.4"},
-						Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-						Zone:       utilpointer.StringPtr("us-central1-a"),
-						NodeName:   utilpointer.StringPtr("node-1"),
+						Addresses: []string{"1.2.3.4"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						Zone:     utilpointer.StringPtr("us-central1-a"),
+						NodeName: utilpointer.StringPtr("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -213,10 +193,14 @@ func TestReconcile1Pod(t *testing.T) {
 			},
 			expectedAddressType: discovery.AddressTypeIPv4,
 			expectedEndpoint: discovery.Endpoint{
-				Addresses:  []string{"1.2.3.4"},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-				Zone:       utilpointer.StringPtr("us-central1-a"),
-				NodeName:   utilpointer.StringPtr("node-1"),
+				Addresses: []string{"1.2.3.4"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(true),
+					Serving:     utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(false),
+				},
+				Zone:     utilpointer.StringPtr("us-central1-a"),
+				NodeName: utilpointer.StringPtr("node-1"),
 				TargetRef: &corev1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: namespace,
@@ -233,10 +217,14 @@ func TestReconcile1Pod(t *testing.T) {
 			expectedEndpointPerSlice: map[discovery.AddressType][]discovery.Endpoint{
 				discovery.AddressTypeIPv4: {
 					{
-						Addresses:  []string{"1.2.3.4"},
-						Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-						Zone:       utilpointer.StringPtr("us-central1-a"),
-						NodeName:   utilpointer.StringPtr("node-1"),
+						Addresses: []string{"1.2.3.4"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						Zone:     utilpointer.StringPtr("us-central1-a"),
+						NodeName: utilpointer.StringPtr("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -247,10 +235,14 @@ func TestReconcile1Pod(t *testing.T) {
 			},
 			expectedAddressType: discovery.AddressTypeIPv4,
 			expectedEndpoint: discovery.Endpoint{
-				Addresses:  []string{"1.2.3.4"},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-				Zone:       utilpointer.StringPtr("us-central1-a"),
-				NodeName:   utilpointer.StringPtr("node-1"),
+				Addresses: []string{"1.2.3.4"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(true),
+					Serving:     utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(false),
+				},
+				Zone:     utilpointer.StringPtr("us-central1-a"),
+				NodeName: utilpointer.StringPtr("node-1"),
 				TargetRef: &corev1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: namespace,
@@ -269,10 +261,14 @@ func TestReconcile1Pod(t *testing.T) {
 			expectedEndpointPerSlice: map[discovery.AddressType][]discovery.Endpoint{
 				discovery.AddressTypeIPv4: {
 					{
-						Addresses:  []string{"1.2.3.4"},
-						Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-						Zone:       utilpointer.StringPtr("us-central1-a"),
-						NodeName:   utilpointer.StringPtr("node-1"),
+						Addresses: []string{"1.2.3.4"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						Zone:     utilpointer.StringPtr("us-central1-a"),
+						NodeName: utilpointer.StringPtr("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -283,10 +279,14 @@ func TestReconcile1Pod(t *testing.T) {
 			},
 			expectedAddressType: discovery.AddressTypeIPv4,
 			expectedEndpoint: discovery.Endpoint{
-				Addresses:  []string{"1.2.3.4"},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-				Zone:       utilpointer.StringPtr("us-central1-a"),
-				NodeName:   utilpointer.StringPtr("node-1"),
+				Addresses: []string{"1.2.3.4"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(true),
+					Serving:     utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(false),
+				},
+				Zone:     utilpointer.StringPtr("us-central1-a"),
+				NodeName: utilpointer.StringPtr("node-1"),
 				TargetRef: &corev1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: namespace,
@@ -305,10 +305,14 @@ func TestReconcile1Pod(t *testing.T) {
 			expectedEndpointPerSlice: map[discovery.AddressType][]discovery.Endpoint{
 				discovery.AddressTypeIPv6: {
 					{
-						Addresses:  []string{"1234::5678:0000:0000:9abc:def0"},
-						Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-						Zone:       utilpointer.StringPtr("us-central1-a"),
-						NodeName:   utilpointer.StringPtr("node-1"),
+						Addresses: []string{"1234::5678:0000:0000:9abc:def0"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						Zone:     utilpointer.StringPtr("us-central1-a"),
+						NodeName: utilpointer.StringPtr("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -329,10 +333,14 @@ func TestReconcile1Pod(t *testing.T) {
 			expectedEndpointPerSlice: map[discovery.AddressType][]discovery.Endpoint{
 				discovery.AddressTypeIPv6: {
 					{
-						Addresses:  []string{"1234::5678:0000:0000:9abc:def0"},
-						Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-						Zone:       utilpointer.StringPtr("us-central1-a"),
-						NodeName:   utilpointer.StringPtr("node-1"),
+						Addresses: []string{"1234::5678:0000:0000:9abc:def0"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						Zone:     utilpointer.StringPtr("us-central1-a"),
+						NodeName: utilpointer.StringPtr("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -352,10 +360,14 @@ func TestReconcile1Pod(t *testing.T) {
 			expectedEndpointPerSlice: map[discovery.AddressType][]discovery.Endpoint{
 				discovery.AddressTypeIPv6: {
 					{
-						Addresses:  []string{"1234::5678:0000:0000:9abc:def0"},
-						Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-						Zone:       utilpointer.StringPtr("us-central1-a"),
-						NodeName:   utilpointer.StringPtr("node-1"),
+						Addresses: []string{"1234::5678:0000:0000:9abc:def0"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						Zone:     utilpointer.StringPtr("us-central1-a"),
+						NodeName: utilpointer.StringPtr("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -365,10 +377,14 @@ func TestReconcile1Pod(t *testing.T) {
 				},
 				discovery.AddressTypeIPv4: {
 					{
-						Addresses:  []string{"1.2.3.4"},
-						Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-						Zone:       utilpointer.StringPtr("us-central1-a"),
-						NodeName:   utilpointer.StringPtr("node-1"),
+						Addresses: []string{"1.2.3.4"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						Zone:     utilpointer.StringPtr("us-central1-a"),
+						NodeName: utilpointer.StringPtr("node-1"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -386,8 +402,6 @@ func TestReconcile1Pod(t *testing.T) {
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EndpointSliceTerminatingCondition, testCase.terminatingGateEnabled)()
-
 			client := newClientset()
 			setupMetrics()
 			triggerTime := time.Now().UTC()

@@ -269,6 +269,7 @@ const (
 	// kep: https://kep.k8s.io/1672
 	// alpha: v1.20
 	// beta: v1.22
+	// GA: v1.26
 	//
 	// Enable Terminating condition in Endpoint Slices.
 	EndpointSliceTerminatingCondition featuregate.Feature = "EndpointSliceTerminatingCondition"
@@ -899,7 +900,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	DownwardAPIHugePages: {Default: true, PreRelease: featuregate.Beta}, // on by default in 1.22
 
-	EndpointSliceTerminatingCondition: {Default: true, PreRelease: featuregate.Beta},
+	EndpointSliceTerminatingCondition: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in v1.28
 
 	EphemeralContainers: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
 
