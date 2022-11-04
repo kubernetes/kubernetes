@@ -274,9 +274,8 @@ func (c *celAdmissionController) Validate(
 
 			var param *unstructured.Unstructured
 
-			// If definition has no paramKind, always provide nil params to
-			// evaluator. If binding specifies a params to use they are ignored.
-			// Done this way so you can configure params before definition is ready.
+			// If definition has no paramKind, paramRef must be unset in binding.
+			// If definition has paramKind, paramRef is required in binding.
 			if paramKind := definition.Spec.ParamKind; paramKind != nil {
 				paramRef := binding.Spec.ParamRef
 				if paramRef == nil {
