@@ -128,8 +128,8 @@ const (
 	// nodeStatusUpdateRetry specifies how many times kubelet retries when posting node status failed.
 	nodeStatusUpdateRetry = 5
 
-	// ContainerLogsDir is the location of container logs.
-	ContainerLogsDir = "/var/log/containers"
+	// DefaultContainerLogsDir is the location of container logs.
+	DefaultContainerLogsDir = "/var/log/containers"
 
 	// MaxContainerBackOff is the max backoff period, exported for the e2e test
 	MaxContainerBackOff = 300 * time.Second
@@ -181,7 +181,11 @@ const (
 	nodeLeaseRenewIntervalFraction = 0.25
 )
 
-var etcHostsPath = getContainerEtcHostsPath()
+var (
+	// ContainerLogsDir can be overwrited for testing usage
+	ContainerLogsDir = DefaultContainerLogsDir
+	etcHostsPath     = getContainerEtcHostsPath()
+)
 
 func getContainerEtcHostsPath() string {
 	if sysruntime.GOOS == "windows" {
