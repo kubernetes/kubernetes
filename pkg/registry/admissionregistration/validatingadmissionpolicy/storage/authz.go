@@ -88,10 +88,9 @@ func (r *REST) authorize(ctx context.Context, policy *admissionregistration.Vali
 		return fmt.Errorf("cannot identify user")
 	}
 
-	// defaults if paramKind is not set
-	resource := ""
-	apiGroup := ""
-	apiVersion := "*"
+	var resource string
+	var apiGroup string
+	var apiVersion string
 
 	paramKind := policy.Spec.ParamKind
 	gv, gvr, err := func() (schema.GroupVersion, schema.GroupVersionResource, error) {
