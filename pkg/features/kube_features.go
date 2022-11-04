@@ -67,6 +67,12 @@ const (
 	// Enables dual-stack --node-ip in kubelet with external cloud providers
 	CloudDualStackNodeIPs featuregate.Feature = "CloudDualStackNodeIPs"
 
+	// owner: @ahmedtd
+	// alpha: v1.26
+	//
+	// Enable ClusterTrustBundle objects and Kubelet integration.
+	ClusterTrustBundle featuregate.Feature = "ClusterTrustBundle"
+
 	// owner: @szuecs
 	// alpha: v1.12
 	//
@@ -933,6 +939,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	AppArmor: {Default: true, PreRelease: featuregate.Beta},
 
 	CloudDualStackNodeIPs: {Default: false, PreRelease: featuregate.Alpha},
+
+	ClusterTrustBundle: {Default: false, PreRelease: featuregate.Alpha},
 
 	CPUCFSQuotaPeriod: {Default: false, PreRelease: featuregate.Alpha},
 

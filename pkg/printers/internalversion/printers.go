@@ -31,6 +31,7 @@ import (
 	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	apiv1 "k8s.io/api/core/v1"
@@ -406,6 +407,13 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	_ = h.TableHandler(certificateSigningRequestColumnDefinitions, printCertificateSigningRequest)
 	_ = h.TableHandler(certificateSigningRequestColumnDefinitions, printCertificateSigningRequestList)
+
+	clusterTrustBundleColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "SignerName", Type: "string", Description: certificatesv1alpha1.ClusterTrustBundleSpec{}.SwaggerDoc()["signerName"]},
+	}
+	h.TableHandler(clusterTrustBundleColumnDefinitions, printClusterTrustBundle)
+	h.TableHandler(clusterTrustBundleColumnDefinitions, printClusterTrustBundleList)
 
 	leaseColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -2087,6 +2095,30 @@ func printCertificateSigningRequestList(list *certificates.CertificateSigningReq
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printCertificateSigningRequest(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printClusterTrustBundle(obj *certificates.ClusterTrustBundle, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	signerName := "<none>"
+	if obj.Spec.SignerName != "" {
+		signerName = obj.Spec.SignerName
+	}
+	row.Cells = append(row.Cells, obj.Name, signerName)
+	return []metav1.TableRow{row}, nil
+}
+
+func printClusterTrustBundleList(list *certificates.ClusterTrustBundleList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printClusterTrustBundle(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}
