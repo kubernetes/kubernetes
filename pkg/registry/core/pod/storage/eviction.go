@@ -106,7 +106,7 @@ func (r *EvictionREST) Destroy() {
 var _ rest.SingularNameProvider = &EvictionREST{}
 
 func (r *EvictionREST) GetSingularName() string {
-	return "pod"
+	return "pod/eviction"
 }
 
 // Propagate dry-run takes the dry-run option from the request and pushes it into the eviction object.

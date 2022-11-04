@@ -120,7 +120,7 @@ func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, 
 var _ rest.SingularNameProvider = &StatusREST{}
 
 func (r *StatusREST) GetSingularName() string {
-	return r.store.GetSingularName()
+	return r.store.GetSingularName() + "/status"
 }
 
 var _ = rest.Patcher(&StatusREST{})
@@ -161,7 +161,7 @@ func (r *ApprovalREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set 
 var _ rest.SingularNameProvider = &ApprovalREST{}
 
 func (r *ApprovalREST) GetSingularName() string {
-	return r.store.GetSingularName()
+	return r.store.GetSingularName() + "/approval"
 }
 
 var _ = rest.Patcher(&ApprovalREST{})

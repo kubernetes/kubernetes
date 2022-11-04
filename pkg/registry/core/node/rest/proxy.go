@@ -69,7 +69,7 @@ func (r *ProxyREST) NewConnectOptions() (runtime.Object, bool, string) {
 var _ rest.SingularNameProvider = &ProxyREST{}
 
 func (r *ProxyREST) GetSingularName() string {
-	return r.Store.GetSingularName()
+	return r.Store.GetSingularName() + "/proxy"
 }
 
 // Connect returns a handler for the node proxy

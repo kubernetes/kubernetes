@@ -162,7 +162,7 @@ func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, 
 var _ rest.SingularNameProvider = &StatusREST{}
 
 func (r *StatusREST) GetSingularName() string {
-	return r.store.GetSingularName()
+	return r.store.GetSingularName() + "/status"
 }
 
 type ScaleREST struct {
@@ -226,7 +226,7 @@ func (r *ScaleREST) ConvertToTable(ctx context.Context, object runtime.Object, t
 var _ rest.SingularNameProvider = &ScaleREST{}
 
 func (r *ScaleREST) GetSingularName() string {
-	return r.store.GetSingularName()
+	return r.store.GetSingularName() + "/scale"
 }
 
 func toScaleCreateValidation(f rest.ValidateObjectFunc) rest.ValidateObjectFunc {

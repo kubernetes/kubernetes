@@ -52,7 +52,7 @@ func (r *TokenREST) Destroy() {
 var _ rest.SingularNameProvider = &TokenREST{}
 
 func (r *TokenREST) GetSingularName() string {
-	return "serviceaccount"
+	return "serviceaccount/token"
 }
 
 type TokenREST struct {

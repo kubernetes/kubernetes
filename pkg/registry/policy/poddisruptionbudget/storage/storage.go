@@ -108,5 +108,5 @@ func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, 
 var _ rest.SingularNameProvider = &StatusREST{}
 
 func (r *StatusREST) GetSingularName() string {
-	return r.store.GetSingularName()
+	return r.store.GetSingularName() + "/status"
 }

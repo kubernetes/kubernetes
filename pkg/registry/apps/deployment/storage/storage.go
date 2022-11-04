@@ -171,7 +171,7 @@ func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, 
 var _ rest.SingularNameProvider = &StatusREST{}
 
 func (r *StatusREST) GetSingularName() string {
-	return r.store.GetSingularName()
+	return r.store.GetSingularName() + "/status"
 }
 
 // RollbackREST implements the REST endpoint for initiating the rollback of a deployment
@@ -207,7 +207,7 @@ func (r *RollbackREST) Destroy() {
 var _ rest.SingularNameProvider = &RollbackREST{}
 
 func (r *RollbackREST) GetSingularName() string {
-	return r.store.GetSingularName()
+	return r.store.GetSingularName() + "/rollback"
 }
 
 var _ = rest.NamedCreater(&RollbackREST{})
@@ -357,7 +357,7 @@ func (r *ScaleREST) ConvertToTable(ctx context.Context, object runtime.Object, t
 var _ rest.SingularNameProvider = &ScaleREST{}
 
 func (r *ScaleREST) GetSingularName() string {
-	return r.store.GetSingularName()
+	return r.store.GetSingularName() + "/scale"
 }
 
 func toScaleCreateValidation(f rest.ValidateObjectFunc) rest.ValidateObjectFunc {

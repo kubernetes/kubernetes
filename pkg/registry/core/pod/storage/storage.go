@@ -167,7 +167,7 @@ func (r *BindingREST) Destroy() {
 var _ rest.SingularNameProvider = &BindingREST{}
 
 func (r *BindingREST) GetSingularName() string {
-	return r.store.GetSingularName()
+	return r.store.GetSingularName() + "/binding"
 }
 
 var _ = rest.NamedCreater(&BindingREST{})
@@ -289,7 +289,7 @@ func (r *LegacyBindingREST) Destroy() {
 var _ rest.SingularNameProvider = &LegacyBindingREST{}
 
 func (r *LegacyBindingREST) GetSingularName() string {
-	return r.bindingRest.GetSingularName()
+	return r.bindingRest.GetSingularName() + "/binding"
 }
 
 // Create ensures a pod is bound to a specific host.
@@ -341,7 +341,7 @@ func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, 
 var _ rest.SingularNameProvider = &StatusREST{}
 
 func (r *StatusREST) GetSingularName() string {
-	return r.store.GetSingularName()
+	return r.store.GetSingularName() + "/status"
 }
 
 // EphemeralContainersREST implements the REST endpoint for adding EphemeralContainers
@@ -377,5 +377,5 @@ func (r *EphemeralContainersREST) Update(ctx context.Context, name string, objIn
 var _ rest.SingularNameProvider = &EphemeralContainersREST{}
 
 func (r *EphemeralContainersREST) GetSingularName() string {
-	return r.store.GetSingularName()
+	return r.store.GetSingularName() + "/ephemeralcontainers"
 }
