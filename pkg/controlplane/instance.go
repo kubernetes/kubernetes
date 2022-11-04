@@ -53,6 +53,7 @@ import (
 	policyapiv1 "k8s.io/api/policy/v1"
 	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
 	schedulingapiv1 "k8s.io/api/scheduling/v1"
 	storageapiv1 "k8s.io/api/storage/v1"
 	storageapiv1alpha1 "k8s.io/api/storage/v1alpha1"
@@ -107,6 +108,7 @@ import (
 	noderest "k8s.io/kubernetes/pkg/registry/node/rest"
 	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
+	resourcerest "k8s.io/kubernetes/pkg/registry/resource/rest"
 	schedulingrest "k8s.io/kubernetes/pkg/registry/scheduling/rest"
 	storagerest "k8s.io/kubernetes/pkg/registry/storage/rest"
 )
@@ -417,6 +419,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		appsrest.StorageProvider{},
 		admissionregistrationrest.RESTStorageProvider{},
 		eventsrest.RESTStorageProvider{TTL: c.ExtraConfig.EventTTL},
+		resourcerest.RESTStorageProvider{},
 	}
 	if err := m.InstallAPIs(c.ExtraConfig.APIResourceConfigSource, c.GenericConfig.RESTOptionsGetter, restStorageProviders...); err != nil {
 		return nil, err
@@ -685,6 +688,7 @@ var (
 	alphaAPIGroupVersionsDisabledByDefault = []schema.GroupVersion{
 		apiserverinternalv1alpha1.SchemeGroupVersion,
 		authenticationv1alpha1.SchemeGroupVersion,
+		resourcev1alpha1.SchemeGroupVersion,
 		networkingapiv1alpha1.SchemeGroupVersion,
 		storageapiv1alpha1.SchemeGroupVersion,
 		flowcontrolv1alpha1.SchemeGroupVersion,
