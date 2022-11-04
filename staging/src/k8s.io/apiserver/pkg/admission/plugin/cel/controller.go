@@ -19,8 +19,10 @@ package cel
 import (
 	"context"
 	"fmt"
-	"k8s.io/apiserver/pkg/admission/plugin/cel/matching"
 	"sync"
+	"sync/atomic"
+
+	"k8s.io/apiserver/pkg/admission/plugin/cel/matching"
 
 	"k8s.io/api/admissionregistration/v1alpha1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -94,7 +96,7 @@ type definitionInfo struct {
 
 type bindingInfo struct {
 	// Compiled CEL expression turned into an validator
-	validator Validator
+	validator atomic.Pointer[Validator]
 
 	// Last value seen by this controller to be used in policy enforcement
 	// May not be nil
@@ -316,13 +318,16 @@ func (c *celAdmissionController) Validate(
 				}
 			}
 
-			if bindingInfo.validator == nil {
+			validator := bindingInfo.validator.Load()
+			if validator == nil {
 				// Compile policy definition using binding
-				bindingInfo.validator = c.validatorCompiler.Compile(definition)
-				c.bindingInfos[namespacedBindingName] = bindingInfo
+				newValidator := c.validatorCompiler.Compile(definition)
+				validator = &newValidator
+
+				bindingInfo.validator.Store(validator)
 			}
 
-			decisions, err := bindingInfo.validator.Validate(a, o, param, matchKind)
+			decisions, err := (*validator).Validate(a, o, param, matchKind)
 			if err != nil {
 				// runtime error. Apply failure policy
 				wrappedError := fmt.Errorf("failed to evaluate CEL expression: %w", err)

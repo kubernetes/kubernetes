@@ -73,7 +73,7 @@ func (c *celAdmissionController) reconcilePolicyDefinition(namespace, name strin
 	// definition has changed.
 	for key := range c.definitionsToBindings[namespacedName] {
 		bindingInfo := c.bindingInfos[key]
-		bindingInfo.validator = nil
+		bindingInfo.validator.Store(nil)
 		c.bindingInfos[key] = bindingInfo
 	}
 
@@ -208,7 +208,7 @@ func (c *celAdmissionController) reconcilePolicyBinding(namespace, name string, 
 	}
 
 	// Remove compiled template for old binding
-	info.validator = nil
+	info.validator.Store(nil)
 	info.lastReconciledValue = binding
 	return nil
 }
