@@ -242,7 +242,6 @@ func setupTestCommon(t *testing.T, compiler ValidatorCompiler) (plugin admission
 	t.Cleanup(testContextCancel)
 
 	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme)
-	tracker := clienttesting.NewObjectTracker(scheme, codecs.UniversalDecoder())
 
 	fakeClient := fake.NewSimpleClientset()
 	fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, time.Second)
@@ -270,7 +269,17 @@ func setupTestCommon(t *testing.T, compiler ValidatorCompiler) (plugin admission
 	require.NoError(t, err)
 	require.True(t, handler.enabled)
 
-	return handler, dynamicClient.Tracker(), tracker, handler.evaluator.(*celAdmissionController)
+	// Override compiler used by controller for tests
+	handler.evaluator.(*celAdmissionController).validatorCompiler = compiler
+
+	// Make sure to start the fake informers
+	fakeInformerFactory.Start(testContext.Done())
+	t.Cleanup(func() {
+		testContextCancel()
+		// wait for informer factory to shutdown
+		fakeInformerFactory.Shutdown()
+	})
+	return handler, dynamicClient.Tracker(), fakeClient.Tracker(), handler.evaluator.(*celAdmissionController)
 }
 
 // Gets the last reconciled value in the controller of an object with the same
