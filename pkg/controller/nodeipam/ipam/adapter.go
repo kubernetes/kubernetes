@@ -31,6 +31,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
@@ -43,24 +44,32 @@ type adapter struct {
 	k8s   clientset.Interface
 	cloud *gce.Cloud
 
-	recorder record.EventRecorder
+	broadcaster record.EventBroadcaster
+	recorder    record.EventRecorder
 }
 
 func newAdapter(k8s clientset.Interface, cloud *gce.Cloud) *adapter {
+	broadcaster := record.NewBroadcaster()
+
 	ret := &adapter{
-		k8s:   k8s,
-		cloud: cloud,
+		k8s:         k8s,
+		cloud:       cloud,
+		broadcaster: broadcaster,
+		recorder:    broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloudCIDRAllocator"}),
 	}
 
-	broadcaster := record.NewBroadcaster()
-	broadcaster.StartStructuredLogging(0)
-	ret.recorder = broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloudCIDRAllocator"})
-	klog.V(0).Infof("Sending events to api server.")
-	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{
-		Interface: k8s.CoreV1().Events(""),
-	})
-
 	return ret
+}
+
+func (a *adapter) Run(stopCh <-chan struct{}) {
+	defer utilruntime.HandleCrash()
+
+	// Start event processing pipeline.
+	a.broadcaster.StartStructuredLogging(0)
+	a.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: a.k8s.CoreV1().Events("")})
+	defer a.broadcaster.Shutdown()
+
+	<-stopCh
 }
 
 func (a *adapter) Alias(ctx context.Context, node *v1.Node) (*net.IPNet, error) {
