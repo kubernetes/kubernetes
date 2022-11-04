@@ -621,9 +621,11 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 func shouldDelegateList(opts storage.ListOptions) bool {
 	resourceVersion := opts.ResourceVersion
 	pred := opts.Predicate
+	match := opts.ResourceVersionMatch
 	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	hasContinuation := pagingEnabled && len(pred.Continue) > 0
 	hasLimit := pagingEnabled && pred.Limit > 0 && resourceVersion != "0"
+	unsupportedMatch := match != "" && match != metav1.ResourceVersionMatchNotOlderThan
 
 	// If resourceVersion is not specified, serve it from underlying
 	// storage (for backward compatibility). If a continuation is
@@ -631,7 +633,7 @@ func shouldDelegateList(opts storage.ListOptions) bool {
 	// Limits are only sent to storage when resourceVersion is non-zero
 	// since the watch cache isn't able to perform continuations, and
 	// limits are ignored when resource version is zero
-	return resourceVersion == "" || hasContinuation || hasLimit || opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact
+	return resourceVersion == "" || hasContinuation || hasLimit || unsupportedMatch
 }
 
 func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, pred storage.SelectionPredicate, recursive bool) ([]interface{}, uint64, string, error) {
@@ -655,6 +657,11 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	pred := opts.Predicate
 	if shouldDelegateList(opts) {
 		return c.storage.GetList(ctx, key, opts, listObj)
+	}
+
+	match := opts.ResourceVersionMatch
+	if match != metav1.ResourceVersionMatchNotOlderThan && match != "" {
+		return fmt.Errorf("unknown ResourceVersionMatch value: %v", match)
 	}
 
 	// If resourceVersion is specified, serve it from cache.
