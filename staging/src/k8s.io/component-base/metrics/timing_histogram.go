@@ -177,6 +177,9 @@ func (v *TimingHistogramVec) WithLabelValuesChecked(lvs ...string) (GaugeMetric,
 		v.LabelValueAllowLists.ConstrainToAllowedList(v.originalLabels, lvs)
 	}
 	ops, err := v.TimingHistogramVec.GetMetricWithLabelValues(lvs...)
+	if err != nil {
+		return noop, err
+	}
 	return ops.(GaugeMetric), err
 }
 
