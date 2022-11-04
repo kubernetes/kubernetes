@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -38,7 +37,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elazarl/goproxy"
 	openapi_v2 "github.com/google/gnostic/openapiv2"
 
 	"sigs.k8s.io/yaml"
@@ -472,7 +470,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				framework.Failf("--host variable must be set to the full URI to the api server on e2e run.")
 			}
 
-			ginkgo.By("Starting goproxy")
+			ginkgo.By("Starting http_proxy")
 			testSrv, proxyLogs := startLocalProxy()
 			defer testSrv.Close()
 			proxyAddr := testSrv.URL
@@ -2335,10 +2333,7 @@ func newBlockingReader(s string) (io.Reader, io.Closer, error) {
 }
 
 func startLocalProxy() (srv *httptest.Server, logs *bytes.Buffer) {
-	logs = &bytes.Buffer{}
-	p := goproxy.NewProxyHttpServer()
-	p.Verbose = true
-	p.Logger = log.New(logs, "", 0)
+	p := utilnet.NewHTTPProxyHandler(nil)
 	return httptest.NewServer(p), logs
 }
 

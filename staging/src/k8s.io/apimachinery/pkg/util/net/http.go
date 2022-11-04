@@ -26,12 +26,14 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"path"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -696,4 +698,106 @@ func makeQuotedString(s string) string {
 	// closing quote
 	result.WriteRune('"')
 	return result.String()
+}
+
+// NewHTTPProxyHandler returns a new HTTPProxyHandler. It accepts an optional
+// hook which is called early in the handler to export request state. If the
+// hook returns false, the handler returns immediately with a server error.
+func NewHTTPProxyHandler(hook func(r *http.Request) bool) *HTTPProxyHandler {
+	h := &HTTPProxyHandler{
+		hook: hook,
+		HTTPProxy: httputil.ReverseProxy{
+			Director: func(req *http.Request) {
+				req.URL.Scheme = "http"
+				req.URL.Host = req.Host
+			},
+		},
+		Infof:  klog.Infof,
+		Errorf: klog.Errorf,
+	}
+	return h
+}
+
+// HTTPProxyHandler implements a simple handler for http_proxy and https_proxy
+// requests for use in testing.
+type HTTPProxyHandler struct {
+	handlerDone sync.WaitGroup
+	hook        func(r *http.Request) bool
+	// HTTPProxy is the reverse proxy we use for standard http proxy requests.
+	HTTPProxy httputil.ReverseProxy
+
+	Infof  func(format string, args ...interface{})
+	Errorf func(format string, args ...interface{})
+}
+
+// ServeHTTP handles an HTTP proxy request.
+func (h *HTTPProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	h.handlerDone.Add(1)
+	defer h.handlerDone.Done()
+
+	if h.hook != nil {
+		if ok := h.hook(req); !ok {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+
+	b, err := httputil.DumpRequest(req, false)
+	if err != nil {
+		h.Errorf("Failed to dump request: %s", err)
+	} else {
+		h.Infof("Proxy Request: %s", string(b))
+	}
+
+	if req.Method != http.MethodConnect {
+		h.HTTPProxy.ServeHTTP(w, req)
+		return
+	}
+
+	sconn, err := net.Dial("tcp", req.Host)
+	if err != nil {
+		h.Errorf("Failed to dial proxy backend: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+
+	// CONNECT proxy
+	conn, brw, err := w.(http.Hijacker).Hijack()
+	if err != nil {
+		h.Errorf("Failed to hijack client connection: %v", err)
+		return
+	}
+	if err := brw.Flush(); err != nil {
+		h.Errorf("Failed to flush pending writes to client: %v", err)
+		return
+	}
+	if _, err := io.Copy(sconn, io.LimitReader(brw, int64(brw.Reader.Buffered()))); err != nil {
+		h.Errorf("Failed to flush buffered reads to server: %v", err)
+		return
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer conn.Close()
+		defer wg.Done()
+		defer h.Infof("Server read close")
+		io.Copy(conn, sconn)
+	}()
+	go func() {
+		defer sconn.Close()
+		defer wg.Done()
+		defer h.Infof("Server write close")
+		io.Copy(sconn, conn)
+	}()
+
+	wg.Wait()
+	h.Infof("Done handling CONNECT request")
+}
+
+func (h *HTTPProxyHandler) Wait() {
+	h.handlerDone.Wait()
 }
