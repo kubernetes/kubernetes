@@ -17,11 +17,16 @@ limitations under the License.
 package csaupgrade_test
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/util/csaupgrade"
 )
@@ -30,7 +35,7 @@ func TestUpgradeCSA(t *testing.T) {
 
 	cases := []struct {
 		Name           string
-		CSAManager     string
+		CSAManagers    []string
 		SSAManager     string
 		OriginalObject []byte
 		ExpectedObject []byte
@@ -39,14 +44,15 @@ func TestUpgradeCSA(t *testing.T) {
 			// Case where there is a CSA entry with the given name, but no SSA entry
 			// is found. Expect that the CSA entry is converted to an SSA entry
 			// and renamed.
-			Name:       "csa-basic-direct-conversion",
-			CSAManager: "kubectl-client-side-apply",
-			SSAManager: "kubectl",
+			Name:        "csa-basic-direct-conversion",
+			CSAManagers: []string{"kubectl-client-side-apply"},
+			SSAManager:  "kubectl",
 			OriginalObject: []byte(`
 apiVersion: v1
 data: {}
 kind: ConfigMap
 metadata:
+  resourceVersion: "1"
   annotations:
     kubectl.kubernetes.io/last-applied-configuration: |
       {"apiVersion":"v1","data":{"key":"value","legacy":"unused"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"test","namespace":"default"}}
@@ -74,7 +80,10 @@ apiVersion: v1
 data: {}
 kind: ConfigMap
 metadata:
-  annotations: {}
+  resourceVersion: "1"
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"key":"value","legacy":"unused"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"test","namespace":"default"}}
   creationTimestamp: "2022-08-22T23:08:23Z"
   managedFields:
   - apiVersion: v1
@@ -85,12 +94,14 @@ metadata:
         f:key: {}
         f:legacy: {}
       f:metadata:
-        f:annotations: {}
+        f:annotations:
+          .: {}
+          f:kubectl.kubernetes.io/last-applied-configuration: {}
     manager: kubectl
     operation: Apply
     time: "2022-08-22T23:08:23Z"
   name: test
-  namespace: default  
+  namespace: default
 `),
 		},
 		{
@@ -98,14 +109,15 @@ metadata:
 			// Server creates duplicate managed fields entry - one for Update and another
 			// for Apply. Expect entries to be merged into one entry, which is unchanged
 			// from initial SSA.
-			Name:       "csa-combine-with-ssa-duplicate-keys",
-			CSAManager: "kubectl-client-side-apply",
-			SSAManager: "kubectl",
+			Name:        "csa-combine-with-ssa-duplicate-keys",
+			CSAManagers: []string{"kubectl-client-side-apply"},
+			SSAManager:  "kubectl",
 			OriginalObject: []byte(`
 apiVersion: v1
 data: {}
 kind: ConfigMap
 metadata:
+  resourceVersion: "1"
   annotations:
     kubectl.kubernetes.io/last-applied-configuration: |
       {"apiVersion":"v1","data":{"key":"value","legacy":"unused"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"test","namespace":"default"}}
@@ -147,7 +159,10 @@ apiVersion: v1
 data: {}
 kind: ConfigMap
 metadata:
-  annotations: {}
+  resourceVersion: "1"
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"key":"value","legacy":"unused"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"test","namespace":"default"}}
   creationTimestamp: "2022-08-22T23:08:23Z"
   managedFields:
   - apiVersion: v1
@@ -158,12 +173,14 @@ metadata:
         f:key: {}
         f:legacy: {}
       f:metadata:
-        f:annotations: {}
+        f:annotations:
+          .: {}
+          f:kubectl.kubernetes.io/last-applied-configuration: {}
     manager: kubectl
     operation: Apply
     time: "2022-08-23T23:08:23Z"
   name: test
-  namespace: default  
+  namespace: default
 `),
 		},
 		{
@@ -173,14 +190,15 @@ metadata:
 			// This shows that upgrading such an object results in correct behavior next
 			// time SSA applier
 			// Expect final object to have unioned keys from both entries
-			Name:       "csa-combine-with-ssa-additional-keys",
-			CSAManager: "kubectl-client-side-apply",
-			SSAManager: "kubectl",
+			Name:        "csa-combine-with-ssa-additional-keys",
+			CSAManagers: []string{"kubectl-client-side-apply"},
+			SSAManager:  "kubectl",
 			OriginalObject: []byte(`
 apiVersion: v1
 data: {}
 kind: ConfigMap
 metadata:
+  resourceVersion: "1"
   annotations:
     kubectl.kubernetes.io/last-applied-configuration: |
       {"apiVersion":"v1","data":{"key":"value","legacy":"unused"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"test","namespace":"default"}}
@@ -221,7 +239,10 @@ apiVersion: v1
 data: {}
 kind: ConfigMap
 metadata:
-  annotations: {}
+  resourceVersion: "1"
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"key":"value","legacy":"unused"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"test","namespace":"default"}}
   creationTimestamp: "2022-08-22T23:08:23Z"
   managedFields:
   - apiVersion: v1
@@ -232,26 +253,29 @@ metadata:
         f:key: {}
         f:legacy: {}
       f:metadata:
-        f:annotations: {}
+        f:annotations:
+          .: {}
+          f:kubectl.kubernetes.io/last-applied-configuration: {}
     manager: kubectl
     operation: Apply
     time: "2022-08-23T23:08:23Z"
   name: test
-  namespace: default  
+  namespace: default
 `),
 		},
 		{
 			// Case when there are multiple CSA versions on the object which do not
 			// match the version from the apply entry. Shows they are tossed away
 			// without being merged.
-			Name:       "csa-no-applicable-version",
-			CSAManager: "kubectl-client-side-apply",
-			SSAManager: "kubectl",
+			Name:        "csa-no-applicable-version",
+			CSAManagers: []string{"kubectl-client-side-apply"},
+			SSAManager:  "kubectl",
 			OriginalObject: []byte(`
 apiVersion: v1
 data: {}
 kind: ConfigMap
 metadata:
+  resourceVersion: "1"
   annotations:
     kubectl.kubernetes.io/last-applied-configuration: |
       {"apiVersion":"v1","data":{"key":"value","legacy":"unused"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"test","namespace":"default"}}
@@ -323,7 +347,10 @@ apiVersion: v1
 data: {}
 kind: ConfigMap
 metadata:
-  annotations: {}
+  resourceVersion: "1"
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"key":"value","legacy":"unused"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"test","namespace":"default"}}
   creationTimestamp: "2022-08-22T23:08:23Z"
   managedFields:
   - apiVersion: v5
@@ -334,26 +361,29 @@ metadata:
         f:key: {}
         f:legacy: {}
       f:metadata:
-        f:annotations: {}
+        f:annotations:
+          .: {}
+          f:kubectl.kubernetes.io/last-applied-configuration: {}
     manager: kubectl
     operation: Apply
     time: "2022-08-23T23:08:23Z"
   name: test
-  namespace: default  
+  namespace: default
 `),
 		},
 		{
 			// Case when there are multiple CSA versions on the object which do not
 			// match the version from the apply entry, and one which does.
 			// Shows that CSA entry with matching version is unioned into the SSA entry.
-			Name:       "csa-single-applicable-version",
-			CSAManager: "kubectl-client-side-apply",
-			SSAManager: "kubectl",
+			Name:        "csa-single-applicable-version",
+			CSAManagers: []string{"kubectl-client-side-apply"},
+			SSAManager:  "kubectl",
 			OriginalObject: []byte(`
 apiVersion: v1
 data: {}
 kind: ConfigMap
 metadata:
+  resourceVersion: "1"
   annotations:
     kubectl.kubernetes.io/last-applied-configuration: |
       {"apiVersion":"v1","data":{"key":"value","legacy":"unused"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"test","namespace":"default"}}
@@ -425,7 +455,10 @@ apiVersion: v1
 data: {}
 kind: ConfigMap
 metadata:
-  annotations: {}
+  resourceVersion: "1"
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"key":"value","legacy":"unused"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"test","namespace":"default"}}
   creationTimestamp: "2022-08-22T23:08:23Z"
   managedFields:
   - apiVersion: v5
@@ -440,11 +473,355 @@ metadata:
         f:annotations:
           .: {}
           f:hello2: {}
+          f:kubectl.kubernetes.io/last-applied-configuration: {}
     manager: kubectl
     operation: Apply
     time: "2022-08-23T23:08:23Z"
   name: test
-  namespace: default  
+  namespace: default
+`),
+		},
+		{
+			// Do nothing to object with nothing to migrate and no existing SSA manager
+			Name:        "noop",
+			CSAManagers: []string{"kubectl-client-side-apply"},
+			SSAManager:  "not-already-in-object",
+			OriginalObject: []byte(`
+apiVersion: v1
+data: {}
+kind: ConfigMap
+metadata:
+  resourceVersion: "1"
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"key":"value","legacy":"unused"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"test","namespace":"default"}}
+  creationTimestamp: "2022-08-22T23:08:23Z"
+  managedFields:
+  - apiVersion: v5
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:data:
+        .: {}
+        f:key: {}
+        f:legacy: {}
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:kubectl.kubernetes.io/last-applied-configuration: {}
+    manager: kubectl
+    operation: Apply
+    time: "2022-08-23T23:08:23Z"
+  name: test
+  namespace: default
+`),
+			ExpectedObject: []byte(`
+apiVersion: v1
+data: {}
+kind: ConfigMap
+metadata:
+  resourceVersion: "1"
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"key":"value","legacy":"unused"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"test","namespace":"default"}}
+  creationTimestamp: "2022-08-22T23:08:23Z"
+  managedFields:
+  - apiVersion: v5
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:data:
+        .: {}
+        f:key: {}
+        f:legacy: {}
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:kubectl.kubernetes.io/last-applied-configuration: {}
+    manager: kubectl
+    operation: Apply
+    time: "2022-08-23T23:08:23Z"
+  name: test
+  namespace: default
+`),
+		},
+		{
+			// Expect multiple targets to be merged into existing ssa manager
+			Name:        "multipleTargetsExisting",
+			CSAManagers: []string{"kube-scheduler", "kubectl-client-side-apply"},
+			SSAManager:  "kubectl",
+			OriginalObject: []byte(`
+apiVersion: v1
+data: {}
+kind: ConfigMap
+metadata:
+  resourceVersion: "1"
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"key":"value","legacy":"unused"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"test","namespace":"default"}}
+  creationTimestamp: "2022-08-22T23:08:23Z"
+  managedFields:
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:labels:
+          f:name: {}
+      f:spec:
+        f:containers:
+          k:{"name":"kubernetes-pause"}:
+            .: {}
+            f:image: {}
+            f:name: {}
+    manager: kubectl
+    operation: Apply
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:status:
+        f:conditions:
+          .: {}
+          k:{"type":"PodScheduled"}:
+            .: {}
+            f:lastProbeTime: {}
+            f:lastTransitionTime: {}
+            f:message: {}
+            f:reason: {}
+            f:status: {}
+            f:type: {}
+    manager: kube-scheduler
+    operation: Update
+    time: "2022-11-03T23:22:40Z"
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:kubectl.kubernetes.io/last-applied-configuration: {}
+        f:labels:
+          .: {}
+          f:name: {}
+      f:spec:
+        f:containers:
+          k:{"name":"kubernetes-pause"}:
+            .: {}
+            f:image: {}
+            f:imagePullPolicy: {}
+            f:name: {}
+            f:resources: {}
+            f:terminationMessagePath: {}
+            f:terminationMessagePolicy: {}
+        f:dnsPolicy: {}
+        f:enableServiceLinks: {}
+        f:restartPolicy: {}
+        f:schedulerName: {}
+        f:securityContext: {}
+        f:terminationGracePeriodSeconds: {}
+    manager: kubectl-client-side-apply
+    operation: Update
+    time: "2022-11-03T23:22:40Z"
+  name: test
+  namespace: default
+`),
+			ExpectedObject: []byte(`
+apiVersion: v1
+data: {}
+kind: ConfigMap
+metadata:
+  resourceVersion: "1"
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"key":"value","legacy":"unused"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"test","namespace":"default"}}
+  creationTimestamp: "2022-08-22T23:08:23Z"
+  managedFields:
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:status:
+        f:conditions:
+          .: {}
+          k:{"type":"PodScheduled"}:
+            .: {}
+            f:lastProbeTime: {}
+            f:lastTransitionTime: {}
+            f:message: {}
+            f:reason: {}
+            f:status: {}
+            f:type: {}
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:kubectl.kubernetes.io/last-applied-configuration: {}
+        f:labels:
+          .: {}
+          f:name: {}
+      f:spec:
+        f:containers:
+          k:{"name":"kubernetes-pause"}:
+            .: {}
+            f:image: {}
+            f:imagePullPolicy: {}
+            f:name: {}
+            f:resources: {}
+            f:terminationMessagePath: {}
+            f:terminationMessagePolicy: {}
+        f:dnsPolicy: {}
+        f:enableServiceLinks: {}
+        f:restartPolicy: {}
+        f:schedulerName: {}
+        f:securityContext: {}
+        f:terminationGracePeriodSeconds: {}
+    manager: kubectl
+    operation: Apply
+  name: test
+  namespace: default
+`),
+		},
+		{
+			// Expect multiple targets to be merged into a new ssa manager
+			Name:        "multipleTargetsNewInsertion",
+			CSAManagers: []string{"kubectl-client-side-apply", "kube-scheduler"},
+			SSAManager:  "newly-inserted-manager",
+			OriginalObject: []byte(`
+apiVersion: v1
+data: {}
+kind: ConfigMap
+metadata:
+  resourceVersion: "1"
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"key":"value","legacy":"unused"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"test","namespace":"default"}}
+  creationTimestamp: "2022-08-22T23:08:23Z"
+  managedFields:
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:labels:
+          f:name: {}
+      f:spec:
+        f:containers:
+          k:{"name":"kubernetes-pause"}:
+            .: {}
+            f:image: {}
+            f:name: {}
+    manager: kubectl
+    operation: Apply
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:status:
+        f:conditions:
+          .: {}
+          k:{"type":"PodScheduled"}:
+            .: {}
+            f:lastProbeTime: {}
+            f:lastTransitionTime: {}
+            f:message: {}
+            f:reason: {}
+            f:status: {}
+            f:type: {}
+    manager: kube-scheduler
+    operation: Update
+    time: "2022-11-03T23:22:40Z"
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:kubectl.kubernetes.io/last-applied-configuration: {}
+        f:labels:
+          .: {}
+          f:name: {}
+      f:spec:
+        f:containers:
+          k:{"name":"kubernetes-pause"}:
+            .: {}
+            f:image: {}
+            f:imagePullPolicy: {}
+            f:name: {}
+            f:resources: {}
+            f:terminationMessagePath: {}
+            f:terminationMessagePolicy: {}
+        f:dnsPolicy: {}
+        f:enableServiceLinks: {}
+        f:restartPolicy: {}
+        f:schedulerName: {}
+        f:securityContext: {}
+        f:terminationGracePeriodSeconds: {}
+    manager: kubectl-client-side-apply
+    operation: Update
+    time: "2022-11-03T23:22:40Z"
+  name: test
+  namespace: default
+`),
+			ExpectedObject: []byte(`
+  apiVersion: v1
+  data: {}
+  kind: ConfigMap
+  metadata:
+    resourceVersion: "1"
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"v1","data":{"key":"value","legacy":"unused"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"test","namespace":"default"}}
+    creationTimestamp: "2022-08-22T23:08:23Z"
+    managedFields:
+    - apiVersion: v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:labels:
+            f:name: {}
+        f:spec:
+          f:containers:
+            k:{"name":"kubernetes-pause"}:
+              .: {}
+              f:image: {}
+              f:name: {}
+      manager: kubectl
+      operation: Apply
+    - apiVersion: v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:annotations:
+            .: {}
+            f:kubectl.kubernetes.io/last-applied-configuration: {}
+          f:labels:
+            .: {}
+            f:name: {}
+        f:spec:
+          f:containers:
+            k:{"name":"kubernetes-pause"}:
+              .: {}
+              f:image: {}
+              f:imagePullPolicy: {}
+              f:name: {}
+              f:resources: {}
+              f:terminationMessagePath: {}
+              f:terminationMessagePolicy: {}
+          f:dnsPolicy: {}
+          f:enableServiceLinks: {}
+          f:restartPolicy: {}
+          f:schedulerName: {}
+          f:securityContext: {}
+          f:terminationGracePeriodSeconds: {}
+        f:status:
+          f:conditions:
+            .: {}
+            k:{"type":"PodScheduled"}:
+              .: {}
+              f:lastProbeTime: {}
+              f:lastTransitionTime: {}
+              f:message: {}
+              f:reason: {}
+              f:status: {}
+              f:type: {}
+      manager: newly-inserted-manager
+      operation: Apply
+      time: "2022-11-03T23:22:40Z"
+    name: test
+    namespace: default
 `),
 		},
 	}
@@ -452,7 +829,7 @@ metadata:
 	for _, testCase := range cases {
 		t.Run(testCase.Name, func(t *testing.T) {
 			initialObject := unstructured.Unstructured{}
-			err := yaml.Unmarshal(testCase.OriginalObject, &initialObject)
+			err := yaml.Unmarshal(testCase.OriginalObject, &initialObject.Object)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -460,7 +837,7 @@ metadata:
 			upgraded := initialObject.DeepCopy()
 			err = csaupgrade.UpgradeManagedFields(
 				upgraded,
-				testCase.CSAManager,
+				sets.New(testCase.CSAManagers...),
 				testCase.SSAManager,
 			)
 
@@ -469,13 +846,49 @@ metadata:
 			}
 
 			expectedObject := unstructured.Unstructured{}
-			err = yaml.Unmarshal(testCase.ExpectedObject, &expectedObject)
+			err = yaml.Unmarshal(testCase.ExpectedObject, &expectedObject.Object)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			if !reflect.DeepEqual(&expectedObject, upgraded) {
 				t.Fatal(cmp.Diff(&expectedObject, upgraded))
+			}
+
+			// Show that the UpgradeManagedFieldsPatch yields a patch that does
+			// nothing more and nothing less than make the object equal to output
+			// of UpgradeManagedFields
+
+			initialCopy := initialObject.DeepCopyObject()
+			patchBytes, err := csaupgrade.UpgradeManagedFieldsPatch(
+				initialCopy, sets.New(testCase.CSAManagers...), testCase.SSAManager)
+
+			if err != nil {
+				t.Fatal(err)
+			} else if patchBytes != nil {
+				patch, err := jsonpatch.DecodePatch(patchBytes)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				initialJSON, err := json.Marshal(initialObject.Object)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				patchedBytes, err := patch.Apply(initialJSON)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				var patched unstructured.Unstructured
+				if err := json.Unmarshal(patchedBytes, &patched.Object); err != nil {
+					t.Fatal(err)
+				}
+
+				if !reflect.DeepEqual(&patched, upgraded) {
+					t.Fatalf("expected patch to produce an upgraded object: %v", cmp.Diff(patched, upgraded))
+				}
 			}
 		})
 	}

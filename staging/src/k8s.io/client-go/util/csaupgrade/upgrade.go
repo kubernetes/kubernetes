@@ -18,11 +18,15 @@ package csaupgrade
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -46,21 +50,107 @@ import (
 //     have changed before sending a patch.
 //
 // obj - Target of the operation which has been managed with CSA in the past
-// csaManagerName - Name of FieldManager formerly used for `Update` operations
-// ssaManagerName - Name of FieldManager formerly used for `Apply` operations
+// csaManagerNames - Names of FieldManagers to merge into ssaManagerName
+// ssaManagerName - Name of FieldManager to be used for `Apply` operations
 func UpgradeManagedFields(
 	obj runtime.Object,
-	csaManagerName string,
+	csaManagerNames sets.Set[string],
 	ssaManagerName string,
 ) error {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return fmt.Errorf("error accessing object metadata: %w", err)
+		return err
+	}
+
+	filteredManagers := accessor.GetManagedFields()
+
+	for csaManagerName := range csaManagerNames {
+		filteredManagers, err = upgradedManagedFields(
+			filteredManagers, csaManagerName, ssaManagerName)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	// Commit changes to object
+	accessor.SetManagedFields(filteredManagers)
+	return nil
+}
+
+// Calculates a minimal JSON Patch to send to upgrade managed fields
+// See `UpgradeManagedFields` for more information.
+//
+// obj - Target of the operation which has been managed with CSA in the past
+// csaManagerNames - Names of FieldManagers to merge into ssaManagerName
+// ssaManagerName - Name of FieldManager to be used for `Apply` operations
+//
+// Returns non-nil error if there was an error, a JSON patch, or nil bytes if
+// there is no work to be done.
+func UpgradeManagedFieldsPatch(
+	obj runtime.Object,
+	csaManagerNames sets.Set[string],
+	ssaManagerName string) ([]byte, error) {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	managedFields := accessor.GetManagedFields()
+	filteredManagers := accessor.GetManagedFields()
+	for csaManagerName := range csaManagerNames {
+		filteredManagers, err = upgradedManagedFields(
+			filteredManagers, csaManagerName, ssaManagerName)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if reflect.DeepEqual(managedFields, filteredManagers) {
+		// If the managed fields have not changed from the transformed version,
+		// there is no patch to perform
+		return nil, nil
+	}
+
+	// Create a patch with a diff between old and new objects.
+	// Just include all managed fields since that is only thing that will change
+	//
+	// Also include test for RV to avoid race condition
+	jsonPatch := []map[string]interface{}{
+		{
+			"op":    "replace",
+			"path":  "/metadata/managedFields",
+			"value": filteredManagers,
+		},
+		{
+			// Use "replace" instead of "test" operation so that etcd rejects with
+			// 409 conflict instead of apiserver with an invalid request
+			"op":    "replace",
+			"path":  "/metadata/resourceVersion",
+			"value": accessor.GetResourceVersion(),
+		},
+	}
+
+	return json.Marshal(jsonPatch)
+}
+
+// Returns a copy of the provided managed fields that has been migrated from
+// client-side-apply to server-side-apply, or an error if there was an issue
+func upgradedManagedFields(
+	managedFields []metav1.ManagedFieldsEntry,
+	csaManagerName string,
+	ssaManagerName string,
+) ([]metav1.ManagedFieldsEntry, error) {
+	if managedFields == nil {
+		return nil, nil
 	}
 
 	// Create managed fields clone since we modify the values
-	var managedFields []metav1.ManagedFieldsEntry
-	managedFields = append(managedFields, accessor.GetManagedFields()...)
+	managedFieldsCopy := make([]metav1.ManagedFieldsEntry, len(managedFields))
+	if copy(managedFieldsCopy, managedFields) != len(managedFields) {
+		return nil, errors.New("failed to copy managed fields")
+	}
+	managedFields = managedFieldsCopy
 
 	// Locate SSA manager
 	replaceIndex, managerExists := findFirstIndex(managedFields,
@@ -86,16 +176,16 @@ func UpgradeManagedFields(
 		if !managerExists {
 			// There are no CSA managers that need to be converted. Nothing to do
 			// Return early
-			return nil
+			return managedFields, nil
 		}
 
 		// Convert CSA manager into SSA manager
 		managedFields[replaceIndex].Operation = metav1.ManagedFieldsOperationApply
 		managedFields[replaceIndex].Manager = ssaManagerName
 	}
-	err = unionManagerIntoIndex(managedFields, replaceIndex, csaManagerName)
+	err := unionManagerIntoIndex(managedFields, replaceIndex, csaManagerName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Create version of managed fields which has no CSA managers with the given name
@@ -105,17 +195,17 @@ func UpgradeManagedFields(
 			entry.Subresource == "")
 	})
 
-
-	// Commit changes to object
-	accessor.SetManagedFields(filteredManagers)
-
-	return nil
+	return filteredManagers, nil
 }
 
 // Locates an Update manager entry named `csaManagerName` with the same APIVersion
 // as the manager at the targetIndex. Unions both manager's fields together
 // into the manager specified by `targetIndex`. No other managers are modified.
-func unionManagerIntoIndex(entries []metav1.ManagedFieldsEntry, targetIndex int, csaManagerName string) error {
+func unionManagerIntoIndex(
+	entries []metav1.ManagedFieldsEntry,
+	targetIndex int,
+	csaManagerName string,
+) error {
 	ssaManager := entries[targetIndex]
 
 	// find Update manager of same APIVersion, union ssa fields with it.
@@ -124,6 +214,8 @@ func unionManagerIntoIndex(entries []metav1.ManagedFieldsEntry, targetIndex int,
 		func(entry metav1.ManagedFieldsEntry) bool {
 			return entry.Manager == csaManagerName &&
 				entry.Operation == metav1.ManagedFieldsOperationUpdate &&
+				//!TODO: some users may want to migrate subresources.
+				// should thread through the args at some point.
 				entry.Subresource == "" &&
 				entry.APIVersion == ssaManager.APIVersion
 		})
