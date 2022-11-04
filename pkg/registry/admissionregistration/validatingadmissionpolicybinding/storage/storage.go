@@ -18,11 +18,10 @@ package storage
 
 import (
 	"context"
-	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -30,27 +29,23 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
+	"k8s.io/kubernetes/pkg/registry/admissionregistration/resolver"
 	"k8s.io/kubernetes/pkg/registry/admissionregistration/validatingadmissionpolicybinding"
-	"k8s.io/kubernetes/pkg/registry/rbac"
 )
 
 // REST implements a RESTStorage for policyBinding against etcd
 type REST struct {
 	*genericregistry.Store
-	authorize AuthorizationFunc
+	authorizer       authorizer.Authorizer
+	resourceResolver resolver.ResourceResolver
+	policyGetter     PolicyGetter
 }
-
-// AuthorizationFunc checks the user from the context
-// to determine if the user can perform the requested action.
-// It returns no error if the user is authorized, an error
-// indicating the reason of rejection otherwise.
-type AuthorizationFunc func(ctx context.Context) error
 
 var groupResource = admissionregistration.Resource("validatingadmissionpolicybindings")
 
 // NewREST returns a RESTStorage object that will work against policyBinding.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
-	r := &REST{authorize: superuserOnly}
+func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.Authorizer, policyGetter PolicyGetter, resourceResolver resolver.ResourceResolver) (*REST, error) {
+	r := &REST{authorizer: authorizer, policyGetter: policyGetter, resourceResolver: resourceResolver}
 	store := &genericregistry.Store{
 		NewFunc:     func() runtime.Object { return &admissionregistration.ValidatingAdmissionPolicyBinding{} },
 		NewListFunc: func() runtime.Object { return &admissionregistration.ValidatingAdmissionPolicyBindingList{} },
@@ -62,10 +57,12 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 		CreateStrategy: validatingadmissionpolicybinding.Strategy,
 		UpdateStrategy: validatingadmissionpolicybinding.Strategy,
 		DeleteStrategy: validatingadmissionpolicybinding.Strategy,
-
-		BeginCreate: r.beginCreateFunc(),
-		BeginUpdate: r.beginUpdateFunc(),
-
+		BeginCreate: func(ctx context.Context, obj runtime.Object, options *metav1.CreateOptions) (genericregistry.FinishFunc, error) {
+			return r.beginCreate(ctx, obj, options)
+		},
+		BeginUpdate: func(ctx context.Context, obj, old runtime.Object, options *metav1.UpdateOptions) (genericregistry.FinishFunc, error) {
+			return r.beginUpdate(ctx, obj, old, options)
+		},
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
@@ -84,47 +81,20 @@ func (r *REST) Categories() []string {
 	return []string{"api-extensions"}
 }
 
-func (r *REST) beginCreateFunc() genericregistry.BeginCreateFunc {
-	return func(ctx context.Context, obj runtime.Object, options *metav1.CreateOptions) (genericregistry.FinishFunc, error) {
-		err := r.authorize(ctx)
-		if err == nil {
-			return noop, nil
-		}
-		name := ""
-		if b, ok := obj.(*admissionregistration.ValidatingAdmissionPolicyBinding); ok && b != nil {
-			name = b.Name
-		}
-		return nil, errors.NewForbidden(groupResource, name, err)
-	}
+type PolicyGetter interface {
+	// GetValidatingAdmissionPolicy returns a GetValidatingAdmissionPolicy
+	// by its name. There is no namespace because it is cluster-scoped.
+	GetValidatingAdmissionPolicy(ctx context.Context, name string) (*admissionregistration.ValidatingAdmissionPolicy, error)
 }
 
-func (r *REST) beginUpdateFunc() genericregistry.BeginUpdateFunc {
-	return func(ctx context.Context, obj, old runtime.Object, options *metav1.UpdateOptions) (genericregistry.FinishFunc, error) {
-		err := r.authorize(ctx)
-		if err == nil {
-			return noop, nil
-		}
-		name := ""
-		if b, ok := obj.(*admissionregistration.ValidatingAdmissionPolicyBinding); ok && b != nil {
-			name = b.Name
-		} else if b, ok := obj.(*admissionregistration.ValidatingAdmissionPolicyBinding); ok && b != nil {
-			name = b.Name
-		}
-		return nil, errors.NewForbidden(groupResource, name, err)
-	}
+type DefaultPolicyGetter struct {
+	Getter rest.Getter
 }
 
-func noop(context.Context, bool) {}
-
-func superuserOnly(ctx context.Context) error {
-	if rbac.EscalationAllowed(ctx) {
-		return nil
+func (g *DefaultPolicyGetter) GetValidatingAdmissionPolicy(ctx context.Context, name string) (*admissionregistration.ValidatingAdmissionPolicy, error) {
+	p, err := g.Getter.Get(ctx, name, &metav1.GetOptions{})
+	if err != nil {
+		return nil, err
 	}
-	return ErrNotSuperuser
+	return p.(*admissionregistration.ValidatingAdmissionPolicy), err
 }
-
-var _ genericregistry.FinishFunc = noop
-var _ AuthorizationFunc = superuserOnly
-
-// ErrNotSuperuser is returned if the user sending the request is not considered a superuser.
-var ErrNotSuperuser = fmt.Errorf("not a superuser")

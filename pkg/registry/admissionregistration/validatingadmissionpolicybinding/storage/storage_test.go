@@ -17,21 +17,18 @@ limitations under the License.
 package storage
 
 import (
-	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
-	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/apiserver/pkg/registry/rest/resttest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
+	"k8s.io/kubernetes/pkg/registry/admissionregistration/resolver"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 
 	// Ensure that admissionregistration package is initialized.
@@ -39,7 +36,7 @@ import (
 )
 
 func TestCreate(t *testing.T) {
-	storage, server := newStorage(t)
+	storage, server := newInsecureStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
@@ -53,7 +50,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	storage, server := newStorage(t)
+	storage, server := newInsecureStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
@@ -77,7 +74,7 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	storage, server := newStorage(t)
+	storage, server := newInsecureStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
@@ -85,7 +82,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	storage, server := newStorage(t)
+	storage, server := newInsecureStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
@@ -93,7 +90,7 @@ func TestList(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	storage, server := newStorage(t)
+	storage, server := newInsecureStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
@@ -101,7 +98,7 @@ func TestDelete(t *testing.T) {
 }
 
 func TestWatch(t *testing.T) {
-	storage, server := newStorage(t)
+	storage, server := newInsecureStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
@@ -174,17 +171,18 @@ func newPolicyBinding(name string) *admissionregistration.ValidatingAdmissionPol
 	}
 }
 
-func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
+func newInsecureStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
+	return newStorage(t, nil, nil, nil)
+}
+
+func newStorage(t *testing.T, authorizer authorizer.Authorizer, policyGetter PolicyGetter, resourceResolver resolver.ResourceResolver) (*REST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorageForResource(t, admissionregistration.Resource("validatingadmissionpolicybindings"))
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "validatingadmissionpolicybindings"}
-	storage, err := NewREST(restOptions)
-	storage.authorize = func(ctx context.Context) error {
-		return nil
-	}
+	storage, err := NewREST(restOptions, authorizer, policyGetter, resourceResolver)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
@@ -192,69 +190,9 @@ func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
 }
 
 func TestCategories(t *testing.T) {
-	storage, server := newStorage(t)
+	storage, server := newInsecureStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	expected := []string{"api-extensions"}
 	registrytest.AssertCategories(t, storage, expected)
-}
-
-func newSecureStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
-	etcdStorage, server := registrytest.NewEtcdStorageForResource(t, admissionregistration.Resource("validatingadmissionpolicybindings"))
-	restOptions := generic.RESTOptions{
-		StorageConfig:           etcdStorage,
-		Decorator:               generic.UndecoratedStorage,
-		DeleteCollectionWorkers: 1,
-		ResourcePrefix:          "validatingadmissionpolicybindings"}
-	storage, err := NewREST(restOptions)
-
-	if err != nil {
-		t.Fatalf("unexpected error from REST storage: %v", err)
-	}
-	return storage, server
-}
-
-func TestAuthorization(t *testing.T) {
-	for _, tc := range []struct {
-		name      string
-		userInfo  user.Info
-		expectErr bool
-	}{
-		{
-			name:      "superuser",
-			userInfo:  &user.DefaultInfo{Groups: []string{user.SystemPrivilegedGroup}},
-			expectErr: false,
-		},
-		{
-			name:      "authenticated",
-			userInfo:  &user.DefaultInfo{Groups: []string{user.AllAuthenticated}},
-			expectErr: true,
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			storage, server := newSecureStorage(t)
-			defer server.Terminate(t)
-			defer storage.Store.DestroyFunc()
-			test := resttest.New(t, storage).ClusterScope()
-			t.Run("create", func(t *testing.T) {
-				ctx := request.WithUser(test.TestContext(), tc.userInfo)
-				_, err := storage.Create(ctx, validPolicyBinding(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-				if (err != nil) != tc.expectErr {
-					t.Errorf("expected error: %v but got error: %v", tc.expectErr, err)
-				}
-			})
-			t.Run("update", func(t *testing.T) {
-				ctx := request.WithUser(test.TestContext(), tc.userInfo)
-				obj := validPolicyBinding()
-				_, _, err := storage.Update(ctx, obj.Name, rest.DefaultUpdatedObjectInfo(obj, func(ctx context.Context, newObj runtime.Object, oldObj runtime.Object) (transformedNewObj runtime.Object, err error) {
-					object := oldObj.(*admissionregistration.ValidatingAdmissionPolicyBinding)
-					object.Labels = map[string]string{"c": "d"}
-					return object, nil
-				}), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
-				if (err != nil) != tc.expectErr {
-					t.Errorf("expected error: %v but got error: %v", tc.expectErr, err)
-				}
-			})
-		})
-	}
 }
