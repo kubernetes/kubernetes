@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"k8s.io/utils/pointer"
 	"testing"
 	"time"
 
@@ -27,7 +28,6 @@ import (
 )
 
 func TestDefaultsKubeProxyConfiguration(t *testing.T) {
-	masqBit := int32(14)
 	oomScore := int32(-999)
 	ctMaxPerCore := int32(32768)
 	ctMin := int32(131072)
@@ -50,10 +50,11 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 					Burst:       10,
 				},
 				IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
-					MasqueradeBit: &masqBit,
-					MasqueradeAll: false,
-					SyncPeriod:    metav1.Duration{Duration: 30 * time.Second},
-					MinSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
+					MasqueradeBit:      pointer.Int32(14),
+					MasqueradeAll:      false,
+					LocalhostNodePorts: pointer.Bool(true),
+					SyncPeriod:         metav1.Duration{Duration: 30 * time.Second},
+					MinSyncPeriod:      metav1.Duration{Duration: 1 * time.Second},
 				},
 				IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
 					SyncPeriod: metav1.Duration{Duration: 30 * time.Second},
@@ -85,10 +86,11 @@ func TestDefaultsKubeProxyConfiguration(t *testing.T) {
 					Burst:       10,
 				},
 				IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
-					MasqueradeBit: &masqBit,
-					MasqueradeAll: false,
-					SyncPeriod:    metav1.Duration{Duration: 30 * time.Second},
-					MinSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
+					MasqueradeBit:      pointer.Int32(14),
+					MasqueradeAll:      false,
+					LocalhostNodePorts: pointer.Bool(true),
+					SyncPeriod:         metav1.Duration{Duration: 30 * time.Second},
+					MinSyncPeriod:      metav1.Duration{Duration: 1 * time.Second},
 				},
 				IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
 					SyncPeriod: metav1.Duration{Duration: 30 * time.Second},

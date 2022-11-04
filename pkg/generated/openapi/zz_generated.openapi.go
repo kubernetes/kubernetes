@@ -52001,6 +52001,13 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyIPTablesConfiguration(ref 
 							Format:      "",
 						},
 					},
+					"localhostNodePorts": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LocalhostNodePorts tells kube-proxy to allow service NodePorts to be accessed via localhost (iptables mode only)",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 					"syncPeriod": {
 						SchemaProps: spec.SchemaProps{
 							Description: "syncPeriod is the period that iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.",
@@ -52016,7 +52023,7 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyIPTablesConfiguration(ref 
 						},
 					},
 				},
-				Required: []string{"masqueradeBit", "masqueradeAll", "syncPeriod", "minSyncPeriod"},
+				Required: []string{"masqueradeBit", "masqueradeAll", "localhostNodePorts", "syncPeriod", "minSyncPeriod"},
 			},
 		},
 		Dependencies: []string{

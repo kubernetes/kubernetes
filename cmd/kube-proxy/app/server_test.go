@@ -107,6 +107,7 @@ iptables:
   masqueradeBit: 17
   minSyncPeriod: 10s
   syncPeriod: 60s
+  localhostNodePorts: true
 ipvs:
   minSyncPeriod: 10s
   syncPeriod: 60s
@@ -246,10 +247,11 @@ nodePortAddresses:
 			HealthzBindAddress: tc.healthzBindAddress,
 			HostnameOverride:   "foo",
 			IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
-				MasqueradeAll: true,
-				MasqueradeBit: pointer.Int32(17),
-				MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
-				SyncPeriod:    metav1.Duration{Duration: 60 * time.Second},
+				MasqueradeAll:      true,
+				MasqueradeBit:      pointer.Int32(17),
+				LocalhostNodePorts: pointer.Bool(true),
+				MinSyncPeriod:      metav1.Duration{Duration: 10 * time.Second},
+				SyncPeriod:         metav1.Duration{Duration: 60 * time.Second},
 			},
 			IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
 				MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
