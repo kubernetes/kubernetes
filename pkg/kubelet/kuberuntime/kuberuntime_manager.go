@@ -647,13 +647,15 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *ku
 		var err error
 		switch rName {
 		case v1.ResourceCPU:
+			podCpuResources := &cm.ResourceConfig{CPUPeriod: podResources.CPUPeriod}
 			if setLimitValue == true {
-				err = pcm.SetPodCgroupCpuConfig(pod, podResources.CpuQuota, podResources.CpuPeriod, nil)
+				podCpuResources.CPUQuota = podResources.CPUQuota
 			} else {
-				err = pcm.SetPodCgroupCpuConfig(pod, nil, podResources.CpuPeriod, podResources.CpuShares)
+				podCpuResources.CPUShares = podResources.CPUShares
 			}
+			err = pcm.SetPodCgroupConfig(pod, rName, podCpuResources)
 		case v1.ResourceMemory:
-			err = pcm.SetPodCgroupMemoryConfig(pod, *podResources.Memory)
+			err = pcm.SetPodCgroupConfig(pod, rName, podResources)
 		}
 		if err != nil {
 			klog.ErrorS(err, "Failed to set cgroup config", "resource", rName, "pod", pod.Name)
@@ -693,9 +695,9 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *ku
 		return err
 	}
 	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.UpdatePodResources {
-		currentPodMemoryLimit, err := pcm.GetPodCgroupMemoryConfig(pod)
+		currentPodMemoryConfig, err := pcm.GetPodCgroupConfig(pod, v1.ResourceMemory)
 		if err != nil {
-			klog.ErrorS(err, "GetPodCgroupMemoryConfig failed", "pod", pod.Name)
+			klog.ErrorS(err, "GetPodCgroupConfig for memory failed", "pod", pod.Name)
 			result.Fail(err)
 			return
 		}
@@ -710,20 +712,20 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *ku
 			result.Fail(fmt.Errorf("Aborting attempt to set pod memory limit less than current memory usage for pod %s", pod.Name))
 			return
 		}
-		if errResize := resizeContainers(v1.ResourceMemory, int64(currentPodMemoryLimit), *podResources.Memory, 0, 0); errResize != nil {
+		if errResize := resizeContainers(v1.ResourceMemory, int64(*currentPodMemoryConfig.Memory), *podResources.Memory, 0, 0); errResize != nil {
 			result.Fail(errResize)
 			return
 		}
 	}
 	if len(podContainerChanges.ContainersToUpdate[v1.ResourceCPU]) > 0 || podContainerChanges.UpdatePodResources {
-		currentPodCpuQuota, _, currentPodCPUShares, err := pcm.GetPodCgroupCpuConfig(pod)
+		currentPodCpuConfig, err := pcm.GetPodCgroupConfig(pod, v1.ResourceCPU)
 		if err != nil {
-			klog.ErrorS(err, "GetPodCgroupCpuConfig failed", "pod", pod.Name)
+			klog.ErrorS(err, "GetPodCgroupConfig for CPU failed", "pod", pod.Name)
 			result.Fail(err)
 			return
 		}
-		if errResize := resizeContainers(v1.ResourceCPU, currentPodCpuQuota, *podResources.CpuQuota,
-			int64(currentPodCPUShares), int64(*podResources.CpuShares)); errResize != nil {
+		if errResize := resizeContainers(v1.ResourceCPU, *currentPodCpuConfig.CPUQuota, *podResources.CPUQuota,
+			int64(*currentPodCpuConfig.CPUShares), int64(*podResources.CPUShares)); errResize != nil {
 			result.Fail(errResize)
 			return
 		}
@@ -780,7 +782,7 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(pod *v1.Pod, res
 }
 
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
-func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *kubecontainer.PodStatus) podActions {
+func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) podActions {
 	klog.V(5).InfoS("Syncing Pod", "pod", klog.KObj(pod))
 
 	createPodSandbox, attempt, sandboxID := runtimeutil.PodSandboxChanged(pod, podStatus)
@@ -873,7 +875,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		changes.ContainersToUpdate = make(map[v1.ResourceName][]containerToUpdateInfo)
-		latestPodStatus, err := m.GetPodStatus(podStatus.ID, pod.Name, pod.Namespace)
+		latestPodStatus, err := m.GetPodStatus(ctx, podStatus.ID, pod.Name, pod.Namespace)
 		if err == nil {
 			podStatus = latestPodStatus
 		}
@@ -982,7 +984,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 //  8. Create normal containers.
 func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
 	// Step 1: Compute sandbox and container changes.
-	podContainerChanges := m.computePodActions(pod, podStatus)
+	podContainerChanges := m.computePodActions(ctx, pod, podStatus)
 	klog.V(3).InfoS("computePodActions got for pod", "podActions", podContainerChanges, "pod", klog.KObj(pod))
 	if podContainerChanges.CreateSandbox {
 		ref, err := ref.GetReference(legacyscheme.Scheme, pod)

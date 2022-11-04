@@ -366,7 +366,8 @@ func (m *kubeGenericRuntimeManager) updateContainerResources(pod *v1.Pod, contai
 	if containerResources == nil {
 		return fmt.Errorf("container %q updateContainerResources failed: cannot generate resources config", containerID.String())
 	}
-	err := m.runtimeService.UpdateContainerResources(containerID.ID, containerResources)
+	ctx := context.Background()
+	err := m.runtimeService.UpdateContainerResources(ctx, containerID.ID, containerResources)
 	if err != nil {
 		klog.ErrorS(err, "UpdateContainerResources failed", "container", containerID.String())
 	}

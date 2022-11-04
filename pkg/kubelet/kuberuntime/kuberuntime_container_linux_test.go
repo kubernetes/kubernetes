@@ -865,15 +865,16 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			if tc.scalingFg {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)()
 			}
-			tc.expected.HugepageLimits = []*runtimeapi.HugepageLimit{{PageSize: "2MB", Limit: 0}, {PageSize: "1GB", Limit: 0}}
 			pod.Spec.Containers[0].Resources = v1.ResourceRequirements{Limits: tc.limits, Requests: tc.requests}
 			if len(tc.cStatus) > 0 {
 				pod.Status.ContainerStatuses = tc.cStatus
 			}
 			resources := m.generateLinuxContainerResources(pod, &pod.Spec.Containers[0], false)
+			tc.expected.HugepageLimits = resources.HugepageLimits
 			if diff.ObjectDiff(resources, tc.expected) != "" {
 				t.Errorf("Test %s: expected resources %+v, but got %+v", tc.name, tc.expected, resources)
 			}
 		})
 	}
+	//TODO(vinaykul,InPlacePodVerticalScaling): Add unit tests for cgroup v1 & v2
 }

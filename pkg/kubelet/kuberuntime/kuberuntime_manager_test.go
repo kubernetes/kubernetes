@@ -1174,7 +1174,8 @@ func TestComputePodActions(t *testing.T) {
 		if test.mutateStatusFn != nil {
 			test.mutateStatusFn(status)
 		}
-		actions := m.computePodActions(pod, status)
+		ctx := context.Background()
+		actions := m.computePodActions(ctx, pod, status)
 		verifyActions(t, &test.actions, &actions, desc)
 		if test.resetStatusFn != nil {
 			test.resetStatusFn(status)
@@ -1389,7 +1390,8 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 		if test.mutateStatusFn != nil {
 			test.mutateStatusFn(status)
 		}
-		actions := m.computePodActions(pod, status)
+		ctx := context.Background()
+		actions := m.computePodActions(ctx, pod, status)
 		verifyActions(t, &test.actions, &actions, desc)
 	}
 }
@@ -1571,7 +1573,8 @@ func TestComputePodActionsWithInitAndEphemeralContainers(t *testing.T) {
 		if test.mutateStatusFn != nil {
 			test.mutateStatusFn(status)
 		}
-		actions := m.computePodActions(pod, status)
+		ctx := context.Background()
+		actions := m.computePodActions(ctx, pod, status)
 		verifyActions(t, &test.actions, &actions, desc)
 	}
 }
@@ -1964,7 +1967,8 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			}
 		}
 		makeAndSetFakePod(t, m, fakeRuntime, pod)
-		status, _ := m.GetPodStatus(kps.ID, pod.Name, pod.Namespace)
+		ctx := context.Background()
+		status, _ := m.GetPodStatus(ctx, kps.ID, pod.Name, pod.Namespace)
 		for idx := range pod.Spec.Containers {
 			if rcs := status.FindContainerStatusByName(pod.Spec.Containers[idx].Name); rcs != nil {
 				if csIdx, found := podutil.GetIndexOfContainerStatus(pod.Status.ContainerStatuses, pod.Spec.Containers[idx].Name); found {
@@ -1982,7 +1986,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			test.mutatePodFn(pod)
 		}
 		expectedActions := test.getExpectedPodActionsFn(pod, status)
-		actions := m.computePodActions(pod, status)
+		actions := m.computePodActions(ctx, pod, status)
 		verifyActions(t, expectedActions, &actions, desc)
 	}
 }

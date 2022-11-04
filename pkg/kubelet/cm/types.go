@@ -84,14 +84,10 @@ type CgroupManager interface {
 	ReduceCPULimits(cgroupName CgroupName) error
 	// MemoryUsage returns current memory usage of the specified cgroup, as read from the cgroupfs.
 	MemoryUsage(name CgroupName) (int64, error)
-	// GetCgroupMemoryConfig returns the memory limit of the specified cgroup as read from cgroup fs.
-	GetCgroupMemoryConfig(name CgroupName) (uint64, error)
-	// GetCgroupCpuConfig returns the cpu quota, cpu period, and cpu shares of the specified cgroup as read from cgroup fs.
-	GetCgroupCpuConfig(name CgroupName) (int64, uint64, uint64, error)
-	// SetCgroupMemoryConfig sets the memory limit of the specified cgroup.
-	SetCgroupMemoryConfig(name CgroupName, memoryLimit int64) error
-	// SetCgroupCpuConfig sets the cpu quota, cpu period, and cpu shares of the specified cgroup.
-	SetCgroupCpuConfig(name CgroupName, cpuQuota *int64, cpuPeriod, cpuShares *uint64) error
+	// Get the resource config values applied to the cgroup for specified resource type
+	GetCgroupConfig(name CgroupName, resource v1.ResourceName) (*ResourceConfig, error)
+	// Set resource config for the specified resource type on the cgroup
+	SetCgroupConfig(name CgroupName, resource v1.ResourceName, resourceConfig *ResourceConfig) error
 }
 
 // QOSContainersInfo stores the names of containers per qos
@@ -128,18 +124,12 @@ type PodContainerManager interface {
 	// IsPodCgroup returns true if the literal cgroupfs name corresponds to a pod
 	IsPodCgroup(cgroupfs string) (bool, types.UID)
 
-	// Get value of memory.usage_in_bytes for the pod Cgroup
+	// Get value of memory usage for the pod Cgroup
 	GetPodCgroupMemoryUsage(pod *v1.Pod) (uint64, error)
 
-	// Get value of memory.limit_in_bytes for the pod Cgroup
-	GetPodCgroupMemoryConfig(pod *v1.Pod) (uint64, error)
+	// Get the resource config values applied to the pod cgroup for specified resource type
+	GetPodCgroupConfig(pod *v1.Pod, resource v1.ResourceName) (*ResourceConfig, error)
 
-	// Get values of cpu.cfs_quota_us, cpu.cfs_period_us, and cpu.shares for the pod Cgroup
-	GetPodCgroupCpuConfig(pod *v1.Pod) (int64, uint64, uint64, error)
-
-	// Set value of memory.limit_in_bytes for the pod Cgroup
-	SetPodCgroupMemoryConfig(pod *v1.Pod, memoryLimit int64) error
-
-	// Set values of cpu.cfs_quota_us, cpu.cfs_period_us, and cpu.shares for the pod Cgroup
-	SetPodCgroupCpuConfig(pod *v1.Pod, cpuQuota *int64, cpuPeriod, cpuShares *uint64) error
+	// Set resource config values for the specified resource type on the pod cgroup
+	SetPodCgroupConfig(pod *v1.Pod, resource v1.ResourceName, resourceConfig *ResourceConfig) error
 }

@@ -1861,7 +1861,7 @@ func (kl *Kubelet) syncPod(_ context.Context, updateType kubetypes.SyncPodType, 
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && isPodResizeInProgress(pod, &apiPodStatus) {
 		// While resize is in progress, periodically call PLEG to update pod cache
 		runningPod := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
-		if err := kl.pleg.UpdateCache(&runningPod, pod.UID); err != nil {
+		if err, _ := kl.pleg.UpdateCache(&runningPod, pod.UID); err != nil {
 			klog.ErrorS(err, "Failed to update pod cache", "pod", klog.KObj(pod))
 			return false, err
 		}
@@ -2534,7 +2534,7 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, *v1.Pod, v1.PodResizeStatus)
 	cpuRequests := resource.GetResourceRequest(pod, v1.ResourceCPU)
 	memRequests := resource.GetResourceRequest(pod, v1.ResourceMemory)
 	if cpuRequests > cpuAvailable || memRequests > memAvailable {
-		klog.V(3).InfoS("Resize is not feasible as request exceeds allocatable node resources", "Pod", pod.Name)
+		klog.V(3).InfoS("Resize is not feasible as request exceeds allocatable node resources", "pod", pod.Name)
 		return false, nil, v1.PodResizeStatusInfeasible
 	}
 
@@ -2549,7 +2549,7 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, *v1.Pod, v1.PodResizeStatus)
 
 	if ok, failReason, failMessage := kl.canAdmitPod(otherActivePods, pod); !ok {
 		// Log reason and return. Let the next sync iteration retry the resize
-		klog.V(3).InfoS("Resize cannot be accommodated", "Pod", pod.Name, "Reason", failReason, "Message", failMessage)
+		klog.V(3).InfoS("Resize cannot be accommodated", "pod", pod.Name, "reason", failReason, "message", failMessage)
 		return false, nil, v1.PodResizeStatusDeferred
 	}
 

@@ -327,13 +327,13 @@ type PodStatus struct {
 
 // ContainerResources represents the Resources allocated to the running container.
 type ContainerResources struct {
-	// CPU capacity reserved for the container (cpu.shares)
+	// CPU capacity reserved for the container
 	CPURequest *resource.Quantity
-	// CPU limit enforced on the container (cpu.cfs_quota_us)
+	// CPU limit enforced on the container
 	CPULimit *resource.Quantity
 	// Memory capaacity reserved for the container
 	MemoryRequest *resource.Quantity
-	// Memory limit enforced on the container (memory.limit_in_bytes)
+	// Memory limit enforced on the container
 	MemoryLimit *resource.Quantity
 }
 
