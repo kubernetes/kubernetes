@@ -114,7 +114,7 @@ func NewDefaultComponentConfig() (*ccmconfig.CloudControllerManagerConfiguration
 	return internal, nil
 }
 
-// Flags returns flags for a specific APIServer by section name
+// Flags returns flags for a specific CloudController by section name
 func (o *CloudControllerManagerOptions) Flags(allControllers, disabledByDefaultControllers []string) cliflag.NamedFlagSets {
 	fss := cliflag.NamedFlagSets{}
 	o.Generic.AddFlags(&fss, allControllers, disabledByDefaultControllers)
