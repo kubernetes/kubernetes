@@ -194,6 +194,7 @@ func TestValidatePodScheduling(t *testing.T) {
 
 func TestValidatePodSchedulingUpdate(t *testing.T) {
 	validScheduling := testPodScheduling("foo", "ns", resource.PodSchedulingSpec{})
+	badName := "!@#$%^"
 
 	scenarios := map[string]struct {
 		oldScheduling *resource.PodScheduling
@@ -220,13 +221,21 @@ func TestValidatePodSchedulingUpdate(t *testing.T) {
 				return scheduling
 			},
 		},
-		"invalid-potential-nodes": {
-			wantFailures:  field.ErrorList{field.TooLongMaxLength(field.NewPath("spec", "potentialNodes"), nil, resource.PodSchedulingNodeListMaxSize)},
+		"invalid-potential-nodes-too-long": {
+			wantFailures:  field.ErrorList{field.TooLongMaxLength(field.NewPath("spec", "potentialNodes"), 129, resource.PodSchedulingNodeListMaxSize)},
 			oldScheduling: validScheduling,
 			update: func(scheduling *resource.PodScheduling) *resource.PodScheduling {
 				for i := 0; i < resource.PodSchedulingNodeListMaxSize+1; i++ {
 					scheduling.Spec.PotentialNodes = append(scheduling.Spec.PotentialNodes, fmt.Sprintf("worker%d", i))
 				}
+				return scheduling
+			},
+		},
+		"invalid-potential-nodes-name": {
+			wantFailures:  field.ErrorList{field.Invalid(field.NewPath("spec", "potentialNodes").Index(0), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			oldScheduling: validScheduling,
+			update: func(scheduling *resource.PodScheduling) *resource.PodScheduling {
+				scheduling.Spec.PotentialNodes = append(scheduling.Spec.PotentialNodes, badName)
 				return scheduling
 			},
 		},
@@ -243,6 +252,7 @@ func TestValidatePodSchedulingUpdate(t *testing.T) {
 
 func TestValidatePodSchedulingStatusUpdate(t *testing.T) {
 	validScheduling := testPodScheduling("foo", "ns", resource.PodSchedulingSpec{})
+	badName := "!@#$%^"
 
 	scenarios := map[string]struct {
 		oldScheduling *resource.PodScheduling
@@ -283,7 +293,7 @@ func TestValidatePodSchedulingStatusUpdate(t *testing.T) {
 			},
 		},
 		"invalid-too-long-claim-status": {
-			wantFailures:  field.ErrorList{field.TooLongMaxLength(field.NewPath("status", "claims").Index(0).Child("unsuitableNodes"), nil, resource.PodSchedulingNodeListMaxSize)},
+			wantFailures:  field.ErrorList{field.TooLongMaxLength(field.NewPath("status", "claims").Index(0).Child("unsuitableNodes"), 129, resource.PodSchedulingNodeListMaxSize)},
 			oldScheduling: validScheduling,
 			update: func(scheduling *resource.PodScheduling) *resource.PodScheduling {
 				scheduling.Status.ResourceClaims = append(scheduling.Status.ResourceClaims,
@@ -297,6 +307,22 @@ func TestValidatePodSchedulingStatusUpdate(t *testing.T) {
 						fmt.Sprintf("worker%d", i),
 					)
 				}
+				return scheduling
+			},
+		},
+		"invalid-node-name": {
+			wantFailures:  field.ErrorList{field.Invalid(field.NewPath("status", "claims").Index(0).Child("unsuitableNodes").Index(0), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			oldScheduling: validScheduling,
+			update: func(scheduling *resource.PodScheduling) *resource.PodScheduling {
+				scheduling.Status.ResourceClaims = append(scheduling.Status.ResourceClaims,
+					resource.ResourceClaimSchedulingStatus{
+						Name: "my-claim",
+					},
+				)
+				scheduling.Status.ResourceClaims[0].UnsuitableNodes = append(
+					scheduling.Status.ResourceClaims[0].UnsuitableNodes,
+					badName,
+				)
 				return scheduling
 			},
 		},

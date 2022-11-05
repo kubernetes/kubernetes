@@ -239,15 +239,7 @@ func ValidatePodScheduling(resourceClaim *resource.PodScheduling) field.ErrorLis
 }
 
 func validatePodSchedulingSpec(spec *resource.PodSchedulingSpec, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	// Checking PotentialNodes for duplicates is intentionally not done. It
-	// could be fairly expensive and the only component which normally has
-	// permissions to set this field, kube-scheduler, is a trusted
-	// component.  Also, if it gets this wrong because of a bug, then the
-	// effect is limited (same semantic).
-	if len(spec.PotentialNodes) > resource.PodSchedulingNodeListMaxSize {
-		allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("potentialNodes"), nil, resource.PodSchedulingNodeListMaxSize))
-	}
+	allErrs := validateSliceIsASet(spec.PotentialNodes, resource.PodSchedulingNodeListMaxSize, validateNodeName, fldPath.Child("potentialNodes"))
 	return allErrs
 }
 
@@ -283,15 +275,8 @@ func validatePodSchedulingClaims(claimStatuses []resource.ResourceClaimSchedulin
 	return allErrs
 }
 
-func validatePodSchedulingClaim(claim resource.ResourceClaimSchedulingStatus, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	// Checking UnsuitableNodes for duplicates is intentionally not done. It
-	// could be fairly expensive and if a resource driver gets this wrong,
-	// then it is only going to have a negative effect for the pods relying
-	// on this driver.
-	if len(claim.UnsuitableNodes) > resource.PodSchedulingNodeListMaxSize {
-		allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("unsuitableNodes"), nil, resource.PodSchedulingNodeListMaxSize))
-	}
+func validatePodSchedulingClaim(status resource.ResourceClaimSchedulingStatus, fldPath *field.Path) field.ErrorList {
+	allErrs := validateSliceIsASet(status.UnsuitableNodes, resource.PodSchedulingNodeListMaxSize, validateNodeName, fldPath.Child("unsuitableNodes"))
 	return allErrs
 }
 
@@ -313,5 +298,13 @@ func ValidateClaimTemplateUpdate(template, oldTemplate *resource.ResourceClaimTe
 	allErrs := corevalidation.ValidateObjectMetaUpdate(&template.ObjectMeta, &oldTemplate.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(template.Spec, oldTemplate.Spec, field.NewPath("spec"))...)
 	allErrs = append(allErrs, ValidateClaimTemplate(template)...)
+	return allErrs
+}
+
+func validateNodeName(name string, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for _, msg := range corevalidation.ValidateNodeName(name, false) {
+		allErrs = append(allErrs, field.Invalid(fldPath, name, msg))
+	}
 	return allErrs
 }
