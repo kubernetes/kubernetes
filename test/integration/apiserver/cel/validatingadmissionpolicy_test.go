@@ -189,6 +189,8 @@ func Test_ValidateNamespace_NoParams(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			time.Sleep(time.Second)
+
 			_, err = client.CoreV1().Namespaces().Create(context.TODO(), testcase.namespace, metav1.CreateOptions{})
 			if err == nil && testcase.err == "" {
 				return
@@ -298,6 +300,8 @@ func Test_ValidateNamespace_WithConfigMapParams(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			time.Sleep(time.Second)
+
 			_, err = client.CoreV1().Namespaces().Create(context.TODO(), testcase.namespace, metav1.CreateOptions{})
 			if err == nil && testcase.err == "" {
 				return
@@ -391,6 +395,8 @@ func TestMultiplePolicyBindings(t *testing.T) {
 	if err := createAndWaitReady(t, client, condpassBinding, map[string]string{"paramIdent": "true", "condpass-binding-label": "true"}); err != nil {
 		t.Fatal(err)
 	}
+
+	time.Sleep(time.Second)
 
 	autofailingSecret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
