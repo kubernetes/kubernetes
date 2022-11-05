@@ -20,7 +20,6 @@ limitations under the License.
 package e2enode
 
 import (
-	"context"
 	"fmt"
 	"os/exec"
 	"path"
@@ -161,7 +160,7 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 						ginkgo.By("Dump all running containers")
 						runtime, _, err := getCRIClient()
 						framework.ExpectNoError(err)
-						containers, err := runtime.ListContainers(context.Background(), &runtimeapi.ContainerFilter{
+						containers, err := runtime.ListContainers(&runtimeapi.ContainerFilter{
 							State: &runtimeapi.ContainerStateValue{
 								State: runtimeapi.ContainerState_CONTAINER_RUNNING,
 							},

@@ -1694,7 +1694,12 @@
           "os": {
             "name": "nameValue"
           },
-          "hostUsers": true
+          "hostUsers": true,
+          "schedulingGates": [
+            {
+              "name": "nameValue"
+            }
+          ]
         }
       },
       "ttlSecondsAfterFinished": 8,

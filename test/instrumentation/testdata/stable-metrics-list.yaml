@@ -1,3 +1,20 @@
+- name: job_creation_skew_duration_seconds
+  subsystem: cronjob_controller
+  help: Time between when a cronjob is scheduled to be run, and when the corresponding
+    job is created
+  type: Histogram
+  stabilityLevel: STABLE
+  buckets:
+  - 1
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+  - 128
+  - 256
+  - 512
 - name: evictions_total
   subsystem: node_collector
   help: Number of Node evictions that happened since current instance of NodeController

@@ -39,12 +39,9 @@ import (
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	epstest "k8s.io/kubernetes/pkg/api/endpoints/testing"
 	svctest "k8s.io/kubernetes/pkg/api/service/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	endpointstore "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
 	podstore "k8s.io/kubernetes/pkg/registry/core/pod/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
@@ -6113,11 +6110,10 @@ func TestCreateDeleteReuse(t *testing.T) {
 
 func TestCreateInitNodePorts(t *testing.T) {
 	testCases := []struct {
-		name                       string
-		svc                        *api.Service
-		expectError                bool
-		expectNodePorts            bool
-		gateMixedProtocolLBService bool
+		name            string
+		svc             *api.Service
+		expectError     bool
+		expectNodePorts bool
 	}{{
 		name:            "type:ExternalName",
 		svc:             svctest.MakeService("foo"),
@@ -6281,66 +6277,31 @@ func TestCreateInitNodePorts(t *testing.T) {
 			svctest.SetNodePorts(30080, 30080)),
 		expectError: true,
 	}, {
-		// When the MixedProtocolLBService gate is locked, this can be removed.
-		name: "type:LoadBalancer_multiport_multiproto_unspecified_MixedProtocolLBService:off",
+		name: "type:LoadBalancer_multiport_multiproto_unspecified",
 		svc: svctest.MakeService("foo",
 			svctest.SetTypeLoadBalancer,
 			svctest.SetPorts(
 				svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
 				svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP))),
-		gateMixedProtocolLBService: false,
-		expectError:                true,
+		expectNodePorts: true,
 	}, {
-		// When the MixedProtocolLBService gate is locked, this can be removed.
-		name: "type:LoadBalancer_multiport_multiproto_specified_MixedProtocolLBService:off",
+		name: "type:LoadBalancer_multiport_multiproto_specified",
 		svc: svctest.MakeService("foo",
 			svctest.SetTypeLoadBalancer,
 			svctest.SetPorts(
 				svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
 				svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP)),
 			svctest.SetUniqueNodePorts),
-		gateMixedProtocolLBService: false,
-		expectError:                true,
+		expectNodePorts: true,
 	}, {
-		// When the MixedProtocolLBService gate is locked, this can be removed.
-		name: "type:LoadBalancer_multiport_multiproto_same_MixedProtocolLBService:off",
+		name: "type:LoadBalancer_multiport_multiproto_same",
 		svc: svctest.MakeService("foo",
 			svctest.SetTypeLoadBalancer,
 			svctest.SetPorts(
 				svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
 				svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP)),
 			svctest.SetNodePorts(30053, 30053)),
-		gateMixedProtocolLBService: false,
-		expectError:                true,
-	}, {
-		name: "type:LoadBalancer_multiport_multiproto_unspecified_MixedProtocolLBService:on",
-		svc: svctest.MakeService("foo",
-			svctest.SetTypeLoadBalancer,
-			svctest.SetPorts(
-				svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP))),
-		gateMixedProtocolLBService: true,
-		expectNodePorts:            true,
-	}, {
-		name: "type:LoadBalancer_multiport_multiproto_specified_MixedProtocolLBService:on",
-		svc: svctest.MakeService("foo",
-			svctest.SetTypeLoadBalancer,
-			svctest.SetPorts(
-				svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP)),
-			svctest.SetUniqueNodePorts),
-		gateMixedProtocolLBService: true,
-		expectNodePorts:            true,
-	}, {
-		name: "type:LoadBalancer_multiport_multiproto_same_MixedProtocolLBService:on",
-		svc: svctest.MakeService("foo",
-			svctest.SetTypeLoadBalancer,
-			svctest.SetPorts(
-				svctest.MakeServicePort("p", 53, intstr.FromInt(53), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 53, intstr.FromInt(53), api.ProtocolUDP)),
-			svctest.SetNodePorts(30053, 30053)),
-		gateMixedProtocolLBService: true,
-		expectNodePorts:            true,
+		expectNodePorts: true,
 	}, {
 		name: "type:LoadBalancer_multiport_multiproto_conflict",
 		svc: svctest.MakeService("foo",
@@ -6358,8 +6319,6 @@ func TestCreateInitNodePorts(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 
 	for _, tc := range testCases {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MixedProtocolLBService, tc.gateMixedProtocolLBService)()
-
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := genericapirequest.NewDefaultContext()
 			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})

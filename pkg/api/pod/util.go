@@ -537,6 +537,11 @@ func dropDisabledFields(
 		}
 	}
 
+	// If the feature is disabled and not in use, drop the schedulingGates field.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness) && !schedulingGatesInUse(oldPodSpec) {
+		podSpec.SchedulingGates = nil
+	}
+
 	dropDisabledProcMountField(podSpec, oldPodSpec)
 
 	dropDisabledTopologySpreadConstraintsFields(podSpec, oldPodSpec)
@@ -717,6 +722,14 @@ func probeGracePeriodInUse(podSpec *api.PodSpec) bool {
 	})
 
 	return inUse
+}
+
+// schedulingGatesInUse returns true if the pod spec is non-nil and it has SchedulingGates field set.
+func schedulingGatesInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	return len(podSpec.SchedulingGates) != 0
 }
 
 // SeccompAnnotationForField takes a pod seccomp profile field and returns the

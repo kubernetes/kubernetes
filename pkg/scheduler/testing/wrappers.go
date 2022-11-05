@@ -581,10 +581,7 @@ func (p *PodWrapper) Labels(labels map[string]string) *PodWrapper {
 
 // Annotation sets a {k,v} pair to the inner pod annotation.
 func (p *PodWrapper) Annotation(key, value string) *PodWrapper {
-	if p.ObjectMeta.Annotations == nil {
-		p.ObjectMeta.Annotations = make(map[string]string)
-	}
-	p.ObjectMeta.Annotations[key] = value
+	metav1.SetMetaDataAnnotation(&p.ObjectMeta, key, value)
 	return p
 }
 
@@ -694,4 +691,95 @@ func (n *NodeWrapper) Images(images map[string]int64) *NodeWrapper {
 func (n *NodeWrapper) Taints(taints []v1.Taint) *NodeWrapper {
 	n.Spec.Taints = taints
 	return n
+}
+
+// PersistentVolumeClaimWrapper wraps a PersistentVolumeClaim inside.
+type PersistentVolumeClaimWrapper struct{ v1.PersistentVolumeClaim }
+
+// MakePersistentVolumeClaim creates a PersistentVolumeClaim wrapper.
+func MakePersistentVolumeClaim() *PersistentVolumeClaimWrapper {
+	return &PersistentVolumeClaimWrapper{}
+}
+
+// Obj returns the inner PersistentVolumeClaim.
+func (p *PersistentVolumeClaimWrapper) Obj() *v1.PersistentVolumeClaim {
+	return &p.PersistentVolumeClaim
+}
+
+// Name sets `s` as the name of the inner PersistentVolumeClaim.
+func (p *PersistentVolumeClaimWrapper) Name(s string) *PersistentVolumeClaimWrapper {
+	p.SetName(s)
+	return p
+}
+
+// Namespace sets `s` as the namespace of the inner PersistentVolumeClaim.
+func (p *PersistentVolumeClaimWrapper) Namespace(s string) *PersistentVolumeClaimWrapper {
+	p.SetNamespace(s)
+	return p
+}
+
+// Annotation sets a {k,v} pair to the inner PersistentVolumeClaim.
+func (p *PersistentVolumeClaimWrapper) Annotation(key, value string) *PersistentVolumeClaimWrapper {
+	metav1.SetMetaDataAnnotation(&p.ObjectMeta, key, value)
+	return p
+}
+
+// VolumeName sets `name` as the volume name of the inner
+// PersistentVolumeClaim.
+func (p *PersistentVolumeClaimWrapper) VolumeName(name string) *PersistentVolumeClaimWrapper {
+	p.PersistentVolumeClaim.Spec.VolumeName = name
+	return p
+}
+
+// AccessModes sets `accessModes` as the access modes of the inner
+// PersistentVolumeClaim.
+func (p *PersistentVolumeClaimWrapper) AccessModes(accessModes []v1.PersistentVolumeAccessMode) *PersistentVolumeClaimWrapper {
+	p.PersistentVolumeClaim.Spec.AccessModes = accessModes
+	return p
+}
+
+// Resources sets `resources` as the resource requirements of the inner
+// PersistentVolumeClaim.
+func (p *PersistentVolumeClaimWrapper) Resources(resources v1.ResourceRequirements) *PersistentVolumeClaimWrapper {
+	p.PersistentVolumeClaim.Spec.Resources = resources
+	return p
+}
+
+// PersistentVolumeWrapper wraps a PersistentVolume inside.
+type PersistentVolumeWrapper struct{ v1.PersistentVolume }
+
+// MakePersistentVolume creates a PersistentVolume wrapper.
+func MakePersistentVolume() *PersistentVolumeWrapper {
+	return &PersistentVolumeWrapper{}
+}
+
+// Obj returns the inner PersistentVolume.
+func (p *PersistentVolumeWrapper) Obj() *v1.PersistentVolume {
+	return &p.PersistentVolume
+}
+
+// Name sets `s` as the name of the inner PersistentVolume.
+func (p *PersistentVolumeWrapper) Name(s string) *PersistentVolumeWrapper {
+	p.SetName(s)
+	return p
+}
+
+// AccessModes sets `accessModes` as the access modes of the inner
+// PersistentVolume.
+func (p *PersistentVolumeWrapper) AccessModes(accessModes []v1.PersistentVolumeAccessMode) *PersistentVolumeWrapper {
+	p.PersistentVolume.Spec.AccessModes = accessModes
+	return p
+}
+
+// Capacity sets `capacity` as the resource list of the inner PersistentVolume.
+func (p *PersistentVolumeWrapper) Capacity(capacity v1.ResourceList) *PersistentVolumeWrapper {
+	p.PersistentVolume.Spec.Capacity = capacity
+	return p
+}
+
+// HostPathVolumeSource sets `src` as the host path volume source of the inner
+// PersistentVolume.
+func (p *PersistentVolumeWrapper) HostPathVolumeSource(src *v1.HostPathVolumeSource) *PersistentVolumeWrapper {
+	p.PersistentVolume.Spec.HostPath = src
+	return p
 }

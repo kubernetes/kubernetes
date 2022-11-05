@@ -201,7 +201,6 @@ func configureTopologyManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguratio
 		newCfg.FeatureGates = make(map[string]bool)
 	}
 
-	newCfg.FeatureGates["CPUManager"] = true
 	newCfg.FeatureGates["TopologyManager"] = true
 
 	// Set the Topology Manager policy
@@ -382,7 +381,7 @@ func waitForAllContainerRemoval(podName, podNS string) {
 	rs, _, err := getCRIClient()
 	framework.ExpectNoError(err)
 	gomega.Eventually(func() bool {
-		containers, err := rs.ListContainers(context.Background(), &runtimeapi.ContainerFilter{
+		containers, err := rs.ListContainers(&runtimeapi.ContainerFilter{
 			LabelSelector: map[string]string{
 				types.KubernetesPodNameLabel:      podName,
 				types.KubernetesPodNamespaceLabel: podNS,

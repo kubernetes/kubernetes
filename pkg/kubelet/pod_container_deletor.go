@@ -17,7 +17,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"context"
 	"sort"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -49,7 +48,7 @@ func newPodContainerDeletor(runtime kubecontainer.Runtime, containersToKeep int)
 	go wait.Until(func() {
 		for {
 			id := <-buffer
-			if err := runtime.DeleteContainer(context.Background(), id); err != nil {
+			if err := runtime.DeleteContainer(id); err != nil {
 				klog.InfoS("DeleteContainer returned error", "containerID", id, "err", err)
 			}
 		}

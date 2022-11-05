@@ -31,11 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -251,129 +248,9 @@ func TestPodToEndpoint(t *testing.T) {
 		svc                      *v1.Service
 		expectedEndpoint         discovery.Endpoint
 		publishNotReadyAddresses bool
-		terminatingGateEnabled   bool
 	}{
 		{
 			name: "Ready pod",
-			pod:  readyPod,
-			svc:  &svc,
-			expectedEndpoint: discovery.Endpoint{
-				Addresses:  []string{"1.2.3.5"},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-				NodeName:   utilpointer.StringPtr("node-1"),
-				TargetRef: &v1.ObjectReference{
-					Kind:      "Pod",
-					Namespace: ns,
-					Name:      readyPod.Name,
-					UID:       readyPod.UID,
-				},
-			},
-		},
-		{
-			name: "Ready pod + publishNotReadyAddresses",
-			pod:  readyPod,
-			svc:  &svcPublishNotReady,
-			expectedEndpoint: discovery.Endpoint{
-				Addresses:  []string{"1.2.3.5"},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-				NodeName:   utilpointer.StringPtr("node-1"),
-				TargetRef: &v1.ObjectReference{
-					Kind:      "Pod",
-					Namespace: ns,
-					Name:      readyPod.Name,
-					UID:       readyPod.UID,
-				},
-			},
-		},
-		{
-			name: "Unready pod",
-			pod:  unreadyPod,
-			svc:  &svc,
-			expectedEndpoint: discovery.Endpoint{
-				Addresses:  []string{"1.2.3.5"},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
-				NodeName:   utilpointer.StringPtr("node-1"),
-				TargetRef: &v1.ObjectReference{
-					Kind:      "Pod",
-					Namespace: ns,
-					Name:      readyPod.Name,
-					UID:       readyPod.UID,
-				},
-			},
-		},
-		{
-			name: "Unready pod + publishNotReadyAddresses",
-			pod:  unreadyPod,
-			svc:  &svcPublishNotReady,
-			expectedEndpoint: discovery.Endpoint{
-				Addresses:  []string{"1.2.3.5"},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-				NodeName:   utilpointer.StringPtr("node-1"),
-				TargetRef: &v1.ObjectReference{
-					Kind:      "Pod",
-					Namespace: ns,
-					Name:      readyPod.Name,
-					UID:       readyPod.UID,
-				},
-			},
-		},
-		{
-			name: "Ready pod + node labels",
-			pod:  readyPod,
-			node: node1,
-			svc:  &svc,
-			expectedEndpoint: discovery.Endpoint{
-				Addresses:  []string{"1.2.3.5"},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-				Zone:       utilpointer.StringPtr("us-central1-a"),
-				NodeName:   utilpointer.StringPtr("node-1"),
-				TargetRef: &v1.ObjectReference{
-					Kind:      "Pod",
-					Namespace: ns,
-					Name:      readyPod.Name,
-					UID:       readyPod.UID,
-				},
-			},
-		},
-		{
-			name: "Multi IP Ready pod + node labels",
-			pod:  multiIPPod,
-			node: node1,
-			svc:  &svc,
-			expectedEndpoint: discovery.Endpoint{
-				Addresses:  []string{"1.2.3.4"},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-				Zone:       utilpointer.StringPtr("us-central1-a"),
-				NodeName:   utilpointer.StringPtr("node-1"),
-				TargetRef: &v1.ObjectReference{
-					Kind:      "Pod",
-					Namespace: ns,
-					Name:      readyPod.Name,
-					UID:       readyPod.UID,
-				},
-			},
-		},
-		{
-			name: "Ready pod + hostname",
-			pod:  readyPodHostname,
-			node: node1,
-			svc:  &svc,
-			expectedEndpoint: discovery.Endpoint{
-				Addresses:  []string{"1.2.3.5"},
-				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-				Hostname:   &readyPodHostname.Spec.Hostname,
-				Zone:       utilpointer.StringPtr("us-central1-a"),
-				NodeName:   utilpointer.StringPtr("node-1"),
-				TargetRef: &v1.ObjectReference{
-					Kind:      "Pod",
-					Namespace: ns,
-					Name:      readyPodHostname.Name,
-					UID:       readyPodHostname.UID,
-				},
-			},
-		},
-		{
-			name: "Ready pod, terminating gate enabled",
 			pod:  readyPod,
 			svc:  &svc,
 			expectedEndpoint: discovery.Endpoint{
@@ -391,16 +268,17 @@ func TestPodToEndpoint(t *testing.T) {
 					UID:       readyPod.UID,
 				},
 			},
-			terminatingGateEnabled: true,
 		},
 		{
-			name: "Ready terminating pod, terminating gate disabled",
-			pod:  readyTerminatingPod,
-			svc:  &svc,
+			name: "Ready pod + publishNotReadyAddresses",
+			pod:  readyPod,
+			svc:  &svcPublishNotReady,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
-					Ready: utilpointer.BoolPtr(false),
+					Ready:       utilpointer.BoolPtr(true),
+					Serving:     utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(false),
 				},
 				NodeName: utilpointer.StringPtr("node-1"),
 				TargetRef: &v1.ObjectReference{
@@ -410,10 +288,136 @@ func TestPodToEndpoint(t *testing.T) {
 					UID:       readyPod.UID,
 				},
 			},
-			terminatingGateEnabled: false,
 		},
 		{
-			name: "Ready terminating pod, terminating gate enabled",
+			name: "Unready pod",
+			pod:  unreadyPod,
+			svc:  &svc,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses: []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(false),
+					Serving:     utilpointer.BoolPtr(false),
+					Terminating: utilpointer.BoolPtr(false),
+				},
+				NodeName: utilpointer.StringPtr("node-1"),
+				TargetRef: &v1.ObjectReference{
+					Kind:      "Pod",
+					Namespace: ns,
+					Name:      readyPod.Name,
+					UID:       readyPod.UID,
+				},
+			},
+		},
+		{
+			name: "Unready pod + publishNotReadyAddresses",
+			pod:  unreadyPod,
+			svc:  &svcPublishNotReady,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses: []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(true),
+					Serving:     utilpointer.BoolPtr(false),
+					Terminating: utilpointer.BoolPtr(false),
+				},
+				NodeName: utilpointer.StringPtr("node-1"),
+				TargetRef: &v1.ObjectReference{
+					Kind:      "Pod",
+					Namespace: ns,
+					Name:      readyPod.Name,
+					UID:       readyPod.UID,
+				},
+			},
+		},
+		{
+			name: "Ready pod + node labels",
+			pod:  readyPod,
+			node: node1,
+			svc:  &svc,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses: []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(true),
+					Serving:     utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(false),
+				},
+				Zone:     utilpointer.StringPtr("us-central1-a"),
+				NodeName: utilpointer.StringPtr("node-1"),
+				TargetRef: &v1.ObjectReference{
+					Kind:      "Pod",
+					Namespace: ns,
+					Name:      readyPod.Name,
+					UID:       readyPod.UID,
+				},
+			},
+		},
+		{
+			name: "Multi IP Ready pod + node labels",
+			pod:  multiIPPod,
+			node: node1,
+			svc:  &svc,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses: []string{"1.2.3.4"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(true),
+					Serving:     utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(false),
+				},
+				Zone:     utilpointer.StringPtr("us-central1-a"),
+				NodeName: utilpointer.StringPtr("node-1"),
+				TargetRef: &v1.ObjectReference{
+					Kind:      "Pod",
+					Namespace: ns,
+					Name:      readyPod.Name,
+					UID:       readyPod.UID,
+				},
+			},
+		},
+		{
+			name: "Ready pod + hostname",
+			pod:  readyPodHostname,
+			node: node1,
+			svc:  &svc,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses: []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(true),
+					Serving:     utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(false),
+				},
+				Hostname: &readyPodHostname.Spec.Hostname,
+				Zone:     utilpointer.StringPtr("us-central1-a"),
+				NodeName: utilpointer.StringPtr("node-1"),
+				TargetRef: &v1.ObjectReference{
+					Kind:      "Pod",
+					Namespace: ns,
+					Name:      readyPodHostname.Name,
+					UID:       readyPodHostname.UID,
+				},
+			},
+		},
+		{
+			name: "Ready pod",
+			pod:  readyPod,
+			svc:  &svc,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses: []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(true),
+					Serving:     utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(false),
+				},
+				NodeName: utilpointer.StringPtr("node-1"),
+				TargetRef: &v1.ObjectReference{
+					Kind:      "Pod",
+					Namespace: ns,
+					Name:      readyPod.Name,
+					UID:       readyPod.UID,
+				},
+			},
+		},
+		{
+			name: "Ready terminating pod",
 			pod:  readyTerminatingPod,
 			svc:  &svc,
 			expectedEndpoint: discovery.Endpoint{
@@ -431,29 +435,9 @@ func TestPodToEndpoint(t *testing.T) {
 					UID:       readyPod.UID,
 				},
 			},
-			terminatingGateEnabled: true,
 		},
 		{
-			name: "Not ready terminating pod, terminating gate disabled",
-			pod:  unreadyTerminatingPod,
-			svc:  &svc,
-			expectedEndpoint: discovery.Endpoint{
-				Addresses: []string{"1.2.3.5"},
-				Conditions: discovery.EndpointConditions{
-					Ready: utilpointer.BoolPtr(false),
-				},
-				NodeName: utilpointer.StringPtr("node-1"),
-				TargetRef: &v1.ObjectReference{
-					Kind:      "Pod",
-					Namespace: ns,
-					Name:      readyPod.Name,
-					UID:       readyPod.UID,
-				},
-			},
-			terminatingGateEnabled: false,
-		},
-		{
-			name: "Not ready terminating pod, terminating gate enabled",
+			name: "Not ready terminating pod",
 			pod:  unreadyTerminatingPod,
 			svc:  &svc,
 			expectedEndpoint: discovery.Endpoint{
@@ -471,14 +455,11 @@ func TestPodToEndpoint(t *testing.T) {
 					UID:       readyPod.UID,
 				},
 			},
-			terminatingGateEnabled: true,
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EndpointSliceTerminatingCondition, testCase.terminatingGateEnabled)()
-
 			endpoint := podToEndpoint(testCase.pod, testCase.node, testCase.svc, discovery.AddressTypeIPv4)
 			if !reflect.DeepEqual(testCase.expectedEndpoint, endpoint) {
 				t.Errorf("Expected endpoint: %+v, got: %+v", testCase.expectedEndpoint, endpoint)

@@ -118,6 +118,15 @@ func IsZeroCIDR(cidr string) bool {
 	return false
 }
 
+// IsLoopBack checks if a given IP address is a loopback address.
+func IsLoopBack(ip string) bool {
+	netIP := netutils.ParseIPSloppy(ip)
+	if netIP != nil {
+		return netIP.IsLoopback()
+	}
+	return false
+}
+
 // IsProxyableIP checks if a given IP address is permitted to be proxied
 func IsProxyableIP(ip string) error {
 	netIP := netutils.ParseIPSloppy(ip)

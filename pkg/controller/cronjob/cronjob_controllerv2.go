@@ -62,8 +62,11 @@ var (
 // ControllerV2 is a controller for CronJobs.
 // Refactored Cronjob controller that uses DelayingQueue and informers
 type ControllerV2 struct {
-	queue    workqueue.RateLimitingInterface
-	recorder record.EventRecorder
+	queue workqueue.RateLimitingInterface
+
+	kubeClient  clientset.Interface
+	recorder    record.EventRecorder
+	broadcaster record.EventBroadcaster
 
 	jobControl     jobControlInterface
 	cronJobControl cjControlInterface
@@ -81,12 +84,12 @@ type ControllerV2 struct {
 // NewControllerV2 creates and initializes a new Controller.
 func NewControllerV2(jobInformer batchv1informers.JobInformer, cronJobsInformer batchv1informers.CronJobInformer, kubeClient clientset.Interface) (*ControllerV2, error) {
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
-	eventBroadcaster.StartRecordingToSink(&covev1client.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 
 	jm := &ControllerV2{
-		queue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cronjob"),
-		recorder: eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "cronjob-controller"}),
+		queue:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cronjob"),
+		kubeClient:  kubeClient,
+		broadcaster: eventBroadcaster,
+		recorder:    eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "cronjob-controller"}),
 
 		jobControl:     realJobControl{KubeClient: kubeClient},
 		cronJobControl: &realCJControl{KubeClient: kubeClient},
@@ -123,6 +126,12 @@ func NewControllerV2(jobInformer batchv1informers.JobInformer, cronJobsInformer 
 // Run starts the main goroutine responsible for watching and syncing jobs.
 func (jm *ControllerV2) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
+
+	// Start event processing pipeline.
+	jm.broadcaster.StartStructuredLogging(0)
+	jm.broadcaster.StartRecordingToSink(&covev1client.EventSinkImpl{Interface: jm.kubeClient.CoreV1().Events("")})
+	defer jm.broadcaster.Shutdown()
+
 	defer jm.queue.ShutDown()
 
 	klog.InfoS("Starting cronjob controller v2")

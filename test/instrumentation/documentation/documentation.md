@@ -6,7 +6,7 @@ description: >-
 ---
 
 
-## Metrics (auto-generated 2022 Nov 01)
+## Metrics (auto-generated 2022 Nov 02)
 
 This page details the metrics that different Kubernetes components export. You can query the metrics endpoint for these 
 components using an HTTP scrape, and fetch the current metrics data in Prometheus format.
@@ -343,6 +343,12 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_type" data-type="counter">Counter</td>
 <td class="metric_description">Dial failure count, labeled by the protocol (http-connect or grpc), transport (tcp or uds), and stage (connect or proxy). The stage indicates at which stage the dial failed</td>
 <td class="metric_labels_varying"><div class="metric_label">protocol</div><div class="metric_label">stage</div><div class="metric_label">transport</div></td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">apiserver_egress_dialer_dial_start_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Dial starts, labeled by the protocol (http-connect or grpc) and transport (tcp or uds).</td>
+<td class="metric_labels_varying"><div class="metric_label">protocol</div><div class="metric_label">transport</div></td>
 <td class="metric_labels_constant">None</td></tr>
 <tr class="metric"><td class="metric_name">apiserver_envelope_encryption_dek_cache_fill_percent</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
@@ -1476,6 +1482,12 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="counter">Counter</td>
 <td class="metric_description">Cumulative proxy rules Endpoint changes</td>
+<td class="metric_labels_varying">None</td>
+<td class="metric_labels_constant">None</td></tr>
+<tr class="metric"><td class="metric_name">kubeproxy_sync_proxy_rules_iptables_partial_restore_failures_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Cumulative proxy iptables partial restore failures</td>
 <td class="metric_labels_varying">None</td>
 <td class="metric_labels_constant">None</td></tr>
 <tr class="metric"><td class="metric_name">kubeproxy_sync_proxy_rules_iptables_restore_failures_total</td>

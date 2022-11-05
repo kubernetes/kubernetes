@@ -4869,6 +4869,20 @@
         ],
         "type": "object"
       },
+      "io.k8s.api.core.v1.PodSchedulingGate": {
+        "description": "PodSchedulingGate is associated to a Pod to guard its scheduling.",
+        "properties": {
+          "name": {
+            "default": "",
+            "description": "Name of the scheduling gate. Each scheduling gate must have a unique name field.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
       "io.k8s.api.core.v1.PodSecurityContext": {
         "description": "PodSecurityContext holds pod-level security attributes and common container settings. Some fields are also present in container.securityContext.  Field values of container.securityContext take precedence over field values of PodSecurityContext.",
         "properties": {
@@ -5138,6 +5152,24 @@
           "schedulerName": {
             "description": "If specified, the pod will be dispatched by specified scheduler. If not specified, the pod will be dispatched by default scheduler.",
             "type": "string"
+          },
+          "schedulingGates": {
+            "description": "SchedulingGates is an opaque list of values that if specified will block scheduling the pod. More info:  https://git.k8s.io/enhancements/keps/sig-scheduling/3521-pod-scheduling-readiness.\n\nThis is an alpha-level feature enabled by PodSchedulingReadiness feature gate.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.PodSchedulingGate"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "name",
+            "x-kubernetes-patch-strategy": "merge"
           },
           "securityContext": {
             "allOf": [

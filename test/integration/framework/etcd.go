@@ -196,9 +196,9 @@ func EtcdMain(tests func() int) {
 	checkNumberOfGoroutines := func() (bool, error) {
 		// Leave some room for goroutines we can not get rid of
 		// like k8s.io/klog/v2.(*loggingT).flushDaemon()
-		// TODO(#108483): Reduce this number once we address the
-		//   couple remaining issues.
-		if dg := runtime.NumGoroutine() - before; dg <= 9 {
+		// TODO(#108483): Figure out if we can reduce this
+		//   further (ideally down to zero).
+		if dg := runtime.NumGoroutine() - before; dg <= 4 {
 			return true, nil
 		}
 		// Allow goroutines to schedule and die off.

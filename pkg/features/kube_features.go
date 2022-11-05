@@ -59,9 +59,10 @@ const (
 	// Enable nodes to change CPUCFSQuotaPeriod
 	CPUCFSQuotaPeriod featuregate.Feature = "CustomCPUCFSQuotaPeriod"
 
-	// owner: @ConnorDoyle
+	// owner: @ConnorDoyle, @fromanirh (only for GA graduation)
 	// alpha: v1.8
 	// beta: v1.10
+	// GA: v1.26
 	//
 	// Alternative container-level CPU affinity policies.
 	CPUManager featuregate.Feature = "CPUManager"
@@ -160,7 +161,7 @@ const (
 
 	// owner: @divyenpatel
 	// beta: v1.19 (requires: vSphere vCenter/ESXi Version: 7.0u2, HW Version: VM version 15)
-	//
+	// GA: 1.26
 	// Enables the vSphere in-tree driver to vSphere CSI Driver migration feature.
 	CSIMigrationvSphere featuregate.Feature = "CSIMigrationvSphere"
 
@@ -221,16 +222,19 @@ const (
 	// DaemonSets allow workloads to maintain availability during update per node
 	DaemonSetUpdateSurge featuregate.Feature = "DaemonSetUpdateSurge"
 
-	// owner: @gnufied, @verult
+	// owner: @gnufied, @verult, @bertinatto
 	// alpha: v1.22
 	// beta: v1.23
+	// GA: v1.26
 	// If supported by the CSI driver, delegates the role of applying FSGroup to
 	// the driver by passing FSGroup through the NodeStageVolume and
 	// NodePublishVolume calls.
 	DelegateFSGroupToCSIDriver featuregate.Feature = "DelegateFSGroupToCSIDriver"
 
-	// owner: @jiayingz
+	// owner: @jiayingz, @swatisehgal (for GA graduation)
+	// alpha: v1.8
 	// beta: v1.10
+	// GA: v1.26
 	//
 	// Enables support for Device Plugins
 	DevicePlugins featuregate.Feature = "DevicePlugins"
@@ -266,6 +270,7 @@ const (
 	// kep: https://kep.k8s.io/1672
 	// alpha: v1.20
 	// beta: v1.22
+	// GA: v1.26
 	//
 	// Enable Terminating condition in Endpoint Slices.
 	EndpointSliceTerminatingCondition featuregate.Feature = "EndpointSliceTerminatingCondition"
@@ -568,6 +573,7 @@ const (
 	// kep: https://kep.k8s.io/1435
 	// alpha: v1.20
 	// beta: v1.24
+	// ga: v1.26
 	//
 	// Enables the usage of different protocols in the same Service with type=LoadBalancer
 	MixedProtocolLBService featuregate.Feature = "MixedProtocolLBService"
@@ -598,6 +604,7 @@ const (
 	// owner: @xing-yang @sonasingh46
 	// kep: https://kep.k8s.io/2268
 	// alpha: v1.24
+	// beta: v1.26
 	//
 	// Allow pods to failover to a different node in case of non graceful node shutdown
 	NodeOutOfServiceVolumeDetach featuregate.Feature = "NodeOutOfServiceVolumeDetach"
@@ -638,6 +645,13 @@ const (
 	// sandbox creation and network configuration completes successfully
 	PodHasNetworkCondition featuregate.Feature = "PodHasNetworkCondition"
 
+	// owner: @Huang-Wei
+	// kep: https://kep.k8s.io/3521
+	// alpha: v1.26
+	//
+	// Enable users to specify when a Pod is ready for scheduling.
+	PodSchedulingReadiness featuregate.Feature = "PodSchedulingReadiness"
+
 	// owner: @liggitt, @tallclair, sig-auth
 	// alpha: v1.22
 	// beta: v1.23
@@ -662,6 +676,7 @@ const (
 	// owner: @andrewsykim
 	// kep: https://kep.k8s.io/1669
 	// alpha: v1.22
+	// beta: v1.26
 	//
 	// Enable kube-proxy to handle terminating ednpoints when externalTrafficPolicy=Local
 	ProxyTerminatingEndpoints featuregate.Feature = "ProxyTerminatingEndpoints"
@@ -714,6 +729,7 @@ const (
 	// kep: https://kep.k8s.io/2086
 	// alpha: v1.21
 	// beta: v1.22
+	// GA: v1.26
 	//
 	// Enables node-local routing for Service internal traffic
 	ServiceInternalTrafficPolicy featuregate.Feature = "ServiceInternalTrafficPolicy"
@@ -831,7 +847,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CPUCFSQuotaPeriod: {Default: false, PreRelease: featuregate.Alpha},
 
-	CPUManager: {Default: true, PreRelease: featuregate.Beta},
+	CPUManager: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.26
 
 	CPUManagerPolicyAlphaOptions: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -855,7 +871,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CSIMigrationRBD: {Default: false, PreRelease: featuregate.Alpha}, // Off by default (requires RBD CSI driver)
 
-	CSIMigrationvSphere: {Default: true, PreRelease: featuregate.Beta},
+	CSIMigrationvSphere: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	CSINodeExpandSecret: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -873,9 +889,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	DaemonSetUpdateSurge: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
 
-	DelegateFSGroupToCSIDriver: {Default: true, PreRelease: featuregate.Beta},
+	DelegateFSGroupToCSIDriver: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
-	DevicePlugins: {Default: true, PreRelease: featuregate.Beta},
+	DevicePlugins: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.26
 
 	DisableAcceleratorUsageMetrics: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
@@ -885,7 +901,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	DownwardAPIHugePages: {Default: true, PreRelease: featuregate.Beta}, // on by default in 1.22
 
-	EndpointSliceTerminatingCondition: {Default: true, PreRelease: featuregate.Beta},
+	EndpointSliceTerminatingCondition: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in v1.28
 
 	EphemeralContainers: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
 
@@ -947,7 +963,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	KubeletTracing: {Default: false, PreRelease: featuregate.Alpha},
 
-	LegacyServiceAccountTokenNoAutoGeneration: {Default: true, PreRelease: featuregate.Beta},
+	LegacyServiceAccountTokenNoAutoGeneration: {Default: true, PreRelease: featuregate.GA},
 
 	LegacyServiceAccountTokenTracking: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -969,7 +985,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	MinimizeIPTablesRestore: {Default: false, PreRelease: featuregate.Alpha},
 
-	MixedProtocolLBService: {Default: true, PreRelease: featuregate.Beta},
+	MixedProtocolLBService: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	MultiCIDRRangeAllocator: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -977,7 +993,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	NetworkPolicyStatus: {Default: false, PreRelease: featuregate.Alpha},
 
-	NodeOutOfServiceVolumeDetach: {Default: false, PreRelease: featuregate.Alpha},
+	NodeOutOfServiceVolumeDetach: {Default: true, PreRelease: featuregate.Beta},
 
 	NodeSwap: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -989,13 +1005,15 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	PodHasNetworkCondition: {Default: false, PreRelease: featuregate.Alpha},
 
+	PodSchedulingReadiness: {Default: false, PreRelease: featuregate.Alpha},
+
 	PodSecurity: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
 	ProbeTerminationGracePeriod: {Default: true, PreRelease: featuregate.Beta}, // Default to true in beta 1.25
 
 	ProcMountType: {Default: false, PreRelease: featuregate.Alpha},
 
-	ProxyTerminatingEndpoints: {Default: false, PreRelease: featuregate.Alpha},
+	ProxyTerminatingEndpoints: {Default: true, PreRelease: featuregate.Beta},
 
 	QOSReserved: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -1003,7 +1021,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	RecoverVolumeExpansionFailure: {Default: false, PreRelease: featuregate.Alpha},
 
-	RetroactiveDefaultStorageClass: {Default: false, PreRelease: featuregate.Alpha},
+	RetroactiveDefaultStorageClass: {Default: true, PreRelease: featuregate.Beta},
 
 	RotateKubeletServerCertificate: {Default: true, PreRelease: featuregate.Beta},
 
@@ -1011,7 +1029,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ServiceIPStaticSubrange: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
-	ServiceInternalTrafficPolicy: {Default: true, PreRelease: featuregate.Beta},
+	ServiceInternalTrafficPolicy: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 
 	SizeMemoryBackedVolumes: {Default: true, PreRelease: featuregate.Beta},
 

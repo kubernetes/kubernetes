@@ -166,6 +166,7 @@ API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,DeploymentSt
 API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,FSGroupStrategyOptions,Ranges
 API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,HTTPIngressRuleValue,Paths
 API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,IPBlock,Except
+API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,IngressLoadBalancerStatus,Ingress
 API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,IngressSpec,Rules
 API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,IngressSpec,TLS
 API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,IngressTLS,Hosts
@@ -194,6 +195,7 @@ API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,RuntimeClass
 API rule violation: list_type_missing,k8s.io/api/extensions/v1beta1,SupplementalGroupsStrategyOptions,Ranges
 API rule violation: list_type_missing,k8s.io/api/imagepolicy/v1alpha1,ImageReviewSpec,Containers
 API rule violation: list_type_missing,k8s.io/api/networking/v1,IPBlock,Except
+API rule violation: list_type_missing,k8s.io/api/networking/v1,IngressLoadBalancerStatus,Ingress
 API rule violation: list_type_missing,k8s.io/api/networking/v1,NetworkPolicyEgressRule,Ports
 API rule violation: list_type_missing,k8s.io/api/networking/v1,NetworkPolicyEgressRule,To
 API rule violation: list_type_missing,k8s.io/api/networking/v1,NetworkPolicyIngressRule,From
@@ -202,6 +204,7 @@ API rule violation: list_type_missing,k8s.io/api/networking/v1,NetworkPolicySpec
 API rule violation: list_type_missing,k8s.io/api/networking/v1,NetworkPolicySpec,Ingress
 API rule violation: list_type_missing,k8s.io/api/networking/v1,NetworkPolicySpec,PolicyTypes
 API rule violation: list_type_missing,k8s.io/api/networking/v1beta1,HTTPIngressRuleValue,Paths
+API rule violation: list_type_missing,k8s.io/api/networking/v1beta1,IngressLoadBalancerStatus,Ingress
 API rule violation: list_type_missing,k8s.io/api/networking/v1beta1,IngressSpec,Rules
 API rule violation: list_type_missing,k8s.io/api/networking/v1beta1,IngressSpec,TLS
 API rule violation: list_type_missing,k8s.io/api/networking/v1beta1,IngressTLS,Hosts

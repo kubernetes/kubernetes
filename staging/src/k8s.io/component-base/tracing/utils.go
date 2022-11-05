@@ -31,14 +31,32 @@ import (
 	"k8s.io/component-base/tracing/api/v1"
 )
 
+// TracerProvider is an OpenTelemetry TracerProvider which can be shut down
+type TracerProvider interface {
+	oteltrace.TracerProvider
+	Shutdown(context.Context) error
+}
+
+type noopTracerProvider struct {
+	oteltrace.TracerProvider
+}
+
+func (n *noopTracerProvider) Shutdown(context.Context) error {
+	return nil
+}
+
+func NewNoopTracerProvider() TracerProvider {
+	return &noopTracerProvider{TracerProvider: oteltrace.NewNoopTracerProvider()}
+}
+
 // NewProvider creates a TracerProvider in a component, and enforces recommended tracing behavior
 func NewProvider(ctx context.Context,
 	tracingConfig *v1.TracingConfiguration,
 	addedOpts []otlptracegrpc.Option,
 	resourceOpts []resource.Option,
-) (oteltrace.TracerProvider, error) {
+) (TracerProvider, error) {
 	if tracingConfig == nil {
-		return oteltrace.NewNoopTracerProvider(), nil
+		return NewNoopTracerProvider(), nil
 	}
 	opts := append([]otlptracegrpc.Option{}, addedOpts...)
 	if tracingConfig.Endpoint != nil {

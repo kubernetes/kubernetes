@@ -45,7 +45,7 @@ const (
 )
 
 // CreateNamespaceOrDie creates a namespace.
-func CreateNamespaceOrDie(c clientset.Interface, baseName string, t *testing.T) *v1.Namespace {
+func CreateNamespaceOrDie(c clientset.Interface, baseName string, t testing.TB) *v1.Namespace {
 	ns := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: baseName}}
 	result, err := c.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 	if err != nil {
@@ -55,7 +55,7 @@ func CreateNamespaceOrDie(c clientset.Interface, baseName string, t *testing.T) 
 }
 
 // DeleteNamespaceOrDie deletes a namespace.
-func DeleteNamespaceOrDie(c clientset.Interface, ns *v1.Namespace, t *testing.T) {
+func DeleteNamespaceOrDie(c clientset.Interface, ns *v1.Namespace, t testing.TB) {
 	err := c.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("Failed to delete namespace: %v", err)

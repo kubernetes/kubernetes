@@ -1,75 +1,6 @@
 {
   "components": {
     "schemas": {
-      "io.k8s.api.core.v1.LoadBalancerIngress": {
-        "description": "LoadBalancerIngress represents the status of a load-balancer ingress point: traffic intended for the service should be sent to an ingress point.",
-        "properties": {
-          "hostname": {
-            "description": "Hostname is set for load-balancer ingress points that are DNS based (typically AWS load-balancers)",
-            "type": "string"
-          },
-          "ip": {
-            "description": "IP is set for load-balancer ingress points that are IP based (typically GCE or OpenStack load-balancers)",
-            "type": "string"
-          },
-          "ports": {
-            "description": "Ports is a list of records of service ports If used, every port defined in the service should have an entry in it",
-            "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.core.v1.PortStatus"
-                }
-              ],
-              "default": {}
-            },
-            "type": "array",
-            "x-kubernetes-list-type": "atomic"
-          }
-        },
-        "type": "object"
-      },
-      "io.k8s.api.core.v1.LoadBalancerStatus": {
-        "description": "LoadBalancerStatus represents the status of a load-balancer.",
-        "properties": {
-          "ingress": {
-            "description": "Ingress is a list containing ingress points for the load-balancer. Traffic intended for the service should be sent to these ingress points.",
-            "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.core.v1.LoadBalancerIngress"
-                }
-              ],
-              "default": {}
-            },
-            "type": "array"
-          }
-        },
-        "type": "object"
-      },
-      "io.k8s.api.core.v1.PortStatus": {
-        "properties": {
-          "error": {
-            "description": "Error is to record the problem with the service port The format of the error shall comply with the following rules: - built-in error values shall be specified in this file and those shall use\n  CamelCase names\n- cloud provider specific error values must have names that comply with the\n  format foo.example.com/CamelCase.",
-            "type": "string"
-          },
-          "port": {
-            "default": 0,
-            "description": "Port is the port number of the service port of which status is recorded here",
-            "format": "int32",
-            "type": "integer"
-          },
-          "protocol": {
-            "default": "",
-            "description": "Protocol is the protocol of the service port of which status is recorded here The supported values are: \"TCP\", \"UDP\", \"SCTP\"\n\n",
-            "type": "string"
-          }
-        },
-        "required": [
-          "port",
-          "protocol"
-        ],
-        "type": "object"
-      },
       "io.k8s.api.core.v1.TypedLocalObjectReference": {
         "description": "TypedLocalObjectReference contains enough information to let you locate the typed referenced object inside the same namespace.",
         "properties": {
@@ -415,6 +346,76 @@
           }
         ]
       },
+      "io.k8s.api.networking.v1.IngressLoadBalancerIngress": {
+        "description": "IngressLoadBalancerIngress represents the status of a load-balancer ingress point.",
+        "properties": {
+          "hostname": {
+            "description": "Hostname is set for load-balancer ingress points that are DNS based.",
+            "type": "string"
+          },
+          "ip": {
+            "description": "IP is set for load-balancer ingress points that are IP based.",
+            "type": "string"
+          },
+          "ports": {
+            "description": "Ports provides information about the ports exposed by this LoadBalancer.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1.IngressPortStatus"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          }
+        },
+        "type": "object"
+      },
+      "io.k8s.api.networking.v1.IngressLoadBalancerStatus": {
+        "description": "IngressLoadBalancerStatus represents the status of a load-balancer.",
+        "properties": {
+          "ingress": {
+            "description": "Ingress is a list containing ingress points for the load-balancer.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1.IngressLoadBalancerIngress"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "io.k8s.api.networking.v1.IngressPortStatus": {
+        "description": "IngressPortStatus represents the error condition of a service port",
+        "properties": {
+          "error": {
+            "description": "Error is to record the problem with the service port The format of the error shall comply with the following rules: - built-in error values shall be specified in this file and those shall use\n  CamelCase names\n- cloud provider specific error values must have names that comply with the\n  format foo.example.com/CamelCase.",
+            "type": "string"
+          },
+          "port": {
+            "default": 0,
+            "description": "Port is the port number of the ingress port.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "protocol": {
+            "default": "",
+            "description": "Protocol is the protocol of the ingress port. The supported values are: \"TCP\", \"UDP\", \"SCTP\"\n\n",
+            "type": "string"
+          }
+        },
+        "required": [
+          "port",
+          "protocol"
+        ],
+        "type": "object"
+      },
       "io.k8s.api.networking.v1.IngressRule": {
         "description": "IngressRule represents the rules mapping the paths under a specified host to the related backend services. Incoming requests are first evaluated for a host match, then routed to the backend associated with the matching IngressRuleValue.",
         "properties": {
@@ -501,7 +502,7 @@
           "loadBalancer": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.core.v1.LoadBalancerStatus"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1.IngressLoadBalancerStatus"
               }
             ],
             "default": {},

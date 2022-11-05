@@ -17,7 +17,6 @@ limitations under the License.
 package testing
 
 import (
-	"context"
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -33,7 +32,7 @@ func NewFakeCache(runtime container.Runtime) container.Cache {
 }
 
 func (c *fakeCache) Get(id types.UID) (*container.PodStatus, error) {
-	return c.runtime.GetPodStatus(context.Background(), id, "", "")
+	return c.runtime.GetPodStatus(id, "", "")
 }
 
 func (c *fakeCache) GetNewerThan(id types.UID, minTime time.Time) (*container.PodStatus, error) {

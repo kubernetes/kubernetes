@@ -46,6 +46,7 @@ import (
 	kubesecret "k8s.io/kubernetes/pkg/kubelet/secret"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
 // Generate new instance of test pod with the same initial value.
@@ -84,7 +85,8 @@ func (m *manager) testSyncBatch() {
 func newTestManager(kubeClient clientset.Interface) *manager {
 	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), kubesecret.NewFakeManager(), kubeconfigmap.NewFakeManager())
 	podManager.AddPod(getTestPod())
-	return NewManager(kubeClient, podManager, &statustest.FakePodDeletionSafetyProvider{}).(*manager)
+	podStartupLatencyTracker := util.NewPodStartupLatencyTracker()
+	return NewManager(kubeClient, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker).(*manager)
 }
 
 func generateRandomMessage() string {
@@ -958,7 +960,8 @@ func TestTerminatePod_DefaultUnknownStatus(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), kubesecret.NewFakeManager(), kubeconfigmap.NewFakeManager())
-			syncer := NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}).(*manager)
+			podStartupLatencyTracker := util.NewPodStartupLatencyTracker()
+			syncer := NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker).(*manager)
 
 			original := tc.pod.DeepCopy()
 			syncer.SetPodStatus(original, original.Status)

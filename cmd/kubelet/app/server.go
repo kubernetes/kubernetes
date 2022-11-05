@@ -99,6 +99,7 @@ import (
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
+	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/pkg/util/flock"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -144,7 +145,7 @@ various mechanisms (primarily through the apiserver) and ensures that the contai
 described in those PodSpecs are running and healthy. The kubelet doesn't manage
 containers which were not created by Kubernetes.
 
-Other than from an PodSpec from the apiserver, there are three ways that a container
+Other than from an PodSpec from the apiserver, there are two ways that a container
 manifest can be provided to the Kubelet.
 
 File: Path passed as a flag on the command line. Files under this path will be monitored
@@ -152,10 +153,7 @@ periodically for updates. The monitoring period is 20s by default and is configu
 via a flag.
 
 HTTP endpoint: HTTP endpoint passed as a parameter on the command line. This endpoint
-is checked every 20 seconds (also configurable with a flag).
-
-HTTP server: The kubelet can also listen for HTTP and respond to a simple API
-(underspec'd currently) to submit a new manifest.`,
+is checked every 20 seconds (also configurable with a flag).`,
 		// The Kubelet has special flag parsing requirements to enforce flag precedence rules,
 		// so we do all our parsing manually in Run, below.
 		// DisableFlagParsing=true provides the full set of flags passed to the kubelet in the
@@ -704,16 +702,12 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			return err
 		}
 
-		devicePluginEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DevicePlugins)
-
 		var cpuManagerPolicyOptions map[string]string
-		if utilfeature.DefaultFeatureGate.Enabled(features.CPUManager) {
-			if utilfeature.DefaultFeatureGate.Enabled(features.CPUManagerPolicyOptions) {
-				cpuManagerPolicyOptions = s.CPUManagerPolicyOptions
-			} else if s.CPUManagerPolicyOptions != nil {
-				return fmt.Errorf("CPU Manager policy options %v require feature gates %q, %q enabled",
-					s.CPUManagerPolicyOptions, features.CPUManager, features.CPUManagerPolicyOptions)
-			}
+		if utilfeature.DefaultFeatureGate.Enabled(features.CPUManagerPolicyOptions) {
+			cpuManagerPolicyOptions = s.CPUManagerPolicyOptions
+		} else if s.CPUManagerPolicyOptions != nil {
+			return fmt.Errorf("CPU Manager policy options %v require feature gates %q, %q enabled",
+				s.CPUManagerPolicyOptions, features.CPUManager, features.CPUManagerPolicyOptions)
 		}
 
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(
@@ -739,9 +733,9 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 					HardEvictionThresholds:   hardEvictionThresholds,
 				},
 				QOSReserved:                             *experimentalQOSReserved,
-				ExperimentalCPUManagerPolicy:            s.CPUManagerPolicy,
-				ExperimentalCPUManagerPolicyOptions:     cpuManagerPolicyOptions,
-				ExperimentalCPUManagerReconcilePeriod:   s.CPUManagerReconcilePeriod.Duration,
+				CPUManagerPolicy:                        s.CPUManagerPolicy,
+				CPUManagerPolicyOptions:                 cpuManagerPolicyOptions,
+				CPUManagerReconcilePeriod:               s.CPUManagerReconcilePeriod.Duration,
 				ExperimentalMemoryManagerPolicy:         s.MemoryManagerPolicy,
 				ExperimentalMemoryManagerReservedMemory: s.ReservedMemory,
 				ExperimentalPodPidsLimit:                s.PodPidsLimit,
@@ -751,12 +745,15 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				ExperimentalTopologyManagerScope:        s.TopologyManagerScope,
 			},
 			s.FailSwapOn,
-			devicePluginEnabled,
 			kubeDeps.Recorder)
 
 		if err != nil {
 			return err
 		}
+	}
+
+	if kubeDeps.PodStartupLatencyTracker == nil {
+		kubeDeps.PodStartupLatencyTracker = kubeletutil.NewPodStartupLatencyTracker()
 	}
 
 	// TODO(vmarmol): Do this through container config.

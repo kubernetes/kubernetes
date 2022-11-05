@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"reflect"
 	"sync/atomic"
 	"testing"
@@ -60,8 +61,9 @@ func newPod() runtime.Object {
 	return &example.Pod{}
 }
 
-func checkStorageInvariants(etcdClient *clientv3.Client, codec runtime.Codec) storagetesting.KeyValidation {
+func checkStorageInvariants(prefix string, etcdClient *clientv3.Client, codec runtime.Codec) storagetesting.KeyValidation {
 	return func(ctx context.Context, t *testing.T, key string) {
+		key = path.Join(prefix, key)
 		getResp, err := etcdClient.KV.Get(ctx, key)
 		if err != nil {
 			t.Fatalf("etcdClient.KV.Get failed: %v", err)
@@ -85,7 +87,7 @@ func checkStorageInvariants(etcdClient *clientv3.Client, codec runtime.Codec) st
 
 func TestCreate(t *testing.T) {
 	ctx, store, etcdClient := testSetup(t)
-	storagetesting.RunTestCreate(ctx, t, store, checkStorageInvariants(etcdClient, store.codec))
+	storagetesting.RunTestCreate(ctx, t, store, checkStorageInvariants("/", etcdClient, store.codec))
 }
 
 func TestCreateWithTTL(t *testing.T) {
@@ -158,7 +160,7 @@ func (s *storeWithPrefixTransformer) UpdatePrefixTransformer(modifier storagetes
 
 func TestGuaranteedUpdate(t *testing.T) {
 	ctx, store, etcdClient := testSetup(t)
-	storagetesting.RunTestGuaranteedUpdate(ctx, t, &storeWithPrefixTransformer{store}, checkStorageInvariants(etcdClient, store.codec))
+	storagetesting.RunTestGuaranteedUpdate(ctx, t, &storeWithPrefixTransformer{store}, checkStorageInvariants("/", etcdClient, store.codec))
 }
 
 func TestGuaranteedUpdateWithTTL(t *testing.T) {

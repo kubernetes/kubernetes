@@ -17,8 +17,6 @@ limitations under the License.
 package kuberuntime
 
 import (
-	"context"
-
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -30,7 +28,7 @@ import (
 
 // PullImage pulls an image from the network to local storage using the supplied
 // secrets if necessary.
-func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	img := image.Image
 	repoToPull, _, _, err := parsers.ParseImageName(img)
 	if err != nil {
@@ -48,7 +46,7 @@ func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecon
 	if !withCredentials {
 		klog.V(3).InfoS("Pulling image without credentials", "image", img)
 
-		imageRef, err := m.imageService.PullImage(ctx, imgSpec, nil, podSandboxConfig)
+		imageRef, err := m.imageService.PullImage(imgSpec, nil, podSandboxConfig)
 		if err != nil {
 			klog.ErrorS(err, "Failed to pull image", "image", img)
 			return "", err
@@ -68,7 +66,7 @@ func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecon
 			RegistryToken: currentCreds.RegistryToken,
 		}
 
-		imageRef, err := m.imageService.PullImage(ctx, imgSpec, auth, podSandboxConfig)
+		imageRef, err := m.imageService.PullImage(imgSpec, auth, podSandboxConfig)
 		// If there was no error, return success
 		if err == nil {
 			return imageRef, nil
@@ -82,8 +80,8 @@ func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecon
 
 // GetImageRef gets the ID of the image which has already been in
 // the local storage. It returns ("", nil) if the image isn't in the local storage.
-func (m *kubeGenericRuntimeManager) GetImageRef(ctx context.Context, image kubecontainer.ImageSpec) (string, error) {
-	resp, err := m.imageService.ImageStatus(ctx, toRuntimeAPIImageSpec(image), false)
+func (m *kubeGenericRuntimeManager) GetImageRef(image kubecontainer.ImageSpec) (string, error) {
+	resp, err := m.imageService.ImageStatus(toRuntimeAPIImageSpec(image), false)
 	if err != nil {
 		klog.ErrorS(err, "Failed to get image status", "image", image.Image)
 		return "", err
@@ -95,10 +93,10 @@ func (m *kubeGenericRuntimeManager) GetImageRef(ctx context.Context, image kubec
 }
 
 // ListImages gets all images currently on the machine.
-func (m *kubeGenericRuntimeManager) ListImages(ctx context.Context) ([]kubecontainer.Image, error) {
+func (m *kubeGenericRuntimeManager) ListImages() ([]kubecontainer.Image, error) {
 	var images []kubecontainer.Image
 
-	allImages, err := m.imageService.ListImages(ctx, nil)
+	allImages, err := m.imageService.ListImages(nil)
 	if err != nil {
 		klog.ErrorS(err, "Failed to list images")
 		return nil, err
@@ -118,8 +116,8 @@ func (m *kubeGenericRuntimeManager) ListImages(ctx context.Context) ([]kubeconta
 }
 
 // RemoveImage removes the specified image.
-func (m *kubeGenericRuntimeManager) RemoveImage(ctx context.Context, image kubecontainer.ImageSpec) error {
-	err := m.imageService.RemoveImage(ctx, &runtimeapi.ImageSpec{Image: image.Image})
+func (m *kubeGenericRuntimeManager) RemoveImage(image kubecontainer.ImageSpec) error {
+	err := m.imageService.RemoveImage(&runtimeapi.ImageSpec{Image: image.Image})
 	if err != nil {
 		klog.ErrorS(err, "Failed to remove image", "image", image.Image)
 		return err
@@ -132,8 +130,8 @@ func (m *kubeGenericRuntimeManager) RemoveImage(ctx context.Context, image kubec
 // Notice that current logic doesn't really work for images which share layers (e.g. docker image),
 // this is a known issue, and we'll address this by getting imagefs stats directly from CRI.
 // TODO: Get imagefs stats directly from CRI.
-func (m *kubeGenericRuntimeManager) ImageStats(ctx context.Context) (*kubecontainer.ImageStats, error) {
-	allImages, err := m.imageService.ListImages(ctx, nil)
+func (m *kubeGenericRuntimeManager) ImageStats() (*kubecontainer.ImageStats, error) {
+	allImages, err := m.imageService.ListImages(nil)
 	if err != nil {
 		klog.ErrorS(err, "Failed to list images")
 		return nil, err

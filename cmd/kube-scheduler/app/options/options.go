@@ -222,6 +222,15 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		c.ComponentConfig = *cfg
 	}
 
+	// Build kubeconfig first to so that if it fails, it doesn't cause leaking
+	// goroutines (started from initializing secure serving - which underneath
+	// creates a queue which in its constructor starts a goroutine).
+	kubeConfig, err := createKubeConfig(c.ComponentConfig.ClientConnection, o.Master)
+	if err != nil {
+		return err
+	}
+	c.KubeConfig = kubeConfig
+
 	if err := o.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {
 		return err
 	}
@@ -271,14 +280,8 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 		return nil, err
 	}
 
-	// Prepare kube config.
-	kubeConfig, err := createKubeConfig(c.ComponentConfig.ClientConnection, o.Master)
-	if err != nil {
-		return nil, err
-	}
-
 	// Prepare kube clients.
-	client, eventClient, err := createClients(kubeConfig)
+	client, eventClient, err := createClients(c.KubeConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -294,16 +297,15 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 			schedulerName = c.ComponentConfig.Profiles[0].SchedulerName
 		}
 		coreRecorder := c.EventBroadcaster.DeprecatedNewLegacyRecorder(schedulerName)
-		leaderElectionConfig, err = makeLeaderElectionConfig(c.ComponentConfig.LeaderElection, kubeConfig, coreRecorder)
+		leaderElectionConfig, err = makeLeaderElectionConfig(c.ComponentConfig.LeaderElection, c.KubeConfig, coreRecorder)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	c.Client = client
-	c.KubeConfig = kubeConfig
 	c.InformerFactory = scheduler.NewInformerFactory(client, 0)
-	dynClient := dynamic.NewForConfigOrDie(kubeConfig)
+	dynClient := dynamic.NewForConfigOrDie(c.KubeConfig)
 	c.DynInformerFactory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynClient, 0, corev1.NamespaceAll, nil)
 	c.LeaderElection = leaderElectionConfig
 

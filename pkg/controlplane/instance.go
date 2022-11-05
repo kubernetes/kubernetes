@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"reflect"
 	"strconv"
 	"time"
@@ -60,6 +61,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -470,13 +472,18 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			if err != nil {
 				return err
 			}
+
+			leaseName := m.GenericAPIServer.APIServerID
+			holderIdentity := m.GenericAPIServer.APIServerID + "_" + string(uuid.NewUUID())
+
 			controller := lease.NewController(
 				clock.RealClock{},
 				kubeClient,
-				m.GenericAPIServer.APIServerID,
+				holderIdentity,
 				int32(c.ExtraConfig.IdentityLeaseDurationSeconds),
 				nil,
 				time.Duration(c.ExtraConfig.IdentityLeaseRenewIntervalSeconds)*time.Second,
+				leaseName,
 				metav1.NamespaceSystem,
 				labelAPIServerHeartbeat)
 			go controller.Run(hookContext.StopCh)
@@ -515,6 +522,14 @@ func labelAPIServerHeartbeat(lease *coordinationapiv1.Lease) error {
 	}
 	// This label indicates that kube-apiserver owns this identity lease object
 	lease.Labels[IdentityLeaseComponentLabelKey] = KubeAPIServer
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+
+	// convenience label to easily map a lease object to a specific apiserver
+	lease.Labels[apiv1.LabelHostname] = hostname
 	return nil
 }
 

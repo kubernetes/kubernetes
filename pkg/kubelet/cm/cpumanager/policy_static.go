@@ -51,6 +51,7 @@ func (e SMTAlignmentError) Error() string {
 	return fmt.Sprintf("SMT Alignment Error: requested %d cpus not multiple cpus per core = %d", e.RequestedCPUs, e.CpusPerCore)
 }
 
+// Type returns human-readable type of this error. Used in the admission control to populate Admission Failure reason.
 func (e SMTAlignmentError) Type() string {
 	return ErrorSMTAlignment
 }
