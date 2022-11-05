@@ -112,9 +112,10 @@ type ValidatingAdmissionPolicySpec struct {
 	Validations []Validation `json:"validations" protobuf:"bytes,3,rep,name=validations"`
 
 	// FailurePolicy defines how to handle failures for the admission policy.
-	// Failures can occur from invalid policy definitions or bindings, as well as validation errors from CEL expressions.
+	// Failures can occur from invalid or mis-configured policy definitions or bindings.
 	// A policy is invalid if spec.paramKind refers to a non-existent Kind.
 	// A binding is invalid if spec.paramRef.name refers to a non-existent resource.
+	// Allowed values are Ignore or Fail. Defaults to Fail.
 	// +optional
 	FailurePolicy *FailurePolicyType `json:"failurePolicy,omitempty" protobuf:"bytes,4,opt,name=failurePolicy,casttype=FailurePolicyType"`
 }
