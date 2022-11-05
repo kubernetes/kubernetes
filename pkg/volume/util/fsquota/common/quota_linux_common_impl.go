@@ -116,7 +116,7 @@ func getXFSQuotaCmd() (string, error) {
 			return quotaCmd, nil
 		}
 	}
-	quotaCmdInitialized = true
+	quotaCmdInitialized = false
 	return "", fmt.Errorf("no xfs_quota program found")
 }
 
