@@ -177,6 +177,65 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 					},
 				},
 				{
+					name: "authentication",
+				},
+				{
+					name: "Create",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"url": func(v *commonv1.AnyValue) bool {
+							return strings.HasSuffix(v.GetStringValue(), "/api/v1/nodes")
+						},
+						"user-agent": func(v *commonv1.AnyValue) bool {
+							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"client": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "127.0.0.1"
+						},
+						"accept": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "application/vnd.kubernetes.protobuf, */*"
+						},
+						"protocol": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "HTTP/2.0"
+						},
+					},
+					events: []string{
+						"limitedReadBody succeeded",
+						"About to convert to expected version",
+						"Conversion done",
+						"About to store object in database",
+						"Write to database call succeeded",
+						"About to write a response",
+						"Writing http response done",
+					},
+				},
+				{
+					name: "Create etcd3",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"key": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "/minions/fake"
+						},
+						"type": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "*core.Node"
+						},
+						"resource": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "nodes"
+						},
+					},
+					events: []string{
+						"About to Encode",
+						"Encode succeeded",
+						"TransformToStorage succeeded",
+						"Txn call succeeded",
+						"decode succeeded",
+					},
+				},
+				{
 					name: "etcdserverpb.KV/Txn",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
 						"rpc.system": func(v *commonv1.AnyValue) bool {
@@ -184,6 +243,33 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						},
 					},
 					events: []string{"message"},
+				},
+				{
+					name: "SerializeObject",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"url": func(v *commonv1.AnyValue) bool {
+							return strings.HasSuffix(v.GetStringValue(), "/api/v1/nodes")
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"protocol": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "HTTP/2.0"
+						},
+						"method": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "POST"
+						},
+						"mediaType": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "application/vnd.kubernetes.protobuf"
+						},
+						"encoder": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "{\"encodeGV\":\"v1\",\"encoder\":\"protobuf\",\"name\":\"versioning\"}"
+						},
+					},
+					events: []string{
+						"About to start writing response",
+						"Write call succeeded",
+					},
 				},
 			},
 		},
@@ -210,6 +296,37 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 					},
 				},
 				{
+					name: "authentication",
+				},
+				{
+					name: "Get",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"url": func(v *commonv1.AnyValue) bool {
+							return strings.HasSuffix(v.GetStringValue(), "/api/v1/nodes/fake")
+						},
+						"user-agent": func(v *commonv1.AnyValue) bool {
+							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"client": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "127.0.0.1"
+						},
+						"accept": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "application/vnd.kubernetes.protobuf, */*"
+						},
+						"protocol": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "HTTP/2.0"
+						},
+					},
+					events: []string{
+						"About to Get from storage",
+						"About to write a response",
+						"Writing http response done",
+					},
+				},
+				{
 					name: "etcdserverpb.KV/Range",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
 						"rpc.system": func(v *commonv1.AnyValue) bool {
@@ -217,6 +334,33 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						},
 					},
 					events: []string{"message"},
+				},
+				{
+					name: "SerializeObject",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"url": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "/api/v1/nodes/fake"
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"protocol": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "HTTP/2.0"
+						},
+						"method": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "GET"
+						},
+						"mediaType": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "application/vnd.kubernetes.protobuf"
+						},
+						"encoder": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "{\"encodeGV\":\"v1\",\"encoder\":\"protobuf\",\"name\":\"versioning\"}"
+						},
+					},
+					events: []string{
+						"About to start writing response",
+						"Write call succeeded",
+					},
 				},
 			},
 		},
@@ -242,6 +386,60 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 					},
 				},
 				{
+					name: "authentication",
+				},
+				{
+					name: "List",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"url": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "/api/v1/nodes"
+						},
+						"user-agent": func(v *commonv1.AnyValue) bool {
+							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"client": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "127.0.0.1"
+						},
+						"accept": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "application/vnd.kubernetes.protobuf, */*"
+						},
+						"protocol": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "HTTP/2.0"
+						},
+					},
+					events: []string{
+						"About to List from storage",
+						"Listing from storage done",
+						"Writing http response done",
+					},
+				},
+				{
+					name: "List(recursive=true) etcd3",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"key": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "/minions"
+						},
+						"resourceVersion": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == ""
+						},
+						"resourceVersionMatch": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == ""
+						},
+						"limit": func(v *commonv1.AnyValue) bool {
+							return v.GetIntValue() == 0
+						},
+						"continue": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == ""
+						},
+					},
+				},
+				{
 					name: "etcdserverpb.KV/Range",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
 						"rpc.system": func(v *commonv1.AnyValue) bool {
@@ -249,6 +447,33 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						},
 					},
 					events: []string{"message"},
+				},
+				{
+					name: "SerializeObject",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"url": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "/api/v1/nodes"
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"protocol": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "HTTP/2.0"
+						},
+						"method": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "GET"
+						},
+						"mediaType": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "application/vnd.kubernetes.protobuf"
+						},
+						"encoder": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "{\"encodeGV\":\"v1\",\"encoder\":\"protobuf\",\"name\":\"versioning\"}"
+						},
+					},
+					events: []string{
+						"About to start writing response",
+						"Write call succeeded",
+					},
 				},
 			},
 		},
@@ -279,6 +504,68 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 					},
 				},
 				{
+					name: "authentication",
+				},
+				{
+					name: "Update",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"url": func(v *commonv1.AnyValue) bool {
+							return strings.HasSuffix(v.GetStringValue(), "/api/v1/nodes/fake")
+						},
+						"user-agent": func(v *commonv1.AnyValue) bool {
+							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"client": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "127.0.0.1"
+						},
+						"accept": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "application/vnd.kubernetes.protobuf, */*"
+						},
+						"protocol": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "HTTP/2.0"
+						},
+					},
+					events: []string{
+						"limitedReadBody succeeded",
+						"About to convert to expected version",
+						"Conversion done",
+						"About to store object in database",
+						"Write to database call succeeded",
+						"About to write a response",
+						"Writing http response done",
+					},
+				},
+				{
+					name: "GuaranteedUpdate etcd3",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"key": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "/minions/fake"
+						},
+						"type": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "*core.Node"
+						},
+						"resource": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "nodes"
+						},
+					},
+					events: []string{
+						"initial value restored",
+						"About to Encode",
+						"Encode succeeded",
+						"TransformToStorage succeeded",
+						"Transaction prepared",
+						"Txn call completed",
+						"Transaction committed",
+						"decode succeeded",
+					},
+				},
+				{
 					name: "etcdserverpb.KV/Txn",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
 						"rpc.system": func(v *commonv1.AnyValue) bool {
@@ -286,6 +573,33 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						},
 					},
 					events: []string{"message"},
+				},
+				{
+					name: "SerializeObject",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"url": func(v *commonv1.AnyValue) bool {
+							return strings.HasSuffix(v.GetStringValue(), "/api/v1/nodes/fake")
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"protocol": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "HTTP/2.0"
+						},
+						"method": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "PUT"
+						},
+						"mediaType": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "application/vnd.kubernetes.protobuf"
+						},
+						"encoder": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "{\"encodeGV\":\"v1\",\"encoder\":\"protobuf\",\"name\":\"versioning\"}"
+						},
+					},
+					events: []string{
+						"About to start writing response",
+						"Write call succeeded",
+					},
 				},
 			},
 		},
@@ -334,6 +648,68 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 					},
 				},
 				{
+					name: "authentication",
+				},
+				{
+					name: "Patch",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"url": func(v *commonv1.AnyValue) bool {
+							return strings.HasSuffix(v.GetStringValue(), "/api/v1/nodes/fake")
+						},
+						"user-agent": func(v *commonv1.AnyValue) bool {
+							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"client": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "127.0.0.1"
+						},
+						"accept": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "application/vnd.kubernetes.protobuf, */*"
+						},
+						"protocol": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "HTTP/2.0"
+						},
+					},
+					events: []string{
+						"limitedReadBody succeeded",
+						"Recorded the audit event",
+						"About to apply patch",
+						"About to check admission control",
+						"Object stored in database",
+						"About to write a response",
+						"Writing http response done",
+					},
+				},
+				{
+					name: "GuaranteedUpdate etcd3",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"key": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "/minions/fake"
+						},
+						"type": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "*core.Node"
+						},
+						"resource": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "nodes"
+						},
+					},
+					events: []string{
+						"initial value restored",
+						"About to Encode",
+						"Encode succeeded",
+						"TransformToStorage succeeded",
+						"Transaction prepared",
+						"Txn call completed",
+						"Transaction committed",
+						"decode succeeded",
+					},
+				},
+				{
 					name: "etcdserverpb.KV/Txn",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
 						"rpc.system": func(v *commonv1.AnyValue) bool {
@@ -341,6 +717,33 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						},
 					},
 					events: []string{"message"},
+				},
+				{
+					name: "SerializeObject",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"url": func(v *commonv1.AnyValue) bool {
+							return strings.HasSuffix(v.GetStringValue(), "/api/v1/nodes/fake")
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"protocol": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "HTTP/2.0"
+						},
+						"method": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "PATCH"
+						},
+						"mediaType": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "application/vnd.kubernetes.protobuf"
+						},
+						"encoder": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "{\"encodeGV\":\"v1\",\"encoder\":\"protobuf\",\"name\":\"versioning\"}"
+						},
+					},
+					events: []string{
+						"About to start writing response",
+						"Write call succeeded",
+					},
 				},
 			},
 		},
@@ -366,6 +769,41 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 					},
 				},
 				{
+					name: "authentication",
+				},
+				{
+					name: "Delete",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"url": func(v *commonv1.AnyValue) bool {
+							return strings.HasSuffix(v.GetStringValue(), "/api/v1/nodes/fake")
+						},
+						"user-agent": func(v *commonv1.AnyValue) bool {
+							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"client": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "127.0.0.1"
+						},
+						"accept": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "application/vnd.kubernetes.protobuf, */*"
+						},
+						"protocol": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "HTTP/2.0"
+						},
+					},
+					events: []string{
+						"limitedReadBody succeeded",
+						"Decoded delete options",
+						"Recorded the audit event",
+						"About to delete object from database",
+						"Object deleted from database",
+						"About to write a response",
+						"Writing http response done",
+					},
+				},
+				{
 					name: "etcdserverpb.KV/Txn",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
 						"rpc.system": func(v *commonv1.AnyValue) bool {
@@ -373,6 +811,33 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						},
 					},
 					events: []string{"message"},
+				},
+				{
+					name: "SerializeObject",
+					attributes: map[string]func(*commonv1.AnyValue) bool{
+						"url": func(v *commonv1.AnyValue) bool {
+							return strings.HasSuffix(v.GetStringValue(), "/api/v1/nodes/fake")
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
+						"protocol": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "HTTP/2.0"
+						},
+						"method": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "DELETE"
+						},
+						"mediaType": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "application/vnd.kubernetes.protobuf"
+						},
+						"encoder": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() == "{\"encodeGV\":\"v1\",\"encoder\":\"protobuf\",\"name\":\"versioning\"}"
+						},
+					},
+					events: []string{
+						"About to start writing response",
+						"Write call succeeded",
+					},
 				},
 			},
 		},
