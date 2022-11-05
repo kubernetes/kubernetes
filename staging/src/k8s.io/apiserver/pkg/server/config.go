@@ -18,8 +18,9 @@ package server
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base32"
 	"fmt"
-	"hash/fnv"
 	"net"
 	"net/http"
 	"os"
@@ -335,9 +336,8 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 			klog.Fatalf("error getting hostname for apiserver identity: %v", err)
 		}
 
-		h := fnv.New32a()
-		h.Write([]byte(hostname))
-		id = "kube-apiserver-" + fmt.Sprint(h.Sum32())
+		hash := sha256.Sum256([]byte(hostname))
+		id = "kube-apiserver-" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(hash[:16]))
 	}
 	lifecycleSignals := newLifecycleSignals()
 

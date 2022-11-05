@@ -18,9 +18,11 @@ package controlplane
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base32"
 	"fmt"
-	"hash/fnv"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -44,9 +46,8 @@ const (
 )
 
 func expectedAPIServerIdentity(hostname string) string {
-	h := fnv.New32a()
-	h.Write([]byte(hostname))
-	return "kube-apiserver-" + fmt.Sprint(h.Sum32())
+	hash := sha256.Sum256([]byte(hostname))
+	return "kube-apiserver-" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(hash[:16]))
 }
 
 func TestCreateLeaseOnStart(t *testing.T) {
