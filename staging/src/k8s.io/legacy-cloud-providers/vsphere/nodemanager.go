@@ -128,7 +128,7 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 		for vc, vsi := range nm.vsphereInstanceMap {
 
 			found := getVMFound()
-			if found == true {
+			if found {
 				break
 			}
 
@@ -169,7 +169,7 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 
 			for _, datacenterObj := range datacenterObjs {
 				found := getVMFound()
-				if found == true {
+				if found {
 					break
 				}
 
@@ -189,7 +189,7 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 			for res := range queueChannel {
 				ctx, cancel := context.WithCancel(context.Background())
 				vm, err := res.datacenter.GetVMByUUID(ctx, nodeUUID)
-				if err != nil {
+				if err != nil || vm == nil {
 					klog.V(4).Infof("Error while looking for vm=%+v in vc=%s and datacenter=%s: %v",
 						vm, res.vc, res.datacenter.Name(), err)
 					if err != vclib.ErrNoVMFound {
@@ -201,11 +201,11 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 					cancel()
 					continue
 				}
-				if vm != nil {
+				
 					klog.V(4).Infof("Found node %s as vm=%+v in vc=%s and datacenter=%s",
 						node.Name, vm, res.vc, res.datacenter.Name())
 					var vmObj mo.VirtualMachine
-					err := vm.Properties(ctx, vm.Reference(), []string{"config"}, &vmObj)
+					err = vm.Properties(ctx, vm.Reference(), []string{"config"}, &vmObj)
 					if err != nil || vmObj.Config == nil {
 						klog.Errorf("failed to retrieve guest vmconfig for node: %s Err: %v", node.Name, err)
 					} else {
@@ -230,7 +230,7 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 					setVMFound(true)
 					cancel()
 					break
-				}
+				
 			}
 			wg.Done()
 		}()
