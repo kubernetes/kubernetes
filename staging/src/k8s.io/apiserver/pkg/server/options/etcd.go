@@ -133,7 +133,8 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&s.DefaultStorageMediaType, "storage-media-type", s.DefaultStorageMediaType, ""+
 		"The media type to use to store objects in storage. "+
-		"Some resources or storage backends may only support a specific media type and will ignore this setting.")
+		"Some resources or storage backends may only support a specific media type and will ignore this setting. "+
+		"Supported media types: [application/json, application/yaml, application/vnd.kubernetes.protobuf]")
 	fs.IntVar(&s.DeleteCollectionWorkers, "delete-collection-workers", s.DeleteCollectionWorkers,
 		"Number of workers spawned for DeleteCollection call. These are used to speed up namespace cleanup.")
 
