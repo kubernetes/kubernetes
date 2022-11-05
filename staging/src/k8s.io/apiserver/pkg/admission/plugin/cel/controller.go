@@ -215,9 +215,9 @@ func (c *celAdmissionController) Validate(
 		switch policy {
 		case v1alpha1.Ignore:
 			if binding == nil {
-				klog.Info("ignored ValidatingAdmissionPolicy %w failure, due to FailurePolicy=Ignore. Error: %w", definition.Name, err)
+				klog.Infof("ignored ValidatingAdmissionPolicy %s failure, due to FailurePolicy=Ignore. Error: %w", definition.Name, err)
 			} else {
-				klog.Info("ignored ValidatingAdmissionPolicy %w failure for binding %w, due to FailurePolicy=Ignore. Error: %w", definition.Name, binding.Name, err)
+				klog.Infof("ignored ValidatingAdmissionPolicy %s failure for binding %s, due to FailurePolicy=Ignore. Error: %w", definition.Name, binding.Name, err)
 			}
 			return
 		case v1alpha1.Fail:
