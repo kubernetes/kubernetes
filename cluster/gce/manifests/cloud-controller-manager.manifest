@@ -18,7 +18,7 @@
       "type": "RuntimeDefault"
   }
 },
-"priorityClass": "system-node-critical",
+"priorityClassName": "system-node-critical",
 "hostNetwork": true,
 "containers":[
     {
