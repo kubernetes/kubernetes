@@ -437,7 +437,12 @@
                   },
                   "requests": {
                     "requestsKey": "0"
-                  }
+                  },
+                  "claims": [
+                    {
+                      "name": "nameValue"
+                    }
+                  ]
                 },
                 "volumeName": "volumeNameValue",
                 "storageClassName": "storageClassNameValue",
@@ -523,7 +528,12 @@
             },
             "requests": {
               "requestsKey": "0"
-            }
+            },
+            "claims": [
+              {
+                "name": "nameValue"
+              }
+            ]
           },
           "volumeMounts": [
             {
@@ -795,7 +805,12 @@
             },
             "requests": {
               "requestsKey": "0"
-            }
+            },
+            "claims": [
+              {
+                "name": "nameValue"
+              }
+            ]
           },
           "volumeMounts": [
             {
@@ -1067,7 +1082,12 @@
             },
             "requests": {
               "requestsKey": "0"
-            }
+            },
+            "claims": [
+              {
+                "name": "nameValue"
+              }
+            ]
           },
           "volumeMounts": [
             {
@@ -1615,6 +1635,15 @@
       "schedulingGates": [
         {
           "name": "nameValue"
+        }
+      ],
+      "resourceClaims": [
+        {
+          "name": "nameValue",
+          "source": {
+            "resourceClaimName": "resourceClaimNameValue",
+            "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
+          }
         }
       ]
     }
