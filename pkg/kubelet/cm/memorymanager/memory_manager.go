@@ -17,6 +17,7 @@ limitations under the License.
 package memorymanager
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -43,7 +44,7 @@ const memoryManagerStateFileName = "memory_manager_state"
 type ActivePodsFunc func() []*v1.Pod
 
 type runtimeService interface {
-	UpdateContainerResources(id string, resources *runtimeapi.ContainerResources) error
+	UpdateContainerResources(ctx context.Context, id string, resources *runtimeapi.ContainerResources) error
 }
 
 type sourcesReadyStub struct{}

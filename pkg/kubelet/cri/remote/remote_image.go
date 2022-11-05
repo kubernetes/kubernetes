@@ -79,8 +79,7 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration, tp 
 	}
 
 	service := &remoteImageService{timeout: connectionTimeout}
-
-	if err := service.validateServiceConnection(conn, endpoint); err != nil {
+	if err := service.validateServiceConnection(ctx, conn, endpoint); err != nil {
 		return nil, fmt.Errorf("validate service connection: %w", err)
 	}
 
@@ -90,10 +89,7 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration, tp 
 
 // validateServiceConnection tries to connect to the remote image service by
 // using the CRI v1 API version and fails if that's not possible.
-func (r *remoteImageService) validateServiceConnection(conn *grpc.ClientConn, endpoint string) error {
-	ctx, cancel := getContextWithTimeout(r.timeout)
-	defer cancel()
-
+func (r *remoteImageService) validateServiceConnection(ctx context.Context, conn *grpc.ClientConn, endpoint string) error {
 	klog.V(4).InfoS("Validating the CRI v1 API image version")
 	r.imageClient = runtimeapi.NewImageServiceClient(conn)
 
@@ -108,8 +104,8 @@ func (r *remoteImageService) validateServiceConnection(conn *grpc.ClientConn, en
 }
 
 // ListImages lists available images.
-func (r *remoteImageService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
-	ctx, cancel := getContextWithTimeout(r.timeout)
+func (r *remoteImageService) ListImages(ctx context.Context, filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
 	return r.listImagesV1(ctx, filter)
@@ -128,8 +124,8 @@ func (r *remoteImageService) listImagesV1(ctx context.Context, filter *runtimeap
 }
 
 // ImageStatus returns the status of the image.
-func (r *remoteImageService) ImageStatus(image *runtimeapi.ImageSpec, verbose bool) (*runtimeapi.ImageStatusResponse, error) {
-	ctx, cancel := getContextWithTimeout(r.timeout)
+func (r *remoteImageService) ImageStatus(ctx context.Context, image *runtimeapi.ImageSpec, verbose bool) (*runtimeapi.ImageStatusResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
 	return r.imageStatusV1(ctx, image, verbose)
@@ -158,8 +154,8 @@ func (r *remoteImageService) imageStatusV1(ctx context.Context, image *runtimeap
 }
 
 // PullImage pulls an image with authentication config.
-func (r *remoteImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
-	ctx, cancel := getContextWithCancel()
+func (r *remoteImageService) PullImage(ctx context.Context, image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	return r.pullImageV1(ctx, image, auth, podSandboxConfig)
@@ -186,8 +182,8 @@ func (r *remoteImageService) pullImageV1(ctx context.Context, image *runtimeapi.
 }
 
 // RemoveImage removes the image.
-func (r *remoteImageService) RemoveImage(image *runtimeapi.ImageSpec) (err error) {
-	ctx, cancel := getContextWithTimeout(r.timeout)
+func (r *remoteImageService) RemoveImage(ctx context.Context, image *runtimeapi.ImageSpec) (err error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
 	if _, err = r.imageClient.RemoveImage(ctx, &runtimeapi.RemoveImageRequest{
@@ -201,10 +197,10 @@ func (r *remoteImageService) RemoveImage(image *runtimeapi.ImageSpec) (err error
 }
 
 // ImageFsInfo returns information of the filesystem that is used to store images.
-func (r *remoteImageService) ImageFsInfo() ([]*runtimeapi.FilesystemUsage, error) {
+func (r *remoteImageService) ImageFsInfo(ctx context.Context) ([]*runtimeapi.FilesystemUsage, error) {
 	// Do not set timeout, because `ImageFsInfo` takes time.
 	// TODO(random-liu): Should we assume runtime should cache the result, and set timeout here?
-	ctx, cancel := getContextWithCancel()
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	return r.imageFsInfoV1(ctx)

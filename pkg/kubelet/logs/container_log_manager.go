@@ -18,6 +18,7 @@ package logs
 
 import (
 	"compress/gzip"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -58,7 +59,7 @@ type ContainerLogManager interface {
 	// Start container log manager.
 	Start()
 	// Clean removes all logs of specified container.
-	Clean(containerID string) error
+	Clean(ctx context.Context, containerID string) error
 }
 
 // LogRotatePolicy is a policy for container log rotation. The policy applies to all
@@ -177,19 +178,20 @@ func NewContainerLogManager(runtimeService internalapi.RuntimeService, osInterfa
 
 // Start the container log manager.
 func (c *containerLogManager) Start() {
+	ctx := context.Background()
 	// Start a goroutine periodically does container log rotation.
 	go wait.Forever(func() {
-		if err := c.rotateLogs(); err != nil {
+		if err := c.rotateLogs(ctx); err != nil {
 			klog.ErrorS(err, "Failed to rotate container logs")
 		}
 	}, logMonitorPeriod)
 }
 
 // Clean removes all logs of specified container (including rotated one).
-func (c *containerLogManager) Clean(containerID string) error {
+func (c *containerLogManager) Clean(ctx context.Context, containerID string) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	resp, err := c.runtimeService.ContainerStatus(containerID, false)
+	resp, err := c.runtimeService.ContainerStatus(ctx, containerID, false)
 	if err != nil {
 		return fmt.Errorf("failed to get container status %q: %v", containerID, err)
 	}
@@ -211,11 +213,11 @@ func (c *containerLogManager) Clean(containerID string) error {
 	return nil
 }
 
-func (c *containerLogManager) rotateLogs() error {
+func (c *containerLogManager) rotateLogs(ctx context.Context) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	// TODO(#59998): Use kubelet pod cache.
-	containers, err := c.runtimeService.ListContainers(&runtimeapi.ContainerFilter{})
+	containers, err := c.runtimeService.ListContainers(ctx, &runtimeapi.ContainerFilter{})
 	if err != nil {
 		return fmt.Errorf("failed to list containers: %v", err)
 	}
@@ -228,7 +230,7 @@ func (c *containerLogManager) rotateLogs() error {
 		}
 		id := container.GetId()
 		// Note that we should not block log rotate for an error of a single container.
-		resp, err := c.runtimeService.ContainerStatus(id, false)
+		resp, err := c.runtimeService.ContainerStatus(ctx, id, false)
 		if err != nil {
 			klog.ErrorS(err, "Failed to get container status", "containerID", id)
 			continue
@@ -247,7 +249,7 @@ func (c *containerLogManager) rotateLogs() error {
 			// In rotateLatestLog, there are several cases that we may
 			// lose original container log after ReopenContainerLog fails.
 			// We try to recover it by reopening container log.
-			if err := c.runtimeService.ReopenContainerLog(id); err != nil {
+			if err := c.runtimeService.ReopenContainerLog(ctx, id); err != nil {
 				klog.ErrorS(err, "Container log doesn't exist, reopen container log failed", "containerID", id, "path", path)
 				continue
 			}
@@ -262,7 +264,7 @@ func (c *containerLogManager) rotateLogs() error {
 			continue
 		}
 		// Perform log rotation.
-		if err := c.rotateLog(id, path); err != nil {
+		if err := c.rotateLog(ctx, id, path); err != nil {
 			klog.ErrorS(err, "Failed to rotate log for container", "path", path, "containerID", id)
 			continue
 		}
@@ -270,7 +272,7 @@ func (c *containerLogManager) rotateLogs() error {
 	return nil
 }
 
-func (c *containerLogManager) rotateLog(id, log string) error {
+func (c *containerLogManager) rotateLog(ctx context.Context, id, log string) error {
 	// pattern is used to match all rotated files.
 	pattern := fmt.Sprintf("%s.*", log)
 	logs, err := filepath.Glob(pattern)
@@ -298,7 +300,7 @@ func (c *containerLogManager) rotateLog(id, log string) error {
 		}
 	}
 
-	if err := c.rotateLatestLog(id, log); err != nil {
+	if err := c.rotateLatestLog(ctx, id, log); err != nil {
 		return fmt.Errorf("failed to rotate log %q: %v", log, err)
 	}
 
@@ -410,13 +412,13 @@ func (c *containerLogManager) compressLog(log string) error {
 
 // rotateLatestLog rotates latest log without compression, so that container can still write
 // and fluentd can finish reading.
-func (c *containerLogManager) rotateLatestLog(id, log string) error {
+func (c *containerLogManager) rotateLatestLog(ctx context.Context, id, log string) error {
 	timestamp := c.clock.Now().Format(timestampFormat)
 	rotated := fmt.Sprintf("%s.%s", log, timestamp)
 	if err := c.osInterface.Rename(log, rotated); err != nil {
 		return fmt.Errorf("failed to rotate log %q to %q: %v", log, rotated, err)
 	}
-	if err := c.runtimeService.ReopenContainerLog(id); err != nil {
+	if err := c.runtimeService.ReopenContainerLog(ctx, id); err != nil {
 		// Rename the rotated log back, so that we can try rotating it again
 		// next round.
 		// If kubelet gets restarted at this point, we'll lose original log.
