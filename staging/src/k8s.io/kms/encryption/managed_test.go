@@ -18,6 +18,7 @@ package encryption_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"sync"
 	"testing"
@@ -29,6 +30,7 @@ import (
 func TestManagedCipher(t *testing.T) {
 	var id, encryptedLocalKEK, ct []byte
 	plaintext := []byte("lorem ipsum")
+	ctx := context.Background()
 	remoteKMS, err := newRemoteKMS([]byte("helloworld"))
 	if err != nil {
 		t.Fatal(err)
@@ -40,12 +42,12 @@ func TestManagedCipher(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_, encryptedLocalKEK, ct, err = mc.Encrypt(plaintext)
+		_, encryptedLocalKEK, ct, err = mc.Encrypt(ctx, plaintext)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		pt, err := mc.Decrypt(id, encryptedLocalKEK, ct)
+		pt, err := mc.Decrypt(ctx, id, encryptedLocalKEK, ct)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -64,7 +66,7 @@ func TestManagedCipher(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		pt, err := mc.Decrypt(id, encryptedLocalKEK, ct)
+		pt, err := mc.Decrypt(ctx, id, encryptedLocalKEK, ct)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -85,6 +87,7 @@ func TestExpiry(t *testing.T) {
 	if !ok {
 		t.Logf("Please consider using -timeout of %s", sleepDuration)
 	}
+	ctx := context.Background()
 
 	cipher, err := encryption.NewAESGCM()
 	if err != nil {
@@ -100,7 +103,7 @@ func TestExpiry(t *testing.T) {
 				t.Fatal("local kek rotation shouldn't lock the main thread")
 			}
 
-			ct, err := cipher.Encrypt(plaintext)
+			ct, err := cipher.Encrypt(ctx, plaintext)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -108,7 +111,7 @@ func TestExpiry(t *testing.T) {
 			return []byte("112358"), ct, nil
 		},
 		decrypt: func(keyID, ciphertext []byte) ([]byte, error) {
-			return cipher.Decrypt(ciphertext)
+			return cipher.Decrypt(ctx, ciphertext)
 		},
 	}
 
@@ -122,6 +125,7 @@ func TestExpiry(t *testing.T) {
 		// threading. TODO consider injecting the cipher into constructor.
 		ids := make(map[string]struct{})
 		plaintext := []byte("lorem ipsum")
+		ctx := context.Background()
 
 		beyondCollision := encryption.MaxUsage + 5
 		var wg sync.WaitGroup
@@ -134,7 +138,7 @@ func TestExpiry(t *testing.T) {
 			go func(t *testing.T, ids map[string]struct{}) {
 				defer wg.Done()
 
-				_, encKey, _, err := mc.Encrypt(plaintext)
+				_, encKey, _, err := mc.Encrypt(ctx, plaintext)
 				if err != nil {
 					t.Error(err)
 				}
@@ -162,6 +166,7 @@ var (
 )
 
 func newRemoteKMS(keyID []byte) (*remoteKMS, error) {
+	ctx := context.Background()
 	cipher, err := encryption.NewAESGCM()
 	if err != nil {
 		return nil, err
@@ -169,7 +174,7 @@ func newRemoteKMS(keyID []byte) (*remoteKMS, error) {
 
 	return &remoteKMS{
 		encrypt: func(pt []byte) ([]byte, []byte, error) {
-			ct, err := cipher.Encrypt(pt)
+			ct, err := cipher.Encrypt(ctx, pt)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -177,7 +182,7 @@ func newRemoteKMS(keyID []byte) (*remoteKMS, error) {
 			return keyID, ct, nil
 		},
 		decrypt: func(keyID []byte, encryptedKey []byte) ([]byte, error) {
-			pt, err := cipher.Decrypt(encryptedKey)
+			pt, err := cipher.Decrypt(ctx, encryptedKey)
 			if err != nil {
 				return nil, err
 			}

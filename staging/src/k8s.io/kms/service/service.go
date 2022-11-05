@@ -81,7 +81,7 @@ func (s *Service) Decrypt(ctx context.Context, req *api.DecryptRequest) (*api.De
 
 	encryptedLocalKEK, ok := req.Annotations[encryptedLocalKEKKey]
 	if ok {
-		pt, err := s.managedKeys.Decrypt(keyID, encryptedLocalKEK, req.Ciphertext)
+		pt, err := s.managedKeys.Decrypt(ctx, keyID, encryptedLocalKEK, req.Ciphertext)
 		if err != nil {
 			klog.Infof("decrypt attempt (id: %q) failed: %w", req.Uid, err)
 			return nil, err
@@ -114,7 +114,7 @@ func (s *Service) Decrypt(ctx context.Context, req *api.DecryptRequest) (*api.De
 func (s *Service) Encrypt(ctx context.Context, req *api.EncryptRequest) (*api.EncryptResponse, error) {
 	klog.Infof("encrypt request received (id: %q)", req.Uid)
 
-	remoteKeyID, encryptedLocalKEK, ct, err := s.managedKeys.Encrypt(req.Plaintext)
+	remoteKeyID, encryptedLocalKEK, ct, err := s.managedKeys.Encrypt(ctx, req.Plaintext)
 	if err != nil {
 		klog.Infof("encrypt attempt (id: %q) failed: %w", req.Uid, err)
 		return nil, err

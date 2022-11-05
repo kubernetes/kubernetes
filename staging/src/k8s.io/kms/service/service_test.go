@@ -128,7 +128,7 @@ func newRemoteKMS(id []byte) (*remoteKMS, error) {
 }
 
 func (k *remoteKMS) Encrypt(pt []byte) ([]byte, []byte, error) {
-	ct, err := k.cipher.Encrypt(pt)
+	ct, err := k.cipher.Encrypt(context.Background(), pt)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -137,7 +137,7 @@ func (k *remoteKMS) Encrypt(pt []byte) ([]byte, []byte, error) {
 }
 
 func (k *remoteKMS) Decrypt(observedID, encryptedKey []byte) ([]byte, error) {
-	pt, err := k.cipher.Decrypt(encryptedKey)
+	pt, err := k.cipher.Decrypt(context.Background(), encryptedKey)
 	if err != nil {
 		return nil, err
 	}

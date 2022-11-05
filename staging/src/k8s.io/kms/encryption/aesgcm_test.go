@@ -18,12 +18,14 @@ package encryption_test
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
 	"k8s.io/kms/encryption"
 )
 
 func TestAESGCM(t *testing.T) {
+	ctx := context.Background()
 	aesgcmNew, err := encryption.NewAESGCM()
 	if err != nil {
 		t.Fatal(err)
@@ -31,12 +33,12 @@ func TestAESGCM(t *testing.T) {
 
 	plaintext := []byte("lorem ipsum")
 	t.Run("should be able to encrypt and decrypt from scratch", func(t *testing.T) {
-		ciphertext, err := aesgcmNew.Encrypt(plaintext)
+		ciphertext, err := aesgcmNew.Encrypt(ctx, plaintext)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		decrypted, err := aesgcmNew.Decrypt(ciphertext)
+		decrypted, err := aesgcmNew.Decrypt(ctx, ciphertext)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -73,12 +75,12 @@ func TestAESGCM(t *testing.T) {
 				return
 			}
 
-			encrypted, err := aesgcmOld.Encrypt(plaintext)
+			encrypted, err := aesgcmOld.Encrypt(ctx, plaintext)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			decrypted, err := aesgcmNew.Decrypt(encrypted)
+			decrypted, err := aesgcmNew.Decrypt(ctx, encrypted)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -93,14 +95,14 @@ func TestAESGCM(t *testing.T) {
 
 	t.Run("should not be able to encrypt on empty byte slice", func(t *testing.T) {
 		var plaintext []byte
-		nonceKey, err := aesgcmNew.Encrypt(plaintext)
+		nonceKey, err := aesgcmNew.Encrypt(ctx, plaintext)
 		if err == nil {
 			t.Errorf("empty plaintext could've been used: %q", nonceKey)
 		}
 	})
 
 	t.Run("should not be able to decrypt non-sense", func(t *testing.T) {
-		pt, err := aesgcmNew.Decrypt([]byte("lorem ipsum dolor"))
+		pt, err := aesgcmNew.Decrypt(ctx, []byte("lorem ipsum dolor"))
 		if err == nil {
 			t.Errorf("non-sense got decrypted: %q", pt)
 		}

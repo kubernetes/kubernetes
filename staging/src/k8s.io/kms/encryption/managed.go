@@ -17,6 +17,7 @@ limitations under the License.
 package encryption
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -29,8 +30,6 @@ import (
 const (
 	// MaxUsage with 2^21 is a very defensive value. 2^32 is more commonly used.
 	MaxUsage = 2097151
-	// keySize is the key size in bytes
-	keySize = 128 / 8
 	// nonceSize is the size of the nonce. Do not change, without breaking version change.
 	// The nonceSize is a de facto standard.
 	nonceSize = 12
@@ -185,7 +184,7 @@ func (m *ManagedCipher) manageKey() error {
 
 // Encrypt encrypts given plaintext and returns the key used in encrypted form.
 // The encrypted key is encrypted by the given remote KMS.
-func (m *ManagedCipher) Encrypt(pt []byte) ([]byte, []byte, []byte, error) {
+func (m *ManagedCipher) Encrypt(ctx context.Context, pt []byte) ([]byte, []byte, []byte, error) {
 	if err := m.manageKey(); err != nil {
 		return nil, nil, nil, fmt.Errorf("manage keys upfront of an encryption: %w", err)
 	}
@@ -202,7 +201,7 @@ func (m *ManagedCipher) Encrypt(pt []byte) ([]byte, []byte, []byte, error) {
 		)
 	}
 
-	ct, err := cipher.Encrypt(pt)
+	ct, err := cipher.Encrypt(ctx, pt)
 	if err != nil {
 		klog.Infof("encrypt plaintext: %w", err)
 		return nil, nil, nil, err
@@ -219,11 +218,11 @@ func (m *ManagedCipher) DecryptRemotely(id, ct []byte) ([]byte, error) {
 
 // Decrypt decrypts the given ciphertext. If the given encrypted key is unknown,
 // Remote KMS is asked for decryption of the encrypted key.
-func (m *ManagedCipher) Decrypt(keyID, encKey, ct []byte) ([]byte, error) {
+func (m *ManagedCipher) Decrypt(ctx context.Context, keyID, encKey, ct []byte) ([]byte, error) {
 	// Lookup key from cache.
 	cipher, ok := m.keys.Get(encKey)
 	if ok {
-		pt, err := cipher.Decrypt(ct)
+		pt, err := cipher.Decrypt(ctx, ct)
 		if err != nil {
 			klog.Infof("decrypt ciphertext: %w", err)
 			return nil, err
@@ -270,7 +269,7 @@ func (m *ManagedCipher) Decrypt(keyID, encKey, ct []byte) ([]byte, error) {
 	)
 
 	// Eventually decrypt with new key.
-	pt, err := cipher.Decrypt(ct)
+	pt, err := cipher.Decrypt(ctx, ct)
 	if err != nil {
 		klog.Infof("decrypt ciphertext: %w", err)
 		return nil, err

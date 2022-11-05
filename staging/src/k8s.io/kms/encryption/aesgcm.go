@@ -17,10 +17,18 @@ limitations under the License.
 package encryption
 
 import (
+	"context"
 	"crypto/aes"
-	"crypto/cipher"
 	"crypto/rand"
 	"errors"
+
+	"k8s.io/apiserver/pkg/storage/value"
+	kaes "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
+)
+
+const (
+	// keySize is the key size in bytes
+	keySize = 128 / 8
 )
 
 var (
@@ -32,7 +40,7 @@ var (
 type AESGCM struct {
 	key []byte
 
-	aesgcm cipher.AEAD
+	aesGCM value.Transformer
 }
 
 // NewAESGCM returns a pointer to a AESGCM with a key and cipher.AEAD created.
@@ -45,20 +53,22 @@ func NewAESGCM() (*AESGCM, error) {
 	return FromKey(key)
 }
 
+// FromKey initializes a cipher.AEAD from bytes so the block cipher doesn't need
+// to be initialized every time.
 func FromKey(key []byte) (*AESGCM, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
 
-	aesgcm, err := cipher.NewGCM(block)
+	transformer, _, err := kaes.NewGCMTransformer(block)
 	if err != nil {
 		return nil, err
 	}
 
 	return &AESGCM{
 		key:    key,
-		aesgcm: aesgcm,
+		aesGCM: transformer,
 	}, nil
 
 }
@@ -71,36 +81,15 @@ func (c *AESGCM) Key() []byte {
 
 // Encrypt encrypts given plaintext. The nonce is prepended. Therefore any
 // change to the standard nonceSize is a breaking change.
-func (c *AESGCM) Encrypt(plaintext []byte) ([]byte, error) {
-	if len(plaintext) == 0 {
-		return nil, ErrEmptyPlaintext
-	}
-
-	nonce, err := randomBytes(nonceSize)
-	if err != nil {
-		return nil, err
-	}
-
-	return append(
-		nonce, // TODO: move from append of bytes to protobuf as bytes.
-		c.aesgcm.Seal(nil, nonce, plaintext, nil)...,
-	), nil
+func (c *AESGCM) Encrypt(ctx context.Context, plaintext []byte) ([]byte, error) {
+	return c.aesGCM.TransformToStorage(ctx, plaintext, value.DefaultContext)
 }
 
 // Decrypt decrypts a ciphertext. The nonce is assumed to be prepended.
 // Therefore any change to the standard nonceSize is a breaking change.
-func (k *AESGCM) Decrypt(ciphertext []byte) ([]byte, error) {
-	plaintext, err := k.aesgcm.Open(
-		nil,
-		ciphertext[:nonceSize],
-		ciphertext[nonceSize:],
-		nil,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return plaintext, nil
+func (k *AESGCM) Decrypt(ctx context.Context, ciphertext []byte) ([]byte, error) {
+	plaintext, _, err := k.aesGCM.TransformFromStorage(ctx, ciphertext, value.DefaultContext)
+	return plaintext, err
 }
 
 // randomBytes generates length amount of bytes.
