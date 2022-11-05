@@ -37,11 +37,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/value"
 )
 
-// CreateObj will create a single object using the storage interface.
-func CreateObj(helper storage.Interface, name string, obj, out runtime.Object, ttl uint64) error {
-	return helper.Create(context.TODO(), name, obj, out, ttl)
-}
-
 // CreateObjList will create a list from the array of objects.
 func CreateObjList(prefix string, helper storage.Interface, items []runtime.Object) error {
 	for i := range items {
@@ -50,7 +45,7 @@ func CreateObjList(prefix string, helper storage.Interface, items []runtime.Obje
 		if err != nil {
 			return err
 		}
-		err = CreateObj(helper, path.Join(prefix, meta.GetName()), obj, obj, 0)
+		err = helper.Create(context.Background(), path.Join(prefix, meta.GetName()), obj, obj, 0)
 		if err != nil {
 			return err
 		}
@@ -82,16 +77,12 @@ func DeepEqualSafePodSpec() example.PodSpec {
 	}
 }
 
-// TestPropagateStore helps propagates store with objects, automates key generation, and returns
+// testPropagateStore helps propagates store with objects, automates key generation, and returns
 // keys and stored objects.
-func TestPropagateStore(ctx context.Context, t *testing.T, store storage.Interface, obj *example.Pod) (string, *example.Pod) {
+func testPropagateStore(ctx context.Context, t *testing.T, store storage.Interface, obj *example.Pod) (string, *example.Pod) {
 	// Setup store with a key and grab the output for returning.
 	key := fmt.Sprintf("/%s/%s", obj.Namespace, obj.Name)
-	return key, TestPropagateStoreWithKey(ctx, t, store, key, obj)
-}
 
-// TestPropagateStoreWithKey helps propagate store with objects, the given object will be stored at the specified key.
-func TestPropagateStoreWithKey(ctx context.Context, t *testing.T, store storage.Interface, key string, obj *example.Pod) *example.Pod {
 	// Setup store with the specified key and grab the output for returning.
 	err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil)
 	if err != nil && !storage.IsNotFound(err) {
@@ -101,7 +92,7 @@ func TestPropagateStoreWithKey(ctx context.Context, t *testing.T, store storage.
 	if err := store.Create(ctx, key, obj, setOutput, 0); err != nil {
 		t.Fatalf("Set failed: %v", err)
 	}
-	return setOutput
+	return key, setOutput
 }
 
 func ExpectNoDiff(t *testing.T, msg string, expected, got interface{}) {
@@ -135,7 +126,7 @@ func ExpectContains(t *testing.T, msg string, expectedList []interface{}, got in
 
 const dummyPrefix = "adapter"
 
-func EncodeContinueOrDie(key string, resourceVersion int64) string {
+func encodeContinueOrDie(key string, resourceVersion int64) string {
 	token, err := storage.EncodeContinue(dummyPrefix+key, dummyPrefix, resourceVersion)
 	if err != nil {
 		panic(err)
@@ -143,7 +134,7 @@ func EncodeContinueOrDie(key string, resourceVersion int64) string {
 	return token
 }
 
-func TestCheckEventType(t *testing.T, expectEventType watch.EventType, w watch.Interface) {
+func testCheckEventType(t *testing.T, expectEventType watch.EventType, w watch.Interface) {
 	select {
 	case res := <-w.ResultChan():
 		if res.Type != expectEventType {
@@ -154,14 +145,14 @@ func TestCheckEventType(t *testing.T, expectEventType watch.EventType, w watch.I
 	}
 }
 
-func TestCheckResult(t *testing.T, expectEventType watch.EventType, w watch.Interface, expectObj *example.Pod) {
-	TestCheckResultFunc(t, expectEventType, w, func(object runtime.Object) error {
+func testCheckResult(t *testing.T, expectEventType watch.EventType, w watch.Interface, expectObj *example.Pod) {
+	testCheckResultFunc(t, expectEventType, w, func(object runtime.Object) error {
 		ExpectNoDiff(t, "incorrect object", expectObj, object)
 		return nil
 	})
 }
 
-func TestCheckResultFunc(t *testing.T, expectEventType watch.EventType, w watch.Interface, check func(object runtime.Object) error) {
+func testCheckResultFunc(t *testing.T, expectEventType watch.EventType, w watch.Interface, check func(object runtime.Object) error) {
 	select {
 	case res := <-w.ResultChan():
 		if res.Type != expectEventType {
@@ -176,7 +167,7 @@ func TestCheckResultFunc(t *testing.T, expectEventType watch.EventType, w watch.
 	}
 }
 
-func TestCheckStop(t *testing.T, w watch.Interface) {
+func testCheckStop(t *testing.T, w watch.Interface) {
 	select {
 	case e, ok := <-w.ResultChan():
 		if ok {
@@ -194,10 +185,10 @@ func TestCheckStop(t *testing.T, w watch.Interface) {
 	}
 }
 
-// ResourceVersionNotOlderThan returns a function to validate resource versions. Resource versions
+// resourceVersionNotOlderThan returns a function to validate resource versions. Resource versions
 // referring to points in logical time before the sentinel generate an error. All logical times as
 // new as the sentinel or newer generate no error.
-func ResourceVersionNotOlderThan(sentinel string) func(string) error {
+func resourceVersionNotOlderThan(sentinel string) func(string) error {
 	return func(resourceVersion string) error {
 		objectVersioner := storage.APIObjectVersioner{}
 		actualRV, err := objectVersioner.ParseResourceVersion(resourceVersion)
