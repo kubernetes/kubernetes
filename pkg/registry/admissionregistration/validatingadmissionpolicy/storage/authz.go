@@ -19,12 +19,12 @@ package storage
 import (
 	"context"
 	"fmt"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -97,10 +97,11 @@ func (r *REST) authorize(ctx context.Context, policy *admissionregistration.Vali
 	}()
 
 	if err != nil {
-		// fail back if resolution fails
-		utilruntime.HandleError(fmt.Errorf(
-			"error resolving paramKind of %s: %v", policy.Name, paramKind,
-		))
+		if len(gv.Version) == 0 {
+			klog.Infof("error parsing APIVersion in ParamKind of %s: %v", policy.Name, paramKind)
+		} else {
+			klog.Infof("error resolving paramKind of %s: %v", policy.Name, paramKind)
+		}
 		// defaults if resolution fails
 		resource = "*"
 		apiGroup = gv.Group

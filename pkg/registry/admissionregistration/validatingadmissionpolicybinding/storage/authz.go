@@ -19,12 +19,12 @@ package storage
 import (
 	"context"
 	"fmt"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -91,9 +91,7 @@ func (r *REST) authorize(ctx context.Context, binding *admissionregistration.Val
 	// resolve the bound ValidatingAdmissionPolicy
 	policy, err := r.policyGetter.GetValidatingAdmissionPolicy(ctx, binding.Spec.PolicyName)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf(
-			"error getting ValidatingAdmissionPolicy %s: %v", binding.Spec.PolicyName, err,
-		))
+		klog.Infof("error getting ValidatingAdmissionPolicy %s: %v", binding.Spec.PolicyName, err)
 	}
 
 	// defaults if paramKind is not set
@@ -115,10 +113,13 @@ func (r *REST) authorize(ctx context.Context, binding *admissionregistration.Val
 		}()
 
 		if err != nil {
-			// fail back if resolution fails
-			utilruntime.HandleError(fmt.Errorf(
-				"error resolving ParamKind of %s: %v", binding.Name, paramKind,
-			))
+			if len(gv.Version) == 0 {
+				klog.Infof("error parsing APIVersion in ParamKind of %s: %v", binding.Name, paramKind)
+			} else {
+				// fail back if resolution fails
+				klog.Infof("error resolving ParamKind of %s: %v", binding.Name, paramKind)
+			}
+
 			// defaults if resolution fails
 			resource = "*"
 			apiGroup = gv.Group
@@ -149,7 +150,7 @@ func (r *REST) authorize(ctx context.Context, binding *admissionregistration.Val
 		return err
 	}
 	if d != authorizer.DecisionAllow {
-		return fmt.Errorf("user %v cannot read paramRef of ValidatingAdmissionPolicyBinding %s: %v", user, binding.Name, paramRef)
+		return fmt.Errorf(`user %v must have "get" permission on object of the referenced paramRef %s`, user, paramRef)
 	}
 	return nil
 }
