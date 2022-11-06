@@ -1,13 +1,13 @@
 # OSX leaves these everywhere on SMB shares
 ._*
 
-# OSX trash
+# OSX trash The Trash folder in macOS is similar to the Recycle bin in Windows computers
 .DS_Store
 
 # Developers can store local stuff in dirs named __something
 __*
 
-# Eclipse files
+# Eclipse files , Eclipse is a runtime environment for plugins
 .classpath
 .project
 .settings/**
@@ -24,12 +24,12 @@ __*
 /_output*/
 /_output
 
-# Emacs save files
+# Emacs save files  Emacs uses buffers to store the contents of a file
 *~
 \#*\#
 .\#*
 
-# Vim-related files
+# Vim-related files 
 [._]*.s[a-w][a-z]
 [._]s[a-w][a-z]
 *.un~
