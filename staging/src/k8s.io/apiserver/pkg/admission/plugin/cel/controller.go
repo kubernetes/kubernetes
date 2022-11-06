@@ -18,6 +18,7 @@ package cel
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -246,7 +247,7 @@ func (c *celAdmissionController) Validate(
 		matches, matchKind, err := c.validatorCompiler.DefinitionMatches(a, o, definition)
 		if err != nil {
 			// Configuration error.
-			addConfigError(definitionInfo.configurationError, definition, nil)
+			addConfigError(err, definition, nil)
 			continue
 		}
 		if !matches {
@@ -271,7 +272,7 @@ func (c *celAdmissionController) Validate(
 			matches, err := c.validatorCompiler.BindingMatches(a, o, binding)
 			if err != nil {
 				// Configuration error.
-				addConfigError(definitionInfo.configurationError, definition, binding)
+				addConfigError(err, definition, binding)
 				continue
 			}
 			if !matches {
@@ -364,9 +365,13 @@ func (c *celAdmissionController) Validate(
 	}
 
 	if len(deniedDecisions) > 0 {
-		return &policyError{
-			deniedDecisions: deniedDecisions,
+		// TODO: refactor NewForbidden so the name extraction is reusable for different error types
+		err := admission.NewForbidden(a, errors.New(deniedDecisions[0].message)).(*k8serrors.StatusError)
+		if len(deniedDecisions[0].reason) != 0 {
+			err.ErrStatus.Reason = deniedDecisions[0].reason
+			err.ErrStatus.Code = reasonToCode(deniedDecisions[0].reason)
 		}
+		return err
 	}
 
 	return nil

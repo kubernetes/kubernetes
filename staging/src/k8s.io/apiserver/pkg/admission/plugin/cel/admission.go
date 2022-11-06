@@ -116,6 +116,9 @@ func (c *celAdmissionPlugin) InspectFeatureGates(featureGates featuregate.Featur
 
 // ValidateInitialization - once clientset and informer factory are provided, creates and starts the admission controller
 func (c *celAdmissionPlugin) ValidateInitialization() error {
+	if !c.enabled {
+		return nil
+	}
 	if !c.inspectedFeatureGates {
 		return fmt.Errorf("%s did not see feature gates", PluginName)
 	}
@@ -179,7 +182,7 @@ func (c *celAdmissionPlugin) Validate(
 func isPolicyResource(attr admission.Attributes) bool {
 	gvk := attr.GetResource()
 	if gvk.Group == "admissionregistration.k8s.io" {
-		if gvk.Resource == "ValidatingAdmissionPolicy" || gvk.Resource == "ValidatingAdmissionPolicyBinding" {
+		if gvk.Resource == "ValidatingAdmissionPolicies" || gvk.Resource == "ValidatingAdmissionPolicyBindings" {
 			return true
 		}
 	}

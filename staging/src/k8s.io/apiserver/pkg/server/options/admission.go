@@ -147,11 +147,11 @@ func (a *AdmissionOptions) ApplyTo(
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := dynamic.NewForConfig(c.LoopbackClientConfig)
+	dynamicClient, err := dynamic.NewForConfig(kubeAPIServerClientConfig)
 	if err != nil {
 		return err
 	}
-	genericInitializer := initializer.New(clientset, dynamicClient, informers, c.Authorization.Authorizer, features, c.DrainedNotify(), nil)
+	genericInitializer := initializer.New(clientset, dynamicClient, informers, c.Authorization.Authorizer, features, c.DrainedNotify())
 	initializersChain := admission.PluginInitializers{genericInitializer}
 	initializersChain = append(initializersChain, pluginInitializers...)
 

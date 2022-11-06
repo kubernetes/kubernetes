@@ -259,7 +259,7 @@ func setupTestCommon(t *testing.T, compiler ValidatorCompiler) (plugin admission
 
 	handler := &celAdmissionPlugin{enabled: true}
 
-	genericInitializer := initializer.New(fakeClient, dynamicClient, fakeInformerFactory, nil, featureGate, testContext.Done(), fakeRestMapper)
+	genericInitializer := initializer.New(fakeClient, dynamicClient, fakeInformerFactory, nil, featureGate, testContext.Done())
 	genericInitializer.Initialize(handler)
 	err = admission.ValidateInitialization(handler)
 	require.NoError(t, err)

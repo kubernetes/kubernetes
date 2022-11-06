@@ -396,7 +396,6 @@ var supportedReinvocationPolicies = sets.NewString(
 )
 
 var supportedValidationPolicyReason = sets.NewString(
-	string(metav1.StatusReasonUnauthorized),
 	string(metav1.StatusReasonForbidden),
 	string(metav1.StatusReasonInvalid),
 	string(metav1.StatusReasonRequestEntityTooLarge),
