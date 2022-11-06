@@ -1206,7 +1206,7 @@ func TestExemptNamespaceWarning(t *testing.T) {
 		},
 		defaultPolicy:         baselinePolicy,
 		expectWarning:         true,
-		expectWarningContains: "(enforce=baseline:v1.23, audit=baseline:v1.23, warn=baseline:latest)",
+		expectWarningContains: "(warn=baseline:latest)",
 	}}
 
 	const (
@@ -1228,7 +1228,7 @@ func TestExemptNamespaceWarning(t *testing.T) {
 			policy, err := api.PolicyToEvaluate(labels, defaultPolicy)
 			require.NoError(t, err.ToAggregate())
 
-			warning := a.exemptNamespaceWarning(test.name, policy)
+			warning := a.exemptNamespaceWarning(test.name, policy, labels)
 			if !test.expectWarning {
 				assert.Empty(t, warning)
 				return
