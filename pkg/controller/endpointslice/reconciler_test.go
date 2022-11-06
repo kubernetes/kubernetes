@@ -1865,52 +1865,16 @@ func TestReconcileTopology(t *testing.T) {
 				return
 			}
 
-			actualCrossZoneHints := 0
-			actualHints := map[string]int{}
-
-			for _, slice := range fetchedSlices {
-				for _, endpoint := range slice.Endpoints {
-					if endpoint.Hints == nil || len(endpoint.Hints.ForZones) == 0 {
-						t.Fatalf("Expected endpoint to have zone hints: %+v", endpoint)
-					}
-					if len(endpoint.Hints.ForZones) > 1 {
-						t.Fatalf("Expected endpoint to only have 1 zone hint, got %d", len(endpoint.Hints.ForZones))
-					}
-
-					if endpoint.Zone == nil || *endpoint.Zone == "" {
-						t.Fatalf("Expected endpoint to have zone: %+v", endpoint)
-					}
-					zoneHint := endpoint.Hints.ForZones[0].Name
-					if *endpoint.Zone != zoneHint {
-						actualCrossZoneHints++
-					}
-					actualHints[zoneHint]++
-				}
-			}
-
-			if len(actualHints) != len(tc.expectedHints) {
-				t.Errorf("Expected hints for %d zones, got %d", len(tc.expectedHints), len(actualHints))
-			}
-
-			for zone, expectedNum := range tc.expectedHints {
-				actualNum, _ := actualHints[zone]
-				if actualNum != expectedNum {
-					t.Errorf("Expected %d hints for %s zone, got %d", expectedNum, zone, actualNum)
-				}
-			}
-
-			if actualCrossZoneHints != tc.expectedCrossZoneHints {
-				t.Errorf("Expected %d cross zone hints, got %d", tc.expectedCrossZoneHints, actualCrossZoneHints)
-			}
+			verifyHints(t, fetchedSlices, tc.expectedHints, tc.expectedCrossZoneHints, endpointMeta.AddressType)
 		})
 	}
 }
 
-func TestReconcileTopologyDualStuck(t *testing.T) {
+func TestReconcileTopologyDualStack(t *testing.T) {
 	ns := "testing"
 	svc, epMetaV4 := newServiceAndEndpointMeta("foo", ns)
 	svc.Spec.IPFamilies = []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}
-	// svc.Spec.ClusterIP = "10.0.0.10"
+	svc.Spec.ClusterIP = "10.0.0.10"
 	svc.Spec.ClusterIPs = []string{"10.0.0.10", "2000::1"}
 
 	epMetaV6 := epMetaV4
@@ -1943,7 +1907,7 @@ func TestReconcileTopologyDualStuck(t *testing.T) {
 			nodes = append(nodes, node)
 
 			pod := newPod(i*100+j, ns, true, 1, false)
-			pod.Status.PodIPs = append(pod.Status.PodIPs, corev1.PodIP{IP: "1234::5678:0000:0000:9abc:def0"})
+			pod.Status.PodIPs = append(pod.Status.PodIPs, corev1.PodIP{IP: fmt.Sprintf("1234::5678:0000:0000:9abc:%d", i*100+j)})
 			pod.Spec.NodeName = node.Name
 			pods = append(pods, pod)
 		}
@@ -1966,10 +1930,10 @@ func TestReconcileTopologyDualStuck(t *testing.T) {
 				endpoints = append(endpoints, podToEndpoint(pod, nodesByName[pod.Spec.NodeName], &svc, epMeta.AddressType))
 			}
 
-			tmp := fmt.Sprintf("%s-%s", name, epMeta.AddressType)
-			slicesByName[tmp] = &discovery.EndpointSlice{
+			sliceName := fmt.Sprintf("%s-%s", name, epMeta.AddressType)
+			slicesByName[sliceName] = &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:            tmp,
+					Name:            sliceName,
 					OwnerReferences: []metav1.OwnerReference{*ownerRef},
 					Labels: map[string]string{
 						discovery.LabelManagedBy:   controllerName,
@@ -2007,7 +1971,7 @@ func TestReconcileTopologyDualStuck(t *testing.T) {
 		expectedCrossZoneHints: 0,
 		expectedMetrics: expectedMetrics{
 			desiredSlices:        1,
-			actualSlices:         2,
+			actualSlices:         1,
 			desiredEndpoints:     3,
 			addedPerSync:         0,
 			removedPerSync:       0,
@@ -2034,84 +1998,16 @@ func TestReconcileTopologyDualStuck(t *testing.T) {
 		expectedCrossZoneHints: 2,
 		expectedMetrics: expectedMetrics{
 			desiredSlices:                1,
-			actualSlices:                 2,
+			actualSlices:                 1,
 			desiredEndpoints:             3,
 			addedPerSync:                 0,
 			removedPerSync:               0,
 			numCreated:                   0,
-			numUpdated:                   1,
-			numDeleted:                   0,
-			slicesChangedPerSyncTopology: 1,
-		},
-	}, {
-		name:                   "topology enabled,  hintsAnnotation==auto, ratio beyond threshold",
-		topologyCacheEnabled:   true,
-		hintsAnnotation:        "auto",
-		existingSlices:         []*discovery.EndpointSlice{slicesByName["zone-a-c"]},
-		pods:                   slicePods["zone-a-c"],
-		nodes:                  nodes,
-		expectedHints:          nil,
-		expectedCrossZoneHints: 0,
-		expectedMetrics: expectedMetrics{
-			desiredSlices:                1,
-			actualSlices:                 1,
-			desiredEndpoints:             4,
-			addedPerSync:                 0,
-			removedPerSync:               0,
-			numCreated:                   0,
-			numUpdated:                   0,
-			numDeleted:                   0,
-			slicesChangedPerSyncTopology: 0,
-		},
-	}, {
-		name:                 "topology enabled, hintsAnnotation==Auto, more slices and endpoints",
-		topologyCacheEnabled: true,
-		hintsAnnotation:      "Auto",
-		existingSlices:       []*discovery.EndpointSlice{slicesByName["zone-a-c"], slicesByName["zone-a-b"]},
-		pods:                 append(slicePods["zone-a-c"], slicePods["zone-a-b"]...),
-		nodes:                nodes,
-		expectedHints: map[string]int{
-			"zone-a": 3,
-			"zone-b": 3,
-			"zone-c": 3,
-		},
-		expectedCrossZoneHints: 1,
-		expectedMetrics: expectedMetrics{
-			desiredSlices:    1,
-			actualSlices:     2,
-			desiredEndpoints: 9,
-			addedPerSync:     0,
-			removedPerSync:   0,
-			numCreated:       0,
-			// TODO(robscott): Since we're potentially changing more slices when
-			// adding topology hints we could use it as a free repacking
-			// opportunity. That would make this value 1.
 			numUpdated:                   2,
 			numDeleted:                   0,
 			slicesChangedPerSyncTopology: 2,
 		},
-	}, {
-		name:                   "topology enabled, hintsAnnotation==disabled, more slices and endpoints",
-		topologyCacheEnabled:   true,
-		hintsAnnotation:        "disabled",
-		existingSlices:         []*discovery.EndpointSlice{slicesByName["zone-a-c"], slicesByName["zone-a-b"]},
-		pods:                   append(slicePods["zone-a-c"], slicePods["zone-a-b"]...),
-		nodes:                  nodes,
-		expectedHints:          nil,
-		expectedCrossZoneHints: 0,
-		expectedMetrics: expectedMetrics{
-			desiredSlices:        1,
-			actualSlices:         2,
-			desiredEndpoints:     9,
-			addedPerSync:         0,
-			removedPerSync:       0,
-			numCreated:           0,
-			numUpdated:           0,
-			numDeleted:           0,
-			slicesChangedPerSync: 0,
-		},
-	},
-	}
+	}}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -2133,11 +2029,8 @@ func TestReconcileTopologyDualStuck(t *testing.T) {
 			r.reconcile(service, tc.pods, tc.existingSlices, time.Now())
 
 			cmc.Check(t)
-			// expectMetrics(t, tc.expectedMetrics)
+			expectMetrics(t, tc.expectedMetrics)
 			fetchedSlices := fetchEndpointSlices(t, client, ns)
-			if len(fetchedSlices) != tc.expectedMetrics.actualSlices {
-				t.Fatalf("Actual slices %d doesn't match metric %d", len(fetchedSlices), tc.expectedMetrics.actualSlices)
-			}
 
 			if tc.expectedHints == nil {
 				for _, slice := range fetchedSlices {
@@ -2150,42 +2043,16 @@ func TestReconcileTopologyDualStuck(t *testing.T) {
 				return
 			}
 
-			actualCrossZoneHints := 0
-			actualHints := map[string]int{}
-
+			slicesByAddrType := map[discovery.AddressType][]discovery.EndpointSlice{
+				discovery.AddressTypeIPv4: {},
+				discovery.AddressTypeIPv6: {},
+			}
 			for _, slice := range fetchedSlices {
-				for _, endpoint := range slice.Endpoints {
-					if endpoint.Hints == nil || len(endpoint.Hints.ForZones) == 0 {
-						t.Fatalf("Expected endpoint to have zone hints: %+v", endpoint)
-					}
-					if len(endpoint.Hints.ForZones) > 1 {
-						t.Fatalf("Expected endpoint to only have 1 zone hint, got %d", len(endpoint.Hints.ForZones))
-					}
-
-					if endpoint.Zone == nil || *endpoint.Zone == "" {
-						t.Fatalf("Expected endpoint to have zone: %+v", endpoint)
-					}
-					zoneHint := endpoint.Hints.ForZones[0].Name
-					if *endpoint.Zone != zoneHint {
-						actualCrossZoneHints++
-					}
-					actualHints[zoneHint]++
-				}
+				slicesByAddrType[slice.AddressType] = append(slicesByAddrType[slice.AddressType], slice)
 			}
 
-			if len(actualHints) != len(tc.expectedHints) {
-				t.Errorf("Expected hints for %d zones, got %d", len(tc.expectedHints), len(actualHints))
-			}
-
-			for zone, expectedNum := range tc.expectedHints {
-				actualNum, _ := actualHints[zone]
-				if actualNum != expectedNum {
-					t.Errorf("Expected %d hints for %s zone, got %d", expectedNum, zone, actualNum)
-				}
-			}
-
-			if actualCrossZoneHints != tc.expectedCrossZoneHints {
-				t.Errorf("Expected %d cross zone hints, got %d", tc.expectedCrossZoneHints, actualCrossZoneHints)
+			for _, addrType := range []discovery.AddressType{discovery.AddressTypeIPv4, discovery.AddressTypeIPv6} {
+				verifyHints(t, slicesByAddrType[addrType], tc.expectedHints, tc.expectedCrossZoneHints, addrType)
 			}
 		})
 	}
@@ -2437,4 +2304,46 @@ func setupMetrics() {
 	metrics.EndpointSlicesChangedPerSync.Delete(map[string]string{"topology": "Auto"})
 	metrics.EndpointSliceSyncs.Delete(map[string]string{"result": "success"})
 	metrics.EndpointSliceSyncs.Delete(map[string]string{"result": "error"})
+}
+
+func verifyHints(t *testing.T, fetchedSlices []discovery.EndpointSlice, expectedHints map[string]int, expectedCrossZoneHints int, addrType discovery.AddressType) {
+	t.Helper()
+
+	actualCrossZoneHints := 0
+	actualHints := map[string]int{}
+
+	for _, slice := range fetchedSlices {
+		for _, endpoint := range slice.Endpoints {
+			if endpoint.Hints == nil || len(endpoint.Hints.ForZones) == 0 {
+				t.Fatalf("Expected %s endpoint to have zone hints: %+v", addrType, endpoint)
+			}
+			if len(endpoint.Hints.ForZones) > 1 {
+				t.Fatalf("Expected %s endpoint to only have 1 zone hint, got %d", addrType, len(endpoint.Hints.ForZones))
+			}
+
+			if endpoint.Zone == nil || *endpoint.Zone == "" {
+				t.Fatalf("Expected %s endpoint to have zone: %+v", addrType, endpoint)
+			}
+			zoneHint := endpoint.Hints.ForZones[0].Name
+			if *endpoint.Zone != zoneHint {
+				actualCrossZoneHints++
+			}
+			actualHints[zoneHint]++
+		}
+	}
+
+	if len(actualHints) != len(expectedHints) {
+		t.Errorf("Expected %s hints for %d zones, got %d", addrType, len(expectedHints), len(actualHints))
+	}
+
+	for zone, expectedNum := range expectedHints {
+		actualNum, _ := actualHints[zone]
+		if actualNum != expectedNum {
+			t.Errorf("Expected %d %s hints for %s zone, got %d", expectedNum, addrType, zone, actualNum)
+		}
+	}
+
+	if actualCrossZoneHints != expectedCrossZoneHints {
+		t.Errorf("Expected %d %s cross zone hints, got %d", expectedCrossZoneHints, addrType, actualCrossZoneHints)
+	}
 }
