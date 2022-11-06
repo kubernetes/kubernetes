@@ -17,12 +17,11 @@ limitations under the License.
 package resolver
 
 import (
+	"strings"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
-	"k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
+	"k8s.io/client-go/discovery"
 )
 
 type ResourceResolver interface {
@@ -30,29 +29,40 @@ type ResourceResolver interface {
 }
 
 type discoveryResourceResolver struct {
-	restMapper meta.RESTMapper
+	client discovery.DiscoveryInterface
 }
 
 func (d *discoveryResourceResolver) Resolve(gvk schema.GroupVersionKind) (schema.GroupVersionResource, error) {
-	mapping, err := d.restMapper.RESTMapping(schema.GroupKind{
-		Group: gvk.Group,
-		Kind:  gvk.Kind,
-	}, gvk.Version)
+	gv := gvk.GroupVersion()
+	// TODO: refactor this into an efficient gvk --> gvr resolver that remembers hits and re-resolves group/version info on misses
+	resources, err := d.client.ServerResourcesForGroupVersion(gv.String())
 	if err != nil {
 		return schema.GroupVersionResource{}, err
 	}
-	return mapping.Resource, nil
+	for _, resource := range resources.APIResources {
+		if resource.Kind != gvk.Kind {
+			// ignore unrelated kinds
+			continue
+		}
+		if strings.Contains(resource.Name, "/") {
+			// ignore subresources
+			continue
+		}
+		if resource.Group != "" && resource.Group != gvk.Group {
+			// group didn't match
+			continue
+		}
+		if resource.Version != "" && resource.Version != gvk.Version {
+			// version didn't match
+			continue
+		}
+		return gv.WithResource(resource.Name), nil
+	}
+	return schema.GroupVersionResource{}, &meta.NoKindMatchError{GroupKind: gvk.GroupKind(), SearchedVersions: []string{gvk.Version}}
 }
 
-func NewDiscoveryResourceResolver(clientConfig *restclient.Config) (ResourceResolver, error) {
-	clientset, err := kubernetes.NewForConfig(clientConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	discoveryClient := cacheddiscovery.NewMemCacheClient(clientset.Discovery())
-	discoveryRESTMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
-	return &discoveryResourceResolver{restMapper: discoveryRESTMapper}, nil
+func NewDiscoveryResourceResolver(client discovery.DiscoveryInterface) (ResourceResolver, error) {
+	return &discoveryResourceResolver{client: client}, nil
 }
 
 type ResourceResolverFunc func(gvk schema.GroupVersionKind) (schema.GroupVersionResource, error)

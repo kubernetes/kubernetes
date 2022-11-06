@@ -54,20 +54,13 @@ func (r *REST) beginUpdate(ctx context.Context, obj, old runtime.Object, options
 	policy := obj.(*admissionregistration.ValidatingAdmissionPolicy)
 	oldPolicy := old.(*admissionregistration.ValidatingAdmissionPolicy)
 
-	// both nil, no change
-	if policy.Spec.ParamKind == nil && oldPolicy.Spec.ParamKind == nil {
-		return noop, nil
-	}
-
-	// both non-nil but equivalent
-	if policy.Spec.ParamKind != nil && oldPolicy.Spec.ParamKind != nil &&
-		policy.Spec.ParamKind.Kind == oldPolicy.Spec.ParamKind.Kind &&
-		policy.Spec.ParamKind.APIVersion == oldPolicy.Spec.ParamKind.APIVersion {
-		return noop, nil
-	}
-
-	// if the policy has no paramKind, no EXTRA permissions are checked
+	// if the policy has no paramKind, no extra authorization is required
 	if policy.Spec.ParamKind == nil {
+		return noop, nil
+	}
+
+	// if the new policy has the same paramKind as the old policy, no extra authorization is required
+	if oldPolicy.Spec.ParamKind != nil && *oldPolicy.Spec.ParamKind == *policy.Spec.ParamKind {
 		return noop, nil
 	}
 
@@ -85,7 +78,7 @@ func (r *REST) authorize(ctx context.Context, policy *admissionregistration.Vali
 
 	user, ok := genericapirequest.UserFrom(ctx)
 	if !ok {
-		return fmt.Errorf("cannot identify user")
+		return fmt.Errorf("cannot identify user to authorize read access to kind=%s, apiVersion=%s", policy.Spec.ParamKind.Kind, policy.Spec.ParamKind.APIVersion)
 	}
 
 	var resource string
@@ -135,7 +128,7 @@ func (r *REST) authorize(ctx context.Context, policy *admissionregistration.Vali
 		return err
 	}
 	if d != authorizer.DecisionAllow {
-		return fmt.Errorf("user %v cannot read paramKind of ValidatingAdmissionPolicy %s: %v", user, policy.Name, paramKind)
+		return fmt.Errorf(`user %v must have "get" permission on all objects of the referenced paramKind (kind=%s, apiVersion=%s)`, user, paramKind.Kind, paramKind.APIVersion)
 	}
 	return nil
 }

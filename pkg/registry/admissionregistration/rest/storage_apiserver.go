@@ -24,7 +24,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/discovery"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	mutatingwebhookconfigurationstorage "k8s.io/kubernetes/pkg/registry/admissionregistration/mutatingwebhookconfiguration/storage"
@@ -35,8 +35,8 @@ import (
 )
 
 type RESTStorageProvider struct {
-	Authorizer   authorizer.Authorizer
-	ClientConfig *restclient.Config
+	Authorizer      authorizer.Authorizer
+	DiscoveryClient discovery.DiscoveryInterface
 }
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
@@ -88,7 +88,7 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 	// use a simple wrapper so that initialization order won't cause a nil getter
 	var policyGetter rest.Getter
 
-	r, err := resolver.NewDiscoveryResourceResolver(p.ClientConfig)
+	r, err := resolver.NewDiscoveryResourceResolver(p.DiscoveryClient)
 	if err != nil {
 		return storage, err
 	}

@@ -85,7 +85,7 @@ func (r *REST) authorize(ctx context.Context, binding *admissionregistration.Val
 
 	user, ok := genericapirequest.UserFrom(ctx)
 	if !ok {
-		return fmt.Errorf("cannot identify user")
+		return fmt.Errorf("cannot identify user to authorize read access to namesapce=%s, name=%s", binding.Spec.ParamRef.Namespace, binding.Spec.ParamRef.Name)
 	}
 
 	// resolve the bound ValidatingAdmissionPolicy
@@ -101,7 +101,7 @@ func (r *REST) authorize(ctx context.Context, binding *admissionregistration.Val
 	apiGroup := ""
 	apiVersion := "*"
 
-	if policy.Spec.ParamKind != nil {
+	if policy != nil && policy.Spec.ParamKind != nil {
 		// resolve ParamKind with the resource resolver
 		paramKind := policy.Spec.ParamKind
 		gv, gvr, err := func() (schema.GroupVersion, schema.GroupVersionResource, error) {
