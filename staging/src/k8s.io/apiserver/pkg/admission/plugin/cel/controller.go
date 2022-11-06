@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sync"
 	"sync/atomic"
 
@@ -367,10 +368,12 @@ func (c *celAdmissionController) Validate(
 	if len(deniedDecisions) > 0 {
 		// TODO: refactor NewForbidden so the name extraction is reusable for different error types
 		err := admission.NewForbidden(a, errors.New(deniedDecisions[0].message)).(*k8serrors.StatusError)
-		if len(deniedDecisions[0].reason) != 0 {
-			err.ErrStatus.Reason = deniedDecisions[0].reason
-			err.ErrStatus.Code = reasonToCode(deniedDecisions[0].reason)
+		reason := deniedDecisions[0].reason
+		if len(reason) == 0 {
+			reason = metav1.StatusReasonInvalid
 		}
+		err.ErrStatus.Reason = reason
+		err.ErrStatus.Code = reasonToCode(deniedDecisions[0].reason)
 		return err
 	}
 
