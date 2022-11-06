@@ -514,6 +514,164 @@ func TestNodeAffinity(t *testing.T) {
 			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node1")},
 		},
 		{
+			name: "Pod with matchFields using In operator and AddedAffinity has affinity to specific Nodes",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      metav1.ObjectNameField,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node1"},
+											},
+										},
+									},
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      metav1.ObjectNameField,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node3"},
+											},
+										},
+									},
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      metav1.ObjectNameField,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node4"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			args: config.NodeAffinityArgs{
+				AddedAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchFields: []v1.NodeSelectorRequirement{
+									{
+										Key:      metav1.ObjectNameField,
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"node1"},
+									},
+								},
+							},
+							{
+								MatchFields: []v1.NodeSelectorRequirement{
+									{
+										Key:      metav1.ObjectNameField,
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"node2"},
+									},
+								},
+							},
+							{
+								MatchFields: []v1.NodeSelectorRequirement{
+									{
+										Key:      metav1.ObjectNameField,
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"node3"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node1", "node3")},
+		},
+		{
+			name: "Pod with matchFields using In operator, AddedAffinity has affinity to specific Nodes, and no nodes can be eligible as a result",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      metav1.ObjectNameField,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node4"},
+											},
+										},
+									},
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      metav1.ObjectNameField,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node5"},
+											},
+										},
+									},
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      metav1.ObjectNameField,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node6"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			args: config.NodeAffinityArgs{
+				AddedAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchFields: []v1.NodeSelectorRequirement{
+									{
+										Key:      metav1.ObjectNameField,
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"node1"},
+									},
+								},
+							},
+							{
+								MatchFields: []v1.NodeSelectorRequirement{
+									{
+										Key:      metav1.ObjectNameField,
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"node2"},
+									},
+								},
+							},
+							{
+								MatchFields: []v1.NodeSelectorRequirement{
+									{
+										Key:      metav1.ObjectNameField,
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"node3"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, errReasonConflict),
+			nodeName:            "node1",
+			wantStatus:          framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+		},
+		{
 			name: "Pod with matchFields using In operator that does not match the existing node",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
@@ -786,6 +944,7 @@ func TestNodeAffinity(t *testing.T) {
 					},
 				},
 			},
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node2")},
 		},
 		{
 			name: "Matches added affinity but not Pod's node affinity",
@@ -825,7 +984,8 @@ func TestNodeAffinity(t *testing.T) {
 					},
 				},
 			},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node2")},
+			wantStatus:          framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
 		},
 		{
 			name:     "Doesn't match added affinity",

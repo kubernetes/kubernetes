@@ -18,9 +18,10 @@ package nodeaffinity
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -37,6 +38,11 @@ type NodeAffinity struct {
 	handle              framework.Handle
 	addedNodeSelector   *nodeaffinity.NodeSelector
 	addedPrefSchedTerms *nodeaffinity.PreferredSchedulingTerms
+
+	// eligibleNodesFromAddedAffinity represents Node names that are eligible from NodeAffinityArgs.AddedAffinity.RequiredDuringSchedulingIgnoredDuringExecution.
+	// If all nodes are eligible from NodeAffinityArgs.AddedAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+	// this field will be nil.
+	eligibleNodesFromAddedAffinity sets.String
 }
 
 var _ framework.PreFilterPlugin = &NodeAffinity{}
@@ -100,7 +106,38 @@ func (pl *NodeAffinity) PreFilter(ctx context.Context, cycleState *framework.Cyc
 	}
 
 	// Check if there is affinity to a specific node and return it.
-	terms := affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
+	eligibleNodesFromPodSpec, err := eligibleNodeNames(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms)
+	if err != nil {
+		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
+	}
+	if eligibleNodesFromPodSpec == nil && pl.eligibleNodesFromAddedAffinity == nil {
+		return nil, nil
+	}
+
+	var eligibleNodes sets.String
+
+	if pl.eligibleNodesFromAddedAffinity != nil && eligibleNodesFromPodSpec != nil {
+		// When AddedAffinity is used, Nodes need to satisfy AddedAffinity AND .spec.NodeAffinity.
+		// So, we need to find the intersection of nodes here.
+		eligibleNodes = eligibleNodesFromPodSpec.Intersection(pl.eligibleNodesFromAddedAffinity)
+
+		// If the set is empty, it means the terms had affinity to different
+		// sets of nodes, and since they are ANDed, then the pod will not match any node.
+		if len(eligibleNodes) == 0 {
+			return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, errReasonConflict)
+		}
+	} else if pl.eligibleNodesFromAddedAffinity != nil {
+		eligibleNodes = pl.eligibleNodesFromAddedAffinity
+	} else { // if eligibleNodesFromPodSpec != nil
+		eligibleNodes = eligibleNodesFromPodSpec
+	}
+
+	return &framework.PreFilterResult{NodeNames: eligibleNodes}, nil
+}
+
+// eligibleNodeNames checks if there is affinity to specific nodes and return their names.
+// It returns nil when all nodes can be eligible.
+func eligibleNodeNames(terms []v1.NodeSelectorTerm) (sets.String, error) {
 	var nodeNames sets.String
 	for _, t := range terms {
 		var termNodeNames sets.String
@@ -124,15 +161,11 @@ func (pl *NodeAffinity) PreFilter(ctx context.Context, cycleState *framework.Cyc
 		// If the set is empty, it means the terms had affinity to different
 		// sets of nodes, and since they are ANDed, then the pod will not match any node.
 		if len(termNodeNames) == 0 {
-			return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, errReasonConflict)
+			return nil, errors.New(errReasonConflict)
 		}
 		nodeNames = nodeNames.Union(termNodeNames)
 	}
-	if nodeNames != nil {
-		return &framework.PreFilterResult{NodeNames: nodeNames}, nil
-	}
-	return nil, nil
-
+	return nodeNames, nil
 }
 
 // PreFilterExtensions not necessary for this plugin as state doesn't depend on pod additions or deletions.
@@ -250,6 +283,11 @@ func New(plArgs runtime.Object, h framework.Handle) (framework.Plugin, error) {
 	}
 	if args.AddedAffinity != nil {
 		if ns := args.AddedAffinity.RequiredDuringSchedulingIgnoredDuringExecution; ns != nil {
+			nodeNames, err := eligibleNodeNames(ns.NodeSelectorTerms)
+			if err != nil {
+				return nil, fmt.Errorf("no Pods will match with the given addedAffinity.requiredDuringSchedulingIgnoredDuringExecution: %w", err)
+			}
+			pl.eligibleNodesFromAddedAffinity = nodeNames
 			pl.addedNodeSelector, err = nodeaffinity.NewNodeSelector(ns)
 			if err != nil {
 				return nil, fmt.Errorf("parsing addedAffinity.requiredDuringSchedulingIgnoredDuringExecution: %w", err)
