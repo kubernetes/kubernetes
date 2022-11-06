@@ -117,8 +117,10 @@ const (
 func NewKubeletCommand() *cobra.Command {
 	cleanFlagSet := pflag.NewFlagSet(componentKubelet, pflag.ContinueOnError)
 	cleanFlagSet.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
+	//kubelet flags 启动传入的flags
 	kubeletFlags := options.NewKubeletFlags()
 
+	//创建启动配置
 	kubeletConfig, err := options.NewKubeletConfiguration()
 	// programmer error
 	if err != nil {
@@ -508,6 +510,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	}
 
 	// Register current configuration with /configz endpoint
+	//注册endpoint
 	err = initConfigz(&s.KubeletConfiguration)
 	if err != nil {
 		klog.ErrorS(err, "Failed to register kubelet configuration with configz")
@@ -518,6 +521,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	}
 
 	// About to get clients and such, detect standaloneMode
+	//什么是standalone mode呢?
 	standaloneMode := true
 	if len(s.KubeConfig) > 0 {
 		standaloneMode = false
