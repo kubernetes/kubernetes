@@ -26,7 +26,6 @@ import (
 	v1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	appsv1beta2 "k8s.io/client-go/applyconfigurations/apps/v1beta2"
@@ -39,9 +38,9 @@ type FakeDeployments struct {
 	ns   string
 }
 
-var deploymentsResource = schema.GroupVersionResource{Group: "apps", Version: "v1beta2", Resource: "deployments"}
+var deploymentsResource = v1beta2.SchemeGroupVersion.WithResource("deployments")
 
-var deploymentsKind = schema.GroupVersionKind{Group: "apps", Version: "v1beta2", Kind: "Deployment"}
+var deploymentsKind = v1beta2.SchemeGroupVersion.WithKind("Deployment")
 
 // Get takes name of the deployment, and returns the corresponding deployment object, and an error if there is any.
 func (c *FakeDeployments) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta2.Deployment, err error) {

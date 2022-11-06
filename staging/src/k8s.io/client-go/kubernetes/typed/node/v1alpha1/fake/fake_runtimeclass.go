@@ -26,7 +26,6 @@ import (
 	v1alpha1 "k8s.io/api/node/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	nodev1alpha1 "k8s.io/client-go/applyconfigurations/node/v1alpha1"
@@ -38,9 +37,9 @@ type FakeRuntimeClasses struct {
 	Fake *FakeNodeV1alpha1
 }
 
-var runtimeclassesResource = schema.GroupVersionResource{Group: "node.k8s.io", Version: "v1alpha1", Resource: "runtimeclasses"}
+var runtimeclassesResource = v1alpha1.SchemeGroupVersion.WithResource("runtimeclasses")
 
-var runtimeclassesKind = schema.GroupVersionKind{Group: "node.k8s.io", Version: "v1alpha1", Kind: "RuntimeClass"}
+var runtimeclassesKind = v1alpha1.SchemeGroupVersion.WithKind("RuntimeClass")
 
 // Get takes name of the runtimeClass, and returns the corresponding runtimeClass object, and an error if there is any.
 func (c *FakeRuntimeClasses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.RuntimeClass, err error) {

@@ -23,7 +23,6 @@ import (
 
 	v1alpha1 "k8s.io/api/authentication/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -32,9 +31,9 @@ type FakeSelfSubjectReviews struct {
 	Fake *FakeAuthenticationV1alpha1
 }
 
-var selfsubjectreviewsResource = schema.GroupVersionResource{Group: "authentication.k8s.io", Version: "v1alpha1", Resource: "selfsubjectreviews"}
+var selfsubjectreviewsResource = v1alpha1.SchemeGroupVersion.WithResource("selfsubjectreviews")
 
-var selfsubjectreviewsKind = schema.GroupVersionKind{Group: "authentication.k8s.io", Version: "v1alpha1", Kind: "SelfSubjectReview"}
+var selfsubjectreviewsKind = v1alpha1.SchemeGroupVersion.WithKind("SelfSubjectReview")
 
 // Create takes the representation of a selfSubjectReview and creates it.  Returns the server's representation of the selfSubjectReview, and an error, if there is any.
 func (c *FakeSelfSubjectReviews) Create(ctx context.Context, selfSubjectReview *v1alpha1.SelfSubjectReview, opts v1.CreateOptions) (result *v1alpha1.SelfSubjectReview, err error) {

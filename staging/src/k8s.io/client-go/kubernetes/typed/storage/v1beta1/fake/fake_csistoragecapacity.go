@@ -26,7 +26,6 @@ import (
 	v1beta1 "k8s.io/api/storage/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	storagev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
@@ -39,9 +38,9 @@ type FakeCSIStorageCapacities struct {
 	ns   string
 }
 
-var csistoragecapacitiesResource = schema.GroupVersionResource{Group: "storage.k8s.io", Version: "v1beta1", Resource: "csistoragecapacities"}
+var csistoragecapacitiesResource = v1beta1.SchemeGroupVersion.WithResource("csistoragecapacities")
 
-var csistoragecapacitiesKind = schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1beta1", Kind: "CSIStorageCapacity"}
+var csistoragecapacitiesKind = v1beta1.SchemeGroupVersion.WithKind("CSIStorageCapacity")
 
 // Get takes name of the cSIStorageCapacity, and returns the corresponding cSIStorageCapacity object, and an error if there is any.
 func (c *FakeCSIStorageCapacities) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.CSIStorageCapacity, err error) {

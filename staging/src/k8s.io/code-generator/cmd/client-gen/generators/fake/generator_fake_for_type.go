@@ -27,7 +27,6 @@ import (
 	"k8s.io/gengo/types"
 
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
-	"k8s.io/code-generator/cmd/client-gen/path"
 )
 
 // genFakeForType produces a file for each top-level type.
@@ -93,51 +92,33 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 	if err != nil {
 		return err
 	}
-	canonicalGroup := g.group
-	if canonicalGroup == "core" {
-		canonicalGroup = ""
-	}
-
-	groupName := g.group
-	if g.group == "core" {
-		groupName = ""
-	}
-
-	// allow user to define a group name that's different from the one parsed from the directory.
-	p := c.Universe.Package(path.Vendorless(g.inputPackage))
-	if override := types.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
-		groupName = override[0]
-	}
 
 	const pkgClientGoTesting = "k8s.io/client-go/testing"
 	m := map[string]interface{}{
-		"type":                 t,
-		"inputType":            t,
-		"resultType":           t,
-		"subresourcePath":      "",
-		"package":              pkg,
-		"Package":              namer.IC(pkg),
-		"namespaced":           !tags.NonNamespaced,
-		"Group":                namer.IC(g.group),
-		"GroupGoName":          g.groupGoName,
-		"Version":              namer.IC(g.version),
-		"group":                canonicalGroup,
-		"groupName":            groupName,
-		"version":              g.version,
-		"CreateOptions":        c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "CreateOptions"}),
-		"DeleteOptions":        c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "DeleteOptions"}),
-		"GetOptions":           c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "GetOptions"}),
-		"ListOptions":          c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ListOptions"}),
-		"PatchOptions":         c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "PatchOptions"}),
-		"ApplyOptions":         c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ApplyOptions"}),
-		"UpdateOptions":        c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "UpdateOptions"}),
-		"Everything":           c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/labels", Name: "Everything"}),
-		"GroupVersionResource": c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersionResource"}),
-		"GroupVersionKind":     c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersionKind"}),
-		"PatchType":            c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "PatchType"}),
-		"ApplyPatchType":       c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "ApplyPatchType"}),
-		"watchInterface":       c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/watch", Name: "Interface"}),
-		"jsonMarshal":          c.Universe.Type(types.Name{Package: "encoding/json", Name: "Marshal"}),
+		"type":               t,
+		"inputType":          t,
+		"resultType":         t,
+		"subresourcePath":    "",
+		"package":            pkg,
+		"Package":            namer.IC(pkg),
+		"namespaced":         !tags.NonNamespaced,
+		"Group":              namer.IC(g.group),
+		"GroupGoName":        g.groupGoName,
+		"Version":            namer.IC(g.version),
+		"version":            g.version,
+		"SchemeGroupVersion": c.Universe.Type(types.Name{Package: t.Name.Package, Name: "SchemeGroupVersion"}),
+		"CreateOptions":      c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "CreateOptions"}),
+		"DeleteOptions":      c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "DeleteOptions"}),
+		"GetOptions":         c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "GetOptions"}),
+		"ListOptions":        c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ListOptions"}),
+		"PatchOptions":       c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "PatchOptions"}),
+		"ApplyOptions":       c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ApplyOptions"}),
+		"UpdateOptions":      c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "UpdateOptions"}),
+		"Everything":         c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/labels", Name: "Everything"}),
+		"PatchType":          c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "PatchType"}),
+		"ApplyPatchType":     c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "ApplyPatchType"}),
+		"watchInterface":     c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/watch", Name: "Interface"}),
+		"jsonMarshal":        c.Universe.Type(types.Name{Package: "encoding/json", Name: "Marshal"}),
 
 		"NewRootListAction":              c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewRootListAction"}),
 		"NewListAction":                  c.Universe.Function(types.Name{Package: pkgClientGoTesting, Name: "NewListAction"}),
@@ -340,11 +321,11 @@ type Fake$.type|publicPlural$ struct {
 `
 
 var resource = `
-var $.type|allLowercasePlural$Resource = $.GroupVersionResource|raw${Group: "$.groupName$", Version: "$.version$", Resource: "$.type|resource$"}
+var $.type|allLowercasePlural$Resource = $.SchemeGroupVersion|raw$.WithResource("$.type|resource$")
 `
 
 var kind = `
-var $.type|allLowercasePlural$Kind = $.GroupVersionKind|raw${Group: "$.groupName$", Version: "$.version$", Kind: "$.type|singularKind$"}
+var $.type|allLowercasePlural$Kind = $.SchemeGroupVersion|raw$.WithKind("$.type|singularKind$")
 `
 
 var listTemplate = `
