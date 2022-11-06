@@ -185,7 +185,7 @@ func TestDescribeObjectShowEvents(t *testing.T) {
 	cmd := NewCmdDescribe("kubectl", tf, genericclioptions.NewTestIOStreamsDiscard())
 	cmd.Flags().Set("show-events", "true")
 	cmd.Run(cmd, []string{"pods"})
-	if d.Settings.ShowEvents != true {
+	if !d.Settings.ShowEvents {
 		t.Errorf("ShowEvents = true expected, got ShowEvents = %v", d.Settings.ShowEvents)
 	}
 }
@@ -211,7 +211,7 @@ func TestDescribeObjectSkipEvents(t *testing.T) {
 	cmd := NewCmdDescribe("kubectl", tf, genericclioptions.NewTestIOStreamsDiscard())
 	cmd.Flags().Set("show-events", "false")
 	cmd.Run(cmd, []string{"pods"})
-	if d.Settings.ShowEvents != false {
+	if d.Settings.ShowEvents {
 		t.Errorf("ShowEvents = false expected, got ShowEvents = %v", d.Settings.ShowEvents)
 	}
 }

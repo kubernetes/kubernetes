@@ -180,7 +180,7 @@ func TestDeploymentScaleRetry(t *testing.T) {
 
 	scaleFunc := ScaleCondition(scaler, nil, namespace, name, count, nil, deploygvr, false)
 	pass, err := scaleFunc()
-	if pass != false {
+	if pass {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
 	}
 	if err != nil {
@@ -310,7 +310,7 @@ func TestStatefulSetScaleRetry(t *testing.T) {
 
 	scaleFunc := ScaleCondition(scaler, nil, namespace, name, count, nil, stsgvr, false)
 	pass, err := scaleFunc()
-	if pass != false {
+	if pass {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
 	}
 	if err != nil {
@@ -419,7 +419,7 @@ func TestReplicaSetScaleRetry(t *testing.T) {
 
 	scaleFunc := ScaleCondition(scaler, nil, namespace, name, count, nil, rsgvr, false)
 	pass, err := scaleFunc()
-	if pass != false {
+	if pass {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
 	}
 	if err != nil {

@@ -412,7 +412,7 @@ func TestAddSubject(t *testing.T) {
 	for _, tt := range tests {
 		changed := false
 		var got []rbacv1.Subject
-		if changed, got = addSubjects(tt.existing, tt.subjects); (changed != false) != tt.wantChange {
+		if changed, got = addSubjects(tt.existing, tt.subjects); changed != tt.wantChange {
 			t.Errorf("%q. addSubjects() changed = %v, wantChange = %v", tt.Name, changed, tt.wantChange)
 		}
 

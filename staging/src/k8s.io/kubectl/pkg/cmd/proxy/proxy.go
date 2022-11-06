@@ -161,7 +161,7 @@ func (o *ProxyOptions) Complete(f cmdutil.Factory) error {
 		o.apiPrefix += "/"
 	}
 
-	if o.appendServerPath == false {
+	if !o.appendServerPath {
 		target, err := url.Parse(clientConfig.Host)
 		if err != nil {
 			return err

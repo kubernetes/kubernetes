@@ -448,7 +448,7 @@ func getObjAndCheckCondition(info *resource.Info, o *WaitOptions, condMet isCond
 		if err != nil {
 			return gottenObj, false, err
 		}
-		if conditionCheck == false {
+		if !conditionCheck {
 			return gottenObj, false, fmt.Errorf("condition not met for %s", info.ObjectName())
 		}
 		return gottenObj, true, nil
