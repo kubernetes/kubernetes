@@ -25,12 +25,9 @@ import (
 
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	webhookinit "k8s.io/apiserver/pkg/admission/plugin/webhook/initializer"
-	"k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	egressselector "k8s.io/apiserver/pkg/server/egressselector"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	externalinformers "k8s.io/client-go/informers"
@@ -81,12 +78,6 @@ func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselec
 	}
 
 	initializers := []admission.PluginInitializer{webhookPluginInitializer, kubePluginInitializer}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.CELValidatingAdmission) {
-		celAdmissionPluginInitializer := cel.NewPluginInitializer(discoveryRESTMapper)
-		initializers = append(initializers, celAdmissionPluginInitializer)
-
-	}
 
 	return initializers, admissionPostStartHook, nil
 }

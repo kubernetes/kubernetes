@@ -22,16 +22,16 @@ import (
 	"fmt"
 	"io"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/component-base/featuregate"
 	"time"
 
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/component-base/featuregate"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -61,7 +61,9 @@ func Register(plugins *admission.Plugins) {
 
 type celAdmissionPlugin struct {
 	evaluator CELPolicyEvaluator
-	enabled   bool
+
+	inspectedFeatureGates bool
+	enabled               bool
 
 	// Injected Dependencies
 	informerFactory informers.SharedInformerFactory
@@ -73,7 +75,7 @@ type celAdmissionPlugin struct {
 
 var _ initializer.WantsExternalKubeInformerFactory = &celAdmissionPlugin{}
 var _ initializer.WantsExternalKubeClientSet = &celAdmissionPlugin{}
-var _ WantsRESTMapper = &celAdmissionPlugin{}
+var _ initializer.WantsRESTMapper = &celAdmissionPlugin{}
 var _ initializer.WantsDynamicClient = &celAdmissionPlugin{}
 var _ initializer.WantsDrainedNotification = &celAdmissionPlugin{}
 
@@ -105,10 +107,17 @@ func (c *celAdmissionPlugin) SetDrainedNotification(stopCh <-chan struct{}) {
 	c.stopCh = stopCh
 }
 
+func (c *celAdmissionPlugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
+	if featureGates.Enabled(features.CELValidatingAdmission) {
+		c.enabled = true
+	}
+	c.inspectedFeatureGates = true
+}
+
 // ValidateInitialization - once clientset and informer factory are provided, creates and starts the admission controller
 func (c *celAdmissionPlugin) ValidateInitialization() error {
-	if !c.enabled {
-		return nil
+	if !c.inspectedFeatureGates {
+		return fmt.Errorf("%s did not see feature gates", PluginName)
 	}
 	if c.informerFactory == nil {
 		return errors.New("missing informer factory")
@@ -130,18 +139,8 @@ func (c *celAdmissionPlugin) ValidateInitialization() error {
 		return err
 	}
 
-	c.initController()
-	return nil
-}
-
-func (c *celAdmissionPlugin) initController() {
 	go c.evaluator.Run(c.stopCh)
-}
-
-func (c *celAdmissionPlugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	if featureGates.Enabled(features.CELValidatingAdmission) {
-		c.enabled = true
-	}
+	return nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -164,14 +163,14 @@ func (c *celAdmissionPlugin) Validate(
 	deadlined, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	if !cache.WaitForNamedCacheSync("cel-admission-plugin", deadlined.Done(), c.evaluator.HasSynced) {
-		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
-	}
-
 	// isPolicyResource determines if an admission.Attributes object is describing
 	// the admission of a ValidatingAdmissionPolicy or a ValidatingAdmissionPolicyBinding
 	if isPolicyResource(a) {
 		return
+	}
+
+	if !cache.WaitForNamedCacheSync("cel-admission-plugin", deadlined.Done(), c.evaluator.HasSynced) {
+		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
 	}
 
 	return c.evaluator.Validate(ctx, a, o)
@@ -179,8 +178,10 @@ func (c *celAdmissionPlugin) Validate(
 
 func isPolicyResource(attr admission.Attributes) bool {
 	gvk := attr.GetResource()
-	if gvk.Resource == "ValidatingAdmissionPolicy" || gvk.Resource == "ValidatingAdmissionPolicyBinding" {
-		return true
+	if gvk.Group == "admissionregistration.k8s.io" {
+		if gvk.Resource == "ValidatingAdmissionPolicy" || gvk.Resource == "ValidatingAdmissionPolicyBinding" {
+			return true
+		}
 	}
 	return false
 }

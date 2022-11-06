@@ -35,7 +35,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
 )
 
 var _ CELPolicyEvaluator = &celAdmissionController{}
@@ -214,11 +213,7 @@ func (c *celAdmissionController) Validate(
 		// apply FailurePolicy specified in ValidatingAdmissionPolicy, the default would be Fail
 		switch policy {
 		case v1alpha1.Ignore:
-			if binding == nil {
-				klog.Infof("ignored ValidatingAdmissionPolicy %s failure, due to FailurePolicy=Ignore. Error: %w", definition.Name, err)
-			} else {
-				klog.Infof("ignored ValidatingAdmissionPolicy %s failure for binding %s, due to FailurePolicy=Ignore. Error: %w", definition.Name, binding.Name, err)
-			}
+			// TODO: add metrics for ignored error here
 			return
 		case v1alpha1.Fail:
 			var message string
@@ -236,14 +231,23 @@ func (c *celAdmissionController) Validate(
 				binding:    binding,
 			})
 		default:
-			utilruntime.HandleError(fmt.Errorf("unrecognized failure policy: '%v'", policy))
+			deniedDecisions = append(deniedDecisions, policyDecisionWithMetadata{
+				policyDecision: policyDecision{
+					kind:    deny,
+					message: fmt.Errorf("unrecognized failure policy: '%v'", policy).Error(),
+				},
+				definition: definition,
+				binding:    binding,
+			})
 		}
 	}
 	for definitionNamespacedName, definitionInfo := range c.definitionInfo {
 		definition := definitionInfo.lastReconciledValue
 		matches, matchKind, err := c.validatorCompiler.DefinitionMatches(a, o, definition)
 		if err != nil {
-			return err
+			// Configuration error.
+			addConfigError(definitionInfo.configurationError, definition, nil)
+			continue
 		}
 		if !matches {
 			// Policy definition does not match request
@@ -266,7 +270,9 @@ func (c *celAdmissionController) Validate(
 			binding := bindingInfo.lastReconciledValue
 			matches, err := c.validatorCompiler.BindingMatches(a, o, binding)
 			if err != nil {
-				return err
+				// Configuration error.
+				addConfigError(definitionInfo.configurationError, definition, binding)
+				continue
 			}
 			if !matches {
 				continue
@@ -342,9 +348,7 @@ func (c *celAdmissionController) Validate(
 			for _, decision := range decisions {
 				switch decision.kind {
 				case admit:
-					if len(decision.message) != 0 {
-						klog.Info("ignored ValidatingAdmissionPolicy %w failure for binding %w, due to FailurePolicy=Ignore. Error: %w", definition.Name, binding.Name, decision.message)
-					}
+					// TODO: add metrics for ignored error here
 				case deny:
 					deniedDecisions = append(deniedDecisions, policyDecisionWithMetadata{
 						definition:     definition,

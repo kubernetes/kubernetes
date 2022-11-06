@@ -17,6 +17,7 @@ limitations under the License.
 package initializer
 
 import (
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	quota "k8s.io/apiserver/pkg/quota/v1"
@@ -72,5 +73,11 @@ type WantsFeatures interface {
 
 type WantsDynamicClient interface {
 	SetDynamicClient(dynamic.Interface)
+	admission.InitializationValidator
+}
+
+// WantsRESTMapper defines a function which sets RESTMapper for admission plugins that need it.
+type WantsRESTMapper interface {
+	SetRESTMapper(meta.RESTMapper)
 	admission.InitializationValidator
 }

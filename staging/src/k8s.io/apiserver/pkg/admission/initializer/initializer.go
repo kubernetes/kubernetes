@@ -17,6 +17,7 @@ limitations under the License.
 package initializer
 
 import (
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/dynamic"
@@ -27,11 +28,12 @@ import (
 
 type pluginInitializer struct {
 	externalClient    kubernetes.Interface
+	dynamicClient     dynamic.Interface
 	externalInformers informers.SharedInformerFactory
 	authorizer        authorizer.Authorizer
 	featureGates      featuregate.FeatureGate
 	stopCh            <-chan struct{}
-	dynamicClient     dynamic.Interface
+	restMapper        meta.RESTMapper
 }
 
 // New creates an instance of admission plugins initializer.
@@ -39,19 +41,21 @@ type pluginInitializer struct {
 // during compilation when they update a level.
 func New(
 	extClientset kubernetes.Interface,
+	dynamicClient dynamic.Interface,
 	extInformers informers.SharedInformerFactory,
 	authz authorizer.Authorizer,
 	featureGates featuregate.FeatureGate,
 	stopCh <-chan struct{},
-	dynamicClient dynamic.Interface,
+	restMapper meta.RESTMapper,
 ) pluginInitializer {
 	return pluginInitializer{
 		externalClient:    extClientset,
+		dynamicClient:     dynamicClient,
 		externalInformers: extInformers,
 		authorizer:        authz,
 		featureGates:      featureGates,
 		stopCh:            stopCh,
-		dynamicClient:     dynamicClient,
+		restMapper:        restMapper,
 	}
 }
 
@@ -72,6 +76,10 @@ func (i pluginInitializer) Initialize(plugin admission.Interface) {
 		wants.SetExternalKubeClientSet(i.externalClient)
 	}
 
+	if wants, ok := plugin.(WantsDynamicClient); ok {
+		wants.SetDynamicClient(i.dynamicClient)
+	}
+
 	if wants, ok := plugin.(WantsExternalKubeInformerFactory); ok {
 		wants.SetExternalKubeInformerFactory(i.externalInformers)
 	}
@@ -80,8 +88,8 @@ func (i pluginInitializer) Initialize(plugin admission.Interface) {
 		wants.SetAuthorizer(i.authorizer)
 	}
 
-	if wants, ok := plugin.(WantsDynamicClient); ok {
-		wants.SetDynamicClient(i.dynamicClient)
+	if wants, ok := plugin.(WantsRESTMapper); ok {
+		wants.SetRESTMapper(i.restMapper)
 	}
 }
 
