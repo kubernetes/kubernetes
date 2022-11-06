@@ -1,11 +1,11 @@
 # Files that should be ignored by tools which do not want to consider generated
 # code.
-#
+
 # https://github.com/kubernetes/test-infra/blob/master/prow/plugins/size/size.go
-#
+
 # This file is a series of lines, each of the form:
 #     <type> <name>
-#
+
 # Type can be:
 #    path - an exact path to a single file
 #    file-name - an exact leaf filename, regardless of path
