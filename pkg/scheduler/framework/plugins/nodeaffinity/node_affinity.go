@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -94,8 +94,15 @@ func (pl *NodeAffinity) PreFilter(ctx context.Context, cycleState *framework.Cyc
 	affinity := pod.Spec.Affinity
 	if affinity == nil ||
 		affinity.NodeAffinity == nil ||
-		affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil ||
-		len(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms) == 0 {
+		affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		if pl.addedNodeSelector == nil {
+			// NodeAffinity Filter is nothing to do with the Pod.
+			return nil, framework.NewStatus(framework.Skip)
+		}
+		return nil, nil
+	}
+
+	if len(affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms) == 0 {
 		return nil, nil
 	}
 

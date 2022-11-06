@@ -45,15 +45,18 @@ func TestNodeAffinity(t *testing.T) {
 		disablePreFilter    bool
 	}{
 		{
-			name: "no selector",
-			pod:  &v1.Pod{},
+			name:                "no selector",
+			pod:                 &v1.Pod{},
+			wantPreFilterStatus: framework.NewStatus(framework.Skip),
+			wantStatus:          nil, // Actually, the scheduler will skip NodeAffinity Filter as PreFilter returns Skip.
 		},
 		{
 			name: "missing labels",
 			pod: st.MakePod().NodeSelector(map[string]string{
 				"foo": "bar",
 			}).Obj(),
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+			wantStatus:       framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+			disablePreFilter: true,
 		},
 		{
 			name: "same labels",
@@ -63,6 +66,7 @@ func TestNodeAffinity(t *testing.T) {
 			labels: map[string]string{
 				"foo": "bar",
 			},
+			disablePreFilter: true,
 		},
 		{
 			name: "node labels are superset",
@@ -73,6 +77,7 @@ func TestNodeAffinity(t *testing.T) {
 				"foo": "bar",
 				"baz": "blah",
 			},
+			disablePreFilter: true,
 		},
 		{
 			name: "node labels are subset",
@@ -83,7 +88,8 @@ func TestNodeAffinity(t *testing.T) {
 			labels: map[string]string{
 				"foo": "bar",
 			},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+			wantStatus:       framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+			disablePreFilter: true,
 		},
 		{
 			name: "Pod with matchExpressions using In operator that matches the existing node",
@@ -285,6 +291,8 @@ func TestNodeAffinity(t *testing.T) {
 			labels: map[string]string{
 				"foo": "bar",
 			},
+			wantPreFilterStatus: framework.NewStatus(framework.Skip),
+			wantStatus:          nil, // Actually, the scheduler will skip NodeAffinity Filter as PreFilter returns Skip.
 		},
 		{
 			name: "Pod with Affinity but nil NodeSelector will schedule onto a node",
@@ -300,6 +308,8 @@ func TestNodeAffinity(t *testing.T) {
 			labels: map[string]string{
 				"foo": "bar",
 			},
+			wantPreFilterStatus: framework.NewStatus(framework.Skip),
+			wantStatus:          nil, // Actually, the scheduler will skip NodeAffinity Filter as PreFilter returns Skip.
 		},
 		{
 			name: "Pod with multiple matchExpressions ANDed that matches the existing node",
