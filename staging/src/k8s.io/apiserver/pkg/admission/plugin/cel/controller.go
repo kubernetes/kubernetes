@@ -366,14 +366,22 @@ func (c *celAdmissionController) Validate(
 	}
 
 	if len(deniedDecisions) > 0 {
-		// TODO: refactor NewForbidden so the name extraction is reusable for different error types
-		err := admission.NewForbidden(a, errors.New(deniedDecisions[0].message)).(*k8serrors.StatusError)
-		reason := deniedDecisions[0].reason
+		// TODO: refactor admission.NewForbidden so the name extraction is reusable but the code/reason is customizable
+		var message string
+		deniedDecision := deniedDecisions[0]
+		if deniedDecision.binding != nil {
+			message = fmt.Sprintf("ValidatingAdmissionPolicy '%s' with binding '%s' denied request: %s", deniedDecision.definition.Name, deniedDecision.binding.Name, deniedDecision.message)
+		} else {
+			message = fmt.Sprintf("ValidatingAdmissionPolicy '%s' denied request: %s", deniedDecision.definition.Name, deniedDecision.message)
+		}
+		err := admission.NewForbidden(a, errors.New(message)).(*k8serrors.StatusError)
+		reason := deniedDecision.reason
 		if len(reason) == 0 {
 			reason = metav1.StatusReasonInvalid
 		}
 		err.ErrStatus.Reason = reason
-		err.ErrStatus.Code = reasonToCode(deniedDecisions[0].reason)
+		err.ErrStatus.Code = reasonToCode(reason)
+		err.ErrStatus.Details.Causes = append(err.ErrStatus.Details.Causes, metav1.StatusCause{Message: message})
 		return err
 	}
 

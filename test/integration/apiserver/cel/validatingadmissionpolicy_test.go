@@ -81,7 +81,7 @@ func Test_ValidateNamespace_NoParams(t *testing.T) {
 					Name: "test-foobar",
 				},
 			},
-			err:           "namespaces \"test-foobar\" is forbidden: failed expression: object.metadata.name.endsWith('k8s')",
+			err:           "namespaces \"test-foobar\" is forbidden: ValidatingAdmissionPolicy 'validate-namespace-suffix' with binding 'validate-namespace-suffix-binding' denied request: failed expression: object.metadata.name.endsWith('k8s')",
 			failureReason: metav1.StatusReasonInvalid,
 		},
 		{
@@ -98,7 +98,7 @@ func Test_ValidateNamespace_NoParams(t *testing.T) {
 					Name: "forbidden-test-foobar",
 				},
 			},
-			err:           "namespaces \"forbidden-test-foobar\" is forbidden: failed expression: object.metadata.name.endsWith('k8s')",
+			err:           "namespaces \"forbidden-test-foobar\" is forbidden: ValidatingAdmissionPolicy 'validate-namespace-suffix' with binding 'validate-namespace-suffix-binding' denied request: failed expression: object.metadata.name.endsWith('k8s')",
 			failureReason: metav1.StatusReasonForbidden,
 		},
 		{
@@ -159,7 +159,7 @@ func Test_ValidateNamespace_NoParams(t *testing.T) {
 					Name: "test-k8s",
 				},
 			},
-			err:           "namespaces \"test-k8s\" is forbidden: expression 'object.nonExistentProperty == 'someval'' resulted in error: no such key: nonExistentProperty",
+			err:           "namespaces \"test-k8s\" is forbidden: ValidatingAdmissionPolicy 'validate-namespace-suffix' with binding 'validate-namespace-suffix-binding' denied request: expression 'object.nonExistentProperty == 'someval'' resulted in error: no such key: nonExistentProperty",
 			failureReason: metav1.StatusReasonInvalid,
 		},
 	}
@@ -265,7 +265,7 @@ func Test_ValidateNamespace_WithConfigMapParams(t *testing.T) {
 					Name: "test-foo",
 				},
 			},
-			err:           "namespaces \"test-foo\" is forbidden: failed expression: object.metadata.name.endsWith(params.data.namespaceSuffix)",
+			err:           "namespaces \"test-foo\" is forbidden: ValidatingAdmissionPolicy 'validate-namespace-suffix' with binding 'validate-namespace-suffix-binding' denied request: failed expression: object.metadata.name.endsWith(params.data.namespaceSuffix)",
 			failureReason: metav1.StatusReasonInvalid,
 		},
 	}
