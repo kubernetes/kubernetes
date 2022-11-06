@@ -68,18 +68,14 @@ func (m *Matcher) ValidateInitialization() error {
 
 func (m *Matcher) Matches(attr admission.Attributes, o admission.ObjectInterfaces, criteria MatchCriteria) (bool, schema.GroupVersionKind, error) {
 	matches, err := m.namespaceMatcher.MatchNamespaceSelector(criteria, attr)
-	if err != nil {
-		return false, schema.GroupVersionKind{}, err
-	}
-	if !matches {
+	// Should not return an error here for policy which do not apply to the request, even if err is an unexpected scenario.
+	if !matches && err == nil {
 		return false, schema.GroupVersionKind{}, nil
 	}
 
 	matches, err = m.objectMatcher.MatchObjectSelector(criteria, attr)
-	if err != nil {
-		return false, schema.GroupVersionKind{}, err
-	}
-	if !matches {
+	// Should not return an error here for policy which do not apply to the request, even if err is an unexpected scenario.
+	if !matches && err == nil {
 		return false, schema.GroupVersionKind{}, nil
 	}
 
