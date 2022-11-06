@@ -64,11 +64,13 @@ type server struct {
 	stopRestartingCh chan<- bool
 	// Read from this to confirm that the restart loop has stopped.
 	ackStopRestartingCh <-chan bool
+	// The systemd unit name for the service if it exists. If server is not managed by systemd, field is empty.
+	systemdUnitName string
 }
 
 // newServer returns a new server with the given name, commands, health check
 // URLs, etc.
-func newServer(name string, start, kill, restart *exec.Cmd, urls []string, outputFileName string, monitorParent, restartOnExit bool) *server {
+func newServer(name string, start, kill, restart *exec.Cmd, urls []string, outputFileName string, monitorParent, restartOnExit bool, systemdUnitName string) *server {
 	return &server{
 		name:            name,
 		startCommand:    start,
@@ -78,6 +80,7 @@ func newServer(name string, start, kill, restart *exec.Cmd, urls []string, outpu
 		outFilename:     outputFileName,
 		monitorParent:   monitorParent,
 		restartOnExit:   restartOnExit,
+		systemdUnitName: systemdUnitName,
 	}
 }
 
@@ -312,4 +315,15 @@ func (s *server) kill() error {
 	}
 
 	return fmt.Errorf("unable to stop %q", name)
+}
+
+func (s *server) stopUnit() error {
+	klog.Infof("Stopping systemd unit for server %q with unit name: %q", s.name, s.systemdUnitName)
+	if s.systemdUnitName != "" {
+		err := exec.Command("sudo", "systemctl", "stop", s.systemdUnitName).Run()
+		if err != nil {
+			return fmt.Errorf("Failed to stop systemd unit name: %q: %v", s.systemdUnitName, err)
+		}
+	}
+	return nil
 }
