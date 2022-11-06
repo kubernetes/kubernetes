@@ -28,7 +28,6 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"k8s.io/klog/v2"
-	utiltrace "k8s.io/utils/trace"
 )
 
 func init() {
@@ -120,10 +119,6 @@ func TestUtilTracing(t *testing.T) {
 	klog.SetOutput(&buf)
 
 	ctx := context.Background()
-	// Create a utiltracing span
-	tr0 := utiltrace.New("parent utiltrace span")
-	ctx = utiltrace.ContextWithTrace(ctx, tr0)
-
 	// Creates a child span
 	_, tr1 := Start(ctx, "frobber", attribute.String("foo", "bar"))
 
@@ -139,26 +134,13 @@ func TestUtilTracing(t *testing.T) {
 	// Add another event to the frobber span after getting the span from context
 	SpanFromContext(ctx).AddEvent("sequenced particles", attribute.Int("inches in foot", 12)) // took 10ms
 
-	// Creates a nested child span
-	_, tr2 := Start(ctx, "nested child span")
 	// always log
-	tr2.End(0 * time.Second)
 	tr1.End(0 * time.Second)
-
-	// Since all traces are nested, no logging should have occurred yet
-	if buf.String() != "" {
-		t.Errorf("child traces were printed out before the parent span completed: %v", buf.String())
-	}
-
-	// Now, end the parent span to cause logging to occur
-	tr0.Log()
 
 	expected := []string{
 		`"frobber" foo:bar`,
 		`---"reticulated splines" should I do it?:false`,
 		`---"sequenced particles" inches in foot:12`,
-		`"nested child span"`,
-		`"parent utiltrace span"`,
 	}
 	for _, msg := range expected {
 		if !strings.Contains(buf.String(), msg) {

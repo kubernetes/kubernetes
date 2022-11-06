@@ -34,8 +34,7 @@ func Start(ctx context.Context, name string, attributes ...attribute.KeyValue) (
 	// If the incoming context already includes an OpenTelemetry span, create a child span with the provided name and attributes.
 	// If the caller is not using OpenTelemetry, or has tracing disabled (e.g. with a component-specific feature flag), this is a noop.
 	ctx, otelSpan := trace.SpanFromContext(ctx).TracerProvider().Tracer(instrumentationScope).Start(ctx, name, trace.WithAttributes(attributes...))
-	// If there is already a utiltrace span in the context, use that as our parent span.
-	utilSpan := utiltrace.FromContext(ctx).Nest(name, attributesToFields(attributes)...)
+	utilSpan := utiltrace.New(name, attributesToFields(attributes)...)
 	// Set the trace as active in the context so that subsequent Start calls create nested spans.
 	return utiltrace.ContextWithTrace(ctx, utilSpan), &Span{
 		otelSpan: otelSpan,
