@@ -63,6 +63,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 	testutils.SyncInformerFactory(testCtx)
 
 	defer testutils.CleanupTest(t, testCtx)
+	defer testCtx.Scheduler.SchedulingQueue.Close()
 
 	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
 	// Create one Node with a taint.
