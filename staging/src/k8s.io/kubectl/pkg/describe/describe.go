@@ -2653,11 +2653,11 @@ func (i *IngressDescriber) describeIngressV1(ing *networkingv1.Ingress, events *
 		w.Write(LEVEL_0, "Ingress Class:\t%v\n", ingressClassName)
 		def := ing.Spec.DefaultBackend
 		ns := ing.Namespace
-		if def == nil {
-			w.Write(LEVEL_0, "Default backend:\t<default>\n")
-		} else {
-			w.Write(LEVEL_0, "Default backend:\t%s\n", i.describeBackendV1(ns, def))
+		defaultBackendDescribe := "<default>"
+		if def != nil {
+			defaultBackendDescribe = i.describeBackendV1(ns, def)
 		}
+		w.Write(LEVEL_0, "Default backend:\t%s\n", defaultBackendDescribe)
 		if len(ing.Spec.TLS) != 0 {
 			describeIngressTLSV1(w, ing.Spec.TLS)
 		}
@@ -2680,7 +2680,7 @@ func (i *IngressDescriber) describeIngressV1(ing *networkingv1.Ingress, events *
 			}
 		}
 		if count == 0 {
-			w.Write(LEVEL_1, "%s\t%s\t%s\n", "*", "*", i.describeBackendV1(ns, def))
+			w.Write(LEVEL_1, "%s\t%s\t%s\n", "*", "*", defaultBackendDescribe)
 		}
 		printAnnotationsMultiline(w, "Annotations", ing.Annotations)
 
