@@ -471,7 +471,7 @@ func (mounter *SafeFormatAndMount) checkAndRepairFilesystem(source string) error
 }
 
 // formatAndMount uses unix utils to format and mount the given disk
-func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target string, fstype string, options []string, sensitiveOptions []string) error {
+func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target string, fstype string, options []string, sensitiveOptions []string, formatOptions []string) error {
 	readOnly := false
 	for _, option := range options {
 		if option == "ro" {
@@ -523,6 +523,7 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 				source,
 			}
 		}
+		args = append(formatOptions, args...)
 
 		klog.Infof("Disk %q appears to be unformatted, attempting to format as type: %q with options: %v", source, fstype, args)
 		output, err := mounter.Exec.Command("mkfs."+fstype, args...).CombinedOutput()
