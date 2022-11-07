@@ -177,37 +177,37 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 	// Transforms data using one of them, and tries to untransform using the others.
 	// Repeats this for all possible combinations.
 	correctConfigWithIdentityFirst := "testdata/valid-configs/identity-first.yaml"
-	identityFirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithIdentityFirst, ctx.Done())
+	identityFirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithIdentityFirst, false, ctx.Done())
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithIdentityFirst)
 	}
 
 	correctConfigWithAesGcmFirst := "testdata/valid-configs/aes-gcm-first.yaml"
-	aesGcmFirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithAesGcmFirst, ctx.Done())
+	aesGcmFirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithAesGcmFirst, false, ctx.Done())
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithAesGcmFirst)
 	}
 
 	correctConfigWithAesCbcFirst := "testdata/valid-configs/aes-cbc-first.yaml"
-	aesCbcFirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithAesCbcFirst, ctx.Done())
+	aesCbcFirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithAesCbcFirst, false, ctx.Done())
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithAesCbcFirst)
 	}
 
 	correctConfigWithSecretboxFirst := "testdata/valid-configs/secret-box-first.yaml"
-	secretboxFirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithSecretboxFirst, ctx.Done())
+	secretboxFirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithSecretboxFirst, false, ctx.Done())
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithSecretboxFirst)
 	}
 
 	correctConfigWithKMSFirst := "testdata/valid-configs/kms-first.yaml"
-	kmsFirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithKMSFirst, ctx.Done())
+	kmsFirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithKMSFirst, false, ctx.Done())
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithKMSFirst)
 	}
 
 	correctConfigWithKMSv2First := "testdata/valid-configs/kmsv2-first.yaml"
-	kmsv2FirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithKMSv2First, ctx.Done())
+	kmsv2FirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithKMSv2First, false, ctx.Done())
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithKMSv2First)
 	}
@@ -264,6 +264,8 @@ func TestKMSPluginHealthz(t *testing.T) {
 		config  string
 		want    []healthChecker
 		wantErr string
+		kmsv2   bool
+		kmsv1   bool
 	}{
 		{
 			desc:   "Install Healthz",
@@ -274,6 +276,7 @@ func TestKMSPluginHealthz(t *testing.T) {
 					ttl:  3 * time.Second,
 				},
 			},
+			kmsv1: true,
 		},
 		{
 			desc:   "Install multiple healthz",
@@ -288,6 +291,7 @@ func TestKMSPluginHealthz(t *testing.T) {
 					ttl:  3 * time.Second,
 				},
 			},
+			kmsv1: true,
 		},
 		{
 			desc:   "No KMS Providers",
@@ -306,6 +310,8 @@ func TestKMSPluginHealthz(t *testing.T) {
 					ttl:  3 * time.Second,
 				},
 			},
+			kmsv2: true,
+			kmsv1: true,
 		},
 		{
 			desc:    "Invalid API version",
@@ -325,7 +331,7 @@ func TestKMSPluginHealthz(t *testing.T) {
 				return
 			}
 
-			_, got, err := getTransformerOverridesAndKMSPluginProbes(config, testContext(t).Done())
+			_, got, kmsUsed, err := getTransformerOverridesAndKMSPluginProbes(config, testContext(t).Done())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -345,6 +351,13 @@ func TestKMSPluginHealthz(t *testing.T) {
 				default:
 					t.Fatalf("unexpected probe type %T", p)
 				}
+			}
+
+			if tt.kmsv2 != kmsUsed.v2Used {
+				t.Errorf("incorrect kms v2 detection: want=%v got=%v", tt.kmsv2, kmsUsed.v2Used)
+			}
+			if tt.kmsv1 != kmsUsed.v1Used {
+				t.Errorf("incorrect kms v1 detection: want=%v got=%v", tt.kmsv1, kmsUsed.v1Used)
 			}
 
 			if d := cmp.Diff(tt.want, got,
@@ -528,7 +541,7 @@ func getTransformerFromEncryptionConfig(t *testing.T, encryptionConfigPath strin
 	ctx := testContext(t)
 
 	t.Helper()
-	transformers, _, err := LoadEncryptionConfig(encryptionConfigPath, ctx.Done())
+	transformers, _, err := LoadEncryptionConfig(encryptionConfigPath, false, ctx.Done())
 	if err != nil {
 		t.Fatal(err)
 	}

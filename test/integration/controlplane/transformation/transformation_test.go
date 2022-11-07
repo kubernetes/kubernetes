@@ -26,26 +26,28 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-
-	"k8s.io/klog/v2"
+	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"k8s.io/component-base/metrics/legacyregistry"
-	"sigs.k8s.io/yaml"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	apiserverconfigv1 "k8s.io/apiserver/pkg/apis/config/v1"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog/v2"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -78,7 +80,7 @@ type transformTest struct {
 	secret            *corev1.Secret
 }
 
-func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML string) (*transformTest, error) {
+func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML string, reload bool) (*transformTest, error) {
 	e := transformTest{
 		logger:            l,
 		transformerConfig: transformerConfigYAML,
@@ -92,7 +94,7 @@ func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML strin
 		}
 	}
 
-	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(l, nil, e.getEncryptionOptions(), e.storageConfig); err != nil {
+	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(l, nil, e.getEncryptionOptions(reload), e.storageConfig); err != nil {
 		return nil, fmt.Errorf("failed to start KubeAPI server: %v", err)
 	}
 	klog.Infof("Started kube-apiserver %v", e.kubeAPIServer.ClientConfig.Host)
@@ -103,6 +105,15 @@ func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML strin
 
 	if e.ns, err = e.createNamespace(testNamespace); err != nil {
 		return nil, err
+	}
+
+	if transformerConfigYAML != "" && reload {
+		// when reloading is enabled, this healthz endpoint is always present
+		mustBeHealthy(l, "/kms-providers", "ok", e.kubeAPIServer.ClientConfig)
+
+		// excluding healthz endpoints even if they do not exist should work
+		mustBeHealthy(l, "", `warn: some health checks cannot be excluded: no matches for "kms-provider-0","kms-provider-1","kms-provider-2","kms-provider-3"`,
+			e.kubeAPIServer.ClientConfig, "kms-provider-0", "kms-provider-1", "kms-provider-2", "kms-provider-3")
 	}
 
 	return &e, nil
@@ -228,10 +239,11 @@ func (e *transformTest) getRawSecretFromETCD() ([]byte, error) {
 	return etcdResponse.Kvs[0].Value, nil
 }
 
-func (e *transformTest) getEncryptionOptions() []string {
+func (e *transformTest) getEncryptionOptions(reload bool) []string {
 	if e.transformerConfig != "" {
 		return []string{
 			"--encryption-provider-config", path.Join(e.configDir, encryptionConfigFileName),
+			fmt.Sprintf("--encryption-provider-config-automatic-reload=%v", reload),
 			"--disable-admission-plugins", "ServiceAccount"}
 	}
 
@@ -400,4 +412,60 @@ func (e *transformTest) printMetrics() error {
 	}
 
 	return nil
+}
+
+func mustBeHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
+	t.Helper()
+	var restErr error
+	pollErr := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		body, ok, err := getHealthz(checkName, clientConfig, excludes...)
+		restErr = err
+		if err != nil {
+			return false, err
+		}
+		done := ok && strings.Contains(body, wantBodyContains)
+		if !done {
+			t.Logf("expected server check %q to be healthy with message %q but it is not: %s", checkName, wantBodyContains, body)
+		}
+		return done, nil
+	})
+
+	if pollErr == wait.ErrWaitTimeout {
+		t.Fatalf("failed to get the expected healthz status of OK for check: %s, error: %v, debug inner error: %v", checkName, pollErr, restErr)
+	}
+}
+
+func mustBeUnHealthy(t kubeapiservertesting.Logger, checkName, wantBodyContains string, clientConfig *rest.Config, excludes ...string) {
+	t.Helper()
+	var restErr error
+	pollErr := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		body, ok, err := getHealthz(checkName, clientConfig, excludes...)
+		restErr = err
+		if err != nil {
+			return false, err
+		}
+		done := !ok && strings.Contains(body, wantBodyContains)
+		if !done {
+			t.Logf("expected server check %q to be unhealthy with message %q but it is not: %s", checkName, wantBodyContains, body)
+		}
+		return done, nil
+	})
+
+	if pollErr == wait.ErrWaitTimeout {
+		t.Fatalf("failed to get the expected healthz status of !OK for check: %s, error: %v, debug inner error: %v", checkName, pollErr, restErr)
+	}
+}
+
+func getHealthz(checkName string, clientConfig *rest.Config, excludes ...string) (string, bool, error) {
+	client, err := kubernetes.NewForConfig(clientConfig)
+	if err != nil {
+		return "", false, fmt.Errorf("failed to create a client: %v", err)
+	}
+
+	req := client.CoreV1().RESTClient().Get().AbsPath(fmt.Sprintf("/healthz%v", checkName)).Param("verbose", "true")
+	for _, exclude := range excludes {
+		req.Param("exclude", exclude)
+	}
+	body, err := req.DoRaw(context.TODO()) // we can still have a response body during an error case
+	return string(body), err == nil, nil
 }
