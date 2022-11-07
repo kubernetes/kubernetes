@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -56,6 +57,7 @@ const (
 	encryptionConfigFileName = "encryption.conf"
 	testNamespace            = "secret-encryption-test"
 	testSecret               = "test-secret"
+	testConfigmap            = "test-configmap"
 	metricsPrefix            = "apiserver_storage_"
 	configMapKey             = "foo"
 	configMapVal             = "bar"
@@ -73,6 +75,7 @@ type transformTest struct {
 	logger            kubeapiservertesting.Logger
 	storageConfig     *storagebackend.Config
 	configDir         string
+	configParentDir   string
 	transformerConfig string
 	kubeAPIServer     kubeapiservertesting.TestServer
 	restClient        *kubernetes.Clientset
@@ -80,7 +83,7 @@ type transformTest struct {
 	secret            *corev1.Secret
 }
 
-func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML string, reload bool) (*transformTest, error) {
+func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML string, reload bool, configDir string, ecSymLink bool) (*transformTest, error) {
 	e := transformTest{
 		logger:            l,
 		transformerConfig: transformerConfigYAML,
@@ -88,10 +91,14 @@ func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML strin
 	}
 
 	var err error
-	if transformerConfigYAML != "" {
-		if e.configDir, err = e.createEncryptionConfig(); err != nil {
+	// create config dir with provided config yaml
+	if transformerConfigYAML != "" && configDir == "" {
+		if e.configDir, e.configParentDir, err = e.createEncryptionConfig(ecSymLink); err != nil {
 			return nil, fmt.Errorf("error while creating KubeAPIServer encryption config: %v", err)
 		}
+	} else {
+		// configDir already exists. api-server must be restarting with existing encryption config
+		e.configDir = configDir
 	}
 
 	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(l, nil, e.getEncryptionOptions(reload), e.storageConfig); err != nil {
@@ -121,6 +128,11 @@ func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML strin
 
 func (e *transformTest) cleanUp() {
 	os.RemoveAll(e.configDir)
+	os.RemoveAll(e.configParentDir)
+	e.shutdownAPIServer()
+}
+
+func (e *transformTest) shutdownAPIServer() {
 	e.restClient.CoreV1().Namespaces().Delete(context.TODO(), e.ns.Name, *metav1.NewDeleteOptions(0))
 	e.kubeAPIServer.TearDownFn()
 }
@@ -250,20 +262,40 @@ func (e *transformTest) getEncryptionOptions(reload bool) []string {
 	return nil
 }
 
-func (e *transformTest) createEncryptionConfig() (string, error) {
+func (e *transformTest) createEncryptionConfig(ecSymLink bool) (string, string, error) {
 	tempDir, err := os.MkdirTemp("", "secrets-encryption-test")
 	if err != nil {
-		return "", fmt.Errorf("failed to create temp directory: %v", err)
+		return "", "", fmt.Errorf("failed to create temp directory: %v", err)
+	}
+
+	if ecSymLink {
+		// create another temp dir
+		parentTempDir, err := os.MkdirTemp("", "secrets-encryption-symlink-test")
+		if err != nil {
+			return tempDir, "", fmt.Errorf("failed to create temp directory: %v", err)
+		}
+
+		// create config file
+		if err := os.WriteFile(filepath.Join(parentTempDir, encryptionConfigFileName), []byte(e.transformerConfig), 0644); err != nil {
+			return tempDir, parentTempDir, fmt.Errorf("failed to write encryption config file: %v", err)
+		}
+
+		// create symlink
+		if err := os.Symlink(filepath.Join(parentTempDir, encryptionConfigFileName), filepath.Join(tempDir, encryptionConfigFileName)); err != nil {
+			return tempDir, parentTempDir, fmt.Errorf("failed to create symlink: %v", err)
+		}
+
+		return tempDir, parentTempDir, nil
 	}
 
 	encryptionConfig := path.Join(tempDir, encryptionConfigFileName)
 
 	if err := os.WriteFile(encryptionConfig, []byte(e.transformerConfig), 0644); err != nil {
 		os.RemoveAll(tempDir)
-		return "", fmt.Errorf("error while writing encryption config: %v", err)
+		return tempDir, "", fmt.Errorf("error while writing encryption config: %v", err)
 	}
 
-	return tempDir, nil
+	return tempDir, "", nil
 }
 
 func (e *transformTest) getEncryptionConfig() (*apiserverconfigv1.ProviderConfiguration, error) {

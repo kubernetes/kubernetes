@@ -306,7 +306,7 @@ func TestKMSHealthzEndpoint(t *testing.T) {
 				EncryptionProviderConfigAutomaticReload: tc.reload,
 				SkipHealthEndpoints:                     tc.skipHealth,
 			}
-			if err := etcdOptions.Complete(serverConfig.StorageObjectCountTracker, serverConfig.DrainedNotify()); err != nil {
+			if err := etcdOptions.Complete(serverConfig.StorageObjectCountTracker, serverConfig.DrainedNotify(), serverConfig.AddPostStartHook); err != nil {
 				t.Fatal(err)
 			}
 			if err := etcdOptions.ApplyTo(serverConfig); err != nil {
@@ -345,7 +345,7 @@ func TestReadinessCheck(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			serverConfig := server.NewConfig(codecs)
 			etcdOptions := &EtcdOptions{SkipHealthEndpoints: tc.skipHealth}
-			if err := etcdOptions.Complete(serverConfig.StorageObjectCountTracker, serverConfig.DrainedNotify()); err != nil {
+			if err := etcdOptions.Complete(serverConfig.StorageObjectCountTracker, serverConfig.DrainedNotify(), serverConfig.AddPostStartHook); err != nil {
 				t.Fatal(err)
 			}
 			if err := etcdOptions.ApplyTo(serverConfig); err != nil {

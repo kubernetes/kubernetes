@@ -27,15 +27,16 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
+	kmsconfigcontroller "k8s.io/apiserver/pkg/server/options/encryptionconfig/controller"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
-	"k8s.io/apiserver/pkg/storage/value"
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/klog/v2"
 )
@@ -64,7 +65,7 @@ type EtcdOptions struct {
 
 	// complete guards fields that must be initialized via Complete before the Apply methods can be used.
 	complete               bool
-	transformerOverrides   map[schema.GroupResource]value.Transformer
+	resourceTransformers   encryptionconfig.ResourceTransformers
 	kmsPluginHealthzChecks []healthz.HealthChecker
 
 	// SkipHealthEndpoints, when true, causes the Apply methods to not set up health endpoints.
@@ -125,7 +126,7 @@ func (s *EtcdOptions) Validate() []error {
 	return allErrors
 }
 
-// AddEtcdFlags adds flags related to etcd storage for a specific APIServer to the specified FlagSet
+// AddFlags adds flags related to etcd storage for a specific APIServer to the specified FlagSet
 func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 	if s == nil {
 		return
@@ -213,7 +214,11 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 // Complete must be called exactly once before using any of the Apply methods.  It is responsible for setting
 // up objects that must be created once and reused across multiple invocations such as storage transformers.
 // This method mutates the receiver (EtcdOptions).  It must never mutate the inputs.
-func (s *EtcdOptions) Complete(storageObjectCountTracker flowcontrolrequest.StorageObjectCountTracker, stopCh <-chan struct{}) error {
+func (s *EtcdOptions) Complete(
+	storageObjectCountTracker flowcontrolrequest.StorageObjectCountTracker,
+	stopCh <-chan struct{},
+	addPostStartHook func(name string, hook server.PostStartHookFunc) error,
+) error {
 	if s == nil {
 		return nil
 	}
@@ -223,12 +228,56 @@ func (s *EtcdOptions) Complete(storageObjectCountTracker flowcontrolrequest.Stor
 	}
 
 	if len(s.EncryptionProviderConfigFilepath) != 0 {
-		transformerOverrides, kmsPluginHealthzChecks, err := encryptionconfig.LoadEncryptionConfig(s.EncryptionProviderConfigFilepath, s.EncryptionProviderConfigAutomaticReload, stopCh)
+		ctx, closeTransformers := wait.ContextForChannel(stopCh)
+
+		encryptionConfiguration, err := encryptionconfig.LoadEncryptionConfig(s.EncryptionProviderConfigFilepath, s.EncryptionProviderConfigAutomaticReload, ctx.Done())
 		if err != nil {
+			// in case of error, we want to close partially initialized (if any) transformers
+			closeTransformers()
 			return err
 		}
-		s.transformerOverrides = transformerOverrides
-		s.kmsPluginHealthzChecks = kmsPluginHealthzChecks
+
+		// enable kms hot reload controller only if the config file is set to be automatically reloaded
+		if s.EncryptionProviderConfigAutomaticReload {
+			// with reload=true we will always have 1 health check
+			if len(encryptionConfiguration.HealthChecks) != 1 {
+				// in case of error, we want to close partially initialized (if any) transformers
+				closeTransformers()
+				return fmt.Errorf("failed to start kms encryption config hot reload controller. only 1 health check should be available when reload is enabled")
+			}
+
+			dynamicTransformers := encryptionconfig.NewDynamicTransformers(encryptionConfiguration.Transformers, encryptionConfiguration.HealthChecks[0], closeTransformers, encryptionConfiguration.KMSCloseGracePeriod)
+
+			s.resourceTransformers = dynamicTransformers
+			s.kmsPluginHealthzChecks = []healthz.HealthChecker{dynamicTransformers}
+
+			// add post start hook to start hot reload controller
+			// adding this hook here will ensure that it gets configured exactly once
+			err = addPostStartHook(
+				"start-encryption-provider-config-automatic-reload",
+				func(hookContext server.PostStartHookContext) error {
+					kmsConfigController := kmsconfigcontroller.NewDynamicKMSEncryptionConfiguration(
+						"kms-encryption-config",
+						s.EncryptionProviderConfigFilepath,
+						dynamicTransformers,
+						encryptionConfiguration.EncryptionFileContentHash,
+						ctx.Done(),
+					)
+
+					go kmsConfigController.Run(ctx)
+
+					return nil
+				},
+			)
+			if err != nil {
+				// in case of error, we want to close partially initialized (if any) transformers
+				closeTransformers()
+				return fmt.Errorf("failed to add post start hook for kms encryption config hot reload controller: %w", err)
+			}
+		} else {
+			s.resourceTransformers = encryptionconfig.StaticTransformers(encryptionConfiguration.Transformers)
+			s.kmsPluginHealthzChecks = encryptionConfiguration.HealthChecks
+		}
 	}
 
 	s.StorageConfig.StorageObjectCountTracker = storageObjectCountTracker
@@ -263,10 +312,10 @@ func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFac
 		}
 	}
 
-	if len(s.transformerOverrides) > 0 {
+	if s.resourceTransformers != nil {
 		factory = &transformerStorageFactory{
 			delegate:             factory,
-			transformerOverrides: s.transformerOverrides,
+			resourceTransformers: s.resourceTransformers,
 		}
 	}
 
@@ -400,7 +449,7 @@ var _ serverstorage.StorageFactory = &transformerStorageFactory{}
 
 type transformerStorageFactory struct {
 	delegate             serverstorage.StorageFactory
-	transformerOverrides map[schema.GroupResource]value.Transformer
+	resourceTransformers encryptionconfig.ResourceTransformers
 }
 
 func (t *transformerStorageFactory) NewConfig(resource schema.GroupResource) (*storagebackend.ConfigForResource, error) {
@@ -409,14 +458,9 @@ func (t *transformerStorageFactory) NewConfig(resource schema.GroupResource) (*s
 		return nil, err
 	}
 
-	transformer, ok := t.transformerOverrides[resource]
-	if !ok {
-		return config, nil
-	}
-
 	configCopy := *config
 	resourceConfig := configCopy.Config
-	resourceConfig.Transformer = transformer
+	resourceConfig.Transformer = t.resourceTransformers.TransformerForResource(resource)
 	configCopy.Config = resourceConfig
 
 	return &configCopy, nil

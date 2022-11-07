@@ -114,7 +114,7 @@ func newMockErrorEnvelopeKMSv2Service(endpoint string, timeout time.Duration) (e
 
 func TestLegacyConfig(t *testing.T) {
 	legacyV1Config := "testdata/valid-configs/legacy.yaml"
-	legacyConfigObject, err := loadConfig(legacyV1Config, false)
+	legacyConfigObject, _, err := loadConfig(legacyV1Config, false)
 	cacheSize := int32(10)
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, legacyV1Config)
@@ -177,48 +177,48 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 	// Transforms data using one of them, and tries to untransform using the others.
 	// Repeats this for all possible combinations.
 	correctConfigWithIdentityFirst := "testdata/valid-configs/identity-first.yaml"
-	identityFirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithIdentityFirst, false, ctx.Done())
+	identityFirstEncryptionConfiguration, err := LoadEncryptionConfig(correctConfigWithIdentityFirst, false, ctx.Done())
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithIdentityFirst)
 	}
 
 	correctConfigWithAesGcmFirst := "testdata/valid-configs/aes-gcm-first.yaml"
-	aesGcmFirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithAesGcmFirst, false, ctx.Done())
+	aesGcmFirstEncryptionConfiguration, err := LoadEncryptionConfig(correctConfigWithAesGcmFirst, false, ctx.Done())
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithAesGcmFirst)
 	}
 
 	correctConfigWithAesCbcFirst := "testdata/valid-configs/aes-cbc-first.yaml"
-	aesCbcFirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithAesCbcFirst, false, ctx.Done())
+	aesCbcFirstEncryptionConfiguration, err := LoadEncryptionConfig(correctConfigWithAesCbcFirst, false, ctx.Done())
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithAesCbcFirst)
 	}
 
 	correctConfigWithSecretboxFirst := "testdata/valid-configs/secret-box-first.yaml"
-	secretboxFirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithSecretboxFirst, false, ctx.Done())
+	secretboxFirstEncryptionConfiguration, err := LoadEncryptionConfig(correctConfigWithSecretboxFirst, false, ctx.Done())
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithSecretboxFirst)
 	}
 
 	correctConfigWithKMSFirst := "testdata/valid-configs/kms-first.yaml"
-	kmsFirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithKMSFirst, false, ctx.Done())
+	kmsFirstEncryptionConfiguration, err := LoadEncryptionConfig(correctConfigWithKMSFirst, false, ctx.Done())
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithKMSFirst)
 	}
 
 	correctConfigWithKMSv2First := "testdata/valid-configs/kmsv2-first.yaml"
-	kmsv2FirstTransformerOverrides, _, err := LoadEncryptionConfig(correctConfigWithKMSv2First, false, ctx.Done())
+	kmsv2FirstEncryptionConfiguration, err := LoadEncryptionConfig(correctConfigWithKMSv2First, false, ctx.Done())
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithKMSv2First)
 	}
 
 	// Pick the transformer for any of the returned resources.
-	identityFirstTransformer := identityFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
-	aesGcmFirstTransformer := aesGcmFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
-	aesCbcFirstTransformer := aesCbcFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
-	secretboxFirstTransformer := secretboxFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
-	kmsFirstTransformer := kmsFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
-	kmsv2FirstTransformer := kmsv2FirstTransformerOverrides[schema.ParseGroupResource("secrets")]
+	identityFirstTransformer := identityFirstEncryptionConfiguration.Transformers[schema.ParseGroupResource("secrets")]
+	aesGcmFirstTransformer := aesGcmFirstEncryptionConfiguration.Transformers[schema.ParseGroupResource("secrets")]
+	aesCbcFirstTransformer := aesCbcFirstEncryptionConfiguration.Transformers[schema.ParseGroupResource("secrets")]
+	secretboxFirstTransformer := secretboxFirstEncryptionConfiguration.Transformers[schema.ParseGroupResource("secrets")]
+	kmsFirstTransformer := kmsFirstEncryptionConfiguration.Transformers[schema.ParseGroupResource("secrets")]
+	kmsv2FirstTransformer := kmsv2FirstEncryptionConfiguration.Transformers[schema.ParseGroupResource("secrets")]
 
 	dataCtx := value.DefaultContext([]byte(sampleContextText))
 	originalText := []byte(sampleText)
@@ -253,6 +253,222 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 				t.Fatalf("%s: %s transformer transformed data incorrectly. Expected: %v, got %v", testCase.Name, transformer.Name, originalText, untransformedData)
 			}
 		}
+	}
+}
+
+func TestKMSMaxTimeout(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
+
+	testCases := []struct {
+		name            string
+		expectedTimeout time.Duration
+		config          apiserverconfig.EncryptionConfiguration
+	}{
+		{
+			name: "default timeout",
+			config: apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{"secrets"},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout: &metav1.Duration{
+										// default timeout is 3s
+										// this will be set automatically if not provided in config file
+										Duration: 3 * time.Second,
+									},
+									Endpoint: "unix:///tmp/testprovider.sock",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedTimeout: 6 * time.Second,
+		},
+		{
+			name: "with v1 provider",
+			config: apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{"secrets"},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout: &metav1.Duration{
+										// default timeout is 3s
+										// this will be set automatically if not provided in config file
+										Duration: 3 * time.Second,
+									},
+									Endpoint: "unix:///tmp/testprovider.sock",
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{"configmaps"},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout: &metav1.Duration{
+										// default timeout is 3s
+										// this will be set automatically if not provided in config file
+										Duration: 3 * time.Second,
+									},
+									Endpoint: "unix:///tmp/testprovider.sock",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedTimeout: 12 * time.Second,
+		},
+		{
+			name: "with v2 provider",
+			config: apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{"secrets"},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v2",
+									Timeout: &metav1.Duration{
+										Duration: 15 * time.Second,
+									},
+									Endpoint: "unix:///tmp/testprovider.sock",
+								},
+							},
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "new-kms",
+									APIVersion: "v2",
+									Timeout: &metav1.Duration{
+										Duration: 5 * time.Second,
+									},
+									Endpoint: "unix:///tmp/anothertestprovider.sock",
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{"configmaps"},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "another-kms",
+									APIVersion: "v2",
+									Timeout: &metav1.Duration{
+										Duration: 10 * time.Second,
+									},
+									Endpoint: "unix:///tmp/testprovider.sock",
+								},
+							},
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "yet-another-kms",
+									APIVersion: "v2",
+									Timeout: &metav1.Duration{
+										Duration: 2 * time.Second,
+									},
+									Endpoint: "unix:///tmp/anothertestprovider.sock",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedTimeout: 32 * time.Second,
+		},
+		{
+			name: "with v1 and v2 provider",
+			config: apiserverconfig.EncryptionConfiguration{
+				Resources: []apiserverconfig.ResourceConfiguration{
+					{
+						Resources: []string{"secrets"},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout: &metav1.Duration{
+										Duration: 1 * time.Second,
+									},
+									Endpoint: "unix:///tmp/testprovider.sock",
+								},
+							},
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "another-kms",
+									APIVersion: "v2",
+									Timeout: &metav1.Duration{
+										Duration: 1 * time.Second,
+									},
+									Endpoint: "unix:///tmp/anothertestprovider.sock",
+								},
+							},
+						},
+					},
+					{
+						Resources: []string{"configmaps"},
+						Providers: []apiserverconfig.ProviderConfiguration{
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "kms",
+									APIVersion: "v1",
+									Timeout: &metav1.Duration{
+										Duration: 4 * time.Second,
+									},
+									Endpoint: "unix:///tmp/testprovider.sock",
+								},
+							},
+							{
+								KMS: &apiserverconfig.KMSConfiguration{
+									Name:       "yet-another-kms",
+									APIVersion: "v1",
+									Timeout: &metav1.Duration{
+										Duration: 2 * time.Second,
+									},
+									Endpoint: "unix:///tmp/anothertestprovider.sock",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedTimeout: 15 * time.Second,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			cacheSize := int32(1000)
+			for _, resource := range testCase.config.Resources {
+				for _, provider := range resource.Providers {
+					if provider.KMS != nil {
+						provider.KMS.CacheSize = &cacheSize
+					}
+				}
+			}
+
+			_, _, kmsUsed, _ := getTransformerOverridesAndKMSPluginHealthzCheckers(&testCase.config, testContext(t).Done())
+			if kmsUsed == nil {
+				t.Fatal("kmsUsed should not be nil")
+			}
+
+			if kmsUsed.kmsTimeoutSum != testCase.expectedTimeout {
+				t.Fatalf("expected timeout %v, got %v", testCase.expectedTimeout, kmsUsed.kmsTimeoutSum)
+			}
+		})
 	}
 }
 
@@ -323,7 +539,7 @@ func TestKMSPluginHealthz(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
-			config, err := loadConfig(tt.config, false)
+			config, _, err := loadConfig(tt.config, false)
 			if errStr := errString(err); errStr != tt.wantErr {
 				t.Fatalf("unexpected error state got=%s want=%s", errStr, tt.wantErr)
 			}
@@ -541,14 +757,14 @@ func getTransformerFromEncryptionConfig(t *testing.T, encryptionConfigPath strin
 	ctx := testContext(t)
 
 	t.Helper()
-	transformers, _, err := LoadEncryptionConfig(encryptionConfigPath, false, ctx.Done())
+	encryptionConfiguration, err := LoadEncryptionConfig(encryptionConfigPath, false, ctx.Done())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(transformers) != 1 {
+	if len(encryptionConfiguration.Transformers) != 1 {
 		t.Fatalf("input config does not have exactly one resource: %s", encryptionConfigPath)
 	}
-	for _, transformer := range transformers {
+	for _, transformer := range encryptionConfiguration.Transformers {
 		return transformer
 	}
 	panic("unreachable")
@@ -601,4 +817,13 @@ func errString(err error) string {
 	}
 
 	return err.Error()
+}
+
+func TestComputeEncryptionConfigHash(t *testing.T) {
+	// hash the empty string to be sure that sha256 is being used
+	expect := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	sum := computeEncryptionConfigHash([]byte(""))
+	if expect != sum {
+		t.Errorf("expected hash %q but got %q", expect, sum)
+	}
 }

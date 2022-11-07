@@ -140,7 +140,7 @@ resources:
 	}
 	defer pluginMock.CleanUp()
 
-	test, err := newTransformTest(t, encryptionConfig, false)
+	test, err := newTransformTest(t, encryptionConfig, false, "", false)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -253,7 +253,7 @@ resources:
 		t.Fatalf("Failed to start KMS Plugin #2: err: %v", err)
 	}
 
-	test, err := newTransformTest(t, encryptionConfig, false)
+	test, err := newTransformTest(t, encryptionConfig, false, "", false)
 	if err != nil {
 		t.Fatalf("Failed to start kube-apiserver, error: %v", err)
 	}
@@ -341,7 +341,7 @@ resources:
 	}
 	t.Cleanup(pluginMock.CleanUp)
 
-	test, err := newTransformTest(t, encryptionConfig, false)
+	test, err := newTransformTest(t, encryptionConfig, false, "", false)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
