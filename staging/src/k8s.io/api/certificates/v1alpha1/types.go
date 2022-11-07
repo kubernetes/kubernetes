@@ -95,7 +95,7 @@ type ClusterTrustBundleSpec struct {
 // ClusterTrustBundleList is a collection of ClusterTrustBundle objects
 type ClusterTrustBundleList struct {
 	metav1.TypeMeta `json:",inline"`
-	
+
 	// metadata contains the list metadata.
 	//
 	// +optional
