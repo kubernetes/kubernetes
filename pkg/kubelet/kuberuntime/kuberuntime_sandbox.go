@@ -25,8 +25,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	runtimeutil "k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -230,6 +232,15 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 func (m *kubeGenericRuntimeManager) generatePodSandboxWindowsConfig(pod *v1.Pod) (*runtimeapi.WindowsPodSandboxConfig, error) {
 	wc := &runtimeapi.WindowsPodSandboxConfig{
 		SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{},
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostNetwork) {
+		wc.SecurityContext.NamespaceOptions = &runtimeapi.WindowsNamespaceOption{}
+		if kubecontainer.IsHostNetworkPod(pod) {
+			wc.SecurityContext.NamespaceOptions.Network = runtimeapi.NamespaceMode_NODE
+		} else {
+			wc.SecurityContext.NamespaceOptions.Network = runtimeapi.NamespaceMode_POD
+		}
 	}
 
 	// If all of the containers in a pod are HostProcess containers, set the pod's HostProcess field

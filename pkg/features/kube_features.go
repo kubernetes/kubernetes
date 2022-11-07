@@ -806,6 +806,13 @@ const (
 	WinOverlay featuregate.Feature = "WinOverlay"
 
 	// owner: @marosset
+	// kep: https://kep.k8s.io/3503
+	// alpha: v1.26
+	//
+	// Enables support for joining Windows containers to a hosts' network namespace.
+	WindowsHostNetwork featuregate.Feature = "WindowsHostNetwork"
+
+	// owner: @marosset
 	// alpha: v1.22
 	// beta: v1.23
 	// GA: v1.26
@@ -1050,6 +1057,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WinDSR: {Default: false, PreRelease: featuregate.Alpha},
 
 	WinOverlay: {Default: true, PreRelease: featuregate.Beta},
+
+	WindowsHostNetwork: {Default: true, PreRelease: featuregate.Alpha},
 
 	WindowsHostProcessContainers: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.28
 

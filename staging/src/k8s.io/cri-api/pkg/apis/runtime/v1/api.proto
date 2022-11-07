@@ -900,6 +900,13 @@ message LinuxContainerConfig {
     LinuxContainerSecurityContext security_context = 2;
 }
 
+// WindowsNamespaceOption provides options for Windows namespaces.
+message WindowsNamespaceOption {
+    // Network namespace for this container/sandbox.
+    // Namespaces currently set by the kubelet: POD, NODE
+    NamespaceMode network = 1;
+}
+
 // WindowsSandboxSecurityContext holds platform-specific configurations that will be
 // applied to a sandbox.
 // These settings will only apply to the sandbox container.
@@ -914,6 +921,9 @@ message WindowsSandboxSecurityContext {
 
     // Indicates whether the container requested to run as a HostProcess container.
     bool host_process = 3;
+
+    // Configuration for the sandbox's namespaces
+    WindowsNamespaceOption namespace_options = 4;
 }
 
 // WindowsPodSandboxConfig holds platform-specific configurations for Windows
