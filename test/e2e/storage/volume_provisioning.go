@@ -808,7 +808,7 @@ func newStorageClass(t testsuites.StorageClassTest, ns string, prefix string) *s
 		}
 	}
 
-	sc := getStorageClass(pluginName, t.Parameters, &bindingMode, ns, prefix)
+	sc := getStorageClass(pluginName, t.Parameters, &bindingMode, t.MountOptions, ns, prefix)
 	if t.AllowVolumeExpansion {
 		sc.AllowVolumeExpansion = &t.AllowVolumeExpansion
 	}
@@ -819,6 +819,7 @@ func getStorageClass(
 	provisioner string,
 	parameters map[string]string,
 	bindingMode *storagev1.VolumeBindingMode,
+	mountOptions []string,
 	ns string,
 	prefix string,
 ) *storagev1.StorageClass {
@@ -837,6 +838,7 @@ func getStorageClass(
 		Provisioner:       provisioner,
 		Parameters:        parameters,
 		VolumeBindingMode: bindingMode,
+		MountOptions:      mountOptions,
 	}
 }
 

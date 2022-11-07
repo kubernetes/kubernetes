@@ -112,6 +112,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		tokenRequests           []storagev1.TokenRequest
 		requiresRepublish       *bool
 		fsGroupPolicy           *storagev1.FSGroupPolicy
+		enableSELinuxMount      *bool
 	}
 
 	type mockDriverSetup struct {
@@ -155,6 +156,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			TokenRequests:          tp.tokenRequests,
 			RequiresRepublish:      tp.requiresRepublish,
 			FSGroupPolicy:          tp.fsGroupPolicy,
+			EnableSELinuxMount:     tp.enableSELinuxMount,
 		}
 
 		// At the moment, only tests which need hooks are
@@ -270,8 +272,39 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			DelayBinding:         m.tp.lateBinding,
 			AllowVolumeExpansion: m.tp.enableResizing,
 		}
-
 		class, claim, pod := startBusyBoxPod(f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name, fsGroup)
+
+		if class != nil {
+			m.sc[class.Name] = class
+		}
+		if claim != nil {
+			m.pvcs = append(m.pvcs, claim)
+		}
+
+		if pod != nil {
+			m.pods = append(m.pods, pod)
+		}
+
+		return class, claim, pod
+	}
+
+	createPodWithSELinux := func(accessModes []v1.PersistentVolumeAccessMode, mountOptions []string, seLinuxOpts *v1.SELinuxOptions) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+		ginkgo.By("Creating pod with SELinux context")
+		nodeSelection := m.config.ClientNodeSelection
+		sc := m.driver.GetDynamicProvisionStorageClass(m.config, "")
+		scTest := testsuites.StorageClassTest{
+			Name:                 m.driver.GetDriverInfo().Name,
+			Provisioner:          sc.Provisioner,
+			Parameters:           sc.Parameters,
+			ClaimSize:            "1Gi",
+			ExpectedSize:         "1Gi",
+			DelayBinding:         m.tp.lateBinding,
+			AllowVolumeExpansion: m.tp.enableResizing,
+			MountOptions:         mountOptions,
+		}
+		class, claim := createClaim(f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name, accessModes)
+		pod, err := startPausePodWithSELinuxOptions(f.ClientSet, claim, nodeSelection, f.Namespace.Name, seLinuxOpts)
+		framework.ExpectNoError(err, "Failed to create pause pod with SELinux context %s: %v", seLinuxOpts, err)
 
 		if class != nil {
 			m.sc[class.Name] = class
@@ -1978,6 +2011,94 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			})
 		}
 	})
+
+	ginkgo.Context("SELinuxMount [LinuxOnly][Feature:SELinuxMountReadWriteOncePod]", func() {
+		// Make sure all options are set so system specific defaults are not used.
+		seLinuxOpts := v1.SELinuxOptions{
+			User:  "system_u",
+			Role:  "object_r",
+			Type:  "container_file_t",
+			Level: "s0:c0,c1",
+		}
+		seLinuxMountOption := "context=\"system_u:object_r:container_file_t:s0:c0,c1\""
+
+		tests := []struct {
+			name                 string
+			seLinuxEnabled       bool
+			seLinuxSetInPod      bool
+			mountOptions         []string
+			volumeMode           v1.PersistentVolumeAccessMode
+			expectedMountOptions []string
+		}{
+			{
+				name:                 "should pass SELinux mount option for RWOP volume and Pod with SELinux context set",
+				seLinuxEnabled:       true,
+				seLinuxSetInPod:      true,
+				volumeMode:           v1.ReadWriteOncePod,
+				expectedMountOptions: []string{seLinuxMountOption},
+			},
+			{
+				name:                 "should add SELinux mount option to existing mount options",
+				seLinuxEnabled:       true,
+				seLinuxSetInPod:      true,
+				mountOptions:         []string{"noexec", "noatime"},
+				volumeMode:           v1.ReadWriteOncePod,
+				expectedMountOptions: []string{"noexec", "noatime", seLinuxMountOption},
+			},
+			{
+				name:                 "should not pass SELinux mount option for RWO volume",
+				seLinuxEnabled:       true,
+				seLinuxSetInPod:      true,
+				volumeMode:           v1.ReadWriteOnce,
+				expectedMountOptions: nil,
+			},
+			{
+				name:                 "should not pass SELinux mount option for Pod without SELinux context",
+				seLinuxEnabled:       true,
+				seLinuxSetInPod:      false,
+				volumeMode:           v1.ReadWriteOncePod,
+				expectedMountOptions: nil,
+			},
+			{
+				name:                 "should not pass SELinux mount option for CSI driver that does not support SELinux mount",
+				seLinuxEnabled:       false,
+				seLinuxSetInPod:      true,
+				volumeMode:           v1.ReadWriteOncePod,
+				expectedMountOptions: nil,
+			},
+		}
+		for _, t := range tests {
+			t := t
+			ginkgo.It(t.name, func() {
+				if framework.NodeOSDistroIs("windows") {
+					e2eskipper.Skipf("SELinuxMount is only applied on linux nodes -- skipping")
+				}
+				var nodeStageMountOpts, nodePublishMountOpts []string
+				init(testParameters{
+					disableAttach:      true,
+					registerDriver:     true,
+					enableSELinuxMount: &t.seLinuxEnabled,
+					hooks:              createSELinuxMountPreHook(&nodeStageMountOpts, &nodePublishMountOpts),
+				})
+				defer cleanup()
+
+				accessModes := []v1.PersistentVolumeAccessMode{t.volumeMode}
+				var podSELinuxOpts *v1.SELinuxOptions
+				if t.seLinuxSetInPod {
+					// Make sure all options are set so system specific defaults are not used.
+					podSELinuxOpts = &seLinuxOpts
+				}
+
+				_, _, pod := createPodWithSELinux(accessModes, t.mountOptions, podSELinuxOpts)
+				err := e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+				framework.ExpectNoError(err, "failed to start pod")
+
+				framework.ExpectEqual(nodeStageMountOpts, t.expectedMountOptions, "Expect NodeStageVolumeRequest.VolumeCapability.MountVolume. to equal %q; got: %q", t.expectedMountOptions, nodeStageMountOpts)
+				framework.ExpectEqual(nodePublishMountOpts, t.expectedMountOptions, "Expect NodePublishVolumeRequest.VolumeCapability.MountVolume.VolumeMountGroup to equal %q; got: %q", t.expectedMountOptions, nodeStageMountOpts)
+			})
+		}
+	})
+
 })
 
 func deleteSnapshot(cs clientset.Interface, config *storageframework.PerTestConfig, snapshot *unstructured.Unstructured) {
@@ -2122,12 +2243,13 @@ func createSC(cs clientset.Interface, t testsuites.StorageClassTest, scName, ns 
 	return class
 }
 
-func createClaim(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim) {
+func createClaim(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string, accessModes []v1.PersistentVolumeAccessMode) (*storagev1.StorageClass, *v1.PersistentVolumeClaim) {
 	class := createSC(cs, t, scName, ns)
 	claim := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 		ClaimSize:        t.ClaimSize,
 		StorageClassName: &(class.Name),
 		VolumeMode:       &t.VolumeMode,
+		AccessModes:      accessModes,
 	}, ns)
 	claim, err := cs.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), claim, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create claim: %v", err)
@@ -2141,7 +2263,7 @@ func createClaim(cs clientset.Interface, t testsuites.StorageClassTest, node e2e
 }
 
 func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
-	class, claim := createClaim(cs, t, node, scName, ns)
+	class, claim := createClaim(cs, t, node, scName, ns, nil)
 
 	pod, err := startPausePodWithClaim(cs, claim, node, ns)
 	framework.ExpectNoError(err, "Failed to create pause pod: %v", err)
@@ -2149,7 +2271,7 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e
 }
 
 func startBusyBoxPod(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string, fsGroup *int64) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
-	class, claim := createClaim(cs, t, node, scName, ns)
+	class, claim := createClaim(cs, t, node, scName, ns, nil)
 	pod, err := startBusyBoxPodWithClaim(cs, claim, node, ns, fsGroup)
 	framework.ExpectNoError(err, "Failed to create busybox pod: %v", err)
 	return class, claim, pod
@@ -2268,6 +2390,45 @@ func startBusyBoxPodWithVolumeSource(cs clientset.Interface, volumeSource v1.Vol
 				{
 					Name:         "my-volume",
 					VolumeSource: volumeSource,
+				},
+			},
+		},
+	}
+	e2epod.SetNodeSelection(&pod.Spec, node)
+	return cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
+}
+
+func startPausePodWithSELinuxOptions(cs clientset.Interface, pvc *v1.PersistentVolumeClaim, node e2epod.NodeSelection, ns string, seLinuxOpts *v1.SELinuxOptions) (*v1.Pod, error) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "pvc-volume-tester-",
+		},
+		Spec: v1.PodSpec{
+			SecurityContext: &v1.PodSecurityContext{
+				SELinuxOptions: seLinuxOpts,
+			},
+			Containers: []v1.Container{
+				{
+					Name:  "volume-tester",
+					Image: imageutils.GetE2EImage(imageutils.Pause),
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "my-volume",
+							MountPath: "/mnt/test",
+						},
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+			Volumes: []v1.Volume{
+				{
+					Name: "my-volume",
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: pvc.Name,
+							ReadOnly:  false,
+						},
+					},
 				},
 			},
 		},
@@ -2494,6 +2655,30 @@ func createFSGroupRequestPreHook(nodeStageFsGroup, nodePublishFsGroup *string) *
 				mountVolume := nodePublishRequest.GetVolumeCapability().GetMount()
 				if mountVolume != nil {
 					*nodePublishFsGroup = mountVolume.VolumeMountGroup
+				}
+			}
+			return nil, nil
+		},
+	}
+}
+
+// createSELinuxMountPreHook creates a hook that records the mountOptions passed in
+// through NodeStageVolume and NodePublishVolume calls.
+func createSELinuxMountPreHook(nodeStageMountOpts, nodePublishMountOpts *[]string) *drivers.Hooks {
+	return &drivers.Hooks{
+		Pre: func(ctx context.Context, fullMethod string, request interface{}) (reply interface{}, err error) {
+			nodeStageRequest, ok := request.(*csipbv1.NodeStageVolumeRequest)
+			if ok {
+				mountVolume := nodeStageRequest.GetVolumeCapability().GetMount()
+				if mountVolume != nil {
+					*nodeStageMountOpts = mountVolume.MountFlags
+				}
+			}
+			nodePublishRequest, ok := request.(*csipbv1.NodePublishVolumeRequest)
+			if ok {
+				mountVolume := nodePublishRequest.GetVolumeCapability().GetMount()
+				if mountVolume != nil {
+					*nodePublishMountOpts = mountVolume.MountFlags
 				}
 			}
 			return nil, nil
