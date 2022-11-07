@@ -27,8 +27,9 @@ import (
 )
 
 type pullResult struct {
-	imageRef string
-	err      error
+	imageRef     string
+	err          error
+	pullDuration time.Duration
 }
 
 type imagePuller interface {
@@ -47,10 +48,12 @@ func newParallelImagePuller(imageService kubecontainer.ImageService) imagePuller
 
 func (pip *parallelImagePuller) pullImage(ctx context.Context, spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig) {
 	go func() {
+		startTime := time.Now()
 		imageRef, err := pip.imageService.PullImage(ctx, spec, pullSecrets, podSandboxConfig)
 		pullChan <- pullResult{
-			imageRef: imageRef,
-			err:      err,
+			imageRef:     imageRef,
+			err:          err,
+			pullDuration: time.Since(startTime),
 		}
 	}()
 }
@@ -89,10 +92,12 @@ func (sip *serialImagePuller) pullImage(ctx context.Context, spec kubecontainer.
 
 func (sip *serialImagePuller) processImagePullRequests() {
 	for pullRequest := range sip.pullRequests {
+		startTime := time.Now()
 		imageRef, err := sip.imageService.PullImage(pullRequest.ctx, pullRequest.spec, pullRequest.pullSecrets, pullRequest.podSandboxConfig)
 		pullRequest.pullChan <- pullResult{
-			imageRef: imageRef,
-			err:      err,
+			imageRef:     imageRef,
+			err:          err,
+			pullDuration: time.Since(startTime),
 		}
 	}
 }
