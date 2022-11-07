@@ -20,6 +20,7 @@ package options
 // This should probably be part of some configuration fed into the build for a
 // given binary target.
 import (
+	validatingpolicy "k8s.io/apiserver/pkg/admission/plugin/cel"
 	// Admission policies
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/admission/alwayspullimages"
@@ -97,6 +98,7 @@ var AllOrderedPlugins = []string{
 	// webhook, resourcequota, and deny plugins must go at the end
 
 	mutatingwebhook.PluginName,   // MutatingAdmissionWebhook
+	validatingpolicy.PluginName,  // ValidatingAdmissionPolicy
 	validatingwebhook.PluginName, // ValidatingAdmissionWebhook
 	resourcequota.PluginName,     // ResourceQuota
 	deny.PluginName,              // AlwaysDeny
@@ -159,6 +161,7 @@ func DefaultOffAdmissionPlugins() sets.String {
 		certsubjectrestriction.PluginName,       // CertificateSubjectRestriction
 		defaultingressclass.PluginName,          // DefaultIngressClass
 		podsecurity.PluginName,                  // PodSecurity
+		validatingpolicy.PluginName,             // ValidatingAdmissionPolicy, only active when feature gate CELValidatingAdmission is enabled
 	)
 
 	return sets.NewString(AllOrderedPlugins...).Difference(defaultOnPlugins)

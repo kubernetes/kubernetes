@@ -17,37 +17,43 @@ limitations under the License.
 package cel
 
 import (
-	"encoding/json"
-	"fmt"
+	"net/http"
+
+	"k8s.io/api/admissionregistration/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type PolicyDecisionKind string
+type policyDecisionKind string
 
 const (
-	Admit PolicyDecisionKind = "Admit"
-	Deny  PolicyDecisionKind = "Deny"
+	admit policyDecisionKind = "admit"
+	deny  policyDecisionKind = "deny"
 )
 
-type PolicyDecision struct {
-	Kind    PolicyDecisionKind `json:"kind"`
-	Message any                `json:"message"`
+type policyDecision struct {
+	kind    policyDecisionKind
+	message string
+	reason  metav1.StatusReason
 }
 
-type PolicyDecisionWithMetadata struct {
-	PolicyDecision `json:"decision"`
-	Definition     PolicyDefinition `json:"definition"`
-	Binding        PolicyBinding    `json:"binding"`
+type policyDecisionWithMetadata struct {
+	policyDecision
+	definition *v1alpha1.ValidatingAdmissionPolicy
+	binding    *v1alpha1.ValidatingAdmissionPolicyBinding
 }
 
-type PolicyError struct {
-	Decisions []PolicyDecisionWithMetadata
-}
-
-func (p *PolicyError) Error() string {
-	// Just format the error as JSON
-	jsonText, err := json.Marshal(p.Decisions)
-	if err != nil {
-		return fmt.Sprintf("error formatting PolicyError: %s", err.Error())
+func reasonToCode(r metav1.StatusReason) int32 {
+	switch r {
+	case metav1.StatusReasonForbidden:
+		return http.StatusForbidden
+	case metav1.StatusReasonUnauthorized:
+		return http.StatusUnauthorized
+	case metav1.StatusReasonRequestEntityTooLarge:
+		return http.StatusRequestEntityTooLarge
+	case metav1.StatusReasonInvalid:
+		return http.StatusUnprocessableEntity
+	default:
+		// It should not reach here since we only allow above reason to be set from API level
+		return http.StatusUnprocessableEntity
 	}
-	return string(jsonText)
 }

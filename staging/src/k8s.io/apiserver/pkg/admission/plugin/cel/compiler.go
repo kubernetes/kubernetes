@@ -201,6 +201,17 @@ func CompileValidatingPolicyExpression(validationExpression string, hasParams bo
 			},
 		}
 	}
+
+	_, err = cel.AstToCheckedExpr(ast)
+	if err != nil {
+		// should be impossible since env.Compile returned no issues
+		return CompilationResult{
+			Error: &apiservercel.Error{
+				Type:   apiservercel.ErrorTypeInternal,
+				Detail: "unexpected compilation error: " + err.Error(),
+			},
+		}
+	}
 	prog, err := env.Program(ast,
 		cel.EvalOptions(cel.OptOptimize),
 		cel.OptimizeRegex(library.ExtensionLibRegexOptimizations...),
