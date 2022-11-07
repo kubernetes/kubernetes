@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/docker/distribution/reference"
-	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -482,7 +481,7 @@ func getClusterNodeMask(c *kubeadm.ClusterConfiguration, isIPv6 bool) (int, erro
 		// assume it is an integer, if not it will fail later
 		maskSize, err = strconv.Atoi(v)
 		if err != nil {
-			return 0, errors.Wrapf(err, "could not parse the value of the kube-controller-manager flag %s as an integer", maskArg)
+			return 0, fmt.Errorf("could not parse the value of the kube-controller-manager flag %s as an integer: %w", maskArg, err)
 		}
 	} else if isIPv6 {
 		maskSize = defaultNodeMaskCIDRIPv6
@@ -558,7 +557,7 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 	})
 
 	if len(mixedInvalidFlags) != 0 {
-		return errors.Errorf("can not mix '--config' with arguments %v", mixedInvalidFlags)
+		return fmt.Errorf("can not mix '--config' with arguments %v", mixedInvalidFlags)
 	}
 	return nil
 }
