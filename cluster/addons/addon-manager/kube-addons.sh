@@ -51,6 +51,7 @@ if [ -z "${KUBECTL_PRUNE_WHITELIST_OVERRIDE:-}" ]; then
     apps/v1/Deployment
     apps/v1/ReplicaSet
     apps/v1/StatefulSet
+    discovery.k8s.io/v1/EndpointSlice
     networking.k8s.io/v1/Ingress
   )
 else
