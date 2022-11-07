@@ -123,7 +123,7 @@ kube::update::documentation() {
   temp_file=$(mktemp)
   arg1=$1
   arg2=$2
-  doUpdateDocs=$(go run "test/instrumentation/documentation/main.go" --major $arg1 --minor $arg2 -- 1>"${temp_file}")
+  doUpdateDocs=$(go run "test/instrumentation/documentation/main.go" --major "$arg1" --minor "$arg2" -- 1>"${temp_file}")
   if ! $doUpdateDocs; then
     echo "${red}!!! updating documentation has failed! ${reset}" >&2
     exit 1

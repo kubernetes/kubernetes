@@ -32,4 +32,4 @@ kube::version::get_version_vars
 # update the documented list of metrics
 kube::update::documentation::list
 # now write the actual documentation file
-kube::update::documentation $KUBE_GIT_MAJOR $KUBE_GIT_MINOR
+kube::update::documentation "$KUBE_GIT_MAJOR" "$KUBE_GIT_MINOR"
