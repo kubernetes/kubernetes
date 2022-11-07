@@ -57,6 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
+	utilpod "k8s.io/kubernetes/pkg/util/pod"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
@@ -1518,11 +1519,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		// on the container statuses as they are added based on one-time events.
 		cType := v1.AlphaNoCompatGuaranteeDisruptionTarget
 		if _, condition := podutil.GetPodConditionFromList(oldPodStatus.Conditions, cType); condition != nil {
-			if i, _ := podutil.GetPodConditionFromList(s.Conditions, cType); i >= 0 {
-				s.Conditions[i] = *condition
-			} else {
-				s.Conditions = append(s.Conditions, *condition)
-			}
+			s.Conditions = utilpod.ReplaceOrAppendPodCondition(s.Conditions, condition)
 		}
 	}
 

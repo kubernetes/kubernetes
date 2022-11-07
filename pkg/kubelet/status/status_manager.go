@@ -888,15 +888,24 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningCon
 		}
 	}
 
+	transitioningToTerminalPhase := !podutil.IsPodPhaseTerminal(oldPodStatus.Phase) && podutil.IsPodPhaseTerminal(newPodStatus.Phase)
+
 	for _, c := range newPodStatus.Conditions {
 		if kubetypes.PodConditionByKubelet(c.Type) {
 			podConditions = append(podConditions, c)
 		} else if kubetypes.PodConditionSharedByKubelet(c.Type) {
-			// for shared conditions we update or append in podConditions
-			if i, _ := podutil.GetPodConditionFromList(podConditions, c.Type); i >= 0 {
-				podConditions[i] = c
-			} else {
-				podConditions = append(podConditions, c)
+			if c.Type == v1.AlphaNoCompatGuaranteeDisruptionTarget {
+				// update the pod disruption condition only if transitioning to terminal phase. In particular, check if
+				// there might still be running containers to avoid sending an unnecessary PATCH request if the
+				// actual transition is delayed (see below)
+				if transitioningToTerminalPhase && !couldHaveRunningContainers {
+					// update the LastTransitionTime
+					updateLastTransitionTime(&newPodStatus, &oldPodStatus, c.Type)
+					if _, c := podutil.GetPodConditionFromList(newPodStatus.Conditions, c.Type); c != nil {
+						// for shared conditions we update or append in podConditions
+						podConditions = statusutil.ReplaceOrAppendPodCondition(podConditions, c)
+					}
+				}
 			}
 		}
 	}
@@ -911,21 +920,11 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningCon
 	// the Kubelet exclusively owns must be released prior to a pod being reported terminal,
 	// while resources that have participanting components above the API use the pod's
 	// transition to a terminal phase (or full deletion) to release those resources.
-	if !podutil.IsPodPhaseTerminal(oldPodStatus.Phase) && podutil.IsPodPhaseTerminal(newPodStatus.Phase) {
+	if transitioningToTerminalPhase {
 		if couldHaveRunningContainers {
 			newPodStatus.Phase = oldPodStatus.Phase
 			newPodStatus.Reason = oldPodStatus.Reason
 			newPodStatus.Message = oldPodStatus.Message
-			if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
-				// revert setting of the pod disruption condition until the pod is terminal in order to do not issue
-				// an unnecessary PATCH request
-				revertPodCondition(&oldPodStatus, &newPodStatus, v1.AlphaNoCompatGuaranteeDisruptionTarget)
-			}
-		} else {
-			if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
-				// update the LastTransitionTime when transitioning into the failed state
-				updateLastTransitionTime(&newPodStatus, &oldPodStatus, v1.AlphaNoCompatGuaranteeDisruptionTarget)
-			}
 		}
 	}
 
@@ -944,18 +943,6 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningCon
 	}
 
 	return newPodStatus
-}
-
-func revertPodCondition(oldPodStatus, newPodStatus *v1.PodStatus, cType v1.PodConditionType) {
-	if newIndex, newCondition := podutil.GetPodConditionFromList(newPodStatus.Conditions, cType); newCondition != nil {
-		if _, oldCondition := podutil.GetPodConditionFromList(oldPodStatus.Conditions, cType); oldCondition != nil {
-			// revert the new condition to what was before
-			newPodStatus.Conditions[newIndex] = *oldCondition
-		} else {
-			// delete the new condition as it wasn't there before
-			newPodStatus.Conditions = append(newPodStatus.Conditions[:newIndex], newPodStatus.Conditions[newIndex+1:]...)
-		}
-	}
 }
 
 // NeedToReconcilePodReadiness returns if the pod "Ready" condition need to be reconcile

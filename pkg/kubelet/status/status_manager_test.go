@@ -1570,6 +1570,53 @@ func TestMergePodStatus(t *testing.T) {
 				return input
 			},
 			func(input v1.PodStatus) v1.PodStatus {
+				input.Phase = v1.PodFailed
+				input.Conditions = append(input.Conditions, v1.PodCondition{
+					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Status: v1.ConditionTrue,
+					Reason: "TerminationByKubelet",
+				})
+				return input
+			},
+			v1.PodStatus{
+				Phase: v1.PodFailed,
+				Conditions: []v1.PodCondition{
+					{
+						Type:   v1.PodReady,
+						Status: v1.ConditionFalse,
+						Reason: "PodFailed",
+					},
+					{
+						Type:   v1.ContainersReady,
+						Status: v1.ConditionFalse,
+						Reason: "PodFailed",
+					},
+					{
+						Type:   v1.PodScheduled,
+						Status: v1.ConditionTrue,
+					},
+					{
+						Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+						Status: v1.ConditionTrue,
+						Reason: "TerminationByKubelet",
+					},
+				},
+				Message: "Message",
+			},
+		},
+		{
+			"don't override DisruptionTarget condition when remaining in running phase; PodDisruptionConditions enabled",
+			true,
+			false,
+			func(input v1.PodStatus) v1.PodStatus {
+				input.Conditions = append(input.Conditions, v1.PodCondition{
+					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Status: v1.ConditionTrue,
+					Reason: "EvictedByEvictionAPI",
+				})
+				return input
+			},
+			func(input v1.PodStatus) v1.PodStatus {
 				input.Conditions = append(input.Conditions, v1.PodCondition{
 					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
 					Status: v1.ConditionTrue,
@@ -1581,6 +1628,11 @@ func TestMergePodStatus(t *testing.T) {
 				Phase: v1.PodRunning,
 				Conditions: []v1.PodCondition{
 					{
+						Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+						Status: v1.ConditionTrue,
+						Reason: "EvictedByEvictionAPI",
+					},
+					{
 						Type:   v1.PodReady,
 						Status: v1.ConditionTrue,
 					},
@@ -1588,10 +1640,46 @@ func TestMergePodStatus(t *testing.T) {
 						Type:   v1.PodScheduled,
 						Status: v1.ConditionTrue,
 					},
+				},
+				Message: "Message",
+			},
+		},
+		{
+			"don't override DisruptionTarget condition when transitioning to failed phase but there might still be running containers; PodDisruptionConditions enabled",
+			true,
+			true,
+			func(input v1.PodStatus) v1.PodStatus {
+				input.Conditions = append(input.Conditions, v1.PodCondition{
+					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Status: v1.ConditionTrue,
+					Reason: "EvictedByEvictionAPI",
+				})
+				return input
+			},
+			func(input v1.PodStatus) v1.PodStatus {
+				input.Phase = v1.PodFailed
+				input.Conditions = append(input.Conditions, v1.PodCondition{
+					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Status: v1.ConditionTrue,
+					Reason: "TerminationByKubelet",
+				})
+				return input
+			},
+			v1.PodStatus{
+				Phase: v1.PodRunning,
+				Conditions: []v1.PodCondition{
 					{
 						Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
 						Status: v1.ConditionTrue,
-						Reason: "TerminationByKubelet",
+						Reason: "EvictedByEvictionAPI",
+					},
+					{
+						Type:   v1.PodReady,
+						Status: v1.ConditionTrue,
+					},
+					{
+						Type:   v1.PodScheduled,
+						Status: v1.ConditionTrue,
 					},
 				},
 				Message: "Message",
