@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 func TestSetup(t *testing.T) {
@@ -321,7 +322,20 @@ leaderElection:
 				"--feature-gates=VolumeCapacityPriority=true",
 			},
 			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": defaults.ExpandedPluginsV1,
+				"default-scheduler": func() *config.Plugins {
+					plugins := defaults.ExpandedPluginsV1.DeepCopy()
+					plugins.Score.Enabled = []config.Plugin{
+						{Name: names.TaintToleration, Weight: 3},
+						{Name: names.NodeAffinity, Weight: 2},
+						{Name: names.NodeResourcesFit, Weight: 1},
+						{Name: "VolumeBinding", Weight: 1},
+						{Name: names.PodTopologySpread, Weight: 2},
+						{Name: names.InterPodAffinity, Weight: 2},
+						{Name: names.NodeResourcesBalancedAllocation, Weight: 1},
+						{Name: names.ImageLocality, Weight: 1},
+					}
+					return plugins
+				}(),
 			},
 			restoreFeatures: map[featuregate.Feature]bool{
 				features.VolumeCapacityPriority: false,

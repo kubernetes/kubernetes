@@ -177,6 +177,11 @@ var PluginsV1beta3 = &config.Plugins{
 			{Name: names.DefaultBinder},
 		},
 	},
+	Score: config.PluginSet{
+		Disabled: []config.Plugin{
+			{Name: names.VolumeBinding},
+		},
+	},
 }
 
 // ExpandedPluginsV1beta3 default set of v1beta3 plugins after MultiPoint expansion
@@ -240,11 +245,6 @@ var ExpandedPluginsV1beta3 = &config.Plugins{
 			// - This is a score coming from user preference.
 			{Name: names.NodeAffinity, Weight: 2},
 			{Name: names.NodeResourcesFit, Weight: 1},
-			// Weight is tripled because:
-			// - This is a score coming from user preference.
-			// - Usage of node tainting to group nodes in the cluster is increasing becoming a use-case
-			//	 for many user workloads
-			{Name: names.VolumeBinding, Weight: 1},
 			// Weight is doubled because:
 			// - This is a score coming from user preference.
 			// - It makes its signal comparable to NodeResourcesLeastAllocated.
@@ -347,6 +347,11 @@ var PluginsV1 = &config.Plugins{
 			{Name: names.DefaultBinder},
 		},
 	},
+	Score: config.PluginSet{
+		Disabled: []config.Plugin{
+			{Name: names.VolumeBinding},
+		},
+	},
 }
 
 // ExpandedPluginsV1 default set of v1 plugins after MultiPoint expansion
@@ -410,11 +415,6 @@ var ExpandedPluginsV1 = &config.Plugins{
 			// - This is a score coming from user preference.
 			{Name: names.NodeAffinity, Weight: 2},
 			{Name: names.NodeResourcesFit, Weight: 1},
-			// Weight is tripled because:
-			// - This is a score coming from user preference.
-			// - Usage of node tainting to group nodes in the cluster is increasing becoming a use-case
-			//	 for many user workloads
-			{Name: names.VolumeBinding, Weight: 1},
 			// Weight is doubled because:
 			// - This is a score coming from user preference.
 			// - It makes its signal comparable to NodeResourcesLeastAllocated.

@@ -847,6 +847,11 @@ profiles:
 									{Name: names.VolumeBinding},
 								},
 							},
+							Score: kubeschedulerconfig.PluginSet{
+								Disabled: []kubeschedulerconfig.Plugin{
+									{Name: names.VolumeBinding},
+								},
+							},
 							MultiPoint: defaults.PluginsV1.MultiPoint,
 						},
 						PluginConfig: []kubeschedulerconfig.PluginConfig{
@@ -1189,6 +1194,11 @@ profiles:
 									{Name: names.VolumeBinding},
 								},
 							},
+							Score: kubeschedulerconfig.PluginSet{
+								Disabled: []kubeschedulerconfig.Plugin{
+									{Name: names.VolumeBinding},
+								},
+							},
 						},
 						PluginConfig: defaults.PluginConfigsV1,
 					},
@@ -1197,6 +1207,11 @@ profiles:
 						Plugins: &kubeschedulerconfig.Plugins{
 							MultiPoint: defaults.PluginsV1.MultiPoint,
 							PreBind: kubeschedulerconfig.PluginSet{
+								Disabled: []kubeschedulerconfig.Plugin{
+									{Name: names.VolumeBinding},
+								},
+							},
+							Score: kubeschedulerconfig.PluginSet{
 								Disabled: []kubeschedulerconfig.Plugin{
 									{Name: names.VolumeBinding},
 								},
@@ -1303,6 +1318,11 @@ profiles:
 									{Name: names.VolumeBinding},
 								},
 							},
+							Score: kubeschedulerconfig.PluginSet{
+								Disabled: []kubeschedulerconfig.Plugin{
+									{Name: names.VolumeBinding},
+								},
+							},
 						},
 						PluginConfig: defaults.PluginConfigsV1beta3,
 					},
@@ -1311,6 +1331,11 @@ profiles:
 						Plugins: &kubeschedulerconfig.Plugins{
 							MultiPoint: defaults.PluginsV1beta3.MultiPoint,
 							PreBind: kubeschedulerconfig.PluginSet{
+								Disabled: []kubeschedulerconfig.Plugin{
+									{Name: names.VolumeBinding},
+								},
+							},
+							Score: kubeschedulerconfig.PluginSet{
 								Disabled: []kubeschedulerconfig.Plugin{
 									{Name: names.VolumeBinding},
 								},

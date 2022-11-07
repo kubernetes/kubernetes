@@ -350,6 +350,11 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.DefaultBinder},
 								},
 							},
+							Score: v1beta3.PluginSet{
+								Disabled: []v1beta3.Plugin{
+									{Name: names.VolumeBinding},
+								},
+							},
 							Bind: v1beta3.PluginSet{
 								Enabled: []v1beta3.Plugin{
 									{Name: "BarPlugin"},
