@@ -102,6 +102,8 @@ type QueuedPodInfo struct {
 	InitialAttemptTimestamp time.Time
 	// If a Pod failed in a scheduling cycle, record the plugin names it failed by.
 	UnschedulablePlugins sets.String
+	// Whether the Pod is scheduling gated (by PreEnqueuePlugins) or not.
+	Gated bool
 }
 
 // DeepCopy returns a deep copy of the QueuedPodInfo object.
@@ -331,9 +333,9 @@ func getPodAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm) {
 			terms = affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution
 		}
 		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-		//if len(affinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
+		// if len(affinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
 		//	terms = append(terms, affinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
-		//}
+		// }
 	}
 	return terms
 }
@@ -344,9 +346,9 @@ func getPodAntiAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm)
 			terms = affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
 		}
 		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-		//if len(affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
+		// if len(affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
 		//	terms = append(terms, affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
-		//}
+		// }
 	}
 	return terms
 }

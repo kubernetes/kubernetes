@@ -111,3 +111,7 @@ func convertToExternalPluginConfigArgs(out *v1beta2.KubeSchedulerConfiguration) 
 func Convert_config_KubeSchedulerProfile_To_v1beta2_KubeSchedulerProfile(in *config.KubeSchedulerProfile, out *v1beta2.KubeSchedulerProfile, s conversion.Scope) error {
 	return autoConvert_config_KubeSchedulerProfile_To_v1beta2_KubeSchedulerProfile(in, out, s)
 }
+
+func Convert_config_Plugins_To_v1beta2_Plugins(in *config.Plugins, out *v1beta2.Plugins, s conversion.Scope) error {
+	return autoConvert_config_Plugins_To_v1beta2_Plugins(in, out, s)
+}
