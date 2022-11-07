@@ -152,7 +152,7 @@ func isNodeClientCert(csr *capi.CertificateSigningRequest, x509cr *x509.Certific
 	if csr.Spec.SignerName != capi.KubeAPIServerClientKubeletSignerName {
 		return false
 	}
-	return capihelper.IsKubeletClientCSR(x509cr, usagesToSet(csr.Spec.Usages), true)
+	return capihelper.IsKubeletClientCSR(x509cr, usagesToSet(csr.Spec.Usages))
 }
 
 func isSelfNodeClientCert(csr *capi.CertificateSigningRequest, x509cr *x509.CertificateRequest) bool {
