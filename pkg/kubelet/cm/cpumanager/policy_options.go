@@ -85,24 +85,16 @@ func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOption
 			return opts, err
 		}
 
+		optValue, err := strconv.ParseBool(value)
+		if err != nil {
+			return opts, fmt.Errorf("bad value for option %q: %w", name, err)
+		}
 		switch name {
 		case FullPCPUsOnlyOption:
-			optValue, err := strconv.ParseBool(value)
-			if err != nil {
-				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
-			}
 			opts.FullPhysicalCPUsOnly = optValue
 		case DistributeCPUsAcrossNUMAOption:
-			optValue, err := strconv.ParseBool(value)
-			if err != nil {
-				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
-			}
 			opts.DistributeCPUsAcrossNUMA = optValue
 		case AlignBySocketOption:
-			optValue, err := strconv.ParseBool(value)
-			if err != nil {
-				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
-			}
 			opts.AlignBySocket = optValue
 		default:
 			// this should never be reached, we already detect unknown options,
