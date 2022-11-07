@@ -140,7 +140,7 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*gl
 	for _, gvl := range volumesNeedUpdate {
 		err := rc.actualStateOfWorld.MarkVolumeAsAttached(
 			//TODO: the devicePath might not be correct for some volume plugins: see issue #54108
-			gvl.volumeName, gvl.volumeSpec, "" /* nodeName */, gvl.devicePath)
+			gvl.volumeName, gvl.volumeSpec, rc.nodeName, gvl.devicePath)
 		if err != nil {
 			klog.ErrorS(err, "Could not add volume information to actual state of world", "volumeName", gvl.volumeName)
 			continue
