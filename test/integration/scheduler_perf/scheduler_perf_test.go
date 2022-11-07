@@ -988,7 +988,7 @@ func waitUntilPodsScheduledInNamespace(ctx context.Context, podInformer coreinfo
 		if len(scheduled) >= wantCount {
 			return true, nil
 		}
-		klog.Infof("%s: namespace %s: got %d pods, want %d", name, namespace, len(scheduled), wantCount)
+		klog.Infof("%s: namespace %s, pods: want %d, got %d", name, namespace, wantCount, len(scheduled))
 		return false, nil
 	})
 }

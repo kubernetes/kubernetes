@@ -21,16 +21,13 @@ package framework
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 )
@@ -62,42 +59,12 @@ func DeleteNamespaceOrDie(c clientset.Interface, ns *v1.Namespace, t testing.TB)
 	}
 }
 
-// GetReadySchedulableNodes addresses the common use case of getting nodes you can do work on.
-// 1) Needs to be schedulable.
-// 2) Needs to be ready.
-// If EITHER 1 or 2 is not true, most tests will want to ignore the node entirely.
-// If there are no nodes that are both ready and schedulable, this will return an error.
-func GetReadySchedulableNodes(c clientset.Interface) (nodes *v1.NodeList, err error) {
-	nodes, err = checkWaitListSchedulableNodes(c)
-	if err != nil {
-		return nil, fmt.Errorf("listing schedulable nodes error: %s", err)
-	}
-	Filter(nodes, func(node v1.Node) bool {
-		return IsNodeSchedulable(&node) && isNodeUntainted(&node)
-	})
-	if len(nodes.Items) == 0 {
-		return nil, fmt.Errorf("there are currently no ready, schedulable nodes in the cluster")
-	}
-	return nodes, nil
-}
-
-// checkWaitListSchedulableNodes is a wrapper around listing nodes supporting retries.
-func checkWaitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
-	nodes, err := waitListSchedulableNodes(c)
-	if err != nil {
-		return nil, fmt.Errorf("error: %s. Non-retryable failure or timed out while listing nodes for integration test cluster", err)
-	}
-	return nodes, nil
-}
-
-// waitListSchedulableNodes is a wrapper around listing nodes supporting retries.
-func waitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
+// waitListAllNodes is a wrapper around listing nodes supporting retries.
+func waitListAllNodes(c clientset.Interface) (*v1.NodeList, error) {
 	var nodes *v1.NodeList
 	var err error
 	if wait.PollImmediate(poll, singleCallTimeout, func() (bool, error) {
-		nodes, err = c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{FieldSelector: fields.Set{
-			"spec.unschedulable": "false",
-		}.AsSelector().String()})
+		nodes, err = c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -220,53 +187,4 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 		klog.Infof("Couldn't find condition %v on node %v", conditionType, node.Name)
 	}
 	return false
-}
-
-// isNodeUntainted tests whether a fake pod can be scheduled on "node", given its current taints.
-// TODO: need to discuss wether to return bool and error type
-func isNodeUntainted(node *v1.Node) bool {
-	nonblockingTaints := ""
-	fakePod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "fake-not-scheduled",
-			Namespace: "fake-not-scheduled",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "fake-not-scheduled",
-					Image: "fake-not-scheduled",
-				},
-			},
-		},
-	}
-
-	// Simple lookup for nonblocking taints based on comma-delimited list.
-	nonblockingTaintsMap := map[string]struct{}{}
-	for _, t := range strings.Split(nonblockingTaints, ",") {
-		if strings.TrimSpace(t) != "" {
-			nonblockingTaintsMap[strings.TrimSpace(t)] = struct{}{}
-		}
-	}
-
-	n := node
-	if len(nonblockingTaintsMap) > 0 {
-		nodeCopy := node.DeepCopy()
-		nodeCopy.Spec.Taints = []v1.Taint{}
-		for _, v := range node.Spec.Taints {
-			if _, isNonblockingTaint := nonblockingTaintsMap[v.Key]; !isNonblockingTaint {
-				nodeCopy.Spec.Taints = append(nodeCopy.Spec.Taints, v)
-			}
-		}
-		n = nodeCopy
-	}
-
-	_, untolerated := v1helper.FindMatchingUntoleratedTaint(n.Spec.Taints, fakePod.Spec.Tolerations, func(t *v1.Taint) bool {
-		return t.Effect == v1.TaintEffectNoExecute || t.Effect == v1.TaintEffectNoSchedule
-	})
-	return !untolerated
 }
