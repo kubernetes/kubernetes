@@ -760,30 +760,6 @@ func SeccompAnnotationForField(field *api.SeccompProfile) string {
 	return ""
 }
 
-// setsWindowsHostProcess returns true if WindowsOptions.HostProcess is set (true or false)
-// anywhere in the pod spec.
-func setsWindowsHostProcess(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-
-	// Check Pod's WindowsOptions.HostProcess
-	if podSpec.SecurityContext != nil && podSpec.SecurityContext.WindowsOptions != nil && podSpec.SecurityContext.WindowsOptions.HostProcess != nil {
-		return true
-	}
-
-	// Check WindowsOptions.HostProcess for each container
-	inUse := false
-	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-		if c.SecurityContext != nil && c.SecurityContext.WindowsOptions != nil && c.SecurityContext.WindowsOptions.HostProcess != nil {
-			inUse = true
-			return false
-		}
-		return true
-	})
-
-	return inUse
-}
 
 func hasInvalidLabelValueInAffinitySelector(spec *api.PodSpec) bool {
 	if spec.Affinity != nil {
