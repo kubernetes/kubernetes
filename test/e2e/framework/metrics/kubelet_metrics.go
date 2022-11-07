@@ -67,6 +67,7 @@ func NewKubeletMetrics() KubeletMetrics {
 	return KubeletMetrics(result)
 }
 
+// Deprecated: as kubelet read only port is disabled
 // GrabKubeletMetricsWithoutProxy retrieve metrics from the kubelet on the given node using a simple GET over http.
 func GrabKubeletMetricsWithoutProxy(ctx context.Context, nodeName, path string) (KubeletMetrics, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://%s%s", nodeName, path), nil)

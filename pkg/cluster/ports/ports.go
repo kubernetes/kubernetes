@@ -29,7 +29,8 @@ const (
 	// KubeletPort is the default port for the kubelet server on each host machine.
 	// May be overridden by a flag at startup.
 	KubeletPort = 10250
-	// KubeletHealthzPort is the port of the kubelet healthz endpoint.
+	// KubeletHealthzPort exposes a healthz endpoint from the kubelet.
+	// May be overridden by a flag at startup.
 	KubeletHealthzPort = 10248
 	// ProxyHealthzPort is the default port for the proxy healthz server.
 	// May be overridden by a flag at startup.

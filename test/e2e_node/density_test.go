@@ -45,13 +45,12 @@ import (
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/e2e/network"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-const (
-	kubeletAddr = "localhost:10255"
-)
+var kubeletAddr = fmt.Sprintf("localhost:%d", network.LegacyKubeletReadOnlyPort)
 
 var _ = SIGDescribe("Density [Serial] [Slow]", func() {
 	const (

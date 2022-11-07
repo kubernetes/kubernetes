@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/cli-runtime/pkg/printers"
-	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -41,6 +40,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/kubernetes/test/e2e/network"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -148,7 +148,7 @@ func createBasicStaticPod(dir, name, namespace string) error {
 }
 
 func getPodFromStandaloneKubelet(ctx context.Context, podNamespace string, podName string) (*v1.Pod, error) {
-	endpoint := fmt.Sprintf("http://127.0.0.1:%d/pods", ports.KubeletReadOnlyPort)
+	endpoint := fmt.Sprintf("http://127.0.0.1:%d/pods", network.LegacyKubeletReadOnlyPort)
 	// TODO: we do not need TLS and bearer token for this test
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},

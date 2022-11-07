@@ -26,8 +26,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	stats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
@@ -333,9 +334,13 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 
 			ginkgo.By("Validating /stats/summary")
 			// Give pods a minute to actually start up.
-			gomega.Eventually(ctx, getNodeSummary, 180*time.Second, 15*time.Second).Should(matchExpectations)
+			gomega.Eventually(ctx, func(ctx context.Context) (*kubeletstatsv1alpha1.Summary, error) {
+				return e2edebug.GetStatsSummary(f.ClientSet, framework.TestContext.NodeName)
+			}, 180*time.Second, 15*time.Second).Should(matchExpectations)
 			// Then the summary should match the expectations a few more times.
-			gomega.Consistently(ctx, getNodeSummary, 30*time.Second, 15*time.Second).Should(matchExpectations)
+			gomega.Consistently(ctx, func(ctx context.Context) (*kubeletstatsv1alpha1.Summary, error) {
+				return e2edebug.GetStatsSummary(f.ClientSet, framework.TestContext.NodeName)
+			}, 30*time.Second, 15*time.Second).Should(matchExpectations)
 		})
 	})
 })
@@ -389,13 +394,13 @@ func getSummaryTestPods(f *framework.Framework, numRestarts int32, names ...stri
 // Mapping function for gstruct.MatchAllElements
 func summaryObjectID(element interface{}) string {
 	switch el := element.(type) {
-	case stats.PodStats:
+	case kubeletstatsv1alpha1.PodStats:
 		return fmt.Sprintf("%s::%s", el.PodRef.Namespace, el.PodRef.Name)
-	case stats.ContainerStats:
+	case kubeletstatsv1alpha1.ContainerStats:
 		return el.Name
-	case stats.VolumeStats:
+	case kubeletstatsv1alpha1.VolumeStats:
 		return el.Name
-	case stats.UserDefinedMetric:
+	case kubeletstatsv1alpha1.UserDefinedMetric:
 		return el.Name
 	default:
 		framework.Failf("Unknown type: %T", el)

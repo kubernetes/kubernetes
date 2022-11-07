@@ -109,6 +109,7 @@ func TestAddFlags(t *testing.T) {
 		"--etcd-certfile=/var/run/kubernetes/etcdce.crt",
 		"--etcd-cafile=/var/run/kubernetes/etcdca.crt",
 		"--http2-max-streams-per-connection=42",
+		"--kubelet-read-only-port=10255",
 		"--kubelet-timeout=5s",
 		"--kubelet-client-certificate=/var/run/kubernetes/ceserver.crt",
 		"--kubelet-client-key=/var/run/kubernetes/server.key",

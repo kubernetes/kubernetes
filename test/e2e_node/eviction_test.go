@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	clientset "k8s.io/client-go/kubernetes"
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -38,6 +39,7 @@ import (
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -79,7 +81,7 @@ var _ = SIGDescribe("InodeEviction [Slow] [Serial] [Disruptive][NodeFeature:Evic
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			// Set the eviction threshold to inodesFree - inodesConsumed, so that using inodesConsumed causes an eviction.
-			summary := eventuallyGetSummary(ctx)
+			summary := eventuallyGetSummary(ctx, f.ClientSet)
 			inodesFree := *summary.Node.Fs.InodesFree
 			if inodesFree <= inodesConsumed {
 				e2eskipper.Skipf("Too few inodes free on the host for the InodeEviction test to run")
@@ -116,7 +118,7 @@ var _ = SIGDescribe("ImageGCNoEviction [Slow] [Serial] [Disruptive][NodeFeature:
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			// Set the eviction threshold to inodesFree - inodesConsumed, so that using inodesConsumed causes an eviction.
-			summary := eventuallyGetSummary(ctx)
+			summary := eventuallyGetSummary(ctx, f.ClientSet)
 			inodesFree := *summary.Node.Fs.InodesFree
 			if inodesFree <= inodesConsumed {
 				e2eskipper.Skipf("Too few inodes free on the host for the InodeEviction test to run")
@@ -180,7 +182,7 @@ var _ = SIGDescribe("LocalStorageEviction [Slow] [Serial] [Disruptive][NodeFeatu
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			summary := eventuallyGetSummary(ctx)
+			summary := eventuallyGetSummary(ctx, f.ClientSet)
 
 			diskConsumedByTest := resource.MustParse("4Gi")
 			availableBytesOnSystem := *(summary.Node.Fs.AvailableBytes)
@@ -219,7 +221,7 @@ var _ = SIGDescribe("LocalStorageSoftEviction [Slow] [Serial] [Disruptive][NodeF
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			diskConsumed := resource.MustParse("4Gi")
-			summary := eventuallyGetSummary(ctx)
+			summary := eventuallyGetSummary(ctx, f.ClientSet)
 			availableBytes := *(summary.Node.Fs.AvailableBytes)
 			if availableBytes <= uint64(diskConsumed.Value()) {
 				e2eskipper.Skipf("Too little disk free on the host for the LocalStorageSoftEviction test to run")
@@ -358,8 +360,11 @@ var _ = SIGDescribe("PriorityMemoryEvictionOrdering [Slow] [Serial] [Disruptive]
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			memoryConsumed := resource.MustParse("600Mi")
-			summary := eventuallyGetSummary(ctx)
+			summary := eventuallyGetSummary(ctx, f.ClientSet)
 			availableBytes := *(summary.Node.Memory.AvailableBytes)
+			if availableBytes <= uint64(memoryConsumed.Value()) {
+				e2eskipper.Skipf("Too little memory free on the host for the PriorityMemoryEvictionOrdering test to run")
+			}
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalMemoryAvailable): fmt.Sprintf("%d", availableBytes-uint64(memoryConsumed.Value()))}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
@@ -415,7 +420,7 @@ var _ = SIGDescribe("PriorityLocalStorageEvictionOrdering [Slow] [Serial] [Disru
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			diskConsumed := resource.MustParse("4Gi")
-			summary := eventuallyGetSummary(ctx)
+			summary := eventuallyGetSummary(ctx, f.ClientSet)
 			availableBytes := *(summary.Node.Fs.AvailableBytes)
 			if availableBytes <= uint64(diskConsumed.Value()) {
 				e2eskipper.Skipf("Too little disk free on the host for the PriorityLocalStorageEvictionOrdering test to run")
@@ -474,7 +479,7 @@ var _ = SIGDescribe("PriorityPidEvictionOrdering [Slow] [Serial] [Disruptive][No
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			pidsConsumed := int64(10000)
-			summary := eventuallyGetSummary(ctx)
+			summary := eventuallyGetSummary(ctx, f.ClientSet)
 			availablePids := *(summary.Node.Rlimit.MaxPID) - *(summary.Node.Rlimit.NumOfRunningProcesses)
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalPIDAvailable): fmt.Sprintf("%d", availablePids-pidsConsumed)}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
@@ -511,7 +516,7 @@ var _ = SIGDescribe("PriorityPidEvictionOrdering [Slow] [Serial] [Disruptive][No
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition)+"; PodDisruptionConditions enabled [NodeFeature:PodDisruptionConditions]", func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			pidsConsumed := int64(10000)
-			summary := eventuallyGetSummary(ctx)
+			summary := eventuallyGetSummary(ctx, f.ClientSet)
 			availablePids := *(summary.Node.Rlimit.MaxPID) - *(summary.Node.Rlimit.NumOfRunningProcesses)
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalPIDAvailable): fmt.Sprintf("%d", availablePids-pidsConsumed)}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
@@ -549,7 +554,7 @@ type podEvictSpec struct {
 //	It ensures that all pods with non-zero evictionPriority are eventually evicted.
 //
 // runEvictionTest then cleans up the testing environment by deleting provided pods, and ensures that expectedNodeCondition no longer exists
-func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expectedNodeCondition v1.NodeConditionType, expectedStarvedResource v1.ResourceName, logFunc func(ctx context.Context), testSpecs []podEvictSpec) {
+func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expectedNodeCondition v1.NodeConditionType, expectedStarvedResource v1.ResourceName, logFunc func(ctx context.Context, clientset clientset.Interface), testSpecs []podEvictSpec) {
 	// Place the remainder of the test within a context so that the kubelet config is set before and after the test.
 	ginkgo.Context("", func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
@@ -569,7 +574,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 		ginkgo.It("should eventually evict all of the correct pods", func(ctx context.Context) {
 			ginkgo.By(fmt.Sprintf("Waiting for node to have NodeCondition: %s", expectedNodeCondition))
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				logFunc(ctx)
+				logFunc(ctx, f.ClientSet)
 				if expectedNodeCondition == noPressure || hasNodeCondition(ctx, f, expectedNodeCondition) {
 					return nil
 				}
@@ -586,16 +591,22 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 					}
 				}
 				logKubeletLatencyMetrics(ctx, kubeletmetrics.EvictionStatsAgeKey)
-				logFunc(ctx)
+				logFunc(ctx, f.ClientSet)
 				return verifyEvictionOrdering(ctx, f, testSpecs)
 			}, pressureTimeout, evictionPollInterval).Should(gomega.Succeed())
+
+			ginkgo.By("checking for the expected pod conditions for evicted pods")
+			verifyPodConditions(ctx, f, testSpecs)
+
+			// We observe pressure from the API server.  The eviction manager observes pressure from the kubelet internal stats.
+			// This means the eviction manager will observe pressure before we will, creating a delay between when the eviction manager
 			// evicts a pod, and when we observe the pressure by querying the API server.  Add a delay here to account for this delay
 			ginkgo.By("making sure pressure from test has surfaced before continuing")
 			time.Sleep(pressureDelay)
 
 			ginkgo.By(fmt.Sprintf("Waiting for NodeCondition: %s to no longer exist on the node", expectedNodeCondition))
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				logFunc(ctx)
+				logFunc(ctx, f.ClientSet)
 				logKubeletLatencyMetrics(ctx, kubeletmetrics.EvictionStatsAgeKey)
 				if expectedNodeCondition != noPressure && hasNodeCondition(ctx, f, expectedNodeCondition) {
 					return fmt.Errorf("Conditions haven't returned to normal, node still has %s", expectedNodeCondition)
@@ -608,7 +619,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 				if expectedNodeCondition != noPressure && hasNodeCondition(ctx, f, expectedNodeCondition) {
 					return fmt.Errorf("%s disappeared and then reappeared", expectedNodeCondition)
 				}
-				logFunc(ctx)
+				logFunc(ctx, f.ClientSet)
 				logKubeletLatencyMetrics(ctx, kubeletmetrics.EvictionStatsAgeKey)
 				return verifyEvictionOrdering(ctx, f, testSpecs)
 			}, postTestConditionMonitoringPeriod, evictionPollInterval).Should(gomega.Succeed())
@@ -832,8 +843,8 @@ func hasNodeCondition(ctx context.Context, f *framework.Framework, expectedNodeC
 	return actualNodeCondition.Status == v1.ConditionTrue
 }
 
-func logInodeMetrics(ctx context.Context) {
-	summary, err := getNodeSummary(ctx)
+func logInodeMetrics(ctx context.Context, clientset clientset.Interface) {
+	summary, err := e2edebug.GetStatsSummary(clientset, framework.TestContext.NodeName)
 	if err != nil {
 		framework.Logf("Error getting summary: %v", err)
 		return
@@ -859,10 +870,17 @@ func logInodeMetrics(ctx context.Context) {
 	}
 }
 
-func logDiskMetrics(ctx context.Context) {
-	summary, err := getNodeSummary(ctx)
+func logDiskMetrics(ctx context.Context, clientset clientset.Interface) {
+	summary, err := e2edebug.GetStatsSummary(clientset, framework.TestContext.NodeName)
 	if err != nil {
+		framework.Logf("Error getting summary: %v", err)
+		return
+	}
+	if summary.Node.Runtime != nil && summary.Node.Runtime.ImageFs != nil && summary.Node.Runtime.ImageFs.CapacityBytes != nil && summary.Node.Runtime.ImageFs.AvailableBytes != nil {
 		framework.Logf("imageFsInfo.CapacityBytes: %d, imageFsInfo.AvailableBytes: %d", *summary.Node.Runtime.ImageFs.CapacityBytes, *summary.Node.Runtime.ImageFs.AvailableBytes)
+	}
+	if summary.Node.Fs != nil && summary.Node.Fs.CapacityBytes != nil && summary.Node.Fs.AvailableBytes != nil {
+		framework.Logf("rootFsInfo.CapacityBytes: %d, rootFsInfo.AvailableBytes: %d", *summary.Node.Fs.CapacityBytes, *summary.Node.Fs.AvailableBytes)
 	}
 	for _, pod := range summary.Pods {
 		framework.Logf("Pod: %s", pod.PodRef.Name)
@@ -879,8 +897,8 @@ func logDiskMetrics(ctx context.Context) {
 	}
 }
 
-func logMemoryMetrics(ctx context.Context) {
-	summary, err := getNodeSummary(ctx)
+func logMemoryMetrics(ctx context.Context, clientset clientset.Interface) {
+	summary, err := e2edebug.GetStatsSummary(clientset, framework.TestContext.NodeName)
 	if err != nil {
 		framework.Logf("Error getting summary: %v", err)
 		return
@@ -903,8 +921,8 @@ func logMemoryMetrics(ctx context.Context) {
 	}
 }
 
-func logPidMetrics(ctx context.Context) {
-	summary, err := getNodeSummary(ctx)
+func logPidMetrics(ctx context.Context, clientset clientset.Interface) {
+	summary, err := e2edebug.GetStatsSummary(clientset, framework.TestContext.NodeName)
 	if err != nil {
 		framework.Logf("Error getting summary: %v", err)
 		return
@@ -914,9 +932,9 @@ func logPidMetrics(ctx context.Context) {
 	}
 }
 
-func eventuallyGetSummary(ctx context.Context) (s *kubeletstatsv1alpha1.Summary) {
+func eventuallyGetSummary(ctx context.Context, clientset clientset.Interface) (s *kubeletstatsv1alpha1.Summary) {
 	gomega.Eventually(ctx, func() error {
-		summary, err := getNodeSummary(ctx)
+		summary, err := e2edebug.GetStatsSummary(clientset, framework.TestContext.NodeName)
 		if err != nil {
 			return err
 		}

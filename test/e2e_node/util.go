@@ -19,11 +19,9 @@ package e2enode
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -50,7 +48,6 @@ import (
 	"k8s.io/klog/v2"
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubeletpodresourcesv1alpha1 "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
-	stats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -64,6 +61,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	"k8s.io/kubernetes/test/e2e/network"
 	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -93,38 +91,6 @@ var (
 	// KubeletConfig is the kubelet configuration the test is running against.
 	kubeletCfg *kubeletconfig.KubeletConfiguration
 )
-
-func getNodeSummary(ctx context.Context) (*stats.Summary, error) {
-	kubeletConfig, err := getCurrentKubeletConfig(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get current kubelet config")
-	}
-	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://%s/stats/summary", net.JoinHostPort(kubeletConfig.Address, strconv.Itoa(int(kubeletConfig.ReadOnlyPort)))), nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build http request: %w", err)
-	}
-	req.Header.Add("Accept", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get /stats/summary: %w", err)
-	}
-
-	defer resp.Body.Close()
-	contentsBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read /stats/summary: %+v", resp)
-	}
-
-	decoder := json.NewDecoder(strings.NewReader(string(contentsBytes)))
-	summary := stats.Summary{}
-	err = decoder.Decode(&summary)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse /stats/summary to go struct: %+v", resp)
-	}
-	return &summary, nil
-}
 
 func getV1alpha1NodeDevices(ctx context.Context) (*kubeletpodresourcesv1alpha1.ListPodResourcesResponse, error) {
 	endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)

@@ -35,6 +35,7 @@ import (
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/network"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/cpuset"
 )
@@ -164,7 +165,7 @@ var _ = SIGDescribe("CPU Manager Metrics [Serial][Feature:CPUManager]", func() {
 
 func getKubeletMetrics(ctx context.Context) (e2emetrics.KubeletMetrics, error) {
 	ginkgo.By("getting Kubelet metrics from the metrics API")
-	return e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, nodeNameOrIP()+":10255", "/metrics")
+	return e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, fmt.Sprintf("%s:%d", nodeNameOrIP(), network.LegacyKubeletReadOnlyPort), "/metrics")
 }
 
 func makeGuaranteedCPUExclusiveSleeperPod(name string, cpus int) *v1.Pod {

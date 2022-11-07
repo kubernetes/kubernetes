@@ -27,6 +27,7 @@ import (
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
+	"k8s.io/kubernetes/test/e2e/network"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/prometheus/common/model"
@@ -140,7 +141,7 @@ var _ = SIGDescribe("ResourceMetricsAPI [NodeFeature:ResourceMetrics]", func() {
 
 func getResourceMetrics(ctx context.Context) (e2emetrics.KubeletMetrics, error) {
 	ginkgo.By("getting stable resource metrics API")
-	return e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, nodeNameOrIP()+":10255", "/metrics/resource")
+	return e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, fmt.Sprintf("%s:%d", nodeNameOrIP(), network.LegacyKubeletReadOnlyPort), "/metrics/resource")
 }
 
 func nodeID(element interface{}) string {

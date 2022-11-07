@@ -49,6 +49,9 @@ const (
 	// Set ports outside of 30000-32767, 80 and 8080 to avoid being allowlisted by the e2e cluster
 	firewallTestHTTPPort = int32(29999)
 	firewallTestUDPPort  = int32(29998)
+
+	// LegacyKubeletReadOnlyPort is deprecated, and was exposed basic read-only services from the kubelet.
+	LegacyKubeletReadOnlyPort = 10255
 )
 
 var _ = common.SIGDescribe("Firewall rule", func() {
@@ -213,7 +216,7 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 		if nodeAddr != "" {
 			assertNotReachableHTTPTimeout(nodeAddr, "/", ports.KubeletPort, firewallTestTCPTimeout, false)
 			// kubelet readonly port 10255 is by default closed, and it should be removed in later release.
-			assertNotReachableHTTPTimeout(nodeAddr, "/", 10255, firewallTestTCPTimeout, false)
+			assertNotReachableHTTPTimeout(nodeAddr, "/", LegacyKubeletReadOnlyPort, firewallTestTCPTimeout, false)
 			assertNotReachableHTTPTimeout(nodeAddr, "/", ports.ProxyStatusPort, firewallTestTCPTimeout, false)
 		}
 
