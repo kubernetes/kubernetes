@@ -32,9 +32,10 @@ func TestStructure(t *testing.T) {
 	firstResourcePath := root.Index(0)
 	cacheSize := int32(1)
 	testCases := []struct {
-		desc string
-		in   *config.EncryptionConfiguration
-		want field.ErrorList
+		desc   string
+		in     *config.EncryptionConfiguration
+		reload bool
+		want   field.ErrorList
 	}{
 		{
 			desc: "nil encryption config",
@@ -340,11 +341,46 @@ func TestStructure(t *testing.T) {
 			},
 			want: field.ErrorList{},
 		},
+		{
+			desc: "duplicate kms v1 config names should error when reload=true",
+			in: &config.EncryptionConfiguration{
+				Resources: []config.ResourceConfiguration{
+					{
+						Resources: []string{"secrets"},
+						Providers: []config.ProviderConfiguration{
+							{
+								KMS: &config.KMSConfiguration{
+									Name:       "foo",
+									Endpoint:   "unix:///tmp/kms-provider-1.socket",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									CacheSize:  &cacheSize,
+									APIVersion: "v1",
+								},
+							},
+							{
+								KMS: &config.KMSConfiguration{
+									Name:       "foo",
+									Endpoint:   "unix:///tmp/kms-provider-2.socket",
+									Timeout:    &metav1.Duration{Duration: 3 * time.Second},
+									CacheSize:  &cacheSize,
+									APIVersion: "v1",
+								},
+							},
+						},
+					},
+				},
+			},
+			reload: true,
+			want: field.ErrorList{
+				field.Invalid(root.Index(0).Child("providers").Index(1).Child("kms").Child("name"),
+					"foo", fmt.Sprintf(duplicateKMSConfigNameErrFmt, "foo")),
+			},
+		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
-			got := ValidateEncryptionConfiguration(tt.in)
+			got := ValidateEncryptionConfiguration(tt.in, tt.reload)
 			if d := cmp.Diff(tt.want, got); d != "" {
 				t.Fatalf("EncryptionConfiguration validation results mismatch (-want +got):\n%s", d)
 			}
@@ -573,6 +609,7 @@ func TestKMSProviderName(t *testing.T) {
 	testCases := []struct {
 		desc             string
 		in               *config.KMSConfiguration
+		reload           bool
 		kmsProviderNames sets.String
 		want             field.ErrorList
 	}{
@@ -601,8 +638,32 @@ func TestKMSProviderName(t *testing.T) {
 			want: field.ErrorList{},
 		},
 		{
-			desc:             "duplicate name",
-			in:               &config.KMSConfiguration{Name: "foo"},
+			desc:             "duplicate name, kms v2, reload=false",
+			in:               &config.KMSConfiguration{APIVersion: "v2", Name: "foo"},
+			kmsProviderNames: sets.NewString("foo"),
+			want: field.ErrorList{
+				field.Invalid(nameField, "foo", fmt.Sprintf(duplicateKMSConfigNameErrFmt, "foo")),
+			},
+		},
+		{
+			desc:             "duplicate name, kms v2, reload=true",
+			in:               &config.KMSConfiguration{APIVersion: "v2", Name: "foo"},
+			reload:           true,
+			kmsProviderNames: sets.NewString("foo"),
+			want: field.ErrorList{
+				field.Invalid(nameField, "foo", fmt.Sprintf(duplicateKMSConfigNameErrFmt, "foo")),
+			},
+		},
+		{
+			desc:             "duplicate name, kms v1, reload=false",
+			in:               &config.KMSConfiguration{APIVersion: "v1", Name: "foo"},
+			kmsProviderNames: sets.NewString("foo"),
+			want:             field.ErrorList{},
+		},
+		{
+			desc:             "duplicate name, kms v1, reload=true",
+			in:               &config.KMSConfiguration{APIVersion: "v1", Name: "foo"},
+			reload:           true,
 			kmsProviderNames: sets.NewString("foo"),
 			want: field.ErrorList{
 				field.Invalid(nameField, "foo", fmt.Sprintf(duplicateKMSConfigNameErrFmt, "foo")),
@@ -612,7 +673,7 @@ func TestKMSProviderName(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
-			got := validateKMSConfigName(tt.in, nameField, tt.kmsProviderNames)
+			got := validateKMSConfigName(tt.in, nameField, tt.kmsProviderNames, tt.reload)
 			if d := cmp.Diff(tt.want, got); d != "" {
 				t.Fatalf("KMS Provider validation mismatch (-want +got):\n%s", d)
 			}
