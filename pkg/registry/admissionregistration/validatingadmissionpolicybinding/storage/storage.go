@@ -17,7 +17,11 @@ limitations under the License.
 package storage
 
 import (
+	"context"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -25,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
+	"k8s.io/kubernetes/pkg/registry/admissionregistration/resolver"
 	"k8s.io/kubernetes/pkg/registry/admissionregistration/validatingadmissionpolicybinding"
 )
 
@@ -33,19 +38,23 @@ type REST struct {
 	*genericregistry.Store
 }
 
+var groupResource = admissionregistration.Resource("validatingadmissionpolicybindings")
+
 // NewREST returns a RESTStorage object that will work against policyBinding.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
+func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.Authorizer, policyGetter PolicyGetter, resourceResolver resolver.ResourceResolver) (*REST, error) {
+	r := &REST{}
+	strategy := validatingadmissionpolicybinding.NewStrategy(authorizer, policyGetter, resourceResolver)
 	store := &genericregistry.Store{
 		NewFunc:     func() runtime.Object { return &admissionregistration.ValidatingAdmissionPolicyBinding{} },
 		NewListFunc: func() runtime.Object { return &admissionregistration.ValidatingAdmissionPolicyBindingList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*admissionregistration.ValidatingAdmissionPolicyBinding).Name, nil
 		},
-		DefaultQualifiedResource: admissionregistration.Resource("validatingadmissionpolicybindings"),
+		DefaultQualifiedResource: groupResource,
 
-		CreateStrategy: validatingadmissionpolicybinding.Strategy,
-		UpdateStrategy: validatingadmissionpolicybinding.Strategy,
-		DeleteStrategy: validatingadmissionpolicybinding.Strategy,
+		CreateStrategy: strategy,
+		UpdateStrategy: strategy,
+		DeleteStrategy: strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
@@ -53,7 +62,8 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, err
 	}
-	return &REST{store}, nil
+	r.Store = store
+	return r, nil
 }
 
 // Implement CategoriesProvider
@@ -62,4 +72,22 @@ var _ rest.CategoriesProvider = &REST{}
 // Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
 func (r *REST) Categories() []string {
 	return []string{"api-extensions"}
+}
+
+type PolicyGetter interface {
+	// GetValidatingAdmissionPolicy returns a GetValidatingAdmissionPolicy
+	// by its name. There is no namespace because it is cluster-scoped.
+	GetValidatingAdmissionPolicy(ctx context.Context, name string) (*admissionregistration.ValidatingAdmissionPolicy, error)
+}
+
+type DefaultPolicyGetter struct {
+	Getter rest.Getter
+}
+
+func (g *DefaultPolicyGetter) GetValidatingAdmissionPolicy(ctx context.Context, name string) (*admissionregistration.ValidatingAdmissionPolicy, error) {
+	p, err := g.Getter.Get(ctx, name, &metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return p.(*admissionregistration.ValidatingAdmissionPolicy), err
 }

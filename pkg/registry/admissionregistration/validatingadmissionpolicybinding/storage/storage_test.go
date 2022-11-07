@@ -23,10 +23,12 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
+	"k8s.io/kubernetes/pkg/registry/admissionregistration/resolver"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 
 	// Ensure that admissionregistration package is initialized.
@@ -34,7 +36,7 @@ import (
 )
 
 func TestCreate(t *testing.T) {
-	storage, server := newStorage(t)
+	storage, server := newInsecureStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
@@ -48,7 +50,7 @@ func TestCreate(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	storage, server := newStorage(t)
+	storage, server := newInsecureStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
@@ -72,7 +74,7 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	storage, server := newStorage(t)
+	storage, server := newInsecureStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
@@ -80,7 +82,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	storage, server := newStorage(t)
+	storage, server := newInsecureStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
@@ -88,7 +90,7 @@ func TestList(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	storage, server := newStorage(t)
+	storage, server := newInsecureStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
@@ -96,7 +98,7 @@ func TestDelete(t *testing.T) {
 }
 
 func TestWatch(t *testing.T) {
-	storage, server := newStorage(t)
+	storage, server := newInsecureStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).ClusterScope()
@@ -169,14 +171,18 @@ func newPolicyBinding(name string) *admissionregistration.ValidatingAdmissionPol
 	}
 }
 
-func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
+func newInsecureStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
+	return newStorage(t, nil, nil, nil)
+}
+
+func newStorage(t *testing.T, authorizer authorizer.Authorizer, policyGetter PolicyGetter, resourceResolver resolver.ResourceResolver) (*REST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorageForResource(t, admissionregistration.Resource("validatingadmissionpolicybindings"))
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "validatingadmissionpolicybindings"}
-	storage, err := NewREST(restOptions)
+	storage, err := NewREST(restOptions, authorizer, policyGetter, resourceResolver)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
@@ -184,7 +190,7 @@ func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
 }
 
 func TestCategories(t *testing.T) {
-	storage, server := newStorage(t)
+	storage, server := newInsecureStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	expected := []string{"api-extensions"}

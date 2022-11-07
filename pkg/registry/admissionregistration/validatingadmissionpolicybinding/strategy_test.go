@@ -25,25 +25,26 @@ import (
 )
 
 func TestPolicyBindingStrategy(t *testing.T) {
+	strategy := NewStrategy(nil, nil, nil)
 	ctx := genericapirequest.NewDefaultContext()
-	if Strategy.NamespaceScoped() {
+	if strategy.NamespaceScoped() {
 		t.Error("PolicyBinding strategy must be cluster scoped")
 	}
-	if Strategy.AllowCreateOnUpdate() {
+	if strategy.AllowCreateOnUpdate() {
 		t.Errorf("PolicyBinding should not allow create on update")
 	}
 
 	configuration := validPolicyBinding()
-	Strategy.PrepareForCreate(ctx, configuration)
-	errs := Strategy.Validate(ctx, configuration)
+	strategy.PrepareForCreate(ctx, configuration)
+	errs := strategy.Validate(ctx, configuration)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)
 	}
 	invalidConfiguration := &admissionregistration.ValidatingAdmissionPolicyBinding{
 		ObjectMeta: metav1.ObjectMeta{Name: ""},
 	}
-	Strategy.PrepareForUpdate(ctx, invalidConfiguration, configuration)
-	errs = Strategy.ValidateUpdate(ctx, invalidConfiguration, configuration)
+	strategy.PrepareForUpdate(ctx, invalidConfiguration, configuration)
+	errs = strategy.ValidateUpdate(ctx, invalidConfiguration, configuration)
 	if len(errs) == 0 {
 		t.Errorf("Expected a validation error")
 	}

@@ -18,6 +18,7 @@ package storage
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -25,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
+	"k8s.io/kubernetes/pkg/registry/admissionregistration/resolver"
 	"k8s.io/kubernetes/pkg/registry/admissionregistration/validatingadmissionpolicy"
 )
 
@@ -33,19 +35,23 @@ type REST struct {
 	*genericregistry.Store
 }
 
+var groupResource = admissionregistration.Resource("validatingadmissionpolicies")
+
 // NewREST returns a RESTStorage object that will work against validatingAdmissionPolicy.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
+func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.Authorizer, resourceResolver resolver.ResourceResolver) (*REST, error) {
+	r := &REST{}
+	strategy := validatingadmissionpolicy.NewStrategy(authorizer, resourceResolver)
 	store := &genericregistry.Store{
 		NewFunc:     func() runtime.Object { return &admissionregistration.ValidatingAdmissionPolicy{} },
 		NewListFunc: func() runtime.Object { return &admissionregistration.ValidatingAdmissionPolicyList{} },
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*admissionregistration.ValidatingAdmissionPolicy).Name, nil
 		},
-		DefaultQualifiedResource: admissionregistration.Resource("validatingadmissionpolicies"),
+		DefaultQualifiedResource: groupResource,
 
-		CreateStrategy: validatingadmissionpolicy.Strategy,
-		UpdateStrategy: validatingadmissionpolicy.Strategy,
-		DeleteStrategy: validatingadmissionpolicy.Strategy,
+		CreateStrategy: strategy,
+		UpdateStrategy: strategy,
+		DeleteStrategy: strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
@@ -53,7 +59,8 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, err
 	}
-	return &REST{store}, nil
+	r.Store = store
+	return r, nil
 }
 
 // Implement CategoriesProvider

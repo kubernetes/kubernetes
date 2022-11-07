@@ -25,25 +25,26 @@ import (
 )
 
 func TestValidatingAdmissionPolicyStrategy(t *testing.T) {
+	strategy := NewStrategy(nil, nil)
 	ctx := genericapirequest.NewDefaultContext()
-	if Strategy.NamespaceScoped() {
+	if strategy.NamespaceScoped() {
 		t.Error("ValidatingAdmissionPolicy strategy must be cluster scoped")
 	}
-	if Strategy.AllowCreateOnUpdate() {
+	if strategy.AllowCreateOnUpdate() {
 		t.Errorf("ValidatingAdmissionPolicy should not allow create on update")
 	}
 
 	configuration := validValidatingAdmissionPolicy()
-	Strategy.PrepareForCreate(ctx, configuration)
-	errs := Strategy.Validate(ctx, configuration)
+	strategy.PrepareForCreate(ctx, configuration)
+	errs := strategy.Validate(ctx, configuration)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)
 	}
 	invalidConfiguration := &admissionregistration.ValidatingAdmissionPolicy{
 		ObjectMeta: metav1.ObjectMeta{Name: ""},
 	}
-	Strategy.PrepareForUpdate(ctx, invalidConfiguration, configuration)
-	errs = Strategy.ValidateUpdate(ctx, invalidConfiguration, configuration)
+	strategy.PrepareForUpdate(ctx, invalidConfiguration, configuration)
+	errs = strategy.ValidateUpdate(ctx, invalidConfiguration, configuration)
 	if len(errs) == 0 {
 		t.Errorf("Expected a validation error")
 	}
