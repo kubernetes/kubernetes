@@ -309,6 +309,10 @@ func New(client clientset.Interface,
 		return nil, errors.New("at least one profile is required")
 	}
 
+	preEnqueuePluginMap := make(map[string][]framework.PreEnqueuePlugin)
+	for profileName, profile := range profiles {
+		preEnqueuePluginMap[profileName] = profile.PreEnqueuePlugins()
+	}
 	podQueue := internalqueue.NewSchedulingQueue(
 		profiles[options.profiles[0].SchedulerName].QueueSortFunc(),
 		informerFactory,
@@ -317,6 +321,7 @@ func New(client clientset.Interface,
 		internalqueue.WithPodNominator(nominator),
 		internalqueue.WithClusterEventMap(clusterEventMap),
 		internalqueue.WithPodMaxInUnschedulablePodsDuration(options.podMaxInUnschedulablePodsDuration),
+		internalqueue.WithPreEnqueuePluginMap(preEnqueuePluginMap),
 	)
 
 	schedulerCache := internalcache.New(durationToExpireAssumedPod, stopEverything)

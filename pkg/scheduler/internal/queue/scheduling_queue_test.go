@@ -446,6 +446,84 @@ func TestPriorityQueue_Activate(t *testing.T) {
 	}
 }
 
+type preEnqueuePlugin struct {
+	allowlists []string
+}
+
+func (pl *preEnqueuePlugin) Name() string {
+	return "preEnqueuePlugin"
+}
+
+func (pl *preEnqueuePlugin) PreEnqueue(ctx context.Context, p *v1.Pod) *framework.Status {
+	for _, allowed := range pl.allowlists {
+		if strings.Contains(p.Name, allowed) {
+			return nil
+		}
+	}
+	return framework.NewStatus(framework.UnschedulableAndUnresolvable, "pod name not in allowlists")
+}
+
+func TestPriorityQueue_addToActiveQ(t *testing.T) {
+	tests := []struct {
+		name                  string
+		plugins               []framework.PreEnqueuePlugin
+		pod                   *v1.Pod
+		wantUnschedulablePods int
+		wantSuccess           bool
+	}{
+		{
+			name:                  "no plugins registered",
+			pod:                   st.MakePod().Name("p").Obj(),
+			wantUnschedulablePods: 0,
+			wantSuccess:           true,
+		},
+		{
+			name:                  "preEnqueue plugin registered, pod name not in allowlists",
+			plugins:               []framework.PreEnqueuePlugin{&preEnqueuePlugin{}, &preEnqueuePlugin{}},
+			pod:                   st.MakePod().Name("p").Obj(),
+			wantUnschedulablePods: 1,
+			wantSuccess:           false,
+		},
+		{
+			name: "preEnqueue plugin registered, pod failed one preEnqueue plugin",
+			plugins: []framework.PreEnqueuePlugin{
+				&preEnqueuePlugin{allowlists: []string{"foo", "bar"}},
+				&preEnqueuePlugin{allowlists: []string{"foo"}},
+			},
+			pod:                   st.MakePod().Name("bar").Obj(),
+			wantUnschedulablePods: 1,
+			wantSuccess:           false,
+		},
+		{
+			name: "preEnqueue plugin registered, pod passed all preEnqueue plugins",
+			plugins: []framework.PreEnqueuePlugin{
+				&preEnqueuePlugin{allowlists: []string{"foo", "bar"}},
+				&preEnqueuePlugin{allowlists: []string{"bar"}},
+			},
+			pod:                   st.MakePod().Name("bar").Obj(),
+			wantUnschedulablePods: 0,
+			wantSuccess:           true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			m := map[string][]framework.PreEnqueuePlugin{"": tt.plugins}
+			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{tt.pod}, WithPreEnqueuePluginMap(m))
+			got, _ := q.addToActiveQ(newQueuedPodInfoForLookup(tt.pod))
+			if got != tt.wantSuccess {
+				t.Errorf("Unexpected result: want %v, but got %v", tt.wantSuccess, got)
+			}
+			if tt.wantUnschedulablePods != len(q.unschedulablePods.podInfoMap) {
+				t.Errorf("Unexpected unschedulablePods: want %v, but got %v", tt.wantUnschedulablePods, len(q.unschedulablePods.podInfoMap))
+			}
+		})
+	}
+}
+
 func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 	tests := []struct {
 		name      string
@@ -949,7 +1027,7 @@ func TestUnschedulablePodsMap(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			upm := newUnschedulablePods(nil)
+			upm := newUnschedulablePods(nil, nil)
 			for _, p := range test.podsToAdd {
 				upm.addOrUpdate(newQueuedPodInfoForLookup(p))
 			}
@@ -968,7 +1046,7 @@ func TestUnschedulablePodsMap(t *testing.T) {
 				}
 			}
 			for _, p := range test.podsToDelete {
-				upm.delete(p)
+				upm.delete(newQueuedPodInfoForLookup(p))
 			}
 			if !reflect.DeepEqual(upm.podInfoMap, test.expectedMapAfterDelete) {
 				t.Errorf("Unexpected map after deleting pods. Expected: %v, got: %v",
@@ -1307,13 +1385,15 @@ var (
 		queue.activeQ.Update(pInfo)
 	}
 	addPodUnschedulablePods = func(queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
-		// Update pod condition to unschedulable.
-		podutil.UpdatePodCondition(&pInfo.Pod.Status, &v1.PodCondition{
-			Type:    v1.PodScheduled,
-			Status:  v1.ConditionFalse,
-			Reason:  v1.PodReasonUnschedulable,
-			Message: "fake scheduling failure",
-		})
+		if !pInfo.Gated {
+			// Update pod condition to unschedulable.
+			podutil.UpdatePodCondition(&pInfo.Pod.Status, &v1.PodCondition{
+				Type:    v1.PodScheduled,
+				Status:  v1.ConditionFalse,
+				Reason:  v1.PodReasonUnschedulable,
+				Message: "fake scheduling failure",
+			})
+		}
 		queue.unschedulablePods.addOrUpdate(pInfo)
 	}
 	addPodBackoffQ = func(queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
@@ -1434,10 +1514,20 @@ func TestPodTimestamp(t *testing.T) {
 func TestPendingPodsMetric(t *testing.T) {
 	timestamp := time.Now()
 	metrics.Register()
-	total := 50
-	pInfos := makeQueuedPodInfos(total, timestamp)
+	total := 60
+	queueableNum := 50
+	queueable := "queueable"
+	// First 50 Pods are queueable.
+	pInfos := makeQueuedPodInfos(queueableNum, queueable, timestamp)
+	// The last 10 Pods are not queueable.
+	gated := makeQueuedPodInfos(total-queueableNum, "fail-me", timestamp)
+	// Manually mark them as gated=true.
+	for _, pInfo := range gated {
+		pInfo.Gated = true
+	}
+	pInfos = append(pInfos, gated...)
 	totalWithDelay := 20
-	pInfosWithDelay := makeQueuedPodInfos(totalWithDelay, timestamp.Add(2*time.Second))
+	pInfosWithDelay := makeQueuedPodInfos(totalWithDelay, queueable, timestamp.Add(2*time.Second))
 
 	tests := []struct {
 		name        string
@@ -1458,10 +1548,11 @@ func TestPendingPodsMetric(t *testing.T) {
 			},
 			metricsName: "scheduler_pending_pods",
 			wants: `
-# HELP scheduler_pending_pods [STABLE] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods.
+# HELP scheduler_pending_pods [STABLE] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable pods that the scheduler never attempted to schedule because they are gated.
 # TYPE scheduler_pending_pods gauge
 scheduler_pending_pods{queue="active"} 30
 scheduler_pending_pods{queue="backoff"} 0
+scheduler_pending_pods{queue="gated"} 10
 scheduler_pending_pods{queue="unschedulable"} 20
 `,
 		},
@@ -1479,10 +1570,11 @@ scheduler_pending_pods{queue="unschedulable"} 20
 			},
 			metricsName: "scheduler_pending_pods",
 			wants: `
-# HELP scheduler_pending_pods [STABLE] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods.
+# HELP scheduler_pending_pods [STABLE] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable pods that the scheduler never attempted to schedule because they are gated.
 # TYPE scheduler_pending_pods gauge
 scheduler_pending_pods{queue="active"} 15
 scheduler_pending_pods{queue="backoff"} 25
+scheduler_pending_pods{queue="gated"} 10
 scheduler_pending_pods{queue="unschedulable"} 10
 `,
 		},
@@ -1500,10 +1592,11 @@ scheduler_pending_pods{queue="unschedulable"} 10
 			},
 			metricsName: "scheduler_pending_pods",
 			wants: `
-# HELP scheduler_pending_pods [STABLE] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods.
+# HELP scheduler_pending_pods [STABLE] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable pods that the scheduler never attempted to schedule because they are gated.
 # TYPE scheduler_pending_pods gauge
 scheduler_pending_pods{queue="active"} 50
 scheduler_pending_pods{queue="backoff"} 0
+scheduler_pending_pods{queue="gated"} 10
 scheduler_pending_pods{queue="unschedulable"} 0
 `,
 		},
@@ -1523,10 +1616,11 @@ scheduler_pending_pods{queue="unschedulable"} 0
 			},
 			metricsName: "scheduler_pending_pods",
 			wants: `
-# HELP scheduler_pending_pods [STABLE] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods.
+# HELP scheduler_pending_pods [STABLE] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable pods that the scheduler never attempted to schedule because they are gated.
 # TYPE scheduler_pending_pods gauge
 scheduler_pending_pods{queue="active"} 30
 scheduler_pending_pods{queue="backoff"} 20
+scheduler_pending_pods{queue="gated"} 10
 scheduler_pending_pods{queue="unschedulable"} 0
 `,
 		},
@@ -1540,16 +1634,17 @@ scheduler_pending_pods{queue="unschedulable"} 0
 			},
 			operands: [][]*framework.QueuedPodInfo{
 				pInfos[:40],
-				pInfos[40:],
+				pInfos[40:50],
 				{nil},
 				{nil},
 			},
 			metricsName: "scheduler_pending_pods",
 			wants: `
-# HELP scheduler_pending_pods [STABLE] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods.
+# HELP scheduler_pending_pods [STABLE] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable pods that the scheduler never attempted to schedule because they are gated.
 # TYPE scheduler_pending_pods gauge
 scheduler_pending_pods{queue="active"} 50
 scheduler_pending_pods{queue="backoff"} 0
+scheduler_pending_pods{queue="gated"} 0
 scheduler_pending_pods{queue="unschedulable"} 0
 `,
 		},
@@ -1559,6 +1654,7 @@ scheduler_pending_pods{queue="unschedulable"} 0
 		metrics.ActivePods().Set(0)
 		metrics.BackoffPods().Set(0)
 		metrics.UnschedulablePods().Set(0)
+		metrics.GatedPods().Set(0)
 	}
 
 	for _, test := range tests {
@@ -1566,7 +1662,9 @@ scheduler_pending_pods{queue="unschedulable"} 0
 			resetMetrics()
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			queue := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)))
+
+			m := map[string][]framework.PreEnqueuePlugin{"": {&preEnqueuePlugin{allowlists: []string{queueable}}}}
+			queue := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)), WithPreEnqueuePluginMap(m))
 			for i, op := range test.operations {
 				for _, pInfo := range test.operands[i] {
 					op(queue, pInfo)
@@ -1986,12 +2084,13 @@ func TestMoveAllToActiveOrBackoffQueue_PreEnqueueChecks(t *testing.T) {
 	}
 }
 
-func makeQueuedPodInfos(num int, timestamp time.Time) []*framework.QueuedPodInfo {
+func makeQueuedPodInfos(num int, namePrefix string, timestamp time.Time) []*framework.QueuedPodInfo {
 	var pInfos = make([]*framework.QueuedPodInfo, 0, num)
 	for i := 1; i <= num; i++ {
 		p := &framework.QueuedPodInfo{
-			PodInfo:   mustNewPodInfo(st.MakePod().Name(fmt.Sprintf("test-pod-%d", i)).Namespace(fmt.Sprintf("ns%d", i)).UID(fmt.Sprintf("tp-%d", i)).Obj()),
-			Timestamp: timestamp,
+			PodInfo:              mustNewPodInfo(st.MakePod().Name(fmt.Sprintf("%v-%d", namePrefix, i)).Namespace(fmt.Sprintf("ns%d", i)).UID(fmt.Sprintf("tp-%d", i)).Obj()),
+			Timestamp:            timestamp,
+			UnschedulablePlugins: sets.NewString(),
 		}
 		pInfos = append(pInfos, p)
 	}
