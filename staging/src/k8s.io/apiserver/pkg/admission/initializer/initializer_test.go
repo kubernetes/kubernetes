@@ -32,7 +32,7 @@ import (
 // TestWantsAuthorizer ensures that the authorizer is injected
 // when the WantsAuthorizer interface is implemented by a plugin.
 func TestWantsAuthorizer(t *testing.T) {
-	target := initializer.New(nil, nil, &TestAuthorizer{}, nil, nil)
+	target := initializer.New(nil, nil, nil, &TestAuthorizer{}, nil, nil)
 	wantAuthorizerAdmission := &WantAuthorizerAdmission{}
 	target.Initialize(wantAuthorizerAdmission)
 	if wantAuthorizerAdmission.auth == nil {
@@ -44,7 +44,7 @@ func TestWantsAuthorizer(t *testing.T) {
 // when the WantsExternalKubeClientSet interface is implemented by a plugin.
 func TestWantsExternalKubeClientSet(t *testing.T) {
 	cs := &fake.Clientset{}
-	target := initializer.New(cs, nil, &TestAuthorizer{}, nil, nil)
+	target := initializer.New(cs, nil, nil, &TestAuthorizer{}, nil, nil)
 	wantExternalKubeClientSet := &WantExternalKubeClientSet{}
 	target.Initialize(wantExternalKubeClientSet)
 	if wantExternalKubeClientSet.cs != cs {
@@ -57,7 +57,7 @@ func TestWantsExternalKubeClientSet(t *testing.T) {
 func TestWantsExternalKubeInformerFactory(t *testing.T) {
 	cs := &fake.Clientset{}
 	sf := informers.NewSharedInformerFactory(cs, time.Duration(1)*time.Second)
-	target := initializer.New(cs, sf, &TestAuthorizer{}, nil, nil)
+	target := initializer.New(cs, nil, sf, &TestAuthorizer{}, nil, nil)
 	wantExternalKubeInformerFactory := &WantExternalKubeInformerFactory{}
 	target.Initialize(wantExternalKubeInformerFactory)
 	if wantExternalKubeInformerFactory.sf != sf {
@@ -69,7 +69,7 @@ func TestWantsExternalKubeInformerFactory(t *testing.T) {
 // when the WantsShutdownSignal interface is implemented by a plugin.
 func TestWantsShutdownNotification(t *testing.T) {
 	stopCh := make(chan struct{})
-	target := initializer.New(nil, nil, &TestAuthorizer{}, nil, stopCh)
+	target := initializer.New(nil, nil, nil, &TestAuthorizer{}, nil, stopCh)
 	wantDrainedNotification := &WantDrainedNotification{}
 	target.Initialize(wantDrainedNotification)
 	if wantDrainedNotification.stopCh == nil {
