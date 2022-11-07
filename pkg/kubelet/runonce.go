@@ -44,6 +44,7 @@ type RunPodResult struct {
 
 // RunOnce polls from one configuration update and run the associated pods.
 func (kl *Kubelet) RunOnce(updates <-chan kubetypes.PodUpdate) ([]RunPodResult, error) {
+	ctx := context.Background()
 	// Setup filesystem directories.
 	if err := kl.setupDataDirs(); err != nil {
 		return nil, err
@@ -59,7 +60,7 @@ func (kl *Kubelet) RunOnce(updates <-chan kubetypes.PodUpdate) ([]RunPodResult, 
 	select {
 	case u := <-updates:
 		klog.InfoS("Processing manifest with pods", "numPods", len(u.Pods))
-		result, err := kl.runOnce(u.Pods, runOnceRetryDelay)
+		result, err := kl.runOnce(ctx, u.Pods, runOnceRetryDelay)
 		klog.InfoS("Finished processing pods", "numPods", len(u.Pods))
 		return result, err
 	case <-time.After(runOnceManifestDelay):
@@ -68,7 +69,7 @@ func (kl *Kubelet) RunOnce(updates <-chan kubetypes.PodUpdate) ([]RunPodResult, 
 }
 
 // runOnce runs a given set of pods and returns their status.
-func (kl *Kubelet) runOnce(pods []*v1.Pod, retryDelay time.Duration) (results []RunPodResult, err error) {
+func (kl *Kubelet) runOnce(ctx context.Context, pods []*v1.Pod, retryDelay time.Duration) (results []RunPodResult, err error) {
 	ch := make(chan RunPodResult)
 	admitted := []*v1.Pod{}
 	for _, pod := range pods {
@@ -81,7 +82,7 @@ func (kl *Kubelet) runOnce(pods []*v1.Pod, retryDelay time.Duration) (results []
 
 		admitted = append(admitted, pod)
 		go func(pod *v1.Pod) {
-			err := kl.runPod(pod, retryDelay)
+			err := kl.runPod(ctx, pod, retryDelay)
 			ch <- RunPodResult{pod, err}
 		}(pod)
 	}
@@ -92,7 +93,7 @@ func (kl *Kubelet) runOnce(pods []*v1.Pod, retryDelay time.Duration) (results []
 		res := <-ch
 		results = append(results, res)
 		if res.Err != nil {
-			failedContainerName, err := kl.getFailedContainers(res.Pod)
+			failedContainerName, err := kl.getFailedContainers(ctx, res.Pod)
 			if err != nil {
 				klog.InfoS("Unable to get failed containers' names for pod", "pod", klog.KObj(res.Pod), "err", err)
 			} else {
@@ -111,12 +112,12 @@ func (kl *Kubelet) runOnce(pods []*v1.Pod, retryDelay time.Duration) (results []
 }
 
 // runPod runs a single pod and wait until all containers are running.
-func (kl *Kubelet) runPod(pod *v1.Pod, retryDelay time.Duration) error {
+func (kl *Kubelet) runPod(ctx context.Context, pod *v1.Pod, retryDelay time.Duration) error {
 	var isTerminal bool
 	delay := retryDelay
 	retry := 0
 	for !isTerminal {
-		status, err := kl.containerRuntime.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+		status, err := kl.containerRuntime.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
 		if err != nil {
 			return fmt.Errorf("unable to get status for pod %q: %v", format.Pod(pod), err)
 		}
@@ -132,7 +133,7 @@ func (kl *Kubelet) runPod(pod *v1.Pod, retryDelay time.Duration) error {
 			klog.ErrorS(err, "Failed creating a mirror pod", "pod", klog.KObj(pod))
 		}
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
-		if isTerminal, err = kl.syncPod(context.Background(), kubetypes.SyncPodUpdate, pod, mirrorPod, status); err != nil {
+		if isTerminal, err = kl.syncPod(ctx, kubetypes.SyncPodUpdate, pod, mirrorPod, status); err != nil {
 			return fmt.Errorf("error syncing pod %q: %v", format.Pod(pod), err)
 		}
 		if retry >= runOnceMaxRetries {
@@ -160,8 +161,8 @@ func (kl *Kubelet) isPodRunning(pod *v1.Pod, status *kubecontainer.PodStatus) bo
 }
 
 // getFailedContainer returns failed container name for pod.
-func (kl *Kubelet) getFailedContainers(pod *v1.Pod) ([]string, error) {
-	status, err := kl.containerRuntime.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+func (kl *Kubelet) getFailedContainers(ctx context.Context, pod *v1.Pod) ([]string, error) {
+	status, err := kl.containerRuntime.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get status for pod %q: %v", format.Pod(pod), err)
 	}

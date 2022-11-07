@@ -84,6 +84,7 @@ var args = []string{
 	"--cluster-signing-legacy-unknown-cert-file=/cluster-signing-legacy-unknown/cert-file",
 	"--cluster-signing-legacy-unknown-key-file=/cluster-signing-legacy-unknown/key-file",
 	"--concurrent-deployment-syncs=10",
+	"--concurrent-horizontal-pod-autoscaler-syncs=10",
 	"--concurrent-statefulset-syncs=15",
 	"--concurrent-endpoint-syncs=10",
 	"--concurrent-ephemeralvolume-syncs=10",
@@ -304,6 +305,7 @@ func TestAddFlags(t *testing.T) {
 		},
 		HPAController: &HPAControllerOptions{
 			&poautosclerconfig.HPAControllerConfiguration{
+				ConcurrentHorizontalPodAutoscalerSyncs:              10,
 				HorizontalPodAutoscalerSyncPeriod:                   metav1.Duration{Duration: 45 * time.Second},
 				HorizontalPodAutoscalerUpscaleForbiddenWindow:       metav1.Duration{Duration: 1 * time.Minute},
 				HorizontalPodAutoscalerDownscaleForbiddenWindow:     metav1.Duration{Duration: 2 * time.Minute},
@@ -558,6 +560,7 @@ func TestApplyTo(t *testing.T) {
 				EnableGarbageCollector: false,
 			},
 			HPAController: poautosclerconfig.HPAControllerConfiguration{
+				ConcurrentHorizontalPodAutoscalerSyncs:              10,
 				HorizontalPodAutoscalerSyncPeriod:                   metav1.Duration{Duration: 45 * time.Second},
 				HorizontalPodAutoscalerUpscaleForbiddenWindow:       metav1.Duration{Duration: 1 * time.Minute},
 				HorizontalPodAutoscalerDownscaleForbiddenWindow:     metav1.Duration{Duration: 2 * time.Minute},

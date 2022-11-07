@@ -50,7 +50,6 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:StorageProvider]", fun
 		ns                string
 		pvc               *v1.PersistentVolumeClaim
 		sc                *storagev1.StorageClass
-		cleanStorageClass func()
 		nodeName          string
 		nodeKeyValueLabel map[string]string
 		nodeLabelValue    string
@@ -59,7 +58,7 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:StorageProvider]", fun
 
 	f := framework.NewDefaultFramework("mounted-volume-expand")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-	ginkgo.BeforeEach(func() {
+	ginkgo.BeforeEach(func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("aws", "gce")
 		c = f.ClientSet
 		ns = f.Namespace.Name
@@ -84,11 +83,10 @@ var _ = utils.SIGDescribe("Mounted volume expand [Feature:StorageProvider]", fun
 			Parameters:           make(map[string]string),
 		}
 
-		sc, cleanStorageClass = testsuites.SetupStorageClass(c, newStorageClass(test, ns, "resizing"))
+		sc = testsuites.SetupStorageClass(ctx, c, newStorageClass(test, ns, "resizing"))
 		if !*sc.AllowVolumeExpansion {
 			framework.Failf("Class %s does not allow volume expansion", sc.Name)
 		}
-		ginkgo.DeferCleanup(cleanStorageClass)
 
 		pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 			ClaimSize:        test.ClaimSize,

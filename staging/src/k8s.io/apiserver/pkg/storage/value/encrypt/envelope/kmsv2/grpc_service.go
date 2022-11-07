@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/util"
@@ -55,7 +56,7 @@ func NewGRPCService(ctx context.Context, endpoint string, callTimeout time.Durat
 	s := &gRPCService{callTimeout: callTimeout}
 	s.connection, err = grpc.Dial(
 		addr,
-		grpc.WithInsecure(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
 		grpc.WithContextDialer(
 			func(context.Context, string) (net.Conn, error) {

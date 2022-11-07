@@ -46,6 +46,7 @@ var interestingKubeletMetrics = []string{
 	"kubelet_docker_operations_errors_total",
 	"kubelet_docker_operations_duration_seconds",
 	"kubelet_pod_start_duration_seconds",
+	"kubelet_pod_start_sli_duration_seconds",
 	"kubelet_pod_worker_duration_seconds",
 	"kubelet_pod_worker_start_duration_seconds",
 }

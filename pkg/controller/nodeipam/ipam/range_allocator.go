@@ -54,6 +54,7 @@ type rangeAllocator struct {
 	// Channel that is used to pass updating Nodes and their reserved CIDRs to the background
 	// This increases a throughput of CIDR assignment by not blocking on long operations.
 	nodeCIDRUpdateChannel chan nodeReservedCIDRs
+	broadcaster           record.EventBroadcaster
 	recorder              record.EventRecorder
 	// Keep a set of nodes that are currently being processed to avoid races in CIDR allocation
 	lock              sync.Mutex
@@ -72,9 +73,6 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cidrAllocator"})
-	eventBroadcaster.StartStructuredLogging(0)
-	klog.V(0).Infof("Sending events to api server.")
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 
 	// create a cidrSet for each cidr we operate on
 	// cidrSet are mapped to clusterCIDR by index
@@ -94,6 +92,7 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 		nodeLister:            nodeInformer.Lister(),
 		nodesSynced:           nodeInformer.Informer().HasSynced,
 		nodeCIDRUpdateChannel: make(chan nodeReservedCIDRs, cidrUpdateQueueSize),
+		broadcaster:           eventBroadcaster,
 		recorder:              recorder,
 		nodesInProcessing:     sets.NewString(),
 	}
@@ -162,6 +161,12 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 
 func (r *rangeAllocator) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+
+	// Start event processing pipeline.
+	r.broadcaster.StartStructuredLogging(0)
+	klog.V(0).Infof("Sending events to api server.")
+	r.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: r.client.CoreV1().Events("")})
+	defer r.broadcaster.Shutdown()
 
 	klog.Infof("Starting range CIDR allocator")
 	defer klog.Infof("Shutting down range CIDR allocator")

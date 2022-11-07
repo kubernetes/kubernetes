@@ -415,12 +415,12 @@ func (d *driverDefinition) GetCSIDriverName(e2econfig *storageframework.PerTestC
 	return d.DriverInfo.Name
 }
 
-func (d *driverDefinition) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (d *driverDefinition) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
 	e2econfig := &storageframework.PerTestConfig{
 		Driver:              d,
 		Prefix:              "external",
 		Framework:           f,
 		ClientNodeSelection: e2epod.NodeSelection{Name: d.ClientNodeName},
 	}
-	return e2econfig, func() {}
+	return e2econfig
 }

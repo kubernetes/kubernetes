@@ -18,6 +18,7 @@ package windows
 
 import (
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -65,4 +66,15 @@ func getNodeContainerRuntimeAndVersion(n v1.Node) (string, semver.Version, error
 	}
 
 	return parts[0], v, nil
+}
+
+func getRandomUserGrounName() string {
+	var letters = []rune("abcdefghijklmnopqrstuvwxya")
+
+	s := make([]rune, 8)
+	for i := range s {
+		s[i] = letters[rand.Intn(len(letters))]
+	}
+
+	return "hpc-" + string(s)
 }

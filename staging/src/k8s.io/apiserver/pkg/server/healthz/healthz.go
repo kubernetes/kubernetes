@@ -253,7 +253,7 @@ func handleRootHealth(name string, firstTimeHealthy func(), checks ...HealthChec
 		}
 		if excluded.Len() > 0 {
 			fmt.Fprintf(&individualCheckOutput, "warn: some health checks cannot be excluded: no matches for %s\n", formatQuoted(excluded.List()...))
-			klog.Warningf("cannot exclude some health checks, no health checks are installed matching %s",
+			klog.V(6).Infof("cannot exclude some health checks, no health checks are installed matching %s",
 				formatQuoted(excluded.List()...))
 		}
 		// always be verbose on failure

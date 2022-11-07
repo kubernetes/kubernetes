@@ -307,11 +307,15 @@ clean:
 	hack/make-rules/clean.sh
 endif
 
+
 # TODO(thockin): Remove this in v1.29.
 .PHONY: generated_files
 generated_files:
-	echo "'make generated_files' is deprecated.  Please use hack/update-codgen.sh instead."
+	echo "'make generated_files' is deprecated.  Please use hack/update-codegen.sh instead."
+ifneq ($(PRINT_HELP), y)
 	false
+endif
+
 
 define VET_HELP_INFO
 # Run 'go vet'.
@@ -332,6 +336,21 @@ vet:
 else
 vet:
 	hack/make-rules/vet.sh $(WHAT)
+endif
+
+define LINT_HELP_INFO
+# Run golangci-lint
+#
+# Example:
+#   make lint
+endef
+.PHONY: lint
+ifeq ($(PRINT_HELP),y)
+lint:
+	echo "$$LINT_HELP_INFO"
+else
+lint:
+	hack/verify-golangci-lint.sh
 endif
 
 define RELEASE_HELP_INFO
@@ -361,9 +380,14 @@ define RELEASE_IMAGES_HELP_INFO
 #
 # Args:
 #   KUBE_BUILD_CONFORMANCE: Whether to build conformance testing image as well. Set to 'n' to skip.
+#   DBG: If set to "1", build with optimizations disabled for easier debugging. Any other value is ignored.
 #
 # Example:
 #   make release-images
+#   make release-images DBG=1
+#     Note: Specify DBG=1 for building unstripped binaries, which allows you to use code debugging
+#           tools like delve. When DBG is unspecified, it defaults to "-s -w" which strips debug
+#           information.
 endef
 .PHONY: release-images
 ifeq ($(PRINT_HELP),y)
@@ -405,9 +429,14 @@ define QUICK_RELEASE_IMAGES_HELP_INFO
 # Args:
 #   KUBE_FASTBUILD: Whether to cross-compile for other architectures. Set to 'false' to do so.
 #   KUBE_BUILD_CONFORMANCE: Whether to build conformance testing image as well. Set to 'y' to do so.
+#   DBG: If set to "1", build with optimizations disabled for easier debugging. Any other value is ignored.
 #
 # Example:
 #   make quick-release-images
+#   make quick-release-images DBG=1
+#     Note: Specify DBG=1 for building unstripped binaries, which allows you to use code debugging
+#           tools like delve. When DBG is unspecified, it defaults to "-s -w" which strips debug
+#           information.
 endef
 .PHONY: quick-release-images
 ifeq ($(PRINT_HELP),y)

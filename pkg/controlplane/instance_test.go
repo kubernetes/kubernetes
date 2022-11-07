@@ -89,6 +89,9 @@ func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertio
 	etcdOptions := options.NewEtcdOptions(storageConfig)
 	// unit tests don't need watch cache and it leaks lots of goroutines with etcd testing functions during unit tests
 	etcdOptions.EnableWatchCache = false
+	if err := etcdOptions.Complete(config.GenericConfig.StorageObjectCountTracker, config.GenericConfig.DrainedNotify()); err != nil {
+		t.Fatal(err)
+	}
 	err := etcdOptions.ApplyWithStorageFactoryTo(storageFactory, config.GenericConfig)
 	if err != nil {
 		t.Fatal(err)

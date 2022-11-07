@@ -159,7 +159,7 @@ func waitAndVerifyLBWithTier(jig *e2eservice.TestJig, existingIP string, waitTim
 	}
 	// If the IP has been used by previous test, sometimes we get the lingering
 	// 404 errors even after the LB is long gone. Tolerate and retry until the
-	// the new LB is fully established.
+	// new LB is fully established.
 	e2eservice.TestReachableHTTPWithRetriableErrorCodes(ingressIP, svcPort, []int{http.StatusNotFound}, checkTimeout)
 
 	// Verify the network tier matches the desired.

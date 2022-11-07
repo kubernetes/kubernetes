@@ -55,7 +55,9 @@ import (
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	"k8s.io/component-base/metrics/features"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
+	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/term"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
@@ -77,6 +79,7 @@ import (
 
 func init() {
 	utilruntime.Must(logsapi.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+	utilruntime.Must(features.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 }
 
 const (
@@ -205,6 +208,9 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	var unsecuredMux *mux.PathRecorderMux
 	if c.SecureServing != nil {
 		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, healthzHandler)
+		if utilfeature.DefaultFeatureGate.Enabled(features.ComponentSLIs) {
+			slis.SLIMetricsWithReset{}.Install(unsecuredMux)
+		}
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
 		// TODO: handle stoppedCh and listenerStoppedCh returned by c.SecureServing.Serve
 		if _, _, err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {

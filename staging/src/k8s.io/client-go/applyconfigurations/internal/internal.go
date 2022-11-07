@@ -5725,6 +5725,13 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: io.k8s.api.core.v1.PodSchedulingGate
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.core.v1.PodSecurityContext
   map:
     fields:
@@ -5881,6 +5888,14 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: schedulerName
       type:
         scalar: string
+    - name: schedulingGates
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.PodSchedulingGate
+          elementRelationship: associative
+          keys:
+          - name
     - name: securityContext
       type:
         namedType: io.k8s.api.core.v1.PodSecurityContext
@@ -7861,6 +7876,44 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.apimachinery.pkg.util.intstr.IntOrString
       default: {}
+- name: io.k8s.api.extensions.v1beta1.IngressLoadBalancerIngress
+  map:
+    fields:
+    - name: hostname
+      type:
+        scalar: string
+    - name: ip
+      type:
+        scalar: string
+    - name: ports
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.extensions.v1beta1.IngressPortStatus
+          elementRelationship: atomic
+- name: io.k8s.api.extensions.v1beta1.IngressLoadBalancerStatus
+  map:
+    fields:
+    - name: ingress
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.extensions.v1beta1.IngressLoadBalancerIngress
+          elementRelationship: atomic
+- name: io.k8s.api.extensions.v1beta1.IngressPortStatus
+  map:
+    fields:
+    - name: error
+      type:
+        scalar: string
+    - name: port
+      type:
+        scalar: numeric
+      default: 0
+    - name: protocol
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.extensions.v1beta1.IngressRule
   map:
     fields:
@@ -7896,7 +7949,7 @@ var schemaYAML = typed.YAMLObject(`types:
     fields:
     - name: loadBalancer
       type:
-        namedType: io.k8s.api.core.v1.LoadBalancerStatus
+        namedType: io.k8s.api.extensions.v1beta1.IngressLoadBalancerStatus
       default: {}
 - name: io.k8s.api.extensions.v1beta1.IngressTLS
   map:
@@ -9721,6 +9774,44 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: parameters
       type:
         namedType: io.k8s.api.networking.v1.IngressClassParametersReference
+- name: io.k8s.api.networking.v1.IngressLoadBalancerIngress
+  map:
+    fields:
+    - name: hostname
+      type:
+        scalar: string
+    - name: ip
+      type:
+        scalar: string
+    - name: ports
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.networking.v1.IngressPortStatus
+          elementRelationship: atomic
+- name: io.k8s.api.networking.v1.IngressLoadBalancerStatus
+  map:
+    fields:
+    - name: ingress
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.networking.v1.IngressLoadBalancerIngress
+          elementRelationship: atomic
+- name: io.k8s.api.networking.v1.IngressPortStatus
+  map:
+    fields:
+    - name: error
+      type:
+        scalar: string
+    - name: port
+      type:
+        scalar: numeric
+      default: 0
+    - name: protocol
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.networking.v1.IngressRule
   map:
     fields:
@@ -9767,7 +9858,7 @@ var schemaYAML = typed.YAMLObject(`types:
     fields:
     - name: loadBalancer
       type:
-        namedType: io.k8s.api.core.v1.LoadBalancerStatus
+        namedType: io.k8s.api.networking.v1.IngressLoadBalancerStatus
       default: {}
 - name: io.k8s.api.networking.v1.IngressTLS
   map:
@@ -10038,6 +10129,44 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: parameters
       type:
         namedType: io.k8s.api.networking.v1beta1.IngressClassParametersReference
+- name: io.k8s.api.networking.v1beta1.IngressLoadBalancerIngress
+  map:
+    fields:
+    - name: hostname
+      type:
+        scalar: string
+    - name: ip
+      type:
+        scalar: string
+    - name: ports
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.networking.v1beta1.IngressPortStatus
+          elementRelationship: atomic
+- name: io.k8s.api.networking.v1beta1.IngressLoadBalancerStatus
+  map:
+    fields:
+    - name: ingress
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.networking.v1beta1.IngressLoadBalancerIngress
+          elementRelationship: atomic
+- name: io.k8s.api.networking.v1beta1.IngressPortStatus
+  map:
+    fields:
+    - name: error
+      type:
+        scalar: string
+    - name: port
+      type:
+        scalar: numeric
+      default: 0
+    - name: protocol
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.networking.v1beta1.IngressRule
   map:
     fields:
@@ -10073,7 +10202,7 @@ var schemaYAML = typed.YAMLObject(`types:
     fields:
     - name: loadBalancer
       type:
-        namedType: io.k8s.api.core.v1.LoadBalancerStatus
+        namedType: io.k8s.api.networking.v1beta1.IngressLoadBalancerStatus
       default: {}
 - name: io.k8s.api.networking.v1beta1.IngressTLS
   map:

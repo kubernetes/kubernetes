@@ -24,7 +24,7 @@ func BuildRunCommand() command.Command {
 		panic(err)
 	}
 
-	interruptHandler := interrupt_handler.NewInterruptHandler(0, nil)
+	interruptHandler := interrupt_handler.NewInterruptHandler(nil)
 	interrupt_handler.SwallowSigQuit()
 
 	return command.Command{
@@ -68,6 +68,8 @@ func (r *SpecRunner) RunSpecs(args []string, additionalArgs []string) {
 	suites := internal.FindSuites(args, r.cliConfig, true)
 	skippedSuites := suites.WithState(internal.TestSuiteStateSkippedByFilter)
 	suites = suites.WithoutState(internal.TestSuiteStateSkippedByFilter)
+
+	internal.VerifyCLIAndFrameworkVersion(suites)
 
 	if len(skippedSuites) > 0 {
 		fmt.Println("Will skip:")
@@ -115,7 +117,7 @@ OUTER_LOOP:
 			}
 			suites[suiteIdx] = suite
 
-			if r.interruptHandler.Status().Interrupted {
+			if r.interruptHandler.Status().Interrupted() {
 				opc.StopAndDrain()
 				break OUTER_LOOP
 			}

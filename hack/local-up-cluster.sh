@@ -186,7 +186,7 @@ do
     esac
 done
 
-if [ "x${GO_OUT}" == "x" ]; then
+if [ -z "${GO_OUT}" ]; then
     make -C "${KUBE_ROOT}" WHAT="cmd/kubectl cmd/kube-apiserver cmd/kube-controller-manager cmd/cloud-controller-manager cmd/kubelet cmd/kube-proxy cmd/kube-scheduler"
 else
     echo "skipped the build."
@@ -863,7 +863,7 @@ function start_kubescheduler {
     SCHEDULER_LOG=${LOG_DIR}/kube-scheduler.log
 
     cat <<EOF > /tmp/kube-scheduler.yaml
-apiVersion: kubescheduler.config.k8s.io/v1beta2
+apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: ${CERT_DIR}/scheduler.kubeconfig
@@ -1019,9 +1019,10 @@ function parse_eviction {
 }
 
 function install_cni {
+  cni_plugin_sha=CNI_PLUGINS_${CNI_TARGETARCH^^}_SHA256SUM
   echo "Installing CNI plugin binaries ..." \
     && curl -sSL --retry 5 --output /tmp/cni."${CNI_TARGETARCH}".tgz "${CNI_PLUGINS_URL}" \
-    && echo "${CNI_PLUGINS_AMD64_SHA256SUM}  /tmp/cni.amd64.tgz" | tee /tmp/cni.sha256 \
+    && echo "${!cni_plugin_sha} /tmp/cni.${CNI_TARGETARCH}.tgz" | tee /tmp/cni.sha256 \
     && sha256sum --ignore-missing -c /tmp/cni.sha256 \
     && rm -f /tmp/cni.sha256 \
     && sudo mkdir -p /opt/cni/bin \

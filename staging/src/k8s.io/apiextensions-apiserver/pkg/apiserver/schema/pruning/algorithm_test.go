@@ -22,10 +22,12 @@ import (
 	"strings"
 	"testing"
 
-	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
+
+	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
 func TestPrune(t *testing.T) {
@@ -586,7 +588,7 @@ func TestPrune(t *testing.T) {
 				if err != nil {
 					t.Fatalf("unexpected result mashalling error: %v", err)
 				}
-				t.Errorf("expected object: %s\ngot: %s\ndiff: %s", tt.expectedObject, buf.String(), diff.ObjectDiff(expectedObject, in))
+				t.Errorf("expected object: %s\ngot: %s\ndiff: %s", tt.expectedObject, buf.String(), cmp.Diff(expectedObject, in))
 			}
 			if !reflect.DeepEqual(pruned, tt.expectedPruned) {
 				t.Errorf("expected pruned:\n\t%v\ngot:\n\t%v\n", strings.Join(tt.expectedPruned, "\n\t"), strings.Join(pruned, "\n\t"))
@@ -602,7 +604,7 @@ func TestPrune(t *testing.T) {
 				if err != nil {
 					t.Fatalf("unexpected result mashalling error: %v", err)
 				}
-				t.Errorf("expected object: %s\ngot: %s\ndiff: %s", tt.expectedObject, buf.String(), diff.ObjectDiff(expectedObject, in))
+				t.Errorf("expected object: %s\ngot: %s\ndiff: %s", tt.expectedObject, buf.String(), cmp.Diff(expectedObject, in))
 			}
 			if len(emptyPruned) > 0 {
 				t.Errorf("unexpectedly returned pruned fields: %v", emptyPruned)

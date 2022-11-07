@@ -95,7 +95,11 @@ func (e *E2EServices) Stop() {
 	}
 	if e.kubelet != nil {
 		if err := e.kubelet.kill(); err != nil {
-			klog.Errorf("Failed to stop kubelet: %v", err)
+			klog.Errorf("Failed to kill kubelet: %v", err)
+		}
+		// Stop the kubelet systemd unit which will delete the kubelet transient unit.
+		if err := e.kubelet.stopUnit(); err != nil {
+			klog.Errorf("Failed to stop kubelet systemd unit: %v", err)
 		}
 	}
 	for _, d := range e.rmDirs {
@@ -134,7 +138,7 @@ func (e *E2EServices) startInternalServices() (*server, error) {
 			[]string{"--run-services-mode", fmt.Sprintf("--bearer-token=%s", framework.TestContext.BearerToken)},
 			os.Args[1:]...,
 		)...)
-	server := newServer("services", startCmd, nil, nil, getServicesHealthCheckURLs(), servicesLogFile, e.monitorParent, false)
+	server := newServer("services", startCmd, nil, nil, getServicesHealthCheckURLs(), servicesLogFile, e.monitorParent, false, "")
 	return server, server.start()
 }
 

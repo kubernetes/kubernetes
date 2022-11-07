@@ -210,6 +210,40 @@ foo	12m (x3 over 20m)	Normal	ScalingReplicaSet	Deployment/bar	Scaled up replica 
 			expected: `foo	12m (x3 over 20m)	Normal	ScalingReplicaSet	Deployment/bar	Scaled up replica set bar-002 to 1
 `,
 		},
+		{
+			printer: EventPrinter{
+				NoHeaders:     false,
+				AllNamespaces: false,
+			},
+			obj: &corev1.EventList{
+				Items: []corev1.Event{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "bar-000",
+							Namespace: "foo",
+						},
+						InvolvedObject: corev1.ObjectReference{
+							APIVersion: "apps/v1",
+							Kind:       "Deployment",
+							Name:       "bar\x1b",
+							Namespace:  "foo",
+						},
+						Type:                "test\x1b",
+						Reason:              "test\x1b",
+						Message:             "\x1b",
+						ReportingController: "deployment-controller",
+						EventTime:           metav1.NewMicroTime(time.Now().Add(-20 * time.Minute)),
+						Series: &corev1.EventSeries{
+							Count:            3,
+							LastObservedTime: metav1.NewMicroTime(time.Now().Add(-1 * time.Minute)),
+						},
+					},
+				},
+			},
+			expected: `LAST SEEN	TYPE	REASON	OBJECT	MESSAGE
+60s (x3 over 20m)	test^[	test^[	Deployment/bar^[	^[
+`,
+		},
 	}
 
 	for _, test := range tests {

@@ -125,7 +125,7 @@ func (w *KubeWaiter) WaitForPodsWithLabel(kvLabel string) error {
 func (w *KubeWaiter) WaitForPodToDisappear(podName string) error {
 	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
 		_, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).Get(context.TODO(), podName, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
+		if err != nil && apierrors.IsNotFound(err) {
 			fmt.Printf("[apiclient] The old Pod %q is now removed (which is desired)\n", podName)
 			return true, nil
 		}

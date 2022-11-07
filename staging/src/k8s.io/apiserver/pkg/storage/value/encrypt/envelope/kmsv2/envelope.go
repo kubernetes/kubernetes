@@ -34,6 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/value"
 	kmstypes "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2/v2alpha1"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/lru"
 )
 
@@ -131,6 +132,7 @@ func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []b
 			value.RecordCacheMiss()
 		}
 		uid := string(uuid.NewUUID())
+		klog.V(6).InfoS("Decrypting content using envelope service", "uid", uid, "key", string(dataCtx.AuthenticatedData()))
 		key, err := t.envelopeService.Decrypt(ctx, uid, &DecryptRequest{
 			Ciphertext:  encryptedObject.EncryptedDEK,
 			KeyID:       encryptedObject.KeyID,
@@ -158,6 +160,7 @@ func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byt
 	}
 
 	uid := string(uuid.NewUUID())
+	klog.V(6).InfoS("Encrypting content using envelope service", "uid", uid, "key", string(dataCtx.AuthenticatedData()))
 	resp, err := t.envelopeService.Encrypt(ctx, uid, newKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encrypt DEK, error: %w", err)

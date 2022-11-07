@@ -1316,6 +1316,7 @@ ETCD_PEER_KEY: $(yaml-quote "${ETCD_PEER_KEY_BASE64:-}")
 ETCD_PEER_CERT: $(yaml-quote "${ETCD_PEER_CERT_BASE64:-}")
 SERVICEACCOUNT_ISSUER: $(yaml-quote "${SERVICEACCOUNT_ISSUER:-}")
 KUBECTL_PRUNE_WHITELIST_OVERRIDE: $(yaml-quote "${KUBECTL_PRUNE_WHITELIST_OVERRIDE:-}")
+CCM_FEATURE_GATES:  $(yaml-quote "${CCM_FEATURE_GATES:-}")
 KUBE_SCHEDULER_RUNASUSER: 2001
 KUBE_SCHEDULER_RUNASGROUP: 2001
 KUBE_ADDON_MANAGER_RUNASUSER: 2002
@@ -2631,7 +2632,7 @@ function delete-subnetworks() {
       # This value should be kept in sync with number of regions.
       local parallelism=9
       gcloud compute networks subnets list --network="${NETWORK}" --project "${NETWORK_PROJECT}" --format='value(region.basename())' | \
-        xargs -i -P ${parallelism} gcloud --quiet compute networks subnets delete "${NETWORK}" --project "${NETWORK_PROJECT}" --region="{}" || true
+        xargs -I {} -P ${parallelism} gcloud --quiet compute networks subnets delete "${NETWORK}" --project "${NETWORK_PROJECT}" --region="{}" || true
     elif [[ "${CREATE_CUSTOM_NETWORK:-}" == "true" ]]; then
       echo "Deleting custom subnet..."
       gcloud --quiet compute networks subnets delete "${SUBNETWORK}" --project "${NETWORK_PROJECT}" --region="${REGION}" || true

@@ -463,6 +463,8 @@ func (mounter *SafeFormatAndMount) checkAndRepairFilesystem(source string) error
 			return NewMountError(HasFilesystemErrors, "'fsck' found errors on device %s but could not correct them: %s", source, string(out))
 		case isExitError && ee.ExitStatus() > fsckErrorsUncorrected:
 			klog.Infof("`fsck` error %s", string(out))
+		default:
+			klog.Warningf("fsck on device %s failed with error %v, output: %v", source, err, string(out))
 		}
 	}
 	return nil

@@ -21,6 +21,7 @@ package cm
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -194,7 +195,7 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 // TODO(vmarmol): Add limits to the system containers.
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
-func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, devicePluginEnabled bool, recorder record.EventRecorder) (ContainerManager, error) {
+func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder) (ContainerManager, error) {
 	subsystems, err := GetCgroupSubsystems()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
@@ -298,35 +299,29 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		cm.topologyManager = topologymanager.NewFakeManager()
 	}
 
-	klog.InfoS("Creating device plugin manager", "devicePluginEnabled", devicePluginEnabled)
-	if devicePluginEnabled {
-		cm.deviceManager, err = devicemanager.NewManagerImpl(machineInfo.Topology, cm.topologyManager)
-		cm.topologyManager.AddHintProvider(cm.deviceManager)
-	} else {
-		cm.deviceManager, err = devicemanager.NewManagerStub()
-	}
+	klog.InfoS("Creating device plugin manager")
+	cm.deviceManager, err = devicemanager.NewManagerImpl(machineInfo.Topology, cm.topologyManager)
 	if err != nil {
 		return nil, err
 	}
+	cm.topologyManager.AddHintProvider(cm.deviceManager)
 
 	// Initialize CPU manager
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
-		cm.cpuManager, err = cpumanager.NewManager(
-			nodeConfig.ExperimentalCPUManagerPolicy,
-			nodeConfig.ExperimentalCPUManagerPolicyOptions,
-			nodeConfig.ExperimentalCPUManagerReconcilePeriod,
-			machineInfo,
-			nodeConfig.NodeAllocatableConfig.ReservedSystemCPUs,
-			cm.GetNodeAllocatableReservation(),
-			nodeConfig.KubeletRootDir,
-			cm.topologyManager,
-		)
-		if err != nil {
-			klog.ErrorS(err, "Failed to initialize cpu manager")
-			return nil, err
-		}
-		cm.topologyManager.AddHintProvider(cm.cpuManager)
+	cm.cpuManager, err = cpumanager.NewManager(
+		nodeConfig.CPUManagerPolicy,
+		nodeConfig.CPUManagerPolicyOptions,
+		nodeConfig.CPUManagerReconcilePeriod,
+		machineInfo,
+		nodeConfig.NodeAllocatableConfig.ReservedSystemCPUs,
+		cm.GetNodeAllocatableReservation(),
+		nodeConfig.KubeletRootDir,
+		cm.topologyManager,
+	)
+	if err != nil {
+		klog.ErrorS(err, "Failed to initialize cpu manager")
+		return nil, err
 	}
+	cm.topologyManager.AddHintProvider(cm.cpuManager)
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryManager) {
 		cm.memoryManager, err = memorymanager.NewManager(
@@ -557,19 +552,18 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	podStatusProvider status.PodStatusProvider,
 	runtimeService internalapi.RuntimeService,
 	localStorageCapacityIsolation bool) error {
+	ctx := context.Background()
 
 	// Initialize CPU manager
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
-		containerMap := buildContainerMapFromRuntime(runtimeService)
-		err := cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap)
-		if err != nil {
-			return fmt.Errorf("start cpu manager error: %v", err)
-		}
+	containerMap := buildContainerMapFromRuntime(ctx, runtimeService)
+	err := cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap)
+	if err != nil {
+		return fmt.Errorf("start cpu manager error: %v", err)
 	}
 
 	// Initialize memory manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryManager) {
-		containerMap := buildContainerMapFromRuntime(runtimeService)
+		containerMap := buildContainerMapFromRuntime(ctx, runtimeService)
 		err := cm.memoryManager.Start(memorymanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap)
 		if err != nil {
 			return fmt.Errorf("start memory manager error: %v", err)
@@ -727,15 +721,15 @@ func (cm *containerManagerImpl) SystemCgroupsLimit() v1.ResourceList {
 	}
 }
 
-func buildContainerMapFromRuntime(runtimeService internalapi.RuntimeService) containermap.ContainerMap {
+func buildContainerMapFromRuntime(ctx context.Context, runtimeService internalapi.RuntimeService) containermap.ContainerMap {
 	podSandboxMap := make(map[string]string)
-	podSandboxList, _ := runtimeService.ListPodSandbox(nil)
+	podSandboxList, _ := runtimeService.ListPodSandbox(ctx, nil)
 	for _, p := range podSandboxList {
 		podSandboxMap[p.Id] = p.Metadata.Uid
 	}
 
 	containerMap := containermap.NewContainerMap()
-	containerList, _ := runtimeService.ListContainers(nil)
+	containerList, _ := runtimeService.ListContainers(ctx, nil)
 	for _, c := range containerList {
 		if _, exists := podSandboxMap[c.PodSandboxId]; !exists {
 			klog.InfoS("no PodSandBox found for the container", "podSandboxId", c.PodSandboxId, "containerName", c.Metadata.Name, "containerId", c.Id)

@@ -17,9 +17,12 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"fmt"
+	"hash/fnv"
 	"net"
 	"net/http"
+	"os"
 	goruntime "runtime"
 	"runtime/debug"
 	"sort"
@@ -30,7 +33,6 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/google/uuid"
-	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -46,8 +48,6 @@ import (
 	authenticatorunion "k8s.io/apiserver/pkg/authentication/request/union"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
-	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/endpoints/filterlatency"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
@@ -70,6 +70,7 @@ import (
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/prometheus/slis"
+	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -142,7 +143,7 @@ type Config struct {
 	ExternalAddress string
 
 	// TracerProvider can provide a tracer, which records spans for distributed tracing.
-	TracerProvider oteltrace.TracerProvider
+	TracerProvider tracing.TracerProvider
 
 	//===========================================================================
 	// Fields you probably don't care about changing
@@ -329,7 +330,14 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 	defaultHealthChecks := []healthz.HealthChecker{healthz.PingHealthz, healthz.LogHealthz}
 	var id string
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) {
-		id = "kube-apiserver-" + uuid.New().String()
+		hostname, err := os.Hostname()
+		if err != nil {
+			klog.Fatalf("error getting hostname for apiserver identity: %v", err)
+		}
+
+		h := fnv.New32a()
+		h.Write([]byte(hostname))
+		id = "kube-apiserver-" + fmt.Sprint(h.Sum32())
 	}
 	lifecycleSignals := newLifecycleSignals()
 
@@ -366,7 +374,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		// A request body might be encoded in json, and is converted to
 		// proto when persisted in etcd, so we allow 2x as the largest request
 		// body size to be accepted and decoded in a write request.
-		// If this constant is changed, maxRequestSizeBytes in apiextensions-apiserver/pkg/apiserver/schema/cel/model/schemas.go
+		// If this constant is changed, DefaultMaxRequestSizeBytes in k8s.io/apiserver/pkg/cel/limits.go
 		// should be changed to reflect the new value, if the two haven't
 		// been wired together already somehow.
 		MaxRequestBodyBytes: int64(3 * 1024 * 1024),
@@ -379,7 +387,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 
 		APIServerID:           id,
 		StorageVersionManager: storageversion.NewDefaultManager(),
-		TracerProvider:        oteltrace.NewNoopTracerProvider(),
+		TracerProvider:        tracing.NewNoopTracerProvider(),
 	}
 }
 
@@ -789,6 +797,11 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		}
 		s.AddHealthChecks(delegateCheck)
 	}
+	s.RegisterDestroyFunc(func() {
+		if err := c.Config.TracerProvider.Shutdown(context.Background()); err != nil {
+			klog.Errorf("failed to shut down tracer provider: %v", err)
+		}
+	})
 
 	s.listedPathProvider = routes.ListedPathProviders{s.listedPathProvider, delegationTarget}
 
@@ -815,7 +828,7 @@ func BuildHandlerChainWithStorageVersionPrecondition(apiHandler http.Handler, c 
 func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler := filterlatency.TrackCompleted(apiHandler)
 	handler = genericapifilters.WithAuthorization(handler, c.Authorization.Authorizer, c.Serializer)
-	handler = filterlatency.TrackStarted(handler, "authorization")
+	handler = filterlatency.TrackStarted(handler, c.TracerProvider, "authorization")
 
 	if c.FlowControl != nil {
 		workEstimatorCfg := flowcontrolrequest.DefaultWorkEstimatorConfig()
@@ -823,18 +836,18 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 			c.StorageObjectCountTracker.Get, c.FlowControl.GetInterestedWatchCount, workEstimatorCfg)
 		handler = filterlatency.TrackCompleted(handler)
 		handler = genericfilters.WithPriorityAndFairness(handler, c.LongRunningFunc, c.FlowControl, requestWorkEstimator)
-		handler = filterlatency.TrackStarted(handler, "priorityandfairness")
+		handler = filterlatency.TrackStarted(handler, c.TracerProvider, "priorityandfairness")
 	} else {
 		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.LongRunningFunc)
 	}
 
 	handler = filterlatency.TrackCompleted(handler)
 	handler = genericapifilters.WithImpersonation(handler, c.Authorization.Authorizer, c.Serializer)
-	handler = filterlatency.TrackStarted(handler, "impersonation")
+	handler = filterlatency.TrackStarted(handler, c.TracerProvider, "impersonation")
 
 	handler = filterlatency.TrackCompleted(handler)
 	handler = genericapifilters.WithAudit(handler, c.AuditBackend, c.AuditPolicyRuleEvaluator, c.LongRunningFunc)
-	handler = filterlatency.TrackStarted(handler, "audit")
+	handler = filterlatency.TrackStarted(handler, c.TracerProvider, "audit")
 
 	failedHandler := genericapifilters.Unauthorized(c.Serializer)
 	failedHandler = genericapifilters.WithFailedAuthenticationAudit(failedHandler, c.AuditBackend, c.AuditPolicyRuleEvaluator)
@@ -842,7 +855,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	failedHandler = filterlatency.TrackCompleted(failedHandler)
 	handler = filterlatency.TrackCompleted(handler)
 	handler = genericapifilters.WithAuthentication(handler, c.Authentication.Authenticator, failedHandler, c.Authentication.APIAudiences)
-	handler = filterlatency.TrackStarted(handler, "authentication")
+	handler = filterlatency.TrackStarted(handler, c.TracerProvider, "authentication")
 
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 
@@ -856,7 +869,6 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	if c.SecureServing != nil && !c.SecureServing.DisableHTTP2 && c.GoawayChance > 0 {
 		handler = genericfilters.WithProbabilisticGoaway(handler, c.GoawayChance)
 	}
-	handler = genericapifilters.WithAuditAnnotations(handler, c.AuditBackend, c.AuditPolicyRuleEvaluator)
 	handler = genericapifilters.WithWarningRecorder(handler)
 	handler = genericapifilters.WithCacheControl(handler)
 	handler = genericfilters.WithHSTS(handler, c.HSTSDirectives)
@@ -872,7 +884,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericapifilters.WithRequestReceivedTimestamp(handler)
 	handler = genericapifilters.WithMuxAndDiscoveryComplete(handler, c.lifecycleSignals.MuxAndDiscoveryComplete.Signaled())
 	handler = genericfilters.WithPanicRecovery(handler, c.RequestInfoResolver)
-	handler = genericapifilters.WithAuditID(handler)
+	handler = genericapifilters.WithAuditInit(handler)
 	return handler
 }
 
@@ -971,7 +983,4 @@ func AuthorizeClientBearerToken(loopback *restclient.Config, authn *Authenticati
 
 	tokenAuthenticator := authenticatorfactory.NewFromTokens(tokens, authn.APIAudiences)
 	authn.Authenticator = authenticatorunion.New(tokenAuthenticator, authn.Authenticator)
-
-	tokenAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
-	authz.Authorizer = authorizerunion.New(tokenAuthorizer, authz.Authorizer)
 }

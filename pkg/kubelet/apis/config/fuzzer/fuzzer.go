@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
+	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilpointer "k8s.io/utils/pointer"
@@ -91,7 +92,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.KubeAPIQPS = 5
 			obj.KubeAPIBurst = 10
 			obj.HairpinMode = v1beta1.PromiscuousBridge
-			obj.EvictionHard = kubeletconfigv1beta1.DefaultEvictionHard
+			obj.EvictionHard = eviction.DefaultEvictionHard
 			obj.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 5 * time.Minute}
 			obj.MakeIPTablesUtilChains = true
 			obj.IPTablesMasqueradeBit = kubeletconfigv1beta1.DefaultIPTablesMasqueradeBit

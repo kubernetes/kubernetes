@@ -384,6 +384,14 @@
     MUST cause pods created by that RC to be orphaned.
   release: v1.9
   file: test/e2e/apimachinery/garbage_collector.go
+- testname: Namespace, apply finalizer to a namespace
+  codename: '[sig-api-machinery] Namespaces [Serial] should apply a finalizer to a
+    Namespace [Conformance]'
+  description: Attempt to create a Namespace which MUST be succeed. Updating the namespace
+    with a fake finalizer MUST succeed. The fake finalizer MUST be found. Removing
+    the fake finalizer from the namespace MUST succeed and MUST NOT be found.
+  release: v1.26
+  file: test/e2e/apimachinery/namespace.go
 - testname: Namespace, apply update to a namespace
   codename: '[sig-api-machinery] Namespaces [Serial] should apply an update to a Namespace
     [Conformance]'
@@ -420,6 +428,20 @@
     MUST now include the new Label.
   release: v1.18
   file: test/e2e/apimachinery/namespace.go
+- testname: ResourceQuota, apply changes to a ResourceQuota status
+  codename: '[sig-api-machinery] ResourceQuota should apply changes to a resourcequota
+    status [Conformance]'
+  description: Attempt to create a ResourceQuota for CPU and Memory quota limits.
+    Creation MUST be successful. Updating the hard status values MUST succeed and
+    the new values MUST be found. The reported hard status values MUST equal the spec
+    hard values. Patching the spec hard values MUST succeed and the new values MUST
+    be found. Patching the hard status values MUST succeed. The reported hard status
+    values MUST equal the new spec hard values. Getting the /status MUST succeed and
+    the reported hard status values MUST equal the spec hard values. Repatching the
+    hard status values MUST succeed. The spec spec MUST NOT be changed when patching
+    /status.
+  release: v1.26
+  file: test/e2e/apimachinery/resource_quota.go
 - testname: ResourceQuota, update and delete
   codename: '[sig-api-machinery] ResourceQuota should be able to update and delete
     ResourceQuota. [Conformance]'
@@ -903,6 +925,14 @@
     Pod or delete and replace it with a new Pod
   release: v1.13
   file: test/e2e/apps/rc.go
+- testname: Replication Controller, get and update ReplicationController scale
+  codename: '[sig-apps] ReplicationController should get and update a ReplicationController
+    scale [Conformance]'
+  description: A ReplicationController is created which MUST succeed. It MUST succeed
+    when reading the ReplicationController scale. When updating the ReplicationController
+    scale it MUST succeed and the field MUST equal the new value.
+  release: v1.26
+  file: test/e2e/apps/rc.go
 - testname: Replication Controller, release pods
   codename: '[sig-apps] ReplicationController should release no longer matching pods
     [Conformance]'
@@ -1082,6 +1112,12 @@
     the ServiceAccounts MUST return the test ServiceAccount with it's patched values.
     ServiceAccount will be deleted and MUST find a deleted watch event.
   release: v1.19
+  file: test/e2e/auth/service_accounts.go
+- testname: ServiceAccount, update a ServiceAccount
+  codename: '[sig-auth] ServiceAccounts should update a ServiceAccount [Conformance]'
+  description: A ServiceAccount is created which MUST succeed. When updating the ServiceAccount
+    it MUST succeed and the field MUST equal the new value.
+  release: v1.26
   file: test/e2e/auth/service_accounts.go
 - testname: Kubectl, guestbook application
   codename: '[sig-cli] Kubectl client Guestbook application should create and stop
@@ -2360,6 +2396,16 @@
     the Limitrange and validating the Limitrange. Creating Pods with resources and
     validate the pod resources are applied to the Limitrange
   release: v1.18
+  file: test/e2e/scheduling/limit_range.go
+- testname: LimitRange, list, patch and delete a LimitRange by collection
+  codename: '[sig-scheduling] LimitRange should list, patch and delete a LimitRange
+    by collection [Conformance]'
+  description: When two limitRanges are created in different namespaces, both MUST
+    succeed. Listing limitRanges across all namespaces with a labelSelector MUST find
+    both limitRanges. When patching the first limitRange it MUST succeed and the fields
+    MUST equal the new values. When deleting the limitRange by collection with a labelSelector
+    it MUST delete only one limitRange.
+  release: v1.26
   file: test/e2e/scheduling/limit_range.go
 - testname: Scheduler, resource limits
   codename: '[sig-scheduling] SchedulerPredicates [Serial] validates resource limits

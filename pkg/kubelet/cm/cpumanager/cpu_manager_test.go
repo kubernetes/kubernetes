@@ -17,6 +17,7 @@ limitations under the License.
 package cpumanager
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"reflect"
@@ -31,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
@@ -126,7 +128,7 @@ type mockRuntimeService struct {
 	err error
 }
 
-func (rt mockRuntimeService) UpdateContainerResources(id string, resources *runtimeapi.ContainerResources) error {
+func (rt mockRuntimeService) UpdateContainerResources(_ context.Context, id string, resources *runtimeapi.ContainerResources) error {
 	return rt.err
 }
 
@@ -627,7 +629,7 @@ func TestCPUManagerGenerate(t *testing.T) {
 			if testCase.isTopologyBroken {
 				machineInfo = &cadvisorapi.MachineInfo{}
 			}
-			sDir, err := os.MkdirTemp("/tmp/", "cpu_manager_test")
+			sDir, err := os.MkdirTemp("", "cpu_manager_test")
 			if err != nil {
 				t.Errorf("cannot create state file: %s", err.Error())
 			}
@@ -1347,7 +1349,7 @@ func TestCPUManagerHandlePolicyOptions(t *testing.T) {
 		t.Run(testCase.description, func(t *testing.T) {
 			machineInfo := &mockedMachineInfo
 			nodeAllocatableReservation := v1.ResourceList{}
-			sDir, err := os.MkdirTemp("/tmp/", "cpu_manager_test")
+			sDir, err := os.MkdirTemp("", "cpu_manager_test")
 			if err != nil {
 				t.Errorf("cannot create state file: %s", err.Error())
 			}
@@ -1362,5 +1364,68 @@ func TestCPUManagerHandlePolicyOptions(t *testing.T) {
 			}
 		})
 
+	}
+}
+
+func TestCPUManagerGetAllocatableCPUs(t *testing.T) {
+	nonePolicy, _ := NewNonePolicy(nil)
+	staticPolicy, _ := NewStaticPolicy(
+		&topology.CPUTopology{
+			NumCPUs:    4,
+			NumSockets: 1,
+			NumCores:   4,
+			CPUDetails: map[int]topology.CPUInfo{
+				0: {CoreID: 0, SocketID: 0},
+				1: {CoreID: 1, SocketID: 0},
+				2: {CoreID: 2, SocketID: 0},
+				3: {CoreID: 3, SocketID: 0},
+			},
+		},
+		1,
+		cpuset.NewCPUSet(0),
+		topologymanager.NewFakeManager(),
+		nil)
+
+	testCases := []struct {
+		description        string
+		policy             Policy
+		expAllocatableCPUs cpuset.CPUSet
+	}{
+		{
+			description:        "None Policy",
+			policy:             nonePolicy,
+			expAllocatableCPUs: cpuset.NewCPUSet(),
+		},
+		{
+			description:        "Static Policy",
+			policy:             staticPolicy,
+			expAllocatableCPUs: cpuset.NewCPUSet(1, 2, 3),
+		},
+	}
+	for _, testCase := range testCases {
+		mgr := &manager{
+			policy:     testCase.policy,
+			activePods: func() []*v1.Pod { return nil },
+			state: &mockState{
+				assignments:   state.ContainerCPUAssignments{},
+				defaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3),
+			},
+			lastUpdateState:   state.NewMemoryState(),
+			containerMap:      containermap.NewContainerMap(),
+			podStatusProvider: mockPodStatusProvider{},
+			sourcesReady:      &sourcesReadyStub{},
+		}
+		mgr.sourcesReady = &sourcesReadyStub{}
+		mgr.allocatableCPUs = testCase.policy.GetAllocatableCPUs(mgr.state)
+
+		pod := makePod("fakePod", "fakeContainer", "2", "2")
+		container := &pod.Spec.Containers[0]
+
+		_ = mgr.Allocate(pod, container)
+
+		if !mgr.GetAllocatableCPUs().Equals(testCase.expAllocatableCPUs) {
+			t.Errorf("Policy GetAllocatableCPUs() error (%v). expected cpuset %v for container %v but got %v",
+				testCase.description, testCase.expAllocatableCPUs, "fakeContainer", mgr.GetAllocatableCPUs())
+		}
 	}
 }

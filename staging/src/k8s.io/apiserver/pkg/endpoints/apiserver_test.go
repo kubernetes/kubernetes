@@ -290,6 +290,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 	handler := genericapifilters.WithAudit(mux, auditSink, fakeRuleEvaluator, longRunningCheck)
 	handler = genericapifilters.WithRequestDeadline(handler, auditSink, fakeRuleEvaluator, longRunningCheck, codecs, 60*time.Second)
 	handler = genericapifilters.WithRequestInfo(handler, testRequestInfoResolver())
+	handler = genericapifilters.WithAuditInit(handler)
 
 	return &defaultAPIServer{handler, container}
 }
@@ -405,8 +406,8 @@ func (s *SimpleStream) Close() error {
 	return nil
 }
 
-func (obj *SimpleStream) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
-func (obj *SimpleStream) DeepCopyObject() runtime.Object {
+func (s *SimpleStream) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (s *SimpleStream) DeepCopyObject() runtime.Object {
 	panic("SimpleStream does not support DeepCopy")
 }
 

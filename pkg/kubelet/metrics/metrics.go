@@ -35,6 +35,7 @@ const (
 	NodeLabelKey                       = "node"
 	PodWorkerDurationKey               = "pod_worker_duration_seconds"
 	PodStartDurationKey                = "pod_start_duration_seconds"
+	PodStartSLIDurationKey             = "pod_start_sli_duration_seconds"
 	CgroupManagerOperationsKey         = "cgroup_manager_duration_seconds"
 	PodWorkerStartDurationKey          = "pod_worker_start_duration_seconds"
 	PodStatusSyncDurationKey           = "pod_status_sync_duration_seconds"
@@ -86,6 +87,10 @@ const (
 	// Metrics to track ephemeral container usage by this kubelet
 	ManagedEphemeralContainersKey = "managed_ephemeral_containers"
 
+	// Metrics to track the CPU manager behavior
+	CPUManagerPinningRequestsTotalKey = "cpu_manager_pinning_requests_total"
+	CPUManagerPinningErrorsTotalKey   = "cpu_manager_pinning_errors_total"
+
 	// Values used in metric labels
 	Container          = "container"
 	InitContainer      = "init_container"
@@ -135,6 +140,24 @@ var (
 			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
+	)
+	// PodStartSLIDuration is a Histogram that tracks the duration (in seconds) it takes for a single pod to run,
+	// excluding the time for image pulling. This metric should reflect the "Pod startup latency SLI" definition
+	// ref: https://github.com/kubernetes/community/blob/master/sig-scalability/slos/pod_startup_latency.md
+	//
+	// The histogram bucket boundaries for pod startup latency metrics, measured in seconds. These are hand-picked
+	// so as to be roughly exponential but still round numbers in everyday units. This is to minimise the number
+	// of buckets while allowing accurate measurement of thresholds which might be used in SLOs
+	// e.g. x% of pods start up within 30 seconds, or 15 minutes, etc.
+	PodStartSLIDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodStartSLIDurationKey,
+			Help:           "Duration in seconds to start a pod, excluding time to pull images and run init containers, measured from pod creation timestamp to when all its containers are reported as started and observed via watch",
+			Buckets:        []float64{0.5, 1, 2, 3, 4, 5, 6, 8, 10, 20, 30, 45, 60, 120, 180, 240, 300, 360, 480, 600, 900, 1200, 1800, 2700, 3600},
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{},
 	)
 	// CgroupManagerDuration is a Histogram that tracks the duration (in seconds) it takes for cgroup manager operations to complete.
 	// Broken down by method.
@@ -497,6 +520,35 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	LifecycleHandlerHTTPFallbacks = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           "lifecycle_handler_http_fallbacks_total",
+			Help:           "The number of times lifecycle handlers successfully fell back to http from https.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// CPUManagerPinningRequestsTotal tracks the number of times the pod spec will cause the cpu manager to pin cores
+	CPUManagerPinningRequestsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           CPUManagerPinningRequestsTotalKey,
+			Help:           "The number of cpu core allocations which required pinning.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// CPUManagerPinningErrorsTotal tracks the number of times the pod spec required the cpu manager to pin cores, but the allocation failed
+	CPUManagerPinningErrorsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           CPUManagerPinningErrorsTotalKey,
+			Help:           "The number of cpu core allocations which required pinning failed.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 )
 
 var registerMetrics sync.Once
@@ -508,6 +560,7 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(NodeName)
 		legacyregistry.MustRegister(PodWorkerDuration)
 		legacyregistry.MustRegister(PodStartDuration)
+		legacyregistry.MustRegister(PodStartSLIDuration)
 		legacyregistry.MustRegister(CgroupManagerDuration)
 		legacyregistry.MustRegister(PodWorkerStartDuration)
 		legacyregistry.MustRegister(PodStatusSyncDuration)
@@ -527,16 +580,27 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(RunningContainerCount)
 		legacyregistry.MustRegister(RunningPodCount)
 		legacyregistry.MustRegister(ManagedEphemeralContainers)
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResources) {
+			legacyregistry.MustRegister(PodResourcesEndpointRequestsTotalCount)
+
+			if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResourcesGetAllocatable) {
+				legacyregistry.MustRegister(PodResourcesEndpointRequestsListCount)
+				legacyregistry.MustRegister(PodResourcesEndpointRequestsGetAllocatableCount)
+				legacyregistry.MustRegister(PodResourcesEndpointErrorsListCount)
+				legacyregistry.MustRegister(PodResourcesEndpointErrorsGetAllocatableCount)
+			}
+		}
 		legacyregistry.MustRegister(StartedPodsTotal)
 		legacyregistry.MustRegister(StartedPodsErrorsTotal)
 		legacyregistry.MustRegister(StartedContainersTotal)
 		legacyregistry.MustRegister(StartedContainersErrorsTotal)
-		if utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostProcessContainers) {
-			legacyregistry.MustRegister(StartedHostProcessContainersTotal)
-			legacyregistry.MustRegister(StartedHostProcessContainersErrorsTotal)
-		}
+		legacyregistry.MustRegister(StartedHostProcessContainersTotal)
+		legacyregistry.MustRegister(StartedHostProcessContainersErrorsTotal)
 		legacyregistry.MustRegister(RunPodSandboxDuration)
 		legacyregistry.MustRegister(RunPodSandboxErrors)
+		legacyregistry.MustRegister(CPUManagerPinningRequestsTotal)
+		legacyregistry.MustRegister(CPUManagerPinningErrorsTotal)
+
 		for _, collector := range collectors {
 			legacyregistry.CustomMustRegister(collector)
 		}
@@ -547,6 +611,9 @@ func Register(collectors ...metrics.StableCollector) {
 			legacyregistry.MustRegister(GracefulShutdownEndTime)
 		}
 
+		if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentHTTPGetHandlers) {
+			legacyregistry.MustRegister(LifecycleHandlerHTTPFallbacks)
+		}
 	})
 }
 

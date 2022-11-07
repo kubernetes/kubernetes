@@ -657,7 +657,7 @@ func mapFromCheckpoint(store *fsStore, uid, resourceVersion string) (map[string]
 	m := map[string]string{}
 	for _, f := range files {
 		// expect no subdirs, only regular files
-		if !f.Mode().IsRegular() {
+		if !f.Type().IsRegular() {
 			return nil, fmt.Errorf("expect only regular files in checkpoint dir %q", uid)
 		}
 		// read the file contents and build the map

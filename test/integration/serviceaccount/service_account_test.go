@@ -23,6 +23,7 @@ package serviceaccount
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -44,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/controlplane"
+	"k8s.io/kubernetes/pkg/controlplane/controller/legacytokentracking"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	serviceaccountadmission "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
@@ -53,6 +55,8 @@ import (
 const (
 	readOnlyServiceAccountName  = "ro"
 	readWriteServiceAccountName = "rw"
+
+	dateFormat = "2006-01-02"
 )
 
 func TestServiceAccountAutoCreate(t *testing.T) {
@@ -308,6 +312,112 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 	rwClient := clientset.NewForConfigOrDie(&rwClientConfig)
 	doServiceAccountAPIRequests(t, rwClient, myns, true, true, true)
 	doServiceAccountAPIRequests(t, rwClient, otherns, true, false, false)
+}
+
+func TestLegacyServiceAccountTokenTracking(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.LegacyServiceAccountTokenNoAutoGeneration, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.LegacyServiceAccountTokenTracking, true)()
+	c, config, stopFunc, err := startServiceAccountTestServerAndWaitForCaches(t)
+	defer stopFunc()
+	if err != nil {
+		t.Fatalf("failed to setup ServiceAccounts server: %v", err)
+	}
+
+	// create service account
+	myns := "auth-ns"
+	_, err = c.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: myns}}, metav1.CreateOptions{})
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		t.Fatalf("could not create namespace: %v", err)
+	}
+	mysa, err := c.CoreV1().ServiceAccounts(myns).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: readOnlyServiceAccountName}}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Service Account not created: %v", err)
+	}
+	manualSecretName := "manual-token"
+	manualSecret, err := createServiceAccountToken(c, mysa, myns, manualSecretName)
+	if err != nil {
+		t.Fatalf("Secret not created: %v", err)
+	}
+
+	autoSecretName, autoSecretTokenData, err := getReferencedServiceAccountToken(c, myns, readOnlyServiceAccountName, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name            string
+		secretName      string
+		secretTokenData string
+
+		expectWarning bool
+	}{
+		{
+			name:            "manually created legacy token",
+			secretName:      manualSecretName,
+			secretTokenData: string(manualSecret.Data[v1.ServiceAccountTokenKey]),
+		},
+		{
+			name:            "auto created legacy token",
+			secretName:      autoSecretName,
+			secretTokenData: autoSecretTokenData,
+			expectWarning:   true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			myConfig := *config
+			wh := &warningHandler{}
+			myConfig.WarningHandler = wh
+			myConfig.BearerToken = string(test.secretTokenData)
+			roClient := clientset.NewForConfigOrDie(&myConfig)
+			dateBefore := time.Now().UTC().Format(dateFormat)
+			go func() {
+				doServiceAccountAPIRequests(t, roClient, myns, true, true, false)
+			}()
+			doServiceAccountAPIRequests(t, roClient, myns, true, true, false)
+			dateAfter := time.Now().UTC().Format(dateFormat)
+			liveSecret, err := c.CoreV1().Secrets(myns).Get(context.TODO(), test.secretName, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Could not get secret: %v", err)
+			}
+
+			if test.expectWarning && len(wh.warnings) != 8 {
+				t.Fatalf("Expect 8 warnings, got %d", len(wh.warnings))
+			}
+			if !test.expectWarning && len(wh.warnings) != 0 {
+				t.Fatalf("Don't expect warnings, got %d", len(wh.warnings))
+			}
+
+			// authenticated legacy token should have the expected annotation and label.
+			date, ok := liveSecret.GetLabels()[serviceaccount.LastUsedLabelKey]
+			if !ok {
+				t.Fatalf("Secret wasn't labeled with %q", serviceaccount.LastUsedLabelKey)
+			}
+			if date != dateBefore || date != dateAfter {
+				t.Fatalf("Secret was labeled with wrong date: %q", date)
+			}
+		})
+	}
+
+	// configmap should exist with 'since' timestamp.
+	if err = wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+		dateBefore := time.Now().UTC().Format("2006-01-02")
+		configMap, err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), legacytokentracking.ConfigMapName, metav1.GetOptions{})
+		if err != nil {
+			return false, fmt.Errorf("failed to get %q configmap, err %w", legacytokentracking.ConfigMapDataKey, err)
+		}
+		dateAfter := time.Now().UTC().Format("2006-01-02")
+		date, ok := configMap.Data[legacytokentracking.ConfigMapDataKey]
+		if !ok {
+			return false, fmt.Errorf("configMap doesn't contain key %q", legacytokentracking.ConfigMapDataKey)
+		}
+		if date != dateBefore || date != dateAfter {
+			return false, fmt.Errorf("configMap contains a wrong date %q", date)
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // startServiceAccountTestServerAndWaitForCaches returns a started server
@@ -570,4 +680,15 @@ func doServiceAccountAPIRequests(t *testing.T, c clientset.Interface, ns string,
 			t.Fatalf("expected forbidden error, got: %v", err)
 		}
 	}
+}
+
+type warningHandler struct {
+	mu       sync.Mutex
+	warnings []string
+}
+
+func (r *warningHandler) HandleWarningHeader(code int, agent string, message string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.warnings = append(r.warnings, message)
 }

@@ -676,7 +676,7 @@ func TestAudit(t *testing.T) {
 				// simplified long-running check
 				return ri.Verb == "watch"
 			})
-			handler = WithAuditID(handler)
+			handler = WithAuditInit(handler)
 
 			req, _ := http.NewRequest(test.verb, test.path, nil)
 			req = withTestContext(req, &user.DefaultInfo{Name: "admin"}, nil)
@@ -812,7 +812,7 @@ func TestAuditIDHttpHeader(t *testing.T) {
 			})
 			fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(test.level, nil)
 			handler = WithAudit(handler, sink, fakeRuleEvaluator, nil)
-			handler = WithAuditID(handler)
+			handler = WithAuditInit(handler)
 
 			req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
 			req.RemoteAddr = "127.0.0.1"
@@ -843,14 +843,13 @@ func TestAuditIDHttpHeader(t *testing.T) {
 }
 
 func withTestContext(req *http.Request, user user.Info, ae *auditinternal.Event) *http.Request {
-	ctx := req.Context()
+	ctx := audit.WithAuditContext(req.Context())
 	if user != nil {
 		ctx = request.WithUser(ctx, user)
 	}
 	if ae != nil {
-		ctx = audit.WithAuditContext(ctx, &audit.AuditContext{
-			Event: ae,
-		})
+		ac := audit.AuditContextFrom(ctx)
+		ac.Event = ae
 	}
 	if info, err := newTestRequestInfoResolver().NewRequestInfo(req); err == nil {
 		ctx = request.WithRequestInfo(ctx, info)

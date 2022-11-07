@@ -34,8 +34,8 @@ import (
 
 var (
 	successConfig = kubeletconfig.KubeletConfiguration{
-		CgroupsPerQOS:                   true,
-		EnforceNodeAllocatable:          []string{"pods", "system-reserved", "kube-reserved"},
+		CgroupsPerQOS:                   cgroupsPerQOS,
+		EnforceNodeAllocatable:          enforceNodeAllocatable,
 		SystemReservedCgroup:            "/system.slice",
 		KubeReservedCgroup:              "/kubelet.service",
 		SystemCgroups:                   "",

@@ -33,7 +33,6 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
-	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -42,8 +41,7 @@ type volumeStressTestSuite struct {
 }
 
 type volumeStressTest struct {
-	config        *storageframework.PerTestConfig
-	driverCleanup func()
+	config *storageframework.PerTestConfig
 
 	migrationCheck *migrationOpCheck
 
@@ -121,7 +119,7 @@ func (t *volumeStressTestSuite) DefineTests(driver storageframework.TestDriver, 
 		l = &volumeStressTest{}
 
 		// Now do the more expensive test initialization.
-		l.config, l.driverCleanup = driver.PrepareTest(f)
+		l.config = driver.PrepareTest(f)
 		l.migrationCheck = newMigrationOpCheck(f.ClientSet, f.ClientConfig(), dInfo.InTreePluginName)
 		l.volumes = []*storageframework.VolumeResource{}
 		l.pods = []*v1.Pod{}
@@ -187,7 +185,6 @@ func (t *volumeStressTestSuite) DefineTests(driver storageframework.TestDriver, 
 		}
 		wg.Wait()
 
-		errs = append(errs, storageutils.TryFunc(l.driverCleanup))
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
 		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}

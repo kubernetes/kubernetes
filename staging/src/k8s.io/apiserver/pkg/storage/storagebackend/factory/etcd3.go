@@ -48,7 +48,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	"k8s.io/apiserver/pkg/storage/value"
+	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics/legacyregistry"
 	tracing "k8s.io/component-base/tracing"
@@ -395,7 +395,7 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc func() runtime.
 	}
 	transformer := c.Transformer
 	if transformer == nil {
-		transformer = value.IdentityTransformer
+		transformer = identity.NewEncryptCheckTransformer()
 	}
 	return etcd3.New(client, c.Codec, newFunc, c.Prefix, c.GroupResource, transformer, c.Paging, c.LeaseManagerConfig), destroyFunc, nil
 }

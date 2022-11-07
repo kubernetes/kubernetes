@@ -1,3 +1,74 @@
+## 2.4.0
+
+### Features
+
+- DeferCleanup supports functions with multiple-return values [5e33c75]
+- Add GinkgoLogr (#1067) [bf78c28]
+- Introduction of 'MustPassRepeatedly' decorator (#1051) [047c02f]
+
+### Fixes
+- correcting some typos (#1064) [1403d3c]
+- fix flaky internal_integration interupt specs [2105ba3]
+- Correct busted link in README [be6b5b9]
+
+### Maintenance
+- Bump actions/checkout from 2 to 3 (#1062) [8a2f483]
+- Bump golang.org/x/tools from 0.1.12 to 0.2.0 (#1065) [529c4e8]
+- Bump github/codeql-action from 1 to 2 (#1061) [da09146]
+- Bump actions/setup-go from 2 to 3 (#1060) [918040d]
+- Bump github.com/onsi/gomega from 1.22.0 to 1.22.1 (#1053) [2098e4d]
+- Bump nokogiri from 1.13.8 to 1.13.9 in /docs (#1066) [1d74122]
+- Add GHA to dependabot config [4442772]
+
+## 2.3.1
+
+## Fixes
+Several users were invoking `ginkgo` by installing the latest version of the cli via `go install github.com/onsi/ginkgo/v2/ginkgo@latest`.  When 2.3.0 was released this resulted in an influx of issues as CI systems failed due to a change in the internal contract between the Ginkgo CLI and the Ginkgo library.  Ginkgo only supports running the same version of the library as the cli (which is why both are packaged in the same repository).
+
+With this patch release, the ginkgo CLI can now identify a version mismatch and emit a helpful error message.
+
+- Ginkgo cli can identify version mismatches and emit a helpful error message [bc4ae2f]
+- further emphasize that a version match is required when running Ginkgo on CI and/or locally [2691dd8]
+
+### Maintenance
+- bump gomega to v1.22.0 [822a937]
+
+## 2.3.0
+
+### Interruptible Nodes and Timeouts
+
+Ginkgo now supports per-node and per-spec timeouts on interruptible nodes.  Check out the [documentation for all the details](https://onsi.github.io/ginkgo/#spec-timeouts-and-interruptible-nodes) but the gist is you can now write specs like this:
+
+```go
+It("is interruptible", func(ctx SpecContext) { // or context.Context instead of SpecContext, both are valid.
+    // do things until `ctx.Done()` is closed, for example:
+    req, err := http.NewRequestWithContext(ctx, "POST", "/build-widgets", nil)
+    Expect(err).NotTo(HaveOccured())
+    _, err := http.DefaultClient.Do(req)
+    Expect(err).NotTo(HaveOccured())
+
+    Eventually(client.WidgetCount).WithContext(ctx).Should(Equal(17))
+}, NodeTimeout(time.Second*20), GracePeriod(5*time.Second))
+```
+
+and have Ginkgo ensure that the node completes before the timeout elapses.  If it does elapse, or if an external interrupt is received (e.g. `^C`) then Ginkgo will cancel the context and wait for the Grace Period for the node to exit before proceeding with any cleanup nodes associated with the spec.  The `ctx` provided by Ginkgo can also be passed down to Gomega's `Eventually` to have all assertions within the node governed by a single deadline.
+
+### Features
+
+- Ginkgo now records any additional failures that occur during the cleanup of a failed spec.  In prior versions this information was quietly discarded, but the introduction of a more rigorous approach to timeouts and interruptions allows Ginkgo to better track subsequent failures.
+- `SpecContext` also provides a mechanism for third-party libraries to provide additional information when a Progress Report is generated.  Gomega uses this to provide the current state of an `Eventually().WithContext()` assertion when a Progress Report is requested.
+- DescribeTable now exits with an error if it is not passed any Entries [a4c9865]
+
+## Fixes
+- fixes crashes on newer Ruby 3 installations by upgrading github-pages gem dependency [92c88d5]
+- Make the outline command able to use the DSL import [1be2427]
+
+## Maintenance
+- chore(docs): delete no meaning d [57c373c]
+- chore(docs): Fix hyperlinks [30526d5]
+- chore(docs): fix code blocks without language settings [cf611c4]
+- fix intra-doc link [b541bcb]
+
 ## 2.2.0
 
 ### Generate real-time Progress Reports [f91377c]

@@ -289,6 +289,7 @@ type KubeletConfiguration struct {
 	// serializeImagePulls when enabled, tells the Kubelet to pull images one at a time.
 	SerializeImagePulls bool
 	// Map of signal names to quantities that defines hard eviction thresholds. For example: {"memory.available": "300Mi"}.
+	// Some default signals are Linux only: nodefs.inodesFree
 	EvictionHard map[string]string
 	// Map of signal names to quantities that defines soft eviction thresholds.  For example: {"memory.available": "300Mi"}.
 	EvictionSoft map[string]string
@@ -595,6 +596,7 @@ type CredentialProvider struct {
 	// MUST use the same encoding version as the input. Current supported values are:
 	// - credentialprovider.kubelet.k8s.io/v1alpha1
 	// - credentialprovider.kubelet.k8s.io/v1beta1
+	// - credentialprovider.kubelet.k8s.io/v1
 	APIVersion string
 
 	// Arguments to pass to the command when executing it.

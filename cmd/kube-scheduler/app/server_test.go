@@ -198,7 +198,7 @@ profiles:
 	// out-of-tree plugin config v1
 	outOfTreePluginConfigFilev1 := filepath.Join(tmpDir, "outOfTreePluginv1.yaml")
 	if err := os.WriteFile(outOfTreePluginConfigFilev1, []byte(fmt.Sprintf(`
-apiVersion: kubescheduler.config.k8s.io/v1beta3
+apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: '%s'
@@ -321,20 +321,7 @@ leaderElection:
 				"--feature-gates=VolumeCapacityPriority=true",
 			},
 			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": func() *config.Plugins {
-					plugins := &config.Plugins{
-						QueueSort:  defaults.ExpandedPluginsV1beta3.QueueSort,
-						PreFilter:  defaults.ExpandedPluginsV1beta3.PreFilter,
-						Filter:     defaults.ExpandedPluginsV1beta3.Filter,
-						PostFilter: defaults.ExpandedPluginsV1beta3.PostFilter,
-						PreScore:   defaults.ExpandedPluginsV1beta3.PreScore,
-						Score:      defaults.ExpandedPluginsV1beta3.Score,
-						Bind:       defaults.ExpandedPluginsV1beta3.Bind,
-						PreBind:    defaults.ExpandedPluginsV1beta3.PreBind,
-						Reserve:    defaults.ExpandedPluginsV1beta3.Reserve,
-					}
-					return plugins
-				}(),
+				"default-scheduler": defaults.ExpandedPluginsV1,
 			},
 			restoreFeatures: map[featuregate.Feature]bool{
 				features.VolumeCapacityPriority: false,
@@ -346,7 +333,7 @@ leaderElection:
 				"--kubeconfig", configKubeconfig,
 			},
 			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": defaults.ExpandedPluginsV1beta3,
+				"default-scheduler": defaults.ExpandedPluginsV1,
 			},
 		},
 		{

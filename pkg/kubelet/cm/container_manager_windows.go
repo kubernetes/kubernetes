@@ -93,7 +93,7 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 }
 
 // NewContainerManager creates windows container manager.
-func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, devicePluginEnabled bool, recorder record.EventRecorder) (ContainerManager, error) {
+func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder) (ContainerManager, error) {
 	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
 	// machine info is computed and cached once as part of cAdvisor object creation.
 	// But `RootFsInfo` and `ImagesFsInfo` are not available at this moment so they will be called later during manager starts
@@ -111,16 +111,12 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 
 	cm.topologyManager = topologymanager.NewFakeManager()
 
-	klog.InfoS("Creating device plugin manager", "devicePluginEnabled", devicePluginEnabled)
-	if devicePluginEnabled {
-		cm.deviceManager, err = devicemanager.NewManagerImpl(nil, cm.topologyManager)
-		cm.topologyManager.AddHintProvider(cm.deviceManager)
-	} else {
-		cm.deviceManager, err = devicemanager.NewManagerStub()
-	}
+	klog.InfoS("Creating device plugin manager")
+	cm.deviceManager, err = devicemanager.NewManagerImpl(nil, cm.topologyManager)
 	if err != nil {
 		return nil, err
 	}
+	cm.topologyManager.AddHintProvider(cm.deviceManager)
 
 	return cm, nil
 }

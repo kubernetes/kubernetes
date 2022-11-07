@@ -17,13 +17,13 @@ limitations under the License.
 package main
 
 import (
-	"errors"
 	"fmt"
 	"go/ast"
 	"go/token"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"k8s.io/component-base/metrics"
 )
@@ -44,7 +44,6 @@ func decodeMetricCalls(fs []*ast.CallExpr, metricsImportName string, variables m
 		if m != nil {
 			ms = append(ms, *m)
 		}
-
 	}
 	return ms, errors
 }
@@ -59,6 +58,15 @@ func (c *metricDecoder) decodeNewMetricCall(fc *ast.CallExpr) (*metric, error) {
 	var err error
 	se, ok := fc.Fun.(*ast.SelectorExpr)
 	if !ok {
+		// account for timing ratio histogram functions
+		switch v := fc.Fun.(type) {
+		case *ast.Ident:
+			if v.Name == "NewTimingRatioHistogramVec" {
+				m, err = c.decodeMetricVecForTimingRatioHistogram(fc)
+				m.Type = timingRatioHistogram
+				return &m, err
+			}
+		}
 		return nil, newDecodeErrorf(fc, errNotDirectCall)
 	}
 	functionName := se.Sel.String()
@@ -70,12 +78,14 @@ func (c *metricDecoder) decodeNewMetricCall(fc *ast.CallExpr) (*metric, error) {
 		return nil, nil
 	}
 	switch functionName {
-	case "NewCounter", "NewGauge", "NewHistogram", "NewSummary", "NewTimingHistogram":
+	case "NewCounter", "NewGauge", "NewHistogram", "NewSummary", "NewTimingHistogram", "NewGaugeFunc":
 		m, err = c.decodeMetric(fc)
 	case "NewCounterVec", "NewGaugeVec", "NewHistogramVec", "NewSummaryVec", "NewTimingHistogramVec":
 		m, err = c.decodeMetricVec(fc)
 	case "Labels", "HandlerOpts", "HandlerFor", "HandlerWithReset":
 		return nil, nil
+	case "NewDesc":
+		m, err = c.decodeDesc(fc)
 	default:
 		return &m, newDecodeErrorf(fc, errNotDirectCall)
 	}
@@ -88,15 +98,17 @@ func (c *metricDecoder) decodeNewMetricCall(fc *ast.CallExpr) (*metric, error) {
 
 func getMetricType(functionName string) string {
 	switch functionName {
+	case "NewDesc":
+		return customType
 	case "NewCounter", "NewCounterVec":
 		return counterMetricType
-	case "NewGauge", "NewGaugeVec":
+	case "NewGauge", "NewGaugeVec", "NewGaugeFunc":
 		return gaugeMetricType
 	case "NewHistogram", "NewHistogramVec":
 		return histogramMetricType
 	case "NewSummary", "NewSummaryVec":
 		return summaryMetricType
-	case "NewTimingHistogram", "NewTimingHistogramVec":
+	case "NewTimingHistogram", "NewTimingHistogramVec", "NewTimingRatioHistogramVec":
 		return timingRatioHistogram
 	default:
 		panic("getMetricType expects correct function name")
@@ -104,10 +116,141 @@ func getMetricType(functionName string) string {
 }
 
 func (c *metricDecoder) decodeMetric(call *ast.CallExpr) (metric, error) {
-	if len(call.Args) != 1 {
+	if len(call.Args) > 2 {
 		return metric{}, newDecodeErrorf(call, errInvalidNewMetricCall)
 	}
 	return c.decodeOpts(call.Args[0])
+}
+
+func (c *metricDecoder) decodeDesc(ce *ast.CallExpr) (metric, error) {
+	m := &metric{}
+	name, err := c.decodeString(ce.Args[0])
+	if err != nil {
+		return *m, newDecodeErrorf(ce, "can't decode string")
+	}
+	m.Name = *name
+	help, err := c.decodeString(ce.Args[1])
+	if err != nil {
+		return *m, newDecodeErrorf(ce, "can't decode string")
+	}
+	m.Help = *help
+	labels, err := c.decodeLabels(ce.Args[2])
+	if err != nil {
+		return *m, newDecodeErrorf(ce, "can't decode labels")
+	}
+	m.Labels = labels
+	cLabels, err := c.decodeConstLabels(ce.Args[3])
+	if err != nil {
+		return *m, newDecodeErrorf(ce, "can't decode const labels")
+	}
+	m.ConstLabels = cLabels
+	sl, err := decodeStabilityLevel(ce.Args[4], "metrics")
+	if err != nil {
+		return *m, newDecodeErrorf(ce, "can't decode stability level")
+	}
+	if sl != nil {
+		m.StabilityLevel = string(*sl)
+	}
+	deprecatedVersion, err := c.decodeString(ce.Args[5])
+	if err != nil {
+		return *m, newDecodeErrorf(ce, "can't decode string")
+	}
+	if deprecatedVersion != nil {
+		m.DeprecatedVersion = *deprecatedVersion
+	}
+	return *m, nil
+}
+
+func (c *metricDecoder) decodeString(expr ast.Expr) (*string, error) {
+	switch e := expr.(type) {
+	case *ast.BasicLit:
+		value, err := stringValue(e)
+		if err != nil {
+			return nil, err
+		}
+		return &value, nil
+	case *ast.CallExpr:
+		firstArg, secondArg, thirdArg, err := c.decodeBuildFQNameArguments(e)
+		if err != nil {
+			return nil, newDecodeErrorf(expr, errNonStringAttribute)
+		}
+		se, ok := e.Fun.(*ast.SelectorExpr)
+		if ok {
+			functionName := se.Sel.Name
+			switch functionName {
+			case "BuildFQName":
+				n := metrics.BuildFQName(firstArg, secondArg, thirdArg)
+				return &n, nil
+			}
+		}
+	case *ast.Ident:
+		variableExpr, found := c.variables[e.Name]
+		if !found {
+			return nil, newDecodeErrorf(expr, errBadVariableAttribute)
+		}
+		bl, ok := variableExpr.(*ast.BasicLit)
+		if !ok {
+			return nil, newDecodeErrorf(expr, errNonStringAttribute)
+		}
+		value, err := stringValue(bl)
+		if err != nil {
+			return nil, err
+		}
+		return &value, nil
+	case *ast.SelectorExpr:
+		s, ok := e.X.(*ast.Ident)
+		if !ok {
+			return nil, newDecodeErrorf(expr, errExprNotIdent, e.X)
+		}
+		variableExpr, found := c.variables[strings.Join([]string{s.Name, e.Sel.Name}, ".")]
+		if !found {
+			return nil, newDecodeErrorf(expr, errBadImportedVariableAttribute)
+		}
+		bl, ok := variableExpr.(*ast.BasicLit)
+		if !ok {
+			return nil, newDecodeErrorf(expr, errNonStringAttribute)
+		}
+		value, err := stringValue(bl)
+		if err != nil {
+			return nil, err
+		}
+		return &value, nil
+	case *ast.BinaryExpr:
+		var binaryExpr *ast.BinaryExpr
+		binaryExpr = e
+		var okay bool
+		var value string
+		okay = true
+
+		for okay {
+			yV, okay := binaryExpr.Y.(*ast.BasicLit)
+			if !okay {
+				return nil, newDecodeErrorf(expr, errNonStringAttribute)
+			}
+			yVal, err := stringValue(yV)
+			if err != nil {
+				return nil, newDecodeErrorf(expr, errNonStringAttribute)
+			}
+			value = fmt.Sprintf("%s%s", yVal, value)
+			x, okay := binaryExpr.X.(*ast.BinaryExpr)
+			if !okay {
+				// should be basicLit
+				xV, okay := binaryExpr.X.(*ast.BasicLit)
+				if !okay {
+					return nil, newDecodeErrorf(expr, errNonStringAttribute)
+				}
+				xVal, err := stringValue(xV)
+				if err != nil {
+					return nil, newDecodeErrorf(expr, errNonStringAttribute)
+				}
+				value = fmt.Sprintf("%s%s", xVal, value)
+				break
+			}
+			binaryExpr = x
+		}
+		return &value, nil
+	}
+	return nil, fmt.Errorf("can't decode string")
 }
 
 func (c *metricDecoder) decodeMetricVec(call *ast.CallExpr) (metric, error) {
@@ -127,53 +270,73 @@ func (c *metricDecoder) decodeMetricVec(call *ast.CallExpr) (metric, error) {
 	return m, nil
 }
 
-func (c *metricDecoder) decodeLabels(expr ast.Expr) ([]string, error) {
-	cl, ok := expr.(*ast.CompositeLit)
-	if !ok {
-		id, ok := expr.(*ast.Ident)
+func (c *metricDecoder) decodeMetricVecForTimingRatioHistogram(call *ast.CallExpr) (metric, error) {
+	m, err := c.decodeOpts(call.Args[0])
+	if err != nil {
+		return m, err
+	}
+	labels, err := c.decodeLabelsFromArray(call.Args[1:])
+	if err != nil {
+		return m, err
+	}
+	sort.Strings(labels)
+	m.Labels = labels
+	return m, nil
+}
+
+func (c *metricDecoder) decodeLabelsFromArray(exprs []ast.Expr) ([]string, error) {
+	retval := []string{}
+	for _, e := range exprs {
+		id, ok := e.(*ast.Ident)
 		if !ok {
-			return nil, newDecodeErrorf(expr, errInvalidNewMetricCall)
+			if bl, ok := e.(*ast.BasicLit); ok {
+				v, err := stringValue(bl)
+				if err != nil {
+					return nil, err
+				}
+				retval = append(retval, v)
+				continue
+			}
+			return nil, newDecodeErrorf(e, errInvalidNewMetricCall)
 		}
 		variableExpr, found := c.variables[id.Name]
 		if !found {
-			return nil, newDecodeErrorf(expr, "couldn't find variable for labels")
+			return nil, newDecodeErrorf(e, "couldn't find variable for labels")
 		}
-		cl2, ok := variableExpr.(*ast.CompositeLit)
+		bl, ok := variableExpr.(*ast.BasicLit)
 		if !ok {
-			return nil, newDecodeErrorf(expr, "couldn't interpret variable for labels")
+			return nil, newDecodeErrorf(e, "couldn't interpret variable for labels")
 		}
-		cl = cl2
-	}
-	labels := make([]string, len(cl.Elts))
-	for i, el := range cl.Elts {
-		v, ok := el.(*ast.Ident)
-		if ok {
-			variableExpr, found := c.variables[v.Name]
-			if !found {
-				return nil, newDecodeErrorf(expr, errBadVariableAttribute)
-			}
-			bl, ok := variableExpr.(*ast.BasicLit)
-			if !ok {
-				return nil, newDecodeErrorf(expr, errNonStringAttribute)
-			}
-			value, err := stringValue(bl)
-			if err != nil {
-				return nil, err
-			}
-			labels[i] = value
-			continue
-		}
-		bl, ok := el.(*ast.BasicLit)
-		if !ok {
-			return nil, errors.New(errLabels)
-		}
-		value, err := stringValue(bl)
+		v, err := stringValue(bl)
 		if err != nil {
 			return nil, err
 		}
-		labels[i] = value
+		retval = append(retval, v)
 	}
-	return labels, nil
+
+	return retval, nil
+}
+
+func (c *metricDecoder) decodeLabels(expr ast.Expr) ([]string, error) {
+	cl, ok := expr.(*ast.CompositeLit)
+	if !ok {
+		switch e := expr.(type) {
+		case *ast.Ident:
+			if e.Name == "nil" {
+				return []string{}, nil
+			}
+			variableExpr, found := c.variables[e.Name]
+			if !found {
+				return nil, newDecodeErrorf(expr, "couldn't find variable for labels")
+			}
+			cl2, ok := variableExpr.(*ast.CompositeLit)
+			if !ok {
+				return nil, newDecodeErrorf(expr, "couldn't interpret variable for labels")
+			}
+			cl = cl2
+		}
+	}
+	return c.decodeLabelsFromArray(cl.Elts)
 }
 
 func (c *metricDecoder) decodeOpts(expr ast.Expr) (metric, error) {
@@ -200,78 +363,11 @@ func (c *metricDecoder) decodeOpts(expr ast.Expr) (metric, error) {
 		case "Namespace", "Subsystem", "Name", "Help", "DeprecatedVersion":
 			var value string
 			var err error
-			switch v := kv.Value.(type) {
-			case *ast.BasicLit:
-				value, err = stringValue(v)
-				if err != nil {
-					return m, err
-				}
-			case *ast.Ident:
-				variableExpr, found := c.variables[v.Name]
-				if !found {
-					return m, newDecodeErrorf(expr, errBadVariableAttribute)
-				}
-				bl, ok := variableExpr.(*ast.BasicLit)
-				if !ok {
-					return m, newDecodeErrorf(expr, errNonStringAttribute)
-				}
-				value, err = stringValue(bl)
-				if err != nil {
-					return m, err
-				}
-			case *ast.SelectorExpr:
-				s, ok := v.X.(*ast.Ident)
-				if !ok {
-					return m, newDecodeErrorf(expr, errExprNotIdent, v.X)
-				}
-
-				variableExpr, found := c.variables[strings.Join([]string{s.Name, v.Sel.Name}, ".")]
-				if !found {
-					return m, newDecodeErrorf(expr, errBadImportedVariableAttribute)
-				}
-				bl, ok := variableExpr.(*ast.BasicLit)
-				if !ok {
-					return m, newDecodeErrorf(expr, errNonStringAttribute)
-				}
-				value, err = stringValue(bl)
-				if err != nil {
-					return m, err
-				}
-			case *ast.BinaryExpr:
-				var binaryExpr *ast.BinaryExpr
-				binaryExpr = v
-				var okay bool
-				okay = true
-
-				for okay {
-					yV, okay := binaryExpr.Y.(*ast.BasicLit)
-					if !okay {
-						return m, newDecodeErrorf(expr, errNonStringAttribute)
-					}
-					yVal, err := stringValue(yV)
-					if err != nil {
-						return m, newDecodeErrorf(expr, errNonStringAttribute)
-					}
-					value = fmt.Sprintf("%s%s", yVal, value)
-					x, okay := binaryExpr.X.(*ast.BinaryExpr)
-					if !okay {
-						// should be basicLit
-						xV, okay := binaryExpr.X.(*ast.BasicLit)
-						if !okay {
-							return m, newDecodeErrorf(expr, errNonStringAttribute)
-						}
-						xVal, err := stringValue(xV)
-						if err != nil {
-							return m, newDecodeErrorf(expr, errNonStringAttribute)
-						}
-						value = fmt.Sprintf("%s%s", xVal, value)
-						break
-					}
-					binaryExpr = x
-				}
-			default:
-				return m, newDecodeErrorf(expr, errNonStringAttribute)
+			s, err := c.decodeString(kv.Value)
+			if err != nil {
+				return m, newDecodeErrorf(expr, err.Error())
 			}
+			value = *s
 			switch key {
 			case "Namespace":
 				m.Namespace = value
@@ -326,7 +422,6 @@ func (c *metricDecoder) decodeOpts(expr ast.Expr) (metric, error) {
 		case "MaxAge":
 			int64Val, err := c.decodeInt64(kv.Value)
 			if err != nil {
-				print(key)
 				return m, err
 			}
 			m.MaxAge = int64Val
@@ -349,13 +444,19 @@ func (c *metricDecoder) decodeBuckets(expr ast.Expr) ([]float64, error) {
 	case *ast.Ident:
 		variableExpr, found := c.variables[v.Name]
 		if !found {
-			return nil, fmt.Errorf("couldn't find variable for bucket")
+			return nil, newDecodeErrorf(v, "couldn't find variable for bucket")
 		}
-		v2, ok := variableExpr.(*ast.CompositeLit)
-		if !ok {
-			return nil, fmt.Errorf("couldn't find variable for bucket")
+		switch v2 := variableExpr.(type) {
+		case *ast.CompositeLit:
+			return decodeListOfFloats(v2, v2.Elts)
+		case *ast.CallExpr:
+			float64s, err2, done := c.decodeBucketFunctionCall(v2)
+			if done {
+				return float64s, err2
+			}
+		default:
+			return nil, newDecodeErrorf(v, "couldn't find variable for bucket")
 		}
-		return decodeListOfFloats(v2, v2.Elts)
 
 	case *ast.CompositeLit:
 		return decodeListOfFloats(v, v.Elts)
@@ -366,30 +467,109 @@ func (c *metricDecoder) decodeBuckets(expr ast.Expr) ([]float64, error) {
 			return metrics.DefBuckets, nil
 		}
 	case *ast.CallExpr:
-		se, ok := v.Fun.(*ast.SelectorExpr)
-		if !ok {
-			return nil, newDecodeErrorf(v, errBuckets)
-		}
-		functionName := se.Sel.String()
-		functionImport, ok := se.X.(*ast.Ident)
-		if !ok {
-			return nil, newDecodeErrorf(v, errBuckets)
-		}
-		if functionImport.String() != c.kubeMetricsImportName {
-			return nil, newDecodeErrorf(v, errBuckets)
-		}
-		firstArg, secondArg, thirdArg, err := decodeBucketArguments(v)
-		if err != nil {
-			return nil, err
-		}
-		switch functionName {
-		case "LinearBuckets":
-			return metrics.LinearBuckets(firstArg, secondArg, thirdArg), nil
-		case "ExponentialBuckets":
-			return metrics.ExponentialBuckets(firstArg, secondArg, thirdArg), nil
+		float64s, err2, done := c.decodeBucketFunctionCall(v)
+		if done {
+			return float64s, err2
 		}
 	}
 	return nil, newDecodeErrorf(expr, errBuckets)
+}
+
+func (c *metricDecoder) decodeBucketFunctionCall(v *ast.CallExpr) ([]float64, error, bool) {
+	se, ok := v.Fun.(*ast.SelectorExpr)
+	if !ok {
+		// support merged
+		if ai, ok := v.Fun.(*ast.Ident); ok && ai.Name == "merge" {
+			merged := []float64{}
+			for _, arg := range v.Args {
+				v2, ok := arg.(*ast.CallExpr)
+				if !ok {
+					return nil, newDecodeErrorf(v2, errBuckets), true
+				}
+				se, ok = v2.Fun.(*ast.SelectorExpr)
+				if ok {
+					functionName := se.Sel.String()
+					functionImport, ok := se.X.(*ast.Ident)
+					if !ok {
+						return nil, newDecodeErrorf(v, errBuckets), true
+					}
+					if functionImport.String() != c.kubeMetricsImportName {
+						return nil, newDecodeErrorf(v, errBuckets), true
+					}
+					firstArg, secondArg, thirdArg, err := decodeBucketArguments(v2)
+					if err != nil {
+						return nil, err, true
+					}
+					switch functionName {
+					case "LinearBuckets":
+						merged = append(merged, metrics.LinearBuckets(firstArg, secondArg, thirdArg)...)
+					case "ExponentialBuckets":
+						merged = append(merged, metrics.LinearBuckets(firstArg, secondArg, thirdArg)...)
+					}
+				}
+			}
+			return merged, nil, true
+		}
+		return nil, newDecodeErrorf(v, errBuckets), true
+	}
+	functionName := se.Sel.String()
+	functionImport, ok := se.X.(*ast.Ident)
+	if !ok {
+		return nil, newDecodeErrorf(v, errBuckets), true
+	}
+	if functionImport.String() != c.kubeMetricsImportName {
+		return nil, newDecodeErrorf(v, errBuckets), true
+	}
+	switch functionName {
+	case "LinearBuckets":
+		firstArg, secondArg, thirdArg, err := decodeBucketArguments(v)
+		if err != nil {
+			return nil, err, true
+		}
+		return metrics.LinearBuckets(firstArg, secondArg, thirdArg), nil, true
+	case "ExponentialBuckets":
+		firstArg, secondArg, thirdArg, err := decodeBucketArguments(v)
+		if err != nil {
+			return nil, err, true
+		}
+		return metrics.ExponentialBuckets(firstArg, secondArg, thirdArg), nil, true
+	case "MergeBuckets":
+		merged := []float64{}
+		for _, arg := range v.Args {
+			switch argExpr := arg.(type) {
+			case *ast.CompositeLit:
+				fs, err := decodeListOfFloats(argExpr, argExpr.Elts)
+				if err != nil {
+					return nil, err, true
+				}
+				merged = append(merged, fs...)
+			case *ast.CallExpr:
+				se, ok = argExpr.Fun.(*ast.SelectorExpr)
+				if ok {
+					functionName := se.Sel.String()
+					functionImport, ok := se.X.(*ast.Ident)
+					if !ok {
+						return nil, newDecodeErrorf(v, errBuckets), true
+					}
+					if functionImport.String() != c.kubeMetricsImportName {
+						return nil, newDecodeErrorf(v, errBuckets), true
+					}
+					firstArg, secondArg, thirdArg, err := decodeBucketArguments(argExpr)
+					if err != nil {
+						return nil, err, true
+					}
+					switch functionName {
+					case "LinearBuckets":
+						merged = append(merged, metrics.LinearBuckets(firstArg, secondArg, thirdArg)...)
+					case "ExponentialBuckets":
+						merged = append(merged, metrics.LinearBuckets(firstArg, secondArg, thirdArg)...)
+					}
+				}
+			}
+		}
+		return merged, nil, true
+	}
+	return nil, nil, false
 }
 
 func (c *metricDecoder) decodeObjectives(expr ast.Expr) (map[float64]float64, error) {
@@ -462,14 +642,62 @@ func (c *metricDecoder) decodeInt64(expr ast.Expr) (int64, error) {
 				return 1000 * 1000 * 1000 * 60 * 10, nil
 			}
 		}
+	case *ast.Ident:
+		variableExpr, found := c.variables[v.Name]
+		if found {
+			be, ok := variableExpr.(*ast.BinaryExpr)
+			if ok {
+				i, err2, done := c.extractTimeExpression(be)
+				if done {
+					return i, err2
+				}
+			}
+
+		}
+
 	case *ast.CallExpr:
 		_, ok := v.Fun.(*ast.SelectorExpr)
 		if !ok {
 			return 0, newDecodeErrorf(v, errDecodeInt64)
 		}
 		return 0, nil
+	case *ast.BinaryExpr:
+		i, err2, done := c.extractTimeExpression(v)
+		if done {
+			return i, err2
+		}
 	}
 	return 0, newDecodeErrorf(expr, errDecodeInt64)
+}
+
+func (c *metricDecoder) extractTimeExpression(v *ast.BinaryExpr) (int64, error, bool) {
+	x := v.X.(*ast.BasicLit)
+	if x.Kind != token.FLOAT && x.Kind != token.INT {
+		print(x.Kind)
+	}
+
+	xValue, err := strconv.ParseInt(x.Value, 10, 64)
+	if err != nil {
+		return 0, err, true
+	}
+
+	switch y := v.Y.(type) {
+	case *ast.SelectorExpr:
+		variableName := y.Sel.String()
+		importName, ok := y.X.(*ast.Ident)
+		if ok && importName.String() == "time" {
+			if variableName == "Hour" {
+				return xValue * int64(time.Hour), nil, true
+			}
+			if variableName == "Minute" {
+				return xValue * int64(time.Minute), nil, true
+			}
+			if variableName == "Second" {
+				return xValue * int64(time.Second), nil, true
+			}
+		}
+	}
+	return 0, nil, false
 }
 
 func decodeFloatMap(exprs []ast.Expr) (map[float64]float64, error) {
@@ -548,6 +776,20 @@ func decodeBucketArguments(fc *ast.CallExpr) (float64, float64, int, error) {
 	}
 
 	return firstArg, secondArg, int(thirdArg), nil
+}
+func (c *metricDecoder) decodeBuildFQNameArguments(fc *ast.CallExpr) (string, string, string, error) {
+	if len(fc.Args) != 3 {
+		return "", "", "", newDecodeErrorf(fc, "can't decode fq name args")
+	}
+	strArgs := make([]string, len(fc.Args))
+	for i, elt := range fc.Args {
+		s, err := c.decodeString(elt)
+		if err != nil || s == nil {
+			return "", "", "", newDecodeErrorf(fc, err.Error())
+		}
+		strArgs[i] = *s
+	}
+	return strArgs[0], strArgs[1], strArgs[2], nil
 }
 
 func decodeStabilityLevel(expr ast.Expr, metricsFrameworkImportName string) (*metrics.StabilityLevel, error) {

@@ -619,35 +619,38 @@ func formatEndpoints(endpoints *api.Endpoints, ports sets.String) string {
 		ss := &endpoints.Subsets[i]
 		if len(ss.Ports) == 0 {
 			// It's possible to have headless services with no ports.
+			count += len(ss.Addresses)
 			for i := range ss.Addresses {
 				if len(list) == max {
 					more = true
+					// the next loop is redundant
+					break
 				}
-				if !more {
-					list = append(list, ss.Addresses[i].IP)
-				}
-				count++
+				list = append(list, ss.Addresses[i].IP)
 			}
-		} else {
-			// "Normal" services with ports defined.
-			for i := range ss.Ports {
-				port := &ss.Ports[i]
-				if ports == nil || ports.Has(port.Name) {
-					for i := range ss.Addresses {
-						if len(list) == max {
-							more = true
-						}
-						addr := &ss.Addresses[i]
-						if !more {
-							hostPort := net.JoinHostPort(addr.IP, strconv.Itoa(int(port.Port)))
-							list = append(list, hostPort)
-						}
-						count++
+			// avoid nesting code too deeply
+			continue
+		}
+
+		// "Normal" services with ports defined.
+		for i := range ss.Ports {
+			port := &ss.Ports[i]
+			if ports == nil || ports.Has(port.Name) {
+				count += len(ss.Addresses)
+				for i := range ss.Addresses {
+					if len(list) == max {
+						more = true
+						// the next loop is redundant
+						break
 					}
+					addr := &ss.Addresses[i]
+					hostPort := net.JoinHostPort(addr.IP, strconv.Itoa(int(port.Port)))
+					list = append(list, hostPort)
 				}
 			}
 		}
 	}
+
 	ret := strings.Join(list, ",")
 	if more {
 		return fmt.Sprintf("%s + %d more...", ret, count-max)
@@ -762,6 +765,13 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 	reason := string(pod.Status.Phase)
 	if pod.Status.Reason != "" {
 		reason = pod.Status.Reason
+	}
+
+	// If the Pod carries {type:PodScheduled, reason:WaitingForGates}, set reason to 'SchedulingGated'.
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == api.PodScheduled && condition.Reason == api.PodReasonSchedulingGated {
+			reason = api.PodReasonSchedulingGated
+		}
 	}
 
 	row := metav1.TableRow{
@@ -1240,11 +1250,31 @@ func printIngress(obj *networking.Ingress, options printers.GenerateOptions) ([]
 		className = *obj.Spec.IngressClassName
 	}
 	hosts := formatHosts(obj.Spec.Rules)
-	address := loadBalancerStatusStringer(obj.Status.LoadBalancer, options.Wide)
+	address := ingressLoadBalancerStatusStringer(obj.Status.LoadBalancer, options.Wide)
 	ports := formatPorts(obj.Spec.TLS)
 	createTime := translateTimestampSince(obj.CreationTimestamp)
 	row.Cells = append(row.Cells, obj.Name, className, hosts, address, ports, createTime)
 	return []metav1.TableRow{row}, nil
+}
+
+// ingressLoadBalancerStatusStringer behaves mostly like a string interface and converts the given status to a string.
+// `wide` indicates whether the returned value is meant for --o=wide output. If not, it's clipped to 16 bytes.
+func ingressLoadBalancerStatusStringer(s networking.IngressLoadBalancerStatus, wide bool) string {
+	ingress := s.Ingress
+	result := sets.NewString()
+	for i := range ingress {
+		if ingress[i].IP != "" {
+			result.Insert(ingress[i].IP)
+		} else if ingress[i].Hostname != "" {
+			result.Insert(ingress[i].Hostname)
+		}
+	}
+
+	r := strings.Join(result.List(), ",")
+	if !wide && len(r) > loadBalancerWidth {
+		r = r[0:(loadBalancerWidth-3)] + "..."
+	}
+	return r
 }
 
 func printIngressList(list *networking.IngressList, options printers.GenerateOptions) ([]metav1.TableRow, error) {

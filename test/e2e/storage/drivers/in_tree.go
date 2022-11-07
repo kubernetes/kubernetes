@@ -105,10 +105,11 @@ func InitNFSDriver() storageframework.TestDriver {
 			SupportedMountOption: sets.NewString("relatime"),
 			RequiredMountOption:  sets.NewString("vers=4.1"),
 			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence: true,
-				storageframework.CapExec:        true,
-				storageframework.CapRWX:         true,
-				storageframework.CapMultiPODs:   true,
+				storageframework.CapPersistence:       true,
+				storageframework.CapExec:              true,
+				storageframework.CapRWX:               true,
+				storageframework.CapMultiPODs:         true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -157,7 +158,7 @@ func (n *nfsDriver) GetDynamicProvisionStorageClass(config *storageframework.Per
 	return storageframework.GetStorageClass(provisioner, parameters, nil, ns)
 }
 
-func (n *nfsDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (n *nfsDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
 	cs := f.ClientSet
 	ns := f.Namespace
 	n.externalPluginName = fmt.Sprintf("example.com/nfs-%s", ns.Name)
@@ -167,6 +168,10 @@ func (n *nfsDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTe
 	err := e2eauth.BindClusterRole(cs.RbacV1(), "cluster-admin", ns.Name,
 		rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: ns.Name, Name: "default"})
 	framework.ExpectNoError(err)
+	ginkgo.DeferCleanup(func(ctx context.Context) {
+		clusterRoleBindingName := ns.Name + "--" + "cluster-admin"
+		cs.RbacV1().ClusterRoleBindings().Delete(ctx, clusterRoleBindingName, *metav1.NewDeleteOptions(0))
+	})
 
 	err = e2eauth.WaitForAuthorizationUpdate(cs.AuthorizationV1(),
 		serviceaccount.MakeUsername(ns.Name, "default"),
@@ -175,16 +180,15 @@ func (n *nfsDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTe
 
 	ginkgo.By("creating an external dynamic provisioner pod")
 	n.externalProvisionerPod = utils.StartExternalProvisioner(cs, ns.Name, n.externalPluginName)
+	ginkgo.DeferCleanup(func() {
+		framework.ExpectNoError(e2epod.DeletePodWithWait(cs, n.externalProvisionerPod))
+	})
 
 	return &storageframework.PerTestConfig{
-			Driver:    n,
-			Prefix:    "nfs",
-			Framework: f,
-		}, func() {
-			framework.ExpectNoError(e2epod.DeletePodWithWait(cs, n.externalProvisionerPod))
-			clusterRoleBindingName := ns.Name + "--" + "cluster-admin"
-			cs.RbacV1().ClusterRoleBindings().Delete(context.TODO(), clusterRoleBindingName, *metav1.NewDeleteOptions(0))
-		}
+		Driver:    n,
+		Prefix:    "nfs",
+		Framework: f,
+	}
 }
 
 func (n *nfsDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
@@ -249,12 +253,13 @@ func InitISCSIDriver() storageframework.TestDriver {
 			),
 			TopologyKeys: []string{v1.LabelHostname},
 			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence: true,
-				storageframework.CapFsGroup:     true,
-				storageframework.CapBlock:       true,
-				storageframework.CapExec:        true,
-				storageframework.CapMultiPODs:   true,
-				storageframework.CapTopology:    true,
+				storageframework.CapPersistence:       true,
+				storageframework.CapFsGroup:           true,
+				storageframework.CapBlock:             true,
+				storageframework.CapExec:              true,
+				storageframework.CapMultiPODs:         true,
+				storageframework.CapTopology:          true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -307,12 +312,12 @@ func (i *iSCSIDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2
 	return &pvSource, nil
 }
 
-func (i *iSCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (i *iSCSIDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
 	return &storageframework.PerTestConfig{
 		Driver:    i,
 		Prefix:    "iscsi",
 		Framework: f,
-	}, func() {}
+	}
 }
 
 func (i *iSCSIDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
@@ -431,11 +436,12 @@ func InitRbdDriver() storageframework.TestDriver {
 				"ext4",
 			),
 			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence: true,
-				storageframework.CapFsGroup:     true,
-				storageframework.CapBlock:       true,
-				storageframework.CapExec:        true,
-				storageframework.CapMultiPODs:   true,
+				storageframework.CapPersistence:       true,
+				storageframework.CapFsGroup:           true,
+				storageframework.CapBlock:             true,
+				storageframework.CapExec:              true,
+				storageframework.CapMultiPODs:         true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -500,12 +506,12 @@ func (r *rbdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2ev
 	return &pvSource, nil
 }
 
-func (r *rbdDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (r *rbdDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
 	return &storageframework.PerTestConfig{
 		Driver:    r,
 		Prefix:    "rbd",
 		Framework: f,
-	}, func() {}
+	}
 }
 
 func (r *rbdDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
@@ -559,10 +565,11 @@ func InitCephFSDriver() storageframework.TestDriver {
 				"", // Default fsType
 			),
 			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence: true,
-				storageframework.CapExec:        true,
-				storageframework.CapRWX:         true,
-				storageframework.CapMultiPODs:   true,
+				storageframework.CapPersistence:       true,
+				storageframework.CapExec:              true,
+				storageframework.CapRWX:               true,
+				storageframework.CapMultiPODs:         true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -614,12 +621,12 @@ func (c *cephFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e
 	}, nil
 }
 
-func (c *cephFSDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (c *cephFSDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
 	return &storageframework.PerTestConfig{
 		Driver:    c,
 		Prefix:    "cephfs",
 		Framework: f,
-	}, func() {}
+	}
 }
 
 func (c *cephFSDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
@@ -662,10 +669,11 @@ func InitHostPathDriver() storageframework.TestDriver {
 			),
 			TopologyKeys: []string{v1.LabelHostname},
 			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence:      true,
-				storageframework.CapMultiPODs:        true,
-				storageframework.CapSingleNodeVolume: true,
-				storageframework.CapTopology:         true,
+				storageframework.CapPersistence:       true,
+				storageframework.CapMultiPODs:         true,
+				storageframework.CapSingleNodeVolume:  true,
+				storageframework.CapTopology:          true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -690,12 +698,12 @@ func (h *hostPathDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume
 	}
 }
 
-func (h *hostPathDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (h *hostPathDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
 	return &storageframework.PerTestConfig{
 		Driver:    h,
 		Prefix:    "hostpath",
 		Framework: f,
-	}, func() {}
+	}
 }
 
 func (h *hostPathDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
@@ -737,10 +745,11 @@ func InitHostPathSymlinkDriver() storageframework.TestDriver {
 			),
 			TopologyKeys: []string{v1.LabelHostname},
 			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence:      true,
-				storageframework.CapMultiPODs:        true,
-				storageframework.CapSingleNodeVolume: true,
-				storageframework.CapTopology:         true,
+				storageframework.CapPersistence:       true,
+				storageframework.CapMultiPODs:         true,
+				storageframework.CapSingleNodeVolume:  true,
+				storageframework.CapTopology:          true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -770,12 +779,12 @@ func (h *hostPathSymlinkDriver) GetVolumeSource(readOnly bool, fsType string, e2
 	}
 }
 
-func (h *hostPathSymlinkDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (h *hostPathSymlinkDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
 	return &storageframework.PerTestConfig{
 		Driver:    h,
 		Prefix:    "hostpathsymlink",
 		Framework: f,
-	}, func() {}
+	}
 }
 
 func (h *hostPathSymlinkDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
@@ -911,12 +920,12 @@ func (e *emptydirDriver) CreateVolume(config *storageframework.PerTestConfig, vo
 	return nil
 }
 
-func (e *emptydirDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (e *emptydirDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
 	return &storageframework.PerTestConfig{
 		Driver:    e,
 		Prefix:    "emptydir",
 		Framework: f,
-	}, func() {}
+	}
 }
 
 // GCE
@@ -966,8 +975,9 @@ func InitGcePdDriver() storageframework.TestDriver {
 				storageframework.CapNodeExpansion:       true,
 				// GCE supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
-				storageframework.CapVolumeLimits: false,
-				storageframework.CapTopology:     true,
+				storageframework.CapVolumeLimits:      false,
+				storageframework.CapTopology:          true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -998,8 +1008,9 @@ func InitWindowsGcePdDriver() storageframework.TestDriver {
 				storageframework.CapMultiPODs:           true,
 				// GCE supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
-				storageframework.CapVolumeLimits: false,
-				storageframework.CapTopology:     true,
+				storageframework.CapVolumeLimits:      false,
+				storageframework.CapTopology:          true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -1062,7 +1073,7 @@ func (g *gcePdDriver) GetDynamicProvisionStorageClass(config *storageframework.P
 	return storageframework.GetStorageClass(provisioner, parameters, &delayedBinding, ns)
 }
 
-func (g *gcePdDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (g *gcePdDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
 	config := &storageframework.PerTestConfig{
 		Driver:    g,
 		Prefix:    "gcepd",
@@ -1076,7 +1087,7 @@ func (g *gcePdDriver) PrepareTest(f *framework.Framework) (*storageframework.Per
 			},
 		}
 	}
-	return config, func() {}
+	return config
 
 }
 
@@ -1136,12 +1147,13 @@ func InitVSphereDriver() storageframework.TestDriver {
 			),
 			TopologyKeys: []string{v1.LabelFailureDomainBetaZone},
 			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence: true,
-				storageframework.CapFsGroup:     true,
-				storageframework.CapExec:        true,
-				storageframework.CapMultiPODs:   true,
-				storageframework.CapTopology:    true,
-				storageframework.CapBlock:       true,
+				storageframework.CapPersistence:       true,
+				storageframework.CapFsGroup:           true,
+				storageframework.CapExec:              true,
+				storageframework.CapMultiPODs:         true,
+				storageframework.CapTopology:          true,
+				storageframework.CapBlock:             true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -1209,21 +1221,22 @@ func (v *vSphereDriver) GetDynamicProvisionStorageClass(config *storageframework
 	return storageframework.GetStorageClass(provisioner, parameters, nil, ns)
 }
 
-func (v *vSphereDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
-	return &storageframework.PerTestConfig{
-			Driver:    v,
-			Prefix:    "vsphere",
-			Framework: f,
-		}, func() {
-			// Driver Cleanup function
-			// Logout each vSphere client connection to prevent session leakage
-			nodes := vspheretest.GetReadySchedulableNodeInfos()
-			for _, node := range nodes {
-				if node.VSphere.Client != nil {
-					node.VSphere.Client.Logout(context.TODO())
-				}
+func (v *vSphereDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
+	ginkgo.DeferCleanup(func() {
+		// Driver Cleanup function
+		// Logout each vSphere client connection to prevent session leakage
+		nodes := vspheretest.GetReadySchedulableNodeInfos()
+		for _, node := range nodes {
+			if node.VSphere.Client != nil {
+				node.VSphere.Client.Logout(context.TODO())
 			}
 		}
+	})
+	return &storageframework.PerTestConfig{
+		Driver:    v,
+		Prefix:    "vsphere",
+		Framework: f,
+	}
 }
 
 func (v *vSphereDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
@@ -1282,8 +1295,9 @@ func InitAzureDiskDriver() storageframework.TestDriver {
 				storageframework.CapMultiPODs:   true,
 				// Azure supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
-				storageframework.CapVolumeLimits: false,
-				storageframework.CapTopology:     true,
+				storageframework.CapVolumeLimits:      false,
+				storageframework.CapTopology:          true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -1354,12 +1368,12 @@ func (a *azureDiskDriver) GetDynamicProvisionStorageClass(config *storageframewo
 	return storageframework.GetStorageClass(provisioner, parameters, &delayedBinding, ns)
 }
 
-func (a *azureDiskDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (a *azureDiskDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
 	return &storageframework.PerTestConfig{
 		Driver:    a,
 		Prefix:    "azure",
 		Framework: f,
-	}, func() {}
+	}
 }
 
 func (a *azureDiskDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
@@ -1431,8 +1445,9 @@ func InitAwsDriver() storageframework.TestDriver {
 				storageframework.CapOnlineExpansion:     true,
 				// AWS supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
-				storageframework.CapVolumeLimits: false,
-				storageframework.CapTopology:     true,
+				storageframework.CapVolumeLimits:      false,
+				storageframework.CapTopology:          true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 	}
@@ -1492,7 +1507,7 @@ func (a *awsDriver) GetDynamicProvisionStorageClass(config *storageframework.Per
 	return storageframework.GetStorageClass(provisioner, parameters, &delayedBinding, ns)
 }
 
-func (a *awsDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (a *awsDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
 	config := &storageframework.PerTestConfig{
 		Driver:    a,
 		Prefix:    "aws",
@@ -1506,7 +1521,7 @@ func (a *awsDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTe
 			},
 		}
 	}
-	return config, func() {}
+	return config
 }
 
 func (a *awsDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
@@ -1551,21 +1566,23 @@ type localVolume struct {
 var (
 	// capabilities
 	defaultLocalVolumeCapabilities = map[storageframework.Capability]bool{
-		storageframework.CapPersistence:      true,
-		storageframework.CapFsGroup:          true,
-		storageframework.CapBlock:            false,
-		storageframework.CapExec:             true,
-		storageframework.CapMultiPODs:        true,
-		storageframework.CapSingleNodeVolume: true,
+		storageframework.CapPersistence:       true,
+		storageframework.CapFsGroup:           true,
+		storageframework.CapBlock:             false,
+		storageframework.CapExec:              true,
+		storageframework.CapMultiPODs:         true,
+		storageframework.CapSingleNodeVolume:  true,
+		storageframework.CapMultiplePVsSameID: true,
 	}
 	localVolumeCapabitilies = map[utils.LocalVolumeType]map[storageframework.Capability]bool{
 		utils.LocalVolumeBlock: {
-			storageframework.CapPersistence:      true,
-			storageframework.CapFsGroup:          true,
-			storageframework.CapBlock:            true,
-			storageframework.CapExec:             true,
-			storageframework.CapMultiPODs:        true,
-			storageframework.CapSingleNodeVolume: true,
+			storageframework.CapPersistence:       true,
+			storageframework.CapFsGroup:           true,
+			storageframework.CapBlock:             true,
+			storageframework.CapExec:              true,
+			storageframework.CapMultiPODs:         true,
+			storageframework.CapSingleNodeVolume:  true,
+			storageframework.CapMultiplePVsSameID: true,
 		},
 	}
 	// fstype
@@ -1628,7 +1645,7 @@ func (l *localDriver) GetDriverInfo() *storageframework.DriverInfo {
 func (l *localDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
 }
 
-func (l *localDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (l *localDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
 	var err error
 	l.node, err = e2enode.GetRandomReadySchedulableNode(f.ClientSet)
 	framework.ExpectNoError(err)
@@ -1650,14 +1667,13 @@ func (l *localDriver) PrepareTest(f *framework.Framework) (*storageframework.Per
 		}
 	}
 
+	ginkgo.DeferCleanup(l.hostExec.Cleanup)
 	return &storageframework.PerTestConfig{
-			Driver:              l,
-			Prefix:              "local",
-			Framework:           f,
-			ClientNodeSelection: e2epod.NodeSelection{Name: l.node.Name},
-		}, func() {
-			l.hostExec.Cleanup()
-		}
+		Driver:              l,
+		Prefix:              "local",
+		Framework:           f,
+		ClientNodeSelection: e2epod.NodeSelection{Name: l.node.Name},
+	}
 }
 
 func (l *localDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
@@ -1796,6 +1812,7 @@ func InitAzureFileDriver() storageframework.TestDriver {
 				storageframework.CapMultiPODs:           true,
 				storageframework.CapControllerExpansion: true,
 				storageframework.CapNodeExpansion:       true,
+				storageframework.CapMultiplePVsSameID:   true,
 			},
 		},
 	}
@@ -1848,12 +1865,12 @@ func (a *azureFileDriver) GetDynamicProvisionStorageClass(config *storageframewo
 	return storageframework.GetStorageClass(provisioner, parameters, &immediateBinding, ns)
 }
 
-func (a *azureFileDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (a *azureFileDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
 	return &storageframework.PerTestConfig{
 		Driver:    a,
 		Prefix:    "azure-file",
 		Framework: f,
-	}, func() {}
+	}
 }
 
 func (a *azureFileDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
@@ -1891,9 +1908,9 @@ func (v *azureFileVolume) DeleteVolume() {
 }
 
 func (a *azureDiskDriver) GetTimeouts() *framework.TimeoutContext {
-	return &framework.TimeoutContext{
-		PodStart:  time.Minute * 15,
-		PodDelete: time.Minute * 15,
-		PVDelete:  time.Minute * 20,
-	}
+	timeouts := framework.NewTimeoutContextWithDefaults()
+	timeouts.PodStart = time.Minute * 15
+	timeouts.PodDelete = time.Minute * 15
+	timeouts.PVDelete = time.Minute * 20
+	return timeouts
 }

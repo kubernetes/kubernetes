@@ -37,7 +37,6 @@ import (
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
-	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubeexternalinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
@@ -78,24 +77,17 @@ func createAggregatorConfig(
 		genericConfig.BuildHandlerChainFunc = genericapiserver.BuildHandlerChainWithStorageVersionPrecondition
 	}
 
-	// override genericConfig.AdmissionControl with kube-aggregator's scheme,
-	// because aggregator apiserver should use its own scheme to convert its own resources.
-	err := commandOptions.Admission.ApplyTo(
-		&genericConfig,
-		externalInformers,
-		genericConfig.LoopbackClientConfig,
-		utilfeature.DefaultFeatureGate,
-		pluginInitializers...)
-	if err != nil {
-		return nil, err
-	}
-
 	// copy the etcd options so we don't mutate originals.
+	// we assume that the etcd options have been completed already.  avoid messing with anything outside
+	// of changes to StorageConfig as that may lead to unexpected behavior when the options are applied.
 	etcdOptions := *commandOptions.Etcd
 	etcdOptions.StorageConfig.Paging = utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIListChunking)
 	etcdOptions.StorageConfig.Codec = aggregatorscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion, v1beta1.SchemeGroupVersion)
 	etcdOptions.StorageConfig.EncodeVersioner = runtime.NewMultiGroupVersioner(v1.SchemeGroupVersion, schema.GroupKind{Group: v1beta1.GroupName})
-	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
+	etcdOptions.SkipHealthEndpoints = true // avoid double wiring of health checks
+	if err := etcdOptions.ApplyTo(&genericConfig); err != nil {
+		return nil, err
+	}
 
 	// override MergedResourceConfig with aggregator defaults and registry
 	if err := commandOptions.APIEnablement.ApplyTo(

@@ -226,7 +226,17 @@ var _ = SIGDescribe("LimitRange", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should list, patch and delete a LimitRange by collection", func() {
+	/*
+		Release: v1.26
+		Testname: LimitRange, list, patch and delete a LimitRange by collection
+		Description: When two limitRanges are created in different namespaces,
+		both MUST succeed. Listing limitRanges across all namespaces with a
+		labelSelector MUST find both limitRanges. When patching the first limitRange
+		it MUST succeed and the fields MUST equal the new values. When deleting
+		the limitRange by collection with a labelSelector it MUST delete only one
+		limitRange.
+	*/
+	framework.ConformanceIt("should list, patch and delete a LimitRange by collection", func() {
 
 		ns := f.Namespace.Name
 		lrClient := f.ClientSet.CoreV1().LimitRanges(ns)

@@ -18,6 +18,7 @@ package logs
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -74,6 +75,7 @@ func TestGetAllLogs(t *testing.T) {
 }
 
 func TestRotateLogs(t *testing.T) {
+	ctx := context.Background()
 	dir, err := os.MkdirTemp("", "test-rotate-logs")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -147,7 +149,7 @@ func TestRotateLogs(t *testing.T) {
 		},
 	}
 	f.SetFakeContainers(testContainers)
-	require.NoError(t, c.rotateLogs())
+	require.NoError(t, c.rotateLogs(ctx))
 
 	timestamp := now.Format(timestampFormat)
 	logs, err := os.ReadDir(dir)
@@ -161,6 +163,7 @@ func TestRotateLogs(t *testing.T) {
 }
 
 func TestClean(t *testing.T) {
+	ctx := context.Background()
 	dir, err := os.MkdirTemp("", "test-clean")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -219,7 +222,7 @@ func TestClean(t *testing.T) {
 	}
 	f.SetFakeContainers(testContainers)
 
-	err = c.Clean("container-3")
+	err = c.Clean(ctx, "container-3")
 	require.NoError(t, err)
 
 	logs, err := os.ReadDir(dir)
@@ -328,6 +331,7 @@ func TestCompressLog(t *testing.T) {
 	testContent := "test log content"
 	_, err = testFile.Write([]byte(testContent))
 	require.NoError(t, err)
+	testFile.Close()
 
 	testLog := testFile.Name()
 	c := &containerLogManager{osInterface: container.RealOS{}}
@@ -349,6 +353,7 @@ func TestCompressLog(t *testing.T) {
 }
 
 func TestRotateLatestLog(t *testing.T) {
+	ctx := context.Background()
 	dir, err := os.MkdirTemp("", "test-rotate-latest-log")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -388,10 +393,11 @@ func TestRotateLatestLog(t *testing.T) {
 		}
 		testFile, err := os.CreateTemp(dir, "test-rotate-latest-log")
 		require.NoError(t, err)
+		testFile.Close()
 		defer testFile.Close()
 		testLog := testFile.Name()
 		rotatedLog := fmt.Sprintf("%s.%s", testLog, now.Format(timestampFormat))
-		err = c.rotateLatestLog("test-id", testLog)
+		err = c.rotateLatestLog(ctx, "test-id", testLog)
 		assert.Equal(t, test.expectError, err != nil)
 		_, err = os.Stat(testLog)
 		assert.Equal(t, test.expectOriginal, err == nil)

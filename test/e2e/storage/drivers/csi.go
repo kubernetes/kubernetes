@@ -148,6 +148,8 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		storageframework.CapOfflineExpansion:    true,
 		storageframework.CapOnlineExpansion:     true,
 		storageframework.CapSingleNodeVolume:    true,
+		storageframework.CapReadWriteOncePod:    true,
+		storageframework.CapMultiplePVsSameID:   true,
 
 		// This is needed for the
 		// testsuites/volumelimits.go `should support volume limits`
@@ -205,7 +207,7 @@ func (h *hostpathCSIDriver) GetSnapshotClass(config *storageframework.PerTestCon
 	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns)
 }
 
-func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
 	// Create secondary namespace which will be used for creating driver
 	driverNamespace := utils.CreateDriverNamespace(f)
 	driverns := driverNamespace.Name
@@ -284,8 +286,9 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframewo
 		driverns,
 		cleanup,
 		cancelLogging)
+	ginkgo.DeferCleanup(cleanupFunc)
 
-	return config, cleanupFunc
+	return config
 }
 
 // mockCSI
@@ -486,10 +489,11 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) MockCSITestDriver {
 				"", // Default fsType
 			),
 			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence:  false,
-				storageframework.CapFsGroup:      false,
-				storageframework.CapExec:         false,
-				storageframework.CapVolumeLimits: true,
+				storageframework.CapPersistence:       false,
+				storageframework.CapFsGroup:           false,
+				storageframework.CapExec:              false,
+				storageframework.CapVolumeLimits:      true,
+				storageframework.CapMultiplePVsSameID: true,
 			},
 		},
 		manifests:              driverManifests,
@@ -530,7 +534,7 @@ func (m *mockCSIDriver) GetSnapshotClass(config *storageframework.PerTestConfig,
 	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns)
 }
 
-func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (m *mockCSIDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
 	m.clientSet = f.ClientSet
 
 	// Create secondary namespace which will be used for creating driver
@@ -688,12 +692,12 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.P
 		cleanup,
 		cancelLogging)
 
-	cleanupFunc := func() {
+	ginkgo.DeferCleanup(func() {
 		embeddedCleanup()
 		driverCleanupFunc()
-	}
+	})
 
-	return config, cleanupFunc
+	return config
 }
 
 func (m *mockCSIDriver) interceptGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
@@ -805,6 +809,8 @@ func InitGcePDCSIDriver() storageframework.TestDriver {
 				storageframework.CapOnlineExpansion:     true,
 				storageframework.CapNodeExpansion:       true,
 				storageframework.CapSnapshotDataSource:  true,
+				storageframework.CapReadWriteOncePod:    true,
+				storageframework.CapMultiplePVsSameID:   true,
 			},
 			RequiredAccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			TopologyKeys:        []string{GCEPDCSIZoneTopologyKey},
@@ -858,7 +864,7 @@ func (g *gcePDCSIDriver) GetSnapshotClass(config *storageframework.PerTestConfig
 	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns)
 }
 
-func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
 	testns := f.Namespace.Name
 	cfg := &storageframework.PerTestConfig{
 		Driver:    g,
@@ -868,7 +874,7 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.
 
 	if framework.ProviderIs("gke") {
 		framework.Logf("The csi gce-pd driver is automatically installed in GKE. Skipping driver installation.")
-		return cfg, func() {}
+		return cfg
 	}
 
 	ginkgo.By("deploying csi gce-pd driver")
@@ -915,13 +921,14 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.
 		driverns,
 		cleanup,
 		cancelLogging)
+	ginkgo.DeferCleanup(cleanupFunc)
 
 	return &storageframework.PerTestConfig{
 		Driver:          g,
 		Prefix:          "gcepd",
 		Framework:       f,
 		DriverNamespace: driverNamespace,
-	}, cleanupFunc
+	}
 }
 
 // WaitForCSIDriverRegistrationOnAllNodes waits for the CSINode object to be updated

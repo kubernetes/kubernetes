@@ -776,23 +776,6 @@ func TestRetroactiveStorageClassAssignment(t *testing.T) {
 		{
 			storageClasses: []*storagev1.StorageClass{
 				makeDefaultStorageClass(classGold, &modeImmediate),
-				makeDefaultStorageClass(classSilver, &modeImmediate)},
-			tests: []controllerTest{
-				{
-					name:            "15-2 - pvc storage class is not assigned retroactively if there are multiple default storage classes",
-					initialVolumes:  novolumes,
-					expectedVolumes: novolumes,
-					initialClaims:   newClaimArray("claim15-2", "uid15-2", "1Gi", "", v1.ClaimPending, nil),
-					expectedClaims:  newClaimArray("claim15-2", "uid15-2", "1Gi", "", v1.ClaimPending, nil),
-					expectedEvents:  noevents,
-					errors:          noerrors,
-					test:            testSyncClaim,
-				},
-			},
-		},
-		{
-			storageClasses: []*storagev1.StorageClass{
-				makeDefaultStorageClass(classGold, &modeImmediate),
 				makeStorageClass(classSilver, &modeImmediate),
 			},
 			tests: []controllerTest{
@@ -838,6 +821,23 @@ func TestRetroactiveStorageClassAssignment(t *testing.T) {
 					expectedVolumes: novolumes,
 					initialClaims:   newClaimArray("claim15-5", "uid15-5", "1Gi", "", v1.ClaimPending, nil),
 					expectedClaims:  newClaimArray("claim15-5", "uid15-5", "1Gi", "", v1.ClaimPending, &classGold),
+					expectedEvents:  noevents,
+					errors:          noerrors,
+					test:            testSyncClaim,
+				},
+			},
+		},
+		{
+			storageClasses: []*storagev1.StorageClass{
+				makeDefaultStorageClass(classGold, &modeImmediate),
+				makeDefaultStorageClass(classSilver, &modeImmediate)},
+			tests: []controllerTest{
+				{
+					name:            "15-2 - pvc storage class is assigned retroactively if there are multiple default storage classes",
+					initialVolumes:  novolumes,
+					expectedVolumes: novolumes,
+					initialClaims:   newClaimArray("claim15-2", "uid15-2", "1Gi", "", v1.ClaimPending, nil),
+					expectedClaims:  newClaimArray("claim15-2", "uid15-2", "1Gi", "", v1.ClaimPending, &classGold),
 					expectedEvents:  noevents,
 					errors:          noerrors,
 					test:            testSyncClaim,

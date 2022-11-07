@@ -23,7 +23,9 @@ import (
 	"strconv"
 	"strings"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/io"
@@ -100,7 +102,7 @@ func (plugin *fcPlugin) SupportsBulkVolumeVerification() bool {
 }
 
 func (plugin *fcPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
-	return false, nil
+	return true, nil
 }
 
 func (plugin *fcPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
@@ -358,12 +360,13 @@ func (fc *fcDisk) fcPodDeviceMapPath() (string, string) {
 
 type fcDiskMounter struct {
 	*fcDisk
-	readOnly     bool
-	fsType       string
-	volumeMode   v1.PersistentVolumeMode
-	mounter      *mount.SafeFormatAndMount
-	deviceUtil   util.DeviceUtil
-	mountOptions []string
+	readOnly                  bool
+	fsType                    string
+	volumeMode                v1.PersistentVolumeMode
+	mounter                   *mount.SafeFormatAndMount
+	deviceUtil                util.DeviceUtil
+	mountOptions              []string
+	mountedWithSELinuxContext bool
 }
 
 var _ volume.Mounter = &fcDiskMounter{}
@@ -372,7 +375,7 @@ func (b *fcDiskMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
 		ReadOnly:       b.readOnly,
 		Managed:        !b.readOnly,
-		SELinuxRelabel: true,
+		SELinuxRelabel: !b.mountedWithSELinuxContext,
 	}
 }
 
@@ -385,6 +388,11 @@ func (b *fcDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) erro
 	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
 	if err != nil {
 		klog.Errorf("fc: failed to setup")
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		// The volume must have been mounted in MountDevice with -o context.
+		b.mountedWithSELinuxContext = mounterArgs.SELinuxLabel != ""
 	}
 	return err
 }

@@ -703,7 +703,7 @@ func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
 		Namespace: "default",
 	}
 
-	//longSecretRef refers to the secretRefs which are validated with IsDNS1123Subdomain
+	// longSecretRef refers to the secretRefs which are validated with IsDNS1123Subdomain
 	longSecretName := "key-name.example.com"
 	longSecretRef := &core.SecretReference{
 		Name:      longSecretName,
@@ -2440,40 +2440,45 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			oldPvc:                 nil,
 			enableReadWriteOncePod: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:             true,
-				EnableRecoverFromExpansionFailure: false,
+				AllowReadWriteOncePod:                true,
+				EnableRecoverFromExpansionFailure:    false,
+				EnableRetroactiveDefaultStorageClass: true,
 			},
 		},
 		"rwop allowed because feature enabled": {
 			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOnce}),
 			enableReadWriteOncePod: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:             true,
-				EnableRecoverFromExpansionFailure: false,
+				AllowReadWriteOncePod:                true,
+				EnableRecoverFromExpansionFailure:    false,
+				EnableRetroactiveDefaultStorageClass: true,
 			},
 		},
 		"rwop not allowed because not used and feature disabled": {
 			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOnce}),
 			enableReadWriteOncePod: false,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:             false,
-				EnableRecoverFromExpansionFailure: false,
+				AllowReadWriteOncePod:                false,
+				EnableRecoverFromExpansionFailure:    false,
+				EnableRetroactiveDefaultStorageClass: true,
 			},
 		},
 		"rwop allowed because used and feature enabled": {
 			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOncePod}),
 			enableReadWriteOncePod: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:             true,
-				EnableRecoverFromExpansionFailure: false,
+				AllowReadWriteOncePod:                true,
+				EnableRecoverFromExpansionFailure:    false,
+				EnableRetroactiveDefaultStorageClass: true,
 			},
 		},
 		"rwop allowed because used and feature disabled": {
 			oldPvc:                 pvcWithAccessModes([]core.PersistentVolumeAccessMode{core.ReadWriteOncePod}),
 			enableReadWriteOncePod: false,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				AllowReadWriteOncePod:             true,
-				EnableRecoverFromExpansionFailure: false,
+				AllowReadWriteOncePod:                true,
+				EnableRecoverFromExpansionFailure:    false,
+				EnableRetroactiveDefaultStorageClass: true,
 			},
 		},
 	}
@@ -10789,6 +10794,91 @@ func TestValidatePod(t *testing.T) {
 	}
 }
 
+func TestValidatePodCreateWithSchedulingGates(t *testing.T) {
+	applyEssentials := func(pod *core.Pod) {
+		pod.Spec.Containers = []core.Container{
+			{Name: "con", Image: "pause", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+		}
+		pod.Spec.RestartPolicy = core.RestartPolicyAlways
+		pod.Spec.DNSPolicy = core.DNSClusterFirst
+	}
+	fldPath := field.NewPath("spec")
+
+	tests := []struct {
+		name            string
+		pod             *core.Pod
+		featureEnabled  bool
+		wantFieldErrors field.ErrorList
+	}{
+		{
+			name: "create a Pod with nodeName and schedulingGates, feature disabled",
+			pod: &core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "ns"},
+				Spec: core.PodSpec{
+					NodeName: "node",
+					SchedulingGates: []core.PodSchedulingGate{
+						{Name: "foo"},
+					},
+				},
+			},
+			featureEnabled:  false,
+			wantFieldErrors: nil,
+		},
+		{
+			name: "create a Pod with nodeName and schedulingGates, feature enabled",
+			pod: &core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "ns"},
+				Spec: core.PodSpec{
+					NodeName: "node",
+					SchedulingGates: []core.PodSchedulingGate{
+						{Name: "foo"},
+					},
+				},
+			},
+			featureEnabled:  true,
+			wantFieldErrors: []*field.Error{field.Forbidden(fldPath.Child("nodeName"), "cannot be set until all schedulingGates have been cleared")},
+		},
+		{
+			name: "create a Pod with schedulingGates, feature disabled",
+			pod: &core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "ns"},
+				Spec: core.PodSpec{
+					SchedulingGates: []core.PodSchedulingGate{
+						{Name: "foo"},
+					},
+				},
+			},
+			featureEnabled:  false,
+			wantFieldErrors: nil,
+		},
+		{
+			name: "create a Pod with schedulingGates, feature enabled",
+			pod: &core.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "ns"},
+				Spec: core.PodSpec{
+					SchedulingGates: []core.PodSchedulingGate{
+						{Name: "foo"},
+					},
+				},
+			},
+			featureEnabled:  true,
+			wantFieldErrors: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodSchedulingReadiness, tt.featureEnabled)()
+
+			applyEssentials(tt.pod)
+			errs := ValidatePodCreate(tt.pod, PodValidationOptions{})
+			if diff := cmp.Diff(tt.wantFieldErrors, errs); diff != "" {
+				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestValidatePodUpdate(t *testing.T) {
 	var (
 		activeDeadlineSecondsZero     = int64(0)
@@ -11693,6 +11783,54 @@ func TestValidatePodUpdate(t *testing.T) {
 			err:  "Forbidden: pod updates may not change fields other than ",
 			test: "update pod spec OS to a valid value, featuregate disabled",
 		},
+		{
+			new: core.Pod{
+				Spec: core.PodSpec{
+					SchedulingGates: []core.PodSchedulingGate{{Name: "foo"}},
+				},
+			},
+			old:  core.Pod{},
+			err:  "Forbidden: only deletion is allowed, but found new scheduling gate 'foo'",
+			test: "update pod spec schedulingGates: add new scheduling gate",
+		},
+		{
+			new: core.Pod{
+				Spec: core.PodSpec{
+					SchedulingGates: []core.PodSchedulingGate{{Name: "bar"}},
+				},
+			},
+			old: core.Pod{
+				Spec: core.PodSpec{
+					SchedulingGates: []core.PodSchedulingGate{{Name: "foo"}},
+				},
+			},
+			err:  "Forbidden: only deletion is allowed, but found new scheduling gate 'bar'",
+			test: "update pod spec schedulingGates: mutating an existing scheduling gate",
+		},
+		{
+			new: core.Pod{
+				Spec: core.PodSpec{
+					SchedulingGates: []core.PodSchedulingGate{{Name: "baz"}},
+				},
+			},
+			old: core.Pod{
+				Spec: core.PodSpec{
+					SchedulingGates: []core.PodSchedulingGate{{Name: "foo"}, {Name: "bar"}},
+				},
+			},
+			err:  "Forbidden: only deletion is allowed, but found new scheduling gate 'baz'",
+			test: "update pod spec schedulingGates: mutating an existing scheduling gate along with deletion",
+		},
+		{
+			new: core.Pod{},
+			old: core.Pod{
+				Spec: core.PodSpec{
+					SchedulingGates: []core.PodSchedulingGate{{Name: "foo"}},
+				},
+			},
+			err:  "",
+			test: "update pod spec schedulingGates: legal deletion",
+		},
 	}
 	for _, test := range tests {
 		test.new.ObjectMeta.ResourceVersion = "1"
@@ -12304,7 +12442,6 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 
 	// Some tests use Windows host pods as an example of fields that might
 	// conflict between an ephemeral container and the rest of the pod.
-	opts := PodValidationOptions{AllowWindowsHostProcessField: true}
 	capabilities.SetForTests(capabilities.Capabilities{
 		AllowPrivileged: true,
 	})
@@ -12628,7 +12765,7 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		errs := ValidatePodEphemeralContainersUpdate(tc.new, tc.old, opts)
+		errs := ValidatePodEphemeralContainersUpdate(tc.new, tc.old, PodValidationOptions{})
 		if tc.err == "" {
 			if len(errs) != 0 {
 				t.Errorf("unexpected invalid for test: %s\nErrors returned: %+v\nLocal diff of test objects (-old +new):\n%s", tc.name, errs, cmp.Diff(tc.old, tc.new))
@@ -13331,8 +13468,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.InternalTrafficPolicy = nil
 			},
-			featureGates: []featuregate.Feature{features.ServiceInternalTrafficPolicy},
-			numErrs:      1,
+			numErrs: 1,
 		},
 		{
 			name: "internalTrafficPolicy field nil when type is ExternalName",
@@ -13341,8 +13477,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.Type = core.ServiceTypeExternalName
 				s.Spec.ExternalName = "foo.bar.com"
 			},
-			featureGates: []featuregate.Feature{features.ServiceInternalTrafficPolicy},
-			numErrs:      0,
+			numErrs: 0,
 		},
 		{
 			// Typically this should fail validation, but in v1.22 we have existing clusters
@@ -13356,8 +13491,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.Type = core.ServiceTypeExternalName
 				s.Spec.ExternalName = "foo.bar.com"
 			},
-			featureGates: []featuregate.Feature{features.ServiceInternalTrafficPolicy},
-			numErrs:      0,
+			numErrs: 0,
 		},
 		{
 			name: "invalid internalTraffic field",
@@ -18480,6 +18614,7 @@ func TestValidateOSFields(t *testing.T) {
 		"RestartPolicy",
 		"RuntimeClassName",
 		"SchedulerName",
+		"SchedulingGates[*].Name",
 		"SecurityContext.RunAsNonRoot",
 		"ServiceAccountName",
 		"SetHostnameAsFQDN",
@@ -18513,6 +18648,71 @@ func TestValidateOSFields(t *testing.T) {
 				"or add it to the osSpecificFields set, as appropriate:\n%s",
 				strings.Join(unexpected.List(), "\n"))
 		}
+	}
+}
+
+func TestValidateSchedulingGates(t *testing.T) {
+	fieldPath := field.NewPath("field")
+
+	tests := []struct {
+		name            string
+		schedulingGates []core.PodSchedulingGate
+		wantFieldErrors field.ErrorList
+	}{
+		{
+			name:            "nil gates",
+			schedulingGates: nil,
+			wantFieldErrors: field.ErrorList{},
+		},
+		{
+			name: "empty string in gates",
+			schedulingGates: []core.PodSchedulingGate{
+				{Name: "foo"},
+				{Name: ""},
+			},
+			wantFieldErrors: []*field.Error{field.Required(fieldPath.Index(1), "must not be empty")},
+		},
+		{
+			name: "legal gates",
+			schedulingGates: []core.PodSchedulingGate{
+				{Name: "foo"},
+				{Name: "bar"},
+			},
+			wantFieldErrors: field.ErrorList{},
+		},
+		{
+			name: "duplicated gates (single duplication)",
+			schedulingGates: []core.PodSchedulingGate{
+				{Name: "foo"},
+				{Name: "bar"},
+				{Name: "bar"},
+			},
+			wantFieldErrors: []*field.Error{field.Duplicate(fieldPath.Index(2), "bar")},
+		},
+		{
+			name: "duplicated gates (multiple duplications)",
+			schedulingGates: []core.PodSchedulingGate{
+				{Name: "foo"},
+				{Name: "bar"},
+				{Name: "foo"},
+				{Name: "baz"},
+				{Name: "foo"},
+				{Name: "bar"},
+			},
+			wantFieldErrors: field.ErrorList{
+				field.Duplicate(fieldPath.Index(2), "foo"),
+				field.Duplicate(fieldPath.Index(4), "foo"),
+				field.Duplicate(fieldPath.Index(5), "bar"),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := validateSchedulingGates(tt.schedulingGates, fieldPath)
+			if diff := cmp.Diff(tt.wantFieldErrors, errs); diff != "" {
+				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
+			}
+		})
 	}
 }
 
@@ -18660,7 +18860,7 @@ func TestValidateSecurityContext(t *testing.T) {
 		}
 	}
 
-	//setup data
+	// setup data
 	allSettings := fullValidSC()
 	noCaps := fullValidSC()
 	noCaps.Capabilities = nil
@@ -20855,78 +21055,12 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 	testCases := []struct {
 		name            string
 		expectError     bool
-		featureEnabled  bool
 		allowPrivileged bool
 		podSpec         *core.PodSpec
 	}{
 		{
-			name:            "Spec with feature disabled and pod-wide HostProcess=false and should not validate",
-			expectError:     true,
-			featureEnabled:  false,
-			allowPrivileged: true,
-			podSpec: &core.PodSpec{
-				SecurityContext: &core.PodSecurityContext{
-					WindowsOptions: &core.WindowsSecurityContextOptions{
-						HostProcess: &falseVar,
-					},
-				},
-				Containers: []core.Container{{
-					Name: containerName,
-				}},
-			},
-		},
-		{
-			name:            "Spec with feature disabled and pod-wide HostProcess=nil set should valildate",
-			expectError:     false,
-			featureEnabled:  false,
-			allowPrivileged: true,
-			podSpec: &core.PodSpec{
-				SecurityContext: &core.PodSecurityContext{
-					WindowsOptions: &core.WindowsSecurityContextOptions{
-						HostProcess: nil,
-					},
-				},
-				Containers: []core.Container{{
-					Name: containerName,
-				}},
-			},
-		},
-		{
-			name:            "Spec with feature disabled and container setting HostProcess=true should not valildate",
-			expectError:     true,
-			featureEnabled:  false,
-			allowPrivileged: true,
-			podSpec: &core.PodSpec{
-				Containers: []core.Container{{
-					Name: containerName,
-					SecurityContext: &core.SecurityContext{
-						WindowsOptions: &core.WindowsSecurityContextOptions{
-							HostProcess: &trueVar,
-						},
-					},
-				}},
-			},
-		},
-		{
-			name:            "Spec with feature disabled and init container setting HostProcess=true should not valildate",
-			expectError:     true,
-			featureEnabled:  false,
-			allowPrivileged: true,
-			podSpec: &core.PodSpec{
-				InitContainers: []core.Container{{
-					Name: containerName,
-					SecurityContext: &core.SecurityContext{
-						WindowsOptions: &core.WindowsSecurityContextOptions{
-							HostProcess: &trueVar,
-						},
-					},
-				}},
-			},
-		},
-		{
 			name:            "Spec with feature enabled, pod-wide HostProcess=true, and HostNetwork unset should not validate",
 			expectError:     true,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -20942,7 +21076,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Spec with feature enabled, pod-wide HostProcess=ture, and HostNetwork set should validate",
 			expectError:     false,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -20959,7 +21092,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Spec with feature enabled, pod-wide HostProcess=ture, HostNetwork set, and containers setting HostProcess=true should validate",
 			expectError:     false,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -20989,7 +21121,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Spec with feature enabled, pod-wide HostProcess=nil, HostNetwork set, and all containers setting HostProcess=true should validate",
 			expectError:     false,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -21016,7 +21147,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Pods with feature enabled, some containers setting HostProcess=true, and others setting HostProcess=false should not validate",
 			expectError:     true,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -21043,7 +21173,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Spec with feature enabled, some containers setting HostProcess=true, and other leaving HostProcess unset should not validate",
 			expectError:     true,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -21065,7 +21194,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Spec with feature enabled, pod-wide HostProcess=true, some containers setting HostProcess=true, and init containers setting HostProcess=false should not validate",
 			expectError:     true,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -21095,7 +21223,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Spec with feature enabled, pod-wide HostProcess=true, some containers setting HostProcess=true, and others setting HostProcess=false should not validate",
 			expectError:     true,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -21126,7 +21253,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Spec with feature enabled, pod-wide HostProcess=true, some containers setting HostProcess=true, and others leaving HostProcess=nil should validate",
 			expectError:     false,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -21151,7 +21277,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Spec with feature enabled, pod-wide HostProcess=false, some contaienrs setting HostProccess=true should not validate",
 			expectError:     true,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -21176,7 +21301,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Pod's HostProcess set to true but all containers override to false should not validate",
 			expectError:     true,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -21198,7 +21322,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Valid HostProcess pod should spec should not validate if allowPrivileged is not set",
 			expectError:     true,
-			featureEnabled:  true,
 			allowPrivileged: false,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -21217,7 +21340,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Non-HostProcess ephemeral container in HostProcess pod should not validate",
 			expectError:     true,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -21243,7 +21365,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "HostProcess ephemeral container in HostProcess pod should validate",
 			expectError:     false,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				SecurityContext: &core.PodSecurityContext{
@@ -21263,7 +21384,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "Non-HostProcess ephemeral container in Non-HostProcess pod should validate",
 			expectError:     false,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				Containers: []core.Container{{
@@ -21283,7 +21403,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 		{
 			name:            "HostProcess ephemeral container in Non-HostProcess pod should not validate",
 			expectError:     true,
-			featureEnabled:  true,
 			allowPrivileged: true,
 			podSpec: &core.PodSpec{
 				Containers: []core.Container{{
@@ -21304,15 +21423,12 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostProcessContainers, testCase.featureEnabled)()
-
-			opts := PodValidationOptions{AllowWindowsHostProcessField: testCase.featureEnabled}
 
 			capabilities.SetForTests(capabilities.Capabilities{
 				AllowPrivileged: testCase.allowPrivileged,
 			})
 
-			errs := validateWindowsHostProcessPod(testCase.podSpec, field.NewPath("spec"), opts)
+			errs := validateWindowsHostProcessPod(testCase.podSpec, field.NewPath("spec"))
 			if testCase.expectError && len(errs) == 0 {
 				t.Errorf("Unexpected success")
 			}

@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,10 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/kubernetes/pkg/features"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	rctest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
@@ -38,6 +36,7 @@ import (
 
 // TestCreatePodSandbox tests creating sandbox and its corresponding pod log directory.
 func TestCreatePodSandbox(t *testing.T) {
+	ctx := context.Background()
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 	pod := newTestPod()
@@ -49,10 +48,10 @@ func TestCreatePodSandbox(t *testing.T) {
 		assert.Equal(t, os.FileMode(0755), perm)
 		return nil
 	}
-	id, _, err := m.createPodSandbox(pod, 1)
+	id, _, err := m.createPodSandbox(ctx, pod, 1)
 	assert.NoError(t, err)
 	assert.Contains(t, fakeRuntime.Called, "RunPodSandbox")
-	sandboxes, err := fakeRuntime.ListPodSandbox(&runtimeapi.PodSandboxFilter{Id: id})
+	sandboxes, err := fakeRuntime.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{Id: id})
 	assert.NoError(t, err)
 	assert.Equal(t, len(sandboxes), 1)
 	// TODO Check pod sandbox configuration
@@ -103,6 +102,7 @@ func TestGeneratePodSandboxLinuxConfigSeccomp(t *testing.T) {
 
 // TestCreatePodSandbox_RuntimeClass tests creating sandbox with RuntimeClasses enabled.
 func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
+	ctx := context.Background()
 	rcm := runtimeclass.NewManager(rctest.NewPopulatedClient())
 	defer rctest.StartManagerSync(rcm)()
 
@@ -125,7 +125,7 @@ func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
 			pod := newTestPod()
 			pod.Spec.RuntimeClassName = test.rcn
 
-			id, _, err := m.createPodSandbox(pod, 1)
+			id, _, err := m.createPodSandbox(ctx, pod, 1)
 			if test.expectError {
 				assert.Error(t, err)
 			} else {
@@ -182,15 +182,13 @@ func TestGeneratePodSandboxWindowsConfig(t *testing.T) {
 	falseVar := false
 
 	testCases := []struct {
-		name                      string
-		hostProcessFeatureEnabled bool
-		podSpec                   *v1.PodSpec
-		expectedWindowsConfig     *runtimeapi.WindowsPodSandboxConfig
-		expectedError             error
+		name                  string
+		podSpec               *v1.PodSpec
+		expectedWindowsConfig *runtimeapi.WindowsPodSandboxConfig
+		expectedError         error
 	}{
 		{
-			name:                      "Empty PodSecurityContext",
-			hostProcessFeatureEnabled: false,
+			name: "Empty PodSecurityContext",
 			podSpec: &v1.PodSpec{
 				Containers: []v1.Container{{
 					Name: containerName,
@@ -202,8 +200,7 @@ func TestGeneratePodSandboxWindowsConfig(t *testing.T) {
 			expectedError: nil,
 		},
 		{
-			name:                      "GMSACredentialSpec in PodSecurityContext",
-			hostProcessFeatureEnabled: false,
+			name: "GMSACredentialSpec in PodSecurityContext",
 			podSpec: &v1.PodSpec{
 				SecurityContext: &v1.PodSecurityContext{
 					WindowsOptions: &v1.WindowsSecurityContextOptions{
@@ -222,8 +219,7 @@ func TestGeneratePodSandboxWindowsConfig(t *testing.T) {
 			expectedError: nil,
 		},
 		{
-			name:                      "RunAsUserName in PodSecurityContext",
-			hostProcessFeatureEnabled: false,
+			name: "RunAsUserName in PodSecurityContext",
 			podSpec: &v1.PodSpec{
 				SecurityContext: &v1.PodSecurityContext{
 					WindowsOptions: &v1.WindowsSecurityContextOptions{
@@ -242,24 +238,7 @@ func TestGeneratePodSandboxWindowsConfig(t *testing.T) {
 			expectedError: nil,
 		},
 		{
-			name:                      "Pod with HostProcess containers and feature gate disabled",
-			hostProcessFeatureEnabled: false,
-			podSpec: &v1.PodSpec{
-				SecurityContext: &v1.PodSecurityContext{
-					WindowsOptions: &v1.WindowsSecurityContextOptions{
-						HostProcess: &trueVar,
-					},
-				},
-				Containers: []v1.Container{{
-					Name: containerName,
-				}},
-			},
-			expectedWindowsConfig: nil,
-			expectedError:         fmt.Errorf("pod contains HostProcess containers but feature 'WindowsHostProcessContainers' is not enabled"),
-		},
-		{
-			name:                      "Pod with HostProcess containers and non-HostProcess containers",
-			hostProcessFeatureEnabled: true,
+			name: "Pod with HostProcess containers and non-HostProcess containers",
 			podSpec: &v1.PodSpec{
 				SecurityContext: &v1.PodSecurityContext{
 					WindowsOptions: &v1.WindowsSecurityContextOptions{
@@ -281,8 +260,7 @@ func TestGeneratePodSandboxWindowsConfig(t *testing.T) {
 			expectedError:         fmt.Errorf("pod must not contain both HostProcess and non-HostProcess containers"),
 		},
 		{
-			name:                      "Pod with HostProcess containers and HostNetwork not set",
-			hostProcessFeatureEnabled: true,
+			name: "Pod with HostProcess containers and HostNetwork not set",
 			podSpec: &v1.PodSpec{
 				SecurityContext: &v1.PodSecurityContext{
 					WindowsOptions: &v1.WindowsSecurityContextOptions{
@@ -297,8 +275,7 @@ func TestGeneratePodSandboxWindowsConfig(t *testing.T) {
 			expectedError:         fmt.Errorf("hostNetwork is required if Pod contains HostProcess containers"),
 		},
 		{
-			name:                      "Pod with HostProcess containers and HostNetwork set",
-			hostProcessFeatureEnabled: true,
+			name: "Pod with HostProcess containers and HostNetwork set",
 			podSpec: &v1.PodSpec{
 				HostNetwork: true,
 				SecurityContext: &v1.PodSecurityContext{
@@ -318,8 +295,7 @@ func TestGeneratePodSandboxWindowsConfig(t *testing.T) {
 			expectedError: nil,
 		},
 		{
-			name:                      "Pod's WindowsOptions.HostProcess set to false and pod has HostProcess containers",
-			hostProcessFeatureEnabled: true,
+			name: "Pod's WindowsOptions.HostProcess set to false and pod has HostProcess containers",
 			podSpec: &v1.PodSpec{
 				HostNetwork: true,
 				SecurityContext: &v1.PodSecurityContext{
@@ -340,8 +316,7 @@ func TestGeneratePodSandboxWindowsConfig(t *testing.T) {
 			expectedError:         fmt.Errorf("pod must not contain any HostProcess containers if Pod's WindowsOptions.HostProcess is set to false"),
 		},
 		{
-			name:                      "Pod's security context doesn't specify HostProcess containers but Container's security context does",
-			hostProcessFeatureEnabled: true,
+			name: "Pod's security context doesn't specify HostProcess containers but Container's security context does",
 			podSpec: &v1.PodSpec{
 				HostNetwork: true,
 				Containers: []v1.Container{{
@@ -364,7 +339,6 @@ func TestGeneratePodSandboxWindowsConfig(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostProcessContainers, testCase.hostProcessFeatureEnabled)()
 			pod := &v1.Pod{}
 			pod.Spec = *testCase.podSpec
 

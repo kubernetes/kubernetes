@@ -1866,7 +1866,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if s := p.AddPod(ctx, cs, tt.preemptor, framework.NewPodInfo(tt.addedPod), nodeInfo); !s.IsSuccess() {
+			if s := p.AddPod(ctx, cs, tt.preemptor, mustNewPodInfo(t, tt.addedPod), nodeInfo); !s.IsSuccess() {
 				t.Fatal(s.AsError())
 			}
 			state, err := getPreFilterState(cs)
@@ -2188,7 +2188,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if s := p.RemovePod(ctx, cs, tt.preemptor, framework.NewPodInfo(deletedPod), nodeInfo); !s.IsSuccess() {
+			if s := p.RemovePod(ctx, cs, tt.preemptor, mustNewPodInfo(t, deletedPod), nodeInfo); !s.IsSuccess() {
 				t.Fatal(s.AsError())
 			}
 
@@ -3227,4 +3227,12 @@ func TestPreFilterDisabled(t *testing.T) {
 	if !reflect.DeepEqual(gotStatus, wantStatus) {
 		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
 	}
+}
+
+func mustNewPodInfo(t *testing.T, pod *v1.Pod) *framework.PodInfo {
+	podInfo, err := framework.NewPodInfo(pod)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return podInfo
 }

@@ -114,7 +114,7 @@ func NewDefaultComponentConfig() (*ccmconfig.CloudControllerManagerConfiguration
 	return internal, nil
 }
 
-// Flags returns flags for a specific APIServer by section name
+// Flags returns flags for a specific CloudController by section name
 func (o *CloudControllerManagerOptions) Flags(allControllers, disabledByDefaultControllers []string) cliflag.NamedFlagSets {
 	fss := cliflag.NamedFlagSets{}
 	o.Generic.AddFlags(&fss, allControllers, disabledByDefaultControllers)
@@ -138,6 +138,20 @@ func (o *CloudControllerManagerOptions) Flags(allControllers, disabledByDefaultC
 // ApplyTo fills up cloud controller manager config with options.
 func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent string) error {
 	var err error
+
+	// Build kubeconfig first to so that if it fails, it doesn't cause leaking
+	// goroutines (started from initializing secure serving - which underneath
+	// creates a queue which in its constructor starts a goroutine).
+	c.Kubeconfig, err = clientcmd.BuildConfigFromFlags(o.Master, o.Kubeconfig)
+	if err != nil {
+		return err
+	}
+	c.Kubeconfig.DisableCompression = true
+	c.Kubeconfig.ContentConfig.AcceptContentTypes = o.Generic.ClientConnection.AcceptContentTypes
+	c.Kubeconfig.ContentConfig.ContentType = o.Generic.ClientConnection.ContentType
+	c.Kubeconfig.QPS = o.Generic.ClientConnection.QPS
+	c.Kubeconfig.Burst = int(o.Generic.ClientConnection.Burst)
+
 	if err = o.Generic.ApplyTo(&c.ComponentConfig.Generic); err != nil {
 		return err
 	}
@@ -158,16 +172,6 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent stri
 			return err
 		}
 	}
-
-	c.Kubeconfig, err = clientcmd.BuildConfigFromFlags(o.Master, o.Kubeconfig)
-	if err != nil {
-		return err
-	}
-	c.Kubeconfig.DisableCompression = true
-	c.Kubeconfig.ContentConfig.AcceptContentTypes = o.Generic.ClientConnection.AcceptContentTypes
-	c.Kubeconfig.ContentConfig.ContentType = o.Generic.ClientConnection.ContentType
-	c.Kubeconfig.QPS = o.Generic.ClientConnection.QPS
-	c.Kubeconfig.Burst = int(o.Generic.ClientConnection.Burst)
 
 	c.Client, err = clientset.NewForConfig(restclient.AddUserAgent(c.Kubeconfig, userAgent))
 	if err != nil {

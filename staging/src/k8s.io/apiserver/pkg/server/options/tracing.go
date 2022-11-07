@@ -101,11 +101,12 @@ func (o *TracingOptions) ApplyTo(es *egressselector.EgressSelector, c *server.Co
 		if err != nil {
 			return err
 		}
-
-		otelDialer := func(ctx context.Context, addr string) (net.Conn, error) {
-			return egressDialer(ctx, "tcp", addr)
+		if egressDialer != nil {
+			otelDialer := func(ctx context.Context, addr string) (net.Conn, error) {
+				return egressDialer(ctx, "tcp", addr)
+			}
+			opts = append(opts, otlptracegrpc.WithDialOption(grpc.WithContextDialer(otelDialer)))
 		}
-		opts = append(opts, otlptracegrpc.WithDialOption(grpc.WithContextDialer(otelDialer)))
 	}
 
 	resourceOpts := []resource.Option{

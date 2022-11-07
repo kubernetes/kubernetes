@@ -41,11 +41,11 @@ func Logf(format string, args ...interface{}) {
 	log("INFO", format, args...)
 }
 
-// Failf logs the fail info, including a stack trace starts at 2 levels above its caller
-// (for example, for call chain f -> g -> Failf("foo", ...) error would be logged for "f").
+// Failf logs the fail info, including a stack trace starts with its direct caller
+// (for example, for call chain f -> g -> Failf("foo", ...) error would be logged for "g").
 func Failf(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	skip := 2
+	skip := 1
 	log("FAIL", "%s\n\nFull Stack Trace\n%s", msg, PrunedStack(skip))
 	fail(nowStamp()+": "+msg, skip)
 	panic("unreachable")
@@ -126,7 +126,7 @@ var codeFilterRE = regexp.MustCompile(`/github.com/onsi/ginkgo/v2/`)
 func PrunedStack(skip int) []byte {
 	fullStackTrace := debug.Stack()
 	stack := bytes.Split(fullStackTrace, []byte("\n"))
-	// Ensure that the even entries are the method names and the
+	// Ensure that the even entries are the method names and
 	// the odd entries the source code information.
 	if len(stack) > 0 && bytes.HasPrefix(stack[0], []byte("goroutine ")) {
 		// Ignore "goroutine 29 [running]:" line.

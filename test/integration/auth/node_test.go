@@ -33,11 +33,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/utils/pointer"
 )
@@ -51,9 +48,6 @@ func TestNodeAuthorizer(t *testing.T) {
 		tokenNode1       = "node1-token"
 		tokenNode2       = "node2-token"
 	)
-
-	// Enable DynamicKubeletConfig feature so that Node.Spec.ConfigSource can be set
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicKubeletConfig, true)()
 
 	tokenFile, err := os.CreateTemp("", "kubeconfig")
 	if err != nil {
@@ -106,9 +100,6 @@ func TestNodeAuthorizer(t *testing.T) {
 	if _, err := superuserClient.CoreV1().ConfigMaps("ns").Create(context.TODO(), &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "myconfigmap"}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := superuserClient.CoreV1().ConfigMaps("ns").Create(context.TODO(), &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "myconfigmapconfigsource"}}, metav1.CreateOptions{}); err != nil {
-		t.Fatal(err)
-	}
 	pvName := "mypv"
 	if _, err := superuserClientExternal.StorageV1().VolumeAttachments().Create(context.TODO(), &storagev1.VolumeAttachment{
 		ObjectMeta: metav1.ObjectMeta{Name: "myattachment"},
@@ -157,12 +148,6 @@ func TestNodeAuthorizer(t *testing.T) {
 	getConfigMap := func(client clientset.Interface) func() error {
 		return func() error {
 			_, err := client.CoreV1().ConfigMaps("ns").Get(context.TODO(), "myconfigmap", metav1.GetOptions{})
-			return err
-		}
-	}
-	getConfigMapConfigSource := func(client clientset.Interface) func() error {
-		return func() error {
-			_, err := client.CoreV1().ConfigMaps("ns").Get(context.TODO(), "myconfigmapconfigsource", metav1.GetOptions{})
 			return err
 		}
 	}
@@ -257,34 +242,6 @@ func TestNodeAuthorizer(t *testing.T) {
 	createNode2 := func(client clientset.Interface) func() error {
 		return func() error {
 			_, err := client.CoreV1().Nodes().Create(context.TODO(), &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node2"}}, metav1.CreateOptions{})
-			return err
-		}
-	}
-	setNode2ConfigSource := func(client clientset.Interface) func() error {
-		return func() error {
-			node2, err := client.CoreV1().Nodes().Get(context.TODO(), "node2", metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			node2.Spec.ConfigSource = &corev1.NodeConfigSource{
-				ConfigMap: &corev1.ConfigMapNodeConfigSource{
-					Namespace:        "ns",
-					Name:             "myconfigmapconfigsource",
-					KubeletConfigKey: "kubelet",
-				},
-			}
-			_, err = client.CoreV1().Nodes().Update(context.TODO(), node2, metav1.UpdateOptions{})
-			return err
-		}
-	}
-	unsetNode2ConfigSource := func(client clientset.Interface) func() error {
-		return func() error {
-			node2, err := client.CoreV1().Nodes().Get(context.TODO(), "node2", metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			node2.Spec.ConfigSource = nil
-			_, err = client.CoreV1().Nodes().Update(context.TODO(), node2, metav1.UpdateOptions{})
 			return err
 		}
 	}
@@ -578,20 +535,6 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	// create node2 again
 	expectAllowed(t, createNode2(node2Client))
-	// node2 can not set its own config source
-	expectForbidden(t, setNode2ConfigSource(node2Client))
-	// node2 can not access the configmap config source yet
-	expectForbidden(t, getConfigMapConfigSource(node2Client))
-	// superuser can access the configmap config source
-	expectAllowed(t, getConfigMapConfigSource(superuserClient))
-	// superuser can set node2's config source
-	expectAllowed(t, setNode2ConfigSource(superuserClient))
-	// node2 can now get the configmap assigned as its config source
-	expectAllowed(t, getConfigMapConfigSource(node2Client))
-	// superuser can unset node2's config source
-	expectAllowed(t, unsetNode2ConfigSource(superuserClient))
-	// node2 can no longer get the configmap after it is unassigned as its config source
-	expectForbidden(t, getConfigMapConfigSource(node2Client))
 	// clean up node2
 	expectAllowed(t, deleteNode2(superuserClient))
 

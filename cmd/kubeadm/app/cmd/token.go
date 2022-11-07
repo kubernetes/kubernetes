@@ -190,7 +190,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		`),
 		RunE: func(tokenCmd *cobra.Command, args []string) error {
 			if len(args) < 1 {
-				return errors.Errorf("missing subcommand; 'token delete' is missing token of form %q", bootstrapapi.BootstrapTokenIDPattern)
+				return errors.Errorf("missing argument; 'token delete' is missing token of form %q or %q", bootstrapapi.BootstrapTokenPattern, bootstrapapi.BootstrapTokenIDPattern)
 			}
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 			client, err := cmdutil.GetClientSet(kubeConfigFile, dryRun)
@@ -416,7 +416,7 @@ func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens
 			bts, err := bootstraptokenv1.NewBootstrapTokenString(tokenIDOrToken)
 			if err != nil {
 				return errors.Errorf("given token didn't match pattern %q or %q",
-					bootstrapapi.BootstrapTokenIDPattern, bootstrapapi.BootstrapTokenIDPattern)
+					bootstrapapi.BootstrapTokenPattern, bootstrapapi.BootstrapTokenIDPattern)
 			}
 			tokenID = bts.ID
 		}

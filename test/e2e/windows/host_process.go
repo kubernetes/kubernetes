@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -520,6 +521,8 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 
 		ginkgo.By("Scheduling a pod with a HostProcess init container that will fail")
 
+		badUserName := "bad-user-name"
+
 		podName := "host-process-metrics-pod-failing-init-container"
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -535,6 +538,11 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 				HostNetwork: true,
 				InitContainers: []v1.Container{
 					{
+						SecurityContext: &v1.SecurityContext{
+							WindowsOptions: &v1.WindowsSecurityContextOptions{
+								RunAsUserName: &badUserName,
+							},
+						},
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Name:    "failing-init-container",
 						Command: []string{"foobar.exe"},
@@ -571,6 +579,11 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 				HostNetwork: true,
 				Containers: []v1.Container{
 					{
+						SecurityContext: &v1.SecurityContext{
+							WindowsOptions: &v1.WindowsSecurityContextOptions{
+								RunAsUserName: &badUserName,
+							},
+						},
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Name:    "failing-container",
 						Command: []string{"foobar.exe"},
@@ -598,6 +611,253 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		gomega.Expect(beforeMetrics.StartedContainersErrorCount).To(gomega.BeNumerically("<", afterMetrics.StartedContainersErrorCount), "Count of started HostProcess errors containers should increase")
 		gomega.Expect(beforeMetrics.StartedInitContainersCount).To(gomega.BeNumerically("<", afterMetrics.StartedInitContainersCount), "Count of started HostProcess init containers should increase")
 		gomega.Expect(beforeMetrics.StartedInitContainersErrorCount).To(gomega.BeNumerically("<", afterMetrics.StartedInitContainersErrorCount), "Count of started HostProcess errors init containers should increase")
+	})
+
+	ginkgo.It("container stats validation", func() {
+		ginkgo.By("selecting a Windows node")
+		targetNode, err := findWindowsNode(f)
+		framework.ExpectNoError(err, "Error finding Windows node")
+		framework.Logf("Using node: %v", targetNode.Name)
+
+		ginkgo.By("schedule a pod with a HostProcess container")
+		image := imageutils.GetConfig(imageutils.BusyBox)
+		podName := "host-process-stats-pod"
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: podName,
+			},
+			Spec: v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess:   &trueVar,
+						RunAsUserName: &User_NTAuthorityLocalService,
+					},
+				},
+				HostNetwork: true,
+				Containers: []v1.Container{
+					{
+						Image:   image.GetE2EImage(),
+						Name:    "host-process-stats",
+						Command: []string{"powershell.exe", "-Command", "Write-Host 'Hello'; sleep -Seconds 600"},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+				NodeName:      targetNode.Name,
+			},
+		}
+
+		e2epod.NewPodClient(f).Create(pod)
+
+		ginkgo.By("Waiting for the pod to start running")
+		timeout := 3 * time.Minute
+		e2epod.WaitForPodsRunningReady(f.ClientSet, f.Namespace.Name, 1, 0, timeout, make(map[string]string))
+
+		ginkgo.By("Getting container stats for pod")
+		nodeStats, err := e2ekubelet.GetStatsSummary(f.ClientSet, targetNode.Name)
+		framework.ExpectNoError(err, "Error getting node stats")
+
+		statsChecked := false
+		for _, podStats := range nodeStats.Pods {
+
+			if podStats.PodRef.Namespace != f.Namespace.Name {
+				continue
+			}
+
+			// check various pod stats
+			if *podStats.CPU.UsageCoreNanoSeconds <= 0 {
+				framework.Failf("Pod %s/%s stats report cpu usage equal to %v but should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.CPU.UsageCoreNanoSeconds)
+			}
+			if *podStats.Memory.WorkingSetBytes <= 0 {
+				framework.Failf("Pod %s/%s stats report memory usage equal to %v but should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.CPU.UsageCoreNanoSeconds)
+			}
+
+			for _, containerStats := range podStats.Containers {
+				statsChecked = true
+
+				// check various container stats
+				if *containerStats.CPU.UsageCoreNanoSeconds <= 0 {
+					framework.Failf("Container %s stats report cpu usage equal to %v but should be greater than 0", containerStats.Name, *containerStats.CPU.UsageCoreNanoSeconds)
+				}
+				if *containerStats.Memory.WorkingSetBytes <= 0 {
+					framework.Failf("Container %s stats report memory usage equal to %v but should be greater than 0", containerStats.Name, *containerStats.Memory.WorkingSetBytes)
+				}
+				if *containerStats.Logs.UsedBytes <= 0 {
+					framework.Failf("Container %s stats log usage equal to %v but should be greater than 0", containerStats.Name, *containerStats.Logs.UsedBytes)
+				}
+			}
+		}
+
+		if !statsChecked {
+			framework.Failf("Failed to get stats for pod %s/%s", f.Namespace.Name, podName)
+		}
+	})
+
+	ginkgo.It("should support querying api-server using in-cluster config", func() {
+		// This functionality is only support on containerd  v1.7+
+		ginkgo.By("Ensuring Windows nodes are running containerd v1.7+")
+		windowsNode, err := findWindowsNode(f)
+		framework.ExpectNoError(err, "error finding Windows node")
+		r, v, err := getNodeContainerRuntimeAndVersion(windowsNode)
+		framework.ExpectNoError(err, "error getting node container runtime and version")
+		framework.Logf("Got runtime: %s, version %v for node %s", r, v, windowsNode.Name)
+
+		if !strings.EqualFold(r, "containerd") {
+			e2eskipper.Skipf("container runtime is not containerd")
+		}
+
+		v1dot7 := semver.MustParse("1.7.0")
+		if v.LT(v1dot7) {
+			e2eskipper.Skipf("container runtime is < 1.7.0")
+		}
+
+		ginkgo.By("Scheduling a pod that runs agnhost inclusterclient")
+		podName := "host-process-agnhost-icc"
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: podName,
+			},
+			Spec: v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess:   &trueVar,
+						RunAsUserName: &User_NTAuthoritySystem,
+					},
+				},
+				HostNetwork: true,
+				Containers: []v1.Container{
+					{
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Name:  "hpc-agnhost",
+						// TODO: Figure out why we need to copy agnhost as agnhost.exe here
+						// Possibly related to https://github.com/microsoft/hcsshim/issues/1128 and
+						// https://github.com/microsoft/hcsshim/pull/1174 updating PATHEXT here doesn't
+						// seem address the issue.
+						Command: []string{"cmd", "/C", "copy", "c:\\hpc\\agnhost", "c:\\hpc\\agnhost.exe", "&&", "c:\\hpc\\agnhost.exe", "inclusterclient"},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+				NodeSelector: map[string]string{
+					"kubernetes.io/os": "windows",
+				},
+			},
+		}
+
+		pc := e2epod.NewPodClient(f)
+		pc.Create(pod)
+
+		ginkgo.By("Waiting for pod to run")
+		e2epod.WaitForPodsRunningReady(f.ClientSet, f.Namespace.Name, 1, 0, 3*time.Minute, make(map[string]string))
+
+		ginkgo.By("Waiting for 60 seconds")
+		// We wait an additional 60 seconds after the pod is Running because the
+		// `InClusterClient` app in the agnhost image waits 30 seconds before
+		// starting to make queries - https://github.com/kubernetes/kubernetes/blob/ceee3783ed963497db669504241af2ca6a11610f/test/images/agnhost/inclusterclient/main.go#L51
+		time.Sleep(60 * time.Second)
+
+		ginkgo.By("Ensuring the test app was able to successfully query the api-server")
+		logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, "hpc-agnhost")
+		framework.ExpectNoError(err, "Error getting pod logs")
+
+		framework.Logf("Logs: %s\n", logs)
+
+		framework.ExpectEqual(
+			strings.Contains(logs, "calling /healthz"),
+			true,
+			"app logs should contain 'calling /healthz'")
+
+		framework.ExpectEqual(
+			strings.Contains(logs, "status=failed"),
+			false,
+			"app logs should not contain 'status=failed")
+	})
+
+	ginkgo.It("should run as localgroup accounts", func() {
+		// This functionality is only supported on containerd v1.7+
+		ginkgo.By("Ensuring Windows nodes are running containerd v1.7+")
+		windowsNode, err := findWindowsNode(f)
+		framework.ExpectNoError(err, "error finding Windows node")
+		r, v, err := getNodeContainerRuntimeAndVersion(windowsNode)
+		framework.ExpectNoError(err, "error getting node container runtime and version")
+		framework.Logf("Got runtime: %s, version %v for node %s", r, v, windowsNode.Name)
+
+		if !strings.EqualFold(r, "containerd") {
+			e2eskipper.Skipf("container runtime is not containerd")
+		}
+
+		v1dot7 := semver.MustParse("1.7.0")
+		if v.LT(v1dot7) {
+			e2eskipper.Skipf("container runtime is < 1.7.0")
+		}
+
+		ginkgo.By("Scheduling a pod that creates a localgroup from an init container then starts a container using that group")
+		localGroupName := getRandomUserGrounName()
+		podName := "host-process-localgroup-pod"
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: podName,
+			},
+			Spec: v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess:   &trueVar,
+						RunAsUserName: &User_NTAuthoritySystem,
+					},
+				},
+				HostNetwork: true,
+				InitContainers: []v1.Container{
+					{
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Name:    "setup",
+						Command: []string{"cmd", "/C", "net", "localgroup", localGroupName, "/add"},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Name:    "localgroup-container",
+						Command: []string{"cmd", "/C", "whoami"},
+						SecurityContext: &v1.SecurityContext{
+							WindowsOptions: &v1.WindowsSecurityContextOptions{
+								RunAsUserName: &localGroupName,
+							},
+						},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+				NodeSelector: map[string]string{
+					"kubernetes.io/os": "windows",
+				},
+			},
+		}
+
+		e2epod.NewPodClient(f).Create(pod)
+
+		ginkgo.By("Waiting for pod to run")
+		e2epod.NewPodClient(f).WaitForFinish(podName, 3*time.Minute)
+
+		ginkgo.By("Then ensuring pod finished running successfully")
+		p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(
+			context.TODO(),
+			podName,
+			metav1.GetOptions{})
+
+		framework.ExpectNoError(err, "error retrieving pod")
+		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
+
+		// whoami will output %COMPUTER_NAME%/{randomly generated username} here.
+		// It is sufficient to just check that the logs do not container `nt authority`
+		// because all of the 'built-in' accounts that can be used with HostProcess
+		// are prefixed with this.
+		ginkgo.By("Then ensuring pod was not running as a system account")
+		logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, "localgroup-container")
+		framework.ExpectNoError(err, "error retrieving container logs")
+		framework.Logf("Pod logs: %s", logs)
+		framework.ExpectEqual(
+			strings.Contains(
+				strings.ToLower(logs),
+				"nt authority"),
+			false,
+			"Container runs 'whoami' and logs should not contain 'nt authority'")
 	})
 
 })

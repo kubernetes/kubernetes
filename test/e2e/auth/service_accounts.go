@@ -800,7 +800,14 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		framework.Logf("Reconciled root ca configmap in namespace %q", f.Namespace.Name)
 	})
 
-	ginkgo.It("should update a ServiceAccount", func() {
+	/*
+		Release: v1.26
+		Testname: ServiceAccount, update a ServiceAccount
+		Description: A ServiceAccount is created which MUST succeed. When
+		updating the ServiceAccount it MUST succeed and the field MUST equal
+		the new value.
+	*/
+	framework.ConformanceIt("should update a ServiceAccount", func() {
 		saClient := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name)
 		saName := "e2e-sa-" + utilrand.String(5)
 

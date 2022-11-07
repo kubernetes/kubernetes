@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/util/webhook"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
@@ -1038,7 +1039,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 							celContext.TotalCost.ObserveExpressionCost(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), expressionCost)
 						}
 						if cr.Error != nil {
-							if cr.Error.Type == cel.ErrorTypeRequired {
+							if cr.Error.Type == apiservercel.ErrorTypeRequired {
 								allErrs.CELErrors = append(allErrs.CELErrors, field.Required(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), cr.Error.Detail))
 							} else {
 								allErrs.CELErrors = append(allErrs.CELErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), schema.XValidations[i], cr.Error.Detail))

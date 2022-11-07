@@ -47,7 +47,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -114,8 +113,6 @@ type DaemonSetsController struct {
 	historyStoreSynced cache.InformerSynced
 	// podLister get list/get pods from the shared informers's store
 	podLister corelisters.PodLister
-	// podNodeIndex indexes pods by their nodeName
-	podNodeIndex cache.Indexer
 	// podStoreSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	podStoreSynced cache.InformerSynced
@@ -142,11 +139,6 @@ func NewDaemonSetsController(
 ) (*DaemonSetsController, error) {
 	eventBroadcaster := record.NewBroadcaster()
 
-	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("daemon_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
-			return nil, err
-		}
-	}
 	dsc := &DaemonSetsController{
 		kubeClient:       kubeClient,
 		eventBroadcaster: eventBroadcaster,
@@ -187,12 +179,6 @@ func NewDaemonSetsController(
 		DeleteFunc: dsc.deletePod,
 	})
 	dsc.podLister = podInformer.Lister()
-
-	// This custom indexer will index pods based on their NodeName which will decrease the amount of pods we need to get in simulate() call.
-	podInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
-		"nodeName": indexByPodNodeName,
-	})
-	dsc.podNodeIndex = podInformer.Informer().GetIndexer()
 	dsc.podStoreSynced = podInformer.Informer().HasSynced
 
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -209,18 +195,6 @@ func NewDaemonSetsController(
 	dsc.failedPodsBackoff = failedPodsBackoff
 
 	return dsc, nil
-}
-
-func indexByPodNodeName(obj interface{}) ([]string, error) {
-	pod, ok := obj.(*v1.Pod)
-	if !ok {
-		return []string{}, nil
-	}
-	// We are only interested in active pods with nodeName set
-	if len(pod.Spec.NodeName) == 0 || pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
-		return []string{}, nil
-	}
-	return []string{pod.Spec.NodeName}, nil
 }
 
 func (dsc *DaemonSetsController) addDaemonset(obj interface{}) {

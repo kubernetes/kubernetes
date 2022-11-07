@@ -18,6 +18,8 @@ import (
 	"encoding/json"
 
 	"github.com/go-openapi/swag"
+	"k8s.io/kube-openapi/pkg/internal"
+	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 )
 
 // OperationProps describes an operation
@@ -75,10 +77,32 @@ type Operation struct {
 
 // UnmarshalJSON hydrates this items instance with the data from JSON
 func (o *Operation) UnmarshalJSON(data []byte) error {
+	if internal.UseOptimizedJSONUnmarshaling {
+		return jsonv2.Unmarshal(data, o)
+	}
+
 	if err := json.Unmarshal(data, &o.OperationProps); err != nil {
 		return err
 	}
 	return json.Unmarshal(data, &o.VendorExtensible)
+}
+
+func (o *Operation) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+	type OperationPropsNoMethods OperationProps // strip MarshalJSON method
+	var x struct {
+		Extensions
+		OperationPropsNoMethods
+	}
+	if err := opts.UnmarshalNext(dec, &x); err != nil {
+		return err
+	}
+	x.Extensions.sanitize()
+	if len(x.Extensions) == 0 {
+		x.Extensions = nil
+	}
+	o.VendorExtensible.Extensions = x.Extensions
+	o.OperationProps = OperationProps(x.OperationPropsNoMethods)
+	return nil
 }
 
 // MarshalJSON converts this items object to JSON

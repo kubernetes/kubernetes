@@ -56,7 +56,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/legacyregistry"
-	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
@@ -138,9 +137,6 @@ func NewReplicaSetController(rsInformer appsinformers.ReplicaSetInformer, podInf
 // parameters so that it can also serve as the implementation of NewReplicationController.
 func NewBaseController(rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int,
 	gvk schema.GroupVersionKind, metricOwnerName, queueName string, podControl controller.PodControlInterface, eventBroadcaster record.EventBroadcaster) *ReplicaSetController {
-	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		ratelimiter.RegisterMetricAndTrackRateLimiterUsage(metricOwnerName, kubeClient.CoreV1().RESTClient().GetRateLimiter())
-	}
 
 	rsc := &ReplicaSetController{
 		GroupVersionKind: gvk,
@@ -235,10 +231,8 @@ func (rsc *ReplicaSetController) getReplicaSetsWithSameController(rs *apps.Repli
 		relatedRSs = append(relatedRSs, obj.(*apps.ReplicaSet))
 	}
 
-	// The if check is used to avoid the overhead for the KObjs call, see
-	// https://github.com/kubernetes/kubernetes/issues/106945.
 	if klogV := klog.V(2); klogV.Enabled() {
-		klogV.InfoS("Found related ReplicaSets", "replicaSet", klog.KObj(rs), "relatedReplicaSets", klog.KObjs(relatedRSs))
+		klogV.InfoS("Found related ReplicaSets", "replicaSet", klog.KObj(rs), "relatedReplicaSets", klog.KObjSlice(relatedRSs))
 	}
 
 	return relatedRSs
@@ -806,7 +800,7 @@ func (rsc *ReplicaSetController) getIndirectlyRelatedPods(rs *apps.ReplicaSet) (
 			relatedPods = append(relatedPods, pod)
 		}
 	}
-	klog.V(4).InfoS("Found related pods", "kind", rsc.Kind, "object", klog.KObj(rs), "pods", klog.KObjs(relatedPods))
+	klog.V(4).InfoS("Found related pods", "kind", rsc.Kind, "object", klog.KObj(rs), "pods", klog.KObjSlice(relatedPods))
 	return relatedPods, nil
 }
 

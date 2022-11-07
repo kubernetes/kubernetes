@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onsi/ginkgo/v2/formatter"
 	"github.com/onsi/ginkgo/v2/internal/interrupt_handler"
 	"github.com/onsi/ginkgo/v2/internal/parallel_support"
 	"github.com/onsi/ginkgo/v2/reporters"
@@ -35,12 +34,15 @@ type Suite struct {
 	outputInterceptor OutputInterceptor
 	interruptHandler  interrupt_handler.InterruptHandlerInterface
 	config            types.SuiteConfig
+	deadline          time.Time
 
 	skipAll              bool
 	report               types.Report
 	currentSpecReport    types.SpecReport
 	currentNode          Node
 	currentNodeStartTime time.Time
+
+	currentSpecContext *specContext
 
 	progressStepCursor ProgressStepCursor
 
@@ -97,6 +99,10 @@ func (suite *Suite) Run(description string, suiteLabels Labels, suitePath string
 	suite.outputInterceptor = outputInterceptor
 	suite.interruptHandler = interruptHandler
 	suite.config = suiteConfig
+
+	if suite.config.Timeout > 0 {
+		suite.deadline = time.Now().Add(suite.config.Timeout)
+	}
 
 	cancelProgressHandler := progressSignalRegistrar(suite.handleProgressSignal)
 
@@ -165,7 +171,7 @@ func (suite *Suite) PushNode(node Node) error {
 						err = types.GinkgoErrors.CaughtPanicDuringABuildPhase(e, node.CodeLocation)
 					}
 				}()
-				node.Body()
+				node.Body(nil)
 				return err
 			}()
 			suite.tree = parentTree
@@ -270,10 +276,14 @@ func (suite *Suite) generateProgressReport(fullReport bool) types.ProgressReport
 	suite.selectiveLock.Lock()
 	defer suite.selectiveLock.Unlock()
 
+	var additionalReports []string
+	if suite.currentSpecContext != nil {
+		additionalReports = suite.currentSpecContext.QueryProgressReporters()
+	}
 	stepCursor := suite.progressStepCursor
 
 	gwOutput := suite.currentSpecReport.CapturedGinkgoWriterOutput + string(suite.writer.Bytes())
-	pr, err := NewProgressReport(suite.isRunningInParallel(), suite.currentSpecReport, suite.currentNode, suite.currentNodeStartTime, stepCursor, gwOutput, suite.config.SourceRoots, fullReport)
+	pr, err := NewProgressReport(suite.isRunningInParallel(), suite.currentSpecReport, suite.currentNode, suite.currentNodeStartTime, stepCursor, gwOutput, additionalReports, suite.config.SourceRoots, fullReport)
 
 	if err != nil {
 		fmt.Printf("{{red}}Failed to generate progress report:{{/}}\n%s\n", err.Error())
@@ -283,7 +293,11 @@ func (suite *Suite) generateProgressReport(fullReport bool) types.ProgressReport
 
 func (suite *Suite) handleProgressSignal() {
 	report := suite.generateProgressReport(false)
+	report.Message = "{{bold}}You've requested a progress report:{{/}}"
+	suite.emitProgressReport(report)
+}
 
+func (suite *Suite) emitProgressReport(report types.ProgressReport) {
 	suite.selectiveLock.Lock()
 	suite.currentSpecReport.ProgressReports = append(suite.currentSpecReport.ProgressReports, report.WithoutCapturedGinkgoWriterOutput())
 	suite.selectiveLock.Unlock()
@@ -383,12 +397,16 @@ func (suite *Suite) runSpecs(description string, suiteLabels Labels, suitePath s
 	suite.runAfterSuiteCleanup(numSpecsThatWillBeRun)
 
 	interruptStatus := suite.interruptHandler.Status()
-	if interruptStatus.Interrupted {
+	if interruptStatus.Interrupted() {
 		suite.report.SpecialSuiteFailureReasons = append(suite.report.SpecialSuiteFailureReasons, interruptStatus.Cause.String())
 		suite.report.SuiteSucceeded = false
 	}
 	suite.report.EndTime = time.Now()
 	suite.report.RunTime = suite.report.EndTime.Sub(suite.report.StartTime)
+	if !suite.deadline.IsZero() && suite.report.EndTime.After(suite.deadline) {
+		suite.report.SpecialSuiteFailureReasons = append(suite.report.SpecialSuiteFailureReasons, "Suite Timeout Elapsed")
+		suite.report.SuiteSucceeded = false
+	}
 
 	if suite.config.ParallelProcess == 1 {
 		suite.runReportAfterSuite()
@@ -402,9 +420,8 @@ func (suite *Suite) runSpecs(description string, suiteLabels Labels, suitePath s
 }
 
 func (suite *Suite) runBeforeSuite(numSpecsThatWillBeRun int) {
-	interruptStatus := suite.interruptHandler.Status()
 	beforeSuiteNode := suite.suiteNodes.FirstNodeWithType(types.NodeTypeBeforeSuite | types.NodeTypeSynchronizedBeforeSuite)
-	if !beforeSuiteNode.IsZero() && !interruptStatus.Interrupted && numSpecsThatWillBeRun > 0 {
+	if !beforeSuiteNode.IsZero() && numSpecsThatWillBeRun > 0 {
 		suite.selectiveLock.Lock()
 		suite.currentSpecReport = types.SpecReport{
 			LeafNodeType:     beforeSuiteNode.NodeType,
@@ -414,7 +431,7 @@ func (suite *Suite) runBeforeSuite(numSpecsThatWillBeRun int) {
 		suite.selectiveLock.Unlock()
 
 		suite.reporter.WillRun(suite.currentSpecReport)
-		suite.runSuiteNode(beforeSuiteNode, interruptStatus.Channel)
+		suite.runSuiteNode(beforeSuiteNode)
 		if suite.currentSpecReport.State.Is(types.SpecStateSkipped) {
 			suite.report.SpecialSuiteFailureReasons = append(suite.report.SpecialSuiteFailureReasons, "Suite skipped in BeforeSuite")
 			suite.skipAll = true
@@ -435,7 +452,7 @@ func (suite *Suite) runAfterSuiteCleanup(numSpecsThatWillBeRun int) {
 		suite.selectiveLock.Unlock()
 
 		suite.reporter.WillRun(suite.currentSpecReport)
-		suite.runSuiteNode(afterSuiteNode, suite.interruptHandler.Status().Channel)
+		suite.runSuiteNode(afterSuiteNode)
 		suite.processCurrentSpecReport()
 	}
 
@@ -451,7 +468,7 @@ func (suite *Suite) runAfterSuiteCleanup(numSpecsThatWillBeRun int) {
 			suite.selectiveLock.Unlock()
 
 			suite.reporter.WillRun(suite.currentSpecReport)
-			suite.runSuiteNode(cleanupNode, suite.interruptHandler.Status().Channel)
+			suite.runSuiteNode(cleanupNode)
 			suite.processCurrentSpecReport()
 		}
 	}
@@ -490,16 +507,11 @@ func (suite *Suite) reportEach(spec Spec, nodeType types.NodeType) {
 		suite.writer.Truncate()
 		suite.outputInterceptor.StartInterceptingOutput()
 		report := suite.currentSpecReport
-		nodes[i].Body = func() {
+		nodes[i].Body = func(SpecContext) {
 			nodes[i].ReportEachBody(report)
 		}
-		suite.interruptHandler.SetInterruptPlaceholderMessage(formatter.Fiw(0, formatter.COLS,
-			"{{yellow}}Ginkgo received an interrupt signal but is currently running a %s node.  To avoid an invalid report the %s node will not be interrupted however subsequent tests will be skipped.{{/}}\n\n{{bold}}The running %s node is at:\n%s.{{/}}",
-			nodeType, nodeType, nodeType,
-			nodes[i].CodeLocation,
-		))
-		state, failure := suite.runNode(nodes[i], nil, spec.Nodes.BestTextFor(nodes[i]))
-		suite.interruptHandler.ClearInterruptPlaceholderMessage()
+		state, failure := suite.runNode(nodes[i], time.Time{}, spec.Nodes.BestTextFor(nodes[i]))
+
 		// If the spec is not in a failure state (i.e. it's Passed/Skipped/Pending) and the reporter has failed, override the state.
 		// Also, if the reporter is every aborted - always override the state to propagate the abort
 		if (!suite.currentSpecReport.State.Is(types.SpecStateFailureStates) && state.Is(types.SpecStateFailureStates)) || state.Is(types.SpecStateAborted) {
@@ -511,7 +523,7 @@ func (suite *Suite) reportEach(spec Spec, nodeType types.NodeType) {
 	}
 }
 
-func (suite *Suite) runSuiteNode(node Node, interruptChannel chan interface{}) {
+func (suite *Suite) runSuiteNode(node Node) {
 	if suite.config.DryRun {
 		suite.currentSpecReport.State = types.SpecStatePassed
 		return
@@ -524,13 +536,13 @@ func (suite *Suite) runSuiteNode(node Node, interruptChannel chan interface{}) {
 	var err error
 	switch node.NodeType {
 	case types.NodeTypeBeforeSuite, types.NodeTypeAfterSuite:
-		suite.currentSpecReport.State, suite.currentSpecReport.Failure = suite.runNode(node, interruptChannel, "")
+		suite.currentSpecReport.State, suite.currentSpecReport.Failure = suite.runNode(node, time.Time{}, "")
 	case types.NodeTypeCleanupAfterSuite:
 		if suite.config.ParallelTotal > 1 && suite.config.ParallelProcess == 1 {
 			err = suite.client.BlockUntilNonprimaryProcsHaveFinished()
 		}
 		if err == nil {
-			suite.currentSpecReport.State, suite.currentSpecReport.Failure = suite.runNode(node, interruptChannel, "")
+			suite.currentSpecReport.State, suite.currentSpecReport.Failure = suite.runNode(node, time.Time{}, "")
 		}
 	case types.NodeTypeSynchronizedBeforeSuite:
 		var data []byte
@@ -540,8 +552,9 @@ func (suite *Suite) runSuiteNode(node Node, interruptChannel chan interface{}) {
 				suite.outputInterceptor.StopInterceptingAndReturnOutput()
 				suite.outputInterceptor.StartInterceptingOutputAndForwardTo(suite.client)
 			}
-			node.Body = func() { data = node.SynchronizedBeforeSuiteProc1Body() }
-			suite.currentSpecReport.State, suite.currentSpecReport.Failure = suite.runNode(node, interruptChannel, "")
+			node.Body = func(c SpecContext) { data = node.SynchronizedBeforeSuiteProc1Body(c) }
+			node.HasContext = node.SynchronizedBeforeSuiteProc1BodyHasContext
+			suite.currentSpecReport.State, suite.currentSpecReport.Failure = suite.runNode(node, time.Time{}, "")
 			if suite.config.ParallelTotal > 1 {
 				suite.currentSpecReport.CapturedStdOutErr += suite.outputInterceptor.StopInterceptingAndReturnOutput()
 				suite.outputInterceptor.StartInterceptingOutput()
@@ -558,19 +571,21 @@ func (suite *Suite) runSuiteNode(node Node, interruptChannel chan interface{}) {
 			switch proc1State {
 			case types.SpecStatePassed:
 				runAllProcs = true
-			case types.SpecStateFailed, types.SpecStatePanicked:
+			case types.SpecStateFailed, types.SpecStatePanicked, types.SpecStateTimedout:
 				err = types.GinkgoErrors.SynchronizedBeforeSuiteFailedOnProc1()
 			case types.SpecStateInterrupted, types.SpecStateAborted, types.SpecStateSkipped:
 				suite.currentSpecReport.State = proc1State
 			}
 		}
 		if runAllProcs {
-			node.Body = func() { node.SynchronizedBeforeSuiteAllProcsBody(data) }
-			suite.currentSpecReport.State, suite.currentSpecReport.Failure = suite.runNode(node, interruptChannel, "")
+			node.Body = func(c SpecContext) { node.SynchronizedBeforeSuiteAllProcsBody(c, data) }
+			node.HasContext = node.SynchronizedBeforeSuiteAllProcsBodyHasContext
+			suite.currentSpecReport.State, suite.currentSpecReport.Failure = suite.runNode(node, time.Time{}, "")
 		}
 	case types.NodeTypeSynchronizedAfterSuite:
 		node.Body = node.SynchronizedAfterSuiteAllProcsBody
-		suite.currentSpecReport.State, suite.currentSpecReport.Failure = suite.runNode(node, interruptChannel, "")
+		node.HasContext = node.SynchronizedAfterSuiteAllProcsBodyHasContext
+		suite.currentSpecReport.State, suite.currentSpecReport.Failure = suite.runNode(node, time.Time{}, "")
 		if suite.config.ParallelProcess == 1 {
 			if suite.config.ParallelTotal > 1 {
 				err = suite.client.BlockUntilNonprimaryProcsHaveFinished()
@@ -582,7 +597,8 @@ func (suite *Suite) runSuiteNode(node Node, interruptChannel chan interface{}) {
 				}
 
 				node.Body = node.SynchronizedAfterSuiteProc1Body
-				state, failure := suite.runNode(node, interruptChannel, "")
+				node.HasContext = node.SynchronizedAfterSuiteProc1BodyHasContext
+				state, failure := suite.runNode(node, time.Time{}, "")
 				if suite.currentSpecReport.State.Is(types.SpecStatePassed) {
 					suite.currentSpecReport.State, suite.currentSpecReport.Failure = state, failure
 				}
@@ -616,13 +632,8 @@ func (suite *Suite) runReportAfterSuiteNode(node Node, report types.Report) {
 		report = report.Add(aggregatedReport)
 	}
 
-	node.Body = func() { node.ReportAfterSuiteBody(report) }
-	suite.interruptHandler.SetInterruptPlaceholderMessage(formatter.Fiw(0, formatter.COLS,
-		"{{yellow}}Ginkgo received an interrupt signal but is currently running a ReportAfterSuite node.  To avoid an invalid report the ReportAfterSuite node will not be interrupted.{{/}}\n\n{{bold}}The running ReportAfterSuite node is at:\n%s.{{/}}",
-		node.CodeLocation,
-	))
-	suite.currentSpecReport.State, suite.currentSpecReport.Failure = suite.runNode(node, nil, "")
-	suite.interruptHandler.ClearInterruptPlaceholderMessage()
+	node.Body = func(SpecContext) { node.ReportAfterSuiteBody(report) }
+	suite.currentSpecReport.State, suite.currentSpecReport.Failure = suite.runNode(node, time.Time{}, "")
 
 	suite.currentSpecReport.EndTime = time.Now()
 	suite.currentSpecReport.RunTime = suite.currentSpecReport.EndTime.Sub(suite.currentSpecReport.StartTime)
@@ -632,9 +643,20 @@ func (suite *Suite) runReportAfterSuiteNode(node Node, report types.Report) {
 	return
 }
 
-func (suite *Suite) runNode(node Node, interruptChannel chan interface{}, text string) (types.SpecState, types.Failure) {
+func (suite *Suite) runNode(node Node, specDeadline time.Time, text string) (types.SpecState, types.Failure) {
 	if node.NodeType.Is(types.NodeTypeCleanupAfterEach | types.NodeTypeCleanupAfterAll | types.NodeTypeCleanupAfterSuite) {
 		suite.cleanupNodes = suite.cleanupNodes.WithoutNode(node)
+	}
+
+	interruptStatus := suite.interruptHandler.Status()
+	if interruptStatus.Level == interrupt_handler.InterruptLevelBailOut {
+		return types.SpecStateSkipped, types.Failure{}
+	}
+	if interruptStatus.Level == interrupt_handler.InterruptLevelReportOnly && !node.NodeType.Is(types.NodeTypesAllowedDuringReportInterrupt) {
+		return types.SpecStateSkipped, types.Failure{}
+	}
+	if interruptStatus.Level == interrupt_handler.InterruptLevelCleanupAndReport && !node.NodeType.Is(types.NodeTypesAllowedDuringReportInterrupt|types.NodeTypesAllowedDuringCleanupInterrupt) {
+		return types.SpecStateSkipped, types.Failure{}
 	}
 
 	suite.selectiveLock.Lock()
@@ -666,6 +688,49 @@ func (suite *Suite) runNode(node Node, interruptChannel chan interface{}, text s
 	} else {
 		failure.FailureNodeContext, failure.FailureNodeContainerIndex = types.FailureNodeInContainer, node.NestingLevel-1
 	}
+	var outcome types.SpecState
+
+	gracePeriod := suite.config.GracePeriod
+	if node.GracePeriod >= 0 {
+		gracePeriod = node.GracePeriod
+	}
+
+	now := time.Now()
+	deadline := suite.deadline
+	if deadline.IsZero() || (!specDeadline.IsZero() && specDeadline.Before(deadline)) {
+		deadline = specDeadline
+	}
+	if node.NodeTimeout > 0 && (deadline.IsZero() || deadline.Sub(now) > node.NodeTimeout) {
+		deadline = now.Add(node.NodeTimeout)
+	}
+	if (!deadline.IsZero() && deadline.Before(now)) || interruptStatus.Interrupted() {
+		//we're out of time already.  let's wait for a NodeTimeout if we have it, or GracePeriod if we don't
+		if node.NodeTimeout > 0 {
+			deadline = now.Add(node.NodeTimeout)
+		} else {
+			deadline = now.Add(gracePeriod)
+		}
+	}
+
+	if !node.HasContext {
+		// this maps onto the pre-context behavior:
+		// - an interrupted node exits immediately.  with this, context-less nodes that are in a spec with a SpecTimeout and/or are interrupted by other means will simply exit immediately after the timeout/interrupt
+		// - clean up nodes have up to GracePeriod (formerly hard-coded at 30s) to complete before they are interrupted
+		gracePeriod = 0
+	}
+
+	sc := NewSpecContext(suite)
+	defer sc.cancel()
+
+	suite.selectiveLock.Lock()
+	suite.currentSpecContext = sc
+	suite.selectiveLock.Unlock()
+
+	var deadlineChannel <-chan time.Time
+	if !deadline.IsZero() {
+		deadlineChannel = time.After(deadline.Sub(now))
+	}
+	var gracePeriodChannel <-chan time.Time
 
 	outcomeC := make(chan types.SpecState)
 	failureC := make(chan types.Failure)
@@ -677,15 +742,16 @@ func (suite *Suite) runNode(node Node, interruptChannel chan interface{}, text s
 				suite.failer.Panic(types.NewCodeLocationWithStackTrace(2), e)
 			}
 
-			outcome, failureFromRun := suite.failer.Drain()
-			outcomeC <- outcome
+			outcomeFromRun, failureFromRun := suite.failer.Drain()
+			outcomeC <- outcomeFromRun
 			failureC <- failureFromRun
 		}()
 
-		node.Body()
+		node.Body(sc)
 		finished = true
 	}()
 
+	// progress polling timer and channel
 	var emitProgressNow <-chan time.Time
 	var progressPoller *time.Timer
 	var pollProgressAfter, pollProgressInterval = suite.config.PollProgressAfter, suite.config.PollProgressInterval
@@ -695,31 +761,102 @@ func (suite *Suite) runNode(node Node, interruptChannel chan interface{}, text s
 	if node.PollProgressInterval >= 0 {
 		pollProgressInterval = node.PollProgressInterval
 	}
-
 	if pollProgressAfter > 0 {
 		progressPoller = time.NewTimer(pollProgressAfter)
 		emitProgressNow = progressPoller.C
 		defer progressPoller.Stop()
 	}
 
+	// now we wait for an outcome, an interrupt, a timeout, or a progress poll
 	for {
 		select {
-		case outcome := <-outcomeC:
+		case outcomeFromRun := <-outcomeC:
 			failureFromRun := <-failureC
-			if outcome == types.SpecStatePassed {
-				return outcome, types.Failure{}
+			if outcome == types.SpecStateInterrupted {
+				// we've already been interrupted.  we just managed to actually exit
+				// before the grace period elapsed
+				return outcome, failure
+			} else if outcome == types.SpecStateTimedout {
+				// we've already timed out.  we just managed to actually exit
+				// before the grace period elapsed.  if we have a failure message we should include it
+				if outcomeFromRun != types.SpecStatePassed {
+					failure.Location, failure.ForwardedPanic = failureFromRun.Location, failureFromRun.ForwardedPanic
+					failure.Message = "This spec timed out and reported the following failure after the timeout:\n\n" + failureFromRun.Message
+				}
+				return outcome, failure
 			}
-			failure.Message, failure.Location, failure.ForwardedPanic = failureFromRun.Message, failureFromRun.Location, failureFromRun.ForwardedPanic
+			if outcomeFromRun.Is(types.SpecStatePassed) {
+				return outcomeFromRun, types.Failure{}
+			} else {
+				failure.Message, failure.Location, failure.ForwardedPanic = failureFromRun.Message, failureFromRun.Location, failureFromRun.ForwardedPanic
+				return outcomeFromRun, failure
+			}
+		case <-gracePeriodChannel:
+			if node.HasContext && outcome.Is(types.SpecStateTimedout) {
+				report := suite.generateProgressReport(false)
+				report.Message = "{{bold}}{{orange}}A running node failed to exit in time{{/}}\nGinkgo is moving on but a node has timed out and failed to exit before its grace period elapsed.  The node has now leaked and is running in the background.\nHere's a current progress report:"
+				suite.emitProgressReport(report)
+			}
 			return outcome, failure
-		case <-interruptChannel:
-			reason, includeProgressReport := suite.interruptHandler.InterruptMessage()
-			failure.Message, failure.Location = reason, node.CodeLocation
-			if includeProgressReport {
-				failure.ProgressReport = suite.generateProgressReport(true).WithoutCapturedGinkgoWriterOutput()
+		case <-deadlineChannel:
+			// we're out of time - the outcome is a timeout and we capture the failure and progress report
+			outcome = types.SpecStateTimedout
+			failure.Message, failure.Location = "Timedout", node.CodeLocation
+			failure.ProgressReport = suite.generateProgressReport(false).WithoutCapturedGinkgoWriterOutput()
+			failure.ProgressReport.Message = "{{bold}}This is the Progress Report generated when the timeout occurred:{{/}}"
+			deadlineChannel = nil
+			// tell the spec to stop.  it's important we generate the progress report first to make sure we capture where
+			// the spec is actually stuck
+			sc.cancel()
+			//and now we wait for the grace period
+			gracePeriodChannel = time.After(gracePeriod)
+		case <-interruptStatus.Channel:
+			interruptStatus = suite.interruptHandler.Status()
+			deadlineChannel = nil // don't worry about deadlines, time's up now
+
+			if outcome == types.SpecStateInvalid {
+				outcome = types.SpecStateInterrupted
+				failure.Message, failure.Location = interruptStatus.Message(), node.CodeLocation
+				if interruptStatus.ShouldIncludeProgressReport() {
+					failure.ProgressReport = suite.generateProgressReport(true).WithoutCapturedGinkgoWriterOutput()
+					failure.ProgressReport.Message = "{{bold}}This is the Progress Report generated when the interrupt was received:{{/}}"
+				}
 			}
-			return types.SpecStateInterrupted, failure
+
+			var report types.ProgressReport
+			if interruptStatus.ShouldIncludeProgressReport() {
+				report = suite.generateProgressReport(false)
+			}
+
+			sc.cancel()
+
+			if interruptStatus.Level == interrupt_handler.InterruptLevelBailOut {
+				if interruptStatus.ShouldIncludeProgressReport() {
+					report.Message = fmt.Sprintf("{{bold}}{{orange}}%s{{/}}\n{{bold}}{{red}}Final interrupt received{{/}}; Ginkgo will not run any cleanup or reporting nodes and will terminate as soon as possible.\nHere's a current progress report:", interruptStatus.Message())
+					suite.emitProgressReport(report)
+				}
+				return outcome, failure
+			}
+			if interruptStatus.ShouldIncludeProgressReport() {
+				if interruptStatus.Level == interrupt_handler.InterruptLevelCleanupAndReport {
+					report.Message = fmt.Sprintf("{{bold}}{{orange}}%s{{/}}\nFirst interrupt received; Ginkgo will run any cleanup and reporting nodes but will skip all remaining specs.  {{bold}}Interrupt again to skip cleanup{{/}}.\nHere's a current progress report:", interruptStatus.Message())
+				} else if interruptStatus.Level == interrupt_handler.InterruptLevelReportOnly {
+					report.Message = fmt.Sprintf("{{bold}}{{orange}}%s{{/}}\nSecond interrupt received; Ginkgo will run any reporting nodes but will skip all remaining specs and cleanup nodes.  {{bold}}Interrupt again to bail immediately{{/}}.\nHere's a current progress report:", interruptStatus.Message())
+				}
+				suite.emitProgressReport(report)
+			}
+
+			if gracePeriodChannel == nil {
+				// we haven't given grace yet... so let's
+				gracePeriodChannel = time.After(gracePeriod)
+			} else {
+				// we've already given grace.  time's up.  now.
+				return outcome, failure
+			}
 		case <-emitProgressNow:
-			suite.handleProgressSignal()
+			report := suite.generateProgressReport(false)
+			report.Message = "{{bold}}Automatically polling progress:{{/}}"
+			suite.emitProgressReport(report)
 			if pollProgressInterval > 0 {
 				progressPoller.Reset(pollProgressInterval)
 			}

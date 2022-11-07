@@ -42,7 +42,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	clientset "k8s.io/client-go/kubernetes"
 	toolswatch "k8s.io/client-go/tools/watch"
 	"k8s.io/component-base/configz"
@@ -55,7 +54,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
 	proxymetrics "k8s.io/kubernetes/pkg/proxy/metrics"
-	"k8s.io/kubernetes/pkg/proxy/userspace"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -157,22 +155,20 @@ func newProxyServer(
 	var ipt [2]utiliptables.Interface
 	dualStack := true // While we assume that node supports, we do further checks below
 
-	if proxyMode != proxyconfigapi.ProxyModeUserspace {
-		// Create iptables handlers for both families, one is already created
-		// Always ordered as IPv4, IPv6
-		if primaryProtocol == utiliptables.ProtocolIPv4 {
-			ipt[0] = iptInterface
-			ipt[1] = utiliptables.New(execer, utiliptables.ProtocolIPv6)
-		} else {
-			ipt[0] = utiliptables.New(execer, utiliptables.ProtocolIPv4)
-			ipt[1] = iptInterface
-		}
+	// Create iptables handlers for both families, one is already created
+	// Always ordered as IPv4, IPv6
+	if primaryProtocol == utiliptables.ProtocolIPv4 {
+		ipt[0] = iptInterface
+		ipt[1] = utiliptables.New(execer, utiliptables.ProtocolIPv6)
+	} else {
+		ipt[0] = utiliptables.New(execer, utiliptables.ProtocolIPv4)
+		ipt[1] = iptInterface
+	}
 
-		for _, perFamilyIpt := range ipt {
-			if !perFamilyIpt.Present() {
-				klog.InfoS("kube-proxy running in single-stack mode, this ipFamily is not supported", "ipFamily", perFamilyIpt.Protocol())
-				dualStack = false
-			}
+	for _, perFamilyIpt := range ipt {
+		if !perFamilyIpt.Present() {
+			klog.V(0).InfoS("kube-proxy running in single-stack mode, this ipFamily is not supported", "ipFamily", perFamilyIpt.Protocol())
+			dualStack = false
 		}
 	}
 
@@ -201,6 +197,7 @@ func newProxyServer(
 				config.IPTables.SyncPeriod.Duration,
 				config.IPTables.MinSyncPeriod.Duration,
 				config.IPTables.MasqueradeAll,
+				*config.IPTables.LocalhostNodePorts,
 				int(*config.IPTables.MasqueradeBit),
 				localDetectors,
 				hostname,
@@ -225,6 +222,7 @@ func newProxyServer(
 				config.IPTables.SyncPeriod.Duration,
 				config.IPTables.MinSyncPeriod.Duration,
 				config.IPTables.MasqueradeAll,
+				*config.IPTables.LocalhostNodePorts,
 				int(*config.IPTables.MasqueradeBit),
 				localDetector,
 				hostname,
@@ -320,31 +318,6 @@ func newProxyServer(
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
 		proxymetrics.RegisterMetrics()
-	} else {
-		klog.InfoS("Using userspace Proxier")
-		klog.InfoS("The userspace proxier is now deprecated and will be removed in a future release, please use 'iptables' or 'ipvs' instead")
-
-		// TODO this has side effects that should only happen when Run() is invoked.
-		proxier, err = userspace.NewProxier(
-			userspace.NewLoadBalancerRR(),
-			netutils.ParseIPSloppy(config.BindAddress),
-			iptInterface,
-			execer,
-			*utilnet.ParsePortRangeOrDie(config.PortRange),
-			config.IPTables.SyncPeriod.Duration,
-			config.IPTables.MinSyncPeriod.Duration,
-			config.UDPIdleTimeout.Duration,
-			config.NodePortAddresses,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("unable to create proxier: %v", err)
-		}
-	}
-
-	useEndpointSlices := true
-	if proxyMode == proxyconfigapi.ProxyModeUserspace {
-		// userspace mode doesn't support endpointslice.
-		useEndpointSlices = false
 	}
 
 	return &ProxyServer{
@@ -367,7 +340,7 @@ func newProxyServer(
 		OOMScoreAdj:            config.OOMScoreAdj,
 		ConfigSyncPeriod:       config.ConfigSyncPeriod.Duration,
 		HealthzServer:          healthzServer,
-		UseEndpointSlices:      useEndpointSlices,
+		localDetectorMode:      detectLocalMode,
 	}, nil
 }
 
@@ -389,10 +362,20 @@ func waitForPodCIDR(client clientset.Interface, nodeName string) (*v1.Node, erro
 		},
 	}
 	condition := func(event watch.Event) (bool, error) {
-		if n, ok := event.Object.(*v1.Node); ok {
-			return n.Spec.PodCIDR != "" && len(n.Spec.PodCIDRs) > 0, nil
+		// don't process delete events
+		if event.Type != watch.Modified && event.Type != watch.Added {
+			return false, nil
 		}
-		return false, fmt.Errorf("event object not of type Node")
+
+		n, ok := event.Object.(*v1.Node)
+		if !ok {
+			return false, fmt.Errorf("event object not of type Node")
+		}
+		// don't consider the node if is going to be deleted and keep waiting
+		if !n.DeletionTimestamp.IsZero() {
+			return false, nil
+		}
+		return n.Spec.PodCIDR != "" && len(n.Spec.PodCIDRs) > 0, nil
 	}
 
 	evt, err := toolswatch.UntilWithSync(ctx, lw, &v1.Node{}, nil, condition)
@@ -571,7 +554,6 @@ func cleanupAndExit() error {
 
 	var encounteredError bool
 	for _, ipt := range ipts {
-		encounteredError = userspace.CleanupLeftovers(ipt) || encounteredError
 		encounteredError = iptables.CleanupLeftovers(ipt) || encounteredError
 		encounteredError = ipvs.CleanupLeftovers(ipvsInterface, ipt, ipsetInterface) || encounteredError
 	}

@@ -25,6 +25,7 @@ import (
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/cel"
 )
 
 // unbounded uses nil to represent an unbounded cardinality value.
@@ -109,7 +110,7 @@ type CELTypeInfo struct {
 	// Schema is a structural schema for this CELSchemaContext node. It must be non-nil.
 	Schema *structuralschema.Structural
 	// DeclType is a CEL declaration representation of Schema of this CELSchemaContext node. It must be non-nil.
-	DeclType *model.DeclType
+	DeclType *cel.DeclType
 }
 
 // converter converts from JSON schema to a structural schema and a CEL declType, or returns an error if the conversion
@@ -224,7 +225,7 @@ type propertyTypeInfoAccessor struct {
 func (c propertyTypeInfoAccessor) accessTypeInfo(parentTypeInfo *CELTypeInfo) *CELTypeInfo {
 	if parentTypeInfo.Schema.Properties != nil {
 		propSchema := parentTypeInfo.Schema.Properties[c.propertyName]
-		if escapedPropName, ok := model.Escape(c.propertyName); ok {
+		if escapedPropName, ok := cel.Escape(c.propertyName); ok {
 			if fieldDeclType, ok := parentTypeInfo.DeclType.Fields[escapedPropName]; ok {
 				return &CELTypeInfo{Schema: &propSchema, DeclType: fieldDeclType.Type}
 			} // else fields with unknown types are omitted from CEL validation entirely

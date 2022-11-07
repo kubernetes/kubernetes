@@ -35,6 +35,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/workqueue"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	metricstestutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/features"
@@ -631,6 +632,8 @@ func TestGCTerminating(t *testing.T) {
 			verifyDeletedAndPatchedPods(t, client, test.deletedPodNames, test.patchedPodNames)
 		})
 	}
+	// deletingPodsTotal is 7 in this test
+	testDeletingPodsMetrics(t, 7)
 }
 
 func verifyDeletedAndPatchedPods(t *testing.T, client *fake.Clientset, wantDeletedPodNames, wantPatchedPodNames sets.String) {
@@ -642,6 +645,26 @@ func verifyDeletedAndPatchedPods(t *testing.T, client *fake.Clientset, wantDelet
 	patchedPodNames := getPatchedPodNames(client)
 	if diff := cmp.Diff(wantPatchedPodNames, patchedPodNames); diff != "" {
 		t.Errorf("Patched pod names (-want,+got):\n%s", diff)
+	}
+}
+
+func testDeletingPodsMetrics(t *testing.T, inputDeletingPodsTotal int) {
+	t.Helper()
+
+	actualDeletingPodsTotal, err := metricstestutil.GetCounterMetricValue(deletingPodsTotal.WithLabelValues())
+	if err != nil {
+		t.Errorf("Error getting actualDeletingPodsTotal")
+	}
+	if actualDeletingPodsTotal != float64(inputDeletingPodsTotal) {
+		t.Errorf("Expected desiredDeletingPodsTotal to be %d, got %v", inputDeletingPodsTotal, actualDeletingPodsTotal)
+	}
+
+	actualDeletingPodsErrorTotal, err := metricstestutil.GetCounterMetricValue(deletingPodsErrorTotal.WithLabelValues())
+	if err != nil {
+		t.Errorf("Error getting actualDeletingPodsErrorTotal")
+	}
+	if actualDeletingPodsErrorTotal != float64(0) {
+		t.Errorf("Expected desiredDeletingPodsTotal to be %d, got %v", 0, actualDeletingPodsErrorTotal)
 	}
 }
 

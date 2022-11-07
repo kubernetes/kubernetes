@@ -76,9 +76,9 @@ func NewClientBackedDryRunGetterFromKubeconfig(file string) (*ClientBackedDryRun
 // HandleGetAction handles GET actions to the dryrun clientset this interface supports
 func (clg *ClientBackedDryRunGetter) HandleGetAction(action core.GetAction) (bool, runtime.Object, error) {
 	unstructuredObj, err := clg.dynamicClient.Resource(action.GetResource()).Namespace(action.GetNamespace()).Get(context.TODO(), action.GetName(), metav1.GetOptions{})
-	// Inform the user that the requested object wasn't found.
-	printIfNotExists(err)
 	if err != nil {
+		// Inform the user that the requested object wasn't found.
+		printIfNotExists(err)
 		return true, nil, err
 	}
 	newObj, err := decodeUnstructuredIntoAPIObject(action, unstructuredObj)

@@ -191,28 +191,35 @@ func GenerateJUnitReport(report types.Report, dst string) error {
 			test.Failure = &JUnitFailure{
 				Message:     spec.Failure.Message,
 				Type:        "failed",
-				Description: fmt.Sprintf("%s\n%s", spec.Failure.Location.String(), spec.Failure.Location.FullStackTrace),
+				Description: failureDescriptionForUnstructuredReporters(spec),
+			}
+			suite.Failures += 1
+		case types.SpecStateTimedout:
+			test.Failure = &JUnitFailure{
+				Message:     spec.Failure.Message,
+				Type:        "timedout",
+				Description: failureDescriptionForUnstructuredReporters(spec),
 			}
 			suite.Failures += 1
 		case types.SpecStateInterrupted:
 			test.Error = &JUnitError{
-				Message:     "interrupted",
+				Message:     spec.Failure.Message,
 				Type:        "interrupted",
-				Description: interruptDescriptionForUnstructuredReporters(spec.Failure),
+				Description: failureDescriptionForUnstructuredReporters(spec),
 			}
 			suite.Errors += 1
 		case types.SpecStateAborted:
 			test.Failure = &JUnitFailure{
 				Message:     spec.Failure.Message,
 				Type:        "aborted",
-				Description: fmt.Sprintf("%s\n%s", spec.Failure.Location.String(), spec.Failure.Location.FullStackTrace),
+				Description: failureDescriptionForUnstructuredReporters(spec),
 			}
 			suite.Errors += 1
 		case types.SpecStatePanicked:
 			test.Error = &JUnitError{
 				Message:     spec.Failure.ForwardedPanic,
 				Type:        "panicked",
-				Description: fmt.Sprintf("%s\n%s", spec.Failure.Location.String(), spec.Failure.Location.FullStackTrace),
+				Description: failureDescriptionForUnstructuredReporters(spec),
 			}
 			suite.Errors += 1
 		}
@@ -278,10 +285,23 @@ func MergeAndCleanupJUnitReports(sources []string, dst string) ([]string, error)
 	return messages, f.Close()
 }
 
-func interruptDescriptionForUnstructuredReporters(failure types.Failure) string {
+func failureDescriptionForUnstructuredReporters(spec types.SpecReport) string {
 	out := &strings.Builder{}
-	out.WriteString(failure.Message + "\n")
-	NewDefaultReporter(types.ReporterConfig{NoColor: true}, out).EmitProgressReport(failure.ProgressReport)
+	out.WriteString(spec.Failure.Location.String() + "\n")
+	out.WriteString(spec.Failure.Location.FullStackTrace)
+	if !spec.Failure.ProgressReport.IsZero() {
+		out.WriteString("\n")
+		NewDefaultReporter(types.ReporterConfig{NoColor: true}, out).EmitProgressReport(spec.Failure.ProgressReport)
+	}
+	if len(spec.AdditionalFailures) > 0 {
+		out.WriteString("\nThere were additional failures detected after the initial failure:\n")
+		for i, additionalFailure := range spec.AdditionalFailures {
+			NewDefaultReporter(types.ReporterConfig{NoColor: true}, out).EmitFailure(0, additionalFailure.State, additionalFailure.Failure, true)
+			if i < len(spec.AdditionalFailures)-1 {
+				out.WriteString("----------\n")
+			}
+		}
+	}
 	return out.String()
 }
 

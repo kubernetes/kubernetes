@@ -313,6 +313,22 @@ foo    baz
 foo    baz           <none>
 `,
 		},
+		{
+			columns: []Column{
+				{
+					Header:    "NAME",
+					FieldSpec: "{.metadata.name}",
+				},
+			},
+			obj: &corev1.PodList{
+				Items: []corev1.Pod{
+					{ObjectMeta: metav1.ObjectMeta{Name: "\x1b \r"}},
+				},
+			},
+			expectedOutput: `NAME
+^[ \r
+`,
+		},
 	}
 
 	for _, test := range tests {

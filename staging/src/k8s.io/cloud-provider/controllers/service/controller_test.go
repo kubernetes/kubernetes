@@ -1391,6 +1391,75 @@ func TestNeedsUpdate(t *testing.T) {
 			},
 			expectedNeedsUpdate: true,
 		},
+		{
+			testName: "If appProtocol is the same",
+			updateFn: func() {
+				oldSvc = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "tcp-service",
+						Namespace: "default",
+					},
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{{
+							Port:       80,
+							Protocol:   v1.ProtocolTCP,
+							TargetPort: intstr.Parse("22"),
+						}},
+						Type: v1.ServiceTypeLoadBalancer,
+					},
+				}
+				newSvc = oldSvc.DeepCopy()
+			},
+			expectedNeedsUpdate: false,
+		},
+		{
+			testName: "If appProtocol is set when previously unset",
+			updateFn: func() {
+				oldSvc = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "tcp-service",
+						Namespace: "default",
+					},
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{{
+							Port:       80,
+							Protocol:   v1.ProtocolTCP,
+							TargetPort: intstr.Parse("22"),
+						}},
+						Type: v1.ServiceTypeLoadBalancer,
+					},
+				}
+				newSvc = oldSvc.DeepCopy()
+				protocol := "http"
+				newSvc.Spec.Ports[0].AppProtocol = &protocol
+			},
+			expectedNeedsUpdate: true,
+		},
+		{
+			testName: "If appProtocol is set to a different value",
+			updateFn: func() {
+				protocol := "http"
+				oldSvc = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "tcp-service",
+						Namespace: "default",
+					},
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{{
+							Port:        80,
+							Protocol:    v1.ProtocolTCP,
+							TargetPort:  intstr.Parse("22"),
+							AppProtocol: &protocol,
+						}},
+						Type: v1.ServiceTypeLoadBalancer,
+					},
+				}
+				newSvc = oldSvc.DeepCopy()
+				newProtocol := "tcp"
+				newSvc.Spec.Ports[0].AppProtocol = &newProtocol
+			},
+			expectedNeedsUpdate: true,
+		},
 	}
 
 	controller, _, _ := newController()

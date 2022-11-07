@@ -38,10 +38,12 @@ import (
 	"k8s.io/klog/v2"
 	credentialproviderapi "k8s.io/kubelet/pkg/apis/credentialprovider"
 	"k8s.io/kubelet/pkg/apis/credentialprovider/install"
+	credentialproviderv1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1"
 	credentialproviderv1alpha1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1alpha1"
 	credentialproviderv1beta1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1beta1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeletconfigv1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1"
 	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1alpha1"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 	"k8s.io/utils/clock"
@@ -59,6 +61,7 @@ var (
 	apiVersions = map[string]schema.GroupVersion{
 		credentialproviderv1alpha1.SchemeGroupVersion.String(): credentialproviderv1alpha1.SchemeGroupVersion,
 		credentialproviderv1beta1.SchemeGroupVersion.String():  credentialproviderv1beta1.SchemeGroupVersion,
+		credentialproviderv1.SchemeGroupVersion.String():       credentialproviderv1.SchemeGroupVersion,
 	}
 )
 
@@ -67,6 +70,7 @@ func init() {
 	kubeletconfig.AddToScheme(scheme)
 	kubeletconfigv1alpha1.AddToScheme(scheme)
 	kubeletconfigv1beta1.AddToScheme(scheme)
+	kubeletconfigv1.AddToScheme(scheme)
 }
 
 // RegisterCredentialProviderPlugins is called from kubelet to register external credential provider
@@ -431,7 +435,9 @@ func (e *execPlugin) ExecPlugin(ctx context.Context, image string) (*credentialp
 
 func (e *execPlugin) runPlugin(ctx context.Context, cmd *exec.Cmd, image string) error {
 	startTime := time.Now()
-	defer kubeletCredentialProviderPluginDuration.WithLabelValues(e.name).Observe(time.Since(startTime).Seconds())
+	defer func() {
+		kubeletCredentialProviderPluginDuration.WithLabelValues(e.name).Observe(time.Since(startTime).Seconds())
+	}()
 
 	err := cmd.Run()
 	if ctx.Err() != nil {

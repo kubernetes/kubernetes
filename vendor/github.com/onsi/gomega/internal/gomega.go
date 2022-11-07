@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"context"
+	"fmt"
 	"time"
 
 	"github.com/onsi/gomega/types"
@@ -51,38 +53,68 @@ func (g *Gomega) ExpectWithOffset(offset int, actual interface{}, extra ...inter
 	return NewAssertion(actual, g, offset, extra...)
 }
 
-func (g *Gomega) Eventually(actual interface{}, intervals ...interface{}) types.AsyncAssertion {
-	return g.EventuallyWithOffset(0, actual, intervals...)
+func (g *Gomega) Eventually(args ...interface{}) types.AsyncAssertion {
+	return g.makeAsyncAssertion(AsyncAssertionTypeEventually, 0, args...)
 }
 
-func (g *Gomega) EventuallyWithOffset(offset int, actual interface{}, intervals ...interface{}) types.AsyncAssertion {
-	timeoutInterval := g.DurationBundle.EventuallyTimeout
-	pollingInterval := g.DurationBundle.EventuallyPollingInterval
+func (g *Gomega) EventuallyWithOffset(offset int, args ...interface{}) types.AsyncAssertion {
+	return g.makeAsyncAssertion(AsyncAssertionTypeEventually, offset, args...)
+}
+
+func (g *Gomega) Consistently(args ...interface{}) types.AsyncAssertion {
+	return g.makeAsyncAssertion(AsyncAssertionTypeConsistently, 0, args...)
+}
+
+func (g *Gomega) ConsistentlyWithOffset(offset int, args ...interface{}) types.AsyncAssertion {
+	return g.makeAsyncAssertion(AsyncAssertionTypeConsistently, offset, args...)
+}
+
+func (g *Gomega) makeAsyncAssertion(asyncAssertionType AsyncAssertionType, offset int, args ...interface{}) types.AsyncAssertion {
+	baseOffset := 3
+	timeoutInterval := -time.Duration(1)
+	pollingInterval := -time.Duration(1)
+	intervals := []interface{}{}
+	var ctx context.Context
+	if len(args) == 0 {
+		g.Fail(fmt.Sprintf("Call to %s is missing a value or function to poll", asyncAssertionType), offset+baseOffset)
+		return nil
+	}
+
+	actual := args[0]
+	startingIndex := 1
+	if _, isCtx := args[0].(context.Context); isCtx && len(args) > 1 {
+		// the first argument is a context, we should accept it as the context _only if_ it is **not** the only argumnent **and** the second argument is not a parseable duration
+		// this is due to an unfortunate ambiguity in early version of Gomega in which multi-type durations are allowed after the actual
+		if _, err := toDuration(args[1]); err != nil {
+			ctx = args[0].(context.Context)
+			actual = args[1]
+			startingIndex = 2
+		}
+	}
+
+	for _, arg := range args[startingIndex:] {
+		switch v := arg.(type) {
+		case context.Context:
+			ctx = v
+		default:
+			intervals = append(intervals, arg)
+		}
+	}
+	var err error
 	if len(intervals) > 0 {
-		timeoutInterval = toDuration(intervals[0])
+		timeoutInterval, err = toDuration(intervals[0])
+		if err != nil {
+			g.Fail(err.Error(), offset+baseOffset)
+		}
 	}
 	if len(intervals) > 1 {
-		pollingInterval = toDuration(intervals[1])
+		pollingInterval, err = toDuration(intervals[1])
+		if err != nil {
+			g.Fail(err.Error(), offset+baseOffset)
+		}
 	}
 
-	return NewAsyncAssertion(AsyncAssertionTypeEventually, actual, g, timeoutInterval, pollingInterval, offset)
-}
-
-func (g *Gomega) Consistently(actual interface{}, intervals ...interface{}) types.AsyncAssertion {
-	return g.ConsistentlyWithOffset(0, actual, intervals...)
-}
-
-func (g *Gomega) ConsistentlyWithOffset(offset int, actual interface{}, intervals ...interface{}) types.AsyncAssertion {
-	timeoutInterval := g.DurationBundle.ConsistentlyDuration
-	pollingInterval := g.DurationBundle.ConsistentlyPollingInterval
-	if len(intervals) > 0 {
-		timeoutInterval = toDuration(intervals[0])
-	}
-	if len(intervals) > 1 {
-		pollingInterval = toDuration(intervals[1])
-	}
-
-	return NewAsyncAssertion(AsyncAssertionTypeConsistently, actual, g, timeoutInterval, pollingInterval, offset)
+	return NewAsyncAssertion(asyncAssertionType, actual, g, timeoutInterval, pollingInterval, ctx, offset)
 }
 
 func (g *Gomega) SetDefaultEventuallyTimeout(t time.Duration) {

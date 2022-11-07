@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
+	"k8s.io/component-base/tracing"
 	netutils "k8s.io/utils/net"
 )
 
@@ -302,11 +303,12 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		RequestTimeout:        10 * time.Second,
 		LongRunningFunc:       func(_ *http.Request, _ *request.RequestInfo) bool { return false },
 		lifecycleSignals:      newLifecycleSignals(),
+		TracerProvider:        tracing.NewNoopTracerProvider(),
 	}
 
 	h := DefaultBuildHandlerChain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// confirm this is a no-op
-		if r.Context() != audit.WithAuditAnnotations(r.Context()) {
+		if r.Context() != audit.WithAuditContext(r.Context()) {
 			t.Error("unexpected double wrapping of context")
 		}
 

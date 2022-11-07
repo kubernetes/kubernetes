@@ -610,6 +610,7 @@ type PausePodConfig struct {
 	Priority                          *int32
 	PreemptionPolicy                  *v1.PreemptionPolicy
 	PriorityClassName                 string
+	Volumes                           []v1.Volume
 }
 
 // InitPausePod initializes a pod API object from the given config. It is used
@@ -637,6 +638,7 @@ func InitPausePod(conf *PausePodConfig) *v1.Pod {
 			Priority:          conf.Priority,
 			PreemptionPolicy:  conf.PreemptionPolicy,
 			PriorityClassName: conf.PriorityClassName,
+			Volumes:           conf.Volumes,
 		},
 	}
 	if conf.Resources != nil {
@@ -672,6 +674,18 @@ func CreatePausePodWithResource(cs clientset.Interface, podName string,
 		}
 	}
 	return CreatePausePod(cs, InitPausePod(&conf))
+}
+
+// CreatePVC creates a PersistentVolumeClaim with the given config and returns
+// its pointer and error status.
+func CreatePVC(cs clientset.Interface, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
+	return cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
+}
+
+// CreatePV creates a PersistentVolume with the given config and returns its
+// pointer and error status.
+func CreatePV(cs clientset.Interface, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+	return cs.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{})
 }
 
 // RunPausePod creates a pod with "Pause" image and the given config and waits

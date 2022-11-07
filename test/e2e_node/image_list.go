@@ -125,11 +125,11 @@ func (rp *remotePuller) Name() string {
 }
 
 func (rp *remotePuller) Pull(image string) ([]byte, error) {
-	resp, err := rp.imageService.ImageStatus(&runtimeapi.ImageSpec{Image: image}, false)
+	resp, err := rp.imageService.ImageStatus(context.Background(), &runtimeapi.ImageSpec{Image: image}, false)
 	if err == nil && resp.GetImage() != nil {
 		return nil, nil
 	}
-	_, err = rp.imageService.PullImage(&runtimeapi.ImageSpec{Image: image}, nil, nil)
+	_, err = rp.imageService.PullImage(context.Background(), &runtimeapi.ImageSpec{Image: image}, nil, nil)
 	return nil, err
 }
 

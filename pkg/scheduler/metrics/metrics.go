@@ -77,8 +77,8 @@ var (
 			Subsystem: SchedulerSubsystem,
 			Name:      "preemption_victims",
 			Help:      "Number of selected preemption victims",
-			// we think #victims>50 is pretty rare, therefore [50, +Inf) is considered a single bucket.
-			Buckets:        metrics.LinearBuckets(5, 5, 10),
+			// we think #victims>64 is pretty rare, therefore [64, +Inf) is considered a single bucket.
+			Buckets:        metrics.ExponentialBuckets(1, 2, 7),
 			StabilityLevel: metrics.STABLE,
 		})
 	PreemptionAttempts = metrics.NewCounter(

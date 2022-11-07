@@ -128,15 +128,15 @@ INFO: after #1
 [AfterEach] e2e
   cleanup_test.go:76
 INFO: after #2
-[DeferCleanup] e2e
+[DeferCleanup (Each)] e2e
   cleanup_test.go:85
 INFO: cleanup first
-[DeferCleanup] e2e
+[DeferCleanup (Each)] e2e
   cleanup_test.go:82
 INFO: cleanup last
-[DeferCleanup] e2e
+[DeferCleanup (Each)] e2e
   dump namespaces | framework.go:xxx
-[DeferCleanup] e2e
+[DeferCleanup (Each)] e2e
   tear down framework | framework.go:xxx
 STEP: Destroying namespace "test-namespace-zzz" for this suite.
 `

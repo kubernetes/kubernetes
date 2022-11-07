@@ -16,10 +16,13 @@ package spec
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strconv"
 
 	"github.com/go-openapi/swag"
+	"k8s.io/kube-openapi/pkg/internal"
+	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
 )
 
 // Responses is a container for the expected responses of an operation.
@@ -42,6 +45,10 @@ type Responses struct {
 
 // UnmarshalJSON hydrates this items instance with the data from JSON
 func (r *Responses) UnmarshalJSON(data []byte) error {
+	if internal.UseOptimizedJSONUnmarshaling {
+		return jsonv2.Unmarshal(data, r)
+	}
+
 	if err := json.Unmarshal(data, &r.ResponsesProps); err != nil {
 		return err
 	}
@@ -90,21 +97,90 @@ func (r ResponsesProps) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON unmarshals responses from JSON
 func (r *ResponsesProps) UnmarshalJSON(data []byte) error {
-	var res map[string]Response
+	if internal.UseOptimizedJSONUnmarshaling {
+		return jsonv2.Unmarshal(data, r)
+	}
+	var res map[string]json.RawMessage
 	if err := json.Unmarshal(data, &res); err != nil {
-		return nil
+		return err
 	}
 	if v, ok := res["default"]; ok {
-		r.Default = &v
+		value := Response{}
+		if err := json.Unmarshal(v, &value); err != nil {
+			return err
+		}
+		r.Default = &value
 		delete(res, "default")
 	}
 	for k, v := range res {
+		// Take all integral keys
 		if nk, err := strconv.Atoi(k); err == nil {
 			if r.StatusCodeResponses == nil {
 				r.StatusCodeResponses = map[int]Response{}
 			}
-			r.StatusCodeResponses[nk] = v
+			value := Response{}
+			if err := json.Unmarshal(v, &value); err != nil {
+				return err
+			}
+			r.StatusCodeResponses[nk] = value
 		}
 	}
 	return nil
+}
+
+func (r *Responses) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) (err error) {
+	tok, err := dec.ReadToken()
+	if err != nil {
+		return err
+	}
+	var ext any
+	var resp Response
+	switch k := tok.Kind(); k {
+	case 'n':
+		return nil // noop
+	case '{':
+		for {
+			tok, err := dec.ReadToken()
+			if err != nil {
+				return err
+			}
+			if tok.Kind() == '}' {
+				return nil
+			}
+			switch k := tok.String(); {
+			case isExtensionKey(k):
+				ext = nil
+				if err := opts.UnmarshalNext(dec, &ext); err != nil {
+					return err
+				}
+
+				if r.Extensions == nil {
+					r.Extensions = make(map[string]any)
+				}
+				r.Extensions[k] = ext
+			case k == "default":
+				resp = Response{}
+				if err := opts.UnmarshalNext(dec, &resp); err != nil {
+					return err
+				}
+
+				respCopy := resp
+				r.ResponsesProps.Default = &respCopy
+			default:
+				if nk, err := strconv.Atoi(k); err == nil {
+					resp = Response{}
+					if err := opts.UnmarshalNext(dec, &resp); err != nil {
+						return err
+					}
+
+					if r.StatusCodeResponses == nil {
+						r.StatusCodeResponses = map[int]Response{}
+					}
+					r.StatusCodeResponses[nk] = resp
+				}
+			}
+		}
+	default:
+		return fmt.Errorf("unknown JSON kind: %v", k)
+	}
 }

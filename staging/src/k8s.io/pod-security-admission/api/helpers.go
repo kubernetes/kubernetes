@@ -161,35 +161,6 @@ func (p *Policy) String() string {
 	return fmt.Sprintf("enforce=%#v, audit=%#v, warn=%#v", p.Enforce, p.Audit, p.Warn)
 }
 
-// CompactString prints a minimalist representation of the policy that excludes any privileged
-// levels.
-func (p *Policy) CompactString() string {
-	sb := strings.Builder{}
-	if p.Enforce.Level != LevelPrivileged {
-		sb.WriteString("enforce=")
-		sb.WriteString(p.Enforce.String())
-	}
-	if p.Audit.Level != LevelPrivileged {
-		if sb.Len() > 0 {
-			sb.WriteString(", ")
-		}
-		sb.WriteString("audit=")
-		sb.WriteString(p.Audit.String())
-	}
-	if p.Warn.Level != LevelPrivileged {
-		if sb.Len() > 0 {
-			sb.WriteString(", ")
-		}
-		sb.WriteString("warn=")
-		sb.WriteString(p.Warn.String())
-	}
-	if sb.Len() == 0 {
-		// All modes were privileged, just output "privileged".
-		return string(LevelPrivileged)
-	}
-	return sb.String()
-}
-
 // Equivalent determines whether two policies are functionally equivalent. Policies are considered
 // equivalent if all 3 modes are considered equivalent.
 func (p *Policy) Equivalent(other *Policy) bool {
@@ -213,12 +184,16 @@ func PolicyToEvaluate(labels map[string]string, defaults Policy) (Policy, field.
 		errs field.ErrorList
 
 		p = defaults
+
+		hasEnforceLevel              bool
+		hasWarnLevel, hasWarnVersion bool
 	)
 	if len(labels) == 0 {
 		return p, nil
 	}
 	if level, ok := labels[EnforceLevelLabel]; ok {
 		p.Enforce.Level, err = ParseLevel(level)
+		hasEnforceLevel = (err == nil) // Don't default warn in case of error
 		errs = appendErr(errs, err, EnforceLevelLabel, level)
 	}
 	if version, ok := labels[EnforceVersionLabel]; ok {
@@ -237,6 +212,7 @@ func PolicyToEvaluate(labels map[string]string, defaults Policy) (Policy, field.
 		errs = appendErr(errs, err, AuditVersionLabel, version)
 	}
 	if level, ok := labels[WarnLevelLabel]; ok {
+		hasWarnLevel = true
 		p.Warn.Level, err = ParseLevel(level)
 		errs = appendErr(errs, err, WarnLevelLabel, level)
 		if err != nil {
@@ -244,9 +220,19 @@ func PolicyToEvaluate(labels map[string]string, defaults Policy) (Policy, field.
 		}
 	}
 	if version, ok := labels[WarnVersionLabel]; ok {
+		hasWarnVersion = true
 		p.Warn.Version, err = ParseVersion(version)
 		errs = appendErr(errs, err, WarnVersionLabel, version)
 	}
+
+	// Default warn to the enforce level when explicitly set to a more restrictive level.
+	if !hasWarnLevel && hasEnforceLevel && CompareLevels(p.Enforce.Level, p.Warn.Level) > 0 {
+		p.Warn.Level = p.Enforce.Level
+		if !hasWarnVersion {
+			p.Warn.Version = p.Enforce.Version
+		}
+	}
+
 	return p, errs
 }
 

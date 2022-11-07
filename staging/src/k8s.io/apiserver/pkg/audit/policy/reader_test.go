@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/apis/audit"
+
 	// import to call webhook's init() function to register audit.Policy to schema
 	_ "k8s.io/apiserver/plugin/pkg/audit/webhook"
 
@@ -70,6 +71,18 @@ rules:
   - level: Metadata
 `
 
+const policyWithUnknownField = `
+apiVersion: audit.k8s.io/v1
+kind: Policy
+rules:
+- level: None
+  resources:
+  - group: coordination.k8s.io
+    resources:
+    - "leases"
+    verbs: ["watch", "get", "list"] # invalid indentation on verbs
+`
+
 var expectedPolicy = &audit.Policy{
 	Rules: []audit.PolicyRule{{
 		Level:           audit.LevelNone,
@@ -111,6 +124,15 @@ func TestParsePolicyWithNoVersionOrKind(t *testing.T) {
 
 	_, err = LoadPolicyFromFile(f)
 	assert.Contains(t, err.Error(), "unknown group version field")
+}
+
+func TestParsePolicyWithUnknownField(t *testing.T) {
+	f, err := writePolicy(t, policyWithUnknownField)
+	require.NoError(t, err)
+	defer os.Remove(f)
+
+	_, err = LoadPolicyFromFile(f)
+	require.NoError(t, err)
 }
 
 func TestPolicyCntCheck(t *testing.T) {

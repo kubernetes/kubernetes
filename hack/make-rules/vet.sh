@@ -25,6 +25,7 @@ cd "${KUBE_ROOT}"
 
 # Filter out arguments that start with "-" and move them to goflags.
 targets=()
+goflags=()
 for arg; do
   if [[ "${arg}" == -* ]]; then
     goflags+=("${arg}")

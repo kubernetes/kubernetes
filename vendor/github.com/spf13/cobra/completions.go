@@ -1,3 +1,17 @@
+// Copyright 2013-2022 The Cobra Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package cobra
 
 import (
@@ -260,6 +274,12 @@ func (c *Command) getCompletions(args []string) (*Command, []string, ShellCompDi
 	}
 	finalCmd.ctx = c.ctx
 
+	// These flags are normally added when `execute()` is called on `finalCmd`,
+	// however, when doing completion, we don't call `finalCmd.execute()`.
+	// Let's add the --help and --version flag ourselves.
+	finalCmd.InitDefaultHelpFlag()
+	finalCmd.InitDefaultVersionFlag()
+
 	// Check if we are doing flag value completion before parsing the flags.
 	// This is important because if we are completing a flag value, we need to also
 	// remove the flag name argument from the list of finalArgs or else the parsing
@@ -290,6 +310,12 @@ func (c *Command) getCompletions(args []string) (*Command, []string, ShellCompDi
 		if _, ok := flagErr.(*flagCompError); !(ok && !flagCompletion) {
 			return finalCmd, []string{}, ShellCompDirectiveDefault, flagErr
 		}
+	}
+
+	// Look for the --help or --version flags.  If they are present,
+	// there should be no further completions.
+	if helpOrVersionFlagPresent(finalCmd) {
+		return finalCmd, []string{}, ShellCompDirectiveNoFileComp, nil
 	}
 
 	// We only remove the flags from the arguments if DisableFlagParsing is not set.
@@ -463,6 +489,18 @@ func (c *Command) getCompletions(args []string) (*Command, []string, ShellCompDi
 	return finalCmd, completions, directive, nil
 }
 
+func helpOrVersionFlagPresent(cmd *Command) bool {
+	if versionFlag := cmd.Flags().Lookup("version"); versionFlag != nil &&
+		len(versionFlag.Annotations[FlagSetByCobraAnnotation]) > 0 && versionFlag.Changed {
+		return true
+	}
+	if helpFlag := cmd.Flags().Lookup("help"); helpFlag != nil &&
+		len(helpFlag.Annotations[FlagSetByCobraAnnotation]) > 0 && helpFlag.Changed {
+		return true
+	}
+	return false
+}
+
 func getFlagNameCompletions(flag *pflag.Flag, toComplete string) []string {
 	if nonCompletableFlag(flag) {
 		return []string{}
@@ -607,12 +645,12 @@ func checkIfFlagCompletion(finalCmd *Command, args []string, lastArg string) (*p
 	return flag, trimmedArgs, lastArg, nil
 }
 
-// initDefaultCompletionCmd adds a default 'completion' command to c.
+// InitDefaultCompletionCmd adds a default 'completion' command to c.
 // This function will do nothing if any of the following is true:
 // 1- the feature has been explicitly disabled by the program,
 // 2- c has no subcommands (to avoid creating one),
 // 3- c already has a 'completion' command provided by the program.
-func (c *Command) initDefaultCompletionCmd() {
+func (c *Command) InitDefaultCompletionCmd() {
 	if c.CompletionOptions.DisableDefaultCmd || !c.HasSubCommands() {
 		return
 	}
@@ -635,6 +673,7 @@ See each sub-command's help for details on how to use the generated script.
 		Args:              NoArgs,
 		ValidArgsFunction: NoFileCompletions,
 		Hidden:            c.CompletionOptions.HiddenDefaultCmd,
+		GroupID:           c.completionCommandGroupID,
 	}
 	c.AddCommand(completionCmd)
 

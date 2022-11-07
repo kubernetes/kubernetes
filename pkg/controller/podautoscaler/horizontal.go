@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
@@ -49,6 +50,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+	"k8s.io/kubernetes/pkg/controller/util/selectors"
 )
 
 var (
@@ -94,11 +96,18 @@ type HorizontalController struct {
 	queue workqueue.RateLimitingInterface
 
 	// Latest unstabilized recommendations for each autoscaler.
-	recommendations map[string][]timestampedRecommendation
+	recommendations     map[string][]timestampedRecommendation
+	recommendationsLock sync.Mutex
 
 	// Latest autoscaler events
-	scaleUpEvents   map[string][]timestampedScaleEvent
-	scaleDownEvents map[string][]timestampedScaleEvent
+	scaleUpEvents       map[string][]timestampedScaleEvent
+	scaleUpEventsLock   sync.RWMutex
+	scaleDownEvents     map[string][]timestampedScaleEvent
+	scaleDownEventsLock sync.RWMutex
+
+	// Storage of HPAs and their selectors.
+	hpaSelectors    *selectors.BiMultimap
+	hpaSelectorsMux sync.Mutex
 }
 
 // NewHorizontalController creates a new HorizontalController.
@@ -130,8 +139,12 @@ func NewHorizontalController(
 		queue:                        workqueue.NewNamedRateLimitingQueue(NewDefaultHPARateLimiter(resyncPeriod), "horizontalpodautoscaler"),
 		mapper:                       mapper,
 		recommendations:              map[string][]timestampedRecommendation{},
+		recommendationsLock:          sync.Mutex{},
 		scaleUpEvents:                map[string][]timestampedScaleEvent{},
+		scaleUpEventsLock:            sync.RWMutex{},
 		scaleDownEvents:              map[string][]timestampedScaleEvent{},
+		scaleDownEventsLock:          sync.RWMutex{},
+		hpaSelectors:                 selectors.NewBiMultimap(),
 	}
 
 	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -161,7 +174,7 @@ func NewHorizontalController(
 }
 
 // Run begins watching and syncing.
-func (a *HorizontalController) Run(ctx context.Context) {
+func (a *HorizontalController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer a.queue.ShutDown()
 
@@ -172,8 +185,9 @@ func (a *HorizontalController) Run(ctx context.Context) {
 		return
 	}
 
-	// start a single worker (we may wish to start more in the future)
-	go wait.UntilWithContext(ctx, a.worker, time.Second)
+	for i := 0; i < workers; i++ {
+		go wait.UntilWithContext(ctx, a.worker, time.Second)
+	}
 
 	<-ctx.Done()
 }
@@ -195,6 +209,15 @@ func (a *HorizontalController) enqueueHPA(obj interface{}) {
 	// request for the HPA in the queue then a new request is always dropped. Requests spend resync
 	// interval in queue so HPAs are processed every resync interval.
 	a.queue.AddRateLimited(key)
+
+	// Register HPA in the hpaSelectors map if it's not present yet. Attaching the Nothing selector
+	// that does not select objects. The actual selector is going to be updated
+	// when it's available during the autoscaler reconciliation.
+	a.hpaSelectorsMux.Lock()
+	defer a.hpaSelectorsMux.Unlock()
+	if hpaKey := selectors.Parse(key); !a.hpaSelectors.SelectorExists(hpaKey) {
+		a.hpaSelectors.PutSelector(hpaKey, labels.Nothing())
+	}
 }
 
 func (a *HorizontalController) deleteHPA(obj interface{}) {
@@ -206,6 +229,11 @@ func (a *HorizontalController) deleteHPA(obj interface{}) {
 
 	// TODO: could we leak if we fail to get the key?
 	a.queue.Forget(key)
+
+	// Remove HPA and attached selector.
+	a.hpaSelectorsMux.Lock()
+	defer a.hpaSelectorsMux.Unlock()
+	a.hpaSelectors.DeleteSelector(selectors.Parse(key))
 }
 
 func (a *HorizontalController) worker(ctx context.Context) {
@@ -246,19 +274,10 @@ func (a *HorizontalController) processNextWorkItem(ctx context.Context) bool {
 // all metrics computed.
 func (a *HorizontalController) computeReplicasForMetrics(ctx context.Context, hpa *autoscalingv2.HorizontalPodAutoscaler, scale *autoscalingv1.Scale,
 	metricSpecs []autoscalingv2.MetricSpec) (replicas int32, metric string, statuses []autoscalingv2.MetricStatus, timestamp time.Time, err error) {
-	if scale.Status.Selector == "" {
-		errMsg := "selector is required"
-		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "SelectorRequired", errMsg)
-		setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "InvalidSelector", "the HPA target's scale is missing a selector")
-		return 0, "", nil, time.Time{}, fmt.Errorf(errMsg)
-	}
 
-	selector, err := labels.Parse(scale.Status.Selector)
+	selector, err := a.validateAndParseSelector(hpa, scale.Status.Selector)
 	if err != nil {
-		errMsg := fmt.Sprintf("couldn't convert selector into a corresponding internal selector object: %v", err)
-		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "InvalidSelector", errMsg)
-		setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "InvalidSelector", errMsg)
-		return 0, "", nil, time.Time{}, fmt.Errorf(errMsg)
+		return 0, "", nil, time.Time{}, err
 	}
 
 	specReplicas := scale.Spec.Replicas
@@ -295,6 +314,80 @@ func (a *HorizontalController) computeReplicasForMetrics(ctx context.Context, hp
 	}
 	setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionTrue, "ValidMetricFound", "the HPA was able to successfully calculate a replica count from %s", metric)
 	return replicas, metric, statuses, timestamp, nil
+}
+
+// hpasControllingPodsUnderSelector returns a list of keys of all HPAs that control a given list of pods.
+func (a *HorizontalController) hpasControllingPodsUnderSelector(pods []*v1.Pod) []selectors.Key {
+	a.hpaSelectorsMux.Lock()
+	defer a.hpaSelectorsMux.Unlock()
+
+	hpas := map[selectors.Key]struct{}{}
+	for _, p := range pods {
+		podKey := selectors.Key{Name: p.Name, Namespace: p.Namespace}
+		a.hpaSelectors.Put(podKey, p.Labels)
+
+		selectingHpas, ok := a.hpaSelectors.ReverseSelect(podKey)
+		if !ok {
+			continue
+		}
+		for _, hpa := range selectingHpas {
+			hpas[hpa] = struct{}{}
+		}
+	}
+	// Clean up all added pods.
+	a.hpaSelectors.KeepOnly([]selectors.Key{})
+
+	hpaList := []selectors.Key{}
+	for hpa := range hpas {
+		hpaList = append(hpaList, hpa)
+	}
+	return hpaList
+}
+
+// validateAndParseSelector verifies that:
+// - selector is not empty;
+// - selector format is valid;
+// - all pods by current selector are controlled by only one HPA.
+// Returns an error if the check has failed or the parsed selector if succeeded.
+// In case of an error the ScalingActive is set to false with the corresponding reason.
+func (a *HorizontalController) validateAndParseSelector(hpa *autoscalingv2.HorizontalPodAutoscaler, selector string) (labels.Selector, error) {
+	if selector == "" {
+		errMsg := "selector is required"
+		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "SelectorRequired", errMsg)
+		setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "InvalidSelector", "the HPA target's scale is missing a selector")
+		return nil, fmt.Errorf(errMsg)
+	}
+
+	parsedSelector, err := labels.Parse(selector)
+	if err != nil {
+		errMsg := fmt.Sprintf("couldn't convert selector into a corresponding internal selector object: %v", err)
+		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "InvalidSelector", errMsg)
+		setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "InvalidSelector", errMsg)
+		return nil, fmt.Errorf(errMsg)
+	}
+
+	hpaKey := selectors.Key{Name: hpa.Name, Namespace: hpa.Namespace}
+	a.hpaSelectorsMux.Lock()
+	if a.hpaSelectors.SelectorExists(hpaKey) {
+		// Update HPA selector only if the HPA was registered in enqueueHPA.
+		a.hpaSelectors.PutSelector(hpaKey, parsedSelector)
+	}
+	a.hpaSelectorsMux.Unlock()
+
+	pods, err := a.podLister.Pods(hpa.Namespace).List(parsedSelector)
+	if err != nil {
+		return nil, err
+	}
+
+	selectingHpas := a.hpasControllingPodsUnderSelector(pods)
+	if len(selectingHpas) > 1 {
+		errMsg := fmt.Sprintf("pods by selector %v are controlled by multiple HPAs: %v", selector, selectingHpas)
+		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "AmbiguousSelector", errMsg)
+		setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "AmbiguousSelector", errMsg)
+		return nil, fmt.Errorf(errMsg)
+	}
+
+	return parsedSelector, nil
 }
 
 // Computes the desired number of replicas for a specific hpa and metric specification,
@@ -357,9 +450,19 @@ func (a *HorizontalController) reconcileKey(ctx context.Context, key string) (de
 	hpa, err := a.hpaLister.HorizontalPodAutoscalers(namespace).Get(name)
 	if errors.IsNotFound(err) {
 		klog.Infof("Horizontal Pod Autoscaler %s has been deleted in %s", name, namespace)
+
+		a.recommendationsLock.Lock()
 		delete(a.recommendations, key)
+		a.recommendationsLock.Unlock()
+
+		a.scaleUpEventsLock.Lock()
 		delete(a.scaleUpEvents, key)
+		a.scaleUpEventsLock.Unlock()
+
+		a.scaleDownEventsLock.Lock()
 		delete(a.scaleDownEvents, key)
+		a.scaleDownEventsLock.Unlock()
+
 		return true, nil
 	}
 	if err != nil {
@@ -564,6 +667,8 @@ func (a *HorizontalController) computeStatusForExternalMetric(specReplicas, stat
 }
 
 func (a *HorizontalController) recordInitialRecommendation(currentReplicas int32, key string) {
+	a.recommendationsLock.Lock()
+	defer a.recommendationsLock.Unlock()
 	if a.recommendations[key] == nil {
 		a.recommendations[key] = []timestampedRecommendation{{currentReplicas, time.Now()}}
 	}
@@ -712,6 +817,9 @@ func (a *HorizontalController) stabilizeRecommendation(key string, prenormalized
 	foundOldSample := false
 	oldSampleIndex := 0
 	cutoff := time.Now().Add(-a.downscaleStabilisationWindow)
+
+	a.recommendationsLock.Lock()
+	defer a.recommendationsLock.Unlock()
 	for i, rec := range a.recommendations[key] {
 		if rec.timestamp.Before(cutoff) {
 			foundOldSample = true
@@ -836,6 +944,9 @@ func (a *HorizontalController) storeScaleEvent(behavior *autoscalingv2.Horizonta
 	foundOldSample := false
 	if newReplicas > prevReplicas {
 		longestPolicyPeriod = getLongestPolicyPeriod(behavior.ScaleUp)
+
+		a.scaleUpEventsLock.Lock()
+		defer a.scaleUpEventsLock.Unlock()
 		markScaleEventsOutdated(a.scaleUpEvents[key], longestPolicyPeriod)
 		replicaChange := newReplicas - prevReplicas
 		for i, event := range a.scaleUpEvents[key] {
@@ -852,6 +963,9 @@ func (a *HorizontalController) storeScaleEvent(behavior *autoscalingv2.Horizonta
 		}
 	} else {
 		longestPolicyPeriod = getLongestPolicyPeriod(behavior.ScaleDown)
+
+		a.scaleDownEventsLock.Lock()
+		defer a.scaleDownEventsLock.Unlock()
 		markScaleEventsOutdated(a.scaleDownEvents[key], longestPolicyPeriod)
 		replicaChange := prevReplicas - newReplicas
 		for i, event := range a.scaleDownEvents[key] {
@@ -887,6 +1001,8 @@ func (a *HorizontalController) stabilizeRecommendationWithBehaviors(args Normali
 	downCutoff := now.Add(-time.Second * time.Duration(downDelaySeconds))
 
 	// Calculate the upper and lower stabilization limits.
+	a.recommendationsLock.Lock()
+	defer a.recommendationsLock.Unlock()
 	for i, rec := range a.recommendations[args.Key] {
 		if rec.timestamp.After(upCutoff) {
 			upRecommendation = min(rec.recommendation, upRecommendation)
@@ -934,7 +1050,12 @@ func (a *HorizontalController) convertDesiredReplicasWithBehaviorRate(args Norma
 	var possibleLimitingReason, possibleLimitingMessage string
 
 	if args.DesiredReplicas > args.CurrentReplicas {
+		a.scaleUpEventsLock.RLock()
+		defer a.scaleUpEventsLock.RUnlock()
+		a.scaleDownEventsLock.RLock()
+		defer a.scaleDownEventsLock.RUnlock()
 		scaleUpLimit := calculateScaleUpLimitWithScalingRules(args.CurrentReplicas, a.scaleUpEvents[args.Key], a.scaleDownEvents[args.Key], args.ScaleUpBehavior)
+
 		if scaleUpLimit < args.CurrentReplicas {
 			// We shouldn't scale up further until the scaleUpEvents will be cleaned up
 			scaleUpLimit = args.CurrentReplicas
@@ -952,7 +1073,12 @@ func (a *HorizontalController) convertDesiredReplicasWithBehaviorRate(args Norma
 			return maximumAllowedReplicas, possibleLimitingReason, possibleLimitingMessage
 		}
 	} else if args.DesiredReplicas < args.CurrentReplicas {
+		a.scaleUpEventsLock.RLock()
+		defer a.scaleUpEventsLock.RUnlock()
+		a.scaleDownEventsLock.RLock()
+		defer a.scaleDownEventsLock.RUnlock()
 		scaleDownLimit := calculateScaleDownLimitWithBehaviors(args.CurrentReplicas, a.scaleUpEvents[args.Key], a.scaleDownEvents[args.Key], args.ScaleDownBehavior)
+
 		if scaleDownLimit > args.CurrentReplicas {
 			// We shouldn't scale down further until the scaleDownEvents will be cleaned up
 			scaleDownLimit = args.CurrentReplicas

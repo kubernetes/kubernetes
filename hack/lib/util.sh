@@ -603,11 +603,9 @@ function kube::util::list_staging_repos() {
 
 # Determines if docker can be run, failures may simply require that the user be added to the docker group.
 function kube::util::ensure_docker_daemon_connectivity {
-  IFS=" " read -ra DOCKER <<< "${DOCKER_OPTS}"
-  # Expand ${DOCKER[@]} only if it's not unset. This is to work around
-  # Bash 3 issue with unbound variable.
-  DOCKER=(docker ${DOCKER[@]:+"${DOCKER[@]}"})
-  if ! "${DOCKER[@]}" info > /dev/null 2>&1 ; then
+  DOCKER_OPTS=${DOCKER_OPTS:-""}
+  IFS=" " read -ra docker_opts <<< "${DOCKER_OPTS}"
+  if ! docker "${docker_opts[@]:+"${docker_opts[@]}"}" info > /dev/null 2>&1 ; then
     cat <<'EOF' >&2
 Can't connect to 'docker' daemon.  please fix and retry.
 
@@ -658,6 +656,7 @@ function kube::util::join {
 #  CFSSL_BIN: The path of the installed cfssl binary
 #  CFSSLJSON_BIN: The path of the installed cfssljson binary
 #
+# shellcheck disable=SC2120 # optional parameters
 function kube::util::ensure-cfssl {
   if command -v cfssl &>/dev/null && command -v cfssljson &>/dev/null; then
     CFSSL_BIN=$(command -v cfssl)
@@ -759,6 +758,27 @@ function kube::util::ensure-gnu-sed {
     return 1
   fi
   kube::util::sourced_variable "${SED}"
+}
+
+# kube::util::ensure-gnu-date
+# Determines which date binary is gnu-date on linux/darwin
+#
+# Sets:
+#  DATE: The name of the gnu-date binary
+#
+function kube::util::ensure-gnu-date {
+  # NOTE: the echo below is a workaround to ensure date is executed before the grep.
+  # see: https://github.com/kubernetes/kubernetes/issues/87251
+  date_help="$(LANG=C date --help 2>&1 || true)"
+  if echo "${date_help}" | grep -q "GNU\|BusyBox"; then
+    DATE="date"
+  elif command -v gdate &>/dev/null; then
+    DATE="gdate"
+  else
+    kube::log::error "Failed to find GNU date as date or gdate. If you are on Mac: brew install coreutils." >&2
+    return 1
+  fi
+  kube::util::sourced_variable "${DATE}"
 }
 
 # kube::util::check-file-in-alphabetical-order <file>

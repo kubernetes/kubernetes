@@ -802,6 +802,8 @@ spec:
       restartPolicy: restartPolicyValue
       runtimeClassName: runtimeClassNameValue
       schedulerName: schedulerNameValue
+      schedulingGates:
+      - name: nameValue
       securityContext:
         fsGroup: 5
         fsGroupChangePolicy: fsGroupChangePolicyValue

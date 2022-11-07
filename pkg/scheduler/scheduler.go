@@ -104,8 +104,9 @@ func (s *Scheduler) applyDefaultHandlers() {
 }
 
 type schedulerOptions struct {
-	componentConfigVersion            string
-	kubeConfig                        *restclient.Config
+	componentConfigVersion string
+	kubeConfig             *restclient.Config
+	// Overridden by profile level percentageOfNodesToScore if set in v1.
 	percentageOfNodesToScore          int32
 	podInitialBackoffSeconds          int64
 	podMaxBackoffSeconds              int64
@@ -131,6 +132,11 @@ type ScheduleResult struct {
 	EvaluatedNodes int
 	// The number of nodes out of the evaluated ones that fit the pod.
 	FeasibleNodes int
+
+	// The reason records the failure in scheduling cycle.
+	reason string
+	// The nominating info for scheduling cycle.
+	nominatingInfo *framework.NominatingInfo
 }
 
 // WithComponentConfigVersion sets the component config version to the
@@ -166,10 +172,13 @@ func WithParallelism(threads int32) Option {
 	}
 }
 
-// WithPercentageOfNodesToScore sets percentageOfNodesToScore for Scheduler, the default value is 50
-func WithPercentageOfNodesToScore(percentageOfNodesToScore int32) Option {
+// WithPercentageOfNodesToScore sets percentageOfNodesToScore for Scheduler.
+// The default value of 0 will use an adaptive percentage: 50 - (num of nodes)/125.
+func WithPercentageOfNodesToScore(percentageOfNodesToScore *int32) Option {
 	return func(o *schedulerOptions) {
-		o.percentageOfNodesToScore = percentageOfNodesToScore
+		if percentageOfNodesToScore != nil {
+			o.percentageOfNodesToScore = *percentageOfNodesToScore
+		}
 	}
 }
 
@@ -416,7 +425,7 @@ func buildExtenders(extenders []schedulerapi.Extender, profiles []schedulerapi.K
 	return fExtenders, nil
 }
 
-type FailureHandlerFn func(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, err error, reason string, nominatingInfo *framework.NominatingInfo)
+type FailureHandlerFn func(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, err error, reason string, nominatingInfo *framework.NominatingInfo, start time.Time)
 
 func unionedGVKs(m map[framework.ClusterEvent]sets.String) map[framework.GVK]framework.ActionType {
 	gvkMap := make(map[framework.GVK]framework.ActionType)

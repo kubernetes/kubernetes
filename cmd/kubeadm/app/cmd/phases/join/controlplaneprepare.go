@@ -108,6 +108,7 @@ func getControlPlanePreparePhaseFlags(name string) []string {
 			options.TokenDiscoverySkipCAHash,
 			options.TLSBootstrapToken,
 			options.TokenStr,
+			options.DryRun,
 		}
 	case "kubeconfig":
 		flags = []string{
@@ -230,10 +231,10 @@ func runControlPlanePrepareDownloadCertsPhaseLocal(c workflow.RunData) error {
 		return err
 	}
 
-	// If we're dry-running, download certs to tmp dir
-	if data.DryRun() {
-		cfg.CertificatesDir = data.CertificateWriteDir()
-	}
+	// If we're dry-running, download certs to tmp dir, and defer to restore to the path originally specified by the user
+	certsDir := cfg.CertificatesDir
+	cfg.CertificatesDir = data.CertificateWriteDir()
+	defer func() { cfg.CertificatesDir = certsDir }()
 
 	client, err := bootstrapClient(data)
 	if err != nil {
@@ -264,6 +265,10 @@ func runControlPlanePrepareCertsPhaseLocal(c workflow.RunData) error {
 
 	fmt.Printf("[certs] Using certificateDir folder %q\n", cfg.CertificatesDir)
 
+	// if dryrunning, write certificates files to a temporary folder (and defer restore to the path originally specified by the user)
+	certsDir := cfg.CertificatesDir
+	cfg.CertificatesDir = data.CertificateWriteDir()
+	defer func() { cfg.CertificatesDir = certsDir }()
 	// Generate missing certificates (if any)
 	return certsphase.CreatePKIAssets(cfg)
 }

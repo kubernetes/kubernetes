@@ -5507,3 +5507,22 @@ func TestControllerRef(t *testing.T) {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
+
+func TestDescribeTerminalEscape(t *testing.T) {
+	fake := fake.NewSimpleClientset(&corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "mycm",
+			Namespace:   "foo",
+			Annotations: map[string]string{"annotation1": "terminal escape: \x1b"},
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := ConfigMapDescriber{c}
+	out, err := d.Describe("foo", "mycm", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if strings.Contains(out, "\x1b") || !strings.Contains(out, "^[") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
