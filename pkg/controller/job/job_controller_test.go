@@ -135,7 +135,7 @@ func newPodList(count int, status v1.PodPhase, job *batch.Job) []*v1.Pod {
 	for i := 0; i < count; i++ {
 		newPod := newPod(fmt.Sprintf("pod-%v", rand.String(10)), job)
 		newPod.Status = v1.PodStatus{Phase: status}
-		if trackingUncountedPods(job) {
+		if hasJobTrackingAnnotation(job) {
 			newPod.Finalizers = append(newPod.Finalizers, batch.JobTrackingFinalizer)
 		}
 		pods = append(pods, newPod)
@@ -178,7 +178,7 @@ func setPodsStatusesWithIndexes(podIndexer cache.Indexer, job *batch.Job, status
 			}
 			p.Spec.Hostname = fmt.Sprintf("%s-%s", job.Name, s.Index)
 		}
-		if trackingUncountedPods(job) {
+		if hasJobTrackingAnnotation(job) {
 			p.Finalizers = append(p.Finalizers, batch.JobTrackingFinalizer)
 		}
 		podIndexer.Add(p)
@@ -343,15 +343,15 @@ func TestControllerSyncJob(t *testing.T) {
 			parallelism:        2,
 			completions:        5,
 			backoffLimit:       6,
-			podControllerError: fmt.Errorf("fake error"),
 			jobKeyForget:       true,
 			activePods:         1,
 			succeededPods:      1,
 			failedPods:         1,
 			expectedCreations:  1,
-			expectedActive:     1,
+			expectedActive:     2,
 			expectedSucceeded:  1,
 			expectedFailed:     1,
+			expectedPodPatches: 2,
 		},
 		"new failed pod": {
 			parallelism:        2,
@@ -728,7 +728,6 @@ func TestControllerSyncJob(t *testing.T) {
 					t.Skipf("Test is exclusive for wFinalizers=%t", *tc.wFinalizersExclusive)
 				}
 				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobReadyPods, tc.jobReadyPodsEnabled)()
-				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, wFinalizers)()
 
 				// job manager setup
 				clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
@@ -918,13 +917,12 @@ func checkIndexedJobPods(t *testing.T, control *controller.FakePodControl, wantI
 }
 
 // TestSyncJobLegacyTracking makes sure that a Job is only tracked with
-// finalizers only when the feature is enabled and the job has the finalizer.
+// finalizers when the job has the annotation.
 func TestSyncJobLegacyTracking(t *testing.T) {
 	cases := map[string]struct {
-		job                           batch.Job
-		trackingWithFinalizersEnabled bool
-		wantUncounted                 bool
-		wantPatches                   int
+		job           batch.Job
+		wantUncounted bool
+		wantPatches   int
 	}{
 		"no annotation": {
 			job: batch.Job{
@@ -937,19 +935,7 @@ func TestSyncJobLegacyTracking(t *testing.T) {
 				},
 			},
 		},
-		"no annotation, feature enabled": {
-			job: batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "ns",
-				},
-				Spec: batch.JobSpec{
-					Parallelism: pointer.Int32Ptr(1),
-				},
-			},
-			trackingWithFinalizersEnabled: true,
-		},
-		"tracking annotation, feature disabled": {
+		"tracking annotation": {
 			job: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
@@ -962,26 +948,9 @@ func TestSyncJobLegacyTracking(t *testing.T) {
 					Parallelism: pointer.Int32Ptr(1),
 				},
 			},
-			// Finalizer removed.
-			wantPatches: 1,
+			wantUncounted: true,
 		},
-		"tracking annotation, feature enabled": {
-			job: batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						batch.JobTrackingFinalizer: "",
-					},
-				},
-				Spec: batch.JobSpec{
-					Parallelism: pointer.Int32Ptr(1),
-				},
-			},
-			trackingWithFinalizersEnabled: true,
-			wantUncounted:                 true,
-		},
-		"different annotation, feature enabled": {
+		"different annotation": {
 			job: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
@@ -994,13 +963,10 @@ func TestSyncJobLegacyTracking(t *testing.T) {
 					Parallelism: pointer.Int32Ptr(1),
 				},
 			},
-			trackingWithFinalizersEnabled: true,
 		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, tc.trackingWithFinalizersEnabled)()
-
 			// Job manager setup.
 			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 			manager, sharedInformerFactory := newControllerFromClient(clientSet, controller.NoResyncPeriodFunc)
@@ -2909,7 +2875,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 	for _, wFinalizers := range []bool{false, true} {
 		for name, tc := range testCases {
 			t.Run(fmt.Sprintf("%s; finalizers=%t", name, wFinalizers), func(t *testing.T) {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, wFinalizers)()
 				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)()
 				clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 				manager, sharedInformerFactory := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
@@ -2992,15 +2957,9 @@ func TestSyncJobUpdateRequeue(t *testing.T) {
 			updateErr:   apierrors.NewConflict(schema.GroupResource{}, "", nil),
 			wantRequeue: true,
 		},
-		"conflict error, with finalizers": {
-			withFinalizers: true,
-			updateErr:      apierrors.NewConflict(schema.GroupResource{}, "", nil),
-			wantRequeue:    true,
-		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, tc.withFinalizers)()
 			manager, sharedInformerFactory := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 			fakePodControl := controller.FakePodControl{}
 			manager.podControl = &fakePodControl
@@ -4204,7 +4163,6 @@ func TestEnsureJobConditions(t *testing.T) {
 }
 
 func TestFinalizersRemovedExpectations(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, true)()
 	clientset := fake.NewSimpleClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	manager := NewController(sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset)
