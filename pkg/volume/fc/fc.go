@@ -240,7 +240,7 @@ func (plugin *fcPlugin) newUnmapperInternal(volName string, podUID types.UID, ma
 	}, nil
 }
 
-func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
 	// Find globalPDPath from pod volume directory(mountPath)
 	// examples:
 	//   mountPath:     pods/{podUid}/volumes/kubernetes.io~fc/{volumeName}
@@ -256,10 +256,10 @@ func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volu
 	if io.IsInconsistentReadError(err) {
 		klog.Errorf("Failed to read mount refs from /proc/mounts for %s: %s", mountPath, err)
 		klog.Errorf("Kubelet cannot unmount volume at %s, please unmount it manually", mountPath)
-		return nil, err
+		return volume.ReconstructedVolume{}, err
 	}
 	if err != nil {
-		return nil, err
+		return volume.ReconstructedVolume{}, err
 	}
 	for _, path := range paths {
 		if strings.Contains(path, plugin.host.GetPluginDir(fcPluginName)) {
@@ -269,12 +269,12 @@ func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volu
 	}
 	// Couldn't fetch globalPDPath
 	if len(globalPDPath) == 0 {
-		return nil, fmt.Errorf("couldn't fetch globalPDPath. failed to obtain volume spec")
+		return volume.ReconstructedVolume{}, fmt.Errorf("couldn't fetch globalPDPath. failed to obtain volume spec")
 	}
 
 	wwns, lun, wwids, err := parsePDName(globalPDPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve volume plugin information from globalPDPath: %s", err)
+		return volume.ReconstructedVolume{}, fmt.Errorf("failed to retrieve volume plugin information from globalPDPath: %s", err)
 	}
 	// Create volume from wwn+lun or wwid
 	fcVolume := &v1.Volume{
@@ -285,7 +285,9 @@ func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volu
 	}
 	klog.V(5).Infof("ConstructVolumeSpec: TargetWWNs: %v, Lun: %v, WWIDs: %v",
 		fcVolume.VolumeSource.FC.TargetWWNs, *fcVolume.VolumeSource.FC.Lun, fcVolume.VolumeSource.FC.WWIDs)
-	return volume.NewSpecFromVolume(fcVolume), nil
+	return volume.ReconstructedVolume{
+		Spec: volume.NewSpecFromVolume(fcVolume),
+	}, nil
 }
 
 // ConstructBlockVolumeSpec creates a new volume.Spec with following steps.

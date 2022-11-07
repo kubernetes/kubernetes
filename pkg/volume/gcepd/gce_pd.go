@@ -299,17 +299,17 @@ func (plugin *gcePersistentDiskPlugin) NodeExpand(resizeOptions volume.NodeResiz
 
 var _ volume.NodeExpandableVolumePlugin = &gcePersistentDiskPlugin{}
 
-func (plugin *gcePersistentDiskPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (plugin *gcePersistentDiskPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
 	kvh, ok := plugin.host.(volume.KubeletVolumeHost)
 	if !ok {
-		return nil, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
+		return volume.ReconstructedVolume{}, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
 	}
 	hu := kvh.GetHostUtil()
 	pluginMntDir := util.GetPluginMountDir(plugin.host, plugin.GetPluginName())
 	sourceName, err := hu.GetDeviceNameFromMount(mounter, mountPath, pluginMntDir)
 	if err != nil {
-		return nil, err
+		return volume.ReconstructedVolume{}, err
 	}
 	gceVolume := &v1.Volume{
 		Name: volumeName,
@@ -319,7 +319,9 @@ func (plugin *gcePersistentDiskPlugin) ConstructVolumeSpec(volumeName, mountPath
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(gceVolume), nil
+	return volume.ReconstructedVolume{
+		Spec: volume.NewSpecFromVolume(gceVolume),
+	}, nil
 }
 
 // Abstract interface to PD operations.

@@ -166,7 +166,7 @@ type VolumePlugin interface {
 	// and volumePath. The spec may have incomplete information due to limited
 	// information from input. This function is used by volume manager to reconstruct
 	// volume spec by reading the volume directories from disk
-	ConstructVolumeSpec(volumeName, volumePath string) (*Spec, error)
+	ConstructVolumeSpec(volumeName, volumePath string) (ReconstructedVolume, error)
 
 	// SupportsMountOption returns true if volume plugins supports Mount options
 	// Specifying mount options in a volume plugin that doesn't support
@@ -568,6 +568,12 @@ type VolumeConfig struct {
 	// ProvisioningEnabled configures whether provisioning of this plugin is
 	// enabled or not. Currently used only in host_path plugin.
 	ProvisioningEnabled bool
+}
+
+// ReconstructedVolume contains information about a volume reconstructed by
+// ConstructVolumeSpec().
+type ReconstructedVolume struct {
+	Spec *Spec
 }
 
 // NewSpecFromVolume creates an Spec from an v1.Volume
