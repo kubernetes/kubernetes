@@ -559,7 +559,7 @@ func PodRecreateDeleteFailure(t *testing.T, set *apps.StatefulSet, invariants in
 	}
 }
 
-func emptyInvaraints(set *apps.StatefulSet, om *fakeObjectManager) error {
+func emptyInvariants(set *apps.StatefulSet, om *fakeObjectManager) error {
 	return nil
 }
 
@@ -584,7 +584,7 @@ func TestStatefulSetControlWithStartOrdinal(t *testing.T) {
 		testFn := testCase.fn
 
 		set := testObj()
-		testFn(t, set, emptyInvaraints)
+		testFn(t, set, emptyInvariants)
 	}
 }
 
