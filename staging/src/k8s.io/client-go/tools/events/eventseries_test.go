@@ -161,7 +161,10 @@ func TestEventSeriesf(t *testing.T) {
 	// Don't call StartRecordingToSink, as we don't need neither refreshing event
 	// series nor finishing them in this tests and additional events updated would
 	// race with our expected ones.
-	broadcaster.startRecordingEvents(stopCh)
+	err = broadcaster.startRecordingEvents(stopCh)
+	if err != nil {
+		t.Fatal(err)
+	}
 	recorder.Eventf(regarding, related, isomorphicEvent.Type, isomorphicEvent.Reason, isomorphicEvent.Action, isomorphicEvent.Note, []interface{}{1})
 	// read from the chan as this was needed only to populate the cache
 	<-createEvent
