@@ -28,7 +28,7 @@ import (
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"k8s.io/client-go/transport"
-	"k8s.io/component-base/tracing/api/v1"
+	v1 "k8s.io/component-base/tracing/api/v1"
 )
 
 // TracerProvider is an OpenTelemetry TracerProvider which can be shut down
@@ -51,12 +51,14 @@ func NewNoopTracerProvider() TracerProvider {
 
 // NewProvider creates a TracerProvider in a component, and enforces recommended tracing behavior
 func NewProvider(ctx context.Context,
-	tracingConfig *v1.TracingConfiguration,
+	_ *v1.TracingConfiguration,
 	addedOpts []otlptracegrpc.Option,
 	resourceOpts []resource.Option,
 ) (TracerProvider, error) {
-	if tracingConfig == nil {
-		return NewNoopTracerProvider(), nil
+	// hardcode sampling rate to 100%
+	oneMillion := int32(1000000)
+	tracingConfig := &v1.TracingConfiguration{
+		SamplingRatePerMillion: &oneMillion,
 	}
 	opts := append([]otlptracegrpc.Option{}, addedOpts...)
 	if tracingConfig.Endpoint != nil {
@@ -74,7 +76,7 @@ func NewProvider(ctx context.Context,
 
 	// sampler respects parent span's sampling rate or
 	// otherwise never samples.
-	sampler := sdktrace.NeverSample()
+	sampler := sdktrace.AlwaysSample()
 	// Or, emit spans for a fraction of transactions
 	if tracingConfig.SamplingRatePerMillion != nil && *tracingConfig.SamplingRatePerMillion > 0 {
 		sampler = sdktrace.TraceIDRatioBased(float64(*tracingConfig.SamplingRatePerMillion) / float64(1000000))
