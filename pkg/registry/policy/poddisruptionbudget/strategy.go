@@ -111,7 +111,7 @@ func (podDisruptionBudgetStrategy) AllowCreateOnUpdate() bool {
 // ValidateUpdate is the default update validation for an end user.
 func (podDisruptionBudgetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	opts := validation.PodDisruptionBudgetValidationOptions{
-		AllowInvalidLabelValueInSelector: allowValidateLabelValueInLabelSelector(old.(*policy.PodDisruptionBudget)),
+		AllowInvalidLabelValueInSelector: hasInvalidLabelValueInLabelSelector(old.(*policy.PodDisruptionBudget)),
 	}
 	return validation.ValidatePodDisruptionBudget(obj.(*policy.PodDisruptionBudget), opts)
 }
@@ -175,9 +175,9 @@ func (podDisruptionBudgetStatusStrategy) WarningsOnUpdate(ctx context.Context, o
 	return nil
 }
 
-func allowValidateLabelValueInLabelSelector(pdb *policy.PodDisruptionBudget) bool {
-	labelSelectorValidationOptions := metav1validation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: false}
+func hasInvalidLabelValueInLabelSelector(pdb *policy.PodDisruptionBudget) bool {
 	if pdb.Spec.Selector != nil {
+		labelSelectorValidationOptions := metav1validation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: false}
 		return len(metav1validation.ValidateLabelSelector(pdb.Spec.Selector, labelSelectorValidationOptions, nil)) > 0
 	}
 	return false

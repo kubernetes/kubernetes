@@ -2113,13 +2113,13 @@ func validateDataSource(dataSource *core.TypedLocalObjectReference, fldPath *fie
 // ValidatePersistentVolumeClaimSpec validates a PersistentVolumeClaimSpec
 func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fldPath *field.Path, opts PersistentVolumeClaimSpecValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
-	labelSelectorValidationOpts := unversionedvalidation.LabelSelectorValidationOptions{
-		AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector,
-	}
 	if len(spec.AccessModes) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("accessModes"), "at least 1 access mode is required"))
 	}
 	if spec.Selector != nil {
+		labelSelectorValidationOpts := unversionedvalidation.LabelSelectorValidationOptions{
+			AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector,
+		}
 		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, labelSelectorValidationOpts, fldPath.Child("selector"))...)
 	}
 

@@ -79,7 +79,7 @@ func (csiStorageCapacityStrategy) ValidateUpdate(ctx context.Context, obj, old r
 	newCSIStorageCapacityObj := obj.(*storage.CSIStorageCapacity)
 	oldCSIStorageCapacityObj := old.(*storage.CSIStorageCapacity)
 	opts := validation.CSIStorageCapacityValidateOptions{
-		AllowInvalidLabelValueInSelector: allowValidateLabelValueInLabelSelector(oldCSIStorageCapacityObj),
+		AllowInvalidLabelValueInSelector: hasInvalidLabelValueInLabelSelector(oldCSIStorageCapacityObj),
 	}
 	errorList := validation.ValidateCSIStorageCapacity(newCSIStorageCapacityObj, opts)
 	return append(errorList, validation.ValidateCSIStorageCapacityUpdate(newCSIStorageCapacityObj, oldCSIStorageCapacityObj)...)
@@ -94,7 +94,7 @@ func (csiStorageCapacityStrategy) AllowUnconditionalUpdate() bool {
 	return false
 }
 
-func allowValidateLabelValueInLabelSelector(capacity *storage.CSIStorageCapacity) bool {
+func hasInvalidLabelValueInLabelSelector(capacity *storage.CSIStorageCapacity) bool {
 	labelSelectorValidationOptions := metav1validation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: false}
 	return len(metav1validation.ValidateLabelSelector(capacity.NodeTopology, labelSelectorValidationOptions, nil)) > 0
 }

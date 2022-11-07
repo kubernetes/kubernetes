@@ -91,7 +91,7 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 	newObj := obj.(*rbac.ClusterRole)
 	oldObj := old.(*rbac.ClusterRole)
 	opts := validation.ClusterRoleValidationOptions{
-		AllowInvalidLabelValueInSelector: allowValidateLabelValueInLabelSelector(oldObj),
+		AllowInvalidLabelValueInSelector: hasInvalidLabelValueInLabelSelector(oldObj),
 	}
 	errorList := validation.ValidateClusterRole(newObj, opts)
 	return append(errorList, validation.ValidateClusterRoleUpdate(newObj, old.(*rbac.ClusterRole), opts)...)
@@ -111,9 +111,9 @@ func (strategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-func allowValidateLabelValueInLabelSelector(role *rbac.ClusterRole) bool {
-	labelSelectorValidationOptions := metav1validation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: false}
+func hasInvalidLabelValueInLabelSelector(role *rbac.ClusterRole) bool {
 	if role.AggregationRule != nil {
+		labelSelectorValidationOptions := metav1validation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: false}
 		for _, selector := range role.AggregationRule.ClusterRoleSelectors {
 			if len(metav1validation.ValidateLabelSelector(&selector, labelSelectorValidationOptions, nil)) > 0 {
 				return true

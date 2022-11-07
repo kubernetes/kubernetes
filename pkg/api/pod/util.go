@@ -760,7 +760,6 @@ func SeccompAnnotationForField(field *api.SeccompProfile) string {
 	return ""
 }
 
-
 func hasInvalidLabelValueInAffinitySelector(spec *api.PodSpec) bool {
 	if spec.Affinity != nil {
 		if spec.Affinity.PodAffinity != nil {

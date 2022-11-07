@@ -34,6 +34,25 @@ type LabelSelectorValidationOptions struct {
 	AllowInvalidLabelValueInSelector bool
 }
 
+// LabelSelectorHasInvalidLabelValue returns true if the given selector contains an invalid label value in a match expression.
+// This is useful for determining whether AllowInvalidLabelValueInSelector should be set to true when validating an update
+// based on existing persisted invalid values.
+func LabelSelectorHasInvalidLabelValue(ps *metav1.LabelSelector) bool {
+	if ps == nil {
+		return false
+	}
+	for _, e := range ps.MatchExpressions {
+		for _, v := range e.Values {
+			if len(validation.IsValidLabelValue(v)) > 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// ValidateLabelSelector validate the LabelSelector according to the opts and returns any validation errors.
+// opts.AllowInvalidLabelValueInSelector is only expected to be set to true when required for backwards compatibility with existing invalid data.
 func ValidateLabelSelector(ps *metav1.LabelSelector, opts LabelSelectorValidationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if ps == nil {
@@ -46,6 +65,8 @@ func ValidateLabelSelector(ps *metav1.LabelSelector, opts LabelSelectorValidatio
 	return allErrs
 }
 
+// ValidateLabelSelectorRequirement validate the requirement according to the opts and returns any validation errors.
+// opts.AllowInvalidLabelValueInSelector is only expected to be set to true when required for backwards compatibility with existing invalid data.
 func ValidateLabelSelectorRequirement(sr metav1.LabelSelectorRequirement, opts LabelSelectorValidationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	switch sr.Operator {

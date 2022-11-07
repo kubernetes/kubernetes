@@ -688,13 +688,15 @@ func validateMatchResources(mc *admissionregistration.MatchResources, fldPath *f
 	if mc.NamespaceSelector == nil {
 		allErrors = append(allErrors, field.Required(fldPath.Child("namespaceSelector"), ""))
 	} else {
-		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(mc.NamespaceSelector, fldPath.Child("namespaceSelector"))...)
+		// validate selector strictly, this type was released after issue #99139 was resolved
+		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(mc.NamespaceSelector, metav1validation.LabelSelectorValidationOptions{}, fldPath.Child("namespaceSelector"))...)
 	}
 
 	if mc.ObjectSelector == nil {
 		allErrors = append(allErrors, field.Required(fldPath.Child("labelSelector"), ""))
 	} else {
-		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(mc.ObjectSelector, fldPath.Child("labelSelector"))...)
+		// validate selector strictly, this type was released after issue #99139 was resolved
+		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(mc.ObjectSelector, metav1validation.LabelSelectorValidationOptions{}, fldPath.Child("labelSelector"))...)
 	}
 
 	for i, namedRuleWithOperations := range mc.ResourceRules {

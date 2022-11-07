@@ -146,12 +146,12 @@ func hasJobTrackingAnnotation(job *batch.Job) bool {
 // ValidateJobSpec validates a JobSpec and returns an ErrorList with any errors.
 func ValidateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := validateJobSpec(spec, fldPath, opts)
-	labelSelectorValidationOpts := unversionedvalidation.LabelSelectorValidationOptions{
-		AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector,
-	}
 	if spec.Selector == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
 	} else {
+		labelSelectorValidationOpts := unversionedvalidation.LabelSelectorValidationOptions{
+			AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector,
+		}
 		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, labelSelectorValidationOpts, fldPath.Child("selector"))...)
 	}
 

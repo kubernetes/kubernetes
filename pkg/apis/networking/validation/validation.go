@@ -194,10 +194,10 @@ func ValidationOptionsForNetworking(new, old *networking.NetworkPolicy) NetworkP
 	opts := NetworkPolicyValidationOptions{
 		AllowInvalidLabelValueInSelector: false,
 	}
-	labelSelectorValidationOpts := unversionedvalidation.LabelSelectorValidationOptions{
-		AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector,
-	}
 	if old != nil {
+		labelSelectorValidationOpts := unversionedvalidation.LabelSelectorValidationOptions{
+			AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector,
+		}
 		if len(unversionedvalidation.ValidateLabelSelector(&old.Spec.PodSelector, labelSelectorValidationOpts, nil)) > 0 {
 			opts.AllowInvalidLabelValueInSelector = true
 		}

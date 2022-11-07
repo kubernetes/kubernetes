@@ -428,7 +428,6 @@ func TestValidateConditions(t *testing.T) {
 }
 
 func TestLabelSelectorMatchExpression(t *testing.T) {
-	// Success case
 	testCases := []struct {
 		name            string
 		labelSelector   *metav1.LabelSelector

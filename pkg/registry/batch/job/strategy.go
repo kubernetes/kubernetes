@@ -24,6 +24,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -169,6 +170,8 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) validation.JobValidation
 		AllowTrackingAnnotation: true,
 	}
 	if oldJob != nil {
+		opts.AllowInvalidLabelValueInSelector = opts.AllowInvalidLabelValueInSelector || metav1validation.LabelSelectorHasInvalidLabelValue(oldJob.Spec.Selector)
+
 		// Because we don't support the tracking with finalizers for already
 		// existing jobs, we allow the annotation only if the Job already had it,
 		// regardless of the feature gate.
@@ -261,10 +264,6 @@ func (jobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	oldJob := old.(*batch.Job)
 
 	opts := validationOptionsForJob(job, oldJob)
-	tempErrs := validation.ValidateJob(oldJob, opts)
-	if len(tempErrs) > 0 {
-		opts.AllowInvalidLabelValueInSelector = false
-	}
 	validationErrorList := validation.ValidateJob(job, opts)
 	updateErrorList := validation.ValidateJobUpdate(job, oldJob, opts)
 	return append(validationErrorList, updateErrorList...)
