@@ -565,6 +565,20 @@ func InstrumentHandlerFunc(verb, group, version, resource, subresource, scope, c
 	}
 }
 
+// NormalizedVerb returns normalized verb
+func NormalizedVerb(req *http.Request) string {
+	verb := req.Method
+	if requestInfo, ok := request.RequestInfoFrom(req.Context()); ok {
+		// If we can find a requestInfo, we can get a scope, and then
+		// we can convert GETs to LISTs when needed.
+		scope := CleanScope(requestInfo)
+		verb = CanonicalVerb(strings.ToUpper(verb), scope)
+	}
+
+	// mark APPLY requests and WATCH requests correctly.
+	return CleanVerb(verb, req)
+}
+
 // CleanScope returns the scope of the request.
 func CleanScope(requestInfo *request.RequestInfo) string {
 	if requestInfo.Name != "" || requestInfo.Verb == "create" {

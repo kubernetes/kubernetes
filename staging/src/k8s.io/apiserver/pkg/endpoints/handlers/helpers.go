@@ -21,6 +21,7 @@ import (
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
@@ -91,25 +92,20 @@ func (lazy *lazyAuditID) String() string {
 }
 
 // lazyVerb implements String() string and it will
-// lazily get Verb from request info based on request context
+// lazily get normalized Verb
 type lazyVerb struct {
 	req *http.Request
 }
 
 func (lazy *lazyVerb) String() string {
-	if lazy.req != nil {
-		ctx := lazy.req.Context()
-		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
-		if ok {
-			return requestInfo.Verb
-		}
+	if lazy.req == nil {
+		return "unknown"
 	}
-
-	return "unknown"
+	return metrics.NormalizedVerb(lazy.req)
 }
 
-// lazyVerb implements String() string and it will
-// lazily get Resource from request info based on request context
+// lazyResource implements String() string and it will
+// lazily get Resource from request info
 type lazyResource struct {
 	req *http.Request
 }
