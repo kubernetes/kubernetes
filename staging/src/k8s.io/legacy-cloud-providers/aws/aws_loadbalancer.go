@@ -528,6 +528,14 @@ func (c *Cloud) createListenerV2(loadBalancerArn *string, mapping nlbPortMapping
 		return nil, err
 	}
 
+	elbTags := []*elbv2.Tag{}
+	for k, v := range tags {
+		elbTags = append(elbTags, &elbv2.Tag{
+			Key:   aws.String(k),
+			Value: aws.String(v),
+		})
+	}
+
 	createListernerInput := &elbv2.CreateListenerInput{
 		LoadBalancerArn: loadBalancerArn,
 		Port:            aws.Int64(mapping.FrontendPort),
@@ -536,6 +544,7 @@ func (c *Cloud) createListenerV2(loadBalancerArn *string, mapping nlbPortMapping
 			TargetGroupArn: target.TargetGroupArn,
 			Type:           aws.String(elbv2.ActionTypeEnumForward),
 		}},
+		Tags: elbTags,
 	}
 	if mapping.FrontendProtocol == "TLS" {
 		if mapping.SSLPolicy != "" {
@@ -595,14 +604,6 @@ func (c *Cloud) ensureTargetGroup(targetGroup *elbv2.TargetGroup, serviceName ty
 			input.HealthCheckPath = aws.String(mapping.HealthCheckConfig.Path)
 		}
 
-		result, err := c.elbv2.CreateTargetGroup(input)
-		if err != nil {
-			return nil, fmt.Errorf("error creating load balancer target group: %q", err)
-		}
-		if len(result.TargetGroups) != 1 {
-			return nil, fmt.Errorf("expected only one target group on CreateTargetGroup, got %d groups", len(result.TargetGroups))
-		}
-
 		if len(tags) != 0 {
 			targetGroupTags := make([]*elbv2.Tag, 0, len(tags))
 			for k, v := range tags {
@@ -610,13 +611,14 @@ func (c *Cloud) ensureTargetGroup(targetGroup *elbv2.TargetGroup, serviceName ty
 					Key: aws.String(k), Value: aws.String(v),
 				})
 			}
-			tgArn := aws.StringValue(result.TargetGroups[0].TargetGroupArn)
-			if _, err := c.elbv2.AddTags(&elbv2.AddTagsInput{
-				ResourceArns: []*string{aws.String(tgArn)},
-				Tags:         targetGroupTags,
-			}); err != nil {
-				return nil, fmt.Errorf("error adding tags for targetGroup %s due to %q", tgArn, err)
-			}
+			input.Tags = targetGroupTags
+		}
+		result, err := c.elbv2.CreateTargetGroup(input)
+		if err != nil {
+			return nil, fmt.Errorf("error creating load balancer target group: %q", err)
+		}
+		if len(result.TargetGroups) != 1 {
+			return nil, fmt.Errorf("expected only one target group on CreateTargetGroup, got %d groups", len(result.TargetGroups))
 		}
 
 		tg := result.TargetGroups[0]

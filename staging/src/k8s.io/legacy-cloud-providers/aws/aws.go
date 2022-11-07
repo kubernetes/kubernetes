@@ -3394,6 +3394,21 @@ func (c *Cloud) ensureSecurityGroup(name string, description string, additionalT
 		createRequest.VpcId = &c.vpcID
 		createRequest.GroupName = &name
 		createRequest.Description = &description
+		tags := c.tagging.buildTags(ResourceLifecycleOwned, additionalTags)
+		var awsTags []*ec2.Tag
+		for k, v := range tags {
+			tag := &ec2.Tag{
+				Key:   aws.String(k),
+				Value: aws.String(v),
+			}
+			awsTags = append(awsTags, tag)
+		}
+		createRequest.TagSpecifications = []*ec2.TagSpecification{
+			{
+				ResourceType: aws.String(ec2.ResourceTypeSecurityGroup),
+				Tags:         awsTags,
+			},
+		}
 
 		createResponse, err := c.ec2.CreateSecurityGroup(createRequest)
 		if err != nil {
@@ -3419,14 +3434,6 @@ func (c *Cloud) ensureSecurityGroup(name string, description string, additionalT
 		return "", fmt.Errorf("created security group, but id was not returned: %s", name)
 	}
 
-	err := c.tagging.createTags(c.ec2, groupID, ResourceLifecycleOwned, additionalTags)
-	if err != nil {
-		// If we retry, ensureClusterTags will recover from this - it
-		// will add the missing tags.  We could delete the security
-		// group here, but that doesn't feel like the right thing, as
-		// the caller is likely to retry the create
-		return "", fmt.Errorf("error tagging security group: %q", err)
-	}
 	return groupID, nil
 }
 
