@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/openapi"
 	"k8s.io/kubectl/pkg/util/prune"
+	"k8s.io/kubectl/pkg/util/slice"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/validation"
 )
@@ -68,7 +69,10 @@ type ApplyFlags struct {
 	All            bool
 	Overwrite      bool
 	OpenAPIPatch   bool
-	PruneWhitelist []string
+
+	// DEPRECATED: Use PruneAllowlist instead
+	PruneWhitelist []string // TODO: Remove this in kubectl 1.28 or later
+	PruneAllowlist []string
 
 	genericclioptions.IOStreams
 }
@@ -95,7 +99,6 @@ type ApplyOptions struct {
 	All                     bool
 	Overwrite               bool
 	OpenAPIPatch            bool
-	PruneWhitelist          []string
 
 	ValidationDirective string
 	Validator           validation.Schema
@@ -161,7 +164,7 @@ var (
 		kubectl apply --prune -f manifest.yaml -l app=nginx
 
 		# Apply the configuration in manifest.yaml and delete all the other config maps that are not in the file
-		kubectl apply --prune -f manifest.yaml --all --prune-whitelist=core/v1/ConfigMap`))
+		kubectl apply --prune -f manifest.yaml --all --prune-allowlist=core/v1/ConfigMap`))
 
 	warningNoLastAppliedConfigAnnotation = "Warning: resource %[1]s is missing the %[2]s annotation which is required by %[3]s apply. %[3]s apply should only be used on resources created declaratively by either %[3]s create --save-config or %[3]s apply. The missing annotation will be patched automatically.\n"
 	warningChangesOnDeletingResource     = "Warning: Detected changes to resource %[1]s which is currently being deleted.\n"
@@ -229,7 +232,9 @@ func (flags *ApplyFlags) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&flags.Overwrite, "overwrite", flags.Overwrite, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")
 	cmd.Flags().BoolVar(&flags.Prune, "prune", flags.Prune, "Automatically delete resource objects, that do not appear in the configs and are created by either apply or create --save-config. Should be used with either -l or --all.")
 	cmd.Flags().BoolVar(&flags.All, "all", flags.All, "Select all resources in the namespace of the specified resource types.")
-	cmd.Flags().StringArrayVar(&flags.PruneWhitelist, "prune-whitelist", flags.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune")
+	cmd.Flags().StringArrayVar(&flags.PruneAllowlist, "prune-allowlist", flags.PruneAllowlist, "Overwrite the default allowlist with <group/version/kind> for --prune")
+	cmd.Flags().StringArrayVar(&flags.PruneWhitelist, "prune-whitelist", flags.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune") // TODO: Remove this in kubectl 1.28 or later
+	cmd.Flags().MarkDeprecated("prune-whitelist", "Use --prune-allowlist instead.")
 	cmd.Flags().BoolVar(&flags.OpenAPIPatch, "openapi-patch", flags.OpenAPIPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
 }
 
@@ -300,7 +305,8 @@ func (flags *ApplyFlags) ToOptions(cmd *cobra.Command, baseName string, args []s
 	}
 
 	if flags.Prune {
-		flags.PruneResources, err = prune.ParseResources(mapper, flags.PruneWhitelist)
+		pruneAllowlist := slice.ToSet(flags.PruneAllowlist, flags.PruneWhitelist)
+		flags.PruneResources, err = prune.ParseResources(mapper, pruneAllowlist)
 		if err != nil {
 			return nil, err
 		}
@@ -326,7 +332,6 @@ func (flags *ApplyFlags) ToOptions(cmd *cobra.Command, baseName string, args []s
 		All:             flags.All,
 		Overwrite:       flags.Overwrite,
 		OpenAPIPatch:    flags.OpenAPIPatch,
-		PruneWhitelist:  flags.PruneWhitelist,
 
 		Recorder:            recorder,
 		Namespace:           namespace,

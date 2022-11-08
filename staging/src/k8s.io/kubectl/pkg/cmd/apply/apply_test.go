@@ -49,12 +49,14 @@ import (
 	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	testing2 "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/csaupgrade"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/openapi"
 	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/strings/slices"
 )
 
 var (
@@ -712,6 +714,250 @@ func TestApplyPruneObjects(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestApplyPruneObjectsWithAllowlist(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+
+	// Read ReplicationController from the file we will use to apply. This one will not be pruned because it exists in the file.
+	rc := readUnstructuredFromFile(t, filenameRC)
+	err := setLastAppliedConfigAnnotation(rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create another ReplicationController that can be pruned
+	rc2 := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "ReplicationController",
+			"apiVersion": "v1",
+			"metadata": map[string]interface{}{
+				"name":      "test-rc2",
+				"namespace": "test",
+				"uid":       "uid-rc2",
+			},
+		},
+	}
+	err = setLastAppliedConfigAnnotation(rc2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a ConfigMap that can be pruned
+	cm := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "ConfigMap",
+			"apiVersion": "v1",
+			"metadata": map[string]interface{}{
+				"name":      "test-cm",
+				"namespace": "test",
+				"uid":       "uid-cm",
+			},
+		},
+	}
+	err = setLastAppliedConfigAnnotation(cm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a ConfigMap without a UID. Resources without a UID will not be pruned.
+	cmNoUID := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "ConfigMap",
+			"apiVersion": "v1",
+			"metadata": map[string]interface{}{
+				"name":      "test-cm-nouid",
+				"namespace": "test",
+			},
+		},
+	}
+	err = setLastAppliedConfigAnnotation(cmNoUID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a ConfigMap without a last applied annotation. Resources without a last applied annotation will not be pruned.
+	cmNoLastApplied := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "ConfigMap",
+			"apiVersion": "v1",
+			"metadata": map[string]interface{}{
+				"name":      "test-cm-nolastapplied",
+				"namespace": "test",
+				"uid":       "uid-cm-nolastapplied",
+			},
+		},
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testCases := map[string]struct {
+		currentResources        []runtime.Object
+		pruneAllowlist          []string
+		expectedPrunedResources []string
+		expectedOutputs         []string
+	}{
+		"prune without allowlist should delete resources that are not in the specified file": {
+			currentResources:        []runtime.Object{rc, rc2, cm},
+			expectedPrunedResources: []string{"test/test-cm", "test/test-rc2"},
+			expectedOutputs: []string{
+				"replicationcontroller/test-rc unchanged",
+				"configmap/test-cm pruned",
+				"replicationcontroller/test-rc2 pruned",
+			},
+		},
+		"prune with allowlist should delete only matching resources": {
+			currentResources:        []runtime.Object{rc, rc2, cm},
+			pruneAllowlist:          []string{"core/v1/ConfigMap"},
+			expectedPrunedResources: []string{"test/test-cm"},
+			expectedOutputs: []string{
+				"replicationcontroller/test-rc unchanged",
+				"configmap/test-cm pruned",
+			},
+		},
+		"prune with allowlist specifying the same resource type multiple times should not fail": {
+			currentResources:        []runtime.Object{rc, rc2, cm},
+			pruneAllowlist:          []string{"core/v1/ConfigMap", "core/v1/ConfigMap"},
+			expectedPrunedResources: []string{"test/test-cm"},
+			expectedOutputs: []string{
+				"replicationcontroller/test-rc unchanged",
+				"configmap/test-cm pruned",
+			},
+		},
+		"prune with allowlist should not delete resources that exist in the specified file": {
+			currentResources:        []runtime.Object{rc, rc2, cm},
+			pruneAllowlist:          []string{"core/v1/ReplicationController"},
+			expectedPrunedResources: []string{"test/test-rc2"},
+			expectedOutputs: []string{
+				"replicationcontroller/test-rc unchanged",
+				"replicationcontroller/test-rc2 pruned",
+			},
+		},
+		"prune with allowlist specifying multiple resource types should delete matching resources": {
+			currentResources:        []runtime.Object{rc, rc2, cm},
+			pruneAllowlist:          []string{"core/v1/ConfigMap", "core/v1/ReplicationController"},
+			expectedPrunedResources: []string{"test/test-cm", "test/test-rc2"},
+			expectedOutputs: []string{
+				"replicationcontroller/test-rc unchanged",
+				"configmap/test-cm pruned",
+				"replicationcontroller/test-rc2 pruned",
+			},
+		},
+		"prune should not delete resources that are missing a UID": {
+			currentResources:        []runtime.Object{rc, cm, cmNoUID},
+			expectedPrunedResources: []string{"test/test-cm"},
+			expectedOutputs: []string{
+				"replicationcontroller/test-rc unchanged",
+				"configmap/test-cm pruned",
+			},
+		},
+		"prune should not delete resources that are missing the last applied config annotation": {
+			currentResources:        []runtime.Object{rc, cm, cmNoLastApplied},
+			expectedPrunedResources: []string{"test/test-cm"},
+			expectedOutputs: []string{
+				"replicationcontroller/test-rc unchanged",
+				"configmap/test-cm pruned",
+			},
+		},
+	}
+
+	for testCaseName, tc := range testCases {
+		for _, testingOpenAPISchema := range testingOpenAPISchemas {
+			t.Run(testCaseName, func(t *testing.T) {
+				tf := cmdtesting.NewTestFactory().WithNamespace("test")
+				defer tf.Cleanup()
+
+				tf.UnstructuredClient = &fake.RESTClient{
+					NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+					Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+						switch p, m := req.URL.Path, req.Method; {
+						case p == "/namespaces/test/replicationcontrollers/test-rc" && m == "GET":
+							encoded := runtime.EncodeOrDie(unstructured.UnstructuredJSONScheme, rc)
+							bodyRC := io.NopCloser(strings.NewReader(encoded))
+							return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
+						case p == "/namespaces/test/replicationcontrollers/test-rc" && m == "PATCH":
+							encoded := runtime.EncodeOrDie(unstructured.UnstructuredJSONScheme, rc)
+							bodyRC := io.NopCloser(strings.NewReader(encoded))
+							return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
+						default:
+							t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+							return nil, nil
+						}
+					}),
+				}
+				tf.OpenAPISchemaFunc = testingOpenAPISchema.OpenAPISchemaFn
+				tf.FakeOpenAPIGetter = testingOpenAPISchema.OpenAPIGetter
+				tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+				for _, resource := range tc.currentResources {
+					if err := tf.FakeDynamicClient.Tracker().Add(resource); err != nil {
+						t.Fatal(err)
+					}
+				}
+
+				ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+				cmd := NewCmdApply("kubectl", tf, ioStreams)
+				cmd.Flags().Set("filename", filenameRC)
+				cmd.Flags().Set("prune", "true")
+				cmd.Flags().Set("namespace", "test")
+				cmd.Flags().Set("all", "true")
+				for _, allow := range tc.pruneAllowlist {
+					cmd.Flags().Set("prune-allowlist", allow)
+				}
+				cmd.Run(cmd, []string{})
+
+				if errBuf.String() != "" {
+					t.Fatalf("unexpected error output: %s", errBuf.String())
+				}
+
+				actualOutput := buf.String()
+				for _, expectedOutput := range tc.expectedOutputs {
+					if !strings.Contains(actualOutput, expectedOutput) {
+						t.Fatalf("expected output to contain %q, but it did not. Actual Output:\n%s", expectedOutput, actualOutput)
+					}
+				}
+
+				var prunedResources []string
+				for _, action := range tf.FakeDynamicClient.Actions() {
+					if action.GetVerb() == "delete" {
+						deleteAction := action.(testing2.DeleteAction)
+						prunedResources = append(prunedResources, deleteAction.GetNamespace()+"/"+deleteAction.GetName())
+					}
+				}
+
+				// Make sure nothing unexpected was pruned
+				for _, resource := range prunedResources {
+					if !slices.Contains(tc.expectedPrunedResources, resource) {
+						t.Fatalf("expected %s not to be pruned, but it was", resource)
+					}
+				}
+
+				// Make sure everything that was expected to be pruned was pruned
+				for _, resource := range tc.expectedPrunedResources {
+					if !slices.Contains(prunedResources, resource) {
+						t.Fatalf("expected %s to be pruned, but it was not", resource)
+					}
+				}
+
+			})
+		}
+	}
+}
+
+func setLastAppliedConfigAnnotation(obj runtime.Object) error {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return err
+	}
+	annotations := accessor.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+		accessor.SetAnnotations(annotations)
+	}
+	annotations[corev1.LastAppliedConfigAnnotation] = runtime.EncodeOrDie(unstructured.NewJSONFallbackEncoder(codec), obj)
+	accessor.SetAnnotations(annotations)
+	return nil
 }
 
 // Tests that apply of object in need of CSA migration results in a call
