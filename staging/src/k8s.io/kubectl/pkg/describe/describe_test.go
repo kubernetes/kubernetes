@@ -2802,6 +2802,30 @@ Annotations:  <none>
 Events:       <none>
 `,
 		},
+		"EmptyBackend": {
+			input: fake.NewSimpleClientset(&networkingv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: networkingv1.IngressSpec{
+					IngressClassName: &ingresClassName,
+				},
+			}),
+			output: `Name:             bar
+Labels:           <none>
+Namespace:        foo
+Address:          
+Ingress Class:    test
+Default backend:  <default>
+Rules:
+  Host        Path  Backends
+  ----        ----  --------
+  *           *     <default>
+Annotations:  <none>
+Events:       <none>
+`,
+		},
 		"EmptyIngressClassName": {
 			input: fake.NewSimpleClientset(&networkingv1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
