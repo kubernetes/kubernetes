@@ -216,7 +216,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	APIResponseCompression: {Default: true, PreRelease: featuregate.Beta},
 
-	APIServerIdentity: {Default: false, PreRelease: featuregate.Alpha},
+	APIServerIdentity: {Default: true, PreRelease: featuregate.Beta},
 
 	APIServerTracing: {Default: false, PreRelease: featuregate.Alpha},
 

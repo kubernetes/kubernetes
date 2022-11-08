@@ -130,6 +130,18 @@ const (
 	repairLoopInterval = 3 * time.Minute
 )
 
+var (
+	// IdentityLeaseGCPeriod is the interval which the lease GC controller checks for expired leases
+	// IdentityLeaseGCPeriod is exposed so integration tests can tune this value.
+	IdentityLeaseGCPeriod = 3600 * time.Second
+	// IdentityLeaseDurationSeconds is the duration of kube-apiserver lease in seconds
+	// IdentityLeaseDurationSeconds is exposed so integration tests can tune this value.
+	IdentityLeaseDurationSeconds = 3600
+	// IdentityLeaseRenewIntervalSeconds is the interval of kube-apiserver renewing its lease in seconds
+	// IdentityLeaseRenewIntervalSeconds is exposed so integration tests can tune this value.
+	IdentityLeaseRenewIntervalPeriod = 10 * time.Second
+)
+
 // ExtraConfig defines extra configuration for the master
 type ExtraConfig struct {
 	ClusterAuthenticationInfo clusterauthenticationtrust.ClusterAuthenticationInfo
@@ -193,9 +205,6 @@ type ExtraConfig struct {
 	ServiceAccountPublicKeys []interface{}
 
 	VersionedInformers informers.SharedInformerFactory
-
-	IdentityLeaseDurationSeconds      int
-	IdentityLeaseRenewIntervalSeconds int
 
 	// RepairServicesInterval interval used by the repair loops for
 	// the Services NodePort and ClusterIP resources
@@ -489,9 +498,9 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 				clock.RealClock{},
 				kubeClient,
 				holderIdentity,
-				int32(c.ExtraConfig.IdentityLeaseDurationSeconds),
+				int32(IdentityLeaseDurationSeconds),
 				nil,
-				time.Duration(c.ExtraConfig.IdentityLeaseRenewIntervalSeconds)*time.Second,
+				IdentityLeaseRenewIntervalPeriod,
 				leaseName,
 				metav1.NamespaceSystem,
 				labelAPIServerHeartbeat)
@@ -505,7 +514,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			}
 			go apiserverleasegc.NewAPIServerLeaseGC(
 				kubeClient,
-				time.Duration(c.ExtraConfig.IdentityLeaseDurationSeconds)*time.Second,
+				IdentityLeaseGCPeriod,
 				metav1.NamespaceSystem,
 				KubeAPIServerIdentityLeaseLabelSelector,
 			).Run(hookContext.StopCh)
