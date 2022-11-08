@@ -1844,7 +1844,8 @@ func TestStatefulSetStatusUpdate(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			set := newStatefulSet(3)
 			client := fake.NewSimpleClientset(set)
-			om, ssu, ssc := setupController(client)
+			om, ssu, ssc, stop := setupController(client)
+			defer close(stop)
 
 			if tc.hasSyncErr {
 				om.SetCreateStatefulPodError(syncErr, 0)
