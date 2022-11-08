@@ -91,6 +91,7 @@ const (
 	// Wait is used when a Permit plugin finds a pod scheduling should wait.
 	Wait
 	// Skip is used when a Bind plugin chooses to skip binding.
+	// Also, if a PreFilter plugin returns Skip, coupled Filter plugin will be skipped.
 	Skip
 )
 

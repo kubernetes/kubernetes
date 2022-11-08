@@ -599,8 +599,10 @@ func (f *frameworkImpl) QueueSortFunc() framework.LessFunc {
 
 // RunPreFilterPlugins runs the set of configured PreFilter plugins. It returns
 // *Status and its code is set to non-success if any of the plugins returns
-// anything but Success. If a non-success status is returned, then the scheduling
-// cycle is aborted.
+// anything but Success/Skip.
+// Plugins that returned Skip status are recorded in the cyclestate,
+// and they are skipped in the Filter extension point.
+// If a non-success status is returned, then the scheduling cycle is aborted.
 func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (_ *framework.PreFilterResult, status *framework.Status) {
 	startTime := time.Now()
 	defer func() {
@@ -608,14 +610,18 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 	}()
 	var result *framework.PreFilterResult
 	var pluginsWithNodes []string
+	skipPlugins := sets.NewString()
 	for _, pl := range f.preFilterPlugins {
 		r, s := f.runPreFilterPlugin(ctx, pl, state, pod)
-		if !s.IsSuccess() {
+		if !s.IsSuccess() && !s.IsSkip() {
 			s.SetFailedPlugin(pl.Name())
 			if s.IsUnschedulable() {
 				return nil, s
 			}
 			return nil, framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", pl.Name(), s.AsError())).WithFailedPlugin(pl.Name())
+		}
+		if s.IsSkip() {
+			skipPlugins.Insert(pl.Name())
 		}
 		if !r.AllNodes() {
 			pluginsWithNodes = append(pluginsWithNodes, pl.Name())
@@ -628,8 +634,8 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 			}
 			return nil, framework.NewStatus(framework.Unschedulable, msg)
 		}
-
 	}
+	state.SkipFilterPlugins = skipPlugins
 	return result, nil
 }
 
@@ -723,8 +729,12 @@ func (f *frameworkImpl) RunFilterPlugins(
 	pod *v1.Pod,
 	nodeInfo *framework.NodeInfo,
 ) framework.PluginToStatus {
+	skippedPlugins := state.SkipFilterPlugins
 	statuses := make(framework.PluginToStatus)
 	for _, pl := range f.filterPlugins {
+		if skippedPlugins.Has(pl.Name()) {
+			continue
+		}
 		pluginStatus := f.runFilterPlugin(ctx, pl, state, pod, nodeInfo)
 		if !pluginStatus.IsSuccess() {
 			if !pluginStatus.IsUnschedulable() {
