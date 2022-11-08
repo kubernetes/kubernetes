@@ -275,6 +275,10 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		volDataKey.attachmentID:        getAttachmentName(volumeHandle, string(c.driverName), nodeName),
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) && selinuxLabelMount {
+		volData[volDataKey.seLinuxMountContext] = mounterArgs.SELinuxLabel
+	}
+
 	err = saveVolumeData(parentDir, volDataFileName, volData)
 	defer func() {
 		// Only if there was an error and volume operation was considered

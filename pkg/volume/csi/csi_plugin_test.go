@@ -29,9 +29,12 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -316,16 +319,20 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	testCases := []struct {
-		name       string
-		originSpec *volume.Spec
-		specVolID  string
-		volHandle  string
-		podUID     types.UID
+		name                      string
+		seLinuxMountEnabled       bool
+		originSpec                *volume.Spec
+		originSELinuxMountContext string
+		specVolID                 string
+		volHandle                 string
+		expectedSELinuxContext    string
+		podUID                    types.UID
 	}{
 		{
-			name:       "construct spec1 from original persistent spec",
-			specVolID:  "test.vol.id",
-			volHandle:  "testvol-handle1",
+			name:      "construct spec1 from original persistent spec",
+			specVolID: "test.vol.id",
+			volHandle: "testvol-handle1",
+
 			originSpec: volume.NewSpecFromPersistentVolume(makeTestPV("test.vol.id", 20, testDriver, "testvol-handle1"), true),
 			podUID:     types.UID(fmt.Sprintf("%08X", rand.Uint64())),
 		},
@@ -336,12 +343,35 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 			originSpec: volume.NewSpecFromPersistentVolume(makeTestPV("spec2", 20, testDriver, "handle2"), true),
 			podUID:     types.UID(fmt.Sprintf("%08X", rand.Uint64())),
 		},
+		{
+			name:                      "construct SELinux context from original persistent spec when the feature is enabled",
+			seLinuxMountEnabled:       true,
+			specVolID:                 "spec3",
+			volHandle:                 "handle3",
+			originSELinuxMountContext: "system_u:object_r:container_file_t:s0:c314,c894",
+			originSpec:                volume.NewSpecFromPersistentVolume(makeTestPV("spec3", 20, testDriver, "handle3"), true),
+			expectedSELinuxContext:    "system_u:object_r:container_file_t:s0:c314,c894",
+			podUID:                    types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+		},
+		{
+			name:                      "construct empty SELinux from original persistent spec when the feature is disabled",
+			seLinuxMountEnabled:       false,
+			specVolID:                 "spec4",
+			volHandle:                 "handle4",
+			originSELinuxMountContext: "system_u:object_r:container_file_t:s0:c314,c894",
+			originSpec:                volume.NewSpecFromPersistentVolume(makeTestPV("spec4", 20, testDriver, "handle4"), true),
+			expectedSELinuxContext:    "", // The context is cleared when the feature gate is off
+			podUID:                    types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+		},
 	}
 
 	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, tc.seLinuxMountEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, tc.seLinuxMountEnabled)()
+
 			mounter, err := plug.NewMounter(
 				tc.originSpec,
 				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
@@ -356,7 +386,7 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 			csiMounter := mounter.(*csiMountMgr)
 
 			mountPath := filepath.Dir(csiMounter.GetPath())
-			err = prepareVolumeInfoFile(mountPath, plug, tc.originSpec.Name(), csiMounter.volumeID, testDriver, string(csiMounter.volumeLifecycleMode))
+			err = prepareVolumeInfoFile(mountPath, plug, tc.originSpec.Name(), csiMounter.volumeID, testDriver, string(csiMounter.volumeLifecycleMode), tc.originSELinuxMountContext)
 			if err != nil {
 				t.Fatalf("failed to save fake volume info file: %s", err)
 			}
@@ -394,6 +424,10 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 
 			if rec.Spec.Name() != tc.specVolID {
 				t.Errorf("Unexpected spec name constructed %s", rec.Spec.Name())
+			}
+
+			if rec.SELinuxMountContext != tc.expectedSELinuxContext {
+				t.Errorf("Expected SELinux context %q, got %q", tc.expectedSELinuxContext, rec.SELinuxMountContext)
 			}
 		})
 	}
@@ -490,7 +524,7 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 			csiMounter := mounter.(*csiMountMgr)
 
 			mountPath := filepath.Dir(csiMounter.GetPath())
-			err = prepareVolumeInfoFile(mountPath, plug, tc.originSpec.Name(), csiMounter.volumeID, testDriver, string(csiMounter.volumeLifecycleMode))
+			err = prepareVolumeInfoFile(mountPath, plug, tc.originSpec.Name(), csiMounter.volumeID, testDriver, string(csiMounter.volumeLifecycleMode), "")
 			if err != nil {
 				t.Fatalf("failed to save fake volume info file: %s", err)
 			}

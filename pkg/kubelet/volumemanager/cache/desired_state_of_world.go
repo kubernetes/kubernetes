@@ -290,7 +290,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 	if err != nil {
 		return "", err
 	}
-	klog.V(4).InfoS("volume final SELinux label decided", "volume", volumeSpec.Name(), "label", seLinuxFileLabel)
+	klog.V(4).InfoS("expected volume SELinux label context", "volume", volumeSpec.Name(), "label", seLinuxFileLabel)
 
 	if vol, volumeExists := dsw.volumesToMount[volumeName]; !volumeExists {
 		var sizeLimit *resource.Quantity
@@ -309,6 +309,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 		}
 		if !util.VolumeSupportsSELinuxMount(volumeSpec) {
 			// Clear SELinux label for the volume with unsupported access modes.
+			klog.V(4).InfoS("volume does not support SELinux context mount, clearing the expected label", "volume", volumeSpec.Name())
 			seLinuxFileLabel = ""
 		}
 		if seLinuxFileLabel != "" {

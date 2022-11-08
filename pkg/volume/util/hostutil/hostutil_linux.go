@@ -299,3 +299,35 @@ func GetModeLinux(pathname string) (os.FileMode, error) {
 	}
 	return info.Mode(), nil
 }
+
+// GetSELinuxMountContext returns value of -o context=XYZ mount option on
+// given mount point.
+func (hu *HostUtil) GetSELinuxMountContext(pathname string) (string, error) {
+	return getSELinuxMountContext(pathname, procMountInfoPath, selinux.GetEnabled)
+}
+
+// getSELinux is common implementation of GetSELinuxSupport on Linux.
+// Using an extra function for unit tests.
+func getSELinuxMountContext(path string, mountInfoFilename string, selinuxEnabled seLinuxEnabledFunc) (string, error) {
+	// Skip /proc/mounts parsing if SELinux is disabled.
+	if !selinuxEnabled() {
+		return "", nil
+	}
+
+	info, err := findMountInfo(path, mountInfoFilename)
+	if err != nil {
+		return "", err
+	}
+
+	for _, opt := range info.SuperOptions {
+		if !strings.HasPrefix(opt, "context=") {
+			continue
+		}
+		// Remove context=
+		context := strings.TrimPrefix(opt, "context=")
+		// Remove double quotes
+		context = strings.Trim(context, "\"")
+		return context, nil
+	}
+	return "", nil
+}

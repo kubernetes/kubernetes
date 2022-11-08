@@ -279,8 +279,23 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (vo
 			},
 		},
 	}
+
+	var mountContext string
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		kvh, ok := plugin.host.(volume.KubeletVolumeHost)
+		if !ok {
+			return volume.ReconstructedVolume{}, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
+		}
+		hu := kvh.GetHostUtil()
+		mountContext, err = hu.GetSELinuxMountContext(mountPath)
+		if err != nil {
+			return volume.ReconstructedVolume{}, err
+		}
+	}
+
 	return volume.ReconstructedVolume{
-		Spec: volume.NewSpecFromVolume(iscsiVolume),
+		Spec:                volume.NewSpecFromVolume(iscsiVolume),
+		SELinuxMountContext: mountContext,
 	}, nil
 }
 

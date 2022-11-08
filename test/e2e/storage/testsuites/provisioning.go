@@ -66,6 +66,7 @@ type StorageClassTest struct {
 	VolumeMode           v1.PersistentVolumeMode
 	AllowVolumeExpansion bool
 	NodeSelection        e2epod.NodeSelection
+	MountOptions         []string
 }
 
 type provisioningTestSuite struct {

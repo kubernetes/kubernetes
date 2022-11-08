@@ -116,3 +116,9 @@ func (hu *FakeHostUtil) GetSELinuxSupport(pathname string) (bool, error) {
 func (hu *FakeHostUtil) GetMode(pathname string) (os.FileMode, error) {
 	return 0, errors.New("not implemented")
 }
+
+// GetSELinuxMountContext returns value of -o context=XYZ mount option on
+// given mount point.
+func (hu *FakeHostUtil) GetSELinuxMountContext(pathname string) (string, error) {
+	return "", errors.New("not implemented")
+}

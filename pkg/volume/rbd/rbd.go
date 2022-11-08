@@ -430,8 +430,18 @@ func (plugin *rbdPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volu
 			},
 		},
 	}
+
+	var mountContext string
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		mountContext, err = hu.GetSELinuxMountContext(mountPath)
+		if err != nil {
+			return volume.ReconstructedVolume{}, err
+		}
+	}
+
 	return volume.ReconstructedVolume{
-		Spec: volume.NewSpecFromVolume(rbdVolume),
+		Spec:                volume.NewSpecFromVolume(rbdVolume),
+		SELinuxMountContext: mountContext,
 	}, nil
 }
 

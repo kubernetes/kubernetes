@@ -309,6 +309,7 @@ type mockCSIDriver struct {
 	embedded               bool
 	calls                  MockCSICalls
 	embeddedCSIDriver      *mockdriver.CSIDriver
+	enableSELinuxMount     *bool
 
 	// Additional values set during PrepareTest
 	clientSet       clientset.Interface
@@ -355,6 +356,7 @@ type CSIMockDriverOpts struct {
 	TokenRequests          []storagev1.TokenRequest
 	RequiresRepublish      *bool
 	FSGroupPolicy          *storagev1.FSGroupPolicy
+	EnableSELinuxMount     *bool
 
 	// Embedded defines whether the CSI mock driver runs
 	// inside the cluster (false, the default) or just a proxy
@@ -507,6 +509,7 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) MockCSITestDriver {
 		requiresRepublish:      driverOpts.RequiresRepublish,
 		fsGroupPolicy:          driverOpts.FSGroupPolicy,
 		enableVolumeMountGroup: driverOpts.EnableVolumeMountGroup,
+		enableSELinuxMount:     driverOpts.EnableSELinuxMount,
 		embedded:               driverOpts.Embedded,
 		hooks:                  driverOpts.Hooks,
 	}
@@ -657,6 +660,7 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) *storageframework.Pe
 		TokenRequests:     m.tokenRequests,
 		RequiresRepublish: m.requiresRepublish,
 		FSGroupPolicy:     m.fsGroupPolicy,
+		SELinuxMount:      m.enableSELinuxMount,
 	}
 	cleanup, err := utils.CreateFromManifests(f, m.driverNamespace, func(item interface{}) error {
 		if err := utils.PatchCSIDeployment(config.Framework, o, item); err != nil {
