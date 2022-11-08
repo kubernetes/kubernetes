@@ -121,3 +121,21 @@ func (lazy *lazyResource) String() string {
 
 	return "unknown"
 }
+
+// lazyScope implements String() string and it will
+// lazily get Scope from request info
+type lazyScope struct {
+	req *http.Request
+}
+
+func (lazy *lazyScope) String() string {
+	if lazy.req != nil {
+		ctx := lazy.req.Context()
+		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
+		if ok {
+			return metrics.CleanScope(requestInfo)
+		}
+	}
+
+	return "unknown"
+}
