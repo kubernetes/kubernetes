@@ -476,7 +476,7 @@ func startServiceAccountTestServerAndWaitForCaches(t *testing.T) (clientset.Inte
 	informers := clientinformers.NewSharedInformerFactory(rootClientset, controller.NoResyncPeriodFunc())
 
 	// Start the service account and service account token controllers
-	tokenGenerator, err := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, serviceAccountKey)
+	tokenGenerator, err := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, "", serviceAccountKey)
 	if err != nil {
 		return rootClientset, clientConfig, stop, err
 	}

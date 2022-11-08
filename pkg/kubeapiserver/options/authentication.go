@@ -90,6 +90,7 @@ type ServiceAccountAuthenticationOptions struct {
 	JWKSURI          string
 	MaxExpiration    time.Duration
 	ExtendExpiration bool
+	KeyServiceURL    string
 }
 
 // TokenFileAuthenticationOptions contains token file authentication options for API Server
@@ -333,6 +334,9 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"{service-account-issuer}/.well-known/openid-configuration. "+
 			"When this flag is specified multiple times, the first is used to generate tokens "+
 			"and all are used to determine which issuers are accepted.")
+
+		fs.StringVar(&o.ServiceAccounts.KeyServiceURL, "key-service-url", o.ServiceAccounts.KeyServiceURL, ""+
+			"Path to a unix socket for external signing of service account tokens. (Requires the 'TokenRequest' and 'ExternalKeyService' feature gates.)")
 
 		fs.StringVar(&o.ServiceAccounts.JWKSURI, "service-account-jwks-uri", o.ServiceAccounts.JWKSURI, ""+
 			"Overrides the URI for the JSON Web Key Set in the discovery doc served at "+
