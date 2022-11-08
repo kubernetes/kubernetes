@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coordinformers "k8s.io/client-go/informers/coordination/v1"
@@ -43,13 +44,14 @@ import (
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/klog/v2/ktesting"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
+	"k8s.io/utils/pointer"
+
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/kubernetes/pkg/util/node"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
-	"k8s.io/utils/pointer"
 )
 
 const (
@@ -3348,6 +3350,144 @@ func Test_isNodeExcludedFromDisruptionChecks(t *testing.T) {
 			if result := isNodeExcludedFromDisruptionChecks(tt.input); result != tt.want {
 				t.Errorf("isNodeExcludedFromDisruptionChecks() = %v, want %v", result, tt.want)
 			}
+		})
+	}
+}
+
+func TestDeleteHealthDataFromNodeHealthMap(t *testing.T) {
+	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
+	nodes := []v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "node0",
+				CreationTimestamp: fakeNow,
+			},
+			Status: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{
+					{
+						Type:               v1.NodeReady,
+						Status:             v1.ConditionTrue,
+						LastHeartbeatTime:  fakeNow,
+						LastTransitionTime: fakeNow,
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "node1",
+				CreationTimestamp: fakeNow,
+			},
+			Status: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{
+					{
+						Type:               v1.NodeReady,
+						Status:             v1.ConditionFalse,
+						LastHeartbeatTime:  fakeNow,
+						LastTransitionTime: fakeNow,
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name   string
+		nodes  []v1.Node
+		delete []string
+		exists []string
+	}{
+		{
+			name:   "delete node0",
+			nodes:  nodes,
+			delete: []string{"node0"},
+			exists: []string{"node1"},
+		},
+		{
+			name:   "delete node1",
+			nodes:  nodes,
+			delete: []string{"node1"},
+			exists: []string{"node0"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			kubeClient := fake.NewSimpleClientset(&v1.NodeList{Items: nodes})
+			factory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+
+			leaseInformer := factory.Coordination().V1().Leases()
+			nodeInformer := factory.Core().V1().Nodes()
+			daemonSetInformer := factory.Apps().V1().DaemonSets()
+
+			nodeController, _ := NewNodeLifecycleController(
+				context.TODO(),
+				leaseInformer,
+				factory.Core().V1().Pods(),
+				nodeInformer,
+				daemonSetInformer,
+				kubeClient,
+				testNodeMonitorPeriod,
+				testNodeStartupGracePeriod,
+				testNodeMonitorGracePeriod,
+				testRateLimiterQPS,
+				testRateLimiterQPS,
+				testLargeClusterThreshold,
+				testUnhealthyThreshold,
+			)
+
+			nodeController.leaseInformerSynced = alwaysReady
+			nodeController.podInformerSynced = alwaysReady
+			nodeController.nodeInformerSynced = alwaysReady
+			nodeController.daemonSetInformerSynced = alwaysReady
+
+			nodeController.now = func() metav1.Time { return fakeNow }
+			nodeController.recorder = testutil.NewFakeRecorder()
+			nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(kubeClient)
+
+			go nodeController.Run(context.TODO())
+			factory.Start(context.TODO().Done())
+
+			factory.WaitForCacheSync(context.TODO().Done())
+
+			if err := wait.PollImmediate(300*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+				for _, no := range nodes {
+					if nodeController.nodeHealthMap.getDeepCopy(no.Name) == nil {
+						return false, nil
+					}
+				}
+				return true, nil
+			}); err != nil {
+				t.Fatalf("unexpected error waiting for node health add to the node health map")
+			}
+
+			for _, no := range tt.delete {
+				if err := kubeClient.CoreV1().Nodes().Delete(context.TODO(), no, metav1.DeleteOptions{}); err != nil {
+					t.Fatalf("failed to delete node %s", no)
+				}
+			}
+
+			if err := wait.PollImmediate(10*time.Millisecond, time.Second, func() (done bool, err error) {
+				for _, no := range tt.delete {
+					if nodeController.nodeHealthMap.getDeepCopy(no) != nil {
+						return false, nil
+					}
+				}
+				return true, nil
+			}); err != nil {
+				t.Errorf("got node existed in nodeHealthMap, want deleted")
+			}
+
+			if err := wait.PollImmediate(10*time.Millisecond, time.Second, func() (done bool, err error) {
+				for _, exist := range tt.exists {
+					if nodeController.nodeHealthMap.getDeepCopy(exist) == nil {
+						return false, nil
+					}
+				}
+				return true, nil
+			}); err != nil {
+				t.Errorf("got node deleted in nodeHealthMap, want existed")
+			}
+
 		})
 	}
 }
