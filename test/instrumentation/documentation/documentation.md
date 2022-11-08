@@ -7,7 +7,7 @@ description: >-
 
 ## Metrics (v1.26)
 
-<!-- (auto-generated 2022 Nov 03) -->
+<!-- (auto-generated 2022 Nov 08) -->
 <!-- (auto-generated v1.26) -->
 This page details the metrics that different Kubernetes components export. You can query the metrics endpoint for these 
 components using an HTTP scrape, and fetch the current metrics data in Prometheus format.
@@ -98,6 +98,41 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_labels_varying"><div class="metric_label">resource</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">cronjob_controller_job_creation_skew_duration_seconds</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">Time between when a cronjob is scheduled to be run, and when the corresponding job is created</td>
+<td class="metric_labels_varying"></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">job_controller_job_pods_finished_total</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">The number of finished Pods that are fully tracked</td>
+<td class="metric_labels_varying"><div class="metric_label">completion_mode</div><div class="metric_label">result</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">job_controller_job_sync_duration_seconds</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">The time it took to sync a job</td>
+<td class="metric_labels_varying"><div class="metric_label">action</div><div class="metric_label">completion_mode</div><div class="metric_label">result</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">job_controller_job_syncs_total</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">The number of job syncs</td>
+<td class="metric_labels_varying"><div class="metric_label">action</div><div class="metric_label">completion_mode</div><div class="metric_label">result</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">job_controller_jobs_finished_total</td>
+<td class="metric_stability_level" data-stability="stable">STABLE</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">The number of finished jobs</td>
+<td class="metric_labels_varying"><div class="metric_label">completion_mode</div><div class="metric_label">reason</div><div class="metric_label">result</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">node_collector_evictions_total</td>
 <td class="metric_stability_level" data-stability="stable">STABLE</td>
 <td class="metric_type" data-type="counter">Counter</td>
@@ -115,7 +150,7 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <tr class="metric"><td class="metric_name">scheduler_pending_pods</td>
 <td class="metric_stability_level" data-stability="stable">STABLE</td>
 <td class="metric_type" data-type="gauge">Gauge</td>
-<td class="metric_description">Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods.</td>
+<td class="metric_description">Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable pods that the scheduler never attempted to schedule because they are gated.</td>
 <td class="metric_labels_varying"><div class="metric_label">queue</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
@@ -432,10 +467,52 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_labels_varying"><div class="metric_label">flow_schema</div><div class="metric_label">priority_level</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">apiserver_flowcontrol_current_limit_seats</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="gauge">Gauge</td>
+<td class="metric_description">current derived number of execution seats available to each priority level</td>
+<td class="metric_labels_varying"><div class="metric_label">priority_level</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">apiserver_flowcontrol_current_r</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="gauge">Gauge</td>
 <td class="metric_description">R(time of last change)</td>
+<td class="metric_labels_varying"><div class="metric_label">priority_level</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">apiserver_flowcontrol_demand_seats</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="timingratiohistogram">TimingRatioHistogram</td>
+<td class="metric_description">Observations, at the end of every nanosecond, of (the number of seats each priority level could use) / (nominal number of seats for that level)</td>
+<td class="metric_labels_varying"><div class="metric_label">priority_level</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">apiserver_flowcontrol_demand_seats_average</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="gauge">Gauge</td>
+<td class="metric_description">Time-weighted average, over last adjustment period, of demand_seats</td>
+<td class="metric_labels_varying"><div class="metric_label">priority_level</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">apiserver_flowcontrol_demand_seats_high_watermark</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="gauge">Gauge</td>
+<td class="metric_description">High watermark, over last adjustment period, of demand_seats</td>
+<td class="metric_labels_varying"><div class="metric_label">priority_level</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">apiserver_flowcontrol_demand_seats_smoothed</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="gauge">Gauge</td>
+<td class="metric_description">Smoothed seat demands</td>
+<td class="metric_labels_varying"><div class="metric_label">priority_level</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">apiserver_flowcontrol_demand_seats_stdev</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="gauge">Gauge</td>
+<td class="metric_description">Time-weighted standard deviation, over last adjustment period, of demand_seats</td>
 <td class="metric_labels_varying"><div class="metric_label">priority_level</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
@@ -467,6 +544,13 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_labels_varying"><div class="metric_label">priority_level</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">apiserver_flowcontrol_lower_limit_seats</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="gauge">Gauge</td>
+<td class="metric_description">Configured lower bound on number of execution seats available to each priority level</td>
+<td class="metric_labels_varying"><div class="metric_label">priority_level</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">apiserver_flowcontrol_next_discounted_s_bounds</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="gauge">Gauge</td>
@@ -479,6 +563,13 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_type" data-type="gauge">Gauge</td>
 <td class="metric_description">min and max, over queues, of S(oldest waiting request in queue)</td>
 <td class="metric_labels_varying"><div class="metric_label">bound</div><div class="metric_label">priority_level</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">apiserver_flowcontrol_nominal_limit_seats</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="gauge">Gauge</td>
+<td class="metric_description">Nominal number of execution seats configured for each priority level</td>
+<td class="metric_labels_varying"><div class="metric_label">priority_level</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">apiserver_flowcontrol_priority_level_request_utilization</td>
@@ -551,6 +642,27 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_labels_varying"><div class="metric_label">execute</div><div class="metric_label">flow_schema</div><div class="metric_label">priority_level</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">apiserver_flowcontrol_seat_fair_frac</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="gauge">Gauge</td>
+<td class="metric_description">Fair fraction of server's concurrency to allocate to each priority level that can use it</td>
+<td class="metric_labels_varying"></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">apiserver_flowcontrol_target_seats</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="gauge">Gauge</td>
+<td class="metric_description">Seat allocation targets</td>
+<td class="metric_labels_varying"><div class="metric_label">priority_level</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">apiserver_flowcontrol_upper_limit_seats</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="gauge">Gauge</td>
+<td class="metric_description">Configured upper bound on number of execution seats available to each priority level</td>
+<td class="metric_labels_varying"><div class="metric_label">priority_level</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">apiserver_flowcontrol_watch_count_samples</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="histogram">Histogram</td>
@@ -614,13 +726,20 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_labels_varying"><div class="metric_label">source</div><div class="metric_label">status</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
-<tr class="metric"><td class="metric_name">apiserver_request_slo_duration_seconds</td>
+<tr class="metric"><td class="metric_name">apiserver_request_sli_duration_seconds</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="histogram">Histogram</td>
 <td class="metric_description">Response latency distribution (not counting webhook duration) in seconds for each verb, group, version, resource, subresource, scope and component.</td>
 <td class="metric_labels_varying"><div class="metric_label">component</div><div class="metric_label">group</div><div class="metric_label">resource</div><div class="metric_label">scope</div><div class="metric_label">subresource</div><div class="metric_label">verb</div><div class="metric_label">version</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">apiserver_request_slo_duration_seconds</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">Response latency distribution (not counting webhook duration) in seconds for each verb, group, version, resource, subresource, scope and component.</td>
+<td class="metric_labels_varying"><div class="metric_label">component</div><div class="metric_label">group</div><div class="metric_label">resource</div><div class="metric_label">scope</div><div class="metric_label">subresource</div><div class="metric_label">verb</div><div class="metric_label">version</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version">1.27.0</td></tr>
 <tr class="metric"><td class="metric_name">apiserver_request_terminations_total</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="counter">Counter</td>
@@ -985,13 +1104,6 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_labels_varying"><div class="metric_label">container</div><div class="metric_label">pod</div><div class="metric_label">namespace</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
-<tr class="metric"><td class="metric_name">cronjob_controller_cronjob_job_creation_skew_duration_seconds</td>
-<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
-<td class="metric_type" data-type="histogram">Histogram</td>
-<td class="metric_description">Time between when a cronjob is scheduled to be run, and when the corresponding job is created</td>
-<td class="metric_labels_varying"></td>
-<td class="metric_labels_constant"></td>
-<td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">csi_operations_seconds</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="histogram">Histogram</td>
@@ -1186,34 +1298,6 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_type" data-type="counter">Counter</td>
 <td class="metric_description">Counter of failed Token() requests to the alternate token source</td>
 <td class="metric_labels_varying"></td>
-<td class="metric_labels_constant"></td>
-<td class="metric_deprecated_version"></td></tr>
-<tr class="metric"><td class="metric_name">job_controller_job_finished_total</td>
-<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
-<td class="metric_type" data-type="counter">Counter</td>
-<td class="metric_description">The number of finished job</td>
-<td class="metric_labels_varying"><div class="metric_label">completion_mode</div><div class="metric_label">reason</div><div class="metric_label">result</div></td>
-<td class="metric_labels_constant"></td>
-<td class="metric_deprecated_version"></td></tr>
-<tr class="metric"><td class="metric_name">job_controller_job_pods_finished_total</td>
-<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
-<td class="metric_type" data-type="counter">Counter</td>
-<td class="metric_description">The number of finished Pods that are fully tracked</td>
-<td class="metric_labels_varying"><div class="metric_label">completion_mode</div><div class="metric_label">result</div></td>
-<td class="metric_labels_constant"></td>
-<td class="metric_deprecated_version"></td></tr>
-<tr class="metric"><td class="metric_name">job_controller_job_sync_duration_seconds</td>
-<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
-<td class="metric_type" data-type="histogram">Histogram</td>
-<td class="metric_description">The time it took to sync a job</td>
-<td class="metric_labels_varying"><div class="metric_label">action</div><div class="metric_label">completion_mode</div><div class="metric_label">result</div></td>
-<td class="metric_labels_constant"></td>
-<td class="metric_deprecated_version"></td></tr>
-<tr class="metric"><td class="metric_name">job_controller_job_sync_total</td>
-<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
-<td class="metric_type" data-type="counter">Counter</td>
-<td class="metric_description">The number of job syncs</td>
-<td class="metric_labels_varying"><div class="metric_label">action</div><div class="metric_label">completion_mode</div><div class="metric_label">result</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">job_controller_pod_failures_handled_by_failure_policy_total</td>
@@ -1514,6 +1598,13 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="histogram">Histogram</td>
 <td class="metric_description">Duration in seconds from kubelet seeing a pod for the first time to the pod starting to run</td>
+<td class="metric_labels_varying"></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">kubelet_pod_start_sli_duration_seconds</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">Duration in seconds to start a pod, excluding time to pull images and run init containers, measured from pod creation timestamp to when all its containers are reported as started and observed via watch</td>
 <td class="metric_labels_varying"></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
@@ -1942,6 +2033,20 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_type" data-type="custom">Custom</td>
 <td class="metric_description">Cumulative cpu time consumed by the pod in core-seconds</td>
 <td class="metric_labels_varying"><div class="metric_label">pod</div><div class="metric_label">namespace</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">pod_gc_collector_force_delete_pod_errors_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Number of errors encountered when forcefully deleting the pods since the Pod GC Controller started.</td>
+<td class="metric_labels_varying"></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">pod_gc_collector_force_delete_pods_total</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Number of pods that are being forcefully deleted since the Pod GC Controller started.</td>
+<td class="metric_labels_varying"></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">pod_memory_working_set_bytes</td>

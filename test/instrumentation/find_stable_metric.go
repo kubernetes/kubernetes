@@ -80,7 +80,6 @@ func (f *stableMetricFinder) Visit(node ast.Node) (w ast.Visitor) {
 						return nil
 					}
 				}
-
 			} else {
 				f.currentFunctionCall = opts
 			}

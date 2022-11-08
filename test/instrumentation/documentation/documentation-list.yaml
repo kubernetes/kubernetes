@@ -12,23 +12,6 @@
     certificate is invalid or unused, the value will be +INF.
   type: Gauge
   stabilityLevel: ALPHA
-- name: cronjob_job_creation_skew_duration_seconds
-  subsystem: cronjob_controller
-  help: Time between when a cronjob is scheduled to be run, and when the corresponding
-    job is created
-  type: Histogram
-  stabilityLevel: ALPHA
-  buckets:
-  - 1
-  - 2
-  - 4
-  - 8
-  - 16
-  - 32
-  - 64
-  - 128
-  - 256
-  - 512
 - name: changes
   subsystem: endpoint_slice_controller
   help: Number of EndpointSlice changes
@@ -270,6 +253,23 @@
   stabilityLevel: ALPHA
   labels:
   - code
+- name: job_creation_skew_duration_seconds
+  subsystem: cronjob_controller
+  help: Time between when a cronjob is scheduled to be run, and when the corresponding
+    job is created
+  type: Histogram
+  stabilityLevel: STABLE
+  buckets:
+  - 1
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+  - 128
+  - 256
+  - 512
 - name: attachdetach_controller_forced_detaches
   help: Number of times the A/D Controller performed a forced detach
   type: Counter
@@ -281,57 +281,6 @@
   labels:
   - plugin_name
   - state
-- name: job_finished_total
-  subsystem: job_controller
-  help: The number of finished job
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - completion_mode
-  - reason
-  - result
-- name: job_pods_finished_total
-  subsystem: job_controller
-  help: The number of finished Pods that are fully tracked
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - completion_mode
-  - result
-- name: job_sync_duration_seconds
-  subsystem: job_controller
-  help: The time it took to sync a job
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - action
-  - completion_mode
-  - result
-  buckets:
-  - 0.001
-  - 0.002
-  - 0.004
-  - 0.008
-  - 0.016
-  - 0.032
-  - 0.064
-  - 0.128
-  - 0.256
-  - 0.512
-  - 1.024
-  - 2.048
-  - 4.096
-  - 8.192
-  - 16.384
-- name: job_sync_total
-  subsystem: job_controller
-  help: The number of job syncs
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - action
-  - completion_mode
-  - result
 - name: pod_failures_handled_by_failure_policy_total
   subsystem: job_controller
   help: "`The number of failed Pods handled by failure policy with\n\t\t\trespect
@@ -450,6 +399,18 @@
   stabilityLevel: ALPHA
   labels:
   - clusterCIDR
+- name: force_delete_pod_errors_total
+  subsystem: pod_gc_collector
+  help: Number of errors encountered when forcefully deleting the pods since the Pod
+    GC Controller started.
+  type: Counter
+  stabilityLevel: ALPHA
+- name: force_delete_pods_total
+  subsystem: pod_gc_collector
+  help: Number of pods that are being forcefully deleted since the Pod GC Controller
+    started.
+  type: Counter
+  stabilityLevel: ALPHA
 - name: sorting_deletion_age_ratio
   subsystem: replicaset_controller
   help: The ratio of chosen deleted pod's ages to the current youngest pod's age (at
@@ -493,6 +454,57 @@
   - 204.8
   - 409.6
   - 819.2
+- name: job_pods_finished_total
+  subsystem: job_controller
+  help: The number of finished Pods that are fully tracked
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - completion_mode
+  - result
+- name: job_sync_duration_seconds
+  subsystem: job_controller
+  help: The time it took to sync a job
+  type: Histogram
+  stabilityLevel: STABLE
+  labels:
+  - action
+  - completion_mode
+  - result
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+- name: job_syncs_total
+  subsystem: job_controller
+  help: The number of job syncs
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - action
+  - completion_mode
+  - result
+- name: jobs_finished_total
+  subsystem: job_controller
+  help: The number of finished jobs
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - completion_mode
+  - reason
+  - result
 - name: evictions_total
   subsystem: node_collector
   help: Number of Node evictions that happened since current instance of NodeController
@@ -758,48 +770,6 @@
   help: Last graceful shutdown start time since unix epoch in seconds
   type: Gauge
   stabilityLevel: ALPHA
-- name: http_inflight_requests
-  subsystem: kubelet
-  help: Number of the inflight http requests
-  type: Gauge
-  stabilityLevel: ALPHA
-  labels:
-  - long_running
-  - method
-  - path
-  - server_type
-- name: http_requests_duration_seconds
-  subsystem: kubelet
-  help: Duration in seconds to serve http requests
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - long_running
-  - method
-  - path
-  - server_type
-  buckets:
-  - 0.005
-  - 0.01
-  - 0.025
-  - 0.05
-  - 0.1
-  - 0.25
-  - 0.5
-  - 1
-  - 2.5
-  - 5
-  - 10
-- name: http_requests_total
-  subsystem: kubelet
-  help: Number of the http requests received since the server started
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - long_running
-  - method
-  - path
-  - server_type
 - name: lifecycle_handler_http_fallbacks_total
   subsystem: kubelet
   help: The number of times lifecycle handlers successfully fell back to http from
@@ -922,6 +892,39 @@
   - 2.5
   - 5
   - 10
+- name: pod_start_sli_duration_seconds
+  subsystem: kubelet
+  help: Duration in seconds to start a pod, excluding time to pull images and run
+    init containers, measured from pod creation timestamp to when all its containers
+    are reported as started and observed via watch
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 0.5
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 8
+  - 10
+  - 20
+  - 30
+  - 45
+  - 60
+  - 120
+  - 180
+  - 240
+  - 300
+  - 360
+  - 480
+  - 600
+  - 900
+  - 1200
+  - 1800
+  - 2700
+  - 3600
 - name: pod_status_sync_duration_seconds
   subsystem: kubelet
   help: Duration in seconds to sync a pod status update. Measures time from detection
@@ -1103,25 +1106,6 @@
   help: Cumulative number of pods started
   type: Counter
   stabilityLevel: ALPHA
-- name: volume_metric_collection_duration_seconds
-  subsystem: kubelet
-  help: Duration in seconds to calculate volume stats
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - metric_source
-  buckets:
-  - 0.005
-  - 0.01
-  - 0.025
-  - 0.05
-  - 0.1
-  - 0.25
-  - 0.5
-  - 1
-  - 2.5
-  - 5
-  - 10
 - name: kubelet_volume_stats_available_bytes
   help: Number of available bytes in the volume
   type: Custom
@@ -1228,24 +1212,67 @@
   help: 1 if there was an error while getting container metrics, 0 otherwise
   type: Custom
   stabilityLevel: ALPHA
-- name: csr_honored_duration_total
-  subsystem: certificates_registry
-  namespace: apiserver
-  help: Total number of issued CSRs with a requested duration that was honored, sliced
-    by signer (only kubernetes.io signer names are specifically identified)
+- name: http_inflight_requests
+  subsystem: kubelet
+  help: Number of the inflight http requests
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - long_running
+  - method
+  - path
+  - server_type
+- name: http_requests_duration_seconds
+  subsystem: kubelet
+  help: Duration in seconds to serve http requests
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - long_running
+  - method
+  - path
+  - server_type
+  buckets:
+  - 0.005
+  - 0.01
+  - 0.025
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 5
+  - 10
+- name: http_requests_total
+  subsystem: kubelet
+  help: Number of the http requests received since the server started
   type: Counter
   stabilityLevel: ALPHA
   labels:
-  - signerName
-- name: csr_requested_duration_total
-  subsystem: certificates_registry
-  namespace: apiserver
-  help: Total number of issued CSRs with a requested duration, sliced by signer (only
-    kubernetes.io signer names are specifically identified)
-  type: Counter
+  - long_running
+  - method
+  - path
+  - server_type
+- name: volume_metric_collection_duration_seconds
+  subsystem: kubelet
+  help: Duration in seconds to calculate volume stats
+  type: Histogram
   stabilityLevel: ALPHA
   labels:
-  - signerName
+  - metric_source
+  buckets:
+  - 0.005
+  - 0.01
+  - 0.025
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 5
+  - 10
 - name: network_programming_duration_seconds
   subsystem: kubeproxy
   help: In Cluster Network Programming Latency in seconds
@@ -1457,6 +1484,24 @@
   labels:
   - plugin_name
   - state
+- name: csr_honored_duration_total
+  subsystem: certificates_registry
+  namespace: apiserver
+  help: Total number of issued CSRs with a requested duration that was honored, sliced
+    by signer (only kubernetes.io signer names are specifically identified)
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - signerName
+- name: csr_requested_duration_total
+  subsystem: certificates_registry
+  namespace: apiserver
+  help: Total number of issued CSRs with a requested duration, sliced by signer (only
+    kubernetes.io signer names are specifically identified)
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - signerName
 - name: allocated_ips
   subsystem: clusterip_allocator
   namespace: kube_apiserver
@@ -1723,7 +1768,9 @@
   subsystem: scheduler
   help: Number of pending pods, by the queue type. 'active' means number of pods in
     activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number
-    of pods in unschedulablePods.
+    of pods in unschedulablePods that the scheduler attempted to schedule and failed;
+    'gated' is the number of unschedulable pods that the scheduler never attempted
+    to schedule because they are gated.
   type: Gauge
   stabilityLevel: STABLE
   labels:
@@ -1959,52 +2006,6 @@
   - 4.096
   - 8.192
   - 16.384
-- name: check_duration_seconds
-  subsystem: validating_admission_policy
-  namespace: apiserver
-  help: Validation admission latency for individual validation expressions in seconds,
-    labeled by policy and param resource, further including binding, state and enforcement
-    action taken.
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - enforcement_action
-  - params
-  - policy
-  - policy_binding
-  - state
-  - validation_expression
-  buckets:
-  - 5e-07
-  - 0.001
-  - 0.01
-  - 0.1
-  - 1
-- name: check_total
-  subsystem: validating_admission_policy
-  namespace: apiserver
-  help: Validation admission policy check total, labeled by policy and param resource,
-    and further identified by binding, validation expression, enforcement action taken,
-    and state.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - enforcement_action
-  - params
-  - policy
-  - policy_binding
-  - state
-  - validation_expression
-- name: definition_total
-  subsystem: validating_admission_policy
-  namespace: apiserver
-  help: Validation admission policy count total, labeled by state and enforcement
-    action.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - enforcement_action
-  - state
 - name: step_admission_duration_seconds_summary
   subsystem: admission
   namespace: apiserver
@@ -2060,52 +2061,52 @@
   - operation
   - rejected
   - type
-- name: error_total
-  subsystem: apiserver_audit
-  help: Counter of audit events that failed to be audited properly. Plugin identifies
-    the plugin affected by the error.
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - plugin
-- name: event_total
-  subsystem: apiserver_audit
-  help: Counter of audit events generated and sent to the audit backend.
-  type: Counter
-  stabilityLevel: ALPHA
-- name: level_total
-  subsystem: apiserver_audit
-  help: Counter of policy levels for audit events (1 per request).
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - level
-- name: requests_rejected_total
-  subsystem: apiserver_audit
-  help: Counter of apiserver requests rejected due to an error in audit logging backend.
-  type: Counter
-  stabilityLevel: ALPHA
-- name: apiserver_delegated_authn_request_duration_seconds
-  help: Request latency in seconds. Broken down by status code.
+- name: check_duration_seconds
+  subsystem: validating_admission_policy
+  namespace: apiserver
+  help: Validation admission latency for individual validation expressions in seconds,
+    labeled by policy and param resource, further including binding, state and enforcement
+    action taken.
   type: Histogram
   stabilityLevel: ALPHA
   labels:
-  - code
+  - enforcement_action
+  - params
+  - policy
+  - policy_binding
+  - state
+  - validation_expression
   buckets:
-  - 0.25
-  - 0.5
-  - 0.7
+  - 5e-07
+  - 0.001
+  - 0.01
+  - 0.1
   - 1
-  - 1.5
-  - 3
-  - 5
-  - 10
-- name: apiserver_delegated_authn_request_total
-  help: Number of HTTP requests partitioned by status code.
+- name: check_total
+  subsystem: validating_admission_policy
+  namespace: apiserver
+  help: Validation admission policy check total, labeled by policy and param resource,
+    and further identified by binding, validation expression, enforcement action taken,
+    and state.
   type: Counter
   stabilityLevel: ALPHA
   labels:
-  - code
+  - enforcement_action
+  - params
+  - policy
+  - policy_binding
+  - state
+  - validation_expression
+- name: definition_total
+  subsystem: validating_admission_policy
+  namespace: apiserver
+  help: Validation admission policy count total, labeled by state and enforcement
+    action.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - enforcement_action
+  - state
 - name: controller_admission_duration_seconds
   subsystem: admission
   namespace: apiserver
@@ -2162,6 +2163,31 @@
   - 0.5
   - 1
   - 2.5
+- name: error_total
+  subsystem: apiserver_audit
+  help: Counter of audit events that failed to be audited properly. Plugin identifies
+    the plugin affected by the error.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - plugin
+- name: event_total
+  subsystem: apiserver_audit
+  help: Counter of audit events generated and sent to the audit backend.
+  type: Counter
+  stabilityLevel: ALPHA
+- name: level_total
+  subsystem: apiserver_audit
+  help: Counter of policy levels for audit events (1 per request).
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - level
+- name: requests_rejected_total
+  subsystem: apiserver_audit
+  help: Counter of apiserver requests rejected due to an error in audit logging backend.
+  type: Counter
+  stabilityLevel: ALPHA
 - name: compilation_duration_seconds
   subsystem: cel
   namespace: apiserver
@@ -2202,6 +2228,27 @@
   stabilityLevel: ALPHA
   labels:
   - request_kind
+- name: apiserver_delegated_authn_request_duration_seconds
+  help: Request latency in seconds. Broken down by status code.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - code
+  buckets:
+  - 0.25
+  - 0.5
+  - 0.7
+  - 1
+  - 1.5
+  - 3
+  - 5
+  - 10
+- name: apiserver_delegated_authn_request_total
+  help: Number of HTTP requests partitioned by status code.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - code
 - name: apiserver_delegated_authz_request_duration_seconds
   help: Request latency in seconds. Broken down by status code.
   type: Histogram
@@ -2223,45 +2270,6 @@
   stabilityLevel: ALPHA
   labels:
   - code
-- name: dial_duration_seconds
-  subsystem: egress_dialer
-  namespace: apiserver
-  help: Dial latency histogram in seconds, labeled by the protocol (http-connect or
-    grpc), transport (tcp or uds)
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - protocol
-  - transport
-  buckets:
-  - 0.005
-  - 0.025
-  - 0.1
-  - 0.5
-  - 2.5
-  - 12.5
-- name: dial_failure_count
-  subsystem: egress_dialer
-  namespace: apiserver
-  help: Dial failure count, labeled by the protocol (http-connect or grpc), transport
-    (tcp or uds), and stage (connect or proxy). The stage indicates at which stage
-    the dial failed
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - protocol
-  - stage
-  - transport
-- name: dial_start_total
-  subsystem: egress_dialer
-  namespace: apiserver
-  help: Dial starts, labeled by the protocol (http-connect or grpc) and transport
-    (tcp or uds).
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - protocol
-  - transport
 - name: request_aborts_total
   subsystem: apiserver
   help: Number of requests which apiserver aborted possibly due to a timeout, for
@@ -2342,11 +2350,48 @@
   labels:
   - source
   - status
+- name: request_sli_duration_seconds
+  subsystem: apiserver
+  help: Response latency distribution (not counting webhook duration) in seconds for
+    each verb, group, version, resource, subresource, scope and component.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - component
+  - group
+  - resource
+  - scope
+  - subresource
+  - verb
+  - version
+  buckets:
+  - 0.05
+  - 0.1
+  - 0.2
+  - 0.4
+  - 0.6
+  - 0.8
+  - 1
+  - 1.25
+  - 1.5
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 8
+  - 10
+  - 15
+  - 20
+  - 30
+  - 45
+  - 60
 - name: request_slo_duration_seconds
   subsystem: apiserver
   help: Response latency distribution (not counting webhook duration) in seconds for
     each verb, group, version, resource, subresource, scope and component.
   type: Histogram
+  deprecatedVersion: 1.27.0
   stabilityLevel: ALPHA
   labels:
   - component
@@ -2678,6 +2723,45 @@
   labels:
   - index
   - resource_prefix
+- name: dial_duration_seconds
+  subsystem: egress_dialer
+  namespace: apiserver
+  help: Dial latency histogram in seconds, labeled by the protocol (http-connect or
+    grpc), transport (tcp or uds)
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - protocol
+  - transport
+  buckets:
+  - 0.005
+  - 0.025
+  - 0.1
+  - 0.5
+  - 2.5
+  - 12.5
+- name: dial_failure_count
+  subsystem: egress_dialer
+  namespace: apiserver
+  help: Dial failure count, labeled by the protocol (http-connect or grpc), transport
+    (tcp or uds), and stage (connect or proxy). The stage indicates at which stage
+    the dial failed
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - protocol
+  - stage
+  - transport
+- name: dial_start_total
+  subsystem: egress_dialer
+  namespace: apiserver
+  help: Dial starts, labeled by the protocol (http-connect or grpc) and transport
+    (tcp or uds).
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - protocol
+  - transport
 - name: dek_cache_fill_percent
   subsystem: envelope_encryption
   namespace: apiserver
@@ -2723,10 +2807,72 @@
   labels:
   - flow_schema
   - priority_level
+- name: current_limit_seats
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: current derived number of execution seats available to each priority level
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - priority_level
 - name: current_r
   subsystem: flowcontrol
   namespace: apiserver
   help: R(time of last change)
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - priority_level
+- name: demand_seats
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Observations, at the end of every nanosecond, of (the number of seats each
+    priority level could use) / (nominal number of seats for that level)
+  type: TimingRatioHistogram
+  stabilityLevel: ALPHA
+  labels:
+  - priority_level
+  buckets:
+  - 0.2
+  - 0.4
+  - 0.6
+  - 0.8
+  - 1
+  - 1.2
+  - 1.4
+  - 1.7
+  - 2
+  - 2.8
+  - 4
+  - 6
+- name: demand_seats_average
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Time-weighted average, over last adjustment period, of demand_seats
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - priority_level
+- name: demand_seats_high_watermark
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: High watermark, over last adjustment period, of demand_seats
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - priority_level
+- name: demand_seats_smoothed
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Smoothed seat demands
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - priority_level
+- name: demand_seats_stdev
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Time-weighted standard deviation, over last adjustment period, of demand_seats
   type: Gauge
   stabilityLevel: ALPHA
   labels:
@@ -2765,6 +2911,15 @@
   stabilityLevel: ALPHA
   labels:
   - priority_level
+- name: lower_limit_seats
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Configured lower bound on number of execution seats available to each priority
+    level
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - priority_level
 - name: next_discounted_s_bounds
   subsystem: flowcontrol
   namespace: apiserver
@@ -2783,6 +2938,14 @@
   stabilityLevel: ALPHA
   labels:
   - bound
+  - priority_level
+- name: nominal_limit_seats
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Nominal number of execution seats configured for each priority level
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
   - priority_level
 - name: priority_level_request_utilization
   subsystem: flowcontrol
@@ -2962,6 +3125,30 @@
   - 5
   - 10
   - 30
+- name: seat_fair_frac
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Fair fraction of server's concurrency to allocate to each priority level that
+    can use it
+  type: Gauge
+  stabilityLevel: ALPHA
+- name: target_seats
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Seat allocation targets
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - priority_level
+- name: upper_limit_seats
+  subsystem: flowcontrol
+  namespace: apiserver
+  help: Configured upper bound on number of execution seats available to each priority
+    level
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - priority_level
 - name: watch_count_samples
   subsystem: flowcontrol
   namespace: apiserver
@@ -3516,22 +3703,6 @@
   - 0.1
   - 1
   - 10
-- name: x509_insecure_sha1_total
-  subsystem: kube_aggregator
-  namespace: apiserver
-  help: Counts the number of requests to servers with insecure SHA1 signatures in
-    their serving certificate OR the number of connection failures due to the insecure
-    SHA1 signatures (either/or, based on the runtime environment)
-  type: Counter
-  stabilityLevel: ALPHA
-- name: x509_missing_san_total
-  subsystem: kube_aggregator
-  namespace: apiserver
-  help: Counts the number of requests to servers missing SAN extension in their serving
-    certificate OR the number of connection failures due to the lack of x509 certificate
-    SAN extension missing (either/or, based on the runtime environment)
-  type: Counter
-  stabilityLevel: ALPHA
 - name: aggregator_openapi_v2_regeneration_count
   help: Counter of OpenAPI v2 spec regeneration count broken down by causing APIService
     name and reason.
@@ -3561,6 +3732,22 @@
   labels:
   - name
   - reason
+- name: x509_insecure_sha1_total
+  subsystem: kube_aggregator
+  namespace: apiserver
+  help: Counts the number of requests to servers with insecure SHA1 signatures in
+    their serving certificate OR the number of connection failures due to the insecure
+    SHA1 signatures (either/or, based on the runtime environment)
+  type: Counter
+  stabilityLevel: ALPHA
+- name: x509_missing_san_total
+  subsystem: kube_aggregator
+  namespace: apiserver
+  help: Counts the number of requests to servers missing SAN extension in their serving
+    certificate OR the number of connection failures due to the lack of x509 certificate
+    SAN extension missing (either/or, based on the runtime environment)
+  type: Counter
+  stabilityLevel: ALPHA
 - name: cloudprovider_aws_api_request_duration_seconds
   help: Latency of AWS API calls
   type: Histogram
@@ -3668,6 +3855,12 @@
   - resource_group
   - source
   - subscription_id
+- name: number_of_l4_ilbs
+  help: Number of L4 ILBs
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - feature
 - name: cloudprovider_gce_api_request_duration_seconds
   help: Latency of a GCE API call
   type: Histogram
@@ -3726,12 +3919,6 @@
   help: Counter of failed Token() requests to the alternate token source
   type: Counter
   stabilityLevel: ALPHA
-- name: number_of_l4_ilbs
-  help: Number of L4 ILBs
-  type: Gauge
-  stabilityLevel: ALPHA
-  labels:
-  - feature
 - name: pod_security_errors_total
   help: Number of errors preventing normal evaluation. Non-fatal errors may result
     in the latest restricted profile being used for evaluation.

@@ -126,17 +126,17 @@ func (c *metricDecoder) decodeDesc(ce *ast.CallExpr) (metric, error) {
 	m := &metric{}
 	name, err := c.decodeString(ce.Args[0])
 	if err != nil {
-		return *m, newDecodeErrorf(ce, "can't decode string")
+		return *m, newDecodeErrorf(ce, errorDecodingString)
 	}
 	m.Name = *name
 	help, err := c.decodeString(ce.Args[1])
 	if err != nil {
-		return *m, newDecodeErrorf(ce, "can't decode string")
+		return *m, newDecodeErrorf(ce, errorDecodingString)
 	}
 	m.Help = *help
 	labels, err := c.decodeLabels(ce.Args[2])
 	if err != nil {
-		return *m, newDecodeErrorf(ce, "can't decode labels")
+		return *m, newDecodeErrorf(ce, errorDecodingLabels)
 	}
 	m.Labels = labels
 	cLabels, err := c.decodeConstLabels(ce.Args[3])
@@ -153,7 +153,7 @@ func (c *metricDecoder) decodeDesc(ce *ast.CallExpr) (metric, error) {
 	}
 	deprecatedVersion, err := c.decodeString(ce.Args[5])
 	if err != nil {
-		return *m, newDecodeErrorf(ce, "can't decode string")
+		return *m, newDecodeErrorf(ce, errorDecodingString)
 	}
 	if deprecatedVersion != nil {
 		m.DeprecatedVersion = *deprecatedVersion
@@ -250,7 +250,7 @@ func (c *metricDecoder) decodeString(expr ast.Expr) (*string, error) {
 		}
 		return &value, nil
 	}
-	return nil, fmt.Errorf("can't decode string")
+	return nil, newDecodeErrorf(expr, errorDecodingString)
 }
 
 func (c *metricDecoder) decodeMetricVec(call *ast.CallExpr) (metric, error) {
@@ -307,11 +307,11 @@ func (c *metricDecoder) decodeLabels(expr ast.Expr) ([]string, error) {
 			}
 			variableExpr, found := c.variables[e.Name]
 			if !found {
-				return nil, newDecodeErrorf(expr, "couldn't find variable for labels")
+				return nil, newDecodeErrorf(expr, errorFindingVariableForLabels)
 			}
 			cl2, ok := variableExpr.(*ast.CompositeLit)
 			if !ok {
-				return nil, newDecodeErrorf(expr, "couldn't interpret variable for labels")
+				return nil, newDecodeErrorf(expr, errorFindingVariableForLabels)
 			}
 			cl = cl2
 		}
@@ -435,7 +435,7 @@ func (c *metricDecoder) decodeBuckets(expr ast.Expr) ([]float64, error) {
 				return float64s, err2
 			}
 		default:
-			return nil, newDecodeErrorf(v, "couldn't find variable for bucket")
+			return nil, newDecodeErrorf(v, errorFindingVariableForBuckets)
 		}
 
 	case *ast.CompositeLit:
@@ -478,7 +478,7 @@ func (c *metricDecoder) decodeBucketFunctionCall(v *ast.CallExpr) ([]float64, er
 					}
 					firstArg, secondArg, thirdArg, err := decodeBucketArguments(v2)
 					if err != nil {
-						return nil, err, true
+						return nil, newDecodeErrorf(v, errBuckets), true
 					}
 					switch functionName {
 					case "LinearBuckets":
@@ -520,7 +520,7 @@ func (c *metricDecoder) decodeBucketFunctionCall(v *ast.CallExpr) ([]float64, er
 			case *ast.CompositeLit:
 				fs, err := decodeListOfFloats(argExpr, argExpr.Elts)
 				if err != nil {
-					return nil, err, true
+					return nil, newDecodeErrorf(v, errBuckets), true
 				}
 				merged = append(merged, fs...)
 			case *ast.CallExpr:
@@ -536,7 +536,7 @@ func (c *metricDecoder) decodeBucketFunctionCall(v *ast.CallExpr) ([]float64, er
 					}
 					firstArg, secondArg, thirdArg, err := decodeBucketArguments(argExpr)
 					if err != nil {
-						return nil, err, true
+						return nil, newDecodeErrorf(v, errBuckets), true
 					}
 					switch functionName {
 					case "LinearBuckets":
@@ -583,11 +583,11 @@ func (c *metricDecoder) decodeUint32(expr ast.Expr) (uint32, error) {
 		if ok && importName.String() == c.kubeMetricsImportName {
 			if variableName == "DefAgeBuckets" {
 				// hardcode this for now
-				return 5, nil
+				return metrics.DefAgeBuckets, nil
 			}
 			if variableName == "DefBufCap" {
 				// hardcode this for now
-				return 500, nil
+				return metrics.DefBufCap, nil
 			}
 		}
 	case *ast.CallExpr:
@@ -617,9 +617,9 @@ func (c *metricDecoder) decodeInt64(expr ast.Expr) (int64, error) {
 		importName, ok := v.X.(*ast.Ident)
 		if ok && importName.String() == c.kubeMetricsImportName {
 			if variableName == "DefMaxAge" {
-				// hardcode this for now. This is a duration but we'll output it as
+				// hardcode this for now. This is a duration, but we'll output it as
 				// an int64 representing nanoseconds.
-				return 1000 * 1000 * 1000 * 60 * 10, nil
+				return int64(metrics.DefMaxAge), nil
 			}
 		}
 	case *ast.Ident:
