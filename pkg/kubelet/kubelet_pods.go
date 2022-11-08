@@ -57,6 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
+	utilpod "k8s.io/kubernetes/pkg/util/pod"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
@@ -1510,6 +1511,18 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 			s.Conditions = append(s.Conditions, c)
 		}
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		// copy over the pod disruption conditions from state which is already
+		// updated during the eviciton (due to either node resource pressure or
+		// node graceful shutdown). We do not re-generate the conditions based
+		// on the container statuses as they are added based on one-time events.
+		cType := v1.AlphaNoCompatGuaranteeDisruptionTarget
+		if _, condition := podutil.GetPodConditionFromList(oldPodStatus.Conditions, cType); condition != nil {
+			s.Conditions = utilpod.ReplaceOrAppendPodCondition(s.Conditions, condition)
+		}
+	}
+
 	// set all Kubelet-owned conditions
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodHasNetworkCondition) {
 		s.Conditions = append(s.Conditions, status.GeneratePodHasNetworkCondition(pod, podStatus))

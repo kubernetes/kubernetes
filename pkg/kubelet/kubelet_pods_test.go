@@ -2497,7 +2497,9 @@ func Test_generateAPIPodStatus(t *testing.T) {
 			},
 		},
 	}
+
 	now := metav1.Now()
+	normalized_now := now.Rfc3339Copy()
 
 	tests := []struct {
 		name                           string
@@ -2505,9 +2507,66 @@ func Test_generateAPIPodStatus(t *testing.T) {
 		currentStatus                  *kubecontainer.PodStatus
 		unreadyContainer               []string
 		previousStatus                 v1.PodStatus
+		enablePodDisruptionConditions  bool
 		expected                       v1.PodStatus
+		expectedPodDisruptionCondition v1.PodCondition
 		expectedPodHasNetworkCondition v1.PodCondition
 	}{
+		{
+			name: "pod disruption condition is copied over; PodDisruptionConditions enabled",
+			pod: &v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+					Conditions: []v1.PodCondition{{
+						Type:               v1.AlphaNoCompatGuaranteeDisruptionTarget,
+						Status:             v1.ConditionTrue,
+						LastTransitionTime: normalized_now,
+					}},
+				},
+				ObjectMeta: metav1.ObjectMeta{Name: "my-pod", DeletionTimestamp: &now},
+			},
+			currentStatus: sandboxReadyStatus,
+			previousStatus: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					runningState("containerA"),
+					runningState("containerB"),
+				},
+				Conditions: []v1.PodCondition{{
+					Type:               v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Status:             v1.ConditionTrue,
+					LastTransitionTime: normalized_now,
+				}},
+			},
+			enablePodDisruptionConditions: true,
+			expected: v1.PodStatus{
+				Phase:    v1.PodRunning,
+				HostIP:   "127.0.0.1",
+				QOSClass: v1.PodQOSBestEffort,
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
+					{Type: v1.PodReady, Status: v1.ConditionTrue},
+					{Type: v1.ContainersReady, Status: v1.ConditionTrue},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+				},
+				ContainerStatuses: []v1.ContainerStatus{
+					ready(waitingWithLastTerminationUnknown("containerA", 0)),
+					ready(waitingWithLastTerminationUnknown("containerB", 0)),
+				},
+			},
+			expectedPodDisruptionCondition: v1.PodCondition{
+				Type:               v1.AlphaNoCompatGuaranteeDisruptionTarget,
+				Status:             v1.ConditionTrue,
+				LastTransitionTime: normalized_now,
+			},
+			expectedPodHasNetworkCondition: v1.PodCondition{
+				Type:   kubetypes.PodHasNetwork,
+				Status: v1.ConditionTrue,
+			},
+		},
 		{
 			name: "current status ready, with previous statuses and deletion",
 			pod: &v1.Pod{
@@ -2876,6 +2935,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 	for _, test := range tests {
 		for _, enablePodHasNetworkCondition := range []bool{false, true} {
 			t.Run(test.name, func(t *testing.T) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHasNetworkCondition, enablePodHasNetworkCondition)()
 				testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 				defer testKubelet.Cleanup()
@@ -2884,12 +2944,16 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				for _, name := range test.unreadyContainer {
 					kl.readinessManager.Set(kubecontainer.BuildContainerID("", findContainerStatusByName(test.expected, name).ContainerID), results.Failure, test.pod)
 				}
+				expected := test.expected.DeepCopy()
 				actual := kl.generateAPIPodStatus(test.pod, test.currentStatus)
 				if enablePodHasNetworkCondition {
-					test.expected.Conditions = append([]v1.PodCondition{test.expectedPodHasNetworkCondition}, test.expected.Conditions...)
+					expected.Conditions = append([]v1.PodCondition{test.expectedPodHasNetworkCondition}, expected.Conditions...)
 				}
-				if !apiequality.Semantic.DeepEqual(test.expected, actual) {
-					t.Fatalf("Unexpected status: %s", diff.ObjectReflectDiff(actual, test.expected))
+				if test.enablePodDisruptionConditions {
+					expected.Conditions = append([]v1.PodCondition{test.expectedPodDisruptionCondition}, expected.Conditions...)
+				}
+				if !apiequality.Semantic.DeepEqual(*expected, actual) {
+					t.Fatalf("Unexpected status: %s", diff.ObjectReflectDiff(*expected, actual))
 				}
 			})
 		}
