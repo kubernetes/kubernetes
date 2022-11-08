@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sync"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -93,13 +94,16 @@ func (s traceStep) writeItem(b *bytes.Buffer, formatter string, startTime time.T
 // Trace keeps track of a set of "steps" and allows us to log a specific
 // step if it took longer than its share of the total allowed time
 type Trace struct {
+	// constant fields
 	name        string
 	fields      []Field
-	threshold   *time.Duration
 	startTime   time.Time
-	endTime     *time.Time
-	traceItems  []traceItem
 	parentTrace *Trace
+	// fields guarded by a lock
+	lock       sync.RWMutex
+	threshold  *time.Duration
+	endTime    *time.Time
+	traceItems []traceItem
 }
 
 func (t *Trace) time() time.Time {
@@ -138,6 +142,8 @@ func New(name string, fields ...Field) *Trace {
 // how long it took. The Fields add key value pairs to provide additional details about the trace
 // step.
 func (t *Trace) Step(msg string, fields ...Field) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
 	if t.traceItems == nil {
 		// traces almost always have less than 6 steps, do this to avoid more than a single allocation
 		t.traceItems = make([]traceItem, 0, 6)
@@ -153,7 +159,9 @@ func (t *Trace) Nest(msg string, fields ...Field) *Trace {
 	newTrace := New(msg, fields...)
 	if t != nil {
 		newTrace.parentTrace = t
+		t.lock.Lock()
 		t.traceItems = append(t.traceItems, newTrace)
+		t.lock.Unlock()
 	}
 	return newTrace
 }
@@ -163,7 +171,9 @@ func (t *Trace) Nest(msg string, fields ...Field) *Trace {
 // is logged.
 func (t *Trace) Log() {
 	endTime := time.Now()
+	t.lock.Lock()
 	t.endTime = &endTime
+	t.lock.Unlock()
 	// an explicit logging request should dump all the steps out at the higher level
 	if t.parentTrace == nil { // We don't start logging until Log or LogIfLong is called on the root trace
 		t.logTrace()
@@ -178,13 +188,17 @@ func (t *Trace) Log() {
 // If the Trace is nested it is not immediately logged. Instead, it is logged when the trace it
 // is nested within is logged.
 func (t *Trace) LogIfLong(threshold time.Duration) {
+	t.lock.Lock()
 	t.threshold = &threshold
+	t.lock.Unlock()
 	t.Log()
 }
 
 // logTopLevelTraces finds all traces in a hierarchy of nested traces that should be logged but do not have any
 // parents that will be logged, due to threshold limits, and logs them as top level traces.
 func (t *Trace) logTrace() {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 	if t.durationIsWithinThreshold() {
 		var buffer bytes.Buffer
 		traceNum := rand.Int31()
@@ -244,9 +258,13 @@ func (t *Trace) calculateStepThreshold() *time.Duration {
 	traceThreshold := *t.threshold
 	for _, s := range t.traceItems {
 		nestedTrace, ok := s.(*Trace)
-		if ok && nestedTrace.threshold != nil {
-			traceThreshold = traceThreshold - *nestedTrace.threshold
-			lenTrace--
+		if ok {
+			nestedTrace.lock.RLock()
+			if nestedTrace.threshold != nil {
+				traceThreshold = traceThreshold - *nestedTrace.threshold
+				lenTrace--
+			}
+			nestedTrace.lock.RUnlock()
 		}
 	}
 
