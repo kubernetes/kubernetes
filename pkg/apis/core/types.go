@@ -5754,7 +5754,7 @@ type TopologySpreadConstraint struct {
 	// - Ignore: nodeAffinity/nodeSelector are ignored. All nodes are included in the calculations.
 	//
 	// If this value is nil, the behavior is equivalent to the Honor policy.
-	// This is a alpha-level feature enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
+	// This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
 	// +optional
 	NodeAffinityPolicy *NodeInclusionPolicy
 	// NodeTaintsPolicy indicates how we will treat node taints when calculating
@@ -5764,7 +5764,7 @@ type TopologySpreadConstraint struct {
 	// - Ignore: node taints are ignored. All nodes are included.
 	//
 	// If this value is nil, the behavior is equivalent to the Ignore policy.
-	// This is a alpha-level feature enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
+	// This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
 	// +optional
 	NodeTaintsPolicy *NodeInclusionPolicy
 	// MatchLabelKeys is a set of pod label keys to select the pods over which
