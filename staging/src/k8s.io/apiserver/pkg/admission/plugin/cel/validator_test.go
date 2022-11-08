@@ -263,6 +263,8 @@ func TestValidate(t *testing.T) {
 		},
 	}
 
+	var nilUnstructured *unstructured.Unstructured
+
 	cases := []struct {
 		name            string
 		policy          *v1alpha1.ValidatingAdmissionPolicy
@@ -498,6 +500,39 @@ func TestValidate(t *testing.T) {
 			}, nil, nil),
 			attributes: newValidAttribute(&podObject, false),
 			params:     crdParams,
+			policyDecisions: []policyDecision{
+				generatedDecision(admit, "", ""),
+			},
+		},
+		{
+			name: "test deny paramKind without paramRef",
+			policy: getValidPolicy([]v1alpha1.Validation{
+				{
+					Expression: "params != null",
+					Reason:     forbiddenReason,
+					Message:    "params as required",
+				},
+			}, hasParamKind, nil),
+			attributes: newValidAttribute(nil, true),
+			// Simulate a interface holding a nil pointer, since this is how param is passed to Validate
+			// if paramRef is unset on a binding
+			params: runtime.Object(nilUnstructured),
+			policyDecisions: []policyDecision{
+				generatedDecision(deny, "params as required", metav1.StatusReasonForbidden),
+			},
+		},
+		{
+			name: "test allow paramKind without paramRef",
+			policy: getValidPolicy([]v1alpha1.Validation{
+				{
+					Expression: "params == null",
+					Reason:     forbiddenReason,
+				},
+			}, hasParamKind, nil),
+			attributes: newValidAttribute(nil, true),
+			// Simulate a interface holding a nil pointer, since this is how param is passed to Validate
+			// if paramRef is unset on a binding
+			params: runtime.Object(nilUnstructured),
 			policyDecisions: []policyDecision{
 				generatedDecision(admit, "", ""),
 			},
