@@ -451,6 +451,87 @@ func TestMultiplePolicyBindings(t *testing.T) {
 	checkFailureReason(t, err, metav1.StatusReasonInvalid)
 }
 
+// Test_PolicyExemption tests that ValidatingAdmissionPolicy and ValidatingAdmissionPolicyBinding resources
+// are exempt from policy rules.
+func Test_PolicyExemption(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CELValidatingAdmission, true)()
+	server, err := apiservertesting.StartTestServer(t, nil, []string{
+		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+	}, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+
+	config := server.ClientConfig
+
+	client, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policy := makePolicy("test-policy")
+	policy.Spec.MatchConstraints = &admissionregistrationv1alpha1.MatchResources{
+		ResourceRules: []admissionregistrationv1alpha1.NamedRuleWithOperations{
+			{
+				RuleWithOperations: admissionregistrationv1alpha1.RuleWithOperations{
+					Operations: []admissionregistrationv1.OperationType{
+						"*",
+					},
+					Rule: admissionregistrationv1.Rule{
+						APIGroups: []string{
+							"*",
+						},
+						APIVersions: []string{
+							"*",
+						},
+						Resources: []string{
+							"*",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	policy.Spec.Validations = []admissionregistrationv1alpha1.Validation{{
+		Expression: "false",
+		Message:    "marker denied; policy is ready",
+	}}
+
+	policy, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policyBinding := makeBinding("test-policy-binding", "test-policy", "")
+	if err := createAndWaitReady(t, client, policyBinding, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// validate that operations to ValidatingAdmissionPolicy are exempt from an existing policy that catches all resources
+	policyCopy := policy.DeepCopy()
+	ignoreFailurePolicy := admissionregistrationv1alpha1.Ignore
+	policyCopy.Spec.FailurePolicy = &ignoreFailurePolicy
+	_, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Update(context.TODO(), policyCopy, metav1.UpdateOptions{})
+	if err != nil {
+		t.Error(err)
+	}
+
+	policyBinding, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicyBindings().Get(context.TODO(), policyBinding.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// validate that operations to ValidatingAdmissionPolicyBindings are exempt from an existing policy that catches all resources
+	policyBindingCopy := policyBinding.DeepCopy()
+	policyBindingCopy.Spec.PolicyName = "different-binding"
+	_, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicyBindings().Update(context.TODO(), policyBindingCopy, metav1.UpdateOptions{})
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func withWaitReadyConstraintAndExpression(policy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy) *admissionregistrationv1alpha1.ValidatingAdmissionPolicy {
 	policy = policy.DeepCopy()
 	policy.Spec.MatchConstraints.ResourceRules = append(policy.Spec.MatchConstraints.ResourceRules, admissionregistrationv1alpha1.NamedRuleWithOperations{
