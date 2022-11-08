@@ -107,6 +107,7 @@ type loadBalancerIdentifier struct {
 type loadBalancerFlags struct {
 	isILB           bool
 	isDSR           bool
+	isVipExternalIP bool
 	localRoutedVIP  bool
 	useMUX          bool
 	preserveDIP     bool
@@ -988,6 +989,17 @@ func isNetworkNotFoundError(err error) bool {
 	return false
 }
 
+// isAllEndpointsTerminating function will return true if all the endpoints are terminating.
+// If atleast one is not terminating, then return false
+func (proxier *Proxier) isAllEndpointsTerminating(svcName proxy.ServicePortName) bool {
+	for _, epInfo := range proxier.endpointsMap[svcName] {
+		if ep, ok := epInfo.(*endpointsInfo); ok && !ep.terminating {
+			return false
+		}
+	}
+	return true
+}
+
 // This is where all of the hns save/restore calls happen.
 // assumes proxier.mu is held
 func (proxier *Proxier) syncProxyRules() {
@@ -1117,6 +1129,8 @@ func (proxier *Proxier) syncProxyRules() {
 		containsPublicIP := false
 		containsNodeIP := false
 
+		isAllEpTerminating := proxier.isAllEndpointsTerminating(svcName)
+
 		for _, epInfo := range proxier.endpointsMap[svcName] {
 			ep, ok := epInfo.(*endpointsInfo)
 			if !ok {
@@ -1124,9 +1138,14 @@ func (proxier *Proxier) syncProxyRules() {
 				continue
 			}
 
-			if !ep.IsReady() {
+			if !isAllEpTerminating && !ep.IsReady() {
 				continue
 			}
+
+			if ep.IsServing() {
+				continue
+			}
+
 			var newHnsEndpoint *endpointsInfo
 			hnsNetworkName := proxier.network.name
 			var err error
@@ -1262,23 +1281,29 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.InfoS("Session Affinity is not supported on this version of Windows")
 		}
 
-		hnsLoadBalancer, err := hns.getLoadBalancer(
-			hnsEndpoints,
-			loadBalancerFlags{isDSR: proxier.isDSR, isIPv6: proxier.isIPv6Mode, sessionAffinity: sessionAffinityClientIP},
-			sourceVip,
-			svcInfo.ClusterIP().String(),
-			Enum(svcInfo.Protocol()),
-			uint16(svcInfo.targetPort),
-			uint16(svcInfo.Port()),
-			queriedLoadBalancers,
-		)
-		if err != nil {
-			klog.ErrorS(err, "Policy creation failed")
-			continue
-		}
+		if !isAllEpTerminating {
 
-		svcInfo.hnsID = hnsLoadBalancer.hnsID
-		klog.V(3).InfoS("Hns LoadBalancer resource created for cluster ip resources", "clusterIP", svcInfo.ClusterIP(), "hnsID", hnsLoadBalancer.hnsID)
+			// Cluster IP LoadBalancer
+			hnsLoadBalancer, err := hns.getLoadBalancer(
+				hnsEndpoints,
+				loadBalancerFlags{isDSR: proxier.isDSR, isIPv6: proxier.isIPv6Mode, sessionAffinity: sessionAffinityClientIP},
+				sourceVip,
+				svcInfo.ClusterIP().String(),
+				Enum(svcInfo.Protocol()),
+				uint16(svcInfo.targetPort),
+				uint16(svcInfo.Port()),
+				queriedLoadBalancers,
+			)
+
+			if err != nil {
+				klog.ErrorS(err, "Policy creation failed")
+				continue
+			}
+
+			svcInfo.hnsID = hnsLoadBalancer.hnsID
+			klog.V(3).InfoS("Hns LoadBalancer resource created for cluster ip resources", "clusterIP", svcInfo.ClusterIP(), "hnsID", hnsLoadBalancer.hnsID)
+
+		}
 
 		// If nodePort is specified, user should be able to use nodeIP:nodePort to reach the backend endpoints
 		if svcInfo.NodePort() > 0 {
@@ -1289,10 +1314,10 @@ func (proxier *Proxier) syncProxyRules() {
 				nodePortEndpoints = hnsLocalEndpoints
 			}
 
-			if len(nodePortEndpoints) > 0 {
+			if len(nodePortEndpoints) > 0 && !isAllEpTerminating {
 				hnsLoadBalancer, err := hns.getLoadBalancer(
 					nodePortEndpoints,
-					loadBalancerFlags{isDSR: svcInfo.localTrafficDSR, localRoutedVIP: true, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
+					loadBalancerFlags{isVipExternalIP: true, isDSR: svcInfo.localTrafficDSR, localRoutedVIP: true, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
 					sourceVip,
 					"",
 					Enum(svcInfo.Protocol()),
@@ -1320,7 +1345,7 @@ func (proxier *Proxier) syncProxyRules() {
 				externalIPEndpoints = hnsLocalEndpoints
 			}
 
-			if len(externalIPEndpoints) > 0 {
+			if len(externalIPEndpoints) > 0 && !isAllEpTerminating {
 				// Try loading existing policies, if already available
 				hnsLoadBalancer, err = hns.getLoadBalancer(
 					externalIPEndpoints,
@@ -1351,9 +1376,10 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 
 			if len(lbIngressEndpoints) > 0 {
+				// IngressIP Loadbalancer
 				hnsLoadBalancer, err := hns.getLoadBalancer(
 					lbIngressEndpoints,
-					loadBalancerFlags{isDSR: svcInfo.preserveDIP || svcInfo.localTrafficDSR, useMUX: svcInfo.preserveDIP, preserveDIP: svcInfo.preserveDIP, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
+					loadBalancerFlags{isVipExternalIP: true, isDSR: svcInfo.preserveDIP || svcInfo.localTrafficDSR, useMUX: svcInfo.preserveDIP, preserveDIP: svcInfo.preserveDIP, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
 					sourceVip,
 					lbIngressIP.ip,
 					Enum(svcInfo.Protocol()),
@@ -1373,7 +1399,7 @@ func (proxier *Proxier) syncProxyRules() {
 			lbIngressIP.hnsID = hnsLoadBalancer.hnsID
 			klog.V(3).InfoS("Hns LoadBalancer resource created for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)
 
-			if proxier.forwardHealthCheckVip && gatewayHnsendpoint != nil {
+			if proxier.forwardHealthCheckVip && gatewayHnsendpoint != nil && !isAllEpTerminating {
 				nodeport := proxier.healthzPort
 				if svcInfo.HealthCheckNodePort() != 0 {
 					nodeport = svcInfo.HealthCheckNodePort()

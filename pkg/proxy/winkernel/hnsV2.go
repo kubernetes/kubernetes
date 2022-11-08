@@ -279,6 +279,9 @@ func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 	if flags.localRoutedVIP {
 		lbPortMappingFlags |= hcn.LoadBalancerPortMappingFlagsLocalRoutedVIP
 	}
+	if flags.isVipExternalIP {
+		lbPortMappingFlags |= 16
+	}
 
 	lbFlags := hcn.LoadBalancerFlagsNone
 	if flags.isDSR {
