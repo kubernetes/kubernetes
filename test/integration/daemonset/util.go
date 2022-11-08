@@ -19,6 +19,7 @@ package daemonset
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -27,6 +28,7 @@ import (
 var _ admission.ValidationInterface = &fakePodFailAdmission{}
 
 type fakePodFailAdmission struct {
+	lock             sync.Mutex
 	limitedPodNumber int
 	succeedPodsCount int
 }
@@ -36,6 +38,8 @@ func (f *fakePodFailAdmission) Handles(operation admission.Operation) bool {
 }
 
 func (f *fakePodFailAdmission) Validate(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces) (err error) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
 	if attr.GetKind().GroupKind() != api.Kind("Pod") {
 		return nil
 	}
