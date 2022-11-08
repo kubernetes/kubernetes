@@ -17,14 +17,8 @@ limitations under the License.
 package skipper
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"fmt"
-	"regexp"
-	"runtime"
-	"runtime/debug"
-	"strings"
 
 	"github.com/onsi/ginkgo/v2"
 
@@ -44,87 +38,14 @@ import (
 
 func skipInternalf(caller int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
+	// Long term this should get replaced with https://github.com/onsi/ginkgo/issues/1069.
 	framework.Logf(msg)
-	skip(msg, caller+1)
-}
-
-// SkipPanic is the value that will be panicked from Skip.
-type SkipPanic struct {
-	Message        string // The failure message passed to Fail
-	Filename       string // The filename that is the source of the failure
-	Line           int    // The line number of the filename that is the source of the failure
-	FullStackTrace string // A full stack trace starting at the source of the failure
-}
-
-const ginkgoSkipPanic = `
-Your test was skipped.
-Ginkgo panics to prevent subsequent assertions from running.
-Normally Ginkgo rescues this panic so you shouldn't see it.
-But, if you make an assertion in a goroutine, Ginkgo can't capture the panic.
-To circumvent this, you should call
-	defer GinkgoRecover()
-at the top of the goroutine that caused this panic.
-`
-
-// String makes SkipPanic look like the old Ginkgo panic when printed.
-func (SkipPanic) String() string { return ginkgoSkipPanic }
-
-// Skip wraps ginkgo.Skip so that it panics with more useful
-// information about why the test is being skipped. This function will
-// panic with a SkipPanic.
-func skip(message string, callerSkip ...int) {
-	skip := 1
-	if len(callerSkip) > 0 {
-		skip += callerSkip[0]
-	}
-
-	_, file, line, _ := runtime.Caller(skip)
-	sp := SkipPanic{
-		Message:        message,
-		Filename:       file,
-		Line:           line,
-		FullStackTrace: pruneStack(skip),
-	}
-
-	defer func() {
-		e := recover()
-		if e != nil {
-			panic(sp)
-		}
-	}()
-
-	ginkgo.Skip(message, skip)
-}
-
-// ginkgo adds a lot of test running infrastructure to the stack, so
-// we filter those out
-var stackSkipPattern = regexp.MustCompile(`onsi/ginkgo/v2`)
-
-func pruneStack(skip int) string {
-	skip += 2 // one for pruneStack and one for debug.Stack
-	stack := debug.Stack()
-	scanner := bufio.NewScanner(bytes.NewBuffer(stack))
-	var prunedStack []string
-
-	// skip the top of the stack
-	for i := 0; i < 2*skip+1; i++ {
-		scanner.Scan()
-	}
-
-	for scanner.Scan() {
-		if stackSkipPattern.Match(scanner.Bytes()) {
-			scanner.Scan() // these come in pairs
-		} else {
-			prunedStack = append(prunedStack, scanner.Text())
-			scanner.Scan() // these come in pairs
-			prunedStack = append(prunedStack, scanner.Text())
-		}
-	}
-
-	return strings.Join(prunedStack, "\n")
+	ginkgo.Skip(msg, caller+1)
+	panic("unreachable")
 }
 
 // Skipf skips with information about why the test is being skipped.
+// The direct caller is recorded in the callstack.
 func Skipf(format string, args ...interface{}) {
 	skipInternalf(1, format, args...)
 	panic("unreachable")

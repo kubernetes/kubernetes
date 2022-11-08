@@ -36,8 +36,6 @@ import (
 // ControlPlaneUpgradeFunc returns a function that performs control plane upgrade.
 func ControlPlaneUpgradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext, testCase *junit.TestCase, controlPlaneExtraEnvs []string) func() {
 	return func() {
-		start := time.Now()
-		defer upgrades.FinalizeUpgradeTest(start, testCase)
 		target := upgCtx.Versions[1].Version.String()
 		framework.ExpectNoError(controlPlaneUpgrade(f, target, controlPlaneExtraEnvs))
 		framework.ExpectNoError(checkControlPlaneVersion(f.ClientSet, target))
@@ -47,8 +45,6 @@ func ControlPlaneUpgradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeCon
 // ClusterUpgradeFunc returns a function that performs full cluster upgrade (both control plane and nodes).
 func ClusterUpgradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext, testCase *junit.TestCase, controlPlaneExtraEnvs, nodeExtraEnvs []string) func() {
 	return func() {
-		start := time.Now()
-		defer upgrades.FinalizeUpgradeTest(start, testCase)
 		target := upgCtx.Versions[1].Version.String()
 		image := upgCtx.Versions[1].NodeImage
 		framework.ExpectNoError(controlPlaneUpgrade(f, target, controlPlaneExtraEnvs))
@@ -61,8 +57,6 @@ func ClusterUpgradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext,
 // ClusterDowngradeFunc returns a function that performs full cluster downgrade (both nodes and control plane).
 func ClusterDowngradeFunc(f *framework.Framework, upgCtx *upgrades.UpgradeContext, testCase *junit.TestCase, controlPlaneExtraEnvs, nodeExtraEnvs []string) func() {
 	return func() {
-		start := time.Now()
-		defer upgrades.FinalizeUpgradeTest(start, testCase)
 		target := upgCtx.Versions[1].Version.String()
 		image := upgCtx.Versions[1].NodeImage
 		// Yes this really is a downgrade. And nodes must downgrade first.
