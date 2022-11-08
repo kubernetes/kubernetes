@@ -782,6 +782,10 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			options = append(options, clientv3.WithRev(withRev))
 		}
 	}
+	if v.IsNil() {
+		// Ensure that we never return a nil Items pointer in the result for consistency.
+		v.Set(reflect.MakeSlice(v.Type(), 0, 0))
+	}
 
 	// instruct the client to begin querying from immediately after the last key we returned
 	// we never return a key that the client wouldn't be allowed to see

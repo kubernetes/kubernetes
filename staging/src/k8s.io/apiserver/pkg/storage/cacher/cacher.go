@@ -715,6 +715,10 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object).Elem()))
 		}
 	}
+	if listVal.IsNil() {
+		// Ensure that we never return a nil Items pointer in the result for consistency.
+		listVal.Set(reflect.MakeSlice(listVal.Type(), 0, 0))
+	}
 	span.AddEvent("Filtered items", attribute.Int("count", listVal.Len()))
 	if c.versioner != nil {
 		if err := c.versioner.UpdateList(listObj, readResourceVersion, "", nil); err != nil {

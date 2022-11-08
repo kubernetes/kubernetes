@@ -1088,13 +1088,13 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage
 		name:                 "existing key, resourceVersion=0",
 		key:                  key,
 		pred:                 storage.Everything,
-		expectedAlternatives: [][]example.Pod{nil, {*storedObj}},
+		expectedAlternatives: [][]example.Pod{{}, {*storedObj}},
 		rv:                   "0",
 	}, {
 		name:                 "existing key, resourceVersion=0, resourceVersionMatch=notOlderThan",
 		key:                  key,
 		pred:                 storage.Everything,
-		expectedAlternatives: [][]example.Pod{nil, {*storedObj}},
+		expectedAlternatives: [][]example.Pod{{}, {*storedObj}},
 		rv:                   "0",
 		rvMatch:              metav1.ResourceVersionMatchNotOlderThan,
 	}, {
@@ -1142,7 +1142,7 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage
 		name:        "non-existing key",
 		key:         "/non-existing",
 		pred:        storage.Everything,
-		expectedOut: nil,
+		expectedOut: []example.Pod{},
 	}, {
 		name: "with matching pod name",
 		key:  "/non-existing",
@@ -1154,7 +1154,7 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, store storage
 				return nil, fields.Set{"metadata.name": pod.Name}, nil
 			},
 		},
-		expectedOut: nil,
+		expectedOut: []example.Pod{},
 	}}
 
 	for _, tt := range tests {
