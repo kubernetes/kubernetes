@@ -148,9 +148,9 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 						framework.Logf("Expecting pod to be shutdown, but it's not currently: Pod: %q, Pod Status %+v", pod.Name, pod.Status)
 						return fmt.Errorf("pod should be shutdown, phase: %s", pod.Status.Phase)
 					}
-					podDisruptionCondition := e2epod.FindPodConditionByType(&pod.Status, v1.AlphaNoCompatGuaranteeDisruptionTarget)
+					podDisruptionCondition := e2epod.FindPodConditionByType(&pod.Status, v1.DisruptionTarget)
 					if podDisruptionCondition == nil {
-						framework.Failf("pod %q should have the condition: %q, pod status: %v", pod.Name, v1.AlphaNoCompatGuaranteeDisruptionTarget, pod.Status)
+						framework.Failf("pod %q should have the condition: %q, pod status: %v", pod.Name, v1.DisruptionTarget, pod.Status)
 					}
 				}
 				return nil

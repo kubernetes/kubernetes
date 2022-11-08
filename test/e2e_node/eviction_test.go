@@ -513,7 +513,7 @@ var _ = SIGDescribe("PriorityPidEvictionOrdering [Slow] [Serial] [Disruptive][No
 				string(features.PodDisruptionConditions): true,
 			}
 		})
-		disruptionTarget := v1.AlphaNoCompatGuaranteeDisruptionTarget
+		disruptionTarget := v1.DisruptionTarget
 		specs := []podEvictSpec{
 			{
 				evictionPriority:           1,

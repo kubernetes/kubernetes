@@ -1426,7 +1426,7 @@ func TestMergePodStatus(t *testing.T) {
 			func(input v1.PodStatus) v1.PodStatus {
 				input.Phase = v1.PodFailed
 				input.Conditions = append(input.Conditions, v1.PodCondition{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionTrue,
 					Reason: "TerminationByKubelet",
 				})
@@ -1436,7 +1436,7 @@ func TestMergePodStatus(t *testing.T) {
 				Phase: v1.PodFailed,
 				Conditions: []v1.PodCondition{
 					{
-						Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+						Type:   v1.DisruptionTarget,
 						Status: v1.ConditionTrue,
 						Reason: "TerminationByKubelet",
 					},
@@ -1466,7 +1466,7 @@ func TestMergePodStatus(t *testing.T) {
 			func(input v1.PodStatus) v1.PodStatus {
 				input.Phase = v1.PodFailed
 				input.Conditions = append(input.Conditions, v1.PodCondition{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionTrue,
 					Reason: "TerminationByKubelet",
 				})
@@ -1493,7 +1493,7 @@ func TestMergePodStatus(t *testing.T) {
 			false,
 			func(input v1.PodStatus) v1.PodStatus {
 				input.Conditions = append(input.Conditions, v1.PodCondition{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionTrue,
 					Reason: "TerminationByKubelet",
 				})
@@ -1514,7 +1514,7 @@ func TestMergePodStatus(t *testing.T) {
 						Status: v1.ConditionTrue,
 					},
 					{
-						Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+						Type:   v1.DisruptionTarget,
 						Status: v1.ConditionTrue,
 						Reason: "TerminationByKubelet",
 					},
@@ -1528,7 +1528,7 @@ func TestMergePodStatus(t *testing.T) {
 			false,
 			func(input v1.PodStatus) v1.PodStatus {
 				input.Conditions = append(input.Conditions, v1.PodCondition{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionTrue,
 					Reason: "TerminationByKubelet",
 				})
@@ -1549,7 +1549,7 @@ func TestMergePodStatus(t *testing.T) {
 						Status: v1.ConditionTrue,
 					},
 					{
-						Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+						Type:   v1.DisruptionTarget,
 						Status: v1.ConditionTrue,
 						Reason: "TerminationByKubelet",
 					},
@@ -1563,7 +1563,7 @@ func TestMergePodStatus(t *testing.T) {
 			false,
 			func(input v1.PodStatus) v1.PodStatus {
 				input.Conditions = append(input.Conditions, v1.PodCondition{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionTrue,
 					Reason: "EvictedByEvictionAPI",
 				})
@@ -1572,7 +1572,7 @@ func TestMergePodStatus(t *testing.T) {
 			func(input v1.PodStatus) v1.PodStatus {
 				input.Phase = v1.PodFailed
 				input.Conditions = append(input.Conditions, v1.PodCondition{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionTrue,
 					Reason: "TerminationByKubelet",
 				})
@@ -1596,7 +1596,7 @@ func TestMergePodStatus(t *testing.T) {
 						Status: v1.ConditionTrue,
 					},
 					{
-						Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+						Type:   v1.DisruptionTarget,
 						Status: v1.ConditionTrue,
 						Reason: "TerminationByKubelet",
 					},
@@ -1610,7 +1610,7 @@ func TestMergePodStatus(t *testing.T) {
 			false,
 			func(input v1.PodStatus) v1.PodStatus {
 				input.Conditions = append(input.Conditions, v1.PodCondition{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionTrue,
 					Reason: "EvictedByEvictionAPI",
 				})
@@ -1618,7 +1618,7 @@ func TestMergePodStatus(t *testing.T) {
 			},
 			func(input v1.PodStatus) v1.PodStatus {
 				input.Conditions = append(input.Conditions, v1.PodCondition{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionTrue,
 					Reason: "TerminationByKubelet",
 				})
@@ -1628,7 +1628,7 @@ func TestMergePodStatus(t *testing.T) {
 				Phase: v1.PodRunning,
 				Conditions: []v1.PodCondition{
 					{
-						Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+						Type:   v1.DisruptionTarget,
 						Status: v1.ConditionTrue,
 						Reason: "EvictedByEvictionAPI",
 					},
@@ -1650,7 +1650,7 @@ func TestMergePodStatus(t *testing.T) {
 			true,
 			func(input v1.PodStatus) v1.PodStatus {
 				input.Conditions = append(input.Conditions, v1.PodCondition{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionTrue,
 					Reason: "EvictedByEvictionAPI",
 				})
@@ -1659,7 +1659,7 @@ func TestMergePodStatus(t *testing.T) {
 			func(input v1.PodStatus) v1.PodStatus {
 				input.Phase = v1.PodFailed
 				input.Conditions = append(input.Conditions, v1.PodCondition{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionTrue,
 					Reason: "TerminationByKubelet",
 				})
@@ -1669,7 +1669,7 @@ func TestMergePodStatus(t *testing.T) {
 				Phase: v1.PodRunning,
 				Conditions: []v1.PodCondition{
 					{
-						Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+						Type:   v1.DisruptionTarget,
 						Status: v1.ConditionTrue,
 						Reason: "EvictedByEvictionAPI",
 					},

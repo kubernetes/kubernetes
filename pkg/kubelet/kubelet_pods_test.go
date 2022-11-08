@@ -2522,7 +2522,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 						runningState("containerB"),
 					},
 					Conditions: []v1.PodCondition{{
-						Type:               v1.AlphaNoCompatGuaranteeDisruptionTarget,
+						Type:               v1.DisruptionTarget,
 						Status:             v1.ConditionTrue,
 						LastTransitionTime: normalized_now,
 					}},
@@ -2536,7 +2536,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					runningState("containerB"),
 				},
 				Conditions: []v1.PodCondition{{
-					Type:               v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:               v1.DisruptionTarget,
 					Status:             v1.ConditionTrue,
 					LastTransitionTime: normalized_now,
 				}},
@@ -2558,7 +2558,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				},
 			},
 			expectedPodDisruptionCondition: v1.PodCondition{
-				Type:               v1.AlphaNoCompatGuaranteeDisruptionTarget,
+				Type:               v1.DisruptionTarget,
 				Status:             v1.ConditionTrue,
 				LastTransitionTime: normalized_now,
 			},

@@ -43,6 +43,10 @@ var (
 	pauseImage = imageutils.GetE2EImage(imageutils.Pause)
 )
 
+const (
+	testFinalizer = "example.com/test-finalizer"
+)
+
 func getTestTaint() v1.Taint {
 	now := metav1.Now()
 	return v1.Taint{
@@ -336,6 +340,37 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		case <-observedDeletions:
 			framework.Failf("Pod was evicted despite toleration")
 		}
+	})
+
+	// 1. Run a pod with finalizer
+	// 2. Taint the node running this pod with a no-execute taint
+	// 3. See if pod will get evicted and has the pod disruption condition
+	// 4. Remove the finalizer so that the pod can be deleted by GC
+	ginkgo.It("pods evicted from tainted nodes have pod disruption condition", func() {
+		podName := "taint-eviction-pod-disruption"
+		pod := createPodForTaintsTest(false, 0, podName, podName, ns)
+		pod.Finalizers = append(pod.Finalizers, testFinalizer)
+
+		ginkgo.By("Starting pod...")
+		nodeName, err := testutils.RunPodAndGetNodeName(cs, pod, 2*time.Minute)
+		framework.ExpectNoError(err)
+		framework.Logf("Pod is running on %v. Tainting Node", nodeName)
+
+		defer e2epod.NewPodClient(f).RemoveFinalizer(pod.Name, testFinalizer)
+
+		ginkgo.By("Trying to apply a taint on the Node")
+		testTaint := getTestTaint()
+		e2enode.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
+		e2enode.ExpectNodeHasTaint(cs, nodeName, &testTaint)
+		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
+
+		ginkgo.By("Waiting for Pod to be terminating")
+		timeout := time.Duration(kubeletPodDeletionDelaySeconds+3*additionalWaitPerDeleteSeconds) * time.Second
+		err = e2epod.WaitForPodTerminatingInNamespaceTimeout(f.ClientSet, pod.Name, pod.Namespace, timeout)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Verifying the pod has the pod disruption condition")
+		e2epod.VerifyPodHasConditionWithType(f, pod, v1.DisruptionTarget)
 	})
 })
 

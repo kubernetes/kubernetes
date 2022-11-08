@@ -246,12 +246,11 @@ func (gcc *PodGCController) gcOrphaned(ctx context.Context, pods []*v1.Pod, node
 		}
 		klog.V(2).InfoS("Found orphaned Pod assigned to the Node, deleting.", "pod", klog.KObj(pod), "node", pod.Spec.NodeName)
 		condition := corev1apply.PodCondition().
-			WithType(v1.AlphaNoCompatGuaranteeDisruptionTarget).
+			WithType(v1.DisruptionTarget).
 			WithStatus(v1.ConditionTrue).
 			WithReason("DeletionByPodGC").
 			WithMessage("PodGC: node no longer exists").
 			WithLastTransitionTime(metav1.Now())
-
 		if err := gcc.markFailedAndDeletePodWithCondition(ctx, pod, condition); err != nil {
 			utilruntime.HandleError(err)
 		} else {

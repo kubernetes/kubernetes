@@ -506,7 +506,7 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
 		// Set DisruptionTarget.LastTransitionTime.
-		updateLastTransitionTime(&status, &oldStatus, v1.AlphaNoCompatGuaranteeDisruptionTarget)
+		updateLastTransitionTime(&status, &oldStatus, v1.DisruptionTarget)
 	}
 
 	// ensure that the start time does not change across updates.
@@ -895,7 +895,7 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningCon
 			podConditions = append(podConditions, c)
 		} else if kubetypes.PodConditionSharedByKubelet(c.Type) {
 			// we replace or append all the "shared by kubelet" conditions
-			if c.Type == v1.AlphaNoCompatGuaranteeDisruptionTarget {
+			if c.Type == v1.DisruptionTarget {
 				// guard the update of the DisruptionTarget condition with a check to ensure
 				// it will only be sent once all containers have terminated and the phase
 				// is terminal. This avoids sending an unnecessary patch request to add

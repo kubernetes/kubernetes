@@ -383,9 +383,9 @@ func (m *managerImpl) processShutdownEvent() error {
 					status.Reason = nodeShutdownReason
 					if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
 						podutil.UpdatePodCondition(status, &v1.PodCondition{
-							Type:    v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:    v1.DisruptionTarget,
 							Status:  v1.ConditionTrue,
-							Reason:  v1.AlphaNoCompatGuaranteePodReasonTerminationByKubelet,
+							Reason:  v1.PodReasonTerminationByKubelet,
 							Message: nodeShutdownMessage,
 						})
 					}

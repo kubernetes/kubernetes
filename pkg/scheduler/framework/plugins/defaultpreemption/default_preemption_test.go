@@ -337,6 +337,9 @@ func TestPostFilter(t *testing.T) {
 			}
 			// As we use a bare clientset above, it's needed to add a reactor here
 			// to not fail Victims deletion logic.
+			cs.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				return true, nil, nil
+			})
 			cs.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
 				return true, nil, nil
 			})
@@ -1642,6 +1645,11 @@ func TestPreempt(t *testing.T) {
 			}
 
 			deletedPodNames := make(sets.String)
+			patchedPodNames := make(sets.String)
+			client.PrependReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				patchedPodNames.Insert(action.(clienttesting.PatchAction).GetName())
+				return true, nil, nil
+			})
 			client.PrependReactor("delete", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
 				deletedPodNames.Insert(action.(clienttesting.DeleteAction).GetName())
 				return true, nil, nil
@@ -1728,6 +1736,9 @@ func TestPreempt(t *testing.T) {
 			}
 			if len(deletedPodNames) != len(test.expectedPods) {
 				t.Errorf("expected %v pods, got %v.", len(test.expectedPods), len(deletedPodNames))
+			}
+			if diff := cmp.Diff(patchedPodNames.List(), deletedPodNames.List()); diff != "" {
+				t.Errorf("unexpected difference in the set of patched and deleted pods: %s", diff)
 			}
 			for victimName := range deletedPodNames {
 				found := false

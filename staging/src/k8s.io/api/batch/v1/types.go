@@ -425,8 +425,7 @@ const (
 	// JobFailed means the job has failed its execution.
 	JobFailed JobConditionType = "Failed"
 	// FailureTarget means the job is about to fail its execution.
-	// The constant is to be renamed once the name is accepted within the KEP-3329.
-	AlphaNoCompatGuaranteeJobFailureTarget JobConditionType = "FailureTarget"
+	JobFailureTarget JobConditionType = "FailureTarget"
 )
 
 // JobCondition describes current state of a job.

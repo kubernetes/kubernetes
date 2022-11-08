@@ -359,7 +359,7 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 			if feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
 				victimPodApply := corev1apply.Pod(victim.Name, victim.Namespace).WithStatus(corev1apply.PodStatus())
 				victimPodApply.Status.WithConditions(corev1apply.PodCondition().
-					WithType(v1.AlphaNoCompatGuaranteeDisruptionTarget).
+					WithType(v1.DisruptionTarget).
 					WithStatus(v1.ConditionTrue).
 					WithReason("PreemptionByKubeScheduler").
 					WithMessage(fmt.Sprintf("Kube-scheduler: preempting to accommodate a higher priority pod: %s", klog.KObj(pod))).

@@ -481,7 +481,7 @@ func TestJobPodFailurePolicy(t *testing.T) {
 						Action: batchv1.PodFailurePolicyActionIgnore,
 						OnPodConditions: []batchv1.PodFailurePolicyOnPodConditionsPattern{
 							{
-								Type: v1.AlphaNoCompatGuaranteeDisruptionTarget,
+								Type: v1.DisruptionTarget,
 							},
 						},
 					},
@@ -533,7 +533,7 @@ func TestJobPodFailurePolicy(t *testing.T) {
 		Phase: v1.PodFailed,
 		Conditions: []v1.PodCondition{
 			{
-				Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+				Type:   v1.DisruptionTarget,
 				Status: v1.ConditionTrue,
 			},
 		},

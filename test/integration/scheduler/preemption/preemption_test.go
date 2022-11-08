@@ -468,11 +468,11 @@ func TestPreemption(t *testing.T) {
 					if err != nil {
 						t.Errorf("Error %v when getting the updated status for pod %v/%v ", err, p.Namespace, p.Name)
 					}
-					_, cond := podutil.GetPodCondition(&pod.Status, v1.AlphaNoCompatGuaranteeDisruptionTarget)
+					_, cond := podutil.GetPodCondition(&pod.Status, v1.DisruptionTarget)
 					if test.enablePodDisruptionConditions == true && cond == nil {
-						t.Errorf("Pod %q does not have the expected condition: %q", klog.KObj(pod), v1.AlphaNoCompatGuaranteeDisruptionTarget)
+						t.Errorf("Pod %q does not have the expected condition: %q", klog.KObj(pod), v1.DisruptionTarget)
 					} else if test.enablePodDisruptionConditions == false && cond != nil {
-						t.Errorf("Pod %q has an unexpected condition: %q", klog.KObj(pod), v1.AlphaNoCompatGuaranteeDisruptionTarget)
+						t.Errorf("Pod %q has an unexpected condition: %q", klog.KObj(pod), v1.DisruptionTarget)
 					}
 				} else {
 					if p.DeletionTimestamp != nil {

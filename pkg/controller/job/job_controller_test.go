@@ -2192,7 +2192,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				Status: batch.JobStatus{
 					Conditions: []batch.JobCondition{
 						{
-							Type:    batch.AlphaNoCompatGuaranteeJobFailureTarget,
+							Type:    batch.JobFailureTarget,
 							Status:  v1.ConditionTrue,
 							Reason:  "PodFailurePolicy",
 							Message: "Container main-container for pod default/mypod-0 failed with exit code 5 matching FailJob rule at index 1",
@@ -2245,7 +2245,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				Status: batch.JobStatus{
 					Conditions: []batch.JobCondition{
 						{
-							Type:    batch.AlphaNoCompatGuaranteeJobFailureTarget,
+							Type:    batch.JobFailureTarget,
 							Status:  v1.ConditionTrue,
 							Reason:  "PodFailurePolicy",
 							Message: "Container main-container for pod default/already-deleted-pod failed with exit code 5 matching FailJob rule at index 1",
@@ -2751,7 +2751,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 								Action: batch.PodFailurePolicyActionIgnore,
 								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 									{
-										Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+										Type:   v1.DisruptionTarget,
 										Status: v1.ConditionTrue,
 									},
 								},
@@ -2769,7 +2769,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 							Status: v1.ConditionTrue,
 						},
 						{
-							Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:   v1.DisruptionTarget,
 							Status: v1.ConditionTrue,
 						},
 					},
@@ -2797,7 +2797,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 								Action: batch.PodFailurePolicyActionIgnore,
 								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 									{
-										Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+										Type:   v1.DisruptionTarget,
 										Status: v1.ConditionTrue,
 									},
 								},
@@ -2811,7 +2811,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					Phase: v1.PodFailed,
 					Conditions: []v1.PodCondition{
 						{
-							Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:   v1.DisruptionTarget,
 							Status: v1.ConditionTrue,
 						},
 					},
@@ -2839,7 +2839,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 								Action: batch.PodFailurePolicyActionFailJob,
 								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 									{
-										Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+										Type:   v1.DisruptionTarget,
 										Status: v1.ConditionTrue,
 									},
 								},
@@ -2853,7 +2853,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					Phase: v1.PodFailed,
 					Conditions: []v1.PodCondition{
 						{
-							Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:   v1.DisruptionTarget,
 							Status: v1.ConditionTrue,
 						},
 					},

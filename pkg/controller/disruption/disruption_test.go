@@ -1403,7 +1403,7 @@ func TestStalePodDisruption(t *testing.T) {
 				Status: v1.PodStatus{
 					Conditions: []v1.PodCondition{
 						{
-							Type:               v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:               v1.DisruptionTarget,
 							Status:             v1.ConditionTrue,
 							LastTransitionTime: metav1.Time{Time: now},
 						},
@@ -1413,7 +1413,7 @@ func TestStalePodDisruption(t *testing.T) {
 			timePassed: 2*time.Minute + time.Second,
 			wantConditions: []v1.PodCondition{
 				{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionFalse,
 				},
 			},
@@ -1427,7 +1427,7 @@ func TestStalePodDisruption(t *testing.T) {
 				Status: v1.PodStatus{
 					Conditions: []v1.PodCondition{
 						{
-							Type:               v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:               v1.DisruptionTarget,
 							Status:             v1.ConditionTrue,
 							LastTransitionTime: metav1.Time{Time: now},
 						},
@@ -1437,7 +1437,7 @@ func TestStalePodDisruption(t *testing.T) {
 			timePassed: 2*time.Minute - time.Second,
 			wantConditions: []v1.PodCondition{
 				{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionTrue,
 				},
 			},
@@ -1452,7 +1452,7 @@ func TestStalePodDisruption(t *testing.T) {
 				Status: v1.PodStatus{
 					Conditions: []v1.PodCondition{
 						{
-							Type:               v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:               v1.DisruptionTarget,
 							Status:             v1.ConditionTrue,
 							LastTransitionTime: metav1.Time{Time: now},
 						},
@@ -1462,7 +1462,7 @@ func TestStalePodDisruption(t *testing.T) {
 			timePassed: 2*time.Minute + time.Second,
 			wantConditions: []v1.PodCondition{
 				{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionTrue,
 				},
 			},
@@ -1487,7 +1487,7 @@ func TestStalePodDisruption(t *testing.T) {
 				Status: v1.PodStatus{
 					Conditions: []v1.PodCondition{
 						{
-							Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:   v1.DisruptionTarget,
 							Status: v1.ConditionFalse,
 						},
 					},
@@ -1496,7 +1496,7 @@ func TestStalePodDisruption(t *testing.T) {
 			timePassed: 2*time.Minute + time.Second,
 			wantConditions: []v1.PodCondition{
 				{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionFalse,
 				},
 			},

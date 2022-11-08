@@ -58,6 +58,27 @@ func WaitForJobComplete(c clientset.Interface, ns, jobName string, completions i
 	})
 }
 
+// WaitForJobFailed uses c to wait for the Job jobName in namespace ns to fail
+func WaitForJobFailed(c clientset.Interface, ns, jobName string) error {
+	return wait.PollImmediate(framework.Poll, JobTimeout, func() (bool, error) {
+		curr, err := c.BatchV1().Jobs(ns).Get(context.TODO(), jobName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		return isJobFailed(curr), nil
+	})
+}
+
+func isJobFailed(j *batchv1.Job) bool {
+	for _, c := range j.Status.Conditions {
+		if (c.Type == batchv1.JobFailed) && c.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
+
 // WaitForJobFinish uses c to wait for the Job jobName in namespace ns to finish (either Failed or Complete).
 func WaitForJobFinish(c clientset.Interface, ns, jobName string) error {
 	return wait.PollImmediate(framework.Poll, JobTimeout, func() (bool, error) {
