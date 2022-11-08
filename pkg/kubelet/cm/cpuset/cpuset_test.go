@@ -19,29 +19,7 @@ package cpuset
 import (
 	"reflect"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
-
-func TestCPUSetBuilder(t *testing.T) {
-	b := NewBuilder()
-	elems := []int{1, 2, 3, 4, 5}
-	for _, elem := range elems {
-		b.Add(elem)
-	}
-	result := b.Result()
-	for _, elem := range elems {
-		if !result.Contains(elem) {
-			t.Fatalf("expected cpuset to contain element %d: [%v]", elem, result)
-		}
-	}
-	if len(elems) != result.Size() {
-		t.Fatalf("expected cpuset %s to have the same size as %v", result, elems)
-	}
-
-	b.Add(6)
-	require.False(t, result.Contains(6), "expected calls to Add after calling Result() to have no effect")
-}
 
 func TestCPUSetSize(t *testing.T) {
 	testCases := []struct {

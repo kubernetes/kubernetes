@@ -733,13 +733,12 @@ func validateSMTAlignment(cpus cpuset.CPUSet, smtLevel int, pod *v1.Pod, cnt *v1
 	// now check all the given cpus are thread siblings.
 	// to do so the easiest way is to rebuild the expected set of siblings from all the cpus we got.
 	// if the expected set matches the given set, the given set was good.
-	b := cpuset.NewBuilder()
+	siblingsCPUs := cpuset.New()
 	for _, cpuID := range cpus.UnsortedList() {
 		threadSiblings, err := cpuset.Parse(strings.TrimSpace(getCPUSiblingList(int64(cpuID))))
 		framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
-		b.Add(threadSiblings.UnsortedList()...)
+		siblingsCPUs = siblingsCPUs.Union(threadSiblings)
 	}
-	siblingsCPUs := b.Result()
 
 	framework.Logf("siblings cpus: %v", siblingsCPUs)
 	if !siblingsCPUs.Equals(cpus) {

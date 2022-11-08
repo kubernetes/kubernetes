@@ -176,21 +176,21 @@ func TestStaticPolicyStart(t *testing.T) {
 }
 
 func TestStaticPolicyAdd(t *testing.T) {
-	largeTopoBuilder := cpuset.NewBuilder()
-	largeTopoSock0Builder := cpuset.NewBuilder()
-	largeTopoSock1Builder := cpuset.NewBuilder()
+	var largeTopoCPUids []int
+	var largeTopoSock0CPUids []int
+	var largeTopoSock1CPUids []int
 	largeTopo := *topoQuadSocketFourWayHT
 	for cpuid, val := range largeTopo.CPUDetails {
-		largeTopoBuilder.Add(cpuid)
+		largeTopoCPUids = append(largeTopoCPUids, cpuid)
 		if val.SocketID == 0 {
-			largeTopoSock0Builder.Add(cpuid)
+			largeTopoSock0CPUids = append(largeTopoSock0CPUids, cpuid)
 		} else if val.SocketID == 1 {
-			largeTopoSock1Builder.Add(cpuid)
+			largeTopoSock1CPUids = append(largeTopoSock1CPUids, cpuid)
 		}
 	}
-	largeTopoCPUSet := largeTopoBuilder.Result()
-	largeTopoSock0CPUSet := largeTopoSock0Builder.Result()
-	largeTopoSock1CPUSet := largeTopoSock1Builder.Result()
+	largeTopoCPUSet := cpuset.New(largeTopoCPUids...)
+	largeTopoSock0CPUSet := cpuset.New(largeTopoSock0CPUids...)
+	largeTopoSock1CPUSet := cpuset.New(largeTopoSock1CPUids...)
 
 	// these are the cases which must behave the same regardless the policy options.
 	// So we will permutate the options to ensure this holds true.
