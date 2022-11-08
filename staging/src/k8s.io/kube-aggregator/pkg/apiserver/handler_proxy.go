@@ -231,6 +231,14 @@ func (r *responder) Error(_ http.ResponseWriter, _ *http.Request, err error) {
 
 // these methods provide locked access to fields
 
+// Sets serviceAvailable value on proxyHandler
+// not thread safe
+func (r *proxyHandler) setServiceAvailable(value bool) {
+	info := r.handlingInfo.Load().(proxyHandlingInfo)
+	info.serviceAvailable = true
+	r.handlingInfo.Store(info)
+}
+
 func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIService) {
 	if apiService.Spec.Service == nil {
 		r.handlingInfo.Store(proxyHandlingInfo{local: true})
