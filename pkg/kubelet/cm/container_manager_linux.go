@@ -972,16 +972,24 @@ func (cm *containerManagerImpl) GetAllocatableDevices() []*podresourcesapi.Conta
 	return containerDevicesFromResourceDeviceInstances(cm.deviceManager.GetAllocatableDevices())
 }
 
+func int64Slice(in []int) []int64 {
+	out := make([]int64, len(in))
+	for i := range in {
+		out[i] = int64(in[i])
+	}
+	return out
+}
+
 func (cm *containerManagerImpl) GetCPUs(podUID, containerName string) []int64 {
 	if cm.cpuManager != nil {
-		return cm.cpuManager.GetExclusiveCPUs(podUID, containerName).ToSliceNoSortInt64()
+		return int64Slice(cm.cpuManager.GetExclusiveCPUs(podUID, containerName).ToSliceNoSort())
 	}
 	return []int64{}
 }
 
 func (cm *containerManagerImpl) GetAllocatableCPUs() []int64 {
 	if cm.cpuManager != nil {
-		return cm.cpuManager.GetAllocatableCPUs().ToSliceNoSortInt64()
+		return int64Slice(cm.cpuManager.GetAllocatableCPUs().ToSliceNoSort())
 	}
 	return []int64{}
 }

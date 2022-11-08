@@ -522,7 +522,11 @@ func podresourcesGetAllocatableResourcesTests(ctx context.Context, cli kubeletpo
 	resp, err := cli.GetAllocatableResources(ctx, &kubeletpodresourcesv1.AllocatableResourcesRequest{})
 	framework.ExpectNoErrorWithOffset(1, err)
 	devs := resp.GetDevices()
-	allocatableCPUs := cpuset.NewCPUSetInt64(resp.GetCpuIds()...)
+	b := cpuset.NewBuilder()
+	for _, cpuid := range resp.GetCpuIds() {
+		b.Add(int(cpuid))
+	}
+	allocatableCPUs := b.Result()
 
 	if onlineCPUs.Size() == 0 {
 		ginkgo.By("expecting no CPUs reported")
