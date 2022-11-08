@@ -438,6 +438,165 @@ run_kubectl_server_side_apply_tests() {
   # clean-up
   kubectl delete -f hack/testdata/pod.yaml "${kube_flags[@]:?}"
 
+  # Test apply migration
+
+  # Create a configmap in the cluster with client-side apply:
+  output_message=$(kubectl "${kube_flags[@]:?}" apply --server-side=false -f - << __EOF__
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test
+data:
+  key: value
+  legacy: unused
+__EOF__
+  )
+
+  kube::test::if_has_string "${output_message}" 'configmap/test created'
+
+  # Apply the same manifest with --server-side flag, as per server-side-apply migration instructions:
+  output_message=$(kubectl "${kube_flags[@]:?}" apply --server-side -f - << __EOF__
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test
+data:
+  key: value
+  legacy: unused
+__EOF__
+  )
+
+  kube::test::if_has_string "${output_message}" 'configmap/test serverside-applied'
+
+  # Apply the object a third time using server-side-apply, but this time removing
+  # a field and adding a field. Old versions of kubectl would not allow the field 
+  # to be removed
+  output_message=$(kubectl "${kube_flags[@]:?}" apply --server-side -f - << __EOF__
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test
+data:
+  key: value
+  ssaKey: ssaValue
+__EOF__
+  )
+
+  kube::test::if_has_string "${output_message}" 'configmap/test serverside-applied'
+
+  # Fetch the object and check to see that it does not have a field 'legacy'
+  kube::test::get_object_assert "configmap test" "{{ .data.key }}" 'value'
+  kube::test::get_object_assert "configmap test" "{{ .data.legacy }}" '<no value>'
+  kube::test::get_object_assert "configmap test" "{{ .data.ssaKey }}" 'ssaValue'
+
+  # CSA the object after it has been server-side-applied and had a field removed
+  # Add new key with client-side-apply. Also removes the field from server-side-apply
+  output_message=$(kubectl "${kube_flags[@]:?}" apply --server-side=false -f - << __EOF__
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test
+data:
+  key: value
+  newKey: newValue
+__EOF__
+  )
+
+  kube::test::get_object_assert "configmap test" "{{ .data.key }}" 'value'
+  kube::test::get_object_assert "configmap test" "{{ .data.newKey }}" 'newValue'
+  kube::test::get_object_assert "configmap test" "{{ .data.ssaKey }}" '<no value>'
+
+  # SSA the object without the field added above by CSA. Show that the object
+  # on the server has had the field removed
+  output_message=$(kubectl "${kube_flags[@]:?}" apply --server-side -f - << __EOF__
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test
+data:
+  key: value
+  ssaKey: ssaValue
+__EOF__
+  )
+
+  # Fetch the object and check to see that it does not have a field 'newKey'
+  kube::test::get_object_assert "configmap test" "{{ .data.key }}" 'value'
+  kube::test::get_object_assert "configmap test" "{{ .data.newKey }}" '<no value>'
+  kube::test::get_object_assert "configmap test" "{{ .data.ssaKey }}" 'ssaValue'
+
+  # Show that kubectl diff --server-side also functions after a migration
+  output_message=$(kubectl diff "${kube_flags[@]:?}" --server-side -f - << __EOF__ || test $? -eq 1
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test
+  annotations:
+    newAnnotation: newValue
+data:
+  key: value
+  newKey: newValue
+__EOF__
+)
+  kube::test::if_has_string "${output_message}" '+  newKey: newValue'
+  kube::test::if_has_string "${output_message}" '+    newAnnotation: newValue'
+
+  # clean-up
+  kubectl "${kube_flags[@]:?}" delete configmap test
+
+  ## Test to show that supplying a custom field manager to kubectl apply
+  # does not prevent migration from client-side-apply to server-side-apply
+  output_message=$(kubectl "${kube_flags[@]:?}" apply --server-side=false --field-manager=myfm  -f - << __EOF__
+apiVersion: v1
+data:
+ key: value1
+ legacy: value2
+kind: ConfigMap
+metadata:
+ name: ssa-test
+__EOF__
+)
+  kube::test::if_has_string "$output_message" "configmap/ssa-test created"
+  kube::test::get_object_assert "configmap ssa-test" "{{ .data.key }}" 'value1'
+
+  # show that after client-side applying with a custom field manager, the
+  # last-applied-annotation is present
+  grep -q kubectl.kubernetes.io/last-applied-configuration <<< "$(kubectl get configmap ssa-test -o yaml "${kube_flags[@]:?}")"
+
+  # Migrate to server-side-apply by applying the same object
+  output_message=$(kubectl "${kube_flags[@]:?}" apply --server-side=true --field-manager=myfm  -f - << __EOF__
+apiVersion: v1
+data:
+ key: value1
+ legacy: value2
+kind: ConfigMap
+metadata:
+ name: ssa-test
+__EOF__
+)
+  kube::test::if_has_string "$output_message" "configmap/ssa-test serverside-applied"
+  kube::test::get_object_assert "configmap ssa-test" "{{ .data.key }}" 'value1'
+
+  # show that after migrating to SSA with a custom field manager, the 
+  # last-applied-annotation is dropped
+  ! grep -q kubectl.kubernetes.io/last-applied-configuration <<< "$(kubectl get configmap ssa-test -o yaml "${kube_flags[@]:?}")" || exit 1
+
+  # Change a field without having any conflict and also drop a field in the same patch
+  output_message=$(kubectl "${kube_flags[@]:?}" apply --server-side=true --field-manager=myfm  -f - << __EOF__
+apiVersion: v1
+data:
+ key: value2
+kind: ConfigMap
+metadata:
+ name: ssa-test
+__EOF__
+)
+  kube::test::if_has_string "$output_message" "configmap/ssa-test serverside-applied"
+  kube::test::get_object_assert "configmap ssa-test" "{{ .data.key }}" 'value2'
+  kube::test::get_object_assert "configmap ssa-test" "{{ .data.legacy }}" '<no value>'
+
+  # Clean up
+  kubectl delete configmap ssa-test
+
   ## kubectl apply dry-run on CR
   # Create CRD
   kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__

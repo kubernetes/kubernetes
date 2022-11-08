@@ -31,6 +31,7 @@ import (
 
 	openapi_v2 "github.com/google/gnostic/openapiv2"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/require"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	sptest "k8s.io/apimachinery/pkg/util/strategicpatch/testing"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -47,6 +49,7 @@ import (
 	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/client-go/util/csaupgrade"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -185,6 +188,7 @@ const (
 	filenameRCLastAppliedArgs = "../../../testdata/apply/rc-lastapplied-args.yaml"
 	filenameRCNoAnnotation    = "../../../testdata/apply/rc-no-annotation.yaml"
 	filenameRCLASTAPPLIED     = "../../../testdata/apply/rc-lastapplied.yaml"
+	filenameRCManagedFieldsLA = "../../../testdata/apply/rc-managedfields-lastapplied.yaml"
 	filenameSVC               = "../../../testdata/apply/service.yaml"
 	filenameRCSVC             = "../../../testdata/apply/rc-service.yaml"
 	filenameNoExistRC         = "../../../testdata/apply/rc-noexist.yaml"
@@ -708,6 +712,157 @@ func TestApplyPruneObjects(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Tests that apply of object in need of CSA migration results in a call
+// to patch it.
+func TestApplyCSAMigration(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+	nameRC, rcWithManagedFields := readAndAnnotateReplicationController(t, filenameRCManagedFieldsLA)
+	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	// The object after patch should be equivalent to the output of
+	// csaupgrade.UpgradeManagedFields
+	//
+	// Parse object into unstructured, apply patch
+	postPatchObj := &unstructured.Unstructured{}
+	err := json.Unmarshal(rcWithManagedFields, &postPatchObj.Object)
+	require.NoError(t, err)
+
+	expectedPatch, err := csaupgrade.UpgradeManagedFieldsPatch(postPatchObj, sets.New(FieldManagerClientSideApply), "kubectl")
+	require.NoError(t, err)
+
+	err = csaupgrade.UpgradeManagedFields(postPatchObj, sets.New("kubectl-client-side-apply"), "kubectl")
+	require.NoError(t, err)
+
+	postPatchData, err := json.Marshal(postPatchObj)
+	require.NoError(t, err)
+
+	patches := 0
+	targetPatches := 2
+	applies := 0
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == pathRC && m == "GET":
+				// During retry loop for patch fetch is performed.
+				// keep returning the unchanged data
+				if patches < targetPatches {
+					bodyRC := ioutil.NopCloser(bytes.NewReader(rcWithManagedFields))
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
+				}
+
+				t.Fatalf("should not do a fetch in serverside-apply")
+				return nil, nil
+			case p == pathRC && m == "PATCH":
+				if got := req.Header.Get("Content-Type"); got == string(types.ApplyPatchType) {
+					defer func() {
+						applies += 1
+					}()
+
+					switch applies {
+					case 0:
+						// initial apply.
+						// Just return the same object but with managed fields
+						bodyRC := ioutil.NopCloser(bytes.NewReader(rcWithManagedFields))
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
+					case 1:
+						// Second apply should include only last apply annotation unmodified
+						// Return new object
+						// NOTE: on a real server this would also modify the managed fields
+						// just return the same object unmodified. It is not so important
+						// for this test for the last-applied to appear in new field
+						// manager response, only that the client asks the server to do it
+						bodyRC := ioutil.NopCloser(bytes.NewReader(rcWithManagedFields))
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
+					case 2, 3:
+						// Before the last apply we have formed our JSONPAtch so it
+						// should reply now with the upgraded object
+						bodyRC := ioutil.NopCloser(bytes.NewReader(postPatchData))
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
+					default:
+						require.Fail(t, "sent more apply requests than expected")
+						return &http.Response{StatusCode: http.StatusBadRequest, Header: cmdtesting.DefaultHeader()}, nil
+					}
+				} else if got == string(types.JSONPatchType) {
+					defer func() {
+						patches += 1
+					}()
+
+					// Require that the patch is equal to what is expected
+					body, err := ioutil.ReadAll(req.Body)
+					require.NoError(t, err)
+					require.Equal(t, expectedPatch, body)
+
+					switch patches {
+					case targetPatches - 1:
+						bodyRC := ioutil.NopCloser(bytes.NewReader(postPatchData))
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
+					default:
+						// Return conflict until the client has retried enough times
+						return &http.Response{StatusCode: http.StatusConflict, Header: cmdtesting.DefaultHeader()}, nil
+
+					}
+				} else {
+					t.Fatalf("unexpected content-type: %s\n", got)
+					return nil, nil
+				}
+
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.OpenAPISchemaFunc = FakeOpenAPISchema.OpenAPISchemaFn
+	tf.FakeOpenAPIGetter = FakeOpenAPISchema.OpenAPIGetter
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+	ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdApply("kubectl", tf, ioStreams)
+	cmd.Flags().Set("filename", filenameRC)
+	cmd.Flags().Set("output", "yaml")
+	cmd.Flags().Set("server-side", "true")
+	cmd.Flags().Set("show-managed-fields", "true")
+	cmd.Run(cmd, []string{})
+
+	// JSONPatch should have been attempted exactly the given number of times
+	require.Equal(t, targetPatches, patches, "should retry as many times as a conflict was returned")
+	require.Equal(t, 3, applies, "should perform specified # of apply calls upon migration")
+	require.Empty(t, errBuf.String())
+
+	// ensure that in the future there will be no migrations necessary
+	// (by showing migration is a no-op)
+
+	rc := &corev1.ReplicationController{}
+	if err := runtime.DecodeInto(codec, buf.Bytes(), rc); err != nil {
+		t.Fatal(err)
+	}
+
+	upgradedRC := rc.DeepCopyObject()
+	err = csaupgrade.UpgradeManagedFields(upgradedRC, sets.New("kubectl-client-side-apply"), "kubectl")
+	require.NoError(t, err)
+	require.NotEmpty(t, rc.ManagedFields)
+	require.Equal(t, rc, upgradedRC, "upgrading should be no-op in future")
+
+	// Apply the upgraded object.
+	// Expect only a single PATCH call to apiserver
+	ioStreams, _, _, errBuf = genericclioptions.NewTestIOStreams()
+	cmd = NewCmdApply("kubectl", tf, ioStreams)
+	cmd.Flags().Set("filename", filenameRC)
+	cmd.Flags().Set("output", "yaml")
+	cmd.Flags().Set("server-side", "true")
+	cmd.Flags().Set("show-managed-fields", "true")
+	cmd.Run(cmd, []string{})
+
+	require.Empty(t, errBuf)
+	require.Equal(t, 4, applies, "only a single call to server-side apply should have been performed")
+	require.Equal(t, targetPatches, patches, "no more json patches should have been needed")
 }
 
 func TestApplyObjectOutput(t *testing.T) {
