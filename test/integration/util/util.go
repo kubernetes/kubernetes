@@ -899,7 +899,7 @@ func timeout(ctx context.Context, d time.Duration, f func()) error {
 	done := make(chan struct{})
 	go func() {
 		f()
-		done <- struct{}{}
+		close(done)
 	}()
 
 	select {
