@@ -162,6 +162,86 @@ func Test_ValidateNamespace_NoParams(t *testing.T) {
 			err:           "namespaces \"test-k8s\" is forbidden: ValidatingAdmissionPolicy 'validate-namespace-suffix' with binding 'validate-namespace-suffix-binding' denied request: expression 'object.nonExistentProperty == 'someval'' resulted in error: no such key: nonExistentProperty",
 			failureReason: metav1.StatusReasonInvalid,
 		},
+		{
+			name: "runtime error due to unguarded params",
+			policy: withValidations([]admissionregistrationv1alpha1.Validation{
+				{
+					Expression: "object.metadata.name.startsWith(params.metadata.name)",
+				},
+			}, withParams(configParamKind(), withFailurePolicy(admissionregistrationv1alpha1.Fail, withNamespaceMatch(makePolicy("validate-namespace-suffix"))))),
+			policyBinding: makeBinding("validate-namespace-suffix-binding", "validate-namespace-suffix", ""),
+			namespace: &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-k8s",
+				},
+			},
+			err:           "namespaces \"test-k8s\" is forbidden: ValidatingAdmissionPolicy 'validate-namespace-suffix' with binding 'validate-namespace-suffix-binding' denied request: expression 'object.metadata.name.startsWith(params.metadata.name)' resulted in error: no such key: metadata",
+			failureReason: metav1.StatusReasonInvalid,
+		},
+		{
+			name: "with check against unguarded params using has()",
+			policy: withValidations([]admissionregistrationv1alpha1.Validation{
+				{
+					Expression: "has(params.metadata) && has(params.metadata.name) && object.metadata.name.endsWith(params.metadata.name)",
+				},
+			}, withParams(configParamKind(), withFailurePolicy(admissionregistrationv1alpha1.Fail, withNamespaceMatch(makePolicy("validate-namespace-suffix"))))),
+			policyBinding: makeBinding("validate-namespace-suffix-binding", "validate-namespace-suffix", ""),
+			namespace: &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-k8s",
+				},
+			},
+			err:           "namespaces \"test-k8s\" is forbidden: ValidatingAdmissionPolicy 'validate-namespace-suffix' with binding 'validate-namespace-suffix-binding' denied request: expression 'has(params.metadata) && has(params.metadata.name) && object.metadata.name.endsWith(params.metadata.name)' resulted in error: invalid type for field selection.",
+			failureReason: metav1.StatusReasonInvalid,
+		},
+		{
+			name: "with check against null params",
+			policy: withValidations([]admissionregistrationv1alpha1.Validation{
+				{
+					Expression: "(params != null && object.metadata.name.endsWith(params.metadata.name))",
+				},
+			}, withParams(configParamKind(), withFailurePolicy(admissionregistrationv1alpha1.Fail, withNamespaceMatch(makePolicy("validate-namespace-suffix"))))),
+			policyBinding: makeBinding("validate-namespace-suffix-binding", "validate-namespace-suffix", ""),
+			namespace: &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-k8s",
+				},
+			},
+			err:           "namespaces \"test-k8s\" is forbidden: ValidatingAdmissionPolicy 'validate-namespace-suffix' with binding 'validate-namespace-suffix-binding' denied request: failed expression: (params != null && object.metadata.name.endsWith(params.metadata.name))",
+			failureReason: metav1.StatusReasonInvalid,
+		},
+		{
+			name: "with check against unguarded params using has() and default check",
+			policy: withValidations([]admissionregistrationv1alpha1.Validation{
+				{
+					Expression: "(has(params.metadata) && has(params.metadata.name) && object.metadata.name.startsWith(params.metadata.name)) || object.metadata.name.endsWith('k8s')",
+				},
+			}, withParams(configParamKind(), withFailurePolicy(admissionregistrationv1alpha1.Fail, withNamespaceMatch(makePolicy("validate-namespace-suffix"))))),
+			policyBinding: makeBinding("validate-namespace-suffix-binding", "validate-namespace-suffix", ""),
+			namespace: &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-k8s",
+				},
+			},
+			err:           "",
+			failureReason: metav1.StatusReasonInvalid,
+		},
+		{
+			name: "with check against null params and default check",
+			policy: withValidations([]admissionregistrationv1alpha1.Validation{
+				{
+					Expression: "(params != null && object.metadata.name.startsWith(params.metadata.name)) || object.metadata.name.endsWith('k8s')",
+				},
+			}, withParams(configParamKind(), withFailurePolicy(admissionregistrationv1alpha1.Fail, withNamespaceMatch(makePolicy("validate-namespace-suffix"))))),
+			policyBinding: makeBinding("validate-namespace-suffix-binding", "validate-namespace-suffix", ""),
+			namespace: &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-k8s",
+				},
+			},
+			err:           "",
+			failureReason: metav1.StatusReasonInvalid,
+		},
 	}
 
 	for _, testcase := range testcases {
