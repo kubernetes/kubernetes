@@ -1245,6 +1245,7 @@ gopkg.in/natefinch/lumberjack.v2
 ## explicit
 gopkg.in/square/go-jose.v2
 gopkg.in/square/go-jose.v2/cipher
+gopkg.in/square/go-jose.v2/cryptosigner
 gopkg.in/square/go-jose.v2/json
 gopkg.in/square/go-jose.v2/jwt
 # gopkg.in/warnings.v0 v0.1.1

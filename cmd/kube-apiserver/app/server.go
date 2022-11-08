@@ -598,6 +598,26 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 		s.ServiceAccountTokenMaxExpiration = s.Authentication.ServiceAccounts.MaxExpiration
 	}
 
+	if s.Authentication.ServiceAccounts.KeyServiceUrl != "" && len(s.Authentication.ServiceAccounts.Issuers) != 0 &&
+		s.Authentication.ServiceAccounts.Issuers[0] != "" {
+		if s.Authentication.ServiceAccounts.MaxExpiration != 0 {
+			lowBound := time.Hour
+			upBound := time.Duration(1<<32) * time.Second
+			if s.Authentication.ServiceAccounts.MaxExpiration < lowBound ||
+				s.Authentication.ServiceAccounts.MaxExpiration > upBound {
+				return options, fmt.Errorf("the serviceaccount max expiration must be between 1 hour to 2^32 seconds")
+			}
+		}
+		s.ServiceAccountTokenMaxExpiration = s.Authentication.ServiceAccounts.MaxExpiration
+		s.ServiceAccountIssuer, err = serviceaccount.ExternalJWTTokenGenerator(
+			s.Authentication.ServiceAccounts.Issuers[0],
+			s.Authentication.ServiceAccounts.KeyServiceUrl,
+		)
+		if err != nil {
+			return options, fmt.Errorf("failed to build external token generator: %v", err)
+		}
+	}
+
 	if s.Etcd.EnableWatchCache {
 		sizes := kubeapiserver.DefaultWatchCacheSizes()
 		// Ensure that overrides parse correctly.

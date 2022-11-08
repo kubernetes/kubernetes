@@ -19,6 +19,7 @@ package options
 import (
 	"errors"
 	"fmt"
+	"k8s.io/kubernetes/pkg/features"
 	"net"
 	"strings"
 
@@ -142,6 +143,24 @@ func validateAPIPriorityAndFairness(options *ServerRunOptions) []error {
 	return nil
 }
 
+func validateExternalKeyServer(options *ServerRunOptions) []error {
+	var errs []error
+
+	enableAttempted := options.Authentication.ServiceAccounts.KeyServiceUrl != ""
+	requiredTokenFlagsSet := len(options.Authentication.ServiceAccounts.Issuers) != 0
+
+	if enableAttempted && !utilfeature.DefaultFeatureGate.Enabled(features.ExternalKeyService) {
+		errs = append(errs, errors.New("the ExternalKeyService feature is not enabled but --key-service-url flag was passed"))
+	}
+
+	// TODO: @velichkovich validate url format of --key-service-url
+
+	if enableAttempted && !requiredTokenFlagsSet {
+		errs = append(errs, errors.New("the --key-service-url flag requires --service-account-issuer"))
+	}
+	return errs
+}
+
 // Validate checks ServerRunOptions and return a slice of found errs.
 func (s *ServerRunOptions) Validate() []error {
 	var errs []error
@@ -158,8 +177,13 @@ func (s *ServerRunOptions) Validate() []error {
 	errs = append(errs, s.Audit.Validate()...)
 	errs = append(errs, s.Admission.Validate()...)
 	errs = append(errs, s.APIEnablement.Validate(legacyscheme.Scheme, apiextensionsapiserver.Scheme, aggregatorscheme.Scheme)...)
-	errs = append(errs, validateTokenRequest(s)...)
 	errs = append(errs, s.Metrics.Validate()...)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExternalKeyService) {
+		errs = append(errs, validateExternalKeyServer(s)...)
+	} else {
+		errs = append(errs, validateTokenRequest(s)...)
+	}
 
 	return errs
 }

@@ -90,6 +90,7 @@ type ServiceAccountAuthenticationOptions struct {
 	JWKSURI          string
 	MaxExpiration    time.Duration
 	ExtendExpiration bool
+	KeyServiceUrl    string
 }
 
 // TokenFileAuthenticationOptions contains token file authentication options for API Server
@@ -340,6 +341,9 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"and key set are served to relying parties from a URL other than the "+
 			"API server's external (as auto-detected or overridden with external-hostname). ")
 
+		fs.StringVar(&o.ServiceAccounts.KeyServiceUrl, "key-service-url", o.ServiceAccounts.KeyServiceUrl, ""+
+			"Path to a unix socket for external signing of service account tokens. (Requires the 'TokenRequest' and 'ExternalKeyService' feature gates.)")
+
 		fs.DurationVar(&o.ServiceAccounts.MaxExpiration, "service-account-max-token-expiration", o.ServiceAccounts.MaxExpiration, ""+
 			"The maximum validity duration of a token created by the service account token issuer. If an otherwise valid "+
 			"TokenRequest with a validity duration larger than this value is requested, a token will be issued with a validity duration of this value.")
@@ -421,6 +425,7 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 		ret.ServiceAccountKeyFiles = o.ServiceAccounts.KeyFiles
 		ret.ServiceAccountIssuers = o.ServiceAccounts.Issuers
 		ret.ServiceAccountLookup = o.ServiceAccounts.Lookup
+		ret.KeyServiceURL = o.ServiceAccounts.KeyServiceUrl
 	}
 
 	if o.TokenFile != nil {

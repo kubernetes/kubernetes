@@ -335,6 +335,12 @@ const (
 	// SYS_TIME). This should only be enabled if user namespace remapping is enabled in the docker daemon.
 	ExperimentalHostUserNamespaceDefaultingGate featuregate.Feature = "ExperimentalHostUserNamespaceDefaulting"
 
+	// owner: @micahhausler, @ivelichkovich
+	// alpha: v1.27
+	//
+	// External signing of projected service account tokens
+	ExternalKeyService featuregate.Feature = "ExternalKeyService"
+
 	// owner: @yuzhiquan, @bowei, @PxyUp, @SergeyKanzhelev
 	// kep: https://kep.k8s.io/2727
 	// alpha: v1.23
@@ -964,6 +970,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ExpandedDNSConfig: {Default: true, PreRelease: featuregate.Beta},
 
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: featuregate.Beta},
+
+	ExternalKeyService: {Default: false, PreRelease: featuregate.Alpha},
 
 	GRPCContainerProbe: {Default: true, PreRelease: featuregate.Beta},
 
