@@ -280,6 +280,12 @@ func runNonGuPodTest(ctx context.Context, f *framework.Framework, cpuCap int64) 
 	waitForContainerRemoval(ctx, pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
 }
 
+func mustParseCPUSet(s string) cpuset.CPUSet {
+	res, err := cpuset.Parse(s)
+	framework.ExpectNoError(err)
+	return res
+}
+
 func runMultipleGuNonGuPods(ctx context.Context, f *framework.Framework, cpuCap int64, cpuAlloc int64) {
 	var cpuListString, expAllowedCPUsListRegex string
 	var cpuList []int
@@ -312,10 +318,10 @@ func runMultipleGuNonGuPods(ctx context.Context, f *framework.Framework, cpuCap 
 	ginkgo.By("checking if the expected cpuset was assigned")
 	cpu1 = 1
 	if isHTEnabled() {
-		cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
+		cpuList = mustParseCPUSet(getCPUSiblingList(0)).ToSlice()
 		cpu1 = cpuList[1]
 	} else if isMultiNUMA() {
-		cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
+		cpuList = mustParseCPUSet(getCoreSiblingList(0)).ToSlice()
 		if len(cpuList) > 1 {
 			cpu1 = cpuList[1]
 		}
@@ -327,7 +333,7 @@ func runMultipleGuNonGuPods(ctx context.Context, f *framework.Framework, cpuCap 
 
 	cpuListString = "0"
 	if cpuAlloc > 2 {
-		cset = cpuset.MustParse(fmt.Sprintf("0-%d", cpuCap-1))
+		cset = mustParseCPUSet(fmt.Sprintf("0-%d", cpuCap-1))
 		cpuListString = fmt.Sprintf("%s", cset.Difference(cpuset.NewCPUSet(cpu1)))
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%s\n$", cpuListString)
@@ -361,19 +367,19 @@ func runMultipleCPUGuPod(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("checking if the expected cpuset was assigned")
 	cpuListString = "1-2"
 	if isMultiNUMA() {
-		cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
+		cpuList = mustParseCPUSet(getCoreSiblingList(0)).ToSlice()
 		if len(cpuList) > 1 {
-			cset = cpuset.MustParse(getCPUSiblingList(int64(cpuList[1])))
+			cset = mustParseCPUSet(getCPUSiblingList(int64(cpuList[1])))
 			if !isHTEnabled() && len(cpuList) > 2 {
-				cset = cpuset.MustParse(fmt.Sprintf("%d-%d", cpuList[1], cpuList[2]))
+				cset = mustParseCPUSet(fmt.Sprintf("%d-%d", cpuList[1], cpuList[2]))
 			}
 			cpuListString = fmt.Sprintf("%s", cset)
 		}
 	} else if isHTEnabled() {
 		cpuListString = "2-3"
-		cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
+		cpuList = mustParseCPUSet(getCPUSiblingList(0)).ToSlice()
 		if cpuList[1] != 1 {
-			cset = cpuset.MustParse(getCPUSiblingList(1))
+			cset = mustParseCPUSet(getCPUSiblingList(1))
 			cpuListString = fmt.Sprintf("%s", cset)
 		}
 	}
@@ -412,18 +418,18 @@ func runMultipleCPUContainersGuPod(ctx context.Context, f *framework.Framework) 
 	ginkgo.By("checking if the expected cpuset was assigned")
 	cpu1, cpu2 = 1, 2
 	if isHTEnabled() {
-		cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
+		cpuList = mustParseCPUSet(getCPUSiblingList(0)).ToSlice()
 		if cpuList[1] != 1 {
 			cpu1, cpu2 = cpuList[1], 1
 		}
 		if isMultiNUMA() {
-			cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
+			cpuList = mustParseCPUSet(getCoreSiblingList(0)).ToSlice()
 			if len(cpuList) > 1 {
 				cpu2 = cpuList[1]
 			}
 		}
 	} else if isMultiNUMA() {
-		cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
+		cpuList = mustParseCPUSet(getCoreSiblingList(0)).ToSlice()
 		if len(cpuList) > 2 {
 			cpu1, cpu2 = cpuList[1], cpuList[2]
 		}
@@ -474,18 +480,18 @@ func runMultipleGuPods(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("checking if the expected cpuset was assigned")
 	cpu1, cpu2 = 1, 2
 	if isHTEnabled() {
-		cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
+		cpuList = mustParseCPUSet(getCPUSiblingList(0)).ToSlice()
 		if cpuList[1] != 1 {
 			cpu1, cpu2 = cpuList[1], 1
 		}
 		if isMultiNUMA() {
-			cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
+			cpuList = mustParseCPUSet(getCoreSiblingList(0)).ToSlice()
 			if len(cpuList) > 1 {
 				cpu2 = cpuList[1]
 			}
 		}
 	} else if isMultiNUMA() {
-		cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
+		cpuList = mustParseCPUSet(getCoreSiblingList(0)).ToSlice()
 		if len(cpuList) > 2 {
 			cpu1, cpu2 = cpuList[1], cpuList[2]
 		}
@@ -582,10 +588,10 @@ func runCPUManagerTests(f *framework.Framework) {
 		ginkgo.By("checking if the expected cpuset was assigned")
 		cpu1 = 1
 		if isHTEnabled() {
-			cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
+			cpuList = mustParseCPUSet(getCPUSiblingList(0)).ToSlice()
 			cpu1 = cpuList[1]
 		} else if isMultiNUMA() {
-			cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
+			cpuList = mustParseCPUSet(getCoreSiblingList(0)).ToSlice()
 			if len(cpuList) > 1 {
 				cpu1 = cpuList[1]
 			}

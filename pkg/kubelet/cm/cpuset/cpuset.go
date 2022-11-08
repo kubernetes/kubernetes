@@ -19,13 +19,10 @@ package cpuset
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
-
-	"k8s.io/klog/v2"
 )
 
 // Builder is a mutable builder for CPUSet. Functions that mutate instances
@@ -257,18 +254,6 @@ func (s CPUSet) String() string {
 		result.WriteString(",")
 	}
 	return strings.TrimRight(result.String(), ",")
-}
-
-// MustParse CPUSet constructs a new CPU set from a Linux CPU list formatted
-// string. Unlike Parse, it does not return an error but rather panics if the
-// input cannot be used to construct a CPU set.
-func MustParse(s string) CPUSet {
-	res, err := Parse(s)
-	if err != nil {
-		klog.ErrorS(err, "Failed to parse input as CPUSet", "input", s)
-		os.Exit(1)
-	}
-	return res
 }
 
 // Parse CPUSet constructs a new CPU set from a Linux CPU list formatted string.
