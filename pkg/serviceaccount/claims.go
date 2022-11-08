@@ -34,7 +34,7 @@ const (
 	// Injected bound service account token expiration which triggers monitoring of its time-bound feature.
 	WarnOnlyBoundTokenExpirationSeconds = 60*60 + 7
 
-	// Extended expiration for those modifed tokens involved in safe rollout if time-bound feature.
+	// Extended expiration for those modified tokens involved in safe rollout if time-bound feature.
 	ExpirationExtensionSeconds = 24 * 365 * 60 * 60
 )
 
