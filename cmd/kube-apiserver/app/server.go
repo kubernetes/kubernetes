@@ -594,11 +594,30 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 			}
 		}
 
-		s.ServiceAccountIssuer, err = serviceaccount.JWTTokenGenerator(s.Authentication.ServiceAccounts.Issuers[0], sk)
+		s.ServiceAccountIssuer, err = serviceaccount.JWTTokenGenerator(s.Authentication.ServiceAccounts.Issuers[0], "", sk)
 		if err != nil {
 			return options, fmt.Errorf("failed to build token generator: %v", err)
 		}
 		s.ServiceAccountTokenMaxExpiration = s.Authentication.ServiceAccounts.MaxExpiration
+	}
+	//TODO: igor, should we check the length here
+	if s.Authentication.ServiceAccounts.KeyServiceURL != "" && s.Authentication.ServiceAccounts.Issuers[0] != "" {
+		if s.Authentication.ServiceAccounts.MaxExpiration != 0 {
+			lowBound := time.Hour
+			upBound := time.Duration(1<<32) * time.Second
+			if s.Authentication.ServiceAccounts.MaxExpiration < lowBound ||
+				s.Authentication.ServiceAccounts.MaxExpiration > upBound {
+				return options, fmt.Errorf("the serviceaccount max expiration must be between 1 hour to 2^32 seconds")
+			}
+		}
+		s.ServiceAccountTokenMaxExpiration = s.Authentication.ServiceAccounts.MaxExpiration
+		s.ServiceAccountIssuer, err = serviceaccount.ExternalJWTTokenGenerator(
+			s.Authentication.ServiceAccounts.Issuers,
+			s.Authentication.ServiceAccounts.KeyServiceURL,
+		)
+		if err != nil {
+			return options, fmt.Errorf("failed to build external token generator: %v", err)
+		}
 	}
 
 	if s.Etcd.EnableWatchCache {
