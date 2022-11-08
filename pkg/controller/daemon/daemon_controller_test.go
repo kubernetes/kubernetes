@@ -18,7 +18,6 @@ package daemon
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -256,7 +255,7 @@ func (f *fakePodControl) CreatePods(ctx context.Context, namespace string, templ
 	f.Lock()
 	defer f.Unlock()
 	if err := f.FakePodControl.CreatePods(ctx, namespace, template, object, controllerRef); err != nil {
-		return fmt.Errorf("failed to create pod for DaemonSet: %w", err)
+		return fmt.Errorf("failed to create pod for DaemonSet")
 	}
 
 	pod := &v1.Pod{
@@ -389,22 +388,13 @@ func validateSyncDaemonSets(manager *daemonSetsController, fakePodControl *fakeP
 
 func expectSyncDaemonSets(t *testing.T, manager *daemonSetsController, ds *apps.DaemonSet, podControl *fakePodControl, expectedCreates, expectedDeletes int, expectedEvents int) {
 	t.Helper()
-	expectSyncDaemonSetsWithError(t, manager, ds, podControl, expectedCreates, expectedDeletes, expectedEvents, nil)
-}
-
-func expectSyncDaemonSetsWithError(t *testing.T, manager *daemonSetsController, ds *apps.DaemonSet, podControl *fakePodControl, expectedCreates, expectedDeletes int, expectedEvents int, expectedError error) {
-	t.Helper()
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
 		t.Fatal("could not get key for daemon")
 	}
 
 	err = manager.syncHandler(context.TODO(), key)
-	if expectedError != nil && !errors.Is(err, expectedError) {
-		t.Fatalf("Unexpected error returned from syncHandler: %v", err)
-	}
-
-	if expectedError == nil && err != nil {
+	if err != nil {
 		t.Log(err)
 	}
 
@@ -781,7 +771,7 @@ func TestSimpleDaemonSetPodCreateErrors(t *testing.T) {
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("foo")
 		ds.Spec.UpdateStrategy = *strategy
-		manager, podControl, clientset, err := newTestController(ds)
+		manager, podControl, _, err := newTestController(ds)
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
 		}
@@ -792,17 +782,6 @@ func TestSimpleDaemonSetPodCreateErrors(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		var updated *apps.DaemonSet
-		clientset.PrependReactor("update", "daemonsets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-			if action.GetSubresource() != "status" {
-				return false, nil, nil
-			}
-			if u, ok := action.(core.UpdateAction); ok {
-				updated = u.GetObject().(*apps.DaemonSet)
-			}
-			return false, nil, nil
-		})
-
 		expectSyncDaemonSets(t, manager, ds, podControl, podControl.FakePodControl.CreateLimit, 0, 0)
 
 		expectedLimit := 0
@@ -811,18 +790,6 @@ func TestSimpleDaemonSetPodCreateErrors(t *testing.T) {
 		}
 		if podControl.FakePodControl.CreateCallCount > expectedLimit {
 			t.Errorf("Unexpected number of create calls.  Expected <= %d, saw %d\n", podControl.FakePodControl.CreateLimit*2, podControl.FakePodControl.CreateCallCount)
-		}
-		if updated == nil {
-			t.Fatalf("Failed to get updated status")
-		}
-		if got, want := updated.Status.DesiredNumberScheduled, int32(podControl.FakePodControl.CreateLimit)*10; got != want {
-			t.Errorf("Status.DesiredNumberScheduled = %v, want %v", got, want)
-		}
-		if got, want := updated.Status.CurrentNumberScheduled, int32(podControl.FakePodControl.CreateLimit); got != want {
-			t.Errorf("Status.CurrentNumberScheduled = %v, want %v", got, want)
-		}
-		if got, want := updated.Status.UpdatedNumberScheduled, int32(podControl.FakePodControl.CreateLimit); got != want {
-			t.Errorf("Status.UpdatedNumberScheduled = %v, want %v", got, want)
 		}
 	}
 }
@@ -886,74 +853,6 @@ func TestSimpleDaemonSetUpdatesStatusAfterLaunchingPods(t *testing.T) {
 		if got, want := updated.Status.CurrentNumberScheduled, int32(5); got != want {
 			t.Errorf("Status.CurrentNumberScheduled = %v, want %v", got, want)
 		}
-	}
-}
-
-func TestSimpleDaemonSetUpdatesStatusError(t *testing.T) {
-	var (
-		syncErr   = fmt.Errorf("sync error")
-		statusErr = fmt.Errorf("status error")
-	)
-
-	testCases := []struct {
-		desc string
-
-		hasSyncErr   bool
-		hasStatusErr bool
-
-		expectedErr error
-	}{
-		{
-			desc:         "sync error",
-			hasSyncErr:   true,
-			hasStatusErr: false,
-			expectedErr:  syncErr,
-		},
-		{
-			desc:         "status error",
-			hasSyncErr:   false,
-			hasStatusErr: true,
-			expectedErr:  statusErr,
-		},
-		{
-			desc:         "sync and status error",
-			hasSyncErr:   true,
-			hasStatusErr: true,
-			expectedErr:  syncErr,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.desc, func(t *testing.T) {
-			for _, strategy := range updateStrategies() {
-				ds := newDaemonSet("foo")
-				ds.Spec.UpdateStrategy = *strategy
-				manager, podControl, clientset, err := newTestController(ds)
-				if err != nil {
-					t.Fatalf("error creating DaemonSets controller: %v", err)
-				}
-
-				if tc.hasSyncErr {
-					podControl.FakePodControl.Err = syncErr
-				}
-
-				clientset.PrependReactor("update", "daemonsets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-					if action.GetSubresource() != "status" {
-						return false, nil, nil
-					}
-
-					if tc.hasStatusErr {
-						return true, nil, statusErr
-					} else {
-						return false, nil, nil
-					}
-				})
-
-				manager.dsStore.Add(ds)
-				addNodes(manager.nodeStore, 0, 1, nil)
-				expectSyncDaemonSetsWithError(t, manager, ds, podControl, 1, 0, 0, tc.expectedErr)
-			}
-		})
 	}
 }
 
