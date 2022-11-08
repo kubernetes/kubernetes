@@ -146,7 +146,7 @@ func convertObjectToUnstructured(obj interface{}) (*unstructured.Unstructured, e
 }
 
 func objectToResolveVal(r runtime.Object) (interface{}, error) {
-	if r == nil {
+	if r == nil || reflect.ValueOf(r).IsNil() {
 		return nil, nil
 	}
 	v, err := convertObjectToUnstructured(r)
