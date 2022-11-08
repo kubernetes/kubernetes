@@ -532,6 +532,146 @@ func Test_PolicyExemption(t *testing.T) {
 	}
 }
 
+// Test_ValidatingAdmissionPolicy_UpdateParamKind validates the behavior of ValidatingAdmissionPolicy when
+// only the ParamKind is updated. This test creates a policy where namespaces must have a prefix that matches
+// the ParamKind set in the policy. Switching the ParamKind should result in only namespaces with prefixes matching
+// the new ParamKind to be allowed. For example, when Paramkind is v1/ConfigMap, only namespaces prefixed with "configmap"
+// is allowed and when ParamKind is updated to v1/Secret, only namespaces prefixed with "secret" is allowed, etc.
+func Test_ValidatingAdmissionPolicy_UpdateParamKind(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CELValidatingAdmission, true)()
+	server, err := apiservertesting.StartTestServer(t, nil, []string{
+		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+	}, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+
+	config := server.ClientConfig
+
+	client, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	allowedPrefixesParamsConfigMap := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "allowed-prefixes",
+		},
+	}
+	if _, err := client.CoreV1().ConfigMaps("default").Create(context.TODO(), allowedPrefixesParamsConfigMap, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	allowedPrefixesParamSecret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "allowed-prefixes",
+		},
+	}
+	if _, err := client.CoreV1().Secrets("default").Create(context.TODO(), allowedPrefixesParamSecret, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	paramKind := &admissionregistrationv1alpha1.ParamKind{
+		APIVersion: "v1",
+		Kind:       "ConfigMap",
+	}
+
+	policy := withValidations([]admissionregistrationv1alpha1.Validation{
+		{
+			Expression: "object.metadata.name.startsWith(params.kind.lowerAscii())",
+			Message:    "wrong paramKind",
+		},
+	}, withParams(paramKind, withNamespaceMatch(withFailurePolicy(admissionregistrationv1alpha1.Fail, makePolicy("allowed-prefixes")))))
+	policy = withWaitReadyConstraintAndExpression(policy)
+	policy, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	allowedPrefixesBinding := makeBinding("allowed-prefixes-binding", "allowed-prefixes", "allowed-prefixes")
+	if err := createAndWaitReady(t, client, allowedPrefixesBinding, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// validate that namespaces starting with "configmap-" are allowed
+	// and namespaces starting with "secret-" are disallowed
+	allowedNamespace := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "configmap-",
+		},
+	}
+	_, err = client.CoreV1().Namespaces().Create(context.TODO(), allowedNamespace, metav1.CreateOptions{})
+	if err != nil {
+		t.Error(err)
+	}
+
+	disallowedNamespace := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "secret-",
+		},
+	}
+	_, err = client.CoreV1().Namespaces().Create(context.TODO(), disallowedNamespace, metav1.CreateOptions{})
+	if err == nil {
+		t.Error("unexpected nil error")
+	}
+	if !strings.Contains(err.Error(), "wrong paramKind") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+	checkFailureReason(t, err, metav1.StatusReasonInvalid)
+
+	// update the policy ParamKind to reference a Secret
+	paramKind = &admissionregistrationv1alpha1.ParamKind{
+		APIVersion: "v1",
+		Kind:       "Secret",
+	}
+	policyCopy := policy.DeepCopy()
+	policyCopy.Spec.ParamKind = paramKind
+	_, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Update(context.TODO(), policyCopy, metav1.UpdateOptions{})
+	if err != nil {
+		t.Error(err)
+	}
+
+	// validate that namespaces starting with "secret-" are allowed
+	// and namespaces starting with "configmap-" are disallowed
+	// wait loop is required here since ConfigMaps were previousy allowed and we need to wait for the new policy
+	// to be enforced
+	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+		disallowedNamespace = &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "configmap-",
+			},
+		}
+
+		_, err = client.CoreV1().Namespaces().Create(context.TODO(), disallowedNamespace, metav1.CreateOptions{})
+		if err == nil {
+			return false, nil
+		}
+
+		if strings.Contains(err.Error(), "not yet synced to use for admission") {
+			return false, nil
+		}
+
+		if !strings.Contains(err.Error(), "wrong paramKind") {
+			return false, err
+		}
+
+		return true, nil
+	}); waitErr != nil {
+		t.Errorf("timed out waiting: %v", err)
+	}
+
+	allowedNamespace = &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "secret-",
+		},
+	}
+	_, err = client.CoreV1().Namespaces().Create(context.TODO(), allowedNamespace, metav1.CreateOptions{})
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func withWaitReadyConstraintAndExpression(policy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy) *admissionregistrationv1alpha1.ValidatingAdmissionPolicy {
 	policy = policy.DeepCopy()
 	policy.Spec.MatchConstraints.ResourceRules = append(policy.Spec.MatchConstraints.ResourceRules, admissionregistrationv1alpha1.NamedRuleWithOperations{
