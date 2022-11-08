@@ -897,7 +897,7 @@ type setupOptions struct {
 type setupOption func(*setupOptions)
 
 func withDefaults(options *setupOptions) {
-	prefix := ""
+	prefix := "/pods"
 
 	options.resourcePrefix = prefix
 	options.keyFunc = func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) }
