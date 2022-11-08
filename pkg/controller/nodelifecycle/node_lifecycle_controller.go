@@ -200,6 +200,12 @@ func (n *nodeHealthMap) set(name string, data *nodeHealthData) {
 	n.nodeHealths[name] = data
 }
 
+func (n *nodeHealthMap) delete(name string) {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+	delete(n.nodeHealths, name)
+}
+
 type podUpdateItem struct {
 	namespace string
 	name      string
@@ -440,6 +446,7 @@ func NewNodeLifecycleController(
 		}),
 		DeleteFunc: controllerutil.CreateDeleteNodeHandler(func(node *v1.Node) error {
 			nc.nodesToRetry.Delete(node.Name)
+			nc.nodeHealthMap.delete(node.Name)
 			return nil
 		}),
 	})
@@ -1048,9 +1055,11 @@ func (nc *Controller) handleDisruption(ctx context.Context, zoneToNodeConditions
 			now := nc.now()
 			for i := range nodes {
 				v := nc.nodeHealthMap.getDeepCopy(nodes[i].Name)
-				v.probeTimestamp = now
-				v.readyTransitionTimestamp = now
-				nc.nodeHealthMap.set(nodes[i].Name, v)
+				if v != nil {
+					v.probeTimestamp = now
+					v.readyTransitionTimestamp = now
+					nc.nodeHealthMap.set(nodes[i].Name, v)
+				}
 			}
 			// We reset all rate limiters to settings appropriate for the given state.
 			for k := range nc.zoneStates {
