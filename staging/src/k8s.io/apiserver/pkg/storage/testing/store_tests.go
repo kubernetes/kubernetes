@@ -42,6 +42,8 @@ import (
 
 type KeyValidation func(ctx context.Context, t *testing.T, key string)
 
+const basePath = "/keybase"
+
 func RunTestCreate(ctx context.Context, t *testing.T, store storage.Interface, validation KeyValidation) {
 	key := "/testkey"
 	out := &example.Pod{}
@@ -445,11 +447,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 		Predicate:       storage.Everything,
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, "/two-level", storageOpts, list); err != nil {
+	if err := store.GetList(ctx, basePath+"/two-level", storageOpts, list); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	continueRV, _ := strconv.Atoi(list.ResourceVersion)
-	secondContinuation, err := storage.EncodeContinue("/two-level/2", "/two-level/", int64(continueRV))
+	secondContinuation, err := storage.EncodeContinue(basePath+"/two-level/2", basePath+"/two-level/", int64(continueRV))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -827,7 +829,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface) {
 				Predicate:            tt.pred,
 				Recursive:            true,
 			}
-			err = store.GetList(ctx, tt.prefix, storageOpts, out)
+			err = store.GetList(ctx, basePath+tt.prefix, storageOpts, out)
 			if tt.expectRVTooLarge {
 				if err == nil || !storage.IsTooLargeResourceVersion(err) {
 					t.Fatalf("expecting resource version too high error, but get: %s", err)
@@ -926,7 +928,7 @@ func RunTestListWithoutPaging(ctx context.Context, t *testing.T, store storage.I
 				Recursive:            true,
 			}
 
-			if err := store.GetList(ctx, tt.prefix, storageOpts, out); err != nil {
+			if err := store.GetList(ctx, basePath+tt.prefix, storageOpts, out); err != nil {
 				t.Fatalf("GetList failed: %v", err)
 				return
 			}
@@ -952,7 +954,7 @@ func RunTestListWithoutPaging(ctx context.Context, t *testing.T, store storage.I
 // from before any were created along with the full set of objects that were persisted
 func seedMultiLevelData(ctx context.Context, store storage.Interface) (string, []*example.Pod, error) {
 	// Setup storage with the following structure:
-	//  /
+	//  /keybase/
 	//   - one-level/
 	//  |            - test
 	//  |
@@ -975,30 +977,30 @@ func seedMultiLevelData(ctx context.Context, store storage.Interface) (string, [
 		storedObj *example.Pod
 	}{
 		{
-			key: "/one-level/test",
+			key: basePath + "/one-level/test",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 		},
 		{
-			key: "/two-level/1/test",
+			key: basePath + "/two-level/1/test",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 		},
 		{
-			key: "/two-level/2/test",
+			key: basePath + "/two-level/2/test",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
 		},
 		{
-			key: "/z-level/3/test",
+			key: basePath + "/z-level/3/test",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "fourth"}},
 		},
 		{
-			key: "/z-level/3/test-2",
+			key: basePath + "/z-level/3/test-2",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
 		},
 	}
 
 	// we want to figure out the resourceVersion before we create anything
 	initialList := &example.PodList{}
-	if err := store.GetList(ctx, "/", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, initialList); err != nil {
+	if err := store.GetList(ctx, basePath, storage.ListOptions{Predicate: storage.Everything, Recursive: true}, initialList); err != nil {
 		return "", nil, fmt.Errorf("failed to determine starting resourceVersion: %w", err)
 	}
 	initialRV := initialList.ResourceVersion
