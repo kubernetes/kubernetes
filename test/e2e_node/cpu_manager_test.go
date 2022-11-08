@@ -318,10 +318,10 @@ func runMultipleGuNonGuPods(ctx context.Context, f *framework.Framework, cpuCap 
 	ginkgo.By("checking if the expected cpuset was assigned")
 	cpu1 = 1
 	if isHTEnabled() {
-		cpuList = mustParseCPUSet(getCPUSiblingList(0)).ToSlice()
+		cpuList = mustParseCPUSet(getCPUSiblingList(0)).List()
 		cpu1 = cpuList[1]
 	} else if isMultiNUMA() {
-		cpuList = mustParseCPUSet(getCoreSiblingList(0)).ToSlice()
+		cpuList = mustParseCPUSet(getCoreSiblingList(0)).List()
 		if len(cpuList) > 1 {
 			cpu1 = cpuList[1]
 		}
@@ -367,7 +367,7 @@ func runMultipleCPUGuPod(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("checking if the expected cpuset was assigned")
 	cpuListString = "1-2"
 	if isMultiNUMA() {
-		cpuList = mustParseCPUSet(getCoreSiblingList(0)).ToSlice()
+		cpuList = mustParseCPUSet(getCoreSiblingList(0)).List()
 		if len(cpuList) > 1 {
 			cset = mustParseCPUSet(getCPUSiblingList(int64(cpuList[1])))
 			if !isHTEnabled() && len(cpuList) > 2 {
@@ -377,7 +377,7 @@ func runMultipleCPUGuPod(ctx context.Context, f *framework.Framework) {
 		}
 	} else if isHTEnabled() {
 		cpuListString = "2-3"
-		cpuList = mustParseCPUSet(getCPUSiblingList(0)).ToSlice()
+		cpuList = mustParseCPUSet(getCPUSiblingList(0)).List()
 		if cpuList[1] != 1 {
 			cset = mustParseCPUSet(getCPUSiblingList(1))
 			cpuListString = fmt.Sprintf("%s", cset)
@@ -418,18 +418,18 @@ func runMultipleCPUContainersGuPod(ctx context.Context, f *framework.Framework) 
 	ginkgo.By("checking if the expected cpuset was assigned")
 	cpu1, cpu2 = 1, 2
 	if isHTEnabled() {
-		cpuList = mustParseCPUSet(getCPUSiblingList(0)).ToSlice()
+		cpuList = mustParseCPUSet(getCPUSiblingList(0)).List()
 		if cpuList[1] != 1 {
 			cpu1, cpu2 = cpuList[1], 1
 		}
 		if isMultiNUMA() {
-			cpuList = mustParseCPUSet(getCoreSiblingList(0)).ToSlice()
+			cpuList = mustParseCPUSet(getCoreSiblingList(0)).List()
 			if len(cpuList) > 1 {
 				cpu2 = cpuList[1]
 			}
 		}
 	} else if isMultiNUMA() {
-		cpuList = mustParseCPUSet(getCoreSiblingList(0)).ToSlice()
+		cpuList = mustParseCPUSet(getCoreSiblingList(0)).List()
 		if len(cpuList) > 2 {
 			cpu1, cpu2 = cpuList[1], cpuList[2]
 		}
@@ -480,18 +480,18 @@ func runMultipleGuPods(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("checking if the expected cpuset was assigned")
 	cpu1, cpu2 = 1, 2
 	if isHTEnabled() {
-		cpuList = mustParseCPUSet(getCPUSiblingList(0)).ToSlice()
+		cpuList = mustParseCPUSet(getCPUSiblingList(0)).List()
 		if cpuList[1] != 1 {
 			cpu1, cpu2 = cpuList[1], 1
 		}
 		if isMultiNUMA() {
-			cpuList = mustParseCPUSet(getCoreSiblingList(0)).ToSlice()
+			cpuList = mustParseCPUSet(getCoreSiblingList(0)).List()
 			if len(cpuList) > 1 {
 				cpu2 = cpuList[1]
 			}
 		}
 	} else if isMultiNUMA() {
-		cpuList = mustParseCPUSet(getCoreSiblingList(0)).ToSlice()
+		cpuList = mustParseCPUSet(getCoreSiblingList(0)).List()
 		if len(cpuList) > 2 {
 			cpu1, cpu2 = cpuList[1], cpuList[2]
 		}
@@ -588,10 +588,10 @@ func runCPUManagerTests(f *framework.Framework) {
 		ginkgo.By("checking if the expected cpuset was assigned")
 		cpu1 = 1
 		if isHTEnabled() {
-			cpuList = mustParseCPUSet(getCPUSiblingList(0)).ToSlice()
+			cpuList = mustParseCPUSet(getCPUSiblingList(0)).List()
 			cpu1 = cpuList[1]
 		} else if isMultiNUMA() {
-			cpuList = mustParseCPUSet(getCoreSiblingList(0)).ToSlice()
+			cpuList = mustParseCPUSet(getCoreSiblingList(0)).List()
 			if len(cpuList) > 1 {
 				cpu1 = cpuList[1]
 			}
@@ -734,10 +734,10 @@ func validateSMTAlignment(cpus cpuset.CPUSet, smtLevel int, pod *v1.Pod, cnt *v1
 	// to do so the easiest way is to rebuild the expected set of siblings from all the cpus we got.
 	// if the expected set matches the given set, the given set was good.
 	b := cpuset.NewBuilder()
-	for _, cpuID := range cpus.ToSliceNoSort() {
+	for _, cpuID := range cpus.UnsortedList() {
 		threadSiblings, err := cpuset.Parse(strings.TrimSpace(getCPUSiblingList(int64(cpuID))))
 		framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
-		b.Add(threadSiblings.ToSliceNoSort()...)
+		b.Add(threadSiblings.UnsortedList()...)
 	}
 	siblingsCPUs := b.Result()
 

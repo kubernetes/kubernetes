@@ -162,20 +162,17 @@ func (s CPUSet) Difference(s2 CPUSet) CPUSet {
 	return s.FilterNot(func(cpu int) bool { return s2.Contains(cpu) })
 }
 
-// ToSlice returns a slice of integers that contains all elements from
-// this set.
-func (s CPUSet) ToSlice() []int {
-	result := make([]int, 0, len(s.elems))
-	for cpu := range s.elems {
-		result = append(result, cpu)
-	}
+// List returns a slice of integers that contains all elements from
+// this set. The list is sorted.
+func (s CPUSet) List() []int {
+	result := s.UnsortedList()
 	sort.Ints(result)
 	return result
 }
 
-// ToSliceNoSort returns a slice of integers that contains all elements from
+// UnsortedList returns a slice of integers that contains all elements from
 // this set.
-func (s CPUSet) ToSliceNoSort() []int {
+func (s CPUSet) UnsortedList() []int {
 	result := make([]int, 0, len(s.elems))
 	for cpu := range s.elems {
 		result = append(result, cpu)
@@ -192,7 +189,7 @@ func (s CPUSet) String() string {
 		return ""
 	}
 
-	elems := s.ToSlice()
+	elems := s.List()
 
 	type rng struct {
 		start int

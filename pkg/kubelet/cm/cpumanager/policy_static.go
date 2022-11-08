@@ -544,7 +544,7 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 
 	// Iterate through all combinations of numa nodes bitmask and build hints from them.
 	hints := []topologymanager.TopologyHint{}
-	bitmask.IterateBitMasks(p.topology.CPUDetails.NUMANodes().ToSlice(), func(mask bitmask.BitMask) {
+	bitmask.IterateBitMasks(p.topology.CPUDetails.NUMANodes().List(), func(mask bitmask.BitMask) {
 		// First, update minAffinitySize for the current request size.
 		cpusInMask := p.topology.CPUDetails.CPUsInNUMANodes(mask.GetBits()...).Size()
 		if cpusInMask >= request && mask.Count() < minAffinitySize {
@@ -554,7 +554,7 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 		// Then check to see if we have enough CPUs available on the current
 		// numa node bitmask to satisfy the CPU request.
 		numMatching := 0
-		for _, c := range reusableCPUs.ToSlice() {
+		for _, c := range reusableCPUs.List() {
 			// Disregard this mask if its NUMANode isn't part of it.
 			if !mask.IsSet(p.topology.CPUDetails[c].NUMANodeID) {
 				return
@@ -564,7 +564,7 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 
 		// Finally, check to see if enough available CPUs remain on the current
 		// NUMA node combination to satisfy the CPU request.
-		for _, c := range availableCPUs.ToSlice() {
+		for _, c := range availableCPUs.List() {
 			if mask.IsSet(p.topology.CPUDetails[c].NUMANodeID) {
 				numMatching++
 			}
@@ -623,7 +623,7 @@ func (p *staticPolicy) getAlignedCPUs(numaAffinity bitmask.BitMask, allocatableC
 	// socket aligned hint. It will ensure that first socket aligned available CPUs are
 	// allocated before we try to find CPUs across socket to satisfy allocation request.
 	if p.options.AlignBySocket {
-		socketBits := p.topology.CPUDetails.SocketsInNUMANodes(numaBits...).ToSliceNoSort()
+		socketBits := p.topology.CPUDetails.SocketsInNUMANodes(numaBits...).UnsortedList()
 		for _, socketID := range socketBits {
 			alignedCPUs = alignedCPUs.Union(allocatableCPUs.Intersection(p.topology.CPUDetails.CPUsInSockets(socketID)))
 		}

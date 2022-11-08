@@ -128,7 +128,7 @@ func (n *numaFirst) takeFullSecondLevel() {
 // If NUMA nodes are higher in the memory hierarchy than sockets, then just
 // sort the NUMA nodes directly, and return them.
 func (n *numaFirst) sortAvailableNUMANodes() []int {
-	numas := n.acc.details.NUMANodes().ToSliceNoSort()
+	numas := n.acc.details.NUMANodes().UnsortedList()
 	n.acc.sort(numas, n.acc.details.CPUsInNUMANodes)
 	return numas
 }
@@ -139,7 +139,7 @@ func (n *numaFirst) sortAvailableNUMANodes() []int {
 func (n *numaFirst) sortAvailableSockets() []int {
 	var result []int
 	for _, numa := range n.sortAvailableNUMANodes() {
-		sockets := n.acc.details.SocketsInNUMANodes(numa).ToSliceNoSort()
+		sockets := n.acc.details.SocketsInNUMANodes(numa).UnsortedList()
 		n.acc.sort(sockets, n.acc.details.CPUsInSockets)
 		result = append(result, sockets...)
 	}
@@ -151,7 +151,7 @@ func (n *numaFirst) sortAvailableSockets() []int {
 func (n *numaFirst) sortAvailableCores() []int {
 	var result []int
 	for _, socket := range n.acc.sortAvailableSockets() {
-		cores := n.acc.details.CoresInSockets(socket).ToSliceNoSort()
+		cores := n.acc.details.CoresInSockets(socket).UnsortedList()
 		n.acc.sort(cores, n.acc.details.CPUsInCores)
 		result = append(result, cores...)
 	}
@@ -176,7 +176,7 @@ func (s *socketsFirst) takeFullSecondLevel() {
 func (s *socketsFirst) sortAvailableNUMANodes() []int {
 	var result []int
 	for _, socket := range s.sortAvailableSockets() {
-		numas := s.acc.details.NUMANodesInSockets(socket).ToSliceNoSort()
+		numas := s.acc.details.NUMANodesInSockets(socket).UnsortedList()
 		s.acc.sort(numas, s.acc.details.CPUsInNUMANodes)
 		result = append(result, numas...)
 	}
@@ -186,7 +186,7 @@ func (s *socketsFirst) sortAvailableNUMANodes() []int {
 // If sockets are higher in the memory hierarchy than NUMA nodes, then just
 // sort the sockets directly, and return them.
 func (s *socketsFirst) sortAvailableSockets() []int {
-	sockets := s.acc.details.Sockets().ToSliceNoSort()
+	sockets := s.acc.details.Sockets().UnsortedList()
 	s.acc.sort(sockets, s.acc.details.CPUsInSockets)
 	return sockets
 }
@@ -196,7 +196,7 @@ func (s *socketsFirst) sortAvailableSockets() []int {
 func (s *socketsFirst) sortAvailableCores() []int {
 	var result []int
 	for _, numa := range s.acc.sortAvailableNUMANodes() {
-		cores := s.acc.details.CoresInNUMANodes(numa).ToSliceNoSort()
+		cores := s.acc.details.CoresInNUMANodes(numa).UnsortedList()
 		s.acc.sort(cores, s.acc.details.CPUsInCores)
 		result = append(result, cores...)
 	}
@@ -323,7 +323,7 @@ func (a *cpuAccumulator) sortAvailableCores() []int {
 func (a *cpuAccumulator) sortAvailableCPUs() []int {
 	var result []int
 	for _, core := range a.sortAvailableCores() {
-		cpus := a.details.CPUsInCores(core).ToSliceNoSort()
+		cpus := a.details.CPUsInCores(core).UnsortedList()
 		sort.Ints(cpus)
 		result = append(result, cpus...)
 	}

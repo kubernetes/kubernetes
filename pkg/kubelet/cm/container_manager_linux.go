@@ -982,14 +982,14 @@ func int64Slice(in []int) []int64 {
 
 func (cm *containerManagerImpl) GetCPUs(podUID, containerName string) []int64 {
 	if cm.cpuManager != nil {
-		return int64Slice(cm.cpuManager.GetExclusiveCPUs(podUID, containerName).ToSliceNoSort())
+		return int64Slice(cm.cpuManager.GetExclusiveCPUs(podUID, containerName).UnsortedList())
 	}
 	return []int64{}
 }
 
 func (cm *containerManagerImpl) GetAllocatableCPUs() []int64 {
 	if cm.cpuManager != nil {
-		return int64Slice(cm.cpuManager.GetAllocatableCPUs().ToSliceNoSort())
+		return int64Slice(cm.cpuManager.GetAllocatableCPUs().UnsortedList())
 	}
 	return []int64{}
 }
