@@ -134,6 +134,13 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 		apiExtensionInformers.Apiextensions().V1().CustomResourceDefinitions(),
 		autoRegistrationController)
 
+	// Imbue all builtin group-priorities onto the aggregated discovery
+	if aggregatorConfig.GenericConfig.AggregatedDiscoveryGroupManager != nil {
+		for gv, entry := range apiVersionPriorities {
+			aggregatorConfig.GenericConfig.AggregatedDiscoveryGroupManager.SetGroupPriority(gv.Group, int(entry.group))
+		}
+	}
+
 	err = aggregatorServer.GenericAPIServer.AddPostStartHook("kube-apiserver-autoregistration", func(context genericapiserver.PostStartHookContext) error {
 		go crdRegistrationController.Run(5, context.StopCh)
 		go func() {

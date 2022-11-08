@@ -69,5 +69,5 @@ func (s *APIGroupHandler) handle(req *restful.Request, resp *restful.Response) {
 }
 
 func (s *APIGroupHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	responsewriters.WriteObjectNegotiated(s.serializer, negotiation.DefaultEndpointRestrictions, schema.GroupVersion{}, w, req, http.StatusOK, &s.group)
+	responsewriters.WriteObjectNegotiated(s.serializer, negotiation.DefaultEndpointRestrictions, schema.GroupVersion{}, w, req, http.StatusOK, &s.group, false)
 }
