@@ -54,12 +54,12 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 		watchTests []*testWatchStruct
 	}{{
 		name:       "create a key",
-		key:        basePath + "/somekey-1",
+		key:        "/pods/somekey-1",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}},
 		pred:       storage.Everything,
 	}, {
 		name:       "key updated to match predicate",
-		key:        basePath + "/somekey-3",
+		key:        "/pods/somekey-3",
 		watchTests: []*testWatchStruct{{podFoo, false, ""}, {podBar, true, watch.Added}},
 		pred: storage.SelectionPredicate{
 			Label: labels.Everything(),
@@ -71,12 +71,12 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 		},
 	}, {
 		name:       "update",
-		key:        basePath + "/somekey-4",
+		key:        "/pods/somekey-4",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}, {podBar, true, watch.Modified}},
 		pred:       storage.Everything,
 	}, {
 		name:       "delete because of being filtered",
-		key:        basePath + "/somekey-5",
+		key:        "/pods/somekey-5",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}, {podBar, true, watch.Deleted}},
 		pred: storage.SelectionPredicate{
 			Label: labels.Everything(),
@@ -214,13 +214,13 @@ func RunTestWatchError(ctx context.Context, t *testing.T, store InterfaceWithPre
 		Predicate:       storage.Everything,
 		Recursive:       true,
 	}
-	if err := store.GetList(ctx, basePath, storageOpts, list); err != nil {
+	if err := store.GetList(ctx, "/pods/", storageOpts, list); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	if err := store.GuaranteedUpdate(ctx, basePath+"//foo", &example.Pod{}, true, nil, storage.SimpleUpdate(
+	if err := store.GuaranteedUpdate(ctx, "/pods/test-ns/foo", &example.Pod{}, true, nil, storage.SimpleUpdate(
 		func(runtime.Object) (runtime.Object, error) {
-			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}, nil
+			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}}, nil
 		}), nil); err != nil {
 		t.Fatalf("GuaranteedUpdate failed: %v", err)
 	}
@@ -232,7 +232,7 @@ func RunTestWatchError(ctx context.Context, t *testing.T, store InterfaceWithPre
 		})
 	defer revertTransformer()
 
-	w, err := store.Watch(ctx, basePath+"//foo", storage.ListOptions{ResourceVersion: list.ResourceVersion, Predicate: storage.Everything})
+	w, err := store.Watch(ctx, "/pods/test-ns/foo", storage.ListOptions{ResourceVersion: list.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
@@ -244,7 +244,7 @@ func RunTestWatchContextCancel(ctx context.Context, t *testing.T, store storage.
 	cancel()
 	// When we watch with a canceled context, we should detect that it's context canceled.
 	// We won't take it as error and also close the watcher.
-	w, err := store.Watch(canceledCtx, basePath+"/abc", storage.ListOptions{
+	w, err := store.Watch(canceledCtx, "/pods/abc", storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       storage.Everything,
 	})
@@ -309,7 +309,7 @@ func RunTestWatchInitializationSignal(ctx context.Context, t *testing.T, store s
 // (it rather is used by wrappers of storage.Interface to implement its functionalities)
 // this test is currently considered optional.
 func RunOptionalTestProgressNotify(ctx context.Context, t *testing.T, store storage.Interface) {
-	key := basePath + "/somekey"
+	key := "/pods/somekey"
 	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}}
 	out := &example.Pod{}
 	if err := store.Create(ctx, key, input, out, 0); err != nil {
