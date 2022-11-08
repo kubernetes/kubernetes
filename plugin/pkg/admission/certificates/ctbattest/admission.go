@@ -101,22 +101,7 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, _ admissi
 	}
 
 	// Unlike CSRs, it's OK to validate against the *new* object, because
-	// updates to signer name will be rejected during validation.  For defense
-	// in depth, reject attempts to change signer at this layer as well.
-	//
-	// We want to use the new object because we also need to perform the signer
-	// name permission check on *create*.
-
-	if a.GetOperation() == admission.Update {
-		oldBundle, ok := a.GetOldObject().(*api.ClusterTrustBundle)
-		if !ok {
-			return admission.NewForbidden(a, fmt.Errorf("expected type ClusterTrustBundle, got: %T", a.GetOldObject()))
-		}
-
-		if oldBundle.Spec.SignerName != newBundle.Spec.SignerName {
-			return admission.NewForbidden(a, fmt.Errorf("changing signerName is forbidden"))
-		}
-	}
+	// updates to signer name will be rejected during validation.
 
 	// If signer name isn't specified, we don't need to perform the
 	// attest check.
