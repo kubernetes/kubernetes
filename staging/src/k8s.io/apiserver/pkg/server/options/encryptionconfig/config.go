@@ -117,7 +117,7 @@ func (h *kmsv2PluginProbe) toHealthzCheck(idx int) healthz.HealthChecker {
 // It may launch multiple go routines whose lifecycle is controlled by stopCh.
 // If reload is true, or KMS v2 plugins are used with no KMS v1 plugins, the returned slice of health checkers will always be of length 1.
 func LoadEncryptionConfig(filepath string, reload bool, stopCh <-chan struct{}) (map[schema.GroupResource]value.Transformer, []healthz.HealthChecker, error) {
-	config, err := loadConfig(filepath)
+	config, err := loadConfig(filepath, reload)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error while parsing file: %w", err)
 	}
@@ -262,7 +262,7 @@ func isKMSv2ProviderHealthy(name string, response *envelopekmsv2.StatusResponse)
 	return nil
 }
 
-func loadConfig(filepath string) (*apiserverconfig.EncryptionConfiguration, error) {
+func loadConfig(filepath string, reload bool) (*apiserverconfig.EncryptionConfiguration, error) {
 	f, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("error opening encryption provider configuration file %q: %w", filepath, err)
@@ -291,7 +291,7 @@ func loadConfig(filepath string) (*apiserverconfig.EncryptionConfiguration, erro
 		return nil, fmt.Errorf("got unexpected config type: %v", gvk)
 	}
 
-	return config, validation.ValidateEncryptionConfiguration(config).ToAggregate()
+	return config, validation.ValidateEncryptionConfiguration(config, reload).ToAggregate()
 }
 
 func prefixTransformersAndProbes(config apiserverconfig.ResourceConfiguration, stopCh <-chan struct{}) ([]value.PrefixTransformer, []healthChecker, *kmsState, error) {

@@ -114,7 +114,7 @@ func newMockErrorEnvelopeKMSv2Service(endpoint string, timeout time.Duration) (e
 
 func TestLegacyConfig(t *testing.T) {
 	legacyV1Config := "testdata/valid-configs/legacy.yaml"
-	legacyConfigObject, err := loadConfig(legacyV1Config)
+	legacyConfigObject, err := loadConfig(legacyV1Config, false)
 	cacheSize := int32(10)
 	if err != nil {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, legacyV1Config)
@@ -323,7 +323,7 @@ func TestKMSPluginHealthz(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
-			config, err := loadConfig(tt.config)
+			config, err := loadConfig(tt.config, false)
 			if errStr := errString(err); errStr != tt.wantErr {
 				t.Fatalf("unexpected error state got=%s want=%s", errStr, tt.wantErr)
 			}
