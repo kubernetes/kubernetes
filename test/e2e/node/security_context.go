@@ -77,6 +77,37 @@ var _ = SIGDescribe("Security Context", func() {
 		e2eoutput.TestContainerOutput(f, "pod.Spec.SecurityContext.SupplementalGroups", pod, 0, groups)
 	})
 
+	ginkgo.When("if the container's primary UID belongs to some groups in the image [LinuxOnly]", func() {
+		ginkgo.It("should add pod.Spec.SecurityContext.SupplementalGroups to them [LinuxOnly] in resultant supplementary groups for the container processes", func() {
+			uidInImage := int64(1000)
+			gidDefinedInImage := int64(50000)
+			supplementalGroup := int64(60000)
+			agnhost := imageutils.GetConfig(imageutils.Agnhost)
+			(&agnhost).SetVersion("2.43")
+			pod := scTestPod(false, false)
+			pod.Spec.Containers[0].Image = agnhost.GetE2EImage()
+			pod.Spec.Containers[0].Command = []string{"id", "-G"}
+			pod.Spec.SecurityContext.SupplementalGroups = []int64{int64(supplementalGroup)}
+			pod.Spec.SecurityContext.RunAsUser = &uidInImage
+
+			// In specified image(agnhost E2E image),
+			// - user-defined-in-image(uid=1000) is defined
+			// - user-defined-in-image belongs to group-defined-in-image(gid=50000)
+			// thus, resultant supplementary group of the container processes should be
+			// - 1000: self
+			// - 50000: pre-defined groups define in the container image of self(uid=1000)
+			// - 60000: SupplementalGroups
+			// $ id -G
+			// 1000 50000 60000
+			e2eoutput.TestContainerOutput(
+				f,
+				"pod.Spec.SecurityContext.SupplementalGroups with pre-defined-group in the image",
+				pod, 0,
+				[]string{fmt.Sprintf("%d %d %d", uidInImage, gidDefinedInImage, supplementalGroup)},
+			)
+		})
+	})
+
 	ginkgo.It("should support pod.Spec.SecurityContext.RunAsUser [LinuxOnly]", func() {
 		pod := scTestPod(false, false)
 		userID := int64(1001)

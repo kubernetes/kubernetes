@@ -3586,8 +3586,11 @@ type PodSecurityContext struct {
 	// +optional
 	RunAsNonRoot *bool `json:"runAsNonRoot,omitempty" protobuf:"varint,3,opt,name=runAsNonRoot"`
 	// A list of groups applied to the first process run in each container, in addition
-	// to the container's primary GID.  If unspecified, no groups will be added to
-	// any container.
+	// to the container's primary GID, the fsGroup (if specified), and group memberships
+	// defined in the container image for the uid of the container process. If unspecified,
+	// no additional groups are added to any container. Note that group memberships
+	// defined in the container image for the uid of the container process are still effective,
+	// even if they are not included in this list.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	SupplementalGroups []int64 `json:"supplementalGroups,omitempty" protobuf:"varint,4,rep,name=supplementalGroups"`
