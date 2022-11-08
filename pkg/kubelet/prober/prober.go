@@ -171,10 +171,13 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.GRPCContainerProbe) && p.GRPC != nil {
-		host := &(status.PodIP)
-		service := p.GRPC.Service
+		host := status.PodIP
+		service := ""
+		if p.GRPC.Service != nil {
+			service = *p.GRPC.Service
+		}
 		klog.V(4).InfoS("GRPC-Probe", "host", host, "service", service, "port", p.GRPC.Port, "timeout", timeout)
-		return pb.grpc.Probe(*host, *service, int(p.GRPC.Port), timeout)
+		return pb.grpc.Probe(host, service, int(p.GRPC.Port), timeout)
 	}
 
 	klog.InfoS("Failed to find probe builder for container", "containerName", container.Name)
