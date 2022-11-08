@@ -62,6 +62,7 @@ var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
 
 const defaultTestPrefix = "test!"
+const basePath = "/keybase"
 
 func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
@@ -258,12 +259,12 @@ func TestGet(t *testing.T) {
 		rv:               fmt.Sprintf("%d", lastUpdatedCurrentRV+1),
 	}, { // test get on non-existing item with ignoreNotFound=false
 		name:              "get non-existing",
-		key:               "/non-existing",
+		key:               basePath + "/non-existing",
 		ignoreNotFound:    false,
 		expectNotFoundErr: true,
 	}, { // test get on non-existing item with ignoreNotFound=true
 		name:              "get non-existing, ignore not found",
-		key:               "/non-existing",
+		key:               basePath + "/non-existing",
 		ignoreNotFound:    true,
 		expectNotFoundErr: false,
 		expectedOut:       &example.Pod{},
@@ -647,7 +648,7 @@ func TestGetToList(t *testing.T) {
 
 func TestGuaranteedUpdate(t *testing.T) {
 	ctx, store, etcdClient := testSetup(t)
-	key := "/testkey"
+	key := basePath + "/testkey"
 
 	tests := []struct {
 		key                 string
@@ -659,14 +660,14 @@ func TestGuaranteedUpdate(t *testing.T) {
 		transformStale      bool
 		hasSelfLink         bool
 	}{{ // GuaranteedUpdate on non-existing key with ignoreNotFound=false
-		key:                 "/non-existing",
+		key:                 basePath + "/non-existing",
 		ignoreNotFound:      false,
 		precondition:        nil,
 		expectNotFoundErr:   true,
 		expectInvalidObjErr: false,
 		expectNoUpdate:      false,
 	}, { // GuaranteedUpdate on non-existing key with ignoreNotFound=true
-		key:                 "/non-existing",
+		key:                 basePath + "/non-existing",
 		ignoreNotFound:      true,
 		precondition:        nil,
 		expectNotFoundErr:   false,
@@ -1009,13 +1010,13 @@ func TestTransformationFailure(t *testing.T) {
 		obj       *example.Pod
 		storedObj *example.Pod
 	}{{
-		key: "/one-level/test",
+		key: basePath + "/one-level/test",
 		obj: &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 			Spec:       storagetesting.DeepEqualSafePodSpec(),
 		},
 	}, {
-		key: "/two-level/1/test",
+		key: basePath + "/two-level/1/test",
 		obj: &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "baz"},
 			Spec:       storagetesting.DeepEqualSafePodSpec(),
@@ -1043,7 +1044,7 @@ func TestTransformationFailure(t *testing.T) {
 
 	// List should fail
 	var got example.PodList
-	if err := store.List(ctx, "/", storage.ListOptions{Predicate: storage.Everything}, &got); !storage.IsInternalError(err) {
+	if err := store.List(ctx, basePath, storage.ListOptions{Predicate: storage.Everything}, &got); !storage.IsInternalError(err) {
 		t.Errorf("Unexpected error %v", err)
 	}
 
@@ -1105,23 +1106,23 @@ func TestList(t *testing.T) {
 		storedObj *example.Pod
 	}{
 		{
-			key: "/one-level/test",
+			key: basePath + "/one-level/test",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 		},
 		{
-			key: "/two-level/1/test",
+			key: basePath + "/two-level/1/test",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 		},
 		{
-			key: "/two-level/2/test",
+			key: basePath + "/two-level/2/test",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
 		},
 		{
-			key: "/z-level/3/test",
+			key: basePath + "/z-level/3/test",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "fourth"}},
 		},
 		{
-			key: "/z-level/3/test-2",
+			key: basePath + "/z-level/3/test-2",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
 		},
 	}
@@ -1135,7 +1136,7 @@ func TestList(t *testing.T) {
 	}
 
 	list := &example.PodList{}
-	store.List(ctx, "/two-level", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything}, list)
+	store.List(ctx, basePath+"/two-level", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything}, list)
 	continueRV, _ := strconv.Atoi(list.ResourceVersion)
 	secondContinuation, err := encodeContinue("/two-level/2", "/two-level/", int64(continueRV))
 	if err != nil {
@@ -1163,14 +1164,14 @@ func TestList(t *testing.T) {
 	}{
 		{
 			name:        "rejects invalid resource version",
-			prefix:      "/",
+			prefix:      basePath,
 			pred:        storage.Everything,
 			rv:          "abc",
 			expectError: true,
 		},
 		{
 			name:   "rejects resource version and continue token",
-			prefix: "/",
+			prefix: basePath,
 			pred: storage.SelectionPredicate{
 				Label:    labels.Everything(),
 				Field:    fields.Everything(),
@@ -1182,26 +1183,26 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:             "rejects resource version set too high",
-			prefix:           "/",
+			prefix:           basePath,
 			rv:               fmt.Sprintf("%d", continueRV+1),
 			expectRVTooLarge: true,
 		},
 		{
 			name:        "test List on existing key",
-			prefix:      "/one-level/",
+			prefix:      basePath + "/one-level/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{preset[0].storedObj},
 		},
 		{
 			name:        "test List on existing key with resource version set to 0",
-			prefix:      "/one-level/",
+			prefix:      basePath + "/one-level/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{preset[0].storedObj},
 			rv:          "0",
 		},
 		{
 			name:        "test List on existing key with resource version set to 1, match=Exact",
-			prefix:      "/one-level/",
+			prefix:      basePath + "/one-level/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{},
 			rv:          "1",
@@ -1210,7 +1211,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:        "test List on existing key with resource version set to 1, match=NotOlderThan",
-			prefix:      "/one-level/",
+			prefix:      basePath + "/one-level/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{preset[0].storedObj},
 			rv:          "0",
@@ -1218,7 +1219,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:        "test List on existing key with resource version set to 1, match=Invalid",
-			prefix:      "/one-level/",
+			prefix:      basePath + "/one-level/",
 			pred:        storage.Everything,
 			rv:          "0",
 			rvMatch:     "Invalid",
@@ -1226,14 +1227,14 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:        "test List on existing key with resource version set to current resource version",
-			prefix:      "/one-level/",
+			prefix:      basePath + "/one-level/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{preset[0].storedObj},
 			rv:          list.ResourceVersion,
 		},
 		{
 			name:        "test List on existing key with resource version set to current resource version, match=Exact",
-			prefix:      "/one-level/",
+			prefix:      basePath + "/one-level/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{preset[0].storedObj},
 			rv:          list.ResourceVersion,
@@ -1242,7 +1243,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:        "test List on existing key with resource version set to current resource version, match=NotOlderThan",
-			prefix:      "/one-level/",
+			prefix:      basePath + "/one-level/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{preset[0].storedObj},
 			rv:          list.ResourceVersion,
@@ -1250,13 +1251,13 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:        "test List on non-existing key",
-			prefix:      "/non-existing/",
+			prefix:      basePath + "/non-existing/",
 			pred:        storage.Everything,
 			expectedOut: nil,
 		},
 		{
 			name:   "test List with pod name matching",
-			prefix: "/one-level/",
+			prefix: basePath + "/one-level/",
 			pred: storage.SelectionPredicate{
 				Label: labels.Everything(),
 				Field: fields.ParseSelectorOrDie("metadata.name!=foo"),
@@ -1265,7 +1266,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:   "test List with limit",
-			prefix: "/two-level/",
+			prefix: basePath + "/two-level/",
 			pred: storage.SelectionPredicate{
 				Label: labels.Everything(),
 				Field: fields.Everything(),
@@ -1277,7 +1278,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:   "test List with limit at current resource version",
-			prefix: "/two-level/",
+			prefix: basePath + "/two-level/",
 			pred: storage.SelectionPredicate{
 				Label: labels.Everything(),
 				Field: fields.Everything(),
@@ -1291,7 +1292,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:   "test List with limit at current resource version and match=Exact",
-			prefix: "/two-level/",
+			prefix: basePath + "/two-level/",
 			pred: storage.SelectionPredicate{
 				Label: labels.Everything(),
 				Field: fields.Everything(),
@@ -1306,7 +1307,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:   "test List with limit at resource version 0",
-			prefix: "/two-level/",
+			prefix: basePath + "/two-level/",
 			pred: storage.SelectionPredicate{
 				Label: labels.Everything(),
 				Field: fields.Everything(),
@@ -1320,7 +1321,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:   "test List with limit at resource version 0 match=NotOlderThan",
-			prefix: "/two-level/",
+			prefix: basePath + "/two-level/",
 			pred: storage.SelectionPredicate{
 				Label: labels.Everything(),
 				Field: fields.Everything(),
@@ -1335,7 +1336,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:   "test List with limit at resource version 1 and match=Exact",
-			prefix: "/two-level/",
+			prefix: basePath + "/two-level/",
 			pred: storage.SelectionPredicate{
 				Label: labels.Everything(),
 				Field: fields.Everything(),
@@ -1364,7 +1365,7 @@ func TestList(t *testing.T) {
 		{
 			name:          "test List with limit when paging disabled",
 			disablePaging: true,
-			prefix:        "/two-level/",
+			prefix:        basePath + "/two-level/",
 			pred: storage.SelectionPredicate{
 				Label: labels.Everything(),
 				Field: fields.Everything(),
@@ -1375,7 +1376,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:   "test List with pregenerated continue token",
-			prefix: "/two-level/",
+			prefix: basePath + "/two-level/",
 			pred: storage.SelectionPredicate{
 				Label:    labels.Everything(),
 				Field:    fields.Everything(),
@@ -1386,7 +1387,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:   "ignores resource version 0 for List with pregenerated continue token",
-			prefix: "/two-level/",
+			prefix: basePath + "/two-level/",
 			pred: storage.SelectionPredicate{
 				Label:    labels.Everything(),
 				Field:    fields.Everything(),
@@ -1398,13 +1399,13 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:        "test List with multiple levels of directories and expect flattened result",
-			prefix:      "/two-level/",
+			prefix:      basePath + "/two-level/",
 			pred:        storage.Everything,
 			expectedOut: []*example.Pod{preset[1].storedObj, preset[2].storedObj},
 		},
 		{
 			name:   "test List with filter returning only one item, ensure only a single page returned",
-			prefix: "/",
+			prefix: basePath,
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "fourth"),
 				Label: labels.Everything(),
@@ -1415,7 +1416,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:   "test List with filter returning only one item, covers the entire list",
-			prefix: "/",
+			prefix: basePath,
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "fourth"),
 				Label: labels.Everything(),
@@ -1426,7 +1427,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:   "test List with filter returning only one item, covers the entire list, with resource version 0",
-			prefix: "/",
+			prefix: basePath,
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "fourth"),
 				Label: labels.Everything(),
@@ -1438,7 +1439,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:   "test List with filter returning two items, more pages possible",
-			prefix: "/",
+			prefix: basePath,
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "foo"),
 				Label: labels.Everything(),
@@ -1449,7 +1450,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:   "filter returns two items split across multiple pages",
-			prefix: "/",
+			prefix: basePath,
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "bar"),
 				Label: labels.Everything(),
@@ -1459,7 +1460,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:   "filter returns one item for last page, ends on last item, not full",
-			prefix: "/",
+			prefix: basePath,
 			pred: storage.SelectionPredicate{
 				Field:    fields.OneTermEqualSelector("metadata.name", "bar"),
 				Label:    labels.Everything(),
@@ -1470,7 +1471,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:   "filter returns one item for last page, starts on last item, full",
-			prefix: "/",
+			prefix: basePath,
 			pred: storage.SelectionPredicate{
 				Field:    fields.OneTermEqualSelector("metadata.name", "bar"),
 				Label:    labels.Everything(),
@@ -1481,7 +1482,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:   "filter returns one item for last page, starts on last item, partial page",
-			prefix: "/",
+			prefix: basePath,
 			pred: storage.SelectionPredicate{
 				Field:    fields.OneTermEqualSelector("metadata.name", "bar"),
 				Label:    labels.Everything(),
@@ -1492,7 +1493,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:   "filter returns two items, page size equal to total list size",
-			prefix: "/",
+			prefix: basePath,
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "bar"),
 				Label: labels.Everything(),
@@ -1502,7 +1503,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:   "filter returns one item, page size equal to total list size",
-			prefix: "/",
+			prefix: basePath,
 			pred: storage.SelectionPredicate{
 				Field: fields.OneTermEqualSelector("metadata.name", "fourth"),
 				Label: labels.Everything(),
@@ -1578,7 +1579,7 @@ func TestListContinuation(t *testing.T) {
 	ctx := context.Background()
 
 	// Setup storage with the following structure:
-	//  /
+	//  /keybase/
 	//   - one-level/
 	//  |            - test
 	//  |
@@ -1595,15 +1596,15 @@ func TestListContinuation(t *testing.T) {
 		storedObj *example.Pod
 	}{
 		{
-			key: "/one-level/test",
+			key: basePath + "/one-level/test",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 		},
 		{
-			key: "/two-level/1/test",
+			key: basePath + "/two-level/1/test",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 		},
 		{
-			key: "/two-level/2/test",
+			key: basePath + "/two-level/2/test",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
 		},
 	}
@@ -1630,7 +1631,7 @@ func TestListContinuation(t *testing.T) {
 			},
 		}
 	}
-	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, "")}, out); err != nil {
+	if err := store.List(ctx, basePath, storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, "")}, out); err != nil {
 		t.Fatalf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1652,14 +1653,14 @@ func TestListContinuation(t *testing.T) {
 
 	// no limit, should get two items
 	out = &example.PodList{}
-	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(0, continueFromSecondItem)}, out); err != nil {
+	if err := store.List(ctx, basePath, storage.ListOptions{ResourceVersion: "0", Predicate: pred(0, continueFromSecondItem)}, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
 		t.Fatalf("Unexpected continuation token set")
 	}
 	if !reflect.DeepEqual(out.Items, []example.Pod{*preset[1].storedObj, *preset[2].storedObj}) {
-		key, rv, err := decodeContinue(continueFromSecondItem, "/")
+		key, rv, err := decodeContinue(continueFromSecondItem, basePath)
 		t.Logf("continue token was %d %s %v", rv, key, err)
 		t.Fatalf("Unexpected second page: %#v", out.Items)
 	}
@@ -1674,7 +1675,7 @@ func TestListContinuation(t *testing.T) {
 
 	// limit, should get two more pages
 	out = &example.PodList{}
-	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, continueFromSecondItem)}, out); err != nil {
+	if err := store.List(ctx, basePath, storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, continueFromSecondItem)}, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1695,7 +1696,7 @@ func TestListContinuation(t *testing.T) {
 	continueFromThirdItem := out.Continue
 
 	out = &example.PodList{}
-	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, continueFromThirdItem)}, out); err != nil {
+	if err := store.List(ctx, basePath, storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, continueFromThirdItem)}, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -1743,26 +1744,26 @@ func TestListContinuationWithFilter(t *testing.T) {
 		storedObj *example.Pod
 	}{
 		{
-			key: "/1",
+			key: basePath + "/1",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 		},
 		{
-			key: "/2",
+			key: basePath + "/2",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}, // this should not match
 		},
 		{
-			key: "/3",
+			key: basePath + "/3",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 		},
 		{
-			key: "/4",
+			key: basePath + "/4",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 		},
 	}
 
 	for i, ps := range preset {
 		preset[i].storedObj = &example.Pod{}
-		err := store.Create(ctx, ps.key, ps.obj, preset[i].storedObj, 0)
+		err := store.Create(ctx, basePath+ps.key, ps.obj, preset[i].storedObj, 0)
 		if err != nil {
 			t.Fatalf("Set failed: %v", err)
 		}
@@ -1785,7 +1786,7 @@ func TestListContinuationWithFilter(t *testing.T) {
 			},
 		}
 	}
-	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(2, "")}, out); err != nil {
+	if err := store.List(ctx, basePath, storage.ListOptions{ResourceVersion: "0", Predicate: pred(2, "")}, out); err != nil {
 		t.Errorf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1814,7 +1815,7 @@ func TestListContinuationWithFilter(t *testing.T) {
 	// but since there is only one item left, that is all we should get with no continueValue
 	// both read counters should be incremented for the singular calls they make in this case
 	out = &example.PodList{}
-	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(2, cont)}, out); err != nil {
+	if err := store.List(ctx, basePath, storage.ListOptions{ResourceVersion: "0", Predicate: pred(2, cont)}, out); err != nil {
 		t.Errorf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -1840,7 +1841,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 	ctx := context.Background()
 
 	// Setup storage with the following structure:
-	//  /
+	//  /keybase/
 	//   - one-level/
 	//  |            - test
 	//  |
@@ -1857,15 +1858,15 @@ func TestListInconsistentContinuation(t *testing.T) {
 		storedObj *example.Pod
 	}{
 		{
-			key: "/one-level/test",
+			key: basePath + "/one-level/test",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 		},
 		{
-			key: "/two-level/1/test",
+			key: basePath + "/two-level/1/test",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 		},
 		{
-			key: "/two-level/2/test",
+			key: basePath + "/two-level/2/test",
 			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
 		},
 	}
@@ -1892,7 +1893,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 	}
 
 	out := &example.PodList{}
-	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, "")}, out); err != nil {
+	if err := store.List(ctx, basePath, storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, "")}, out); err != nil {
 		t.Fatalf("Unable to get initial list: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1933,7 +1934,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 	}
 
 	// The old continue token should have expired
-	err = store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(0, continueFromSecondItem)}, out)
+	err = store.List(ctx, basePath, storage.ListOptions{ResourceVersion: "0", Predicate: pred(0, continueFromSecondItem)}, out)
 	if err == nil {
 		t.Fatalf("unexpected no error")
 	}
@@ -1950,7 +1951,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 	}
 
 	out = &example.PodList{}
-	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, inconsistentContinueFromSecondItem)}, out); err != nil {
+	if err := store.List(ctx, basePath, storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, inconsistentContinueFromSecondItem)}, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) == 0 {
@@ -1964,7 +1965,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 	}
 	continueFromThirdItem := out.Continue
 	out = &example.PodList{}
-	if err := store.List(ctx, "/", storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, continueFromThirdItem)}, out); err != nil {
+	if err := store.List(ctx, basePath, storage.ListOptions{ResourceVersion: "0", Predicate: pred(1, continueFromThirdItem)}, out); err != nil {
 		t.Fatalf("Unable to get second page: %v", err)
 	}
 	if len(out.Continue) != 0 {
@@ -1996,7 +1997,7 @@ func testSetup(t *testing.T) (context.Context, *store, *clientv3.Client) {
 // keys and stored objects.
 func testPropogateStore(ctx context.Context, t *testing.T, store *store, obj *example.Pod) (string, *example.Pod) {
 	// Setup store with a key and grab the output for returning.
-	key := "/testkey"
+	key := basePath + "/testkey"
 	return key, testPropogateStoreWithKey(ctx, t, store, key, obj)
 }
 
@@ -2023,9 +2024,9 @@ func TestPrefix(t *testing.T) {
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
 	transformer := &prefixTransformer{prefix: []byte(defaultTestPrefix)}
 	testcases := map[string]string{
-		"custom/prefix":     "/custom/prefix",
-		"/custom//prefix//": "/custom/prefix",
-		"/registry":         "/registry",
+		"custom/prefix":     "/custom/prefix/",
+		"/custom//prefix//": "/custom/prefix/",
+		"/registry":         "/registry/",
 	}
 	for configuredPrefix, effectivePrefix := range testcases {
 		store := newStore(client, codec, nil, configuredPrefix, schema.GroupResource{Resource: "widgets"}, transformer, true, NewDefaultLeaseManagerConfig())
@@ -2245,7 +2246,7 @@ func TestConsistentList(t *testing.T) {
 	}
 
 	result1 := example.PodList{}
-	if err := store.List(context.TODO(), "/", storage.ListOptions{Predicate: predicate}, &result1); err != nil {
+	if err := store.List(context.TODO(), basePath, storage.ListOptions{Predicate: predicate}, &result1); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -2257,7 +2258,7 @@ func TestConsistentList(t *testing.T) {
 	}
 
 	result2 := example.PodList{}
-	if err := store.List(context.TODO(), "/", options, &result2); err != nil {
+	if err := store.List(context.TODO(), basePath, options, &result2); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -2269,7 +2270,7 @@ func TestConsistentList(t *testing.T) {
 	options.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
 
 	result3 := example.PodList{}
-	if err := store.List(context.TODO(), "/", options, &result3); err != nil {
+	if err := store.List(context.TODO(), basePath, options, &result3); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -2277,7 +2278,7 @@ func TestConsistentList(t *testing.T) {
 	options.ResourceVersionMatch = metav1.ResourceVersionMatchExact
 
 	result4 := example.PodList{}
-	if err := store.List(context.TODO(), "/", options, &result4); err != nil {
+	if err := store.List(context.TODO(), basePath, options, &result4); err != nil {
 		t.Fatalf("failed to list objects: %v", err)
 	}
 
@@ -2340,15 +2341,15 @@ func TestLeaseMaxObjectCount(t *testing.T) {
 		expectAttachedCount int64
 	}{
 		{
-			key:                 "testkey1",
+			key:                 basePath + "/testkey1",
 			expectAttachedCount: 1,
 		},
 		{
-			key:                 "testkey2",
+			key:                 basePath + "/testkey2",
 			expectAttachedCount: 2,
 		},
 		{
-			key: "testkey3",
+			key: basePath + "testkey3",
 			// We assume each time has 1 object attached to the lease
 			// so after granting a new lease, the recorded count is set to 1
 			expectAttachedCount: 1,
@@ -2364,4 +2365,84 @@ func TestLeaseMaxObjectCount(t *testing.T) {
 			t.Errorf("Lease manager recorded count %v should be %v", store.leaseManager.leaseAttachedObjectCount, tc.expectAttachedCount)
 		}
 	}
+}
+
+func TestValidateKey(t *testing.T) {
+	validKeys := []string{
+		"/foo/bar/baz/a.b.c/",
+		"/foo",
+		"foo/bar/baz",
+		"/foo/bar..baz/",
+		"/foo/bar..",
+		"foo",
+		"foo/bar",
+		"/foo/bar/",
+	}
+	invalidKeys := []string{
+		"/foo/bar/../a.b.c/",
+		"..",
+		"/..",
+		"../",
+		"/foo/bar/..",
+		"../foo/bar",
+		"/../foo",
+		"/foo/bar/../",
+		".",
+		"/.",
+		"./",
+		"/./",
+		"/foo/.",
+		"./bar",
+		"/foo/./bar/",
+	}
+	const (
+		pathPrefix   = "/first/second"
+		expectPrefix = pathPrefix + "/"
+	)
+	client := testserver.RunEtcd(t, nil)
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
+	store := newStore(client, codec, newPod, pathPrefix, schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, true, LeaseManagerConfig{
+		ReuseDurationSeconds: 1,
+		MaxObjectCount:       defaultLeaseMaxObjectCount,
+	})
+
+	for _, key := range validKeys {
+		k, err := store.prepareKey(key)
+		if err != nil {
+			t.Errorf("key %q should be valid; unexpected error: %v", key, err)
+		} else if !strings.HasPrefix(k, expectPrefix) {
+			t.Errorf("key %q should have prefix %q", k, expectPrefix)
+		}
+	}
+
+	for _, key := range invalidKeys {
+		_, err := store.prepareKey(key)
+		if err == nil {
+			t.Errorf("key %q should be invalid", key)
+		}
+	}
+}
+
+func TestInvalidKeys(t *testing.T) {
+	const invalidKey = "/foo/bar/../baz"
+	expectedError := fmt.Sprintf("invalid key: %q", invalidKey)
+
+	expectInvalidKey := func(methodName string, err error) {
+		if err == nil {
+			t.Errorf("[%s] expected invalid key error; got nil", methodName)
+		} else if err.Error() != expectedError {
+			t.Errorf("[%s] expected invalid key error; got %v", methodName, err)
+		}
+	}
+
+	ctx, store, _ := testSetup(t)
+	expectInvalidKey("Create", store.Create(ctx, invalidKey, nil, nil, 0))
+	expectInvalidKey("Delete", store.Delete(ctx, invalidKey, nil, nil, nil, nil))
+	_, watchErr := store.Watch(ctx, invalidKey, storage.ListOptions{})
+	expectInvalidKey("Watch", watchErr)
+	expectInvalidKey("Get", store.Get(ctx, invalidKey, storage.GetOptions{}, nil))
+	expectInvalidKey("GetList", store.List(ctx, invalidKey, storage.ListOptions{}, nil))
+	expectInvalidKey("GuaranteedUpdate", store.GuaranteedUpdate(ctx, invalidKey, nil, true, nil, nil, nil))
+	_, countErr := store.Count(invalidKey)
+	expectInvalidKey("Count", countErr)
 }
