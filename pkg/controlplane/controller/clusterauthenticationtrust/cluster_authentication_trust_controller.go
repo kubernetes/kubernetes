@@ -89,28 +89,25 @@ type ClusterAuthenticationInfo struct {
 
 // NewClusterAuthenticationTrustController returns a controller that will maintain the kube-system configmap/extension-apiserver-authentication
 // that holds information about how to aggregated apiservers are recommended (but not required) to configure themselves.
-func NewClusterAuthenticationTrustController(requiredAuthenticationData ClusterAuthenticationInfo, kubeClient kubernetes.Interface) *Controller {
-	// we construct our own informer because we need such a small subset of the information available.  Just one namespace.
-	kubeSystemConfigMapInformer := corev1informers.NewConfigMapInformer(kubeClient, configMapNamespace, 12*time.Hour, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-
+func NewClusterAuthenticationTrustController(requiredAuthenticationData ClusterAuthenticationInfo, kubeClient kubernetes.Interface, rootConfigMapInformer corev1informers.ConfigMapInformer) *Controller {
 	c := &Controller{
 		requiredAuthenticationData:  requiredAuthenticationData,
-		configMapLister:             corev1listers.NewConfigMapLister(kubeSystemConfigMapInformer.GetIndexer()),
+		configMapLister:             rootConfigMapInformer.Lister(),
 		configMapClient:             kubeClient.CoreV1(),
 		namespaceClient:             kubeClient.CoreV1(),
 		queue:                       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cluster_authentication_trust_controller"),
-		preRunCaches:                []cache.InformerSynced{kubeSystemConfigMapInformer.HasSynced},
-		kubeSystemConfigMapInformer: kubeSystemConfigMapInformer,
+		preRunCaches:                []cache.InformerSynced{rootConfigMapInformer.Informer().HasSynced},
+		kubeSystemConfigMapInformer: rootConfigMapInformer.Informer(),
 	}
 
-	kubeSystemConfigMapInformer.AddEventHandler(cache.FilteringResourceEventHandler{
+	rootConfigMapInformer.Informer().AddEventHandler(cache.FilteringResourceEventHandler{
 		FilterFunc: func(obj interface{}) bool {
 			if cast, ok := obj.(*corev1.ConfigMap); ok {
-				return cast.Name == configMapName
+				return cast.Namespace == configMapNamespace && cast.Name == configMapName
 			}
 			if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 				if cast, ok := tombstone.Obj.(*corev1.ConfigMap); ok {
-					return cast.Name == configMapName
+					return cast.Namespace == configMapNamespace && cast.Name == configMapName
 				}
 			}
 			return true // always return true just in case.  The checks are fairly cheap

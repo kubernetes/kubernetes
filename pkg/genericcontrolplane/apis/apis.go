@@ -22,8 +22,8 @@ import (
 	"net/http"
 	"time"
 
-	kcpkubernetesclientset "github.com/kcp-dev/client-go/kubernetes"
 	kcpkubernetesinformers "github.com/kcp-dev/client-go/informers"
+	kcpkubernetesclientset "github.com/kcp-dev/client-go/kubernetes"
 	"github.com/kcp-dev/logicalcluster/v2"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
@@ -148,7 +148,8 @@ func (c *Config) Complete() CompletedConfig {
 // New returns a new instance of GenericControlPlane from the given config.
 // Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
-//   KubeletClientConfig
+//
+//	KubeletClientConfig
 func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget) (*GenericControlPlane, error) {
 	s, err := c.GenericConfig.New("kube-control-plane", delegationTarget)
 	if err != nil {
@@ -190,12 +191,20 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil, err
 	}
 
+	rootCluster := logicalcluster.New("root")
+
+	// Have to create this outside the post-start hook to ensure the informer is started correctly
+	rootConfigMapsInformer := c.ExtraConfig.VersionedInformers.Core().V1().ConfigMaps().Cluster(rootCluster)
+	// Register the informer for starting when the factory is started in a different post-start hook
+	_ = rootConfigMapsInformer.Informer()
+
 	m.GenericAPIServer.AddPostStartHookOrDie("start-cluster-authentication-info-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 		kubeClient, err := kcpkubernetesclientset.NewForConfig(hookContext.LoopbackClientConfig)
 		if err != nil {
 			return err
 		}
-		controller := clusterauthenticationtrust.NewClusterAuthenticationTrustController(m.ClusterAuthenticationInfo, kubeClient.Cluster(logicalcluster.New("root")))
+
+		controller := clusterauthenticationtrust.NewClusterAuthenticationTrustController(m.ClusterAuthenticationInfo, kubeClient.Cluster(rootCluster), rootConfigMapsInformer)
 
 		// generate a context  from stopCh. This is to avoid modifying files which are relying on apiserver
 		// TODO: See if we can pass ctx to the current method
@@ -242,7 +251,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			}
 			controller := lease.NewController(
 				clock.RealClock{},
-				kubeClient.Cluster(logicalcluster.New("root")),
+				kubeClient.Cluster(rootCluster),
 				m.GenericAPIServer.APIServerID,
 				int32(c.ExtraConfig.IdentityLeaseDurationSeconds),
 				nil,
@@ -258,7 +267,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 				return err
 			}
 			go apiserverleasegc.NewAPIServerLeaseGC(
-				kubeClient.Cluster(logicalcluster.New("root")),
+				kubeClient.Cluster(rootCluster),
 				time.Duration(c.ExtraConfig.IdentityLeaseDurationSeconds)*time.Second,
 				metav1.NamespaceSystem,
 				KubeAPIServerIdentityLeaseLabelSelector,
