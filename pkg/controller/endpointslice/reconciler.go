@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
 	"k8s.io/kubernetes/pkg/controller/endpointslice/topologycache"
@@ -50,6 +51,8 @@ type reconciler struct {
 	// topologyCache tracks the distribution of Nodes and endpoints across zones
 	// to enable TopologyAwareHints.
 	topologyCache *topologycache.TopologyCache
+	// eventRecorder allows reconciler to record and publish events.
+	eventRecorder record.EventRecorder
 }
 
 // endpointMeta includes the attributes we group slices on, this type helps with
@@ -133,6 +136,7 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 	slicesToCreate := []*discovery.EndpointSlice{}
 	slicesToUpdate := []*discovery.EndpointSlice{}
 	slicesToDelete := []*discovery.EndpointSlice{}
+	events := []*topologycache.EventBuilder{}
 
 	// Build data structures for existing state.
 	existingSlicesByPortMap := map[endpointutil.PortMapKey][]*discovery.EndpointSlice{}
@@ -252,24 +256,35 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 	// theoretically possible for endpoints of one address type to be assigned
 	// hints while another endpoints of another address type are not.
 	si := &topologycache.SliceInfo{
-		ServiceKey: fmt.Sprintf("%s/%s", service.Namespace, service.Name),
-		ToCreate:   slicesToCreate,
-		ToUpdate:   slicesToUpdate,
-		Unchanged:  unchangedSlices(existingSlices, slicesToUpdate, slicesToDelete),
+		ServiceKey:  fmt.Sprintf("%s/%s", service.Namespace, service.Name),
+		AddressType: addressType,
+		ToCreate:    slicesToCreate,
+		ToUpdate:    slicesToUpdate,
+		Unchanged:   unchangedSlices(existingSlices, slicesToUpdate, slicesToDelete),
 	}
 
 	if r.topologyCache != nil && hintsEnabled(service.Annotations) {
-		slicesToCreate, slicesToUpdate = r.topologyCache.AddHints(si)
+		slicesToCreate, slicesToUpdate, events = r.topologyCache.AddHints(si)
 	} else {
 		if r.topologyCache != nil {
+			if r.topologyCache.HasPopulatedHints(si.ServiceKey) {
+				klog.InfoS("TopologyAwareHints annotation has changed, removing hints", "serviceKey", si.ServiceKey, "addressType", si.AddressType)
+				events = append(events, &topologycache.EventBuilder{
+					EventType: corev1.EventTypeWarning,
+					Reason:    "TopologyAwareHintsDisabled",
+					Message:   topologycache.FormatWithAddressType(topologycache.TopologyAwareHintsDisabled, si.AddressType),
+				})
+			}
 			r.topologyCache.RemoveHints(si.ServiceKey, addressType)
 		}
 		slicesToCreate, slicesToUpdate = topologycache.RemoveHintsFromSlices(si)
 	}
-
 	err := r.finalize(service, slicesToCreate, slicesToUpdate, slicesToDelete, triggerTime)
 	if err != nil {
 		errs = append(errs, err)
+	}
+	for _, event := range events {
+		r.eventRecorder.Event(service, event.EventType, event.Reason, event.Message)
 	}
 	return utilerrors.NewAggregate(errs)
 
