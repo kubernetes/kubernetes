@@ -18,8 +18,10 @@ package v1
 
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	v1 "k8s.io/kube-scheduler/config/v1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/utils/pointer"
 )
@@ -52,8 +54,15 @@ func getDefaultPlugins() *v1.Plugins {
 			},
 		},
 	}
+	applyFeatureGates(plugins)
 
 	return plugins
+}
+
+func applyFeatureGates(config *v1.Plugins) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness) {
+		config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.SchedulingGates})
+	}
 }
 
 // mergePlugins merges the custom set into the given default one, handling disabled sets.
@@ -63,6 +72,7 @@ func mergePlugins(defaultPlugins, customPlugins *v1.Plugins) *v1.Plugins {
 	}
 
 	defaultPlugins.MultiPoint = mergePluginSet(defaultPlugins.MultiPoint, customPlugins.MultiPoint)
+	defaultPlugins.PreEnqueue = mergePluginSet(defaultPlugins.PreEnqueue, customPlugins.PreEnqueue)
 	defaultPlugins.QueueSort = mergePluginSet(defaultPlugins.QueueSort, customPlugins.QueueSort)
 	defaultPlugins.PreFilter = mergePluginSet(defaultPlugins.PreFilter, customPlugins.PreFilter)
 	defaultPlugins.Filter = mergePluginSet(defaultPlugins.Filter, customPlugins.Filter)

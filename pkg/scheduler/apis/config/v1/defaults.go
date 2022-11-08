@@ -53,6 +53,7 @@ func pluginsNames(p *configv1.Plugins) []string {
 		p.Bind,
 		p.PostBind,
 		p.Permit,
+		p.PreEnqueue,
 		p.QueueSort,
 	}
 	n := sets.NewString()

@@ -116,6 +116,9 @@ func applyFeatureGates(config *v1beta2.Plugins) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
 		config.Score.Enabled = append(config.Score.Enabled, v1beta2.Plugin{Name: names.VolumeBinding, Weight: pointer.Int32(1)})
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness) {
+		config.PreEnqueue.Enabled = append(config.PreEnqueue.Enabled, v1beta2.Plugin{Name: names.SchedulingGates})
+	}
 }
 
 // mergePlugins merges the custom set into the given default one, handling disabled sets.

@@ -56,6 +56,13 @@ func NewBackoffPodsRecorder() *PendingPodsRecorder {
 	}
 }
 
+// NewGatedPodsRecorder returns GatedPods in a Prometheus metric fashion
+func NewGatedPodsRecorder() *PendingPodsRecorder {
+	return &PendingPodsRecorder{
+		recorder: GatedPods(),
+	}
+}
+
 // Inc increases a metric counter by 1, in an atomic way
 func (r *PendingPodsRecorder) Inc() {
 	r.recorder.Inc()

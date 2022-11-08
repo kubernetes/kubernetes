@@ -543,6 +543,12 @@ func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
 		},
 	}
 
+	duplicatedPlugins := validConfig.DeepCopy()
+	duplicatedPlugins.Profiles[0].Plugins.PreEnqueue.Enabled = []config.Plugin{
+		{Name: "CustomPreEnqueue"},
+		{Name: "CustomPreEnqueue"},
+	}
+
 	duplicatedPluginConfig := validConfig.DeepCopy()
 	duplicatedPluginConfig.Profiles[0].PluginConfig = []config.PluginConfig{
 		{

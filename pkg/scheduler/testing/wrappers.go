@@ -385,6 +385,14 @@ func (p *PodWrapper) Volume(volume v1.Volume) *PodWrapper {
 	return p
 }
 
+// SchedulingGates sets `gates` as additional SchedulerGates of the inner pod.
+func (p *PodWrapper) SchedulingGates(gates []string) *PodWrapper {
+	for _, gate := range gates {
+		p.Spec.SchedulingGates = append(p.Spec.SchedulingGates, v1.PodSchedulingGate{Name: gate})
+	}
+	return p
+}
+
 // PodAffinityKind represents different kinds of PodAffinity.
 type PodAffinityKind int
 

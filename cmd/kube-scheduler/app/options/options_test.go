@@ -221,6 +221,9 @@ clientConnection:
   kubeconfig: '%s'
 profiles:
 - plugins:
+    preEnqueue:
+      enabled:
+      - name: foo
     reserve:
       enabled:
       - name: foo
@@ -830,6 +833,11 @@ profiles:
 					{
 						SchedulerName: "default-scheduler",
 						Plugins: &kubeschedulerconfig.Plugins{
+							PreEnqueue: kubeschedulerconfig.PluginSet{
+								Enabled: []kubeschedulerconfig.Plugin{
+									{Name: "foo"},
+								},
+							},
 							Reserve: kubeschedulerconfig.PluginSet{
 								Enabled: []kubeschedulerconfig.Plugin{
 									{Name: "foo"},
@@ -944,6 +952,7 @@ profiles:
 					{
 						SchedulerName: "default-scheduler",
 						Plugins: &kubeschedulerconfig.Plugins{
+							PreEnqueue: defaults.PluginsV1beta3.PreEnqueue,
 							QueueSort:  defaults.PluginsV1beta3.QueueSort,
 							PreFilter:  defaults.PluginsV1beta3.PreFilter,
 							Filter:     defaults.PluginsV1beta3.Filter,
@@ -1065,6 +1074,7 @@ profiles:
 					{
 						SchedulerName: "default-scheduler",
 						Plugins: &kubeschedulerconfig.Plugins{
+							PreEnqueue: defaults.PluginsV1beta2.PreEnqueue,
 							QueueSort:  defaults.PluginsV1beta2.QueueSort,
 							PreFilter:  defaults.PluginsV1beta2.PreFilter,
 							Filter:     defaults.PluginsV1beta2.Filter,
@@ -1427,6 +1437,7 @@ profiles:
 					{
 						SchedulerName: "bar-profile",
 						Plugins: &kubeschedulerconfig.Plugins{
+							PreEnqueue: defaults.PluginsV1beta2.PreEnqueue,
 							QueueSort:  defaults.PluginsV1beta2.QueueSort,
 							PreFilter:  defaults.PluginsV1beta2.PreFilter,
 							Filter:     defaults.PluginsV1beta2.Filter,

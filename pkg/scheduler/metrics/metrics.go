@@ -92,7 +92,7 @@ var (
 		&metrics.GaugeOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "pending_pods",
-			Help:           "Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods.",
+			Help:           "Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable pods that the scheduler never attempted to schedule because they are gated.",
 			StabilityLevel: metrics.STABLE,
 		}, []string{"queue"})
 	// SchedulerGoroutines isn't called in some parts where goroutines start.
@@ -247,6 +247,11 @@ func BackoffPods() metrics.GaugeMetric {
 // UnschedulablePods returns the pending pods metrics with the label unschedulable
 func UnschedulablePods() metrics.GaugeMetric {
 	return pendingPods.With(metrics.Labels{"queue": "unschedulable"})
+}
+
+// GatedPods returns the pending pods metrics with the label gated
+func GatedPods() metrics.GaugeMetric {
+	return pendingPods.With(metrics.Labels{"queue": "gated"})
 }
 
 // SinceInSeconds gets the time since the specified start in seconds.

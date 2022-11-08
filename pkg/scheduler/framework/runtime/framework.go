@@ -75,6 +75,7 @@ type frameworkImpl struct {
 	snapshotSharedLister framework.SharedLister
 	waitingPods          *waitingPodsMap
 	scorePluginWeight    map[string]int
+	preEnqueuePlugins    []framework.PreEnqueuePlugin
 	queueSortPlugins     []framework.QueueSortPlugin
 	preFilterPlugins     []framework.PreFilterPlugin
 	filterPlugins        []framework.FilterPlugin
@@ -125,6 +126,7 @@ func (f *frameworkImpl) getExtensionPoints(plugins *config.Plugins) []extensionP
 		{&plugins.Bind, &f.bindPlugins},
 		{&plugins.PostBind, &f.postBindPlugins},
 		{&plugins.Permit, &f.permitPlugins},
+		{&plugins.PreEnqueue, &f.preEnqueuePlugins},
 		{&plugins.QueueSort, &f.queueSortPlugins},
 	}
 }
@@ -572,6 +574,11 @@ func updatePluginList(pluginList interface{}, pluginSet config.PluginSet, plugin
 		plugins.Set(newPlugins)
 	}
 	return nil
+}
+
+// EnqueuePlugins returns the registered enqueue plugins.
+func (f *frameworkImpl) PreEnqueuePlugins() []framework.PreEnqueuePlugin {
+	return f.preEnqueuePlugins
 }
 
 // QueueSortFunc returns the function to sort pods in scheduling queue
