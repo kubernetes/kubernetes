@@ -76,6 +76,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.NodeStatusMaxImages = 50
 			obj.TopologyManagerPolicy = kubeletconfig.NoneTopologyManagerPolicy
 			obj.TopologyManagerScope = kubeletconfig.ContainerTopologyManagerScope
+			obj.TopologyManagerPolicyOptions = make(map[string]string)
 			obj.QOSReserved = map[string]string{
 				"memory": "50%",
 			}

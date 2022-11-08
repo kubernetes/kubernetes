@@ -710,6 +710,16 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				s.CPUManagerPolicyOptions, features.CPUManager, features.CPUManagerPolicyOptions)
 		}
 
+		var topologyManagerPolicyOptions map[string]string
+		if utilfeature.DefaultFeatureGate.Enabled(features.TopologyManager) {
+			if utilfeature.DefaultFeatureGate.Enabled(features.TopologyManagerPolicyOptions) {
+				topologyManagerPolicyOptions = s.TopologyManagerPolicyOptions
+			} else if s.TopologyManagerPolicyOptions != nil {
+				return fmt.Errorf("topology manager policy options %v require feature gates %q, %q enabled",
+					s.TopologyManagerPolicyOptions, features.TopologyManager, features.TopologyManagerPolicyOptions)
+			}
+		}
+
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(
 			kubeDeps.Mounter,
 			kubeDeps.CAdvisorInterface,
@@ -732,17 +742,18 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 					ReservedSystemCPUs:       reservedSystemCPUs,
 					HardEvictionThresholds:   hardEvictionThresholds,
 				},
-				QOSReserved:                             *experimentalQOSReserved,
-				CPUManagerPolicy:                        s.CPUManagerPolicy,
-				CPUManagerPolicyOptions:                 cpuManagerPolicyOptions,
-				CPUManagerReconcilePeriod:               s.CPUManagerReconcilePeriod.Duration,
-				ExperimentalMemoryManagerPolicy:         s.MemoryManagerPolicy,
-				ExperimentalMemoryManagerReservedMemory: s.ReservedMemory,
-				ExperimentalPodPidsLimit:                s.PodPidsLimit,
-				EnforceCPULimits:                        s.CPUCFSQuota,
-				CPUCFSQuotaPeriod:                       s.CPUCFSQuotaPeriod.Duration,
-				ExperimentalTopologyManagerPolicy:       s.TopologyManagerPolicy,
-				ExperimentalTopologyManagerScope:        s.TopologyManagerScope,
+				QOSReserved:                              *experimentalQOSReserved,
+				CPUManagerPolicy:                         s.CPUManagerPolicy,
+				CPUManagerPolicyOptions:                  cpuManagerPolicyOptions,
+				CPUManagerReconcilePeriod:                s.CPUManagerReconcilePeriod.Duration,
+				ExperimentalMemoryManagerPolicy:          s.MemoryManagerPolicy,
+				ExperimentalMemoryManagerReservedMemory:  s.ReservedMemory,
+				ExperimentalPodPidsLimit:                 s.PodPidsLimit,
+				EnforceCPULimits:                         s.CPUCFSQuota,
+				CPUCFSQuotaPeriod:                        s.CPUCFSQuotaPeriod.Duration,
+				ExperimentalTopologyManagerPolicy:        s.TopologyManagerPolicy,
+				ExperimentalTopologyManagerScope:         s.TopologyManagerScope,
+				ExperimentalTopologyManagerPolicyOptions: topologyManagerPolicyOptions,
 			},
 			s.FailSwapOn,
 			kubeDeps.Recorder)

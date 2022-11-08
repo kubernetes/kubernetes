@@ -22,6 +22,9 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
+
+	cadvisorapi "github.com/google/cadvisor/info/v1"
+
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
@@ -37,6 +40,8 @@ func TestNewManager(t *testing.T) {
 		policyName     string
 		expectedPolicy string
 		expectedError  error
+		topologyError  error
+		policyOptions  map[string]string
 	}{
 		{
 			description:    "Policy is set to none",
@@ -63,11 +68,30 @@ func TestNewManager(t *testing.T) {
 			policyName:    "unknown",
 			expectedError: fmt.Errorf("unknown policy: \"unknown\""),
 		},
+		{
+			description:    "Unknown policy name best-effort policy",
+			policyName:     "best-effort",
+			expectedPolicy: "best-effort",
+			expectedError:  fmt.Errorf("unknown Topology Manager Policy option:"),
+			policyOptions: map[string]string{
+				"unknown-option": "true",
+			},
+		},
+		{
+			description:    "Unknown policy name restricted policy",
+			policyName:     "restricted",
+			expectedPolicy: "restricted",
+			expectedError:  fmt.Errorf("unknown Topology Manager Policy option:"),
+			policyOptions: map[string]string{
+				"unknown-option": "true",
+			},
+		},
 	}
 
 	for _, tc := range tcases {
-		mngr, err := NewManager(nil, tc.policyName, "container")
+		topology := []cadvisorapi.Node{}
 
+		mngr, err := NewManager(topology, tc.policyName, "container", tc.policyOptions)
 		if tc.expectedError != nil {
 			if !strings.Contains(err.Error(), tc.expectedError.Error()) {
 				t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), tc.expectedError.Error())
@@ -107,7 +131,7 @@ func TestManagerScope(t *testing.T) {
 	}
 
 	for _, tc := range tcases {
-		mngr, err := NewManager(nil, "best-effort", tc.scopeName)
+		mngr, err := NewManager(nil, "best-effort", tc.scopeName, nil)
 
 		if tc.expectedError != nil {
 			if !strings.Contains(err.Error(), tc.expectedError.Error()) {
@@ -179,7 +203,18 @@ func TestAddHintProvider(t *testing.T) {
 }
 
 func TestAdmit(t *testing.T) {
-	numaNodes := []int{0, 1}
+	numaInfo := &NUMAInfo{
+		Nodes: []int{0, 1},
+		NUMADistances: NUMADistances{
+			{10, 11},
+			{11, 10},
+		},
+	}
+
+	opts := map[string]string{}
+	bePolicy, _ := NewBestEffortPolicy(numaInfo, opts)
+	restrictedPolicy, _ := NewRestrictedPolicy(numaInfo, opts)
+	singleNumaPolicy, _ := NewSingleNumaNodePolicy(numaInfo, opts)
 
 	tcases := []struct {
 		name     string
@@ -206,7 +241,7 @@ func TestAdmit(t *testing.T) {
 		{
 			name:     "QOSClass set as BestEffort. single-numa-node Policy. No Hints.",
 			qosClass: v1.PodQOSBestEffort,
-			policy:   NewRestrictedPolicy(numaNodes),
+			policy:   singleNumaPolicy,
 			hp: []HintProvider{
 				&mockHintProvider{},
 			},
@@ -215,7 +250,7 @@ func TestAdmit(t *testing.T) {
 		{
 			name:     "QOSClass set as BestEffort. Restricted Policy. No Hints.",
 			qosClass: v1.PodQOSBestEffort,
-			policy:   NewRestrictedPolicy(numaNodes),
+			policy:   restrictedPolicy,
 			hp: []HintProvider{
 				&mockHintProvider{},
 			},
@@ -224,7 +259,7 @@ func TestAdmit(t *testing.T) {
 		{
 			name:     "QOSClass set as Guaranteed. BestEffort Policy. Preferred Affinity.",
 			qosClass: v1.PodQOSGuaranteed,
-			policy:   NewBestEffortPolicy(numaNodes),
+			policy:   bePolicy,
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -246,7 +281,7 @@ func TestAdmit(t *testing.T) {
 		{
 			name:     "QOSClass set as Guaranteed. BestEffort Policy. More than one Preferred Affinity.",
 			qosClass: v1.PodQOSGuaranteed,
-			policy:   NewBestEffortPolicy(numaNodes),
+			policy:   bePolicy,
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -272,7 +307,7 @@ func TestAdmit(t *testing.T) {
 		{
 			name:     "QOSClass set as Burstable. BestEffort Policy. More than one Preferred Affinity.",
 			qosClass: v1.PodQOSBurstable,
-			policy:   NewBestEffortPolicy(numaNodes),
+			policy:   bePolicy,
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -298,7 +333,7 @@ func TestAdmit(t *testing.T) {
 		{
 			name:     "QOSClass set as Guaranteed. BestEffort Policy. No Preferred Affinity.",
 			qosClass: v1.PodQOSGuaranteed,
-			policy:   NewBestEffortPolicy(numaNodes),
+			policy:   bePolicy,
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -316,7 +351,7 @@ func TestAdmit(t *testing.T) {
 		{
 			name:     "QOSClass set as Guaranteed. Restricted Policy. Preferred Affinity.",
 			qosClass: v1.PodQOSGuaranteed,
-			policy:   NewRestrictedPolicy(numaNodes),
+			policy:   restrictedPolicy,
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -338,7 +373,7 @@ func TestAdmit(t *testing.T) {
 		{
 			name:     "QOSClass set as Burstable. Restricted Policy. Preferred Affinity.",
 			qosClass: v1.PodQOSBurstable,
-			policy:   NewRestrictedPolicy(numaNodes),
+			policy:   restrictedPolicy,
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -360,7 +395,7 @@ func TestAdmit(t *testing.T) {
 		{
 			name:     "QOSClass set as Guaranteed. Restricted Policy. More than one Preferred affinity.",
 			qosClass: v1.PodQOSGuaranteed,
-			policy:   NewRestrictedPolicy(numaNodes),
+			policy:   restrictedPolicy,
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -386,7 +421,7 @@ func TestAdmit(t *testing.T) {
 		{
 			name:     "QOSClass set as Burstable. Restricted Policy. More than one Preferred affinity.",
 			qosClass: v1.PodQOSBurstable,
-			policy:   NewRestrictedPolicy(numaNodes),
+			policy:   restrictedPolicy,
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -412,7 +447,7 @@ func TestAdmit(t *testing.T) {
 		{
 			name:     "QOSClass set as Guaranteed. Restricted Policy. No Preferred affinity.",
 			qosClass: v1.PodQOSGuaranteed,
-			policy:   NewRestrictedPolicy(numaNodes),
+			policy:   restrictedPolicy,
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -430,7 +465,7 @@ func TestAdmit(t *testing.T) {
 		{
 			name:     "QOSClass set as Burstable. Restricted Policy. No Preferred affinity.",
 			qosClass: v1.PodQOSBurstable,
-			policy:   NewRestrictedPolicy(numaNodes),
+			policy:   restrictedPolicy,
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
