@@ -2106,6 +2106,78 @@ func TestStatefulSetAvailability(t *testing.T) {
 	}
 }
 
+func TestStatefulSetStatusUpdate(t *testing.T) {
+	var (
+		syncErr   = fmt.Errorf("sync error")
+		statusErr = fmt.Errorf("status error")
+	)
+
+	testCases := []struct {
+		desc string
+
+		hasSyncErr   bool
+		hasStatusErr bool
+
+		expectedErr error
+	}{
+		{
+			desc:         "no error",
+			hasSyncErr:   false,
+			hasStatusErr: false,
+			expectedErr:  nil,
+		},
+		{
+			desc:         "sync error",
+			hasSyncErr:   true,
+			hasStatusErr: false,
+			expectedErr:  syncErr,
+		},
+		{
+			desc:         "status error",
+			hasSyncErr:   false,
+			hasStatusErr: true,
+			expectedErr:  statusErr,
+		},
+		{
+			desc:         "sync and status error",
+			hasSyncErr:   true,
+			hasStatusErr: true,
+			expectedErr:  syncErr,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			set := newStatefulSet(3)
+			client := fake.NewSimpleClientset(set)
+			om, ssu, ssc := setupController(client)
+
+			if tc.hasSyncErr {
+				om.SetCreateStatefulPodError(syncErr, 0)
+			}
+			if tc.hasStatusErr {
+				ssu.SetUpdateStatefulSetStatusError(statusErr, 0)
+			}
+
+			selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+			if err != nil {
+				t.Error(err)
+			}
+			pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+			if err != nil {
+				t.Error(err)
+			}
+			_, err = ssc.UpdateStatefulSet(context.TODO(), set, pods)
+			if ssu.updateStatusTracker.requests != 1 {
+				t.Errorf("Did not update status")
+			}
+			if !errors.Is(err, tc.expectedErr) {
+				t.Errorf("Expected error: %v, got: %v", tc.expectedErr, err)
+			}
+		})
+	}
+}
+
 type requestTracker struct {
 	requests int
 	err      error
