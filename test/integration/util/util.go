@@ -776,7 +776,7 @@ func PodScheduledIn(c clientset.Interface, podNamespace, podName string, nodeNam
 }
 
 // PodUnschedulable returns a condition function that returns true if the given pod
-// gets unschedulable status.
+// gets unschedulable status of reason 'Unschedulable'.
 func PodUnschedulable(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
 		pod, err := c.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
@@ -806,16 +806,37 @@ func PodSchedulingError(c clientset.Interface, podNamespace, podName string) wai
 	}
 }
 
-// waitForPodUnscheduleWithTimeout waits for a pod to fail scheduling and returns
+// PodSchedulingGated returns a condition function that returns true if the given pod
+// gets unschedulable status of reason 'SchedulingGated'.
+func PodSchedulingGated(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
+	return func() (bool, error) {
+		pod, err := c.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
+		if err != nil {
+			// This could be a connection error so we want to retry.
+			return false, nil
+		}
+		_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
+		return cond != nil && cond.Status == v1.ConditionFalse &&
+			cond.Reason == v1.PodReasonSchedulingGated && pod.Spec.NodeName == "", nil
+	}
+}
+
+// WaitForPodUnschedulableWithTimeout waits for a pod to fail scheduling and returns
 // an error if it does not become unschedulable within the given timeout.
 func WaitForPodUnschedulableWithTimeout(cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
 	return wait.Poll(100*time.Millisecond, timeout, PodUnschedulable(cs, pod.Namespace, pod.Name))
 }
 
-// waitForPodUnschedule waits for a pod to fail scheduling and returns
+// WaitForPodUnschedulable waits for a pod to fail scheduling and returns
 // an error if it does not become unschedulable within the timeout duration (30 seconds).
 func WaitForPodUnschedulable(cs clientset.Interface, pod *v1.Pod) error {
 	return WaitForPodUnschedulableWithTimeout(cs, pod, 30*time.Second)
+}
+
+// WaitForPodSchedulingGated waits for a pod to be in scheduling gated state
+// and returns an error if it does not fall into this state within the given timeout.
+func WaitForPodSchedulingGated(cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
+	return wait.Poll(100*time.Millisecond, timeout, PodSchedulingGated(cs, pod.Namespace, pod.Name))
 }
 
 // WaitForPDBsStable waits for PDBs to have "CurrentHealthy" status equal to

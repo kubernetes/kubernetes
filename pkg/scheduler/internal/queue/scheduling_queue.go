@@ -441,6 +441,9 @@ func (p *PriorityQueue) activate(pod *v1.Pod) bool {
 // isPodBackingoff returns true if a pod is still waiting for its backoff timer.
 // If this returns true, the pod should not be re-tried.
 func (p *PriorityQueue) isPodBackingoff(podInfo *framework.QueuedPodInfo) bool {
+	if podInfo.Gated {
+		return false
+	}
 	boTime := p.getBackoffTime(podInfo)
 	return boTime.After(p.clock.Now())
 }

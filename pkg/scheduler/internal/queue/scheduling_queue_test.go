@@ -512,11 +512,21 @@ func TestPriorityQueue_addToActiveQ(t *testing.T) {
 			defer cancel()
 
 			m := map[string][]framework.PreEnqueuePlugin{"": tt.plugins}
-			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{tt.pod}, WithPreEnqueuePluginMap(m))
-			got, _ := q.addToActiveQ(newQueuedPodInfoForLookup(tt.pod))
+			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{tt.pod}, WithPreEnqueuePluginMap(m),
+				WithPodInitialBackoffDuration(time.Second*30), WithPodMaxBackoffDuration(time.Second*60))
+			got, _ := q.addToActiveQ(q.newQueuedPodInfo(tt.pod))
 			if got != tt.wantSuccess {
 				t.Errorf("Unexpected result: want %v, but got %v", tt.wantSuccess, got)
 			}
+			if tt.wantUnschedulablePods != len(q.unschedulablePods.podInfoMap) {
+				t.Errorf("Unexpected unschedulablePods: want %v, but got %v", tt.wantUnschedulablePods, len(q.unschedulablePods.podInfoMap))
+			}
+
+			// Simulate an update event.
+			clone := tt.pod.DeepCopy()
+			metav1.SetMetaDataAnnotation(&clone.ObjectMeta, "foo", "")
+			q.Update(tt.pod, clone)
+			// Ensure the pod is still located in unschedulablePods.
 			if tt.wantUnschedulablePods != len(q.unschedulablePods.podInfoMap) {
 				t.Errorf("Unexpected unschedulablePods: want %v, but got %v", tt.wantUnschedulablePods, len(q.unschedulablePods.podInfoMap))
 			}
