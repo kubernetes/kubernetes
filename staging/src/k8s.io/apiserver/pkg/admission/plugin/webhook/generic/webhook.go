@@ -219,7 +219,7 @@ func (a *attrWithResourceOverride) GetResource() schema.GroupVersionResource { r
 
 // Dispatch is called by the downstream Validate or Admit methods.
 func (a *Webhook) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces) error {
-	if rules.IsWebhookConfigurationResource(attr) {
+	if rules.IsExemptAdmissionConfigurationResource(attr) {
 		return nil
 	}
 	if !a.WaitForReady() {

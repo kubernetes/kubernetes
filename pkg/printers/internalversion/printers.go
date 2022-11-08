@@ -553,6 +553,24 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(validatingWebhookColumnDefinitions, printValidatingWebhook)
 	h.TableHandler(validatingWebhookColumnDefinitions, printValidatingWebhookList)
 
+	validatingAdmissionPolicy := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Validations", Type: "integer", Description: "Validations indicates the number of validation rules defined in this configuration"},
+		{Name: "ParamKind", Type: "string", Description: "ParamKind specifies the kind of resources used to parameterize this policy"},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(validatingAdmissionPolicy, printValidatingAdmissionPolicy)
+	h.TableHandler(validatingAdmissionPolicy, printValidatingAdmissionPolicyList)
+
+	validatingAdmissionPolicyBinding := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "PolicyName", Type: "string", Description: "PolicyName indicates the policy definition which the policy binding binded to"},
+		{Name: "ParamRef", Type: "string", Description: "ParamRef indicates the param resource which sets the configration param"},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(validatingAdmissionPolicyBinding, printValidatingAdmissionPolicyBinding)
+	h.TableHandler(validatingAdmissionPolicyBinding, printValidatingAdmissionPolicyBindingList)
+
 	flowSchemaColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "PriorityLevel", Type: "string", Description: flowcontrolv1beta3.PriorityLevelConfigurationReference{}.SwaggerDoc()["name"]},
@@ -1552,6 +1570,59 @@ func printValidatingWebhookList(list *admissionregistration.ValidatingWebhookCon
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printValidatingWebhook(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printValidatingAdmissionPolicy(obj *admissionregistration.ValidatingAdmissionPolicy, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	paramKind := "<unset>"
+	if obj.Spec.ParamKind != nil {
+		paramKind = obj.Spec.ParamKind.APIVersion + "/" + obj.Spec.ParamKind.Kind
+	}
+	row.Cells = append(row.Cells, obj.Name, int64(len(obj.Spec.Validations)), paramKind, translateTimestampSince(obj.CreationTimestamp))
+	return []metav1.TableRow{row}, nil
+}
+
+func printValidatingAdmissionPolicyList(list *admissionregistration.ValidatingAdmissionPolicyList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printValidatingAdmissionPolicy(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printValidatingAdmissionPolicyBinding(obj *admissionregistration.ValidatingAdmissionPolicyBinding, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	paramName := "<unset>"
+	if obj.Spec.ParamRef != nil {
+		if obj.Spec.ParamRef.Namespace != "" {
+			paramName = obj.Spec.ParamRef.Namespace + "/" + obj.Spec.ParamRef.Name
+		} else {
+			paramName = obj.Spec.ParamRef.Name
+		}
+
+	}
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.PolicyName, paramName, translateTimestampSince(obj.CreationTimestamp))
+	return []metav1.TableRow{row}, nil
+}
+
+func printValidatingAdmissionPolicyBindingList(list *admissionregistration.ValidatingAdmissionPolicyBindingList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printValidatingAdmissionPolicyBinding(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

@@ -65,6 +65,7 @@ export KUBE_OUTPUT_HOSTBIN
 KUBE_AVAILABLE_GROUP_VERSIONS="${KUBE_AVAILABLE_GROUP_VERSIONS:-\
 v1 \
 admissionregistration.k8s.io/v1 \
+admissionregistration.k8s.io/v1alpha1 \
 admissionregistration.k8s.io/v1beta1 \
 admission.k8s.io/v1 \
 admission.k8s.io/v1beta1 \

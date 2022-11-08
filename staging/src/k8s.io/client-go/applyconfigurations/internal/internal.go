@@ -225,6 +225,165 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: url
       type:
         scalar: string
+- name: io.k8s.api.admissionregistration.v1alpha1.MatchResources
+  map:
+    fields:
+    - name: excludeResourceRules
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.admissionregistration.v1alpha1.NamedRuleWithOperations
+          elementRelationship: atomic
+    - name: matchPolicy
+      type:
+        scalar: string
+    - name: namespaceSelector
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+    - name: objectSelector
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+    - name: resourceRules
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.admissionregistration.v1alpha1.NamedRuleWithOperations
+          elementRelationship: atomic
+    elementRelationship: atomic
+- name: io.k8s.api.admissionregistration.v1alpha1.NamedRuleWithOperations
+  map:
+    fields:
+    - name: apiGroups
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: apiVersions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: operations
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: resourceNames
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: resources
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: scope
+      type:
+        scalar: string
+    elementRelationship: atomic
+- name: io.k8s.api.admissionregistration.v1alpha1.ParamKind
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    elementRelationship: atomic
+- name: io.k8s.api.admissionregistration.v1alpha1.ParamRef
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+    - name: namespace
+      type:
+        scalar: string
+    elementRelationship: atomic
+- name: io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicySpec
+      default: {}
+- name: io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBindingSpec
+      default: {}
+- name: io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBindingSpec
+  map:
+    fields:
+    - name: matchResources
+      type:
+        namedType: io.k8s.api.admissionregistration.v1alpha1.MatchResources
+    - name: paramRef
+      type:
+        namedType: io.k8s.api.admissionregistration.v1alpha1.ParamRef
+    - name: policyName
+      type:
+        scalar: string
+- name: io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicySpec
+  map:
+    fields:
+    - name: failurePolicy
+      type:
+        scalar: string
+    - name: matchConstraints
+      type:
+        namedType: io.k8s.api.admissionregistration.v1alpha1.MatchResources
+    - name: paramKind
+      type:
+        namedType: io.k8s.api.admissionregistration.v1alpha1.ParamKind
+    - name: validations
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.admissionregistration.v1alpha1.Validation
+          elementRelationship: atomic
+- name: io.k8s.api.admissionregistration.v1alpha1.Validation
+  map:
+    fields:
+    - name: expression
+      type:
+        scalar: string
+      default: ""
+    - name: message
+      type:
+        scalar: string
+    - name: reason
+      type:
+        scalar: string
 - name: io.k8s.api.admissionregistration.v1beta1.MutatingWebhook
   map:
     fields:
@@ -261,7 +420,7 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         list:
           elementType:
-            namedType: io.k8s.api.admissionregistration.v1beta1.RuleWithOperations
+            namedType: io.k8s.api.admissionregistration.v1.RuleWithOperations
           elementRelationship: atomic
     - name: sideEffects
       type:
@@ -290,36 +449,6 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - name
-- name: io.k8s.api.admissionregistration.v1beta1.RuleWithOperations
-  map:
-    fields:
-    - name: apiGroups
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
-    - name: apiVersions
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
-    - name: operations
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
-    - name: resources
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
-    - name: scope
-      type:
-        scalar: string
 - name: io.k8s.api.admissionregistration.v1beta1.ServiceReference
   map:
     fields:
@@ -370,7 +499,7 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         list:
           elementType:
-            namedType: io.k8s.api.admissionregistration.v1beta1.RuleWithOperations
+            namedType: io.k8s.api.admissionregistration.v1.RuleWithOperations
           elementRelationship: atomic
     - name: sideEffects
       type:

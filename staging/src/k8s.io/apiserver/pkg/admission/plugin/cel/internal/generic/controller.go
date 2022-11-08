@@ -52,7 +52,7 @@ type ControllerOptions struct {
 	Workers uint
 }
 
-func (c controller[T]) Informer() Informer[T] {
+func (c *controller[T]) Informer() Informer[T] {
 	return c.informer
 }
 
@@ -73,7 +73,7 @@ func NewController[T runtime.Object](
 		options:    options,
 		informer:   informer,
 		reconciler: reconciler,
-		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), options.Name),
+		queue:      nil,
 	}
 }
 
@@ -84,10 +84,18 @@ func (c *controller[T]) Run(ctx context.Context) error {
 	klog.Infof("starting %s", c.options.Name)
 	defer klog.Infof("stopping %s", c.options.Name)
 
+	c.queue = workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), c.options.Name)
+
+	// Forcefully shutdown workqueue. Drop any enqueued items.
+	// Important to do this in a `defer` at the start of `Run`.
+	// Otherwise, if there are any early returns without calling this, we
+	// would never shut down the workqueue
+	defer c.queue.ShutDown()
+
 	enqueue := func(obj interface{}) {
 		var key string
 		var err error
-		if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
+		if key, err = cache.DeletionHandlingMetaNamespaceKeyFunc(obj); err != nil {
 			utilruntime.HandleError(err)
 			return
 		}
@@ -185,7 +193,7 @@ func (c *controller[T]) HasSynced() bool {
 
 func (c *controller[T]) runWorker() {
 	for {
-		obj, shutdown := c.queue.Get()
+		key, shutdown := c.queue.Get()
 		if shutdown {
 			return
 		}
@@ -221,9 +229,9 @@ func (c *controller[T]) runWorker() {
 			// Finally, if no error occurs we Forget this item so it is allowed
 			// to be re-enqueued without a long rate limit
 			c.queue.Forget(obj)
-			klog.Infof("Successfully synced '%s'", key)
+			klog.V(4).Infof("syncAdmissionPolicy(%q)", key)
 			return nil
-		}(obj)
+		}(key)
 
 		if err != nil {
 			utilruntime.HandleError(err)
