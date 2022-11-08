@@ -96,3 +96,15 @@ func TestLazyResource(t *testing.T) {
 	resourceWithReq := &lazyResource{req: req.WithContext(ctx)}
 	assert.Equal(t, "resource", fmt.Sprintf("%v", resourceWithReq))
 }
+
+func TestLazyScope(t *testing.T) {
+	assert.Equal(t, "unknown", fmt.Sprintf("%v", &lazyScope{}))
+
+	scopeWithEmptyReq := &lazyScope{&http.Request{}}
+	assert.Equal(t, "unknown", fmt.Sprintf("%v", scopeWithEmptyReq))
+
+	req := &http.Request{}
+	ctx := request.WithRequestInfo(context.TODO(), &request.RequestInfo{Namespace: "ns"})
+	scopeWithReq := &lazyScope{req: req.WithContext(ctx)}
+	assert.Equal(t, "namespace", fmt.Sprintf("%v", scopeWithReq))
+}
