@@ -30,12 +30,12 @@ The entrypoint to this package is defined in a shell script (i.e. stability-util
 the logic for feeding file names as arguments into the program. The logic of this program is as
 follows:
 
-   - parse all files fed in, keeping track of:
-		- the function and struct pointers which correspond to prometheus metric definitions.
-		- consts/variable we encounter, so that we can use these to resolve values in metric definitions
-   - then, iterate over the function and struct pointers, resolving attributes to concrete metric values
-   - then, using our collected and resolved metric definitions, output (depending on the mode):
-		- a yaml file corresponding to all stable metrics
-		- a documentation file corresponding to all parseable metrics in the Kubernetes codebase
+  - parse all files fed in, keeping track of:
+  - the function and struct pointers which correspond to prometheus metric definitions.
+  - consts/variable we encounter, so that we can use these to resolve values in metric definitions
+  - then, iterate over the function and struct pointers, resolving attributes to concrete metric values
+  - then, using our collected and resolved metric definitions, output (depending on the mode):
+  - a yaml file corresponding to all stable metrics
+  - a documentation file corresponding to all parseable metrics in the Kubernetes codebase
 */
 package main
