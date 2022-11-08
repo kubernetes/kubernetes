@@ -146,11 +146,13 @@ func hasJobTrackingAnnotation(job *batch.Job) bool {
 // ValidateJobSpec validates a JobSpec and returns an ErrorList with any errors.
 func ValidateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := validateJobSpec(spec, fldPath, opts)
-
 	if spec.Selector == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
 	} else {
-		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
+		labelSelectorValidationOpts := unversionedvalidation.LabelSelectorValidationOptions{
+			AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector,
+		}
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, labelSelectorValidationOpts, fldPath.Child("selector"))...)
 	}
 
 	// Whether manually or automatically generated, the selector of the job must match the pods it will produce.

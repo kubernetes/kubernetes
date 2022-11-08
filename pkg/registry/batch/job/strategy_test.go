@@ -449,6 +449,31 @@ func TestJobStrategy(t *testing.T) {
 	}
 }
 
+func TestValidateToleratingBadLabels(t *testing.T) {
+	invalidSelector := getValidLabelSelector()
+	invalidSelector.MatchExpressions = []metav1.LabelSelectorRequirement{{Key: "key", Operator: metav1.LabelSelectorOpNotIn, Values: []string{"bad value"}}}
+
+	validPodTemplateSpec := getValidPodTemplateSpecForSelector(getValidLabelSelector())
+	job := &batch.Job{
+		ObjectMeta: getValidObjectMeta(0),
+		Spec: batch.JobSpec{
+			Selector:       invalidSelector,
+			ManualSelector: pointer.BoolPtr(true),
+			Template:       validPodTemplateSpec,
+		},
+	}
+	job.ResourceVersion = "1"
+
+	oldObj := job.DeepCopy()
+	newObj := job.DeepCopy()
+
+	context := genericapirequest.NewContext()
+	errorList := Strategy.ValidateUpdate(context, newObj, oldObj)
+	if len(errorList) > 0 {
+		t.Errorf("Unexpected error list with no-op update of bad object: %v", errorList)
+	}
+}
+
 func TestJobStrategyValidateUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	validSelector := &metav1.LabelSelector{

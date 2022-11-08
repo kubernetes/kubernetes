@@ -105,6 +105,19 @@ func TestSelectorImmutability(t *testing.T) {
 	}
 }
 
+func TestValidateToleratingBadLabels(t *testing.T) {
+	oldObj := newDaemonSetWithSelectorLabels(map[string]string{"a": "b"}, 1)
+	oldObj.Spec.Selector.MatchExpressions = []metav1.LabelSelectorRequirement{{Key: "key", Operator: metav1.LabelSelectorOpNotIn, Values: []string{"bad value"}}}
+	newObj := newDaemonSetWithSelectorLabels(map[string]string{"a": "b"}, 1)
+	newObj.Spec.Selector.MatchExpressions = []metav1.LabelSelectorRequirement{{Key: "key", Operator: metav1.LabelSelectorOpNotIn, Values: []string{"bad value"}}}
+
+	context := genericapirequest.NewContext()
+	errorList := daemonSetStrategy{}.ValidateUpdate(context, newObj, oldObj)
+	if len(errorList) > 0 {
+		t.Errorf("Unexpected error list with no-op update of bad object: %v", errorList)
+	}
+}
+
 func newDaemonSetWithSelectorLabels(selectorLabels map[string]string, templateGeneration int64) *apps.DaemonSet {
 	return &apps.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{

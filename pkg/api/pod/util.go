@@ -412,7 +412,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		// Do not allow pod spec to use non-integer multiple of huge page unit size default
 		AllowIndivisibleHugePagesValues: false,
 		// Allow pod spec with expanded DNS configuration
-		AllowExpandedDNSConfig: utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) || haveSameExpandedDNSConfig(podSpec, oldPodSpec),
+		AllowExpandedDNSConfig:           utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) || haveSameExpandedDNSConfig(podSpec, oldPodSpec),
+		AllowInvalidLabelValueInSelector: false,
 	}
 
 	if oldPodSpec != nil {
@@ -428,6 +429,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 
 		// if old spec used non-integer multiple of huge page unit size, we must allow it
 		opts.AllowIndivisibleHugePagesValues = usesIndivisibleHugePagesValues(oldPodSpec)
+
+		opts.AllowInvalidLabelValueInSelector = hasInvalidLabelValueInAffinitySelector(oldPodSpec)
 
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
@@ -755,4 +758,38 @@ func SeccompAnnotationForField(field *api.SeccompProfile) string {
 	// provided field type is SeccompProfileTypeLocalhost or if an unrecognized
 	// type is specified
 	return ""
+}
+
+func hasInvalidLabelValueInAffinitySelector(spec *api.PodSpec) bool {
+	if spec.Affinity != nil {
+		if spec.Affinity.PodAffinity != nil {
+			for _, term := range spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution {
+				allErrs := apivalidation.ValidatePodAffinityTermSelector(term, false, nil)
+				if len(allErrs) != 0 {
+					return true
+				}
+			}
+			for _, term := range spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
+				allErrs := apivalidation.ValidatePodAffinityTermSelector(term.PodAffinityTerm, false, nil)
+				if len(allErrs) != 0 {
+					return true
+				}
+			}
+		}
+		if spec.Affinity.PodAntiAffinity != nil {
+			for _, term := range spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution {
+				allErrs := apivalidation.ValidatePodAffinityTermSelector(term, false, nil)
+				if len(allErrs) != 0 {
+					return true
+				}
+			}
+			for _, term := range spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
+				allErrs := apivalidation.ValidatePodAffinityTermSelector(term.PodAffinityTerm, false, nil)
+				if len(allErrs) != 0 {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

@@ -210,6 +210,7 @@ func ValidateValidatingWebhookConfiguration(e *admissionregistration.ValidatingW
 		requireNoSideEffects:                    true,
 		requireRecognizedAdmissionReviewVersion: true,
 		requireUniqueWebhookNames:               true,
+		allowInvalidLabelValueInSelector:        false,
 	})
 }
 
@@ -236,6 +237,7 @@ func ValidateMutatingWebhookConfiguration(e *admissionregistration.MutatingWebho
 		requireNoSideEffects:                    true,
 		requireRecognizedAdmissionReviewVersion: true,
 		requireUniqueWebhookNames:               true,
+		allowInvalidLabelValueInSelector:        false,
 	})
 }
 
@@ -243,10 +245,12 @@ type validationOptions struct {
 	requireNoSideEffects                    bool
 	requireRecognizedAdmissionReviewVersion bool
 	requireUniqueWebhookNames               bool
+	allowInvalidLabelValueInSelector        bool
 }
 
 func validateMutatingWebhookConfiguration(e *admissionregistration.MutatingWebhookConfiguration, opts validationOptions) field.ErrorList {
 	allErrors := genericvalidation.ValidateObjectMeta(&e.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+
 	hookNames := sets.NewString()
 	for i, hook := range e.Webhooks {
 		allErrors = append(allErrors, validateMutatingWebhook(&hook, opts, field.NewPath("webhooks").Index(i))...)
@@ -266,6 +270,9 @@ func validateValidatingWebhook(hook *admissionregistration.ValidatingWebhook, op
 	var allErrors field.ErrorList
 	// hook.Name must be fully qualified
 	allErrors = append(allErrors, utilvalidation.IsFullyQualifiedName(fldPath.Child("name"), hook.Name)...)
+	labelSelectorValidationOpts := metav1validation.LabelSelectorValidationOptions{
+		AllowInvalidLabelValueInSelector: opts.allowInvalidLabelValueInSelector,
+	}
 
 	for i, rule := range hook.Rules {
 		allErrors = append(allErrors, validateRuleWithOperations(&rule, fldPath.Child("rules").Index(i))...)
@@ -291,11 +298,11 @@ func validateValidatingWebhook(hook *admissionregistration.ValidatingWebhook, op
 	}
 
 	if hook.NamespaceSelector != nil {
-		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.NamespaceSelector, fldPath.Child("namespaceSelector"))...)
+		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.NamespaceSelector, labelSelectorValidationOpts, fldPath.Child("namespaceSelector"))...)
 	}
 
 	if hook.ObjectSelector != nil {
-		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.ObjectSelector, fldPath.Child("objectSelector"))...)
+		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.ObjectSelector, labelSelectorValidationOpts, fldPath.Child("objectSelector"))...)
 	}
 
 	cc := hook.ClientConfig
@@ -314,6 +321,9 @@ func validateMutatingWebhook(hook *admissionregistration.MutatingWebhook, opts v
 	var allErrors field.ErrorList
 	// hook.Name must be fully qualified
 	allErrors = append(allErrors, utilvalidation.IsFullyQualifiedName(fldPath.Child("name"), hook.Name)...)
+	labelSelectorValidationOpts := metav1validation.LabelSelectorValidationOptions{
+		AllowInvalidLabelValueInSelector: opts.allowInvalidLabelValueInSelector,
+	}
 
 	for i, rule := range hook.Rules {
 		allErrors = append(allErrors, validateRuleWithOperations(&rule, fldPath.Child("rules").Index(i))...)
@@ -339,10 +349,10 @@ func validateMutatingWebhook(hook *admissionregistration.MutatingWebhook, opts v
 	}
 
 	if hook.NamespaceSelector != nil {
-		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.NamespaceSelector, fldPath.Child("namespaceSelector"))...)
+		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.NamespaceSelector, labelSelectorValidationOpts, fldPath.Child("namespaceSelector"))...)
 	}
 	if hook.ObjectSelector != nil {
-		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.ObjectSelector, fldPath.Child("objectSelector"))...)
+		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.ObjectSelector, labelSelectorValidationOpts, fldPath.Child("objectSelector"))...)
 	}
 	if hook.ReinvocationPolicy != nil && !supportedReinvocationPolicies.Has(string(*hook.ReinvocationPolicy)) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("reinvocationPolicy"), *hook.ReinvocationPolicy, supportedReinvocationPolicies.List()))
@@ -508,12 +518,55 @@ func validatingHasNoSideEffects(webhooks []admissionregistration.ValidatingWebho
 	return true
 }
 
+// validatingWebhookAllowInvalidLabelValueInSelector returns true if all webhooksallow invalid label value in selector
+func validatingWebhookHasInvalidLabelValueInSelector(webhooks []admissionregistration.ValidatingWebhook) bool {
+	labelSelectorValidationOpts := metav1validation.LabelSelectorValidationOptions{
+		AllowInvalidLabelValueInSelector: false,
+	}
+
+	for _, hook := range webhooks {
+		if hook.NamespaceSelector != nil {
+			if len(metav1validation.ValidateLabelSelector(hook.NamespaceSelector, labelSelectorValidationOpts, nil)) > 0 {
+				return true
+			}
+		}
+		if hook.ObjectSelector != nil {
+			if len(metav1validation.ValidateLabelSelector(hook.ObjectSelector, labelSelectorValidationOpts, nil)) > 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// mutatingWebhookAllowInvalidLabelValueInSelector returns true if all webhooks allow invalid label value in selector
+func mutatingWebhookHasInvalidLabelValueInSelector(webhooks []admissionregistration.MutatingWebhook) bool {
+	labelSelectorValidationOpts := metav1validation.LabelSelectorValidationOptions{
+		AllowInvalidLabelValueInSelector: false,
+	}
+
+	for _, hook := range webhooks {
+		if hook.NamespaceSelector != nil {
+			if len(metav1validation.ValidateLabelSelector(hook.NamespaceSelector, labelSelectorValidationOpts, nil)) > 0 {
+				return true
+			}
+		}
+		if hook.ObjectSelector != nil {
+			if len(metav1validation.ValidateLabelSelector(hook.ObjectSelector, labelSelectorValidationOpts, nil)) > 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // ValidateValidatingWebhookConfigurationUpdate validates update of validating webhook configuration
 func ValidateValidatingWebhookConfigurationUpdate(newC, oldC *admissionregistration.ValidatingWebhookConfiguration) field.ErrorList {
 	return validateValidatingWebhookConfiguration(newC, validationOptions{
 		requireNoSideEffects:                    validatingHasNoSideEffects(oldC.Webhooks),
 		requireRecognizedAdmissionReviewVersion: validatingHasAcceptedAdmissionReviewVersions(oldC.Webhooks),
 		requireUniqueWebhookNames:               validatingHasUniqueWebhookNames(oldC.Webhooks),
+		allowInvalidLabelValueInSelector:        validatingWebhookHasInvalidLabelValueInSelector(oldC.Webhooks),
 	})
 }
 
@@ -523,6 +576,7 @@ func ValidateMutatingWebhookConfigurationUpdate(newC, oldC *admissionregistratio
 		requireNoSideEffects:                    mutatingHasNoSideEffects(oldC.Webhooks),
 		requireRecognizedAdmissionReviewVersion: mutatingHasAcceptedAdmissionReviewVersions(oldC.Webhooks),
 		requireUniqueWebhookNames:               mutatingHasUniqueWebhookNames(oldC.Webhooks),
+		allowInvalidLabelValueInSelector:        mutatingWebhookHasInvalidLabelValueInSelector(oldC.Webhooks),
 	})
 }
 
@@ -634,13 +688,15 @@ func validateMatchResources(mc *admissionregistration.MatchResources, fldPath *f
 	if mc.NamespaceSelector == nil {
 		allErrors = append(allErrors, field.Required(fldPath.Child("namespaceSelector"), ""))
 	} else {
-		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(mc.NamespaceSelector, fldPath.Child("namespaceSelector"))...)
+		// validate selector strictly, this type was released after issue #99139 was resolved
+		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(mc.NamespaceSelector, metav1validation.LabelSelectorValidationOptions{}, fldPath.Child("namespaceSelector"))...)
 	}
 
 	if mc.ObjectSelector == nil {
 		allErrors = append(allErrors, field.Required(fldPath.Child("labelSelector"), ""))
 	} else {
-		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(mc.ObjectSelector, fldPath.Child("labelSelector"))...)
+		// validate selector strictly, this type was released after issue #99139 was resolved
+		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(mc.ObjectSelector, metav1validation.LabelSelectorValidationOptions{}, fldPath.Child("labelSelector"))...)
 	}
 
 	for i, namedRuleWithOperations := range mc.ResourceRules {
