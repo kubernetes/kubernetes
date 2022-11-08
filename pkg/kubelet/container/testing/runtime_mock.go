@@ -286,6 +286,36 @@ func (mr *MockRuntimeMockRecorder) ListImages(ctx interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListImages", reflect.TypeOf((*MockRuntime)(nil).ListImages), ctx)
 }
 
+// ListMetricDescriptors mocks base method.
+func (m *MockRuntime) ListMetricDescriptors(ctx context.Context) ([]*v10.MetricDescriptor, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListMetricDescriptors", ctx)
+	ret0, _ := ret[0].([]*v10.MetricDescriptor)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListMetricDescriptors indicates an expected call of ListMetricDescriptors.
+func (mr *MockRuntimeMockRecorder) ListMetricDescriptors(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListMetricDescriptors", reflect.TypeOf((*MockRuntime)(nil).ListMetricDescriptors), ctx)
+}
+
+// ListPodSandboxMetrics mocks base method.
+func (m *MockRuntime) ListPodSandboxMetrics(ctx context.Context) ([]*v10.PodSandboxMetrics, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListPodSandboxMetrics", ctx)
+	ret0, _ := ret[0].([]*v10.PodSandboxMetrics)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListPodSandboxMetrics indicates an expected call of ListPodSandboxMetrics.
+func (mr *MockRuntimeMockRecorder) ListPodSandboxMetrics(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPodSandboxMetrics", reflect.TypeOf((*MockRuntime)(nil).ListPodSandboxMetrics), ctx)
+}
+
 // PullImage mocks base method.
 func (m *MockRuntime) PullImage(ctx context.Context, image container.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *v10.PodSandboxConfig) (string, error) {
 	m.ctrl.T.Helper()

@@ -343,3 +343,21 @@ func (in instrumentedRuntimeService) GetContainerEvents(containerEventsCh chan *
 	recordError(operation, err)
 	return err
 }
+
+func (in instrumentedRuntimeService) ListMetricDescriptors(ctx context.Context) ([]*runtimeapi.MetricDescriptor, error) {
+	const operation = "list_metric_descriptors"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.service.ListMetricDescriptors(ctx)
+	recordError(operation, err)
+	return out, err
+}
+
+func (in instrumentedRuntimeService) ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error) {
+	const operation = "list_podsandbox_metrics"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.service.ListPodSandboxMetrics(ctx)
+	recordError(operation, err)
+	return out, err
+}

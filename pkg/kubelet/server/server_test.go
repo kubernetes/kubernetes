@@ -156,6 +156,14 @@ func (fk *fakeKubelet) CheckpointContainer(_ context.Context, podUID types.UID, 
 	return nil
 }
 
+func (fk *fakeKubelet) ListMetricDescriptors(ctx context.Context) ([]*runtimeapi.MetricDescriptor, error) {
+	return nil, nil
+}
+
+func (fk *fakeKubelet) ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error) {
+	return nil, nil
+}
+
 type fakeRuntime struct {
 	execFunc        func(string, []string, io.Reader, io.WriteCloser, io.WriteCloser, bool, <-chan remotecommand.TerminalSize) error
 	attachFunc      func(string, io.Reader, io.WriteCloser, io.WriteCloser, bool, <-chan remotecommand.TerminalSize) error

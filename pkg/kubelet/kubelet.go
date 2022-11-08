@@ -2562,6 +2562,16 @@ func (kl *Kubelet) CheckpointContainer(
 	return nil
 }
 
+// ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
+func (kl *Kubelet) ListMetricDescriptors(ctx context.Context) ([]*runtimeapi.MetricDescriptor, error) {
+	return kl.containerRuntime.ListMetricDescriptors(ctx)
+}
+
+// ListPodSandboxMetrics retrieves the metrics for all pod sandboxes.
+func (kl *Kubelet) ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error) {
+	return kl.containerRuntime.ListPodSandboxMetrics(ctx)
+}
+
 func (kl *Kubelet) supportLocalStorageCapacityIsolation() bool {
 	return kl.GetConfiguration().LocalStorageCapacityIsolation
 }

@@ -336,3 +336,23 @@ func (f *RemoteRuntime) CheckpointContainer(ctx context.Context, req *kubeapi.Ch
 func (f *RemoteRuntime) GetContainerEvents(req *kubeapi.GetEventsRequest, ces kubeapi.RuntimeService_GetContainerEventsServer) error {
 	return nil
 }
+
+// ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
+func (f *RemoteRuntime) ListMetricDescriptors(ctx context.Context, req *kubeapi.ListMetricDescriptorsRequest) (*kubeapi.ListMetricDescriptorsResponse, error) {
+	descs, err := f.RuntimeService.ListMetricDescriptors(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &kubeapi.ListMetricDescriptorsResponse{Descriptors: descs}, nil
+}
+
+// ListPodSandboxMetrics retrieves the metrics for all pod sandboxes.
+func (f *RemoteRuntime) ListPodSandboxMetrics(ctx context.Context, req *kubeapi.ListPodSandboxMetricsRequest) (*kubeapi.ListPodSandboxMetricsResponse, error) {
+	podMetrics, err := f.RuntimeService.ListPodSandboxMetrics(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &kubeapi.ListPodSandboxMetricsResponse{PodMetrics: podMetrics}, nil
+}
