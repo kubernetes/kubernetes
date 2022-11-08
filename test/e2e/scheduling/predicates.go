@@ -62,6 +62,7 @@ var workerNodes = sets.String{}
 type pausePodConfig struct {
 	Name                              string
 	Namespace                         string
+	Finalizers                        []string
 	Affinity                          *v1.Affinity
 	Annotations, Labels, NodeSelector map[string]string
 	Resources                         *v1.ResourceRequirements
@@ -897,6 +898,7 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 			Labels:          map[string]string{},
 			Annotations:     map[string]string{},
 			OwnerReferences: conf.OwnerReferences,
+			Finalizers:      conf.Finalizers,
 		},
 		Spec: v1.PodSpec{
 			SecurityContext:           e2epod.GetRestrictedPodSecurityContext(),
