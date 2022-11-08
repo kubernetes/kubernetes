@@ -440,12 +440,18 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil, err
 	}
 
+	// Have to create this here instead of inside the post-start hook so when the shared informer factory is started
+	// (in a different async post-start hook), we make sure the ConfigMap informer gets started too.
+	configMapInformer := c.ExtraConfig.VersionedInformers.Core().V1().ConfigMaps()
+	// This ensures the factory knows it needs to start this informer
+	_ = configMapInformer.Informer()
+
 	m.GenericAPIServer.AddPostStartHookOrDie("start-cluster-authentication-info-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 		kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
 		if err != nil {
 			return err
 		}
-		controller := clusterauthenticationtrust.NewClusterAuthenticationTrustController(m.ClusterAuthenticationInfo, kubeClient)
+		controller := clusterauthenticationtrust.NewClusterAuthenticationTrustController(m.ClusterAuthenticationInfo, kubeClient, configMapInformer)
 
 		// generate a context  from stopCh. This is to avoid modifying files which are relying on apiserver
 		// TODO: See if we can pass ctx to the current method

@@ -63,9 +63,6 @@ type Controller struct {
 	// we only ever place one entry in here, but it is keyed as usual: namespace/name
 	queue workqueue.RateLimitingInterface
 
-	// kubeSystemConfigMapInformer is tracked so that we can start these on Run
-	kubeSystemConfigMapInformer cache.SharedIndexInformer
-
 	// preRunCaches are the caches to sync before starting the work of this control loop
 	preRunCaches []cache.InformerSynced
 }
@@ -89,28 +86,24 @@ type ClusterAuthenticationInfo struct {
 
 // NewClusterAuthenticationTrustController returns a controller that will maintain the kube-system configmap/extension-apiserver-authentication
 // that holds information about how to aggregated apiservers are recommended (but not required) to configure themselves.
-func NewClusterAuthenticationTrustController(requiredAuthenticationData ClusterAuthenticationInfo, kubeClient kubernetes.Interface) *Controller {
-	// we construct our own informer because we need such a small subset of the information available.  Just one namespace.
-	kubeSystemConfigMapInformer := corev1informers.NewConfigMapInformer(kubeClient, configMapNamespace, 12*time.Hour, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-
+func NewClusterAuthenticationTrustController(requiredAuthenticationData ClusterAuthenticationInfo, kubeClient kubernetes.Interface, configMapInformer corev1informers.ConfigMapInformer) *Controller {
 	c := &Controller{
-		requiredAuthenticationData:  requiredAuthenticationData,
-		configMapLister:             corev1listers.NewConfigMapLister(kubeSystemConfigMapInformer.GetIndexer()),
-		configMapClient:             kubeClient.CoreV1(),
-		namespaceClient:             kubeClient.CoreV1(),
-		queue:                       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cluster_authentication_trust_controller"),
-		preRunCaches:                []cache.InformerSynced{kubeSystemConfigMapInformer.HasSynced},
-		kubeSystemConfigMapInformer: kubeSystemConfigMapInformer,
+		requiredAuthenticationData: requiredAuthenticationData,
+		configMapLister:            configMapInformer.Lister(),
+		configMapClient:            kubeClient.CoreV1(),
+		namespaceClient:            kubeClient.CoreV1(),
+		queue:                      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cluster_authentication_trust_controller"),
+		preRunCaches:               []cache.InformerSynced{configMapInformer.Informer().HasSynced},
 	}
 
-	kubeSystemConfigMapInformer.AddEventHandler(cache.FilteringResourceEventHandler{
+	configMapInformer.Informer().AddEventHandler(cache.FilteringResourceEventHandler{
 		FilterFunc: func(obj interface{}) bool {
 			if cast, ok := obj.(*corev1.ConfigMap); ok {
-				return cast.Name == configMapName
+				return cast.Namespace == configMapNamespace && cast.Name == configMapName
 			}
 			if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 				if cast, ok := tombstone.Obj.(*corev1.ConfigMap); ok {
-					return cast.Name == configMapName
+					return cast.Namespace == configMapNamespace && cast.Name == configMapName
 				}
 			}
 			return true // always return true just in case.  The checks are fairly cheap
@@ -439,9 +432,6 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 
 	klog.Infof("Starting cluster_authentication_trust_controller controller")
 	defer klog.Infof("Shutting down cluster_authentication_trust_controller controller")
-
-	// we have a personal informer that is narrowly scoped, start it.
-	go c.kubeSystemConfigMapInformer.Run(ctx.Done())
 
 	// wait for your secondary caches to fill before starting your work
 	if !cache.WaitForNamedCacheSync("cluster_authentication_trust_controller", ctx.Done(), c.preRunCaches...) {
