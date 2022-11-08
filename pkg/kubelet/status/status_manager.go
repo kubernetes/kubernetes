@@ -894,12 +894,16 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningCon
 		if kubetypes.PodConditionByKubelet(c.Type) {
 			podConditions = append(podConditions, c)
 		} else if kubetypes.PodConditionSharedByKubelet(c.Type) {
+			// we replace or append all the "shared by kubelet" conditions
 			if c.Type == v1.AlphaNoCompatGuaranteeDisruptionTarget {
-				// update the pod disruption condition only if transitioning to terminal phase. In particular, check if
-				// there might still be running containers to avoid sending an unnecessary PATCH request if the
-				// actual transition is delayed (see below)
+				// guard the update of the DisruptionTarget condition with a check to ensure
+				// it will only be sent once all containers have terminated and the phase
+				// is terminal. This avoids sending an unnecessary patch request to add
+				// the condition if the actual status phase transition is delayed.
 				if transitioningToTerminalPhase && !couldHaveRunningContainers {
-					// update the LastTransitionTime
+					// update the LastTransitionTime again here because the older transition
+					// time set in updateStatusInternal is likely stale as sending of
+					// the condition was delayed until all pod's containers have terminated.
 					updateLastTransitionTime(&newPodStatus, &oldPodStatus, c.Type)
 					if _, c := podutil.GetPodConditionFromList(newPodStatus.Conditions, c.Type); c != nil {
 						// for shared conditions we update or append in podConditions
