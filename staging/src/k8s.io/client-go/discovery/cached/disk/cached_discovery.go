@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/openapi"
 	cachedopenapi "k8s.io/client-go/openapi/cached"
@@ -271,6 +272,9 @@ func (d *CachedDiscoveryClient) Invalidate() {
 	d.fresh = true
 	d.invalidated = true
 	d.openapiClient = nil
+	if ad, ok := d.delegate.(discovery.CachedDiscoveryInterface); ok {
+		ad.Invalidate()
+	}
 }
 
 // NewCachedDiscoveryClientForConfig creates a new DiscoveryClient for the given config, and wraps
@@ -297,7 +301,10 @@ func NewCachedDiscoveryClientForConfig(config *restclient.Config, discoveryCache
 		return nil, err
 	}
 
-	return newCachedDiscoveryClient(discoveryClient, discoveryCacheDir, ttl), nil
+	// The delegate caches the discovery groups and resources (memcache). "ServerGroups",
+	// which usually only returns (and caches) the groups, can now store the resources as
+	// well if the server supports the newer aggregated discovery format.
+	return newCachedDiscoveryClient(memory.NewMemCacheClient(discoveryClient), discoveryCacheDir, ttl), nil
 }
 
 // NewCachedDiscoveryClient creates a new DiscoveryClient.  cacheDirectory is the directory where discovery docs are held.  It must be unique per host:port combination to work well.
