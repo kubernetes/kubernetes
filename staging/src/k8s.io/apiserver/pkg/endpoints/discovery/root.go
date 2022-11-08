@@ -35,7 +35,7 @@ import (
 type GroupManager interface {
 	AddGroup(apiGroup metav1.APIGroup)
 	RemoveGroup(groupName string)
-
+	ServeHTTP(resp http.ResponseWriter, req *http.Request)
 	WebService() *restful.WebService
 }
 

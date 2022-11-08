@@ -26,6 +26,7 @@ import (
 	"unicode"
 
 	restful "github.com/emicklei/go-restful/v3"
+	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -66,6 +67,94 @@ type action struct {
 	Params        []*restful.Parameter // List of parameters associated with the action.
 	Namer         handlers.ScopeNamer
 	AllNamespaces bool // true iff the action is namespaced but works on aggregate result for all namespaces
+}
+
+func ConvertGroupVersionIntoToDiscovery(list []metav1.APIResource) ([]apidiscoveryv2beta1.APIResourceDiscovery, error) {
+	var apiResourceList []apidiscoveryv2beta1.APIResourceDiscovery
+	parentResources := map[string]*apidiscoveryv2beta1.APIResourceDiscovery{}
+
+	// Loop through all top-level resources
+	for _, r := range list {
+		if strings.Contains(r.Name, "/") {
+			// Skip subresources for now so we can get the list of resources
+			continue
+		}
+
+		var scope apidiscoveryv2beta1.ResourceScope
+		if r.Namespaced {
+			scope = apidiscoveryv2beta1.ScopeNamespace
+		} else {
+			scope = apidiscoveryv2beta1.ScopeCluster
+		}
+
+		apiResourceList = append(apiResourceList, apidiscoveryv2beta1.APIResourceDiscovery{
+			Resource: r.Name,
+			Scope:    scope,
+			ResponseKind: &metav1.GroupVersionKind{
+				Group:   r.Group,
+				Version: r.Version,
+				Kind:    r.Kind,
+			},
+			Verbs:            r.Verbs,
+			ShortNames:       r.ShortNames,
+			Categories:       r.Categories,
+			SingularResource: r.SingularName,
+		})
+		parentResources[r.Name] = &apiResourceList[len(apiResourceList)-1]
+	}
+
+	// Loop through all subresources
+	for _, r := range list {
+		// Split resource name and subresource name
+		split := strings.SplitN(r.Name, "/", 2)
+
+		if len(split) != 2 {
+			// Skip parent resources
+			continue
+		}
+
+		var scope apidiscoveryv2beta1.ResourceScope
+		if r.Namespaced {
+			scope = apidiscoveryv2beta1.ScopeNamespace
+		} else {
+			scope = apidiscoveryv2beta1.ScopeCluster
+		}
+
+		var parent *apidiscoveryv2beta1.APIResourceDiscovery
+		var exists bool
+
+		parent, exists = parentResources[split[0]]
+		if !exists {
+			// If a subresource exists without a parent, create a parent
+			apiResourceList = append(apiResourceList, apidiscoveryv2beta1.APIResourceDiscovery{
+				Resource: split[0],
+				Scope:    scope,
+			})
+			parentResources[split[0]] = &apiResourceList[len(apiResourceList)-1]
+			parent = &apiResourceList[len(apiResourceList)-1]
+			parentResources[split[0]] = parent
+		}
+
+		if parent.Scope != scope {
+			return nil, fmt.Errorf("Error: Parent %s (scope: %s) and subresource %s (scope: %s) scope do not match", split[0], parent.Scope, split[1], scope)
+			//
+		}
+
+		subresource := apidiscoveryv2beta1.APISubresourceDiscovery{
+			Subresource: split[1],
+			Verbs:       r.Verbs,
+		}
+		if r.Kind != "" {
+			subresource.ResponseKind = &metav1.GroupVersionKind{
+				Group:   r.Group,
+				Version: r.Version,
+				Kind:    r.Kind,
+			}
+		}
+		parent.Subresources = append(parent.Subresources, subresource)
+
+	}
+	return apiResourceList, nil
 }
 
 // An interface to see if one storage supports override its default verb for monitoring

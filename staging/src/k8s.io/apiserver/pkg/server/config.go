@@ -47,6 +47,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
+	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 	"k8s.io/apiserver/pkg/endpoints/filterlatency"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
@@ -122,6 +123,7 @@ type Config struct {
 	EnableIndex     bool
 	EnableProfiling bool
 	EnableDiscovery bool
+
 	// Requires generic profiling enabled
 	EnableContentionProfiling bool
 	EnableMetrics             bool
@@ -259,6 +261,9 @@ type Config struct {
 
 	// StorageVersionManager holds the storage versions of the API resources installed by this server.
 	StorageVersionManager storageversion.Manager
+
+	// AggregatedDiscoveryGroupManager serves /apis in an aggregated form.
+	AggregatedDiscoveryGroupManager discoveryendpoint.ResourceManager
 }
 
 type RecommendedConfig struct {
@@ -668,6 +673,14 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		muxAndDiscoveryCompleteSignals: map[string]<-chan struct{}{},
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
+		manager := c.AggregatedDiscoveryGroupManager
+		if manager == nil {
+			manager = discoveryendpoint.NewResourceManager()
+		}
+		s.AggregatedDiscoveryGroupManager = manager
+		s.AggregatedLegacyDiscoveryGroupManager = discoveryendpoint.NewResourceManager()
+	}
 	for {
 		if c.JSONPatchMaxCopyBytes <= 0 {
 			break
