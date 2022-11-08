@@ -34,6 +34,8 @@ type hnsV2 struct{}
 var (
 	// LoadBalancerFlagsIPv6 enables IPV6.
 	LoadBalancerFlagsIPv6 hcn.LoadBalancerFlags = 2
+	// LoadBalancerPortMappingFlagsVipExternalIP enables VipExternalIP.
+	LoadBalancerPortMappingFlagsVipExternalIP hcn.LoadBalancerPortMappingFlags = 16
 )
 
 func (hns hnsV2) getNetworkByName(name string) (*hnsNetworkInfo, error) {
@@ -267,6 +269,9 @@ func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 	}
 	if flags.localRoutedVIP {
 		lbPortMappingFlags |= hcn.LoadBalancerPortMappingFlagsLocalRoutedVIP
+	}
+	if flags.isVipExternalIP {
+		lbPortMappingFlags |= LoadBalancerPortMappingFlagsVipExternalIP
 	}
 
 	lbFlags := hcn.LoadBalancerFlagsNone
