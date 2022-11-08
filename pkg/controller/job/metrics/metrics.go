@@ -37,7 +37,7 @@ var (
 			Subsystem:      JobControllerSubsystem,
 			Name:           "job_sync_duration_seconds",
 			Help:           "The time it took to sync a job",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.STABLE,
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 		},
 		[]string{"completion_mode", "result", "action"},
@@ -49,9 +49,9 @@ var (
 	JobSyncNum = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      JobControllerSubsystem,
-			Name:           "job_sync_total",
+			Name:           "job_syncs_total",
 			Help:           "The number of job syncs",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.STABLE,
 		},
 		[]string{"completion_mode", "result", "action"},
 	)
@@ -64,9 +64,9 @@ var (
 	JobFinishedNum = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      JobControllerSubsystem,
-			Name:           "job_finished_total",
-			Help:           "The number of finished job",
-			StabilityLevel: metrics.ALPHA,
+			Name:           "jobs_finished_total",
+			Help:           "The number of finished jobs",
+			StabilityLevel: metrics.STABLE,
 		},
 		[]string{"completion_mode", "result", "reason"},
 	)
@@ -80,9 +80,10 @@ var (
 	//   result:          failed, succeeded
 	JobPodsFinished = metrics.NewCounterVec(
 		&metrics.CounterOpts{
-			Subsystem: JobControllerSubsystem,
-			Name:      "job_pods_finished_total",
-			Help:      "The number of finished Pods that are fully tracked",
+			Subsystem:      JobControllerSubsystem,
+			Name:           "job_pods_finished_total",
+			Help:           "The number of finished Pods that are fully tracked",
+			StabilityLevel: metrics.STABLE,
 		},
 		[]string{"completion_mode", "result"})
 
