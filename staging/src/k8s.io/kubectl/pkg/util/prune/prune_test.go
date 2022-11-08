@@ -67,7 +67,7 @@ func TestGetRESTMappings(t *testing.T) {
 			mapper:             &testRESTMapper{},
 			pr:                 []Resource{},
 			namespaceSpecified: true,
-			expectedns:  14,
+			expectedns:         14,
 			// it will be 0 non-namespaced resources after the deprecation period has passed.
 			// for details, refer to https://github.com/kubernetes/kubernetes/pull/110907/.
 			expectednns: 2,
