@@ -117,13 +117,10 @@ func (c *CELValidatorCompiler) Compile(p *v1alpha1.ValidatingAdmissionPolicy) Va
 	if len(p.Spec.Validations) == 0 {
 		return nil
 	}
-	hasParam := false
-	if p.Spec.ParamKind != nil {
-		hasParam = true
-	}
 	compilationResults := make([]CompilationResult, len(p.Spec.Validations))
 	for i, validation := range p.Spec.Validations {
-		compilationResults[i] = CompileValidatingPolicyExpression(validation.Expression, hasParam)
+		// always build with params
+		compilationResults[i] = CompileValidatingPolicyExpression(validation.Expression, true)
 	}
 	return &CELValidator{policy: p, compilationResults: compilationResults}
 }
