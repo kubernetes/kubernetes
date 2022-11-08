@@ -864,12 +864,21 @@ func TestLimitRanger_GetLimitRangesFixed22422(t *testing.T) {
 	limitRange := validLimitRangeNoDefaults()
 	limitRanges := []corev1.LimitRange{limitRange}
 
-	var count int64
 	mockClient := &fake.Clientset{}
 
-	unhold := make(chan struct{})
+	var (
+		testCount  int64
+		test1Count int64
+	)
 	mockClient.AddReactor("list", "limitranges", func(action core.Action) (bool, runtime.Object, error) {
-		atomic.AddInt64(&count, 1)
+		switch action.GetNamespace() {
+		case "test":
+			atomic.AddInt64(&testCount, 1)
+		case "test1":
+			atomic.AddInt64(&test1Count, 1)
+		default:
+			t.Error("unexpected namespace")
+		}
 
 		limitRangeList := &corev1.LimitRangeList{
 			ListMeta: metav1.ListMeta{
@@ -881,8 +890,8 @@ func TestLimitRanger_GetLimitRangesFixed22422(t *testing.T) {
 			value.Namespace = action.GetNamespace()
 			limitRangeList.Items = append(limitRangeList.Items, value)
 		}
-		// he always blocking before sending the signal
-		<-unhold
+		// make the handler slow so concurrent calls exercise the singleflight
+		time.Sleep(time.Second)
 		return true, limitRangeList, nil
 	})
 
@@ -926,34 +935,30 @@ func TestLimitRanger_GetLimitRangesFixed22422(t *testing.T) {
 			}
 		}()
 	}
-	// unhold all the calls with the same namespace handler.GetLimitRanges(attributes) calls, that have to be aggregated
-	unhold <- struct{}{}
-	go func() {
-		unhold <- struct{}{}
-	}()
 
 	// and here we wait for all the goroutines
 	wg.Wait()
 	// since all the calls with the same namespace will be holded, they must be catched on the singleflight group,
 	// There are two different sets of namespace calls
 	// hence only 2
-	if count != 2 {
-		t.Errorf("Expected 1 limit range, got %d", count)
+	if testCount != 1 {
+		t.Errorf("Expected 1 limit range call, got %d", testCount)
+	}
+	if test1Count != 1 {
+		t.Errorf("Expected 1 limit range call, got %d", test1Count)
 	}
 
 	// invalidate the cache
 	handler.liveLookupCache.Remove(attributes.GetNamespace())
-	go func() {
-		// unhold it is blocking until GetLimitRanges is executed
-		unhold <- struct{}{}
-	}()
 	_, err = handler.GetLimitRanges(attributes)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	close(unhold)
 
-	if count != 3 {
-		t.Errorf("Expected 2 limit range, got %d", count)
+	if testCount != 2 {
+		t.Errorf("Expected 2 limit range call, got %d", testCount)
+	}
+	if test1Count != 1 {
+		t.Errorf("Expected 1 limit range call, got %d", test1Count)
 	}
 }
