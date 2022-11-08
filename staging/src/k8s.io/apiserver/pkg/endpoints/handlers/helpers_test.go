@@ -17,10 +17,14 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"net/http"
+	"net/url"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 func TestLazyTruncatedUserAgent(t *testing.T) {
@@ -70,4 +74,25 @@ func TestLazyAccept(t *testing.T) {
 
 	acceptWithoutReq := &lazyAccept{}
 	assert.Equal(t, "unknown", fmt.Sprintf("%v", acceptWithoutReq))
+}
+
+func TestLazyVerb(t *testing.T) {
+	assert.Equal(t, "unknown", fmt.Sprintf("%v", &lazyVerb{}))
+
+	u, _ := url.Parse("?watch=true")
+	req := &http.Request{Method: "GET", URL: u}
+	verbWithReq := &lazyVerb{req: req}
+	assert.Equal(t, "WATCH", fmt.Sprintf("%v", verbWithReq))
+}
+
+func TestLazyResource(t *testing.T) {
+	assert.Equal(t, "unknown", fmt.Sprintf("%v", &lazyResource{}))
+
+	resourceWithEmptyReq := &lazyResource{&http.Request{}}
+	assert.Equal(t, "unknown", fmt.Sprintf("%v", resourceWithEmptyReq))
+
+	req := &http.Request{}
+	ctx := request.WithRequestInfo(context.TODO(), &request.RequestInfo{Resource: "resource"})
+	resourceWithReq := &lazyResource{req: req.WithContext(ctx)}
+	assert.Equal(t, "resource", fmt.Sprintf("%v", resourceWithReq))
 }
