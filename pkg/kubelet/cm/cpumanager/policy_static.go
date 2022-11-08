@@ -217,7 +217,7 @@ func (p *staticPolicy) validateState(s state.State) error {
 			tmpCPUSets = append(tmpCPUSets, cset)
 		}
 	}
-	totalKnownCPUs = totalKnownCPUs.UnionAll(tmpCPUSets)
+	totalKnownCPUs = totalKnownCPUs.Union(tmpCPUSets...)
 	if !totalKnownCPUs.Equals(p.topology.CPUDetails.CPUs()) {
 		return fmt.Errorf("current set of available CPUs \"%s\" doesn't match with CPUs in state \"%s\"",
 			p.topology.CPUDetails.CPUs().String(), totalKnownCPUs.String())
