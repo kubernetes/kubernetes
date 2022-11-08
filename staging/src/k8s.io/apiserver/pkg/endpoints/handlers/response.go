@@ -146,7 +146,7 @@ func transformResponseObject(ctx context.Context, scope *RequestScope, req *http
 		return
 	}
 	kind, serializer, _ := targetEncodingForTransform(scope, mediaType, req)
-	responsewriters.WriteObjectNegotiated(serializer, scope, kind.GroupVersion(), w, req, statusCode, obj)
+	responsewriters.WriteObjectNegotiated(serializer, scope, kind.GroupVersion(), w, req, statusCode, obj, false)
 }
 
 // errNotAcceptable indicates Accept negotiation has failed
