@@ -246,7 +246,8 @@ func (v *CounterVec) GetMetricWith(labels Labels) (Counter, error) {
 // WithLabelValues works as GetMetricWithLabelValues, but panics where
 // GetMetricWithLabelValues would have returned an error. Not returning an
 // error allows shortcuts like
-//     myVec.WithLabelValues("404", "GET").Add(42)
+//
+//	myVec.WithLabelValues("404", "GET").Add(42)
 func (v *CounterVec) WithLabelValues(lvs ...string) Counter {
 	c, err := v.GetMetricWithLabelValues(lvs...)
 	if err != nil {
@@ -257,7 +258,8 @@ func (v *CounterVec) WithLabelValues(lvs ...string) Counter {
 
 // With works as GetMetricWith, but panics where GetMetricWithLabels would have
 // returned an error. Not returning an error allows shortcuts like
-//     myVec.With(prometheus.Labels{"code": "404", "method": "GET"}).Add(42)
+//
+//	myVec.With(prometheus.Labels{"code": "404", "method": "GET"}).Add(42)
 func (v *CounterVec) With(labels Labels) Counter {
 	c, err := v.GetMetricWith(labels)
 	if err != nil {
