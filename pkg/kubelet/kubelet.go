@@ -162,7 +162,13 @@ const (
 	// Note that even though we set the period to 1s, the relisting itself can
 	// take more than 1s to finish if the container runtime responds slowly
 	// and/or when there are many container changes in one cycle.
-	plegRelistPeriod = time.Second * 1
+	genericPlegRelistPeriod    = time.Second * 1
+	genericPlegRelistThreshold = time.Minute * 3
+
+	// Generic PLEG relist period and threshold when used with Evented PLEG.
+	eventedPlegRelistPeriod     = time.Second * 300
+	eventedPlegRelistThreshold  = time.Minute * 10
+	eventedPlegMaxStreamRetries = 5
 
 	// backOffPeriod is the period to back off when pod syncing results in an
 	// error. It is also used as the base period for the exponential backoff
@@ -699,9 +705,37 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			utilfeature.DefaultFeatureGate.Enabled(features.PodAndContainerStatsFromCRI))
 	}
 
-	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, clock.RealClock{})
+	eventChannel := make(chan *pleg.PodLifecycleEvent, plegChannelCapacity)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+		// adjust Generic PLEG relisting period and threshold to higher value when Evented PLEG is turned on
+		genericRelistDuration := &pleg.RelistDuration{
+			RelistPeriod:    eventedPlegRelistPeriod,
+			RelistThreshold: eventedPlegRelistThreshold,
+		}
+		klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, eventChannel, genericRelistDuration, klet.podCache, clock.RealClock{})
+		// In case Evented PLEG has to fall back on Generic PLEG due to an error,
+		// Evented PLEG should be able to reset the Generic PLEG relisting duration
+		// to the default value.
+		eventedRelistDuration := &pleg.RelistDuration{
+			RelistPeriod:    genericPlegRelistPeriod,
+			RelistThreshold: genericPlegRelistThreshold,
+		}
+		klet.eventedPleg = pleg.NewEventedPLEG(klet.containerRuntime, klet.runtimeService, eventChannel,
+			klet.podCache, klet.pleg, eventedPlegMaxStreamRetries, eventedRelistDuration, clock.RealClock{})
+	} else {
+		genericRelistDuration := &pleg.RelistDuration{
+			RelistPeriod:    genericPlegRelistPeriod,
+			RelistThreshold: genericPlegRelistThreshold,
+		}
+		klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, eventChannel, genericRelistDuration, klet.podCache, clock.RealClock{})
+	}
+
 	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
 	klet.runtimeState.addHealthCheck("PLEG", klet.pleg.Healthy)
+	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+		klet.runtimeState.addHealthCheck("EventedPLEG", klet.eventedPleg.Healthy)
+	}
 	if _, err := klet.updatePodCIDR(ctx, kubeCfg.PodCIDR); err != nil {
 		klog.ErrorS(err, "Pod CIDR update failed")
 	}
@@ -1061,6 +1095,9 @@ type Kubelet struct {
 
 	// Generates pod events.
 	pleg pleg.PodLifecycleEventGenerator
+
+	// Evented PLEG
+	eventedPleg pleg.PodLifecycleEventGenerator
 
 	// Store kubecontainer.PodStatus for all pods.
 	podCache kubecontainer.Cache
@@ -1485,6 +1522,12 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 
 	// Start the pod lifecycle event generator.
 	kl.pleg.Start()
+
+	// Start eventedPLEG only if EventedPLEG feature gate is enabled.
+	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+		kl.eventedPleg.Start()
+	}
+
 	kl.syncLoop(ctx, updates, kl)
 }
 

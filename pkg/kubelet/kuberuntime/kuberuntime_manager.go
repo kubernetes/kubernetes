@@ -34,6 +34,7 @@ import (
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/flowcontrol"
@@ -43,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/credentialprovider/plugin"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -967,6 +969,26 @@ func (m *kubeGenericRuntimeManager) killPodWithSyncResult(ctx context.Context, p
 	return
 }
 
+func (m *kubeGenericRuntimeManager) GeneratePodStatus(event *runtimeapi.ContainerEventResponse) (*kubecontainer.PodStatus, error) {
+	podIPs := m.determinePodSandboxIPs(event.PodSandboxStatus.Metadata.Namespace, event.PodSandboxStatus.Metadata.Name, event.PodSandboxStatus)
+
+	kubeContainerStatuses := []*kubecontainer.Status{}
+	for _, status := range event.ContainersStatuses {
+		kubeContainerStatuses = append(kubeContainerStatuses, m.convertToKubeContainerStatus(status))
+	}
+
+	sort.Sort(containerStatusByCreated(kubeContainerStatuses))
+
+	return &kubecontainer.PodStatus{
+		ID:                kubetypes.UID(event.PodSandboxStatus.Metadata.Uid),
+		Name:              event.PodSandboxStatus.Metadata.Name,
+		Namespace:         event.PodSandboxStatus.Metadata.Namespace,
+		IPs:               podIPs,
+		SandboxStatuses:   []*runtimeapi.PodSandboxStatus{event.PodSandboxStatus},
+		ContainerStatuses: kubeContainerStatuses,
+	}, nil
+}
+
 // GetPodStatus retrieves the status of the pod, including the
 // information of all containers in the pod that are visible in Runtime.
 func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubetypes.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
@@ -1001,6 +1023,9 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 	klog.V(4).InfoS("getSandboxIDByPodUID got sandbox IDs for pod", "podSandboxID", podSandboxIDs, "pod", klog.KObj(pod))
 
 	sandboxStatuses := []*runtimeapi.PodSandboxStatus{}
+	containerStatuses := []*kubecontainer.Status{}
+	var timestamp time.Time
+
 	podIPs := []string{}
 	for idx, podSandboxID := range podSandboxIDs {
 		resp, err := m.runtimeService.PodSandboxStatus(ctx, podSandboxID, false)
@@ -1024,16 +1049,45 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 		if idx == 0 && resp.Status.State == runtimeapi.PodSandboxState_SANDBOX_READY {
 			podIPs = m.determinePodSandboxIPs(namespace, name, resp.Status)
 		}
+
+		if idx == 0 && utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+			if resp.Timestamp == 0 {
+				// If the Evented PLEG is enabled in the kubelet, but not in the runtime
+				// then the pod status we get will not have the timestamp set.
+				// e.g. CI job 'pull-kubernetes-e2e-gce-alpha-features' will runs with
+				// features gate enabled, which includes Evented PLEG, but uses the
+				// runtime without Evented PLEG support.
+				klog.V(4).InfoS("Runtime does not set pod status timestamp", "pod", klog.KObj(pod))
+				containerStatuses, err = m.getPodContainerStatuses(ctx, uid, name, namespace)
+				if err != nil {
+					if m.logReduction.ShouldMessageBePrinted(err.Error(), podFullName) {
+						klog.ErrorS(err, "getPodContainerStatuses for pod failed", "pod", klog.KObj(pod))
+					}
+					return nil, err
+				}
+			} else {
+				// Get the statuses of all containers visible to the pod and
+				// timestamp from sandboxStatus.
+				timestamp = time.Unix(resp.Timestamp, 0)
+				for _, cs := range resp.ContainersStatuses {
+					cStatus := m.convertToKubeContainerStatus(cs)
+					containerStatuses = append(containerStatuses, cStatus)
+				}
+			}
+		}
 	}
 
-	// Get statuses of all containers visible in the pod.
-	containerStatuses, err := m.getPodContainerStatuses(ctx, uid, name, namespace)
-	if err != nil {
-		if m.logReduction.ShouldMessageBePrinted(err.Error(), podFullName) {
-			klog.ErrorS(err, "getPodContainerStatuses for pod failed", "pod", klog.KObj(pod))
+	if !utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+		// Get statuses of all containers visible in the pod.
+		containerStatuses, err = m.getPodContainerStatuses(ctx, uid, name, namespace)
+		if err != nil {
+			if m.logReduction.ShouldMessageBePrinted(err.Error(), podFullName) {
+				klog.ErrorS(err, "getPodContainerStatuses for pod failed", "pod", klog.KObj(pod))
+			}
+			return nil, err
 		}
-		return nil, err
 	}
+
 	m.logReduction.ClearID(podFullName)
 
 	return &kubecontainer.PodStatus{
@@ -1043,6 +1097,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 		IPs:               podIPs,
 		SandboxStatuses:   sandboxStatuses,
 		ContainerStatuses: containerStatuses,
+		TimeStamp:         timestamp,
 	}, nil
 }
 

@@ -168,6 +168,21 @@ func (mr *MockRuntimeMockRecorder) GarbageCollect(ctx, gcPolicy, allSourcesReady
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GarbageCollect", reflect.TypeOf((*MockRuntime)(nil).GarbageCollect), ctx, gcPolicy, allSourcesReady, evictNonDeletedPods)
 }
 
+// GeneratePodStatus mocks base method.
+func (m *MockRuntime) GeneratePodStatus(event *v10.ContainerEventResponse) (*container.PodStatus, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GeneratePodStatus", event)
+	ret0, _ := ret[0].(*container.PodStatus)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GeneratePodStatus indicates an expected call of GeneratePodStatus.
+func (mr *MockRuntimeMockRecorder) GeneratePodStatus(event interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GeneratePodStatus", reflect.TypeOf((*MockRuntime)(nil).GeneratePodStatus), event)
+}
+
 // GetContainerLogs mocks base method.
 func (m *MockRuntime) GetContainerLogs(ctx context.Context, pod *v1.Pod, containerID container.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error {
 	m.ctrl.T.Helper()

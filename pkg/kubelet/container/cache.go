@@ -21,6 +21,8 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // Cache stores the PodStatus for the pods. It represents *all* the visible
@@ -36,7 +38,10 @@ import (
 // cache entries.
 type Cache interface {
 	Get(types.UID) (*PodStatus, error)
-	Set(types.UID, *PodStatus, error, time.Time)
+	// Set updates the cache by setting the PodStatus for the pod only
+	// if the data is newer than the cache based on the provided
+	// time stamp. Returns if the cache was updated.
+	Set(types.UID, *PodStatus, error, time.Time) (updated bool)
 	// GetNewerThan is a blocking call that only returns the status
 	// when it is newer than the given time.
 	GetNewerThan(types.UID, time.Time) (*PodStatus, error)
@@ -93,12 +98,22 @@ func (c *cache) GetNewerThan(id types.UID, minTime time.Time) (*PodStatus, error
 	return d.status, d.err
 }
 
-// Set sets the PodStatus for the pod.
-func (c *cache) Set(id types.UID, status *PodStatus, err error, timestamp time.Time) {
+// Set sets the PodStatus for the pod only if the data is newer than the cache
+func (c *cache) Set(id types.UID, status *PodStatus, err error, timestamp time.Time) (updated bool) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	defer c.notify(id, timestamp)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+		// Set the value in the cache only if it's not present already
+		// or the timestamp in the cache is older than the current update timestamp
+		if cachedVal, ok := c.pods[id]; ok && cachedVal.modified.After(timestamp) {
+			return false
+		}
+	}
+
 	c.pods[id] = &data{status: status, err: err, modified: timestamp}
+	c.notify(id, timestamp)
+	return true
 }
 
 // Delete removes the entry of the pod.
@@ -142,6 +157,29 @@ func (c *cache) get(id types.UID) *data {
 // Otherwise, it returns nil. The caller should acquire the lock.
 func (c *cache) getIfNewerThan(id types.UID, minTime time.Time) *data {
 	d, ok := c.pods[id]
+	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+		// Evented PLEG has CREATED, STARTED, STOPPED and DELETED events
+		// However if the container creation fails for some reason there is no
+		// CRI event received by the kubelet and that pod will get stuck a
+		// GetNewerThan call in the pod workers. This is reproducible with
+		// the node e2e test,
+		// https://github.com/kubernetes/kubernetes/blob/83415e5c9e6e59a3d60a148160490560af2178a1/test/e2e_node/pod_hostnamefqdn_test.go#L161
+		// which forces failure during pod creation. This issue also exists in
+		// Generic PLEG but since it updates global timestamp periodically
+		// the GetNewerThan call gets unstuck.
+
+		// During node e2e tests, it was observed this change does not have any
+		// adverse impact on the behaviour of the Generic PLEG as well.
+		switch {
+		case !ok:
+			return makeDefaultData(id)
+		case ok && (d.modified.After(minTime) || (c.timestamp != nil && c.timestamp.After(minTime))):
+			return d
+		default:
+			return nil
+		}
+	}
+
 	globalTimestampIsNewer := (c.timestamp != nil && c.timestamp.After(minTime))
 	if !ok && globalTimestampIsNewer {
 		// Status is not cached, but the global timestamp is newer than

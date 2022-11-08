@@ -121,7 +121,6 @@ service RuntimeService {
 
     // GetContainerEvents gets container events from the CRI runtime
     rpc  GetContainerEvents(GetEventsRequest) returns (stream ContainerEventResponse) {}
-
 }
 
 // ImageService defines the public APIs for managing images.
@@ -544,6 +543,10 @@ message PodSandboxStatusResponse {
     // debug, e.g. network namespace for linux container based container runtime.
     // It should only be returned non-empty when Verbose is true.
     map<string, string> info = 2;
+    // Container statuses
+    repeated ContainerStatus containers_statuses = 3;
+    // Timestamp at which container and pod statuses were recorded
+    int64 timestamp = 4;
 }
 
 // PodSandboxStateValue is the wrapper of PodSandboxState.
@@ -1693,8 +1696,11 @@ message ContainerEventResponse {
     // Creation timestamp of this event
     int64 created_at = 3;
 
-    // ID of the sandbox container
-    PodSandboxMetadata pod_sandbox_metadata = 4;
+    // Sandbox status
+    PodSandboxStatus pod_sandbox_status = 4;
+
+    // Container statuses
+    repeated ContainerStatus containers_statuses = 5;
 }
 
 enum ContainerEventType {

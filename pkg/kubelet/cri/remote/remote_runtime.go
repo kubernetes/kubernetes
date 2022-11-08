@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -792,5 +793,25 @@ func (r *remoteRuntimeService) CheckpointContainer(ctx context.Context, options 
 }
 
 func (r *remoteRuntimeService) GetContainerEvents(containerEventsCh chan *runtimeapi.ContainerEventResponse) error {
-	return nil
+	containerEventsStreamingClient, err := r.runtimeClient.GetContainerEvents(context.Background(), &runtimeapi.GetEventsRequest{})
+	if err != nil {
+		klog.ErrorS(err, "GetContainerEvents failed to get streaming client")
+		return err
+	}
+
+	for {
+		resp, err := containerEventsStreamingClient.Recv()
+		if err == io.EOF {
+			klog.ErrorS(err, "container events stream is closed")
+			return err
+		}
+		if err != nil {
+			klog.ErrorS(err, "failed to receive streaming container event")
+			return err
+		}
+		if resp != nil {
+			containerEventsCh <- resp
+			klog.V(4).InfoS("container event received", "resp", resp)
+		}
+	}
 }
