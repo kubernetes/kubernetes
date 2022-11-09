@@ -18,6 +18,7 @@ package cel
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -46,6 +47,13 @@ import (
 	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+)
+
+const (
+	crdGroup = "crdgroup.example.com"
+	crdName  = "config-resource"
+	crdKind  = "ConfigResource"
+	crName   = "config-obj"
 )
 
 // Test_ValidateNamespace_NoParams tests a ValidatingAdmissionPolicy that validates creation of a Namespace with no params.
@@ -277,28 +285,8 @@ func Test_ValidateNamespace_NoParams(t *testing.T) {
 			}
 
 			_, err = client.CoreV1().Namespaces().Create(context.TODO(), testcase.namespace, metav1.CreateOptions{})
-			if err == nil && testcase.err == "" {
-				return
-			}
 
-			if err == nil && testcase.err != "" {
-				t.Logf("actual error: %v", err)
-				t.Logf("expected error: %v", testcase.err)
-				t.Fatal("got nil error but expected an error")
-			}
-
-			if err != nil && testcase.err == "" {
-				t.Logf("actual error: %v", err)
-				t.Logf("expected error: %v", testcase.err)
-				t.Fatal("got error but expected none")
-			}
-
-			if err.Error() != testcase.err {
-				t.Logf("actual validation error: %v", err)
-				t.Logf("expected validation error: %v", testcase.err)
-				t.Error("unexpected validation error")
-			}
-
+			checkExpectedError(t, err, testcase.err)
 			checkFailureReason(t, err, testcase.failureReason)
 		})
 	}
@@ -390,24 +378,7 @@ func Test_ValidateNamespace_WithConfigMapParams(t *testing.T) {
 				return
 			}
 
-			if err == nil && testcase.err != "" {
-				t.Logf("actual error: %v", err)
-				t.Logf("expected error: %v", testcase.err)
-				t.Fatal("got nil error but expected an error")
-			}
-
-			if err != nil && testcase.err == "" {
-				t.Logf("actual error: %v", err)
-				t.Logf("expected error: %v", testcase.err)
-				t.Fatal("got error but expected none")
-			}
-
-			if err.Error() != testcase.err {
-				t.Logf("actual validation error: %v", err)
-				t.Logf("expected validation error: %v", testcase.err)
-				t.Error("unexpected validation error")
-			}
-
+			checkExpectedError(t, err, testcase.err)
 			checkFailureReason(t, err, testcase.failureReason)
 		})
 	}
@@ -1883,6 +1854,151 @@ func Test_ValidatingAdmissionPolicy_ParamResourceDeletedThenRecreated(t *testing
 	}
 }
 
+// TestCRDParams tests that a CustomResource can be used as a param resource for a ValidatingAdmissionPolicy.
+func TestCRDParams(t *testing.T) {
+	testcases := []struct {
+		name          string
+		schema        string
+		crSpec        map[string]interface{}
+		policy        *admissionregistrationv1alpha1.ValidatingAdmissionPolicy
+		policyBinding *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding
+		namespace     *v1.Namespace
+		err           string
+		failureReason metav1.StatusReason
+	}{
+		{
+			name: "a rule that uses data from a CRD param resource does NOT pass",
+			schema: `{
+				"type":"object",
+				"properties":{
+				   "spec":{
+					  "type":"object",
+					  "properties":{
+						 "someNum":{
+							"type":"integer"
+						 }
+					  }
+				   }
+				}`,
+			crSpec: map[string]interface{}{
+				"someNum": 3,
+			},
+			policy: withValidations([]admissionregistrationv1alpha1.Validation{
+				{
+					Expression: "params.spec.someNum == 2",
+				},
+			}, withNamespaceMatch(withParams(withCRDParamKind("ConfigResource"), withFailurePolicy(admissionregistrationv1alpha1.Fail, makePolicy("test-policy"))))),
+			policyBinding: makeBinding("crd-policy-binding", "test-policy", crName),
+			namespace: &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "crd-test-k8s",
+				},
+			},
+			err:           `namespaces "crd-test-k8s" is forbidden: ValidatingAdmissionPolicy 'test-policy' with binding 'crd-policy-binding' denied request: failed expression: params.spec.someNum == 2`,
+			failureReason: metav1.StatusReasonInvalid,
+		},
+		{
+			name: "a rule that uses data from a CRD param resource that does pass",
+			schema: `{
+				"type":"object",
+				"properties":{
+				   "spec":{
+					  "type":"object",
+					  "properties":{
+						 "someNum":{
+							"type":"integer"
+						 }
+					  }
+				   }
+				}`,
+			crSpec: map[string]interface{}{
+				"someNum": 3,
+			},
+			policy: withValidations([]admissionregistrationv1alpha1.Validation{
+				{
+					Expression: "params.spec.someNum == 3",
+				},
+			}, withNamespaceMatch(withParams(withCRDParamKind("ConfigResource"), withFailurePolicy(admissionregistrationv1alpha1.Fail, makePolicy("test-policy"))))),
+			policyBinding: makeBinding("crd-policy-binding", "test-policy", crName),
+			namespace: &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "crd-test-k8s",
+				},
+			},
+			err: ``,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+			server, err := apiservertesting.StartTestServer(t, nil, []string{
+				"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+			}, framework.SharedEtcd())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer server.TearDownFn()
+
+			config := server.ClientConfig
+
+			client, err := clientset.NewForConfig(config)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			apiExtensionClient, err := apiextensionsclientset.NewForConfig(config)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			crd := genCRD(crdName, crdKind)
+			crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			dynamicClient, err := dynamic.NewForConfig(config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			gvr := schema.GroupVersionResource{
+				Group:    crd.Spec.Group,
+				Version:  crd.Spec.Versions[0].Name,
+				Resource: crd.Spec.Names.Plural,
+			}
+			crClient := dynamicClient.Resource(gvr)
+			_, err = crClient.Namespace("default").Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": gvr.Group + "/" + gvr.Version,
+				"kind":       crd.Spec.Names.Kind,
+				"metadata": map[string]interface{}{
+					"name": crName,
+				},
+				"spec": testcase.crSpec,
+			}}, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("error creating %s: %s", gvr, err)
+			}
+
+			policy := withWaitReadyConstraintAndExpression(testcase.policy)
+			if _, err := client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			if err := createAndWaitReady(t, client, testcase.policyBinding, nil); err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = client.CoreV1().Namespaces().Create(context.TODO(), testcase.namespace, metav1.CreateOptions{})
+			if err == nil && testcase.err == "" {
+				return
+			}
+
+			checkExpectedError(t, err, testcase.err)
+			checkFailureReason(t, err, testcase.failureReason)
+		})
+	}
+}
+
 func withWaitReadyConstraintAndExpression(policy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy) *admissionregistrationv1alpha1.ValidatingAdmissionPolicy {
 	policy = policy.DeepCopy()
 	policy.Spec.MatchConstraints.ResourceRules = append(policy.Spec.MatchConstraints.ResourceRules, admissionregistrationv1alpha1.NamedRuleWithOperations{
@@ -2114,6 +2230,69 @@ func checkFailureReason(t *testing.T, err error, expectedReason metav1.StatusRea
 		t.Logf("actual error reason: %v", reason)
 		t.Logf("expected failure reason: %v", expectedReason)
 		t.Error("unexpected error reason")
+	}
+}
+
+func unmarshalSchema(t *testing.T, schemaJSON []byte) *apiextensionsv1.JSONSchemaProps {
+	var c apiextensionsv1.JSONSchemaProps
+	err := json.Unmarshal(schemaJSON, &c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &c
+}
+
+func withCRDParamKind(kind string) *admissionregistrationv1alpha1.ParamKind {
+	return &admissionregistrationv1alpha1.ParamKind{
+		APIVersion: crdGroup + "/v1beta1",
+		Kind:       kind,
+	}
+}
+
+func genCRD(name, kind string) *apiextensionsv1.CustomResourceDefinition {
+	return &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: name + "s." + crdGroup},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: crdGroup,
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1beta1",
+					Served:  true,
+					Storage: true,
+					Schema:  fixtures.AllowAllSchema(),
+				},
+			},
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
+				Plural:   name + "s",
+				Singular: name,
+				Kind:     kind,
+				ListKind: kind + "List",
+			},
+			Scope: apiextensionsv1.NamespaceScoped,
+		},
+	}
+}
+
+func checkExpectedError(t *testing.T, err error, expectedErr string) {
+	if err == nil && expectedErr == "" {
+		return
+	}
+	if err == nil && expectedErr != "" {
+		t.Logf("actual error: %v", err)
+		t.Logf("expected error: %v", expectedErr)
+		t.Fatal("got nil error but expected an error")
+	}
+
+	if err != nil && expectedErr == "" {
+		t.Logf("actual error: %v", err)
+		t.Logf("expected error: %v", expectedErr)
+		t.Fatal("got error but expected none")
+	}
+
+	if err.Error() != expectedErr {
+		t.Logf("actual validation error: %v", err)
+		t.Logf("expected validation error: %v", expectedErr)
+		t.Error("unexpected validation error")
 	}
 }
 
