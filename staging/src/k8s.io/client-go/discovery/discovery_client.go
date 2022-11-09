@@ -74,6 +74,10 @@ type DiscoveryInterface interface {
 	ServerVersionInterface
 	OpenAPISchemaInterface
 	OpenAPIV3SchemaInterface
+	// Returns copy of current discovery client that will only
+	// receive the legacy discovery format, or pointer to current
+	// discovery client if it does not support legacy-only discovery.
+	WithLegacy() DiscoveryInterface
 }
 
 // AggregatedDiscoveryInterface extends DiscoveryInterface to include a method to possibly
@@ -154,6 +158,8 @@ type DiscoveryClient struct {
 	restClient restclient.Interface
 
 	LegacyPrefix string
+	// Forces the client to request only "unaggregated" (legacy) discovery.
+	UseLegacyDiscovery bool
 }
 
 var _ AggregatedDiscoveryInterface = &DiscoveryClient{}
@@ -213,10 +219,14 @@ func (d *DiscoveryClient) GroupsAndMaybeResources() (*metav1.APIGroupList, map[s
 // possible for the resource map to be nil if the server returned
 // the unaggregated discovery.
 func (d *DiscoveryClient) downloadLegacy() (*metav1.APIGroupList, map[schema.GroupVersion]*metav1.APIResourceList, error) {
+	accept := acceptDiscoveryFormats
+	if d.UseLegacyDiscovery {
+		accept = AcceptV1
+	}
 	var responseContentType string
 	body, err := d.restClient.Get().
 		AbsPath("/api").
-		SetHeader("Accept", acceptDiscoveryFormats).
+		SetHeader("Accept", accept).
 		Do(context.TODO()).
 		ContentType(&responseContentType).
 		Raw()
@@ -262,10 +272,14 @@ func (d *DiscoveryClient) downloadLegacy() (*metav1.APIGroupList, map[schema.Gro
 // discovery resources. The returned groups will always exist, but the
 // resources map may be nil.
 func (d *DiscoveryClient) downloadAPIs() (*metav1.APIGroupList, map[schema.GroupVersion]*metav1.APIResourceList, error) {
+	accept := acceptDiscoveryFormats
+	if d.UseLegacyDiscovery {
+		accept = AcceptV1
+	}
 	var responseContentType string
 	body, err := d.restClient.Get().
 		AbsPath("/apis").
-		SetHeader("Accept", acceptDiscoveryFormats).
+		SetHeader("Accept", accept).
 		Do(context.TODO()).
 		ContentType(&responseContentType).
 		Raw()
@@ -590,6 +604,14 @@ func (d *DiscoveryClient) OpenAPIV3() openapi.Client {
 	return openapi.NewClient(d.restClient)
 }
 
+// WithLegacy returns copy of current discovery client that will only
+// receive the legacy discovery format.
+func (d *DiscoveryClient) WithLegacy() DiscoveryInterface {
+	client := *d
+	client.UseLegacyDiscovery = true
+	return &client
+}
+
 // withRetries retries the given recovery function in case the groups supported by the server change after ServerGroup() returns.
 func withRetries(maxRetries int, f func() ([]*metav1.APIGroup, []*metav1.APIResourceList, error)) ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
 	var result []*metav1.APIResourceList
@@ -654,7 +676,7 @@ func NewDiscoveryClientForConfigAndClient(c *restclient.Config, httpClient *http
 		return nil, err
 	}
 	client, err := restclient.UnversionedRESTClientForConfigAndClient(&config, httpClient)
-	return &DiscoveryClient{restClient: client, LegacyPrefix: "/api"}, err
+	return &DiscoveryClient{restClient: client, LegacyPrefix: "/api", UseLegacyDiscovery: false}, err
 }
 
 // NewDiscoveryClientForConfigOrDie creates a new DiscoveryClient for the given config. If
@@ -670,7 +692,7 @@ func NewDiscoveryClientForConfigOrDie(c *restclient.Config) *DiscoveryClient {
 
 // NewDiscoveryClient returns a new DiscoveryClient for the given RESTClient.
 func NewDiscoveryClient(c restclient.Interface) *DiscoveryClient {
-	return &DiscoveryClient{restClient: c, LegacyPrefix: "/api"}
+	return &DiscoveryClient{restClient: c, LegacyPrefix: "/api", UseLegacyDiscovery: false}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

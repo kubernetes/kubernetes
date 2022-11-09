@@ -277,6 +277,12 @@ func (d *CachedDiscoveryClient) Invalidate() {
 	}
 }
 
+// WithLegacy returns current cached discovery client;
+// current client does not support legacy-only discovery.
+func (d *CachedDiscoveryClient) WithLegacy() discovery.DiscoveryInterface {
+	return d
+}
+
 // NewCachedDiscoveryClientForConfig creates a new DiscoveryClient for the given config, and wraps
 // the created client in a CachedDiscoveryClient. The provided configuration is updated with a
 // custom transport that understands cache responses.

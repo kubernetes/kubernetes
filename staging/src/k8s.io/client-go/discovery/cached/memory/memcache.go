@@ -279,6 +279,12 @@ func (d *memCacheClient) serverResourcesForGroupVersion(groupVersion string) (*m
 	return r, nil
 }
 
+// WithLegacy returns current memory-cached discovery client;
+// current client does not support legacy-only discovery.
+func (d *memCacheClient) WithLegacy() discovery.DiscoveryInterface {
+	return d
+}
+
 // NewMemCacheClient creates a new CachedDiscoveryInterface which caches
 // discovery information in memory and will stay up-to-date if Invalidate is
 // called with regularity.

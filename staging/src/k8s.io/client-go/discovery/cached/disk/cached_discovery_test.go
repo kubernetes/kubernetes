@@ -786,6 +786,10 @@ func (d *fakeDiscoveryClient) OpenAPIV3() openapi.Client {
 	panic("unimplemented")
 }
 
+func (d *fakeDiscoveryClient) WithLegacy() discovery.DiscoveryInterface {
+	panic("unimplemented")
+}
+
 func groupNamesFromList(groups *metav1.APIGroupList) []string {
 	result := []string{}
 	for _, group := range groups.Groups {
