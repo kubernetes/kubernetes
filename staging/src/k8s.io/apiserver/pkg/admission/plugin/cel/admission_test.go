@@ -227,7 +227,7 @@ func (f *fakeCompiler) RegisterBinding(binding *v1alpha1.ValidatingAdmissionPoli
 }
 
 func setupFakeTest(t *testing.T, comp *fakeCompiler) (plugin admission.ValidationInterface, paramTracker, policyTracker clienttesting.ObjectTracker, controller *celAdmissionController) {
-	return setupTestCommon(t, comp)
+	return setupTestCommon(t, comp, true)
 }
 
 // Starts CEL admission controller and sets up a plugin configured with it as well
@@ -237,7 +237,9 @@ func setupFakeTest(t *testing.T, comp *fakeCompiler) (plugin admission.Validatio
 // support multiple types of params this function needs to be augmented
 //
 // PolicyTracker expects FakePolicyDefinition and FakePolicyBinding types
-func setupTestCommon(t *testing.T, compiler ValidatorCompiler) (plugin admission.ValidationInterface, paramTracker, policyTracker clienttesting.ObjectTracker, controller *celAdmissionController) {
+// !TODO: refactor this test/framework to remove startInformers argument and
+// clean up the return args, and in general make it more accessible.
+func setupTestCommon(t *testing.T, compiler ValidatorCompiler, shouldStartInformers bool) (plugin admission.ValidationInterface, paramTracker, policyTracker clienttesting.ObjectTracker, controller *celAdmissionController) {
 	testContext, testContextCancel := context.WithCancel(context.Background())
 	t.Cleanup(testContextCancel)
 
@@ -259,7 +261,11 @@ func setupTestCommon(t *testing.T, compiler ValidatorCompiler) (plugin admission
 		panic("Unexpected error.")
 	}
 
-	handler := &celAdmissionPlugin{enabled: true}
+	plug, err := NewPlugin()
+	require.NoError(t, err)
+
+	handler := plug.(*celAdmissionPlugin)
+	handler.enabled = true
 
 	genericInitializer := initializer.New(fakeClient, dynamicClient, fakeInformerFactory, nil, featureGate, testContext.Done())
 	genericInitializer.Initialize(handler)
@@ -272,13 +278,18 @@ func setupTestCommon(t *testing.T, compiler ValidatorCompiler) (plugin admission
 	controller = handler.evaluator.(*celAdmissionController)
 	controller.validatorCompiler = compiler
 
-	// Make sure to start the fake informers
-	fakeInformerFactory.Start(testContext.Done())
 	t.Cleanup(func() {
 		testContextCancel()
 		// wait for informer factory to shutdown
 		fakeInformerFactory.Shutdown()
 	})
+
+	if !shouldStartInformers {
+		return handler, dynamicClient.Tracker(), fakeClient.Tracker(), controller
+	}
+
+	// Make sure to start the fake informers
+	fakeInformerFactory.Start(testContext.Done())
 
 	// Wait for admission controller to begin its object watches
 	// This is because there is a very rare (0.05% on my machine) race doing the
@@ -531,6 +542,38 @@ func must3[T any, I any](val T, _ I, err error) T {
 ////////////////////////////////////////////////////////////////////////////////
 // Functionality Tests
 ////////////////////////////////////////////////////////////////////////////////
+
+func TestPluginNotReady(t *testing.T) {
+	compiler := &fakeCompiler{
+		// Match everything by default
+		DefaultMatch: true,
+	}
+
+	// Show that an unstarted informer (or one that has failed its listwatch)
+	// will show proper error from plugin
+	handler, _, _, _ := setupTestCommon(t, compiler, false)
+	err := handler.Validate(
+		context.Background(),
+		// Object is irrelevant/unchecked for this test. Just test that
+		// the evaluator is executed, and returns a denial
+		attributeRecord(nil, fakeParams, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	require.ErrorContains(t, err, "not yet ready to handle request")
+
+	// Show that by now starting the informer, the error is dissipated
+	handler, _, _, _ = setupTestCommon(t, compiler, true)
+	err = handler.Validate(
+		context.Background(),
+		// Object is irrelevant/unchecked for this test. Just test that
+		// the evaluator is executed, and returns a denial
+		attributeRecord(nil, fakeParams, admission.Create),
+		&admission.RuntimeObjectInterfaces{},
+	)
+
+	require.NoError(t, err)
+}
 
 func TestBasicPolicyDefinitionFailure(t *testing.T) {
 	testContext, testContextCancel := context.WithCancel(context.Background())
