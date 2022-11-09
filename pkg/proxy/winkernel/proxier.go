@@ -993,8 +993,12 @@ func isNetworkNotFoundError(err error) bool {
 // If atleast one is not terminating, then return false
 func (proxier *Proxier) isAllEndpointsTerminating(svcName proxy.ServicePortName) bool {
 	for _, epInfo := range proxier.endpointsMap[svcName] {
-		if ep, ok := epInfo.(*endpointsInfo); ok && !ep.terminating {
+		ep, ok := epInfo.(*endpointsInfo)
+		if ok && !ep.terminating {
 			return false
+		}
+		if !ok {
+			klog.V(2).InfoS("Prince not ok in isAllEndpointsTerminating")
 		}
 	}
 	return true
@@ -1081,7 +1085,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 
-	klog.V(3).InfoS("Syncing Policies")
+	klog.V(3).InfoS("Prince Syncing Policies new")
 
 	// Program HNS by adding corresponding policies for each service.
 	for svcName, svc := range proxier.serviceMap {
@@ -1130,7 +1134,7 @@ func (proxier *Proxier) syncProxyRules() {
 		containsNodeIP := false
 
 		isAllEpTerminating := proxier.isAllEndpointsTerminating(svcName)
-
+		klog.V(4).InfoS("Prince status of ", "isAllEpTerminating : ", isAllEpTerminating)
 		for _, epInfo := range proxier.endpointsMap[svcName] {
 			ep, ok := epInfo.(*endpointsInfo)
 			if !ok {
@@ -1138,11 +1142,13 @@ func (proxier *Proxier) syncProxyRules() {
 				continue
 			}
 
+			klog.V(2).InfoS("Prince ==>> ", "syncProxyRules => : EpIP : ", ep.ip, " EpPort : ", ep.port, " hnsID ", ep.hnsID, " ready : ", ep.ready, " serving : ", ep.serving, " terminating : ", ep.terminating)
+
 			if !isAllEpTerminating && !ep.IsReady() {
 				continue
 			}
 
-			if ep.IsServing() {
+			if !ep.IsServing() {
 				continue
 			}
 
@@ -1396,8 +1402,8 @@ func (proxier *Proxier) syncProxyRules() {
 			} else {
 				klog.V(3).InfoS("Skipped creating Hns LoadBalancer for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)
 			}
-			lbIngressIP.hnsID = hnsLoadBalancer.hnsID
-			klog.V(3).InfoS("Hns LoadBalancer resource created for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)
+			// lbIngressIP.hnsID = hnsLoadBalancer.hnsID
+			// klog.V(3).InfoS("Hns LoadBalancer resource created for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)
 
 			if proxier.forwardHealthCheckVip && gatewayHnsendpoint != nil && !isAllEpTerminating {
 				nodeport := proxier.healthzPort
