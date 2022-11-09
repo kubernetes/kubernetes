@@ -42,7 +42,7 @@ import (
 
 const maxProbeRetries = 3
 
-// Prober helps to check the liveness/readiness/startup of a container.
+// prober helps to check the liveness/readiness/startup of a container.
 type prober struct {
 	exec   execprobe.Prober
 	http   httpprobe.Prober
@@ -53,7 +53,7 @@ type prober struct {
 	recorder record.EventRecorder
 }
 
-// NewProber creates a Prober, it takes a command runner and
+// newProber creates a Prober, it takes a command runner and
 // several container info managers.
 func newProber(
 	runner kubecontainer.CommandRunner,

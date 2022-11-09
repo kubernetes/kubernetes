@@ -32,7 +32,7 @@ type frameworkMetric struct {
 	value       float64
 }
 
-// metricRecorder records framework metrics in a separate goroutine to avoid overhead in the critical path.
+// metricsRecorder records framework metrics in a separate goroutine to avoid overhead in the critical path.
 type metricsRecorder struct {
 	// bufferCh is a channel that serves as a metrics buffer before the metricsRecorder goroutine reports it.
 	bufferCh chan *frameworkMetric

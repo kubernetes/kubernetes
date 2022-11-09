@@ -23,7 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// NoneEndpointReconciler allows for the endpoint reconciler to be disabled
+// noneEndpointReconciler allows for the endpoint reconciler to be disabled
 type noneEndpointReconciler struct{}
 
 // NewNoneEndpointReconciler creates a new EndpointReconciler that reconciles based on a

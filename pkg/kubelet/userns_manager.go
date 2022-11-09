@@ -63,7 +63,7 @@ type usernsManager struct {
 	lock sync.Mutex
 }
 
-// UserNamespace holds the configuration for the user namespace.
+// userNamespace holds the configuration for the user namespace.
 type userNamespace struct {
 	// UIDs mappings for the user namespace.
 	UIDMappings []idMapping `json:"uidMappings"`
