@@ -39,6 +39,10 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
+const (
+	csiResizeWaitPeriod = 5 * time.Minute
+)
+
 var _ = utils.SIGDescribe("PersistentVolumes-expansion ", func() {
 	f := framework.NewDefaultFramework("persistent-local-volumes-expansion")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
