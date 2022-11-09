@@ -215,6 +215,8 @@ type PodWorkers interface {
 	// deleting a terminating static pod from the apiserver before the pod is shut
 	// down.
 	IsPodForMirrorPodTerminatingByFullName(podFullname string) bool
+
+	ForgerWorker(uid types.UID)
 }
 
 // the function to invoke to perform a sync (reconcile the kubelet state to the desired shape of the pod)
@@ -535,6 +537,16 @@ func (p *podWorkers) IsPodForMirrorPodTerminatingByFullName(podFullName string) 
 	return true
 }
 
+func (p *podWorkers) ForgerWorker(uid types.UID) {
+	p.podLock.Lock()
+	defer p.podLock.Unlock()
+	if ch, ok := p.podUpdates[uid]; ok {
+		close(ch)
+		delete(p.podUpdates, uid)
+		delete(p.lastUndeliveredWorkUpdate, uid)
+	}
+}
+
 func isPodStatusCacheTerminal(status *kubecontainer.PodStatus) bool {
 	runningContainers := 0
 	runningSandboxes := 0
@@ -716,7 +728,19 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 		WorkType: workType,
 		Options:  options,
 	}
-
+	if options.UpdateType == kubetypes.SyncPodKill {
+		var podUpdates chan podWork
+		p.ForgerWorker(uid)
+		podUpdates = make(chan podWork, 1)
+		p.podUpdates[uid] = podUpdates
+		var gracePeriod int64 = 1
+		work.Options.KillPodOptions.PodTerminationGracePeriodSecondsOverride = &gracePeriod
+		podUpdates <- work
+		go func() {
+			defer runtime.HandleCrash()
+			p.managePodLoop(podUpdates)
+		}()
+	}
 	// start the pod worker goroutine if it doesn't exist
 	podUpdates, exists := p.podUpdates[uid]
 	if !exists {
