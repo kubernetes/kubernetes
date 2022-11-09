@@ -1112,7 +1112,7 @@ func startAPFController(t *testing.T, stopCh <-chan struct{}, apfConfiguration [
 	// make sure that apf controller syncs the priority level configuration object we are using in this test.
 	// read the metrics and ensure the concurrency limit for our priority level is set to the expected value.
 	pollErr := wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (done bool, err error) {
-		if err := gaugeValueMatch("apiserver_flowcontrol_request_concurrency_limit", map[string]string{"priority_level": plName}, plConcurrency); err != nil {
+		if err := gaugeValueMatch("apiserver_flowcontrol_nominal_limit_seats", map[string]string{"priority_level": plName}, plConcurrency); err != nil {
 			t.Logf("polling retry - error: %s", err)
 			return false, nil
 		}

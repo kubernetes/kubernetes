@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
+	"k8s.io/utils/pointer"
 )
 
 func TestFlowSchemaValidation(t *testing.T) {
@@ -1019,6 +1021,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 					Type: flowcontrol.PriorityLevelEnablementLimited,
 					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 						NominalConcurrencyShares: 5,
+						LendablePercent:          pointer.Int32(0),
 						LimitResponse: flowcontrol.LimitResponse{
 							Type: flowcontrol.LimitResponseTypeReject,
 						}}},
@@ -1428,6 +1431,95 @@ func TestValidateLimitedPriorityLevelConfiguration(t *testing.T) {
 			specPath := field.NewPath("spec").Child("limited")
 
 			errGot := ValidateLimitedPriorityLevelConfiguration(configuration, test.requestVersion, specPath)
+			if !cmp.Equal(test.errExpected, errGot) {
+				t.Errorf("Expected error: %v, diff: %s", test.errExpected, cmp.Diff(test.errExpected, errGot))
+			}
+		})
+	}
+}
+
+func TestValidateLimitedPriorityLevelConfigurationWithBorrowing(t *testing.T) {
+	errLendablePercentFn := func(v int32) field.ErrorList {
+		return field.ErrorList{
+			field.Invalid(field.NewPath("spec").Child("limited").Child("lendablePercent"), v, "must be between 0 and 100, inclusive"),
+		}
+	}
+	errBorrowingLimitPercentFn := func(v int32) field.ErrorList {
+		return field.ErrorList{
+			field.Invalid(field.NewPath("spec").Child("limited").Child("borrowingLimitPercent"), v, "if specified, must be a non-negative integer"),
+		}
+	}
+
+	makeTestNameFn := func(lendablePercent *int32, borrowingLimitPercent *int32) string {
+		formatFn := func(v *int32) string {
+			if v == nil {
+				return "<nil>"
+			}
+			return fmt.Sprintf("%d", *v)
+		}
+		return fmt.Sprintf("lendablePercent %s, borrowingLimitPercent %s", formatFn(lendablePercent), formatFn(borrowingLimitPercent))
+	}
+
+	tests := []struct {
+		lendablePercent       *int32
+		borrowingLimitPercent *int32
+		errExpected           field.ErrorList
+	}{
+		{
+			lendablePercent: nil,
+			errExpected:     nil,
+		},
+		{
+			lendablePercent: pointer.Int32(0),
+			errExpected:     nil,
+		},
+		{
+			lendablePercent: pointer.Int32(100),
+			errExpected:     nil,
+		},
+		{
+			lendablePercent: pointer.Int32(101),
+			errExpected:     errLendablePercentFn(101),
+		},
+		{
+			lendablePercent: pointer.Int32(-1),
+			errExpected:     errLendablePercentFn(-1),
+		},
+		{
+			borrowingLimitPercent: nil,
+			errExpected:           nil,
+		},
+		{
+			borrowingLimitPercent: pointer.Int32(1),
+			errExpected:           nil,
+		},
+		{
+			borrowingLimitPercent: pointer.Int32(100),
+			errExpected:           nil,
+		},
+		{
+			borrowingLimitPercent: pointer.Int32(0),
+			errExpected:           nil,
+		},
+		{
+			borrowingLimitPercent: pointer.Int32(-1),
+			errExpected:           errBorrowingLimitPercentFn(-1),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(makeTestNameFn(test.lendablePercent, test.borrowingLimitPercent), func(t *testing.T) {
+			configuration := &flowcontrol.LimitedPriorityLevelConfiguration{
+				NominalConcurrencyShares: 1,
+				LimitResponse: flowcontrol.LimitResponse{
+					Type: flowcontrol.LimitResponseTypeReject,
+				},
+				LendablePercent:       test.lendablePercent,
+				BorrowingLimitPercent: test.borrowingLimitPercent,
+			}
+			specPath := field.NewPath("spec").Child("limited")
+
+			errGot := ValidateLimitedPriorityLevelConfiguration(configuration, flowcontrolv1beta3.SchemeGroupVersion, specPath)
 			if !cmp.Equal(test.errExpected, errGot) {
 				t.Errorf("Expected error: %v, diff: %s", test.errExpected, cmp.Diff(test.errExpected, errGot))
 			}
