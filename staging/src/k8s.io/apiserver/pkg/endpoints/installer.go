@@ -70,7 +70,7 @@ type action struct {
 }
 
 func ConvertGroupVersionIntoToDiscovery(list []metav1.APIResource) ([]apidiscoveryv2beta1.APIResourceDiscovery, error) {
-	var apiResourceList []apidiscoveryv2beta1.APIResourceDiscovery
+	var apiResourceList []*apidiscoveryv2beta1.APIResourceDiscovery
 	parentResources := map[string]*apidiscoveryv2beta1.APIResourceDiscovery{}
 
 	// Loop through all top-level resources
@@ -87,7 +87,7 @@ func ConvertGroupVersionIntoToDiscovery(list []metav1.APIResource) ([]apidiscove
 			scope = apidiscoveryv2beta1.ScopeCluster
 		}
 
-		apiResourceList = append(apiResourceList, apidiscoveryv2beta1.APIResourceDiscovery{
+		resource := &apidiscoveryv2beta1.APIResourceDiscovery{
 			Resource: r.Name,
 			Scope:    scope,
 			ResponseKind: &metav1.GroupVersionKind{
@@ -99,8 +99,9 @@ func ConvertGroupVersionIntoToDiscovery(list []metav1.APIResource) ([]apidiscove
 			ShortNames:       r.ShortNames,
 			Categories:       r.Categories,
 			SingularResource: r.SingularName,
-		})
-		parentResources[r.Name] = &apiResourceList[len(apiResourceList)-1]
+		}
+		apiResourceList = append(apiResourceList, resource)
+		parentResources[r.Name] = resource
 	}
 
 	// Loop through all subresources
@@ -126,12 +127,11 @@ func ConvertGroupVersionIntoToDiscovery(list []metav1.APIResource) ([]apidiscove
 		parent, exists = parentResources[split[0]]
 		if !exists {
 			// If a subresource exists without a parent, create a parent
-			apiResourceList = append(apiResourceList, apidiscoveryv2beta1.APIResourceDiscovery{
+			parent = &apidiscoveryv2beta1.APIResourceDiscovery{
 				Resource: split[0],
 				Scope:    scope,
-			})
-			parentResources[split[0]] = &apiResourceList[len(apiResourceList)-1]
-			parent = &apiResourceList[len(apiResourceList)-1]
+			}
+			apiResourceList = append(apiResourceList, parent)
 			parentResources[split[0]] = parent
 		}
 
@@ -152,9 +152,13 @@ func ConvertGroupVersionIntoToDiscovery(list []metav1.APIResource) ([]apidiscove
 			}
 		}
 		parent.Subresources = append(parent.Subresources, subresource)
-
 	}
-	return apiResourceList, nil
+
+	returnResourceList := make([]apidiscoveryv2beta1.APIResourceDiscovery, len(apiResourceList))
+	for i, v := range apiResourceList {
+		returnResourceList[i] = *v
+	}
+	return returnResourceList, nil
 }
 
 // An interface to see if one storage supports override its default verb for monitoring
