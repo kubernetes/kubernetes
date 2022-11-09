@@ -42,6 +42,13 @@ var (
 	//
 	// Enables the vSphere CSI migration for the Attach/Detach controller (ADC) only.
 	ADCCSIMigrationVSphere featuregate.Feature = "ADC_CSIMigrationVSphere"
+
+	// owner: @dobsonj
+	// beta: v1.25
+	//
+	// Enables the CSI Inline Volume admission plugin for OCP
+	// Tech preview in OCP 4.12 and can be removed when the plugin is GA
+	CSIInlineVolumeAdmission featuregate.Feature = "CSIInlineVolumeAdmission"
 )
 
 var ocpDefaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -51,6 +58,7 @@ var ocpDefaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.Featu
 	ADCCSIMigrationCinder:    {Default: true, PreRelease: featuregate.Beta},
 	ADCCSIMigrationGCEPD:     {Default: true, PreRelease: featuregate.Beta},
 	ADCCSIMigrationVSphere:   {Default: true, PreRelease: featuregate.Beta},
+	CSIInlineVolumeAdmission: {Default: false, PreRelease: featuregate.Beta},
 }
 
 func init() {
