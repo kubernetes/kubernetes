@@ -656,6 +656,10 @@ func getAttachmentName(volName, csiDriverName, nodeName string) string {
 }
 
 func makeDeviceMountPath(plugin *csiPlugin, spec *volume.Spec) (string, error) {
+	if plugin == nil {
+		return "", errors.New("makeDeviceMountPath failed, plugin is nil")
+	}
+
 	if spec == nil {
 		return "", errors.New("makeDeviceMountPath failed, spec is nil")
 	}
