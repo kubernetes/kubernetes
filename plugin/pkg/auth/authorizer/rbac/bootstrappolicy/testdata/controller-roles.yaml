@@ -905,6 +905,7 @@ items:
     resources:
     - pods/status
     verbs:
+    - patch
     - update
   - apiGroups:
     - ""
@@ -937,12 +938,6 @@ items:
     - pods
     verbs:
     - get
-  - apiGroups:
-    - ""
-    resources:
-    - pods/status
-    verbs:
-    - patch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
