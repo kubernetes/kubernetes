@@ -73,7 +73,7 @@ func TestStatus(t *testing.T) {
 			status:            NewStatus(Skip, ""),
 			expectedCode:      Skip,
 			expectedMessage:   "",
-			expectedIsSuccess: false,
+			expectedIsSuccess: true,
 			expectedIsWait:    false,
 			expectedIsSkip:    true,
 			expectedAsError:   nil,

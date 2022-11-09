@@ -203,9 +203,9 @@ func (s *Status) AppendReason(reason string) {
 	s.reasons = append(s.reasons, reason)
 }
 
-// IsSuccess returns true if and only if "Status" is nil or Code is "Success".
+// IsSuccess returns true if and only if "Status" is nil or Code is "Success" or "Skip".
 func (s *Status) IsSuccess() bool {
-	return s.Code() == Success
+	return s.Code() == Success || s.Code() == Skip
 }
 
 // IsWait returns true if and only if "Status" is non-nil and its Code is "Wait".

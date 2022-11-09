@@ -395,6 +395,9 @@ func (bp *BindPlugin) Bind(ctx context.Context, state *framework.CycleState, p *
 	if bp.pluginInvokeEventChan != nil {
 		bp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: bp.Name(), val: bp.numBindCalled}
 	}
+	if bp.bindStatus.IsSkip() {
+		return bp.bindStatus
+	}
 	if bp.bindStatus.IsSuccess() {
 		if err := bp.client.CoreV1().Pods(p.Namespace).Bind(context.TODO(), &v1.Binding{
 			ObjectMeta: metav1.ObjectMeta{Namespace: p.Namespace, Name: p.Name, UID: p.UID, Annotations: map[string]string{bindPluginAnnotation: bp.Name()}},

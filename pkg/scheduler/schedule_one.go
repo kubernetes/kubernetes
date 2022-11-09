@@ -109,7 +109,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		defer metrics.Goroutines.WithLabelValues(metrics.Binding).Dec()
 
 		status := sched.bindingCycle(bindingCycleCtx, state, fwk, scheduleResult, assumedPodInfo, start, podsToActivate)
-		if !status.IsSuccess() {
+		if !status.IsSuccess() || status.IsSkip() {
 			sched.handleBindingCycleError(bindingCycleCtx, state, fwk, assumedPodInfo, start, scheduleResult, status)
 		}
 	}()
@@ -244,7 +244,7 @@ func (sched *Scheduler) bindingCycle(
 	}
 
 	// Run "bind" plugins.
-	if status := sched.bind(ctx, fwk, assumedPod, scheduleResult.SuggestedHost, state); !status.IsSuccess() {
+	if status := sched.bind(ctx, fwk, assumedPod, scheduleResult.SuggestedHost, state); !status.IsSuccess() || status.IsSkip() {
 		return status
 	}
 
