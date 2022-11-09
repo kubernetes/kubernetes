@@ -50,6 +50,15 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 					WhenDeleted: policies[choice&1],
 					WhenScaled:  policies[(choice>>1)&1],
 				}
+			} else {
+				// Defaulting will set empty policy fields, so they are
+				//proactively set here to avoid changes during conversion.
+				if len(s.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted) == 0 {
+					s.Spec.PersistentVolumeClaimRetentionPolicy.WhenDeleted = apps.RetainPersistentVolumeClaimRetentionPolicyType
+				}
+				if len(s.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled) == 0 {
+					s.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled = apps.RetainPersistentVolumeClaimRetentionPolicyType
+				}
 			}
 			if s.Spec.RevisionHistoryLimit == nil {
 				s.Spec.RevisionHistoryLimit = new(int32)
