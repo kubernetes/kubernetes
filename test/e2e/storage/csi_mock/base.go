@@ -664,6 +664,11 @@ func startPausePodWithSELinuxOptions(cs clientset.Interface, pvc *v1.PersistentV
 			},
 		},
 	}
+	if node.Name != "" {
+		// Force schedule the pod to skip scheduler RWOP checks
+		framework.Logf("Forcing node name %s", node.Name)
+		pod.Spec.NodeName = node.Name
+	}
 	e2epod.SetNodeSelection(&pod.Spec, node)
 	return cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 }
@@ -821,11 +826,12 @@ func compareCSICalls(ctx context.Context, trackedCalls []string, expectedCallSeq
 
 // createSELinuxMountPreHook creates a hook that records the mountOptions passed in
 // through NodeStageVolume and NodePublishVolume calls.
-func createSELinuxMountPreHook(nodeStageMountOpts, nodePublishMountOpts *[]string) *drivers.Hooks {
+func createSELinuxMountPreHook(nodeStageMountOpts, nodePublishMountOpts *[]string, stageCalls, unstageCalls, publishCalls, unpublishCalls *atomic.Int32) *drivers.Hooks {
 	return &drivers.Hooks{
 		Pre: func(ctx context.Context, fullMethod string, request interface{}) (reply interface{}, err error) {
 			nodeStageRequest, ok := request.(*csipbv1.NodeStageVolumeRequest)
 			if ok {
+				stageCalls.Add(1)
 				mountVolume := nodeStageRequest.GetVolumeCapability().GetMount()
 				if mountVolume != nil {
 					*nodeStageMountOpts = mountVolume.MountFlags
@@ -833,10 +839,19 @@ func createSELinuxMountPreHook(nodeStageMountOpts, nodePublishMountOpts *[]strin
 			}
 			nodePublishRequest, ok := request.(*csipbv1.NodePublishVolumeRequest)
 			if ok {
+				publishCalls.Add(1)
 				mountVolume := nodePublishRequest.GetVolumeCapability().GetMount()
 				if mountVolume != nil {
 					*nodePublishMountOpts = mountVolume.MountFlags
 				}
+			}
+			_, ok = request.(*csipbv1.NodeUnstageVolumeRequest)
+			if ok {
+				unstageCalls.Add(1)
+			}
+			_, ok = request.(*csipbv1.NodeUnpublishVolumeRequest)
+			if ok {
+				unpublishCalls.Add(1)
 			}
 			return nil, nil
 		},
