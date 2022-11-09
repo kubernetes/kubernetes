@@ -1758,6 +1758,9 @@
     "persistentVolumeClaimRetentionPolicy": {
       "whenDeleted": "whenDeletedValue",
       "whenScaled": "whenScaledValue"
+    },
+    "ordinals": {
+      "start": 1
     }
   },
   "status": {

@@ -1044,6 +1044,18 @@
           }
         ]
       },
+      "io.k8s.api.apps.v1.StatefulSetOrdinals": {
+        "description": "StatefulSetOrdinals describes the policy used for replica ordinal assignment in this StatefulSet.",
+        "properties": {
+          "start": {
+            "default": 0,
+            "description": "start is the number representing the first replica's index. It may be used to number replicas from an alternate index (eg: 1-indexed) over the default 0-indexed names, or to orchestrate progressive movement of replicas from one StatefulSet to another. If set, replica indices will be in the range:\n  [.spec.ordinals.start, .spec.ordinals.start + .spec.replicas).\nIf unset, defaults to 0. Replica indices will be in the range:\n  [0, .spec.replicas).",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "io.k8s.api.apps.v1.StatefulSetPersistentVolumeClaimRetentionPolicy": {
         "description": "StatefulSetPersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from the StatefulSet VolumeClaimTemplates.",
         "properties": {
@@ -1065,6 +1077,14 @@
             "description": "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
             "format": "int32",
             "type": "integer"
+          },
+          "ordinals": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.apps.v1.StatefulSetOrdinals"
+              }
+            ],
+            "description": "ordinals controls the numbering of replica indices in a StatefulSet. The default ordinals behavior assigns a \"0\" index to the first replica and increments the index by one for each additional replica requested. Using the ordinals field requires the StatefulSetStartOrdinal feature gate to be enabled, which is alpha."
           },
           "persistentVolumeClaimRetentionPolicy": {
             "allOf": [
@@ -1108,7 +1128,7 @@
               }
             ],
             "default": {},
-            "description": "template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the StatefulSet will fulfill this Template, but have a unique identity from the rest of the StatefulSet."
+            "description": "template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the StatefulSet will fulfill this Template, but have a unique identity from the rest of the StatefulSet. Each pod will be named with the format <statefulsetname>-<podindex>. For example, a pod in a StatefulSet named \"web\" with index number \"3\" would be named \"web-3\"."
           },
           "updateStrategy": {
             "allOf": [
