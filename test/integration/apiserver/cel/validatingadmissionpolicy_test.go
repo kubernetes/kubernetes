@@ -672,6 +672,154 @@ func Test_ValidatingAdmissionPolicy_UpdateParamKind(t *testing.T) {
 	}
 }
 
+// Test_ValidatingAdmissionPolicy_UpdateParamRef validates the behavior of ValidatingAdmissionPolicy when
+// only the ParamRef in the binding is updated. This test creates a policy where namespaces must have a prefix that matches
+// the ParamRef set in the policy binding. The paramRef in the binding is then updated to a different object.
+func Test_ValidatingAdmissionPolicy_UpdateParamRef(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CELValidatingAdmission, true)()
+	server, err := apiservertesting.StartTestServer(t, nil, []string{
+		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+	}, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+
+	config := server.ClientConfig
+
+	client, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	allowedPrefixesParamsConfigMap1 := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-1",
+			Namespace: "default",
+		},
+	}
+	if _, err := client.CoreV1().ConfigMaps("default").Create(context.TODO(), allowedPrefixesParamsConfigMap1, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	allowedPrefixesParamsConfigMap2 := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-2",
+			Namespace: "default",
+		},
+	}
+	if _, err := client.CoreV1().ConfigMaps("default").Create(context.TODO(), allowedPrefixesParamsConfigMap2, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	policy := withValidations([]admissionregistrationv1alpha1.Validation{
+		{
+			Expression: "object.metadata.name.startsWith(params.metadata.name)",
+			Message:    "wrong paramRef",
+		},
+	}, withParams(configParamKind(), withNamespaceMatch(withFailurePolicy(admissionregistrationv1alpha1.Fail, makePolicy("allowed-prefixes")))))
+	policy = withWaitReadyConstraintAndExpression(policy)
+	_, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// validate that namespaces starting with "test-1" are allowed
+	// and namespaces starting with "test-2-" are disallowed
+	allowedPrefixesBinding := makeBinding("allowed-prefixes-binding", "allowed-prefixes", "test-1")
+	if err := createAndWaitReady(t, client, allowedPrefixesBinding, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+		disallowedNamespace := &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-2-",
+			},
+		}
+
+		_, err = client.CoreV1().Namespaces().Create(context.TODO(), disallowedNamespace, metav1.CreateOptions{})
+		if err == nil {
+			return false, nil
+		}
+
+		if strings.Contains(err.Error(), "not yet synced to use for admission") {
+			return false, nil
+		}
+
+		if !strings.Contains(err.Error(), "wrong paramRef") {
+			return false, err
+		}
+
+		return true, nil
+	}); waitErr != nil {
+		t.Errorf("timed out waiting: %v", err)
+	}
+
+	allowedNamespace := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "test-1-",
+		},
+	}
+	_, err = client.CoreV1().Namespaces().Create(context.TODO(), allowedNamespace, metav1.CreateOptions{})
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Update the paramRef in the policy binding to use the test-2 ConfigMap
+	policyBinding, err := client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicyBindings().Get(context.TODO(), allowedPrefixesBinding.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policyBindingCopy := policyBinding.DeepCopy()
+	policyBindingCopy.Spec.ParamRef = &admissionregistrationv1alpha1.ParamRef{
+		Name:      "test-2",
+		Namespace: "default",
+	}
+	_, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicyBindings().Update(context.TODO(), policyBindingCopy, metav1.UpdateOptions{})
+	if err != nil {
+		t.Error(err)
+	}
+
+	// validate that namespaces starting with "test-2" are allowed
+	// and namespaces starting with "test-1" are disallowed
+	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+		disallowedNamespace := &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-1-",
+			},
+		}
+
+		_, err = client.CoreV1().Namespaces().Create(context.TODO(), disallowedNamespace, metav1.CreateOptions{})
+		if err == nil {
+			return false, nil
+		}
+
+		if strings.Contains(err.Error(), "not yet synced to use for admission") {
+			return false, nil
+		}
+
+		if !strings.Contains(err.Error(), "wrong paramRef") {
+			return false, err
+		}
+
+		return true, nil
+	}); waitErr != nil {
+		t.Errorf("timed out waiting: %v", err)
+	}
+
+	allowedNamespace = &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "test-2-",
+		},
+	}
+	_, err = client.CoreV1().Namespaces().Create(context.TODO(), allowedNamespace, metav1.CreateOptions{})
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func withWaitReadyConstraintAndExpression(policy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy) *admissionregistrationv1alpha1.ValidatingAdmissionPolicy {
 	policy = policy.DeepCopy()
 	policy.Spec.MatchConstraints.ResourceRules = append(policy.Spec.MatchConstraints.ResourceRules, admissionregistrationv1alpha1.NamedRuleWithOperations{
