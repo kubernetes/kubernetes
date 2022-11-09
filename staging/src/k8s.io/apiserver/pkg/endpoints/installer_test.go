@@ -206,6 +206,87 @@ func TestConvertAPIResourceToDiscovery(t *testing.T) {
 			},
 		},
 		{
+			name: "Test multiple resources and subresources",
+			resources: []metav1.APIResource{
+				{
+					Name:       "cronjobs",
+					Namespaced: true,
+					Kind:       "CronJob",
+					Group:      "batch",
+					Version:    "v1",
+					ShortNames: []string{"cj"},
+					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				},
+				{
+					Name:       "cronjobs/status",
+					Namespaced: true,
+					Kind:       "CronJob",
+					Group:      "batch",
+					Version:    "v1",
+					ShortNames: []string{"cj"},
+					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				},
+				{
+					Name:       "deployments",
+					Namespaced: true,
+					Kind:       "Deployment",
+					Group:      "apps",
+					Version:    "v1",
+					ShortNames: []string{"deploy"},
+					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				},
+				{
+					Name:       "deployments/status",
+					Namespaced: true,
+					Kind:       "Deployment",
+					Group:      "apps",
+					Version:    "v1",
+					ShortNames: []string{"deploy"},
+					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+				},
+			},
+			wantAPIResourceDiscovery: []apidiscoveryv2beta1.APIResourceDiscovery{
+				{
+					Resource: "cronjobs",
+					Scope:    apidiscoveryv2beta1.ScopeNamespace,
+					ResponseKind: &metav1.GroupVersionKind{
+						Group:   "batch",
+						Version: "v1",
+						Kind:    "CronJob",
+					},
+					ShortNames: []string{"cj"},
+					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+					Subresources: []apidiscoveryv2beta1.APISubresourceDiscovery{{
+						Subresource: "status",
+						ResponseKind: &metav1.GroupVersionKind{
+							Group:   "batch",
+							Version: "v1",
+							Kind:    "CronJob",
+						},
+						Verbs: []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+					}},
+				}, {
+					Resource: "deployments",
+					Scope:    apidiscoveryv2beta1.ScopeNamespace,
+					ResponseKind: &metav1.GroupVersionKind{
+						Group:   "apps",
+						Version: "v1",
+						Kind:    "Deployment",
+					},
+					ShortNames: []string{"deploy"},
+					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+					Subresources: []apidiscoveryv2beta1.APISubresourceDiscovery{{
+						Subresource: "status",
+						ResponseKind: &metav1.GroupVersionKind{
+							Group:   "apps",
+							Version: "v1",
+							Kind:    "Deployment",
+						},
+						Verbs: []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
+					}},
+				},
+			},
+		}, {
 			name: "Test with subresource with no parent",
 			resources: []metav1.APIResource{
 				{
