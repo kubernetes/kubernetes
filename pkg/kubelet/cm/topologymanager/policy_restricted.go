@@ -26,13 +26,8 @@ var _ Policy = &restrictedPolicy{}
 const PolicyRestricted string = "restricted"
 
 // NewRestrictedPolicy returns restricted policy.
-func NewRestrictedPolicy(numaInfo *NUMAInfo, topologyPolicyOptions map[string]string) (Policy, error) {
-	opts, err := NewPolicyOptions(topologyPolicyOptions)
-	if err != nil {
-		return nil, err
-	}
-
-	return &restrictedPolicy{bestEffortPolicy{numaInfo: numaInfo, opts: opts}}, nil
+func NewRestrictedPolicy(numaInfo *NUMAInfo, opts PolicyOptions) Policy {
+	return &restrictedPolicy{bestEffortPolicy{numaInfo: numaInfo, opts: opts}}
 }
 
 func (p *restrictedPolicy) Name() string {

@@ -162,7 +162,7 @@ func TestValidateStaticPolicyOptions(t *testing.T) {
 		t.Run(testCase.description, func(t *testing.T) {
 			topoMgrPolicy := topologymanager.NewNonePolicy()
 			if testCase.topoMgrPolicy == topologymanager.PolicySingleNumaNode {
-				topoMgrPolicy, _ = topologymanager.NewSingleNumaNodePolicy(&topologymanager.NUMAInfo{}, map[string]string{})
+				topoMgrPolicy = topologymanager.NewSingleNumaNodePolicy(&topologymanager.NUMAInfo{}, topologymanager.PolicyOptions{})
 
 			}
 			topoMgrStore := topologymanager.NewFakeManagerWithPolicy(topoMgrPolicy)

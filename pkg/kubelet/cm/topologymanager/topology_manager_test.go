@@ -206,15 +206,15 @@ func TestAdmit(t *testing.T) {
 	numaInfo := &NUMAInfo{
 		Nodes: []int{0, 1},
 		NUMADistances: NUMADistances{
-			{10, 11},
-			{11, 10},
+			0: {10, 11},
+			1: {11, 10},
 		},
 	}
 
-	opts := map[string]string{}
-	bePolicy, _ := NewBestEffortPolicy(numaInfo, opts)
-	restrictedPolicy, _ := NewRestrictedPolicy(numaInfo, opts)
-	singleNumaPolicy, _ := NewSingleNumaNodePolicy(numaInfo, opts)
+	opts := PolicyOptions{}
+	bePolicy := NewBestEffortPolicy(numaInfo, opts)
+	restrictedPolicy := NewRestrictedPolicy(numaInfo, opts)
+	singleNumaPolicy := NewSingleNumaNodePolicy(numaInfo, opts)
 
 	tcases := []struct {
 		name     string

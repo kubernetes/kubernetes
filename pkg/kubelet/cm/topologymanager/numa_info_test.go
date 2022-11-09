@@ -17,12 +17,8 @@ limitations under the License.
 package topologymanager
 
 import (
-	"bytes"
 	"fmt"
-	"os"
-	"path/filepath"
 	"reflect"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -36,6 +32,7 @@ func TestNUMAInfo(t *testing.T) {
 		topology         []cadvisorapi.Node
 		expectedNUMAInfo *NUMAInfo
 		expectedErr      error
+		opts             PolicyOptions
 	}{
 		{
 			name: "positive test 1 node",
@@ -47,13 +44,37 @@ func TestNUMAInfo(t *testing.T) {
 			expectedNUMAInfo: &NUMAInfo{
 				Nodes: []int{0},
 				NUMADistances: NUMADistances{
-					{
+					0: nil,
+				},
+			},
+			opts: PolicyOptions{},
+		},
+		{
+			name: "positive test 1 node, with PreferClosestNUMA",
+			topology: []cadvisorapi.Node{
+				{
+					Id: 0,
+					Distances: []uint64{
 						10,
 						11,
 						12,
 						12,
 					},
 				},
+			},
+			expectedNUMAInfo: &NUMAInfo{
+				Nodes: []int{0},
+				NUMADistances: NUMADistances{
+					0: {
+						10,
+						11,
+						12,
+						12,
+					},
+				},
+			},
+			opts: PolicyOptions{
+				PreferClosestNUMA: true,
 			},
 		},
 		{
@@ -69,19 +90,52 @@ func TestNUMAInfo(t *testing.T) {
 			expectedNUMAInfo: &NUMAInfo{
 				Nodes: []int{0, 1},
 				NUMADistances: NUMADistances{
-					{
+					0: nil,
+					1: nil,
+				},
+			},
+		},
+		{
+			name: "positive test 2 nodes, with PreferClosestNUMA",
+			topology: []cadvisorapi.Node{
+				{
+					Id: 0,
+					Distances: []uint64{
 						10,
 						11,
 						12,
 						12,
 					},
-					{
+				},
+				{
+					Id: 1,
+					Distances: []uint64{
 						11,
 						10,
 						12,
 						12,
 					},
 				},
+			},
+			expectedNUMAInfo: &NUMAInfo{
+				Nodes: []int{0, 1},
+				NUMADistances: NUMADistances{
+					0: {
+						10,
+						11,
+						12,
+						12,
+					},
+					1: {
+						11,
+						10,
+						12,
+						12,
+					},
+				},
+			},
+			opts: PolicyOptions{
+				PreferClosestNUMA: true,
 			},
 		},
 		{
@@ -100,25 +154,68 @@ func TestNUMAInfo(t *testing.T) {
 			expectedNUMAInfo: &NUMAInfo{
 				Nodes: []int{0, 1, 2},
 				NUMADistances: NUMADistances{
-					{
+					0: nil,
+					1: nil,
+					2: nil,
+				},
+			},
+		},
+		{
+			name: "positive test 3 nodes, with PreferClosestNUMA",
+			topology: []cadvisorapi.Node{
+				{
+					Id: 0,
+					Distances: []uint64{
 						10,
 						11,
 						12,
 						12,
 					},
-					{
+				},
+				{
+					Id: 1,
+					Distances: []uint64{
 						11,
 						10,
 						12,
 						12,
 					},
-					{
+				},
+				{
+					Id: 2,
+					Distances: []uint64{
 						12,
 						12,
 						10,
 						11,
 					},
 				},
+			},
+			expectedNUMAInfo: &NUMAInfo{
+				Nodes: []int{0, 1, 2},
+				NUMADistances: NUMADistances{
+					0: {
+						10,
+						11,
+						12,
+						12,
+					},
+					1: {
+						11,
+						10,
+						12,
+						12,
+					},
+					2: {
+						12,
+						12,
+						10,
+						11,
+					},
+				},
+			},
+			opts: PolicyOptions{
+				PreferClosestNUMA: true,
 			},
 		},
 		{
@@ -140,25 +237,46 @@ func TestNUMAInfo(t *testing.T) {
 			expectedNUMAInfo: &NUMAInfo{
 				Nodes: []int{0, 1, 2, 3},
 				NUMADistances: NUMADistances{
-					{
+					0: nil,
+					1: nil,
+					2: nil,
+					3: nil,
+				},
+			},
+		},
+		{
+			name: "positive test 4 nodes, with PreferClosestNUMA",
+			topology: []cadvisorapi.Node{
+				{
+					Id: 0,
+					Distances: []uint64{
 						10,
 						11,
 						12,
 						12,
 					},
-					{
+				},
+				{
+					Id: 1,
+					Distances: []uint64{
 						11,
 						10,
 						12,
 						12,
 					},
-					{
+				},
+				{
+					Id: 2,
+					Distances: []uint64{
 						12,
 						12,
 						10,
 						11,
 					},
-					{
+				},
+				{
+					Id: 3,
+					Distances: []uint64{
 						12,
 						12,
 						11,
@@ -166,50 +284,171 @@ func TestNUMAInfo(t *testing.T) {
 					},
 				},
 			},
+			expectedNUMAInfo: &NUMAInfo{
+				Nodes: []int{0, 1, 2, 3},
+				NUMADistances: NUMADistances{
+					0: {
+						10,
+						11,
+						12,
+						12,
+					},
+					1: {
+						11,
+						10,
+						12,
+						12,
+					},
+					2: {
+						12,
+						12,
+						10,
+						11,
+					},
+					3: {
+						12,
+						12,
+						11,
+						10,
+					},
+				},
+			},
+			opts: PolicyOptions{
+				PreferClosestNUMA: true,
+			},
 		},
 		{
-			name: "negative test 1 node",
+			name: "negative test 1 node, no distance file with PreferClosestNUMA",
 			topology: []cadvisorapi.Node{
 				{
 					Id: 9,
 				},
 			},
 			expectedNUMAInfo: nil,
-			expectedErr:      fmt.Errorf("no such file or directory"),
+			expectedErr:      fmt.Errorf("error getting NUMA distances from cadvisor"),
+			opts: PolicyOptions{
+				PreferClosestNUMA: true,
+			},
+		},
+		{
+			name: "one node and its id is 1",
+			topology: []cadvisorapi.Node{
+				{
+					Id: 1,
+				},
+			},
+			expectedNUMAInfo: &NUMAInfo{
+				Nodes: []int{1},
+				NUMADistances: NUMADistances{
+					1: nil,
+				},
+			},
+		},
+		{
+			name: "one node and its id is 1, with PreferClosestNUMA",
+			topology: []cadvisorapi.Node{
+				{
+					Id: 1,
+					Distances: []uint64{
+						11,
+						10,
+						12,
+						12,
+					},
+				},
+			},
+			expectedNUMAInfo: &NUMAInfo{
+				Nodes: []int{1},
+				NUMADistances: NUMADistances{
+					1: {
+						11,
+						10,
+						12,
+						12,
+					},
+				},
+			},
+			opts: PolicyOptions{
+				PreferClosestNUMA: true,
+			},
+		},
+		{
+			name: "two nodes not sequential",
+			topology: []cadvisorapi.Node{
+				{
+					Id: 0,
+					Distances: []uint64{
+						10,
+						11,
+						12,
+						12,
+					},
+				},
+				{
+					Id: 2,
+					Distances: []uint64{
+						12,
+						12,
+						10,
+						11,
+					},
+				},
+			},
+			expectedNUMAInfo: &NUMAInfo{
+				Nodes: []int{0, 2},
+				NUMADistances: NUMADistances{
+					0: nil,
+					2: nil,
+				},
+			},
+		},
+		{
+			name: "two nodes not sequential, with PreferClosestNUMA",
+			topology: []cadvisorapi.Node{
+				{
+					Id: 0,
+					Distances: []uint64{
+						10,
+						11,
+						12,
+						12,
+					},
+				},
+				{
+					Id: 2,
+					Distances: []uint64{
+						12,
+						12,
+						10,
+						11,
+					},
+				},
+			},
+			expectedNUMAInfo: &NUMAInfo{
+				Nodes: []int{0, 2},
+				NUMADistances: NUMADistances{
+					0: {
+						10,
+						11,
+						12,
+						12,
+					},
+					2: {
+						12,
+						12,
+						10,
+						11,
+					},
+				},
+			},
+			opts: PolicyOptions{
+				PreferClosestNUMA: true,
+			},
 		},
 	}
 
-	nodeDir, err := os.MkdirTemp("", "TestNUMAInfo")
-	if err != nil {
-		t.Fatalf("Unable to create temporary directory: %v", err)
-	}
-	defer os.RemoveAll(nodeDir)
-
-	numaDistances := map[int]string{
-		0: "10 11 12 12",
-		1: "11 10 12 12",
-		2: "12 12 10 11",
-		3: "12 12 11 10",
-	}
-
-	for i, distances := range numaDistances {
-		numaDir := filepath.Join(nodeDir, fmt.Sprintf("node%d", i))
-		if err := os.Mkdir(numaDir, 0700); err != nil {
-			t.Fatalf("Unable to create numaDir %s: %v", numaDir, err)
-		}
-
-		distanceFile := filepath.Join(numaDir, "distance")
-
-		if err = os.WriteFile(distanceFile, []byte(distances), 0644); err != nil {
-			t.Fatalf("Unable to create test distanceFile: %v", err)
-		}
-	}
-
-	// stub sysFs to read from temp dir
-	sysFs := &NUMASysFs{nodeDir: nodeDir}
-
 	for _, tcase := range tcases {
-		topology, err := newNUMAInfo(tcase.topology, sysFs)
+		topology, err := NewNUMAInfo(tcase.topology, tcase.opts)
 		if tcase.expectedErr == nil && err != nil {
 			t.Fatalf("Expected err to equal nil, not %v", err)
 		} else if tcase.expectedErr != nil && err == nil {
@@ -231,7 +470,7 @@ func TestCalculateAvgDistanceFor(t *testing.T) {
 	tcases := []struct {
 		name        string
 		bm          []int
-		distance    [][]uint64
+		distance    NUMADistances
 		expectedAvg float64
 	}{
 		{
@@ -239,8 +478,8 @@ func TestCalculateAvgDistanceFor(t *testing.T) {
 			bm: []int{
 				0,
 			},
-			distance: [][]uint64{
-				{
+			distance: NUMADistances{
+				0: {
 					10,
 				},
 			},
@@ -251,12 +490,12 @@ func TestCalculateAvgDistanceFor(t *testing.T) {
 			bm: []int{
 				0,
 			},
-			distance: [][]uint64{
-				{
+			distance: NUMADistances{
+				0: {
 					10,
 					11,
 				},
-				{
+				1: {
 					11,
 					10,
 				},
@@ -269,12 +508,12 @@ func TestCalculateAvgDistanceFor(t *testing.T) {
 				0,
 				1,
 			},
-			distance: [][]uint64{
-				{
+			distance: NUMADistances{
+				0: {
 					10,
 					11,
 				},
-				{
+				1: {
 					11,
 					10,
 				},
@@ -287,26 +526,26 @@ func TestCalculateAvgDistanceFor(t *testing.T) {
 				0,
 				2,
 			},
-			distance: [][]uint64{
-				{
+			distance: NUMADistances{
+				0: {
 					10,
 					11,
 					12,
 					12,
 				},
-				{
+				1: {
 					11,
 					10,
 					12,
 					12,
 				},
-				{
+				2: {
 					12,
 					12,
 					10,
 					11,
 				},
-				{
+				3: {
 					12,
 					12,
 					11,
@@ -322,26 +561,26 @@ func TestCalculateAvgDistanceFor(t *testing.T) {
 				2,
 				3,
 			},
-			distance: [][]uint64{
-				{
+			distance: NUMADistances{
+				0: {
 					10,
 					11,
 					12,
 					12,
 				},
-				{
+				1: {
 					11,
 					10,
 					12,
 					12,
 				},
-				{
+				2: {
 					12,
 					12,
 					10,
 					11,
 				},
-				{
+				3: {
 					12,
 					12,
 					11,
@@ -353,7 +592,7 @@ func TestCalculateAvgDistanceFor(t *testing.T) {
 		{
 			name:        "0 NUMA node, 0 set in bitmask",
 			bm:          []int{},
-			distance:    [][]uint64{},
+			distance:    NUMADistances{},
 			expectedAvg: 0,
 		},
 	}
@@ -377,123 +616,6 @@ func TestCalculateAvgDistanceFor(t *testing.T) {
 
 }
 
-func TestGetDistances(t *testing.T) {
-	testCases := []struct {
-		name              string
-		expectedErr       bool
-		expectedDistances []uint64
-		nodeId            int
-		nodeExists        bool
-	}{
-		{
-			name:              "reading proper distance file",
-			expectedErr:       false,
-			expectedDistances: []uint64{10, 11, 12, 13},
-			nodeId:            0,
-			nodeExists:        true,
-		},
-		{
-			name:              "no distance file",
-			expectedErr:       true,
-			expectedDistances: nil,
-			nodeId:            99,
-		},
-	}
-
-	for _, tcase := range testCases {
-		t.Run(tcase.name, func(t *testing.T) {
-			var err error
-
-			nodeDir, err := os.MkdirTemp("", "TestGetDistances")
-			if err != nil {
-				t.Fatalf("Unable to create temporary directory: %v", err)
-			}
-
-			defer os.RemoveAll(nodeDir)
-
-			if tcase.nodeExists {
-				numaDir := filepath.Join(nodeDir, fmt.Sprintf("node%d", tcase.nodeId))
-				if err := os.Mkdir(numaDir, 0700); err != nil {
-					t.Fatalf("Unable to create numaDir %s: %v", numaDir, err)
-				}
-
-				distanceFile := filepath.Join(numaDir, "distance")
-
-				var buffer bytes.Buffer
-				for i, distance := range tcase.expectedDistances {
-					buffer.WriteString(strconv.Itoa(int(distance)))
-					if i != len(tcase.expectedDistances)-1 {
-						buffer.WriteString(" ")
-					}
-				}
-
-				if err = os.WriteFile(distanceFile, buffer.Bytes(), 0644); err != nil {
-					t.Fatalf("Unable to create test distanceFile: %v", err)
-				}
-			}
-
-			sysFs := &NUMASysFs{nodeDir: nodeDir}
-
-			distances, err := sysFs.GetDistances(tcase.nodeId)
-			if !tcase.expectedErr && err != nil {
-				t.Fatalf("Expected err to equal nil, not %v", err)
-			} else if tcase.expectedErr && err == nil {
-				t.Fatalf("Expected err to equal %v, not nil", tcase.expectedErr)
-			}
-
-			if !tcase.expectedErr && !reflect.DeepEqual(distances, tcase.expectedDistances) {
-				t.Fatalf("Expected distances to equal %v, not %v", tcase.expectedDistances, distances)
-			}
-		})
-	}
-}
-
-func TestSplitDistances(t *testing.T) {
-	tcases := []struct {
-		description  string
-		rawDistances string
-		expected     []uint64
-		expectedErr  error
-	}{
-		{
-			description:  "read one distance",
-			rawDistances: "10",
-			expected:     []uint64{10},
-			expectedErr:  nil,
-		},
-		{
-			description:  "read two distances",
-			rawDistances: "10 20",
-			expected:     []uint64{10, 20},
-			expectedErr:  nil,
-		},
-		{
-			description:  "can't convert negative number to uint64",
-			rawDistances: "10 -20",
-			expected:     nil,
-			expectedErr:  fmt.Errorf("cannot conver"),
-		},
-	}
-
-	for _, tc := range tcases {
-		result, err := splitDistances(tc.rawDistances)
-
-		if tc.expectedErr == nil && err != nil {
-			t.Fatalf("Expected err to equal nil, not %v", err)
-		} else if tc.expectedErr != nil && err == nil {
-			t.Fatalf("Expected err to equal %v, not nil", tc.expectedErr)
-		} else if tc.expectedErr != nil {
-			if !strings.Contains(err.Error(), tc.expectedErr.Error()) {
-				t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), tc.expectedErr.Error())
-			}
-		}
-
-		if !reflect.DeepEqual(tc.expected, result) {
-			t.Fatalf("Expected distances to equal: %v, got: %v", tc.expected, result)
-		}
-	}
-}
-
 func TestClosest(t *testing.T) {
 	tcases := []struct {
 		description string
@@ -515,10 +637,10 @@ func TestClosest(t *testing.T) {
 			candidate:   NewTestBitMask(0, 2),
 			expected:    "current",
 			numaInfo: &NUMAInfo{
-				NUMADistances: [][]uint64{
-					{10, 10, 10},
-					{10, 10, 10},
-					{10, 10, 10},
+				NUMADistances: NUMADistances{
+					0: {10, 10, 10},
+					1: {10, 10, 10},
+					2: {10, 10, 10},
 				},
 			},
 		},
@@ -528,11 +650,11 @@ func TestClosest(t *testing.T) {
 			candidate:   NewTestBitMask(0, 2),
 			expected:    "candidate",
 			numaInfo: &NUMAInfo{
-				NUMADistances: [][]uint64{
-					{10, 10, 10, 10},
-					{10, 10, 10, 10},
-					{10, 10, 10, 10},
-					{10, 10, 10, 10},
+				NUMADistances: NUMADistances{
+					0: {10, 10, 10, 10},
+					1: {10, 10, 10, 10},
+					2: {10, 10, 10, 10},
+					3: {10, 10, 10, 10},
 				},
 			},
 		},
@@ -542,11 +664,11 @@ func TestClosest(t *testing.T) {
 			candidate:   NewTestBitMask(0, 1),
 			expected:    "candidate",
 			numaInfo: &NUMAInfo{
-				NUMADistances: [][]uint64{
-					{10, 11, 12, 12},
-					{11, 10, 12, 12},
-					{12, 12, 10, 11},
-					{12, 12, 11, 10},
+				NUMADistances: NUMADistances{
+					0: {10, 11, 12, 12},
+					1: {11, 10, 12, 12},
+					2: {12, 12, 10, 11},
+					3: {12, 12, 11, 10},
 				},
 			},
 		},
@@ -556,11 +678,11 @@ func TestClosest(t *testing.T) {
 			candidate:   NewTestBitMask(0, 3),
 			expected:    "current",
 			numaInfo: &NUMAInfo{
-				NUMADistances: [][]uint64{
-					{10, 11, 12, 12},
-					{11, 10, 12, 12},
-					{12, 12, 10, 11},
-					{12, 12, 11, 10},
+				NUMADistances: NUMADistances{
+					0: {10, 11, 12, 12},
+					1: {11, 10, 12, 12},
+					2: {12, 12, 10, 11},
+					3: {12, 12, 11, 10},
 				},
 			},
 		},

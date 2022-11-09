@@ -18,46 +18,30 @@ package topologymanager
 
 import (
 	"fmt"
-	"io/ioutil"
-	"strconv"
-	"strings"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 )
 
-const (
-	defaultNodeDir = "/sys/devices/system/node/"
-)
-
-type NUMADistances [][]uint64
+type NUMADistances map[int][]uint64
 
 type NUMAInfo struct {
 	Nodes         []int
 	NUMADistances NUMADistances
 }
 
-type NUMASysFs struct {
-	nodeDir string
-}
-
-func NewNUMAInfo(topology []cadvisorapi.Node) (*NUMAInfo, error) {
-	return newNUMAInfo(topology, &NUMASysFs{nodeDir: defaultNodeDir})
-}
-
-func newNUMAInfo(topology []cadvisorapi.Node, sysFs *NUMASysFs) (*NUMAInfo, error) {
+func NewNUMAInfo(topology []cadvisorapi.Node, opts PolicyOptions) (*NUMAInfo, error) {
 	var numaNodes []int
-	distances := make([][]uint64, len(topology))
+	distances := map[int][]uint64{}
 	for _, node := range topology {
 		numaNodes = append(numaNodes, node.Id)
 
-		// Populate the NUMA distances
-		// For now we need to retrieve this information from sysfs.
-		// TODO: Update this as follows once a version of cadvisor with this commit is vendored in https://github.com/google/cadvisor/commit/24dd1de08a72cfee661f6178454db995900c0fee
-		//	distances[node.Id] = node.Distances[:]
-		nodeDistance, err := sysFs.GetDistances(node.Id)
-		if err != nil {
-			return nil, fmt.Errorf("error getting NUMA distances from sysfs: %w", err)
+		var nodeDistance []uint64
+		if opts.PreferClosestNUMA {
+			nodeDistance = node.Distances
+			if nodeDistance == nil {
+				return nil, fmt.Errorf("error getting NUMA distances from cadvisor")
+			}
 		}
 		distances[node.Id] = nodeDistance
 	}
@@ -122,29 +106,4 @@ func (d NUMADistances) CalculateAverageFor(bm bitmask.BitMask) float64 {
 	}
 
 	return sum / count
-}
-
-func (s NUMASysFs) GetDistances(nodeId int) ([]uint64, error) {
-	distancePath := fmt.Sprintf("%s/node%d/distance", s.nodeDir, nodeId)
-	distance, err := ioutil.ReadFile(distancePath)
-	if err != nil {
-		return nil, fmt.Errorf("problem reading %s: %w", distancePath, err)
-	}
-
-	rawDistances := strings.TrimSpace(string(distance))
-
-	return splitDistances(rawDistances)
-}
-
-func splitDistances(rawDistances string) ([]uint64, error) {
-	distances := []uint64{}
-	for _, distance := range strings.Split(rawDistances, " ") {
-		distanceUint, err := strconv.ParseUint(distance, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("cannot convert %s to int", distance)
-		}
-		distances = append(distances, distanceUint)
-	}
-
-	return distances, nil
 }

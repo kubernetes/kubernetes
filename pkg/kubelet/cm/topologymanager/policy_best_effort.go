@@ -28,13 +28,8 @@ var _ Policy = &bestEffortPolicy{}
 const PolicyBestEffort string = "best-effort"
 
 // NewBestEffortPolicy returns best-effort policy.
-func NewBestEffortPolicy(numaInfo *NUMAInfo, topologyPolicyOptions map[string]string) (Policy, error) {
-	opts, err := NewPolicyOptions(topologyPolicyOptions)
-	if err != nil {
-		return nil, err
-	}
-
-	return &bestEffortPolicy{numaInfo: numaInfo, opts: opts}, nil
+func NewBestEffortPolicy(numaInfo *NUMAInfo, opts PolicyOptions) Policy {
+	return &bestEffortPolicy{numaInfo: numaInfo, opts: opts}
 }
 
 func (p *bestEffortPolicy) Name() string {
