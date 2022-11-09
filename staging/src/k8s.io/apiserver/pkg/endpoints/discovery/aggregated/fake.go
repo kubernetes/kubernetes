@@ -121,6 +121,18 @@ func (f *recorderResourceManager) SetGroupPriority(groupName string, priority in
 	})
 }
 
+func (f *recorderResourceManager) SetGroupVersionPriority(gv metav1.GroupVersion, priority int) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	f.Actions = append(f.Actions, recorderResourceManagerAction{
+		Type:    "SetGroupVersionPriority",
+		Group:   gv.Group,
+		Version: gv.Version,
+		Value:   priority,
+	})
+}
+
 func (f *recorderResourceManager) AddGroupVersion(groupName string, value apidiscoveryv2beta1.APIVersionDiscovery) {
 	f.lock.Lock()
 	defer f.lock.Unlock()

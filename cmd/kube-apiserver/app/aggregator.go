@@ -138,6 +138,7 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 	if aggregatorConfig.GenericConfig.AggregatedDiscoveryGroupManager != nil {
 		for gv, entry := range apiVersionPriorities {
 			aggregatorConfig.GenericConfig.AggregatedDiscoveryGroupManager.SetGroupPriority(gv.Group, int(entry.group))
+			aggregatorConfig.GenericConfig.AggregatedDiscoveryGroupManager.SetGroupVersionPriority(metav1.GroupVersion(gv), int(entry.version))
 		}
 	}
 

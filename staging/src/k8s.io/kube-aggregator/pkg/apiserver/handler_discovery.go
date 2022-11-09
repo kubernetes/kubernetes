@@ -151,8 +151,11 @@ type groupVersionInfo struct {
 	// describes how to contact the server responsible for this GroupVersion.
 	service serviceKey
 
-	// groupPriority describes the priority of the APIService for sorting
+	// groupPriority describes the priority of the APIService's group for sorting
 	groupPriority int
+
+	// groupPriority describes the priority of the APIService version for sorting
+	versionPriority int
 
 	// Method for contacting the service
 	handler http.Handler
@@ -390,6 +393,8 @@ func (dm *discoveryManager) syncAPIService(apiServiceName string) error {
 	}
 
 	dm.mergedDiscoveryHandler.AddGroupVersion(gv.Group, entry)
+	dm.mergedDiscoveryHandler.SetGroupPriority(gv.Group, info.groupPriority)
+	dm.mergedDiscoveryHandler.SetGroupVersionPriority(metav1.GroupVersion(gv), info.versionPriority)
 	return nil
 }
 
@@ -458,6 +463,7 @@ func (dm *discoveryManager) AddAPIService(apiService *apiregistrationv1.APIServi
 	// Add or update APIService record and mark it as dirty
 	dm.setInfoForAPIService(apiService.Name, &groupVersionInfo{
 		groupPriority:   int(apiService.Spec.GroupPriorityMinimum),
+		versionPriority: int(apiService.Spec.VersionPriority),
 		handler:         handler,
 		lastMarkedDirty: time.Now(),
 		service:         newServiceKey(*apiService.Spec.Service),

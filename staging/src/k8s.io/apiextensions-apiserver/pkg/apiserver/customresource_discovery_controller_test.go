@@ -341,6 +341,9 @@ func TestMultipleCRDSameVersion(t *testing.T) {
 	env.FakeResourceManager.Expect().
 		AddGroupVersion(coolFooCRD.Spec.Group, coolFooDiscovery)
 	env.FakeResourceManager.Expect().SetGroupPriority(coolFooCRD.Spec.Group, 1000)
+	for _, versionEntry := range coolFooCRD.Spec.Versions {
+		env.FakeResourceManager.Expect().SetGroupVersionPriority(metav1.GroupVersion{Group: coolFooCRD.Spec.Group, Version: versionEntry.Name}, 100)
+	}
 	err = env.FakeResourceManager.WaitForActions(ctx, 1*time.Second)
 	require.NoError(t, err)
 
@@ -359,6 +362,9 @@ func TestMultipleCRDSameVersion(t *testing.T) {
 	env.FakeResourceManager.Expect().
 		AddGroupVersion(coolFooCRD.Spec.Group, mergedDiscovery)
 	env.FakeResourceManager.Expect().SetGroupPriority(coolFooCRD.Spec.Group, 1000)
+	for _, versionEntry := range coolFooCRD.Spec.Versions {
+		env.FakeResourceManager.Expect().SetGroupVersionPriority(metav1.GroupVersion{Group: coolFooCRD.Spec.Group, Version: versionEntry.Name}, 100)
+	}
 	err = env.FakeResourceManager.WaitForActions(ctx, 1*time.Second)
 	require.NoError(t, err)
 }
@@ -389,6 +395,9 @@ func TestDiscoveryControllerResourceManagerRemovedCRD(t *testing.T) {
 	env.FakeResourceManager.Expect().
 		AddGroupVersion(coolFooCRD.Spec.Group, coolFooDiscovery)
 	env.FakeResourceManager.Expect().SetGroupPriority(coolFooCRD.Spec.Group, 1000)
+	for _, versionEntry := range coolFooCRD.Spec.Versions {
+		env.FakeResourceManager.Expect().SetGroupVersionPriority(metav1.GroupVersion{Group: coolFooCRD.Spec.Group, Version: versionEntry.Name}, 100)
+	}
 	err = env.FakeResourceManager.WaitForActions(ctx, 1*time.Second)
 	require.NoError(t, err)
 

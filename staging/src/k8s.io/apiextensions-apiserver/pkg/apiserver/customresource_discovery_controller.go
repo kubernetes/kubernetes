@@ -270,6 +270,7 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 		})
 		// Default priority for CRDs
 		c.resourceManager.SetGroupPriority(version.Group, 1000)
+		c.resourceManager.SetGroupVersionPriority(metav1.GroupVersion(version), 100)
 	}
 	return nil
 }
