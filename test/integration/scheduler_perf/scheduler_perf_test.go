@@ -43,7 +43,6 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -597,7 +596,7 @@ func BenchmarkPerfScheduling(b *testing.B) {
 		})
 	}
 	if err := dataItems2JSONFile(dataItems, b.Name()); err != nil {
-		klog.Fatalf("%v: unable to write measured data %+v: %v", b.Name(), dataItems, err)
+		b.Fatalf("unable to write measured data %+v: %v", dataItems, err)
 	}
 }
 
@@ -626,7 +625,7 @@ func unrollWorkloadTemplate(b *testing.B, wt []op, w *workload) []op {
 		}
 		switch concreteOp := realOp.(type) {
 		case *createPodSetsOp:
-			klog.Infof("Creating %d pod sets %s", concreteOp.Count, concreteOp.CountParam)
+			b.Logf("Creating %d pod sets %s", concreteOp.Count, concreteOp.CountParam)
 			for i := 0; i < concreteOp.Count; i++ {
 				copy := concreteOp.CreatePodsOp
 				ns := fmt.Sprintf("%s-%d", concreteOp.NamespacePrefix, i)
@@ -697,7 +696,7 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 			nextNodeIndex += concreteOp.Count
 
 		case *createNamespacesOp:
-			nsPreparer, err := newNamespacePreparer(concreteOp, client)
+			nsPreparer, err := newNamespacePreparer(concreteOp, client, b)
 			if err != nil {
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
@@ -743,7 +742,7 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 					go collector.run(collectorCtx)
 				}
 			}
-			if err := createPods(namespace, concreteOp, client); err != nil {
+			if err := createPods(b, namespace, concreteOp, client); err != nil {
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
 			if concreteOp.SkipWaitToCompletion {
@@ -755,7 +754,7 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 					numPodsScheduledPerNamespace[namespace] = concreteOp.Count
 				}
 			} else {
-				if err := waitUntilPodsScheduledInNamespace(ctx, podInformer, b.Name(), namespace, concreteOp.Count); err != nil {
+				if err := waitUntilPodsScheduledInNamespace(ctx, b, podInformer, namespace, concreteOp.Count); err != nil {
 					b.Fatalf("op %d: error in waiting for pods to get scheduled: %v", opIndex, err)
 				}
 			}
@@ -882,7 +881,7 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 					b.Fatalf("op %d: unknown namespace %s", opIndex, namespace)
 				}
 			}
-			if err := waitUntilPodsScheduled(ctx, podInformer, b.Name(), concreteOp.Namespaces, numPodsScheduledPerNamespace); err != nil {
+			if err := waitUntilPodsScheduled(ctx, b, podInformer, concreteOp.Namespaces, numPodsScheduledPerNamespace); err != nil {
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
 			// At the end of the barrier, we can be sure that there are no pods
@@ -959,12 +958,12 @@ func getNodePreparer(prefix string, cno *createNodesOp, clientset clientset.Inte
 	), nil
 }
 
-func createPods(namespace string, cpo *createPodsOp, clientset clientset.Interface) error {
+func createPods(b *testing.B, namespace string, cpo *createPodsOp, clientset clientset.Interface) error {
 	strategy, err := getPodStrategy(cpo)
 	if err != nil {
 		return err
 	}
-	klog.Infof("Creating %d pods in namespace %q", cpo.Count, namespace)
+	b.Logf("creating %d pods in namespace %q", cpo.Count, namespace)
 	config := testutils.NewTestPodCreatorConfig()
 	config.AddStrategy(namespace, cpo.Count, strategy)
 	podCreator := testutils.NewTestPodCreator(clientset, config)
@@ -974,7 +973,7 @@ func createPods(namespace string, cpo *createPodsOp, clientset clientset.Interfa
 // waitUntilPodsScheduledInNamespace blocks until all pods in the given
 // namespace are scheduled. Times out after 10 minutes because even at the
 // lowest observed QPS of ~10 pods/sec, a 5000-node test should complete.
-func waitUntilPodsScheduledInNamespace(ctx context.Context, podInformer coreinformers.PodInformer, name string, namespace string, wantCount int) error {
+func waitUntilPodsScheduledInNamespace(ctx context.Context, b *testing.B, podInformer coreinformers.PodInformer, namespace string, wantCount int) error {
 	return wait.PollImmediate(1*time.Second, 10*time.Minute, func() (bool, error) {
 		select {
 		case <-ctx.Done():
@@ -988,14 +987,14 @@ func waitUntilPodsScheduledInNamespace(ctx context.Context, podInformer coreinfo
 		if len(scheduled) >= wantCount {
 			return true, nil
 		}
-		klog.Infof("%s: namespace %s, pods: want %d, got %d", name, namespace, wantCount, len(scheduled))
+		b.Logf("namespace: %s, pods: want %d, got %d", namespace, wantCount, len(scheduled))
 		return false, nil
 	})
 }
 
 // waitUntilPodsScheduled blocks until the all pods in the given namespaces are
 // scheduled.
-func waitUntilPodsScheduled(ctx context.Context, podInformer coreinformers.PodInformer, name string, namespaces []string, numPodsScheduledPerNamespace map[string]int) error {
+func waitUntilPodsScheduled(ctx context.Context, b *testing.B, podInformer coreinformers.PodInformer, namespaces []string, numPodsScheduledPerNamespace map[string]int) error {
 	// If unspecified, default to all known namespaces.
 	if len(namespaces) == 0 {
 		for namespace := range numPodsScheduledPerNamespace {
@@ -1012,7 +1011,7 @@ func waitUntilPodsScheduled(ctx context.Context, podInformer coreinformers.PodIn
 		if !ok {
 			return fmt.Errorf("unknown namespace %s", namespace)
 		}
-		if err := waitUntilPodsScheduledInNamespace(ctx, podInformer, name, namespace, wantCount); err != nil {
+		if err := waitUntilPodsScheduledInNamespace(ctx, b, podInformer, namespace, wantCount); err != nil {
 			return fmt.Errorf("error waiting for pods in namespace %q: %w", namespace, err)
 		}
 	}
@@ -1166,9 +1165,10 @@ type namespacePreparer struct {
 	count  int
 	prefix string
 	spec   *v1.Namespace
+	t      testing.TB
 }
 
-func newNamespacePreparer(cno *createNamespacesOp, clientset clientset.Interface) (*namespacePreparer, error) {
+func newNamespacePreparer(cno *createNamespacesOp, clientset clientset.Interface, b *testing.B) (*namespacePreparer, error) {
 	ns := &v1.Namespace{}
 	if cno.NamespaceTemplatePath != nil {
 		if err := getSpecFromFile(cno.NamespaceTemplatePath, ns); err != nil {
@@ -1181,6 +1181,7 @@ func newNamespacePreparer(cno *createNamespacesOp, clientset clientset.Interface
 		count:  cno.Count,
 		prefix: cno.Prefix,
 		spec:   ns,
+		t:      b,
 	}, nil
 }
 
@@ -1199,7 +1200,7 @@ func (p *namespacePreparer) prepare() error {
 	if p.spec != nil {
 		base = p.spec
 	}
-	klog.Infof("Making %d namespaces with prefix %q and template %v", p.count, p.prefix, *base)
+	p.t.Logf("Making %d namespaces with prefix %q and template %v", p.count, p.prefix, *base)
 	for i := 0; i < p.count; i++ {
 		n := base.DeepCopy()
 		n.Name = fmt.Sprintf("%s-%d", p.prefix, i)
@@ -1219,7 +1220,7 @@ func (p *namespacePreparer) cleanup() error {
 	for i := 0; i < p.count; i++ {
 		n := fmt.Sprintf("%s-%d", p.prefix, i)
 		if err := p.client.CoreV1().Namespaces().Delete(context.Background(), n, metav1.DeleteOptions{}); err != nil {
-			klog.Errorf("Deleting Namespace: %v", err)
+			p.t.Errorf("Deleting Namespace: %v", err)
 			errRet = err
 		}
 	}

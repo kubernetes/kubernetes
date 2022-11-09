@@ -97,7 +97,7 @@ func mustSetupScheduler(b *testing.B, config *config.KubeSchedulerConfiguration)
 		var err error
 		config, err = newDefaultComponentConfig()
 		if err != nil {
-			klog.Fatalf("Error creating default component config: %v", err)
+			b.Fatalf("Error creating default component config: %v", err)
 		}
 	}
 
