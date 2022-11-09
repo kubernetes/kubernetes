@@ -104,7 +104,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 		t.Errorf("Failed to create PodDisruptionBudget: %v", err)
 	}
 
-	waitPDBStable(t, clientSet, numOfEvictions, ns.Name, pdb.Name)
+	waitPDBStable(t, clientSet, ns.Name, pdb.Name, numOfEvictions)
 
 	var numberPodsEvicted uint32
 	errCh := make(chan error, 3*numOfEvictions)
@@ -212,7 +212,7 @@ func TestTerminalPodEviction(t *testing.T) {
 		t.Errorf("Failed to create PodDisruptionBudget: %v", err)
 	}
 
-	waitPDBStable(t, clientSet, 1, ns.Name, pdb.Name)
+	waitPDBStable(t, clientSet, ns.Name, pdb.Name, 1)
 
 	pdbList, err := clientSet.PolicyV1().PodDisruptionBudgets(ns.Name).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
@@ -394,13 +394,7 @@ func TestEvictionWithFinalizers(t *testing.T) {
 
 			eviction := newV1Eviction(ns.Name, pod.Name, deleteOption)
 
-			err := wait.PollImmediate(5*time.Second, 60*time.Second, func() (bool, error) {
-				e := clientSet.PolicyV1().Evictions(ns.Name).Evict(ctx, eviction)
-				if e != nil {
-					return false, e
-				}
-				return true, nil
-			})
+			err := clientSet.PolicyV1().Evictions(ns.Name).Evict(ctx, eviction)
 			if err != nil {
 				t.Fatalf("Eviction of pod failed %v", err)
 			}
@@ -415,6 +409,95 @@ func TestEvictionWithFinalizers(t *testing.T) {
 			} else if tc.enablePodDisruptionConditions == false && cond != nil {
 				t.Errorf("Pod %q has an unexpected condition: %q", klog.KObj(updatedPod), v1.AlphaNoCompatGuaranteeDisruptionTarget)
 			}
+		})
+	}
+}
+
+// TestEvictionWithUnhealthyPodEvictionPolicy tests eviction with a PDB that has a UnhealthyPodEvictionPolicy
+func TestEvictionWithUnhealthyPodEvictionPolicy(t *testing.T) {
+	cases := map[string]struct {
+		enableUnhealthyPodEvictionPolicy bool
+		unhealthyPodEvictionPolicy       *policyv1.UnhealthyPodEvictionPolicyType
+		isPodReady                       bool
+	}{
+		"UnhealthyPodEvictionPolicy disabled and policy not set": {
+			enableUnhealthyPodEvictionPolicy: false,
+			unhealthyPodEvictionPolicy:       nil,
+			isPodReady:                       true,
+		},
+		"UnhealthyPodEvictionPolicy enabled but policy not set": {
+			enableUnhealthyPodEvictionPolicy: true,
+			unhealthyPodEvictionPolicy:       nil,
+			isPodReady:                       true,
+		},
+		"UnhealthyPodEvictionPolicy enabled but policy set to IfHealthyBudget with ready pod": {
+			enableUnhealthyPodEvictionPolicy: true,
+			unhealthyPodEvictionPolicy:       unhealthyPolicyPtr(policyv1.IfHealthyBudget),
+			isPodReady:                       true,
+		},
+		"UnhealthyPodEvictionPolicy enabled but policy set to AlwaysAllow with ready pod": {
+			enableUnhealthyPodEvictionPolicy: true,
+			unhealthyPodEvictionPolicy:       unhealthyPolicyPtr(policyv1.AlwaysAllow),
+			isPodReady:                       true,
+		},
+		"UnhealthyPodEvictionPolicy enabled but policy set to AlwaysAllow with unready pod": {
+			enableUnhealthyPodEvictionPolicy: true,
+			unhealthyPodEvictionPolicy:       unhealthyPolicyPtr(policyv1.AlwaysAllow),
+			isPodReady:                       false,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PDBUnhealthyPodEvictionPolicy, tc.enableUnhealthyPodEvictionPolicy)()
+			closeFn, rm, informers, _, clientSet := rmSetup(t)
+			defer closeFn()
+
+			ns := framework.CreateNamespaceOrDie(clientSet, "eviction-with-pdb-pod-healthy-policy", t)
+			defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			informers.Start(ctx.Done())
+			go rm.Run(ctx)
+
+			pod := newPod("pod")
+			if _, err := clientSet.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
+				t.Errorf("Failed to create pod: %v", err)
+			}
+
+			pod.Status.Phase = v1.PodRunning
+			if tc.isPodReady {
+				addPodConditionReady(pod)
+			}
+
+			if _, err := clientSet.CoreV1().Pods(ns.Name).UpdateStatus(ctx, pod, metav1.UpdateOptions{}); err != nil {
+				t.Fatal(err)
+			}
+
+			waitToObservePods(t, informers.Core().V1().Pods().Informer(), 1, v1.PodRunning)
+
+			pdb := newPDB()
+			pdb.Spec.UnhealthyPodEvictionPolicy = tc.unhealthyPodEvictionPolicy
+			if _, err := clientSet.PolicyV1().PodDisruptionBudgets(ns.Name).Create(context.TODO(), pdb, metav1.CreateOptions{}); err != nil {
+				t.Errorf("Failed to create PodDisruptionBudget: %v", err)
+			}
+
+			if tc.isPodReady {
+				waitPDBStable(t, clientSet, ns.Name, pdb.Name, 1)
+			} else {
+				waitPDB(t, clientSet, ns.Name, pdb.Name, func(pdb *policyv1.PodDisruptionBudget) bool {
+					return pdb.Status.ExpectedPods == 1
+				})
+			}
+			deleteOption := metav1.DeleteOptions{}
+			eviction := newV1Eviction(ns.Name, pod.Name, deleteOption)
+			err := clientSet.PolicyV1().Evictions(ns.Name).Evict(ctx, eviction)
+			if err != nil {
+				t.Fatalf("Eviction of pod failed %v", err)
+			}
+
+			waitToObservePods(t, informers.Core().V1().Pods().Informer(), 0, v1.PodRunning)
+			waitPDBStable(t, clientSet, ns.Name, pdb.Name, 0)
 		})
 	}
 }
@@ -533,17 +616,24 @@ func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podN
 	}
 }
 
-func waitPDBStable(t *testing.T, clientSet clientset.Interface, podNum int32, ns, pdbName string) {
+func waitPDBStable(t *testing.T, clientSet clientset.Interface, ns, pdbName string, podNum int32) {
+	waitPDB(t, clientSet, ns, pdbName, func(pdb *policyv1.PodDisruptionBudget) bool {
+		return pdb.Status.CurrentHealthy == podNum
+	})
+}
+
+func waitPDB(t *testing.T, clientSet clientset.Interface, ns, pdbName string, condition func(budget *policyv1.PodDisruptionBudget) bool) {
 	if err := wait.PollImmediate(2*time.Second, 60*time.Second, func() (bool, error) {
 		pdb, err := clientSet.PolicyV1().PodDisruptionBudgets(ns).Get(context.TODO(), pdbName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
-		if pdb.Status.CurrentHealthy != podNum {
-			return false, nil
-		}
-		return true, nil
+		return condition(pdb), nil
 	}); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func unhealthyPolicyPtr(unhealthyPodEvictionPolicy policyv1.UnhealthyPodEvictionPolicyType) *policyv1.UnhealthyPodEvictionPolicyType {
+	return &unhealthyPodEvictionPolicy
 }
