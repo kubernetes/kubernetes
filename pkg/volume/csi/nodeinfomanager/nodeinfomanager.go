@@ -557,7 +557,7 @@ func (nim *nodeInfoManager) installDriverToCSINode(
 		}
 		m := int32(maxAttachLimit)
 		driverSpec.Allocatable = &storagev1.VolumeNodeResources{Count: &m}
-	} else {
+	} else if maxAttachLimit != 0 {
 		klog.Errorf("Invalid attach limit value %d cannot be added to CSINode object for %q", maxAttachLimit, driverName)
 	}
 
