@@ -73,7 +73,7 @@ const (
 	APIServerIdentity featuregate.Feature = "APIServerIdentity"
 
 	// owner: @dashpole
-	// alpha: v1.22
+	// beta: v1.26
 	//
 	// Add support for distributed tracing in the API Server
 	APIServerTracing featuregate.Feature = "APIServerTracing"
@@ -218,7 +218,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	APIServerIdentity: {Default: true, PreRelease: featuregate.Beta},
 
-	APIServerTracing: {Default: false, PreRelease: featuregate.Alpha},
+	APIServerTracing: {Default: true, PreRelease: featuregate.Beta},
 
 	AdvancedAuditing: {Default: true, PreRelease: featuregate.GA},
 
