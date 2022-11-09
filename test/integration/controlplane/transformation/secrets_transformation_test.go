@@ -85,7 +85,7 @@ func TestSecretsShouldBeTransformed(t *testing.T) {
 		// TODO: add secretbox
 	}
 	for _, tt := range testCases {
-		test, err := newTransformTest(t, tt.transformerConfigContent, false)
+		test, err := newTransformTest(t, tt.transformerConfigContent, false, "", false)
 		if err != nil {
 			test.cleanUp()
 			t.Errorf("failed to setup test for envelop %s, error was %v", tt.transformerPrefix, err)
@@ -120,7 +120,7 @@ func BenchmarkAESCBCEnvelopeWrite(b *testing.B) {
 
 func runBenchmark(b *testing.B, transformerConfig string) {
 	b.StopTimer()
-	test, err := newTransformTest(b, transformerConfig, false)
+	test, err := newTransformTest(b, transformerConfig, false, "", false)
 	defer test.cleanUp()
 	if err != nil {
 		b.Fatalf("failed to setup benchmark for config %s, error was %v", transformerConfig, err)
