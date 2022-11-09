@@ -195,6 +195,8 @@ type PodWorkers interface {
 	// deleting a terminating static pod from the apiserver before the pod is shut
 	// down.
 	IsPodForMirrorPodTerminatingByFullName(podFullname string) bool
+
+	ForgerWorker(uid types.UID)
 }
 
 // the function to invoke to perform a sync (reconcile the kubelet state to the desired shape of the pod)
@@ -475,6 +477,15 @@ func (p *podWorkers) IsPodForMirrorPodTerminatingByFullName(podFullName string) 
 	_, ok := p.terminatingStaticPodFullnames[podFullName]
 	return ok
 }
+func (p *podWorkers) ForgerWorker(uid types.UID) {
+	p.podLock.Lock()
+	defer p.podLock.Unlock()
+	if ch, ok := p.podUpdates[uid]; ok {
+		close(ch)
+		delete(p.podUpdates, uid)
+		delete(p.lastUndeliveredWorkUpdate, uid)
+	}
+}
 
 // UpdatePod carries a configuration change or termination state to a pod. A pod is either runnable,
 // terminating, or terminated, and will transition to terminating if deleted on the apiserver, it is
@@ -619,6 +630,18 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 	// start the pod worker goroutine if it doesn't exist
 	var podUpdates chan podWork
 	var exists bool
+	if options.UpdateType == kubetypes.SyncPodKill {
+		p.ForgerWorker(uid)
+		podUpdates = make(chan podWork, 1)
+		p.podUpdates[uid] = podUpdates
+		var gracePeriod int64 = 1
+		work.Options.KillPodOptions.PodTerminationGracePeriodSecondsOverride = &gracePeriod
+		podUpdates <- work
+		go func() {
+			defer runtime.HandleCrash()
+			p.managePodLoop(podUpdates)
+		}()
+	}
 	if podUpdates, exists = p.podUpdates[uid]; !exists {
 		// We need to have a buffer here, because checkForUpdates() method that
 		// puts an update into channel is called from the same goroutine where
