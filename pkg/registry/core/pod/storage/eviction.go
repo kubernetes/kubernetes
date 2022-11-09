@@ -302,7 +302,7 @@ func addConditionAndDeletePod(r *EvictionREST, ctx context.Context, name string,
 		conditionAppender := func(_ context.Context, newObj, _ runtime.Object) (runtime.Object, error) {
 			podObj := newObj.(*api.Pod)
 			podutil.UpdatePodCondition(&podObj.Status, &api.PodCondition{
-				Type:    api.AlphaNoCompatGuaranteeDisruptionTarget,
+				Type:    api.DisruptionTarget,
 				Status:  api.ConditionTrue,
 				Reason:  "EvictionByEvictionAPI",
 				Message: "Eviction API: evicting",

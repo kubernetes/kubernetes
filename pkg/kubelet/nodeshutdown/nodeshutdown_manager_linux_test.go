@@ -170,7 +170,7 @@ func TestManager(t *testing.T) {
 					Reason:  "Terminated",
 					Conditions: []v1.PodCondition{
 						{
-							Type:    v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:    v1.DisruptionTarget,
 							Status:  v1.ConditionTrue,
 							Reason:  "TerminationByKubelet",
 							Message: "Pod was terminated in response to imminent node shutdown.",
@@ -183,7 +183,7 @@ func TestManager(t *testing.T) {
 					Reason:  "Terminated",
 					Conditions: []v1.PodCondition{
 						{
-							Type:    v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:    v1.DisruptionTarget,
 							Status:  v1.ConditionTrue,
 							Reason:  "TerminationByKubelet",
 							Message: "Pod was terminated in response to imminent node shutdown.",
@@ -196,7 +196,7 @@ func TestManager(t *testing.T) {
 					Reason:  "Terminated",
 					Conditions: []v1.PodCondition{
 						{
-							Type:    v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:    v1.DisruptionTarget,
 							Status:  v1.ConditionTrue,
 							Reason:  "TerminationByKubelet",
 							Message: "Pod was terminated in response to imminent node shutdown.",

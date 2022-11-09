@@ -327,6 +327,7 @@ func TestCreateNode(t *testing.T) {
 		description  string
 		pods         []v1.Pod
 		node         *v1.Node
+		expectPatch  bool
 		expectDelete bool
 	}{
 		{
@@ -335,6 +336,7 @@ func TestCreateNode(t *testing.T) {
 				*testutil.NewPod("pod1", "node1"),
 			},
 			node:         testutil.NewNode("node1"),
+			expectPatch:  false,
 			expectDelete: false,
 		},
 		{
@@ -343,6 +345,7 @@ func TestCreateNode(t *testing.T) {
 				*testutil.NewPod("pod1", "node1"),
 			},
 			node:         addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			expectPatch:  true,
 			expectDelete: true,
 		},
 		{
@@ -351,6 +354,7 @@ func TestCreateNode(t *testing.T) {
 				*addToleration(testutil.NewPod("pod1", "node1"), 1, -1),
 			},
 			node:         addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			expectPatch:  false,
 			expectDelete: false,
 		},
 	}
@@ -366,7 +370,7 @@ func TestCreateNode(t *testing.T) {
 		// wait a bit
 		time.Sleep(timeForControllerToProgress)
 
-		verifyPodActions(t, item.description, fakeClientset, false, item.expectDelete)
+		verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
 
 		cancel()
 	}
@@ -766,6 +770,7 @@ func TestEventualConsistency(t *testing.T) {
 		newPod       *v1.Pod
 		oldNode      *v1.Node
 		newNode      *v1.Node
+		expectPatch  bool
 		expectDelete bool
 	}{
 		{
@@ -777,6 +782,7 @@ func TestEventualConsistency(t *testing.T) {
 			newPod:       testutil.NewPod("pod2", "node1"),
 			oldNode:      testutil.NewNode("node1"),
 			newNode:      addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			expectPatch:  true,
 			expectDelete: true,
 		},
 		{
@@ -788,6 +794,7 @@ func TestEventualConsistency(t *testing.T) {
 			newPod:       addToleration(testutil.NewPod("pod2", "node1"), 1, 100),
 			oldNode:      testutil.NewNode("node1"),
 			newNode:      addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			expectPatch:  true,
 			expectDelete: true,
 		},
 		{
@@ -799,6 +806,7 @@ func TestEventualConsistency(t *testing.T) {
 			newPod:       testutil.NewPod("pod2", "node1"),
 			oldNode:      testutil.NewNode("node1"),
 			newNode:      addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			expectPatch:  true,
 			expectDelete: true,
 		},
 		{
@@ -810,6 +818,7 @@ func TestEventualConsistency(t *testing.T) {
 			newPod:       addToleration(testutil.NewPod("pod2", "node1"), 1, 100),
 			oldNode:      testutil.NewNode("node1"),
 			newNode:      addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			expectPatch:  true,
 			expectDelete: true,
 		},
 	}
@@ -835,7 +844,7 @@ func TestEventualConsistency(t *testing.T) {
 			// TODO(mborsz): Remove this sleep and other sleeps in this file.
 			time.Sleep(timeForControllerToProgress)
 
-			verifyPodActions(t, item.description, fakeClientset, false, item.expectDelete)
+			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
 			fakeClientset.ClearActions()
 
 			// And now the delayed update of 'pod2' comes to the TaintManager. We should delete it as well.

@@ -676,7 +676,7 @@ func TestStalePodDisruption(t *testing.T) {
 			podPhase: v1.PodRunning,
 			wantConditions: []v1.PodCondition{
 				{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionFalse,
 				},
 			},
@@ -686,19 +686,19 @@ func TestStalePodDisruption(t *testing.T) {
 			deletePod: true,
 			wantConditions: []v1.PodCondition{
 				{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionTrue,
 				},
 			},
 		},
 		"disruption-condition-by-kubelet": {
 			podPhase: v1.PodFailed,
-			reason:   v1.AlphaNoCompatGuaranteePodReasonTerminationByKubelet,
+			reason:   v1.PodReasonTerminationByKubelet,
 			wantConditions: []v1.PodCondition{
 				{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionTrue,
-					Reason: v1.AlphaNoCompatGuaranteePodReasonTerminationByKubelet,
+					Reason: v1.PodReasonTerminationByKubelet,
 				},
 			},
 		},
@@ -706,7 +706,7 @@ func TestStalePodDisruption(t *testing.T) {
 			podPhase: v1.PodFailed,
 			wantConditions: []v1.PodCondition{
 				{
-					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Type:   v1.DisruptionTarget,
 					Status: v1.ConditionTrue,
 				},
 			},
@@ -728,7 +728,7 @@ func TestStalePodDisruption(t *testing.T) {
 
 			pod.Status.Phase = tc.podPhase
 			pod.Status.Conditions = append(pod.Status.Conditions, v1.PodCondition{
-				Type:               v1.AlphaNoCompatGuaranteeDisruptionTarget,
+				Type:               v1.DisruptionTarget,
 				Status:             v1.ConditionTrue,
 				Reason:             tc.reason,
 				LastTransitionTime: metav1.Now(),

@@ -436,6 +436,7 @@ const (
 	// owner: @mimowo
 	// kep: https://kep.k8s.io/3329
 	// alpha: v1.25
+	// beta: v1.26
 	//
 	// Allow users to specify handling of pod failures based on container exit codes
 	// and pod conditions.
@@ -643,6 +644,7 @@ const (
 	// owner: @mimowo
 	// kep: https://kep.k8s.io/3329
 	// alpha: v1.25
+	// beta: v1.26
 	//
 	// Enables support for appending a dedicated pod condition indicating that
 	// the pod is being deleted due to a disruption.
@@ -993,7 +995,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	IPTablesOwnershipCleanup: {Default: false, PreRelease: featuregate.Alpha},
 
-	JobPodFailurePolicy: {Default: false, PreRelease: featuregate.Alpha},
+	JobPodFailurePolicy: {Default: true, PreRelease: featuregate.Beta},
 
 	JobMutableNodeSchedulingDirectives: {Default: true, PreRelease: featuregate.Beta},
 
@@ -1049,7 +1051,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	PodDeletionCost: {Default: true, PreRelease: featuregate.Beta},
 
-	PodDisruptionConditions: {Default: false, PreRelease: featuregate.Alpha},
+	PodDisruptionConditions: {Default: true, PreRelease: featuregate.Beta},
 
 	PodHasNetworkCondition: {Default: false, PreRelease: featuregate.Alpha},
 

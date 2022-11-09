@@ -755,7 +755,7 @@ func (dc *DisruptionController) syncStalePodDisruption(ctx context.Context, key 
 		WithStatus(corev1apply.PodStatus()).
 		WithResourceVersion(pod.ResourceVersion)
 	podApply.Status.WithConditions(corev1apply.PodCondition().
-		WithType(v1.AlphaNoCompatGuaranteeDisruptionTarget).
+		WithType(v1.DisruptionTarget).
 		WithStatus(v1.ConditionFalse).
 		WithLastTransitionTime(metav1.Now()),
 	)
@@ -998,11 +998,11 @@ func (dc *DisruptionController) nonTerminatingPodHasStaleDisruptionCondition(pod
 	if pod.DeletionTimestamp != nil {
 		return false, 0
 	}
-	_, cond := apipod.GetPodCondition(&pod.Status, v1.AlphaNoCompatGuaranteeDisruptionTarget)
+	_, cond := apipod.GetPodCondition(&pod.Status, v1.DisruptionTarget)
 	// Pod disruption conditions added by kubelet are never considered stale because the condition might take
 	// arbitrarily long before the pod is terminating (has deletion timestamp). Also, pod conditions present
 	// on pods in terminal phase are not stale to avoid unnecessary status updates.
-	if cond == nil || cond.Status != v1.ConditionTrue || cond.Reason == v1.AlphaNoCompatGuaranteePodReasonTerminationByKubelet || apipod.IsPodPhaseTerminal(pod.Status.Phase) {
+	if cond == nil || cond.Status != v1.ConditionTrue || cond.Reason == v1.PodReasonTerminationByKubelet || apipod.IsPodPhaseTerminal(pod.Status.Phase) {
 		return false, 0
 	}
 	waitFor := dc.stalePodDisruptionTimeout - dc.clock.Since(cond.LastTransitionTime.Time)

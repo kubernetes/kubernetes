@@ -59,7 +59,7 @@ func TestPodConditionSharedByKubelet(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, true)()
 
 	trueCases := []v1.PodConditionType{
-		v1.AlphaNoCompatGuaranteeDisruptionTarget,
+		v1.DisruptionTarget,
 	}
 
 	for _, tc := range trueCases {

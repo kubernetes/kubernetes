@@ -89,7 +89,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 						Action: "UnkonwnAction",
 						OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 							{
-								Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+								Type:   v1.DisruptionTarget,
 								Status: v1.ConditionTrue,
 							},
 						},
@@ -98,7 +98,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 						Action: batch.PodFailurePolicyActionIgnore,
 						OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 							{
-								Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+								Type:   v1.DisruptionTarget,
 								Status: v1.ConditionTrue,
 							},
 						},
@@ -111,7 +111,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 					Phase: v1.PodFailed,
 					Conditions: []v1.PodCondition{
 						{
-							Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:   v1.DisruptionTarget,
 							Status: v1.ConditionTrue,
 						},
 					},
@@ -410,7 +410,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 						Action: batch.PodFailurePolicyActionIgnore,
 						OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 							{
-								Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+								Type:   v1.DisruptionTarget,
 								Status: v1.ConditionTrue,
 							},
 						},
@@ -423,7 +423,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 					Phase: v1.PodFailed,
 					Conditions: []v1.PodCondition{
 						{
-							Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:   v1.DisruptionTarget,
 							Status: v1.ConditionTrue,
 						},
 					},
@@ -440,7 +440,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 						Action: batch.PodFailurePolicyActionIgnore,
 						OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 							{
-								Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+								Type:   v1.DisruptionTarget,
 								Status: v1.ConditionFalse,
 							},
 						},
@@ -453,7 +453,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 					Phase: v1.PodFailed,
 					Conditions: []v1.PodCondition{
 						{
-							Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:   v1.DisruptionTarget,
 							Status: v1.ConditionFalse,
 						},
 					},
@@ -470,7 +470,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 						Action: batch.PodFailurePolicyActionIgnore,
 						OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 							{
-								Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+								Type:   v1.DisruptionTarget,
 								Status: v1.ConditionUnknown,
 							},
 						},
@@ -483,7 +483,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 					Phase: v1.PodFailed,
 					Conditions: []v1.PodCondition{
 						{
-							Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:   v1.DisruptionTarget,
 							Status: v1.ConditionUnknown,
 						},
 					},
@@ -500,7 +500,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 						Action: batch.PodFailurePolicyActionIgnore,
 						OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 							{
-								Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+								Type:   v1.DisruptionTarget,
 								Status: v1.ConditionFalse,
 							},
 						},
@@ -513,7 +513,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 					Phase: v1.PodFailed,
 					Conditions: []v1.PodCondition{
 						{
-							Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:   v1.DisruptionTarget,
 							Status: v1.ConditionTrue,
 						},
 					},
@@ -529,7 +529,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 						Action: batch.PodFailurePolicyActionIgnore,
 						OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 							{
-								Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+								Type:   v1.DisruptionTarget,
 								Status: v1.ConditionTrue,
 							},
 						},
@@ -542,7 +542,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 					Phase: v1.PodFailed,
 					Conditions: []v1.PodCondition{
 						{
-							Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:   v1.DisruptionTarget,
 							Status: v1.ConditionFalse,
 						},
 					},
@@ -558,7 +558,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 						Action: batch.PodFailurePolicyActionIgnore,
 						OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 							{
-								Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+								Type:   v1.DisruptionTarget,
 								Status: v1.ConditionTrue,
 							},
 						},
@@ -571,7 +571,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 					Phase: v1.PodFailed,
 					Conditions: []v1.PodCondition{
 						{
-							Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:   v1.DisruptionTarget,
 							Status: v1.ConditionFalse,
 						},
 					},
@@ -587,7 +587,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 						Action: batch.PodFailurePolicyActionFailJob,
 						OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 							{
-								Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+								Type:   v1.DisruptionTarget,
 								Status: v1.ConditionTrue,
 							},
 						},
@@ -600,7 +600,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 					Phase: v1.PodFailed,
 					Conditions: []v1.PodCondition{
 						{
-							Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:   v1.DisruptionTarget,
 							Status: v1.ConditionTrue,
 						},
 					},
@@ -617,7 +617,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 						Action: batch.PodFailurePolicyActionCount,
 						OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 							{
-								Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+								Type:   v1.DisruptionTarget,
 								Status: v1.ConditionTrue,
 							},
 						},
@@ -630,7 +630,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 					Phase: v1.PodFailed,
 					Conditions: []v1.PodCondition{
 						{
-							Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Type:   v1.DisruptionTarget,
 							Status: v1.ConditionTrue,
 						},
 					},
@@ -677,7 +677,7 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 						Action: batch.PodFailurePolicyActionIgnore,
 						OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 							{
-								Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+								Type:   v1.DisruptionTarget,
 								Status: v1.ConditionTrue,
 							},
 						},

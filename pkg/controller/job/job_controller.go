@@ -758,12 +758,12 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 		(failed > *job.Spec.BackoffLimit)
 
 	if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) {
-		if failureTargetCondition := findConditionByType(job.Status.Conditions, batch.AlphaNoCompatGuaranteeJobFailureTarget); failureTargetCondition != nil {
+		if failureTargetCondition := findConditionByType(job.Status.Conditions, batch.JobFailureTarget); failureTargetCondition != nil {
 			finishedCondition = newFailedConditionForFailureTarget(failureTargetCondition)
 		} else if failJobMessage := getFailJobMessage(&job, pods, uncounted.Failed()); failJobMessage != nil {
 			if uncounted != nil {
 				// Prepare the interim FailureTarget condition to record the failure message before the finalizers (allowing removal of the pods) are removed.
-				finishedCondition = newCondition(batch.AlphaNoCompatGuaranteeJobFailureTarget, v1.ConditionTrue, jobConditionReasonPodFailurePolicy, *failJobMessage)
+				finishedCondition = newCondition(batch.JobFailureTarget, v1.ConditionTrue, jobConditionReasonPodFailurePolicy, *failJobMessage)
 			} else {
 				// Prepare the Failed job condition for the legacy path without finalizers (don't use the interim FailureTarget condition).
 				finishedCondition = newCondition(batch.JobFailed, v1.ConditionTrue, jobConditionReasonPodFailurePolicy, *failJobMessage)
@@ -1090,7 +1090,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 		job.Status.CompletedIndexes = succeededIndexes.String()
 	}
 	if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) {
-		if finishedCond != nil && finishedCond.Type == batch.AlphaNoCompatGuaranteeJobFailureTarget {
+		if finishedCond != nil && finishedCond.Type == batch.JobFailureTarget {
 
 			// Append the interim FailureTarget condition to update the job status with before finalizers are removed.
 			job.Status.Conditions = append(job.Status.Conditions, *finishedCond)

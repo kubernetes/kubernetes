@@ -100,6 +100,75 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectEqual(successes, completions, "expected %d successful job pods, but got  %d", completions, successes)
 	})
 
+	ginkgo.It("should allow to use the pod failure policy on exit code to fail the job early", func() {
+
+		// We fail the Job's pod only once to ensure the backoffLimit is not
+		// reached and thus the job is failed due to the pod failure policy
+		// with FailJob action.
+		// In order to ensure a Job's pod fails once before succeeding we force
+		// the Job's Pods to be scheduled to a single Node and use a hostPath
+		// volume to persist data across new Pods.
+		ginkgo.By("Looking for a node to schedule job pod")
+		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Creating a job")
+		job := e2ejob.NewTestJobOnNode("failOnce", "pod-failure-failjob", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit, node.Name)
+		job.Spec.PodFailurePolicy = &batchv1.PodFailurePolicy{
+			Rules: []batchv1.PodFailurePolicyRule{
+				{
+					Action: batchv1.PodFailurePolicyActionFailJob,
+					OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
+						Operator: batchv1.PodFailurePolicyOnExitCodesOpIn,
+						Values:   []int32{1},
+					},
+				},
+			},
+		}
+		job, err = e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring job fails")
+		err = e2ejob.WaitForJobFailed(f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to ensure job failure in namespace: %s", f.Namespace.Name)
+	})
+
+	ginkgo.It("should allow to use the pod failure policy to not count the failure towards the backoffLimit", func() {
+
+		// We set the backoffLimit to 0 so that any pod failure would trigger
+		// job failure if not for the pod failure policy to ignore the failed
+		// pods from counting them towards the backoffLimit. Also, we fail the
+		// pod only once so that the job eventually succeeds.
+		// In order to ensure a Job's pod fails once before succeeding we force
+		// the Job's Pods to be scheduled to a single Node and use a hostPath
+		// volume to persist data across new Pods.
+		backoffLimit := int32(0)
+
+		ginkgo.By("Looking for a node to schedule job pod")
+		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Creating a job")
+		job := e2ejob.NewTestJobOnNode("failOnce", "pod-failure-ignore", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit, node.Name)
+		job.Spec.PodFailurePolicy = &batchv1.PodFailurePolicy{
+			Rules: []batchv1.PodFailurePolicyRule{
+				{
+					Action: batchv1.PodFailurePolicyActionIgnore,
+					OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
+						Operator: batchv1.PodFailurePolicyOnExitCodesOpIn,
+						Values:   []int32{1},
+					},
+				},
+			},
+		}
+		job, err = e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring job reaches completions")
+		err = e2ejob.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, completions)
+		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+	})
+
 	ginkgo.It("should not create pods when created in suspend state", func() {
 		ginkgo.By("Creating a job with suspend=true")
 		job := e2ejob.NewTestJob("succeed", "suspend-true-to-false", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)

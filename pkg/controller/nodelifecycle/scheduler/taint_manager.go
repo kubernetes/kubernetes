@@ -129,7 +129,7 @@ func addConditionAndDeletePod(ctx context.Context, c clientset.Interface, name, 
 		}
 		podApply := corev1apply.Pod(pod.Name, pod.Namespace).WithStatus(corev1apply.PodStatus())
 		podApply.Status.WithConditions(corev1apply.PodCondition().
-			WithType(v1.AlphaNoCompatGuaranteeDisruptionTarget).
+			WithType(v1.DisruptionTarget).
 			WithStatus(v1.ConditionTrue).
 			WithReason("DeletionByTaintManager").
 			WithMessage("Taint manager: deleting due to NoExecute taint").

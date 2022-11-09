@@ -623,6 +623,15 @@ func GetPodSecretUpdateTimeout(c clientset.Interface) time.Duration {
 	return podLogTimeout
 }
 
+// VerifyPodHasConditionWithType verifies the pod has the expected condition by type
+func VerifyPodHasConditionWithType(f *framework.Framework, pod *v1.Pod, cType v1.PodConditionType) {
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "Failed to get the recent pod object for name: %q", pod.Name)
+	if condition := FindPodConditionByType(&pod.Status, cType); condition == nil {
+		framework.Failf("pod %q should have the condition: %q, pod status: %v", pod.Name, cType, pod.Status)
+	}
+}
+
 func getNodeTTLAnnotationValue(c clientset.Interface) (time.Duration, error) {
 	nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil || len(nodes.Items) == 0 {
