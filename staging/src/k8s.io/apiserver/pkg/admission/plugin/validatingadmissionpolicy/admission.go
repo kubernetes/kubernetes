@@ -109,7 +109,7 @@ func (c *celAdmissionPlugin) SetDrainedNotification(stopCh <-chan struct{}) {
 }
 
 func (c *celAdmissionPlugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	if featureGates.Enabled(features.CELValidatingAdmission) {
+	if featureGates.Enabled(features.ValidatingAdmissionPolicy) {
 		c.enabled = true
 	}
 	c.inspectedFeatureGates = true

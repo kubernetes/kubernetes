@@ -249,13 +249,13 @@ func setupTestCommon(t *testing.T, compiler ValidatorCompiler, shouldStartInform
 	fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, time.Second)
 	featureGate := featuregate.NewFeatureGate()
 	err := featureGate.Add(map[featuregate.Feature]featuregate.FeatureSpec{
-		features.CELValidatingAdmission: {
+		features.ValidatingAdmissionPolicy: {
 			Default: true, PreRelease: featuregate.Alpha}})
 	if err != nil {
 		// FIXME: handle error.
 		panic("Unexpected error")
 	}
-	err = featureGate.SetFromMap(map[string]bool{string(features.CELValidatingAdmission): true})
+	err = featureGate.SetFromMap(map[string]bool{string(features.ValidatingAdmissionPolicy): true})
 	if err != nil {
 		// FIXME: handle error.
 		panic("Unexpected error.")

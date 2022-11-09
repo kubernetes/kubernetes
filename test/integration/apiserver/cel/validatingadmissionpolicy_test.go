@@ -166,7 +166,7 @@ func Test_ValidateNamespace_NoParams(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CELValidatingAdmission, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
 			server, err := apiservertesting.StartTestServer(t, nil, []string{
 				"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 			}, framework.SharedEtcd())
@@ -270,7 +270,7 @@ func Test_ValidateNamespace_WithConfigMapParams(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CELValidatingAdmission, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
 			server, err := apiservertesting.StartTestServer(t, nil, []string{
 				"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 			}, framework.SharedEtcd())
@@ -327,7 +327,7 @@ func Test_ValidateNamespace_WithConfigMapParams(t *testing.T) {
 }
 
 func TestMultiplePolicyBindings(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CELValidatingAdmission, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
 	server, err := apiservertesting.StartTestServer(t, nil, nil, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
