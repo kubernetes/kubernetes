@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/klog/v2"
 
+	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	autoscaling "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
+	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
@@ -41,8 +43,9 @@ import (
 )
 
 type DiscoveryController struct {
-	versionHandler *versionDiscoveryHandler
-	groupHandler   *groupDiscoveryHandler
+	versionHandler  *versionDiscoveryHandler
+	groupHandler    *groupDiscoveryHandler
+	resourceManager discoveryendpoint.ResourceManager
 
 	crdLister  listers.CustomResourceDefinitionLister
 	crdsSynced cache.InformerSynced
@@ -53,12 +56,18 @@ type DiscoveryController struct {
 	queue workqueue.RateLimitingInterface
 }
 
-func NewDiscoveryController(crdInformer informers.CustomResourceDefinitionInformer, versionHandler *versionDiscoveryHandler, groupHandler *groupDiscoveryHandler) *DiscoveryController {
+func NewDiscoveryController(
+	crdInformer informers.CustomResourceDefinitionInformer,
+	versionHandler *versionDiscoveryHandler,
+	groupHandler *groupDiscoveryHandler,
+	resourceManager discoveryendpoint.ResourceManager,
+) *DiscoveryController {
 	c := &DiscoveryController{
-		versionHandler: versionHandler,
-		groupHandler:   groupHandler,
-		crdLister:      crdInformer.Lister(),
-		crdsSynced:     crdInformer.Informer().HasSynced,
+		versionHandler:  versionHandler,
+		groupHandler:    groupHandler,
+		resourceManager: resourceManager,
+		crdLister:       crdInformer.Lister(),
+		crdsSynced:      crdInformer.Informer().HasSynced,
 
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "DiscoveryController"),
 	}
@@ -78,6 +87,7 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 
 	apiVersionsForDiscovery := []metav1.GroupVersionForDiscovery{}
 	apiResourcesForDiscovery := []metav1.APIResource{}
+	aggregatedApiResourcesForDiscovery := []apidiscoveryv2beta1.APIResourceDiscovery{}
 	versionsForDiscoveryMap := map[metav1.GroupVersion]bool{}
 
 	crds, err := c.crdLister.List(labels.Everything())
@@ -146,6 +156,53 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 		if err != nil {
 			return err
 		}
+
+		if c.resourceManager != nil {
+			var scope apidiscoveryv2beta1.ResourceScope
+			if crd.Spec.Scope == apiextensionsv1.NamespaceScoped {
+				scope = apidiscoveryv2beta1.ScopeNamespace
+			} else {
+				scope = apidiscoveryv2beta1.ScopeCluster
+			}
+			apiResourceDiscovery := apidiscoveryv2beta1.APIResourceDiscovery{
+				Resource:         crd.Status.AcceptedNames.Plural,
+				SingularResource: crd.Status.AcceptedNames.Singular,
+				Scope:            scope,
+				ResponseKind: &metav1.GroupVersionKind{
+					Group:   version.Group,
+					Version: version.Version,
+					Kind:    crd.Status.AcceptedNames.Kind,
+				},
+				Verbs:      verbs,
+				ShortNames: crd.Status.AcceptedNames.ShortNames,
+				Categories: crd.Status.AcceptedNames.Categories,
+			}
+			if subresources != nil && subresources.Status != nil {
+				apiResourceDiscovery.Subresources = append(apiResourceDiscovery.Subresources, apidiscoveryv2beta1.APISubresourceDiscovery{
+					Subresource: "status",
+					ResponseKind: &metav1.GroupVersionKind{
+						Group:   version.Group,
+						Version: version.Version,
+						Kind:    crd.Status.AcceptedNames.Kind,
+					},
+					Verbs: metav1.Verbs([]string{"get", "patch", "update"}),
+				})
+			}
+			if subresources != nil && subresources.Scale != nil {
+				apiResourceDiscovery.Subresources = append(apiResourceDiscovery.Subresources, apidiscoveryv2beta1.APISubresourceDiscovery{
+					Subresource: "scale",
+					ResponseKind: &metav1.GroupVersionKind{
+						Group:   autoscaling.GroupName,
+						Version: "v1",
+						Kind:    "Scale",
+					},
+					Verbs: metav1.Verbs([]string{"get", "patch", "update"}),
+				})
+
+			}
+			aggregatedApiResourcesForDiscovery = append(aggregatedApiResourcesForDiscovery, apiResourceDiscovery)
+		}
+
 		if subresources != nil && subresources.Status != nil {
 			apiResourcesForDiscovery = append(apiResourcesForDiscovery, metav1.APIResource{
 				Name:       crd.Status.AcceptedNames.Plural + "/status",
@@ -170,6 +227,10 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 	if !foundGroup {
 		c.groupHandler.unsetDiscovery(version.Group)
 		c.versionHandler.unsetDiscovery(version)
+
+		if c.resourceManager != nil {
+			c.resourceManager.RemoveGroup(version.Group)
+		}
 		return nil
 	}
 
@@ -186,12 +247,30 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 
 	if !foundVersion {
 		c.versionHandler.unsetDiscovery(version)
+
+		if c.resourceManager != nil {
+			c.resourceManager.RemoveGroupVersion(metav1.GroupVersion{
+				Group:   version.Group,
+				Version: version.Version,
+			})
+		}
 		return nil
 	}
 	c.versionHandler.setDiscovery(version, discovery.NewAPIVersionHandler(Codecs, version, discovery.APIResourceListerFunc(func() []metav1.APIResource {
 		return apiResourcesForDiscovery
 	})))
 
+	sort.Slice(aggregatedApiResourcesForDiscovery[:], func(i, j int) bool {
+		return aggregatedApiResourcesForDiscovery[i].Resource < aggregatedApiResourcesForDiscovery[j].Resource
+	})
+	if c.resourceManager != nil {
+		c.resourceManager.AddGroupVersion(version.Group, apidiscoveryv2beta1.APIVersionDiscovery{
+			Version:   version.Version,
+			Resources: aggregatedApiResourcesForDiscovery,
+		})
+		// Default priority for CRDs
+		c.resourceManager.SetGroupPriority(version.Group, 1000)
+	}
 	return nil
 }
 

@@ -259,7 +259,7 @@ func (w *deferredResponseWriter) Close() error {
 }
 
 // WriteObjectNegotiated renders an object in the content type negotiated by the client.
-func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiation.EndpointRestrictions, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
+func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiation.EndpointRestrictions, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object, listGVKInContentType bool) {
 	stream, ok := object.(rest.ResourceStreamer)
 	if ok {
 		requestInfo, _ := request.RequestInfoFrom(req.Context())
@@ -269,7 +269,7 @@ func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiat
 		return
 	}
 
-	_, serializer, err := negotiation.NegotiateOutputMediaType(req, s, restrictions)
+	mediaType, serializer, err := negotiation.NegotiateOutputMediaType(req, s, restrictions)
 	if err != nil {
 		// if original statusCode was not successful we need to return the original error
 		// we cannot hide it behind negotiation problems
@@ -286,8 +286,28 @@ func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiat
 
 	encoder := s.EncoderForVersion(serializer.Serializer, gv)
 	request.TrackSerializeResponseObjectLatency(req.Context(), func() {
-		SerializeObject(serializer.MediaType, encoder, w, req, statusCode, object)
+		if listGVKInContentType {
+			SerializeObject(generateMediaTypeWithGVK(serializer.MediaType, mediaType.Convert), encoder, w, req, statusCode, object)
+		} else {
+			SerializeObject(serializer.MediaType, encoder, w, req, statusCode, object)
+		}
 	})
+}
+
+func generateMediaTypeWithGVK(mediaType string, gvk *schema.GroupVersionKind) string {
+	if gvk == nil {
+		return mediaType
+	}
+	if gvk.Group != "" {
+		mediaType += ";g=" + gvk.Group
+	}
+	if gvk.Version != "" {
+		mediaType += ";v=" + gvk.Version
+	}
+	if gvk.Kind != "" {
+		mediaType += ";as=" + gvk.Kind
+	}
+	return mediaType
 }
 
 // ErrorNegotiated renders an error to the response. Returns the HTTP status code of the error.
@@ -306,7 +326,7 @@ func ErrorNegotiated(err error, s runtime.NegotiatedSerializer, gv schema.GroupV
 		return code
 	}
 
-	WriteObjectNegotiated(s, negotiation.DefaultEndpointRestrictions, gv, w, req, code, status)
+	WriteObjectNegotiated(s, negotiation.DefaultEndpointRestrictions, gv, w, req, code, status, false)
 	return code
 }
 
