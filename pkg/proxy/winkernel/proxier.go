@@ -107,6 +107,7 @@ type loadBalancerIdentifier struct {
 type loadBalancerFlags struct {
 	isILB           bool
 	isDSR           bool
+	isVipExternalIP bool
 	localRoutedVIP  bool
 	useMUX          bool
 	preserveDIP     bool
@@ -1292,7 +1293,7 @@ func (proxier *Proxier) syncProxyRules() {
 			if len(nodePortEndpoints) > 0 {
 				hnsLoadBalancer, err := hns.getLoadBalancer(
 					nodePortEndpoints,
-					loadBalancerFlags{isDSR: svcInfo.localTrafficDSR, localRoutedVIP: true, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
+					loadBalancerFlags{isVipExternalIP: true, isDSR: svcInfo.localTrafficDSR, localRoutedVIP: true, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
 					sourceVip,
 					"",
 					Enum(svcInfo.Protocol()),
@@ -1353,7 +1354,7 @@ func (proxier *Proxier) syncProxyRules() {
 			if len(lbIngressEndpoints) > 0 {
 				hnsLoadBalancer, err := hns.getLoadBalancer(
 					lbIngressEndpoints,
-					loadBalancerFlags{isDSR: svcInfo.preserveDIP || svcInfo.localTrafficDSR, useMUX: svcInfo.preserveDIP, preserveDIP: svcInfo.preserveDIP, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
+					loadBalancerFlags{isVipExternalIP: true, isDSR: svcInfo.preserveDIP || svcInfo.localTrafficDSR, useMUX: svcInfo.preserveDIP, preserveDIP: svcInfo.preserveDIP, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
 					sourceVip,
 					lbIngressIP.ip,
 					Enum(svcInfo.Protocol()),
