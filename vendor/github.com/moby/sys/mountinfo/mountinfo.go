@@ -15,7 +15,7 @@ func GetMounts(f FilterFunc) ([]*Info, error) {
 //
 // If a non-existent path is specified, an appropriate error is returned.
 // In case the caller is not interested in this particular error, it should
-// be handled separately using e.g. errors.Is(err, os.ErrNotExist).
+// be handled separately using e.g. errors.Is(err, fs.ErrNotExist).
 func Mounted(path string) (bool, error) {
 	// root is always mounted
 	if path == string(os.PathSeparator) {
