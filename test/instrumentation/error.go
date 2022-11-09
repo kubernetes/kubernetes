@@ -26,7 +26,6 @@ const (
 	errNotDirectCall                = "Opts for STABLE metric was not directly passed to new metric function"
 	errPositionalArguments          = "Positional arguments are not supported"
 	errStabilityLevel               = "StabilityLevel should be passed STABLE, ALPHA or removed"
-	errStableSummary                = "Stable summary metric is not supported"
 	errInvalidNewMetricCall         = "Invalid new metric call, please ensure code compiles"
 	errNonStringAttribute           = "Non string attribute is not supported"
 	errBadVariableAttribute         = "Metric attribute was not correctly set. Please use only global consts in same file"
@@ -40,6 +39,13 @@ const (
 	errLabels       = "Labels were not set to list of strings"
 	errImport       = `Importing using "." is not supported`
 	errExprNotIdent = "expr selector does not refer to type ast.Ident, is type %s"
+
+	errorDecodingString            = "can't decode string"
+	errorDecodingLabels            = "can't decode labels"
+	errorDecodingConstLabels       = "can't decode const labels"
+	errorDecodingStabilityLevel    = "can't decode stability level"
+	errorFindingVariableForBuckets = "couldn't find variable for bucket"
+	errorFindingVariableForLabels  = "couldn't find variable for labels"
 )
 
 type decodeError struct {
