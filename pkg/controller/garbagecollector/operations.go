@@ -89,11 +89,11 @@ func (gc *GarbageCollector) removeFinalizer(owner *node, targetFinalizer string)
 			return nil
 		}
 		if err != nil {
-			return fmt.Errorf("cannot finalize owner %s, because cannot get it: %v. The garbage collector will retry later", owner.identity, err)
+			return fmt.Errorf("%s: cannot finalize owner %s, because cannot get it: %v. The garbage collector will retry later", gc.clusterName, owner.identity, err)
 		}
 		accessor, err := meta.Accessor(ownerObject)
 		if err != nil {
-			return fmt.Errorf("cannot access the owner object %v: %v. The garbage collector will retry later", ownerObject, err)
+			return fmt.Errorf("%s: cannot access the owner object %v: %v. The garbage collector will retry later", gc.clusterName, ownerObject, err)
 		}
 		finalizers := accessor.GetFinalizers()
 		var newFinalizers []string
@@ -106,7 +106,7 @@ func (gc *GarbageCollector) removeFinalizer(owner *node, targetFinalizer string)
 			newFinalizers = append(newFinalizers, f)
 		}
 		if !found {
-			klog.V(5).Infof("the %s finalizer is already removed from object %s", targetFinalizer, owner.identity)
+			klog.V(5).Infof("%s: the %s finalizer is already removed from object %s", gc.clusterName, targetFinalizer, owner.identity)
 			return nil
 		}
 
@@ -118,13 +118,13 @@ func (gc *GarbageCollector) removeFinalizer(owner *node, targetFinalizer string)
 			},
 		})
 		if err != nil {
-			return fmt.Errorf("unable to finalize %s due to an error serializing patch: %v", owner.identity, err)
+			return fmt.Errorf("%s: unable to finalize %s due to an error serializing patch: %v", gc.clusterName, owner.identity, err)
 		}
 		_, err = gc.patchObject(owner.identity, patch, types.MergePatchType)
 		return err
 	})
 	if errors.IsConflict(err) {
-		return fmt.Errorf("updateMaxRetries(%d) has reached. The garbage collector will retry later for owner %v", retry.DefaultBackoff.Steps, owner.identity)
+		return fmt.Errorf("%s: updateMaxRetries(%d) has reached. The garbage collector will retry later for owner %v", gc.clusterName, retry.DefaultBackoff.Steps, owner.identity)
 	}
 	return err
 }

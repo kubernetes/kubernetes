@@ -57,7 +57,7 @@ func (gc *GarbageCollector) getMetadata(apiVersion, kind, namespace, name string
 	}
 	obj, ok := raw.(runtime.Object)
 	if !ok {
-		return nil, fmt.Errorf("expect a runtime.Object, got %v", raw)
+		return nil, fmt.Errorf("%s: expect a runtime.Object, got %v", gc.clusterName, raw)
 	}
 	return meta.Accessor(obj)
 }
