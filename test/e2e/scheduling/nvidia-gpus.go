@@ -240,7 +240,7 @@ func testNvidiaGPUsJob(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	// make sure job is running by waiting for its first pod to start running
-	err = e2ejob.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, 1)
+	err = e2ejob.WaitForJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, 1)
 	framework.ExpectNoError(err)
 
 	numNodes, err := e2enode.TotalRegistered(f.ClientSet)

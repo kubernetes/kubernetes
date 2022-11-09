@@ -29,9 +29,19 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-// WaitForAllJobPodsRunning wait for all pods for the Job named JobName in namespace ns to become Running.  Only use
+// WaitForJobPodsRunning wait for all pods for the Job named JobName in namespace ns to become Running.  Only use
 // when pods will run for a long time, or it will be racy.
-func WaitForAllJobPodsRunning(c clientset.Interface, ns, jobName string, parallelism int32) error {
+func WaitForJobPodsRunning(c clientset.Interface, ns, jobName string, expectedCount int32) error {
+	return waitForJobPodsInPhase(c, ns, jobName, expectedCount, v1.PodRunning)
+}
+
+// WaitForJobPodsSucceeded wait for all pods for the Job named JobName in namespace ns to become Succeeded.
+func WaitForJobPodsSucceeded(c clientset.Interface, ns, jobName string, expectedCount int32) error {
+	return waitForJobPodsInPhase(c, ns, jobName, expectedCount, v1.PodSucceeded)
+}
+
+// waitForJobPodsInPhase wait for all pods for the Job named JobName in namespace ns to be in a given phase.
+func waitForJobPodsInPhase(c clientset.Interface, ns, jobName string, expectedCount int32, phase v1.PodPhase) error {
 	return wait.Poll(framework.Poll, JobTimeout, func() (bool, error) {
 		pods, err := GetJobPods(c, ns, jobName)
 		if err != nil {
@@ -39,11 +49,11 @@ func WaitForAllJobPodsRunning(c clientset.Interface, ns, jobName string, paralle
 		}
 		count := int32(0)
 		for _, p := range pods.Items {
-			if p.Status.Phase == v1.PodRunning {
+			if p.Status.Phase == phase {
 				count++
 			}
 		}
-		return count == parallelism, nil
+		return count == expectedCount, nil
 	})
 }
 
