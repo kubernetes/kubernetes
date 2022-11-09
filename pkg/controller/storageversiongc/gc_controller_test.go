@@ -42,47 +42,29 @@ func setupController(clientset kubernetes.Interface) {
 	informerFactory.Start(nil)
 }
 
+func newKubeApiserverLease(name, holderIdentity string) *coordinationv1.Lease {
+	return &coordinationv1.Lease{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: metav1.NamespaceSystem,
+			Labels: map[string]string{
+				"k8s.io/component": "kube-apiserver",
+			},
+		},
+		Spec: coordinationv1.LeaseSpec{
+			HolderIdentity: utilpointer.StringPtr(holderIdentity),
+		},
+	}
+}
+
 // Test_StorageVersionUpdatedWithAllEncodingVersionsEqualOnLeaseDeletion validates that
 // status.serverStorageVersions is updated when a kube-apiserver Lease is deleted.
 // If the remaining Leases agree on a new encoding version, status.commonEncodingVersion
 // should reflect the newly agreed version.
 func Test_StorageVersionUpdatedWithAllEncodingVersionsEqualOnLeaseDeletion(t *testing.T) {
-	lease1 := &coordinationv1.Lease{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "kube-apiserver-1",
-			Namespace: metav1.NamespaceSystem,
-			Labels: map[string]string{
-				"k8s.io/component": "kube-apiserver",
-			},
-		},
-		Spec: coordinationv1.LeaseSpec{
-			HolderIdentity: utilpointer.StringPtr("kube-apiserver-1"),
-		},
-	}
-	lease2 := &coordinationv1.Lease{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "kube-apiserver-2",
-			Namespace: metav1.NamespaceSystem,
-			Labels: map[string]string{
-				"k8s.io/component": "kube-apiserver",
-			},
-		},
-		Spec: coordinationv1.LeaseSpec{
-			HolderIdentity: utilpointer.StringPtr("kube-apiserver-2"),
-		},
-	}
-	lease3 := &coordinationv1.Lease{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "kube-apiserver-3",
-			Namespace: metav1.NamespaceSystem,
-			Labels: map[string]string{
-				"k8s.io/component": "kube-apiserver",
-			},
-		},
-		Spec: coordinationv1.LeaseSpec{
-			HolderIdentity: utilpointer.StringPtr("kube-apiserver-3"),
-		},
-	}
+	lease1 := newKubeApiserverLease("kube-apiserver-1", "kube-apiserver-1")
+	lease2 := newKubeApiserverLease("kube-apiserver-2", "kube-apiserver-2")
+	lease3 := newKubeApiserverLease("kube-apiserver-3", "kube-apiserver-3")
 
 	storageVersion := &apiserverinternalv1alpha1.StorageVersion{
 		ObjectMeta: metav1.ObjectMeta{
@@ -169,42 +151,9 @@ func Test_StorageVersionUpdatedWithAllEncodingVersionsEqualOnLeaseDeletion(t *te
 // If the remaining Leases do not agree on a new encoding version, status.commonEncodingVersion
 // should remain unchanged.
 func Test_StorageVersionUpdatedWithDifferentEncodingVersionsOnLeaseDeletion(t *testing.T) {
-	lease1 := &coordinationv1.Lease{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "kube-apiserver-1",
-			Namespace: metav1.NamespaceSystem,
-			Labels: map[string]string{
-				"k8s.io/component": "kube-apiserver",
-			},
-		},
-		Spec: coordinationv1.LeaseSpec{
-			HolderIdentity: utilpointer.StringPtr("kube-apiserver-1"),
-		},
-	}
-	lease2 := &coordinationv1.Lease{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "kube-apiserver-2",
-			Namespace: metav1.NamespaceSystem,
-			Labels: map[string]string{
-				"k8s.io/component": "kube-apiserver",
-			},
-		},
-		Spec: coordinationv1.LeaseSpec{
-			HolderIdentity: utilpointer.StringPtr("kube-apiserver-2"),
-		},
-	}
-	lease3 := &coordinationv1.Lease{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "kube-apiserver-3",
-			Namespace: metav1.NamespaceSystem,
-			Labels: map[string]string{
-				"k8s.io/component": "kube-apiserver",
-			},
-		},
-		Spec: coordinationv1.LeaseSpec{
-			HolderIdentity: utilpointer.StringPtr("kube-apiserver-3"),
-		},
-	}
+	lease1 := newKubeApiserverLease("kube-apiserver-1", "kube-apiserver-1")
+	lease2 := newKubeApiserverLease("kube-apiserver-2", "kube-apiserver-2")
+	lease3 := newKubeApiserverLease("kube-apiserver-3", "kube-apiserver-3")
 
 	storageVersion := &apiserverinternalv1alpha1.StorageVersion{
 		ObjectMeta: metav1.ObjectMeta{
@@ -272,42 +221,9 @@ func Test_StorageVersionUpdatedWithDifferentEncodingVersionsOnLeaseDeletion(t *t
 // Test_StorageVersionContainsInvalidLeaseID validates that status.serverStorageVersions
 // only contains the holder identity from kube-apiserver Leases that exist.
 func Test_StorageVersionContainsInvalidLeaseID(t *testing.T) {
-	lease1 := &coordinationv1.Lease{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "kube-apiserver-1",
-			Namespace: metav1.NamespaceSystem,
-			Labels: map[string]string{
-				"k8s.io/component": "kube-apiserver",
-			},
-		},
-		Spec: coordinationv1.LeaseSpec{
-			HolderIdentity: utilpointer.StringPtr("kube-apiserver-1"),
-		},
-	}
-	lease2 := &coordinationv1.Lease{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "kube-apiserver-2",
-			Namespace: metav1.NamespaceSystem,
-			Labels: map[string]string{
-				"k8s.io/component": "kube-apiserver",
-			},
-		},
-		Spec: coordinationv1.LeaseSpec{
-			HolderIdentity: utilpointer.StringPtr("kube-apiserver-2"),
-		},
-	}
-	lease3 := &coordinationv1.Lease{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "kube-apiserver-3",
-			Namespace: metav1.NamespaceSystem,
-			Labels: map[string]string{
-				"k8s.io/component": "kube-apiserver",
-			},
-		},
-		Spec: coordinationv1.LeaseSpec{
-			HolderIdentity: utilpointer.StringPtr("kube-apiserver-3"),
-		},
-	}
+	lease1 := newKubeApiserverLease("kube-apiserver-1", "kube-apiserver-1")
+	lease2 := newKubeApiserverLease("kube-apiserver-2", "kube-apiserver-2")
+	lease3 := newKubeApiserverLease("kube-apiserver-3", "kube-apiserver-3")
 
 	storageVersion := &apiserverinternalv1alpha1.StorageVersion{
 		ObjectMeta: metav1.ObjectMeta{
@@ -391,18 +307,7 @@ func Test_StorageVersionContainsInvalidLeaseID(t *testing.T) {
 // Test_StorageVersionDeletedOnLeaseDeletion validates that a StorageVersion
 // object is deleted if there are no kube-apiserver Leases.
 func Test_StorageVersionDeletedOnLeaseDeletion(t *testing.T) {
-	lease1 := &coordinationv1.Lease{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "kube-apiserver-1",
-			Namespace: metav1.NamespaceSystem,
-			Labels: map[string]string{
-				"k8s.io/component": "kube-apiserver",
-			},
-		},
-		Spec: coordinationv1.LeaseSpec{
-			HolderIdentity: utilpointer.StringPtr("kube-apiserver-1"),
-		},
-	}
+	lease1 := newKubeApiserverLease("kube-apiserver-1", "kube-apiserver-1")
 
 	storageVersion := &apiserverinternalv1alpha1.StorageVersion{
 		ObjectMeta: metav1.ObjectMeta{
