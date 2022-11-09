@@ -760,6 +760,22 @@ func TestApplyPruneObjectsWithAllowlist(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Create Namespace that can be pruned
+	ns := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "Namespace",
+			"apiVersion": "v1",
+			"metadata": map[string]interface{}{
+				"name": "test-apply",
+				"uid":  "uid-ns",
+			},
+		},
+	}
+	err = setLastAppliedConfigAnnotation(ns)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Create a ConfigMap without a UID. Resources without a UID will not be pruned.
 	cmNoUID := &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -788,28 +804,53 @@ func TestApplyPruneObjectsWithAllowlist(t *testing.T) {
 			},
 		},
 	}
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	testCases := map[string]struct {
 		currentResources        []runtime.Object
 		pruneAllowlist          []string
+		namespace               string
 		expectedPrunedResources []string
 		expectedOutputs         []string
 	}{
-		"prune without allowlist should delete resources that are not in the specified file": {
-			currentResources:        []runtime.Object{rc, rc2, cm},
-			expectedPrunedResources: []string{"test/test-cm", "test/test-rc2"},
+		"prune without namespace and allowlist should delete resources that are not in the specified file": {
+			currentResources:        []runtime.Object{rc, rc2, cm, ns},
+			expectedPrunedResources: []string{"test/test-cm", "test/test-rc2", "/test-apply"},
 			expectedOutputs: []string{
 				"replicationcontroller/test-rc unchanged",
 				"configmap/test-cm pruned",
 				"replicationcontroller/test-rc2 pruned",
+				"namespace/test-apply pruned",
+			},
+		},
+		// Deprecated: kubectl apply will no longer prune non-namespaced resources by default when used with the --namespace flag in a future release
+		// namespace is a non-namespaced resource and will not be pruned in the future
+		"prune with namespace and without allowlist should delete resources that are not in the specified file": {
+			currentResources:        []runtime.Object{rc, rc2, cm, ns},
+			namespace:               "test",
+			expectedPrunedResources: []string{"test/test-cm", "test/test-rc2", "/test-apply"},
+			expectedOutputs: []string{
+				"replicationcontroller/test-rc unchanged",
+				"configmap/test-cm pruned",
+				"replicationcontroller/test-rc2 pruned",
+				"namespace/test-apply pruned",
+			},
+		},
+		// Even namespace is a non-namespaced resource, it will be pruned if specified in pruneAllowList in the future
+		"prune with namespace and allowlist should delete all matching resources": {
+			currentResources:        []runtime.Object{rc, cm, ns},
+			pruneAllowlist:          []string{"core/v1/ConfigMap", "core/v1/Namespace"},
+			namespace:               "test",
+			expectedPrunedResources: []string{"test/test-cm", "/test-apply"},
+			expectedOutputs: []string{
+				"replicationcontroller/test-rc unchanged",
+				"configmap/test-cm pruned",
+				"namespace/test-apply pruned",
 			},
 		},
 		"prune with allowlist should delete only matching resources": {
 			currentResources:        []runtime.Object{rc, rc2, cm},
 			pruneAllowlist:          []string{"core/v1/ConfigMap"},
+			namespace:               "test",
 			expectedPrunedResources: []string{"test/test-cm"},
 			expectedOutputs: []string{
 				"replicationcontroller/test-rc unchanged",
@@ -819,6 +860,7 @@ func TestApplyPruneObjectsWithAllowlist(t *testing.T) {
 		"prune with allowlist specifying the same resource type multiple times should not fail": {
 			currentResources:        []runtime.Object{rc, rc2, cm},
 			pruneAllowlist:          []string{"core/v1/ConfigMap", "core/v1/ConfigMap"},
+			namespace:               "test",
 			expectedPrunedResources: []string{"test/test-cm"},
 			expectedOutputs: []string{
 				"replicationcontroller/test-rc unchanged",
@@ -828,6 +870,7 @@ func TestApplyPruneObjectsWithAllowlist(t *testing.T) {
 		"prune with allowlist should not delete resources that exist in the specified file": {
 			currentResources:        []runtime.Object{rc, rc2, cm},
 			pruneAllowlist:          []string{"core/v1/ReplicationController"},
+			namespace:               "test",
 			expectedPrunedResources: []string{"test/test-rc2"},
 			expectedOutputs: []string{
 				"replicationcontroller/test-rc unchanged",
@@ -837,6 +880,7 @@ func TestApplyPruneObjectsWithAllowlist(t *testing.T) {
 		"prune with allowlist specifying multiple resource types should delete matching resources": {
 			currentResources:        []runtime.Object{rc, rc2, cm},
 			pruneAllowlist:          []string{"core/v1/ConfigMap", "core/v1/ReplicationController"},
+			namespace:               "test",
 			expectedPrunedResources: []string{"test/test-cm", "test/test-rc2"},
 			expectedOutputs: []string{
 				"replicationcontroller/test-rc unchanged",
@@ -900,7 +944,7 @@ func TestApplyPruneObjectsWithAllowlist(t *testing.T) {
 				cmd := NewCmdApply("kubectl", tf, ioStreams)
 				cmd.Flags().Set("filename", filenameRC)
 				cmd.Flags().Set("prune", "true")
-				cmd.Flags().Set("namespace", "test")
+				cmd.Flags().Set("namespace", tc.namespace)
 				cmd.Flags().Set("all", "true")
 				for _, allow := range tc.pruneAllowlist {
 					cmd.Flags().Set("prune-allowlist", allow)
