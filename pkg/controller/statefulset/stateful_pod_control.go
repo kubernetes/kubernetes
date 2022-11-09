@@ -334,7 +334,7 @@ func (spc *StatefulPodControl) createPersistentVolumeClaims(set *apps.StatefulSe
 		case err != nil:
 			errs = append(errs, fmt.Errorf("failed to retrieve PVC %s: %s", claim.Name, err))
 			spc.recordClaimEvent("create", set, pod, &claim, err)
-		case err == nil:
+		default:
 			if pvc.DeletionTimestamp != nil {
 				errs = append(errs, fmt.Errorf("pvc %s is being deleted", claim.Name))
 			}
