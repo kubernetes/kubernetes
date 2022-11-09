@@ -68,23 +68,21 @@ func (o *BuiltInAuthorizationOptions) Validate() []error {
 	}
 
 	modes := sets.NewString(o.Modes...)
-	for _, mode := range o.Modes {
+	for mode := range modes {
 		if !authzmodes.IsValidAuthorizationMode(mode) {
 			allErrors = append(allErrors, fmt.Errorf("authorization-mode %q is not a valid mode", mode))
 		}
-		if mode == authzmodes.ModeABAC && o.PolicyFile == "" {
-			allErrors = append(allErrors, fmt.Errorf("authorization-mode ABAC's authorization policy file not passed"))
-		}
-		if mode == authzmodes.ModeWebhook && o.WebhookConfigFile == "" {
-			allErrors = append(allErrors, fmt.Errorf("authorization-mode Webhook's authorization config file not passed"))
-		}
 	}
 
-	if o.PolicyFile != "" && !modes.Has(authzmodes.ModeABAC) {
+	if modes.Has(authzmodes.ModeABAC) && o.PolicyFile == "" {
+		allErrors = append(allErrors, fmt.Errorf("authorization-mode ABAC's authorization policy file not passed"))
+	} else if o.PolicyFile != "" && !modes.Has(authzmodes.ModeABAC) {
 		allErrors = append(allErrors, fmt.Errorf("cannot specify --authorization-policy-file without mode ABAC"))
 	}
 
-	if o.WebhookConfigFile != "" && !modes.Has(authzmodes.ModeWebhook) {
+	if modes.Has(authzmodes.ModeWebhook) && o.WebhookConfigFile == "" {
+		allErrors = append(allErrors, fmt.Errorf("authorization-mode Webhook's authorization config file not passed"))
+	} else if o.WebhookConfigFile != "" && !modes.Has(authzmodes.ModeWebhook) {
 		allErrors = append(allErrors, fmt.Errorf("cannot specify --authorization-webhook-config-file without mode Webhook"))
 	}
 
