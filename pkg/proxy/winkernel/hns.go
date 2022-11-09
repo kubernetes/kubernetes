@@ -244,6 +244,20 @@ func (hns hns) deleteEndpoint(hnsID string) error {
 	return err
 }
 
+// findLoadBalancerID will construct a id from the provided loadbalancer fields
+func findLoadBalancerID(endpoints []endpointsInfo, vip string, protocol, internalPort, externalPort uint16) (loadBalancerIdentifier, error) {
+	// Compute hash from backends (endpoint IDs)
+	hash, err := hashEndpoints(endpoints)
+	if err != nil {
+		klog.V(2).ErrorS(err, "Error hashing endpoints", "endpoints", endpoints)
+		return loadBalancerIdentifier{}, err
+	}
+	if len(vip) > 0 {
+		return loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsHash: hash}, nil
+	}
+	return loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, endpointsHash: hash}, nil
+}
+
 func (hns hns) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerInfo, error) {
 	lbs, err := hcn.ListLoadBalancers()
 	var id loadBalancerIdentifier
@@ -396,7 +410,7 @@ func hashEndpoints[T string | endpointsInfo](endpoints []T) (hash [20]byte, err 
 	for _, ep := range endpoints {
 		switch x := any(ep).(type) {
 		case endpointsInfo:
-			id = x.hnsID
+			id = strings.ToUpper(x.hnsID)
 		case string:
 			id = x
 		}
