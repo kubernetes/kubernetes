@@ -476,6 +476,15 @@ func (c *coster) sizeEstimate(t AstNode) SizeEstimate {
 	if l := c.estimator.EstimateSize(t); l != nil {
 		return *l
 	}
+	// return an estimate of 1 for return types of set
+	// lengths, since strings/bytes/more complex objects could be of
+	// variable length
+	if isScalar(t.Type()) {
+		// TODO: since the logic for size estimation is split between
+		// ComputedSize and isScalar, changing one will likely require changing
+		// the other, so they should be merged in the future if possible
+		return SizeEstimate{Min: 1, Max: 1}
+	}
 	return SizeEstimate{Min: 0, Max: math.MaxUint64}
 }
 
@@ -598,4 +607,21 @@ func (c *coster) newAstNode(e *exprpb.Expr) *astNode {
 		derivedSize = &size
 	}
 	return &astNode{path: path, t: c.getType(e), expr: e, derivedSize: derivedSize}
+}
+
+// isScalar returns true if the given type is known to be of a constant size at
+// compile time. isScalar will return false for strings (they are variable-width)
+// in addition to protobuf.Any and protobuf.Value (their size is not knowable at compile time).
+func isScalar(t *exprpb.Type) bool {
+	switch kindOf(t) {
+	case kindPrimitive:
+		if t.GetPrimitive() != exprpb.Type_STRING && t.GetPrimitive() != exprpb.Type_BYTES {
+			return true
+		}
+	case kindWellKnown:
+		if t.GetWellKnown() == exprpb.Type_DURATION || t.GetWellKnown() == exprpb.Type_TIMESTAMP {
+			return true
+		}
+	}
+	return false
 }

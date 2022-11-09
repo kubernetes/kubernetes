@@ -1142,13 +1142,15 @@ func (proxier *Proxier) syncProxyRules() {
 				continue
 			}
 
-			klog.V(2).InfoS("Prince ==>> ", "syncProxyRules => : EpIP : ", ep.ip, " EpPort : ", ep.port, " hnsID ", ep.hnsID, " ready : ", ep.ready, " serving : ", ep.serving, " terminating : ", ep.terminating)
+			klog.V(3).InfoS("Prince ==>> ", "syncProxyRules => : EpIP : ", ep.ip, " EpPort : ", ep.port, " hnsID ", ep.hnsID, " ready : ", ep.ready, " serving : ", ep.serving, " terminating : ", ep.terminating)
 
 			if !isAllEpTerminating && !ep.IsReady() {
+				klog.V(3).InfoS("Prince ==>> ", "Continuing 1 => : EpIP : ", ep.ip, "!isAllEpTerminating :", !isAllEpTerminating, " !ep.IsReady() ", !ep.IsReady())
 				continue
 			}
 
 			if !ep.IsServing() {
+				klog.V(3).InfoS("Prince ==>> ", "Continuing 2 => : EpIP : ", ep.ip, "!isAllEpTerminating :", !isAllEpTerminating, " !ep.IsReady() ", !ep.IsReady())
 				continue
 			}
 
@@ -1402,8 +1404,6 @@ func (proxier *Proxier) syncProxyRules() {
 			} else {
 				klog.V(3).InfoS("Skipped creating Hns LoadBalancer for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)
 			}
-			// lbIngressIP.hnsID = hnsLoadBalancer.hnsID
-			// klog.V(3).InfoS("Hns LoadBalancer resource created for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)
 
 			if proxier.forwardHealthCheckVip && gatewayHnsendpoint != nil && !isAllEpTerminating {
 				nodeport := proxier.healthzPort

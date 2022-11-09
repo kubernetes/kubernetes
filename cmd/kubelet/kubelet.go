@@ -22,6 +22,7 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 	"time"
@@ -53,6 +54,7 @@ func run(command *cobra.Command) int {
 
 	command.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
 	if err := command.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return 1
 	}
 	return 0

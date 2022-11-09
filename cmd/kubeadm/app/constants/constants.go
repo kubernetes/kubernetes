@@ -320,7 +320,7 @@ const (
 	MinExternalEtcdVersion = "3.2.18"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.5.3-0"
+	DefaultEtcdVersion = "3.5.5-0"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -370,6 +370,9 @@ const (
 	// YAMLDocumentSeparator is the separator for YAML documents
 	// TODO: Find a better place for this constant
 	YAMLDocumentSeparator = "---\n"
+
+	// CIKubernetesVersionPrefix is the prefix for CI Kubernetes version
+	CIKubernetesVersionPrefix = "ci/"
 
 	// DefaultAPIServerBindAddress is the default bind address for the API Server
 	DefaultAPIServerBindAddress = "0.0.0.0"
@@ -498,9 +501,10 @@ var (
 		19: "3.4.13-0",
 		20: "3.4.13-0",
 		21: "3.4.13-0",
-		22: "3.5.3-0",
-		23: "3.5.3-0",
-		24: "3.5.3-0",
+		22: "3.5.5-0",
+		23: "3.5.5-0",
+		24: "3.5.5-0",
+		25: "3.5.5-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows

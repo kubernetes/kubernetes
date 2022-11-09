@@ -155,6 +155,13 @@ func (s *preFilterState) updateWithPod(updatedPod, preemptorPod *v1.Pod, node *v
 		return
 	}
 
+	// We only need to update the counters for the nodes that match the topology spreading policy,
+	// in other words, the node affinity.
+	requiredSchedulingTerm := nodeaffinity.GetRequiredNodeAffinity(preemptorPod)
+	if match, _ := requiredSchedulingTerm.Match(node); !match {
+		return
+	}
+
 	podLabelSet := labels.Set(updatedPod.Labels)
 	for _, constraint := range s.Constraints {
 		if !constraint.Selector.Matches(podLabelSet) {
