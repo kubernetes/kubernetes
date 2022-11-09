@@ -76,8 +76,11 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 	}
 	lc.Resources = m.calculateLinuxResources(cpuRequest, container.Resources.Limits.Cpu(), container.Resources.Limits.Memory())
 
-	lc.Resources.OomScoreAdj = int64(qos.GetContainerOOMScoreAdjust(pod, container,
-		int64(m.machineInfo.MemoryCapacity)))
+	oomScoreAdj, err := qos.GetContainerOOMScoreAdjust(pod, container, int64(m.machineInfo.MemoryCapacity))
+	if err != nil {
+		return nil, err
+	}
+	lc.Resources.OomScoreAdj = int64(oomScoreAdj)
 
 	lc.Resources.HugepageLimits = GetHugepageLimitsFromResources(container.Resources)
 

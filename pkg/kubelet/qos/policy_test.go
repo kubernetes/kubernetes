@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -171,6 +172,7 @@ type oomTest struct {
 	memoryCapacity  int64
 	lowOOMScoreAdj  int // The max oom_score_adj score the container should be assigned.
 	highOOMScoreAdj int // The min oom_score_adj score the container should be assigned.
+	expectedErr     string
 }
 
 func TestGetContainerOOMScoreAdjust(t *testing.T) {
@@ -229,9 +231,25 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 			lowOOMScoreAdj:  -997,
 			highOOMScoreAdj: -997,
 		},
+		{
+			pod:            &nodeCritical,
+			memoryCapacity: 0,
+			expectedErr:    "expected a non-zero memory capacity for the host",
+		},
+		{
+			pod:            &nodeCritical,
+			memoryCapacity: -10,
+			expectedErr:    "expected a non-zero memory capacity for the host",
+		},
 	}
 	for _, test := range oomTests {
-		oomScoreAdj := GetContainerOOMScoreAdjust(test.pod, &test.pod.Spec.Containers[0], test.memoryCapacity)
+		oomScoreAdj, err := GetContainerOOMScoreAdjust(test.pod, &test.pod.Spec.Containers[0], test.memoryCapacity)
+		if test.expectedErr != "" {
+			require.Error(t, err)
+			require.EqualError(t, err, test.expectedErr)
+			return
+		}
+
 		if oomScoreAdj < test.lowOOMScoreAdj || oomScoreAdj > test.highOOMScoreAdj {
 			t.Errorf("oom_score_adj should be between %d and %d, but was %d", test.lowOOMScoreAdj, test.highOOMScoreAdj, oomScoreAdj)
 		}
