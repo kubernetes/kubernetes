@@ -33,6 +33,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	golangproto "google.golang.org/protobuf/proto"
+	apidiscovery "k8s.io/api/apidiscovery/v2beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -1103,10 +1104,1249 @@ func TestServerPreferredNamespacedResources(t *testing.T) {
 	}
 }
 
+// Tests of the aggregated discovery format.
+func TestAggregatedServerGroups(t *testing.T) {
+	tests := []struct {
+		name                      string
+		corev1                    *apidiscovery.APIGroupDiscoveryList
+		apis                      *apidiscovery.APIGroupDiscoveryList
+		expectedGroupNames        []string
+		expectedGroupVersions     []string
+		expectedPreferredVersions []string
+	}{
+		{
+			name: "Aggregated discovery: 1 group/1 version at /api, 1 group/1 version at /apis",
+			corev1: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "pods",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "",
+											Version: "v1",
+											Kind:    "Pod",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			apis: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "apps",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedGroupNames:        []string{"", "apps"},
+			expectedGroupVersions:     []string{"v1", "apps/v1"},
+			expectedPreferredVersions: []string{"v1", "apps/v1"},
+		},
+		{
+			name: "Aggregated discovery: 1 group/1 version at /api, 1 group/2 versions at /apis",
+			corev1: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "pods",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "",
+											Version: "v1",
+											Kind:    "Pod",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			apis: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "apps",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							// v2 is preferred since it is first
+							{
+								Version: "v2",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v2",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedGroupNames:        []string{"", "apps"},
+			expectedGroupVersions:     []string{"v1", "apps/v1", "apps/v2"},
+			expectedPreferredVersions: []string{"v1", "apps/v2"},
+		},
+		{
+			name:   "Aggregated discovery: /api returns nothing, 2 groups at /apis",
+			corev1: &apidiscovery.APIGroupDiscoveryList{},
+			apis: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "apps",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "statefulsets",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "StatefulSet",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "batch",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							// v1 is preferred since it is first
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "jobs",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "batch",
+											Version: "v1",
+											Kind:    "Job",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "cronjobs",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "batch",
+											Version: "v1",
+											Kind:    "CronJob",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+							{
+								Version: "v1beta1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "jobs",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "batch",
+											Version: "v1beta1",
+											Kind:    "Job",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "cronjobs",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "batch",
+											Version: "v1beta1",
+											Kind:    "CronJob",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedGroupNames:        []string{"apps", "batch"},
+			expectedGroupVersions:     []string{"apps/v1", "batch/v1", "batch/v1beta1"},
+			expectedPreferredVersions: []string{"apps/v1", "batch/v1"},
+		},
+	}
+
+	for _, test := range tests {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			var agg *apidiscovery.APIGroupDiscoveryList
+			switch req.URL.Path {
+			case "/api":
+				agg = test.corev1
+			case "/apis":
+				agg = test.apis
+			default:
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			output, err := json.Marshal(agg)
+			require.NoError(t, err)
+			// Content-type is "aggregated" discovery format.
+			w.Header().Set("Content-Type", AcceptV2Beta1)
+			w.WriteHeader(http.StatusOK)
+			w.Write(output)
+		}))
+		defer server.Close()
+		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+		apiGroupList, err := client.ServerGroups()
+		require.NoError(t, err)
+		// Test the expected groups are returned for the aggregated format.
+		expectedGroupNames := sets.NewString(test.expectedGroupNames...)
+		actualGroupNames := sets.NewString(groupNamesFromList(apiGroupList)...)
+		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
+			"%s: Expected groups (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
+		// Test the expected group versions for the aggregated discovery is correct.
+		expectedGroupVersions := sets.NewString(test.expectedGroupVersions...)
+		actualGroupVersions := sets.NewString(groupVersionsFromGroups(apiGroupList)...)
+		assert.True(t, expectedGroupVersions.Equal(actualGroupVersions),
+			"%s: Expected group/versions (%s), got (%s)", test.name, expectedGroupVersions.List(), actualGroupVersions.List())
+		// Test the groups preferred version is correct.
+		expectedPreferredVersions := sets.NewString(test.expectedPreferredVersions...)
+		actualPreferredVersions := sets.NewString(preferredVersionsFromList(apiGroupList)...)
+		assert.True(t, expectedPreferredVersions.Equal(actualPreferredVersions),
+			"%s: Expected preferred group/version (%s), got (%s)", test.name, expectedPreferredVersions.List(), actualPreferredVersions.List())
+	}
+}
+
+func TestAggregatedServerGroupsAndResources(t *testing.T) {
+	tests := []struct {
+		name                  string
+		corev1                *apidiscovery.APIGroupDiscoveryList
+		apis                  *apidiscovery.APIGroupDiscoveryList
+		expectedGroupNames    []string
+		expectedGroupVersions []string
+		expectedGVKs          []string
+	}{
+		{
+			name: "Aggregated discovery: 1 group/1 resources at /api, 1 group/1 resources at /apis",
+			corev1: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "pods",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "",
+											Version: "v1",
+											Kind:    "Pod",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			apis: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "apps",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedGroupNames:    []string{"", "apps"},
+			expectedGroupVersions: []string{"v1", "apps/v1"},
+			expectedGVKs: []string{
+				"/v1/Pod",
+				"apps/v1/Deployment",
+			},
+		},
+		{
+			name: "Aggregated discovery: 1 group/1 resources at /api, 1 group/2 versions/1 resources at /apis",
+			corev1: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "pods",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "",
+											Version: "v1",
+											Kind:    "Pod",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			apis: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "apps",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+							{
+								Version: "v2",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v2",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedGroupNames:    []string{"", "apps"},
+			expectedGroupVersions: []string{"v1", "apps/v1", "apps/v2"},
+			expectedGVKs: []string{
+				"/v1/Pod",
+				"apps/v1/Deployment",
+				"apps/v2/Deployment",
+			},
+		},
+		{
+			name: "Aggregated discovery: 1 group/2 resources at /api, 1 group/2 resources at /apis",
+			corev1: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "pods",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "",
+											Version: "v1",
+											Kind:    "Pod",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "services",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "",
+											Version: "v1",
+											Kind:    "Service",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			apis: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "apps",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "statefulsets",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "StatefulSet",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedGroupNames:    []string{"", "apps"},
+			expectedGroupVersions: []string{"v1", "apps/v1"},
+			expectedGVKs: []string{
+				"/v1/Pod",
+				"/v1/Service",
+				"apps/v1/Deployment",
+				"apps/v1/StatefulSet",
+			},
+		},
+		{
+			name: "Aggregated discovery: 1 group/2 resources at /api, 2 group/2 resources at /apis",
+			corev1: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "pods",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "",
+											Version: "v1",
+											Kind:    "Pod",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "services",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "",
+											Version: "v1",
+											Kind:    "Service",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			apis: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "apps",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "statefulsets",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "StatefulSet",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "batch",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "jobs",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "batch",
+											Version: "v1",
+											Kind:    "Job",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "cronjobs",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "batch",
+											Version: "v1",
+											Kind:    "CronJob",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedGroupNames:    []string{"", "apps", "batch"},
+			expectedGroupVersions: []string{"v1", "apps/v1", "batch/v1"},
+			expectedGVKs: []string{
+				"/v1/Pod",
+				"/v1/Service",
+				"apps/v1/Deployment",
+				"apps/v1/StatefulSet",
+				"batch/v1/Job",
+				"batch/v1/CronJob",
+			},
+		},
+		{
+			name:   "Aggregated discovery: /api returns nothing, 2 groups/2 resources at /apis",
+			corev1: &apidiscovery.APIGroupDiscoveryList{},
+			apis: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "apps",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "statefulsets",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "StatefulSet",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "batch",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "jobs",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "batch",
+											Version: "v1",
+											Kind:    "Job",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "cronjobs",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "batch",
+											Version: "v1",
+											Kind:    "CronJob",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedGroupNames:    []string{"apps", "batch"},
+			expectedGroupVersions: []string{"apps/v1", "batch/v1"},
+			expectedGVKs: []string{
+				"apps/v1/Deployment",
+				"apps/v1/StatefulSet",
+				"batch/v1/Job",
+				"batch/v1/CronJob",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			var agg *apidiscovery.APIGroupDiscoveryList
+			switch req.URL.Path {
+			case "/api":
+				agg = test.corev1
+			case "/apis":
+				agg = test.apis
+			default:
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			output, err := json.Marshal(agg)
+			require.NoError(t, err)
+			// Content-type is "aggregated" discovery format.
+			w.Header().Set("Content-Type", AcceptV2Beta1)
+			w.WriteHeader(http.StatusOK)
+			w.Write(output)
+		}))
+		defer server.Close()
+		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+		apiGroups, resources, err := client.ServerGroupsAndResources()
+		require.NoError(t, err)
+		// Test the expected groups are returned for the aggregated format.
+		expectedGroupNames := sets.NewString(test.expectedGroupNames...)
+		actualGroupNames := sets.NewString(groupNames(apiGroups)...)
+		assert.True(t, expectedGroupNames.Equal(actualGroupNames),
+			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
+		// If the core V1 group is returned from /api, it should be the first group.
+		if expectedGroupNames.Has("") {
+			assert.True(t, len(apiGroups) > 0)
+			actualFirstGroup := apiGroups[0]
+			assert.True(t, len(actualFirstGroup.Versions) > 0)
+			actualFirstGroupVersion := actualFirstGroup.Versions[0].GroupVersion
+			assert.Equal(t, "v1", actualFirstGroupVersion)
+		}
+		// Test the expected group/versions are returned from the aggregated discovery.
+		expectedGroupVersions := sets.NewString(test.expectedGroupVersions...)
+		actualGroupVersions := sets.NewString(groupVersions(resources)...)
+		assert.True(t, expectedGroupVersions.Equal(actualGroupVersions),
+			"%s: Expected GroupVersions(%s), got (%s)", test.name, expectedGroupVersions.List(), actualGroupVersions.List())
+		// Test the expected GVKs are returned from the aggregated discovery.
+		expectedGVKs := sets.NewString(test.expectedGVKs...)
+		actualGVKs := sets.NewString(groupVersionKinds(resources)...)
+		assert.True(t, expectedGVKs.Equal(actualGVKs),
+			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGVKs.List(), actualGVKs.List())
+	}
+}
+
+func TestAggregatedServerPreferredResources(t *testing.T) {
+	tests := []struct {
+		name         string
+		corev1       *apidiscovery.APIGroupDiscoveryList
+		apis         *apidiscovery.APIGroupDiscoveryList
+		expectedGVKs []string
+	}{
+		{
+			name: "Aggregated discovery: basic corev1 and apps/v1 preferred resources returned",
+			corev1: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "pods",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "",
+											Version: "v1",
+											Kind:    "Pod",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			apis: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "apps",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedGVKs: []string{
+				"/v1/Pod",
+				"apps/v1/Deployment",
+			},
+		},
+		{
+			name: "Aggregated discovery: only resources from preferred apps/v2 group/version",
+			corev1: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "pods",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "",
+											Version: "v1",
+											Kind:    "Pod",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			apis: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "apps",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							// v2 is "preferred version since it is first
+							{
+								Version: "v2",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v2",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			// Only v2 resources from apps group, since v2 is preferred version.
+			expectedGVKs: []string{
+				"/v1/Pod",
+				"apps/v2/Deployment",
+			},
+		},
+		{
+			name: "Aggregated discovery: preferred multiple resources from multiple group/versions",
+			corev1: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "pods",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "",
+											Version: "v1",
+											Kind:    "Pod",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "services",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "",
+											Version: "v1",
+											Kind:    "Service",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			apis: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "apps",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "statefulsets",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "StatefulSet",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedGVKs: []string{
+				"/v1/Pod",
+				"/v1/Service",
+				"apps/v1/Deployment",
+				"apps/v1/StatefulSet",
+			},
+		},
+		{
+			name: "Aggregated discovery: resources from multiple preferred group versions at /apis",
+			corev1: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "pods",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "",
+											Version: "v1",
+											Kind:    "Pod",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "services",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "",
+											Version: "v1",
+											Kind:    "Service",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			apis: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "apps",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "statefulsets",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "StatefulSet",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "batch",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "jobs",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "batch",
+											Version: "v1",
+											Kind:    "Job",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "cronjobs",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "batch",
+											Version: "v1",
+											Kind:    "CronJob",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedGVKs: []string{
+				"/v1/Pod",
+				"/v1/Service",
+				"apps/v1/Deployment",
+				"apps/v1/StatefulSet",
+				"batch/v1/Job",
+				"batch/v1/CronJob",
+			},
+		},
+		{
+			name: "Aggregated discovery: resources from only preferred group versions for batch group",
+			corev1: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "pods",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "",
+											Version: "v1",
+											Kind:    "Pod",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "services",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "",
+											Version: "v1",
+											Kind:    "Service",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			apis: &apidiscovery.APIGroupDiscoveryList{
+				Items: []apidiscovery.APIGroupDiscovery{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "apps",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "deployments",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "Deployment",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "statefulsets",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "apps",
+											Version: "v1",
+											Kind:    "StatefulSet",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "batch",
+						},
+						Versions: []apidiscovery.APIVersionDiscovery{
+							{
+								Version: "v1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "jobs",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "batch",
+											Version: "v1",
+											Kind:    "Job",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "cronjobs",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "batch",
+											Version: "v1",
+											Kind:    "CronJob",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+							{
+								Version: "v1beta1",
+								Resources: []apidiscovery.APIResourceDiscovery{
+									{
+										Resource: "jobs",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "batch",
+											Version: "v1beta1",
+											Kind:    "Job",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+									{
+										Resource: "cronjobs",
+										ResponseKind: &metav1.GroupVersionKind{
+											Group:   "batch",
+											Version: "v1beta1",
+											Kind:    "CronJob",
+										},
+										Scope: apidiscovery.ScopeNamespace,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			// Only preferred resources expected--not batch/v1beta1 resources.
+			expectedGVKs: []string{
+				"/v1/Pod",
+				"/v1/Service",
+				"apps/v1/Deployment",
+				"apps/v1/StatefulSet",
+				"batch/v1/Job",
+				"batch/v1/CronJob",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			var agg *apidiscovery.APIGroupDiscoveryList
+			switch req.URL.Path {
+			case "/api":
+				agg = test.corev1
+			case "/apis":
+				agg = test.apis
+			default:
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			output, err := json.Marshal(agg)
+			require.NoError(t, err)
+			// Content-type is "aggregated" discovery format.
+			w.Header().Set("Content-Type", AcceptV2Beta1)
+			w.WriteHeader(http.StatusOK)
+			w.Write(output)
+		}))
+		defer server.Close()
+		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+		resources, err := client.ServerPreferredResources()
+		require.NoError(t, err)
+		// Test the expected preferred GVKs are returned from the aggregated discovery.
+		expectedGVKs := sets.NewString(test.expectedGVKs...)
+		actualGVKs := sets.NewString(groupVersionKinds(resources)...)
+		assert.True(t, expectedGVKs.Equal(actualGVKs),
+			"%s: Expected GVKs (%s), got (%s)", test.name, expectedGVKs.List(), actualGVKs.List())
+	}
+}
+
+func groupNames(groups []*metav1.APIGroup) []string {
+	result := []string{}
+	for _, group := range groups {
+		result = append(result, group.Name)
+	}
+	return result
+}
+
+func groupNamesFromList(groups *metav1.APIGroupList) []string {
+	result := []string{}
+	for _, group := range groups.Groups {
+		result = append(result, group.Name)
+	}
+	return result
+}
+
+func preferredVersionsFromList(groups *metav1.APIGroupList) []string {
+	result := []string{}
+	for _, group := range groups.Groups {
+		preferredGV := group.PreferredVersion.GroupVersion
+		result = append(result, preferredGV)
+	}
+	return result
+}
+
 func groupVersions(resources []*metav1.APIResourceList) []string {
 	result := []string{}
 	for _, resourceList := range resources {
 		result = append(result, resourceList.GroupVersion)
+	}
+	return result
+}
+
+func groupVersionsFromGroups(groups *metav1.APIGroupList) []string {
+	result := []string{}
+	for _, group := range groups.Groups {
+		for _, version := range group.Versions {
+			result = append(result, version.GroupVersion)
+		}
+	}
+	return result
+}
+
+func groupVersionKinds(resources []*metav1.APIResourceList) []string {
+	result := []string{}
+	for _, resourceList := range resources {
+		for _, resource := range resourceList.APIResources {
+			gvk := fmt.Sprintf("%s/%s/%s", resource.Group, resource.Version, resource.Kind)
+			result = append(result, gvk)
+		}
 	}
 	return result
 }
