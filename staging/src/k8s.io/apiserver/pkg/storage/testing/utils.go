@@ -37,9 +37,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/value"
 )
 
-// basePath for storage keys used across tests
-const basePath = "/keybase"
-
 // CreateObjList will create a list from the array of objects.
 func CreateObjList(prefix string, helper storage.Interface, items []runtime.Object) error {
 	for i := range items {
