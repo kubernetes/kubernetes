@@ -25,7 +25,7 @@ metadata:
   name: {{ .ProxyConfigMap }}
   namespace: kube-system
   labels:
-    app: kube-proxy
+    app: kube-proxy # deprecated
     app.kubernetes.io/name: kube-proxy
 data:
   kubeconfig.conf: |-
@@ -57,7 +57,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   labels:
-    k8s-app: kube-proxy
+    k8s-app: kube-proxy # deprecated
     app.kubernetes.io/name: kube-proxy
   name: kube-proxy
   namespace: kube-system
@@ -70,7 +70,7 @@ spec:
   template:
     metadata:
       labels:
-        k8s-app: kube-proxy
+        k8s-app: kube-proxy # deprecated
         app.kubernetes.io/name: kube-proxy
     spec:
       priorityClassName: system-node-critical

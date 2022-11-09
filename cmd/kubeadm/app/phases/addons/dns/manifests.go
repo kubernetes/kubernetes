@@ -23,7 +23,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    k8s-app: kube-dns
+    k8s-app: kube-dns # deprecated
     kubernetes.io/cluster-service: "true"
     kubernetes.io/name: "CoreDNS"
     app.kubernetes.io/name: "coredns"
@@ -62,7 +62,7 @@ metadata:
   name: {{ .DeploymentName }}
   namespace: kube-system
   labels:
-    k8s-app: kube-dns
+    k8s-app: kube-dns # deprecated
     app.kubernetes.io/name: "coredns"
 spec:
   replicas: {{ .Replicas }}
@@ -72,11 +72,11 @@ spec:
       maxUnavailable: 1
   selector:
     matchLabels:
-      k8s-app: kube-dns
+      k8s-app: kube-dns # deprecated
   template:
     metadata:
       labels:
-        k8s-app: kube-dns
+        k8s-app: kube-dns # deprecated
         app.kubernetes.io/name: "coredns"
     spec:
       priorityClassName: system-cluster-critical
@@ -163,6 +163,8 @@ kind: ConfigMap
 metadata:
   name: coredns
   namespace: kube-system
+  labels:
+    app.kubernetes.io/name: "coredns"
 data:
   Corefile: |
     .:53 {
@@ -192,6 +194,8 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: system:coredns
+  labels:
+    app.kubernetes.io/name: "coredns"
 rules:
 - apiGroups:
   - ""
@@ -223,6 +227,8 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: system:coredns
+  labels:
+    app.kubernetes.io/name: "coredns"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -239,5 +245,7 @@ kind: ServiceAccount
 metadata:
   name: coredns
   namespace: kube-system
+  labels:
+    app.kubernetes.io/name: "coredns"
 `
 )
