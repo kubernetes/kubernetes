@@ -30,7 +30,7 @@ const (
 	defaultNodeDir = "/sys/devices/system/node/"
 )
 
-type NUMADistances [][]uint64
+type NUMADistances map[int][]uint64
 
 type NUMAInfo struct {
 	Nodes         []int
@@ -41,13 +41,13 @@ type NUMASysFs struct {
 	nodeDir string
 }
 
-func NewNUMAInfo(topology []cadvisorapi.Node) (*NUMAInfo, error) {
-	return newNUMAInfo(topology, &NUMASysFs{nodeDir: defaultNodeDir})
+func NewNUMAInfo(topology []cadvisorapi.Node, opts PolicyOptions) (*NUMAInfo, error) {
+	return newNUMAInfo(topology, &NUMASysFs{nodeDir: defaultNodeDir}, opts)
 }
 
-func newNUMAInfo(topology []cadvisorapi.Node, sysFs *NUMASysFs) (*NUMAInfo, error) {
+func newNUMAInfo(topology []cadvisorapi.Node, sysFs *NUMASysFs, opts PolicyOptions) (*NUMAInfo, error) {
 	var numaNodes []int
-	distances := make([][]uint64, len(topology))
+	distances := map[int][]uint64{}
 	for _, node := range topology {
 		numaNodes = append(numaNodes, node.Id)
 
@@ -55,9 +55,13 @@ func newNUMAInfo(topology []cadvisorapi.Node, sysFs *NUMASysFs) (*NUMAInfo, erro
 		// For now we need to retrieve this information from sysfs.
 		// TODO: Update this as follows once a version of cadvisor with this commit is vendored in https://github.com/google/cadvisor/commit/24dd1de08a72cfee661f6178454db995900c0fee
 		//	distances[node.Id] = node.Distances[:]
-		nodeDistance, err := sysFs.GetDistances(node.Id)
-		if err != nil {
-			return nil, fmt.Errorf("error getting NUMA distances from sysfs: %w", err)
+		var nodeDistance []uint64
+		if opts.PreferClosestNUMA {
+			var err error
+			nodeDistance, err = sysFs.GetDistances(node.Id)
+			if err != nil {
+				return nil, fmt.Errorf("error getting NUMA distances from sysfs: %w", err)
+			}
 		}
 		distances[node.Id] = nodeDistance
 	}

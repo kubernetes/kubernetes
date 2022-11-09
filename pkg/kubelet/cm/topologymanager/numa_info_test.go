@@ -36,6 +36,7 @@ func TestNUMAInfo(t *testing.T) {
 		topology         []cadvisorapi.Node
 		expectedNUMAInfo *NUMAInfo
 		expectedErr      error
+		opts             PolicyOptions
 	}{
 		{
 			name: "positive test 1 node",
@@ -47,13 +48,31 @@ func TestNUMAInfo(t *testing.T) {
 			expectedNUMAInfo: &NUMAInfo{
 				Nodes: []int{0},
 				NUMADistances: NUMADistances{
-					{
+					0: nil,
+				},
+			},
+			opts: PolicyOptions{},
+		},
+		{
+			name: "positive test 1 node, with PreferClosestNUMA",
+			topology: []cadvisorapi.Node{
+				{
+					Id: 0,
+				},
+			},
+			expectedNUMAInfo: &NUMAInfo{
+				Nodes: []int{0},
+				NUMADistances: NUMADistances{
+					0: {
 						10,
 						11,
 						12,
 						12,
 					},
 				},
+			},
+			opts: PolicyOptions{
+				PreferClosestNUMA: true,
 			},
 		},
 		{
@@ -69,19 +88,40 @@ func TestNUMAInfo(t *testing.T) {
 			expectedNUMAInfo: &NUMAInfo{
 				Nodes: []int{0, 1},
 				NUMADistances: NUMADistances{
-					{
+					0: nil,
+					1: nil,
+				},
+			},
+		},
+		{
+			name: "positive test 2 nodes, with PreferClosestNUMA",
+			topology: []cadvisorapi.Node{
+				{
+					Id: 0,
+				},
+				{
+					Id: 1,
+				},
+			},
+			expectedNUMAInfo: &NUMAInfo{
+				Nodes: []int{0, 1},
+				NUMADistances: NUMADistances{
+					0: {
 						10,
 						11,
 						12,
 						12,
 					},
-					{
+					1: {
 						11,
 						10,
 						12,
 						12,
 					},
 				},
+			},
+			opts: PolicyOptions{
+				PreferClosestNUMA: true,
 			},
 		},
 		{
@@ -100,25 +140,50 @@ func TestNUMAInfo(t *testing.T) {
 			expectedNUMAInfo: &NUMAInfo{
 				Nodes: []int{0, 1, 2},
 				NUMADistances: NUMADistances{
-					{
+					0: nil,
+					1: nil,
+					2: nil,
+				},
+			},
+		},
+		{
+			name: "positive test 3 nodes, with PreferClosestNUMA",
+			topology: []cadvisorapi.Node{
+				{
+					Id: 0,
+				},
+				{
+					Id: 1,
+				},
+				{
+					Id: 2,
+				},
+			},
+			expectedNUMAInfo: &NUMAInfo{
+				Nodes: []int{0, 1, 2},
+				NUMADistances: NUMADistances{
+					0: {
 						10,
 						11,
 						12,
 						12,
 					},
-					{
+					1: {
 						11,
 						10,
 						12,
 						12,
 					},
-					{
+					2: {
 						12,
 						12,
 						10,
 						11,
 					},
 				},
+			},
+			opts: PolicyOptions{
+				PreferClosestNUMA: true,
 			},
 		},
 		{
@@ -140,25 +205,51 @@ func TestNUMAInfo(t *testing.T) {
 			expectedNUMAInfo: &NUMAInfo{
 				Nodes: []int{0, 1, 2, 3},
 				NUMADistances: NUMADistances{
-					{
+					0: nil,
+					1: nil,
+					2: nil,
+					3: nil,
+				},
+			},
+		},
+		{
+			name: "positive test 4 nodes, with PreferClosestNUMA",
+			topology: []cadvisorapi.Node{
+				{
+					Id: 0,
+				},
+				{
+					Id: 1,
+				},
+				{
+					Id: 2,
+				},
+				{
+					Id: 3,
+				},
+			},
+			expectedNUMAInfo: &NUMAInfo{
+				Nodes: []int{0, 1, 2, 3},
+				NUMADistances: NUMADistances{
+					0: {
 						10,
 						11,
 						12,
 						12,
 					},
-					{
+					1: {
 						11,
 						10,
 						12,
 						12,
 					},
-					{
+					2: {
 						12,
 						12,
 						10,
 						11,
 					},
-					{
+					3: {
 						12,
 						12,
 						11,
@@ -166,9 +257,12 @@ func TestNUMAInfo(t *testing.T) {
 					},
 				},
 			},
+			opts: PolicyOptions{
+				PreferClosestNUMA: true,
+			},
 		},
 		{
-			name: "negative test 1 node",
+			name: "negative test 1 node, no distance file with PreferClosestNUMA",
 			topology: []cadvisorapi.Node{
 				{
 					Id: 9,
@@ -176,6 +270,94 @@ func TestNUMAInfo(t *testing.T) {
 			},
 			expectedNUMAInfo: nil,
 			expectedErr:      fmt.Errorf("no such file or directory"),
+			opts: PolicyOptions{
+				PreferClosestNUMA: true,
+			},
+		},
+		{
+			name: "one node and its id is 1",
+			topology: []cadvisorapi.Node{
+				{
+					Id: 1,
+				},
+			},
+			expectedNUMAInfo: &NUMAInfo{
+				Nodes: []int{1},
+				NUMADistances: NUMADistances{
+					1: nil,
+				},
+			},
+		},
+		{
+			name: "one node and its id is 1, with PreferClosestNUMA",
+			topology: []cadvisorapi.Node{
+				{
+					Id: 1,
+				},
+			},
+			expectedNUMAInfo: &NUMAInfo{
+				Nodes: []int{1},
+				NUMADistances: NUMADistances{
+					1: {
+						11,
+						10,
+						12,
+						12,
+					},
+				},
+			},
+			opts: PolicyOptions{
+				PreferClosestNUMA: true,
+			},
+		},
+		{
+			name: "two nodes not sequential",
+			topology: []cadvisorapi.Node{
+				{
+					Id: 0,
+				},
+				{
+					Id: 2,
+				},
+			},
+			expectedNUMAInfo: &NUMAInfo{
+				Nodes: []int{0, 2},
+				NUMADistances: NUMADistances{
+					0: nil,
+					2: nil,
+				},
+			},
+		},
+		{
+			name: "two nodes not sequential, with PreferClosestNUMA",
+			topology: []cadvisorapi.Node{
+				{
+					Id: 0,
+				},
+				{
+					Id: 2,
+				},
+			},
+			expectedNUMAInfo: &NUMAInfo{
+				Nodes: []int{0, 2},
+				NUMADistances: NUMADistances{
+					0: {
+						10,
+						11,
+						12,
+						12,
+					},
+					2: {
+						12,
+						12,
+						10,
+						11,
+					},
+				},
+			},
+			opts: PolicyOptions{
+				PreferClosestNUMA: true,
+			},
 		},
 	}
 
@@ -209,7 +391,7 @@ func TestNUMAInfo(t *testing.T) {
 	sysFs := &NUMASysFs{nodeDir: nodeDir}
 
 	for _, tcase := range tcases {
-		topology, err := newNUMAInfo(tcase.topology, sysFs)
+		topology, err := newNUMAInfo(tcase.topology, sysFs, tcase.opts)
 		if tcase.expectedErr == nil && err != nil {
 			t.Fatalf("Expected err to equal nil, not %v", err)
 		} else if tcase.expectedErr != nil && err == nil {
@@ -231,7 +413,7 @@ func TestCalculateAvgDistanceFor(t *testing.T) {
 	tcases := []struct {
 		name        string
 		bm          []int
-		distance    [][]uint64
+		distance    NUMADistances
 		expectedAvg float64
 	}{
 		{
@@ -239,8 +421,8 @@ func TestCalculateAvgDistanceFor(t *testing.T) {
 			bm: []int{
 				0,
 			},
-			distance: [][]uint64{
-				{
+			distance: NUMADistances{
+				0: {
 					10,
 				},
 			},
@@ -251,12 +433,12 @@ func TestCalculateAvgDistanceFor(t *testing.T) {
 			bm: []int{
 				0,
 			},
-			distance: [][]uint64{
-				{
+			distance: NUMADistances{
+				0: {
 					10,
 					11,
 				},
-				{
+				1: {
 					11,
 					10,
 				},
@@ -269,12 +451,12 @@ func TestCalculateAvgDistanceFor(t *testing.T) {
 				0,
 				1,
 			},
-			distance: [][]uint64{
-				{
+			distance: NUMADistances{
+				0: {
 					10,
 					11,
 				},
-				{
+				1: {
 					11,
 					10,
 				},
@@ -287,26 +469,26 @@ func TestCalculateAvgDistanceFor(t *testing.T) {
 				0,
 				2,
 			},
-			distance: [][]uint64{
-				{
+			distance: NUMADistances{
+				0: {
 					10,
 					11,
 					12,
 					12,
 				},
-				{
+				1: {
 					11,
 					10,
 					12,
 					12,
 				},
-				{
+				2: {
 					12,
 					12,
 					10,
 					11,
 				},
-				{
+				3: {
 					12,
 					12,
 					11,
@@ -322,26 +504,26 @@ func TestCalculateAvgDistanceFor(t *testing.T) {
 				2,
 				3,
 			},
-			distance: [][]uint64{
-				{
+			distance: NUMADistances{
+				0: {
 					10,
 					11,
 					12,
 					12,
 				},
-				{
+				1: {
 					11,
 					10,
 					12,
 					12,
 				},
-				{
+				2: {
 					12,
 					12,
 					10,
 					11,
 				},
-				{
+				3: {
 					12,
 					12,
 					11,
@@ -353,7 +535,7 @@ func TestCalculateAvgDistanceFor(t *testing.T) {
 		{
 			name:        "0 NUMA node, 0 set in bitmask",
 			bm:          []int{},
-			distance:    [][]uint64{},
+			distance:    NUMADistances{},
 			expectedAvg: 0,
 		},
 	}
@@ -515,10 +697,10 @@ func TestClosest(t *testing.T) {
 			candidate:   NewTestBitMask(0, 2),
 			expected:    "current",
 			numaInfo: &NUMAInfo{
-				NUMADistances: [][]uint64{
-					{10, 10, 10},
-					{10, 10, 10},
-					{10, 10, 10},
+				NUMADistances: NUMADistances{
+					0: {10, 10, 10},
+					1: {10, 10, 10},
+					2: {10, 10, 10},
 				},
 			},
 		},
@@ -528,11 +710,11 @@ func TestClosest(t *testing.T) {
 			candidate:   NewTestBitMask(0, 2),
 			expected:    "candidate",
 			numaInfo: &NUMAInfo{
-				NUMADistances: [][]uint64{
-					{10, 10, 10, 10},
-					{10, 10, 10, 10},
-					{10, 10, 10, 10},
-					{10, 10, 10, 10},
+				NUMADistances: NUMADistances{
+					0: {10, 10, 10, 10},
+					1: {10, 10, 10, 10},
+					2: {10, 10, 10, 10},
+					3: {10, 10, 10, 10},
 				},
 			},
 		},
@@ -542,11 +724,11 @@ func TestClosest(t *testing.T) {
 			candidate:   NewTestBitMask(0, 1),
 			expected:    "candidate",
 			numaInfo: &NUMAInfo{
-				NUMADistances: [][]uint64{
-					{10, 11, 12, 12},
-					{11, 10, 12, 12},
-					{12, 12, 10, 11},
-					{12, 12, 11, 10},
+				NUMADistances: NUMADistances{
+					0: {10, 11, 12, 12},
+					1: {11, 10, 12, 12},
+					2: {12, 12, 10, 11},
+					3: {12, 12, 11, 10},
 				},
 			},
 		},
@@ -556,11 +738,11 @@ func TestClosest(t *testing.T) {
 			candidate:   NewTestBitMask(0, 3),
 			expected:    "current",
 			numaInfo: &NUMAInfo{
-				NUMADistances: [][]uint64{
-					{10, 11, 12, 12},
-					{11, 10, 12, 12},
-					{12, 12, 10, 11},
-					{12, 12, 11, 10},
+				NUMADistances: NUMADistances{
+					0: {10, 11, 12, 12},
+					1: {11, 10, 12, 12},
+					2: {12, 12, 10, 11},
+					3: {12, 12, 11, 10},
 				},
 			},
 		},

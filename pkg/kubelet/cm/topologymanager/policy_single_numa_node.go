@@ -28,13 +28,8 @@ var _ Policy = &singleNumaNodePolicy{}
 const PolicySingleNumaNode string = "single-numa-node"
 
 // NewSingleNumaNodePolicy returns single-numa-node policy.
-func NewSingleNumaNodePolicy(numaInfo *NUMAInfo, topologyPolicyOptions map[string]string) (Policy, error) {
-	opts, err := NewPolicyOptions(topologyPolicyOptions)
-	if err != nil {
-		return nil, err
-	}
-
-	return &singleNumaNodePolicy{numaInfo: numaInfo, opts: opts}, nil
+func NewSingleNumaNodePolicy(numaInfo *NUMAInfo, opts PolicyOptions) Policy {
+	return &singleNumaNodePolicy{numaInfo: numaInfo, opts: opts}
 }
 
 func (p *singleNumaNodePolicy) Name() string {

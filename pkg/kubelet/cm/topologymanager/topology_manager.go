@@ -133,7 +133,12 @@ var _ Manager = &manager{}
 func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topologyScopeName string, topologyPolicyOptions map[string]string) (Manager, error) {
 	klog.InfoS("Creating topology manager with policy per scope", "topologyPolicyName", topologyPolicyName, "topologyScopeName", topologyScopeName)
 
-	numaInfo, err := NewNUMAInfo(topology)
+	opts, err := NewPolicyOptions(topologyPolicyOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	numaInfo, err := NewNUMAInfo(topology, opts)
 	if err != nil {
 		return nil, fmt.Errorf("cannot discover NUMA topology: %w", err)
 	}
@@ -149,22 +154,13 @@ func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topology
 		policy = NewNonePolicy()
 
 	case PolicyBestEffort:
-		policy, err = NewBestEffortPolicy(numaInfo, topologyPolicyOptions)
-		if err != nil {
-			return nil, err
-		}
+		policy = NewBestEffortPolicy(numaInfo, opts)
 
 	case PolicyRestricted:
-		policy, err = NewRestrictedPolicy(numaInfo, topologyPolicyOptions)
-		if err != nil {
-			return nil, err
-		}
+		policy = NewRestrictedPolicy(numaInfo, opts)
 
 	case PolicySingleNumaNode:
-		policy, err = NewSingleNumaNodePolicy(numaInfo, topologyPolicyOptions)
-		if err != nil {
-			return nil, err
-		}
+		policy = NewSingleNumaNodePolicy(numaInfo, opts)
 
 	default:
 		return nil, fmt.Errorf("unknown policy: \"%s\"", topologyPolicyName)
