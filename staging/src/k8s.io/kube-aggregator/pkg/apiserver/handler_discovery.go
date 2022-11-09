@@ -232,7 +232,7 @@ func (dm *discoveryManager) fetchFreshDiscoveryForService(gv metav1.GroupVersion
 
 		dm.setCacheEntryForService(info.service, cached)
 		return &cached, nil
-	case http.StatusNotFound:
+	case http.StatusNotAcceptable:
 		// Discovery Document is not being served at all.
 		// Fall back to legacy discovery information
 		if len(gv.Version) == 0 {
