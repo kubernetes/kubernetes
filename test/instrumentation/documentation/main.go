@@ -44,6 +44,7 @@ const (
 	templ = `---
 title: Kubernetes Metrics Reference
 content_type: reference
+auto-generated: true
 description: >-
   Details of the metric data that Kubernetes components export.
 ---

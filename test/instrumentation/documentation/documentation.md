@@ -1,13 +1,14 @@
 ---
 title: Kubernetes Metrics Reference
 content_type: reference
+auto-generated: true
 description: >-
   Details of the metric data that Kubernetes components export.
 ---
 
 ## Metrics (v1.26)
 
-<!-- (auto-generated 2022 Nov 08) -->
+<!-- (auto-generated 2022 Nov 10) -->
 <!-- (auto-generated v1.26) -->
 This page details the metrics that different Kubernetes components export. You can query the metrics endpoint for these 
 components using an HTTP scrape, and fetch the current metrics data in Prometheus format.
@@ -848,15 +849,15 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <tr class="metric"><td class="metric_name">apiserver_validating_admission_policy_check_duration_seconds</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="histogram">Histogram</td>
-<td class="metric_description">Validation admission latency for individual validation expressions in seconds, labeled by policy and param resource, further including binding, state and enforcement action taken.</td>
-<td class="metric_labels_varying"><div class="metric_label">enforcement_action</div><div class="metric_label">params</div><div class="metric_label">policy</div><div class="metric_label">policy_binding</div><div class="metric_label">state</div><div class="metric_label">validation_expression</div></td>
+<td class="metric_description">Validation admission latency for individual validation expressions in seconds, labeled by policy and further including binding, state and enforcement action taken.</td>
+<td class="metric_labels_varying"><div class="metric_label">enforcement_action</div><div class="metric_label">policy</div><div class="metric_label">policy_binding</div><div class="metric_label">state</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">apiserver_validating_admission_policy_check_total</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="counter">Counter</td>
-<td class="metric_description">Validation admission policy check total, labeled by policy and param resource, and further identified by binding, validation expression, enforcement action taken, and state.</td>
-<td class="metric_labels_varying"><div class="metric_label">enforcement_action</div><div class="metric_label">params</div><div class="metric_label">policy</div><div class="metric_label">policy_binding</div><div class="metric_label">state</div><div class="metric_label">validation_expression</div></td>
+<td class="metric_description">Validation admission policy check total, labeled by policy and further identified by binding, enforcement action taken, and state.</td>
+<td class="metric_labels_varying"><div class="metric_label">enforcement_action</div><div class="metric_label">policy</div><div class="metric_label">policy_binding</div><div class="metric_label">state</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">apiserver_validating_admission_policy_definition_total</td>
@@ -1433,6 +1434,20 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_labels_varying"></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">kubelet_credential_provider_plugin_duration</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="histogram">Histogram</td>
+<td class="metric_description">Duration of execution in seconds for credential provider plugin</td>
+<td class="metric_labels_varying"><div class="metric_label">plugin_name</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
+<tr class="metric"><td class="metric_name">kubelet_credential_provider_plugin_errors</td>
+<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
+<td class="metric_type" data-type="counter">Counter</td>
+<td class="metric_description">Number of errors from credential provider plugin</td>
+<td class="metric_labels_varying"><div class="metric_label">plugin_name</div></td>
+<td class="metric_labels_constant"></td>
+<td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">kubelet_device_plugin_alloc_duration_seconds</td>
 <td class="metric_stability_level" data-stability="alpha">ALPHA</td>
 <td class="metric_type" data-type="histogram">Histogram</td>
@@ -1494,20 +1509,6 @@ components using an HTTP scrape, and fetch the current metrics data in Prometheu
 <td class="metric_type" data-type="counter">Counter</td>
 <td class="metric_description">Number of the http requests received since the server started</td>
 <td class="metric_labels_varying"><div class="metric_label">long_running</div><div class="metric_label">method</div><div class="metric_label">path</div><div class="metric_label">server_type</div></td>
-<td class="metric_labels_constant"></td>
-<td class="metric_deprecated_version"></td></tr>
-<tr class="metric"><td class="metric_name">kubelet_kubelet_credential_provider_plugin_duration</td>
-<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
-<td class="metric_type" data-type="histogram">Histogram</td>
-<td class="metric_description">Duration of execution in seconds for credential provider plugin</td>
-<td class="metric_labels_varying"><div class="metric_label">plugin_name</div></td>
-<td class="metric_labels_constant"></td>
-<td class="metric_deprecated_version"></td></tr>
-<tr class="metric"><td class="metric_name">kubelet_kubelet_credential_provider_plugin_errors</td>
-<td class="metric_stability_level" data-stability="alpha">ALPHA</td>
-<td class="metric_type" data-type="counter">Counter</td>
-<td class="metric_description">Number of errors from credential provider plugin</td>
-<td class="metric_labels_varying"><div class="metric_label">plugin_name</div></td>
 <td class="metric_labels_constant"></td>
 <td class="metric_deprecated_version"></td></tr>
 <tr class="metric"><td class="metric_name">kubelet_lifecycle_handler_http_fallbacks_total</td>
