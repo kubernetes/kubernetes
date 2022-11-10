@@ -539,7 +539,7 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 						}
 						if action == "patch" {
 							expected := []string{"application/json-patch+json", "application/merge-patch+json", "application/apply-patch+yaml"}
-							assert.Equal(t, operation.Consumes, expected)
+							assert.Equal(t, expected, operation.Consumes)
 						} else {
 							assert.Equal(t, operation.Consumes, []string{"application/json", "application/yaml"})
 						}
