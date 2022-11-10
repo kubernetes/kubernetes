@@ -17,6 +17,7 @@ limitations under the License.
 package fc
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -26,13 +27,16 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/mount-utils"
 )
 
 type fcAttacher struct {
+	plugin  *fcPlugin
 	host    volume.VolumeHost
 	manager diskManager
 }
@@ -117,9 +121,17 @@ func (attacher *fcAttacher) MountDevice(spec *volume.Spec, devicePath string, de
 	if readOnly {
 		options = append(options, "ro")
 	}
-	if mountArgs.SELinuxLabel != "" {
-		options = volumeutil.AddSELinuxMountOption(options, mountArgs.SELinuxLabel)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		support, err := attacher.plugin.SupportsSELinuxContextMount(spec)
+		if err != nil {
+			return errors.New(fmt.Sprintf("failed to query for SELinuxMount support: %s", err))
+		}
+		if support && mountArgs.SELinuxLabel != "" {
+			options = volumeutil.AddSELinuxMountOption(options, mountArgs.SELinuxLabel)
+		}
 	}
+
 	if notMnt {
 		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Exec: attacher.host.GetExec(fcPluginName)}
 		mountOptions := volumeutil.MountOptionFromSpec(spec, options...)

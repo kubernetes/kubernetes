@@ -17,6 +17,7 @@ limitations under the License.
 package rbd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -26,6 +27,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -174,9 +177,17 @@ func (attacher *rbdAttacher) MountDevice(spec *volume.Spec, devicePath string, d
 	if ro {
 		options = append(options, "ro")
 	}
-	if mountArgs.SELinuxLabel != "" {
-		options = volutil.AddSELinuxMountOption(options, mountArgs.SELinuxLabel)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		support, err := attacher.plugin.SupportsSELinuxContextMount(spec)
+		if err != nil {
+			return errors.New(fmt.Sprintf("failed to query for SELinuxMount support: %s", err))
+		}
+		if support && mountArgs.SELinuxLabel != "" {
+			options = volutil.AddSELinuxMountOption(options, mountArgs.SELinuxLabel)
+		}
 	}
+
 	mountOptions := volutil.MountOptionFromSpec(spec, options...)
 
 	err = attacher.mounter.FormatAndMount(devicePath, deviceMountPath, fstype, mountOptions)
