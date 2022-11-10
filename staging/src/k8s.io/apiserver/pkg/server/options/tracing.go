@@ -154,5 +154,9 @@ func ReadTracingConfiguration(configFilePath string) (*tracingapi.TracingConfigu
 	if err := runtime.DecodeInto(codecs.UniversalDecoder(), data, internalConfig); err != nil {
 		return nil, fmt.Errorf("unable to decode tracing configuration data: %v", err)
 	}
-	return &internalConfig.TracingConfiguration, nil
+	tc := &tracingapi.TracingConfiguration{
+		Endpoint:               internalConfig.Endpoint,
+		SamplingRatePerMillion: internalConfig.SamplingRatePerMillion,
+	}
+	return tc, nil
 }
