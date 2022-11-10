@@ -406,20 +406,6 @@ func TestConcurrentRequests(t *testing.T) {
 	waitGroup.Wait()
 }
 
-// Shows that versions within groups are ordered in the dicvoery document
-// by their assigned version priority
-func TestVersionOrdering(t *testing.T) {
-	manager := discoveryendpoint.NewResourceManager()
-	manager.AddGroupVersion("stable.example.com", apidiscoveryv2beta1.APIVersionDiscovery{
-		Version: "v1",
-		Resources: []apidiscoveryv2beta1.APIResourceDiscovery{
-			{
-				Resource: "foos",
-			},
-		},
-	})
-}
-
 // Show the handler is capable of serving many concurrent readers and many
 // concurrent writers without tripping up. Good to run with go '-race' detector
 // since there are not many "correctness" checks

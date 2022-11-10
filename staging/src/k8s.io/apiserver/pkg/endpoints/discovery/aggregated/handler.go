@@ -195,7 +195,6 @@ func (rdm *resourceDiscoveryManager) addGroupVersionLocked(groupName string, val
 func (rdm *resourceDiscoveryManager) RemoveGroupVersion(apiGroup metav1.GroupVersion) {
 	rdm.lock.Lock()
 	defer rdm.lock.Unlock()
-	delete(rdm.versionPriorities, apiGroup)
 	group, exists := rdm.apiGroups[apiGroup.Group]
 	if !exists {
 		return
@@ -214,6 +213,7 @@ func (rdm *resourceDiscoveryManager) RemoveGroupVersion(apiGroup metav1.GroupVer
 		return
 	}
 
+	delete(rdm.versionPriorities, apiGroup)
 	if len(group.Versions) == 0 {
 		delete(rdm.apiGroups, group.Name)
 		delete(rdm.apiGroupNames, group.Name)
@@ -230,7 +230,7 @@ func (rdm *resourceDiscoveryManager) RemoveGroup(groupName string) {
 	delete(rdm.apiGroups, groupName)
 	delete(rdm.apiGroupNames, groupName)
 
-	for k, _ := range rdm.versionPriorities {
+	for k := range rdm.versionPriorities {
 		if k.Group == groupName {
 			delete(rdm.versionPriorities, k)
 		}
