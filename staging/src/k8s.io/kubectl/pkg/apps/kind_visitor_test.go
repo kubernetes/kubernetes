@@ -29,7 +29,7 @@ var _ = Describe("When KindVisitor accepts a GroupKind", func() {
 		visitor = &TestKindVisitor{map[string]int{}}
 	})
 
-	It("should Visit DaemonSet iff the Kind is a DaemonSet", func() {
+	It("should Visit DaemonSet if the Kind is a DaemonSet", func() {
 		kind := GroupKindElement{
 			Kind:  "DaemonSet",
 			Group: "apps",

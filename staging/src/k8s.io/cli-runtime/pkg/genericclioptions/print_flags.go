@@ -28,7 +28,7 @@ import (
 )
 
 // NoCompatiblePrinterError is a struct that contains error information.
-// It will be constructed when a invalid printing format is provided
+// It will be constructed when an invalid printing format is provided
 type NoCompatiblePrinterError struct {
 	OutputFormat   *string
 	AllowedFormats []string

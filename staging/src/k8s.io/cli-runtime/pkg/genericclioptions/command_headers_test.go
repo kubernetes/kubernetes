@@ -105,7 +105,7 @@ func buildCommandChain(commands []*cobra.Command) *cobra.Command {
 	return currCmd
 }
 
-// Tests that the CancelRequest function is propogated to the wrapped Delegate
+// Tests that the CancelRequest function is propagated to the wrapped Delegate
 // RoundTripper; but only if the Delegate implements the CancelRequest function.
 func TestCancelRequest(t *testing.T) {
 	tests := map[string]struct {
