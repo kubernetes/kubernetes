@@ -867,6 +867,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.TopologySpreadConstraintApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("TypedLocalObjectReference"):
 		return &applyconfigurationscorev1.TypedLocalObjectReferenceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("TypedObjectReference"):
+		return &applyconfigurationscorev1.TypedObjectReferenceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("Volume"):
 		return &applyconfigurationscorev1.VolumeApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("VolumeDevice"):

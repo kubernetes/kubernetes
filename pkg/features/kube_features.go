@@ -36,6 +36,13 @@ const (
 	// of code conflicts because changes are more likely to be scattered
 	// across the file.
 
+	// owner: @ttakahashi21 @mkimuram
+	// kep: https://kep.k8s.io/3294
+	// alpha: v1.26
+	//
+	// Enable usage of Provision of PVCs from snapshots in other namespaces
+	CrossNamespaceVolumeDataSource featuregate.Feature = "CrossNamespaceVolumeDataSource"
+
 	// owner: @bswartz
 	// alpha: v1.18
 	// beta: v1.24
@@ -893,6 +900,8 @@ func init() {
 // Entries are separated from each other with blank lines to avoid sweeping gofmt changes
 // when adding or removing one entry.
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+	CrossNamespaceVolumeDataSource: {Default: false, PreRelease: featuregate.Alpha},
+
 	AnyVolumeDataSource: {Default: true, PreRelease: featuregate.Beta}, // on by default in 1.24
 
 	APISelfSubjectReview: {Default: false, PreRelease: featuregate.Alpha},

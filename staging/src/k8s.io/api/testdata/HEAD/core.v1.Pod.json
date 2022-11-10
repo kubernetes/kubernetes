@@ -407,7 +407,8 @@
               "dataSourceRef": {
                 "apiGroup": "apiGroupValue",
                 "kind": "kindValue",
-                "name": "nameValue"
+                "name": "nameValue",
+                "namespace": "namespaceValue"
               }
             }
           }

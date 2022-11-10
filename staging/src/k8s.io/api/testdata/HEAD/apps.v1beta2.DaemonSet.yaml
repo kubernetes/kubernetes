@@ -965,6 +965,7 @@ spec:
                 apiGroup: apiGroupValue
                 kind: kindValue
                 name: nameValue
+                namespace: namespaceValue
               resources:
                 limits:
                   limitsKey: "0"
