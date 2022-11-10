@@ -209,6 +209,16 @@ func (CinderVolumeSource) SwaggerDoc() map[string]string {
 	return map_CinderVolumeSource
 }
 
+var map_ClaimSource = map[string]string{
+	"":                          "ClaimSource describes a reference to a ResourceClaim.\n\nExactly one of these fields should be set.  Consumers of this type must treat an empty object as if it has an unknown value.",
+	"resourceClaimName":         "ResourceClaimName is the name of a ResourceClaim object in the same namespace as this pod.",
+	"resourceClaimTemplateName": "ResourceClaimTemplateName is the name of a ResourceClaimTemplate object in the same namespace as this pod.\n\nThe template will be used to create a new ResourceClaim, which will be bound to this pod. When this pod is deleted, the ResourceClaim will also be deleted. The name of the ResourceClaim will be <pod name>-<resource name>, where <resource name> is the PodResourceClaim.Name. Pod validation will reject the pod if the concatenated name is not valid for a ResourceClaim (e.g. too long).\n\nAn existing ResourceClaim with that name that is not owned by the pod will not be used for the pod to avoid using an unrelated resource by mistake. Scheduling and pod startup are then blocked until the unrelated ResourceClaim is removed.\n\nThis field is immutable and no changes will be made to the corresponding ResourceClaim by the control plane after creating the ResourceClaim.",
+}
+
+func (ClaimSource) SwaggerDoc() map[string]string {
+	return map_ClaimSource
+}
+
 var map_ClientIPConfig = map[string]string{
 	"":               "ClientIPConfig represents the configurations of Client IP based session affinity.",
 	"timeoutSeconds": "timeoutSeconds specifies the seconds of ClientIP type session sticky time. The value must be >0 && <=86400(for 1 day) if ServiceAffinity == \"ClientIP\". Default value is 10800(for 3 hours).",
@@ -1606,6 +1616,16 @@ func (PodReadinessGate) SwaggerDoc() map[string]string {
 	return map_PodReadinessGate
 }
 
+var map_PodResourceClaim = map[string]string{
+	"":       "PodResourceClaim references exactly one ResourceClaim through a ClaimSource. It adds a name to it that uniquely identifies the ResourceClaim inside the Pod. Containers that need access to the ResourceClaim reference it with this name.",
+	"name":   "Name uniquely identifies this resource claim inside the pod. This must be a DNS_LABEL.",
+	"source": "Source describes where to find the ResourceClaim.",
+}
+
+func (PodResourceClaim) SwaggerDoc() map[string]string {
+	return map_PodResourceClaim
+}
+
 var map_PodSchedulingGate = map[string]string{
 	"":     "PodSchedulingGate is associated to a Pod to guard its scheduling.",
 	"name": "Name of the scheduling gate. Each scheduling gate must have a unique name field.",
@@ -1682,6 +1702,7 @@ var map_PodSpec = map[string]string{
 	"os":                            "Specifies the OS of the containers in the pod. Some pod and container fields are restricted if this is set.\n\nIf the OS field is set to linux, the following fields must be unset: -securityContext.windowsOptions\n\nIf the OS field is set to windows, following fields must be unset: - spec.hostPID - spec.hostIPC - spec.hostUsers - spec.securityContext.seLinuxOptions - spec.securityContext.seccompProfile - spec.securityContext.fsGroup - spec.securityContext.fsGroupChangePolicy - spec.securityContext.sysctls - spec.shareProcessNamespace - spec.securityContext.runAsUser - spec.securityContext.runAsGroup - spec.securityContext.supplementalGroups - spec.containers[*].securityContext.seLinuxOptions - spec.containers[*].securityContext.seccompProfile - spec.containers[*].securityContext.capabilities - spec.containers[*].securityContext.readOnlyRootFilesystem - spec.containers[*].securityContext.privileged - spec.containers[*].securityContext.allowPrivilegeEscalation - spec.containers[*].securityContext.procMount - spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup",
 	"hostUsers":                     "Use the host's user namespace. Optional: Default to true. If set to true or not present, the pod will be run in the host user namespace, useful for when the pod needs a feature only available to the host user namespace, such as loading a kernel module with CAP_SYS_MODULE. When set to false, a new userns is created for the pod. Setting false is useful for mitigating container breakout vulnerabilities even allowing users to run their containers as root without actually having root privileges on the host. This field is alpha-level and is only honored by servers that enable the UserNamespacesSupport feature.",
 	"schedulingGates":               "SchedulingGates is an opaque list of values that if specified will block scheduling the pod. More info:  https://git.k8s.io/enhancements/keps/sig-scheduling/3521-pod-scheduling-readiness.\n\nThis is an alpha-level feature enabled by PodSchedulingReadiness feature gate.",
+	"resourceClaims":                "ResourceClaims defines which ResourceClaims must be allocated and reserved before the Pod is allowed to start. The resources will be made available to those containers which consume them by name.\n\nThis is an alpha field and requires enabling the DynamicResourceAllocation feature gate.\n\nThis field is immutable.",
 }
 
 func (PodSpec) SwaggerDoc() map[string]string {
@@ -1954,6 +1975,15 @@ func (ReplicationControllerStatus) SwaggerDoc() map[string]string {
 	return map_ReplicationControllerStatus
 }
 
+var map_ResourceClaim = map[string]string{
+	"":     "ResourceClaim references one entry in PodSpec.ResourceClaims.",
+	"name": "Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.",
+}
+
+func (ResourceClaim) SwaggerDoc() map[string]string {
+	return map_ResourceClaim
+}
+
 var map_ResourceFieldSelector = map[string]string{
 	"":              "ResourceFieldSelector represents container resources (cpu, memory) and their output format",
 	"containerName": "Container name: required for volumes, optional for env vars",
@@ -2011,6 +2041,7 @@ var map_ResourceRequirements = map[string]string{
 	"":         "ResourceRequirements describes the compute resource requirements.",
 	"limits":   "Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
 	"requests": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+	"claims":   "Claims lists the names of resources, defined in spec.resourceClaims, that are used by this container.\n\nThis is an alpha field and requires enabling the DynamicResourceAllocation feature gate.\n\nThis field is immutable.",
 }
 
 func (ResourceRequirements) SwaggerDoc() map[string]string {
