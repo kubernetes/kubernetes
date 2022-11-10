@@ -260,7 +260,7 @@ type CloudConfig struct {
 	ClusterIPRange    string
 	ClusterTag        string
 	Network           string
-	ConfigFile        string // for azure
+	ConfigFile        string // for azure and openstack
 	NodeTag           string
 	MasterTag         string
 

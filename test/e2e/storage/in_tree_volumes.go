@@ -36,6 +36,7 @@ var testDrivers = []func() storageframework.TestDriver{
 	drivers.InitHostPathDriver,
 	drivers.InitHostPathSymlinkDriver,
 	drivers.InitEmptydirDriver,
+	drivers.InitCinderDriver,
 	drivers.InitVSphereDriver,
 	drivers.InitAzureDiskDriver,
 	drivers.InitAzureFileDriver,

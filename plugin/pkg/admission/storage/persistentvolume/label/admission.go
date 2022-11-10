@@ -55,12 +55,13 @@ var _ = admission.Interface(&persistentVolumeLabel{})
 type persistentVolumeLabel struct {
 	*admission.Handler
 
-	mutex            sync.Mutex
-	cloudConfig      []byte
-	awsPVLabeler     cloudprovider.PVLabeler
-	gcePVLabeler     cloudprovider.PVLabeler
-	azurePVLabeler   cloudprovider.PVLabeler
-	vspherePVLabeler cloudprovider.PVLabeler
+	mutex              sync.Mutex
+	cloudConfig        []byte
+	awsPVLabeler       cloudprovider.PVLabeler
+	gcePVLabeler       cloudprovider.PVLabeler
+	azurePVLabeler     cloudprovider.PVLabeler
+	openStackPVLabeler cloudprovider.PVLabeler
+	vspherePVLabeler   cloudprovider.PVLabeler
 }
 
 var _ admission.MutationInterface = &persistentVolumeLabel{}
@@ -72,7 +73,7 @@ var _ kubeapiserveradmission.WantsCloudConfig = &persistentVolumeLabel{}
 // As a side effect, the cloud provider may block invalid or non-existent volumes.
 func newPersistentVolumeLabel() *persistentVolumeLabel {
 	// DEPRECATED: in a future release, we will use mutating admission webhooks to apply PV labels.
-	// Once the mutating admission webhook is used for AWS, Azure and GCE,
+	// Once the mutating admission webhook is used for AWS, Azure, GCE, and OpenStack,
 	// this admission controller will be removed.
 	klog.Warning("PersistentVolumeLabel admission controller is deprecated. " +
 		"Please remove this controller from your configuration files and scripts.")
@@ -216,6 +217,12 @@ func (l *persistentVolumeLabel) findVolumeLabels(volume *api.PersistentVolume) (
 		labels, err := l.findAzureDiskLabels(volume)
 		if err != nil {
 			return nil, fmt.Errorf("error querying AzureDisk volume %s: %v", volume.Spec.AzureDisk.DiskName, err)
+		}
+		return labels, nil
+	case volume.Spec.Cinder != nil:
+		labels, err := l.findCinderDiskLabels(volume)
+		if err != nil {
+			return nil, fmt.Errorf("error querying Cinder volume %s: %v", volume.Spec.Cinder.VolumeID, err)
 		}
 		return labels, nil
 	case volume.Spec.VsphereVolume != nil:
@@ -372,6 +379,56 @@ func (l *persistentVolumeLabel) findAzureDiskLabels(volume *api.PersistentVolume
 		return nil, fmt.Errorf("failed to convert PersistentVolume to core/v1: %q", err)
 	}
 	return pvlabler.GetLabelsForVolume(context.TODO(), pv)
+}
+
+func (l *persistentVolumeLabel) getOpenStackPVLabeler() (cloudprovider.PVLabeler, error) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	if l.openStackPVLabeler == nil {
+		var cloudConfigReader io.Reader
+		if len(l.cloudConfig) > 0 {
+			cloudConfigReader = bytes.NewReader(l.cloudConfig)
+		}
+
+		cloudProvider, err := cloudprovider.GetCloudProvider("openstack", cloudConfigReader)
+		if err != nil || cloudProvider == nil {
+			return nil, err
+		}
+
+		openStackPVLabeler, ok := cloudProvider.(cloudprovider.PVLabeler)
+		if !ok {
+			return nil, errors.New("OpenStack cloud provider does not implement PV labeling")
+		}
+
+		l.openStackPVLabeler = openStackPVLabeler
+	}
+
+	return l.openStackPVLabeler, nil
+
+}
+
+func (l *persistentVolumeLabel) findCinderDiskLabels(volume *api.PersistentVolume) (map[string]string, error) {
+	// Ignore any volumes that are being provisioned
+	if volume.Spec.Cinder.VolumeID == cloudvolume.ProvisionedVolumeName {
+		return nil, nil
+	}
+
+	pvlabler, err := l.getOpenStackPVLabeler()
+	if err != nil {
+		return nil, err
+	}
+	if pvlabler == nil {
+		return nil, fmt.Errorf("unable to build OpenStack cloud provider for Cinder disk")
+	}
+
+	pv := &v1.PersistentVolume{}
+	err = k8s_api_v1.Convert_core_PersistentVolume_To_v1_PersistentVolume(volume, pv, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert PersistentVolume to core/v1: %q", err)
+	}
+	return pvlabler.GetLabelsForVolume(context.TODO(), pv)
+
 }
 
 func (l *persistentVolumeLabel) findVsphereVolumeLabels(volume *api.PersistentVolume) (map[string]string, error) {
