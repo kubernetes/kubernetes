@@ -70,10 +70,10 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 		watchTests: []*testWatchStruct{{basePod, false, ""}, {basePodAssigned, true, watch.Added}},
 		pred: storage.SelectionPredicate{
 			Label: labels.Everything(),
-			Field: fields.ParseSelectorOrDie("spec.nodename=bar"),
+			Field: fields.ParseSelectorOrDie("spec.nodeName=bar"),
 			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
 				pod := obj.(*example.Pod)
-				return nil, fields.Set{"spec.nodename": pod.Spec.NodeName}, nil
+				return nil, fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
 			},
 		},
 	}, {
@@ -87,22 +87,28 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 		watchTests: []*testWatchStruct{{basePod, true, watch.Added}, {basePodAssigned, true, watch.Deleted}},
 		pred: storage.SelectionPredicate{
 			Label: labels.Everything(),
-			Field: fields.ParseSelectorOrDie("spec.nodename!=bar"),
+			Field: fields.ParseSelectorOrDie("spec.nodeName!=bar"),
 			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
 				pod := obj.(*example.Pod)
-				return nil, fields.Set{"spec.nodename": pod.Spec.NodeName}, nil
+				return nil, fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
 			},
 		},
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			watchKey := fmt.Sprintf("pods/%s", tt.namespace)
+			watchKey := fmt.Sprintf("/pods/%s", tt.namespace)
 			key := watchKey + "/foo"
 			if !recursive {
 				watchKey = key
 			}
 
-			w, err := store.Watch(ctx, watchKey, storage.ListOptions{ResourceVersion: "0", Predicate: tt.pred, Recursive: recursive})
+			// Get the current RV from which we can start watching.
+			out := &example.PodList{}
+			if err := store.GetList(ctx, watchKey, storage.ListOptions{ResourceVersion: "", Predicate: tt.pred, Recursive: recursive}, out); err != nil {
+				t.Fatalf("List failed: %v", err)
+			}
+
+			w, err := store.Watch(ctx, watchKey, storage.ListOptions{ResourceVersion: out.ResourceVersion, Predicate: tt.pred, Recursive: recursive})
 			if err != nil {
 				t.Fatalf("Watch failed: %v", err)
 			}
