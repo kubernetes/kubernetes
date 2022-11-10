@@ -19,15 +19,14 @@ package discovery
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strconv"
 	"sync"
-	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"k8s.io/client-go/kubernetes"
@@ -38,7 +37,7 @@ import (
 )
 
 type FakeService interface {
-	Start(t *testing.T, ctx context.Context)
+	Run(ctx context.Context) error
 	Port() *int32
 	Name() string
 }
@@ -62,7 +61,7 @@ func NewFakeService(name string, client kubernetes.Interface, handler http.Handl
 	}
 }
 
-func (f *fakeService) run(ctx context.Context) error {
+func (f *fakeService) Run(ctx context.Context) error {
 	aggregatedServer := httptest.NewUnstartedServer(f.handler)
 	aggregatedServer.StartTLS()
 	defer aggregatedServer.Close()
@@ -111,26 +110,24 @@ func (f *fakeService) run(ctx context.Context) error {
 
 	// Uninstall service from the cluser
 	err = f.client.CoreV1().Services("default").Delete(ctx, service.Name, metav1.DeleteOptions{})
+	if errors.Is(err, context.Canceled) {
+		err = nil
+	}
 	return err
 }
 
-func (f *fakeService) Start(t *testing.T, ctx context.Context) {
-	go func() {
-		err := f.run(ctx)
-		if errors.Is(err, context.Canceled) {
-			err = nil
-		}
-		require.NoError(t, err)
-	}()
-
+func (f *fakeService) WaitForReady(ctx context.Context) error {
 	err := wait.PollWithContext(ctx, 1*time.Second, 200*time.Millisecond, func(ctx context.Context) (done bool, err error) {
 		return f.Port() != nil, nil
 	})
 
 	if errors.Is(err, context.Canceled) {
 		err = nil
+	} else if err != nil {
+		err = fmt.Errorf("service should have come alive in a reasonable amount of time: %w", err)
 	}
-	require.NoError(t, err, "service should have come alive in a reasonable amount of time")
+
+	return err
 }
 
 func (f *fakeService) Port() *int32 {
