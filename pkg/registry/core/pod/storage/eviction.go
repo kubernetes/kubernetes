@@ -226,10 +226,24 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 		pdb := &pdbs[0]
 		pdbName = pdb.Name
 
-		// If the pod is not ready, it doesn't count towards healthy and we should not decrement
-		if !podutil.IsPodReady(pod) && pdb.Status.CurrentHealthy >= pdb.Status.DesiredHealthy && pdb.Status.DesiredHealthy > 0 {
-			updateDeletionOptions = true
-			return nil
+		// IsPodReady is the current implementation of IsHealthy
+		// If the pod is healthy, it should be guarded by the PDB.
+		if !podutil.IsPodReady(pod) {
+			if feature.DefaultFeatureGate.Enabled(features.PDBUnhealthyPodEvictionPolicy) {
+				if pdb.Spec.UnhealthyPodEvictionPolicy != nil && *pdb.Spec.UnhealthyPodEvictionPolicy == policyv1.AlwaysAllow {
+					// Delete the unhealthy pod, it doesn't count towards currentHealthy and desiredHealthy and we should not decrement disruptionsAllowed.
+					updateDeletionOptions = true
+					return nil
+				}
+			}
+			// default nil and IfHealthyBudget policy
+			if pdb.Status.CurrentHealthy >= pdb.Status.DesiredHealthy && pdb.Status.DesiredHealthy > 0 {
+				// Delete the unhealthy pod, it doesn't count towards currentHealthy and desiredHealthy and we should not decrement disruptionsAllowed.
+				// Application guarded by the PDB is not disrupted at the moment and deleting unhealthy (unready) pod will not disrupt it.
+				updateDeletionOptions = true
+				return nil
+			}
+			// confirm no disruptions allowed in checkAndDecrement
 		}
 
 		refresh := false
@@ -264,12 +278,12 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 	}
 
 	// At this point there was either no PDB or we succeeded in decrementing or
-	// the pod was unready and we have enough healthy replicas
+	// the pod was unhealthy (unready) and we have enough healthy replicas
 
 	deleteOptions := originalDeleteOptions
 
 	// Set deleteOptions.Preconditions.ResourceVersion to ensure
-	// the pod hasn't been considered ready since we calculated
+	// the pod hasn't been considered healthy (ready) since we calculated
 	if updateDeletionOptions {
 		// Take a copy so we can compare to client-provied Options later.
 		deleteOptions = deleteOptions.DeepCopy()
@@ -351,7 +365,7 @@ func shouldEnforceResourceVersion(pod *api.Pod) bool {
 		return false
 	}
 	// Return true for all other pods to ensure we don't race against a pod becoming
-	// ready and violating PDBs.
+	// healthy (ready) and violating PDBs.
 	return true
 }
 

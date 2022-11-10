@@ -44,6 +44,11 @@ const (
 	seccompAllowedProfilesAnnotationKey = "seccomp.security.alpha.kubernetes.io/allowedProfileNames"
 )
 
+var supportedUnhealthyPodEvictionPolicies = sets.NewString(
+	string(policy.IfHealthyBudget),
+	string(policy.AlwaysAllow),
+)
+
 type PodDisruptionBudgetValidationOptions struct {
 	AllowInvalidLabelValueInSelector bool
 }
@@ -77,6 +82,10 @@ func ValidatePodDisruptionBudgetSpec(spec policy.PodDisruptionBudgetSpec, opts P
 	labelSelectorValidationOptions := unversionedvalidation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: opts.AllowInvalidLabelValueInSelector}
 
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, labelSelectorValidationOptions, fldPath.Child("selector"))...)
+
+	if spec.UnhealthyPodEvictionPolicy != nil && !supportedUnhealthyPodEvictionPolicies.Has(string(*spec.UnhealthyPodEvictionPolicy)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("unhealthyPodEvictionPolicy"), *spec.UnhealthyPodEvictionPolicy, supportedUnhealthyPodEvictionPolicies.List()))
+	}
 
 	return allErrs
 }
