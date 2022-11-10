@@ -87,7 +87,7 @@ func NewResourceManager() ResourceManager {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
 	utilruntime.Must(apidiscoveryv2beta1.AddToScheme(scheme))
-	return &resourceDiscoveryManager{serializer: codecs, apiGroupNames: make(map[string]int)}
+	return &resourceDiscoveryManager{serializer: codecs, apiGroupNames: make(map[string]int), versionPriorities: make(map[metav1.GroupVersion]int)}
 }
 
 func (rdm *resourceDiscoveryManager) SetGroupPriority(group string, priority int) {
@@ -110,7 +110,7 @@ func (rdm *resourceDiscoveryManager) SetGroupVersionPriority(gv metav1.GroupVers
 		rdm.versionPriorities[gv] = priority
 		rdm.cache.Store(nil)
 	} else {
-		klog.Warningf("DiscoveryManager: Attempted to set priority for group-versoin %s but does not exist", gv)
+		klog.Warningf("DiscoveryManager: Attempted to set priority for group-version %s but does not exist", gv)
 	}
 }
 
@@ -183,6 +183,11 @@ func (rdm *resourceDiscoveryManager) addGroupVersionLocked(groupName string, val
 		rdm.apiGroupNames[groupName] = 0
 	}
 
+	gv := metav1.GroupVersion{Group: groupName, Version: value.Version}
+	if _, ok := rdm.versionPriorities[gv]; !ok {
+		rdm.versionPriorities[gv] = 0
+	}
+
 	// Reset response document so it is recreated lazily
 	rdm.cache.Store(nil)
 }
@@ -190,6 +195,7 @@ func (rdm *resourceDiscoveryManager) addGroupVersionLocked(groupName string, val
 func (rdm *resourceDiscoveryManager) RemoveGroupVersion(apiGroup metav1.GroupVersion) {
 	rdm.lock.Lock()
 	defer rdm.lock.Unlock()
+	delete(rdm.versionPriorities, apiGroup)
 	group, exists := rdm.apiGroups[apiGroup.Group]
 	if !exists {
 		return
@@ -224,6 +230,12 @@ func (rdm *resourceDiscoveryManager) RemoveGroup(groupName string) {
 	delete(rdm.apiGroups, groupName)
 	delete(rdm.apiGroupNames, groupName)
 
+	for k, _ := range rdm.versionPriorities {
+		if k.Group == groupName {
+			delete(rdm.versionPriorities, k)
+		}
+	}
+
 	// Reset response document so it is recreated lazily
 	rdm.cache.Store(nil)
 }
@@ -247,14 +259,14 @@ func (rdm *resourceDiscoveryManager) calculateAPIGroupsLocked() []apidiscoveryv2
 
 			// Sort by version string comparator if priority is equal
 			if iPriority == jPriority {
-				return version.CompareKubeAwareVersionStrings(iVersion, jVersion) < 0
+				return version.CompareKubeAwareVersionStrings(iVersion, jVersion) > 0
 			}
 
-			// i sorts before j if it has a lower priority
+			// i sorts before j if it has a higher priority
 			return iPriority > jPriority
 		})
 
-		groups = append(groups, *group.DeepCopy())
+		groups = append(groups, *copied.DeepCopy())
 
 	}
 
@@ -273,7 +285,7 @@ func (rdm *resourceDiscoveryManager) calculateAPIGroupsLocked() []apidiscoveryv2
 			return iName < jName
 		}
 
-		// i sorts before j if it has a lower priority
+		// i sorts before j if it has a higher priority
 		return iPriority > jPriority
 	})
 

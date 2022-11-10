@@ -35,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/version"
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 )
 
@@ -61,6 +62,9 @@ func fuzzAPIGroups(atLeastNumGroups, maxNumGroups int, seed int64) apidiscoveryv
 		atLeastOne := apidiscoveryv2beta1.APIVersionDiscovery{}
 		c.Fuzz(&atLeastOne)
 		o.Versions = append(o.Versions, atLeastOne)
+		sort.Slice(o.Versions[:], func(i, j int) bool {
+			return version.CompareKubeAwareVersionStrings(o.Versions[i].Version, o.Versions[j].Version) > 0
+		})
 
 		o.TypeMeta = metav1.TypeMeta{}
 		var name string
@@ -512,4 +516,58 @@ func TestAbuse(t *testing.T) {
 	}
 
 	waitGroup.Wait()
+}
+
+func TestVersionSortingNoPriority(t *testing.T) {
+	manager := discoveryendpoint.NewResourceManager()
+
+	manager.AddGroupVersion("default", apidiscoveryv2beta1.APIVersionDiscovery{
+		Version: "v1alpha1",
+	})
+	manager.AddGroupVersion("default", apidiscoveryv2beta1.APIVersionDiscovery{
+		Version: "v2beta1",
+	})
+	manager.AddGroupVersion("default", apidiscoveryv2beta1.APIVersionDiscovery{
+		Version: "v1",
+	})
+	manager.AddGroupVersion("default", apidiscoveryv2beta1.APIVersionDiscovery{
+		Version: "v1beta1",
+	})
+	manager.AddGroupVersion("default", apidiscoveryv2beta1.APIVersionDiscovery{
+		Version: "v2",
+	})
+
+	response, _, decoded := fetchPath(manager, "application/json", discoveryPath, "")
+	assert.Equal(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
+
+	versions := decoded.Items[0].Versions
+
+	// Ensure that v1 is sorted before v1alpha1
+	assert.Equal(t, versions[0].Version, "v2")
+	assert.Equal(t, versions[1].Version, "v1")
+	assert.Equal(t, versions[2].Version, "v2beta1")
+	assert.Equal(t, versions[3].Version, "v1beta1")
+	assert.Equal(t, versions[4].Version, "v1alpha1")
+}
+
+func TestVersionSortingWithPriority(t *testing.T) {
+	manager := discoveryendpoint.NewResourceManager()
+
+	manager.AddGroupVersion("default", apidiscoveryv2beta1.APIVersionDiscovery{
+		Version: "v1",
+	})
+	manager.SetGroupVersionPriority(metav1.GroupVersion{Group: "default", Version: "v1"}, 100)
+	manager.AddGroupVersion("default", apidiscoveryv2beta1.APIVersionDiscovery{
+		Version: "v1alpha1",
+	})
+	manager.SetGroupVersionPriority(metav1.GroupVersion{Group: "default", Version: "v1alpha1"}, 200)
+
+	response, _, decoded := fetchPath(manager, "application/json", discoveryPath, "")
+	assert.Equal(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
+
+	versions := decoded.Items[0].Versions
+
+	// Ensure that reverse alpha sort order can be overridden by setting group version priorities.
+	assert.Equal(t, versions[0].Version, "v1alpha1")
+	assert.Equal(t, versions[1].Version, "v1")
 }
