@@ -39,7 +39,10 @@ import (
 )
 
 var APIRegistrationGroupVersion metav1.GroupVersion = metav1.GroupVersion{Group: "apiregistration.k8s.io", Version: "v1"}
-var APIRegistrationGroupPriority int = 18000
+
+// Maximum is 20000. Set to higher than that so apiregistration always is listed
+// first (mirrors v1 discovery behavior)
+var APIRegistrationGroupPriority int = 20001
 
 // Given a list of APIServices and proxyHandlers for contacting them,
 // DiscoveryManager caches a list of discovery documents for each server
