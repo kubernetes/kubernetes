@@ -22,6 +22,7 @@ import (
 	"io"
 
 	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/json"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -41,6 +43,11 @@ import (
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
+)
+
+const (
+	MsgAnnotationUnchanged = "annotation(s) unchanged" // no change
+	MsgAnnotationModified  = "annotation(s) modified"  // support ADD, DEL and ADD && DEL scenarios
 )
 
 // AnnotateFlags directly reflect the information that CLI is gathering via flags.  They will be converted to Options, which
@@ -321,41 +328,59 @@ func (o AnnotateOptions) RunAnnotate() error {
 		}
 
 		var outputObj runtime.Object
+		//var dataChangeMsg string
 		obj := info.Object
+
+		if len(o.resourceVersion) != 0 {
+			// ensure resourceVersion is always sent in the patch by clearing it from the starting JSON
+			accessor, err := meta.Accessor(obj)
+			if err != nil {
+				return err
+			}
+			accessor.SetResourceVersion("")
+		}
+
+		oldObj, err := json.Marshal(obj)
+		if err != nil {
+			return err
+		}
 
 		if o.dryRunStrategy == cmdutil.DryRunClient || o.local || o.list {
 			if err := o.updateAnnotations(obj); err != nil {
 				return err
 			}
+			/*newObj, err := json.Marshal(obj)
+			if err != nil {
+				return err
+			}*/
+			//dataChangeMsg = updateDataChangeMsg(oldObj, newObj)
 			outputObj = obj
 		} else {
 			mapping := info.ResourceMapping()
 			name, namespace := info.Name, info.Namespace
 
-			if len(o.resourceVersion) != 0 {
-				// ensure resourceVersion is always sent in the patch by clearing it from the starting JSON
-				accessor, err := meta.Accessor(obj)
-				if err != nil {
-					return err
-				}
-				accessor.SetResourceVersion("")
-			}
-
-			oldData, err := json.Marshal(obj)
+			accessor, err := meta.Accessor(obj)
 			if err != nil {
 				return err
 			}
+			for _, ann := range o.removeAnnotations {
+				if _, ok := accessor.GetAnnotations()[ann]; !ok {
+					fmt.Fprintf(o.Out, "annotation %q not found.\n", ann)
+				}
+			}
+
 			if err := o.Recorder.Record(info.Object); err != nil {
 				klog.V(4).Infof("error recording current command: %v", err)
 			}
 			if err := o.updateAnnotations(obj); err != nil {
 				return err
 			}
-			newData, err := json.Marshal(obj)
+			newObj, err := json.Marshal(obj)
 			if err != nil {
 				return err
 			}
-			patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
+			//dataChangeMsg = updateDataChangeMsg(oldObj, newObj)
+			patchBytes, err := jsonpatch.CreateMergePatch(oldObj, newObj)
 			createdPatch := err == nil
 			if err != nil {
 				klog.V(2).Infof("couldn't compute patch: %v", err)
@@ -406,6 +431,15 @@ func (o AnnotateOptions) RunAnnotate() error {
 	})
 }
 
+// updateDataChangeMsg gets final operation msg
+func updateDataChangeMsg(oldObj, newObj []byte) string {
+	msg := MsgAnnotationUnchanged
+	if !cmp.Equal(oldObj, newObj) {
+		msg = MsgAnnotationModified
+	}
+	return msg
+}
+
 // parseAnnotations retrieves new and remove annotations from annotation args
 func parseAnnotations(annotationArgs []string) (map[string]string, []string, error) {
 	return cmdutil.ParsePairs(annotationArgs, "annotation", true)
@@ -431,23 +465,17 @@ func validateAnnotations(removeAnnotations []string, newAnnotations map[string]s
 
 // validateNoAnnotationOverwrites validates that when overwrite is false, to-be-updated annotations don't exist in the object annotation map (yet)
 func validateNoAnnotationOverwrites(accessor metav1.Object, annotations map[string]string) error {
-	var buf bytes.Buffer
+	allErrs := []error{}
 	for key, value := range annotations {
 		// change-cause annotation can always be overwritten
 		if key == polymorphichelpers.ChangeCauseAnnotation {
 			continue
 		}
 		if currValue, found := accessor.GetAnnotations()[key]; found && currValue != value {
-			if buf.Len() > 0 {
-				buf.WriteString("; ")
-			}
-			buf.WriteString(fmt.Sprintf("'%s' already has a value (%s)", key, currValue))
+			allErrs = append(allErrs, fmt.Errorf("'%s' already has a value (%s), and --overwrite is false", key, currValue))
 		}
 	}
-	if buf.Len() > 0 {
-		return fmt.Errorf("--overwrite is false but found the following declared annotation(s): %s", buf.String())
-	}
-	return nil
+	return utilerrors.NewAggregate(allErrs)
 }
 
 // updateAnnotations updates annotations of obj

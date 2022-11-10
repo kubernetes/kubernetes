@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
@@ -249,7 +250,7 @@ func TestUpdateAnnotations(t *testing.T) {
 				},
 			},
 			annotations: map[string]string{"a": "c"},
-			expectedErr: "--overwrite is false but found the following declared annotation(s): 'a' already has a value (b)",
+			expectedErr: "'a' already has a value (b), and --overwrite is false",
 		},
 		{
 			obj: &v1.Pod{
@@ -275,6 +276,36 @@ func TestUpdateAnnotations(t *testing.T) {
 			expected: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{"a": "b", "c": "d"},
+				},
+			},
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"a": "b"},
+				},
+			},
+			annotations: map[string]string{"c": "d"},
+			version:     "",
+			expected: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations:     map[string]string{"a": "b", "c": "d"},
+					ResourceVersion: "",
+				},
+			},
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"a": "b"},
+				},
+			},
+			annotations: map[string]string{"c": "d"},
+			version:     "0",
+			expected: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations:     map[string]string{"a": "b", "c": "d"},
+					ResourceVersion: "0",
 				},
 			},
 		},
@@ -721,5 +752,203 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	}
 	if err := options.RunAnnotate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestAnnotateMsg(t *testing.T) {
+	tests := []struct {
+		obj             runtime.Object
+		overwrite       bool
+		resourceVersion string
+		annotations     map[string]string
+		remove          []string
+		expectObj       runtime.Object
+		expectMsg       string
+		expectErr       bool
+	}{
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"a": "b"},
+				},
+			},
+			annotations: map[string]string{"a": "b"},
+			expectMsg:   MsgAnnotationUnchanged,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{},
+			},
+			annotations: map[string]string{"a": "b"},
+			expectObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"a": "b"},
+				},
+			},
+			expectMsg: MsgAnnotationModified,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"a": "b"},
+				},
+			},
+			annotations: map[string]string{"a": "c"},
+			overwrite:   true,
+			expectObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"a": "c"},
+				},
+			},
+			expectMsg: MsgAnnotationModified,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"a": "b"},
+				},
+			},
+			annotations: map[string]string{"c": "d"},
+			expectObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"a": "b", "c": "d"},
+				},
+			},
+			expectMsg: MsgAnnotationModified,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"a": "b"},
+				},
+			},
+			annotations:     map[string]string{"c": "d"},
+			resourceVersion: "2",
+			expectObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations:     map[string]string{"a": "b", "c": "d"},
+					ResourceVersion: "2",
+				},
+			},
+			expectMsg: MsgAnnotationModified,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"a": "b"},
+				},
+			},
+			annotations: map[string]string{},
+			remove:      []string{"a"}, // exist
+			expectObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{},
+				},
+			},
+			expectMsg: MsgAnnotationModified,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"a": "b"},
+				},
+			},
+			annotations: map[string]string{},
+			remove:      []string{"c"}, // not exist
+			expectObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"a": "b"},
+				},
+			},
+			expectMsg: MsgAnnotationUnchanged,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"a": "b", "c": "d"},
+				},
+			},
+			annotations: map[string]string{"e": "f"},
+			remove:      []string{"a"},
+			expectObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"c": "d",
+						"e": "f",
+					},
+				},
+			},
+			expectMsg: MsgAnnotationModified,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"status": "unhealthy"},
+				},
+			},
+			annotations: map[string]string{"status": "healthy"},
+			overwrite:   true,
+			expectObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"status": "healthy",
+					},
+				},
+			},
+			expectMsg: MsgAnnotationModified,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{"status": "unhealthy"},
+				},
+			},
+			annotations: map[string]string{"status": "healthy"},
+			overwrite:   false,
+			expectObj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"status": "unhealthy",
+					},
+				},
+			},
+			expectMsg: MsgAnnotationUnchanged,
+			expectErr: true,
+		},
+	}
+
+	for i, test := range tests {
+		options := &AnnotateOptions{
+			overwrite:         test.overwrite,
+			newAnnotations:    test.annotations,
+			removeAnnotations: test.remove,
+			resourceVersion:   test.resourceVersion,
+		}
+
+		oldData, err := json.Marshal(test.obj)
+		if err != nil {
+			t.Errorf("unexpected error: %v %v", err, i)
+		}
+
+		err = options.updateAnnotations(test.obj)
+		if test.expectErr {
+			if err == nil {
+				t.Errorf("unexpected non-error: %v", i)
+			}
+			continue
+		}
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected error: %v %v", err, i)
+		}
+
+		newData, err := json.Marshal(test.obj)
+		if err != nil {
+			t.Errorf("unexpected error: %v %v", err, i)
+		}
+
+		dataChangeMsg := updateDataChangeMsg(oldData, newData)
+		if dataChangeMsg != test.expectMsg {
+			t.Errorf("unexpected dataChangeMsg: %v != %v, %v", dataChangeMsg, test.expectMsg, i)
+		}
 	}
 }

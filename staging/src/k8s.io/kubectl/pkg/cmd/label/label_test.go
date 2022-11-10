@@ -422,7 +422,7 @@ func TestLabelForResourceFromFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(buf.String(), "labeled") {
+	if !strings.Contains(buf.String(), MsgLabelModified) {
 		t.Errorf("did not set labels: %s", buf.String())
 	}
 }
@@ -455,7 +455,7 @@ func TestLabelLocal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(buf.String(), "labeled") {
+	if !strings.Contains(buf.String(), MsgLabelModified) {
 		t.Errorf("did not set labels: %s", buf.String())
 	}
 }
@@ -511,7 +511,7 @@ func TestLabelMultipleObjects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if strings.Count(buf.String(), "labeled") != len(pods.Items) {
+	if strings.Count(buf.String(), MsgLabelModified) != len(pods.Items) {
 		t.Errorf("not all labels are set: %s", buf.String())
 	}
 }
@@ -641,7 +641,7 @@ func TestRunLabelMsg(t *testing.T) {
 		{
 			name:        "set new label",
 			args:        []string{"pods/foo", "foo=bar"},
-			expectedOut: "pod/foo labeled\n",
+			expectedOut: "pod/foo " + MsgLabelModified + "\n",
 		},
 		{
 			name:          "attempt to set existing label without using overwrite flag",
@@ -652,43 +652,43 @@ func TestRunLabelMsg(t *testing.T) {
 			name:        "set existing label",
 			args:        []string{"pods/foo", "existing=bar"},
 			overwrite:   true,
-			expectedOut: "pod/foo labeled\n",
+			expectedOut: "pod/foo " + MsgLabelModified + "\n",
 		},
 		{
 			name:        "unset existing label",
 			args:        []string{"pods/foo", "existing-"},
-			expectedOut: "pod/foo unlabeled\n",
+			expectedOut: "pod/foo " + MsgLabelModified + "\n",
 		},
 		{
 			name: "unset nonexisting label",
 			args: []string{"pods/foo", "foo-"},
 			expectedOut: `label "foo" not found.
-pod/foo not labeled
+pod/foo label(s) unchanged
 `,
 		},
 		{
 			name:        "set new label with server dry run",
 			args:        []string{"pods/foo", "foo=bar"},
 			dryRun:      "server",
-			expectedOut: "pod/foo labeled (server dry run)\n",
+			expectedOut: "pod/foo " + MsgLabelModified + " (server dry run)\n",
 		},
 		{
 			name:        "set new label with client dry run",
 			args:        []string{"pods/foo", "foo=bar"},
 			dryRun:      "client",
-			expectedOut: "pod/foo labeled (dry run)\n",
+			expectedOut: "pod/foo " + MsgLabelModified + " (dry run)\n",
 		},
 		{
 			name:        "unset existing label with server dry run",
 			args:        []string{"pods/foo", "existing-"},
 			dryRun:      "server",
-			expectedOut: "pod/foo unlabeled (server dry run)\n",
+			expectedOut: "pod/foo " + MsgLabelModified + " (server dry run)\n",
 		},
 		{
 			name:        "unset existing label with client dry run",
 			args:        []string{"pods/foo", "existing-"},
 			dryRun:      "client",
-			expectedOut: "pod/foo unlabeled (dry run)\n",
+			expectedOut: "pod/foo " + MsgLabelModified + " (dry run)\n",
 		},
 	}
 
@@ -750,7 +750,7 @@ func TestLabelMsg(t *testing.T) {
 				},
 			},
 			labels:    map[string]string{"a": "b"},
-			expectMsg: MsgNotLabeled,
+			expectMsg: MsgLabelUnchanged,
 		},
 		{
 			obj: &v1.Pod{
@@ -762,7 +762,7 @@ func TestLabelMsg(t *testing.T) {
 					Labels: map[string]string{"a": "b"},
 				},
 			},
-			expectMsg: MsgLabeled,
+			expectMsg: MsgLabelModified,
 		},
 		{
 			obj: &v1.Pod{
@@ -777,7 +777,7 @@ func TestLabelMsg(t *testing.T) {
 					Labels: map[string]string{"a": "c"},
 				},
 			},
-			expectMsg: MsgLabeled,
+			expectMsg: MsgLabelModified,
 		},
 		{
 			obj: &v1.Pod{
@@ -791,7 +791,7 @@ func TestLabelMsg(t *testing.T) {
 					Labels: map[string]string{"a": "b", "c": "d"},
 				},
 			},
-			expectMsg: MsgLabeled,
+			expectMsg: MsgLabelModified,
 		},
 		{
 			obj: &v1.Pod{
@@ -807,7 +807,7 @@ func TestLabelMsg(t *testing.T) {
 					ResourceVersion: "2",
 				},
 			},
-			expectMsg: MsgLabeled,
+			expectMsg: MsgLabelModified,
 		},
 		{
 			obj: &v1.Pod{
@@ -822,7 +822,7 @@ func TestLabelMsg(t *testing.T) {
 					Labels: map[string]string{},
 				},
 			},
-			expectMsg: MsgUnLabeled,
+			expectMsg: MsgLabelModified,
 		},
 		{
 			obj: &v1.Pod{
@@ -840,7 +840,7 @@ func TestLabelMsg(t *testing.T) {
 					},
 				},
 			},
-			expectMsg: MsgLabeled,
+			expectMsg: MsgLabelModified,
 		},
 		{
 			obj: &v1.Pod{
@@ -857,7 +857,7 @@ func TestLabelMsg(t *testing.T) {
 					},
 				},
 			},
-			expectMsg: MsgLabeled,
+			expectMsg: MsgLabelModified,
 		},
 		{
 			obj: &v1.Pod{
@@ -874,7 +874,7 @@ func TestLabelMsg(t *testing.T) {
 					},
 				},
 			},
-			expectMsg: MsgNotLabeled,
+			expectMsg: MsgLabelUnchanged,
 			expectErr: true,
 		},
 	}
@@ -899,7 +899,7 @@ func TestLabelMsg(t *testing.T) {
 			t.Errorf("unexpected error: %v %v", err, test)
 		}
 
-		dataChangeMsg := updateDataChangeMsg(oldData, newObj, test.overwrite)
+		dataChangeMsg := updateDataChangeMsg(oldData, newObj)
 		if dataChangeMsg != test.expectMsg {
 			t.Errorf("unexpected dataChangeMsg: %v != %v, %v", dataChangeMsg, test.expectMsg, test)
 		}

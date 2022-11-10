@@ -18,10 +18,10 @@ package label
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 
@@ -45,19 +45,18 @@ import (
 )
 
 const (
-	MsgNotLabeled = "not labeled"
-	MsgLabeled    = "labeled"
-	MsgUnLabeled  = "unlabeled"
+	MsgLabelUnchanged = "label(s) unchanged" // no change
+	MsgLabelModified  = "label(s) modified"  // support ADD, DEL and ADD && DEL scenarios
 )
 
 // LabelOptions have the data required to perform the label operation
 type LabelOptions struct {
+	PrintFlags *genericclioptions.PrintFlags
+	ToPrinter  func(string) (printers.ResourcePrinter, error)
+
 	// Filename options
 	resource.FilenameOptions
 	RecordFlags *genericclioptions.RecordFlags
-
-	PrintFlags *genericclioptions.PrintFlags
-	ToPrinter  func(string) (printers.ResourcePrinter, error)
 
 	// Common user flags
 	overwrite       bool
@@ -123,7 +122,7 @@ func NewLabelOptions(ioStreams genericclioptions.IOStreams) *LabelOptions {
 		RecordFlags: genericclioptions.NewRecordFlags(),
 		Recorder:    genericclioptions.NoopRecorder{},
 
-		PrintFlags: genericclioptions.NewPrintFlags("labeled").WithTypeSetter(scheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags(MsgLabelModified).WithTypeSetter(scheme.Scheme),
 
 		IOStreams: ioStreams,
 	}
@@ -289,10 +288,11 @@ func (o *LabelOptions) RunLabel() error {
 			accessor.SetResourceVersion("")
 		}
 
-		oldData, err := json.Marshal(obj)
+		oldObj, err := json.Marshal(obj)
 		if err != nil {
 			return err
 		}
+
 		if o.dryRunStrategy == cmdutil.DryRunClient || o.local || o.list {
 			err = labelFunc(obj, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels)
 			if err != nil {
@@ -302,7 +302,7 @@ func (o *LabelOptions) RunLabel() error {
 			if err != nil {
 				return err
 			}
-			dataChangeMsg = updateDataChangeMsg(oldData, newObj, o.overwrite)
+			dataChangeMsg = updateDataChangeMsg(oldObj, newObj)
 			outputObj = info.Object
 		} else {
 			name, namespace := info.Name, info.Namespace
@@ -329,8 +329,8 @@ func (o *LabelOptions) RunLabel() error {
 			if err != nil {
 				return err
 			}
-			dataChangeMsg = updateDataChangeMsg(oldData, newObj, o.overwrite)
-			patchBytes, err := jsonpatch.CreateMergePatch(oldData, newObj)
+			dataChangeMsg = updateDataChangeMsg(oldObj, newObj)
+			patchBytes, err := jsonpatch.CreateMergePatch(oldObj, newObj)
 			createdPatch := err == nil
 			if err != nil {
 				klog.V(2).Infof("couldn't compute patch: %v", err)
@@ -381,17 +381,15 @@ func (o *LabelOptions) RunLabel() error {
 		if err != nil {
 			return err
 		}
-		return printer.PrintObj(info.Object, o.Out)
+		return printer.PrintObj(outputObj, o.Out)
 	})
 }
 
-func updateDataChangeMsg(oldObj []byte, newObj []byte, overwrite bool) string {
-	msg := MsgNotLabeled
-	if !reflect.DeepEqual(oldObj, newObj) {
-		msg = MsgLabeled
-		if !overwrite && len(newObj) < len(oldObj) {
-			msg = MsgUnLabeled
-		}
+// updateDataChangeMsg gets final operation msg
+func updateDataChangeMsg(oldObj, newObj []byte) string {
+	msg := MsgLabelUnchanged
+	if !cmp.Equal(oldObj, newObj) {
+		msg = MsgLabelModified
 	}
 	return msg
 }
