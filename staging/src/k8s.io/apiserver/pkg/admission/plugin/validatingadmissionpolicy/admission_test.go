@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cel
+package validatingadmissionpolicy
 
 import (
 	"context"
@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
-	"k8s.io/apiserver/pkg/admission/plugin/cel/internal/generic"
+	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/internal/generic"
 	"k8s.io/apiserver/pkg/features"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/informers"
@@ -249,13 +249,13 @@ func setupTestCommon(t *testing.T, compiler ValidatorCompiler, shouldStartInform
 	fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, time.Second)
 	featureGate := featuregate.NewFeatureGate()
 	err := featureGate.Add(map[featuregate.Feature]featuregate.FeatureSpec{
-		features.CELValidatingAdmission: {
+		features.ValidatingAdmissionPolicy: {
 			Default: true, PreRelease: featuregate.Alpha}})
 	if err != nil {
 		// FIXME: handle error.
 		panic("Unexpected error")
 	}
-	err = featureGate.SetFromMap(map[string]bool{string(features.CELValidatingAdmission): true})
+	err = featureGate.SetFromMap(map[string]bool{string(features.ValidatingAdmissionPolicy): true})
 	if err != nil {
 		// FIXME: handle error.
 		panic("Unexpected error.")

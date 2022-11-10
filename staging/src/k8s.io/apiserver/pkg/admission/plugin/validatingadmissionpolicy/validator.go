@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cel
+package validatingadmissionpolicy
 
 import (
 	"fmt"
@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/admission/plugin/cel/matching"
+	"k8s.io/apiserver/pkg/admission/plugin/validatingadmissionpolicy/matching"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 )
 
