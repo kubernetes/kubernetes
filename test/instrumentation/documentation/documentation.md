@@ -1,14 +1,14 @@
 ---
 title: Kubernetes Metrics Reference
 content_type: reference
-auto-generated: true
+auto_generated: true
 description: >-
   Details of the metric data that Kubernetes components export.
 ---
 
 ## Metrics (v1.26)
 
-<!-- (auto-generated 2022 Nov 10) -->
+<!-- (auto-generated 2022 Nov 11) -->
 <!-- (auto-generated v1.26) -->
 This page details the metrics that different Kubernetes components export. You can query the metrics endpoint for these 
 components using an HTTP scrape, and fetch the current metrics data in Prometheus format.
