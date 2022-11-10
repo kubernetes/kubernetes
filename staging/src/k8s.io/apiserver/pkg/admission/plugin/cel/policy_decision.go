@@ -18,22 +18,33 @@ package cel
 
 import (
 	"net/http"
+	"time"
 
 	"k8s.io/api/admissionregistration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type policyDecisionKind string
+type policyDecisionAction string
 
 const (
-	admit policyDecisionKind = "admit"
-	deny  policyDecisionKind = "deny"
+	actionAdmit policyDecisionAction = "admit"
+	actionDeny  policyDecisionAction = "deny"
+)
+
+type policyDecisionEvaluation string
+
+const (
+	evalAdmit policyDecisionEvaluation = "admit"
+	evalError policyDecisionEvaluation = "error"
+	evalDeny  policyDecisionEvaluation = "deny"
 )
 
 type policyDecision struct {
-	kind    policyDecisionKind
-	message string
-	reason  metav1.StatusReason
+	action     policyDecisionAction
+	evaluation policyDecisionEvaluation
+	message    string
+	reason     metav1.StatusReason
+	elapsed    time.Duration
 }
 
 type policyDecisionWithMetadata struct {

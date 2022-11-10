@@ -47,10 +47,10 @@ func newValidationAdmissionMetrics() *ValidatingAdmissionPolicyMetrics {
 			Namespace:      metricsNamespace,
 			Subsystem:      metricsSubsystem,
 			Name:           "check_total",
-			Help:           "Validation admission policy check total, labeled by policy and param resource, and further identified by binding, validation expression, enforcement action taken, and state.",
+			Help:           "Validation admission policy check total, labeled by policy and further identified by binding, enforcement action taken, and state.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"policy", "policy_binding", "validation_expression", "enforcement_action", "params", "state"},
+		[]string{"policy", "policy_binding", "enforcement_action", "state"},
 	)
 	definition := metrics.NewCounterVec(&metrics.CounterOpts{
 		Namespace:      metricsNamespace,
@@ -65,7 +65,7 @@ func newValidationAdmissionMetrics() *ValidatingAdmissionPolicyMetrics {
 		Namespace: metricsNamespace,
 		Subsystem: metricsSubsystem,
 		Name:      "check_duration_seconds",
-		Help:      "Validation admission latency for individual validation expressions in seconds, labeled by policy and param resource, further including binding, state and enforcement action taken.",
+		Help:      "Validation admission latency for individual validation expressions in seconds, labeled by policy and further including binding, state and enforcement action taken.",
 		// the bucket distribution here is based oo the benchmark suite at
 		// github.com/DangerOnTheRanger/cel-benchmark performed on 16-core Intel Xeon
 		// the lowest bucket was based around the 180ns/op figure for BenchmarkAccess,
@@ -77,7 +77,7 @@ func newValidationAdmissionMetrics() *ValidatingAdmissionPolicyMetrics {
 		Buckets:        []float64{0.0000005, 0.001, 0.01, 0.1, 1.0},
 		StabilityLevel: metrics.ALPHA,
 	},
-		[]string{"policy", "policy_binding", "validation_expression", "enforcement_action", "params", "state"},
+		[]string{"policy", "policy_binding", "enforcement_action", "state"},
 	)
 
 	legacyregistry.MustRegister(check)
@@ -98,8 +98,14 @@ func (m *ValidatingAdmissionPolicyMetrics) ObserveDefinition(ctx context.Context
 	m.policyDefinition.WithContext(ctx).WithLabelValues(state, enforcementAction).Inc()
 }
 
-// ObserveCheck observes a policy validation check.
-func (m *ValidatingAdmissionPolicyMetrics) ObserveCheck(ctx context.Context, elapsed time.Duration, policy, binding, expression, enforcementAction, params, state string) {
-	m.policyCheck.WithContext(ctx).WithLabelValues(policy, binding, expression, enforcementAction, params, state).Inc()
-	m.policyLatency.WithContext(ctx).WithLabelValues(policy, binding, expression, enforcementAction, params, state).Observe(elapsed.Seconds())
+// ObserveAdmissionWithError observes a policy validation error that was ignored due to failure policy.
+func (m *ValidatingAdmissionPolicyMetrics) ObserveAdmissionWithError(ctx context.Context, elapsed time.Duration, policy, binding, state string) {
+	m.policyCheck.WithContext(ctx).WithLabelValues(policy, binding, "allow", state).Inc()
+	m.policyLatency.WithContext(ctx).WithLabelValues(policy, binding, "allow", state).Observe(elapsed.Seconds())
+}
+
+// ObserveRejection observes a policy validation error that was at least one of the reasons for a deny.
+func (m *ValidatingAdmissionPolicyMetrics) ObserveRejection(ctx context.Context, elapsed time.Duration, policy, binding, state string) {
+	m.policyCheck.WithContext(ctx).WithLabelValues(policy, binding, "deny", state).Inc()
+	m.policyLatency.WithContext(ctx).WithLabelValues(policy, binding, "deny", state).Observe(elapsed.Seconds())
 }
