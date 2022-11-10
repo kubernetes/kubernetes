@@ -43,15 +43,12 @@ type ResourceManager interface {
 	// Thread-safe
 	AddGroupVersion(groupName string, value apidiscoveryv2beta1.APIVersionDiscovery)
 
-	// Sets priority for a group for sorting discovery.
-	// If a priority is set before the group is known, the priority will be ignored
-	// Once a group is removed, the priority is forgotten.
-	SetGroupPriority(groupName string, priority int)
-
-	// Sets a priority to be used while sorting a specific group-version
-	// If the group is not known, the priority is ignored.
-	// The priority for this version is forgotten once the group-version is forgotten
-	SetGroupVersionPriority(gv metav1.GroupVersion, priority int)
+	// Sets a priority to be used while sorting a specific group and
+	// group-version. If two versions report different priorities for
+	// the group, the higher one will be used. If the group is not
+	// known, the priority is ignored. The priority for this version
+	// is forgotten once the group-version is forgotten
+	SetGroupVersionPriority(gv metav1.GroupVersion, grouppriority, versionpriority int)
 
 	// Removes all group versions for a given group
 	// Thread-safe
@@ -90,28 +87,21 @@ func NewResourceManager() ResourceManager {
 	return &resourceDiscoveryManager{serializer: codecs, apiGroupNames: make(map[string]int), versionPriorities: make(map[metav1.GroupVersion]int)}
 }
 
-func (rdm *resourceDiscoveryManager) SetGroupPriority(group string, priority int) {
+func (rdm *resourceDiscoveryManager) SetGroupVersionPriority(gv metav1.GroupVersion, grouppriority, versionpriority int) {
 	rdm.lock.Lock()
 	defer rdm.lock.Unlock()
 
-	if _, exists := rdm.apiGroupNames[group]; exists {
-		rdm.apiGroupNames[group] = priority
-		rdm.cache.Store(nil)
+	if p, exists := rdm.apiGroupNames[gv.Group]; exists {
+		if grouppriority > p {
+			rdm.apiGroupNames[gv.Group] = grouppriority
+		}
 	} else {
-		klog.Warningf("DiscoveryManager: Attempted to set priority for group %s but does not exist", group)
+		rdm.apiGroupNames[gv.Group] = grouppriority
 	}
-}
 
-func (rdm *resourceDiscoveryManager) SetGroupVersionPriority(gv metav1.GroupVersion, priority int) {
-	rdm.lock.Lock()
-	defer rdm.lock.Unlock()
+	rdm.versionPriorities[gv] = versionpriority
 
-	if _, exists := rdm.versionPriorities[gv]; exists {
-		rdm.versionPriorities[gv] = priority
-		rdm.cache.Store(nil)
-	} else {
-		klog.Warningf("DiscoveryManager: Attempted to set priority for group-version %s but does not exist", gv)
-	}
+	rdm.cache.Store(nil)
 }
 
 func (rdm *resourceDiscoveryManager) SetGroups(groups []apidiscoveryv2beta1.APIGroupDiscovery) {

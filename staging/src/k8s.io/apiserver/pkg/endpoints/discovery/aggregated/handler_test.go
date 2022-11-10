@@ -542,11 +542,11 @@ func TestVersionSortingWithPriority(t *testing.T) {
 	manager.AddGroupVersion("default", apidiscoveryv2beta1.APIVersionDiscovery{
 		Version: "v1",
 	})
-	manager.SetGroupVersionPriority(metav1.GroupVersion{Group: "default", Version: "v1"}, 100)
+	manager.SetGroupVersionPriority(metav1.GroupVersion{Group: "default", Version: "v1"}, 1000, 100)
 	manager.AddGroupVersion("default", apidiscoveryv2beta1.APIVersionDiscovery{
 		Version: "v1alpha1",
 	})
-	manager.SetGroupVersionPriority(metav1.GroupVersion{Group: "default", Version: "v1alpha1"}, 200)
+	manager.SetGroupVersionPriority(metav1.GroupVersion{Group: "default", Version: "v1alpha1"}, 1000, 200)
 
 	response, _, decoded := fetchPath(manager, "application/json", discoveryPath, "")
 	assert.Equal(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
@@ -556,4 +556,31 @@ func TestVersionSortingWithPriority(t *testing.T) {
 	// Ensure that reverse alpha sort order can be overridden by setting group version priorities.
 	assert.Equal(t, versions[0].Version, "v1alpha1")
 	assert.Equal(t, versions[1].Version, "v1")
+}
+
+// if two apiservices declare conflicting priorities for their group priority, take the higher one.
+func TestGroupVersionSortingConflictingPriority(t *testing.T) {
+	manager := discoveryendpoint.NewResourceManager()
+
+	manager.AddGroupVersion("default", apidiscoveryv2beta1.APIVersionDiscovery{
+		Version: "v1",
+	})
+	manager.SetGroupVersionPriority(metav1.GroupVersion{Group: "default", Version: "v1"}, 1000, 100)
+	manager.AddGroupVersion("test", apidiscoveryv2beta1.APIVersionDiscovery{
+		Version: "v1alpha1",
+	})
+	manager.SetGroupVersionPriority(metav1.GroupVersion{Group: "test", Version: "v1alpha1"}, 500, 100)
+	manager.AddGroupVersion("test", apidiscoveryv2beta1.APIVersionDiscovery{
+		Version: "v1alpha2",
+	})
+	manager.SetGroupVersionPriority(metav1.GroupVersion{Group: "test", Version: "v1alpha1"}, 2000, 100)
+
+	response, _, decoded := fetchPath(manager, "application/json", discoveryPath, "")
+	assert.Equal(t, http.StatusOK, response.StatusCode, "response should be 200 OK")
+
+	groups := decoded.Items
+
+	// Ensure that reverse alpha sort order can be overridden by setting group version priorities.
+	assert.Equal(t, groups[0].Name, "test")
+	assert.Equal(t, groups[1].Name, "default")
 }

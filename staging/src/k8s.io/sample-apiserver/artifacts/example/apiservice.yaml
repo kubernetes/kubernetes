@@ -5,7 +5,7 @@ metadata:
 spec:
   insecureSkipTLSVerify: true
   group: wardle.example.com
-  groupPriorityMinimum: 1000
+  groupPriorityMinimum: 20000
   versionPriority: 15
   service:
     name: api

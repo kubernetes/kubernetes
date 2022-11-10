@@ -110,18 +110,7 @@ func (f *fakeResourceManager) WaitForActions(ctx context.Context, timeout time.D
 	return err
 }
 
-func (f *recorderResourceManager) SetGroupPriority(groupName string, priority int) {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-
-	f.Actions = append(f.Actions, recorderResourceManagerAction{
-		Type:  "SetGroupPriority",
-		Group: groupName,
-		Value: priority,
-	})
-}
-
-func (f *recorderResourceManager) SetGroupVersionPriority(gv metav1.GroupVersion, priority int) {
+func (f *recorderResourceManager) SetGroupVersionPriority(gv metav1.GroupVersion, grouppriority, versionpriority int) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -129,7 +118,7 @@ func (f *recorderResourceManager) SetGroupVersionPriority(gv metav1.GroupVersion
 		Type:    "SetGroupVersionPriority",
 		Group:   gv.Group,
 		Version: gv.Version,
-		Value:   priority,
+		Value:   versionpriority,
 	})
 }
 

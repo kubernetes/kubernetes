@@ -38,7 +38,7 @@ import (
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
 )
 
-var APIRegistrationGroup string = "apiregistration.k8s.io"
+var APIRegistrationGroupVersion metav1.GroupVersion = metav1.GroupVersion{Group: "apiregistration.k8s.io", Version: "v1"}
 var APIRegistrationGroupPriority int = 18000
 
 // Given a list of APIServices and proxyHandlers for contacting them,
@@ -393,8 +393,7 @@ func (dm *discoveryManager) syncAPIService(apiServiceName string) error {
 	}
 
 	dm.mergedDiscoveryHandler.AddGroupVersion(gv.Group, entry)
-	dm.mergedDiscoveryHandler.SetGroupPriority(gv.Group, info.groupPriority)
-	dm.mergedDiscoveryHandler.SetGroupVersionPriority(metav1.GroupVersion(gv), info.versionPriority)
+	dm.mergedDiscoveryHandler.SetGroupVersionPriority(metav1.GroupVersion(gv), info.groupPriority, info.versionPriority)
 	return nil
 }
 
@@ -433,7 +432,7 @@ func (dm *discoveryManager) Run(stopCh <-chan struct{}) {
 	}
 
 	// Ensure that apiregistration.k8s.io is the first group in the discovery group.
-	dm.mergedDiscoveryHandler.SetGroupPriority(APIRegistrationGroup, APIRegistrationGroupPriority)
+	dm.mergedDiscoveryHandler.SetGroupVersionPriority(APIRegistrationGroupVersion, APIRegistrationGroupPriority, 0)
 
 	wait.PollUntil(1*time.Minute, func() (done bool, err error) {
 		dm.servicesLock.Lock()
