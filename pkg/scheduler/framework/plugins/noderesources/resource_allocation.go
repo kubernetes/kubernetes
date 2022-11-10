@@ -51,7 +51,7 @@ func (r *resourceAllocationScorer) score(
 	if node == nil {
 		return 0, framework.NewStatus(framework.Error, "node not found")
 	}
-	if r.resourceToWeightMap == nil {
+	if len(r.resourceToWeightMap) == 0 {
 		return 0, framework.NewStatus(framework.Error, "resources not found")
 	}
 
