@@ -43,6 +43,7 @@ spec:
       - valuesValue
     matchLabels:
       matchLabelsKey: matchLabelsValue
+  unhealthyPodEvictionPolicy: unhealthyPodEvictionPolicyValue
 status:
   conditions:
   - lastTransitionTime: "2004-01-01T01:01:01Z"
