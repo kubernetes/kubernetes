@@ -371,18 +371,26 @@ func TestLegacyServiceAccountTokenTracking(t *testing.T) {
 			myConfig.BearerToken = string(test.secretTokenData)
 			roClient := clientset.NewForConfigOrDie(&myConfig)
 			dateBefore := time.Now().UTC().Format(dateFormat)
-			go func() {
-				doServiceAccountAPIRequests(t, roClient, myns, true, true, false)
-			}()
-			doServiceAccountAPIRequests(t, roClient, myns, true, true, false)
+
+			var wg sync.WaitGroup
+			concurrency := 5
+			for i := 0; i < concurrency; i++ {
+				wg.Add(1)
+				go func() {
+					doServiceAccountAPIRequests(t, roClient, myns, true, true, false)
+					wg.Done()
+				}()
+			}
+			wg.Wait()
 			dateAfter := time.Now().UTC().Format(dateFormat)
 			liveSecret, err := c.CoreV1().Secrets(myns).Get(context.TODO(), test.secretName, metav1.GetOptions{})
 			if err != nil {
 				t.Fatalf("Could not get secret: %v", err)
 			}
 
-			if test.expectWarning && len(wh.warnings) != 8 {
-				t.Fatalf("Expect 8 warnings, got %d", len(wh.warnings))
+			// doServiceAccountAPIRequests has 4 API requests
+			if test.expectWarning && len(wh.warnings) != 4*concurrency {
+				t.Fatalf("Expect %d warnings, got %d", 4*concurrency, len(wh.warnings))
 			}
 			if !test.expectWarning && len(wh.warnings) != 0 {
 				t.Fatalf("Don't expect warnings, got %d", len(wh.warnings))
