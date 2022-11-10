@@ -22,15 +22,22 @@ import (
 	"testing"
 	"time"
 
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 
 	v1 "k8s.io/api/core/v1"
@@ -900,6 +907,484 @@ func Test_ValidatingAdmissionPolicy_UpdateParamRef(t *testing.T) {
 	}
 }
 
+func Test_ValidatingAdmissionPolicy_MatchByObjectSelector(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CELValidatingAdmission, true)()
+	server, err := apiservertesting.StartTestServer(t, nil, []string{
+		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+	}, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+
+	config := server.ClientConfig
+
+	client, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	labelSelector := &metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			"foo": "bar",
+		},
+	}
+
+	policy := withValidations([]admissionregistrationv1alpha1.Validation{
+		{
+			Expression: "false",
+			Message:    "matched by object selector!",
+		},
+	}, withConfigMapMatch(withFailurePolicy(admissionregistrationv1alpha1.Fail, makePolicy("match-by-object-selector"))))
+	policy = withObjectSelector(labelSelector, policy)
+	policy = withWaitReadyConstraintAndExpression(policy)
+	_, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policyBinding := makeBinding("match-by-object-selector-binding", "match-by-object-selector", "")
+	if err := createAndWaitReady(t, client, policyBinding, map[string]string{"foo": "bar"}); err != nil {
+		t.Fatal(err)
+	}
+
+	matchedConfigMap := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "denied",
+			Namespace: "default",
+			Labels: map[string]string{
+				"foo": "bar",
+			},
+		},
+	}
+
+	_, err = client.CoreV1().ConfigMaps(matchedConfigMap.Namespace).Create(context.TODO(), matchedConfigMap, metav1.CreateOptions{})
+	if !strings.Contains(err.Error(), "matched by object selector!") {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	allowedConfigMap := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "allowed",
+			Namespace: "default",
+		},
+	}
+
+	if _, err := client.CoreV1().ConfigMaps(allowedConfigMap.Namespace).Create(context.TODO(), allowedConfigMap, metav1.CreateOptions{}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func Test_ValidatingAdmissionPolicy_MatchByNamespaceSelector(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CELValidatingAdmission, true)()
+	server, err := apiservertesting.StartTestServer(t, nil, []string{
+		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+	}, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+
+	config := server.ClientConfig
+
+	client, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// only configmaps in default will be allowed.
+	labelSelector := &metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      "kubernetes.io/metadata.name",
+				Operator: "NotIn",
+				Values:   []string{"default"},
+			},
+		},
+	}
+
+	policy := withValidations([]admissionregistrationv1alpha1.Validation{
+		{
+			Expression: "false",
+			Message:    "matched by namespace selector!",
+		},
+	}, withConfigMapMatch(withFailurePolicy(admissionregistrationv1alpha1.Fail, makePolicy("match-by-namespace-selector"))))
+	policy = withNamespaceSelector(labelSelector, policy)
+	policy = withWaitReadyConstraintAndExpression(policy)
+	_, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policyBinding := makeBinding("match-by-namespace-selector-binding", "match-by-namespace-selector", "")
+	_, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicyBindings().Create(context.TODO(), policyBinding, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	namespace := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "not-default",
+		},
+	}
+	if _, err := client.CoreV1().Namespaces().Create(context.TODO(), namespace, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+		matchedConfigMap := &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "denied-",
+				Namespace:    "not-default",
+			},
+		}
+
+		_, err := client.CoreV1().ConfigMaps(matchedConfigMap.Namespace).Create(context.TODO(), matchedConfigMap, metav1.CreateOptions{})
+		// policy not enforced yet, try again
+		if err == nil {
+			return false, nil
+		}
+
+		if !strings.Contains(err.Error(), "matched by namespace selector!") {
+			return false, err
+		}
+
+		return true, nil
+
+	}); waitErr != nil {
+		t.Errorf("timed out waiting: %v", waitErr)
+	}
+
+	allowedConfigMap := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "allowed",
+			Namespace: "default",
+		},
+	}
+
+	if _, err := client.CoreV1().ConfigMaps(allowedConfigMap.Namespace).Create(context.TODO(), allowedConfigMap, metav1.CreateOptions{}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func Test_ValidatingAdmissionPolicy_MatchByResourceNames(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CELValidatingAdmission, true)()
+	server, err := apiservertesting.StartTestServer(t, nil, []string{
+		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+	}, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+
+	config := server.ClientConfig
+
+	client, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policy := withValidations([]admissionregistrationv1alpha1.Validation{
+		{
+			Expression: "false",
+			Message:    "matched by resource names!",
+		},
+	}, withConfigMapMatch(withFailurePolicy(admissionregistrationv1alpha1.Fail, makePolicy("match-by-resource-names"))))
+	policy.Spec.MatchConstraints.ResourceRules[0].ResourceNames = []string{"matched-by-resource-name"}
+	policy = withWaitReadyConstraintAndExpression(policy)
+	_, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policyBinding := makeBinding("match-by-resource-names-binding", "match-by-resource-names", "")
+	if err := createAndWaitReady(t, client, policyBinding, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	matchedConfigMap := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "matched-by-resource-name",
+			Namespace: "default",
+		},
+	}
+
+	_, err = client.CoreV1().ConfigMaps(matchedConfigMap.Namespace).Create(context.TODO(), matchedConfigMap, metav1.CreateOptions{})
+	if !strings.Contains(err.Error(), "matched by resource names!") {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	allowedConfigMap := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "not-matched-by-resource-name",
+			Namespace: "default",
+		},
+	}
+
+	if _, err := client.CoreV1().ConfigMaps(allowedConfigMap.Namespace).Create(context.TODO(), allowedConfigMap, metav1.CreateOptions{}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func Test_ValidatingAdmissionPolicy_MatchWithExcludeResources(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CELValidatingAdmission, true)()
+	server, err := apiservertesting.StartTestServer(t, nil, []string{
+		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+	}, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+
+	config := server.ClientConfig
+
+	client, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policy := withValidations([]admissionregistrationv1alpha1.Validation{
+		{
+			Expression: "false",
+			Message:    "not matched by exclude resources!",
+		},
+	}, withPolicyMatch("*", withFailurePolicy(admissionregistrationv1alpha1.Fail, makePolicy("match-by-resource-names"))))
+
+	policy = withExcludePolicyMatch("configmaps", policy)
+	_, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policyBinding := makeBinding("match-by-resource-names-binding", "match-by-resource-names", "")
+	_, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicyBindings().Create(context.TODO(), policyBinding, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+		secret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "not-matched-by-exclude-resources",
+				Namespace:    "default",
+			},
+		}
+
+		_, err := client.CoreV1().Secrets(secret.Namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+		// policy not enforced yet, try again
+		if err == nil {
+			return false, nil
+		}
+
+		if !strings.Contains(err.Error(), "not matched by exclude resources!") {
+			return false, err
+		}
+
+		return true, nil
+
+	}); waitErr != nil {
+		t.Errorf("timed out waiting: %v", waitErr)
+	}
+
+	allowedConfigMap := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "matched-by-exclude-resources",
+			Namespace: "default",
+		},
+	}
+
+	if _, err := client.CoreV1().ConfigMaps(allowedConfigMap.Namespace).Create(context.TODO(), allowedConfigMap, metav1.CreateOptions{}); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func Test_ValidatingAdmissionPolicy_MatchWithMatchPolicyEquivalent(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CELValidatingAdmission, true)()
+	server, err := apiservertesting.StartTestServer(t, nil, []string{
+		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+	}, framework.SharedEtcd())
+	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, versionedCustomResourceDefinition())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+
+	config := server.ClientConfig
+
+	client, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policy := withValidations([]admissionregistrationv1alpha1.Validation{
+		{
+			Expression: "false",
+			Message:    "matched by equivalent match policy!",
+		},
+	}, withFailurePolicy(admissionregistrationv1alpha1.Fail, makePolicy("match-by-match-policy-equivalent")))
+	policy.Spec.MatchConstraints = &admissionregistrationv1alpha1.MatchResources{
+		ResourceRules: []admissionregistrationv1alpha1.NamedRuleWithOperations{
+			{
+				RuleWithOperations: admissionregistrationv1alpha1.RuleWithOperations{
+					Operations: []admissionregistrationv1.OperationType{
+						"*",
+					},
+					Rule: admissionregistrationv1.Rule{
+						APIGroups: []string{
+							"awesome.bears.com",
+						},
+						APIVersions: []string{
+							"v1",
+						},
+						Resources: []string{
+							"pandas",
+						},
+					},
+				},
+			},
+		},
+	}
+	policy = withWaitReadyConstraintAndExpression(policy)
+	if _, err := client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	policyBinding := makeBinding("match-by-match-policy-equivalent-binding", "match-by-match-policy-equivalent", "")
+	if err := createAndWaitReady(t, client, policyBinding, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	v1Resource := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "awesome.bears.com" + "/" + "v1",
+			"kind":       "Panda",
+			"metadata": map[string]interface{}{
+				"name": "v1-bears",
+			},
+		},
+	}
+
+	v2Resource := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "awesome.bears.com" + "/" + "v2",
+			"kind":       "Panda",
+			"metadata": map[string]interface{}{
+				"name": "v2-bears",
+			},
+		},
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = dynamicClient.Resource(schema.GroupVersionResource{Group: "awesome.bears.com", Version: "v1", Resource: "pandas"}).Create(context.TODO(), v1Resource, metav1.CreateOptions{})
+	if !strings.Contains(err.Error(), "matched by equivalent match policy!") {
+		t.Errorf("v1 panadas did not match against policy, err: %v", err)
+	}
+
+	_, err = dynamicClient.Resource(schema.GroupVersionResource{Group: "awesome.bears.com", Version: "v2", Resource: "pandas"}).Create(context.TODO(), v2Resource, metav1.CreateOptions{})
+	if !strings.Contains(err.Error(), "matched by equivalent match policy!") {
+		t.Errorf("v2 panadas did not match against policy, err: %v", err)
+	}
+}
+
+func Test_ValidatingAdmissionPolicy_MatchWithMatchPolicyExact(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CELValidatingAdmission, true)()
+	server, err := apiservertesting.StartTestServer(t, nil, []string{
+		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+	}, framework.SharedEtcd())
+	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, versionedCustomResourceDefinition())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+
+	config := server.ClientConfig
+
+	client, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policy := withValidations([]admissionregistrationv1alpha1.Validation{
+		{
+			Expression: "false",
+			Message:    "matched by exact match policy!",
+		},
+	}, withFailurePolicy(admissionregistrationv1alpha1.Fail, makePolicy("match-by-match-policy-exact")))
+	matchPolicyExact := admissionregistrationv1alpha1.Exact
+	policy.Spec.MatchConstraints = &admissionregistrationv1alpha1.MatchResources{
+		MatchPolicy: &matchPolicyExact,
+		ResourceRules: []admissionregistrationv1alpha1.NamedRuleWithOperations{
+			{
+				RuleWithOperations: admissionregistrationv1alpha1.RuleWithOperations{
+					Operations: []admissionregistrationv1.OperationType{
+						"*",
+					},
+					Rule: admissionregistrationv1.Rule{
+						APIGroups: []string{
+							"awesome.bears.com",
+						},
+						APIVersions: []string{
+							"v1",
+						},
+						Resources: []string{
+							"pandas",
+						},
+					},
+				},
+			},
+		},
+	}
+	policy = withWaitReadyConstraintAndExpression(policy)
+	if _, err := client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	policyBinding := makeBinding("match-by-match-policy-exact-binding", "match-by-match-policy-exact", "")
+	if err := createAndWaitReady(t, client, policyBinding, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	v1Resource := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "awesome.bears.com" + "/" + "v1",
+			"kind":       "Panda",
+			"metadata": map[string]interface{}{
+				"name": "v1-bears",
+			},
+		},
+	}
+
+	v2Resource := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "awesome.bears.com" + "/" + "v2",
+			"kind":       "Panda",
+			"metadata": map[string]interface{}{
+				"name": "v2-bears",
+			},
+		},
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = dynamicClient.Resource(schema.GroupVersionResource{Group: "awesome.bears.com", Version: "v1", Resource: "pandas"}).Create(context.TODO(), v1Resource, metav1.CreateOptions{})
+	if !strings.Contains(err.Error(), "matched by exact match policy!") {
+		t.Errorf("v1 panadas did not match against policy, err: %v", err)
+	}
+
+	// v2 panadas is allowed since policy specificed match policy Exact and only matched against v1
+	_, err = dynamicClient.Resource(schema.GroupVersionResource{Group: "awesome.bears.com", Version: "v2", Resource: "pandas"}).Create(context.TODO(), v2Resource, metav1.CreateOptions{})
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func withWaitReadyConstraintAndExpression(policy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy) *admissionregistrationv1alpha1.ValidatingAdmissionPolicy {
 	policy = policy.DeepCopy()
 	policy.Spec.MatchConstraints.ResourceRules = append(policy.Spec.MatchConstraints.ResourceRules, admissionregistrationv1alpha1.NamedRuleWithOperations{
@@ -987,13 +1472,27 @@ func withNamespaceMatch(policy *admissionregistrationv1alpha1.ValidatingAdmissio
 	return withPolicyMatch("namespaces", policy)
 }
 
+func withConfigMapMatch(policy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy) *admissionregistrationv1alpha1.ValidatingAdmissionPolicy {
+	return withPolicyMatch("configmaps", policy)
+}
+
+func withObjectSelector(labelSelector *metav1.LabelSelector, policy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy) *admissionregistrationv1alpha1.ValidatingAdmissionPolicy {
+	policy.Spec.MatchConstraints.ObjectSelector = labelSelector
+	return policy
+}
+
+func withNamespaceSelector(labelSelector *metav1.LabelSelector, policy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy) *admissionregistrationv1alpha1.ValidatingAdmissionPolicy {
+	policy.Spec.MatchConstraints.NamespaceSelector = labelSelector
+	return policy
+}
+
 func withPolicyMatch(resource string, policy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy) *admissionregistrationv1alpha1.ValidatingAdmissionPolicy {
 	policy.Spec.MatchConstraints = &admissionregistrationv1alpha1.MatchResources{
 		ResourceRules: []admissionregistrationv1alpha1.NamedRuleWithOperations{
 			{
 				RuleWithOperations: admissionregistrationv1alpha1.RuleWithOperations{
 					Operations: []admissionregistrationv1.OperationType{
-						"CREATE",
+						"*",
 					},
 					Rule: admissionregistrationv1.Rule{
 						APIGroups: []string{
@@ -1005,6 +1504,30 @@ func withPolicyMatch(resource string, policy *admissionregistrationv1alpha1.Vali
 						Resources: []string{
 							resource,
 						},
+					},
+				},
+			},
+		},
+	}
+	return policy
+}
+
+func withExcludePolicyMatch(resource string, policy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy) *admissionregistrationv1alpha1.ValidatingAdmissionPolicy {
+	policy.Spec.MatchConstraints.ExcludeResourceRules = []admissionregistrationv1alpha1.NamedRuleWithOperations{
+		{
+			RuleWithOperations: admissionregistrationv1alpha1.RuleWithOperations{
+				Operations: []admissionregistrationv1.OperationType{
+					"*",
+				},
+				Rule: admissionregistrationv1.Rule{
+					APIGroups: []string{
+						"",
+					},
+					APIVersions: []string{
+						"*",
+					},
+					Resources: []string{
+						resource,
 					},
 				},
 			},
@@ -1090,5 +1613,52 @@ func checkFailureReason(t *testing.T, err error, expectedReason metav1.StatusRea
 		t.Logf("actual error reason: %v", reason)
 		t.Logf("expected failure reason: %v", expectedReason)
 		t.Error("unexpected error reason")
+	}
+}
+
+// Copied from etcd.GetCustomResourceDefinitionData
+func versionedCustomResourceDefinition() *apiextensionsv1.CustomResourceDefinition {
+	return &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pandas.awesome.bears.com",
+		},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "awesome.bears.com",
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema:  fixtures.AllowAllSchema(),
+					Subresources: &apiextensionsv1.CustomResourceSubresources{
+						Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+						Scale: &apiextensionsv1.CustomResourceSubresourceScale{
+							SpecReplicasPath:   ".spec.replicas",
+							StatusReplicasPath: ".status.replicas",
+							LabelSelectorPath:  func() *string { path := ".status.selector"; return &path }(),
+						},
+					},
+				},
+				{
+					Name:    "v2",
+					Served:  true,
+					Storage: false,
+					Schema:  fixtures.AllowAllSchema(),
+					Subresources: &apiextensionsv1.CustomResourceSubresources{
+						Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+						Scale: &apiextensionsv1.CustomResourceSubresourceScale{
+							SpecReplicasPath:   ".spec.replicas",
+							StatusReplicasPath: ".status.replicas",
+							LabelSelectorPath:  func() *string { path := ".status.selector"; return &path }(),
+						},
+					},
+				},
+			},
+			Scope: apiextensionsv1.ClusterScoped,
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
+				Plural: "pandas",
+				Kind:   "Panda",
+			},
+		},
 	}
 }
