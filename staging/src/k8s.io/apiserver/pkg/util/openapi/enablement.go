@@ -17,8 +17,6 @@ limitations under the License.
 package openapi
 
 import (
-	"strings"
-
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kube-openapi/pkg/common"
@@ -62,13 +60,6 @@ func pruneEnums(schema *spec.Schema) *spec.Schema {
 					schema = new(spec.Schema)
 					*schema = *orig // make a clone from orig to schema
 				}
-			}
-			if headerIndex := strings.Index(schema.Description, enumTypeDescriptionHeader); headerIndex != -1 {
-				// remove the enum section from description.
-				// note that the new lines before the header should be removed too,
-				// thus the slice range.
-				clone()
-				schema.Description = schema.Description[:headerIndex]
 			}
 			if len(schema.Enum) != 0 {
 				// remove the enum field
