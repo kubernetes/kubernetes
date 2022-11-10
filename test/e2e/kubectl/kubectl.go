@@ -1955,7 +1955,7 @@ metadata:
 			}
 
 			ginkgo.By("show started event for this pod")
-			events := e2ekubectl.RunKubectlOrDie(ns, "alpha", "events", "--for=pod/"+podName)
+			events := e2ekubectl.RunKubectlOrDie(ns, "events", "--for=pod/"+podName)
 
 			// replace multi spaces into single white space
 			eventsStr := strings.Join(strings.Fields(strings.TrimSpace(events)), " ")
@@ -1964,7 +1964,7 @@ metadata:
 			}
 
 			ginkgo.By("expect not showing any WARNING message except timeouts")
-			events = e2ekubectl.RunKubectlOrDie(ns, "alpha", "events", "--types=WARNING", "--for=pod/"+podName)
+			events = e2ekubectl.RunKubectlOrDie(ns, "events", "--types=WARNING", "--for=pod/"+podName)
 			if events != "" && !strings.Contains(events, "timed out") {
 				framework.Failf("unexpected WARNING event fired")
 			}
