@@ -2012,7 +2012,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		}
 	})
 
-	ginkgo.Context("SELinuxMount [LinuxOnly][Feature:SELinuxMountReadWriteOncePod]", func() {
+	ginkgo.Context("SELinuxMount [LinuxOnly][Feature:SELinux][Feature:SELinuxMountReadWriteOncePod]", func() {
 		// Make sure all options are set so system specific defaults are not used.
 		seLinuxOpts := v1.SELinuxOptions{
 			User:  "system_u",
