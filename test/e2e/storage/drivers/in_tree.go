@@ -38,7 +38,6 @@ package drivers
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -930,23 +929,12 @@ func (e *emptydirDriver) PrepareTest(f *framework.Framework) *storageframework.P
 }
 
 // Cinder
-// This driver assumes that OpenStack client tools are installed
-// (/usr/bin/nova, /usr/bin/cinder and /usr/bin/keystone)
-// and that the usual OpenStack authentication env. variables are set
-// (OS_USERNAME, OS_PASSWORD, OS_TENANT_NAME at least).
+// This tests only CSI migration with dynamically provisioned volumes.
 type cinderDriver struct {
 	driverInfo storageframework.DriverInfo
 }
 
-type cinderVolume struct {
-	volumeName string
-	volumeID   string
-}
-
 var _ storageframework.TestDriver = &cinderDriver{}
-var _ storageframework.PreprovisionedVolumeTestDriver = &cinderDriver{}
-var _ storageframework.InlineVolumeTestDriver = &cinderDriver{}
-var _ storageframework.PreprovisionedPVTestDriver = &cinderDriver{}
 var _ storageframework.DynamicPVTestDriver = &cinderDriver{}
 
 // InitCinderDriver returns cinderDriver that implements TestDriver interface
@@ -985,38 +973,6 @@ func (c *cinderDriver) SkipUnsupportedTest(pattern storageframework.TestPattern)
 	e2eskipper.SkipUnlessProviderIs("openstack")
 }
 
-func (c *cinderDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
-	cv, ok := e2evolume.(*cinderVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Cinder test volume")
-
-	volSource := v1.VolumeSource{
-		Cinder: &v1.CinderVolumeSource{
-			VolumeID: cv.volumeID,
-			ReadOnly: readOnly,
-		},
-	}
-	if fsType != "" {
-		volSource.Cinder.FSType = fsType
-	}
-	return &volSource
-}
-
-func (c *cinderDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
-	cv, ok := e2evolume.(*cinderVolume)
-	framework.ExpectEqual(ok, true, "Failed to cast test volume to Cinder test volume")
-
-	pvSource := v1.PersistentVolumeSource{
-		Cinder: &v1.CinderPersistentVolumeSource{
-			VolumeID: cv.volumeID,
-			ReadOnly: readOnly,
-		},
-	}
-	if fsType != "" {
-		pvSource.Cinder.FSType = fsType
-	}
-	return &pvSource, nil
-}
-
 func (c *cinderDriver) GetDynamicProvisionStorageClass(config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := "kubernetes.io/cinder"
 	parameters := map[string]string{}
@@ -1028,78 +984,12 @@ func (c *cinderDriver) GetDynamicProvisionStorageClass(config *storageframework.
 	return storageframework.GetStorageClass(provisioner, parameters, nil, ns)
 }
 
-func (c *cinderDriver) PrepareTest(f *framework.Framework) (*storageframework.PerTestConfig, func()) {
+func (c *cinderDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
 	return &storageframework.PerTestConfig{
 		Driver:    c,
 		Prefix:    "cinder",
 		Framework: f,
-	}, func() {}
-}
-
-func (c *cinderDriver) CreateVolume(config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
-	f := config.Framework
-	ns := f.Namespace
-
-	// We assume that namespace.Name is a random string
-	volumeName := ns.Name
-	ginkgo.By("creating a test Cinder volume")
-	output, err := exec.Command("cinder", "create", "--display-name="+volumeName, "1").CombinedOutput()
-	outputString := string(output[:])
-	framework.Logf("cinder output:\n%s", outputString)
-	framework.ExpectNoError(err)
-
-	// Parse 'id'' from stdout. Expected format:
-	// |     attachments     |                  []                  |
-	// |  availability_zone  |                 nova                 |
-	// ...
-	// |          id         | 1d6ff08f-5d1c-41a4-ad72-4ef872cae685 |
-	volumeID := ""
-	for _, line := range strings.Split(outputString, "\n") {
-		fields := strings.Fields(line)
-		if len(fields) != 5 {
-			continue
-		}
-		if fields[1] != "id" {
-			continue
-		}
-		volumeID = fields[3]
-		break
 	}
-	framework.Logf("Volume ID: %s", volumeID)
-	framework.ExpectNotEqual(volumeID, "")
-	return &cinderVolume{
-		volumeName: volumeName,
-		volumeID:   volumeID,
-	}
-}
-
-func (v *cinderVolume) DeleteVolume() {
-	id := v.volumeID
-	name := v.volumeName
-
-	// Try to delete the volume for several seconds - it takes
-	// a while for the plugin to detach it.
-	var output []byte
-	var err error
-	timeout := time.Second * 120
-
-	framework.Logf("Waiting up to %v for removal of cinder volume %s / %s", timeout, id, name)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
-		output, err = exec.Command("cinder", "delete", id).CombinedOutput()
-		if err == nil {
-			framework.Logf("Cinder volume %s deleted", id)
-			return
-		}
-		framework.Logf("Failed to delete volume %s / %s: %v\n%s", id, name, err, string(output))
-	}
-	// Timed out, try to get "cinder show <volume>" output for easier debugging
-	showOutput, showErr := exec.Command("cinder", "show", id).CombinedOutput()
-	if showErr != nil {
-		framework.Logf("Failed to show volume %s / %s: %v\n%s", id, name, showErr, string(showOutput))
-	} else {
-		framework.Logf("Volume %s / %s:\n%s", id, name, string(showOutput))
-	}
-	framework.Failf("Failed to delete pre-provisioned volume %s / %s: %v\n%s", id, name, err, string(output[:]))
 }
 
 // GCE
