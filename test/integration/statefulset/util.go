@@ -161,7 +161,7 @@ func newStatefulSetPVC(name string) v1.PersistentVolumeClaim {
 }
 
 // scSetup sets up necessities for Statefulset integration test, including control plane, apiserver, informers, and clientset
-func scSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, *statefulset.StatefulSetController, informers.SharedInformerFactory, clientset.Interface) {
+func scSetup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFunc, *statefulset.StatefulSetController, informers.SharedInformerFactory, clientset.Interface) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 
@@ -174,6 +174,7 @@ func scSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, *statefulset.Stat
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "statefulset-informers")), resyncPeriod)
 
 	sc := statefulset.NewStatefulSetController(
+		ctx,
 		informers.Core().V1().Pods(),
 		informers.Apps().V1().StatefulSets(),
 		informers.Core().V1().PersistentVolumeClaims(),
