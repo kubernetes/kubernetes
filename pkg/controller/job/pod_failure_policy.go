@@ -68,6 +68,8 @@ func matchPodFailurePolicy(podFailurePolicy *batch.PodFailurePolicy, failedPod *
 	return nil, true, nil
 }
 
+// matchOnExitCodes returns a terminated container status that matches the error code requirement, if any exists.
+// If the returned status is non-nil, it has a non-nil Terminated field.
 func matchOnExitCodes(podStatus *v1.PodStatus, requirement *batch.PodFailurePolicyOnExitCodesRequirement) *v1.ContainerStatus {
 	if containerStatus := getMatchingContainerFromList(podStatus.ContainerStatuses, requirement); containerStatus != nil {
 		return containerStatus
@@ -86,8 +88,16 @@ func matchOnPodConditions(podStatus *v1.PodStatus, requirement []batch.PodFailur
 	return nil
 }
 
+// getMatchingContainerFromList returns the first terminated container status in the list that matches the error code requirement, or nil if none match.
+// If the returned status is non-nil, it has a non-nil Terminated field
 func getMatchingContainerFromList(containerStatuses []v1.ContainerStatus, requirement *batch.PodFailurePolicyOnExitCodesRequirement) *v1.ContainerStatus {
 	for _, containerStatus := range containerStatuses {
+		if containerStatus.State.Terminated == nil {
+			// This container is still be terminating. There is no exit code to match.
+			// TODO(#113855): Remove this check when it's guaranteed that the
+			// container is terminated.
+			continue
+		}
 		if requirement.ContainerName == nil || *requirement.ContainerName == containerStatus.Name {
 			if containerStatus.State.Terminated.ExitCode != 0 {
 				if isOnExitCodesOperatorMatching(containerStatus.State.Terminated.ExitCode, requirement) {
