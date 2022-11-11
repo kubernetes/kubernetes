@@ -1420,13 +1420,6 @@ func (proxier *Proxier) syncProxyRules() {
 				lps = append(lps, lp)
 			}
 
-			// For ports on node IPs, open the actual port and hold it.
-			for _, lp := range lps {
-				if svcInfo.Protocol() != v1.ProtocolSCTP && lp.Protocol == netutils.UDP {
-					conntrack.ClearEntriesForPort(proxier.exec, lp.Port, isIPv6, v1.ProtocolUDP)
-				}
-			}
-
 			// Nodeports need SNAT, unless they're local.
 			// ipset call
 
