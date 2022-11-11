@@ -850,23 +850,30 @@ func TestDSCUpdatesPodLabelAfterDedupCurHistories(t *testing.T) {
 		t.Fatalf("Failed to update the pod label after new controllerrevision is created: %v", err)
 	}
 
-	revs, err := clientset.AppsV1().ControllerRevisions(ds.Namespace).List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		t.Fatalf("Failed to list controllerrevision: %v", err)
-	}
-	if revs.Size() == 0 {
-		t.Fatalf("No avaialable controllerrevision")
-	}
+	err = wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+		revs, err := clientset.AppsV1().ControllerRevisions(ds.Namespace).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return false, fmt.Errorf("failed to list controllerrevision: %v", err)
+		}
+		if revs.Size() == 0 {
+			return false, fmt.Errorf("no avaialable controllerrevision")
+		}
 
-	for _, rev := range revs.Items {
-		t.Logf("revision: %v;hash: %v", rev.Name, rev.ObjectMeta.Labels[apps.DefaultDaemonSetUniqueLabelKey])
-		for _, oref := range rev.OwnerReferences {
-			if oref.Kind == "DaemonSet" && oref.UID == ds.UID {
-				if rev.Name != newName {
-					t.Fatalf("duplicate controllerrevision is not deleted")
+		for _, rev := range revs.Items {
+			t.Logf("revision: %v;hash: %v", rev.Name, rev.ObjectMeta.Labels[apps.DefaultDaemonSetUniqueLabelKey])
+			for _, oref := range rev.OwnerReferences {
+				if oref.Kind == "DaemonSet" && oref.UID == ds.UID {
+					if rev.Name != newName {
+						t.Logf("waiting for duplicate controllerrevision %v to be deleted", newName)
+						return false, nil
+					}
 				}
 			}
 		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to check that duplicate controllerrevision is not deleted: %v", err)
 	}
 }
 
