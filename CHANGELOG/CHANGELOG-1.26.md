@@ -152,7 +152,7 @@ name | architectures
 
 ### API Change
 
-- A new `enqueue` extension point is added to scheduler's component config v1beta2/v1beta3/v1. ([#113275](https://github.com/kubernetes/kubernetes/pull/113275), [@Huang-Wei](https://github.com/Huang-Wei)) [SIG API Machinery, Apps, Instrumentation, Scheduling and Testing]
+- A new `preEnqueue` extension point is added to scheduler's component config v1beta2/v1beta3/v1. ([#113275](https://github.com/kubernetes/kubernetes/pull/113275), [@Huang-Wei](https://github.com/Huang-Wei)) [SIG API Machinery, Apps, Instrumentation, Scheduling and Testing]
 - Add DataSourceRef2 alpha field to PersistentVolumeClaimSpec API. ([#113186](https://github.com/kubernetes/kubernetes/pull/113186), [@ttakahashi21](https://github.com/ttakahashi21)) [SIG API Machinery, Apps, Storage and Testing]
 - Add a kube-proxy flag (--iptables-localhost-nodeports, default true) to allow disabling NodePort services on loopback addresses. Note: this only applies to iptables mode and ipv4. ([#108250](https://github.com/kubernetes/kubernetes/pull/108250), [@cyclinder](https://github.com/cyclinder)) [SIG API Machinery, Cloud Provider, Network, Node, Scalability, Storage and Testing]
 - Added a --topology-manager-policy-options flag to the kubelet to support fine tuning the topology manager policies. The first policy option, `prefer-closest-numa-nodes`, allows these policies to favor sets of NUMA nodes with shorter distance between nodes when making admission decisions. ([#112914](https://github.com/kubernetes/kubernetes/pull/112914), [@PiotrProkop](https://github.com/PiotrProkop)) [SIG API Machinery and Node]
@@ -170,7 +170,7 @@ name | architectures
   - DisruptionTarget (graceful node shutdown, node pressure eviction) ([#112360](https://github.com/kubernetes/kubernetes/pull/112360), [@mimowo](https://github.com/mimowo)) [SIG Apps, Node and Testing]
 - Metav1.LabelSelectors specified in API objects are now validated to ensure they do not contain invalid label values that will error at time of use. Existing invalid objects can be updated, but new objects are required to contain valid label selectors. ([#113699](https://github.com/kubernetes/kubernetes/pull/113699), [@liggitt](https://github.com/liggitt)) [SIG API Machinery, Apps, Auth, Network and Storage]
 - Moving MixedProtocolLBService from beta to GA ([#112895](https://github.com/kubernetes/kubernetes/pull/112895), [@janosi](https://github.com/janosi)) [SIG Apps, Network and Testing]
-- New Pod API field `.spec.scheudlingGates` is introduced to enable users to control when to mark a Pod as scheduling ready. ([#113274](https://github.com/kubernetes/kubernetes/pull/113274), [@Huang-Wei](https://github.com/Huang-Wei)) [SIG Apps, Scheduling and Testing]
+- New Pod API field `.spec.schedulingGates` is introduced to enable users to control when to mark a Pod as scheduling ready. ([#113274](https://github.com/kubernetes/kubernetes/pull/113274), [@Huang-Wei](https://github.com/Huang-Wei)) [SIG Apps, Scheduling and Testing]
 - NodeInclusionPolicy in podTopologySpread plugin is enabled by default. ([#113500](https://github.com/kubernetes/kubernetes/pull/113500), [@kerthcet](https://github.com/kerthcet)) [SIG API Machinery, Apps, Scheduling and Testing]
 - Priority and Fairness has introduced a new feature called _borrowing_ that allows an API priority level
   to borrow a number of seats from other priority level(s). As a cluster operator, you can enable borrowing
