@@ -20,7 +20,6 @@ import (
 	"context"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
