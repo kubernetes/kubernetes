@@ -36,6 +36,7 @@ type staticPolicyTest struct {
 	description     string
 	topo            *topology.CPUTopology
 	numReservedCPUs int
+	reservedCPUs    *cpuset.CPUSet
 	podUID          string
 	options         map[string]string
 	containerName   string
@@ -497,6 +498,50 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expCPUAlloc:     false,
 			expCSet:         cpuset.NewCPUSet(),
 		},
+		{
+			description: "GuPodManyCores, topoDualSocketHT, ExpectDoNotAllocPartialCPU",
+			topo:        topoDualSocketHT,
+			options: map[string]string{
+				FullPCPUsOnlyOption: "true",
+			},
+			numReservedCPUs: 2,
+			reservedCPUs:    newCPUSetPtr(1, 6),
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 2, 3, 4, 5, 7, 8, 9, 10, 11),
+			pod:             makePod("fakePod", "fakeContainerBug113537_1", "10000m", "10000m"),
+			expErr:          SMTAlignmentError{RequestedCPUs: 10, CpusPerCore: 2, AllocationFailed: true},
+			expCPUAlloc:     false,
+			expCSet:         cpuset.NewCPUSet(),
+		},
+		{
+			description: "GuPodManyCores, topoDualSocketHT, AutoReserve, ExpectAllocAllCPUs",
+			topo:        topoDualSocketHT,
+			options: map[string]string{
+				FullPCPUsOnlyOption: "true",
+			},
+			numReservedCPUs: 2,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.NewCPUSet(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
+			pod:             makePod("fakePod", "fakeContainerBug113537_2", "10000m", "10000m"),
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.NewCPUSet(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
+		},
+		{
+			description: "GuPodManyCores, topoDualSocketHT, ExpectAllocAllCPUs",
+			topo:        topoDualSocketHT,
+			options: map[string]string{
+				FullPCPUsOnlyOption: "true",
+			},
+			numReservedCPUs: 2,
+			reservedCPUs:    newCPUSetPtr(0, 6),
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.NewCPUSet(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
+			pod:             makePod("fakePod", "fakeContainerBug113537_2", "10000m", "10000m"),
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.NewCPUSet(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
+		},
 	}
 	newNUMAAffinity := func(bits ...int) bitmask.BitMask {
 		affinity, _ := bitmask.NewBitMask(bits...)
@@ -565,7 +610,12 @@ func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
 	if testCase.topologyHint != nil {
 		tm = topologymanager.NewFakeManagerWithHint(testCase.topologyHint)
 	}
-	policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), tm, testCase.options)
+
+	cpus := cpuset.NewCPUSet()
+	if testCase.reservedCPUs != nil {
+		cpus = testCase.reservedCPUs.Clone()
+	}
+	policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpus, tm, testCase.options)
 
 	st := &mockState{
 		assignments:   testCase.stAssignments,
@@ -1092,4 +1142,9 @@ func TestStaticPolicyOptions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func newCPUSetPtr(cpus ...int) *cpuset.CPUSet {
+	ret := cpuset.NewCPUSet(cpus...)
+	return &ret
 }
