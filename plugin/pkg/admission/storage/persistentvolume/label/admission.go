@@ -72,7 +72,7 @@ var _ kubeapiserveradmission.WantsCloudConfig = &persistentVolumeLabel{}
 // As a side effect, the cloud provider may block invalid or non-existent volumes.
 func newPersistentVolumeLabel() *persistentVolumeLabel {
 	// DEPRECATED: in a future release, we will use mutating admission webhooks to apply PV labels.
-	// Once the mutating admission webhook is used for AWS, Azure and GCE,
+	// Once the mutating admission webhook is used for AWS, Azure, and GCE,
 	// this admission controller will be removed.
 	klog.Warning("PersistentVolumeLabel admission controller is deprecated. " +
 		"Please remove this controller from your configuration files and scripts.")

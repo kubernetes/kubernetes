@@ -27,7 +27,7 @@ limitations under the License.
  * Note that the server containers are for testing purposes only and should not
  * be used in production.
  *
- * 2) With server or cloud provider outside of Kubernetes (GCE, AWS, Azure, ...)
+ * 2) With server or cloud provider outside of Kubernetes (Cinder, GCE, AWS, Azure, ...)
  * Appropriate server or cloud provider must exist somewhere outside
  * the tested Kubernetes cluster. CreateVolume will create a new volume to be
  * used in the TestSuites for inlineVolume or DynamicPV tests.
@@ -924,6 +924,70 @@ func (e *emptydirDriver) PrepareTest(f *framework.Framework) *storageframework.P
 	return &storageframework.PerTestConfig{
 		Driver:    e,
 		Prefix:    "emptydir",
+		Framework: f,
+	}
+}
+
+// Cinder
+// This tests only CSI migration with dynamically provisioned volumes.
+type cinderDriver struct {
+	driverInfo storageframework.DriverInfo
+}
+
+var _ storageframework.TestDriver = &cinderDriver{}
+var _ storageframework.DynamicPVTestDriver = &cinderDriver{}
+
+// InitCinderDriver returns cinderDriver that implements TestDriver interface
+func InitCinderDriver() storageframework.TestDriver {
+	return &cinderDriver{
+		driverInfo: storageframework.DriverInfo{
+			Name:             "cinder",
+			InTreePluginName: "kubernetes.io/cinder",
+			MaxFileSize:      storageframework.FileSizeMedium,
+			SupportedSizeRange: e2evolume.SizeRange{
+				Min: "1Gi",
+			},
+			SupportedFsType: sets.NewString(
+				"", // Default fsType
+			),
+			TopologyKeys: []string{v1.LabelFailureDomainBetaZone},
+			Capabilities: map[storageframework.Capability]bool{
+				storageframework.CapPersistence: true,
+				storageframework.CapFsGroup:     true,
+				storageframework.CapExec:        true,
+				storageframework.CapBlock:       true,
+				// Cinder supports volume limits, but the test creates large
+				// number of volumes and times out test suites.
+				storageframework.CapVolumeLimits: false,
+				storageframework.CapTopology:     true,
+			},
+		},
+	}
+}
+
+func (c *cinderDriver) GetDriverInfo() *storageframework.DriverInfo {
+	return &c.driverInfo
+}
+
+func (c *cinderDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
+	e2eskipper.SkipUnlessProviderIs("openstack")
+}
+
+func (c *cinderDriver) GetDynamicProvisionStorageClass(config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
+	provisioner := "kubernetes.io/cinder"
+	parameters := map[string]string{}
+	if fsType != "" {
+		parameters["fsType"] = fsType
+	}
+	ns := config.Framework.Namespace.Name
+
+	return storageframework.GetStorageClass(provisioner, parameters, nil, ns)
+}
+
+func (c *cinderDriver) PrepareTest(f *framework.Framework) *storageframework.PerTestConfig {
+	return &storageframework.PerTestConfig{
+		Driver:    c,
+		Prefix:    "cinder",
 		Framework: f,
 	}
 }

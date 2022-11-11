@@ -912,7 +912,7 @@ func Test_PVLAdmission(t *testing.T) {
 // setPVLabler applies the given mock pvlabeler to implement PV labeling for all cloud providers.
 // Given we mock out the values of the labels anyways, assigning the same mock labeler for every
 // provider does not reduce test coverage but it does simplify/clean up the tests here because
-// the provider is then decided based on the type of PV (EBS, Cinder, GCEPD, Azure Disk, etc)
+// the provider is then decided based on the type of PV (EBS, GCEPD, Azure Disk, etc)
 func setPVLabeler(handler *persistentVolumeLabel, pvlabeler cloudprovider.PVLabeler) {
 	handler.awsPVLabeler = pvlabeler
 	handler.gcePVLabeler = pvlabeler

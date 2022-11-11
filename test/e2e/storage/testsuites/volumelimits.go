@@ -371,6 +371,8 @@ func getInTreeNodeLimits(cs clientset.Interface, nodeName string, driverInfo *st
 		allocatableKey = volumeutil.EBSVolumeLimitKey
 	case migrationplugins.GCEPDInTreePluginName:
 		allocatableKey = volumeutil.GCEVolumeLimitKey
+	case migrationplugins.CinderInTreePluginName:
+		allocatableKey = volumeutil.CinderVolumeLimitKey
 	case migrationplugins.AzureDiskInTreePluginName:
 		allocatableKey = volumeutil.AzureVolumeLimitKey
 	default:

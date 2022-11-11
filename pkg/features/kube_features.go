@@ -415,6 +415,12 @@ const (
 	// Disables the GCE PD in-tree driver.
 	InTreePluginGCEUnregister featuregate.Feature = "InTreePluginGCEUnregister"
 
+	// owner: @adisky
+	// alpha: v1.21
+	//
+	// Disables the OpenStack Cinder in-tree driver.
+	InTreePluginOpenStackUnregister featuregate.Feature = "InTreePluginOpenStackUnregister"
+
 	// owner: @trierra
 	// alpha: v1.23
 	//
@@ -1008,6 +1014,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	InTreePluginAzureFileUnregister: {Default: false, PreRelease: featuregate.Alpha},
 
 	InTreePluginGCEUnregister: {Default: false, PreRelease: featuregate.Alpha},
+
+	InTreePluginOpenStackUnregister: {Default: false, PreRelease: featuregate.Alpha},
 
 	InTreePluginPortworxUnregister: {Default: false, PreRelease: featuregate.Alpha},
 

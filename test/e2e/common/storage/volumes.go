@@ -32,7 +32,7 @@ limitations under the License.
  * be used in production.
  *
  * 2) With server outside of Kubernetes
- * Appropriate server exist somewhere outside
+ * Appropriate server must exist somewhere outside
  * the tested Kubernetes cluster. The test itself creates a new volume,
  * and checks, that Kubernetes can use it as a volume.
  */
