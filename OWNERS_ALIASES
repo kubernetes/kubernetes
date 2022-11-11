@@ -135,30 +135,30 @@ aliases:
     - Verolop # Release Manager
     - xmudrii # Release Manager
   sig-storage-approvers:
+    - gnufied
+    - jsafrane
+    - msau42
     - saad-ali
     - thockin
-    - jsafrane
-    - gnufied
-    - msau42
     - xing-yang
   # emeritus:
   # - rootfs
   sig-storage-reviewers:
+    - chrishenzie
+    - gnufied
+    - humblec
     - jsafrane
     - jingxu97
-    - msau42
-    - gnufied
-    - verult
-    - humblec
-    - xing-yang
-    - chrishenzie
-    - Jiawei0227
     - mattcary
+    - mauriciopoppe
+    - msau42
     - saikat-royc
+    - xing-yang
   # emeritus:
   # - davidz627
+  # - Jiawei0227
   # - rootfs
-
+  # - verult
   sig-scheduling-maintainers:
     - alculquicondor
     - Huang-Wei
