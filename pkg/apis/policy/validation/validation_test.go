@@ -98,6 +98,63 @@ func TestValidateMinAvailablePodAndMaxUnavailableDisruptionBudgetSpec(t *testing
 	}
 }
 
+func TestValidateUnhealthyPodEvictionPolicyDisruptionBudgetSpec(t *testing.T) {
+	c1 := intstr.FromString("10%")
+	alwaysAllowPolicy := policy.AlwaysAllow
+	invalidPolicy := policy.UnhealthyPodEvictionPolicyType("Invalid")
+
+	testCases := []struct {
+		name      string
+		pdbSpec   policy.PodDisruptionBudgetSpec
+		expectErr bool
+	}{
+		{
+			name: "valid nil UnhealthyPodEvictionPolicy",
+			pdbSpec: policy.PodDisruptionBudgetSpec{
+				MinAvailable:               &c1,
+				UnhealthyPodEvictionPolicy: nil,
+			},
+			expectErr: false,
+		},
+		{
+			name: "valid UnhealthyPodEvictionPolicy",
+			pdbSpec: policy.PodDisruptionBudgetSpec{
+				MinAvailable:               &c1,
+				UnhealthyPodEvictionPolicy: &alwaysAllowPolicy,
+			},
+			expectErr: false,
+		},
+		{
+			name: "empty UnhealthyPodEvictionPolicy",
+			pdbSpec: policy.PodDisruptionBudgetSpec{
+				MinAvailable:               &c1,
+				UnhealthyPodEvictionPolicy: new(policy.UnhealthyPodEvictionPolicyType),
+			},
+			expectErr: true,
+		},
+		{
+			name: "invalid UnhealthyPodEvictionPolicy",
+			pdbSpec: policy.PodDisruptionBudgetSpec{
+				MinAvailable:               &c1,
+				UnhealthyPodEvictionPolicy: &invalidPolicy,
+			},
+			expectErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidatePodDisruptionBudgetSpec(tc.pdbSpec, PodDisruptionBudgetValidationOptions{true}, field.NewPath("foo"))
+			if len(errs) == 0 && tc.expectErr {
+				t.Errorf("unexpected success for %v", tc.pdbSpec)
+			}
+			if len(errs) != 0 && !tc.expectErr {
+				t.Errorf("unexpected failure for %v", tc.pdbSpec)
+			}
+		})
+	}
+}
+
 func TestValidatePodDisruptionBudgetStatus(t *testing.T) {
 	const expectNoErrors = false
 	const expectErrors = true

@@ -10610,6 +10610,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: selector
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+    - name: unhealthyPodEvictionPolicy
+      type:
+        scalar: string
 - name: io.k8s.api.policy.v1.PodDisruptionBudgetStatus
   map:
     fields:
@@ -10751,6 +10754,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: selector
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+    - name: unhealthyPodEvictionPolicy
+      type:
+        scalar: string
 - name: io.k8s.api.policy.v1beta1.PodDisruptionBudgetStatus
   map:
     fields:
