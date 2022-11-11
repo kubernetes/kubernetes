@@ -68,7 +68,8 @@ func pruneEnums(schema *spec.Schema) *spec.Schema {
 				// note that the new lines before the header should be removed too,
 				// thus the slice range.
 				clone()
-				schema.Description = schema.Description[:headerIndex]
+				// stripping the header, taking account of two extra new lines before it.
+				schema.Description = schema.Description[:headerIndex-2]
 			}
 			if len(schema.Enum) != 0 {
 				// remove the enum field

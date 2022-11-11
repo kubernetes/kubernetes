@@ -122,6 +122,9 @@ func TestGetOpenAPIDefinitionsWithoutDisabledFeatures(t *testing.T) {
 						t.Errorf("enum appeared, description: %s", prop.Description)
 					}
 				}
+				if strings.TrimSpace(prop.Description) != prop.Description {
+					t.Errorf("description contains untrimmed spaces: %q", prop.Description)
+				}
 				if len(prop.Enum) != 0 {
 					enumAppeared = true
 					if !tc.shouldHaveEnum {
