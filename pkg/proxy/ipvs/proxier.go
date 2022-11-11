@@ -1163,11 +1163,6 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.ErrorS(nil, "Failed to cast serviceInfo", "servicePortName", svcPortName)
 			continue
 		}
-		isIPv6 := netutils.IsIPv6(svcInfo.ClusterIP())
-		localPortIPFamily := netutils.IPv4
-		if isIPv6 {
-			localPortIPFamily = netutils.IPv6
-		}
 		protocol := strings.ToLower(string(svcInfo.Protocol()))
 		// Precompute svcNameString; with many services the many calls
 		// to ServicePortName.String() show up in CPU profiles.
@@ -1399,25 +1394,6 @@ func (proxier *Proxier) syncProxyRules() {
 				// Skip nodePort configuration since an error occurred when
 				// computing nodeAddresses or nodeIPs.
 				continue
-			}
-
-			var lps []netutils.LocalPort
-			for _, address := range nodeAddresses {
-				lp := netutils.LocalPort{
-					Description: "nodePort for " + svcPortNameString,
-					IP:          address,
-					IPFamily:    localPortIPFamily,
-					Port:        svcInfo.NodePort(),
-					Protocol:    netutils.Protocol(svcInfo.Protocol()),
-				}
-				if utilproxy.IsZeroCIDR(address) {
-					// Empty IP address means all
-					lp.IP = ""
-					lps = append(lps, lp)
-					// If we encounter a zero CIDR, then there is no point in processing the rest of the addresses.
-					break
-				}
-				lps = append(lps, lp)
 			}
 
 			// Nodeports need SNAT, unless they're local.
