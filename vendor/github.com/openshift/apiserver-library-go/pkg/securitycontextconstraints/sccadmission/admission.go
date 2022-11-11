@@ -266,13 +266,22 @@ func (c *constraint) computeSecurityContext(ctx context.Context, a admission.Att
 	}
 
 	var (
-		provider sccmatching.SecurityContextConstraintsProvider
-		denied   = []string{}
-		failures = map[string]string{}
-		i        int
+		restrictedSCCProvider   sccmatching.SecurityContextConstraintsProvider
+		restrictedV2SCCProvider sccmatching.SecurityContextConstraintsProvider
+		provider                sccmatching.SecurityContextConstraintsProvider
+		denied                  = []string{}
+		failures                = map[string]string{}
+		i                       int
 	)
 loop:
 	for i, provider = range providers {
+		switch provider.GetSCCName() {
+		case "restricted":
+			restrictedSCCProvider = providers[i]
+		case "restricted-v2":
+			restrictedV2SCCProvider = providers[i]
+		}
+
 		if !allowedForUserOrSA(provider) {
 			denied = append(denied, provider.GetSCCName())
 			// this will cause every security context constraint attempted, in order, to the failure
@@ -312,6 +321,26 @@ loop:
 		default:
 			klog.V(5).Infof("pod %s (generate: %s) validated against provider %s, but required mutation, skipping", pod.Name, pod.GenerateName, provider.GetSCCName())
 			failures[provider.GetSCCName()] = fmt.Sprintf("failures final validation after mutating admission")
+		}
+	}
+
+	// if we have restricted-v2, and we're not allowed (this means restricted-v2 did not match) and the user cannot use restricted-v1
+	// then we should check to see if restricted-v1 would allow the pod.  If so, prepend a specific failure message.
+	userCannotUseForRestricted := sets.NewString(denied...).Has("restricted")
+	hasRestrictedV2 := restrictedV2SCCProvider != nil
+	isAllowed := allowingProvider != nil
+	if hasRestrictedV2 && !isAllowed && userCannotUseForRestricted {
+		// restrictedSCCProvider is never nil because the loop above only adds "restricted" to the denied list if it found "restricted"
+		_, restrictedErrs := appliesToPod(restrictedSCCProvider, pod)
+		if len(restrictedErrs) == 0 {
+			// this means that restricted-v1 works, so we should indicate that the pod would have been admitted otherwise
+			validationErrs = append(validationErrs,
+				field.Forbidden(
+					field.NewPath("no access to scc/restricted"),
+					"the pod fails to validate against the `restricted-v2` security context constraint, "+
+						"but would validate successfully against the `restricted` security context constraint",
+				),
+			)
 		}
 	}
 
