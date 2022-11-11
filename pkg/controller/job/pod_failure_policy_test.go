@@ -389,7 +389,10 @@ func TestMatchPodFailurePolicy(t *testing.T) {
 					Phase: v1.PodFailed,
 					ContainerStatuses: []v1.ContainerStatus{
 						{
-							Name: "main-container",
+							Name: "foo",
+						},
+						{
+							Name: "bar",
 							State: v1.ContainerState{
 								Terminated: &v1.ContainerStateTerminated{
 									ExitCode: 2,
