@@ -25,7 +25,7 @@ var _ = SIGDescribe("Forced Deletion", func() {
 				gracePeriodForce = 0
 			)
 			podName := "test"
-			podClient.CreateSync(getGracePeriodTestPod(podName, f.Namespace.Name, gracePeriod))
+			podClient.CreateSync(getGracePeriodTestPod(podName, gracePeriod))
 			err := podClient.Delete(context.TODO(), podName, *metav1.NewDeleteOptions(gracePeriod))
 			framework.ExpectNoError(err)
 			podClient.DeleteSync(podName, *metav1.NewDeleteOptions(gracePeriodForce), 5*time.Second)
@@ -33,15 +33,14 @@ var _ = SIGDescribe("Forced Deletion", func() {
 	})
 })
 
-func getGracePeriodTestPod(name string, namespace string, gracePeriod int64) *v1.Pod {
+func getGracePeriodTestPod(name string, gracePeriod int64) *v1.Pod {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name: name,
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
