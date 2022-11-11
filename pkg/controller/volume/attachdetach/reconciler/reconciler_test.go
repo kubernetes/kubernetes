@@ -1582,6 +1582,7 @@ func verifyVolumeAttachedToNode(
 			attachState,
 			expectedAttachState)
 	}
+	t.Logf("Volume <%v> is attached to node <%v>: %v", volumeName, nodeName, attachState)
 }
 
 func verifyVolumeReportedAsAttachedToNode(
@@ -1600,6 +1601,7 @@ func verifyVolumeReportedAsAttachedToNode(
 	}
 
 	if result == isAttached {
+		t.Logf("Volume <%v> is reported as attached to node <%v>: %v", volumeName, nodeName, result)
 		return
 	}
 	t.Fatalf("Check volume <%v> is reported as attached to node <%v>, got %v, expected %v",
@@ -1624,6 +1626,7 @@ func verifyVolumeNoStatusUpdateNeeded(
 				nodeName)
 		}
 	}
+	t.Logf("Volume <%v> is not reported as need to update status on node <%v>", volumeName, nodeName)
 }
 
 func verifyNewDetacherCallCount(
