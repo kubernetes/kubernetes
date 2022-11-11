@@ -39,6 +39,7 @@ import (
 	libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -1037,4 +1038,12 @@ func (cm *containerManagerImpl) PrepareResources(pod *v1.Pod, container *v1.Cont
 
 func (cm *containerManagerImpl) UnprepareResources(pod *v1.Pod) error {
 	return cm.draManager.UnprepareResources(pod)
+}
+
+func (cm *containerManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) bool {
+	if cm.draManager != nil {
+		return cm.draManager.PodMightNeedToUnprepareResources(UID)
+	}
+
+	return false
 }

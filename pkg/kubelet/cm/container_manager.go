@@ -22,7 +22,9 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+
 	// TODO: Migrate kubelet to either use its own internal objects or client library.
 	v1 "k8s.io/api/core/v1"
 	internalapi "k8s.io/cri-api/pkg/apis"
@@ -121,6 +123,10 @@ type ContainerManager interface {
 
 	// UnrepareResources unprepares pod resources
 	UnprepareResources(*v1.Pod) error
+
+	// PodMightNeedToUnprepareResources returns true if the pod with the given UID
+	// might need to unprepare resources.
+	PodMightNeedToUnprepareResources(UID types.UID) bool
 
 	// Implements the podresources Provider API for CPUs, Memory and Devices
 	podresources.CPUsProvider

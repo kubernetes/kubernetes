@@ -207,11 +207,9 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 			continue
 		}
 
-		// Delete pod UID from the cache
-		claimInfo.deletePodReference(pod.UID)
-
 		// Skip calling NodeUnprepareResource if other pods are still referencing it
-		if len(claimInfo.podUIDs) > 0 {
+		if len(claimInfo.podUIDs) > 1 {
+			claimInfo.deletePodReference(pod.UID)
 			continue
 		}
 
@@ -236,10 +234,22 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 				claimInfo.cdiDevices, err)
 		}
 
+		// Delete last pod UID only if NodeUnprepareResource call succeeds.
+		// This ensures that status manager doesn't enter termination status
+		// for the pod. This logic is implemented in the m.PodMightNeedToUnprepareResources
+		// and in the claimInfo.hasPodReference.
+		claimInfo.deletePodReference(pod.UID)
+
 		klog.V(3).InfoS("NodeUnprepareResource succeeded", "response", response)
 		// delete resource from the cache
 		m.cache.delete(claimInfo.claimName, pod.Namespace)
 	}
 
 	return nil
+}
+
+// PodMightNeedToUnprepareResources returns true if the pod might need to
+// unprepare resources
+func (m *ManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) bool {
+	return m.cache.hasPodReference(UID)
 }

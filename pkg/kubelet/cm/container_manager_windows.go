@@ -30,6 +30,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	internalapi "k8s.io/cri-api/pkg/apis"
@@ -259,4 +260,8 @@ func (cm *containerManagerImpl) PrepareResources(pod *v1.Pod, container *v1.Cont
 
 func (cm *containerManagerImpl) UnprepareResources(*v1.Pod) error {
 	return nil
+}
+
+func (cm *containerManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) bool {
+	return false
 }

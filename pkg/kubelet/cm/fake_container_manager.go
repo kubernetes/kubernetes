@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
@@ -244,4 +245,8 @@ func (cm *FakeContainerManager) PrepareResources(pod *v1.Pod, container *v1.Cont
 
 func (cm *FakeContainerManager) UnprepareResources(*v1.Pod) error {
 	return nil
+}
+
+func (cm *FakeContainerManager) PodMightNeedToUnprepareResources(UID types.UID) bool {
+	return false
 }

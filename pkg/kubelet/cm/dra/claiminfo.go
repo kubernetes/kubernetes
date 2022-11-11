@@ -108,3 +108,20 @@ func (cache *claimInfoCache) delete(claimName, namespace string) {
 
 	delete(cache.claimInfo, claimName+namespace)
 }
+
+// hasPodReference checks if there is at least one claim
+// that is referenced by the pod with the given UID
+// This function is used indirectly by the status manager
+// to check if pod can enter termination status
+func (cache *claimInfoCache) hasPodReference(UID types.UID) bool {
+	cache.RLock()
+	defer cache.RUnlock()
+
+	for _, claimInfo := range cache.claimInfo {
+		if claimInfo.podUIDs.Has(string(UID)) {
+			return true
+		}
+	}
+
+	return false
+}
