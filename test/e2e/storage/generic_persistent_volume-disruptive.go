@@ -80,7 +80,7 @@ var _ = utils.SIGDescribe("GenericPersistentVolume[Disruptive]", func() {
 			func(t disruptiveTest) {
 				ginkgo.It(t.testItStmt, func() {
 					ginkgo.By("Executing Spec")
-					t.runTest(c, f, clientPod)
+					t.runTest(c, f, clientPod, e2epod.VolumeMountPath1)
 				})
 			}(test)
 		}

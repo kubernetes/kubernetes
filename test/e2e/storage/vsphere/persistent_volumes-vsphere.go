@@ -159,7 +159,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() 
 	*/
 	ginkgo.It("should test that a file written to the vsphere volume mount before kubelet restart can be read after restart [Disruptive]", func() {
 		e2eskipper.SkipUnlessSSHKeyPresent()
-		utils.TestKubeletRestartsAndRestoresMount(c, f, clientPod)
+		utils.TestKubeletRestartsAndRestoresMount(c, f, clientPod, e2epod.VolumeMountPath1)
 	})
 
 	/*
@@ -175,7 +175,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() 
 	*/
 	ginkgo.It("should test that a vsphere volume mounted to a pod that is deleted while the kubelet is down unmounts when the kubelet returns [Disruptive]", func() {
 		e2eskipper.SkipUnlessSSHKeyPresent()
-		utils.TestVolumeUnmountsFromDeletedPod(c, f, clientPod)
+		utils.TestVolumeUnmountsFromDeletedPod(c, f, clientPod, e2epod.VolumeMountPath1)
 	})
 
 	/*
