@@ -302,6 +302,11 @@ func IsPodTerminal(pod *v1.Pod) bool {
 	return IsPodPhaseTerminal(pod.Status.Phase)
 }
 
+// IsNeverScheduled returns true if the pod was never scheduled and never will.
+func IsNeverScheduled(pod *v1.Pod) bool {
+	return pod.DeletionTimestamp != nil && pod.Spec.NodeName == ""
+}
+
 // IsPodPhaseTerminal returns true if the pod's phase is terminal.
 func IsPodPhaseTerminal(phase v1.PodPhase) bool {
 	return phase == v1.PodFailed || phase == v1.PodSucceeded
