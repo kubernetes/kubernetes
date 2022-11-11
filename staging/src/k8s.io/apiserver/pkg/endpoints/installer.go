@@ -71,7 +71,7 @@ type action struct {
 
 func ConvertGroupVersionIntoToDiscovery(list []metav1.APIResource) ([]apidiscoveryv2beta1.APIResourceDiscovery, error) {
 	var apiResourceList []apidiscoveryv2beta1.APIResourceDiscovery
-	parentResources := map[string]*apidiscoveryv2beta1.APIResourceDiscovery{}
+	parentResources := make(map[string]int)
 
 	// Loop through all top-level resources
 	for _, r := range list {
@@ -87,7 +87,7 @@ func ConvertGroupVersionIntoToDiscovery(list []metav1.APIResource) ([]apidiscove
 			scope = apidiscoveryv2beta1.ScopeCluster
 		}
 
-		apiResourceList = append(apiResourceList, apidiscoveryv2beta1.APIResourceDiscovery{
+		resource := apidiscoveryv2beta1.APIResourceDiscovery{
 			Resource: r.Name,
 			Scope:    scope,
 			ResponseKind: &metav1.GroupVersionKind{
@@ -99,8 +99,9 @@ func ConvertGroupVersionIntoToDiscovery(list []metav1.APIResource) ([]apidiscove
 			ShortNames:       r.ShortNames,
 			Categories:       r.Categories,
 			SingularResource: r.SingularName,
-		})
-		parentResources[r.Name] = &apiResourceList[len(apiResourceList)-1]
+		}
+		apiResourceList = append(apiResourceList, resource)
+		parentResources[r.Name] = len(apiResourceList) - 1
 	}
 
 	// Loop through all subresources
@@ -120,23 +121,19 @@ func ConvertGroupVersionIntoToDiscovery(list []metav1.APIResource) ([]apidiscove
 			scope = apidiscoveryv2beta1.ScopeCluster
 		}
 
-		var parent *apidiscoveryv2beta1.APIResourceDiscovery
-		var exists bool
-
-		parent, exists = parentResources[split[0]]
+		parentidx, exists := parentResources[split[0]]
 		if !exists {
 			// If a subresource exists without a parent, create a parent
 			apiResourceList = append(apiResourceList, apidiscoveryv2beta1.APIResourceDiscovery{
 				Resource: split[0],
 				Scope:    scope,
 			})
-			parentResources[split[0]] = &apiResourceList[len(apiResourceList)-1]
-			parent = &apiResourceList[len(apiResourceList)-1]
-			parentResources[split[0]] = parent
+			parentidx = len(apiResourceList) - 1
+			parentResources[split[0]] = parentidx
 		}
 
-		if parent.Scope != scope {
-			return nil, fmt.Errorf("Error: Parent %s (scope: %s) and subresource %s (scope: %s) scope do not match", split[0], parent.Scope, split[1], scope)
+		if apiResourceList[parentidx].Scope != scope {
+			return nil, fmt.Errorf("Error: Parent %s (scope: %s) and subresource %s (scope: %s) scope do not match", split[0], apiResourceList[parentidx].Scope, split[1], scope)
 			//
 		}
 
@@ -151,9 +148,9 @@ func ConvertGroupVersionIntoToDiscovery(list []metav1.APIResource) ([]apidiscove
 				Kind:    r.Kind,
 			}
 		}
-		parent.Subresources = append(parent.Subresources, subresource)
-
+		apiResourceList[parentidx].Subresources = append(apiResourceList[parentidx].Subresources, subresource)
 	}
+
 	return apiResourceList, nil
 }
 

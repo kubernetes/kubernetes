@@ -205,6 +205,7 @@ func TestRemoveAPIService(t *testing.T) {
 
 func TestLegacyFallback(t *testing.T) {
 	aggregatedResourceManager := discoveryendpoint.NewResourceManager()
+	rootAPIsHandler := discovery.NewRootAPIsHandler(discovery.DefaultAddresses{DefaultAddress: "192.168.1.1"}, scheme.Codecs)
 
 	legacyGroupHandler := discovery.NewAPIGroupHandler(scheme.Codecs, metav1.APIGroup{
 		Name: "stable.example.com",
@@ -262,9 +263,11 @@ func TestLegacyFallback(t *testing.T) {
 		} else if r.URL.Path == "/apis/stable.example.com/v1" {
 			// defer to legacy discovery
 			legacyResourceHandler.ServeHTTP(w, r)
+		} else if r.URL.Path == "/apis" {
+			rootAPIsHandler.ServeHTTP(w, r)
 		} else {
 			// Unknown url
-			w.WriteHeader(http.StatusNotFound)
+			t.Fatalf("unexpected request sent to %v", r.URL.Path)
 		}
 	}))
 	testCtx, cancel := context.WithCancel(context.Background())

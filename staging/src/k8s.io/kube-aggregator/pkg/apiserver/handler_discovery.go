@@ -38,8 +38,11 @@ import (
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
 )
 
-var APIRegistrationGroup string = "apiregistration.k8s.io"
-var APIRegistrationGroupPriority int = 18000
+var APIRegistrationGroupVersion metav1.GroupVersion = metav1.GroupVersion{Group: "apiregistration.k8s.io", Version: "v1"}
+
+// Maximum is 20000. Set to higher than that so apiregistration always is listed
+// first (mirrors v1 discovery behavior)
+var APIRegistrationGroupPriority int = 20001
 
 // Given a list of APIServices and proxyHandlers for contacting them,
 // DiscoveryManager caches a list of discovery documents for each server
@@ -151,8 +154,11 @@ type groupVersionInfo struct {
 	// describes how to contact the server responsible for this GroupVersion.
 	service serviceKey
 
-	// groupPriority describes the priority of the APIService for sorting
+	// groupPriority describes the priority of the APIService's group for sorting
 	groupPriority int
+
+	// groupPriority describes the priority of the APIService version for sorting
+	versionPriority int
 
 	// Method for contacting the service
 	handler http.Handler
@@ -232,7 +238,7 @@ func (dm *discoveryManager) fetchFreshDiscoveryForService(gv metav1.GroupVersion
 
 		dm.setCacheEntryForService(info.service, cached)
 		return &cached, nil
-	case http.StatusNotFound:
+	case http.StatusNotAcceptable:
 		// Discovery Document is not being served at all.
 		// Fall back to legacy discovery information
 		if len(gv.Version) == 0 {
@@ -390,6 +396,7 @@ func (dm *discoveryManager) syncAPIService(apiServiceName string) error {
 	}
 
 	dm.mergedDiscoveryHandler.AddGroupVersion(gv.Group, entry)
+	dm.mergedDiscoveryHandler.SetGroupVersionPriority(metav1.GroupVersion(gv), info.groupPriority, info.versionPriority)
 	return nil
 }
 
@@ -428,7 +435,7 @@ func (dm *discoveryManager) Run(stopCh <-chan struct{}) {
 	}
 
 	// Ensure that apiregistration.k8s.io is the first group in the discovery group.
-	dm.mergedDiscoveryHandler.SetGroupPriority(APIRegistrationGroup, APIRegistrationGroupPriority)
+	dm.mergedDiscoveryHandler.SetGroupVersionPriority(APIRegistrationGroupVersion, APIRegistrationGroupPriority, 0)
 
 	wait.PollUntil(1*time.Minute, func() (done bool, err error) {
 		dm.servicesLock.Lock()
@@ -458,6 +465,7 @@ func (dm *discoveryManager) AddAPIService(apiService *apiregistrationv1.APIServi
 	// Add or update APIService record and mark it as dirty
 	dm.setInfoForAPIService(apiService.Name, &groupVersionInfo{
 		groupPriority:   int(apiService.Spec.GroupPriorityMinimum),
+		versionPriority: int(apiService.Spec.VersionPriority),
 		handler:         handler,
 		lastMarkedDirty: time.Now(),
 		service:         newServiceKey(*apiService.Spec.Service),
