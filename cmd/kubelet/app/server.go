@@ -496,6 +496,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		return errors.New("cannot exit on lock file contention: no lock file specified")
 	}
 	done := make(chan struct{})
+	//文件锁
 	if s.LockFilePath != "" {
 		klog.InfoS("Acquiring file lock", "path", s.LockFilePath)
 		if err := flock.Acquire(s.LockFilePath); err != nil {
