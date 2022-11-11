@@ -10,6 +10,7 @@
   - [Changelog since v1.23.13](#changelog-since-v12313)
   - [Important Security Information](#important-security-information)
     - [CVE-2022-3162: Unauthorized read of Custom Resources](#cve-2022-3162-unauthorized-read-of-custom-resources)
+    - [CVE-2022-3294: Node address isn't always verified when proxying](#cve-2022-3294-node-address-isnt-always-verified-when-proxying)
   - [Changes by Kind](#changes-by-kind)
     - [API Change](#api-change)
     - [Bug or Regression](#bug-or-regression)
@@ -55,6 +56,7 @@
   - [Changelog since v1.23.10](#changelog-since-v12310)
   - [Important Security Information](#important-security-information-1)
     - [CVE-2022-3172: Aggregated API server can cause clients to be redirected (SSRF)](#cve-2022-3172-aggregated-api-server-can-cause-clients-to-be-redirected-ssrf)
+    - [CVE-2021-25749: `runAsNonRoot` logic bypass for Windows containers](#cve-2021-25749-runasnonroot-logic-bypass-for-windows-containers)
   - [Changes by Kind](#changes-by-kind-3)
     - [Bug or Regression](#bug-or-regression-3)
   - [Dependencies](#dependencies-3)
@@ -468,6 +470,32 @@ This vulnerability was reported by Richard Turnbull of NCC Group as part of the 
 
 **CVSS Rating:** Medium (6.5) [CVSS:3.0/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N](https://www.first.org/cvss/calculator/3.0#CVSS:3.0/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N)
 
+### CVE-2022-3294: Node address isn't always verified when proxying
+
+A security issue was discovered in Kubernetes where users may have access to secure endpoints in the control plane network. Kubernetes clusters are only affected if an untrusted user can to modify Node objects and send requests proxying through them.
+
+Kubernetes supports node proxying, which allows clients of kube-apiserver to access endpoints of a Kubelet to establish connections to Pods, retrieve container logs, and more. While Kubernetes already validates the proxying address for Nodes, a bug in kube-apiserver made it possible to bypass this validation. Bypassing this validation could allow authenticated requests destined for Nodes to be redirected to the API Server through its private network.
+
+The merged fix enforces validation against the proxying address for a Node. In some cases, the fix can break clients that depend on the `nodes/proxy` subresource, specifically if a kubelet advertises a localhost or link-local address to the Kubernetes control plane. Configuring an egress proxy for egress to the cluster network can also mitigate this vulnerability.
+
+**Affected Versions**:
+  - kube-apiserver v1.25.0 - v1.25.3
+  - kube-apiserver v1.24.0 - v1.24.7
+  - kube-apiserver v1.23.0 - v1.23.13
+  - kube-apiserver v1.22.0 - v1.22.15
+  - kube-apiserver <= v1.21.?
+
+**Fixed Versions**:
+  - kube-apiserver v1.25.4
+  - kube-apiserver v1.24.8
+  - kube-apiserver v1.23.13
+  - kube-apiserver v1.22.16
+
+This vulnerability was reported by Yuval Avrahami of Palo Alto Networks
+
+
+**CVSS Rating:** Medium (6.6) [CVSS:3.1/AV:N/AC:H/PR:H/UI:N/S:U/C:H/I:H/A:H](https://www.first.org/cvss/calculator/3.1#CVSS:3.1/AV:N/AC:H/PR:H/UI:N/S:U/C:H/I:H/A:H)
+
 ## Changes by Kind
 
 ### API Change
@@ -775,6 +803,54 @@ This vulnerability was reported by Nicolas Joly & Weinong Wang from Microsoft
 
 
 **CVSS Rating:** Medium (5.1) [CVSS:3.1/AV:N/AC:H/PR:H/UI:R/S:C/C:L/I:L/A:L](https://www.first.org/cvss/calculator/3.1#CVSS:3.1/AV:N/AC:H/PR:H/UI:R/S:C/C:L/I:L/A:L)
+
+### CVE-2021-25749: `runAsNonRoot` logic bypass for Windows containers
+
+A security issue was discovered in Kubernetes that could allow  Windows workloads to run as `ContainerAdministrator` even when those workloads set the `runAsNonRoot` option to `true `.
+
+This issue has been rated low and assigned CVE-2021-25749
+
+**Am I vulnerable?**
+
+All Kubernetes clusters with following versions, running Windows workloads with `runAsNonRoot` are impacted
+
+**Affected Versions**:
+
+- kubelet v1.20 - v1.21
+- kubelet v1.22.0 - v1.22.13
+- kubelet v1.23.0 - v1.23.10
+- kubelet v1.24.0 - v1.24.4
+
+**How do I mitigate this vulnerability?**
+
+There are no known mitigations to this vulnerability.
+
+**Fixed Versions**:
+
+- kubelet v1.22.14
+- kubelet v1.23.11
+- kubelet v1.24.5
+- kubelet v1.25.0
+
+
+To upgrade, refer to this documentation _For core Kubernetes:_ https://kubernetes.io/docs/tasks/administer-cluster/cluster-management/#upgrading-a-cluster 
+
+**Detection**:
+
+Kubernetes Audit logs may indicate if the user name was misspelled to bypass the restriction placed on which user is a pod allowed to run as.
+
+If you find evidence that this vulnerability has been exploited, please contact security@kubernetes.io
+
+**Additional Details**:
+
+See the GitHub issue for more details: https://github.com/kubernetes/kubernetes/issues/112192 
+
+**Acknowledgements**:
+
+This vulnerability was reported and fixed by Mark Rosetti (@marosset)
+
+
+**CVSS Rating:** Low (3.4) [CVSS:3.1/AV:A/AC:H/PR:H/UI:R/S:U/C:L/I:L/A:L/E:P/RL:O/RC:C](https://www.first.org/cvss/calculator/3.1#CVSS:3.1/AV:A/AC:H/PR:H/UI:R/S:U/C:L/I:L/A:L/E:P/RL:O/RC:C)
 
 ## Changes by Kind
 
