@@ -8,6 +8,8 @@
       "github.com/go-openapi/spec": "use k8s.io/kube-openapi/pkg/validation/spec instead",
       "github.com/go-openapi/strfmt": "use k8s.io/kube-openapi/pkg/validation/strfmt instead",
       "github.com/go-openapi/validate": "use k8s.io/kube-openapi/pkg/validation/validate instead",
+      "github.com/gogo/protobuf": "unmaintained",
+      "github.com/gogo/googleapis": "depends on unmaintained github.com/gogo/protobuf",
       "github.com/hashicorp/consul": "MPL license not in CNCF allowlist",
       "github.com/hashicorp/errwrap": "MPL license not in CNCF allowlist",
       "github.com/hashicorp/go-multierror": "MPL license not in CNCF allowlist",
@@ -31,6 +33,22 @@
     "unwantedReferences": {
       "github.com/go-kit/kit": [
         "github.com/grpc-ecosystem/go-grpc-middleware"
+      ],
+      "github.com/gogo/googleapis": [
+        "github.com/google/cadvisor"
+      ],
+      "github.com/gogo/protobuf": [
+        "github.com/Microsoft/hcsshim",
+        "github.com/cockroachdb/datadriven",
+        "github.com/containerd/cgroups",
+        "github.com/containerd/ttrpc",
+        "github.com/containerd/typeurl",
+        "github.com/gogo/googleapis",
+        "github.com/google/cadvisor",
+        "github.com/grpc-ecosystem/go-grpc-middleware",
+        "go.etcd.io/etcd/api/v3",
+        "go.etcd.io/etcd/raft/v3",
+        "go.etcd.io/etcd/server/v3"
       ],
       "github.com/json-iterator/go": [
         "github.com/prometheus/client_golang",
