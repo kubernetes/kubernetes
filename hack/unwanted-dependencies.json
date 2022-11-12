@@ -1,4 +1,4 @@
-{ 
+{
   "spec": {
     "unwantedModules": {
       "cloud.google.com/go/firestore": "db/datastore clients should not be required",
