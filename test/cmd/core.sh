@@ -30,7 +30,7 @@ run_configmap_tests() {
 
   ### Create a new namespace
   # Pre-condition: the test-configmaps namespace does not exist
-  kube::test::get_object_assert 'namespaces' "{{range.items}}{{ if eq $id_field \\\"test-configmaps\\\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'namespaces' "{{range.items}}{{ if eq $id_field \"test-configmaps\" }}found{{end}}{{end}}:" ':'
   # Command
   kubectl create namespace test-configmaps
   # Post-condition: namespace 'test-configmaps' is created.
@@ -38,12 +38,12 @@ run_configmap_tests() {
 
   ### Create a generic configmap in a specific namespace
   # Pre-condition: configmap test-configmap and test-binary-configmap does not exist
-  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \\\"test-configmap\\\" }}found{{end}}{{end}}:" ':'
-  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \\\"test-binary-configmap\\\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \"test-configmap\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \"test-binary-configmap\" }}found{{end}}{{end}}:" ':'
   # Dry-run command
   kubectl create configmap test-configmap --dry-run=client --from-literal=key1=value1 --namespace=test-configmaps
   kubectl create configmap test-configmap --dry-run=server --from-literal=key1=value1 --namespace=test-configmaps
-  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \\\"test-configmap\\\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \"test-configmap\" }}found{{end}}{{end}}:" ':'
   # Command
   kubectl create configmap test-configmap --from-literal=key1=value1 --namespace=test-configmaps
   kubectl create configmap test-binary-configmap --from-file <( head -c 256 /dev/urandom ) --namespace=test-configmaps
@@ -163,15 +163,15 @@ run_pod_tests() {
   # Command
   kubectl create -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml "${kube_flags[@]}"
   # Post-condition: valid-pod POD is created
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" "valid-pod:"
 
   ### Delete POD valid-pod with label
   # Pre-condition: valid-pod POD exists
-  kube::test::get_object_assert "pods -l'name in (valid-pod)'" "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
+  kube::test::get_object_assert "pods -lname=valid-pod" "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   # Command
-  kubectl delete pods -l'name in (valid-pod)' "${kube_flags[@]}" --grace-period=0 --force
+  kubectl delete pods -lname=valid-pod "${kube_flags[@]}" --grace-period=0 --force
   # Post-condition: valid-pod POD doesn't exist
-  kube::test::get_object_assert "pods -l'name in (valid-pod)'" "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert "pods -lname=valid-pod" "{{range.items}}{{$id_field}}:{{end}}" ''
 
   ### Create POD valid-pod from YAML
   # Pre-condition: no POD exists
@@ -201,7 +201,7 @@ run_pod_tests() {
   # Pre-condition: valid-pod POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   # Command
-  ! kubectl delete --all pods -l'name in (valid-pod)' "${kube_flags[@]}" || exit 1
+  ! kubectl delete --all pods -lname=valid-pod "${kube_flags[@]}" || exit 1
   # Post-condition: valid-pod POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
 
@@ -211,12 +211,12 @@ run_pod_tests() {
   # Command
   kubectl delete --all pods "${kube_flags[@]}" --grace-period=0 --force # --all remove all the pods
   # Post-condition: no POD exists
-  kube::test::get_object_assert "pods -l'name in (valid-pod)'" "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert "pods -lname=valid-pod" "{{range.items}}{{$id_field}}:{{end}}" ''
 
   # Detailed tests for describe pod output
     ### Create a new namespace
   # Pre-condition: the test-secrets namespace does not exist
-  kube::test::get_object_assert 'namespaces' "{{range.items}}{{ if eq $id_field \\\"test-kubectl-describe-pod\\\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'namespaces' "{{range.items}}{{ if eq $id_field \"test-kubectl-describe-pod\" }}found{{end}}{{end}}:" ':'
   # Command
   kubectl create namespace test-kubectl-describe-pod
   # Post-condition: namespace 'test-secrets' is created.
@@ -238,7 +238,7 @@ run_pod_tests() {
   ### Create a generic configmap
   # Pre-condition: CONFIGMAP test-configmap does not exist
   #kube::test::get_object_assert 'configmap/test-configmap --namespace=test-kubectl-describe-pod' "{{$id_field}}" ''
-  kube::test::get_object_assert 'configmaps --namespace=test-kubectl-describe-pod' "{{range.items}}{{ if eq $id_field \\\"test-configmap\\\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'configmaps --namespace=test-kubectl-describe-pod' "{{range.items}}{{ if eq $id_field \"test-configmap\" }}found{{end}}{{end}}:" ':'
 
   #kube::test::get_object_assert 'configmaps --namespace=test-kubectl-describe-pod' "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
@@ -248,11 +248,11 @@ run_pod_tests() {
 
   ### Create a pod disruption budget with minAvailable
   # Pre-condition: pdb does not exist
-  kube::test::get_object_assert 'pdb --namespace=test-kubectl-describe-pod' "{{range.items}}{{ if eq $id_field \\\"test-pdb-1\\\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'pdb --namespace=test-kubectl-describe-pod' "{{range.items}}{{ if eq $id_field \"test-pdb-1\" }}found{{end}}{{end}}:" ':'
   # Dry-run command
   kubectl create pdb test-pdb-1 --dry-run=client --selector=app=rails --min-available=2 --namespace=test-kubectl-describe-pod
   kubectl create pdb test-pdb-1 --dry-run=server --selector=app=rails --min-available=2 --namespace=test-kubectl-describe-pod
-  kube::test::get_object_assert 'pdb --namespace=test-kubectl-describe-pod' "{{range.items}}{{ if eq $id_field \\\"test-pdb-1\\\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'pdb --namespace=test-kubectl-describe-pod' "{{range.items}}{{ if eq $id_field \"test-pdb-1\" }}found{{end}}{{end}}:" ':'
   # Command
   kubectl create pdb test-pdb-1 --selector=app=rails --min-available=2 --namespace=test-kubectl-describe-pod
   # Post-condition: pdb exists and has expected values
@@ -293,14 +293,14 @@ run_pod_tests() {
   kubectl delete namespace test-kubectl-describe-pod
 
   ### Priority Class
-  kube::test::get_object_assert 'priorityclasses' "{{range.items}}{{ if eq $id_field \\\"test-priorityclass\\\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'priorityclasses' "{{range.items}}{{ if eq $id_field \"test-priorityclass\" }}found{{end}}{{end}}:" ':'
   # Dry-run command
   kubectl create priorityclass test-priorityclass --dry-run=client
   kubectl create priorityclass test-priorityclass --dry-run=server
-  kube::test::get_object_assert 'priorityclasses' "{{range.items}}{{ if eq $id_field \\\"test-priorityclass\\\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'priorityclasses' "{{range.items}}{{ if eq $id_field \"test-priorityclass\" }}found{{end}}{{end}}:" ':'
   # Command
   kubectl create priorityclass test-priorityclass
-  kube::test::get_object_assert 'priorityclasses' "{{range.items}}{{ if eq $id_field \\\"test-priorityclass\\\" }}found{{end}}{{end}}:" 'found:'
+  kube::test::get_object_assert 'priorityclasses' "{{range.items}}{{ if eq $id_field \"test-priorityclass\" }}found{{end}}{{end}}:" 'found:'
   # Describe command should respect the chunk size parameter
   kube::test::describe_resource_chunk_size_assert priorityclasses events
   kubectl delete priorityclass test-priorityclass
@@ -706,7 +706,7 @@ __EOF__
   # Pre-condition: valid-pod POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   # Command
-  kubectl delete pods -l'name in (valid-pod-super-sayan)' --grace-period=0 --force "${kube_flags[@]}"
+  kubectl delete pods -lname=valid-pod-super-sayan --grace-period=0 --force "${kube_flags[@]}"
   # Post-condition: valid-pod POD doesn't exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -828,7 +828,7 @@ run_secrets_test() {
 
   ### Create a new namespace
   # Pre-condition: the test-secrets namespace does not exist
-  kube::test::get_object_assert 'namespaces' "{{range.items}}{{ if eq $id_field \\\"test-secrets\\\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'namespaces' "{{range.items}}{{ if eq $id_field \"test-secrets\" }}found{{end}}{{end}}:" ':'
   # Command
   kubectl create namespace test-secrets
   # Post-condition: namespace 'test-secrets' is created.
@@ -948,7 +948,7 @@ run_service_accounts_tests() {
 
   ### Create a new namespace
   # Pre-condition: the test-service-accounts namespace does not exist
-  kube::test::get_object_assert 'namespaces' "{{range.items}}{{ if eq $id_field \\\"test-service-accounts\\\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'namespaces' "{{range.items}}{{ if eq $id_field \"test-service-accounts\" }}found{{end}}{{end}}:" ':'
   # Command
   kubectl create namespace test-service-accounts
   # Post-condition: namespace 'test-service-accounts' is created.
@@ -956,11 +956,11 @@ run_service_accounts_tests() {
 
   ### Create a service account in a specific namespace
   # Pre-condition: service account does not exist
-  kube::test::get_object_assert 'serviceaccount --namespace=test-service-accounts' "{{range.items}}{{ if eq $id_field \\\"test-service-account\\\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'serviceaccount --namespace=test-service-accounts' "{{range.items}}{{ if eq $id_field \"test-service-account\" }}found{{end}}{{end}}:" ':'
   # Dry-run command
   kubectl create serviceaccount test-service-account --dry-run=client --namespace=test-service-accounts
   kubectl create serviceaccount test-service-account --dry-run=server --namespace=test-service-accounts
-  kube::test::get_object_assert 'serviceaccount --namespace=test-service-accounts' "{{range.items}}{{ if eq $id_field \\\"test-service-account\\\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'serviceaccount --namespace=test-service-accounts' "{{range.items}}{{ if eq $id_field \"test-service-account\" }}found{{end}}{{end}}:" ':'
   # Command
   kubectl create serviceaccount test-service-account --namespace=test-service-accounts
   # Post-condition: secret exists and has expected values
@@ -1207,7 +1207,7 @@ run_rc_tests() {
   kubectl create -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}"
   kubectl delete rc frontend "${kube_flags[@]}"
   # Post-condition: no pods from frontend controller
-  kube::test::wait_object_assert 'pods -l "name=frontend"' "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::wait_object_assert "pods -l name=frontend" "{{range.items}}{{$id_field}}:{{end}}" ''
 
   ### Create replication controller frontend from JSON
   # Pre-condition: no replication controller exists
@@ -1487,14 +1487,14 @@ run_namespace_tests() {
   ### Quota
   kubectl create namespace quotas
   kube::test::get_object_assert 'namespaces/quotas' "{{$id_field}}" 'quotas'
-  kube::test::get_object_assert 'quota --namespace=quotas' "{{range.items}}{{ if eq $id_field \\\"test-quota\\\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'quota --namespace=quotas' "{{range.items}}{{ if eq $id_field \"test-quota\" }}found{{end}}{{end}}:" ':'
   # Dry-run command
   kubectl create quota test-quota --dry-run=client --namespace=quotas
   kubectl create quota test-quota --dry-run=server --namespace=quotas
-  kube::test::get_object_assert 'quota --namespace=quotas' "{{range.items}}{{ if eq $id_field \\\"test-quota\\\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'quota --namespace=quotas' "{{range.items}}{{ if eq $id_field \"test-quota\" }}found{{end}}{{end}}:" ':'
   # Command
   kubectl create quota test-quota --namespace=quotas
-  kube::test::get_object_assert 'quota --namespace=quotas' "{{range.items}}{{ if eq $id_field \\\"test-quota\\\" }}found{{end}}{{end}}:" 'found:'
+  kube::test::get_object_assert 'quota --namespace=quotas' "{{range.items}}{{ if eq $id_field \"test-quota\" }}found{{end}}{{end}}:" 'found:'
   # Describe command should respect the chunk size parameter
   kube::test::describe_resource_chunk_size_assert resourcequotas "" "--namespace=quotas"
   # Clean up
@@ -1508,7 +1508,7 @@ run_namespace_tests() {
   if kube::test::if_supports_resource "${pods:?}" ; then
     ### Create a new namespace
     # Pre-condition: the other namespace does not exist
-    kube::test::get_object_assert 'namespaces' "{{range.items}}{{ if eq $id_field \\\"other\\\" }}found{{end}}{{end}}:" ':'
+    kube::test::get_object_assert 'namespaces' "{{range.items}}{{ if eq $id_field \"other\" }}found{{end}}{{end}}:" ':'
     # Command
     kubectl create namespace other
     # Post-condition: namespace 'other' is created.

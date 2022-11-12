@@ -28,7 +28,7 @@ run_kubectl_events_tests() {
 
     ### Create a new namespace
     # Pre-condition: the test-events namespace does not exist
-    kube::test::get_object_assert 'namespaces' "{{range.items}}{{ if eq ${id_field:?} \\\"test-events\\\" }}found{{end}}{{end}}:" ':'
+    kube::test::get_object_assert 'namespaces' "{{range.items}}{{ if eq ${id_field:?} \"test-events\" }}found{{end}}{{end}}:" ':'
     # Command
     kubectl create namespace test-events
     # Post-condition: namespace 'test-events' is created.
@@ -39,7 +39,7 @@ run_kubectl_events_tests() {
     kube::test::if_has_not_string "${output_message}" "Warning" "InvalidSchedule" "Cronjob/pi"
 
     # Pre-condition: cronjob does not exist in test-events namespace
-    kube::test::get_object_assert 'cronjob --namespace=test-events' "{{range.items}}{{ if eq $id_field \\\"pi\\\" }}found{{end}}{{end}}:" ':'
+    kube::test::get_object_assert 'cronjob --namespace=test-events' "{{range.items}}{{ if eq $id_field \"pi\" }}found{{end}}{{end}}:" ':'
     ### Create a cronjob in a specific namespace
     kubectl create cronjob pi --schedule="59 23 31 2 *" --namespace=test-events "--image=$IMAGE_PERL" -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]:?}"
     # Post-Condition: assertion object exists

@@ -284,8 +284,8 @@ if [[ "${WHAT}" == "all-conformance" ]]; then
   shift
   conformance_images=("busybox" "agnhost" "jessie-dnsutils" "kitten" "nautilus" "nonewprivs" "resource-consumer" "sample-apiserver")
   for image in "${conformance_images[@]}"; do
-    eval "${TASK}" "${image}" "$@"
+    "${TASK}" "${image}" "$@"
   done
 else
-  eval "${TASK}" "$@"
+  "${TASK}" "$@"
 fi
