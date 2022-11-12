@@ -58,6 +58,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
@@ -106,6 +107,7 @@ import (
 	applyconfigurationsrbacv1 "k8s.io/client-go/applyconfigurations/rbac/v1"
 	applyconfigurationsrbacv1alpha1 "k8s.io/client-go/applyconfigurations/rbac/v1alpha1"
 	applyconfigurationsrbacv1beta1 "k8s.io/client-go/applyconfigurations/rbac/v1beta1"
+	applyconfigurationsresourcev1alpha1 "k8s.io/client-go/applyconfigurations/resource/v1alpha1"
 	applyconfigurationsschedulingv1 "k8s.io/client-go/applyconfigurations/scheduling/v1"
 	applyconfigurationsschedulingv1alpha1 "k8s.io/client-go/applyconfigurations/scheduling/v1alpha1"
 	applyconfigurationsschedulingv1beta1 "k8s.io/client-go/applyconfigurations/scheduling/v1beta1"
@@ -551,6 +553,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.CinderPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("CinderVolumeSource"):
 		return &applyconfigurationscorev1.CinderVolumeSourceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ClaimSource"):
+		return &applyconfigurationscorev1.ClaimSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ClientIPConfig"):
 		return &applyconfigurationscorev1.ClientIPConfigApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ComponentCondition"):
@@ -759,6 +763,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.PodOSApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodReadinessGate"):
 		return &applyconfigurationscorev1.PodReadinessGateApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("PodResourceClaim"):
+		return &applyconfigurationscorev1.PodResourceClaimApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodSchedulingGate"):
 		return &applyconfigurationscorev1.PodSchedulingGateApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodSecurityContext"):
@@ -797,6 +803,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.ReplicationControllerSpecApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ReplicationControllerStatus"):
 		return &applyconfigurationscorev1.ReplicationControllerStatusApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ResourceClaim"):
+		return &applyconfigurationscorev1.ResourceClaimApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ResourceFieldSelector"):
 		return &applyconfigurationscorev1.ResourceFieldSelectorApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ResourceQuota"):
@@ -1455,6 +1463,36 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsrbacv1beta1.RoleRefApplyConfiguration{}
 	case rbacv1beta1.SchemeGroupVersion.WithKind("Subject"):
 		return &applyconfigurationsrbacv1beta1.SubjectApplyConfiguration{}
+
+		// Group=resource.k8s.io, Version=v1alpha1
+	case resourcev1alpha1.SchemeGroupVersion.WithKind("AllocationResult"):
+		return &applyconfigurationsresourcev1alpha1.AllocationResultApplyConfiguration{}
+	case resourcev1alpha1.SchemeGroupVersion.WithKind("PodScheduling"):
+		return &applyconfigurationsresourcev1alpha1.PodSchedulingApplyConfiguration{}
+	case resourcev1alpha1.SchemeGroupVersion.WithKind("PodSchedulingSpec"):
+		return &applyconfigurationsresourcev1alpha1.PodSchedulingSpecApplyConfiguration{}
+	case resourcev1alpha1.SchemeGroupVersion.WithKind("PodSchedulingStatus"):
+		return &applyconfigurationsresourcev1alpha1.PodSchedulingStatusApplyConfiguration{}
+	case resourcev1alpha1.SchemeGroupVersion.WithKind("ResourceClaim"):
+		return &applyconfigurationsresourcev1alpha1.ResourceClaimApplyConfiguration{}
+	case resourcev1alpha1.SchemeGroupVersion.WithKind("ResourceClaimConsumerReference"):
+		return &applyconfigurationsresourcev1alpha1.ResourceClaimConsumerReferenceApplyConfiguration{}
+	case resourcev1alpha1.SchemeGroupVersion.WithKind("ResourceClaimParametersReference"):
+		return &applyconfigurationsresourcev1alpha1.ResourceClaimParametersReferenceApplyConfiguration{}
+	case resourcev1alpha1.SchemeGroupVersion.WithKind("ResourceClaimSchedulingStatus"):
+		return &applyconfigurationsresourcev1alpha1.ResourceClaimSchedulingStatusApplyConfiguration{}
+	case resourcev1alpha1.SchemeGroupVersion.WithKind("ResourceClaimSpec"):
+		return &applyconfigurationsresourcev1alpha1.ResourceClaimSpecApplyConfiguration{}
+	case resourcev1alpha1.SchemeGroupVersion.WithKind("ResourceClaimStatus"):
+		return &applyconfigurationsresourcev1alpha1.ResourceClaimStatusApplyConfiguration{}
+	case resourcev1alpha1.SchemeGroupVersion.WithKind("ResourceClaimTemplate"):
+		return &applyconfigurationsresourcev1alpha1.ResourceClaimTemplateApplyConfiguration{}
+	case resourcev1alpha1.SchemeGroupVersion.WithKind("ResourceClaimTemplateSpec"):
+		return &applyconfigurationsresourcev1alpha1.ResourceClaimTemplateSpecApplyConfiguration{}
+	case resourcev1alpha1.SchemeGroupVersion.WithKind("ResourceClass"):
+		return &applyconfigurationsresourcev1alpha1.ResourceClassApplyConfiguration{}
+	case resourcev1alpha1.SchemeGroupVersion.WithKind("ResourceClassParametersReference"):
+		return &applyconfigurationsresourcev1alpha1.ResourceClassParametersReferenceApplyConfiguration{}
 
 		// Group=scheduling.k8s.io, Version=v1
 	case schedulingv1.SchemeGroupVersion.WithKind("PriorityClass"):

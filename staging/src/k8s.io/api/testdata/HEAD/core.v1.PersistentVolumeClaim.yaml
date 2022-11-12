@@ -45,6 +45,8 @@ spec:
     name: nameValue
     namespace: namespaceValue
   resources:
+    claims:
+    - name: nameValue
     limits:
       limitsKey: "0"
     requests:

@@ -362,6 +362,8 @@ template:
             terminationGracePeriodSeconds: 7
             timeoutSeconds: 3
           resources:
+            claims:
+            - name: nameValue
             limits:
               limitsKey: "0"
             requests:
@@ -563,6 +565,8 @@ template:
             terminationGracePeriodSeconds: 7
             timeoutSeconds: 3
           resources:
+            claims:
+            - name: nameValue
             limits:
               limitsKey: "0"
             requests:
@@ -766,6 +770,8 @@ template:
             terminationGracePeriodSeconds: 7
             timeoutSeconds: 3
           resources:
+            claims:
+            - name: nameValue
             limits:
               limitsKey: "0"
             requests:
@@ -848,6 +854,11 @@ template:
         priorityClassName: priorityClassNameValue
         readinessGates:
         - conditionType: conditionTypeValue
+        resourceClaims:
+        - name: nameValue
+          source:
+            resourceClaimName: resourceClaimNameValue
+            resourceClaimTemplateName: resourceClaimTemplateNameValue
         restartPolicy: restartPolicyValue
         runtimeClassName: runtimeClassNameValue
         schedulerName: schedulerNameValue
@@ -1016,6 +1027,8 @@ template:
                   name: nameValue
                   namespace: namespaceValue
                 resources:
+                  claims:
+                  - name: nameValue
                   limits:
                     limitsKey: "0"
                   requests:
