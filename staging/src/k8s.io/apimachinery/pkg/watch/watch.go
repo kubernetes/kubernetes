@@ -27,7 +27,7 @@ import (
 
 // Interface can be implemented by anything that knows how to watch and report changes.
 type Interface interface {
-	// Stop stops watching. Will close the channel returned by ResultChan(). Releases
+	// Stop watching. Will close the channel returned by ResultChan(). Releases
 	// any resources used by the watch.
 	Stop()
 
