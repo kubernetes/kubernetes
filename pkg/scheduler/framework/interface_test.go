@@ -273,10 +273,10 @@ func TestIsStatusEqual(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "error statuses with same message should not be equal",
+			name: "error statuses with same message should be equal",
 			x:    NewStatus(Error, "error"),
 			y:    NewStatus(Error, "error"),
-			want: false,
+			want: true,
 		},
 		{
 			name: "statuses with different reasons should not be equal",

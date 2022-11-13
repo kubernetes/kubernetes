@@ -20,19 +20,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"sync"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -453,7 +450,9 @@ func TestPlugin(t *testing.T) {
 			initialObjects := testCtx.listAll(t)
 			result, status := testCtx.p.PreFilter(testCtx.ctx, testCtx.state, tc.pod)
 			t.Run("prefilter", func(t *testing.T) {
-				assert.Equal(t, tc.want.preFilterResult, result)
+				if diff := cmp.Diff(tc.want.preFilterResult, result); diff != "" {
+					t.Errorf("Unexpected preFilterResult (-want, +got):\n%s", diff)
+				}
 				testCtx.verify(t, tc.want.prefilter, initialObjects, result, status)
 			})
 			unschedulable := status.Code() != framework.Success
@@ -526,7 +525,9 @@ func TestPlugin(t *testing.T) {
 				initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.postfilter)
 				result, status := testCtx.p.PostFilter(testCtx.ctx, testCtx.state, tc.pod, nil /* filteredNodeStatusMap not used by plugin */)
 				t.Run("postfilter", func(t *testing.T) {
-					assert.Equal(t, tc.want.postFilterResult, result)
+					if diff := cmp.Diff(tc.want.postFilterResult, result); diff != "" {
+						t.Errorf("Unexpected preFilterResult (-want, +got):\n%s", diff)
+					}
 					testCtx.verify(t, tc.want.postfilter, initialObjects, nil, status)
 				})
 			}
@@ -544,12 +545,13 @@ type testContext struct {
 
 func (tc *testContext) verify(t *testing.T, expected result, initialObjects []metav1.Object, result interface{}, status *framework.Status) {
 	t.Helper()
-	assert.Equal(t, expected.status, status)
+
+	if diff := cmp.Diff(expected.status, status); diff != "" {
+		t.Errorf("Unexpected status (-want, +got):\n%s", diff)
+	}
 	objects := tc.listAll(t)
 	wantObjects := update(t, initialObjects, expected.changes)
-	for _, add := range expected.added {
-		wantObjects = append(wantObjects, add)
-	}
+	wantObjects = append(wantObjects, expected.added...)
 	for _, remove := range expected.removed {
 		for i, obj := range wantObjects {
 			// This is a bit relaxed (no GVR comparison, no UID
@@ -560,44 +562,37 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 			}
 		}
 	}
-	sortObjects(wantObjects)
-	stripObjects(wantObjects)
-	stripObjects(objects)
-	assert.Equal(t, wantObjects, objects)
-}
 
-// setGVK is implemented by metav1.TypeMeta and thus all API objects, in
-// contrast to metav1.Type, which is not (?!) implemented.
-type setGVK interface {
-	SetGroupVersionKind(gvk schema.GroupVersionKind)
-}
-
-// stripObjects removes certain fields (Kind, APIVersion, etc.) which are not
-// important and might not be set.
-func stripObjects(objects []metav1.Object) {
-	for _, obj := range objects {
-		obj.SetResourceVersion("")
-		obj.SetUID("")
-		if objType, ok := obj.(setGVK); ok {
-			objType.SetGroupVersionKind(schema.GroupVersionKind{})
+	less := func(o1, o2 metav1.Object) bool {
+		if o1.GetNamespace() < o2.GetNamespace() {
+			return true
 		}
+		return o1.GetName() < o2.GetName()
+	}
+
+	if diff := cmp.Diff(wantObjects, objects, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion", "UID"),
+		cmpopts.IgnoreFields(metav1.TypeMeta{}, "Kind", "APIVersion"), cmpopts.SortSlices(less)); diff != "" {
+		t.Errorf("Unexpected objects (-want, +got):\n%s", diff)
 	}
 }
 
 func (tc *testContext) listAll(t *testing.T) (objects []metav1.Object) {
 	t.Helper()
 	claims, err := tc.client.ResourceV1alpha1().ResourceClaims("").List(tc.ctx, metav1.ListOptions{})
-	require.NoError(t, err, "list claims")
+	if err != nil {
+		t.Fatalf("could not list claims: %v", err)
+	}
 	for _, claim := range claims.Items {
 		objects = append(objects, &claim)
 	}
 	schedulings, err := tc.client.ResourceV1alpha1().PodSchedulings("").List(tc.ctx, metav1.ListOptions{})
-	require.NoError(t, err, "list pod scheduling")
+	if err != nil {
+		t.Fatalf("could not list pod scheduling: %v", err)
+	}
 	for _, scheduling := range schedulings.Items {
 		objects = append(objects, &scheduling)
 	}
 
-	sortObjects(objects)
 	return
 }
 
@@ -627,15 +622,6 @@ func (tc *testContext) updateAPIServer(t *testing.T, objects []metav1.Object, up
 		}
 	}
 	return modified
-}
-
-func sortObjects(objects []metav1.Object) {
-	sort.Slice(objects, func(i, j int) bool {
-		if objects[i].GetNamespace() < objects[j].GetNamespace() {
-			return true
-		}
-		return objects[i].GetName() < objects[j].GetName()
-	})
 }
 
 // update walks through all existing objects, finds the corresponding update
@@ -695,15 +681,21 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourcev1alpha1.ResourceCl
 	// get triggered.
 	for _, claim := range claims {
 		_, err := tc.client.ResourceV1alpha1().ResourceClaims(claim.Namespace).Create(tc.ctx, claim, metav1.CreateOptions{})
-		require.NoError(t, err, "create resource claim")
+		if err != nil {
+			t.Fatalf("could not create resource claim: %v", err)
+		}
 	}
 	for _, class := range classes {
 		_, err := tc.client.ResourceV1alpha1().ResourceClasses().Create(tc.ctx, class, metav1.CreateOptions{})
-		require.NoError(t, err, "create resource class")
+		if err != nil {
+			t.Fatalf("could not create resource class: %v", err)
+		}
 	}
 	for _, scheduling := range schedulings {
 		_, err := tc.client.ResourceV1alpha1().PodSchedulings(scheduling.Namespace).Create(tc.ctx, scheduling, metav1.CreateOptions{})
-		require.NoError(t, err, "create pod scheduling")
+		if err != nil {
+			t.Fatalf("could not create pod scheduling: %v", err)
+		}
 	}
 
 	informerFactory.Start(tc.ctx.Done())

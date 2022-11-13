@@ -145,6 +145,50 @@ func NewPodsToActivate() *PodsToActivate {
 	return &PodsToActivate{Map: make(map[string]*v1.Pod)}
 }
 
+// StatusError is an implementation of error.
+type StatusError struct {
+	message string
+	err     error
+}
+
+// Error returns the error message of StatusError.
+func (e *StatusError) Error() string {
+	if e.err != nil {
+		return e.err.Error()
+	}
+	return e.message
+}
+
+// Is returns if the error message matches the target.
+func (e *StatusError) Is(target error) bool {
+
+	if e.err != nil && errors.Is(e.err, target) {
+		return true
+	}
+	if sErr, ok := target.(*StatusError); ok {
+		if sErr.err != nil {
+			return errors.Is(e.err, sErr.err)
+		}
+		return e.message == sErr.message
+	}
+
+	return false
+}
+
+// NewStatusError returns a StatusError out of message.
+func NewStatusError(m string) *StatusError {
+	return &StatusError{message: m}
+}
+
+// AsStatusError returns a StatusError out of a given error.
+func AsStatusError(e error) *StatusError {
+	return &StatusError{err: e}
+}
+
+func (e *StatusError) Unwrap() error {
+	return e.err
+}
+
 // Status indicates the result of running a plugin. It consists of a code, a
 // message, (optionally) an error, and a plugin name it fails by.
 // When the status code is not Success, the reasons should explain why.
@@ -230,9 +274,9 @@ func (s *Status) AsError() error {
 		return nil
 	}
 	if s.err != nil {
-		return s.err
+		return AsStatusError(s.err)
 	}
-	return errors.New(s.Message())
+	return NewStatusError(s.Message())
 }
 
 // Equal checks equality of two statuses. This is useful for testing with
@@ -256,9 +300,7 @@ func NewStatus(code Code, reasons ...string) *Status {
 		code:    code,
 		reasons: reasons,
 	}
-	if code == Error {
-		s.err = errors.New(s.Message())
-	}
+
 	return s
 }
 
@@ -268,9 +310,8 @@ func AsStatus(err error) *Status {
 		return nil
 	}
 	return &Status{
-		code:    Error,
-		reasons: []string{err.Error()},
-		err:     err,
+		code: Error,
+		err:  err,
 	}
 }
 

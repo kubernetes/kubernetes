@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -478,7 +479,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			expectErrorPod:   podWithID("foo", testNode.Name),
 			expectForgetPod:  podWithID("foo", testNode.Name),
 			expectAssumedPod: podWithID("foo", testNode.Name),
-			expectError:      fmt.Errorf(`running Reserve plugin "FakeReserve": %w`, errors.New("reserve error")),
+			expectError:      framework.AsStatusError(fmt.Errorf(`running Reserve plugin "FakeReserve": %w`, errors.New("reserve error"))),
 			eventReason:      "FailedScheduling",
 		},
 		{
@@ -491,7 +492,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			expectErrorPod:   podWithID("foo", testNode.Name),
 			expectForgetPod:  podWithID("foo", testNode.Name),
 			expectAssumedPod: podWithID("foo", testNode.Name),
-			expectError:      fmt.Errorf(`running Permit plugin "FakePermit": %w`, errors.New("permit error")),
+			expectError:      framework.AsStatusError(fmt.Errorf(`running Permit plugin "FakePermit": %w`, errors.New("permit error"))),
 			eventReason:      "FailedScheduling",
 		},
 		{
@@ -504,7 +505,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			expectErrorPod:   podWithID("foo", testNode.Name),
 			expectForgetPod:  podWithID("foo", testNode.Name),
 			expectAssumedPod: podWithID("foo", testNode.Name),
-			expectError:      fmt.Errorf(`running PreBind plugin "FakePreBind": %w`, preBindErr),
+			expectError:      framework.AsStatusError(fmt.Errorf(`running PreBind plugin "FakePreBind": %w`, preBindErr)),
 			eventReason:      "FailedScheduling",
 		},
 		{
@@ -519,7 +520,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			name:           "error pod failed scheduling",
 			sendPod:        podWithID("foo", ""),
 			mockResult:     mockScheduleResult{ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, errS},
-			expectError:    errS,
+			expectError:    framework.AsStatusError(errS),
 			expectErrorPod: podWithID("foo", ""),
 			eventReason:    "FailedScheduling",
 		},
@@ -530,7 +531,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			expectBind:       &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: testNode.Name}},
 			expectAssumedPod: podWithID("foo", testNode.Name),
 			injectBindError:  errB,
-			expectError:      fmt.Errorf("running Bind plugin %q: %w", "DefaultBinder", errors.New("binder")),
+			expectError:      framework.AsStatusError(fmt.Errorf("running Bind plugin %q: %w", "DefaultBinder", errors.New("binder"))),
 			expectErrorPod:   podWithID("foo", testNode.Name),
 			expectForgetPod:  podWithID("foo", testNode.Name),
 			eventReason:      "FailedScheduling",
@@ -629,7 +630,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			if e, a := item.expectForgetPod, gotForgetPod; !reflect.DeepEqual(e, a) {
 				t.Errorf("forget pod: wanted %v, got %v", e, a)
 			}
-			if e, a := item.expectError, gotError; !reflect.DeepEqual(e, a) {
+			if e, a := item.expectError, gotError; !cmp.Equal(e, a, cmpopts.EquateErrors()) {
 				t.Errorf("error: wanted %v, got %v", e, a)
 			}
 			if diff := cmp.Diff(item.expectBind, gotBinding); diff != "" {
@@ -739,7 +740,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 				UnschedulablePlugins: sets.NewString(nodeports.Name),
 			},
 		}
-		if !reflect.DeepEqual(expectErr, err) {
+		if expectErr.Error() != err.Error() {
 			t.Errorf("err want=%v, get=%v", expectErr, err)
 		}
 	case <-time.After(wait.ForeverTestTimeout):
@@ -848,7 +849,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 		if len(fmt.Sprint(expectErr)) > 150 {
 			t.Errorf("message is too spammy ! %v ", len(fmt.Sprint(expectErr)))
 		}
-		if !reflect.DeepEqual(expectErr, err) {
+		if expectErr.Error() != err.Error() {
 			t.Errorf("\n err \nWANT=%+v,\nGOT=%+v", expectErr, err)
 		}
 	case <-time.After(wait.ForeverTestTimeout):

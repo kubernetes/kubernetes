@@ -1435,8 +1435,8 @@ func TestRunPreFilterPluginsStatus(t *testing.T) {
 	}
 	_, status := f.RunPreFilterPlugins(ctx, nil, nil)
 	wantStatus := framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", preFilter.Name(), errInjectedStatus)).WithFailedPlugin(preFilter.Name())
-	if !reflect.DeepEqual(status, wantStatus) {
-		t.Errorf("wrong status. got: %v, want:%v", status, wantStatus)
+	if diff := cmp.Diff(wantStatus, status); diff != "" {
+		t.Errorf("Unexpected status (-want, +got):\n%s", diff)
 	}
 }
 
@@ -1615,11 +1615,11 @@ func TestFilterPlugins(t *testing.T) {
 			}
 			gotStatusMap := f.RunFilterPlugins(ctx, nil, pod, nil)
 			gotStatus := gotStatusMap.Merge()
-			if !reflect.DeepEqual(gotStatus, tt.wantStatus) {
-				t.Errorf("wrong status code. got: %v, want:%v", gotStatus, tt.wantStatus)
+			if diff := cmp.Diff(tt.wantStatus, gotStatus); diff != "" {
+				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
 			}
-			if !reflect.DeepEqual(gotStatusMap, tt.wantStatusMap) {
-				t.Errorf("wrong status map. got: %+v, want: %+v", gotStatusMap, tt.wantStatusMap)
+			if diff := cmp.Diff(tt.wantStatusMap, gotStatusMap); diff != "" {
+				t.Errorf("Unexpected status map (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -1698,8 +1698,8 @@ func TestPostFilterPlugins(t *testing.T) {
 				t.Fatalf("fail to create framework: %s", err)
 			}
 			_, gotStatus := f.RunPostFilterPlugins(ctx, nil, pod, nil)
-			if !reflect.DeepEqual(gotStatus, tt.wantStatus) {
-				t.Errorf("Unexpected status. got: %v, want: %v", gotStatus, tt.wantStatus)
+			if diff := cmp.Diff(tt.wantStatus, gotStatus); diff != "" {
+				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -1848,8 +1848,8 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 			}
 			tt.nodeInfo.SetNode(tt.node)
 			gotStatus := f.RunFilterPluginsWithNominatedPods(ctx, nil, tt.pod, tt.nodeInfo)
-			if !reflect.DeepEqual(gotStatus, tt.wantStatus) {
-				t.Errorf("Unexpected status. got: %v, want: %v", gotStatus, tt.wantStatus)
+			if diff := cmp.Diff(tt.wantStatus, gotStatus); diff != "" {
+				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -2006,8 +2006,8 @@ func TestPreBindPlugins(t *testing.T) {
 
 			status := f.RunPreBindPlugins(ctx, nil, pod, "")
 
-			if !reflect.DeepEqual(status, tt.wantStatus) {
-				t.Errorf("wrong status code. got %v, want %v", status, tt.wantStatus)
+			if diff := cmp.Diff(tt.wantStatus, status); diff != "" {
+				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -2164,8 +2164,8 @@ func TestReservePlugins(t *testing.T) {
 
 			status := f.RunReservePluginsReserve(ctx, nil, pod, "")
 
-			if !reflect.DeepEqual(status, tt.wantStatus) {
-				t.Errorf("wrong status code. got %v, want %v", status, tt.wantStatus)
+			if diff := cmp.Diff(tt.wantStatus, status); diff != "" {
+				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -2290,8 +2290,8 @@ func TestPermitPlugins(t *testing.T) {
 
 			status := f.RunPermitPlugins(ctx, nil, pod, "")
 
-			if !reflect.DeepEqual(status, tt.want) {
-				t.Errorf("wrong status code. got %v, want %v", status, tt.want)
+			if diff := cmp.Diff(tt.want, status); diff != "" {
+				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -2699,8 +2699,8 @@ func TestWaitOnPermit(t *testing.T) {
 			go tt.action(f)
 
 			got := f.WaitOnPermit(ctx, pod)
-			if !reflect.DeepEqual(tt.want, got) {
-				t.Errorf("Unexpected status: want %v, but got %v", tt.want, got)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
 			}
 		})
 	}
