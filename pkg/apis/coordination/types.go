@@ -28,7 +28,7 @@ type Lease struct {
 	// +optional
 	metav1.ObjectMeta
 
-	// Specification of the Lease.
+	// spec contains the specification of the Lease.
 	// +optional
 	Spec LeaseSpec
 }
@@ -64,6 +64,6 @@ type LeaseList struct {
 	// +optional
 	metav1.ListMeta
 
-	// Items is a list of schema objects.
+	// items is a list of schema objects.
 	Items []Lease
 }
