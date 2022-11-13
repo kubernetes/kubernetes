@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
+	"math"
 	"reflect"
 	"sort"
 	"strconv"
@@ -12,6 +13,12 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/private/protocol"
+)
+
+const (
+	floatNaN    = "NaN"
+	floatInf    = "Infinity"
+	floatNegInf = "-Infinity"
 )
 
 // BuildXML will serialize params into an xml.Encoder. Error will be returned
@@ -275,6 +282,7 @@ func (b *xmlBuilder) buildMap(value reflect.Value, current *XMLNode, tag reflect
 // Error will be returned if the value type is unsupported.
 func (b *xmlBuilder) buildScalar(value reflect.Value, current *XMLNode, tag reflect.StructTag) error {
 	var str string
+
 	switch converted := value.Interface().(type) {
 	case string:
 		str = converted
@@ -289,9 +297,29 @@ func (b *xmlBuilder) buildScalar(value reflect.Value, current *XMLNode, tag refl
 	case int:
 		str = strconv.Itoa(converted)
 	case float64:
-		str = strconv.FormatFloat(converted, 'f', -1, 64)
+		switch {
+		case math.IsNaN(converted):
+			str = floatNaN
+		case math.IsInf(converted, 1):
+			str = floatInf
+		case math.IsInf(converted, -1):
+			str = floatNegInf
+		default:
+			str = strconv.FormatFloat(converted, 'f', -1, 64)
+		}
 	case float32:
-		str = strconv.FormatFloat(float64(converted), 'f', -1, 32)
+		// The SDK doesn't render float32 values in types, only float64. This case would never be hit currently.
+		asFloat64 := float64(converted)
+		switch {
+		case math.IsNaN(asFloat64):
+			str = floatNaN
+		case math.IsInf(asFloat64, 1):
+			str = floatInf
+		case math.IsInf(asFloat64, -1):
+			str = floatNegInf
+		default:
+			str = strconv.FormatFloat(asFloat64, 'f', -1, 32)
+		}
 	case time.Time:
 		format := tag.Get("timestampFormat")
 		if len(format) == 0 {
