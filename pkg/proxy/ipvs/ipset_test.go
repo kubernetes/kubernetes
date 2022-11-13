@@ -57,14 +57,14 @@ func TestCheckIPSetVersion(t *testing.T) {
 
 const testIPSetVersion = "v6.19"
 
-func newTestIPSet(name string) *utilipset.IPSet {
+func newTestIPSet(name string) utilipset.IPSet {
 	return utilipset.NewIPSet(name, utilipset.HashIPPort, "", 1024, 65536, utilipset.DefaultPortRange, "")
 }
 
 func TestSyncIPSetEntries(t *testing.T) {
 	testCases := []struct {
 		name            string
-		set             *utilipset.IPSet
+		set             utilipset.IPSet
 		setType         utilipset.Type
 		ipv6            bool
 		activeEntries   []string
@@ -200,7 +200,7 @@ func TestSyncIPSetEntries(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			set := NewIPSet(fakeipset.NewFake(testIPSetVersion), testCase.set.Name(), testCase.setType, testCase.ipv6, "comment-"+testCase.set.Name())
 
-			if err := set.handle.CreateSet(&set.IPSet, true); err != nil {
+			if err := set.handle.CreateSet(set.IPSet, true); err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
 

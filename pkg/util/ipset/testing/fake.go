@@ -28,7 +28,7 @@ type FakeIPSet struct {
 	// version of ipset util
 	Version string
 	// The key of Sets map is the ip set name
-	Sets map[string]*ipset.IPSet
+	Sets map[string]ipset.IPSet
 	// The key of Entries map is the ip set name where the entries exists
 	Entries map[string]sets.String
 }
@@ -37,7 +37,7 @@ type FakeIPSet struct {
 func NewFake(version string) *FakeIPSet {
 	return &FakeIPSet{
 		Version: version,
-		Sets:    make(map[string]*ipset.IPSet),
+		Sets:    make(map[string]ipset.IPSet),
 		Entries: make(map[string]sets.String),
 	}
 }
@@ -78,8 +78,8 @@ func (f *FakeIPSet) DestroyAllSets() error {
 }
 
 // CreateSet is part of interface.
-func (f *FakeIPSet) CreateSet(set *ipset.IPSet, ignoreExistErr bool) error {
-	if f.Sets[set.Name()] != nil {
+func (f *FakeIPSet) CreateSet(set ipset.IPSet, ignoreExistErr bool) error {
+	if _, ok := f.Sets[set.Name()]; !ok {
 		if !ignoreExistErr {
 			// already exists
 			return fmt.Errorf("Set cannot be created: set with the same name already exists")
@@ -93,7 +93,7 @@ func (f *FakeIPSet) CreateSet(set *ipset.IPSet, ignoreExistErr bool) error {
 }
 
 // AddEntry is part of interface.
-func (f *FakeIPSet) AddEntry(entry string, set *ipset.IPSet, ignoreExistErr bool) error {
+func (f *FakeIPSet) AddEntry(entry string, set ipset.IPSet, ignoreExistErr bool) error {
 	if f.Entries[set.Name()].Has(entry) {
 		if !ignoreExistErr {
 			// already exists

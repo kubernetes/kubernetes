@@ -120,7 +120,7 @@ func NewIPSet(handle utilipset.Interface, name string, setType utilipset.Type, i
 	}
 	defaultHashSize, defaultMaxElem := 1024, 65536
 	set := &IPSet{
-		IPSet: *utilipset.NewIPSet(
+		IPSet: utilipset.NewIPSet(
 			name, setType, hashFamily,
 			defaultHashSize, defaultMaxElem, utilipset.DefaultPortRange,
 			comment,
@@ -132,7 +132,7 @@ func NewIPSet(handle utilipset.Interface, name string, setType utilipset.Type, i
 }
 
 func (set *IPSet) validateEntry(entry *utilipset.Entry) bool {
-	return entry.Validate(&set.IPSet)
+	return entry.Validate(set.IPSet)
 }
 
 func (set *IPSet) isEmpty() bool {
@@ -173,7 +173,7 @@ func (set *IPSet) syncIPSetEntries() {
 		}
 		// Create active entries
 		for _, entry := range set.activeEntries.Difference(currentIPSetEntries).List() {
-			if err := set.handle.AddEntry(entry, &set.IPSet, true); err != nil {
+			if err := set.handle.AddEntry(entry, set.IPSet, true); err != nil {
 				klog.ErrorS(err, "Failed to add ip set entry to ip set", "ipSetEntry", entry, "ipSet", set.Name)
 			} else {
 				klog.V(3).InfoS("Successfully added ip set entry to ip set", "ipSetEntry", entry, "ipSet", set.Name)
@@ -183,7 +183,7 @@ func (set *IPSet) syncIPSetEntries() {
 }
 
 func ensureIPSet(set *IPSet) error {
-	if err := set.handle.CreateSet(&set.IPSet, true); err != nil {
+	if err := set.handle.CreateSet(set.IPSet, true); err != nil {
 		klog.ErrorS(err, "Failed to make sure existence of ip set", "ipSet", set)
 		return err
 	}

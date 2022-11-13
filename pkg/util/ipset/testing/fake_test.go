@@ -128,7 +128,7 @@ func TestSetEntry(t *testing.T) {
 	if err := fake.DestroySet(set.Name()); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if fake.Sets[set.Name()] != nil {
+	if _, ok := fake.Sets[set.Name()]; ok {
 		t.Errorf("Unexpected set: %v", fake.Sets[set.Name()])
 	}
 	if fake.Entries[set.Name()] != nil {
@@ -147,7 +147,7 @@ func TestSetEntry(t *testing.T) {
 	}
 }
 
-func newTestIPSet(name string, setType ipset.Type, hashFamily string) *ipset.IPSet {
+func newTestIPSet(name string, setType ipset.Type, hashFamily string) ipset.IPSet {
 	return ipset.NewIPSet(name, setType, hashFamily, 1024, 65536, ipset.DefaultPortRange, "")
 }
 

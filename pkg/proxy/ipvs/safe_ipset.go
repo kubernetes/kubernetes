@@ -55,14 +55,14 @@ func (s *safeIpset) DestroyAllSets() error {
 }
 
 // CreateSet creates a new set.  It will ignore error when the set already exists if ignoreExistErr=true.
-func (s *safeIpset) CreateSet(set *ipset.IPSet, ignoreExistErr bool) error {
+func (s *safeIpset) CreateSet(set ipset.IPSet, ignoreExistErr bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.ipset.CreateSet(set, ignoreExistErr)
 }
 
 // AddEntry adds a new entry to the named set.  It will ignore error when the entry already exists if ignoreExistErr=true.
-func (s *safeIpset) AddEntry(entry string, set *ipset.IPSet, ignoreExistErr bool) error {
+func (s *safeIpset) AddEntry(entry string, set ipset.IPSet, ignoreExistErr bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.ipset.AddEntry(entry, set, ignoreExistErr)
