@@ -1674,7 +1674,7 @@ func (proxier *Proxier) writeIptablesRules() {
 			}
 			args = append(args,
 				"-m", "comment", "--comment", proxier.ipsetList[set.name].getComment(),
-				"-m", "set", "--match-set", proxier.ipsetList[set.name].Name,
+				"-m", "set", "--match-set", proxier.ipsetList[set.name].Name(),
 				set.matchType,
 			)
 			if set.table == utiliptables.TableFilter {
@@ -1689,7 +1689,7 @@ func (proxier *Proxier) writeIptablesRules() {
 		args = append(args[:0],
 			"-A", string(kubeServicesChain),
 			"-m", "comment", "--comment", proxier.ipsetList[kubeClusterIPSet].getComment(),
-			"-m", "set", "--match-set", proxier.ipsetList[kubeClusterIPSet].Name,
+			"-m", "set", "--match-set", proxier.ipsetList[kubeClusterIPSet].Name(),
 		)
 		if proxier.masqueradeAll {
 			proxier.natRules.Write(
@@ -1740,7 +1740,7 @@ func (proxier *Proxier) writeIptablesRules() {
 		args = append(args[:0],
 			"-A", string(kubeServicesChain),
 			"-m", "comment", "--comment", proxier.ipsetList[kubeExternalIPSet].getComment(),
-			"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPSet].Name,
+			"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPSet].Name(),
 			"dst,dst",
 		)
 		proxier.natRules.Write(args, "-j", string(kubeMarkMasqChain))
@@ -1751,7 +1751,7 @@ func (proxier *Proxier) writeIptablesRules() {
 		args = append(args[:0],
 			"-A", string(kubeServicesChain),
 			"-m", "comment", "--comment", proxier.ipsetList[kubeExternalIPLocalSet].getComment(),
-			"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPLocalSet].Name,
+			"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPLocalSet].Name(),
 			"dst,dst",
 		)
 		externalIPRules(args)
@@ -1805,7 +1805,7 @@ func (proxier *Proxier) writeIptablesRules() {
 	proxier.filterRules.Write(
 		"-A", string(kubeNodePortChain),
 		"-m", "comment", "--comment", proxier.ipsetList[kubeHealthCheckNodePortSet].getComment(),
-		"-m", "set", "--match-set", proxier.ipsetList[kubeHealthCheckNodePortSet].Name, "dst",
+		"-m", "set", "--match-set", proxier.ipsetList[kubeHealthCheckNodePortSet].Name(), "dst",
 		"-j", "ACCEPT",
 	)
 
@@ -1813,17 +1813,17 @@ func (proxier *Proxier) writeIptablesRules() {
 	// https://github.com/kubernetes/kubernetes/issues/72236
 	proxier.filterRules.Write(
 		"-A", string(kubeIPVSFilterChain),
-		"-m", "set", "--match-set", proxier.ipsetList[kubeLoadBalancerSet].Name, "dst,dst", "-j", "RETURN")
+		"-m", "set", "--match-set", proxier.ipsetList[kubeLoadBalancerSet].Name(), "dst,dst", "-j", "RETURN")
 	proxier.filterRules.Write(
 		"-A", string(kubeIPVSFilterChain),
-		"-m", "set", "--match-set", proxier.ipsetList[kubeClusterIPSet].Name, "dst,dst", "-j", "RETURN")
+		"-m", "set", "--match-set", proxier.ipsetList[kubeClusterIPSet].Name(), "dst,dst", "-j", "RETURN")
 	proxier.filterRules.Write(
 		"-A", string(kubeIPVSFilterChain),
-		"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPSet].Name, "dst,dst", "-j", "RETURN")
+		"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPSet].Name(), "dst,dst", "-j", "RETURN")
 	proxier.filterRules.Write(
 		"-A", string(kubeIPVSFilterChain),
 		"-m", "conntrack", "--ctstate", "NEW",
-		"-m", "set", "--match-set", proxier.ipsetList[kubeIPVSSet].Name, "dst", "-j", "REJECT")
+		"-m", "set", "--match-set", proxier.ipsetList[kubeIPVSSet].Name(), "dst", "-j", "REJECT")
 
 	// Install the kubernetes-specific postrouting rules. We use a whole chain for
 	// this so that it is easier to flush and change, for example if the mark
@@ -1868,7 +1868,7 @@ func (proxier *Proxier) acceptIPVSTraffic() {
 	for _, set := range sets {
 		var matchType string
 		if !proxier.ipsetList[set].isEmpty() {
-			switch proxier.ipsetList[set].SetType {
+			switch proxier.ipsetList[set].SetType() {
 			case utilipset.BitmapPort:
 				matchType = "dst"
 			default:
@@ -1876,7 +1876,7 @@ func (proxier *Proxier) acceptIPVSTraffic() {
 			}
 			proxier.natRules.Write(
 				"-A", string(kubeServicesChain),
-				"-m", "set", "--match-set", proxier.ipsetList[set].Name, matchType,
+				"-m", "set", "--match-set", proxier.ipsetList[set].Name(), matchType,
 				"-j", "ACCEPT",
 			)
 		}

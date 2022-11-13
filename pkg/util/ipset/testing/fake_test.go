@@ -49,7 +49,7 @@ func TestSetEntry(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	entries, err := fake.ListEntries(set.Name)
+	entries, err := fake.ListEntries(set.Name())
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestSetEntry(t *testing.T) {
 	}
 
 	// test entries
-	found, err := fake.TestEntry("192.168.1.1,tcp:8080", set.Name)
+	found, err := fake.TestEntry("192.168.1.1,tcp:8080", set.Name())
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -70,7 +70,7 @@ func TestSetEntry(t *testing.T) {
 		t.Errorf("Unexpected entry 192.168.1.1,tcp:8080 not found")
 	}
 
-	found, err = fake.TestEntry("192.168.1.2,tcp:8081", set.Name)
+	found, err = fake.TestEntry("192.168.1.2,tcp:8081", set.Name())
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -79,10 +79,10 @@ func TestSetEntry(t *testing.T) {
 	}
 
 	// delete entry from a given set
-	if err := fake.DelEntry("192.168.1.1,tcp:8080", set.Name); err != nil {
+	if err := fake.DelEntry("192.168.1.1,tcp:8080", set.Name()); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	entries, err = fake.ListEntries(set.Name)
+	entries, err = fake.ListEntries(set.Name())
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -95,10 +95,10 @@ func TestSetEntry(t *testing.T) {
 	}
 
 	// Flush set
-	if err := fake.FlushSet(set.Name); err != nil {
+	if err := fake.FlushSet(set.Name()); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	entries, err = fake.ListEntries(set.Name)
+	entries, err = fake.ListEntries(set.Name())
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -125,14 +125,14 @@ func TestSetEntry(t *testing.T) {
 	}
 
 	// Destroy a given set
-	if err := fake.DestroySet(set.Name); err != nil {
+	if err := fake.DestroySet(set.Name()); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if fake.Sets[set.Name] != nil {
-		t.Errorf("Unexpected set: %v", fake.Sets[set.Name])
+	if fake.Sets[set.Name()] != nil {
+		t.Errorf("Unexpected set: %v", fake.Sets[set.Name()])
 	}
-	if fake.Entries[set.Name] != nil {
-		t.Errorf("Unexpected entries: %v", fake.Entries[set.Name])
+	if fake.Entries[set.Name()] != nil {
+		t.Errorf("Unexpected entries: %v", fake.Entries[set.Name()])
 	}
 
 	// Destroy all sets

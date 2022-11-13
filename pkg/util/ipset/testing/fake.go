@@ -79,29 +79,29 @@ func (f *FakeIPSet) DestroyAllSets() error {
 
 // CreateSet is part of interface.
 func (f *FakeIPSet) CreateSet(set *ipset.IPSet, ignoreExistErr bool) error {
-	if f.Sets[set.Name] != nil {
+	if f.Sets[set.Name()] != nil {
 		if !ignoreExistErr {
 			// already exists
 			return fmt.Errorf("Set cannot be created: set with the same name already exists")
 		}
 		return nil
 	}
-	f.Sets[set.Name] = set
+	f.Sets[set.Name()] = set
 	// initialize entry map
-	f.Entries[set.Name] = sets.NewString()
+	f.Entries[set.Name()] = sets.NewString()
 	return nil
 }
 
 // AddEntry is part of interface.
 func (f *FakeIPSet) AddEntry(entry string, set *ipset.IPSet, ignoreExistErr bool) error {
-	if f.Entries[set.Name].Has(entry) {
+	if f.Entries[set.Name()].Has(entry) {
 		if !ignoreExistErr {
 			// already exists
 			return fmt.Errorf("Element cannot be added to the set: it's already added")
 		}
 		return nil
 	}
-	f.Entries[set.Name].Insert(entry)
+	f.Entries[set.Name()].Insert(entry)
 	return nil
 }
 

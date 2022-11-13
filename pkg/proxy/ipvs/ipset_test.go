@@ -198,7 +198,7 @@ func TestSyncIPSetEntries(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			set := NewIPSet(fakeipset.NewFake(testIPSetVersion), testCase.set.Name, testCase.setType, testCase.ipv6, "comment-"+testCase.set.Name)
+			set := NewIPSet(fakeipset.NewFake(testIPSetVersion), testCase.set.Name(), testCase.setType, testCase.ipv6, "comment-"+testCase.set.Name())
 
 			if err := set.handle.CreateSet(&set.IPSet, true); err != nil {
 				t.Errorf("Unexpected error: %v", err)
@@ -211,7 +211,7 @@ func TestSyncIPSetEntries(t *testing.T) {
 			set.activeEntries.Insert(testCase.activeEntries...)
 			set.syncIPSetEntries()
 			for _, entry := range testCase.expectedEntries {
-				found, err := set.handle.TestEntry(entry, testCase.set.Name)
+				found, err := set.handle.TestEntry(entry, testCase.set.Name())
 				if err != nil {
 					t.Errorf("Unexpected error: %v", err)
 				}

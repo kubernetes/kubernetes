@@ -140,7 +140,7 @@ func (set *IPSet) isEmpty() bool {
 }
 
 func (set *IPSet) getComment() string {
-	return fmt.Sprintf("\"%s\"", set.Comment)
+	return fmt.Sprintf("\"%s\"", set.Comment())
 }
 
 func (set *IPSet) resetEntries() {
@@ -148,7 +148,7 @@ func (set *IPSet) resetEntries() {
 }
 
 func (set *IPSet) syncIPSetEntries() {
-	appliedEntries, err := set.handle.ListEntries(set.Name)
+	appliedEntries, err := set.handle.ListEntries(set.Name())
 	if err != nil {
 		klog.ErrorS(err, "Failed to list ip set entries")
 		return
@@ -163,7 +163,7 @@ func (set *IPSet) syncIPSetEntries() {
 	if !set.activeEntries.Equal(currentIPSetEntries) {
 		// Clean legacy entries
 		for _, entry := range currentIPSetEntries.Difference(set.activeEntries).List() {
-			if err := set.handle.DelEntry(entry, set.Name); err != nil {
+			if err := set.handle.DelEntry(entry, set.Name()); err != nil {
 				if !utilipset.IsNotFoundError(err) {
 					klog.ErrorS(err, "Failed to delete ip set entry from ip set", "ipSetEntry", entry, "ipSet", set.Name)
 				}
