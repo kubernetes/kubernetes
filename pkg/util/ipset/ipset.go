@@ -91,6 +91,31 @@ type IPSet struct {
 	Comment string
 }
 
+// Option is variadic initializer for IPSet
+type Option func(set *IPSet)
+
+// NewIPSet returns a new IPSet struct
+func NewIPSet(
+	name string,
+	setType Type,
+	hashFamily string,
+	hashSize int,
+	maxElem int,
+	portRange string,
+	comment string,
+) *IPSet {
+	ret := IPSet{
+		Name:       name,
+		SetType:    setType,
+		HashFamily: hashFamily,
+		HashSize:   hashSize,
+		MaxElem:    maxElem,
+		PortRange:  portRange,
+		Comment:    comment,
+	}
+	return &ret
+}
+
 // Validate checks if a given ipset is valid or not.
 func (set *IPSet) Validate() error {
 	// Check if protocol is valid for `HashIPPort`, `HashIPPortIP` and `HashIPPortNet` type set.

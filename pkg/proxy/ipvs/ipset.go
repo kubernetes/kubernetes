@@ -118,13 +118,13 @@ func NewIPSet(handle utilipset.Interface, name string, setType utilipset.Type, i
 			}
 		}
 	}
+	defaultHashSize, defaultMaxElem := 1024, 65536
 	set := &IPSet{
-		IPSet: utilipset.IPSet{
-			Name:       name,
-			SetType:    setType,
-			HashFamily: hashFamily,
-			Comment:    comment,
-		},
+		IPSet: *utilipset.NewIPSet(
+			name, setType, hashFamily,
+			defaultHashSize, defaultMaxElem, utilipset.DefaultPortRange,
+			comment,
+		),
 		activeEntries: sets.NewString(),
 		handle:        handle,
 	}

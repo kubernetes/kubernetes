@@ -35,11 +35,7 @@ func TestSetEntry(t *testing.T) {
 		t.Errorf("Unexpected version mismatch, expected: %s, got: %s", testVersion, version)
 	}
 	// create a set
-	set := &ipset.IPSet{
-		Name:       "foo",
-		SetType:    ipset.HashIPPort,
-		HashFamily: ipset.ProtocolFamilyIPV4,
-	}
+	set := newTestIPSet("foo", ipset.HashIPPort, ipset.ProtocolFamilyIPV4)
 	if err := fake.CreateSet(set, true); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -111,11 +107,7 @@ func TestSetEntry(t *testing.T) {
 	}
 
 	// create another set
-	set2 := &ipset.IPSet{
-		Name:       "bar",
-		SetType:    ipset.HashIPPortIP,
-		HashFamily: ipset.ProtocolFamilyIPV6,
-	}
+	set2 := newTestIPSet("bar", ipset.HashIPPort, ipset.ProtocolFamilyIPV6)
 	if err := fake.CreateSet(set2, true); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -153,6 +145,10 @@ func TestSetEntry(t *testing.T) {
 	if len(fake.Entries) != 0 {
 		t.Errorf("Expected 0 entries, got %d, entries: %v", len(fake.Entries), fake.Entries)
 	}
+}
+
+func newTestIPSet(name string, setType ipset.Type, hashFamily string) *ipset.IPSet {
+	return ipset.NewIPSet(name, setType, hashFamily, 1024, 65536, ipset.DefaultPortRange, "")
 }
 
 // TODO: Test ignoreExistErr=false
