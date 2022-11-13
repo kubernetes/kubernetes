@@ -42259,7 +42259,7 @@ func schema_k8sio_api_scheduling_v1_PriorityClass(ref common.ReferenceCallback) 
 					},
 					"value": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The value of this priority class. This is the actual priority that pods receive when they have the name of this class in their pod spec.",
+							Description: "value represents the integer value of this priority class. This is the actual priority that pods receive when they have the name of this class in their pod spec.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -42281,7 +42281,7 @@ func schema_k8sio_api_scheduling_v1_PriorityClass(ref common.ReferenceCallback) 
 					},
 					"preemptionPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PreemptionPolicy is the Policy for preempting pods with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset.",
+							Description: "preemptionPolicy is the Policy for preempting pods with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -42376,7 +42376,7 @@ func schema_k8sio_api_scheduling_v1alpha1_PriorityClass(ref common.ReferenceCall
 					},
 					"value": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The value of this priority class. This is the actual priority that pods receive when they have the name of this class in their pod spec.",
+							Description: "value represents the integer value of this priority class. This is the actual priority that pods receive when they have the name of this class in their pod spec.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -42398,7 +42398,7 @@ func schema_k8sio_api_scheduling_v1alpha1_PriorityClass(ref common.ReferenceCall
 					},
 					"preemptionPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PreemptionPolicy is the Policy for preempting pods with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset.",
+							Description: "preemptionPolicy is the Policy for preempting pods with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -42493,7 +42493,7 @@ func schema_k8sio_api_scheduling_v1beta1_PriorityClass(ref common.ReferenceCallb
 					},
 					"value": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The value of this priority class. This is the actual priority that pods receive when they have the name of this class in their pod spec.",
+							Description: "value represents the integer value of this priority class. This is the actual priority that pods receive when they have the name of this class in their pod spec.",
 							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
@@ -42515,7 +42515,7 @@ func schema_k8sio_api_scheduling_v1beta1_PriorityClass(ref common.ReferenceCallb
 					},
 					"preemptionPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PreemptionPolicy is the Policy for preempting pods with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset.",
+							Description: "preemptionPolicy is the Policy for preempting pods with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
