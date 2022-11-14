@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -39,7 +40,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var timeForControllerToProgress = 500 * time.Millisecond
+var timeForControllerToProgressForSanityCheck = 20 * time.Millisecond
 
 func getPodsAssignedToNode(ctx context.Context, c *fake.Clientset) GetPodsByNodeNameFunc {
 	return func(nodeName string) ([]*v1.Pod, error) {
@@ -206,8 +207,6 @@ func TestCreatePod(t *testing.T) {
 
 			podIndexer.Add(item.pod)
 			controller.PodUpdated(nil, item.pod)
-			// wait a bit
-			time.Sleep(timeForControllerToProgress)
 
 			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
 
@@ -229,18 +228,18 @@ func TestDeletePod(t *testing.T) {
 	}
 	controller.PodUpdated(testutil.NewPod("pod1", "node1"), nil)
 	// wait a bit to see if nothing will panic
-	time.Sleep(timeForControllerToProgress)
+	time.Sleep(timeForControllerToProgressForSanityCheck)
 }
 
 func TestUpdatePod(t *testing.T) {
 	testCases := []struct {
 		description                   string
 		prevPod                       *v1.Pod
+		awaitForScheduledEviction     bool
 		newPod                        *v1.Pod
 		taintedNodes                  map[string][]v1.Taint
 		expectPatch                   bool
 		expectDelete                  bool
-		additionalSleep               time.Duration
 		enablePodDisruptionConditions bool
 	}{
 		{
@@ -273,23 +272,24 @@ func TestUpdatePod(t *testing.T) {
 			expectDelete: false,
 		},
 		{
-			description: "removing toleration",
-			prevPod:     addToleration(testutil.NewPod("pod1", "node1"), 1, 100),
-			newPod:      testutil.NewPod("pod1", "node1"),
+			description:               "removing toleration",
+			prevPod:                   addToleration(testutil.NewPod("pod1", "node1"), 1, 100),
+			newPod:                    testutil.NewPod("pod1", "node1"),
+			awaitForScheduledEviction: true,
 			taintedNodes: map[string][]v1.Taint{
 				"node1": {createNoExecuteTaint(1)},
 			},
 			expectDelete: true,
 		},
 		{
-			description: "lengthening toleration shouldn't work",
-			prevPod:     addToleration(testutil.NewPod("pod1", "node1"), 1, 1),
-			newPod:      addToleration(testutil.NewPod("pod1", "node1"), 1, 100),
+			description:               "lengthening toleration shouldn't work",
+			prevPod:                   addToleration(testutil.NewPod("pod1", "node1"), 1, 1),
+			newPod:                    addToleration(testutil.NewPod("pod1", "node1"), 1, 100),
+			awaitForScheduledEviction: true,
 			taintedNodes: map[string][]v1.Taint{
 				"node1": {createNoExecuteTaint(1)},
 			},
-			expectDelete:    true,
-			additionalSleep: 1500 * time.Millisecond,
+			expectDelete: true,
 		},
 	}
 
@@ -300,21 +300,25 @@ func TestUpdatePod(t *testing.T) {
 			fakeClientset := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*item.prevPod}})
 			controller, podIndexer, _ := setupNewNoExecuteTaintManager(context.TODO(), fakeClientset)
 			controller.recorder = testutil.NewFakeRecorder()
-			go controller.Run(ctx)
 			controller.taintedNodes = item.taintedNodes
+			go controller.Run(ctx)
 
 			podIndexer.Add(item.prevPod)
 			controller.PodUpdated(nil, item.prevPod)
 
-			fakeClientset.ClearActions()
-			time.Sleep(timeForControllerToProgress)
+			if item.awaitForScheduledEviction {
+				nsName := types.NamespacedName{Namespace: item.prevPod.Namespace, Name: item.prevPod.Name}
+				err := wait.PollImmediate(time.Millisecond*10, time.Second, func() (bool, error) {
+					scheduledEviction := controller.taintEvictionQueue.GetWorkerUnsafe(nsName.String())
+					return scheduledEviction != nil, nil
+				})
+				if err != nil {
+					t.Fatalf("Failed to await for scheduled eviction: %q", err)
+				}
+			}
+
 			podIndexer.Update(item.newPod)
 			controller.PodUpdated(item.prevPod, item.newPod)
-			// wait a bit
-			time.Sleep(timeForControllerToProgress)
-			if item.additionalSleep > 0 {
-				time.Sleep(item.additionalSleep)
-			}
 
 			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
 			cancel()
@@ -367,8 +371,6 @@ func TestCreateNode(t *testing.T) {
 		controller.recorder = testutil.NewFakeRecorder()
 		go controller.Run(ctx)
 		controller.NodeUpdated(nil, item.node)
-		// wait a bit
-		time.Sleep(timeForControllerToProgress)
 
 		verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
 
@@ -386,13 +388,17 @@ func TestDeleteNode(t *testing.T) {
 	}
 	go controller.Run(ctx)
 	controller.NodeUpdated(testutil.NewNode("node1"), nil)
-	// wait a bit to see if nothing will panic
-	time.Sleep(timeForControllerToProgress)
-	controller.taintedNodesLock.Lock()
-	if _, ok := controller.taintedNodes["node1"]; ok {
-		t.Error("Node should have been deleted from taintedNodes list")
+
+	// await until controller.taintedNodes is empty
+	err := wait.PollImmediate(10*time.Millisecond, time.Second, func() (bool, error) {
+		controller.taintedNodesLock.Lock()
+		defer controller.taintedNodesLock.Unlock()
+		_, ok := controller.taintedNodes["node1"]
+		return !ok, nil
+	})
+	if err != nil {
+		t.Errorf("Failed to await for processing node deleted: %q", err)
 	}
-	controller.taintedNodesLock.Unlock()
 	cancel()
 }
 
@@ -480,10 +486,9 @@ func TestUpdateNode(t *testing.T) {
 					},
 				},
 			},
-			oldNode:         testutil.NewNode("node1"),
-			newNode:         addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1, 2}),
-			expectDelete:    true,
-			additionalSleep: 1500 * time.Millisecond,
+			oldNode:      testutil.NewNode("node1"),
+			newNode:      addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1, 2}),
+			expectDelete: true,
 		},
 	}
 
@@ -499,8 +504,7 @@ func TestUpdateNode(t *testing.T) {
 			controller.recorder = testutil.NewFakeRecorder()
 			go controller.Run(ctx)
 			controller.NodeUpdated(item.oldNode, item.newNode)
-			// wait a bit
-			time.Sleep(timeForControllerToProgress)
+
 			if item.additionalSleep > 0 {
 				time.Sleep(item.additionalSleep)
 			}
@@ -841,8 +845,6 @@ func TestEventualConsistency(t *testing.T) {
 
 			// First we simulate NodeUpdate that should delete 'pod1'. It doesn't know about 'pod2' yet.
 			controller.NodeUpdated(item.oldNode, item.newNode)
-			// TODO(mborsz): Remove this sleep and other sleeps in this file.
-			time.Sleep(timeForControllerToProgress)
 
 			verifyPodActions(t, item.description, fakeClientset, item.expectPatch, item.expectDelete)
 			fakeClientset.ClearActions()
@@ -851,7 +853,7 @@ func TestEventualConsistency(t *testing.T) {
 			podIndexer.Update(item.newPod)
 			controller.PodUpdated(item.prevPod, item.newPod)
 			// wait a bit
-			time.Sleep(timeForControllerToProgress)
+			time.Sleep(timeForControllerToProgressForSanityCheck)
 		})
 	}
 }
@@ -860,13 +862,21 @@ func verifyPodActions(t *testing.T, description string, fakeClientset *fake.Clie
 	t.Helper()
 	podPatched := false
 	podDeleted := false
-	for _, action := range fakeClientset.Actions() {
-		if action.GetVerb() == "patch" && action.GetResource().Resource == "pods" {
-			podPatched = true
+	// use Poll instead of PollImmediate to give some processing time to the controller that the expected
+	// actions are likely to be already sent
+	err := wait.Poll(10*time.Millisecond, 5*time.Second, func() (bool, error) {
+		for _, action := range fakeClientset.Actions() {
+			if action.GetVerb() == "patch" && action.GetResource().Resource == "pods" {
+				podPatched = true
+			}
+			if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
+				podDeleted = true
+			}
 		}
-		if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
-			podDeleted = true
-		}
+		return podPatched == expectPatch && podDeleted == expectDelete, nil
+	})
+	if err != nil {
+		t.Errorf("Failed waiting for the expected actions: %q", err)
 	}
 	if podPatched != expectPatch {
 		t.Errorf("[%v]Unexpected test result. Expected patch %v, got %v", description, expectPatch, podPatched)
