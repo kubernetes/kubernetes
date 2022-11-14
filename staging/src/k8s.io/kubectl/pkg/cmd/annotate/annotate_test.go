@@ -509,7 +509,7 @@ func TestAnnotateObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := options.RunAnnotate(flags); err != nil {
+	if err := options.RunAnnotate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -570,14 +570,14 @@ func TestAnnotateResourceVersion(t *testing.T) {
 	cmd.SetErr(bufOut)
 	//options := NewAnnotateOptions(iostreams)
 	flags := NewAnnotateFlags(iostreams)
+	flags.resourceVersion = "10"
 	args := []string{"pods/foo", "a=b"}
 
 	options, err := flags.ToOptions(tf, cmd, args)
-	options.resourceVersion = "10"
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := options.RunAnnotate(flags); err != nil {
+	if err := options.RunAnnotate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -632,7 +632,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if err := options.RunAnnotate(flags); err != nil {
+	if err := options.RunAnnotate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -664,7 +664,7 @@ func TestAnnotateLocal(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if err := options.RunAnnotate(flags); err != nil {
+	if err := options.RunAnnotate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -719,7 +719,7 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := options.RunAnnotate(flags); err != nil {
+	if err := options.RunAnnotate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

@@ -56,12 +56,14 @@ type AnnotateFlags struct {
 	FieldManager   string
 	FieldSelector  string
 	resource.FilenameOptions
-	List         bool
-	Local        bool
-	OutputFormat string
-	PrintFlags   *genericclioptions.PrintFlags
-	RecordFlags  *genericclioptions.RecordFlags
-	Selector     string
+	List            bool
+	Local           bool
+	OutputFormat    string
+	overwrite       bool
+	PrintFlags      *genericclioptions.PrintFlags
+	RecordFlags     *genericclioptions.RecordFlags
+	resourceVersion string
+	Selector        string
 
 	genericclioptions.IOStreams
 }
@@ -77,26 +79,35 @@ func NewAnnotateFlags(streams genericclioptions.IOStreams) *AnnotateFlags {
 
 // AnnotateOptions have the data required to perform the annotate operation
 type AnnotateOptions struct {
-	namespace     string
+	all           bool
 	allNamespaces bool
 
+	builder        *resource.Builder
 	dryRunStrategy cmdutil.DryRunStrategy
 	dryRunVerifier *resource.QueryParamVerifier
 
-	PrintObj printers.ResourcePrinterFunc
-
-	// results of arg parsing
-	resources                    []string
-	newAnnotations               map[string]string
-	overwrite                    bool
-	removeAnnotations            []string
-	resourceVersion              string
-	Recorder                     genericclioptions.Recorder
-	enforceNamespace             bool
-	builder                      *resource.Builder
-	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
+	enforceNamespace bool
+	fieldSelector    string
+	fieldManager     string
+	resource.FilenameOptions
 
 	genericclioptions.IOStreams
+
+	list           bool
+	local          bool
+	namespace      string
+	newAnnotations map[string]string
+	overwrite      bool
+
+	PrintObj printers.ResourcePrinterFunc
+
+	Recorder          genericclioptions.Recorder
+	resources         []string
+	resourceVersion   string
+	removeAnnotations []string
+	selector          string
+
+	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 }
 
 var (
@@ -134,14 +145,6 @@ var (
     kubectl annotate pods foo description-`))
 )
 
-// NewAnnotateOptions creates the options for annotate
-func NewAnnotateOptions(ioStreams genericclioptions.IOStreams) *AnnotateOptions {
-	return &AnnotateOptions{
-		Recorder:  genericclioptions.NoopRecorder{},
-		IOStreams: ioStreams,
-	}
-}
-
 // NewCmdAnnotate creates the `annotate` command
 func NewCmdAnnotate(parent string, f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	flags := NewAnnotateFlags(streams)
@@ -156,7 +159,7 @@ func NewCmdAnnotate(parent string, f cmdutil.Factory, streams genericclioptions.
 		Run: func(cmd *cobra.Command, args []string) {
 			o, err := flags.ToOptions(f, cmd, args)
 			cmdutil.CheckErr(err)
-			cmdutil.CheckErr(o.RunAnnotate(flags))
+			cmdutil.CheckErr(o.RunAnnotate())
 		},
 	}
 
@@ -167,8 +170,6 @@ func NewCmdAnnotate(parent string, f cmdutil.Factory, streams genericclioptions.
 
 // AddFlags registers flags for a cli.
 func (flags *AnnotateFlags) AddFlags(cmd *cobra.Command, ioStreams genericclioptions.IOStreams) {
-	o := NewAnnotateOptions(ioStreams)
-
 	flags.PrintFlags.AddFlags(cmd)
 	flags.RecordFlags.AddFlags(cmd)
 
@@ -179,21 +180,32 @@ func (flags *AnnotateFlags) AddFlags(cmd *cobra.Command, ioStreams genericcliopt
 	cmdutil.AddFieldManagerFlagVar(cmd, &flags.FieldManager, "kubectl-annotate")
 	cmdutil.AddLabelSelectorFlagVar(cmd, &flags.Selector)
 
-	cmd.Flags().BoolVar(&o.overwrite, "overwrite", o.overwrite, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
+	cmd.Flags().BoolVar(&flags.overwrite, "overwrite", flags.overwrite, "If true, allow annotations to be overwritten, otherwise reject annotation updates that overwrite existing annotations.")
 	cmd.Flags().BoolVar(&flags.List, "list", flags.List, "If true, display the annotations for a given resource.")
 	cmd.Flags().BoolVar(&flags.Local, "local", flags.Local, "If true, annotation will NOT contact api-server but run locally.")
 	cmd.Flags().StringVar(&flags.FieldSelector, "field-selector", flags.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
 	cmd.Flags().BoolVar(&flags.All, "all", flags.All, "Select all resources, in the namespace of the specified resource types.")
 	cmd.Flags().BoolVarP(&flags.AllNamespaces, "all-namespaces", "A", flags.AllNamespaces, "If true, check the specified action in all namespaces.")
-	cmd.Flags().StringVar(&o.resourceVersion, "resource-version", o.resourceVersion, i18n.T("If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
+	cmd.Flags().StringVar(&flags.resourceVersion, "resource-version", flags.resourceVersion, i18n.T("If non-empty, the annotation update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
 }
 
 // ToOptions converts from CLI inputs to runtime inputs.
 func (flags *AnnotateFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []string) (*AnnotateOptions, error) {
 	options := &AnnotateOptions{
-		allNamespaces: flags.AllNamespaces,
-		IOStreams:     flags.IOStreams,
+		all:             flags.All,
+		allNamespaces:   flags.AllNamespaces,
+		FilenameOptions: flags.FilenameOptions,
+		fieldSelector:   flags.FieldSelector,
+		fieldManager:    flags.FieldManager,
+		IOStreams:       flags.IOStreams,
+		local:           flags.Local,
+		list:            flags.List,
+		overwrite:       flags.overwrite,
+		resourceVersion: flags.resourceVersion,
+		Recorder:        genericclioptions.NoopRecorder{},
+		selector:        flags.Selector,
 	}
+
 	var err error
 
 	flags.RecordFlags.Complete(cmd)
@@ -214,7 +226,7 @@ func (flags *AnnotateFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, arg
 
 	options.dryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
-	cmdutil.PrintFlagsWithDryRunStrategy(flags.PrintFlags, flags.DryRunStrategy)
+	cmdutil.PrintFlagsWithDryRunStrategy(flags.PrintFlags, options.dryRunStrategy)
 	printer, err := flags.PrintFlags.ToPrinter()
 	if err != nil {
 		return nil, err
@@ -280,20 +292,20 @@ func (flags *AnnotateFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, arg
 }
 
 // RunAnnotate does the work
-func (o AnnotateOptions) RunAnnotate(flags *AnnotateFlags) error {
+func (o AnnotateOptions) RunAnnotate() error {
 	b := o.builder.
 		Unstructured().
-		LocalParam(flags.Local).
+		LocalParam(o.local).
 		ContinueOnError().
 		NamespaceParam(o.namespace).DefaultNamespace().
-		FilenameParam(o.enforceNamespace, &flags.FilenameOptions).
+		FilenameParam(o.enforceNamespace, &o.FilenameOptions).
 		Flatten()
 
-	if !flags.Local {
-		b = b.LabelSelectorParam(flags.Selector).
-			FieldSelectorParam(flags.FieldSelector).
+	if !o.local {
+		b = b.LabelSelectorParam(o.selector).
+			FieldSelectorParam(o.fieldSelector).
 			AllNamespaces(o.allNamespaces).
-			ResourceTypeOrNameArgs(flags.All, o.resources...).
+			ResourceTypeOrNameArgs(o.all, o.resources...).
 			Latest()
 	}
 
@@ -321,7 +333,7 @@ func (o AnnotateOptions) RunAnnotate(flags *AnnotateFlags) error {
 		var outputObj runtime.Object
 		obj := info.Object
 
-		if o.dryRunStrategy == cmdutil.DryRunClient || flags.Local || flags.List {
+		if o.dryRunStrategy == cmdutil.DryRunClient || o.local || o.list {
 			if err := o.updateAnnotations(obj); err != nil {
 				return err
 			}
@@ -371,7 +383,7 @@ func (o AnnotateOptions) RunAnnotate(flags *AnnotateFlags) error {
 			helper := resource.
 				NewHelper(client, mapping).
 				DryRun(o.dryRunStrategy == cmdutil.DryRunServer).
-				WithFieldManager(flags.FieldManager)
+				WithFieldManager(o.fieldManager)
 
 			if createdPatch {
 				outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes, nil)
@@ -383,7 +395,7 @@ func (o AnnotateOptions) RunAnnotate(flags *AnnotateFlags) error {
 			}
 		}
 
-		if flags.List {
+		if o.list {
 			accessor, err := meta.Accessor(outputObj)
 			if err != nil {
 				return err
