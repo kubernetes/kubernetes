@@ -1385,6 +1385,370 @@ func Test_ValidatingAdmissionPolicy_MatchWithMatchPolicyExact(t *testing.T) {
 	}
 }
 
+// Test_ValidatingAdmissionPolicy_PolicyDeletedThenRecreated validates that deleting a ValidatingAdmissionPolicy
+// removes the policy from the apiserver admission chain and recreating it re-enables it.
+func Test_ValidatingAdmissionPolicy_PolicyDeletedThenRecreated(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+	server, err := apiservertesting.StartTestServer(t, nil, []string{
+		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+	}, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+
+	config := server.ClientConfig
+
+	client, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policy := withValidations([]admissionregistrationv1alpha1.Validation{
+		{
+			Expression: "object.metadata.name.startsWith('test')",
+			Message:    "wrong prefix",
+		},
+	}, withParams(configParamKind(), withNamespaceMatch(withFailurePolicy(admissionregistrationv1alpha1.Fail, makePolicy("allowed-prefixes")))))
+	policy = withWaitReadyConstraintAndExpression(policy)
+	_, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// validate that namespaces starting with "test" are allowed
+	policyBinding := makeBinding("allowed-prefixes-binding", "allowed-prefixes", "")
+	if err := createAndWaitReady(t, client, policyBinding, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+		disallowedNamespace := &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "not-test-",
+			},
+		}
+
+		_, err = client.CoreV1().Namespaces().Create(context.TODO(), disallowedNamespace, metav1.CreateOptions{})
+		if err == nil {
+			return false, nil
+		}
+
+		if strings.Contains(err.Error(), "not yet synced to use for admission") {
+			return false, nil
+		}
+
+		if !strings.Contains(err.Error(), "wrong prefix") {
+			return false, err
+		}
+
+		return true, nil
+	}); waitErr != nil {
+		t.Errorf("timed out waiting: %v", err)
+	}
+
+	// delete the binding object and validate that policy is not enforced
+	if err := client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Delete(context.TODO(), "allowed-prefixes", metav1.DeleteOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+		allowedNamespace := &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "not-test-",
+			},
+		}
+		_, err = client.CoreV1().Namespaces().Create(context.TODO(), allowedNamespace, metav1.CreateOptions{})
+		if err == nil {
+			return true, nil
+		}
+
+		// old policy is still enforced, try again
+		if strings.Contains(err.Error(), "wrong prefix") {
+			return false, nil
+		}
+
+		return false, err
+	}); waitErr != nil {
+		t.Errorf("timed out waiting: %v", err)
+	}
+
+	_, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+		disallowedNamespace := &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "not-test-",
+			},
+		}
+
+		_, err = client.CoreV1().Namespaces().Create(context.TODO(), disallowedNamespace, metav1.CreateOptions{})
+		if err == nil {
+			return false, nil
+		}
+
+		if strings.Contains(err.Error(), "not yet synced to use for admission") {
+			return false, nil
+		}
+
+		if !strings.Contains(err.Error(), "wrong prefix") {
+			return false, err
+		}
+
+		return true, nil
+	}); waitErr != nil {
+		t.Errorf("timed out waiting: %v", err)
+	}
+}
+
+// Test_ValidatingAdmissionPolicy_BindingDeletedThenRecreated validates that deleting a ValidatingAdmissionPolicyBinding
+// removes the policy from the apiserver admission chain and recreating it re-enables it.
+func Test_ValidatingAdmissionPolicy_BindingDeletedThenRecreated(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+	server, err := apiservertesting.StartTestServer(t, nil, []string{
+		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+	}, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+
+	config := server.ClientConfig
+
+	client, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policy := withValidations([]admissionregistrationv1alpha1.Validation{
+		{
+			Expression: "object.metadata.name.startsWith('test')",
+			Message:    "wrong prefix",
+		},
+	}, withParams(configParamKind(), withNamespaceMatch(withFailurePolicy(admissionregistrationv1alpha1.Fail, makePolicy("allowed-prefixes")))))
+	policy = withWaitReadyConstraintAndExpression(policy)
+	_, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// validate that namespaces starting with "test" are allowed
+	policyBinding := makeBinding("allowed-prefixes-binding", "allowed-prefixes", "")
+	if err := createAndWaitReady(t, client, policyBinding, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+		disallowedNamespace := &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "not-test-",
+			},
+		}
+
+		_, err = client.CoreV1().Namespaces().Create(context.TODO(), disallowedNamespace, metav1.CreateOptions{})
+		if err == nil {
+			return false, nil
+		}
+
+		if strings.Contains(err.Error(), "not yet synced to use for admission") {
+			return false, nil
+		}
+
+		if !strings.Contains(err.Error(), "wrong prefix") {
+			return false, err
+		}
+
+		return true, nil
+	}); waitErr != nil {
+		t.Errorf("timed out waiting: %v", err)
+	}
+
+	// delete the binding object and validate that policy is not enforced
+	if err := client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicyBindings().Delete(context.TODO(), "allowed-prefixes-binding", metav1.DeleteOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+		allowedNamespace := &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "not-test-",
+			},
+		}
+		_, err = client.CoreV1().Namespaces().Create(context.TODO(), allowedNamespace, metav1.CreateOptions{})
+		if err == nil {
+			return true, nil
+		}
+
+		// old policy is still enforced, try again
+		if strings.Contains(err.Error(), "wrong prefix") {
+			return false, nil
+		}
+
+		return false, err
+	}); waitErr != nil {
+		t.Errorf("timed out waiting: %v", err)
+	}
+
+	// recreate the policy binding and test that policy is enforced again
+	_, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicyBindings().Create(context.TODO(), policyBinding, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+		disallowedNamespace := &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "not-test-",
+			},
+		}
+
+		_, err = client.CoreV1().Namespaces().Create(context.TODO(), disallowedNamespace, metav1.CreateOptions{})
+		if err == nil {
+			return false, nil
+		}
+
+		if strings.Contains(err.Error(), "not yet synced to use for admission") {
+			return false, nil
+		}
+
+		if !strings.Contains(err.Error(), "wrong prefix") {
+			return false, err
+		}
+
+		return true, nil
+	}); waitErr != nil {
+		t.Errorf("timed out waiting: %v", err)
+	}
+}
+
+// Test_ValidatingAdmissionPolicy_ParamResourceDeletedThenRecreated validates that deleting a param resource referenced
+// by a binding renders the policy as invalid. Recreating the param resource re-enables the policy.
+func Test_ValidatingAdmissionPolicy_ParamResourceDeletedThenRecreated(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+	server, err := apiservertesting.StartTestServer(t, nil, []string{
+		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+	}, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+
+	config := server.ClientConfig
+
+	client, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	param := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+		},
+	}
+	if _, err := client.CoreV1().ConfigMaps("default").Create(context.TODO(), param, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	policy := withValidations([]admissionregistrationv1alpha1.Validation{
+		{
+			Expression: "object.metadata.name.startsWith(params.metadata.name)",
+			Message:    "wrong prefix",
+		},
+	}, withParams(configParamKind(), withNamespaceMatch(withFailurePolicy(admissionregistrationv1alpha1.Fail, makePolicy("allowed-prefixes")))))
+	policy = withWaitReadyConstraintAndExpression(policy)
+	_, err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// validate that namespaces starting with "test" are allowed
+	policyBinding := makeBinding("allowed-prefixes-binding", "allowed-prefixes", "test")
+	if err := createAndWaitReady(t, client, policyBinding, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+		disallowedNamespace := &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "not-test-",
+			},
+		}
+
+		_, err = client.CoreV1().Namespaces().Create(context.TODO(), disallowedNamespace, metav1.CreateOptions{})
+		if err == nil {
+			return false, nil
+		}
+
+		if strings.Contains(err.Error(), "not yet synced to use for admission") {
+			return false, nil
+		}
+
+		if !strings.Contains(err.Error(), "wrong prefix") {
+			return false, err
+		}
+
+		return true, nil
+	}); waitErr != nil {
+		t.Errorf("timed out waiting: %v", err)
+	}
+
+	// delete param object and validate that policy is invalid
+	if err := client.CoreV1().ConfigMaps("default").Delete(context.TODO(), "test", metav1.DeleteOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+		allowedNamespace := &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "not-test-",
+			},
+		}
+
+		_, err = client.CoreV1().Namespaces().Create(context.TODO(), allowedNamespace, metav1.CreateOptions{})
+		// old policy is still enforced, try again
+		if strings.Contains(err.Error(), "wrong prefix") {
+			return false, nil
+		}
+
+		if !strings.Contains(err.Error(), "failed to configure binding: test not found") {
+			return false, err
+		}
+
+		return true, nil
+	}); waitErr != nil {
+		t.Errorf("timed out waiting: %v", err)
+	}
+
+	// recreate the param resource and validate namespace is disallowed again
+	if _, err := client.CoreV1().ConfigMaps("default").Create(context.TODO(), param, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+		disallowedNamespace := &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "not-test-",
+			},
+		}
+
+		_, err = client.CoreV1().Namespaces().Create(context.TODO(), disallowedNamespace, metav1.CreateOptions{})
+		// cache not synced with new object yet, try again
+		if strings.Contains(err.Error(), "failed to configure binding: test not found") {
+			return false, nil
+		}
+
+		if !strings.Contains(err.Error(), "wrong prefix") {
+			return false, err
+		}
+
+		return true, nil
+	}); waitErr != nil {
+		t.Errorf("timed out waiting: %v", err)
+	}
+}
+
 func withWaitReadyConstraintAndExpression(policy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy) *admissionregistrationv1alpha1.ValidatingAdmissionPolicy {
 	policy = policy.DeepCopy()
 	policy.Spec.MatchConstraints.ResourceRules = append(policy.Spec.MatchConstraints.ResourceRules, admissionregistrationv1alpha1.NamedRuleWithOperations{
