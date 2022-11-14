@@ -2297,6 +2297,26 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 	}
 }
 
+func TestUseLegacyDiscovery(t *testing.T) {
+	// Default client sends aggregated discovery accept format (first) as well as legacy format.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		acceptHeader := req.Header.Get("Accept")
+		assert.Equal(t, acceptDiscoveryFormats, acceptHeader)
+	}))
+	defer server.Close()
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+	client.ServerGroups()
+	// When "UseLegacyDiscovery" field is set, only the legacy discovery format is requested.
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		acceptHeader := req.Header.Get("Accept")
+		assert.Equal(t, AcceptV1, acceptHeader)
+	}))
+	defer server.Close()
+	client = NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+	client.UseLegacyDiscovery = true
+	client.ServerGroups()
+}
+
 func groupNames(groups []*metav1.APIGroup) []string {
 	result := []string{}
 	for _, group := range groups {
