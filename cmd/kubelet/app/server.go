@@ -646,6 +646,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	}
 
 	// Setup event recorder if required.
+	//创建event recorder
 	makeEventRecorder(kubeDeps, nodeName)
 
 	if kubeDeps.ContainerManager == nil {
