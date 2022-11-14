@@ -20,7 +20,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand"
+	"net"
+	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -41,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -167,6 +172,12 @@ var _ = SIGDescribe("Deployment", func() {
 		framework.ExpectNoError(err)
 		e2eskipper.SkipUnlessAtLeast(len(nodes.Items), 3, "load-balancer test requires at least 3 schedulable nodes")
 		testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(f)
+	})
+	ginkgo.It("should not disrupt a load-balancer's connectivity during scaling", func() {
+		nodes, err := e2enode.GetReadySchedulableNodes(c)
+		framework.ExpectNoError(err)
+		e2eskipper.SkipUnlessAtLeast(len(nodes.Items), 2, "load-balancer scale test requires at least 2 schedulable nodes")
+		testScaleDeploymentWithLoadBalancer(f)
 	})
 	// TODO: add tests that cover deployment.Spec.MinReadySeconds once we solved clock-skew issues
 	// See https://github.com/kubernetes/kubernetes/issues/29229
@@ -1439,6 +1450,112 @@ func testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(f *framework.Framew
 	case <-failed:
 		framework.Failf("Connectivity to the load balancer was interrupted")
 	case <-time.After(1 * time.Minute):
+	}
+}
+
+func testScaleDeploymentWithLoadBalancer(f *framework.Framework) {
+	ns := f.Namespace.Name
+	c := f.ClientSet
+
+	name := "test-scale-with-lb"
+	podLabels := map[string]string{"name": name}
+	initialReplicas := int32(2)
+
+	framework.Logf("Creating Deployment %q", name)
+	d := e2edeployment.NewDeployment(name, initialReplicas, podLabels, AgnhostImageName, AgnhostImage, appsv1.RollingUpdateDeploymentStrategyType)
+	d.Spec.Template.Spec.Containers[0].Args = []string{"netexec", "--http-port=80", "--udp-port=80"}
+	deployment, err := c.AppsV1().Deployments(ns).Create(context.TODO(), d, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
+	err = e2edeployment.WaitForDeploymentComplete(c, deployment)
+	framework.ExpectNoError(err)
+
+	framework.Logf("Creating a service %s with type=LoadBalancer in namespace %s", name, ns)
+	jig := e2eservice.NewTestJig(c, ns, name)
+	jig.Labels = podLabels
+	service, err := jig.CreateLoadBalancerService(e2eservice.GetServiceLoadBalancerCreationTimeout(c), func(svc *v1.Service) {})
+	framework.ExpectNoError(err)
+
+	lbNameOrAddress := e2eservice.GetIngressPoint(&service.Status.LoadBalancer.Ingress[0])
+	svcPort := int(service.Spec.Ports[0].Port)
+
+	framework.Logf("Hitting the replica set's pods through the service's load balancer")
+	timeout := e2eservice.LoadBalancerLagTimeoutDefault
+	if framework.ProviderIs("aws") {
+		timeout = e2eservice.LoadBalancerLagTimeoutAWS
+	}
+	e2eservice.TestReachableHTTP(lbNameOrAddress, svcPort, timeout)
+
+	framework.Logf("Starting a goroutine to continously hit the replica set's pods through the service's load balancer")
+	done := make(chan struct{})
+	failed := make(chan struct{})
+	defer close(done)
+	go func() {
+		defer ginkgo.GinkgoRecover()
+		wait.Until(func() {
+			client := &http.Client{
+				Transport: utilnet.SetTransportDefaults(&http.Transport{
+					DisableKeepAlives: true,
+				}),
+				Timeout: timeout,
+			}
+			ipPort := net.JoinHostPort(lbNameOrAddress, strconv.Itoa(svcPort))
+			msg := "hello"
+			url := fmt.Sprintf("http://%s/echo?msg=%s", ipPort, msg)
+			resp, err := client.Get(url)
+			if err != nil {
+				framework.Logf("Got error testing for reachability of %s: %v", url, err)
+				failed <- struct{}{}
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				framework.Logf("Got bad status code: %d", resp.StatusCode)
+				failed <- struct{}{}
+			}
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				framework.Logf("Got error reading HTTP body: %v", err)
+				failed <- struct{}{}
+			}
+			if string(body) != msg {
+				framework.Logf("The response body does not contain expected string %s", string(body))
+				failed <- struct{}{}
+			}
+		}, time.Duration(0), done)
+	}()
+
+	replicas := initialReplicas
+	maxReplicas := int32(6)
+
+	// scale up scenario
+	for newReplicas := replicas + 1; newReplicas <= maxReplicas; newReplicas++ {
+		framework.Logf("Scaling up the deployment %q from %d to %d", name, replicas, newReplicas)
+		deployment, err = e2edeployment.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *appsv1.Deployment) {
+			update.Spec.Replicas = &newReplicas
+		})
+		framework.ExpectNoError(err)
+		replicas = newReplicas
+
+		framework.Logf("Waiting for deployment %q to complete after scaling", name)
+		framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deployment))
+	}
+
+	// scale down scenario
+	for newReplicas := replicas - 1; newReplicas > initialReplicas; newReplicas-- {
+		framework.Logf("Scaling down the deployment %q from %d to %d", name, replicas, newReplicas)
+		deployment, err = e2edeployment.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *appsv1.Deployment) {
+			update.Spec.Replicas = &newReplicas
+		})
+		framework.ExpectNoError(err)
+		replicas = newReplicas
+
+		framework.Logf("Waiting for deployment %q to complete after scaling", name)
+		framework.ExpectNoError(e2edeployment.WaitForDeploymentComplete(c, deployment))
+	}
+
+	select {
+	case <-failed:
+		framework.Failf("Encountered connection drops when doing HTTP requests to the load balancer address")
+	case <-time.After(timeout):
 	}
 }
 
