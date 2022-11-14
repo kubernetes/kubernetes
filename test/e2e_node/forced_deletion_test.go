@@ -29,7 +29,7 @@ var _ = SIGDescribe("Forced Deletion", func() {
 			err := podClient.Delete(context.TODO(), podName, *metav1.NewDeleteOptions(gracePeriod))
 			framework.ExpectNoError(err)
 			start := time.Now()
-			podClient.DeleteSync(podName, *metav1.NewDeleteOptions(gracePeriodForce), 5*time.Second)
+			podClient.DeleteSync(podName, *metav1.NewDeleteOptions(gracePeriodForce), 4*time.Second)
 			framework.ExpectEqual(time.Since(start) < gracePeriod*time.Second, true, "cannot forced deletion")
 		})
 	})
