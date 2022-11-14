@@ -27,6 +27,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	kcpapiextensionsv1informers "k8s.io/apiextensions-apiserver/pkg/client/kcp/informers/externalversions/apiextensions/v1"
+	kcpapiextensionsv1listers "k8s.io/apiextensions-apiserver/pkg/client/kcp/listers/apiextensions/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
@@ -40,8 +42,6 @@ import (
 	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
 	structuralpruning "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/pruning"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
-	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
-	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
 	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
 	"k8s.io/apiextensions-apiserver/pkg/controller/openapi/builder"
@@ -110,7 +110,7 @@ type crdHandler struct {
 	// which is suited for most read and rarely write cases
 	customStorage atomic.Value
 
-	crdLister             listers.CustomResourceDefinitionLister
+	crdLister             kcpapiextensionsv1listers.CustomResourceDefinitionClusterLister
 	clusterAwareCRDLister kcp.ClusterAwareCRDClusterLister
 	crdIndexer            cache.Indexer
 
@@ -183,22 +183,7 @@ type crdStorageMap map[types.UID]*crdInfo
 
 const byGroupResource = "byGroupResource"
 
-func NewCustomResourceDefinitionHandler(
-	versionDiscoveryHandler *versionDiscoveryHandler,
-	groupDiscoveryHandler *groupDiscoveryHandler,
-	crdInformer informers.CustomResourceDefinitionInformer,
-	delegate http.Handler,
-	restOptionsGetter generic.RESTOptionsGetter,
-	admission admission.Interface,
-	establishingController *establish.EstablishingController,
-	serviceResolver webhook.ServiceResolver,
-	authResolverWrapper webhook.AuthenticationInfoResolverWrapper,
-	masterCount int,
-	authorizer authorizer.Authorizer,
-	requestTimeout time.Duration,
-	minRequestTimeout time.Duration,
-	staticOpenAPISpec *spec.Swagger,
-	maxRequestBodyBytes int64) (*crdHandler, error) {
+func NewCustomResourceDefinitionHandler(versionDiscoveryHandler *versionDiscoveryHandler, groupDiscoveryHandler *groupDiscoveryHandler, crdInformer kcpapiextensionsv1informers.CustomResourceDefinitionClusterInformer, delegate http.Handler, restOptionsGetter generic.RESTOptionsGetter, admission admission.Interface, establishingController *establish.EstablishingController, serviceResolver webhook.ServiceResolver, authResolverWrapper webhook.AuthenticationInfoResolverWrapper, masterCount int, authorizer authorizer.Authorizer, requestTimeout time.Duration, minRequestTimeout time.Duration, staticOpenAPISpec *spec.Swagger, maxRequestBodyBytes int64) (*crdHandler, error) {
 	ret := &crdHandler{
 		versionDiscoveryHandler: versionDiscoveryHandler,
 		groupDiscoveryHandler:   groupDiscoveryHandler,

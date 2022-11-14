@@ -25,8 +25,8 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	externalinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
+	kcpapiextensionsv1client "k8s.io/apiextensions-apiserver/pkg/client/kcp/clientset/versioned"
+	kcpapiextensionsv1informers "k8s.io/apiextensions-apiserver/pkg/client/kcp/informers/externalversions"
 	"k8s.io/apiextensions-apiserver/pkg/controller/apiapproval"
 	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
 	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
@@ -89,8 +89,8 @@ type ExtraConfig struct {
 	// AuthResolverWrapper is used in CR webhook converters
 	AuthResolverWrapper webhook.AuthenticationInfoResolverWrapper
 
-	Client    clientset.Interface
-	Informers externalinformers.SharedInformerFactory
+	Client    kcpapiextensionsv1client.ClusterInterface
+	Informers kcpapiextensionsv1informers.SharedInformerFactory
 
 	// KCP
 	ClusterAwareCRDLister  kcp.ClusterAwareCRDClusterLister
@@ -116,7 +116,7 @@ type CustomResourceDefinitions struct {
 	GenericAPIServer *genericapiserver.GenericAPIServer
 
 	// provided for easier embedding
-	Informers externalinformers.SharedInformerFactory
+	Informers kcpapiextensionsv1informers.SharedInformerFactory
 
 	DiscoveryGroupLister discovery.GroupLister
 
@@ -187,7 +187,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 
 	crdClient := c.ExtraConfig.Client
 	if crdClient == nil {
-		crdClient, err = clientset.NewForConfig(s.GenericAPIServer.LoopbackClientConfig)
+		crdClient, err = kcpapiextensionsv1client.NewForConfig(s.GenericAPIServer.LoopbackClientConfig)
 		if err != nil {
 			// it's really bad that this is leaking here, but until we can fix the test (which I'm pretty sure isn't even testing what it wants to test),
 			// we need to be able to move forward
@@ -197,7 +197,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 
 	s.Informers = c.ExtraConfig.Informers
 	if s.Informers == nil {
-		s.Informers = externalinformers.NewSharedInformerFactory(crdClient, 5*time.Minute)
+		s.Informers = kcpapiextensionsv1informers.NewSharedInformerFactory(crdClient, 5*time.Minute)
 	}
 
 	s.ClusterAwareCRDLister = c.ExtraConfig.ClusterAwareCRDLister
