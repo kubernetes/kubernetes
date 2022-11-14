@@ -111,8 +111,8 @@ func TestCleanupKubeletDynamicEnvFileContainerRuntime(t *testing.T) {
 	}{
 		{
 			name:     "common flag",
-			input:    fmt.Sprintf("%s=\"--container-runtime=remote --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock --pod-infra-container-image=registry.k8s.io/pause:3.8\"", constants.KubeletEnvFileVariableName),
-			expected: fmt.Sprintf("%s=\"--container-runtime-endpoint=unix:///var/run/containerd/containerd.sock --pod-infra-container-image=registry.k8s.io/pause:3.8\"", constants.KubeletEnvFileVariableName),
+			input:    fmt.Sprintf("%s=\"--container-runtime=remote --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock --pod-infra-container-image=registry.k8s.io/pause:3.9\"", constants.KubeletEnvFileVariableName),
+			expected: fmt.Sprintf("%s=\"--container-runtime-endpoint=unix:///var/run/containerd/containerd.sock --pod-infra-container-image=registry.k8s.io/pause:3.9\"", constants.KubeletEnvFileVariableName),
 		},
 		{
 			name:     "missing flag of interest",
