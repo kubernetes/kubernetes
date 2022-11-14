@@ -17,84 +17,103 @@ limitations under the License.
 package output
 
 import (
+	"encoding/xml"
+	"io/ioutil"
+	"path"
 	"regexp"
-	"sort"
-	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/reporters"
 	"github.com/onsi/gomega"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/internal/junit"
 )
 
-func TestGinkgoOutput(t *testing.T, expected SuiteResults, runSpecsArgs ...interface{}) {
-	// Run the Ginkgo suite with spec results collected via ReportAfterEach
-	// in adddition to the default one. To see what the full
-	// Ginkgo output looks like, run this test with "go test -v".
+// TestGinkgoOutput runs the current suite and verifies that the generated
+// JUnit file matches the expected result.
+//
+// The Ginkgo output on the console (aka the test suite log) does not get
+// checked. It is usually less important for the CI and more relevant when
+// using test suite interactively. To see what that Ginkgo output looks like,
+// run tests with "go test -v".
+func TestGinkgoOutput(t *testing.T, expected TestResult, runSpecsArgs ...interface{}) {
+	tmpdir := t.TempDir()
+	junitFile := path.Join(tmpdir, "junit.xml")
 	gomega.RegisterFailHandler(framework.Fail)
-	var report []ginkgo.SpecReport
-	ginkgo.ReportAfterEach(func(spec ginkgo.SpecReport) {
-		report = append(report, spec)
+	ginkgo.ReportAfterSuite("write JUnit file", func(report ginkgo.Report) {
+		junit.WriteJUnitReport(report, junitFile)
 	})
 	fakeT := &testing.T{}
 	ginkgo.RunSpecs(fakeT, "Logging Suite", runSpecsArgs...)
 
-	// Now check the output.
-	actual := normalizeReport(report)
+	var actual reporters.JUnitTestSuites
+	data, err := ioutil.ReadFile(junitFile)
+	require.NoError(t, err)
+	err = xml.Unmarshal(data, &actual)
+	require.NoError(t, err)
 
-	if assert.Equal(t, len(expected), len(actual), "Should have %d test results, got: %v", len(expected), actual) {
-		for i := 0; i < len(expected); i++ {
-			assert.Equal(t, expected[i].Name, actual[i].Name, "name from test #%d", i)
-			output := actual[i].Output
-			if expected[i].NormalizeOutput != nil {
-				output = expected[i].NormalizeOutput(output)
-			}
-			assert.Equal(t, expected[i].Output, output, "output from test #%d (%s)", i, expected[i].Name)
-			assert.Equal(t, expected[i].Stack, actual[i].Stack, "stack from test #%d (%s)", i, expected[i].Name)
-			failure := actual[i].Failure
-			if expected[i].NormalizeFailure != nil {
-				failure = expected[i].NormalizeFailure(failure)
-			}
-			assert.Equal(t, expected[i].Failure, failure, "failure from test #%d (%s)", i, expected[i].Name)
-		}
+	if len(actual.TestSuites) != 1 {
+		t.Fatalf("expected one test suite, got %d, JUnit content:\n%s", len(actual.TestSuites), string(data))
+	}
+	diff := cmp.Diff(expected.Suite, actual.TestSuites[0],
+		// Time varies.
+		// Name and Classname are "Logging Suite".
+		// Package includes a varying path, not interesting.
+		// Properties also too complicated to compare.
+		cmpopts.IgnoreFields(reporters.JUnitTestSuite{}, "Time", "Timestamp", "Name", "Package", "Properties"),
+		cmpopts.IgnoreFields(reporters.JUnitTestCase{}, "Time", "Classname"),
+		cmpopts.SortSlices(func(tc1, tc2 reporters.JUnitTestCase) bool {
+			return tc1.Name < tc2.Name
+		}),
+		cmpopts.AcyclicTransformer("simplify", func(in string) any {
+			out := simplify(in, expected)
+			// Sometimes cmp.Diff does not print the full string when it is long.
+			// Uncommenting this here may help debug differences.
+			// if len(out) > 100 {
+			// 	t.Logf("%s\n---------------------------------------\n%s\n", in, out)
+			// }
+
+			// Same idea as in
+			// https://github.com/google/go-cmp/issues/192#issuecomment-605346277:
+			// it forces cmp.Diff to diff strings line-by-line,
+			// even when it normally wouldn't.  The downside is
+			// that the output is harder to turn back into the
+			// expected reference string.
+			// if len(out) > 50 {
+			// 	return strings.Split(out, "\n")
+			// }
+
+			return out
+		}),
+	)
+	if diff != "" {
+		t.Fatalf("Simplified JUnit report not as expected (-want, +got):\n%s\n\nFull XML:\n%s", diff, string(data))
 	}
 }
 
-// TestResult is the outcome of one It spec.
+// TestResult is the expected outcome of the suite, with additional parameters that
+// determine equality.
 type TestResult struct {
-	// Name is the full string for a Ginkgo It, including the "[Top Level]" prefix.
-	Name string
-	// Output written to GinkgoWriter during test.
-	Output string
-	// Failure is SpecSummary.Failure.Message with varying parts stripped.
-	Failure string
-	// Stack is a normalized version (just file names, function parameters stripped) of
-	// Ginkgo's FullStackTrace of a failure. Empty if no failure.
-	Stack string
-	// Called to normalize the actual output string before comparison if non-nil.
+	// Called to normalize all output strings before comparison if non-nil.
 	NormalizeOutput func(string) string
-	// Called to normalize the actual failure string before comparison if non-nil.
-	NormalizeFailure func(string) string
+
+	// All test cases and overall suite results.
+	Suite reporters.JUnitTestSuite
 }
 
-type SuiteResults []TestResult
-
-func normalizeReport(report []ginkgo.SpecReport) SuiteResults {
-	var results SuiteResults
-	for _, spec := range report {
-		results = append(results, TestResult{
-			Name:    strings.Join(spec.ContainerHierarchyTexts, " ") + " " + spec.LeafNodeText,
-			Output:  normalizeLocation(stripAddresses(stripTimes(spec.CapturedGinkgoWriterOutput))),
-			Failure: stripAddresses(stripTimes(spec.Failure.Message)),
-			Stack:   normalizeLocation(spec.Failure.Location.FullStackTrace),
-		})
+func simplify(in string, expected TestResult) string {
+	out := normalizeLocation(in)
+	out = stripTimes(out)
+	out = stripAddresses(out)
+	if expected.NormalizeOutput != nil {
+		out = expected.NormalizeOutput(out)
 	}
-	sort.Slice(results, func(i, j int) bool {
-		return strings.Compare(results[i].Name, results[j].Name) < 0
-	})
-	return results
+	return out
 }
 
 // timePrefix matches "Jul 17 08:08:25.950: " at the beginning of each line.
@@ -103,13 +122,13 @@ var timePrefix = regexp.MustCompile(`(?m)^[[:alpha:]]{3} +[[:digit:]]{1,2} +[[:d
 // elapsedSuffix matches "Elapsed: 16.189µs"
 var elapsedSuffix = regexp.MustCompile(`Elapsed: [[:digit:]]+(\.[[:digit:]]+)?(µs|ns|ms|s|m)`)
 
-// timeSuffix matches "09/06/22 15:36:43.445" as printed by Ginkgo v2 for log output.
-var timeSuffix = regexp.MustCompile(`(?m)[[:space:]][[:digit:]]{2}/[[:digit:]]{2}/[[:digit:]]{2} [[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}(\.[[:digit:]]{1,3})?$`)
+// timeSuffix matches "@ 09/06/22 15:36:43.44 (5.001s)" as printed by Ginkgo v2 for log output, with the duration being optional.
+var timeSuffix = regexp.MustCompile(`(?m)@[[:space:]][[:digit:]]{2}/[[:digit:]]{2}/[[:digit:]]{2} [[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}(\.[[:digit:]]{1,3})?( \([[:digit:]]+(\.[[:digit:]]+)?(µs|ns|ms|s|m)\))?$`)
 
 func stripTimes(in string) string {
 	out := timePrefix.ReplaceAllString(in, "")
 	out = elapsedSuffix.ReplaceAllString(out, "Elapsed: <elapsed>")
-	out = timeSuffix.ReplaceAllString(out, "")
+	out = timeSuffix.ReplaceAllString(out, "<time>")
 	return out
 }
 

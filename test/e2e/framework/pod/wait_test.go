@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/reporters"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,10 +47,7 @@ import (
 //
 //
 //
-//
-//
-//
-// This must be line #52.
+// This must be line #50.
 
 var _ = ginkgo.Describe("pod", func() {
 	ginkgo.It("not found", func(ctx context.Context) {
@@ -72,14 +70,32 @@ var (
 )
 
 func TestFailureOutput(t *testing.T) {
-	// Sorted by name!
-	expected := output.SuiteResults{
-		output.TestResult{
-			Name: "pod not found",
-			// "Ignoring NotFound..." will normally occur every two seconds,
-			// but we reduce it to one line because it might occur less often
-			// on a loaded system.
-			Output: `INFO: Waiting up to 5s for pod "no-such-pod" in namespace "default" to be "running"
+
+	expected := output.TestResult{
+		// "INFO: Ignoring ..." or "INFO: Pod ..." will normally occur
+		// every two seconds, but we reduce it to one line because it
+		// might occur less often on a loaded system.
+		NormalizeOutput: func(output string) string {
+			return trimDuplicateLines(output, "INFO: ")
+		},
+		Suite: reporters.JUnitTestSuite{
+			Tests:    2,
+			Failures: 2,
+			Errors:   0,
+			Disabled: 0,
+			Skipped:  0,
+			TestCases: []reporters.JUnitTestCase{
+				{
+					Name:   "[It] pod not found",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Type: "failed",
+						Description: `[FAILED] error while waiting for pod default/no-such-pod to be running: pods "no-such-pod" not found
+In [It] at: wait_test.go:54 <time>
+`,
+					},
+					SystemErr: `> Enter [It] not found - wait_test.go:53 <time>
+INFO: Waiting up to 5s for pod "no-such-pod" in namespace "default" to be "running"
 INFO: Ignoring NotFound error while getting pod default/no-such-pod
 INFO: Unexpected error: 
     <*fmt.wrapError>: {
@@ -101,25 +117,22 @@ INFO: Unexpected error:
             },
         },
     }
-FAIL: error while waiting for pod default/no-such-pod to be running: pods "no-such-pod" not found
-
-Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.1()
-	wait_test.go:56
+[FAILED] error while waiting for pod default/no-such-pod to be running: pods "no-such-pod" not found
+In [It] at: wait_test.go:54 <time>
+< Exit [It] not found - wait_test.go:53 <time>
 `,
-			NormalizeOutput: func(output string) string {
-				return trimDuplicateLines(output, "INFO: Ignoring NotFound error while getting pod default/no-such-pod")
-			},
-			Failure: `error while waiting for pod default/no-such-pod to be running: pods "no-such-pod" not found`,
-			Stack: `k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.1()
-	wait_test.go:56`,
-		},
-		output.TestResult{
-			Name: "pod not running",
-			// "INFO: Pod ..." will normally occur every two seconds,
-			// but we reduce it to one line because it might occur less often
-			// on a loaded system.
-			Output: `INFO: Waiting up to 5s for pod "pending-pod" in namespace "default" to be "running"
+				},
+				{
+					Name:   "[It] pod not running",
+					Status: "failed",
+					Failure: &reporters.JUnitFailure{
+						Description: `[FAILED] wait for pod pending-pod running: timed out while waiting for pod default/pending-pod to be running
+In [It] at: wait_test.go:58 <time>
+`,
+						Type: "failed",
+					},
+					SystemErr: `> Enter [It] not running - wait_test.go:57 <time>
+INFO: Waiting up to 5s for pod "pending-pod" in namespace "default" to be "running"
 INFO: Pod "pending-pod": Phase="", Reason="", readiness=false. Elapsed: <elapsed>
 INFO: Unexpected error: wait for pod pending-pod running: 
     <*pod.timeoutError>: {
@@ -205,21 +218,14 @@ INFO: Unexpected error: wait for pod pending-pod running:
             },
         ],
     }
-FAIL: wait for pod pending-pod running: timed out while waiting for pod default/pending-pod to be running
-
-Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.2()
-	wait_test.go:60
+[FAILED] wait for pod pending-pod running: timed out while waiting for pod default/pending-pod to be running
+In [It] at: wait_test.go:58 <time>
+< Exit [It] not running - wait_test.go:57 <time>
 `,
-			NormalizeOutput: func(output string) string {
-				return trimDuplicateLines(output, `INFO: Pod "pending-pod": Phase="", Reason="", readiness=false. Elapsed: <elapsed>`)
+				},
 			},
-			Failure: `wait for pod pending-pod running: timed out while waiting for pod default/pending-pod to be running`,
-			Stack: `k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.2()
-	wait_test.go:60`,
 		},
 	}
-
 	output.TestGinkgoOutput(t, expected)
 }
 
