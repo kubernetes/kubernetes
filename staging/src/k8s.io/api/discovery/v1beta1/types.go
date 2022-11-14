@@ -168,15 +168,15 @@ type EndpointPort struct {
 	// * must start and end with an alphanumeric character.
 	// Default is empty string.
 	Name *string `json:"name,omitempty" protobuf:"bytes,1,name=name"`
-	// The IP protocol for this port.
+	// protocol represents the IP protocol for this port.
 	// Must be UDP, TCP, or SCTP.
 	// Default is TCP.
 	Protocol *v1.Protocol `json:"protocol,omitempty" protobuf:"bytes,2,name=protocol"`
-	// The port number of the endpoint.
+	// port represents the port number of the endpoint.
 	// If this is not specified, ports are not restricted and must be
 	// interpreted in the context of the specific consumer.
 	Port *int32 `json:"port,omitempty" protobuf:"bytes,3,opt,name=port"`
-	// The application protocol for this port.
+	// appProtocol represents the application protocol for this port.
 	// This field follows standard Kubernetes label syntax.
 	// Un-prefixed names are reserved for IANA standard service names (as per
 	// RFC-6335 and https://www.iana.org/assignments/service-names).
@@ -198,6 +198,6 @@ type EndpointSliceList struct {
 	// Standard list metadata.
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	// List of endpoint slices
+	// items is the list of endpoint slices
 	Items []EndpointSlice `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
