@@ -77,7 +77,7 @@ func (ls Set) AsValidatedSelector() (Selector, error) {
 // perform any validation.
 // According to our measurements this is significantly faster
 // in codepaths that matter at high scale.
-// Note: this method copies the Set; if the Set is immutable, consider wrapping it with SetSelector
+// Note: this method copies the Set; if the Set is immutable, consider wrapping it with ValidatedSetSelector
 // instead, which does not copy.
 func (ls Set) AsSelectorPreValidated() Selector {
 	return SelectorFromValidatedSet(ls)

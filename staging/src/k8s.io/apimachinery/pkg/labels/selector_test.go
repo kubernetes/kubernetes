@@ -838,7 +838,7 @@ func BenchmarkSetSelector(b *testing.B) {
 	})
 
 	for i := 0; i < b.N; i++ {
-		s := SetSelector(set)
+		s := ValidatedSetSelector(set)
 		if s.Empty() {
 			b.Errorf("Unexpected selector")
 		}
@@ -869,7 +869,7 @@ func TestSetSelectorString(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.out, func(t *testing.T) {
-			if got := SetSelector(tt.set).String(); tt.out != got {
+			if got := ValidatedSetSelector(tt.set).String(); tt.out != got {
 				t.Fatalf("expected %v, got %v", tt.out, got)
 			}
 		})
