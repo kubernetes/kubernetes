@@ -18,6 +18,9 @@ package cache
 
 import (
 	"github.com/kcp-dev/logicalcluster/v2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -26,6 +29,61 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 )
+
+// ListAllByCluster used to list items belongs to a cluster from Indexer.
+func ListAllByCluster(indexer cache.Indexer, cluster logicalcluster.Name, selector labels.Selector, appendFn cache.AppendFunc) error {
+	return listAllByIndexWithBackup(indexer, ClusterIndexName, ClusterIndexKey(cluster), ClusterIndexFunc, selector, appendFn)
+}
+
+// ListAllByClusterAndNamespace used to list items belongs to a cluster and namespace from Indexer.
+func ListAllByClusterAndNamespace(indexer cache.Indexer, cluster logicalcluster.Name, namespace string, selector labels.Selector, appendFn cache.AppendFunc) error {
+	if namespace == metav1.NamespaceAll {
+		return ListAllByCluster(indexer, cluster, selector, appendFn)
+	}
+	return listAllByIndexWithBackup(indexer, ClusterAndNamespaceIndexName, ClusterAndNamespaceIndexKey(cluster, namespace), ClusterAndNamespaceIndexFunc, selector, appendFn)
+}
+
+// listAllByIndexWithBackup used to list items from the Indexer using an index, or falling back to a func if no index is registered.
+func listAllByIndexWithBackup(indexer cache.Indexer, indexName, indexKey string, indexFunc cache.IndexFunc, selector labels.Selector, appendFn cache.AppendFunc) error {
+	var items []interface{}
+	var err error
+	items, err = indexer.ByIndex(indexName, indexKey)
+	if err != nil {
+		// Ignore error; do slow search without index.
+		klog.Warningf("can not retrieve list of objects using index : %v", err)
+		for _, item := range indexer.List() {
+			keys, err := indexFunc(item)
+			if err != nil {
+				return err
+			}
+			if sets.NewString(keys...).Has(indexKey) {
+				items = append(items, item)
+			}
+		}
+	}
+	return appendMatchingObjects(items, selector, appendFn)
+}
+
+func appendMatchingObjects(items []interface{}, selector labels.Selector, appendFn cache.AppendFunc) error {
+	selectAll := selector == nil || selector.Empty()
+	for _, item := range items {
+		if selectAll {
+			// Avoid computing labels of the objects to speed up common flows
+			// of listing all objects.
+			appendFn(item)
+			continue
+		}
+		metadata, err := meta.Accessor(item)
+		if err != nil {
+			return err
+		}
+		if selector.Matches(labels.Set(metadata.GetLabels())) {
+			appendFn(item)
+		}
+	}
+
+	return nil
+}
 
 // NewGenericClusterLister creates a new instance for the ClusterLister.
 func NewGenericClusterLister(indexer cache.Indexer, resource schema.GroupResource) *ClusterLister {
@@ -75,27 +133,9 @@ type genericLister struct {
 }
 
 func (s *genericLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
-	selectAll := selector == nil || selector.Empty()
-	list, err := s.indexer.ByIndex(ClusterIndexName, ClusterIndexKey(s.cluster))
-	if err != nil {
-		return nil, err
-	}
-
-	for i := range list {
-		item := list[i].(runtime.Object)
-		if selectAll {
-			ret = append(ret, item)
-		} else {
-			metadata, err := meta.Accessor(item)
-			if err != nil {
-				return nil, err
-			}
-			if selector.Matches(labels.Set(metadata.GetLabels())) {
-				ret = append(ret, item)
-			}
-		}
-	}
-
+	err = ListAllByCluster(s.indexer, s.cluster, selector, func(i interface{}) {
+		ret = append(ret, i.(runtime.Object))
+	})
 	return ret, err
 }
 
@@ -128,27 +168,9 @@ type genericNamespaceLister struct {
 }
 
 func (s *genericNamespaceLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
-	selectAll := selector == nil || selector.Empty()
-
-	list, err := s.indexer.ByIndex(ClusterAndNamespaceIndexName, ClusterAndNamespaceIndexKey(s.cluster, s.namespace))
-	if err != nil {
-		return nil, err
-	}
-
-	for i := range list {
-		item := list[i].(runtime.Object)
-		if selectAll {
-			ret = append(ret, item)
-		} else {
-			metadata, err := meta.Accessor(item)
-			if err != nil {
-				return nil, err
-			}
-			if selector.Matches(labels.Set(metadata.GetLabels())) {
-				ret = append(ret, item)
-			}
-		}
-	}
+	err = ListAllByClusterAndNamespace(s.indexer, s.cluster, s.namespace, selector, func(i interface{}) {
+		ret = append(ret, i.(runtime.Object))
+	})
 	return ret, err
 }
 

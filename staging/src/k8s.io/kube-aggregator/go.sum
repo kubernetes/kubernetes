@@ -68,7 +68,6 @@ github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da/go.mod h1:Q73ZrmV
 github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310/go.mod h1:ufUuZ+zHj4x4TnLV4JWEpy2hxWSpsRywHrMgIH9cCH8=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
 github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a/go.mod h1:lB+ZfQJz7igIIfQNfa7Ml4HSf2uFQQRzpGGRXenZAgY=
-github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a/go.mod h1:lB+ZfQJz7igIIfQNfa7Ml4HSf2uFQQRzpGGRXenZAgY=
 github.com/benbjohnson/clock v1.0.3/go.mod h1:bGMdMPoPVvcYyt1gHDf4J2KE153Yf9BuiUKYMaxlTDM=
 github.com/benbjohnson/clock v1.1.0 h1:Q92kusRqC1XV2MjkWETPvjJVqKetz1OzxZB7mHJLju8=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
@@ -290,8 +289,9 @@ github.com/jstemmer/go-junit-report v0.9.1/go.mod h1:Brl9GWCQeLvo8nXZwPNNblvFj/X
 github.com/jtolds/gls v4.20.0+incompatible/go.mod h1:QJZ7F/aHp+rZTRtaJ1ow/lLfFfVYBRgL+9YlvaHOwJU=
 github.com/julienschmidt/httprouter v1.2.0/go.mod h1:SYymIcj16QtmaHHD7aYtjjsJG7VTCxuUUipMqKk8s4w=
 github.com/julienschmidt/httprouter v1.3.0/go.mod h1:JR6WtHb+2LUe8TCKY3cZOxFyyO8IZAc4RVcycCCAKdM=
-github.com/kcp-dev/apimachinery v0.0.0-20221019133255-9e1e13940519 h1:eU1HvmmP8TbzS2pB9IX2Spky20n6V79/KgX4ssiG/A8=
 github.com/kcp-dev/apimachinery v0.0.0-20221019133255-9e1e13940519/go.mod h1:qnvUHkdxOrNzX17yX+z8r81CZEBuFdveNzWqFlwZ55w=
+github.com/kcp-dev/apimachinery v0.0.0-20221102195355-d65878bc16be h1:2uDzJ896+ojtzgr9HJL8+tZEoqhq8blwymGinWFrQ6E=
+github.com/kcp-dev/apimachinery v0.0.0-20221102195355-d65878bc16be/go.mod h1:qnvUHkdxOrNzX17yX+z8r81CZEBuFdveNzWqFlwZ55w=
 github.com/kcp-dev/client-go v0.0.0-20221025140308-a18ccea074a6 h1:Dxst7pq601Y7zNhSAec7LoBySHFWvD+djLTqoTmHrL0=
 github.com/kcp-dev/client-go v0.0.0-20221025140308-a18ccea074a6/go.mod h1:Qmq1OxUOSdVQ8YIGnjbya5Xt04KMJ5fN41QvErl/XnI=
 github.com/kcp-dev/logicalcluster/v2 v2.0.0-alpha.1 h1:6EMfOioekQNrpcHEK7k2ANBWogFMlf+3xTB3CC4k+2s=
