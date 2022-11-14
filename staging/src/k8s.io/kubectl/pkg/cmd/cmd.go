@@ -80,6 +80,7 @@ import (
 const kubectlCmdHeaders = "KUBECTL_COMMAND_HEADERS"
 
 type KubectlOptions struct {
+	AliasHandler  AliasHandler
 	PluginHandler PluginHandler
 	Arguments     []string
 	ConfigFlags   *genericclioptions.ConfigFlags
@@ -92,6 +93,7 @@ var defaultConfigFlags = genericclioptions.NewConfigFlags(true).WithDeprecatedPa
 // NewDefaultKubectlCommand creates the `kubectl` command with default arguments
 func NewDefaultKubectlCommand() *cobra.Command {
 	return NewDefaultKubectlCommandWithArgs(KubectlOptions{
+		AliasHandler:  NewDefaultAliasHandler(),
 		PluginHandler: NewDefaultPluginHandler(plugin.ValidPluginFilenamePrefixes),
 		Arguments:     os.Args,
 		ConfigFlags:   defaultConfigFlags,
@@ -102,6 +104,10 @@ func NewDefaultKubectlCommand() *cobra.Command {
 // NewDefaultKubectlCommandWithArgs creates the `kubectl` command with arguments
 func NewDefaultKubectlCommandWithArgs(o KubectlOptions) *cobra.Command {
 	cmd := NewKubectlCommand(o)
+
+	if o.AliasHandler != nil {
+		o.AliasHandler.InjectAll(cmd)
+	}
 
 	if o.PluginHandler == nil {
 		return cmd
