@@ -151,7 +151,7 @@ dependencies:
       match: TAG\s*\?=
 
   - name: "registry.k8s.io/pause: dependents"
-    version: 3.8
+    version: 3.9
     refPaths:
     - path: cluster/gce/config-common.sh
       match: registry.k8s.io\/pause:\d+\.\d+
