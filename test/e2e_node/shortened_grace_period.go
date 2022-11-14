@@ -11,10 +11,10 @@ import (
 	"time"
 )
 
-var _ = SIGDescribe("Forced Deletion", func() {
-	f := framework.NewDefaultFramework("forced-deletion")
+var _ = SIGDescribe("Shortened Grace Period", func() {
+	f := framework.NewDefaultFramework("shortened-grace-period")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
-	ginkgo.Context("When forcing pods to be deleted ", func() {
+	ginkgo.Context("When repeatedly deleting pods", func() {
 		var podClient *e2epod.PodClient
 		ginkgo.BeforeEach(func() {
 			podClient = e2epod.NewPodClient(f)
@@ -22,14 +22,14 @@ var _ = SIGDescribe("Forced Deletion", func() {
 		ginkgo.It("should be deleted immediately", func() {
 			const (
 				gracePeriod      = 100
-				gracePeriodForce = 0
+				gracePeriodShort = 10
 			)
 			podName := "test"
 			podClient.CreateSync(getGracePeriodTestPod(podName, gracePeriod))
 			err := podClient.Delete(context.TODO(), podName, *metav1.NewDeleteOptions(gracePeriod))
 			framework.ExpectNoError(err)
 			start := time.Now()
-			podClient.DeleteSync(podName, *metav1.NewDeleteOptions(gracePeriodForce), 5*time.Second)
+			podClient.DeleteSync(podName, *metav1.NewDeleteOptions(gracePeriodShort), gracePeriod*time.Second)
 			framework.ExpectEqual(time.Since(start) < gracePeriod*time.Second, true, "cannot forced deletion")
 		})
 	})
