@@ -143,6 +143,23 @@ func WaitForNodeToBeReady(ctx context.Context, c clientset.Interface, name strin
 	return WaitConditionToBe(ctx, c, name, v1.NodeReady, true, timeout)
 }
 
+func WaitForNodeSchedulable(c clientset.Interface, name string, timeout time.Duration, wantSchedulable bool) bool {
+	framework.Logf("Waiting up to %v for node %s to be schedulable: %t", timeout, name, wantSchedulable)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
+		node, err := c.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			framework.Logf("Couldn't get node %s", name)
+			continue
+		}
+
+		if IsNodeSchedulable(node) == wantSchedulable {
+			return true
+		}
+	}
+	framework.Logf("Node %s didn't reach desired schedulable status (%t) within %v", name, wantSchedulable, timeout)
+	return false
+}
+
 // CheckReady waits up to timeout for cluster to has desired size and
 // there is no not-ready nodes in it. By cluster size we mean number of schedulable Nodes.
 func CheckReady(ctx context.Context, c clientset.Interface, size int, timeout time.Duration) ([]v1.Node, error) {

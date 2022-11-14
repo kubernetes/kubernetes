@@ -1349,7 +1349,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 	})
 
-	ginkgo.It("PVC should be recreated when pod is pending due to missing PVC [Feature:AutomaticPVCRecreation]", func() {
+	ginkgo.It("PVC should be recreated when pod is pending due to missing PVC [Feature:AutomaticPVCRecreation][Disruptive][Serial]", func() {
 		// This test must be run in an environment that will allow the test pod to be scheduled on a node with local volumes
 		ssName := "test-ss"
 		headlessSvcName := "test"
@@ -1394,36 +1394,37 @@ var _ = SIGDescribe("StatefulSet", func() {
 		ginkgo.By("Cordoning Node")
 		_, err = c.CoreV1().Nodes().Patch(context.TODO(), nodeName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 		framework.ExpectNoError(err)
+		cordoned := true
 
-		// wait for the node to be patched
-		time.Sleep(5 * time.Second)
-		node, err = c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(node.Spec.Unschedulable, true)
+		defer func() {
+			if cordoned {
+				uncordonNode(c, oldData, newData, nodeName)
+			}
+		}()
+
+		// wait for the node to be unschedulable
+		e2enode.WaitForNodeSchedulable(c, nodeName, 10*time.Second, false)
 
 		ginkgo.By("Deleting Pod")
 		err = c.CoreV1().Pods(ns).Delete(context.TODO(), podName, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
 
 		// wait for the pod to be recreated
-		time.Sleep(10 * time.Second)
+		e2estatefulset.WaitForStatusCurrentReplicas(c, ss, 1)
 		_, err = c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		pvcList, err := c.CoreV1().PersistentVolumeClaims(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: klabels.Everything().String()})
 		framework.ExpectNoError(err)
+		framework.ExpectEqual(len(pvcList.Items), 1)
 		pvcName := pvcList.Items[0].Name
 
 		ginkgo.By("Deleting PVC")
 		err = c.CoreV1().PersistentVolumeClaims(ns).Delete(context.TODO(), pvcName, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
 
-		ginkgo.By("Uncordoning Node")
-		// uncordon node, by reverting patch
-		revertPatchBytes, err := strategicpatch.CreateTwoWayMergePatch(newData, oldData, v1.Node{})
-		framework.ExpectNoError(err)
-		_, err = c.CoreV1().Nodes().Patch(context.TODO(), nodeName, types.StrategicMergePatchType, revertPatchBytes, metav1.PatchOptions{})
-		framework.ExpectNoError(err)
+		uncordonNode(c, oldData, newData, nodeName)
+		cordoned = false
 
 		ginkgo.By("Confirming PVC recreated")
 		err = verifyStatefulSetPVCsExist(c, ss, []int{0})
@@ -1435,6 +1436,15 @@ var _ = SIGDescribe("StatefulSet", func() {
 		framework.ExpectNoError(err)
 	})
 })
+
+func uncordonNode(c clientset.Interface, oldData, newData []byte, nodeName string) {
+	ginkgo.By("Uncordoning Node")
+	// uncordon node, by reverting patch
+	revertPatchBytes, err := strategicpatch.CreateTwoWayMergePatch(newData, oldData, v1.Node{})
+	framework.ExpectNoError(err)
+	_, err = c.CoreV1().Nodes().Patch(context.TODO(), nodeName, types.StrategicMergePatchType, revertPatchBytes, metav1.PatchOptions{})
+	framework.ExpectNoError(err)
+}
 
 func kubectlExecWithRetries(ns string, args ...string) (out string) {
 	var err error

@@ -171,6 +171,31 @@ func WaitForStatusReplicas(ctx context.Context, c clientset.Interface, ss *appsv
 	}
 }
 
+// WaitForStatusCurrentReplicas waits for the ss.Status.CurrentReplicas to be equal to expectedReplicas
+func WaitForStatusCurrentReplicas(c clientset.Interface, ss *appsv1.StatefulSet, expectedReplicas int32) {
+	framework.Logf("Waiting for statefulset status.currentReplicas updated to %d", expectedReplicas)
+
+	ns, name := ss.Namespace, ss.Name
+	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
+		func() (bool, error) {
+			ssGet, err := c.AppsV1().StatefulSets(ns).Get(context.TODO(), name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			if ssGet.Status.ObservedGeneration < ss.Generation {
+				return false, nil
+			}
+			if ssGet.Status.CurrentReplicas != expectedReplicas {
+				framework.Logf("Waiting for stateful set status.currentReplicas to become %d, currently %d", expectedReplicas, ssGet.Status.CurrentReplicas)
+				return false, nil
+			}
+			return true, nil
+		})
+	if pollErr != nil {
+		framework.Failf("Failed waiting for stateful set status.currentReplicas updated to %d: %v", expectedReplicas, pollErr)
+	}
+}
+
 // Saturate waits for all Pods in ss to become Running and Ready.
 func Saturate(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet) {
 	var i int32
