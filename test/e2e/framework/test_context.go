@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/ginkgo/v2/reporters"
 	"github.com/onsi/ginkgo/v2/types"
 	gomegaformat "github.com/onsi/gomega/format"
 
@@ -40,6 +39,7 @@ import (
 	"k8s.io/klog/v2"
 
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/test/e2e/framework/internal/junit"
 	"k8s.io/kubernetes/test/utils/kubeconfig"
 )
 
@@ -522,32 +522,23 @@ func AfterReadingAllFlags(t *TestContextType) {
 	}
 
 	if TestContext.ReportDir != "" {
-		ginkgo.ReportAfterSuite("Kubernetes e2e JUnit report", writeJUnitReport)
+		ginkgo.ReportAfterSuite("Kubernetes e2e JUnit report", func(report ginkgo.Report) {
+			// With Ginkgo v1, we used to write one file per
+			// parallel node. Now Ginkgo v2 automatically merges
+			// all results into a report for us. The 01 suffix is
+			// kept in case that users expect files to be called
+			// "junit_<prefix><number>.xml".
+			junitReport := path.Join(TestContext.ReportDir, "junit_"+TestContext.ReportPrefix+"01.xml")
+
+			// writeJUnitReport generates a JUnit file in the e2e
+			// report directory that is shorter than the one
+			// normally written by `ginkgo --junit-report`. This is
+			// needed because the full report can become too large
+			// for tools like Spyglass
+			// (https://github.com/kubernetes/kubernetes/issues/111510).
+			//
+			// Users who want the full report can use `--junit-report`.
+			junit.WriteJUnitReport(report, junitReport)
+		})
 	}
-}
-
-// writeJUnitReport generates a JUnit file in the e2e report directory that is
-// shorter than the one normally written by `ginkgo --junit-report`. This is
-// needed because the full report can become too large for tools like Spyglass
-// (https://github.com/kubernetes/kubernetes/issues/111510).
-//
-// Users who want the full report can use `--junit-report`.
-func writeJUnitReport(report ginkgo.Report) {
-	config := reporters.JunitReportConfig{
-		// Remove details for specs where we don't care.
-		OmitTimelinesForSpecState: types.SpecStatePassed | types.SpecStateSkipped,
-
-		// Don't write <failure message="summary">. The same text is
-		// also in the full text for the failure. If we were to write
-		// both, then tools like kettle and spyglass would concatenate
-		// the two strings and thus show duplicated information.
-		OmitFailureMessageAttr: true,
-	}
-
-	// With Ginkgo v1, we used to write one file per parallel node. Now
-	// Ginkgo v2 automatically merges all results into a report for us. The
-	// 01 suffix is kept in case that users expect files to be called
-	// "junit_<prefix><number>.xml".
-	junitReport := path.Join(TestContext.ReportDir, "junit_"+TestContext.ReportPrefix+"01.xml")
-	reporters.GenerateJUnitReportWithConfig(report, junitReport, config)
 }
