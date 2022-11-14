@@ -86,16 +86,19 @@ type Controller struct {
 
 // NewController returns a new sample controller
 func NewController(
+	ctx context.Context,
 	kubeclientset kubernetes.Interface,
 	sampleclientset clientset.Interface,
 	deploymentInformer appsinformers.DeploymentInformer,
 	fooInformer informers.FooInformer) *Controller {
+	logger := klog.FromContext(ctx)
 
 	// Create event broadcaster
 	// Add sample-controller types to the default Kubernetes Scheme so Events can be
 	// logged for sample-controller types.
 	utilruntime.Must(samplescheme.AddToScheme(scheme.Scheme))
-	klog.V(4).Info("Creating event broadcaster")
+	logger.V(4).Info("Creating event broadcaster")
+
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartStructuredLogging(0)
 	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: kubeclientset.CoreV1().Events("")})
@@ -112,7 +115,7 @@ func NewController(
 		recorder:          recorder,
 	}
 
-	klog.Info("Setting up event handlers")
+	logger.Info("Setting up event handlers")
 	// Set up an event handler for when Foo resources change
 	fooInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: controller.enqueueFoo,
@@ -148,28 +151,30 @@ func NewController(
 // as syncing informer caches and starting workers. It will block until stopCh
 // is closed, at which point it will shutdown the workqueue and wait for
 // workers to finish processing their current work items.
-func (c *Controller) Run(workers int, stopCh <-chan struct{}) error {
+func (c *Controller) Run(ctx context.Context, workers int) error {
 	defer utilruntime.HandleCrash()
 	defer c.workqueue.ShutDown()
+	logger := klog.FromContext(ctx)
 
 	// Start the informer factories to begin populating the informer caches
-	klog.Info("Starting Foo controller")
+	logger.Info("Starting Foo controller")
 
 	// Wait for the caches to be synced before starting workers
-	klog.Info("Waiting for informer caches to sync")
-	if ok := cache.WaitForCacheSync(stopCh, c.deploymentsSynced, c.foosSynced); !ok {
+	logger.Info("Waiting for informer caches to sync")
+
+	if ok := cache.WaitForCacheSync(ctx.Done(), c.deploymentsSynced, c.foosSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
 	}
 
-	klog.Info("Starting workers")
+	logger.Info("Starting workers", "count", workers)
 	// Launch two workers to process Foo resources
 	for i := 0; i < workers; i++ {
-		go wait.Until(c.runWorker, time.Second, stopCh)
+		go wait.UntilWithContext(ctx, c.runWorker, time.Second)
 	}
 
-	klog.Info("Started workers")
-	<-stopCh
-	klog.Info("Shutting down workers")
+	logger.Info("Started workers")
+	<-ctx.Done()
+	logger.Info("Shutting down workers")
 
 	return nil
 }
@@ -177,15 +182,16 @@ func (c *Controller) Run(workers int, stopCh <-chan struct{}) error {
 // runWorker is a long-running function that will continually call the
 // processNextWorkItem function in order to read and process a message on the
 // workqueue.
-func (c *Controller) runWorker() {
-	for c.processNextWorkItem() {
+func (c *Controller) runWorker(ctx context.Context) {
+	for c.processNextWorkItem(ctx) {
 	}
 }
 
 // processNextWorkItem will read a single work item off the workqueue and
 // attempt to process it, by calling the syncHandler.
-func (c *Controller) processNextWorkItem() bool {
+func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	obj, shutdown := c.workqueue.Get()
+	logger := klog.FromContext(ctx)
 
 	if shutdown {
 		return false
@@ -217,7 +223,7 @@ func (c *Controller) processNextWorkItem() bool {
 		}
 		// Run the syncHandler, passing it the namespace/name string of the
 		// Foo resource to be synced.
-		if err := c.syncHandler(key); err != nil {
+		if err := c.syncHandler(ctx, key); err != nil {
 			// Put the item back on the workqueue to handle any transient errors.
 			c.workqueue.AddRateLimited(key)
 			return fmt.Errorf("error syncing '%s': %s, requeuing", key, err.Error())
@@ -225,7 +231,7 @@ func (c *Controller) processNextWorkItem() bool {
 		// Finally, if no error occurs we Forget this item so it does not
 		// get queued again until another change happens.
 		c.workqueue.Forget(obj)
-		klog.Infof("Successfully synced '%s'", key)
+		logger.Info("Successfully synced", "resourceName", key)
 		return nil
 	}(obj)
 
@@ -240,8 +246,10 @@ func (c *Controller) processNextWorkItem() bool {
 // syncHandler compares the actual state with the desired, and attempts to
 // converge the two. It then updates the Status block of the Foo resource
 // with the current status of the resource.
-func (c *Controller) syncHandler(key string) error {
+func (c *Controller) syncHandler(ctx context.Context, key string) error {
 	// Convert the namespace/name string into a distinct namespace and name
+	logger := klog.LoggerWithValues(klog.FromContext(ctx), "resourceName", key)
+
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("invalid resource key: %s", key))
@@ -296,7 +304,7 @@ func (c *Controller) syncHandler(key string) error {
 	// number does not equal the current desired replicas on the Deployment, we
 	// should update the Deployment resource.
 	if foo.Spec.Replicas != nil && *foo.Spec.Replicas != *deployment.Spec.Replicas {
-		klog.V(4).Infof("Foo %s replicas: %d, deployment replicas: %d", name, *foo.Spec.Replicas, *deployment.Spec.Replicas)
+		logger.V(4).Info("Update deployment resource", "currentReplicas", *foo.Spec.Replicas, "desiredReplicas", *deployment.Spec.Replicas)
 		deployment, err = c.kubeclientset.AppsV1().Deployments(foo.Namespace).Update(context.TODO(), newDeployment(foo), metav1.UpdateOptions{})
 	}
 
@@ -353,6 +361,7 @@ func (c *Controller) enqueueFoo(obj interface{}) {
 func (c *Controller) handleObject(obj interface{}) {
 	var object metav1.Object
 	var ok bool
+	logger := klog.FromContext(context.Background())
 	if object, ok = obj.(metav1.Object); !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
@@ -364,9 +373,9 @@ func (c *Controller) handleObject(obj interface{}) {
 			utilruntime.HandleError(fmt.Errorf("error decoding object tombstone, invalid type"))
 			return
 		}
-		klog.V(4).Infof("Recovered deleted object '%s' from tombstone", object.GetName())
+		logger.V(4).Info("Recovered deleted object", "resourceName", object.GetName())
 	}
-	klog.V(4).Infof("Processing object: %s", object.GetName())
+	logger.V(4).Info("Processing object", "object", klog.KObj(object))
 	if ownerRef := metav1.GetControllerOf(object); ownerRef != nil {
 		// If this object is not owned by a Foo, we should not do anything more
 		// with it.
@@ -376,7 +385,7 @@ func (c *Controller) handleObject(obj interface{}) {
 
 		foo, err := c.foosLister.Foos(object.GetNamespace()).Get(ownerRef.Name)
 		if err != nil {
-			klog.V(4).Infof("ignoring orphaned object '%s/%s' of foo '%s'", object.GetNamespace(), object.GetName(), ownerRef.Name)
+			logger.V(4).Info("Ignore orphaned object", "object", klog.KObj(object), "foo", ownerRef.Name)
 			return
 		}
 
