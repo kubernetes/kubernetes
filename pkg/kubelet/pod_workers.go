@@ -716,19 +716,7 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 		WorkType: workType,
 		Options:  options,
 	}
-	if options.UpdateType == kubetypes.SyncPodKill {
-		var podUpdates chan podWork
-		p.completeTerminatingRuntimePod(pod)
-		podUpdates = make(chan podWork, 1)
-		p.podUpdates[uid] = podUpdates
-		var gracePeriod int64 = 1
-		work.Options.KillPodOptions.PodTerminationGracePeriodSecondsOverride = &gracePeriod
-		podUpdates <- work
-		go func() {
-			defer runtime.HandleCrash()
-			p.managePodLoop(podUpdates)
-		}()
-	}
+
 	// start the pod worker goroutine if it doesn't exist
 	podUpdates, exists := p.podUpdates[uid]
 	if !exists {
