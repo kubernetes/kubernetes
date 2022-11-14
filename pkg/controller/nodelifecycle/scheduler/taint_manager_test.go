@@ -40,7 +40,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var timeForControllerToProgress = 500 * time.Millisecond
+var timeForControllerToProgressForSanityCheck = 20 * time.Millisecond
 
 func getPodsAssignedToNode(ctx context.Context, c *fake.Clientset) GetPodsByNodeNameFunc {
 	return func(nodeName string) ([]*v1.Pod, error) {
@@ -228,13 +228,14 @@ func TestDeletePod(t *testing.T) {
 	}
 	controller.PodUpdated(testutil.NewPod("pod1", "node1"), nil)
 	// wait a bit to see if nothing will panic
-	time.Sleep(timeForControllerToProgress)
+	time.Sleep(timeForControllerToProgressForSanityCheck)
 }
 
 func TestUpdatePod(t *testing.T) {
 	testCases := []struct {
 		description                   string
 		prevPod                       *v1.Pod
+		awaitForScheduledEviction     bool
 		newPod                        *v1.Pod
 		taintedNodes                  map[string][]v1.Taint
 		expectPatch                   bool
@@ -271,18 +272,20 @@ func TestUpdatePod(t *testing.T) {
 			expectDelete: false,
 		},
 		{
-			description: "removing toleration",
-			prevPod:     addToleration(testutil.NewPod("pod1", "node1"), 1, 100),
-			newPod:      testutil.NewPod("pod1", "node1"),
+			description:               "removing toleration",
+			prevPod:                   addToleration(testutil.NewPod("pod1", "node1"), 1, 100),
+			newPod:                    testutil.NewPod("pod1", "node1"),
+			awaitForScheduledEviction: true,
 			taintedNodes: map[string][]v1.Taint{
 				"node1": {createNoExecuteTaint(1)},
 			},
 			expectDelete: true,
 		},
 		{
-			description: "lengthening toleration shouldn't work",
-			prevPod:     addToleration(testutil.NewPod("pod1", "node1"), 1, 1),
-			newPod:      addToleration(testutil.NewPod("pod1", "node1"), 1, 100),
+			description:               "lengthening toleration shouldn't work",
+			prevPod:                   addToleration(testutil.NewPod("pod1", "node1"), 1, 1),
+			newPod:                    addToleration(testutil.NewPod("pod1", "node1"), 1, 100),
+			awaitForScheduledEviction: true,
 			taintedNodes: map[string][]v1.Taint{
 				"node1": {createNoExecuteTaint(1)},
 			},
@@ -303,7 +306,16 @@ func TestUpdatePod(t *testing.T) {
 			podIndexer.Add(item.prevPod)
 			controller.PodUpdated(nil, item.prevPod)
 
-			time.Sleep(timeForControllerToProgress)
+			if item.awaitForScheduledEviction {
+				nsName := types.NamespacedName{Namespace: item.prevPod.Namespace, Name: item.prevPod.Name}
+				err := wait.PollImmediate(time.Millisecond*10, time.Second, func() (bool, error) {
+					scheduledEviction := controller.taintEvictionQueue.GetWorkerUnsafe(nsName.String())
+					return scheduledEviction != nil, nil
+				})
+				if err != nil {
+					t.Fatalf("Failed to await for scheduled eviction: %q", err)
+				}
+			}
 
 			podIndexer.Update(item.newPod)
 			controller.PodUpdated(item.prevPod, item.newPod)
@@ -841,7 +853,7 @@ func TestEventualConsistency(t *testing.T) {
 			podIndexer.Update(item.newPod)
 			controller.PodUpdated(item.prevPod, item.newPod)
 			// wait a bit
-			time.Sleep(timeForControllerToProgress)
+			time.Sleep(timeForControllerToProgressForSanityCheck)
 		})
 	}
 }
