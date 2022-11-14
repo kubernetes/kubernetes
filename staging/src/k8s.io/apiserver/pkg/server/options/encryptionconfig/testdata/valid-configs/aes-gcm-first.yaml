@@ -22,6 +22,7 @@ resources:
           apiVersion: v2
           name: testproviderv2
           endpoint: unix:///tmp/testprovider.sock
+          timeout: 10s
       - aescbc:
           keys:
             - name: key1

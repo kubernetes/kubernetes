@@ -8,6 +8,7 @@ resources:
           apiVersion: v2
           name: testproviderv2
           endpoint: unix:///tmp/testprovider.sock
+          timeout: 15s
       - kms:
           name: testprovider
           endpoint: unix:///tmp/testprovider.sock
