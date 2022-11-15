@@ -10,6 +10,7 @@
   - [Changelog since v1.22.15](#changelog-since-v12215)
   - [Important Security Information](#important-security-information)
     - [CVE-2022-3162: Unauthorized read of Custom Resources](#cve-2022-3162-unauthorized-read-of-custom-resources)
+    - [CVE-2022-3294: Node address isn't always verified when proxying](#cve-2022-3294-node-address-isnt-always-verified-when-proxying)
   - [Dependencies](#dependencies)
     - [Added](#added)
     - [Changed](#changed)
@@ -38,7 +39,7 @@
   - [Changelog since v1.22.13](#changelog-since-v12213)
   - [Important Security Information](#important-security-information-1)
     - [CVE-2022-3172: Aggregated API server can cause clients to be redirected (SSRF)](#cve-2022-3172-aggregated-api-server-can-cause-clients-to-be-redirected-ssrf)
-    - [CVE-2021-25749: <code>runAsNonRoot</code> logic bypass for Windows containers](#cve-2021-25749-runasnonroot-logic-bypass-for-windows-containers)
+    - [CVE-2021-25749: `runAsNonRoot` logic bypass for Windows containers](#cve-2021-25749-runasnonroot-logic-bypass-for-windows-containers)
     - [Am I vulnerable?](#am-i-vulnerable)
       - [Affected Versions](#affected-versions)
     - [How do I mitigate this vulnerability?](#how-do-i-mitigate-this-vulnerability)
@@ -265,7 +266,7 @@
     - [API changes and improvements for ephemeral containers](#api-changes-and-improvements-for-ephemeral-containers)
   - [Known Issues](#known-issues)
     - [CPU and Memory manager are not working correctly for Guaranteed Pods with multiple containers](#cpu-and-memory-manager-are-not-working-correctly-for-guaranteed-pods-with-multiple-containers)
-    - [<code>CSIMigrationvSphere</code> feature gate has not migrated to new CRD APIs](#csimigrationvsphere-feature-gate-has-not-migrated-to-new-crd-apis)
+    - [`CSIMigrationvSphere` feature gate has not migrated to new CRD APIs](#csimigrationvsphere-feature-gate-has-not-migrated-to-new-crd-apis)
     - [Workloads that saturate nodes with pods may see pods that fail due to node admission](#workloads-that-saturate-nodes-with-pods-may-see-pods-that-fail-due-to-node-admission)
     - [Etcd v3.5.[0-2] data corruption](#etcd-v350-2-data-corruption)
   - [Urgent Upgrade Notes](#urgent-upgrade-notes)
@@ -323,6 +324,7 @@
   - [Changes by Kind](#changes-by-kind-18)
     - [Deprecation](#deprecation-1)
     - [API Change](#api-change-5)
+      - [Additional documentation e.g., KEPs (Kubernetes Enhancement Proposals), usage docs, etc.:](#additional-documentation-eg-keps-kubernetes-enhancement-proposals-usage-docs-etc)
     - [Feature](#feature-10)
     - [Documentation](#documentation-1)
     - [Bug or Regression](#bug-or-regression-18)
@@ -503,6 +505,32 @@ This vulnerability was reported by Richard Turnbull of NCC Group as part of the 
 
 
 **CVSS Rating:** Medium (6.5) [CVSS:3.0/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N](https://www.first.org/cvss/calculator/3.0#CVSS:3.0/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N)
+
+### CVE-2022-3294: Node address isn't always verified when proxying
+
+A security issue was discovered in Kubernetes where users may have access to secure endpoints in the control plane network. Kubernetes clusters are only affected if an untrusted user can to modify Node objects and send requests proxying through them.
+
+Kubernetes supports node proxying, which allows clients of kube-apiserver to access endpoints of a Kubelet to establish connections to Pods, retrieve container logs, and more. While Kubernetes already validates the proxying address for Nodes, a bug in kube-apiserver made it possible to bypass this validation. Bypassing this validation could allow authenticated requests destined for Nodes to be redirected to the API Server through its private network.
+
+The merged fix enforces validation against the proxying address for a Node. In some cases, the fix can break clients that depend on the `nodes/proxy` subresource, specifically if a kubelet advertises a localhost or link-local address to the Kubernetes control plane. Configuring an egress proxy for egress to the cluster network can also mitigate this vulnerability.
+
+**Affected Versions**:
+  - kube-apiserver v1.25.0 - v1.25.3
+  - kube-apiserver v1.24.0 - v1.24.7
+  - kube-apiserver v1.23.0 - v1.23.13
+  - kube-apiserver v1.22.0 - v1.22.15
+  - kube-apiserver <= v1.21.?
+
+**Fixed Versions**:
+  - kube-apiserver v1.25.4
+  - kube-apiserver v1.24.8
+  - kube-apiserver v1.23.13
+  - kube-apiserver v1.22.16
+
+This vulnerability was reported by Yuval Avrahami of Palo Alto Networks
+
+
+**CVSS Rating:** Medium (6.6) [CVSS:3.1/AV:N/AC:H/PR:H/UI:N/S:U/C:H/I:H/A:H](https://www.first.org/cvss/calculator/3.1#CVSS:3.1/AV:N/AC:H/PR:H/UI:N/S:U/C:H/I:H/A:H)
 
 ## Dependencies
 
