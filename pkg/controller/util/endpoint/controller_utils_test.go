@@ -18,14 +18,12 @@ package endpoint
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -330,7 +328,7 @@ func genSimpleSvc(namespace, name string) *v1.Service {
 	}
 }
 
-func TestServiceSelectorCache_GetPodServiceMemberships(t *testing.T) {
+func TestGetPodServiceMemberships(t *testing.T) {
 	fakeInformerFactory := informers.NewSharedInformerFactory(&fake.Clientset{}, 0*time.Second)
 	for i := 0; i < 3; i++ {
 		service := &v1.Service{
@@ -361,7 +359,6 @@ func TestServiceSelectorCache_GetPodServiceMemberships(t *testing.T) {
 		pods = append(pods, pod)
 	}
 
-	cache := NewServiceSelectorCache()
 	tests := []struct {
 		name   string
 		pod    *v1.Pod
@@ -395,64 +392,13 @@ func TestServiceSelectorCache_GetPodServiceMemberships(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			services, err := cache.GetPodServiceMemberships(fakeInformerFactory.Core().V1().Services().Lister(), test.pod)
+			services, err := GetPodServiceMemberships(fakeInformerFactory.Core().V1().Services().Lister(), test.pod)
 			if err != nil {
 				t.Errorf("Error from cache.GetPodServiceMemberships: %v", err)
 			} else if !services.Equal(test.expect) {
 				t.Errorf("Expect service %v, but got %v", test.expect, services)
 			}
 		})
-	}
-}
-
-func TestServiceSelectorCache_Update(t *testing.T) {
-	var selectors []labels.Selector
-	for i := 0; i < 5; i++ {
-		selector := labels.Set(map[string]string{"app": fmt.Sprintf("test-%d", i)}).AsSelectorPreValidated()
-		selectors = append(selectors, selector)
-	}
-	tests := []struct {
-		name   string
-		key    string
-		cache  *ServiceSelectorCache
-		update map[string]string
-		expect labels.Selector
-	}{
-		{
-			name:   "add test/service-0",
-			key:    "test/service-0",
-			cache:  generateServiceSelectorCache(map[string]labels.Selector{}),
-			update: map[string]string{"app": "test-0"},
-			expect: selectors[0],
-		},
-		{
-			name:   "add test/service-1",
-			key:    "test/service-1",
-			cache:  generateServiceSelectorCache(map[string]labels.Selector{"test/service-0": selectors[0]}),
-			update: map[string]string{"app": "test-1"},
-			expect: selectors[1],
-		},
-		{
-			name:   "update test/service-2",
-			key:    "test/service-2",
-			cache:  generateServiceSelectorCache(map[string]labels.Selector{"test/service-2": selectors[2]}),
-			update: map[string]string{"app": "test-0"},
-			expect: selectors[0],
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			selector := test.cache.Update(test.key, test.update)
-			if !reflect.DeepEqual(selector, test.expect) {
-				t.Errorf("Expect selector %v , but got %v", test.expect, selector)
-			}
-		})
-	}
-}
-
-func generateServiceSelectorCache(cache map[string]labels.Selector) *ServiceSelectorCache {
-	return &ServiceSelectorCache{
-		cache: cache,
 	}
 }
 
@@ -484,11 +430,10 @@ func BenchmarkGetPodServiceMemberships(b *testing.B) {
 		},
 	}
 
-	cache := NewServiceSelectorCache()
 	expect := sets.NewString("test/service-0")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		services, err := cache.GetPodServiceMemberships(fakeInformerFactory.Core().V1().Services().Lister(), pod)
+		services, err := GetPodServiceMemberships(fakeInformerFactory.Core().V1().Services().Lister(), pod)
 		if err != nil {
 			b.Fatalf("Error from GetPodServiceMemberships(): %v", err)
 		}
