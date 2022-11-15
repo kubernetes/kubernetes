@@ -1,0 +1,11 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - apelisse
+  - seans3
+reviewers:
+  - alexzielenski
+  - apelisse
+  - seans3
+labels:
+  - sig/api-machinery
