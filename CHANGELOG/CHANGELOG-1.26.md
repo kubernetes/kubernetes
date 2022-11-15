@@ -1,81 +1,196 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 
-- [v1.26.0-beta.0](#v1260-beta0)
-  - [Downloads for v1.26.0-beta.0](#downloads-for-v1260-beta0)
+- [v1.26.0-rc.0](#v1260-rc0)
+  - [Downloads for v1.26.0-rc.0](#downloads-for-v1260-rc0)
     - [Source Code](#source-code)
     - [Client Binaries](#client-binaries)
     - [Server Binaries](#server-binaries)
     - [Node Binaries](#node-binaries)
     - [Container Images](#container-images)
-  - [Changelog since v1.26.0-alpha.3](#changelog-since-v1260-alpha3)
+  - [Changelog since v1.26.0-beta.0](#changelog-since-v1260-beta0)
   - [Changes by Kind](#changes-by-kind)
-    - [Deprecation](#deprecation)
     - [API Change](#api-change)
     - [Feature](#feature)
     - [Bug or Regression](#bug-or-regression)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake)
   - [Dependencies](#dependencies)
     - [Added](#added)
     - [Changed](#changed)
     - [Removed](#removed)
-- [v1.26.0-alpha.3](#v1260-alpha3)
-  - [Downloads for v1.26.0-alpha.3](#downloads-for-v1260-alpha3)
+- [v1.26.0-beta.0](#v1260-beta0)
+  - [Downloads for v1.26.0-beta.0](#downloads-for-v1260-beta0)
     - [Source Code](#source-code-1)
     - [Client Binaries](#client-binaries-1)
     - [Server Binaries](#server-binaries-1)
     - [Node Binaries](#node-binaries-1)
     - [Container Images](#container-images-1)
-  - [Changelog since v1.26.0-alpha.2](#changelog-since-v1260-alpha2)
+  - [Changelog since v1.26.0-alpha.3](#changelog-since-v1260-alpha3)
   - [Changes by Kind](#changes-by-kind-1)
+    - [Deprecation](#deprecation)
     - [API Change](#api-change-1)
     - [Feature](#feature-1)
     - [Bug or Regression](#bug-or-regression-1)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-1)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake)
   - [Dependencies](#dependencies-1)
     - [Added](#added-1)
     - [Changed](#changed-1)
     - [Removed](#removed-1)
-- [v1.26.0-alpha.2](#v1260-alpha2)
-  - [Downloads for v1.26.0-alpha.2](#downloads-for-v1260-alpha2)
+- [v1.26.0-alpha.3](#v1260-alpha3)
+  - [Downloads for v1.26.0-alpha.3](#downloads-for-v1260-alpha3)
     - [Source Code](#source-code-2)
     - [Client Binaries](#client-binaries-2)
     - [Server Binaries](#server-binaries-2)
     - [Node Binaries](#node-binaries-2)
     - [Container Images](#container-images-2)
-  - [Changelog since v1.26.0-alpha.1](#changelog-since-v1260-alpha1)
+  - [Changelog since v1.26.0-alpha.2](#changelog-since-v1260-alpha2)
   - [Changes by Kind](#changes-by-kind-2)
-    - [Deprecation](#deprecation-1)
     - [API Change](#api-change-2)
     - [Feature](#feature-2)
     - [Bug or Regression](#bug-or-regression-2)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-2)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-1)
   - [Dependencies](#dependencies-2)
     - [Added](#added-2)
     - [Changed](#changed-2)
     - [Removed](#removed-2)
-- [v1.26.0-alpha.1](#v1260-alpha1)
-  - [Downloads for v1.26.0-alpha.1](#downloads-for-v1260-alpha1)
+- [v1.26.0-alpha.2](#v1260-alpha2)
+  - [Downloads for v1.26.0-alpha.2](#downloads-for-v1260-alpha2)
     - [Source Code](#source-code-3)
     - [Client Binaries](#client-binaries-3)
     - [Server Binaries](#server-binaries-3)
     - [Node Binaries](#node-binaries-3)
     - [Container Images](#container-images-3)
-  - [Changelog since v1.25.0](#changelog-since-v1250)
-  - [Urgent Upgrade Notes](#urgent-upgrade-notes)
-    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade)
+  - [Changelog since v1.26.0-alpha.1](#changelog-since-v1260-alpha1)
   - [Changes by Kind](#changes-by-kind-3)
-    - [Deprecation](#deprecation-2)
+    - [Deprecation](#deprecation-1)
     - [API Change](#api-change-3)
     - [Feature](#feature-3)
-    - [Documentation](#documentation)
     - [Bug or Regression](#bug-or-regression-3)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-3)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-2)
   - [Dependencies](#dependencies-3)
     - [Added](#added-3)
     - [Changed](#changed-3)
     - [Removed](#removed-3)
+- [v1.26.0-alpha.1](#v1260-alpha1)
+  - [Downloads for v1.26.0-alpha.1](#downloads-for-v1260-alpha1)
+    - [Source Code](#source-code-4)
+    - [Client Binaries](#client-binaries-4)
+    - [Server Binaries](#server-binaries-4)
+    - [Node Binaries](#node-binaries-4)
+    - [Container Images](#container-images-4)
+  - [Changelog since v1.25.0](#changelog-since-v1250)
+  - [Urgent Upgrade Notes](#urgent-upgrade-notes)
+    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade)
+  - [Changes by Kind](#changes-by-kind-4)
+    - [Deprecation](#deprecation-2)
+    - [API Change](#api-change-4)
+    - [Feature](#feature-4)
+    - [Documentation](#documentation)
+    - [Bug or Regression](#bug-or-regression-4)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-3)
+  - [Dependencies](#dependencies-4)
+    - [Added](#added-4)
+    - [Changed](#changed-4)
+    - [Removed](#removed-4)
 
 <!-- END MUNGE: GENERATED_TOC -->
+
+# v1.26.0-rc.0
+
+
+## Downloads for v1.26.0-rc.0
+
+
+
+### Source Code
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes.tar.gz) | c029cbe4bac02811164d6caf5c2474afb57ef0c8d1e5d4c3728a5ca38deff50dff354bc5b63f6a5c831a5d1944c559f5c33ebb5a6f13b2219bcc889127b74184
+[kubernetes-src.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes-src.tar.gz) | 0166a2421ce2ac5a6a5eb9a47f6c3195072e2ea3c6cf042e90fa20ed9624b7f6f3c3fc7fb9403c005e25c14b668cd33aa153c18d66b3a38722d2ea22edb13d88
+
+### Client Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes-client-darwin-amd64.tar.gz) | 73dd4446f6f58698f5dacc771d49eea436ee7a35edbf29b0470e077325385882544a35bc6c0aa4da8a0fcb4f521d25bb394097fc7895fc8b82e70d928d610dcd
+[kubernetes-client-darwin-arm64.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes-client-darwin-arm64.tar.gz) | 8b09a1ab7cd916cfe8a957b459d47dc789405232a09d17313b73ba2174ed61443460835dbdc9420731e29620954713eadc608546c16888902ef729ffa2a4207c
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes-client-linux-386.tar.gz) | 2766bc4210815f141a1862c00c827bc6c4c1f2184d10f40884647da896855a4ae35e174daebda22b55a40ba5d18a4a4efef26ba4a57f25a0cb5b6cb5c0d52604
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes-client-linux-amd64.tar.gz) | e9dc23e70cf54b2daddeb6c6b8dd4a7688311b9aa073ed7a6b7e49f197c4c2c4f5c08eb8289f5341bfd6da6e34f9b9d3a050d20d6e3de82af7c43387ff84abff
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes-client-linux-arm.tar.gz) | d19a5b00fa829a541bab13150ecdfd4427c1f2ae92061c338a93ca3c36c8609fa77dfe5fc05c7f54f117e0c299a79beb5ac14921819cd5a34e3debc9818aeedc
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes-client-linux-arm64.tar.gz) | 63a69da8a5570a08daf2fed9e55e456a761df0aba683cd3b84c6ee3dc6657d982adacf00655c485e6bfb03e9d60e0b89e1dbb568ca92e8e1c458752e24a64bbc
+[kubernetes-client-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes-client-linux-ppc64le.tar.gz) | 1d63b821339b4bb2c3cc9e3eec949a33143c0fbff96d7f723dcd7aecdb2fc7c40d66b569c70f58c012070e206826d9e0070aaed0bb2c87b251a1d644915a5a2a
+[kubernetes-client-linux-s390x.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes-client-linux-s390x.tar.gz) | dda2f1cb4def6094184d24be792fb8de12cd217eda75cf5f9510191956fa01bf3d130329a3318e2b26845b3335fb1dc74e92adb4d20bc5c7842670836eefc993
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes-client-windows-386.tar.gz) | b3a2fea1264a00f6cc1e09b76df6de9ea63988bccc1e568724a1f5a028e921c0832ef09665ea81077d2b58a8127345faa94d3570c4ccb0d4329a85c492152e34
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes-client-windows-amd64.tar.gz) | ac2db53ec5a5421bdebe24ac0ac7a5b585c9e6883f95c2424d6041707bf6b68a8b1e8a9f2ca594fa969e9d555b375cffe684922bfd65149d0d738067bcad0aa9
+[kubernetes-client-windows-arm64.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes-client-windows-arm64.tar.gz) | 0f8c501689f44cdeee4c5917c09e57ee6e5bcac78626fc1fe839a367a80f16ac9724dcc0220e29d169aa3fa8fe379365167814883c1d8596f220b418433cdf55
+
+### Server Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes-server-linux-amd64.tar.gz) | 083916605845bce97c5cb371086122ac1d985853bf565f4619c9463d70f4e0f9f538a1dde9a2c2b79ea4646ced702600b7abab166554d607a6edaec3dc6a73ef
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes-server-linux-arm.tar.gz) | 68212f3854e33b5657f280839f3bda53bf048adf5630342070447db1b3a37004923f3388c51f9d40a54831f9709010669fa712ee937ad4bcf1c9f5c5f4f1b0f8
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes-server-linux-arm64.tar.gz) | 8ded836f67e98240e8e5e6c9ce0a56c3466563462c75e55b5043afe4d1dea30059753fb49d00044083d50b1fda3cbc3b7ac1ba3232ea743706a38684a55131a7
+[kubernetes-server-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes-server-linux-ppc64le.tar.gz) | 4bf5a296b54e805b795777f99b40054287b4a7d5857897b47e3da4f6cdbfe4b91d771c85facfaf96340d14f3764d15d3b019a53961c0b5ffd76fb1e60f2fa586
+[kubernetes-server-linux-s390x.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes-server-linux-s390x.tar.gz) | 4cf0e6a16d011fc0f2a6801b5b0c09e70caffe949f0ef1b5230379ef6f79a9a874b7c6a1c7a49ed8080324c0bf12d43e8181aca9ab2251df7d508dc9e050d6a3
+
+### Node Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes-node-linux-amd64.tar.gz) | b60d6ecaa093b912478c3402a0bb4b01a553fbf8220ce0ed587c5181df2473b7b85750d47e6e30bf935cf616aa1912a5c034fe2e425e5b51bf9a71af634f76ea
+[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes-node-linux-arm.tar.gz) | f8120e276b91fbb88e2458e14b067c2f3517d09d8250cfbdf0306d51fff8355c7dc3e83f66216c803a34b521c40f3ad5b62d79a7f4f86f1a25e2057f098ac024
+[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes-node-linux-arm64.tar.gz) | 09ca76f6a681a489cc6c291358eeca10666ffee7a82382e87714684f24e67ea97bffdafb0b83a01641893db5cabe480b83f9afc77fabb850eeb0a173a2349526
+[kubernetes-node-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes-node-linux-ppc64le.tar.gz) | a09d28611f73193f33f07da4e2fff5987a4332893381f8322fc7a48a2884856c75cce306fced1cb0cd18119e9f801c95307128567400749792a67cd797b5ba01
+[kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes-node-linux-s390x.tar.gz) | 665b856bb641960a654829ef532dab84768e59a6653b07d7d8fd613364e07eff79f102b05799ca718b7ad5f0bd01128b3aa3498ea5afea70992c4cbcb3154065
+[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.26.0-rc.0/kubernetes-node-windows-amd64.tar.gz) | f1d1d38db0a22e68f8c872bcb0569452ade58d5d3d4bb93233a0bea45c70bd8264eaa5cd03cc92e463f7f4c29ee3114a8696748f8f925da5033144e0e9298376
+
+### Container Images
+
+All container images are available as manifest lists and support the described
+architectures. It is also possible to pull a specific architecture directly by
+adding the "-$ARCH" suffix  to the container image name.
+
+name | architectures
+---- | -------------
+[registry.k8s.io/conformance:v1.26.0-rc.0](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/conformance) | [amd64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/conformance-amd64), [arm](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/conformance-arm), [arm64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/conformance-arm64), [ppc64le](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/conformance-ppc64le), [s390x](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/conformance-s390x)
+[registry.k8s.io/kube-apiserver:v1.26.0-rc.0](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-apiserver) | [amd64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-apiserver-amd64), [arm](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-apiserver-arm), [arm64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-apiserver-arm64), [ppc64le](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-apiserver-ppc64le), [s390x](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-apiserver-s390x)
+[registry.k8s.io/kube-controller-manager:v1.26.0-rc.0](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-controller-manager) | [amd64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-controller-manager-amd64), [arm](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-controller-manager-arm), [arm64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-controller-manager-arm64), [ppc64le](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-controller-manager-ppc64le), [s390x](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-controller-manager-s390x)
+[registry.k8s.io/kube-proxy:v1.26.0-rc.0](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-proxy) | [amd64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-proxy-amd64), [arm](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-proxy-arm), [arm64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-proxy-arm64), [ppc64le](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-proxy-ppc64le), [s390x](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-proxy-s390x)
+[registry.k8s.io/kube-scheduler:v1.26.0-rc.0](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-scheduler) | [amd64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-scheduler-amd64), [arm](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-scheduler-arm), [arm64](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-scheduler-arm64), [ppc64le](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-scheduler-ppc64le), [s390x](https://console.cloud.google.com/gcr/images/k8s-artifacts-prod/us/kube-scheduler-s390x)
+
+## Changelog since v1.26.0-beta.0
+
+## Changes by Kind
+
+### API Change
+
+- Add a `ResourceClaim` API (in the resource.k8s.io/v1alpha1 API group and
+  behind the `DynamicResourceAllocation` feature gate).
+  The new API is more flexible than the existing Device Plugins feature of Kubernetes because it
+  allows Pods to request (claim) special kinds of resources, which can be available at node level, cluster
+  level, or following any other model you implement. ([#111023](https://github.com/kubernetes/kubernetes/pull/111023), [@pohly](https://github.com/pohly)) [SIG API Machinery, Apps, Architecture, Auth, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation, Node, Release, Scheduling, Storage and Testing]
+- PodDisruptionBudget adds an alpha `spec.unhealthyPodEvictionPolicy` field. When the `PDBUnhealthyPodEvictionPolicy` feature-gate is enabled in `kube-apiserver`, setting this field to `"AlwaysAllow"` allows pods to be evicted if they do not have a ready condition, regardless of whether the PodDisruptionBudget is currently healthy. ([#113375](https://github.com/kubernetes/kubernetes/pull/113375), [@atiratree](https://github.com/atiratree)) [SIG API Machinery, Apps, Auth and Testing]
+
+### Feature
+
+- Promote kubectl alpha events to kubectl events ([#113819](https://github.com/kubernetes/kubernetes/pull/113819), [@soltysh](https://github.com/soltysh)) [SIG CLI and Testing]
+
+### Bug or Regression
+
+- Known issue: Job field `.spec.podFailurePolicy.rules[*].onExitCode` might be ignored if the Pod is deleted before it terminates. ([#113856](https://github.com/kubernetes/kubernetes/pull/113856), [@alculquicondor](https://github.com/alculquicondor)) [SIG Apps]
+
+## Dependencies
+
+### Added
+_Nothing has changed._
+
+### Changed
+_Nothing has changed._
+
+### Removed
+_Nothing has changed._
+
+
 
 # v1.26.0-beta.0
 
