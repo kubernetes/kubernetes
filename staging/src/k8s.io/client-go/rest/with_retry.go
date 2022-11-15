@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -80,13 +81,15 @@ type WithRetry interface {
 	//   retry, the function will return ctx.Err().
 	// - we need to seek to the beginning of the request body before we
 	//   initiate the next retry, the function should return an error if
-	//   it fails to do so.
+	//   it fails to do so. Before seeking, if lastResponse.Body is non-nil
+	//   it is drained, closed, and replaced with a buffered io.Reader
+	//   containing the original response body content.
 	// - we should wait the number of seconds the server has asked us to
 	//   in the 'Retry-After' response header.
 	//
 	// If BeforeNextRetry returns an error the client should abort the retry,
 	// otherwise it is safe to initiate the next retry.
-	BeforeNextRetry(ctx context.Context, backoff BackoffManager, retryAfter *RetryAfter, url string, body io.Reader) error
+	BeforeNextRetry(ctx context.Context, backoff BackoffManager, retryAfter *RetryAfter, url string, body io.Reader, lastResponse *http.Response) error
 }
 
 // RetryAfter holds information associated with the next retry.
@@ -155,7 +158,7 @@ func (r *withRetry) NextRetry(req *http.Request, resp *http.Response, err error,
 	return retryAfter, true
 }
 
-func (r *withRetry) BeforeNextRetry(ctx context.Context, backoff BackoffManager, retryAfter *RetryAfter, url string, body io.Reader) error {
+func (r *withRetry) BeforeNextRetry(ctx context.Context, backoff BackoffManager, retryAfter *RetryAfter, url string, body io.Reader, lastResponse *http.Response) error {
 	// Ensure the response body is fully read and closed before
 	// we reconnect, so that we reuse the same TCP connection.
 	if ctx.Err() != nil {
@@ -163,6 +166,20 @@ func (r *withRetry) BeforeNextRetry(ctx context.Context, backoff BackoffManager,
 	}
 
 	if seeker, ok := body.(io.Seeker); ok && body != nil {
+		if lastResponse != nil && lastResponse.Body != nil {
+			// drain and close response body before resetting the request body to avoid a data race.
+			// see https://github.com/golang/go/issues/51907#issuecomment-1077927934 and https://github.com/kubernetes/kubernetes/issues/108906
+			data, err := ioutil.ReadAll(lastResponse.Body)
+			lastResponse.Body.Close()
+			// replace the drained/closed response body so the original body content can be read in error handling paths.
+			if err == nil {
+				// preserve the data read from the original body
+				lastResponse.Body = io.NopCloser(bytes.NewBuffer(data))
+			} else {
+				// preserve the data and error read from the original body
+				lastResponse.Body = io.NopCloser(io.MultiReader(bytes.NewBuffer(data), &errorReader{err: err}))
+			}
+		}
 		if _, err := seeker.Seek(0, 0); err != nil {
 			return fmt.Errorf("can't Seek() back to beginning of body for %T", r)
 		}
@@ -173,6 +190,14 @@ func (r *withRetry) BeforeNextRetry(ctx context.Context, backoff BackoffManager,
 		backoff.Sleep(retryAfter.Wait)
 	}
 	return nil
+}
+
+type errorReader struct {
+	err error
+}
+
+func (e *errorReader) Read(p []byte) (n int, err error) {
+	return 0, e.err
 }
 
 // checkWait returns true along with a number of seconds if

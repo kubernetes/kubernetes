@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"golang.org/x/net/http2"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -740,7 +741,7 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 			var retry bool
 			retryAfter, retry = withRetry.NextRetry(req, resp, err, isErrRetryableFunc)
 			if retry {
-				err := withRetry.BeforeNextRetry(ctx, r.backoff, retryAfter, url, r.body)
+				err := withRetry.BeforeNextRetry(ctx, r.backoff, retryAfter, url, r.body, resp)
 				if err == nil {
 					return false, nil
 				}
@@ -874,12 +875,15 @@ func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
 
 		default:
 			done, transformErr := func() (bool, error) {
-				defer resp.Body.Close()
+				defer func() {
+					// evaluate in a function in case the original resp.Body gets drained/swapped by BeforeNextRetry
+					resp.Body.Close()
+				}()
 
 				var retry bool
 				retryAfter, retry = withRetry.NextRetry(req, resp, err, neverRetryError)
 				if retry {
-					err := withRetry.BeforeNextRetry(ctx, r.backoff, retryAfter, url, r.body)
+					err := withRetry.BeforeNextRetry(ctx, r.backoff, retryAfter, url, r.body, resp)
 					if err == nil {
 						return false, nil
 					}
@@ -1027,7 +1031,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 				return false
 			})
 			if retry {
-				err := withRetry.BeforeNextRetry(ctx, r.backoff, retryAfter, req.URL.String(), r.body)
+				err := withRetry.BeforeNextRetry(ctx, r.backoff, retryAfter, req.URL.String(), r.body, resp)
 				if err == nil {
 					return false
 				}
