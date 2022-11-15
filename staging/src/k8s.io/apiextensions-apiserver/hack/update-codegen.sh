@@ -20,6 +20,10 @@ set -o pipefail
 
 SCRIPT_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; ls -d -1 ./vendor/k8s.io/code-generator 2>/dev/null || echo ../code-generator)}
+HACK_PKG=${HACK_PKG:-$(cd "${SCRIPT_ROOT}"; ls -d -1 ./vendor/k8s.io/apiextensions-apiserver/hack 2>/dev/null || echo ./hack)}
+HACK_PKG="$( cd "${HACK_PKG}"; pwd)"
+OUTPUT_DIR=${OUTPUT_DIR:-$(cd "${SCRIPT_ROOT}"; ls -d -1 ./_output/bin/ 2>/dev/null || echo ../../../_output/bin/)}
+OUTPUT_DIR="$( cd "${OUTPUT_DIR}"; pwd)"
 
 CLIENTSET_NAME_VERSIONED=clientset \
 CLIENTSET_PKG_NAME=clientset \
@@ -37,3 +41,13 @@ bash "${CODEGEN_PKG}/generate-internal-groups.sh" deepcopy,conversion \
   "apiextensions:v1beta1,v1" \
   --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
   --go-header-file "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
+
+GO111MODULE=on GOBIN="${OUTPUT_DIR}" "${HACK_PKG}/go-install.sh" github.com/kcp-dev/code-generator code-generator 2dc1248118a7f2337c6374ff5778c0880e1a4226
+pushd "${SCRIPT_ROOT}"
+GO111MODULE=on "${OUTPUT_DIR}/code-generator" \
+  "client:standalone=true,outputPackagePath=k8s.io/apiextensions-apiserver/pkg/client/kcp,name=clientset,apiPackagePath=k8s.io/apiextensions-apiserver/pkg/apis,singleClusterClientPackagePath=k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset,headerFile=${HACK_PKG}/boilerplate.go.txt" \
+  "lister:apiPackagePath=k8s.io/apiextensions-apiserver/pkg/apis,singleClusterListerPackagePath=k8s.io/apiextensions-apiserver/pkg/client/listers,headerFile=${HACK_PKG}/boilerplate.go.txt" \
+  "informer:standalone=true,outputPackagePath=k8s.io/apiextensions-apiserver/pkg/client/kcp,apiPackagePath=k8s.io/apiextensions-apiserver/pkg/apis,singleClusterClientPackagePath=k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset,singleClusterListerPackagePath=k8s.io/apiextensions-apiserver/pkg/client/listers,singleClusterInformerPackagePath=k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions,headerFile=${HACK_PKG}/boilerplate.go.txt" \
+  "paths=./pkg/apis/..." \
+  "output:dir=./pkg/client/kcp"
+popd

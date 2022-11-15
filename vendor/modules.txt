@@ -482,7 +482,7 @@ github.com/josharian/intern
 github.com/json-iterator/go
 # github.com/karrick/godirwalk v1.16.1 => github.com/karrick/godirwalk v1.16.1
 github.com/karrick/godirwalk
-# github.com/kcp-dev/apimachinery v0.0.0-20221019133255-9e1e13940519 => github.com/kcp-dev/apimachinery v0.0.0-20221019133255-9e1e13940519
+# github.com/kcp-dev/apimachinery v0.0.0-20221102195355-d65878bc16be => github.com/kcp-dev/apimachinery v0.0.0-20221102195355-d65878bc16be
 ## explicit
 github.com/kcp-dev/apimachinery/pkg/cache
 github.com/kcp-dev/apimachinery/pkg/client
@@ -1485,6 +1485,16 @@ k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensio
 k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1
 k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1beta1
 k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/internalinterfaces
+k8s.io/apiextensions-apiserver/pkg/client/kcp/clientset/versioned
+k8s.io/apiextensions-apiserver/pkg/client/kcp/clientset/versioned/typed/apiextensions/v1
+k8s.io/apiextensions-apiserver/pkg/client/kcp/clientset/versioned/typed/apiextensions/v1beta1
+k8s.io/apiextensions-apiserver/pkg/client/kcp/informers/externalversions
+k8s.io/apiextensions-apiserver/pkg/client/kcp/informers/externalversions/apiextensions
+k8s.io/apiextensions-apiserver/pkg/client/kcp/informers/externalversions/apiextensions/v1
+k8s.io/apiextensions-apiserver/pkg/client/kcp/informers/externalversions/apiextensions/v1beta1
+k8s.io/apiextensions-apiserver/pkg/client/kcp/informers/externalversions/internalinterfaces
+k8s.io/apiextensions-apiserver/pkg/client/kcp/listers/apiextensions/v1
+k8s.io/apiextensions-apiserver/pkg/client/kcp/listers/apiextensions/v1beta1
 k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1
 k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1
 k8s.io/apiextensions-apiserver/pkg/cmd/server/options
@@ -2745,7 +2755,7 @@ sigs.k8s.io/yaml
 # github.com/julienschmidt/httprouter => github.com/julienschmidt/httprouter v1.3.0
 # github.com/jung-kurt/gofpdf => github.com/jung-kurt/gofpdf v1.0.3-0.20190309125859-24315acbbda5
 # github.com/karrick/godirwalk => github.com/karrick/godirwalk v1.16.1
-# github.com/kcp-dev/apimachinery => github.com/kcp-dev/apimachinery v0.0.0-20221019133255-9e1e13940519
+# github.com/kcp-dev/apimachinery => github.com/kcp-dev/apimachinery v0.0.0-20221102195355-d65878bc16be
 # github.com/kcp-dev/client-go => github.com/kcp-dev/client-go v0.0.0-20221025140308-a18ccea074a6
 # github.com/kcp-dev/logicalcluster/v2 => github.com/kcp-dev/logicalcluster/v2 v2.0.0-alpha.1
 # github.com/kisielk/errcheck => github.com/kisielk/errcheck v1.5.0

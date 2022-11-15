@@ -22,6 +22,9 @@ import (
 	"sync"
 	"time"
 
+	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
+	kcpapiextensionsv1informers "k8s.io/apiextensions-apiserver/pkg/client/kcp/informers/externalversions/apiextensions/v1"
+	kcpapiextensionsv1listers "k8s.io/apiextensions-apiserver/pkg/client/kcp/listers/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -35,14 +38,12 @@ import (
 
 	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
-	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/controller/openapi/builder"
 )
 
 // Controller watches CustomResourceDefinitions and publishes OpenAPI v3
 type Controller struct {
-	crdLister  listers.CustomResourceDefinitionLister
+	crdLister  kcpapiextensionsv1listers.CustomResourceDefinitionClusterLister
 	crdsSynced cache.InformerSynced
 
 	// To allow injection for testing.
@@ -58,7 +59,7 @@ type Controller struct {
 }
 
 // NewController creates a new Controller with input CustomResourceDefinition informer
-func NewController(crdInformer informers.CustomResourceDefinitionInformer) *Controller {
+func NewController(crdInformer kcpapiextensionsv1informers.CustomResourceDefinitionClusterInformer) *Controller {
 	c := &Controller{
 		crdLister:        crdInformer.Lister(),
 		crdsSynced:       crdInformer.Informer().HasSynced,
@@ -146,11 +147,16 @@ func (c *Controller) processNextWorkItem() bool {
 	return true
 }
 
-func (c *Controller) sync(name string) error {
+func (c *Controller) sync(key string) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	crd, err := c.crdLister.Get(name)
+	clusterName, _, name, err := kcpcache.SplitMetaClusterNamespaceKey(key)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return nil
+	}
+	crd, err := c.crdLister.Cluster(clusterName).Get(name)
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
@@ -271,5 +277,10 @@ func (c *Controller) deleteCustomResourceDefinition(obj interface{}) {
 }
 
 func (c *Controller) enqueue(obj *apiextensionsv1.CustomResourceDefinition) {
-	c.queue.Add(obj.Name)
+	key, err := kcpcache.DeletionHandlingMetaClusterNamespaceKeyFunc(obj)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", obj, err))
+		return
+	}
+	c.queue.Add(key)
 }

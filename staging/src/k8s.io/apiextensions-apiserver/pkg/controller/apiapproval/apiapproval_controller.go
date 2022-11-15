@@ -22,11 +22,12 @@ import (
 	"sync"
 	"time"
 
+	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
 	"k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
-	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
-	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
+	kcpapiextensionsv1client "k8s.io/apiextensions-apiserver/pkg/client/kcp/clientset/versioned/typed/apiextensions/v1"
+	kcpapiextensionsv1informers "k8s.io/apiextensions-apiserver/pkg/client/kcp/informers/externalversions/apiextensions/v1"
+	kcpapiextensionsv1listers "k8s.io/apiextensions-apiserver/pkg/client/kcp/listers/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -38,9 +39,9 @@ import (
 
 // KubernetesAPIApprovalPolicyConformantConditionController is maintaining the KubernetesAPIApprovalPolicyConformant condition.
 type KubernetesAPIApprovalPolicyConformantConditionController struct {
-	crdClient client.CustomResourceDefinitionsGetter
+	crdClient kcpapiextensionsv1client.CustomResourceDefinitionsClusterGetter
 
-	crdLister listers.CustomResourceDefinitionLister
+	crdLister kcpapiextensionsv1listers.CustomResourceDefinitionClusterLister
 	crdSynced cache.InformerSynced
 
 	// To allow injection for testing.
@@ -55,10 +56,7 @@ type KubernetesAPIApprovalPolicyConformantConditionController struct {
 }
 
 // NewKubernetesAPIApprovalPolicyConformantConditionController constructs a KubernetesAPIApprovalPolicyConformant schema condition controller.
-func NewKubernetesAPIApprovalPolicyConformantConditionController(
-	crdInformer informers.CustomResourceDefinitionInformer,
-	crdClient client.CustomResourceDefinitionsGetter,
-) *KubernetesAPIApprovalPolicyConformantConditionController {
+func NewKubernetesAPIApprovalPolicyConformantConditionController(crdInformer kcpapiextensionsv1informers.CustomResourceDefinitionClusterInformer, crdClient kcpapiextensionsv1client.ApiextensionsV1ClusterInterface) *KubernetesAPIApprovalPolicyConformantConditionController {
 	c := &KubernetesAPIApprovalPolicyConformantConditionController{
 		crdClient:                   crdClient,
 		crdLister:                   crdInformer.Lister(),
@@ -125,7 +123,12 @@ func calculateCondition(crd *apiextensionsv1.CustomResourceDefinition) *apiexten
 }
 
 func (c *KubernetesAPIApprovalPolicyConformantConditionController) sync(key string) error {
-	inCustomResourceDefinition, err := c.crdLister.Get(key)
+	clusterName, _, name, err := kcpcache.SplitMetaClusterNamespaceKey(key)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return nil
+	}
+	inCustomResourceDefinition, err := c.crdLister.Cluster(clusterName).Get(name)
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
@@ -160,7 +163,7 @@ func (c *KubernetesAPIApprovalPolicyConformantConditionController) sync(key stri
 	crd := inCustomResourceDefinition.DeepCopy()
 	apihelpers.SetCRDCondition(crd, *cond)
 
-	_, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd, metav1.UpdateOptions{})
+	_, err = c.crdClient.CustomResourceDefinitions().Cluster(clusterName).UpdateStatus(context.TODO(), crd, metav1.UpdateOptions{})
 	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
 		// deleted or changed in the meantime, we'll get called again
 		return nil
@@ -223,9 +226,9 @@ func (c *KubernetesAPIApprovalPolicyConformantConditionController) processNextWo
 }
 
 func (c *KubernetesAPIApprovalPolicyConformantConditionController) enqueue(obj *apiextensionsv1.CustomResourceDefinition) {
-	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+	key, err := kcpcache.DeletionHandlingMetaClusterNamespaceKeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", obj, err))
 		return
 	}
 

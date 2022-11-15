@@ -19,7 +19,7 @@ require (
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.2
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/kcp-dev/apimachinery v0.0.0-20221019133255-9e1e13940519
+	github.com/kcp-dev/apimachinery v0.0.0-20221102195355-d65878bc16be
 	github.com/kcp-dev/client-go v0.0.0-20221025140308-a18ccea074a6
 	github.com/kcp-dev/logicalcluster/v2 v2.0.0-alpha.1
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
