@@ -17,7 +17,9 @@ limitations under the License.
 package rest
 
 import (
+	"bytes"
 	"errors"
+	"io"
 	"net/http"
 	"reflect"
 	"testing"
@@ -36,6 +38,7 @@ func TestNextRetry(t *testing.T) {
 		name               string
 		attempts           int
 		maxRetries         int
+		body               io.Reader
 		request            *http.Request
 		response           *http.Response
 		err                error
@@ -66,6 +69,23 @@ func TestNextRetry(t *testing.T) {
 					Attempt: 1,
 				},
 			},
+		},
+		{
+			name:       "server returned a retryable error, custom body prevents retry",
+			maxRetries: 3,
+			attempts:   1,
+			body:       bytes.NewReader(nil),
+			request:    &http.Request{},
+			response:   nil,
+			err:        fakeError,
+			retryableErrFunc: func(_ *http.Request, err error) bool {
+				if err == fakeError {
+					return true
+				}
+				return false
+			},
+			retryExpected:      []bool{false},
+			retryAfterExpected: []*RetryAfter{nil},
 		},
 		{
 			name:       "server returned a retryable error",
@@ -210,7 +230,7 @@ func TestNextRetry(t *testing.T) {
 			retryGot := make([]bool, 0)
 			retryAfterGot := make([]*RetryAfter, 0)
 			for i := 0; i < test.attempts; i++ {
-				retryAfter, retry := r.NextRetry(test.request, test.response, test.err, test.retryableErrFunc)
+				retryAfter, retry := r.NextRetry(test.body, test.request, test.response, test.err, test.retryableErrFunc)
 				retryGot = append(retryGot, retry)
 				retryAfterGot = append(retryAfterGot, retryAfter)
 			}

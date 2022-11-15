@@ -67,26 +67,24 @@ type WithRetry interface {
 	// if retry is set to true, retryAfter will contain the information
 	// regarding the next retry.
 	//
+	// bodyReader: the custom io.Reader body used for the requests. if non-nil, the request cannot be retried.
 	// request: the original request sent to the server
 	// resp: the response sent from the server, it is set if err is nil
 	// err: the server sent this error to us, if err is set then resp is nil.
 	// f: a IsRetryableErrorFunc function provided by the client that determines
 	//    if the err sent by the server is retryable.
-	NextRetry(req *http.Request, resp *http.Response, err error, f IsRetryableErrorFunc) (*RetryAfter, bool)
+	NextRetry(bodyReader io.Reader, req *http.Request, resp *http.Response, err error, f IsRetryableErrorFunc) (*RetryAfter, bool)
 
 	// BeforeNextRetry is responsible for carrying out operations that need
 	// to be completed before the next retry is initiated:
 	// - if the request context is already canceled there is no need to
 	//   retry, the function will return ctx.Err().
-	// - we need to seek to the beginning of the request body before we
-	//   initiate the next retry, the function should return an error if
-	//   it fails to do so.
 	// - we should wait the number of seconds the server has asked us to
 	//   in the 'Retry-After' response header.
 	//
 	// If BeforeNextRetry returns an error the client should abort the retry,
 	// otherwise it is safe to initiate the next retry.
-	BeforeNextRetry(ctx context.Context, backoff BackoffManager, retryAfter *RetryAfter, url string, body io.Reader) error
+	BeforeNextRetry(ctx context.Context, backoff BackoffManager, retryAfter *RetryAfter, url string) error
 }
 
 // RetryAfter holds information associated with the next retry.
@@ -116,9 +114,14 @@ func (r *withRetry) SetMaxRetries(maxRetries int) {
 	r.maxRetries = maxRetries
 }
 
-func (r *withRetry) NextRetry(req *http.Request, resp *http.Response, err error, f IsRetryableErrorFunc) (*RetryAfter, bool) {
+func (r *withRetry) NextRetry(bodyReader io.Reader, req *http.Request, resp *http.Response, err error, f IsRetryableErrorFunc) (*RetryAfter, bool) {
 	if req == nil || (resp == nil && err == nil) {
 		// bad input, we do nothing.
+		return nil, false
+	}
+
+	if bodyReader != nil {
+		// we have an opaque reader, we can't safely reset it
 		return nil, false
 	}
 
@@ -155,17 +158,11 @@ func (r *withRetry) NextRetry(req *http.Request, resp *http.Response, err error,
 	return retryAfter, true
 }
 
-func (r *withRetry) BeforeNextRetry(ctx context.Context, backoff BackoffManager, retryAfter *RetryAfter, url string, body io.Reader) error {
+func (r *withRetry) BeforeNextRetry(ctx context.Context, backoff BackoffManager, retryAfter *RetryAfter, url string) error {
 	// Ensure the response body is fully read and closed before
 	// we reconnect, so that we reuse the same TCP connection.
 	if ctx.Err() != nil {
 		return ctx.Err()
-	}
-
-	if seeker, ok := body.(io.Seeker); ok && body != nil {
-		if _, err := seeker.Seek(0, 0); err != nil {
-			return fmt.Errorf("can't Seek() back to beginning of body for %T", r)
-		}
 	}
 
 	klog.V(4).Infof("Got a Retry-After %s response for attempt %d to %v", retryAfter.Wait, retryAfter.Attempt, url)
