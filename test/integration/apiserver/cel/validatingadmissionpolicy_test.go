@@ -18,7 +18,6 @@ package cel
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -47,13 +46,6 @@ import (
 	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-)
-
-const (
-	crdGroup = "crdgroup.example.com"
-	crdName  = "config-resource"
-	crdKind  = "ConfigResource"
-	crName   = "config-obj"
 )
 
 // Test_ValidateNamespace_NoParams tests a ValidatingAdmissionPolicy that validates creation of a Namespace with no params.
@@ -238,8 +230,7 @@ func Test_ValidateNamespace_NoParams(t *testing.T) {
 					Name: "test-k8s",
 				},
 			},
-			err:           "",
-			failureReason: metav1.StatusReasonInvalid,
+			err: "",
 		},
 		{
 			name: "with check against null params and default check",
@@ -254,8 +245,7 @@ func Test_ValidateNamespace_NoParams(t *testing.T) {
 					Name: "test-k8s",
 				},
 			},
-			err:           "",
-			failureReason: metav1.StatusReasonInvalid,
+			err: "",
 		},
 	}
 
@@ -374,9 +364,6 @@ func Test_ValidateNamespace_WithConfigMapParams(t *testing.T) {
 			}
 
 			_, err = client.CoreV1().Namespaces().Create(context.TODO(), testcase.namespace, metav1.CreateOptions{})
-			if err == nil && testcase.err == "" {
-				return
-			}
 
 			checkExpectedError(t, err, testcase.err)
 			checkFailureReason(t, err, testcase.failureReason)
@@ -1858,8 +1845,7 @@ func Test_ValidatingAdmissionPolicy_ParamResourceDeletedThenRecreated(t *testing
 func TestCRDParams(t *testing.T) {
 	testcases := []struct {
 		name          string
-		schema        string
-		crSpec        map[string]interface{}
+		resource      *unstructured.Unstructured
 		policy        *admissionregistrationv1alpha1.ValidatingAdmissionPolicy
 		policyBinding *admissionregistrationv1alpha1.ValidatingAdmissionPolicyBinding
 		namespace     *v1.Namespace
@@ -1868,58 +1854,48 @@ func TestCRDParams(t *testing.T) {
 	}{
 		{
 			name: "a rule that uses data from a CRD param resource does NOT pass",
-			schema: `{
-				"type":"object",
-				"properties":{
-				   "spec":{
-					  "type":"object",
-					  "properties":{
-						 "someNum":{
-							"type":"integer"
-						 }
-					  }
-				   }
-				}`,
-			crSpec: map[string]interface{}{
-				"someNum": 3,
-			},
+			resource: &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": "awesome.bears.com/v1",
+				"kind":       "Panda",
+				"metadata": map[string]interface{}{
+					"name": "config-obj",
+				},
+				"spec": map[string]interface{}{
+					"nameCheck": "crd-test-k8s",
+				},
+			}},
 			policy: withValidations([]admissionregistrationv1alpha1.Validation{
 				{
-					Expression: "params.spec.someNum == 2",
+					Expression: "params.spec.nameCheck == object.metadata.name",
 				},
-			}, withNamespaceMatch(withParams(withCRDParamKind("ConfigResource"), withFailurePolicy(admissionregistrationv1alpha1.Fail, makePolicy("test-policy"))))),
-			policyBinding: makeBinding("crd-policy-binding", "test-policy", crName),
+			}, withNamespaceMatch(withParams(withCRDParamKind("Panda", "awesome.bears.com", "v1"), withFailurePolicy(admissionregistrationv1alpha1.Fail, makePolicy("test-policy"))))),
+			policyBinding: makeBinding("crd-policy-binding", "test-policy", "config-obj"),
 			namespace: &v1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "crd-test-k8s",
+					Name: "incorrect-name",
 				},
 			},
-			err:           `namespaces "crd-test-k8s" is forbidden: ValidatingAdmissionPolicy 'test-policy' with binding 'crd-policy-binding' denied request: failed expression: params.spec.someNum == 2`,
+			err:           `namespaces "incorrect-name" is forbidden: ValidatingAdmissionPolicy 'test-policy' with binding 'crd-policy-binding' denied request: failed expression: params.spec.nameCheck == object.metadata.name`,
 			failureReason: metav1.StatusReasonInvalid,
 		},
 		{
 			name: "a rule that uses data from a CRD param resource that does pass",
-			schema: `{
-				"type":"object",
-				"properties":{
-				   "spec":{
-					  "type":"object",
-					  "properties":{
-						 "someNum":{
-							"type":"integer"
-						 }
-					  }
-				   }
-				}`,
-			crSpec: map[string]interface{}{
-				"someNum": 3,
-			},
+			resource: &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": "awesome.bears.com/v1",
+				"kind":       "Panda",
+				"metadata": map[string]interface{}{
+					"name": "config-obj",
+				},
+				"spec": map[string]interface{}{
+					"nameCheck": "crd-test-k8s",
+				},
+			}},
 			policy: withValidations([]admissionregistrationv1alpha1.Validation{
 				{
-					Expression: "params.spec.someNum == 3",
+					Expression: "params.spec.nameCheck == object.metadata.name",
 				},
-			}, withNamespaceMatch(withParams(withCRDParamKind("ConfigResource"), withFailurePolicy(admissionregistrationv1alpha1.Fail, makePolicy("test-policy"))))),
-			policyBinding: makeBinding("crd-policy-binding", "test-policy", crName),
+			}, withNamespaceMatch(withParams(withCRDParamKind("Panda", "awesome.bears.com", "v1"), withFailurePolicy(admissionregistrationv1alpha1.Fail, makePolicy("test-policy"))))),
+			policyBinding: makeBinding("crd-policy-binding", "test-policy", "config-obj"),
 			namespace: &v1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "crd-test-k8s",
@@ -1947,17 +1923,8 @@ func TestCRDParams(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			apiExtensionClient, err := apiextensionsclientset.NewForConfig(config)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			crd := genCRD(crdName, crdKind)
-			crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
-			if err != nil {
-				t.Fatal(err)
-			}
-
+			crd := versionedCustomResourceDefinition()
+			etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, crd)
 			dynamicClient, err := dynamic.NewForConfig(config)
 			if err != nil {
 				t.Fatal(err)
@@ -1968,14 +1935,7 @@ func TestCRDParams(t *testing.T) {
 				Resource: crd.Spec.Names.Plural,
 			}
 			crClient := dynamicClient.Resource(gvr)
-			_, err = crClient.Namespace("default").Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{
-				"apiVersion": gvr.Group + "/" + gvr.Version,
-				"kind":       crd.Spec.Names.Kind,
-				"metadata": map[string]interface{}{
-					"name": crName,
-				},
-				"spec": testcase.crSpec,
-			}}, metav1.CreateOptions{})
+			_, err = crClient.Create(context.TODO(), testcase.resource, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("error creating %s: %s", gvr, err)
 			}
@@ -1984,18 +1944,109 @@ func TestCRDParams(t *testing.T) {
 			if _, err := client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{}); err != nil {
 				t.Fatal(err)
 			}
+			// remove default namespace since the CRD is cluster-scoped
+			testcase.policyBinding.Spec.ParamRef.Namespace = ""
 			if err := createAndWaitReady(t, client, testcase.policyBinding, nil); err != nil {
 				t.Fatal(err)
 			}
 
 			_, err = client.CoreV1().Namespaces().Create(context.TODO(), testcase.namespace, metav1.CreateOptions{})
-			if err == nil && testcase.err == "" {
-				return
-			}
 
 			checkExpectedError(t, err, testcase.err)
 			checkFailureReason(t, err, testcase.failureReason)
 		})
+	}
+}
+
+func TestBindingRemoval(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+	server, err := apiservertesting.StartTestServer(t, nil, []string{
+		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+	}, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+
+	config := server.ClientConfig
+
+	client, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policy := withValidations([]admissionregistrationv1alpha1.Validation{
+		{
+			Expression: "false",
+			Message:    "policy still in effect",
+		},
+	}, withNamespaceMatch(withFailurePolicy(admissionregistrationv1alpha1.Fail, makePolicy("test-policy"))))
+	policy = withWaitReadyConstraintAndExpression(policy)
+	if _, err := client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	binding := makeBinding("test-binding", "test-policy", "test-params")
+	if err := createAndWaitReady(t, client, binding, nil); err != nil {
+		t.Fatal(err)
+	}
+	// check that the policy is active
+	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+		namespace := &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "check-namespace",
+			},
+		}
+		_, err = client.CoreV1().Namespaces().Create(context.TODO(), namespace, metav1.CreateOptions{})
+		if err != nil {
+			if strings.Contains(err.Error(), "policy still in effect") {
+				return true, nil
+			} else {
+				// unexpected error while attempting namespace creation
+				return true, err
+			}
+		}
+		return false, nil
+	}); waitErr != nil {
+		t.Errorf("timed out waiting: %v", waitErr)
+	}
+	if err = client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicyBindings().Delete(context.TODO(), "test-binding", metav1.DeleteOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	// wait for binding to be deleted
+	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+
+		_, err := client.AdmissionregistrationV1alpha1().ValidatingAdmissionPolicyBindings().Get(context.TODO(), "test-binding", metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			} else {
+				return true, err
+			}
+		}
+
+		return false, nil
+	}); waitErr != nil {
+		t.Errorf("timed out waiting: %v", waitErr)
+	}
+
+	// policy should be considered in an invalid state and namespace creation should be allowed
+	if waitErr := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+		namespace := &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-namespace",
+			},
+		}
+		_, err = client.CoreV1().Namespaces().Create(context.TODO(), namespace, metav1.CreateOptions{})
+		if err != nil {
+			t.Logf("namespace creation failed: %s", err)
+			return false, nil
+		}
+
+		return true, nil
+	}); waitErr != nil {
+		t.Errorf("expected namespace creation to succeed but timed out waiting: %v", waitErr)
 	}
 }
 
@@ -2225,6 +2276,10 @@ func checkForFailedRule(t *testing.T, err error) {
 }
 
 func checkFailureReason(t *testing.T, err error, expectedReason metav1.StatusReason) {
+	if err == nil && expectedReason == "" {
+		// no reason was given, no error was passed - early exit
+		return
+	}
 	reason := err.(apierrors.APIStatus).Status().Reason
 	if reason != expectedReason {
 		t.Logf("actual error reason: %v", reason)
@@ -2233,43 +2288,10 @@ func checkFailureReason(t *testing.T, err error, expectedReason metav1.StatusRea
 	}
 }
 
-func unmarshalSchema(t *testing.T, schemaJSON []byte) *apiextensionsv1.JSONSchemaProps {
-	var c apiextensionsv1.JSONSchemaProps
-	err := json.Unmarshal(schemaJSON, &c)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return &c
-}
-
-func withCRDParamKind(kind string) *admissionregistrationv1alpha1.ParamKind {
+func withCRDParamKind(kind, crdGroup, crdVersion string) *admissionregistrationv1alpha1.ParamKind {
 	return &admissionregistrationv1alpha1.ParamKind{
-		APIVersion: crdGroup + "/v1beta1",
+		APIVersion: crdGroup + "/" + crdVersion,
 		Kind:       kind,
-	}
-}
-
-func genCRD(name, kind string) *apiextensionsv1.CustomResourceDefinition {
-	return &apiextensionsv1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{Name: name + "s." + crdGroup},
-		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
-			Group: crdGroup,
-			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
-				{
-					Name:    "v1beta1",
-					Served:  true,
-					Storage: true,
-					Schema:  fixtures.AllowAllSchema(),
-				},
-			},
-			Names: apiextensionsv1.CustomResourceDefinitionNames{
-				Plural:   name + "s",
-				Singular: name,
-				Kind:     kind,
-				ListKind: kind + "List",
-			},
-			Scope: apiextensionsv1.NamespaceScoped,
-		},
 	}
 }
 
