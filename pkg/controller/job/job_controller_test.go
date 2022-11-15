@@ -2943,52 +2943,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						DeletionTimestamp: &now,
 					},
-					Spec: v1.PodSpec{
-						NodeName: "foo",
-					},
-				},
-			},
-			wantConditions: &[]batch.JobCondition{
-				{
-					Type:    batch.JobFailed,
-					Status:  v1.ConditionTrue,
-					Reason:  "BackoffLimitExceeded",
-					Message: "Job has reached the specified backoff limit",
-				},
-			},
-			wantStatusFailed: 1,
-		},
-		"not scheduled deleted Pod considered failed when PodDisruptionConditions is enabled": {
-			enableJobPodFailurePolicy:     true,
-			enablePodDisruptionConditions: true,
-			job: batch.Job{
-				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
-				ObjectMeta: validObjectMeta,
-				Spec: batch.JobSpec{
-					Parallelism:  pointer.Int32(1),
-					Selector:     validSelector,
-					Template:     validTemplate,
-					BackoffLimit: pointer.Int32(0),
-					PodFailurePolicy: &batch.PodFailurePolicy{
-						Rules: []batch.PodFailurePolicyRule{
-							{
-								Action: batch.PodFailurePolicyActionCount,
-								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
-									{
-										Type:   v1.DisruptionTarget,
-										Status: v1.ConditionTrue,
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			pods: []v1.Pod{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						DeletionTimestamp: &now,
-					},
 				},
 			},
 			wantConditions: &[]batch.JobCondition{
@@ -3031,9 +2985,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						DeletionTimestamp: &now,
-					},
-					Spec: v1.PodSpec{
-						NodeName: "foo",
 					},
 					Status: v1.PodStatus{
 						Phase: v1.PodRunning,

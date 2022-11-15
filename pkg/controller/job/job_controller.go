@@ -1737,13 +1737,12 @@ func ensureJobConditionStatus(list []batch.JobCondition, cType batch.JobConditio
 
 func isPodFailed(p *v1.Pod, job *batch.Job, wFinalizers bool) bool {
 	if feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) && feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
-		// When PodDisruptionConditions is enabled, orphan Pods are marked as Failed.
-		// We can wait for Pods to fully terminate to check the pod failure policy.
+		// When PodDisruptionConditions is enabled, orphan Pods and unschedulable
+		// terminating Pods are marked as Failed. So we only need to check the phase.
 		// TODO(#113855): Stop limiting this behavior to Jobs with podFailurePolicy.
 		// For now, we do so to avoid affecting all running Jobs without the
 		// avaibility to opt-out into the old behavior.
-		return p.Status.Phase == v1.PodFailed ||
-			podutil.IsNeverScheduled(p) // The Pod will not be marked as Failed, because it was never scheduled.
+		return p.Status.Phase == v1.PodFailed
 	}
 	if p.Status.Phase == v1.PodFailed {
 		return true

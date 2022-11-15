@@ -94,8 +94,6 @@ func getMatchingContainerFromList(containerStatuses []v1.ContainerStatus, requir
 	for _, containerStatus := range containerStatuses {
 		if containerStatus.State.Terminated == nil {
 			// This container is still be terminating. There is no exit code to match.
-			// TODO(#113855): Remove this check when it's guaranteed that the
-			// container is terminated.
 			continue
 		}
 		if requirement.ContainerName == nil || *requirement.ContainerName == containerStatus.Name {

@@ -761,49 +761,6 @@ func TestIsPodTerminal(t *testing.T) {
 	}
 }
 
-func TestIsNeverScheduled(t *testing.T) {
-	now := metav1.Now()
-	cases := map[string]struct {
-		pod  v1.Pod
-		want bool
-	}{
-		"not scheduled yet": {},
-		"scheduled": {
-			pod: v1.Pod{
-				Spec: v1.PodSpec{
-					NodeName: "foo-node",
-				},
-			},
-		},
-		"deleted but scheduled": {
-			pod: v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					DeletionTimestamp: &now,
-				},
-				Spec: v1.PodSpec{
-					NodeName: "foo-node",
-				},
-			},
-		},
-		"deleted and not scheduled": {
-			pod: v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					DeletionTimestamp: &now,
-				},
-			},
-			want: true,
-		},
-	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			got := IsNeverScheduled(&tc.pod)
-			if got != tc.want {
-				t.Errorf("Pod is never scheduled: %t, want %t", got, tc.want)
-			}
-		})
-	}
-}
-
 func TestGetContainerStatus(t *testing.T) {
 	type ExpectedStruct struct {
 		status v1.ContainerStatus
