@@ -1933,6 +1933,9 @@ func createAndWaitReady(t *testing.T, client *clientset.Clientset, binding *admi
 		_, err := client.CoreV1().Endpoints("default").Patch(context.TODO(), marker.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
 		if err != nil && strings.Contains(err.Error(), "marker denied; policy is ready") {
 			return true, nil
+		} else if err != nil && strings.Contains(err.Error(), "not yet synced to use for admission") {
+			t.Logf("waiting for policy to be ready. Marker: %v. Admission not synced yet: %v", marker, err)
+			return false, nil
 		} else {
 			t.Logf("waiting for policy to be ready. Marker: %v, Last marker patch response: %v", marker, err)
 			return false, err
