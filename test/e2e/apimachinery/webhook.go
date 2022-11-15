@@ -793,7 +793,6 @@ func deployWebhookAndService(f *framework.Framework, image string, certCtx *cert
 				"webhook",
 				"--tls-cert-file=/webhook.local.config/certificates/tls.crt",
 				"--tls-private-key-file=/webhook.local.config/certificates/tls.key",
-				"--alsologtostderr",
 				"-v=4",
 				// Use a non-default port for containers.
 				fmt.Sprintf("--port=%d", containerPort),
