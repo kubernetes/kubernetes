@@ -1030,15 +1030,26 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 	podFailureCountByPolicyAction := map[string]int{}
 	for _, pod := range pods {
 		if !hasJobTrackingFinalizer(pod) || expectedRmFinalizers.Has(string(pod.UID)) {
+			// This pod was processed in a previous sync.
 			continue
 		}
-		podFinished := pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed
 		// Terminating pods are counted as failed. This guarantees that orphan Pods
 		// count as failures.
 		// Active pods are terminated when the job has completed, thus they count as
 		// failures as well.
-		podTerminating := pod.DeletionTimestamp != nil || finishedCond != nil
-		if podFinished || podTerminating || job.DeletionTimestamp != nil {
+		considerTerminated := pod.DeletionTimestamp != nil || finishedCond != nil
+
+		if feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) && feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
+			// TODO(#113855): Stop limiting this behavior to Jobs with podFailurePolicy.
+			// For now, we do so to avoid affecting all running Jobs without the
+			// avaibility to opt-out into the old behavior.
+			// We can also simplify the check to remove finalizers to:
+			// considerTerminated || job.DeletionTimestamp != nil
+			considerTerminated = podutil.IsPodTerminal(pod) ||
+				finishedCond != nil || // The Job is terminating. Any running Pod is considered failed.
+				isPodFailed(pod, job, true /* using finalizers */)
+		}
+		if podutil.IsPodTerminal(pod) || considerTerminated || job.DeletionTimestamp != nil {
 			podsToRemoveFinalizer = append(podsToRemoveFinalizer, pod)
 		}
 		if pod.Status.Phase == v1.PodSucceeded && !uncounted.failed.Has(string(pod.UID)) {
@@ -1054,7 +1065,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 				needsFlush = true
 				uncountedStatus.Succeeded = append(uncountedStatus.Succeeded, pod.UID)
 			}
-		} else if pod.Status.Phase == v1.PodFailed || podTerminating {
+		} else if pod.Status.Phase == v1.PodFailed || considerTerminated {
 			ix := getCompletionIndex(pod.Annotations)
 			if !uncounted.failed.Has(string(pod.UID)) && (!isIndexed || (ix != unknownCompletionIndex && ix < int(*job.Spec.Completions))) {
 				if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
@@ -1346,7 +1357,7 @@ func getFailJobMessage(job *batch.Job, pods []*v1.Pod, uncounted sets.String) *s
 		return nil
 	}
 	for _, p := range pods {
-		if isPodFailed(p, uncounted != nil) {
+		if isPodFailed(p, job, uncounted != nil) {
 			jobFailureMessage, _, _ := matchPodFailurePolicy(job.Spec.PodFailurePolicy, p)
 			if jobFailureMessage != nil {
 				return jobFailureMessage
@@ -1368,13 +1379,13 @@ func getStatus(job *batch.Job, pods []*v1.Pod, uncounted *uncountedTerminatedPod
 	}))
 	failed += int32(countValidPodsWithFilter(job, pods, uncounted.Failed(), expectedRmFinalizers, func(p *v1.Pod) bool {
 		if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
-			if !isPodFailed(p, uncounted != nil) {
+			if !isPodFailed(p, job, uncounted != nil) {
 				return false
 			}
 			_, countFailed, _ := matchPodFailurePolicy(job.Spec.PodFailurePolicy, p)
 			return countFailed
 		} else {
-			return isPodFailed(p, uncounted != nil)
+			return isPodFailed(p, job, uncounted != nil)
 		}
 	}))
 	return succeeded, failed
@@ -1724,7 +1735,15 @@ func ensureJobConditionStatus(list []batch.JobCondition, cType batch.JobConditio
 	return list, false
 }
 
-func isPodFailed(p *v1.Pod, wFinalizers bool) bool {
+func isPodFailed(p *v1.Pod, job *batch.Job, wFinalizers bool) bool {
+	if feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) && feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
+		// When PodDisruptionConditions is enabled, orphan Pods and unschedulable
+		// terminating Pods are marked as Failed. So we only need to check the phase.
+		// TODO(#113855): Stop limiting this behavior to Jobs with podFailurePolicy.
+		// For now, we do so to avoid affecting all running Jobs without the
+		// avaibility to opt-out into the old behavior.
+		return p.Status.Phase == v1.PodFailed
+	}
 	if p.Status.Phase == v1.PodFailed {
 		return true
 	}
