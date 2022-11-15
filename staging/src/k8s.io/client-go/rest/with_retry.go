@@ -154,6 +154,11 @@ func (r *withRetry) IsNextRetry(ctx context.Context, restReq *Request, httpReq *
 		return false
 	}
 
+	if restReq.body != nil {
+		// we have an opaque reader, we can't safely reset it
+		return false
+	}
+
 	r.attempts++
 	r.retryAfter = &RetryAfter{Attempt: r.attempts}
 	if r.attempts > r.maxRetries {
@@ -208,19 +213,7 @@ func (r *withRetry) Before(ctx context.Context, request *Request) error {
 		return nil
 	}
 
-	// At this point we've made atleast one attempt, post which the response
-	// body should have been fully read and closed in order for it to be safe
-	// to reset the request body before we reconnect, in order for us to reuse
-	// the same TCP connection.
-	if seeker, ok := request.body.(io.Seeker); ok && request.body != nil {
-		if _, err := seeker.Seek(0, io.SeekStart); err != nil {
-			err = fmt.Errorf("failed to reset the request body while retrying a request: %v", err)
-			r.trackPreviousError(err)
-			return err
-		}
-	}
-
-	// if we are here, we have made attempt(s) al least once before.
+	// if we are here, we have made attempt(s) at least once before.
 	if request.backoff != nil {
 		// TODO(tkashem) with default set to use exponential backoff
 		//  we can merge these two sleeps:
