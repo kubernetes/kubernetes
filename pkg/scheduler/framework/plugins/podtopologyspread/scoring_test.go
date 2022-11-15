@@ -84,7 +84,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 					{key: "zone", value: "zone2"}: pointer.Int64(0),
@@ -125,7 +125,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString("node-x"),
+				IgnoredNodes: sets.New("node-x"),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 				},
@@ -167,7 +167,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: v1.LabelTopologyZone, value: "mars"}: pointer.Int64(0),
 					{key: v1.LabelTopologyZone, value: ""}:     pointer.Int64(0),
@@ -218,7 +218,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "planet", value: "mars"}: pointer.Int64(0),
 				},
@@ -282,7 +282,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{"planet", "mars"}: pointer.Int64(0),
 				},
@@ -314,7 +314,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 					{key: "zone", value: "zone2"}: pointer.Int64(0),
@@ -348,7 +348,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 					{key: "zone", value: "zone2"}: pointer.Int64(0),
@@ -382,7 +382,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 					{key: "zone", value: "zone2"}: pointer.Int64(0),
@@ -416,7 +416,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 					{key: "zone", value: "zone2"}: pointer.Int64(0),
@@ -449,7 +449,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyHonor,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 					{key: "zone", value: "zone2"}: pointer.Int64(0),
@@ -482,7 +482,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 						NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore,
 					},
 				},
-				IgnoredNodes: sets.NewString(),
+				IgnoredNodes: sets.New[string](),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: "zone", value: "zone1"}: pointer.Int64(0),
 					{key: "zone", value: "zone2"}: pointer.Int64(0),

@@ -35,7 +35,7 @@ const mb int64 = 1024 * 1024
 func TestGetNodeImageStates(t *testing.T) {
 	tests := []struct {
 		node              *v1.Node
-		imageExistenceMap map[string]sets.String
+		imageExistenceMap map[string]sets.Set[string]
 		expected          map[string]*framework.ImageStateSummary
 	}{
 		{
@@ -58,9 +58,9 @@ func TestGetNodeImageStates(t *testing.T) {
 					},
 				},
 			},
-			imageExistenceMap: map[string]sets.String{
-				"gcr.io/10:v1":  sets.NewString("node-0", "node-1"),
-				"gcr.io/200:v1": sets.NewString("node-0"),
+			imageExistenceMap: map[string]sets.Set[string]{
+				"gcr.io/10:v1":  sets.New("node-0", "node-1"),
+				"gcr.io/200:v1": sets.New("node-0"),
 			},
 			expected: map[string]*framework.ImageStateSummary{
 				"gcr.io/10:v1": {
@@ -78,9 +78,9 @@ func TestGetNodeImageStates(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "node-0"},
 				Status:     v1.NodeStatus{},
 			},
-			imageExistenceMap: map[string]sets.String{
-				"gcr.io/10:v1":  sets.NewString("node-1"),
-				"gcr.io/200:v1": sets.NewString(),
+			imageExistenceMap: map[string]sets.Set[string]{
+				"gcr.io/10:v1":  sets.New("node-1"),
+				"gcr.io/200:v1": sets.New[string](),
 			},
 			expected: map[string]*framework.ImageStateSummary{},
 		},
@@ -99,7 +99,7 @@ func TestGetNodeImageStates(t *testing.T) {
 func TestCreateImageExistenceMap(t *testing.T) {
 	tests := []struct {
 		nodes    []*v1.Node
-		expected map[string]sets.String
+		expected map[string]sets.Set[string]
 	}{
 		{
 			nodes: []*v1.Node{
@@ -136,9 +136,9 @@ func TestCreateImageExistenceMap(t *testing.T) {
 					},
 				},
 			},
-			expected: map[string]sets.String{
-				"gcr.io/10:v1":  sets.NewString("node-0", "node-1"),
-				"gcr.io/200:v1": sets.NewString("node-1"),
+			expected: map[string]sets.Set[string]{
+				"gcr.io/10:v1":  sets.New("node-0", "node-1"),
+				"gcr.io/200:v1": sets.New("node-1"),
 			},
 		},
 		{
@@ -167,9 +167,9 @@ func TestCreateImageExistenceMap(t *testing.T) {
 					},
 				},
 			},
-			expected: map[string]sets.String{
-				"gcr.io/10:v1":  sets.NewString("node-1"),
-				"gcr.io/200:v1": sets.NewString("node-1"),
+			expected: map[string]sets.Set[string]{
+				"gcr.io/10:v1":  sets.New("node-1"),
+				"gcr.io/200:v1": sets.New("node-1"),
 			},
 		},
 	}
@@ -188,12 +188,12 @@ func TestCreateUsedPVCSet(t *testing.T) {
 	tests := []struct {
 		name     string
 		pods     []*v1.Pod
-		expected sets.String
+		expected sets.Set[string]
 	}{
 		{
 			name:     "empty pods list",
 			pods:     []*v1.Pod{},
-			expected: sets.NewString(),
+			expected: sets.New[string](),
 		},
 		{
 			name: "pods not scheduled",
@@ -201,7 +201,7 @@ func TestCreateUsedPVCSet(t *testing.T) {
 				st.MakePod().Name("foo").Namespace("foo").Obj(),
 				st.MakePod().Name("bar").Namespace("bar").Obj(),
 			},
-			expected: sets.NewString(),
+			expected: sets.New[string](),
 		},
 		{
 			name: "scheduled pods that do not use any PVC",
@@ -209,7 +209,7 @@ func TestCreateUsedPVCSet(t *testing.T) {
 				st.MakePod().Name("foo").Namespace("foo").Node("node-1").Obj(),
 				st.MakePod().Name("bar").Namespace("bar").Node("node-2").Obj(),
 			},
-			expected: sets.NewString(),
+			expected: sets.New[string](),
 		},
 		{
 			name: "scheduled pods that use PVC",
@@ -217,7 +217,7 @@ func TestCreateUsedPVCSet(t *testing.T) {
 				st.MakePod().Name("foo").Namespace("foo").Node("node-1").PVC("pvc1").Obj(),
 				st.MakePod().Name("bar").Namespace("bar").Node("node-2").PVC("pvc2").Obj(),
 			},
-			expected: sets.NewString("foo/pvc1", "bar/pvc2"),
+			expected: sets.New("foo/pvc1", "bar/pvc2"),
 		},
 	}
 

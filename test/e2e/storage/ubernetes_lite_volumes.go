@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -83,7 +84,8 @@ func PodsUseStaticPVsOrFail(ctx context.Context, f *framework.Framework, podCoun
 
 	zones, err := e2enode.GetSchedulableClusterZones(ctx, c)
 	framework.ExpectNoError(err)
-	zonelist := zones.List()
+	zonelist := sets.List(zones)
+
 	ginkgo.By("Creating static PVs across zones")
 	configs := make([]*staticPVTestConfig, podCount)
 	for i := range configs {

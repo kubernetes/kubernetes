@@ -103,7 +103,7 @@ func haveOverlap(a1, a2 []string) bool {
 	if len(a1) > len(a2) {
 		a1, a2 = a2, a1
 	}
-	m := make(sets.String)
+	m := make(sets.Set[string])
 
 	for _, val := range a1 {
 		m.Insert(val)

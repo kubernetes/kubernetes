@@ -284,7 +284,7 @@ func New(client clientset.Interface,
 	// The nominator will be passed all the way to framework instantiation.
 	nominator := internalqueue.NewPodNominator(podLister)
 	snapshot := internalcache.NewEmptySnapshot()
-	clusterEventMap := make(map[framework.ClusterEvent]sets.String)
+	clusterEventMap := make(map[framework.ClusterEvent]sets.Set[string])
 
 	profiles, err := profile.NewMap(options.profiles, registry, recorderFactory, stopCh,
 		frameworkruntime.WithComponentConfigVersion(options.componentConfigVersion),
@@ -429,7 +429,7 @@ func buildExtenders(extenders []schedulerapi.Extender, profiles []schedulerapi.K
 
 type FailureHandlerFn func(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, status *framework.Status, nominatingInfo *framework.NominatingInfo, start time.Time)
 
-func unionedGVKs(m map[framework.ClusterEvent]sets.String) map[framework.GVK]framework.ActionType {
+func unionedGVKs(m map[framework.ClusterEvent]sets.Set[string]) map[framework.GVK]framework.ActionType {
 	gvkMap := make(map[framework.GVK]framework.ActionType)
 	for evt := range m {
 		if _, ok := gvkMap[evt.Resource]; ok {

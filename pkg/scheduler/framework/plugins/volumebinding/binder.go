@@ -1113,13 +1113,13 @@ func isPluginMigratedToCSIOnNode(pluginName string, csiNode *storagev1.CSINode) 
 		return false
 	}
 
-	var mpaSet sets.String
+	var mpaSet sets.Set[string]
 	mpa := csiNodeAnn[v1.MigratedPluginsAnnotationKey]
 	if len(mpa) == 0 {
-		mpaSet = sets.NewString()
+		mpaSet = sets.New[string]()
 	} else {
 		tok := strings.Split(mpa, ",")
-		mpaSet = sets.NewString(tok...)
+		mpaSet = sets.New(tok...)
 	}
 
 	return mpaSet.Has(pluginName)

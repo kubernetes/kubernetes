@@ -174,9 +174,9 @@ type PriorityQueue struct {
 	// when we received move request.
 	moveRequestCycle int64
 
-	clusterEventMap map[framework.ClusterEvent]sets.String
 	// preEnqueuePluginMap is keyed with profile name, valued with registered preEnqueue plugins.
 	preEnqueuePluginMap map[string][]framework.PreEnqueuePlugin
+	clusterEventMap     map[framework.ClusterEvent]sets.Set[string]
 
 	// closed indicates that the queue is closed.
 	// It is mainly used to let Pop() exit its control loop while waiting for an item.
@@ -191,8 +191,8 @@ type priorityQueueOptions struct {
 	podMaxBackoffDuration             time.Duration
 	podMaxInUnschedulablePodsDuration time.Duration
 	podNominator                      framework.PodNominator
-	clusterEventMap                   map[framework.ClusterEvent]sets.String
 	preEnqueuePluginMap               map[string][]framework.PreEnqueuePlugin
+	clusterEventMap                   map[framework.ClusterEvent]sets.Set[string]
 }
 
 // Option configures a PriorityQueue
@@ -227,7 +227,7 @@ func WithPodNominator(pn framework.PodNominator) Option {
 }
 
 // WithClusterEventMap sets clusterEventMap for PriorityQueue.
-func WithClusterEventMap(m map[framework.ClusterEvent]sets.String) Option {
+func WithClusterEventMap(m map[framework.ClusterEvent]sets.Set[string]) Option {
 	return func(o *priorityQueueOptions) {
 		o.clusterEventMap = m
 	}
@@ -263,7 +263,7 @@ func newQueuedPodInfoForLookup(pod *v1.Pod, plugins ...string) *framework.Queued
 	// and so we avoid creating a full PodInfo, which is expensive to instantiate frequently.
 	return &framework.QueuedPodInfo{
 		PodInfo:              &framework.PodInfo{Pod: pod},
-		UnschedulablePlugins: sets.NewString(plugins...),
+		UnschedulablePlugins: sets.New(plugins...),
 	}
 }
 
@@ -839,7 +839,7 @@ func (p *PriorityQueue) newQueuedPodInfo(pod *v1.Pod, plugins ...string) *framew
 		PodInfo:                 podInfo,
 		Timestamp:               now,
 		InitialAttemptTimestamp: now,
-		UnschedulablePlugins:    sets.NewString(plugins...),
+		UnschedulablePlugins:    sets.New[string](plugins...),
 	}
 }
 
@@ -1098,7 +1098,7 @@ func (p *PriorityQueue) podMatchesEvent(podInfo *framework.QueuedPodInfo, cluste
 	return false
 }
 
-func intersect(x, y sets.String) bool {
+func intersect(x, y sets.Set[string]) bool {
 	if len(x) > len(y) {
 		x, y = y, x
 	}

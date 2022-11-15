@@ -46,7 +46,7 @@ var _ = SIGDescribe("Multi-AZ Clusters", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	var zoneCount int
 	var err error
-	var zoneNames sets.String
+	zoneNames := sets.New[string]()
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		cs := f.ClientSet
 
@@ -79,7 +79,7 @@ var _ = SIGDescribe("Multi-AZ Clusters", func() {
 
 // SpreadServiceOrFail check that the pods comprising a service
 // get spread evenly across available zones
-func SpreadServiceOrFail(ctx context.Context, f *framework.Framework, replicaCount int, zoneNames sets.String, image string) {
+func SpreadServiceOrFail(ctx context.Context, f *framework.Framework, replicaCount int, zoneNames sets.Set[string], image string) {
 	// First create the service
 	serviceName := "test-service"
 	serviceSpec := &v1.Service{
@@ -126,9 +126,8 @@ func SpreadServiceOrFail(ctx context.Context, f *framework.Framework, replicaCou
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"service": serviceName}))
 	pods, err := e2epod.WaitForPodsWithLabelScheduled(ctx, f.ClientSet, f.Namespace.Name, selector)
 	framework.ExpectNoError(err)
-
 	// Now make sure they're spread across zones
-	checkZoneSpreading(ctx, f.ClientSet, pods, zoneNames.List())
+	checkZoneSpreading(ctx, f.ClientSet, pods, sets.List(zoneNames))
 }
 
 // Find the name of the zone in which a Node is running
@@ -182,7 +181,7 @@ func checkZoneSpreading(ctx context.Context, c clientset.Interface, pods *v1.Pod
 
 // SpreadRCOrFail Check that the pods comprising a replication
 // controller get spread evenly across available zones
-func SpreadRCOrFail(ctx context.Context, f *framework.Framework, replicaCount int32, zoneNames sets.String, image string, args []string) {
+func SpreadRCOrFail(ctx context.Context, f *framework.Framework, replicaCount int32, zoneNames sets.Set[string], image string, args []string) {
 	name := "ubelite-spread-rc-" + string(uuid.NewUUID())
 	ginkgo.By(fmt.Sprintf("Creating replication controller %s", name))
 	controller, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(ctx, &v1.ReplicationController{
@@ -230,6 +229,7 @@ func SpreadRCOrFail(ctx context.Context, f *framework.Framework, replicaCount in
 	pods, err := e2epod.WaitForPodsWithLabelScheduled(ctx, f.ClientSet, f.Namespace.Name, selector)
 	framework.ExpectNoError(err)
 
+	zones := sets.List(zoneNames)
 	// Now make sure they're spread across zones
-	checkZoneSpreading(ctx, f.ClientSet, pods, zoneNames.List())
+	checkZoneSpreading(ctx, f.ClientSet, pods, zones)
 }

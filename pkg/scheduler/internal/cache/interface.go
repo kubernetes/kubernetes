@@ -117,6 +117,6 @@ type Cache interface {
 
 // Dump is a dump of the cache state.
 type Dump struct {
-	AssumedPods sets.String
+	AssumedPods sets.Set[string]
 	Nodes       map[string]*framework.NodeInfo
 }

@@ -103,7 +103,7 @@ type QueuedPodInfo struct {
 	// latency for a pod.
 	InitialAttemptTimestamp time.Time
 	// If a Pod failed in a scheduling cycle, record the plugin names it failed by.
-	UnschedulablePlugins sets.String
+	UnschedulablePlugins sets.Set[string]
 	// Whether the Pod is scheduling gated (by PreEnqueuePlugins) or not.
 	Gated bool
 }
@@ -192,7 +192,7 @@ func (pi *PodInfo) Update(pod *v1.Pod) error {
 
 // AffinityTerm is a processed version of v1.PodAffinityTerm.
 type AffinityTerm struct {
-	Namespaces        sets.String
+	Namespaces        sets.Set[string]
 	Selector          labels.Selector
 	TopologyKey       string
 	NamespaceSelector labels.Selector
@@ -215,7 +215,7 @@ type WeightedAffinityTerm struct {
 // Diagnosis records the details to diagnose a scheduling failure.
 type Diagnosis struct {
 	NodeToStatusMap      NodeToStatusMap
-	UnschedulablePlugins sets.String
+	UnschedulablePlugins sets.Set[string]
 	// PreFilterMsg records the messages returned from PreFilter plugins.
 	PreFilterMsg string
 	// PostFilterMsg records the messages returned from PostFilter plugins.
@@ -359,8 +359,8 @@ func getPodAntiAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm)
 
 // returns a set of names according to the namespaces indicated in podAffinityTerm.
 // If namespaces is empty it considers the given pod's namespace.
-func getNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm *v1.PodAffinityTerm) sets.String {
-	names := sets.String{}
+func getNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm *v1.PodAffinityTerm) sets.Set[string] {
+	names := sets.Set[string]{}
 	if len(podAffinityTerm.Namespaces) == 0 && podAffinityTerm.NamespaceSelector == nil {
 		names.Insert(pod.Namespace)
 	} else {
