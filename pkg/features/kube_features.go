@@ -315,13 +315,6 @@ const (
 	// Lock to default and remove after v1.22 based on user feedback that should be reflected in KEP #1972 update
 	ExecProbeTimeout featuregate.Feature = "ExecProbeTimeout"
 
-	// owner: @gnufied
-	// alpha: v1.14
-	// beta: v1.16
-	// GA: 1.24
-	// Ability to expand CSI volumes
-	ExpandCSIVolumes featuregate.Feature = "ExpandCSIVolumes"
-
 	// owner: @mlmhl @gnufied
 	// beta: v1.15
 	// GA: 1.24
@@ -994,8 +987,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	EventedPLEG: {Default: false, PreRelease: featuregate.Alpha},
 
 	ExecProbeTimeout: {Default: true, PreRelease: featuregate.GA}, // lock to default and remove after v1.22 based on KEP #1972 update
-
-	ExpandCSIVolumes: {Default: true, PreRelease: featuregate.GA}, // remove in 1.26
 
 	ExpandInUsePersistentVolumes: {Default: true, PreRelease: featuregate.GA}, // remove in 1.26
 
