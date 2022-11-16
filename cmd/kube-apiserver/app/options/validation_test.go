@@ -113,6 +113,11 @@ func TestClusterServiceIPRange(t *testing.T) {
 			expectErrors: false,
 			options:      makeOptionsWithCIDRs("10.0.0.0/16", "3000::/108"),
 		},
+		{
+			name:         "valid v6-v4 dual stack",
+			expectErrors: false,
+			options:      makeOptionsWithCIDRs("3000::/108", "10.0.0.0/16"),
+		},
 	}
 
 	for _, tc := range testCases {
