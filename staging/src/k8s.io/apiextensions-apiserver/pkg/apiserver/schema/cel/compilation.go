@@ -72,9 +72,10 @@ type CompilationResult struct {
 // Compile compiles all the XValidations rules (without recursing into the schema) and returns a slice containing a
 // CompilationResult for each ValidationRule, or an error.
 // Each CompilationResult may contain:
-/// - non-nil Program, nil Error: The program was compiled successfully
-//  - nil Program, non-nil Error: Compilation resulted in an error
-//  - nil Program, nil Error: The provided rule was empty so compilation was not attempted
+// / - non-nil Program, nil Error: The program was compiled successfully
+//   - nil Program, non-nil Error: Compilation resulted in an error
+//   - nil Program, nil Error: The provided rule was empty so compilation was not attempted
+//
 // perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit as input.
 func Compile(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) ([]CompilationResult, error) {
 	if len(s.Extensions.XValidations) == 0 {

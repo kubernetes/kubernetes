@@ -123,26 +123,26 @@ type InTreeToCSITranslator interface {
 // also considered along with the pod's other scheduling requirements.
 //
 // This integrates into the existing scheduler workflow as follows:
-// 1. The scheduler takes a Pod off the scheduler queue and processes it serially:
-//    a. Invokes all pre-filter plugins for the pod. GetPodVolumes() is invoked
-//    here, pod volume information will be saved in current scheduling cycle state for later use.
-//    b. Invokes all filter plugins, parallelized across nodes.  FindPodVolumes() is invoked here.
-//    c. Invokes all score plugins.  Future/TBD
-//    d. Selects the best node for the Pod.
-//    e. Invokes all reserve plugins. AssumePodVolumes() is invoked here.
-//       i.  If PVC binding is required, cache in-memory only:
-//           * For manual binding: update PV objects for prebinding to the corresponding PVCs.
-//           * For dynamic provisioning: update PVC object with a selected node from c)
-//           * For the pod, which PVCs and PVs need API updates.
-//       ii. Afterwards, the main scheduler caches the Pod->Node binding in the scheduler's pod cache,
-//           This is handled in the scheduler and not here.
-//    f. Asynchronously bind volumes and pod in a separate goroutine
-//        i.  BindPodVolumes() is called first in PreBind phase. It makes all the necessary API updates and waits for
-//            PV controller to fully bind and provision the PVCs. If binding fails, the Pod is sent
-//            back through the scheduler.
-//        ii. After BindPodVolumes() is complete, then the scheduler does the final Pod->Node binding.
-// 2. Once all the assume operations are done in e), the scheduler processes the next Pod in the scheduler queue
-//    while the actual binding operation occurs in the background.
+//  1. The scheduler takes a Pod off the scheduler queue and processes it serially:
+//     a. Invokes all pre-filter plugins for the pod. GetPodVolumes() is invoked
+//     here, pod volume information will be saved in current scheduling cycle state for later use.
+//     b. Invokes all filter plugins, parallelized across nodes.  FindPodVolumes() is invoked here.
+//     c. Invokes all score plugins.  Future/TBD
+//     d. Selects the best node for the Pod.
+//     e. Invokes all reserve plugins. AssumePodVolumes() is invoked here.
+//     i.  If PVC binding is required, cache in-memory only:
+//     * For manual binding: update PV objects for prebinding to the corresponding PVCs.
+//     * For dynamic provisioning: update PVC object with a selected node from c)
+//     * For the pod, which PVCs and PVs need API updates.
+//     ii. Afterwards, the main scheduler caches the Pod->Node binding in the scheduler's pod cache,
+//     This is handled in the scheduler and not here.
+//     f. Asynchronously bind volumes and pod in a separate goroutine
+//     i.  BindPodVolumes() is called first in PreBind phase. It makes all the necessary API updates and waits for
+//     PV controller to fully bind and provision the PVCs. If binding fails, the Pod is sent
+//     back through the scheduler.
+//     ii. After BindPodVolumes() is complete, then the scheduler does the final Pod->Node binding.
+//  2. Once all the assume operations are done in e), the scheduler processes the next Pod in the scheduler queue
+//     while the actual binding operation occurs in the background.
 type SchedulerVolumeBinder interface {
 	// GetPodVolumes returns a pod's PVCs separated into bound, unbound with delayed binding (including provisioning)
 	// and unbound with immediate binding (including prebound)

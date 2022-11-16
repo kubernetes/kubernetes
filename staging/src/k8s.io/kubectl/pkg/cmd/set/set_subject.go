@@ -293,7 +293,7 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 	return utilerrors.NewAggregate(allErrs)
 }
 
-//Note: the obj mutates in the function
+// Note: the obj mutates in the function
 func updateSubjectForObject(obj runtime.Object, subjects []rbacv1.Subject, fn updateSubjects) (bool, error) {
 	switch t := obj.(type) {
 	case *rbacv1.RoleBinding:

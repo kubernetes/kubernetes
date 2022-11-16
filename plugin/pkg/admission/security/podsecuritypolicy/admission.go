@@ -105,9 +105,9 @@ func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactor
 // Admit determines if the pod should be admitted based on the requested security context
 // and the available PSPs.
 //
-// 1.  Find available PSPs.
-// 2.  Create the providers, includes setting pre-allocated values if necessary.
-// 3.  Try to generate and validate a PSP with providers.  If we find one then admit the pod
+//  1. Find available PSPs.
+//  2. Create the providers, includes setting pre-allocated values if necessary.
+//  3. Try to generate and validate a PSP with providers.  If we find one then admit the pod
 //     with the validated PSP.  If we don't find any reject the pod and give all errors from the
 //     failed attempts.
 func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {

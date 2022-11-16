@@ -47,8 +47,8 @@ type probeConnectivityArgs struct {
 
 // kubeManager provides a convenience interface to kube functionality that we leverage for polling NetworkPolicy connections.
 // Its responsibilities are:
-//  - creating resources (pods, deployments, namespaces, services, network policies)
-//  - modifying and cleaning up resources
+//   - creating resources (pods, deployments, namespaces, services, network policies)
+//   - modifying and cleaning up resources
 type kubeManager struct {
 	framework *framework.Framework
 	clientSet clientset.Interface

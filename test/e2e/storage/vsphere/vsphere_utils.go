@@ -477,7 +477,7 @@ func getPathFromVMDiskPath(vmDiskPath string) string {
 	return datastorePathObj.Path
 }
 
-//getDatastorePathObjFromVMDiskPath gets the datastorePathObj from VM disk path.
+// getDatastorePathObjFromVMDiskPath gets the datastorePathObj from VM disk path.
 func getDatastorePathObjFromVMDiskPath(vmDiskPath string) (*object.DatastorePath, error) {
 	datastorePathObj := new(object.DatastorePath)
 	isSuccess := datastorePathObj.FromString(vmDiskPath)
@@ -513,7 +513,7 @@ func formatVirtualDiskUUID(uuid string) string {
 	return strings.ToLower(uuidWithNoHypens)
 }
 
-//isValidUUID checks if the string is a valid UUID.
+// isValidUUID checks if the string is a valid UUID.
 func isValidUUID(uuid string) bool {
 	r := regexp.MustCompile("^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
 	return r.MatchString(uuid)

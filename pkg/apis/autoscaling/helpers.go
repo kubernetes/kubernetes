@@ -21,16 +21,16 @@ package autoscaling
 // It should always be called when converting internal -> external versions, prior
 // to setting any of the custom annotations:
 //
-//     annotations, copiedAnnotations := DropRoundTripHorizontalPodAutoscalerAnnotations(externalObj.Annotations)
-//     externalObj.Annotations = annotations
+//	annotations, copiedAnnotations := DropRoundTripHorizontalPodAutoscalerAnnotations(externalObj.Annotations)
+//	externalObj.Annotations = annotations
 //
-//     if internal.SomeField != nil {
-//       if !copiedAnnotations {
-//         externalObj.Annotations = DeepCopyStringMap(externalObj.Annotations)
-//         copiedAnnotations = true
-//       }
-//       externalObj.Annotations[...] = json.Marshal(...)
-//     }
+//	if internal.SomeField != nil {
+//	  if !copiedAnnotations {
+//	    externalObj.Annotations = DeepCopyStringMap(externalObj.Annotations)
+//	    copiedAnnotations = true
+//	  }
+//	  externalObj.Annotations[...] = json.Marshal(...)
+//	}
 func DropRoundTripHorizontalPodAutoscalerAnnotations(in map[string]string) (out map[string]string, copied bool) {
 	_, hasMetricsSpecs := in[MetricSpecsAnnotation]
 	_, hasBehaviorSpecs := in[BehaviorSpecsAnnotation]

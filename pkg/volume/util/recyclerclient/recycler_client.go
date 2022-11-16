@@ -43,9 +43,9 @@ type RecycleEventRecorder func(eventtype, message string)
 // function deletes it as it is not able to judge if it is an old recycler
 // or user has forged a fake recycler to block Kubernetes from recycling.//
 //
-//  pod - the pod designed by a volume plugin to recycle the volume. pod.Name
-//        will be overwritten with unique name based on PV.Name.
-//	client - kube client for API operations.
+//	 pod - the pod designed by a volume plugin to recycle the volume. pod.Name
+//	       will be overwritten with unique name based on PV.Name.
+//		client - kube client for API operations.
 func RecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Pod, kubeClient clientset.Interface, recorder RecycleEventRecorder) error {
 	return internalRecycleVolumeByWatchingPodUntilCompletion(pvName, pod, newRecyclerClient(kubeClient, recorder))
 }

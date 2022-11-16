@@ -1029,7 +1029,7 @@ func TestMaxUnavailable(t *testing.T) {
 	}
 }
 
-//Set of simple tests for annotation related util functions
+// Set of simple tests for annotation related util functions
 func TestAnnotationUtils(t *testing.T) {
 
 	//Setup

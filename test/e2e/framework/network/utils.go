@@ -282,18 +282,19 @@ func makeCURLDialCommand(ipPort, dialCmd, protocol, targetIP string, targetPort 
 // DialFromContainer executes a curl via kubectl exec in a test container,
 // which might then translate to a tcp or udp request based on the protocol
 // argument in the url.
-// - minTries is the minimum number of curl attempts required before declaring
-//   success. Set to 0 if you'd like to return as soon as all endpoints respond
-//   at least once.
-// - maxTries is the maximum number of curl attempts. If this many attempts pass
-//   and we don't see all expected endpoints, the test fails.
-// - targetIP is the source Pod IP that will dial the given dialCommand using the given protocol.
-// - dialCommand is the command that the targetIP will send to the targetIP using the given protocol.
-//   the dialCommand should be formatted properly for the protocol (http: URL path+parameters,
-//   udp: command%20parameters, where parameters are optional)
-// - expectedResponses is the unordered set of responses to wait for. The responses are based on
-//   the dialCommand; for example, for the dialCommand "hostname", the expectedResponses
-//   should contain the hostnames reported by each pod in the service through /hostName.
+//   - minTries is the minimum number of curl attempts required before declaring
+//     success. Set to 0 if you'd like to return as soon as all endpoints respond
+//     at least once.
+//   - maxTries is the maximum number of curl attempts. If this many attempts pass
+//     and we don't see all expected endpoints, the test fails.
+//   - targetIP is the source Pod IP that will dial the given dialCommand using the given protocol.
+//   - dialCommand is the command that the targetIP will send to the targetIP using the given protocol.
+//     the dialCommand should be formatted properly for the protocol (http: URL path+parameters,
+//     udp: command%20parameters, where parameters are optional)
+//   - expectedResponses is the unordered set of responses to wait for. The responses are based on
+//     the dialCommand; for example, for the dialCommand "hostname", the expectedResponses
+//     should contain the hostnames reported by each pod in the service through /hostName.
+//
 // maxTries == minTries will confirm that we see the expected endpoints and no
 // more for maxTries. Use this if you want to eg: fail a readiness check on a
 // pod and confirm it doesn't show up as an endpoint.
@@ -346,8 +347,8 @@ func (config *NetworkingTestConfig) GetEndpointsFromTestContainer(protocol, targ
 // GetEndpointsFromContainer executes a curl via kubectl exec in a test container,
 // which might then translate to a tcp or udp request based on the protocol argument
 // in the url. It returns all different endpoints from multiple retries.
-// - tries is the number of curl attempts. If this many attempts pass and
-//   we don't see any endpoints, the test fails.
+//   - tries is the number of curl attempts. If this many attempts pass and
+//     we don't see any endpoints, the test fails.
 func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containerIP, targetIP string, containerHTTPPort, targetPort, tries int) (sets.String, error) {
 	ipPort := net.JoinHostPort(containerIP, strconv.Itoa(containerHTTPPort))
 	cmd := makeCURLDialCommand(ipPort, "hostName", protocol, targetIP, targetPort)
@@ -431,17 +432,17 @@ func (config *NetworkingTestConfig) GetHTTPCodeFromTestContainer(path, targetIP 
 
 // DialFromNode executes a tcp/udp curl/nc request based on protocol via kubectl exec
 // in a test container running with host networking.
-// - minTries is the minimum number of curl/nc attempts required before declaring
-//   success. If 0, then we return as soon as all endpoints succeed.
-// - There is no logical change to test results if faillures happen AFTER endpoints have succeeded,
-//   hence over-padding minTries will NOT reverse a successful result and is thus not very useful yet
-//   (See the TODO about checking probability, which isnt implemented yet).
-// - maxTries is the maximum number of curl/echo attempts before an error is returned.  The
-//   smaller this number is, the less 'slack' there is for declaring success.
-// - if maxTries < expectedEps, this test is guaranteed to return an error, because all endpoints won't be hit.
-// - maxTries == minTries will return as soon as all endpoints succeed (or fail once maxTries is reached without
-//   success on all endpoints).
-//   In general its prudent to have a high enough level of minTries to guarantee that all pods get a fair chance at receiving traffic.
+//   - minTries is the minimum number of curl/nc attempts required before declaring
+//     success. If 0, then we return as soon as all endpoints succeed.
+//   - There is no logical change to test results if faillures happen AFTER endpoints have succeeded,
+//     hence over-padding minTries will NOT reverse a successful result and is thus not very useful yet
+//     (See the TODO about checking probability, which isnt implemented yet).
+//   - maxTries is the maximum number of curl/echo attempts before an error is returned.  The
+//     smaller this number is, the less 'slack' there is for declaring success.
+//   - if maxTries < expectedEps, this test is guaranteed to return an error, because all endpoints won't be hit.
+//   - maxTries == minTries will return as soon as all endpoints succeed (or fail once maxTries is reached without
+//     success on all endpoints).
+//     In general its prudent to have a high enough level of minTries to guarantee that all pods get a fair chance at receiving traffic.
 func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) error {
 	var cmd string
 	if protocol == "udp" {
@@ -1112,13 +1113,13 @@ func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1
 // slow down the test and cause it to fail if DNS is absent or broken.
 //
 // Suggested usage pattern:
-// func foo() {
-//	...
-//	defer UnblockNetwork(from, to)
-//	BlockNetwork(from, to)
-//	...
-// }
 //
+//	func foo() {
+//		...
+//		defer UnblockNetwork(from, to)
+//		BlockNetwork(from, to)
+//		...
+//	}
 func BlockNetwork(from string, to string) {
 	framework.Logf("block network traffic from %s to %s", from, to)
 	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)

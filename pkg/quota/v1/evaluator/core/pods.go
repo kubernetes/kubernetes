@@ -330,8 +330,8 @@ func podMatchesScopeFunc(selector corev1.ScopedResourceSelectorRequirement, obje
 
 // PodUsageFunc returns the quota usage for a pod.
 // A pod is charged for quota if the following are not true.
-//  - pod has a terminal phase (failed or succeeded)
-//  - pod has been marked for deletion and grace period has expired
+//   - pod has a terminal phase (failed or succeeded)
+//   - pod has been marked for deletion and grace period has expired
 func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, error) {
 	pod, err := toExternalPodOrError(obj)
 	if err != nil {

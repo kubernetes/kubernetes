@@ -439,7 +439,7 @@ func CheckTestingNSDeletedExcept(c clientset.Interface, skip string) error {
 	return fmt.Errorf("Waiting for terminating namespaces to be deleted timed out")
 }
 
-//WaitForServiceEndpointsNum waits until the amount of endpoints that implement service to expectNum.
+// WaitForServiceEndpointsNum waits until the amount of endpoints that implement service to expectNum.
 func WaitForServiceEndpointsNum(c clientset.Interface, namespace, serviceName string, expectNum int, interval, timeout time.Duration) error {
 	return wait.Poll(interval, timeout, func() (bool, error) {
 		Logf("Waiting for amount of service:%s endpoints to be %d", serviceName, expectNum)
@@ -1372,18 +1372,22 @@ func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 
 // WatchEventSequenceVerifier ...
 // manages a watch for a given resource, ensures that events take place in a given order, retries the test on failure
-//   testContext         cancelation signal across API boundries, e.g: context.TODO()
-//   dc                  sets up a client to the API
-//   resourceType        specify the type of resource
-//   namespace           select a namespace
-//   resourceName        the name of the given resource
-//   listOptions         options used to find the resource, recommended to use listOptions.labelSelector
-//   expectedWatchEvents array of events which are expected to occur
-//   scenario            the test itself
-//   retryCleanup        a function to run which ensures that there are no dangling resources upon test failure
+//
+//	testContext         cancelation signal across API boundries, e.g: context.TODO()
+//	dc                  sets up a client to the API
+//	resourceType        specify the type of resource
+//	namespace           select a namespace
+//	resourceName        the name of the given resource
+//	listOptions         options used to find the resource, recommended to use listOptions.labelSelector
+//	expectedWatchEvents array of events which are expected to occur
+//	scenario            the test itself
+//	retryCleanup        a function to run which ensures that there are no dangling resources upon test failure
+//
 // this tooling relies on the test to return the events as they occur
 // the entire scenario must be run to ensure that the desired watch events arrive in order (allowing for interweaving of watch events)
-//   if an expected watch event is missing we elect to clean up and run the entire scenario again
+//
+//	if an expected watch event is missing we elect to clean up and run the entire scenario again
+//
 // we try the scenario three times to allow the sequencing to fail a couple of times
 func WatchEventSequenceVerifier(ctx context.Context, dc dynamic.Interface, resourceType schema.GroupVersionResource, namespace string, resourceName string, listOptions metav1.ListOptions, expectedWatchEvents []watch.Event, scenario func(*watchtools.RetryWatcher) []watch.Event, retryCleanup func() error) {
 	listWatcher := &cache.ListWatch{

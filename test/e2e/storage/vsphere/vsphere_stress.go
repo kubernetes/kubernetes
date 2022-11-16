@@ -37,14 +37,14 @@ import (
 )
 
 /*
-	Induce stress to create volumes in parallel with multiple threads based on user configurable values for number of threads and iterations per thread.
-	The following actions will be performed as part of this test.
+Induce stress to create volumes in parallel with multiple threads based on user configurable values for number of threads and iterations per thread.
+The following actions will be performed as part of this test.
 
-	1. Create Storage Classes of 4 Categories (Default, SC with Non Default Datastore, SC with SPBM Policy, SC with VSAN Storage Capabilities.)
-	2. READ VCP_STRESS_INSTANCES, VCP_STRESS_ITERATIONS, VSPHERE_SPBM_POLICY_NAME and VSPHERE_DATASTORE from System Environment.
-	3. Launch goroutine for volume lifecycle operations.
-	4. Each instance of routine iterates for n times, where n is read from system env - VCP_STRESS_ITERATIONS
-	5. Each iteration creates 1 PVC, 1 POD using the provisioned PV, Verify disk is attached to the node, Verify pod can access the volume, delete the pod and finally delete the PVC.
+1. Create Storage Classes of 4 Categories (Default, SC with Non Default Datastore, SC with SPBM Policy, SC with VSAN Storage Capabilities.)
+2. READ VCP_STRESS_INSTANCES, VCP_STRESS_ITERATIONS, VSPHERE_SPBM_POLICY_NAME and VSPHERE_DATASTORE from System Environment.
+3. Launch goroutine for volume lifecycle operations.
+4. Each instance of routine iterates for n times, where n is read from system env - VCP_STRESS_ITERATIONS
+5. Each iteration creates 1 PVC, 1 POD using the provisioned PV, Verify disk is attached to the node, Verify pod can access the volume, delete the pod and finally delete the PVC.
 */
 var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("vcp-stress")

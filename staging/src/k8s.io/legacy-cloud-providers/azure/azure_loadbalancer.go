@@ -2144,7 +2144,7 @@ func shouldReleaseExistingOwnedPublicIP(existingPip *network.PublicIPAddress, lb
 		(ipTagRequest.IPTagsRequestedByAnnotation && !areIPTagsEquivalent(currentIPTags, ipTagRequest.IPTags))
 }
 
-//  ensurePIPTagged ensures the public IP of the service is tagged as configured
+// ensurePIPTagged ensures the public IP of the service is tagged as configured
 func (az *Cloud) ensurePIPTagged(service *v1.Service, pip *network.PublicIPAddress) bool {
 	configTags := parseTags(az.Tags)
 	annotationTags := make(map[string]*string)

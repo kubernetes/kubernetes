@@ -5000,7 +5000,7 @@ func (d *Describers) DescribeObject(exact interface{}, extra ...interface{}) (st
 // Add adds one or more describer functions to the Describer. The passed function must
 // match the signature:
 //
-//     func(...) (string, error)
+//	func(...) (string, error)
 //
 // Any number of arguments may be provided.
 func (d *Describers) Add(fns ...interface{}) error {

@@ -88,10 +88,10 @@ func (kl *Kubelet) initNetworkUtil() {
 
 // syncNetworkUtil ensures the network utility are present on host.
 // Network util includes:
-// 1. 	In nat table, KUBE-MARK-DROP rule to mark connections for dropping
-// 	Marked connection will be drop on INPUT/OUTPUT Chain in filter table
-// 2. 	In nat table, KUBE-MARK-MASQ rule to mark connections for SNAT
-// 	Marked connection will get SNAT on POSTROUTING Chain in nat table
+//  1. In nat table, KUBE-MARK-DROP rule to mark connections for dropping
+//     Marked connection will be drop on INPUT/OUTPUT Chain in filter table
+//  2. In nat table, KUBE-MARK-MASQ rule to mark connections for SNAT
+//     Marked connection will get SNAT on POSTROUTING Chain in nat table
 func (kl *Kubelet) syncNetworkUtil(iptClient utiliptables.Interface) bool {
 	// Setup KUBE-MARK-DROP rules
 	dropMark := getIPTablesMark(kl.iptablesDropBit)

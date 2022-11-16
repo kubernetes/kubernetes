@@ -92,10 +92,11 @@ type attachDetachStateCollector struct {
 }
 
 // volumeCount is a map of maps used as a counter, e.g.:
-//     node 172.168.1.100.ec2.internal has 10 EBS and 3 glusterfs PVC in use:
-//     {"172.168.1.100.ec2.internal": {"aws-ebs": 10, "glusterfs": 3}}
-//     state actual_state_of_world contains a total of 10 EBS volumes:
-//     {"actual_state_of_world": {"aws-ebs": 10}}
+//
+//	node 172.168.1.100.ec2.internal has 10 EBS and 3 glusterfs PVC in use:
+//	{"172.168.1.100.ec2.internal": {"aws-ebs": 10, "glusterfs": 3}}
+//	state actual_state_of_world contains a total of 10 EBS volumes:
+//	{"actual_state_of_world": {"aws-ebs": 10}}
 type volumeCount map[string]map[string]int64
 
 func (v volumeCount) add(typeKey, counterKey string) {

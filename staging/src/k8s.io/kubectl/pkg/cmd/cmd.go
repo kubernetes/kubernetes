@@ -444,16 +444,18 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 }
 
 // addCmdHeaderHooks performs updates on two hooks:
-//   1) Modifies the passed "cmds" persistent pre-run function to parse command headers.
-//      These headers will be subsequently added as X-headers to every
-//      REST call.
-//   2) Adds CommandHeaderRoundTripper as a wrapper around the standard
-//      RoundTripper. CommandHeaderRoundTripper adds X-Headers then delegates
-//      to standard RoundTripper.
+//  1. Modifies the passed "cmds" persistent pre-run function to parse command headers.
+//     These headers will be subsequently added as X-headers to every
+//     REST call.
+//  2. Adds CommandHeaderRoundTripper as a wrapper around the standard
+//     RoundTripper. CommandHeaderRoundTripper adds X-Headers then delegates
+//     to standard RoundTripper.
+//
 // For beta, these hooks are updated unless the KUBECTL_COMMAND_HEADERS environment variable
 // is set, and the value of the env var is false (or zero).
 // See SIG CLI KEP 859 for more information:
-//   https://github.com/kubernetes/enhancements/tree/master/keps/sig-cli/859-kubectl-headers
+//
+//	https://github.com/kubernetes/enhancements/tree/master/keps/sig-cli/859-kubectl-headers
 func addCmdHeaderHooks(cmds *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags) {
 	// If the feature gate env var is set to "false", then do no add kubectl command headers.
 	if value, exists := os.LookupEnv(kubectlCmdHeaders); exists {

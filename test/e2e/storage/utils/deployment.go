@@ -34,18 +34,18 @@ import (
 //
 // All of that is optional, see PatchCSIOptions. Just beware
 // that not renaming the CSI driver deployment can be problematic:
-// - when multiple tests deploy the driver, they need
-//   to run sequentially
-// - might conflict with manual deployments
+//   - when multiple tests deploy the driver, they need
+//     to run sequentially
+//   - might conflict with manual deployments
 //
 // This function is written so that it works for CSI driver deployments
 // that follow these conventions:
-// - driver and provisioner names are identical
-// - the driver binary accepts a --drivername parameter
-// - the paths inside the container are either fixed
-//   and don't need to be patch (for example, --csi-address=/csi/csi.sock is
-//   okay) or are specified directly in a parameter (for example,
-//   --kubelet-registration-path=/var/lib/kubelet/plugins/csi-hostpath/csi.sock)
+//   - driver and provisioner names are identical
+//   - the driver binary accepts a --drivername parameter
+//   - the paths inside the container are either fixed
+//     and don't need to be patch (for example, --csi-address=/csi/csi.sock is
+//     okay) or are specified directly in a parameter (for example,
+//     --kubelet-registration-path=/var/lib/kubelet/plugins/csi-hostpath/csi.sock)
 //
 // Driver deployments that are different will have to do the patching
 // without this function, or skip patching entirely.

@@ -44,7 +44,7 @@ message ServerStorageVersion {
   repeated string decodableVersions = 3;
 }
 
-//  Storage version of a specific resource.
+// Storage version of a specific resource.
 message StorageVersion {
   // The name is <group>.<resource>.
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;

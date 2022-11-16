@@ -40,9 +40,9 @@ var (
 
 // SetDefaultWarningHandler sets the default handler clients use when warning headers are encountered.
 // By default, warnings are logged. Several built-in implementations are provided:
-//  - NoWarnings suppresses warnings.
-//  - WarningLogger logs warnings.
-//  - NewWarningWriter() outputs warnings to the provided writer.
+//   - NoWarnings suppresses warnings.
+//   - WarningLogger logs warnings.
+//   - NewWarningWriter() outputs warnings to the provided writer.
 func SetDefaultWarningHandler(l WarningHandler) {
 	defaultWarningHandlerLock.Lock()
 	defer defaultWarningHandlerLock.Unlock()
