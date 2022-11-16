@@ -18,6 +18,7 @@ import (
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/oauth"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/project"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/rolebindingrestriction"
+	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/route"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/scheduler"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/securitycontextconstraints"
 )
@@ -40,6 +41,7 @@ var AllCustomResourceValidators = []string{
 	network.PluginName,
 	apirequestcount.PluginName,
 	node.PluginName,
+	route.PluginName,
 
 	// the kubecontrollermanager operator resource has to exist in order to run deployments to deploy admission webhooks.
 	kubecontrollermanager.PluginName,
@@ -77,4 +79,9 @@ func RegisterCustomResourceValidation(plugins *admission.Plugins) {
 
 	// this one is special because we don't work without it.
 	securitycontextconstraints.RegisterDefaulting(plugins)
+
+	// Requests to route.openshift.io/v1 should only go through kube-apiserver admission if
+	// served via CRD. Most OpenShift flavors (including vanilla) will continue to do validation
+	// and defaulting inside openshift-apiserver.
+	route.Register(plugins)
 }
