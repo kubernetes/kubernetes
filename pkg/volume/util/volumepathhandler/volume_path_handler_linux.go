@@ -152,7 +152,8 @@ func getLoopDeviceFromSysfs(path string) (string, error) {
 // corresponding to map path symlink, and then return global map path with pod uuid.
 // (See pkg/volume/volume.go for details on a global map path and a pod device map path.)
 // ex. mapPath symlink: pods/{podUid}}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/{volumeName} -> /dev/sdX
-//     globalMapPath/{pod uuid} bind mount: plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/{pod uuid} -> /dev/sdX
+//
+//	globalMapPath/{pod uuid} bind mount: plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/{pod uuid} -> /dev/sdX
 func (v VolumePathHandler) FindGlobalMapPathUUIDFromPod(pluginDir, mapPath string, podUID types.UID) (string, error) {
 	var globalMapPathUUID string
 	// Find symbolic link named pod uuid under plugin dir
@@ -211,7 +212,8 @@ func compareBindMountAndSymlinks(global, pod string) (bool, error) {
 // getDeviceMajorMinor returns major/minor number for the path with below format:
 // major:minor (in hex)
 // ex)
-//     fc:10
+//
+//	fc:10
 func getDeviceMajorMinor(path string) (string, error) {
 	var stat unix.Stat_t
 

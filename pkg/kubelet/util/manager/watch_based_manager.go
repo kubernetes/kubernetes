@@ -342,9 +342,9 @@ func (c *objectCache) startRecycleIdleWatch() {
 // NewWatchBasedManager creates a manager that keeps a cache of all objects
 // necessary for registered pods.
 // It implements the following logic:
-// - whenever a pod is created or updated, we start individual watches for all
-//   referenced objects that aren't referenced from other registered pods
-// - every GetObject() returns a value from local cache propagated via watches
+//   - whenever a pod is created or updated, we start individual watches for all
+//     referenced objects that aren't referenced from other registered pods
+//   - every GetObject() returns a value from local cache propagated via watches
 func NewWatchBasedManager(
 	listObject listObjectFunc,
 	watchObject watchObjectFunc,

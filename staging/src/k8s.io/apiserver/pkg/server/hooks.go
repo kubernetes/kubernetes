@@ -35,6 +35,7 @@ import (
 //  2. conflicts between the different processes all trying to perform the same action
 //  3. partially complete work (API server crashes while running your hook)
 //  4. API server access **BEFORE** your hook has completed
+//
 // Think of it like a mini-controller that is super privileged and gets to run in-process
 // If you use this feature, tag @deads2k on github who has promised to review code for anyone's PostStartHook
 // until it becomes easier to use.

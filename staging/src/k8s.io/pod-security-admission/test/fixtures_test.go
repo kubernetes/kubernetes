@@ -40,7 +40,7 @@ const updateEnvVar = "UPDATE_POD_SECURITY_FIXTURE_DATA"
 // and that in-memory fixtures match serialized fixtures in testdata.
 // When adding new versions or checks, serialized fixtures can be updated by running:
 //
-//     UPDATE_POD_SECURITY_FIXTURE_DATA=true go test k8s.io/pod-security-admission/test
+//	UPDATE_POD_SECURITY_FIXTURE_DATA=true go test k8s.io/pod-security-admission/test
 func TestFixtures(t *testing.T) {
 	expectedFiles := sets.NewString("testdata/README.md")
 

@@ -371,7 +371,8 @@ func dedupOwnerReferencesAndAddWarning(obj runtime.Object, requestContext contex
 
 // setObjectSelfLink sets the self link of an object as needed.
 // TODO: remove the need for the namer LinkSetters by requiring objects implement either Object or List
-//   interfaces
+//
+//	interfaces
 func setObjectSelfLink(ctx context.Context, obj runtime.Object, req *http.Request, namer ScopeNamer) error {
 	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) {
 		// Ensure that for empty lists we don't return <nil> items.

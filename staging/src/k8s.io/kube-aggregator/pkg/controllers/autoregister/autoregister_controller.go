@@ -204,7 +204,8 @@ func (c *autoRegisterController) processNextWorkItem() bool {
 
 // checkAPIService syncs the current APIService against a list of desired APIService objects
 //
-//                                                 | A. desired: not found | B. desired: sync on start | C. desired: sync always
+//	| A. desired: not found | B. desired: sync on start | C. desired: sync always
+//
 // ------------------------------------------------|-----------------------|---------------------------|------------------------
 // 1. current: lookup error                        | error                 | error                     | error
 // 2. current: not found                           | -                     | create once               | create

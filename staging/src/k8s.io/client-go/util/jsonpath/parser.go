@@ -478,7 +478,7 @@ func isBool(s string) bool {
 	return s == "true" || s == "false"
 }
 
-//UnquoteExtend is almost same as strconv.Unquote(), but it support parse single quotes as a string
+// UnquoteExtend is almost same as strconv.Unquote(), but it support parse single quotes as a string
 func UnquoteExtend(s string) (string, error) {
 	n := len(s)
 	if n < 2 {

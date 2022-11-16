@@ -158,9 +158,10 @@ func (svcStrategy) AllowUnconditionalUpdate() bool {
 
 // dropServiceDisabledFields drops fields that are not used if their associated feature gates
 // are not enabled.  The typical pattern is:
-//     if !utilfeature.DefaultFeatureGate.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
-//         newSvc.Spec.MyFeature = nil
-//     }
+//
+//	if !utilfeature.DefaultFeatureGate.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
+//	    newSvc.Spec.MyFeature = nil
+//	}
 func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 	// Clear AllocateLoadBalancerNodePorts if ServiceLBNodePortControl is not enabled
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) {

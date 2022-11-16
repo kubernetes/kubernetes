@@ -105,7 +105,6 @@ var resultTypeSupportedVerbs = []string{
 // The 'input' is the input type used for creation (function argument).
 // The 'result' (not needed in this case) is the result type returned from the
 // client function.
-//
 type extension struct {
 	// VerbName is the name of the custom verb (Scale, Instantiate, etc..)
 	VerbName string

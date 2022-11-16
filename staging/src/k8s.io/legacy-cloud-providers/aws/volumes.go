@@ -43,9 +43,9 @@ func (i EBSVolumeID) awsString() *string {
 
 // KubernetesVolumeID represents the id for a volume in the kubernetes API;
 // a few forms are recognized:
-//  * aws://<zone>/<awsVolumeId>
-//  * aws:///<awsVolumeId>
-//  * <awsVolumeId>
+//   - aws://<zone>/<awsVolumeId>
+//   - aws:///<awsVolumeId>
+//   - <awsVolumeId>
 type KubernetesVolumeID string
 
 // DiskInfo returns aws disk information in easy to use manner

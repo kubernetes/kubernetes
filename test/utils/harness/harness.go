@@ -29,11 +29,13 @@ import (
 //
 // Example usage:
 // ```
-// func MyTest(tt *testing.T) {
-//   t := harness.For(tt)
-//   defer t.Close()
-//   ...
-// }
+//
+//	func MyTest(tt *testing.T) {
+//	  t := harness.For(tt)
+//	  defer t.Close()
+//	  ...
+//	}
+//
 // ```
 type Harness struct {
 	*testing.T

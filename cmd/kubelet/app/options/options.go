@@ -45,9 +45,10 @@ const defaultRootDir = "/var/lib/kubelet"
 
 // KubeletFlags contains configuration flags for the Kubelet.
 // A configuration field should go in KubeletFlags instead of KubeletConfiguration if any of these are true:
-// - its value will never, or cannot safely be changed during the lifetime of a node, or
-// - its value cannot be safely shared between nodes at the same time (e.g. a hostname);
-//   KubeletConfiguration is intended to be shared between nodes.
+//   - its value will never, or cannot safely be changed during the lifetime of a node, or
+//   - its value cannot be safely shared between nodes at the same time (e.g. a hostname);
+//     KubeletConfiguration is intended to be shared between nodes.
+//
 // In general, please try to avoid adding flags or configuration fields,
 // we already have a confusingly large amount of them.
 type KubeletFlags struct {

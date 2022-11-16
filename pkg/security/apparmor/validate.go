@@ -168,8 +168,10 @@ func (v *validator) getLoadedProfiles() (map[string]bool, error) {
 }
 
 // The profiles file is formatted with one profile per line, matching a form:
-//   namespace://profile-name (mode)
-//   profile-name (mode)
+//
+//	namespace://profile-name (mode)
+//	profile-name (mode)
+//
 // Where mode is {enforce, complain, kill}. The "namespace://" is only included for namespaced
 // profiles. For the purposes of Kubernetes, we consider the namespace part of the profile name.
 func parseProfileName(profileLine string) string {

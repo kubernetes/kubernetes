@@ -70,12 +70,13 @@ type AdmissionOptions struct {
 
 // NewAdmissionOptions creates a new instance of AdmissionOptions
 // Note:
-//  In addition it calls RegisterAllAdmissionPlugins to register
-//  all generic admission plugins.
 //
-//  Provides the list of RecommendedPluginOrder that holds sane values
-//  that can be used by servers that don't care about admission chain.
-//  Servers that do care can overwrite/append that field after creation.
+//	In addition it calls RegisterAllAdmissionPlugins to register
+//	all generic admission plugins.
+//
+//	Provides the list of RecommendedPluginOrder that holds sane values
+//	that can be used by servers that don't care about admission chain.
+//	Servers that do care can overwrite/append that field after creation.
 func NewAdmissionOptions() *AdmissionOptions {
 	options := &AdmissionOptions{
 		Plugins:    admission.NewPlugins(),
@@ -115,7 +116,8 @@ func (a *AdmissionOptions) AddFlags(fs *pflag.FlagSet) {
 // In case admission plugin names were not provided by a cluster-admin they will be prepared from the recommended/default values.
 // In addition the method lazily initializes a generic plugin that is appended to the list of pluginInitializers
 // note this method uses:
-//  genericconfig.Authorizer
+//
+//	genericconfig.Authorizer
 func (a *AdmissionOptions) ApplyTo(
 	c *server.Config,
 	informers informers.SharedInformerFactory,
@@ -221,7 +223,7 @@ func (a *AdmissionOptions) enabledPluginNames() []string {
 	return orderedPlugins
 }
 
-//Return names of plugins which are enabled by default
+// Return names of plugins which are enabled by default
 func (a *AdmissionOptions) defaultEnabledPluginNames() []string {
 	defaultOnPluginNames := []string{}
 	for _, pluginName := range a.RecommendedPluginOrder {

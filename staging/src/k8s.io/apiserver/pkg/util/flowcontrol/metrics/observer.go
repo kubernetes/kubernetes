@@ -22,7 +22,8 @@ type Observer interface {
 	Observe(float64)
 }
 
-//  ChangeObserver extends Observer with the ability to take
+//	ChangeObserver extends Observer with the ability to take
+//
 // an observation that is relative to the previous observation.
 type ChangeObserver interface {
 	Observer
