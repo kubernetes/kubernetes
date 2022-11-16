@@ -228,9 +228,10 @@ func (s *EtcdOptions) Complete(
 	}
 
 	if len(s.EncryptionProviderConfigFilepath) != 0 {
-		ctx, closeTransformers := wait.ContextForChannel(stopCh)
+		ctxTransformers, closeTransformers := wait.ContextForChannel(stopCh)
+		ctxServer, _ := wait.ContextForChannel(stopCh) // explicitly ignore cancel here because we do not own the server's lifecycle
 
-		encryptionConfiguration, err := encryptionconfig.LoadEncryptionConfig(s.EncryptionProviderConfigFilepath, s.EncryptionProviderConfigAutomaticReload, ctx.Done())
+		encryptionConfiguration, err := encryptionconfig.LoadEncryptionConfig(s.EncryptionProviderConfigFilepath, s.EncryptionProviderConfigAutomaticReload, ctxTransformers.Done())
 		if err != nil {
 			// in case of error, we want to close partially initialized (if any) transformers
 			closeTransformers()
@@ -261,10 +262,10 @@ func (s *EtcdOptions) Complete(
 						s.EncryptionProviderConfigFilepath,
 						dynamicTransformers,
 						encryptionConfiguration.EncryptionFileContentHash,
-						ctx.Done(),
+						ctxServer.Done(),
 					)
 
-					go kmsConfigController.Run(ctx)
+					go kmsConfigController.Run(ctxServer)
 
 					return nil
 				},
