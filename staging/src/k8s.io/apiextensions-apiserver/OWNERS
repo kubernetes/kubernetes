@@ -12,5 +12,6 @@ reviewers:
   - jpbetz
   - roycaihw
   - alexzielenski
+  - jefftree
 labels:
   - sig/api-machinery
