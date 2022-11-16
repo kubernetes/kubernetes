@@ -525,9 +525,11 @@ resources:
 func TestEncryptionConfigHotReloadFileWatch(t *testing.T) {
 	testCases := []struct {
 		fileUpdateMethod string
+		sleep            time.Duration
 	}{
 		{
 			fileUpdateMethod: "truncate",
+			sleep:            20 * time.Second, // significantly longer than KMSCloseGracePeriod
 		},
 		{
 			fileUpdateMethod: "deleteAndCreate",
@@ -553,6 +555,7 @@ resources:
        name: kms-provider
        cachesize: 1000
        endpoint: unix:///@kms-provider.sock
+       timeout: 1s
 `
 			pluginMock, err := mock.NewBase64Plugin("@kms-provider.sock")
 			if err != nil {
@@ -598,10 +601,12 @@ resources:
        name: new-kms-provider-for-secrets
        cachesize: 1000
        endpoint: unix:///@new-kms-provider.sock
+       timeout: 1s
     - kms:
        name: kms-provider
        cachesize: 1000
        endpoint: unix:///@kms-provider.sock
+       timeout: 1s
   - resources:
     - configmaps
     providers:
@@ -609,6 +614,7 @@ resources:
        name: new-kms-provider-for-configmaps
        cachesize: 1000
        endpoint: unix:///@new-kms-provider.sock
+       timeout: 1s
     - identity: {}
 `
 			// start new KMS Plugin
@@ -705,6 +711,22 @@ resources:
 			// assert secret
 			if !bytes.HasPrefix(rawEnvelope, []byte(wantPrefix)) {
 				t.Fatalf("expected secret to be prefixed with %s, but got %s", wantPrefix, rawEnvelope)
+			}
+
+			// make sure things still work at a "later" time
+			if tc.sleep != 0 {
+				time.Sleep(tc.sleep)
+			}
+			_, err = test.createSecret(fmt.Sprintf("secret-%d", rand.Intn(100000)), "default")
+			if err != nil {
+				t.Fatalf("Failed to create test secret, error: %v", err)
+			}
+			_, err = test.restClient.CoreV1().Secrets("").List(
+				context.TODO(),
+				metav1.ListOptions{},
+			)
+			if err != nil {
+				t.Fatalf("failed to re-list secrets, err: %v", err)
 			}
 		})
 	}
