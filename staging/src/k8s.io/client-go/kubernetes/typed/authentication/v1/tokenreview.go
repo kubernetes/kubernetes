@@ -21,7 +21,6 @@ package v1
 import (
 	"context"
 
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
@@ -42,15 +41,13 @@ type TokenReviewInterface interface {
 
 // tokenReviews implements TokenReviewInterface
 type tokenReviews struct {
-	client  rest.Interface
-	cluster logicalcluster.Name
+	client rest.Interface
 }
 
 // newTokenReviews returns a TokenReviews
 func newTokenReviews(c *AuthenticationV1Client) *tokenReviews {
 	return &tokenReviews{
-		client:  c.RESTClient(),
-		cluster: c.cluster,
+		client: c.RESTClient(),
 	}
 }
 
@@ -58,7 +55,6 @@ func newTokenReviews(c *AuthenticationV1Client) *tokenReviews {
 func (c *tokenReviews) Create(ctx context.Context, tokenReview *v1.TokenReview, opts metav1.CreateOptions) (result *v1.TokenReview, err error) {
 	result = &v1.TokenReview{}
 	err = c.client.Post().
-		Cluster(c.cluster).
 		Resource("tokenreviews").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(tokenReview).

@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"time"
 
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1beta1 "k8s.io/api/storage/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -58,15 +57,13 @@ type VolumeAttachmentInterface interface {
 
 // volumeAttachments implements VolumeAttachmentInterface
 type volumeAttachments struct {
-	client  rest.Interface
-	cluster logicalcluster.Name
+	client rest.Interface
 }
 
 // newVolumeAttachments returns a VolumeAttachments
 func newVolumeAttachments(c *StorageV1beta1Client) *volumeAttachments {
 	return &volumeAttachments{
-		client:  c.RESTClient(),
-		cluster: c.cluster,
+		client: c.RESTClient(),
 	}
 }
 
@@ -74,7 +71,6 @@ func newVolumeAttachments(c *StorageV1beta1Client) *volumeAttachments {
 func (c *volumeAttachments) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.VolumeAttachment, err error) {
 	result = &v1beta1.VolumeAttachment{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Resource("volumeattachments").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -91,7 +87,6 @@ func (c *volumeAttachments) List(ctx context.Context, opts v1.ListOptions) (resu
 	}
 	result = &v1beta1.VolumeAttachmentList{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Resource("volumeattachments").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -108,7 +103,6 @@ func (c *volumeAttachments) Watch(ctx context.Context, opts v1.ListOptions) (wat
 	}
 	opts.Watch = true
 	return c.client.Get().
-		Cluster(c.cluster).
 		Resource("volumeattachments").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -119,7 +113,6 @@ func (c *volumeAttachments) Watch(ctx context.Context, opts v1.ListOptions) (wat
 func (c *volumeAttachments) Create(ctx context.Context, volumeAttachment *v1beta1.VolumeAttachment, opts v1.CreateOptions) (result *v1beta1.VolumeAttachment, err error) {
 	result = &v1beta1.VolumeAttachment{}
 	err = c.client.Post().
-		Cluster(c.cluster).
 		Resource("volumeattachments").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(volumeAttachment).
@@ -132,7 +125,6 @@ func (c *volumeAttachments) Create(ctx context.Context, volumeAttachment *v1beta
 func (c *volumeAttachments) Update(ctx context.Context, volumeAttachment *v1beta1.VolumeAttachment, opts v1.UpdateOptions) (result *v1beta1.VolumeAttachment, err error) {
 	result = &v1beta1.VolumeAttachment{}
 	err = c.client.Put().
-		Cluster(c.cluster).
 		Resource("volumeattachments").
 		Name(volumeAttachment.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -147,7 +139,6 @@ func (c *volumeAttachments) Update(ctx context.Context, volumeAttachment *v1beta
 func (c *volumeAttachments) UpdateStatus(ctx context.Context, volumeAttachment *v1beta1.VolumeAttachment, opts v1.UpdateOptions) (result *v1beta1.VolumeAttachment, err error) {
 	result = &v1beta1.VolumeAttachment{}
 	err = c.client.Put().
-		Cluster(c.cluster).
 		Resource("volumeattachments").
 		Name(volumeAttachment.Name).
 		SubResource("status").
@@ -161,7 +152,6 @@ func (c *volumeAttachments) UpdateStatus(ctx context.Context, volumeAttachment *
 // Delete takes name of the volumeAttachment and deletes it. Returns an error if one occurs.
 func (c *volumeAttachments) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
-		Cluster(c.cluster).
 		Resource("volumeattachments").
 		Name(name).
 		Body(&opts).
@@ -176,7 +166,6 @@ func (c *volumeAttachments) DeleteCollection(ctx context.Context, opts v1.Delete
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
-		Cluster(c.cluster).
 		Resource("volumeattachments").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -189,7 +178,6 @@ func (c *volumeAttachments) DeleteCollection(ctx context.Context, opts v1.Delete
 func (c *volumeAttachments) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.VolumeAttachment, err error) {
 	result = &v1beta1.VolumeAttachment{}
 	err = c.client.Patch(pt).
-		Cluster(c.cluster).
 		Resource("volumeattachments").
 		Name(name).
 		SubResource(subresources...).
@@ -216,7 +204,6 @@ func (c *volumeAttachments) Apply(ctx context.Context, volumeAttachment *storage
 	}
 	result = &v1beta1.VolumeAttachment{}
 	err = c.client.Patch(types.ApplyPatchType).
-		Cluster(c.cluster).
 		Resource("volumeattachments").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
@@ -245,7 +232,6 @@ func (c *volumeAttachments) ApplyStatus(ctx context.Context, volumeAttachment *s
 
 	result = &v1beta1.VolumeAttachment{}
 	err = c.client.Patch(types.ApplyPatchType).
-		Cluster(c.cluster).
 		Resource("volumeattachments").
 		Name(*name).
 		SubResource("status").

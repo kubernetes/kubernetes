@@ -56,11 +56,7 @@ func NewSecretInformer(client kubernetes.Interface, namespace string, resyncPeri
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredSecretInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewFilteredSecretInformerWithOptions(client, namespace, tweakListOptions, cache.WithResyncPeriod(resyncPeriod), cache.WithIndexers(indexers))
-}
-
-func NewFilteredSecretInformerWithOptions(client kubernetes.Interface, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc, opts ...cache.SharedInformerOption) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -76,22 +72,13 @@ func NewFilteredSecretInformerWithOptions(client kubernetes.Interface, namespace
 			},
 		},
 		&corev1.Secret{},
-		opts...,
+		resyncPeriod,
+		indexers,
 	)
 }
 
 func (f *secretInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	indexers := cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
-	for k, v := range f.factory.ExtraNamespaceScopedIndexers() {
-		indexers[k] = v
-	}
-
-	return NewFilteredSecretInformerWithOptions(client, f.namespace,
-		f.tweakListOptions,
-		cache.WithResyncPeriod(resyncPeriod),
-		cache.WithIndexers(indexers),
-		cache.WithKeyFunction(f.factory.KeyFunction()),
-	)
+	return NewFilteredSecretInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *secretInformer) Informer() cache.SharedIndexInformer {

@@ -21,7 +21,6 @@ package v1
 import (
 	"net/http"
 
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/api/events/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
@@ -35,7 +34,6 @@ type EventsV1Interface interface {
 // EventsV1Client is used to interact with features provided by the events.k8s.io group.
 type EventsV1Client struct {
 	restClient rest.Interface
-	cluster    logicalcluster.Name
 }
 
 func (c *EventsV1Client) Events(namespace string) EventInterface {
@@ -68,7 +66,7 @@ func NewForConfigAndClient(c *rest.Config, h *http.Client) (*EventsV1Client, err
 	if err != nil {
 		return nil, err
 	}
-	return &EventsV1Client{restClient: client}, nil
+	return &EventsV1Client{client}, nil
 }
 
 // NewForConfigOrDie creates a new EventsV1Client for the given config and
@@ -83,12 +81,7 @@ func NewForConfigOrDie(c *rest.Config) *EventsV1Client {
 
 // New creates a new EventsV1Client for the given RESTClient.
 func New(c rest.Interface) *EventsV1Client {
-	return &EventsV1Client{restClient: c}
-}
-
-// NewWithCluster creates a new EventsV1Client for the given RESTClient and cluster.
-func NewWithCluster(c rest.Interface, cluster logicalcluster.Name) *EventsV1Client {
-	return &EventsV1Client{restClient: c, cluster: cluster}
+	return &EventsV1Client{c}
 }
 
 func setConfigDefaults(config *rest.Config) error {

@@ -33,7 +33,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kcp-dev/logicalcluster/v2"
 	"golang.org/x/net/http2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -104,15 +103,12 @@ type Request struct {
 
 	// generic components accessible via method setters
 	verb       string
-	basePath   string
 	pathPrefix string
 	subpath    string
 	params     url.Values
 	headers    http.Header
 
 	// structural elements of the request that are part of the Kubernetes API conventions
-	cluster      logicalcluster.Name
-	clusterSet   bool
 	namespace    string
 	namespaceSet bool
 	resource     string
@@ -136,11 +132,11 @@ func NewRequest(c *RESTClient) *Request {
 		backoff = noBackoff
 	}
 
-	var basePath string
+	var pathPrefix string
 	if c.base != nil {
-		basePath = path.Join("/", c.base.Path)
+		pathPrefix = path.Join("/", c.base.Path, c.versionedAPIPath)
 	} else {
-		basePath = "/"
+		pathPrefix = path.Join("/", c.versionedAPIPath)
 	}
 
 	var timeout time.Duration
@@ -153,8 +149,7 @@ func NewRequest(c *RESTClient) *Request {
 		rateLimiter:    c.rateLimiter,
 		backoff:        backoff,
 		timeout:        timeout,
-		basePath:       basePath,
-		pathPrefix:     c.versionedAPIPath,
+		pathPrefix:     pathPrefix,
 		maxRetries:     10,
 		retryFn:        defaultRequestRetryFn,
 		warningHandler: c.warningHandler,
@@ -308,24 +303,6 @@ func (r *Request) Namespace(namespace string) *Request {
 	return r
 }
 
-// Cluster applies the cluster scope to a request ([clusters/<cluster>]/...)
-func (r *Request) Cluster(cluster logicalcluster.Name) *Request {
-	if r.err != nil {
-		return r
-	}
-	if r.clusterSet {
-		r.err = fmt.Errorf("cluster already set to %q, cannot change to %q", r.namespace, cluster)
-		return r
-	}
-	if msgs := IsValidPathSegmentName(cluster.String()); len(msgs) != 0 {
-		r.err = fmt.Errorf("invalid cluster %q: %v", cluster, msgs)
-		return r
-	}
-	r.clusterSet = true
-	r.cluster = cluster
-	return r
-}
-
 // NamespaceIfScoped is a convenience function to set a namespace if scoped is true
 func (r *Request) NamespaceIfScoped(namespace string, scoped bool) *Request {
 	if scoped {
@@ -340,8 +317,8 @@ func (r *Request) AbsPath(segments ...string) *Request {
 	if r.err != nil {
 		return r
 	}
-	r.pathPrefix = path.Join(segments...)
-	if len(segments) == 1 && len(segments[0]) > 1 && strings.HasSuffix(segments[0], "/") {
+	r.pathPrefix = path.Join(r.c.base.Path, path.Join(segments...))
+	if len(segments) == 1 && (len(r.c.base.Path) > 1 || len(segments[0]) > 1) && strings.HasSuffix(segments[0], "/") {
 		// preserve any trailing slashes for legacy behavior
 		r.pathPrefix += "/"
 	}
@@ -498,11 +475,7 @@ func (r *Request) Body(obj interface{}) *Request {
 
 // URL returns the current working URL.
 func (r *Request) URL() *url.URL {
-	p := r.basePath
-	if r.clusterSet && len(r.cluster.String()) > 0 {
-		p = path.Join(p, r.cluster.Path())
-	}
-	p = path.Join(p, r.pathPrefix)
+	p := r.pathPrefix
 	if r.namespaceSet && len(r.namespace) > 0 {
 		p = path.Join(p, "namespaces", r.namespace)
 	}

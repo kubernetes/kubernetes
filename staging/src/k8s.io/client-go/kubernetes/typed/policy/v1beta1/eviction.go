@@ -19,7 +19,6 @@ limitations under the License.
 package v1beta1
 
 import (
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -36,16 +35,14 @@ type EvictionInterface interface {
 
 // evictions implements EvictionInterface
 type evictions struct {
-	client  rest.Interface
-	cluster logicalcluster.Name
-	ns      string
+	client rest.Interface
+	ns     string
 }
 
 // newEvictions returns a Evictions
 func newEvictions(c *PolicyV1beta1Client, namespace string) *evictions {
 	return &evictions{
-		client:  c.RESTClient(),
-		cluster: c.cluster,
-		ns:      namespace,
+		client: c.RESTClient(),
+		ns:     namespace,
 	}
 }

@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"time"
 
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -58,15 +57,13 @@ type StorageVersionInterface interface {
 
 // storageVersions implements StorageVersionInterface
 type storageVersions struct {
-	client  rest.Interface
-	cluster logicalcluster.Name
+	client rest.Interface
 }
 
 // newStorageVersions returns a StorageVersions
 func newStorageVersions(c *InternalV1alpha1Client) *storageVersions {
 	return &storageVersions{
-		client:  c.RESTClient(),
-		cluster: c.cluster,
+		client: c.RESTClient(),
 	}
 }
 
@@ -74,7 +71,6 @@ func newStorageVersions(c *InternalV1alpha1Client) *storageVersions {
 func (c *storageVersions) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.StorageVersion, err error) {
 	result = &v1alpha1.StorageVersion{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Resource("storageversions").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -91,7 +87,6 @@ func (c *storageVersions) List(ctx context.Context, opts v1.ListOptions) (result
 	}
 	result = &v1alpha1.StorageVersionList{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Resource("storageversions").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -108,7 +103,6 @@ func (c *storageVersions) Watch(ctx context.Context, opts v1.ListOptions) (watch
 	}
 	opts.Watch = true
 	return c.client.Get().
-		Cluster(c.cluster).
 		Resource("storageversions").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -119,7 +113,6 @@ func (c *storageVersions) Watch(ctx context.Context, opts v1.ListOptions) (watch
 func (c *storageVersions) Create(ctx context.Context, storageVersion *v1alpha1.StorageVersion, opts v1.CreateOptions) (result *v1alpha1.StorageVersion, err error) {
 	result = &v1alpha1.StorageVersion{}
 	err = c.client.Post().
-		Cluster(c.cluster).
 		Resource("storageversions").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(storageVersion).
@@ -132,7 +125,6 @@ func (c *storageVersions) Create(ctx context.Context, storageVersion *v1alpha1.S
 func (c *storageVersions) Update(ctx context.Context, storageVersion *v1alpha1.StorageVersion, opts v1.UpdateOptions) (result *v1alpha1.StorageVersion, err error) {
 	result = &v1alpha1.StorageVersion{}
 	err = c.client.Put().
-		Cluster(c.cluster).
 		Resource("storageversions").
 		Name(storageVersion.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -147,7 +139,6 @@ func (c *storageVersions) Update(ctx context.Context, storageVersion *v1alpha1.S
 func (c *storageVersions) UpdateStatus(ctx context.Context, storageVersion *v1alpha1.StorageVersion, opts v1.UpdateOptions) (result *v1alpha1.StorageVersion, err error) {
 	result = &v1alpha1.StorageVersion{}
 	err = c.client.Put().
-		Cluster(c.cluster).
 		Resource("storageversions").
 		Name(storageVersion.Name).
 		SubResource("status").
@@ -161,7 +152,6 @@ func (c *storageVersions) UpdateStatus(ctx context.Context, storageVersion *v1al
 // Delete takes name of the storageVersion and deletes it. Returns an error if one occurs.
 func (c *storageVersions) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
-		Cluster(c.cluster).
 		Resource("storageversions").
 		Name(name).
 		Body(&opts).
@@ -176,7 +166,6 @@ func (c *storageVersions) DeleteCollection(ctx context.Context, opts v1.DeleteOp
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
-		Cluster(c.cluster).
 		Resource("storageversions").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -189,7 +178,6 @@ func (c *storageVersions) DeleteCollection(ctx context.Context, opts v1.DeleteOp
 func (c *storageVersions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.StorageVersion, err error) {
 	result = &v1alpha1.StorageVersion{}
 	err = c.client.Patch(pt).
-		Cluster(c.cluster).
 		Resource("storageversions").
 		Name(name).
 		SubResource(subresources...).
@@ -216,7 +204,6 @@ func (c *storageVersions) Apply(ctx context.Context, storageVersion *apiserverin
 	}
 	result = &v1alpha1.StorageVersion{}
 	err = c.client.Patch(types.ApplyPatchType).
-		Cluster(c.cluster).
 		Resource("storageversions").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
@@ -245,7 +232,6 @@ func (c *storageVersions) ApplyStatus(ctx context.Context, storageVersion *apise
 
 	result = &v1alpha1.StorageVersion{}
 	err = c.client.Patch(types.ApplyPatchType).
-		Cluster(c.cluster).
 		Resource("storageversions").
 		Name(*name).
 		SubResource("status").

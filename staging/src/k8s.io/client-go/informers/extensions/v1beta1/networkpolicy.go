@@ -56,11 +56,7 @@ func NewNetworkPolicyInformer(client kubernetes.Interface, namespace string, res
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredNetworkPolicyInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewFilteredNetworkPolicyInformerWithOptions(client, namespace, tweakListOptions, cache.WithResyncPeriod(resyncPeriod), cache.WithIndexers(indexers))
-}
-
-func NewFilteredNetworkPolicyInformerWithOptions(client kubernetes.Interface, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc, opts ...cache.SharedInformerOption) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -76,22 +72,13 @@ func NewFilteredNetworkPolicyInformerWithOptions(client kubernetes.Interface, na
 			},
 		},
 		&extensionsv1beta1.NetworkPolicy{},
-		opts...,
+		resyncPeriod,
+		indexers,
 	)
 }
 
 func (f *networkPolicyInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	indexers := cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
-	for k, v := range f.factory.ExtraNamespaceScopedIndexers() {
-		indexers[k] = v
-	}
-
-	return NewFilteredNetworkPolicyInformerWithOptions(client, f.namespace,
-		f.tweakListOptions,
-		cache.WithResyncPeriod(resyncPeriod),
-		cache.WithIndexers(indexers),
-		cache.WithKeyFunction(f.factory.KeyFunction()),
-	)
+	return NewFilteredNetworkPolicyInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *networkPolicyInformer) Informer() cache.SharedIndexInformer {

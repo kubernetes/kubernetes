@@ -21,7 +21,6 @@ package v1
 import (
 	"net/http"
 
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
@@ -36,7 +35,6 @@ type AdmissionregistrationV1Interface interface {
 // AdmissionregistrationV1Client is used to interact with features provided by the admissionregistration.k8s.io group.
 type AdmissionregistrationV1Client struct {
 	restClient rest.Interface
-	cluster    logicalcluster.Name
 }
 
 func (c *AdmissionregistrationV1Client) MutatingWebhookConfigurations() MutatingWebhookConfigurationInterface {
@@ -73,7 +71,7 @@ func NewForConfigAndClient(c *rest.Config, h *http.Client) (*Admissionregistrati
 	if err != nil {
 		return nil, err
 	}
-	return &AdmissionregistrationV1Client{restClient: client}, nil
+	return &AdmissionregistrationV1Client{client}, nil
 }
 
 // NewForConfigOrDie creates a new AdmissionregistrationV1Client for the given config and
@@ -88,12 +86,7 @@ func NewForConfigOrDie(c *rest.Config) *AdmissionregistrationV1Client {
 
 // New creates a new AdmissionregistrationV1Client for the given RESTClient.
 func New(c rest.Interface) *AdmissionregistrationV1Client {
-	return &AdmissionregistrationV1Client{restClient: c}
-}
-
-// NewWithCluster creates a new AdmissionregistrationV1Client for the given RESTClient and cluster.
-func NewWithCluster(c rest.Interface, cluster logicalcluster.Name) *AdmissionregistrationV1Client {
-	return &AdmissionregistrationV1Client{restClient: c, cluster: cluster}
+	return &AdmissionregistrationV1Client{c}
 }
 
 func setConfigDefaults(config *rest.Config) error {

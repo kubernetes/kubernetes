@@ -55,11 +55,7 @@ func NewPersistentVolumeInformer(client kubernetes.Interface, resyncPeriod time.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredPersistentVolumeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewFilteredPersistentVolumeInformerWithOptions(client, tweakListOptions, cache.WithResyncPeriod(resyncPeriod), cache.WithIndexers(indexers))
-}
-
-func NewFilteredPersistentVolumeInformerWithOptions(client kubernetes.Interface, tweakListOptions internalinterfaces.TweakListOptionsFunc, opts ...cache.SharedInformerOption) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -75,22 +71,13 @@ func NewFilteredPersistentVolumeInformerWithOptions(client kubernetes.Interface,
 			},
 		},
 		&corev1.PersistentVolume{},
-		opts...,
+		resyncPeriod,
+		indexers,
 	)
 }
 
 func (f *persistentVolumeInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	indexers := cache.Indexers{}
-	for k, v := range f.factory.ExtraClusterScopedIndexers() {
-		indexers[k] = v
-	}
-
-	return NewFilteredPersistentVolumeInformerWithOptions(client,
-		f.tweakListOptions,
-		cache.WithResyncPeriod(resyncPeriod),
-		cache.WithIndexers(indexers),
-		cache.WithKeyFunction(f.factory.KeyFunction()),
-	)
+	return NewFilteredPersistentVolumeInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *persistentVolumeInformer) Informer() cache.SharedIndexInformer {

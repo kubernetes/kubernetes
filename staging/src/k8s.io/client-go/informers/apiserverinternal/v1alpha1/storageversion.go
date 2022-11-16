@@ -55,11 +55,7 @@ func NewStorageVersionInformer(client kubernetes.Interface, resyncPeriod time.Du
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredStorageVersionInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewFilteredStorageVersionInformerWithOptions(client, tweakListOptions, cache.WithResyncPeriod(resyncPeriod), cache.WithIndexers(indexers))
-}
-
-func NewFilteredStorageVersionInformerWithOptions(client kubernetes.Interface, tweakListOptions internalinterfaces.TweakListOptionsFunc, opts ...cache.SharedInformerOption) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -75,22 +71,13 @@ func NewFilteredStorageVersionInformerWithOptions(client kubernetes.Interface, t
 			},
 		},
 		&apiserverinternalv1alpha1.StorageVersion{},
-		opts...,
+		resyncPeriod,
+		indexers,
 	)
 }
 
 func (f *storageVersionInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	indexers := cache.Indexers{}
-	for k, v := range f.factory.ExtraClusterScopedIndexers() {
-		indexers[k] = v
-	}
-
-	return NewFilteredStorageVersionInformerWithOptions(client,
-		f.tweakListOptions,
-		cache.WithResyncPeriod(resyncPeriod),
-		cache.WithIndexers(indexers),
-		cache.WithKeyFunction(f.factory.KeyFunction()),
-	)
+	return NewFilteredStorageVersionInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *storageVersionInformer) Informer() cache.SharedIndexInformer {

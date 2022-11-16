@@ -55,11 +55,7 @@ func NewValidatingWebhookConfigurationInformer(client kubernetes.Interface, resy
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredValidatingWebhookConfigurationInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewFilteredValidatingWebhookConfigurationInformerWithOptions(client, tweakListOptions, cache.WithResyncPeriod(resyncPeriod), cache.WithIndexers(indexers))
-}
-
-func NewFilteredValidatingWebhookConfigurationInformerWithOptions(client kubernetes.Interface, tweakListOptions internalinterfaces.TweakListOptionsFunc, opts ...cache.SharedInformerOption) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -75,22 +71,13 @@ func NewFilteredValidatingWebhookConfigurationInformerWithOptions(client kuberne
 			},
 		},
 		&admissionregistrationv1.ValidatingWebhookConfiguration{},
-		opts...,
+		resyncPeriod,
+		indexers,
 	)
 }
 
 func (f *validatingWebhookConfigurationInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	indexers := cache.Indexers{}
-	for k, v := range f.factory.ExtraClusterScopedIndexers() {
-		indexers[k] = v
-	}
-
-	return NewFilteredValidatingWebhookConfigurationInformerWithOptions(client,
-		f.tweakListOptions,
-		cache.WithResyncPeriod(resyncPeriod),
-		cache.WithIndexers(indexers),
-		cache.WithKeyFunction(f.factory.KeyFunction()),
-	)
+	return NewFilteredValidatingWebhookConfigurationInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *validatingWebhookConfigurationInformer) Informer() cache.SharedIndexInformer {

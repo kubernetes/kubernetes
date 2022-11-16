@@ -21,7 +21,6 @@ package v1beta1
 import (
 	"net/http"
 
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1beta1 "k8s.io/api/certificates/v1beta1"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
@@ -35,7 +34,6 @@ type CertificatesV1beta1Interface interface {
 // CertificatesV1beta1Client is used to interact with features provided by the certificates.k8s.io group.
 type CertificatesV1beta1Client struct {
 	restClient rest.Interface
-	cluster    logicalcluster.Name
 }
 
 func (c *CertificatesV1beta1Client) CertificateSigningRequests() CertificateSigningRequestInterface {
@@ -68,7 +66,7 @@ func NewForConfigAndClient(c *rest.Config, h *http.Client) (*CertificatesV1beta1
 	if err != nil {
 		return nil, err
 	}
-	return &CertificatesV1beta1Client{restClient: client}, nil
+	return &CertificatesV1beta1Client{client}, nil
 }
 
 // NewForConfigOrDie creates a new CertificatesV1beta1Client for the given config and
@@ -83,12 +81,7 @@ func NewForConfigOrDie(c *rest.Config) *CertificatesV1beta1Client {
 
 // New creates a new CertificatesV1beta1Client for the given RESTClient.
 func New(c rest.Interface) *CertificatesV1beta1Client {
-	return &CertificatesV1beta1Client{restClient: c}
-}
-
-// NewWithCluster creates a new CertificatesV1beta1Client for the given RESTClient and cluster.
-func NewWithCluster(c rest.Interface, cluster logicalcluster.Name) *CertificatesV1beta1Client {
-	return &CertificatesV1beta1Client{restClient: c, cluster: cluster}
+	return &CertificatesV1beta1Client{c}
 }
 
 func setConfigDefaults(config *rest.Config) error {

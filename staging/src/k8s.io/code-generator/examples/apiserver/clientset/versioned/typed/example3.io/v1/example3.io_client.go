@@ -21,7 +21,6 @@ package v1
 import (
 	"net/http"
 
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	rest "k8s.io/client-go/rest"
 	v1 "k8s.io/code-generator/examples/apiserver/apis/example3.io/v1"
 	"k8s.io/code-generator/examples/apiserver/clientset/versioned/scheme"
@@ -35,7 +34,6 @@ type ThirdExampleV1Interface interface {
 // ThirdExampleV1Client is used to interact with features provided by the example.dots.apiserver.code-generator.k8s.io group.
 type ThirdExampleV1Client struct {
 	restClient rest.Interface
-	cluster    logicalcluster.Name
 }
 
 func (c *ThirdExampleV1Client) TestTypes(namespace string) TestTypeInterface {
@@ -68,7 +66,7 @@ func NewForConfigAndClient(c *rest.Config, h *http.Client) (*ThirdExampleV1Clien
 	if err != nil {
 		return nil, err
 	}
-	return &ThirdExampleV1Client{restClient: client}, nil
+	return &ThirdExampleV1Client{client}, nil
 }
 
 // NewForConfigOrDie creates a new ThirdExampleV1Client for the given config and
@@ -83,12 +81,7 @@ func NewForConfigOrDie(c *rest.Config) *ThirdExampleV1Client {
 
 // New creates a new ThirdExampleV1Client for the given RESTClient.
 func New(c rest.Interface) *ThirdExampleV1Client {
-	return &ThirdExampleV1Client{restClient: c}
-}
-
-// NewWithCluster creates a new ThirdExampleV1Client for the given RESTClient and cluster.
-func NewWithCluster(c rest.Interface, cluster logicalcluster.Name) *ThirdExampleV1Client {
-	return &ThirdExampleV1Client{restClient: c, cluster: cluster}
+	return &ThirdExampleV1Client{c}
 }
 
 func setConfigDefaults(config *rest.Config) error {

@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"time"
 
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1beta1 "k8s.io/api/policy/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -58,17 +57,15 @@ type PodDisruptionBudgetInterface interface {
 
 // podDisruptionBudgets implements PodDisruptionBudgetInterface
 type podDisruptionBudgets struct {
-	client  rest.Interface
-	cluster logicalcluster.Name
-	ns      string
+	client rest.Interface
+	ns     string
 }
 
 // newPodDisruptionBudgets returns a PodDisruptionBudgets
 func newPodDisruptionBudgets(c *PolicyV1beta1Client, namespace string) *podDisruptionBudgets {
 	return &podDisruptionBudgets{
-		client:  c.RESTClient(),
-		cluster: c.cluster,
-		ns:      namespace,
+		client: c.RESTClient(),
+		ns:     namespace,
 	}
 }
 
@@ -76,7 +73,6 @@ func newPodDisruptionBudgets(c *PolicyV1beta1Client, namespace string) *podDisru
 func (c *podDisruptionBudgets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.PodDisruptionBudget, err error) {
 	result = &v1beta1.PodDisruptionBudget{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("poddisruptionbudgets").
 		Name(name).
@@ -94,7 +90,6 @@ func (c *podDisruptionBudgets) List(ctx context.Context, opts v1.ListOptions) (r
 	}
 	result = &v1beta1.PodDisruptionBudgetList{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("poddisruptionbudgets").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -112,7 +107,6 @@ func (c *podDisruptionBudgets) Watch(ctx context.Context, opts v1.ListOptions) (
 	}
 	opts.Watch = true
 	return c.client.Get().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("poddisruptionbudgets").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -124,7 +118,6 @@ func (c *podDisruptionBudgets) Watch(ctx context.Context, opts v1.ListOptions) (
 func (c *podDisruptionBudgets) Create(ctx context.Context, podDisruptionBudget *v1beta1.PodDisruptionBudget, opts v1.CreateOptions) (result *v1beta1.PodDisruptionBudget, err error) {
 	result = &v1beta1.PodDisruptionBudget{}
 	err = c.client.Post().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("poddisruptionbudgets").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -138,7 +131,6 @@ func (c *podDisruptionBudgets) Create(ctx context.Context, podDisruptionBudget *
 func (c *podDisruptionBudgets) Update(ctx context.Context, podDisruptionBudget *v1beta1.PodDisruptionBudget, opts v1.UpdateOptions) (result *v1beta1.PodDisruptionBudget, err error) {
 	result = &v1beta1.PodDisruptionBudget{}
 	err = c.client.Put().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("poddisruptionbudgets").
 		Name(podDisruptionBudget.Name).
@@ -154,7 +146,6 @@ func (c *podDisruptionBudgets) Update(ctx context.Context, podDisruptionBudget *
 func (c *podDisruptionBudgets) UpdateStatus(ctx context.Context, podDisruptionBudget *v1beta1.PodDisruptionBudget, opts v1.UpdateOptions) (result *v1beta1.PodDisruptionBudget, err error) {
 	result = &v1beta1.PodDisruptionBudget{}
 	err = c.client.Put().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("poddisruptionbudgets").
 		Name(podDisruptionBudget.Name).
@@ -169,7 +160,6 @@ func (c *podDisruptionBudgets) UpdateStatus(ctx context.Context, podDisruptionBu
 // Delete takes name of the podDisruptionBudget and deletes it. Returns an error if one occurs.
 func (c *podDisruptionBudgets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("poddisruptionbudgets").
 		Name(name).
@@ -185,7 +175,6 @@ func (c *podDisruptionBudgets) DeleteCollection(ctx context.Context, opts v1.Del
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("poddisruptionbudgets").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
@@ -199,7 +188,6 @@ func (c *podDisruptionBudgets) DeleteCollection(ctx context.Context, opts v1.Del
 func (c *podDisruptionBudgets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.PodDisruptionBudget, err error) {
 	result = &v1beta1.PodDisruptionBudget{}
 	err = c.client.Patch(pt).
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("poddisruptionbudgets").
 		Name(name).
@@ -227,7 +215,6 @@ func (c *podDisruptionBudgets) Apply(ctx context.Context, podDisruptionBudget *p
 	}
 	result = &v1beta1.PodDisruptionBudget{}
 	err = c.client.Patch(types.ApplyPatchType).
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("poddisruptionbudgets").
 		Name(*name).
@@ -257,7 +244,6 @@ func (c *podDisruptionBudgets) ApplyStatus(ctx context.Context, podDisruptionBud
 
 	result = &v1beta1.PodDisruptionBudget{}
 	err = c.client.Patch(types.ApplyPatchType).
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("poddisruptionbudgets").
 		Name(*name).

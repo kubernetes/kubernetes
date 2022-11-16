@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"time"
 
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1beta1 "k8s.io/api/apps/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -58,17 +57,15 @@ type DeploymentInterface interface {
 
 // deployments implements DeploymentInterface
 type deployments struct {
-	client  rest.Interface
-	cluster logicalcluster.Name
-	ns      string
+	client rest.Interface
+	ns     string
 }
 
 // newDeployments returns a Deployments
 func newDeployments(c *AppsV1beta1Client, namespace string) *deployments {
 	return &deployments{
-		client:  c.RESTClient(),
-		cluster: c.cluster,
-		ns:      namespace,
+		client: c.RESTClient(),
+		ns:     namespace,
 	}
 }
 
@@ -76,7 +73,6 @@ func newDeployments(c *AppsV1beta1Client, namespace string) *deployments {
 func (c *deployments) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.Deployment, err error) {
 	result = &v1beta1.Deployment{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(name).
@@ -94,7 +90,6 @@ func (c *deployments) List(ctx context.Context, opts v1.ListOptions) (result *v1
 	}
 	result = &v1beta1.DeploymentList{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -112,7 +107,6 @@ func (c *deployments) Watch(ctx context.Context, opts v1.ListOptions) (watch.Int
 	}
 	opts.Watch = true
 	return c.client.Get().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -124,7 +118,6 @@ func (c *deployments) Watch(ctx context.Context, opts v1.ListOptions) (watch.Int
 func (c *deployments) Create(ctx context.Context, deployment *v1beta1.Deployment, opts v1.CreateOptions) (result *v1beta1.Deployment, err error) {
 	result = &v1beta1.Deployment{}
 	err = c.client.Post().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -138,7 +131,6 @@ func (c *deployments) Create(ctx context.Context, deployment *v1beta1.Deployment
 func (c *deployments) Update(ctx context.Context, deployment *v1beta1.Deployment, opts v1.UpdateOptions) (result *v1beta1.Deployment, err error) {
 	result = &v1beta1.Deployment{}
 	err = c.client.Put().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(deployment.Name).
@@ -154,7 +146,6 @@ func (c *deployments) Update(ctx context.Context, deployment *v1beta1.Deployment
 func (c *deployments) UpdateStatus(ctx context.Context, deployment *v1beta1.Deployment, opts v1.UpdateOptions) (result *v1beta1.Deployment, err error) {
 	result = &v1beta1.Deployment{}
 	err = c.client.Put().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(deployment.Name).
@@ -169,7 +160,6 @@ func (c *deployments) UpdateStatus(ctx context.Context, deployment *v1beta1.Depl
 // Delete takes name of the deployment and deletes it. Returns an error if one occurs.
 func (c *deployments) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(name).
@@ -185,7 +175,6 @@ func (c *deployments) DeleteCollection(ctx context.Context, opts v1.DeleteOption
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
@@ -199,7 +188,6 @@ func (c *deployments) DeleteCollection(ctx context.Context, opts v1.DeleteOption
 func (c *deployments) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Deployment, err error) {
 	result = &v1beta1.Deployment{}
 	err = c.client.Patch(pt).
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(name).
@@ -227,7 +215,6 @@ func (c *deployments) Apply(ctx context.Context, deployment *appsv1beta1.Deploym
 	}
 	result = &v1beta1.Deployment{}
 	err = c.client.Patch(types.ApplyPatchType).
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(*name).
@@ -257,7 +244,6 @@ func (c *deployments) ApplyStatus(ctx context.Context, deployment *appsv1beta1.D
 
 	result = &v1beta1.Deployment{}
 	err = c.client.Patch(types.ApplyPatchType).
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(*name).

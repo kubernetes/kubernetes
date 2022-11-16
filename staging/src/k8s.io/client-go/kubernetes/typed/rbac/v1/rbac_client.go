@@ -21,7 +21,6 @@ package v1
 import (
 	"net/http"
 
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/api/rbac/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
@@ -38,7 +37,6 @@ type RbacV1Interface interface {
 // RbacV1Client is used to interact with features provided by the rbac.authorization.k8s.io group.
 type RbacV1Client struct {
 	restClient rest.Interface
-	cluster    logicalcluster.Name
 }
 
 func (c *RbacV1Client) ClusterRoles() ClusterRoleInterface {
@@ -83,7 +81,7 @@ func NewForConfigAndClient(c *rest.Config, h *http.Client) (*RbacV1Client, error
 	if err != nil {
 		return nil, err
 	}
-	return &RbacV1Client{restClient: client}, nil
+	return &RbacV1Client{client}, nil
 }
 
 // NewForConfigOrDie creates a new RbacV1Client for the given config and
@@ -98,12 +96,7 @@ func NewForConfigOrDie(c *rest.Config) *RbacV1Client {
 
 // New creates a new RbacV1Client for the given RESTClient.
 func New(c rest.Interface) *RbacV1Client {
-	return &RbacV1Client{restClient: c}
-}
-
-// NewWithCluster creates a new RbacV1Client for the given RESTClient and cluster.
-func NewWithCluster(c rest.Interface, cluster logicalcluster.Name) *RbacV1Client {
-	return &RbacV1Client{restClient: c, cluster: cluster}
+	return &RbacV1Client{c}
 }
 
 func setConfigDefaults(config *rest.Config) error {
