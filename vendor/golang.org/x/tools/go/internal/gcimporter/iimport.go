@@ -17,6 +17,7 @@ import (
 	"go/token"
 	"go/types"
 	"io"
+	"math/big"
 	"sort"
 	"strings"
 
@@ -53,7 +54,7 @@ const (
 )
 
 type ident struct {
-	pkg  string
+	pkg  *types.Package
 	name string
 }
 
@@ -100,7 +101,9 @@ func iimportCommon(fset *token.FileSet, imports map[string]*types.Package, data 
 	if !debug {
 		defer func() {
 			if e := recover(); e != nil {
-				if version > currentVersion {
+				if bundle {
+					err = fmt.Errorf("%v", e)
+				} else if version > currentVersion {
 					err = fmt.Errorf("cannot import %q (%v), export data is newer version - update tool", path, e)
 				} else {
 					err = fmt.Errorf("cannot import %q (%v), possibly version skew - reinstall package", path, e)
@@ -237,11 +240,25 @@ func iimportCommon(fset *token.FileSet, imports map[string]*types.Package, data 
 		pkg.MarkComplete()
 	}
 
+	// SetConstraint can't be called if the constraint type is not yet complete.
+	// When type params are created in the 'P' case of (*importReader).obj(),
+	// the associated constraint type may not be complete due to recursion.
+	// Therefore, we defer calling SetConstraint there, and call it here instead
+	// after all types are complete.
+	for _, d := range p.later {
+		typeparams.SetTypeParamConstraint(d.t, d.constraint)
+	}
+
 	for _, typ := range p.interfaceList {
 		typ.Complete()
 	}
 
 	return pkgs, nil
+}
+
+type setConstraintArgs struct {
+	t          *typeparams.TypeParam
+	constraint types.Type
 }
 
 type iimporter struct {
@@ -259,6 +276,9 @@ type iimporter struct {
 
 	fake          fakeFileSet
 	interfaceList []*types.Interface
+
+	// Arguments for calls to SetConstraint that are deferred due to recursive types
+	later []setConstraintArgs
 
 	indent int // for tracing support
 }
@@ -444,7 +464,7 @@ func (r *importReader) obj(name string) {
 
 		// To handle recursive references to the typeparam within its
 		// bound, save the partial type in tparamIndex before reading the bounds.
-		id := ident{r.currPkg.Name(), name}
+		id := ident{r.currPkg, name}
 		r.p.tparamIndex[id] = t
 		var implicit bool
 		if r.p.version >= iexportVersionGo1_18 {
@@ -458,7 +478,11 @@ func (r *importReader) obj(name string) {
 			}
 			typeparams.MarkImplicit(iface)
 		}
-		typeparams.SetTypeParamConstraint(t, constraint)
+		// The constraint type may not be complete, if we
+		// are in the middle of a type recursion involving type
+		// constraints. So, we defer SetConstraint until we have
+		// completely set up all types in ImportData.
+		r.p.later = append(r.p.later, setConstraintArgs{t: t, constraint: constraint})
 
 	case 'V':
 		typ := r.typ()
@@ -489,7 +513,9 @@ func (r *importReader) value() (typ types.Type, val constant.Value) {
 		val = constant.MakeString(r.string())
 
 	case types.IsInteger:
-		val = r.mpint(b)
+		var x big.Int
+		r.mpint(&x, b)
+		val = constant.Make(&x)
 
 	case types.IsFloat:
 		val = r.mpfloat(b)
@@ -538,8 +564,8 @@ func intSize(b *types.Basic) (signed bool, maxBytes uint) {
 	return
 }
 
-func (r *importReader) mpint(b *types.Basic) constant.Value {
-	signed, maxBytes := intSize(b)
+func (r *importReader) mpint(x *big.Int, typ *types.Basic) {
+	signed, maxBytes := intSize(typ)
 
 	maxSmall := 256 - maxBytes
 	if signed {
@@ -558,7 +584,8 @@ func (r *importReader) mpint(b *types.Basic) constant.Value {
 				v = ^v
 			}
 		}
-		return constant.MakeInt64(v)
+		x.SetInt64(v)
+		return
 	}
 
 	v := -n
@@ -568,47 +595,23 @@ func (r *importReader) mpint(b *types.Basic) constant.Value {
 	if v < 1 || uint(v) > maxBytes {
 		errorf("weird decoding: %v, %v => %v", n, signed, v)
 	}
-
-	buf := make([]byte, v)
-	io.ReadFull(&r.declReader, buf)
-
-	// convert to little endian
-	// TODO(gri) go/constant should have a more direct conversion function
-	//           (e.g., once it supports a big.Float based implementation)
-	for i, j := 0, len(buf)-1; i < j; i, j = i+1, j-1 {
-		buf[i], buf[j] = buf[j], buf[i]
-	}
-
-	x := constant.MakeFromBytes(buf)
+	b := make([]byte, v)
+	io.ReadFull(&r.declReader, b)
+	x.SetBytes(b)
 	if signed && n&1 != 0 {
-		x = constant.UnaryOp(token.SUB, x, 0)
+		x.Neg(x)
 	}
-	return x
 }
 
-func (r *importReader) mpfloat(b *types.Basic) constant.Value {
-	x := r.mpint(b)
-	if constant.Sign(x) == 0 {
-		return x
+func (r *importReader) mpfloat(typ *types.Basic) constant.Value {
+	var mant big.Int
+	r.mpint(&mant, typ)
+	var f big.Float
+	f.SetInt(&mant)
+	if f.Sign() != 0 {
+		f.SetMantExp(&f, int(r.int64()))
 	}
-
-	exp := r.int64()
-	switch {
-	case exp > 0:
-		x = constant.Shift(x, token.SHL, uint(exp))
-		// Ensure that the imported Kind is Float, else this constant may run into
-		// bitsize limits on overlarge integers. Eventually we can instead adopt
-		// the approach of CL 288632, but that CL relies on go/constant APIs that
-		// were introduced in go1.13.
-		//
-		// TODO(rFindley): sync the logic here with tip Go once we no longer
-		// support go1.12.
-		x = constant.ToFloat(x)
-	case exp < 0:
-		d := constant.Shift(constant.MakeInt64(1), token.SHL, uint(-exp))
-		x = constant.BinaryOp(x, token.QUO, d)
-	}
-	return x
+	return constant.Make(&f)
 }
 
 func (r *importReader) ident() string {
@@ -756,7 +759,7 @@ func (r *importReader) doType(base *types.Named) (res types.Type) {
 			errorf("unexpected type param type")
 		}
 		pkg, name := r.qualifiedIdent()
-		id := ident{pkg.Name(), name}
+		id := ident{pkg, name}
 		if t, ok := r.p.tparamIndex[id]; ok {
 			// We're already in the process of importing this typeparam.
 			return t
