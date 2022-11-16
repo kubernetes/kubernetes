@@ -43,11 +43,15 @@ const (
 
 // SMTAlignmentError represents an error due to SMT alignment
 type SMTAlignmentError struct {
-	RequestedCPUs int
-	CpusPerCore   int
+	RequestedCPUs    int
+	CpusPerCore      int
+	AllocationFailed bool
 }
 
 func (e SMTAlignmentError) Error() string {
+	if e.AllocationFailed {
+		return fmt.Sprintf("SMT Alignment Error: cannot allocate %d cpus using groups of cpus per core = %d", e.RequestedCPUs, e.CpusPerCore)
+	}
 	return fmt.Sprintf("SMT Alignment Error: requested %d cpus not multiple cpus per core = %d", e.RequestedCPUs, e.CpusPerCore)
 }
 
@@ -142,7 +146,7 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reserv
 		//
 		// For example: Given a system with 8 CPUs available and HT enabled,
 		// if numReservedCPUs=2, then reserved={0,4}
-		reserved, _, _ = policy.takeByTopology(allCPUs, numReservedCPUs)
+		reserved, _, _ = policy.takeByTopologyWithCPUGroupSize(allCPUs, numReservedCPUs, 1)
 	}
 
 	if reserved.Size() != numReservedCPUs {
@@ -353,7 +357,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 			numAlignedToAlloc = numCPUs
 		}
 
-		alignedCPUs, _, err := p.takeByTopology(alignedCPUs, numAlignedToAlloc)
+		alignedCPUs, err := p.takeByTopology(alignedCPUs, numAlignedToAlloc)
 		if err != nil {
 			return cpuset.NewCPUSet(), err
 		}
@@ -362,7 +366,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 	}
 
 	// Get any remaining CPUs from what's leftover after attempting to grab aligned ones.
-	remainingCPUs, _, err := p.takeByTopology(allocatableCPUs.Difference(result), numCPUs-result.Size())
+	remainingCPUs, err := p.takeByTopology(allocatableCPUs.Difference(result), numCPUs-result.Size())
 	if err != nil {
 		return cpuset.NewCPUSet(), err
 	}
@@ -416,15 +420,30 @@ func (p *staticPolicy) podGuaranteedCPUs(pod *v1.Pod) int {
 	return requestedByAppContainers
 }
 
-func (p *staticPolicy) takeByTopology(availableCPUs cpuset.CPUSet, numCPUs int) (cpuset.CPUSet, bool, error) {
-	if p.options.DistributeCPUsAcrossNUMA {
-		cpuGroupSize := 1
-		if p.options.FullPhysicalCPUsOnly {
-			cpuGroupSize = p.topology.CPUsPerCore()
+func (p *staticPolicy) takeByTopology(availableCPUs cpuset.CPUSet, numCPUs int) (cpuset.CPUSet, error) {
+	cpuGroupSize := 1
+	if p.options.FullPhysicalCPUsOnly {
+		cpuGroupSize = p.topology.CPUsPerCore()
+	}
+	cpus, cpuGroupAligned, err := p.takeByTopologyWithCPUGroupSize(availableCPUs, numCPUs, cpuGroupSize)
+	if err != nil {
+		return cpus, err
+	}
+	if p.options.FullPhysicalCPUsOnly && !cpuGroupAligned {
+		return cpus, SMTAlignmentError{
+			RequestedCPUs:    numCPUs,
+			CpusPerCore:      cpuGroupSize,
+			AllocationFailed: true,
 		}
+	}
+	return cpus, nil
+}
+
+func (p *staticPolicy) takeByTopologyWithCPUGroupSize(availableCPUs cpuset.CPUSet, numCPUs, cpuGroupSize int) (cpuset.CPUSet, bool, error) {
+	if p.options.DistributeCPUsAcrossNUMA {
 		return takeByTopologyNUMADistributed(p.topology, availableCPUs, numCPUs, cpuGroupSize)
 	}
-	return takeByTopologyNUMAPacked(p.topology, availableCPUs, numCPUs, 1)
+	return takeByTopologyNUMAPacked(p.topology, availableCPUs, numCPUs, cpuGroupSize)
 }
 
 func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
