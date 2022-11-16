@@ -1079,9 +1079,9 @@ func computeFlowDistinguisher(rd RequestDigest, method *flowcontrol.FlowDistingu
 	}
 	switch method.Type {
 	case flowcontrol.FlowDistinguisherMethodByUserType:
-		return rd.User.GetName()
+		return rd.User.GetName() + "/" + rd.RequestInfo.Verb
 	case flowcontrol.FlowDistinguisherMethodByNamespaceType:
-		return rd.RequestInfo.Namespace
+		return rd.RequestInfo.Namespace + "/" + rd.RequestInfo.Verb
 	default:
 		// this line shall never reach
 		panic("invalid flow-distinguisher method")
