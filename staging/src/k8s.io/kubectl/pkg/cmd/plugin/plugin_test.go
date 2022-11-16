@@ -184,6 +184,7 @@ func TestListPlugins(t *testing.T) {
 	pluginPath, _ := filepath.Abs("./testdata")
 	expectPlugins := []string{
 		filepath.Join(pluginPath, "kubectl-foo"),
+		filepath.Join(pluginPath, "kubectl-foo-bar"),
 		filepath.Join(pluginPath, "kubectl-version"),
 	}
 

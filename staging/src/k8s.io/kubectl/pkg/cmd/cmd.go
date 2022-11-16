@@ -225,40 +225,26 @@ func (h *DefaultPluginHandler) Execute(executablePath string, cmdArgs, environme
 // HandlePluginCommand receives a pluginHandler and command-line arguments and attempts to find
 // a plugin executable on the PATH that satisfies the given arguments.
 func HandlePluginCommand(pluginHandler PluginHandler, cmdArgs []string) error {
-	var remainingArgs []string // all "non-flag" arguments
-	for _, arg := range cmdArgs {
+	var pluginPath string
+	var pluginArgs []string
+	for i, arg := range cmdArgs {
 		if strings.HasPrefix(arg, "-") {
-			break
+			continue // flag
 		}
-		remainingArgs = append(remainingArgs, strings.Replace(arg, "-", "_", -1))
-	}
-
-	if len(remainingArgs) == 0 {
-		// the length of cmdArgs is at least 1
-		return fmt.Errorf("flags cannot be placed before plugin name: %s", cmdArgs[0])
-	}
-
-	foundBinaryPath := ""
-
-	// attempt to find binary, starting at longest possible name with given cmdArgs
-	for len(remainingArgs) > 0 {
-		path, found := pluginHandler.Lookup(strings.Join(remainingArgs, "-"))
-		if !found {
-			remainingArgs = remainingArgs[:len(remainingArgs)-1]
-			continue
+		for j := i; j < len(cmdArgs); j++ {
+			if strings.HasPrefix(cmdArgs[j], "-") {
+				break // flag
+			}
+			possiblePluginName := strings.Join(cmdArgs[i:j+1], "-")
+			if path, found := pluginHandler.Lookup(possiblePluginName); found {
+				pluginPath = path
+				pluginArgs = append([]string{}, cmdArgs[:i]...)
+				pluginArgs = append(pluginArgs, cmdArgs[j+1:]...)
+			}
 		}
-
-		foundBinaryPath = path
-		break
-	}
-
-	if len(foundBinaryPath) == 0 {
-		return nil
-	}
-
-	// invoke cmd binary relaying the current environment and args given
-	if err := pluginHandler.Execute(foundBinaryPath, cmdArgs[len(remainingArgs):], os.Environ()); err != nil {
-		return err
+		if len(pluginPath) > 0 {
+			return pluginHandler.Execute(pluginPath, pluginArgs, os.Environ())
+		}
 	}
 
 	return nil

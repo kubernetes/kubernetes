@@ -76,6 +76,24 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 			expectPluginArgs: []string{"--bar"},
 		},
 		{
+			name:             "test that a longer plugin executable takes precedence over a shorter one when both exist",
+			args:             []string{"kubectl", "foo", "bar", "--baz"},
+			expectPlugin:     "plugin/testdata/kubectl-foo-bar",
+			expectPluginArgs: []string{"--baz"},
+		},
+		{
+			name:             "test that a plugin can have global flags before it",
+			args:             []string{"kubectl", "--namespace", "myns", "foo"},
+			expectPlugin:     "plugin/testdata/kubectl-foo",
+			expectPluginArgs: []string{"--namespace", "myns"},
+		},
+		{
+			name:             "test that a plugin can have various flags before and after it",
+			args:             []string{"kubectl", "--something", "--namespace", "myns", "--abc=123", "foo", "--bar"},
+			expectPlugin:     "plugin/testdata/kubectl-foo",
+			expectPluginArgs: []string{"--something", "--namespace", "myns", "--abc=123", "--bar"},
+		},
+		{
 			name: "test that a plugin does not execute over an existing command by the same name",
 			args: []string{"kubectl", "version"},
 		},
@@ -198,6 +216,7 @@ func (h *testPluginHandler) Execute(executablePath string, cmdArgs, env []string
 	h.executedPlugin = executablePath
 	h.withArgs = cmdArgs
 	h.withEnv = env
+	h.err = nil
 	return nil
 }
 
