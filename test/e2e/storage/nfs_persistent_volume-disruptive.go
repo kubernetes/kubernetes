@@ -42,7 +42,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-type testBody func(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod)
+type testBody func(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, volumePath string)
 type disruptiveTest struct {
 	testItStmt string
 	runTest    testBody
@@ -272,7 +272,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 			func(t disruptiveTest) {
 				ginkgo.It(t.testItStmt, func() {
 					ginkgo.By("Executing Spec")
-					t.runTest(c, f, clientPod)
+					t.runTest(c, f, clientPod, e2epod.VolumeMountPath1)
 				})
 			}(test)
 		}
