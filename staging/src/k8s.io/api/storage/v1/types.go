@@ -611,9 +611,9 @@ type CSINodeList struct {
 type CSIStorageCapacity struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// The name has no particular meaning. It must be a DNS subdomain (dots allowed, 253 characters). 
-	// To ensure that there are no conflicts with other CSI drivers on the cluster, 
-	// the recommendation is to use csisc-<uuid>, a generated name, or a reverse-domain name 
+	// The name has no particular meaning. It must be a DNS subdomain (dots allowed, 253 characters).
+	// To ensure that there are no conflicts with other CSI drivers on the cluster,
+	// the recommendation is to use csisc-<uuid>, a generated name, or a reverse-domain name
 	// which ends with the unique CSI driver name.
 	//
 	// Objects are namespaced.
