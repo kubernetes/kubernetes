@@ -142,7 +142,7 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reserv
 		//
 		// For example: Given a system with 8 CPUs available and HT enabled,
 		// if numReservedCPUs=2, then reserved={0,4}
-		reserved, _ = policy.takeByTopology(allCPUs, numReservedCPUs)
+		reserved, _, _ = policy.takeByTopology(allCPUs, numReservedCPUs)
 	}
 
 	if reserved.Size() != numReservedCPUs {
@@ -353,7 +353,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 			numAlignedToAlloc = numCPUs
 		}
 
-		alignedCPUs, err := p.takeByTopology(alignedCPUs, numAlignedToAlloc)
+		alignedCPUs, _, err := p.takeByTopology(alignedCPUs, numAlignedToAlloc)
 		if err != nil {
 			return cpuset.NewCPUSet(), err
 		}
@@ -362,7 +362,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 	}
 
 	// Get any remaining CPUs from what's leftover after attempting to grab aligned ones.
-	remainingCPUs, err := p.takeByTopology(allocatableCPUs.Difference(result), numCPUs-result.Size())
+	remainingCPUs, _, err := p.takeByTopology(allocatableCPUs.Difference(result), numCPUs-result.Size())
 	if err != nil {
 		return cpuset.NewCPUSet(), err
 	}
@@ -416,7 +416,7 @@ func (p *staticPolicy) podGuaranteedCPUs(pod *v1.Pod) int {
 	return requestedByAppContainers
 }
 
-func (p *staticPolicy) takeByTopology(availableCPUs cpuset.CPUSet, numCPUs int) (cpuset.CPUSet, error) {
+func (p *staticPolicy) takeByTopology(availableCPUs cpuset.CPUSet, numCPUs int) (cpuset.CPUSet, bool, error) {
 	if p.options.DistributeCPUsAcrossNUMA {
 		cpuGroupSize := 1
 		if p.options.FullPhysicalCPUsOnly {
@@ -424,7 +424,7 @@ func (p *staticPolicy) takeByTopology(availableCPUs cpuset.CPUSet, numCPUs int) 
 		}
 		return takeByTopologyNUMADistributed(p.topology, availableCPUs, numCPUs, cpuGroupSize)
 	}
-	return takeByTopologyNUMAPacked(p.topology, availableCPUs, numCPUs)
+	return takeByTopologyNUMAPacked(p.topology, availableCPUs, numCPUs, 1)
 }
 
 func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
