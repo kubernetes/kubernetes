@@ -78,6 +78,7 @@ spec:
                                 type: array
                                 items:
                                   type: string
+                      x-kubernetes-map-type: atomic
                     scopes:
                       description: A collection of filters that must match each object tracked by a quota. If not specified, the quota matches all objects.
                       type: array
@@ -125,6 +126,7 @@ spec:
                           additionalProperties:
                             type: string
                       nullable: true
+                      x-kubernetes-map-type: atomic
             status:
               description: Status defines the actual enforced quota and its current usage
               type: object

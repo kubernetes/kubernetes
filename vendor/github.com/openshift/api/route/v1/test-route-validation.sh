@@ -57,6 +57,39 @@ spec:
 EOF
 expect_fail 'passthrough with nonempty path'
 
+oc create -f - <<'EOF'
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  namespace: openshift-ingress
+  name: testroute
+spec:
+  host: test.foo
+  path: /
+  to:
+    kind: Service
+    name: router-internal-default
+EOF
+expect_pass 'non-TLS with nonempty path'
+delete_route
+
+oc create -f - <<'EOF'
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  namespace: openshift-ingress
+  name: testroute
+spec:
+  host: test.foo
+  path: /
+  tls:
+    termination: edge
+  to:
+    kind: Service
+    name: router-internal-default
+EOF
+expect_pass 'edge-terminated with nonempty path'
+delete_route
 
 oc create -f - <<'EOF'
 apiVersion: route.openshift.io/v1

@@ -15,186 +15,168 @@ spec:
     singular: clustercsidriver
   scope: Cluster
   versions:
-  - name: v1
-    schema:
-      openAPIV3Schema:
-        description: "ClusterCSIDriver object allows management and configuration
-          of a CSI driver operator installed by default in OpenShift. Name of the
-          object must be name of the CSI driver it operates. See CSIDriverName type
-          for list of allowed values. \n Compatibility level 1: Stable within a major
-          release for a minimum of 12 months or 3 minor releases (whichever is longer)."
-        properties:
-          apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-            type: string
-          kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-            type: string
-          metadata:
-            properties:
-              name:
-                enum:
-                - ebs.csi.aws.com
-                - efs.csi.aws.com
-                - disk.csi.azure.com
-                - file.csi.azure.com
-                - filestore.csi.storage.gke.io
-                - pd.csi.storage.gke.io
-                - cinder.csi.openstack.org
-                - csi.vsphere.vmware.com
-                - manila.csi.openstack.org
-                - csi.ovirt.org
-                - csi.kubevirt.io
-                - csi.sharedresource.openshift.io
-                - diskplugin.csi.alibabacloud.com
-                - vpc.block.csi.ibm.io
-                - powervs.csi.ibm.com
-                type: string
-            type: object
-          spec:
-            description: spec holds user settable values for configuration
-            properties:
-              logLevel:
-                default: Normal
-                description: "logLevel is an intent based logging for an overall component.
-                  \ It does not give fine grained control, but it is a simple way
-                  to manage coarse grained logging choices that operators have to
-                  interpret for their operands. \n Valid values are: \"Normal\", \"Debug\",
-                  \"Trace\", \"TraceAll\". Defaults to \"Normal\"."
-                enum:
-                - ""
-                - Normal
-                - Debug
-                - Trace
-                - TraceAll
-                type: string
-              managementState:
-                description: managementState indicates whether and how the operator
-                  should manage the component
-                pattern: ^(Managed|Unmanaged|Force|Removed)$
-                type: string
-              observedConfig:
-                description: observedConfig holds a sparse config that controller
-                  has observed from the cluster state.  It exists in spec because
-                  it is an input to the level for the operator
-                nullable: true
-                type: object
-                x-kubernetes-preserve-unknown-fields: true
-              operatorLogLevel:
-                default: Normal
-                description: "operatorLogLevel is an intent based logging for the
-                  operator itself.  It does not give fine grained control, but it
-                  is a simple way to manage coarse grained logging choices that operators
-                  have to interpret for themselves. \n Valid values are: \"Normal\",
-                  \"Debug\", \"Trace\", \"TraceAll\". Defaults to \"Normal\"."
-                enum:
-                - ""
-                - Normal
-                - Debug
-                - Trace
-                - TraceAll
-                type: string
-              storageClassState:
-                description: StorageClassState determines if CSI operator should create
-                  and manage storage classes. If this field value is empty or Managed
-                  - CSI operator will continuously reconcile storage class and create
-                  if necessary. If this field value is Unmanaged - CSI operator will
-                  not reconcile any previously created storage class. If this field
-                  value is Removed - CSI operator will delete the storage class it
-                  created previously. When omitted, this means the user has no opinion
-                  and the platform chooses a reasonable default, which is subject
-                  to change over time. The current default behaviour is Managed.
-                enum:
-                - ""
-                - Managed
-                - Unmanaged
-                - Removed
-                type: string
-              unsupportedConfigOverrides:
-                description: 'unsupportedConfigOverrides holds a sparse config that
-                  will override any previously set options.  It only needs to be the
-                  fields to override it will end up overlaying in the following order:
-                  1. hardcoded defaults 2. observedConfig 3. unsupportedConfigOverrides'
-                nullable: true
-                type: object
-                x-kubernetes-preserve-unknown-fields: true
-            type: object
-          status:
-            description: status holds observed values from the cluster. They may not
-              be overridden.
-            properties:
-              conditions:
-                description: conditions is a list of conditions and their status
-                items:
-                  description: OperatorCondition is just the standard condition fields.
+    - name: v1
+      schema:
+        openAPIV3Schema:
+          description: "ClusterCSIDriver object allows management and configuration of a CSI driver operator installed by default in OpenShift. Name of the object must be name of the CSI driver it operates. See CSIDriverName type for list of allowed values. \n Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer)."
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              properties:
+                name:
+                  enum:
+                    - ebs.csi.aws.com
+                    - efs.csi.aws.com
+                    - disk.csi.azure.com
+                    - file.csi.azure.com
+                    - filestore.csi.storage.gke.io
+                    - pd.csi.storage.gke.io
+                    - cinder.csi.openstack.org
+                    - csi.vsphere.vmware.com
+                    - manila.csi.openstack.org
+                    - csi.ovirt.org
+                    - csi.kubevirt.io
+                    - csi.sharedresource.openshift.io
+                    - diskplugin.csi.alibabacloud.com
+                    - vpc.block.csi.ibm.io
+                    - powervs.csi.ibm.com
+                  type: string
+              type: object
+            spec:
+              description: spec holds user settable values for configuration
+              properties:
+                driverConfig:
+                  description: driverConfig can be used to specify platform specific driver configuration. When omitted, this means no opinion and the platform is left to choose reasonable defaults. These defaults are subject to change over time.
                   properties:
-                    lastTransitionTime:
-                      format: date-time
+                    driverType:
+                      description: "driverType indicates type of CSI driver for which the driverConfig is being applied to. \n Valid values are: \n * vSphere \n Allows configuration of vsphere CSI driver topology. \n --- Consumers should treat unknown values as a NO-OP."
+                      enum:
+                        - ""
+                        - vSphere
                       type: string
-                    message:
-                      type: string
-                    reason:
-                      type: string
-                    status:
-                      type: string
-                    type:
-                      type: string
+                    vSphere:
+                      description: vsphere is used to configure the vsphere CSI driver.
+                      properties:
+                        topologyCategories:
+                          description: topologyCategories indicates tag categories with which vcenter resources such as hostcluster or datacenter were tagged with. If cluster Infrastructure object has a topology, values specified in Infrastructure object will be used and modifications to topologyCategories will be rejected.
+                          items:
+                            type: string
+                          type: array
+                      type: object
+                  required:
+                    - driverType
                   type: object
-                type: array
-              generations:
-                description: generations are used to determine when an item needs
-                  to be reconciled or has changed in a way that needs a reaction.
-                items:
-                  description: GenerationStatus keeps track of the generation for
-                    a given resource so that decisions about forced updates can be
-                    made.
-                  properties:
-                    group:
-                      description: group is the group of the thing you're tracking
-                      type: string
-                    hash:
-                      description: hash is an optional field set for resources without
-                        generation that are content sensitive like secrets and configmaps
-                      type: string
-                    lastGeneration:
-                      description: lastGeneration is the last generation of the workload
-                        controller involved
-                      format: int64
-                      type: integer
-                    name:
-                      description: name is the name of the thing you're tracking
-                      type: string
-                    namespace:
-                      description: namespace is where the thing you're tracking is
-                      type: string
-                    resource:
-                      description: resource is the resource type of the thing you're
-                        tracking
-                      type: string
+                logLevel:
+                  default: Normal
+                  description: "logLevel is an intent based logging for an overall component.  It does not give fine grained control, but it is a simple way to manage coarse grained logging choices that operators have to interpret for their operands. \n Valid values are: \"Normal\", \"Debug\", \"Trace\", \"TraceAll\". Defaults to \"Normal\"."
+                  enum:
+                    - ""
+                    - Normal
+                    - Debug
+                    - Trace
+                    - TraceAll
+                  type: string
+                managementState:
+                  description: managementState indicates whether and how the operator should manage the component
+                  pattern: ^(Managed|Unmanaged|Force|Removed)$
+                  type: string
+                observedConfig:
+                  description: observedConfig holds a sparse config that controller has observed from the cluster state.  It exists in spec because it is an input to the level for the operator
+                  nullable: true
                   type: object
-                type: array
-              observedGeneration:
-                description: observedGeneration is the last generation change you've
-                  dealt with
-                format: int64
-                type: integer
-              readyReplicas:
-                description: readyReplicas indicates how many replicas are ready and
-                  at the desired state
-                format: int32
-                type: integer
-              version:
-                description: version is the level this availability applies to
-                type: string
-            type: object
-        required:
-        - spec
-        type: object
-    served: true
-    storage: true
-    subresources:
-      status: {}
+                  x-kubernetes-preserve-unknown-fields: true
+                operatorLogLevel:
+                  default: Normal
+                  description: "operatorLogLevel is an intent based logging for the operator itself.  It does not give fine grained control, but it is a simple way to manage coarse grained logging choices that operators have to interpret for themselves. \n Valid values are: \"Normal\", \"Debug\", \"Trace\", \"TraceAll\". Defaults to \"Normal\"."
+                  enum:
+                    - ""
+                    - Normal
+                    - Debug
+                    - Trace
+                    - TraceAll
+                  type: string
+                storageClassState:
+                  description: StorageClassState determines if CSI operator should create and manage storage classes. If this field value is empty or Managed - CSI operator will continuously reconcile storage class and create if necessary. If this field value is Unmanaged - CSI operator will not reconcile any previously created storage class. If this field value is Removed - CSI operator will delete the storage class it created previously. When omitted, this means the user has no opinion and the platform chooses a reasonable default, which is subject to change over time. The current default behaviour is Managed.
+                  enum:
+                    - ""
+                    - Managed
+                    - Unmanaged
+                    - Removed
+                  type: string
+                unsupportedConfigOverrides:
+                  description: 'unsupportedConfigOverrides holds a sparse config that will override any previously set options.  It only needs to be the fields to override it will end up overlaying in the following order: 1. hardcoded defaults 2. observedConfig 3. unsupportedConfigOverrides'
+                  nullable: true
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+              type: object
+            status:
+              description: status holds observed values from the cluster. They may not be overridden.
+              properties:
+                conditions:
+                  description: conditions is a list of conditions and their status
+                  items:
+                    description: OperatorCondition is just the standard condition fields.
+                    properties:
+                      lastTransitionTime:
+                        format: date-time
+                        type: string
+                      message:
+                        type: string
+                      reason:
+                        type: string
+                      status:
+                        type: string
+                      type:
+                        type: string
+                    type: object
+                  type: array
+                generations:
+                  description: generations are used to determine when an item needs to be reconciled or has changed in a way that needs a reaction.
+                  items:
+                    description: GenerationStatus keeps track of the generation for a given resource so that decisions about forced updates can be made.
+                    properties:
+                      group:
+                        description: group is the group of the thing you're tracking
+                        type: string
+                      hash:
+                        description: hash is an optional field set for resources without generation that are content sensitive like secrets and configmaps
+                        type: string
+                      lastGeneration:
+                        description: lastGeneration is the last generation of the workload controller involved
+                        format: int64
+                        type: integer
+                      name:
+                        description: name is the name of the thing you're tracking
+                        type: string
+                      namespace:
+                        description: namespace is where the thing you're tracking is
+                        type: string
+                      resource:
+                        description: resource is the resource type of the thing you're tracking
+                        type: string
+                    type: object
+                  type: array
+                observedGeneration:
+                  description: observedGeneration is the last generation change you've dealt with
+                  format: int64
+                  type: integer
+                readyReplicas:
+                  description: readyReplicas indicates how many replicas are ready and at the desired state
+                  format: int32
+                  type: integer
+                version:
+                  description: version is the level this availability applies to
+                  type: string
+              type: object
+          required:
+            - spec
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}

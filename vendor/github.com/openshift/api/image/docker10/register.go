@@ -12,14 +12,23 @@ const (
 
 // SchemeGroupVersion is group version used to register these objects
 var (
-	SchemeGroupVersion       = schema.GroupVersion{Group: GroupName, Version: "1.0"}
+	GroupVersion             = schema.GroupVersion{Group: GroupName, Version: "1.0"}
 	LegacySchemeGroupVersion = schema.GroupVersion{Group: LegacyGroupName, Version: "1.0"}
 
 	SchemeBuilder       = runtime.NewSchemeBuilder(addKnownTypes)
 	LegacySchemeBuilder = runtime.NewSchemeBuilder(addLegacyKnownTypes)
 
-	AddToScheme            = SchemeBuilder.AddToScheme
 	AddToSchemeInCoreGroup = LegacySchemeBuilder.AddToScheme
+
+	// Install is a function which adds this version to a scheme
+	Install = SchemeBuilder.AddToScheme
+
+	// SchemeGroupVersion generated code relies on this name
+	// Deprecated
+	SchemeGroupVersion = GroupVersion
+	// AddToScheme exists solely to keep the old generators creating valid code
+	// DEPRECATED
+	AddToScheme = SchemeBuilder.AddToScheme
 )
 
 // Adds the list of known types to api.Scheme.

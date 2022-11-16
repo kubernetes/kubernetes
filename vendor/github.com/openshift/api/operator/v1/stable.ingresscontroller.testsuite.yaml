@@ -1,0 +1,15 @@
+apiVersion: apiextensions.k8s.io/v1 # Hack because controller-gen complains if we don't have this
+name: "[Stable] IngressController"
+crd: 0000_50_ingress-operator_00-ingresscontroller.crd.yaml
+tests:
+  onCreate:
+  - name: Should be able to create a minimal IngressController
+    initial: |
+      apiVersion: operator.openshift.io/v1
+      kind: IngressController
+      spec: {} # No spec is required for a IngressController
+    expected: |
+      apiVersion: operator.openshift.io/v1
+      kind: IngressController
+      spec:
+        httpEmptyRequestsPolicy: Respond

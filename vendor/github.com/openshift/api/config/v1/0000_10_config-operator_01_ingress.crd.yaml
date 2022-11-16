@@ -81,7 +81,7 @@ spec:
                 domain:
                   description: "domain is used to generate a default host name for a route when the route's host name is empty. The generated host name will follow this pattern: \"<route-name>.<route-namespace>.<domain>\". \n It is also used as the default wildcard domain suffix for ingress. The default ingresscontroller domain will follow this pattern: \"*.<domain>\". \n Once set, changing domain is not currently supported."
                   type: string
-                loadbalancer:
+                loadBalancer:
                   description: loadBalancer contains the load balancer details in general which are not only specific to the underlying infrastructure provider of the current cluster and are required for Ingress Controller to work on OpenShift.
                   type: object
                   properties:
@@ -96,7 +96,7 @@ spec:
                             - type
                           properties:
                             type:
-                              description: "type allows user to set a load balancer type. When this field is set the default ingresscontroller will get created using the specified LBType. If this field is not set then the default ingress controller of LBType Classic will be created. Valid values are: \n * \"Classic\": A Classic Load Balancer that makes routing decisions at either   the transport layer (TCP/SSL) or the application layer (HTTP/HTTPS). See   the following for additional details: \n     https://docs.aws.amazon.com/AmazonECS/latest/developerguide/load-balancer-types.html#clb \n * \"NLB\": A Network Load Balancer that makes routing decisions at the   transport layer (TCP/SSL). See the following for additional details: \n     https://docs.aws.amazon.com/AmazonECS/latest/developerguide/load-balancer-types.html#nlb"
+                              description: "type allows user to set a load balancer type. When this field is set the default ingresscontroller will get created using the specified LBType. If this field is not set then the default ingress controller of LBType Classic will be created. Valid values are: \n * \"Classic\": A Classic Load Balancer that makes routing decisions at either the transport layer (TCP/SSL) or the application layer (HTTP/HTTPS). See the following for additional details: \n https://docs.aws.amazon.com/AmazonECS/latest/developerguide/load-balancer-types.html#clb \n * \"NLB\": A Network Load Balancer that makes routing decisions at the transport layer (TCP/SSL). See the following for additional details: \n https://docs.aws.amazon.com/AmazonECS/latest/developerguide/load-balancer-types.html#nlb"
                               type: string
                               enum:
                                 - NLB
@@ -188,6 +188,7 @@ spec:
                             type: object
                             additionalProperties:
                               type: string
+                        x-kubernetes-map-type: atomic
                       preloadPolicy:
                         description: preloadPolicy directs the client to include hosts in its host preload list so that it never needs to do an initial load to get the HSTS header (note that this is not defined in RFC 6797 and is therefore client implementation-dependent).
                         type: string
@@ -215,7 +216,7 @@ spec:
                         description: "conditions are used to communicate the state of the componentRoutes entry. \n Supported conditions include Available, Degraded and Progressing. \n If available is true, the content served by the route can be accessed by users. This includes cases where a default may continue to serve content while the customized route specified by the cluster-admin is being configured. \n If Degraded is true, that means something has gone wrong trying to handle the componentRoutes entry. The currentHostnames field may or may not be in effect. \n If Progressing is true, that means the component is taking some action related to the componentRoutes entry."
                         type: array
                         items:
-                          description: "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, \n \ttype FooStatus struct{ \t    // Represents the observations of a foo's current state. \t    // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\" \t    // +patchMergeKey=type \t    // +patchStrategy=merge \t    // +listType=map \t    // +listMapKey=type \t    Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n \t    // other fields \t}"
+                          description: "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, \n type FooStatus struct{ // Represents the observations of a foo's current state. // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge // +listType=map // +listMapKey=type Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
                           type: object
                           required:
                             - lastTransitionTime

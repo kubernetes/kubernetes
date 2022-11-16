@@ -225,7 +225,7 @@ type UpdateHistory struct {
 type ClusterID string
 
 // ClusterVersionCapability enumerates optional, core cluster components.
-// +kubebuilder:validation:Enum=openshift-samples;baremetal;marketplace;Console;Insights;Storage
+// +kubebuilder:validation:Enum=openshift-samples;baremetal;marketplace;Console;Insights;Storage;CSISnapshot
 type ClusterVersionCapability string
 
 const (
@@ -262,6 +262,12 @@ const (
 	// These clusters heavily rely on that capability and may cause
 	// damage to the cluster.
 	ClusterVersionCapabilityStorage ClusterVersionCapability = "Storage"
+
+	// ClusterVersionCapabilityCSISnapshot manages the csi snapshot
+	// controller operator which is responsible for watching the
+	// VolumeSnapshot CRD objects and manages the creation and deletion
+	// lifecycle of volume snapshots
+	ClusterVersionCapabilityCSISnapshot ClusterVersionCapability = "CSISnapshot"
 )
 
 // KnownClusterVersionCapabilities includes all known optional, core cluster components.
@@ -272,6 +278,7 @@ var KnownClusterVersionCapabilities = []ClusterVersionCapability{
 	ClusterVersionCapabilityMarketplace,
 	ClusterVersionCapabilityStorage,
 	ClusterVersionCapabilityOpenShiftSamples,
+	ClusterVersionCapabilityCSISnapshot,
 }
 
 // ClusterVersionCapabilitySet defines sets of cluster version capabilities.
@@ -316,6 +323,7 @@ var ClusterVersionCapabilitySets = map[ClusterVersionCapabilitySet][]ClusterVers
 		ClusterVersionCapabilityMarketplace,
 		ClusterVersionCapabilityStorage,
 		ClusterVersionCapabilityOpenShiftSamples,
+		ClusterVersionCapabilityCSISnapshot,
 	},
 	ClusterVersionCapabilitySetCurrent: {
 		ClusterVersionCapabilityBaremetal,
@@ -324,6 +332,7 @@ var ClusterVersionCapabilitySets = map[ClusterVersionCapabilitySet][]ClusterVers
 		ClusterVersionCapabilityMarketplace,
 		ClusterVersionCapabilityStorage,
 		ClusterVersionCapabilityOpenShiftSamples,
+		ClusterVersionCapabilityCSISnapshot,
 	},
 }
 

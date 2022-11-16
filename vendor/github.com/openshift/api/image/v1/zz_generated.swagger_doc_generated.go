@@ -30,11 +30,12 @@ var map_Image = map[string]string{
 	"dockerImageMetadata":          "DockerImageMetadata contains metadata about this image",
 	"dockerImageMetadataVersion":   "DockerImageMetadataVersion conveys the version of the object, which if empty defaults to \"1.0\"",
 	"dockerImageManifest":          "DockerImageManifest is the raw JSON of the manifest",
-	"dockerImageLayers":            "DockerImageLayers represents the layers in the image. May not be set if the image does not define that data.",
+	"dockerImageLayers":            "DockerImageLayers represents the layers in the image. May not be set if the image does not define that data or if the image represents a manifest list.",
 	"signatures":                   "Signatures holds all signatures of the image.",
 	"dockerImageSignatures":        "DockerImageSignatures provides the signatures as opaque blobs. This is a part of manifest schema v1.",
 	"dockerImageManifestMediaType": "DockerImageManifestMediaType specifies the mediaType of manifest. This is a part of manifest schema v2.",
-	"dockerImageConfig":            "DockerImageConfig is a JSON blob that the runtime uses to set up the container. This is a part of manifest schema v2.",
+	"dockerImageConfig":            "DockerImageConfig is a JSON blob that the runtime uses to set up the container. This is a part of manifest schema v2. Will not be set when the image represents a manifest list.",
+	"dockerImageManifests":         "DockerImageManifests holds information about sub-manifests when the image represents a manifest list. When this field is present, no DockerImageLayers should be specified.",
 }
 
 func (Image) SwaggerDoc() map[string]string {
@@ -66,10 +67,11 @@ func (ImageImportSpec) SwaggerDoc() map[string]string {
 }
 
 var map_ImageImportStatus = map[string]string{
-	"":       "ImageImportStatus describes the result of an image import.",
-	"status": "Status is the status of the image import, including errors encountered while retrieving the image",
-	"image":  "Image is the metadata of that image, if the image was located",
-	"tag":    "Tag is the tag this image was located under, if any",
+	"":          "ImageImportStatus describes the result of an image import.",
+	"status":    "Status is the status of the image import, including errors encountered while retrieving the image",
+	"image":     "Image is the metadata of that image, if the image was located",
+	"tag":       "Tag is the tag this image was located under, if any",
+	"manifests": "Manifests holds sub-manifests metadata when importing a manifest list",
 }
 
 func (ImageImportStatus) SwaggerDoc() map[string]string {
@@ -113,6 +115,20 @@ var map_ImageLookupPolicy = map[string]string{
 
 func (ImageLookupPolicy) SwaggerDoc() map[string]string {
 	return map_ImageLookupPolicy
+}
+
+var map_ImageManifest = map[string]string{
+	"":             "ImageManifest represents sub-manifests of a manifest list. The Digest field points to a regular Image object.",
+	"digest":       "Digest is the unique identifier for the manifest. It refers to an Image object.",
+	"mediaType":    "MediaType defines the type of the manifest, possible values are application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json or application/vnd.docker.distribution.manifest.v1+json.",
+	"manifestSize": "ManifestSize represents the size of the raw object contents, in bytes.",
+	"architecture": "Architecture specifies the supported CPU architecture, for example `amd64` or `ppc64le`.",
+	"os":           "OS specifies the operating system, for example `linux`.",
+	"variant":      "Variant is an optional field repreenting a variant of the CPU, for example v6 to specify a particular CPU variant of the ARM CPU.",
+}
+
+func (ImageManifest) SwaggerDoc() map[string]string {
+	return map_ImageManifest
 }
 
 var map_ImageSignature = map[string]string{
@@ -377,9 +393,10 @@ func (TagEventCondition) SwaggerDoc() map[string]string {
 }
 
 var map_TagImportPolicy = map[string]string{
-	"":          "TagImportPolicy controls how images related to this tag will be imported.",
-	"insecure":  "Insecure is true if the server may bypass certificate verification or connect directly over HTTP during image import.",
-	"scheduled": "Scheduled indicates to the server that this tag should be periodically checked to ensure it is up to date, and imported",
+	"":           "TagImportPolicy controls how images related to this tag will be imported.",
+	"insecure":   "Insecure is true if the server may bypass certificate verification or connect directly over HTTP during image import.",
+	"scheduled":  "Scheduled indicates to the server that this tag should be periodically checked to ensure it is up to date, and imported",
+	"importMode": "ImportMode describes how to import an image manifest.",
 }
 
 func (TagImportPolicy) SwaggerDoc() map[string]string {

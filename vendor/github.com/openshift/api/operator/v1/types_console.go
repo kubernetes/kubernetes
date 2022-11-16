@@ -1,9 +1,9 @@
 package v1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	configv1 "github.com/openshift/api/config/v1"
+	authorizationv1 "k8s.io/api/authorization/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // +genclient
@@ -114,7 +114,7 @@ type ConsoleCustomization struct {
 	// SVG format preferred
 	// +optional
 	CustomLogoFile configv1.ConfigMapFileReference `json:"customLogoFile,omitempty"`
-	// developerCatalog allows to configure the shown developer catalog categories.
+	// developerCatalog allows to configure the shown developer catalog categories (filters) and types (sub-catalogs).
 	// +kubebuilder:validation:Optional
 	// +optional
 	DeveloperCatalog DeveloperConsoleCatalogCustomization `json:"developerCatalog,omitempty"`
@@ -132,6 +132,11 @@ type ConsoleCustomization struct {
 	// +kubebuilder:validation:Optional
 	// +optional
 	AddPage AddPage `json:"addPage,omitempty"`
+	// perspectives allows enabling/disabling of perspective(s) that user can see in the Perspective switcher dropdown.
+	// +listType=map
+	// +listMapKey=id
+	// +optional
+	Perspectives []Perspective `json:"perspectives"`
 }
 
 // ProjectAccess contains options for project access roles
@@ -143,12 +148,55 @@ type ProjectAccess struct {
 	AvailableClusterRoles []string `json:"availableClusterRoles,omitempty"`
 }
 
+// CatalogTypesState defines the state of the catalog types based on which the types will be enabled or disabled.
+type CatalogTypesState string
+
+const (
+	CatalogTypeEnabled  CatalogTypesState = "Enabled"
+	CatalogTypeDisabled CatalogTypesState = "Disabled"
+)
+
+// DeveloperConsoleCatalogTypes defines the state of the sub-catalog types.
+// +kubebuilder:validation:XValidation:rule="self.state == 'Enabled' ? true : !has(self.enabled)",message="enabled is forbidden when state is not Enabled"
+// +kubebuilder:validation:XValidation:rule="self.state == 'Disabled' ? true : !has(self.disabled)",message="disabled is forbidden when state is not Disabled"
+// +union
+type DeveloperConsoleCatalogTypes struct {
+	// state defines if a list of catalog types should be enabled or disabled.
+	// +unionDiscriminator
+	// +kubebuilder:validation:Enum:="Enabled";"Disabled";
+	// +kubebuilder:default:="Enabled"
+	// +default="Enabled"
+	// +kubebuilder:validation:Required
+	State CatalogTypesState `json:"state,omitempty"`
+	// enabled is a list of developer catalog types (sub-catalogs IDs) that will be shown to users.
+	// Types (sub-catalogs) are added via console plugins, the available types (sub-catalog IDs) are available
+	// in the console on the cluster configuration page, or when editing the YAML in the console.
+	// Example: "Devfile", "HelmChart", "BuilderImage"
+	// If the list is non-empty, a new type will not be shown to the user until it is added to list.
+	// If the list is empty the complete developer catalog will be shown.
+	// +listType=set
+	// +unionMember,optional
+	Enabled *[]string `json:"enabled,omitempty"`
+	// disabled is a list of developer catalog types (sub-catalogs IDs) that are not shown to users.
+	// Types (sub-catalogs) are added via console plugins, the available types (sub-catalog IDs) are available
+	// in the console on the cluster configuration page, or when editing the YAML in the console.
+	// Example: "Devfile", "HelmChart", "BuilderImage"
+	// If the list is empty or all the available sub-catalog types are added, then the complete developer catalog should be hidden.
+	// +listType=set
+	// +unionMember,optional
+	Disabled *[]string `json:"disabled,omitempty"`
+}
+
 // DeveloperConsoleCatalogCustomization allow cluster admin to configure developer catalog.
 type DeveloperConsoleCatalogCustomization struct {
 	// categories which are shown in the developer catalog.
 	// +kubebuilder:validation:Optional
 	// +optional
 	Categories []DeveloperConsoleCatalogCategory `json:"categories,omitempty"`
+	// types allows enabling or disabling of sub-catalog types that user can see in the Developer catalog.
+	// When omitted, all the sub-catalog types will be shown.
+	// +optional
+	Types DeveloperConsoleCatalogTypes `json:"types,omitempty"`
 }
 
 // DeveloperConsoleCatalogCategoryMeta are the key identifiers of a developer catalog category.
@@ -200,6 +248,56 @@ type AddPage struct {
 	// +kubebuilder:validation:MinItems=1
 	// +optional
 	DisabledActions []string `json:"disabledActions,omitempty"`
+}
+
+// PerspectiveState defines the visibility state of the perspective. "Enabled" means the perspective is shown.
+// "Disabled" means the Perspective is hidden.
+// "AccessReview" means access review check is required to show or hide a Perspective.
+type PerspectiveState string
+
+const (
+	PerspectiveEnabled      PerspectiveState = "Enabled"
+	PerspectiveDisabled     PerspectiveState = "Disabled"
+	PerspectiveAccessReview PerspectiveState = "AccessReview"
+)
+
+// ResourceAttributesAccessReview defines the visibility of the perspective depending on the access review checks.
+// `required` and  `missing` can work together esp. in the case where the cluster admin
+// wants to show another perspective to users without specific permissions. Out of `required` and `missing` atleast one property should be non-empty.
+// +kubebuilder:validation:MinProperties:=1
+type ResourceAttributesAccessReview struct {
+	// required defines a list of permission checks. The perspective will only be shown when all checks are successful. When omitted, the access review is skipped and the perspective will not be shown unless it is required to do so based on the configuration of the missing access review list.
+	// +optional
+	Required []authorizationv1.ResourceAttributes `json:"required"`
+	// missing defines a list of permission checks. The perspective will only be shown when at least one check fails. When omitted, the access review is skipped and the perspective will not be shown unless it is required to do so based on the configuration of the required access review list.
+	// +optional
+	Missing []authorizationv1.ResourceAttributes `json:"missing"`
+}
+
+// PerspectiveVisibility defines the criteria to show/hide a perspective
+// +kubebuilder:validation:XValidation:rule="self.state == 'AccessReview' ?  has(self.accessReview) : !has(self.accessReview)",message="accessReview configuration is required when state is AccessReview, and forbidden otherwise"
+// +union
+type PerspectiveVisibility struct {
+	// state defines the perspective is enabled or disabled or access review check is required.
+	// +unionDiscriminator
+	// +kubebuilder:validation:Enum:="Enabled";"Disabled";"AccessReview"
+	// +kubebuilder:validation:Required
+	State PerspectiveState `json:"state"`
+	// accessReview defines required and missing access review checks.
+	// +optional
+	AccessReview *ResourceAttributesAccessReview `json:"accessReview,omitempty"`
+}
+
+type Perspective struct {
+	// id defines the id of the perspective.
+	// Example: "dev", "admin".
+	// The available perspective ids can be found in the code snippet section next to the yaml editor.
+	// Incorrect or unknown ids will be ignored.
+	// +kubebuilder:validation:Required
+	ID string `json:"id"`
+	// visibility defines the state of perspective along with access review checks if needed for that perspective.
+	// +kubebuilder:validation:Required
+	Visibility PerspectiveVisibility `json:"visibility"`
 }
 
 // Brand is a specific supported brand within the console.

@@ -188,6 +188,13 @@ const (
 	// allow updates when this condition is not False, including when it is
 	// missing, True, or Unknown.
 	OperatorUpgradeable ClusterStatusConditionType = "Upgradeable"
+
+	// EvaluationConditionsDetected is used to indicate the result of the detection
+	// logic that was added to a component to evaluate the introduction of an
+	// invasive change that could potentially result in highly visible alerts,
+	// breakages or upgrade failures. You can concatenate multiple Reason using
+	// the "::" delimiter if you need to evaluate the introduction of multiple changes.
+	EvaluationConditionsDetected ClusterStatusConditionType = "EvaluationConditionsDetected"
 )
 
 // ClusterOperatorList is a list of OperatorStatus resources.

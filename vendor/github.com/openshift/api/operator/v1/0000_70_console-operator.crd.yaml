@@ -67,7 +67,7 @@ spec:
                       description: customProductName is the name that will be displayed in page titles, logo alt text, and the about dialog instead of the normal OpenShift product name.
                       type: string
                     developerCatalog:
-                      description: developerCatalog allows to configure the shown developer catalog categories.
+                      description: developerCatalog allows to configure the shown developer catalog categories (filters) and types (sub-catalogs).
                       type: object
                       properties:
                         categories:
@@ -122,10 +122,132 @@ spec:
                                 type: array
                                 items:
                                   type: string
+                        types:
+                          description: types allows enabling or disabling of sub-catalog types that user can see in the Developer catalog. When omitted, all the sub-catalog types will be shown.
+                          type: object
+                          required:
+                            - state
+                          properties:
+                            disabled:
+                              description: 'disabled is a list of developer catalog types (sub-catalogs IDs) that are not shown to users. Types (sub-catalogs) are added via console plugins, the available types (sub-catalog IDs) are available in the console on the cluster configuration page, or when editing the YAML in the console. Example: "Devfile", "HelmChart", "BuilderImage" If the list is empty or all the available sub-catalog types are added, then the complete developer catalog should be hidden.'
+                              type: array
+                              items:
+                                type: string
+                              x-kubernetes-list-type: set
+                            enabled:
+                              description: 'enabled is a list of developer catalog types (sub-catalogs IDs) that will be shown to users. Types (sub-catalogs) are added via console plugins, the available types (sub-catalog IDs) are available in the console on the cluster configuration page, or when editing the YAML in the console. Example: "Devfile", "HelmChart", "BuilderImage" If the list is non-empty, a new type will not be shown to the user until it is added to list. If the list is empty the complete developer catalog will be shown.'
+                              type: array
+                              items:
+                                type: string
+                              x-kubernetes-list-type: set
+                            state:
+                              description: state defines if a list of catalog types should be enabled or disabled.
+                              type: string
+                              default: Enabled
+                              enum:
+                                - Enabled
+                                - Disabled
+                          x-kubernetes-validations:
+                            - rule: 'self.state == ''Enabled'' ? true : !has(self.enabled)'
+                              message: enabled is forbidden when state is not Enabled
+                            - rule: 'self.state == ''Disabled'' ? true : !has(self.disabled)'
+                              message: disabled is forbidden when state is not Disabled
                     documentationBaseURL:
                       description: documentationBaseURL links to external documentation are shown in various sections of the web console.  Providing documentationBaseURL will override the default documentation URL. Invalid value will prevent a console rollout.
                       type: string
                       pattern: ^$|^((https):\/\/?)[^\s()<>]+(?:\([\w\d]+\)|([^[:punct:]\s]|\/?))\/$
+                    perspectives:
+                      description: perspectives allows enabling/disabling of perspective(s) that user can see in the Perspective switcher dropdown.
+                      type: array
+                      items:
+                        type: object
+                        required:
+                          - id
+                          - visibility
+                        properties:
+                          id:
+                            description: 'id defines the id of the perspective. Example: "dev", "admin". The available perspective ids can be found in the code snippet section next to the yaml editor. Incorrect or unknown ids will be ignored.'
+                            type: string
+                          visibility:
+                            description: visibility defines the state of perspective along with access review checks if needed for that perspective.
+                            type: object
+                            required:
+                              - state
+                            properties:
+                              accessReview:
+                                description: accessReview defines required and missing access review checks.
+                                type: object
+                                minProperties: 1
+                                properties:
+                                  missing:
+                                    description: missing defines a list of permission checks. The perspective will only be shown when at least one check fails. When omitted, the access review is skipped and the perspective will not be shown unless it is required to do so based on the configuration of the required access review list.
+                                    type: array
+                                    items:
+                                      description: ResourceAttributes includes the authorization attributes available for resource requests to the Authorizer interface
+                                      type: object
+                                      properties:
+                                        group:
+                                          description: Group is the API Group of the Resource.  "*" means all.
+                                          type: string
+                                        name:
+                                          description: Name is the name of the resource being requested for a "get" or deleted for a "delete". "" (empty) means all.
+                                          type: string
+                                        namespace:
+                                          description: Namespace is the namespace of the action being requested.  Currently, there is no distinction between no namespace and all namespaces "" (empty) is defaulted for LocalSubjectAccessReviews "" (empty) is empty for cluster-scoped resources "" (empty) means "all" for namespace scoped resources from a SubjectAccessReview or SelfSubjectAccessReview
+                                          type: string
+                                        resource:
+                                          description: Resource is one of the existing resource types.  "*" means all.
+                                          type: string
+                                        subresource:
+                                          description: Subresource is one of the existing resource types.  "" means none.
+                                          type: string
+                                        verb:
+                                          description: 'Verb is a kubernetes resource API verb, like: get, list, watch, create, update, delete, proxy.  "*" means all.'
+                                          type: string
+                                        version:
+                                          description: Version is the API Version of the Resource.  "*" means all.
+                                          type: string
+                                  required:
+                                    description: required defines a list of permission checks. The perspective will only be shown when all checks are successful. When omitted, the access review is skipped and the perspective will not be shown unless it is required to do so based on the configuration of the missing access review list.
+                                    type: array
+                                    items:
+                                      description: ResourceAttributes includes the authorization attributes available for resource requests to the Authorizer interface
+                                      type: object
+                                      properties:
+                                        group:
+                                          description: Group is the API Group of the Resource.  "*" means all.
+                                          type: string
+                                        name:
+                                          description: Name is the name of the resource being requested for a "get" or deleted for a "delete". "" (empty) means all.
+                                          type: string
+                                        namespace:
+                                          description: Namespace is the namespace of the action being requested.  Currently, there is no distinction between no namespace and all namespaces "" (empty) is defaulted for LocalSubjectAccessReviews "" (empty) is empty for cluster-scoped resources "" (empty) means "all" for namespace scoped resources from a SubjectAccessReview or SelfSubjectAccessReview
+                                          type: string
+                                        resource:
+                                          description: Resource is one of the existing resource types.  "*" means all.
+                                          type: string
+                                        subresource:
+                                          description: Subresource is one of the existing resource types.  "" means none.
+                                          type: string
+                                        verb:
+                                          description: 'Verb is a kubernetes resource API verb, like: get, list, watch, create, update, delete, proxy.  "*" means all.'
+                                          type: string
+                                        version:
+                                          description: Version is the API Version of the Resource.  "*" means all.
+                                          type: string
+                              state:
+                                description: state defines the perspective is enabled or disabled or access review check is required.
+                                type: string
+                                enum:
+                                  - Enabled
+                                  - Disabled
+                                  - AccessReview
+                            x-kubernetes-validations:
+                              - rule: 'self.state == ''AccessReview'' ?  has(self.accessReview) : !has(self.accessReview)'
+                                message: accessReview configuration is required when state is AccessReview, and forbidden otherwise
+                      x-kubernetes-list-map-keys:
+                        - id
+                      x-kubernetes-list-type: map
                     projectAccess:
                       description: projectAccess allows customizing the available list of ClusterRoles in the Developer perspective Project access page which can be used by a project admin to specify roles to other users and restrict access within the project. If set, the list will replace the default ClusterRole options.
                       type: object
