@@ -319,6 +319,11 @@ type NodePlacement struct {
 	//
 	// These defaults are subject to change.
 	//
+	// Note that using nodeSelector.matchExpressions is not supported.  Only
+	// nodeSelector.matchLabels may be used.  This is a limitation of the
+	// Kubernetes API: the pod spec does not allow complex expressions for
+	// node selectors.
+	//
 	// +optional
 	NodeSelector *metav1.LabelSelector `json:"nodeSelector,omitempty"`
 
@@ -367,6 +372,16 @@ var (
 	ExternalLoadBalancer LoadBalancerScope = "External"
 )
 
+// CIDR is an IP address range in CIDR notation (for example, "10.0.0.0/8"
+// or "fd00::/8").
+// +kubebuilder:validation:Pattern=`(^(([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])/([0-9]|[12][0-9]|3[0-2])$)|(^s*((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3})|:))|(([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4]d|1dd|[1-9]?d)(.(25[0-5]|2[0-4]d|1dd|[1-9]?d)){3}))|:)))(%.+)?s*(\/(12[0-8]|1[0-1][0-9]|[1-9][0-9]|[0-9]))$)`
+// + ---
+// + The regex for the IPv4 CIDR range was taken from other CIDR fields in the OpenShift API
+// + and the one for the IPv6 CIDR range was taken from
+// + https://blog.markhatton.co.uk/2011/03/15/regular-expressions-for-ip-addresses-cidr-ranges-and-hostnames/
+// + The resulting regex is an OR of both regexes.
+type CIDR string
+
 // LoadBalancerStrategy holds parameters for a load balancer.
 type LoadBalancerStrategy struct {
 	// scope indicates the scope at which the load balancer is exposed.
@@ -375,6 +390,23 @@ type LoadBalancerStrategy struct {
 	// +kubebuilder:validation:Required
 	// +required
 	Scope LoadBalancerScope `json:"scope"`
+
+	// allowedSourceRanges specifies an allowlist of IP address ranges to which
+	// access to the load balancer should be restricted.  Each range must be
+	// specified using CIDR notation (e.g. "10.0.0.0/8" or "fd00::/8"). If no range is
+	// specified, "0.0.0.0/0" for IPv4 and "::/0" for IPv6 are used by default,
+	// which allows all source addresses.
+	//
+	// To facilitate migration from earlier versions of OpenShift that did
+	// not have the allowedSourceRanges field, you may set the
+	// service.beta.kubernetes.io/load-balancer-source-ranges annotation on
+	// the "router-<ingresscontroller name>" service in the
+	// "openshift-ingress" namespace, and this annotation will take
+	// effect if allowedSourceRanges is empty on OpenShift 4.12.
+	//
+	// +nullable
+	// +optional
+	AllowedSourceRanges []CIDR `json:"allowedSourceRanges,omitempty"`
 
 	// providerParameters holds desired load balancer information specific to
 	// the underlying infrastructure provider.
@@ -391,9 +423,9 @@ type LoadBalancerStrategy struct {
 	// Valid values are: Managed and Unmanaged.
 	//
 	// +kubebuilder:default:="Managed"
-	// +kubebuilder:validation:Optional
-	// +optional
-	DNSManagementPolicy LoadBalancerDNSManagementPolicy `json:"dnsManagementPolicy"`
+	// +kubebuilder:validation:Required
+	// +default="Managed"
+	DNSManagementPolicy LoadBalancerDNSManagementPolicy `json:"dnsManagementPolicy,omitempty"`
 }
 
 // LoadBalancerDNSManagementPolicy is a policy for configuring how
@@ -1472,7 +1504,7 @@ type IngressControllerTuningOptions struct {
 	// 2000-2000000.
 	//
 	// If this field is empty or 0, the IngressController will use
-	// the default value of 20000, but the default is subject to
+	// the default value of 50000, but the default is subject to
 	// change in future releases.
 	//
 	// If the value is -1 then HAProxy will dynamically compute a
@@ -1480,7 +1512,7 @@ type IngressControllerTuningOptions struct {
 	// container. Selecting -1 (i.e., auto) will result in a large
 	// value being computed (~520000 on OpenShift >=4.10 clusters)
 	// and therefore each HAProxy process will incur significant
-	// memory usage compared to the current default of 20000.
+	// memory usage compared to the current default of 50000.
 	//
 	// Setting a value that is greater than the current operating
 	// system limit will prevent the HAProxy process from
@@ -1526,7 +1558,8 @@ type IngressControllerTuningOptions struct {
 	// which is currently 5s and subject to change without notice.
 	//
 	// This field expects an unsigned duration string of decimal numbers, each with optional
-	// fraction and a unit suffix, e.g. "100s", "1m30s". Valid time units are "s" and "m".
+	// fraction and a unit suffix, e.g. "300ms", "1.5h" or "2h45m".
+	// Valid time units are "ns", "us" (or "µs" U+00B5 or "μs" U+03BC), "ms", "s", "m", "h".
 	//
 	// Note: Setting a value significantly larger than the default of 5s can cause latency
 	// in observing updates to routes and their endpoints. HAProxy's configuration will
@@ -1534,7 +1567,7 @@ type IngressControllerTuningOptions struct {
 	// subsequent reload.
 	//
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:Pattern=^(0|([0-9]+(\.[0-9]+)?(s|m))+)$
+	// +kubebuilder:validation:Pattern=^(0|([0-9]+(\.[0-9]+)?(ns|us|µs|μs|ms|s|m|h))+)$
 	// +kubebuilder:validation:Type:=string
 	// +optional
 	ReloadInterval metav1.Duration `json:"reloadInterval,omitempty"`

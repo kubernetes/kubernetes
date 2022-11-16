@@ -13,9 +13,9 @@ spec:
     kind: ImageDigestMirrorSet
     listKind: ImageDigestMirrorSetList
     plural: imagedigestmirrorsets
-    singular: imagedigestmirrorset
     shortNames:
       - idms
+    singular: imagedigestmirrorset
   scope: Cluster
   versions:
     - name: v1

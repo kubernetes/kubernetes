@@ -1,0 +1,16 @@
+apiVersion: apiextensions.k8s.io/v1 # Hack because controller-gen complains if we don't have this
+name: "[Stable] ClusterNetwork"
+crd: 001-clusternetwork-crd.yaml
+tests:
+  onCreate:
+  - name: Should be able to create a minimal ClusterNetwork
+    initial: |
+      apiVersion: network.openshift.io/v1
+      kind: ClusterNetwork
+      clusterNetworks: []
+      serviceNetwork: 1.2.3.4/32
+    expected: |
+      apiVersion: network.openshift.io/v1
+      kind: ClusterNetwork
+      clusterNetworks: []
+      serviceNetwork: 1.2.3.4/32

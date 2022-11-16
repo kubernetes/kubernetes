@@ -13,9 +13,9 @@ spec:
     kind: ImageTagMirrorSet
     listKind: ImageTagMirrorSetList
     plural: imagetagmirrorsets
-    singular: imagetagmirrorset
     shortNames:
       - itms
+    singular: imagetagmirrorset
   scope: Cluster
   versions:
     - name: v1

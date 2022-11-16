@@ -3,10 +3,10 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.openshift.io: https://github.com/openshift/api/pull/470
+    capability.openshift.io/name: marketplace
     include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
     include.release.openshift.io/single-node-developer: "true"
-    capability.openshift.io/name: "marketplace"
   name: operatorhubs.config.openshift.io
 spec:
   group: config.openshift.io

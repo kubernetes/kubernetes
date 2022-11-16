@@ -59,7 +59,7 @@ message Image {
   // DockerImageManifest is the raw JSON of the manifest
   optional string dockerImageManifest = 5;
 
-  // DockerImageLayers represents the layers in the image. May not be set if the image does not define that data.
+  // DockerImageLayers represents the layers in the image. May not be set if the image does not define that data or if the image represents a manifest list.
   repeated ImageLayer dockerImageLayers = 6;
 
   // Signatures holds all signatures of the image.
@@ -74,7 +74,12 @@ message Image {
   optional string dockerImageManifestMediaType = 9;
 
   // DockerImageConfig is a JSON blob that the runtime uses to set up the container. This is a part of manifest schema v2.
+  // Will not be set when the image represents a manifest list.
   optional string dockerImageConfig = 10;
+
+  // DockerImageManifests holds information about sub-manifests when the image represents a manifest list.
+  // When this field is present, no DockerImageLayers should be specified.
+  repeated ImageManifest dockerImageManifests = 11;
 }
 
 // ImageBlobReferences describes the blob references within an image.
@@ -126,6 +131,9 @@ message ImageImportStatus {
 
   // Tag is the tag this image was located under, if any
   optional string tag = 3;
+
+  // Manifests holds sub-manifests metadata when importing a manifest list
+  repeated Image manifests = 4;
 }
 
 // ImageLayer represents a single layer of the image. Some images may have multiple layers. Some may have none.
@@ -170,6 +178,30 @@ message ImageLookupPolicy {
   // be fully qualified to an image ID if found. The tag's referencePolicy is taken
   // into account on the replaced value. Only works within the current namespace.
   optional bool local = 3;
+}
+
+// ImageManifest represents sub-manifests of a manifest list. The Digest field points to a regular
+// Image object.
+message ImageManifest {
+  // Digest is the unique identifier for the manifest. It refers to an Image object.
+  optional string digest = 1;
+
+  // MediaType defines the type of the manifest, possible values are application/vnd.oci.image.manifest.v1+json,
+  // application/vnd.docker.distribution.manifest.v2+json or application/vnd.docker.distribution.manifest.v1+json.
+  optional string mediaType = 2;
+
+  // ManifestSize represents the size of the raw object contents, in bytes.
+  optional int64 manifestSize = 3;
+
+  // Architecture specifies the supported CPU architecture, for example `amd64` or `ppc64le`.
+  optional string architecture = 4;
+
+  // OS specifies the operating system, for example `linux`.
+  optional string os = 5;
+
+  // Variant is an optional field repreenting a variant of the CPU, for example v6 to specify a particular CPU
+  // variant of the ARM CPU.
+  optional string variant = 6;
 }
 
 // ImageSignature holds a signature of an image. It allows to verify image identity and possibly other claims
@@ -624,6 +656,9 @@ message TagImportPolicy {
 
   // Scheduled indicates to the server that this tag should be periodically checked to ensure it is up to date, and imported
   optional bool scheduled = 2;
+
+  // ImportMode describes how to import an image manifest.
+  optional string importMode = 3;
 }
 
 // TagReference specifies optional annotations for images using this tag and an optional reference to an ImageStreamTag, ImageStreamImage, or DockerImage this tag should track.

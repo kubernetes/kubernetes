@@ -96,6 +96,57 @@ type ClusterCSIDriverSpec struct {
 	// The current default behaviour is Managed.
 	// +optional
 	StorageClassState StorageClassStateName `json:"storageClassState,omitempty"`
+
+	// driverConfig can be used to specify platform specific driver configuration.
+	// When omitted, this means no opinion and the platform is left to choose reasonable
+	// defaults. These defaults are subject to change over time.
+	// +optional
+	DriverConfig CSIDriverConfigSpec `json:"driverConfig"`
+}
+
+// CSIDriverType indicates type of CSI driver being configured.
+// +kubebuilder:validation:Enum="";vSphere
+type CSIDriverType string
+
+const (
+	VSphereDriverType CSIDriverType = "vSphere"
+)
+
+// CSIDriverConfigSpec defines configuration spec that can be
+// used to optionally configure a specific CSI Driver.
+// +union
+type CSIDriverConfigSpec struct {
+	// driverType indicates type of CSI driver for which the
+	// driverConfig is being applied to.
+	//
+	// Valid values are:
+	//
+	// * vSphere
+	//
+	// Allows configuration of vsphere CSI driver topology.
+	//
+	// ---
+	// Consumers should treat unknown values as a NO-OP.
+	//
+	// +kubebuilder:validation:Required
+	// +unionDiscriminator
+	DriverType CSIDriverType `json:"driverType"`
+
+	// vsphere is used to configure the vsphere CSI driver.
+	// +optional
+	VSphere *VSphereCSIDriverConfigSpec `json:"vSphere,omitempty"`
+}
+
+// VSphereCSIDriverConfigSpec defines properties that
+// can be configured for vsphere CSI driver.
+type VSphereCSIDriverConfigSpec struct {
+	// topologyCategories indicates tag categories with which
+	// vcenter resources such as hostcluster or datacenter were tagged with.
+	// If cluster Infrastructure object has a topology, values specified in
+	// Infrastructure object will be used and modifications to topologyCategories
+	// will be rejected.
+	// +optional
+	TopologyCategories []string `json:"topologyCategories,omitempty"`
 }
 
 // ClusterCSIDriverStatus is the observed status of CSI driver operator
