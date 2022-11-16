@@ -323,7 +323,7 @@ func (rc *reconciler) attachDesiredVolumes() {
 		attachState := rc.actualStateOfWorld.GetAttachState(volumeToAttach.VolumeName, volumeToAttach.NodeName)
 		if attachState == cache.AttachStateAttached {
 			// Volume/Node exists, touch it to reset detachRequestedTime
-			klog.V(5).InfoS("Volume attached--touching", "volume", volumeToAttach)
+			klog.V(10).InfoS("Volume attached--touching", "volume", volumeToAttach)
 			rc.actualStateOfWorld.ResetDetachRequestTime(volumeToAttach.VolumeName, volumeToAttach.NodeName)
 			continue
 		}
