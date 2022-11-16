@@ -50,7 +50,7 @@ func (LeaseList) SwaggerDoc() map[string]string {
 var map_LeaseSpec = map[string]string{
 	"":                     "LeaseSpec is a specification of a Lease.",
 	"holderIdentity":       "holderIdentity contains the identity of the holder of a current lease.",
-	"leaseDurationSeconds": "leaseDurationSeconds is a duration that candidates for a lease need to wait to force acquire it. This is measure against time of last observed RenewTime.",
+	"leaseDurationSeconds": "leaseDurationSeconds is a duration that candidates for a lease need to wait to force acquire it. This is measure against time of last observed renewTime.",
 	"acquireTime":          "acquireTime is a time when the current lease was acquired.",
 	"renewTime":            "renewTime is a time when the current holder of a lease has last updated the lease.",
 	"leaseTransitions":     "leaseTransitions is the number of transitions of a lease between holders.",
