@@ -18,18 +18,13 @@ package hostutil
 
 import (
 	"errors"
-	"os"
-	"sync"
-
 	"k8s.io/mount-utils"
+	"os"
 )
 
 // FakeHostUtil is a fake HostUtils implementation for testing
 type FakeHostUtil struct {
-	MountPoints []mount.MountPoint
-	Filesystem  map[string]FileType
-
-	mutex sync.Mutex
+	Filesystem map[string]FileType
 }
 
 // NewFakeHostUtil returns a struct that implements the HostUtils interface
@@ -49,14 +44,6 @@ var _ HostUtils = &FakeHostUtil{}
 // DeviceOpened checks if block device referenced by pathname is in use by
 // checking if is listed as a device in the in-memory mountpoint table.
 func (hu *FakeHostUtil) DeviceOpened(pathname string) (bool, error) {
-	hu.mutex.Lock()
-	defer hu.mutex.Unlock()
-
-	for _, mp := range hu.MountPoints {
-		if mp.Device == pathname {
-			return true, nil
-		}
-	}
 	return false, nil
 }
 
