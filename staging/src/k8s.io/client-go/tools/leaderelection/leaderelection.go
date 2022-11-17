@@ -165,7 +165,8 @@ type LeaderElectionConfig struct {
 type LeaderCallbacks struct {
 	// OnStartedLeading is called when a LeaderElector client starts leading
 	OnStartedLeading func(context.Context)
-	// OnStoppedLeading is called when a LeaderElector client stops leading
+	// OnStoppedLeading is called when a LeaderElector client stops electing,
+	// whether the client has held the leader lease or not.
 	OnStoppedLeading func()
 	// OnNewLeader is called when the client observes a leader that is
 	// not the previously observed leader. This includes the first observed
