@@ -231,3 +231,74 @@ func TestEnforceVersionPolicies(t *testing.T) {
 		})
 	}
 }
+
+func Test_detectUnstableVersionError(t *testing.T) {
+	newKubernetesVersion := version.MustParseSemantic("v1.25.0")
+	type args struct {
+		newK8sVersionStr          string
+		allowExperimentalUpgrades bool
+		allowRCUpgrades           bool
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "PreRelease is nil and allowExperimentalUpgrades is false",
+			args: args{
+				newK8sVersionStr:          newKubernetesVersion.WithPreRelease("").String(),
+				allowExperimentalUpgrades: false,
+				allowRCUpgrades:           false,
+			},
+			wantErr: false,
+		},
+		{
+			name: "PreRelease is not nil and allowExperimentalUpgrades is false",
+			args: args{
+				newK8sVersionStr:          newKubernetesVersion.WithPreRelease("beta.1").String(),
+				allowExperimentalUpgrades: false,
+				allowRCUpgrades:           false,
+			},
+			wantErr: true,
+		},
+		{
+			name: "PreRelease is not nil and allowExperimentalUpgrades is true",
+			args: args{
+				newK8sVersionStr:          newKubernetesVersion.WithPreRelease("beta.1").String(),
+				allowExperimentalUpgrades: true,
+				allowRCUpgrades:           false,
+			},
+			wantErr: false,
+		},
+		{
+			name: "PreRelease is prefixed with rc and allowRCUpgrades is true",
+			args: args{
+				newK8sVersionStr:          newKubernetesVersion.WithPreRelease("rc.1").String(),
+				allowExperimentalUpgrades: false,
+				allowRCUpgrades:           true,
+			},
+			wantErr: false,
+		},
+		{
+			name: "PreRelease is prefixed with rc and allowRCUpgrades is false",
+			args: args{
+				newK8sVersionStr:          newKubernetesVersion.WithPreRelease("rc.1").String(),
+				allowExperimentalUpgrades: false,
+				allowRCUpgrades:           false,
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			newK8sVersion, err := version.ParseSemantic(tt.args.newK8sVersionStr)
+			if err != nil {
+				t.Fatalf("couldn't parse version %s: %v", tt.args.newK8sVersionStr, err)
+			}
+			if err = detectUnstableVersionError(newK8sVersion, tt.args.newK8sVersionStr, tt.args.allowExperimentalUpgrades, tt.args.allowRCUpgrades); (err != nil) != tt.wantErr {
+				t.Errorf("detectUnstableVersionError() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
