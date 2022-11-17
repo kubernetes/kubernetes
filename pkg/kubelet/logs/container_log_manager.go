@@ -393,6 +393,7 @@ func (c *containerLogManager) compressLog(log string) error {
 	if _, err := io.Copy(w, r); err != nil {
 		return fmt.Errorf("failed to compress %q to %q: %v", log, tmpLog, err)
 	}
+	f.Close()
 	compressedLog := log + compressSuffix
 	if err := c.osInterface.Rename(tmpLog, compressedLog); err != nil {
 		return fmt.Errorf("failed to rename %q to %q: %v", tmpLog, compressedLog, err)
