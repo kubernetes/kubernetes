@@ -67,7 +67,7 @@ message CSIStorageCapacity {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // NodeTopology defines which nodes have access to the storage
+  // nodeTopology defines which nodes have access to the storage
   // for which capacity was reported. If not set, the storage is
   // not accessible from any node in the cluster. If empty, the
   // storage is accessible from all nodes. This field is
@@ -76,7 +76,7 @@ message CSIStorageCapacity {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector nodeTopology = 2;
 
-  // The name of the StorageClass that the reported capacity applies to.
+  // storageClassName represents the name of the StorageClass that the reported capacity applies to.
   // It must meet the same requirements as the name of a StorageClass
   // object (non-empty, DNS subdomain). If that object no longer exists,
   // the CSIStorageCapacity object is obsolete and should be removed by its
@@ -84,7 +84,7 @@ message CSIStorageCapacity {
   // This field is immutable.
   optional string storageClassName = 3;
 
-  // Capacity is the value reported by the CSI driver in its GetCapacityResponse
+  // capacity is the value reported by the CSI driver in its GetCapacityResponse
   // for a GetCapacityRequest with topology and parameters that match the
   // previous fields.
   //
@@ -96,7 +96,7 @@ message CSIStorageCapacity {
   // +optional
   optional k8s.io.apimachinery.pkg.api.resource.Quantity capacity = 4;
 
-  // MaximumVolumeSize is the value reported by the CSI driver in its GetCapacityResponse
+  // maximumVolumeSize is the value reported by the CSI driver in its GetCapacityResponse
   // for a GetCapacityRequest with topology and parameters that match the
   // previous fields.
   //
@@ -118,7 +118,7 @@ message CSIStorageCapacityList {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is the list of CSIStorageCapacity objects.
+  // items is the list of CSIStorageCapacity objects.
   // +listType=map
   // +listMapKey=name
   repeated CSIStorageCapacity items = 2;
@@ -134,11 +134,11 @@ message VolumeAttachment {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Specification of the desired attach/detach volume behavior.
+  // spec represents specification of the desired attach/detach volume behavior.
   // Populated by the Kubernetes system.
   optional VolumeAttachmentSpec spec = 2;
 
-  // Status of the VolumeAttachment request.
+  // status represents status of the VolumeAttachment request.
   // Populated by the entity completing the attach or detach
   // operation, i.e. the external-attacher.
   // +optional
@@ -152,7 +152,7 @@ message VolumeAttachmentList {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is the list of VolumeAttachments
+  // items is the list of VolumeAttachments
   repeated VolumeAttachment items = 2;
 }
 
@@ -161,7 +161,7 @@ message VolumeAttachmentList {
 // in future we may allow also inline volumes in pods.
 // Exactly one member can be set.
 message VolumeAttachmentSource {
-  // Name of the persistent volume to attach.
+  // persistentVolumeName represents the name of the persistent volume to attach.
   // +optional
   optional string persistentVolumeName = 1;
 
@@ -177,39 +177,39 @@ message VolumeAttachmentSource {
 
 // VolumeAttachmentSpec is the specification of a VolumeAttachment request.
 message VolumeAttachmentSpec {
-  // Attacher indicates the name of the volume driver that MUST handle this
+  // attacher indicates the name of the volume driver that MUST handle this
   // request. This is the name returned by GetPluginName().
   optional string attacher = 1;
 
-  // Source represents the volume that should be attached.
+  // source represents the volume that should be attached.
   optional VolumeAttachmentSource source = 2;
 
-  // The node that the volume should be attached to.
+  // nodeName represents the node that the volume should be attached to.
   optional string nodeName = 3;
 }
 
 // VolumeAttachmentStatus is the status of a VolumeAttachment request.
 message VolumeAttachmentStatus {
-  // Indicates the volume is successfully attached.
+  // attached indicates the volume is successfully attached.
   // This field must only be set by the entity completing the attach
   // operation, i.e. the external-attacher.
   optional bool attached = 1;
 
-  // Upon successful attach, this field is populated with any
-  // information returned by the attach operation that must be passed
+  // attachmentMetadata is populated with any
+  // information returned by the attach operation, upon successful attach, that must be passed
   // into subsequent WaitForAttach or Mount calls.
   // This field must only be set by the entity completing the attach
   // operation, i.e. the external-attacher.
   // +optional
   map<string, string> attachmentMetadata = 2;
 
-  // The last error encountered during attach operation, if any.
+  // attachError represents the last error encountered during attach operation, if any.
   // This field must only be set by the entity completing the attach
   // operation, i.e. the external-attacher.
   // +optional
   optional VolumeError attachError = 3;
 
-  // The last error encountered during detach operation, if any.
+  // detachError represents the last error encountered during detach operation, if any.
   // This field must only be set by the entity completing the detach
   // operation, i.e. the external-attacher.
   // +optional
@@ -218,11 +218,11 @@ message VolumeAttachmentStatus {
 
 // VolumeError captures an error encountered during a volume operation.
 message VolumeError {
-  // Time the error was encountered.
+  // time represents the time the error was encountered.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time time = 1;
 
-  // String detailing the error encountered during Attach or Detach operation.
+  // message represents the error encountered during Attach or Detach operation.
   // This string maybe logged, so it should not contain sensitive
   // information.
   // +optional

@@ -36,7 +36,7 @@ import (
 // according to etcd is in ObjectMeta.Name.
 type StorageClass struct {
 	metav1.TypeMeta `json:",inline"`
-	
+
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -88,7 +88,7 @@ type StorageClass struct {
 // StorageClassList is a collection of storage classes.
 type StorageClassList struct {
 	metav1.TypeMeta `json:",inline"`
-	
+
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -151,7 +151,7 @@ type VolumeAttachment struct {
 // VolumeAttachmentList is a collection of VolumeAttachment objects.
 type VolumeAttachmentList struct {
 	metav1.TypeMeta `json:",inline"`
-	
+
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -302,7 +302,7 @@ type CSIDriverSpec struct {
 	// +optional
 	AttachRequired *bool `json:"attachRequired,omitempty" protobuf:"varint,1,opt,name=attachRequired"`
 
-	// podInfoOnMount indicates this CSI volume driver requires additional pod information (like podName, podUID, etc.) 
+	// podInfoOnMount indicates this CSI volume driver requires additional pod information (like podName, podUID, etc.)
 	// during mount operations, if set to true.
 	// If set to false, pod information will not be passed on mount.
 	// Default is false.
@@ -332,10 +332,10 @@ type CSIDriverSpec struct {
 	PodInfoOnMount *bool `json:"podInfoOnMount,omitempty" protobuf:"bytes,2,opt,name=podInfoOnMount"`
 
 	// volumeLifecycleModes defines what kind of volumes this CSI volume driver supports.
-	// The default if the list is empty is "Persistent", which is the usage defined by the 
+	// The default if the list is empty is "Persistent", which is the usage defined by the
 	// CSI specification and implemented in Kubernetes via the usual PV/PVC mechanism.
 	//
-	// The other mode is "Ephemeral". In this mode, volumes are defined inline inside the pod spec 
+	// The other mode is "Ephemeral". In this mode, volumes are defined inline inside the pod spec
 	// with CSIVolumeSource and their lifecycle is tied to the lifecycle of that pod.
 	// A driver has to be aware of this because it is only going to get a NodePublishVolume call for such a volume.
 	//
@@ -634,7 +634,7 @@ type CSINodeList struct {
 // node.
 type CSIStorageCapacity struct {
 	metav1.TypeMeta `json:",inline"`
-	
+
 	// Standard object's metadata. The name has no particular meaning. It must be
 	// be a DNS subdomain (dots allowed, 253 characters). To ensure that
 	// there are no conflicts with other CSI drivers on the cluster, the recommendation
@@ -699,7 +699,7 @@ type CSIStorageCapacity struct {
 // CSIStorageCapacityList is a collection of CSIStorageCapacity objects.
 type CSIStorageCapacityList struct {
 	metav1.TypeMeta `json:",inline"`
-	
+
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
