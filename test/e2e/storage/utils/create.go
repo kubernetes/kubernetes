@@ -49,7 +49,7 @@ import (
 //
 // LoadFromManifests has some limitations:
 //   - aliases are not supported (i.e. use serviceAccountName instead of the deprecated serviceAccount,
-//     https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.11/#podspec-v1-core)
+//     https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1)
 //     and silently ignored
 //   - the latest stable API version for each item is used, regardless of what
 //     is specified in the manifest files
