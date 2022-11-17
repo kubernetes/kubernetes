@@ -365,6 +365,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// If kubeClient == nil, we are running in standalone mode (i.e. no API servers)
 	// If not nil, we are running as part of a cluster and should sync w/API
 	if kubeDeps.KubeClient != nil {
+		//? 没有handler?
 		kubeInformers := informers.NewSharedInformerFactoryWithOptions(kubeDeps.KubeClient, 0, informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 			options.FieldSelector = fields.Set{metav1.ObjectNameField: string(nodeName)}.String()
 		}))
@@ -372,6 +373,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		nodeHasSynced = func() bool {
 			return kubeInformers.Core().V1().Nodes().Informer().HasSynced()
 		}
+		//启动informer
 		kubeInformers.Start(wait.NeverStop)
 		klog.InfoS("Attempting to sync node with API server")
 	} else {
@@ -532,11 +534,14 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	var secretManager secret.Manager
 	var configMapManager configmap.Manager
+	//config和secret 监听改变的策略
 	switch kubeCfg.ConfigMapAndSecretChangeDetectionStrategy {
 	case kubeletconfiginternal.WatchChangeDetectionStrategy:
+		//list & watch机制
 		secretManager = secret.NewWatchingSecretManager(kubeDeps.KubeClient, klet.resyncInterval)
 		configMapManager = configmap.NewWatchingConfigMapManager(kubeDeps.KubeClient, klet.resyncInterval)
 	case kubeletconfiginternal.TTLCacheChangeDetectionStrategy:
+		//从node的annotation中获取ttl
 		secretManager = secret.NewCachingSecretManager(
 			kubeDeps.KubeClient, manager.GetObjectTTLFromNodeFunc(klet.GetNode))
 		configMapManager = configmap.NewCachingConfigMapManager(
@@ -564,6 +569,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	machineInfo.Timestamp = time.Time{}
 	klet.setCachedMachineInfo(machineInfo)
 
+	//client-go中流控策略, 指数后退
 	imageBackOff := flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
 
 	klet.livenessManager = proberesults.NewManager()
@@ -572,6 +578,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.podCache = kubecontainer.NewCache()
 
 	// podManager is also responsible for keeping secretManager and configMapManager contents up-to-date.
+	//这个是干啥的?
 	mirrorPodClient := kubepod.NewBasicMirrorClient(klet.kubeClient, string(nodeName), nodeLister)
 	klet.podManager = kubepod.NewBasicPodManager(mirrorPodClient, secretManager, configMapManager)
 

@@ -639,6 +639,9 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 
 	if kubeDeps.CAdvisorInterface == nil {
 		imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(s.RemoteRuntimeEndpoint)
+		//创建cadvisor
+		//go 通过+build选项实现了不同操作系统上加载不同的代码.
+		//创建了cadvisor manager. 返回了cadvisor client(封装了cadvisor manager)
 		kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cgroupRoots, cadvisor.UsingLegacyCadvisorStats(s.RemoteRuntimeEndpoint))
 		if err != nil {
 			return err
@@ -655,6 +658,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			s.CgroupRoot = "/"
 		}
 
+		//通过CAdvisor获取主机信息.
 		machineInfo, err := kubeDeps.CAdvisorInterface.MachineInfo()
 		if err != nil {
 			return err
@@ -709,6 +713,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			}
 		}
 
+		//创建containerManager
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(
 			kubeDeps.Mounter,
 			kubeDeps.CAdvisorInterface,
@@ -754,10 +759,12 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 
 	// TODO(vmarmol): Do this through container config.
 	oomAdjuster := kubeDeps.OOMAdjuster
+	//oom score
 	if err := oomAdjuster.ApplyOOMScoreAdj(0, int(s.OOMScoreAdj)); err != nil {
 		klog.InfoS("Failed to ApplyOOMScoreAdj", "err", err)
 	}
 
+	//初始化运行时的service
 	err = kubelet.PreInitRuntimeService(&s.KubeletConfiguration, kubeDeps, s.RemoteRuntimeEndpoint, s.RemoteImageEndpoint)
 	if err != nil {
 		return err
@@ -767,6 +774,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		return err
 	}
 
+	//开启健康检查的端口
 	if s.HealthzPort > 0 {
 		mux := http.NewServeMux()
 		healthz.InstallHandler(mux)
@@ -783,6 +791,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	}
 
 	// If systemd is used, notify it that we have started
+	//如果使用systemd, 向systemd发送ready信号.
 	go daemon.SdNotify(false, "READY=1")
 
 	select {
@@ -1095,6 +1104,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	}
 	hostnameOverridden := len(kubeServer.HostnameOverride) > 0
 	// Setup event recorder if required.
+	//创建event recorder.
 	makeEventRecorder(kubeDeps, nodeName)
 
 	var nodeIPs []net.IP
