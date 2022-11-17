@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"context"
 	"hash/fnv"
 	"io"
 	"reflect"
@@ -145,7 +146,7 @@ func TestDefaultRuleResolver(t *testing.T) {
 
 	for i, tc := range tests {
 		ruleResolver := newMockRuleResolver(&tc.StaticRoles)
-		rules, err := ruleResolver.RulesFor(tc.user, tc.namespace)
+		rules, err := ruleResolver.RulesFor(context.TODO(), tc.user, tc.namespace)
 		if err != nil {
 			t.Errorf("case %d: GetEffectivePolicyRules(context)=%v", i, err)
 			continue

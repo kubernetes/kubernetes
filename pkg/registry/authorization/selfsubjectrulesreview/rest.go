@@ -78,7 +78,7 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 		}
 	}
 
-	resourceInfo, nonResourceInfo, incomplete, err := r.ruleResolver.RulesFor(user, namespace)
+	resourceInfo, nonResourceInfo, incomplete, err := r.ruleResolver.RulesFor(ctx, user, namespace)
 
 	ret := &authorizationapi.SelfSubjectRulesReview{
 		Status: authorizationapi.SubjectRulesReviewStatus{

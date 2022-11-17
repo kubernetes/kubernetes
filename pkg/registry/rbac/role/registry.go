@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 )
@@ -62,6 +63,6 @@ type AuthorizerAdapter struct {
 }
 
 // GetRole returns the corresponding Role by name in specified namespace
-func (a AuthorizerAdapter) GetRole(namespace, name string) (*rbacv1.Role, error) {
-	return a.Registry.GetRole(genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace), name, &metav1.GetOptions{})
+func (a AuthorizerAdapter) GetRole(ctx context.Context, namespace, name string) (*rbacv1.Role, error) {
+	return a.Registry.GetRole(genericapirequest.WithNamespace(ctx, namespace), name, &metav1.GetOptions{})
 }
