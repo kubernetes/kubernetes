@@ -99,7 +99,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Readiness Gates", Type: "string", Priority: 1, Description: apiv1.PodSpec{}.SwaggerDoc()["readinessGates"]},
 	}
 
-  // Errors are suppressed as TableHandler already logs internally
+	// Errors are suppressed as TableHandler already logs internally
 	_ = h.TableHandler(podColumnDefinitions, printPodList)
 	_ = h.TableHandler(podColumnDefinitions, printPod)
 
