@@ -313,13 +313,20 @@ func conjureMac(macPrefix string, ip net.IP) string {
 }
 
 func (proxier *Proxier) endpointsMapChange(oldEndpointsMap, newEndpointsMap proxy.EndpointsMap) {
+
+	eMap := "OldEPS : "
 	for svcPortName := range oldEndpointsMap {
+		eMap = eMap + svcPortName.String() + ", "
 		proxier.onEndpointsMapChange(&svcPortName)
 	}
 
+	eMap = eMap + " NewEPS : "
 	for svcPortName := range newEndpointsMap {
+		eMap = eMap + svcPortName.String() + ", "
 		proxier.onEndpointsMapChange(&svcPortName)
 	}
+
+	klog.V(3).InfoS("Prince: on endpointsMapChange ", "EPS", eMap)
 }
 
 func (proxier *Proxier) onEndpointsMapChange(svcPortName *proxy.ServicePortName) {
@@ -1365,7 +1372,7 @@ func (proxier *Proxier) syncProxyRules() {
 				// Try loading existing policies, if already available
 				hnsLoadBalancer, err = hns.getLoadBalancer(
 					externalIPEndpoints,
-					loadBalancerFlags{isDSR: svcInfo.localTrafficDSR, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
+					loadBalancerFlags{isVipExternalIP: true, isDSR: svcInfo.localTrafficDSR, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
 					sourceVip,
 					externalIP.ip,
 					Enum(svcInfo.Protocol()),
