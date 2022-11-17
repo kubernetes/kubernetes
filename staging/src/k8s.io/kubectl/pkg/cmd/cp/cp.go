@@ -304,7 +304,6 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) e
 	}(srcFile, destFile, writer)
 	var cmdArr []string
 
-	// TODO: Improve error messages by first testing if 'tar' is present in the container?
 	if o.NoPreserve {
 		cmdArr = []string{"tar", "--no-same-permissions", "--no-same-owner", "-xmf", "-"}
 	} else {
@@ -373,7 +372,6 @@ func (t *TarPipe) initReadFrom(n uint64) {
 			PodName:   t.src.PodName,
 		},
 
-		// TODO: Improve error messages by first testing if 'tar' is present in the container?
 		Command:  []string{"tar", "cf", "-", t.src.File.String()},
 		Executor: &exec.DefaultRemoteExecutor{},
 	}
