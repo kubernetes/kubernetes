@@ -280,12 +280,6 @@ func (r *LegacyBindingREST) Destroy() {
 	// we don't destroy it here explicitly.
 }
 
-var _ rest.SingularNameProvider = &LegacyBindingREST{}
-
-func (r *LegacyBindingREST) GetSingularName() string {
-	return r.bindingRest.GetSingularName() + "/binding"
-}
-
 // Create ensures a pod is bound to a specific host.
 func (r *LegacyBindingREST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (out runtime.Object, err error) {
 	metadata, err := meta.Accessor(obj)
