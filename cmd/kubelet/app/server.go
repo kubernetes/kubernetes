@@ -1265,7 +1265,7 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 		case v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage, pidlimit.PIDs:
 			q, err := resource.ParseQuantity(v)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("unable to parse resource %s of value %s, error: %v", k, v, err)
 			}
 			if q.Sign() == -1 {
 				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
