@@ -45,6 +45,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding/metrics"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // ConflictReason is used for the special strings which explain why
@@ -126,6 +127,8 @@ type InTreeToCSITranslator interface {
 //  1. The scheduler takes a Pod off the scheduler queue and processes it serially:
 //     a. Invokes all pre-filter plugins for the pod. GetPodVolumes() is invoked
 //     here, pod volume information will be saved in current scheduling cycle state for later use.
+//     If pod has bound immediate PVCs, GetEligibleNodes() is invoked to potentially reduce
+//     down the list of eligible nodes based on the bound PV's NodeAffinity (if any).
 //     b. Invokes all filter plugins, parallelized across nodes.  FindPodVolumes() is invoked here.
 //     c. Invokes all score plugins.  Future/TBD
 //     d. Selects the best node for the Pod.
@@ -147,6 +150,14 @@ type SchedulerVolumeBinder interface {
 	// GetPodVolumes returns a pod's PVCs separated into bound, unbound with delayed binding (including provisioning)
 	// and unbound with immediate binding (including prebound)
 	GetPodVolumes(pod *v1.Pod) (boundClaims, unboundClaimsDelayBinding, unboundClaimsImmediate []*v1.PersistentVolumeClaim, err error)
+
+	// GetEligibleNodes checks the existing bound claims of the pod to determine if the list of nodes can be
+	// potentially reduced down to a subset of eligible nodes based on the bound claims which then can be used
+	// in subsequent scheduling stages.
+	//
+	// If eligibleNodes is 'nil', then it indicates that such eligible node reduction cannot be made
+	// and all nodes should be considered.
+	GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.String)
 
 	// FindPodVolumes checks if all of a Pod's PVCs can be satisfied by the
 	// node and returns pod's volumes information.
@@ -208,6 +219,8 @@ type volumeBinder struct {
 	csiStorageCapacityLister storagelisters.CSIStorageCapacityLister
 }
 
+var _ SchedulerVolumeBinder = &volumeBinder{}
+
 // CapacityCheck contains additional parameters for NewVolumeBinder that
 // are only needed when checking volume sizes against available storage
 // capacity is desired.
@@ -248,7 +261,7 @@ func NewVolumeBinder(
 }
 
 // FindPodVolumes finds the matching PVs for PVCs and nodes to provision PVs
-// for the given pod and node. If the node does not fit, confilict reasons are
+// for the given pod and node. If the node does not fit, conflict reasons are
 // returned.
 func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*v1.PersistentVolumeClaim, node *v1.Node) (podVolumes *PodVolumes, reasons ConflictReasons, err error) {
 	podVolumes = &PodVolumes{}
@@ -353,6 +366,55 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*
 		}
 	}
 
+	return
+}
+
+// GetEligibleNodes checks the existing bound claims of the pod to determine if the list of nodes can be
+// potentially reduced down to a subset of eligible nodes based on the bound claims which then can be used
+// in subsequent scheduling stages.
+//
+// Returning 'nil' for eligibleNodes indicates that such eligible node reduction cannot be made and all nodes
+// should be considered.
+func (b *volumeBinder) GetEligibleNodes(boundClaims []*v1.PersistentVolumeClaim) (eligibleNodes sets.String) {
+	if len(boundClaims) == 0 {
+		return
+	}
+
+	var errs []error
+	for _, pvc := range boundClaims {
+		pvName := pvc.Spec.VolumeName
+		pv, err := b.pvCache.GetPV(pvName)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		// if the PersistentVolume is local and has node affinity matching specific node(s),
+		// add them to the eligible nodes
+		nodeNames := util.GetLocalPersistentVolumeNodeNames(pv)
+		if len(nodeNames) != 0 {
+			// on the first found list of eligible nodes for the local PersistentVolume,
+			// insert to the eligible node set.
+			if eligibleNodes == nil {
+				eligibleNodes = sets.NewString(nodeNames...)
+			} else {
+				// for subsequent finding of eligible nodes for the local PersistentVolume,
+				// take the intersection of the nodes with the existing eligible nodes
+				// for cases if PV1 has node affinity to node1 and PV2 has node affinity to node2,
+				// then the eligible node list should be empty.
+				eligibleNodes = eligibleNodes.Intersection(sets.NewString(nodeNames...))
+			}
+		}
+	}
+
+	if len(errs) > 0 {
+		klog.V(4).InfoS("GetEligibleNodes: one or more error occurred finding eligible nodes", "error", errs)
+		return nil
+	}
+
+	if eligibleNodes != nil {
+		klog.V(4).InfoS("GetEligibleNodes: reduced down eligible nodes", "nodes", eligibleNodes)
+	}
 	return
 }
 
