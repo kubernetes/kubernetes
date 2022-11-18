@@ -3752,7 +3752,7 @@ type SessionAffinityConfig struct {
 // ClientIPConfig represents the configurations of Client IP based session affinity.
 type ClientIPConfig struct {
 	// timeoutSeconds specifies the seconds of ClientIP type session sticky time.
-	// The value must be >0 && <=86400(for 1 day) if ServiceAffinity == "ClientIP".
+	// The value must be >0 && <=86400(for 1 day) if sessionAffinity == "ClientIP".
 	// Default value is 10800(for 3 hours).
 	// +optional
 	TimeoutSeconds *int32
