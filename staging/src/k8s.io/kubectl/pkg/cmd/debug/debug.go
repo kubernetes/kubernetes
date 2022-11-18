@@ -654,9 +654,6 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 			Name:                     name,
 			TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 		}
-		defer func() {
-			copied.Spec.Containers = append(copied.Spec.Containers, *c)
-		}()
 	}
 
 	if len(o.Args) > 0 {
@@ -678,6 +675,9 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 	}
 	c.Stdin = o.Interactive
 	c.TTY = o.TTY
+	if !ok {
+		copied.Spec.Containers = append(copied.Spec.Containers, *c)
+	}
 
 	err := o.applier.Apply(copied, c.Name, pod)
 	if err != nil {
