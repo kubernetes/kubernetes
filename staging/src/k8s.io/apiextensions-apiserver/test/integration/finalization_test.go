@@ -163,3 +163,35 @@ func TestFinalizationAndDeletion(t *testing.T) {
 		t.Fatalf("unable to delete crd: %v", err)
 	}
 }
+
+func TestDeletionProtection(t *testing.T) {
+	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
+	require.NoError(t, err)
+	defer tearDown()
+
+	// Create a CRD.
+	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
+	noxuDefinition.Spec.DeletionProtection = true
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	require.NoError(t, err)
+
+	// Create a CR
+	ns := "not-the-default"
+	name := "foo123"
+	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+
+	instance := fixtures.NewNoxuInstance(ns, name)
+	_, err = instantiateCustomResource(t, instance, noxuResourceClient, noxuDefinition)
+	require.NoError(t, err)
+
+	// Delete the CRD.
+	fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient)
+
+	// Check is CR still there after the CRD deletion.
+	_, err = noxuResourceClient.Get(context.TODO(), name, metav1.GetOptions{})
+	require.NoError(t, err)
+
+	// check is CRD still there
+	_, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), noxuDefinition.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+}

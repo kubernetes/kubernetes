@@ -69,6 +69,12 @@ type CustomResourceDefinitionSpec struct {
 	// See https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#field-pruning for details.
 	// +optional
 	PreserveUnknownFields bool `json:"preserveUnknownFields,omitempty" protobuf:"varint,10,opt,name=preserveUnknownFields"`
+
+	// deletionProtection blocks deletion if true and there are still instances of a CRD
+	// if this field is true, all instances of this CRD must be deleted before this CRD can be deleted
+	// if this field is false, all instances of this CRD will automatically be deleted when this CRD is deleted
+	// +optional
+	DeletionProtection bool `json:"deletionProtection,omitempty" protobuf:"varint,10,opt,name=deletionProtection"`
 }
 
 // CustomResourceConversion describes how to convert different versions of a CR.

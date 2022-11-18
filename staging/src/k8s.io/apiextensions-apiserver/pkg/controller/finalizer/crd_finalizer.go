@@ -201,6 +201,15 @@ func (c *CRDFinalizer) deleteInstances(crd *apiextensionsv1.CustomResourceDefini
 		}, err
 	}
 
+	if crd.Spec.DeletionProtection && len(allResources.(*unstructured.UnstructuredList).Items) > 0 {
+		return apiextensionsv1.CustomResourceDefinitionCondition{
+			Type:    apiextensionsv1.Terminating,
+			Status:  apiextensionsv1.ConditionTrue,
+			Reason:  "InstancesStillExist",
+			Message: "could not delete, since instances still exist and deletionProtection is true",
+		}, nil
+	}
+
 	deletedNamespaces := sets.String{}
 	deleteErrors := []error{}
 	for _, item := range allResources.(*unstructured.UnstructuredList).Items {
