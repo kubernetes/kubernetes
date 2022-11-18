@@ -435,7 +435,7 @@ func (ep *endpointsInfo) Cleanup() {
 		// Never delete a Local Endpoint. Local Endpoints are already created by other entities.
 		// Remove only remote endpoints created by this service
 		if *ep.refCount <= 0 && !ep.GetIsLocal() {
-			klog.V(4).InfoS("Removing endpoints, since no one is referencing it", "endpoint", ep)
+			klog.V(3).InfoS("Removing endpoints, since no one is referencing it", "endpoint", ep)
 			err := ep.hns.deleteEndpoint(ep.hnsID)
 			if err == nil {
 				ep.hnsID = ""
@@ -1044,7 +1044,7 @@ func (proxier *Proxier) syncProxyRules() {
 	start := time.Now()
 	defer func() {
 		metrics.SyncProxyRulesLatency.Observe(metrics.SinceInSeconds(start))
-		klog.V(4).InfoS("Syncing proxy rules complete", "elapsed", time.Since(start))
+		klog.V(3).InfoS("Syncing proxy rules complete", "elapsed", time.Since(start))
 	}()
 
 	hnsNetworkName := proxier.network.name
@@ -1087,12 +1087,12 @@ func (proxier *Proxier) syncProxyRules() {
 		return
 	}
 	if queriedEndpoints == nil {
-		klog.V(4).InfoS("No existing endpoints found in HNS")
+		klog.V(3).InfoS("No existing endpoints found in HNS")
 		queriedEndpoints = make(map[string]*(endpointsInfo))
 	}
 	queriedLoadBalancers, err := hns.getAllLoadBalancers()
 	if queriedLoadBalancers == nil {
-		klog.V(4).InfoS("No existing load balancers found in HNS")
+		klog.V(3).InfoS("No existing load balancers found in HNS")
 		queriedLoadBalancers = make(map[loadBalancerIdentifier]*(loadBalancerInfo))
 	}
 	if err != nil {
@@ -1120,14 +1120,14 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		if svcInfo.policyApplied {
-			klog.V(4).InfoS("Policy already applied", "serviceInfo", svcInfo)
+			klog.V(3).InfoS("Policy already applied", "serviceInfo", svcInfo)
 			continue
 		}
 
 		if strings.EqualFold(proxier.network.networkType, NETWORK_TYPE_OVERLAY) {
 			serviceVipEndpoint := queriedEndpoints[svcInfo.ClusterIP().String()]
 			if serviceVipEndpoint == nil {
-				klog.V(4).InfoS("No existing remote endpoint", "IP", svcInfo.ClusterIP())
+				klog.V(3).InfoS("No existing remote endpoint", "IP", svcInfo.ClusterIP())
 				hnsEndpoint := &endpointsInfo{
 					ip:              svcInfo.ClusterIP().String(),
 					isLocal:         false,
@@ -1152,7 +1152,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 		var hnsEndpoints []endpointsInfo
 		var hnsLocalEndpoints []endpointsInfo
-		klog.V(4).InfoS("Applying Policy", "serviceInfo", svcName)
+		klog.V(3).InfoS("Applying Policy", "serviceInfo", svcName)
 		// Create Remote endpoints for every endpoint, corresponding to the service
 		containsPublicIP := false
 		containsNodeIP := false
@@ -1162,9 +1162,9 @@ func (proxier *Proxier) syncProxyRules() {
 			// Check should be done only if comes under the feature gate or enabled
 			// The check should be done only if Spec.Type == Loadbalancer.
 			allEndpointsTerminating = proxier.isAllEndpointsTerminating(svcName, svcInfo.localTrafficDSR)
-			klog.V(4).InfoS("Terminating status checked for all endpoints", "svcClusterIP", svcInfo.ClusterIP(), "allEndpointsTerminating", allEndpointsTerminating, "localTrafficDSR", svcInfo.localTrafficDSR)
+			klog.V(3).InfoS("Terminating status checked for all endpoints", "svcClusterIP", svcInfo.ClusterIP(), "allEndpointsTerminating", allEndpointsTerminating, "localTrafficDSR", svcInfo.localTrafficDSR)
 		} else {
-			klog.V(4).InfoS("Skipped terminating status check for all endpoints", "svcClusterIP", svcInfo.ClusterIP(), "proxyEndpointsFeatureGateEnabled", utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ProxyTerminatingEndpoints), "ingressLBCount", len(svcInfo.loadBalancerIngressIPs))
+			klog.V(3).InfoS("Skipped terminating status check for all endpoints", "svcClusterIP", svcInfo.ClusterIP(), "proxyEndpointsFeatureGateEnabled", utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ProxyTerminatingEndpoints), "ingressLBCount", len(svcInfo.loadBalancerIngressIPs))
 		}
 
 		for _, epInfo := range proxier.endpointsMap[svcName] {
@@ -1175,12 +1175,12 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 
 			if !allEndpointsTerminating && !ep.IsReady() {
-				klog.V(4).InfoS("Skipping the endpoint for LB creation. Endpoint is either not ready or all not all endpoints are terminating", "EpIP", ep.ip, " EpPort", ep.port, "allEndpointsTerminating", allEndpointsTerminating, "IsEpReady", ep.IsReady())
+				klog.V(3).InfoS("Skipping the endpoint for LB creation. Endpoint is either not ready or all not all endpoints are terminating", "EpIP", ep.ip, " EpPort", ep.port, "allEndpointsTerminating", allEndpointsTerminating, "IsEpReady", ep.IsReady())
 				continue
 			}
 
 			if !ep.IsServing() {
-				klog.V(4).InfoS("Skipping the endpoint for LB creation. Endpoint is not serving", "EpIP", ep.ip, " EpPort", ep.port, "IsEpServing", ep.IsServing())
+				klog.V(3).InfoS("Skipping the endpoint for LB creation. Endpoint is not serving", "EpIP", ep.ip, " EpPort", ep.port, "IsEpServing", ep.IsServing())
 				continue
 			}
 
@@ -1307,7 +1307,7 @@ func (proxier *Proxier) syncProxyRules() {
 			continue
 		}
 
-		klog.V(4).InfoS("Trying to apply Policies for service", "serviceInfo", svcInfo)
+		klog.V(3).InfoS("Trying to apply Policies for service", "serviceInfo", svcInfo)
 		var hnsLoadBalancer *loadBalancerInfo
 		var sourceVip = proxier.sourceVip
 		if containsPublicIP || containsNodeIP {
