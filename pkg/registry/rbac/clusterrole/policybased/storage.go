@@ -128,9 +128,9 @@ func hasAggregationRule(clusterRole *rbac.ClusterRole) bool {
 var _ rest.SingularNameProvider = &Storage{}
 
 func (s *Storage) GetSingularName() string {
-	svp, ok := s.StandardStorage.(rest.SingularNameProvider)
+	snp, ok := s.StandardStorage.(rest.SingularNameProvider)
 	if !ok {
 		return ""
 	}
-	return svp.GetSingularName()
+	return snp.GetSingularName()
 }

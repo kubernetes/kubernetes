@@ -91,7 +91,7 @@ spec:
 __EOF__
 
   # Test that we can list this new custom resource
-  kube::test::wait_object_assert customresourcedefinitions "{{range.items}}{{if eq ${id_field:?} \\\"examples.test.com\\\"}}{{$id_field}}:{{end}}{{end}}" 'examples.test.com:'
+  kube::test::wait_object_assert customresourcedefinitions "{{range.items}}{{if eq ${id_field:?} \"examples.test.com\"}}{{$id_field}}:{{end}}{{end}}" 'examples.test.com:'
 
   kubectl create -f - << __EOF__
 apiVersion: test.com/v1
@@ -169,7 +169,7 @@ spec:
 __EOF__
 
   # Test that we can list this new custom resource
-  kube::test::wait_object_assert customresourcedefinitions "{{range.items}}{{if eq ${id_field:?} \\\"examples.test.com\\\"}}{{$id_field}}:{{end}}{{end}}" 'examples.test.com:'
+  kube::test::wait_object_assert customresourcedefinitions "{{range.items}}{{if eq ${id_field:?} \"examples.test.com\"}}{{$id_field}}:{{end}}{{end}}" 'examples.test.com:'
 
   kubectl create -f - << __EOF__
 apiVersion: test.com/v1
