@@ -30,6 +30,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
@@ -1014,12 +1015,67 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Pod copy: ProfileApplier changes are applied",
+			opts: &DebugOptions{
+				Args:        []string{},
+				Attach:      true,
+				CopyTo:      "my-debugger",
+				Image:       "debian",
+				Interactive: true,
+				Namespace:   "default",
+				SetImages: map[string]string{
+					"app":     "app:debug",
+					"sidecar": "sidecar:debug",
+				},
+				ShareProcesses: true,
+				TargetNames:    []string{"mypod"},
+				TTY:            true,
+				applier: applierFunc(func(pod *corev1.Pod, containerName string, target runtime.Object) error {
+					for i := range pod.Spec.Containers {
+						if pod.Spec.Containers[i].Name == containerName {
+							pod.Spec.Containers[i].WorkingDir = "modified-by-custom-profile-applier"
+							break
+						}
+					}
+					return nil
+				}),
+			},
+			havePod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "mypod"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "app", Image: "appimage"},
+						{Name: "sidecar", Image: "sidecarimage"},
+					},
+				},
+			},
+			wantPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "my-debugger"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "app", Image: "app:debug"},
+						{Name: "sidecar", Image: "sidecar:debug"},
+						{
+							Name:                     "debugger-1",
+							Image:                    "debian",
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							Stdin:                    true,
+							TTY:                      true,
+							WorkingDir:               "modified-by-custom-profile-applier",
+						},
+					},
+				},
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var err error
-			tc.opts.applier, err = NewProfileApplier(ProfileLegacy)
-			if err != nil {
-				t.Fatalf("Fail to create legacy profile: %v", err)
+			if tc.opts.applier == nil {
+				tc.opts.applier, err = NewProfileApplier(ProfileLegacy)
+				if err != nil {
+					t.Fatalf("Fail to create legacy profile: %v", err)
+				}
 			}
 			tc.opts.IOStreams = genericclioptions.NewTestIOStreamsDiscard()
 			suffixCounter = 0
