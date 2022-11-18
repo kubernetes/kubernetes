@@ -289,6 +289,10 @@ func (r *LegacyBindingREST) Create(ctx context.Context, obj runtime.Object, crea
 	return r.bindingRest.Create(ctx, metadata.GetName(), obj, createValidation, options)
 }
 
+func (r *LegacyBindingREST) GetSingularName() string {
+	return "bindings"
+}
+
 // StatusREST implements the REST endpoint for changing the status of a pod.
 type StatusREST struct {
 	store *genericregistry.Store
