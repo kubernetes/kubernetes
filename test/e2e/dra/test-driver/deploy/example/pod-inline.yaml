@@ -3,7 +3,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: inline-claim-parameters
+  name: test-inline-claim-parameters
   namespace: default
 data:
   a: b
@@ -21,7 +21,7 @@ spec:
     resourceClassName: example
     parametersRef:
       kind: ConfigMap
-      name: pause-claim-parameters
+      name: test-inline-claim-parameters
 ---
 apiVersion: v1
 kind: Pod
