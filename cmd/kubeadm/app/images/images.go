@@ -48,7 +48,7 @@ func GetDNSImage(cfg *kubeadmapi.ClusterConfiguration) string {
 	if cfg.DNS.ImageRepository != "" {
 		dnsImageRepository = cfg.DNS.ImageRepository
 	}
-	// Handle the renaming of the official image from "k8s.gcr.io/coredns" to "k8s.gcr.io/coredns/coredns
+	// Handle the renaming of the official image from "registry.k8s.io/coredns" to "registry.k8s.io/coredns/coredns
 	if dnsImageRepository == kubeadmapiv1beta2.DefaultImageRepository {
 		dnsImageRepository = fmt.Sprintf("%s/coredns", dnsImageRepository)
 	}
