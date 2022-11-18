@@ -159,12 +159,6 @@ func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, 
 	return r.store.ConvertToTable(ctx, object, tableOptions)
 }
 
-var _ rest.SingularNameProvider = &StatusREST{}
-
-func (r *StatusREST) GetSingularName() string {
-	return r.store.GetSingularName() + "/status"
-}
-
 type ScaleREST struct {
 	store *genericregistry.Store
 }
@@ -221,12 +215,6 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 
 func (r *ScaleREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	return r.store.ConvertToTable(ctx, object, tableOptions)
-}
-
-var _ rest.SingularNameProvider = &ScaleREST{}
-
-func (r *ScaleREST) GetSingularName() string {
-	return r.store.GetSingularName() + "/scale"
 }
 
 func toScaleCreateValidation(f rest.ValidateObjectFunc) rest.ValidateObjectFunc {

@@ -117,12 +117,6 @@ func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, 
 	return r.store.ConvertToTable(ctx, object, tableOptions)
 }
 
-var _ rest.SingularNameProvider = &StatusREST{}
-
-func (r *StatusREST) GetSingularName() string {
-	return r.store.GetSingularName() + "/status"
-}
-
 var _ = rest.Patcher(&StatusREST{})
 
 // ApprovalREST implements the REST endpoint for changing the approval state of a CSR.
@@ -156,12 +150,6 @@ func (r *ApprovalREST) Update(ctx context.Context, name string, objInfo rest.Upd
 // GetResetFields implements rest.ResetFieldsStrategy
 func (r *ApprovalREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return r.store.GetResetFields()
-}
-
-var _ rest.SingularNameProvider = &ApprovalREST{}
-
-func (r *ApprovalREST) GetSingularName() string {
-	return r.store.GetSingularName() + "/approval"
 }
 
 var _ = rest.Patcher(&ApprovalREST{})

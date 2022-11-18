@@ -49,12 +49,6 @@ func (r *TokenREST) Destroy() {
 	// here explicitly.
 }
 
-var _ rest.SingularNameProvider = &TokenREST{}
-
-func (r *TokenREST) GetSingularName() string {
-	return "serviceaccount/token"
-}
-
 type TokenREST struct {
 	svcaccts             getter
 	pods                 getter

@@ -103,12 +103,6 @@ func (r *EvictionREST) Destroy() {
 	// we don't destroy it here explicitly.
 }
 
-var _ rest.SingularNameProvider = &EvictionREST{}
-
-func (r *EvictionREST) GetSingularName() string {
-	return "pod/eviction"
-}
-
 // Propagate dry-run takes the dry-run option from the request and pushes it into the eviction object.
 // It returns an error if they have non-matching dry-run options.
 func propagateDryRun(eviction *policy.Eviction, options *metav1.CreateOptions) (*metav1.DeleteOptions, error) {

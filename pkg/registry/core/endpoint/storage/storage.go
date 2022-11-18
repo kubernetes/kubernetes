@@ -39,7 +39,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 		NewFunc:                   func() runtime.Object { return &api.Endpoints{} },
 		NewListFunc:               func() runtime.Object { return &api.EndpointsList{} },
 		DefaultQualifiedResource:  api.Resource("endpoints"),
-		SingularQualifiedResource: api.Resource("endpoint"),
+		SingularQualifiedResource: api.Resource("endpoints"),
 
 		CreateStrategy: endpoint.Strategy,
 		UpdateStrategy: endpoint.Strategy,

@@ -218,9 +218,3 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return r.store.GetResetFields()
 }
-
-var _ rest.SingularNameProvider = &StatusREST{}
-
-func (r *StatusREST) GetSingularName() string {
-	return r.store.GetSingularName() + "/status"
-}

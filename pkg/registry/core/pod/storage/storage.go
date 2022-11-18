@@ -164,12 +164,6 @@ func (r *BindingREST) Destroy() {
 	// we don't destroy it here explicitly.
 }
 
-var _ rest.SingularNameProvider = &BindingREST{}
-
-func (r *BindingREST) GetSingularName() string {
-	return r.store.GetSingularName() + "/binding"
-}
-
 var _ = rest.NamedCreater(&BindingREST{})
 
 // Create ensures a pod is bound to a specific host.
@@ -338,12 +332,6 @@ func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, 
 	return r.store.ConvertToTable(ctx, object, tableOptions)
 }
 
-var _ rest.SingularNameProvider = &StatusREST{}
-
-func (r *StatusREST) GetSingularName() string {
-	return r.store.GetSingularName() + "/status"
-}
-
 // EphemeralContainersREST implements the REST endpoint for adding EphemeralContainers
 type EphemeralContainersREST struct {
 	store *genericregistry.Store
@@ -372,10 +360,4 @@ func (r *EphemeralContainersREST) Update(ctx context.Context, name string, objIn
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
-}
-
-var _ rest.SingularNameProvider = &EphemeralContainersREST{}
-
-func (r *EphemeralContainersREST) GetSingularName() string {
-	return r.store.GetSingularName() + "/ephemeralcontainers"
 }

@@ -168,12 +168,6 @@ func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, 
 	return r.store.ConvertToTable(ctx, object, tableOptions)
 }
 
-var _ rest.SingularNameProvider = &StatusREST{}
-
-func (r *StatusREST) GetSingularName() string {
-	return r.store.GetSingularName() + "/status"
-}
-
 // RollbackREST implements the REST endpoint for initiating the rollback of a deployment
 type RollbackREST struct {
 	store *genericregistry.Store
@@ -202,12 +196,6 @@ func (r *RollbackREST) New() runtime.Object {
 func (r *RollbackREST) Destroy() {
 	// Given that underlying store is shared with REST,
 	// we don't destroy it here explicitly.
-}
-
-var _ rest.SingularNameProvider = &RollbackREST{}
-
-func (r *RollbackREST) GetSingularName() string {
-	return r.store.GetSingularName() + "/rollback"
 }
 
 var _ = rest.NamedCreater(&RollbackREST{})
@@ -352,12 +340,6 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 
 func (r *ScaleREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	return r.store.ConvertToTable(ctx, object, tableOptions)
-}
-
-var _ rest.SingularNameProvider = &ScaleREST{}
-
-func (r *ScaleREST) GetSingularName() string {
-	return r.store.GetSingularName() + "/scale"
 }
 
 func toScaleCreateValidation(f rest.ValidateObjectFunc) rest.ValidateObjectFunc {

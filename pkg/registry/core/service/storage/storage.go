@@ -196,12 +196,6 @@ func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return r.store.GetResetFields()
 }
 
-var _ rest.SingularNameProvider = &StatusREST{}
-
-func (r *StatusREST) GetSingularName() string {
-	return r.store.GetSingularName() + "/status"
-}
-
 // We have a lot of functions that take a pair of "before" and "after" or
 // "oldSvc" and "newSvc" args.  Convention across the codebase is to pass them
 // as (new, old), but it's easy to screw up when they are the same type.

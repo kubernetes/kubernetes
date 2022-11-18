@@ -80,12 +80,6 @@ func (r *ProxyREST) Connect(ctx context.Context, id string, opts runtime.Object,
 	return newThrottledUpgradeAwareProxyHandler(location, transport, true, false, responder), nil
 }
 
-var _ rest.SingularNameProvider = &ProxyREST{}
-
-func (r *ProxyREST) GetSingularName() string {
-	return r.Store.GetSingularName() + "/proxy"
-}
-
 // Support both GET and POST methods. We must support GET for browsers that want to use WebSockets.
 var upgradeableMethods = []string{"GET", "POST"}
 
@@ -132,12 +126,6 @@ func (r *AttachREST) ConnectMethods() []string {
 	return upgradeableMethods
 }
 
-var _ rest.SingularNameProvider = &AttachREST{}
-
-func (r *AttachREST) GetSingularName() string {
-	return r.Store.GetSingularName() + "/attach"
-}
-
 // ExecREST implements the exec subresource for a Pod
 type ExecREST struct {
 	Store       *genericregistry.Store
@@ -179,12 +167,6 @@ func (r *ExecREST) NewConnectOptions() (runtime.Object, bool, string) {
 // ConnectMethods returns the methods supported by exec
 func (r *ExecREST) ConnectMethods() []string {
 	return upgradeableMethods
-}
-
-var _ rest.SingularNameProvider = &ExecREST{}
-
-func (r *ExecREST) GetSingularName() string {
-	return r.Store.GetSingularName() + "/exec"
 }
 
 // PortForwardREST implements the portforward subresource for a Pod
@@ -229,12 +211,6 @@ func (r *PortForwardREST) Connect(ctx context.Context, name string, opts runtime
 		return nil, err
 	}
 	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
-}
-
-var _ rest.SingularNameProvider = &PortForwardREST{}
-
-func (r *PortForwardREST) GetSingularName() string {
-	return r.Store.GetSingularName() + "/portforward"
 }
 
 func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired bool, responder rest.Responder) *proxy.UpgradeAwareHandler {

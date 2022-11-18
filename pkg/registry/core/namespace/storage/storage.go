@@ -339,12 +339,6 @@ func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, 
 	return r.store.ConvertToTable(ctx, object, tableOptions)
 }
 
-var _ rest.SingularNameProvider = &StatusREST{}
-
-func (r *StatusREST) GetSingularName() string {
-	return r.store.GetSingularName() + "/status"
-}
-
 func (r *FinalizeREST) New() runtime.Object {
 	return r.store.New()
 }
@@ -365,10 +359,4 @@ func (r *FinalizeREST) Update(ctx context.Context, name string, objInfo rest.Upd
 // GetResetFields implements rest.ResetFieldsStrategy
 func (r *FinalizeREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return r.store.GetResetFields()
-}
-
-var _ rest.SingularNameProvider = &FinalizeREST{}
-
-func (r *FinalizeREST) GetSingularName() string {
-	return r.store.GetSingularName() + "/finalize"
 }
