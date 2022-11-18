@@ -10,6 +10,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	coreapi "k8s.io/kubernetes/pkg/apis/core"
 	coreapiv1conversions "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -87,7 +88,10 @@ func NewSCCExecRestrictions() *sccExecRestrictions {
 
 func (d *sccExecRestrictions) SetExternalKubeClientSet(c kubernetes.Interface) {
 	d.client = c
-	d.constraintAdmission.SetExternalKubeClientSet(c)
+}
+
+func (d *sccExecRestrictions) SetExternalKubeInformerFactory(informers informers.SharedInformerFactory) {
+	d.constraintAdmission.SetExternalKubeInformerFactory(informers)
 }
 
 func (d *sccExecRestrictions) SetSecurityInformers(informers securityv1informers.SecurityContextConstraintsInformer) {

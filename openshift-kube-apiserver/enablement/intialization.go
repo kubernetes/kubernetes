@@ -4,8 +4,6 @@ import (
 	"io/ioutil"
 	"path"
 
-	"k8s.io/kubernetes/plugin/pkg/admission/security/podsecurity"
-
 	configv1 "github.com/openshift/api/config/v1"
 	kubecontrolplanev1 "github.com/openshift/api/kubecontrolplane/v1"
 	osinv1 "github.com/openshift/api/osin/v1"
@@ -21,6 +19,7 @@ import (
 	"k8s.io/kubernetes/openshift-kube-apiserver/configdefault"
 	"k8s.io/kubernetes/pkg/capabilities"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/plugin/pkg/admission/security/podsecurity"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 

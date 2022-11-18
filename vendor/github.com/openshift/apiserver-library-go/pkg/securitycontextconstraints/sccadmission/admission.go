@@ -8,11 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/sets"
-
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/labels"
 	kutilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
@@ -20,7 +19,8 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/informers"
+	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	coreapi "k8s.io/kubernetes/pkg/apis/core"
@@ -28,11 +28,10 @@ import (
 	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
 
 	securityv1 "github.com/openshift/api/security/v1"
-	securityv1informer "github.com/openshift/client-go/security/informers/externalversions/security/v1"
-	securityv1listers "github.com/openshift/client-go/security/listers/security/v1"
-
 	"github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/sccmatching"
 	sccsort "github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/util/sort"
+	securityv1informer "github.com/openshift/client-go/security/informers/externalversions/security/v1"
+	securityv1listers "github.com/openshift/client-go/security/listers/security/v1"
 )
 
 const PluginName = "security.openshift.io/SecurityContextConstraint"
@@ -46,16 +45,16 @@ func Register(plugins *admission.Plugins) {
 
 type constraint struct {
 	*admission.Handler
-	client     kubernetes.Interface
-	sccLister  securityv1listers.SecurityContextConstraintsLister
-	sccSynced  cache.InformerSynced
-	authorizer authorizer.Authorizer
+	sccLister       securityv1listers.SecurityContextConstraintsLister
+	namespaceLister corev1listers.NamespaceLister
+	listersSynced   []cache.InformerSynced
+	authorizer      authorizer.Authorizer
 }
 
 var (
 	_ = initializer.WantsAuthorizer(&constraint{})
-	_ = initializer.WantsExternalKubeClientSet(&constraint{})
 	_ = WantsSecurityInformer(&constraint{})
+	_ = initializer.WantsExternalKubeInformerFactory(&constraint{})
 	_ = admission.ValidationInterface(&constraint{})
 	_ = admission.MutationInterface(&constraint{})
 )
@@ -168,12 +167,21 @@ func requireStandardSCCs(sccs []*securityv1.SecurityContextConstraints, err erro
 	return fmt.Errorf("securitycontextconstraints.security.openshift.io cache is missing %v", strings.Join(missingSCCs.List(), ", "))
 }
 
+func (c *constraint) areListersSynced() bool {
+	for _, syncFunc := range c.listersSynced {
+		if !syncFunc() {
+			return false
+		}
+	}
+	return true
+}
+
 func (c *constraint) computeSecurityContext(ctx context.Context, a admission.Attributes, pod *coreapi.Pod, specMutationAllowed bool, validatedSCCHint string) (*coreapi.Pod, string, field.ErrorList, error) {
 	// get all constraints that are usable by the user
 	klog.V(4).Infof("getting security context constraints for pod %s (generate: %s) in namespace %s with user info %v", pod.Name, pod.GenerateName, a.GetNamespace(), a.GetUserInfo())
 
 	err := wait.PollImmediateWithContext(ctx, 1*time.Second, 10*time.Second, func(context.Context) (bool, error) {
-		return c.sccSynced(), nil
+		return c.areListersSynced(), nil
 	})
 	if err != nil {
 		return nil, "", nil, admission.NewForbidden(a, fmt.Errorf("securitycontextconstraints.security.openshift.io cache is not synchronized"))
@@ -226,7 +234,7 @@ func (c *constraint) computeSecurityContext(ctx context.Context, a admission.Att
 		return i < j
 	})
 
-	providers, errs := sccmatching.CreateProvidersFromConstraints(ctx, a.GetNamespace(), constraints, c.client)
+	providers, errs := sccmatching.CreateProvidersFromConstraints(ctx, a.GetNamespace(), constraints, c.namespaceLister)
 	logProviders(pod, providers, errs)
 	if len(errs) > 0 {
 		return nil, "", nil, kutilerrors.NewAggregate(errs)
@@ -441,11 +449,12 @@ func shouldIgnore(a admission.Attributes) (bool, error) {
 // SetSecurityInformers implements WantsSecurityInformer interface for constraint.
 func (c *constraint) SetSecurityInformers(informers securityv1informer.SecurityContextConstraintsInformer) {
 	c.sccLister = informers.Lister()
-	c.sccSynced = informers.Informer().HasSynced
+	c.listersSynced = append(c.listersSynced, informers.Informer().HasSynced)
 }
 
-func (c *constraint) SetExternalKubeClientSet(client kubernetes.Interface) {
-	c.client = client
+func (c *constraint) SetExternalKubeInformerFactory(informers informers.SharedInformerFactory) {
+	c.namespaceLister = informers.Core().V1().Namespaces().Lister()
+	c.listersSynced = append(c.listersSynced, informers.Core().V1().Namespaces().Informer().HasSynced)
 }
 
 func (c *constraint) SetAuthorizer(authorizer authorizer.Authorizer) {
@@ -457,11 +466,11 @@ func (c *constraint) ValidateInitialization() error {
 	if c.sccLister == nil {
 		return fmt.Errorf("%s requires an sccLister", PluginName)
 	}
-	if c.sccSynced == nil {
+	if c.listersSynced == nil {
 		return fmt.Errorf("%s requires an sccSynced", PluginName)
 	}
-	if c.client == nil {
-		return fmt.Errorf("%s requires a client", PluginName)
+	if c.namespaceLister == nil {
+		return fmt.Errorf("%s requires a namespaceLister", PluginName)
 	}
 	if c.authorizer == nil {
 		return fmt.Errorf("%s requires an authorizer", PluginName)
