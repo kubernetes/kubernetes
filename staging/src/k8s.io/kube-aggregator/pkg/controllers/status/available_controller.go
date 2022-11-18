@@ -156,11 +156,8 @@ func NewAvailableConditionController(
 	c := &AvailableConditionController{
 		apiServiceClient: apiServiceClient,
 		apiServiceLister: apiServiceInformer.Lister(),
-		apiServiceSynced: apiServiceInformer.Informer().HasSynced,
 		serviceLister:    serviceInformer.Lister(),
-		servicesSynced:   serviceInformer.Informer().HasSynced,
 		endpointsLister:  endpointsInformer.Lister(),
-		endpointsSynced:  endpointsInformer.Informer().HasSynced,
 		serviceResolver:  serviceResolver,
 		queue: workqueue.NewNamedRateLimitingQueue(
 			// We want a fairly tight requeue time.  The controller listens to the API, but because it relies on the routability of the
@@ -189,25 +186,28 @@ func NewAvailableConditionController(
 	// allows us to detect health in a more timely fashion when network connectivity to
 	// nodes is snipped, but the network still attempts to route there.  See
 	// https://github.com/openshift/origin/issues/17159#issuecomment-341798063
-	apiServiceInformer.Informer().AddEventHandlerWithResyncPeriod(
+	apiServiceHandler, _ := apiServiceInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    c.addAPIService,
 			UpdateFunc: c.updateAPIService,
 			DeleteFunc: c.deleteAPIService,
 		},
 		30*time.Second)
+	c.apiServiceSynced = apiServiceHandler.HasSynced
 
-	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	serviceHandler, _ := serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.addService,
 		UpdateFunc: c.updateService,
 		DeleteFunc: c.deleteService,
 	})
+	c.servicesSynced = serviceHandler.HasSynced
 
-	endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	endpointsHandler, _ := endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.addEndpoints,
 		UpdateFunc: c.updateEndpoints,
 		DeleteFunc: c.deleteEndpoints,
 	})
+	c.endpointsSynced = endpointsHandler.HasSynced
 
 	c.syncFn = c.sync
 
@@ -494,6 +494,10 @@ func (c *AvailableConditionController) Run(workers int, stopCh <-chan struct{}) 
 	klog.Info("Starting AvailableConditionController")
 	defer klog.Info("Shutting down AvailableConditionController")
 
+	// This waits not just for the informers to sync, but for our handlers
+	// to be called; since the handlers are three different ways of
+	// enqueueing the same thing, waiting for this permits the queue to
+	// maximally de-duplicate the entries.
 	if !controllers.WaitForCacheSync("AvailableConditionController", stopCh, c.apiServiceSynced, c.servicesSynced, c.endpointsSynced) {
 		return
 	}

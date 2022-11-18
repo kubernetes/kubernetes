@@ -44,30 +44,26 @@ func AddGraphEventHandlers(
 		graph: graph,
 	}
 
-	var hasSynced []cache.InformerSynced
-
-	pods.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	podHandler, _ := pods.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    g.addPod,
 		UpdateFunc: g.updatePod,
 		DeleteFunc: g.deletePod,
 	})
-	hasSynced = append(hasSynced, pods.Informer().HasSynced)
 
-	pvs.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	pvsHandler, _ := pvs.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    g.addPV,
 		UpdateFunc: g.updatePV,
 		DeleteFunc: g.deletePV,
 	})
-	hasSynced = append(hasSynced, pvs.Informer().HasSynced)
 
-	attachments.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	attachHandler, _ := attachments.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    g.addVolumeAttachment,
 		UpdateFunc: g.updateVolumeAttachment,
 		DeleteFunc: g.deleteVolumeAttachment,
 	})
-	hasSynced = append(hasSynced, attachments.Informer().HasSynced)
 
-	go cache.WaitForNamedCacheSync("node_authorizer", wait.NeverStop, hasSynced...)
+	go cache.WaitForNamedCacheSync("node_authorizer", wait.NeverStop,
+		podHandler.HasSynced, pvsHandler.HasSynced, attachHandler.HasSynced)
 }
 
 func (g *graphPopulator) addPod(obj interface{}) {

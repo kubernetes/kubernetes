@@ -128,7 +128,7 @@ func (c *celAdmissionController) reconcilePolicyDefinition(namespace, name strin
 			c.dynamicClient,
 			paramsGVR.Resource,
 			corev1.NamespaceAll,
-			30*time.Second,
+			30*time.Second, // TODO: do we really need to ever resync these?
 			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 			nil,
 		)

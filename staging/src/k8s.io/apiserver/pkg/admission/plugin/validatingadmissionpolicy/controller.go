@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 )
 
 var _ CELPolicyEvaluator = &celAdmissionController{}
@@ -165,6 +166,7 @@ func NewAdmissionController(
 }
 
 func (c *celAdmissionController) Run(stopCh <-chan struct{}) {
+	// TODO: Doesn't this comparison need a lock?
 	if c.runningContext != nil {
 		return
 	}
@@ -302,9 +304,10 @@ func (c *celAdmissionController) Validate(
 				// If the param informer for this admission policy has not yet
 				// had time to perform an initial listing, don't attempt to use
 				// it.
-				//!TOOD(alexzielenski): add a wait for a very short amount of
-				// time for the cache to sync
-				if !paramInfo.controller.HasSynced() {
+				//!TODO(alexzielenski): Add a shorter timeout
+				// than "forever" to this wait.
+
+				if !cache.WaitForCacheSync(c.runningContext.Done(), paramInfo.controller.HasSynced) {
 					addConfigError(fmt.Errorf("paramKind kind `%v` not yet synced to use for admission",
 						paramKind.String()), definition, binding)
 					continue
