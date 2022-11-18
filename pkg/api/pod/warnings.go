@@ -50,7 +50,6 @@ func GetWarningsForPodTemplate(ctx context.Context, fieldPath *field.Path, podTe
 	if podTemplate == nil {
 		return nil
 	}
-
 	var (
 		oldSpec *api.PodSpec
 		oldMeta *metav1.ObjectMeta
