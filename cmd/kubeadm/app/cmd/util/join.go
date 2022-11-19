@@ -59,7 +59,7 @@ func getJoinCommand(kubeConfigFile, token, key string, controlPlane, skipTokenPr
 	}
 
 	// load the default cluster config
-	clusterConfig := kubeconfigutil.GetClusterFromKubeConfig(config)
+	_, clusterConfig := kubeconfigutil.GetClusterFromKubeConfig(config)
 	if clusterConfig == nil {
 		return "", errors.New("failed to get default cluster config")
 	}
