@@ -1388,7 +1388,7 @@ func (proxier *Proxier) syncProxyRules() {
 				"-s", epInfo.IP(),
 				"-j", string(kubeMarkMasqChain))
 			// Update client-affinity lists.
-			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
+			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP && epInfo.Ready {
 				args = append(args, "-m", "recent", "--name", string(endpointChain), "--set")
 			}
 			// DNAT to final destination.
