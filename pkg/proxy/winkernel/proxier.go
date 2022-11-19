@@ -315,18 +315,24 @@ func conjureMac(macPrefix string, ip net.IP) string {
 func (proxier *Proxier) endpointsMapChange(oldEndpointsMap, newEndpointsMap proxy.EndpointsMap) {
 
 	eMap := "OldEPS : "
-	for svcPortName := range oldEndpointsMap {
-		eMap = eMap + svcPortName.String() + ", "
+	for svcPortName, eps := range oldEndpointsMap {
+		eMap = eMap + svcPortName.String() + " = "
+		for _, v := range eps {
+			eMap = eMap + " " + v.String() + ","
+		}
 		proxier.onEndpointsMapChange(&svcPortName)
 	}
 
 	eMap = eMap + " NewEPS : "
-	for svcPortName := range newEndpointsMap {
-		eMap = eMap + svcPortName.String() + ", "
+	for svcPortName, eps := range newEndpointsMap {
+		eMap = eMap + svcPortName.String() + " = "
+		for _, v := range eps {
+			eMap = eMap + " " + v.String() + ","
+		}
 		proxier.onEndpointsMapChange(&svcPortName)
 	}
 
-	klog.V(3).InfoS("Prince: on endpointsMapChange ", "EPS", eMap)
+	klog.V(3).InfoS("======== Prince: on endpointsMapChange ", "EPS", eMap)
 }
 
 func (proxier *Proxier) onEndpointsMapChange(svcPortName *proxy.ServicePortName) {
@@ -1059,6 +1065,9 @@ func (proxier *Proxier) syncProxyRules() {
 	serviceUpdateResult := proxier.serviceMap.Update(proxier.serviceChanges)
 	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
 
+	klog.V(3).InfoS("======== Prince  syncproxy rules : ", "serviceUpdateResult", serviceUpdateResult)
+	klog.V(3).InfoS("======== Prince  syncproxy rules : ", "endpointUpdateResult", endpointUpdateResult)
+
 	staleServices := serviceUpdateResult.UDPStaleClusterIP
 	// merge stale services gathered from updateEndpointsMap
 	for _, svcPortName := range endpointUpdateResult.StaleServiceNames {
@@ -1311,7 +1320,7 @@ func (proxier *Proxier) syncProxyRules() {
 		if !allEndpointsTerminating {
 			hnsLoadBalancer, err := hns.getLoadBalancer(
 				hnsEndpoints,
-				loadBalancerFlags{isDSR: proxier.isDSR, isIPv6: proxier.isIPv6Mode, sessionAffinity: sessionAffinityClientIP},
+				loadBalancerFlags{isVipExternalIP: true, isDSR: proxier.isDSR, isIPv6: proxier.isIPv6Mode, sessionAffinity: sessionAffinityClientIP},
 				sourceVip,
 				svcInfo.ClusterIP().String(),
 				Enum(svcInfo.Protocol()),
