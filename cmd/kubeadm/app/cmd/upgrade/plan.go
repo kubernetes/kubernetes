@@ -286,9 +286,9 @@ func runPlan(flags *planFlags, args []string, printer output.Printer) error {
 			return err
 		}
 
-		// Actually, this is needed for machine readable output only.
+		// Actually, this is needed for machine-readable output only.
 		// printUpgradePlan won't output the configVersionStates as it will simply print the same table several times
-		// in the human readable output if it did so
+		// in the human-readable output if it did so
 		plan.ConfigVersions = configVersionStates
 
 		printUpgradePlan(&up, plan, unstableVersionFlag, isExternalEtcd, os.Stdout, printer)

@@ -114,7 +114,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 		Args: cobra.NoArgs,
 	}
 
-	// adds flags to the init command
+	// add flags to the init command.
 	// init command local flags could be eventually inherited by the sub-commands automatically generated for phases
 	AddInitConfigFlags(cmd.Flags(), initOptions.externalInitCfg)
 	AddClusterConfigFlags(cmd.Flags(), initOptions.externalClusterCfg, &initOptions.featureGatesString)
