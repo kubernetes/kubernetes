@@ -988,7 +988,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	MultiCIDRRangeAllocator: {Default: false, PreRelease: featuregate.Alpha},
 
-	MultiCIDRServiceAllocator: {Default: false, PreRelease: featuregate.Alpha},
+	MultiCIDRServiceAllocator: {Default: true, PreRelease: featuregate.Alpha},
 
 	NetworkPolicyStatus: {Default: false, PreRelease: featuregate.Alpha},
 
