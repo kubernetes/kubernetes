@@ -541,11 +541,14 @@ func detectStaleConnections(oldEndpointsMap, newEndpointsMap EndpointsMap, stale
 	// Detect stale endpoints: an endpoint can have stale conntrack entries if it was receiving traffic
 	// and then goes unready or changes its IP address.
 	for svcPortName, epList := range oldEndpointsMap {
+		klog.V(3).InfoS("======== Prince  Checking Stale endpoint in oldEndpointsMap", "portName", svcPortName)
 		if svcPortName.Protocol != v1.ProtocolUDP {
 			continue
 		}
 
 		for _, ep := range epList {
+
+			klog.V(3).InfoS("======== Prince  Checking Stale endpoint in EPList", "portName", svcPortName, "EP", ep)
 			// if the old endpoint wasn't ready is not possible to have stale entries
 			// since there was no traffic sent to it.
 			if !ep.IsReady() {
@@ -561,7 +564,7 @@ func detectStaleConnections(oldEndpointsMap, newEndpointsMap EndpointsMap, stale
 				}
 			}
 			if stale {
-				klog.V(4).InfoS("Stale endpoint", "portName", svcPortName, "endpoint", ep)
+				klog.V(3).InfoS("======== Prince  Stale endpoint", "portName", svcPortName, "endpoint", ep)
 				*staleEndpoints = append(*staleEndpoints, ServiceEndpoint{Endpoint: ep.String(), ServicePortName: svcPortName})
 			}
 		}

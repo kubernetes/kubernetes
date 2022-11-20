@@ -206,6 +206,7 @@ func (hns hnsV2) createEndpoint(ep *endpointsInfo, networkName string) (*endpoin
 		if err != nil {
 			return nil, err
 		}
+		klog.V(3).InfoS("======== Prince Endpoint created", "createdEndpoint", createdEndpoint)
 	}
 	return &endpointsInfo{
 		ip:              createdEndpoint.IpConfigurations[0].IpAddress,
@@ -327,10 +328,11 @@ func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 		return nil, err
 	}
 
-	klog.V(1).InfoS("Created Hns loadbalancer policy resource", "loadBalancer", lb)
 	lbInfo := &loadBalancerInfo{
 		hnsID: lb.Id,
 	}
+
+	klog.V(3).InfoS("======== Prince  Created Hns loadbalancer policy resource", "loadBalancer", lb, "lbInfo", lbInfo)
 	// Add to map of load balancers
 	previousLoadBalancers[id] = lbInfo
 	return lbInfo, err
@@ -342,7 +344,7 @@ func (hns hnsV2) deleteLoadBalancer(hnsID string) error {
 		// Return silently
 		return nil
 	}
-
+	klog.V(3).InfoS("======== Prince deleteLoadBalancer", "hnsID", hnsID, "lb", lb)
 	err = lb.Delete()
 	return err
 }

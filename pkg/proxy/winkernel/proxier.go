@@ -449,7 +449,7 @@ func (ep *endpointsInfo) Cleanup() {
 		// Never delete a Local Endpoint. Local Endpoints are already created by other entities.
 		// Remove only remote endpoints created by this service
 		if *ep.refCount <= 0 && !ep.GetIsLocal() {
-			klog.V(4).InfoS("Removing endpoints, since no one is referencing it", "endpoint", ep)
+			klog.V(3).InfoS("======== Prince Removing endpoints, since no one is referencing it", "endpoint", ep)
 			err := ep.hns.deleteEndpoint(ep.hnsID)
 			if err == nil {
 				ep.hnsID = ""
@@ -795,7 +795,7 @@ func CleanupLeftovers() (encounteredError bool) {
 }
 
 func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint) {
-	klog.V(3).InfoS("Service cleanup", "serviceInfo", svcInfo)
+	klog.V(3).InfoS("======== Prince Service cleanup", "serviceInfo", svcInfo)
 	// Skip the svcInfo.policyApplied check to remove all the policies
 	svcInfo.deleteAllHnsLoadBalancerPolicy()
 	// Cleanup Endpoints references
@@ -815,6 +815,7 @@ func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint) {
 func (svcInfo *serviceInfo) deleteAllHnsLoadBalancerPolicy() {
 	// Remove the Hns Policy corresponding to this service
 	hns := svcInfo.hns
+	klog.V(3).InfoS("======== Prince deleteAllHnsLoadBalancerPolicy", "serviceInfo", svcInfo)
 	hns.deleteLoadBalancer(svcInfo.hnsID)
 	svcInfo.hnsID = ""
 
