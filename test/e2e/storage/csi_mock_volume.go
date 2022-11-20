@@ -26,6 +26,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -1007,6 +1008,75 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					return false, nil
 				})
 				framework.ExpectNoError(err, "while waiting for all CSI calls")
+			})
+		}
+	})
+
+	ginkgo.Context("CSI VolumeStats error case", func() {
+		trackedCalls := []string{
+			"NodeGetVolumeStats",
+		}
+
+		tests := []struct {
+			name             string
+			expectedCalls    []csiCall
+			expectPodRunning bool
+			expectReply      interface{}
+			expectError      error
+		}{
+			{
+				name:             "should return the abnormal volume reply",
+				expectPodRunning: true,
+				expectedCalls: []csiCall{
+					{expectedMethod: "NodeGetVolumeStats", expectedError: codes.OK},
+				},
+				expectReply: csi.NodeGetVolumeStatsResponse{
+					VolumeCondition: &csi.VolumeCondition{
+						Abnormal: true,
+						Message:  "volume is unhealthy",
+					},
+				},
+				expectError: nil,
+			},
+		}
+
+		for _, t := range tests {
+			test := t
+			ginkgo.It(test.name, func() {
+				var hooks *drivers.Hooks
+				hooks = createPostHook("NodeGetVolumeStats", test.expectReply, test.expectError)
+				init(testParameters{
+					disableAttach:  true,
+					registerDriver: true,
+					hooks:          hooks,
+				})
+				defer cleanup()
+
+				_, claim, pod := createPod(pvcReference)
+				if pod == nil {
+					return
+				}
+				// Wait for PVC to get bound to make sure the CSI driver is fully started.
+				err := e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, f.ClientSet, f.Namespace.Name, claim.Name, time.Second, framework.ClaimProvisionTimeout)
+				framework.ExpectNoError(err, "while waiting for PVC to get provisioned")
+
+				ginkgo.By("Waiting for expected CSI calls")
+				// Watch for all calls up to deletePod = true
+				ctx, cancel := context.WithTimeout(context.Background(), csiPodRunningTimeout)
+				defer cancel()
+				for {
+					if ctx.Err() != nil {
+						framework.Failf("timed out waiting for the CSI call that indicates that the pod can be deleted: %v", test.expectedCalls)
+					}
+					time.Sleep(1 * time.Second)
+					_, index, err := compareCSICalls(trackedCalls, test.expectedCalls, m.driver.GetCalls)
+					framework.ExpectNoError(err, "while waiting for initial CSI calls")
+					if index == 0 {
+						// No CSI call received yet
+						continue
+					}
+
+				}
 			})
 		}
 	})
@@ -2633,6 +2703,17 @@ func createPreHook(method string, callback func(counter int64) error) *drivers.H
 					return nil, callback(counter)
 				}
 				return nil, nil
+			}
+		}(),
+	}
+}
+
+// createPostHook counts invocations of a certain method (identified by a substring in the full gRPC method name).
+func createPostHook(method string, repBody interface{}, repErr error) *drivers.Hooks {
+	return &drivers.Hooks{
+		Post: func() func(ctx context.Context, method string, request, reply interface{}, err error) (finalReply interface{}, finalErr error) {
+			return func(ctx context.Context, method string, request, reply interface{}, err error) (finalReply interface{}, finalErr error) {
+				return repBody, repErr
 			}
 		}(),
 	}

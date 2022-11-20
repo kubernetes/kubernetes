@@ -208,6 +208,54 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		framework.ExpectNotEqual(len(updatedStorageMetrics.statusMetrics), 0, "Error fetching c-m updated storage metrics")
 	}
 
+	volumeAbnormalError := func(ephemeral bool) {
+		if !metricsGrabber.HasControlPlanePods() {
+			e2eskipper.Skipf("Environment does not support getting controller-manager metrics - skipping")
+		}
+
+		ginkgo.By("Getting default storageclass")
+		defaultClass, err := c.StorageV1().StorageClasses().Get(context.TODO(), defaultScName, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Error getting default storageclass: %v", err)
+		pluginName := defaultClass.Provisioner
+
+		invalidSc = &storagev1.StorageClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("fail-metrics-invalid-sc-%s", pvc.Namespace),
+			},
+			Provisioner: defaultClass.Provisioner,
+			Parameters: map[string]string{
+				"invalidparam": "invalidvalue",
+			},
+		}
+		_, err = c.StorageV1().StorageClasses().Create(context.TODO(), invalidSc, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "Error creating new storageclass: %v", err)
+
+		pvc.Spec.StorageClassName = &invalidSc.Name
+		if !ephemeral {
+			pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "failed to create PVC %s/%s", pvc.Namespace, pvc.Name)
+			framework.ExpectNotEqual(pvc, nil)
+		}
+
+		ginkgo.By("Creating a pod and expecting it to fail")
+		pod := makePod(ns, pvc, ephemeral)
+		pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create Pod %s/%s", pod.Namespace, pod.Name)
+
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, f.Timeouts.PodStart)
+		framework.ExpectError(err)
+
+		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
+		framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
+
+		ginkgo.By("Checking failure metrics")
+		updatedControllerMetrics, err := metricsGrabber.GrabFromControllerManager()
+		framework.ExpectNoError(err, "failed to get controller manager metrics")
+		updatedStorageMetrics := getControllerStorageMetrics(updatedControllerMetrics, pluginName)
+
+		framework.ExpectNotEqual(len(updatedStorageMetrics.statusMetrics), 0, "Error fetching c-m updated storage metrics")
+	}
+
 	filesystemMode := func(isEphemeral bool) {
 		if !isEphemeral {
 			pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
@@ -470,6 +518,9 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		// the volume_provision metric (removed in #106609), issue to investigate the bug #106773
 		ginkgo.It("should create prometheus metrics for volume provisioning errors [Slow]", func() {
 			provisioningError(isEphemeral)
+		})
+		ginkgo.It("should create prometheus metrics for abnormal volume", func() {
+			volumeAbnormalError(isEphemeral)
 		})
 		ginkgo.It("should create volume metrics with the correct FilesystemMode PVC ref", func() {
 			filesystemMode(isEphemeral)
