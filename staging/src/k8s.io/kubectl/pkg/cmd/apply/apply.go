@@ -55,8 +55,6 @@ import (
 // reflect the runtime requirements for the command.  This structure reduces the transformation to wiring and makes
 // the logic itself easy to unit test
 type ApplyFlags struct {
-	Factory cmdutil.Factory
-
 	RecordFlags *genericclioptions.RecordFlags
 	PrintFlags  *genericclioptions.PrintFlags
 
@@ -172,9 +170,8 @@ var (
 )
 
 // NewApplyFlags returns a default ApplyFlags
-func NewApplyFlags(f cmdutil.Factory, streams genericclioptions.IOStreams) *ApplyFlags {
+func NewApplyFlags(streams genericclioptions.IOStreams) *ApplyFlags {
 	return &ApplyFlags{
-		Factory:     f,
 		RecordFlags: genericclioptions.NewRecordFlags(),
 		DeleteFlags: delete.NewDeleteFlags("The files that contain the configurations to apply."),
 		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
@@ -188,7 +185,7 @@ func NewApplyFlags(f cmdutil.Factory, streams genericclioptions.IOStreams) *Appl
 
 // NewCmdApply creates the `apply` command
 func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	flags := NewApplyFlags(f, ioStreams)
+	flags := NewApplyFlags(ioStreams)
 
 	cmd := &cobra.Command{
 		Use:                   "apply (-f FILENAME | -k DIRECTORY)",
@@ -197,7 +194,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 		Long:                  applyLong,
 		Example:               applyExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			o, err := flags.ToOptions(cmd, baseName, args)
+			o, err := flags.ToOptions(f, cmd, baseName, args)
 			cmdutil.CheckErr(err)
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
@@ -207,9 +204,9 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	flags.AddFlags(cmd)
 
 	// apply subcommands
-	cmd.AddCommand(NewCmdApplyViewLastApplied(flags.Factory, flags.IOStreams))
-	cmd.AddCommand(NewCmdApplySetLastApplied(flags.Factory, flags.IOStreams))
-	cmd.AddCommand(NewCmdApplyEditLastApplied(flags.Factory, flags.IOStreams))
+	cmd.AddCommand(NewCmdApplyViewLastApplied(f, flags.IOStreams))
+	cmd.AddCommand(NewCmdApplySetLastApplied(f, flags.IOStreams))
+	cmd.AddCommand(NewCmdApplyEditLastApplied(f, flags.IOStreams))
 
 	return cmd
 }
@@ -237,7 +234,7 @@ func (flags *ApplyFlags) AddFlags(cmd *cobra.Command) {
 }
 
 // ToOptions converts from CLI inputs to runtime inputs
-func (flags *ApplyFlags) ToOptions(cmd *cobra.Command, baseName string, args []string) (*ApplyOptions, error) {
+func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseName string, args []string) (*ApplyOptions, error) {
 	if len(args) != 0 {
 		return nil, cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
 	}
@@ -249,7 +246,7 @@ func (flags *ApplyFlags) ToOptions(cmd *cobra.Command, baseName string, args []s
 		return nil, err
 	}
 
-	dynamicClient, err := flags.Factory.DynamicClient()
+	dynamicClient, err := f.DynamicClient()
 	if err != nil {
 		return nil, err
 	}
@@ -279,23 +276,23 @@ func (flags *ApplyFlags) ToOptions(cmd *cobra.Command, baseName string, args []s
 		return nil, err
 	}
 
-	openAPISchema, _ := flags.Factory.OpenAPISchema()
+	openAPISchema, _ := f.OpenAPISchema()
 
 	validationDirective, err := cmdutil.GetValidationDirective(cmd)
 	if err != nil {
 		return nil, err
 	}
-	validator, err := flags.Factory.Validator(validationDirective)
+	validator, err := f.Validator(validationDirective, fieldValidationVerifier)
 	if err != nil {
 		return nil, err
 	}
-	builder := flags.Factory.NewBuilder()
-	mapper, err := flags.Factory.ToRESTMapper()
+	builder := f.NewBuilder()
+	mapper, err := f.ToRESTMapper()
 	if err != nil {
 		return nil, err
 	}
 
-	namespace, enforceNamespace, err := flags.Factory.ToRawKubeConfigLoader().Namespace()
+	namespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return nil, err
 	}
