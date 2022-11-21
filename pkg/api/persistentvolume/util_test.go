@@ -78,6 +78,13 @@ func TestDropDisabledFields(t *testing.T) {
 			oldSpec:             specWithCSISecrets(nil),
 			expectOldSpec:       specWithCSISecrets(nil),
 		},
+		"disabled csi expansion neither new pv nor old pv had secrets": {
+			csiExpansionEnabled: false,
+			newSpec:             specWithCSISecrets(nil),
+			expectNewSpec:       specWithCSISecrets(nil),
+			oldSpec:             specWithCSISecrets(nil),
+			expectOldSpec:       specWithCSISecrets(nil),
+		},
 	}
 
 	for name, tc := range tests {
