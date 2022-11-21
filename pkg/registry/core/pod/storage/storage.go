@@ -290,7 +290,7 @@ func (r *LegacyBindingREST) Create(ctx context.Context, obj runtime.Object, crea
 }
 
 func (r *LegacyBindingREST) GetSingularName() string {
-	return "bindings"
+	return "binding"
 }
 
 // StatusREST implements the REST endpoint for changing the status of a pod.
