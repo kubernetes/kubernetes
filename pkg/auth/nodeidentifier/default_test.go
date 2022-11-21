@@ -58,10 +58,10 @@ func TestDefaultNodeIdentifier_NodeIdentity(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			nodeName, isNode := NewDefaultNodeIdentifier().NodeIdentity(tt.user)
 			if nodeName != tt.expectNodeName {
-				t.Errorf("DefaultNodeIdentifier.NodeIdentity() got = %v, want %v", nodeName, tt.expectNodeName)
+				t.Errorf("DefaultNodeIdentifier.NodeIdentity() want = %v, got %v", tt.expectNodeName, nodeName)
 			}
 			if isNode != tt.expectIsNode {
-				t.Errorf("DefaultNodeIdentifier.NodeIdentity() got = %v, want %v", isNode, tt.expectIsNode)
+				t.Errorf("DefaultNodeIdentifier.NodeIdentity() want = %v, got %v", tt.expectIsNode, isNode)
 			}
 		})
 	}
