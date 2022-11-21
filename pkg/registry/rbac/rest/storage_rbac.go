@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	kcpkubernetesclientset "github.com/kcp-dev/client-go/kubernetes"
 	"github.com/kcp-dev/logicalcluster/v2"
 
 	rbacapiv1 "k8s.io/api/rbac/v1"
@@ -167,7 +168,7 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 		// initializing roles is really important.  On some e2e runs, we've seen cases where etcd is down when the server
 		// starts, the roles don't initialize, and nothing works.
 		err := wait.Poll(1*time.Second, 30*time.Second, func() (done bool, err error) {
-			clientClusterGetter, err := clientset.NewClusterForConfig(hookContext.LoopbackClientConfig)
+			clientClusterGetter, err := kcpkubernetesclientset.NewForConfig(hookContext.LoopbackClientConfig)
 			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to initialize client set: %v", err))
 				return false, nil

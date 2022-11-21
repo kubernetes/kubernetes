@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"time"
 
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,17 +63,15 @@ type StatefulSetInterface interface {
 
 // statefulSets implements StatefulSetInterface
 type statefulSets struct {
-	client  rest.Interface
-	cluster logicalcluster.Name
-	ns      string
+	client rest.Interface
+	ns     string
 }
 
 // newStatefulSets returns a StatefulSets
 func newStatefulSets(c *AppsV1Client, namespace string) *statefulSets {
 	return &statefulSets{
-		client:  c.RESTClient(),
-		cluster: c.cluster,
-		ns:      namespace,
+		client: c.RESTClient(),
+		ns:     namespace,
 	}
 }
 
@@ -82,7 +79,6 @@ func newStatefulSets(c *AppsV1Client, namespace string) *statefulSets {
 func (c *statefulSets) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.StatefulSet, err error) {
 	result = &v1.StatefulSet{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("statefulsets").
 		Name(name).
@@ -100,7 +96,6 @@ func (c *statefulSets) List(ctx context.Context, opts metav1.ListOptions) (resul
 	}
 	result = &v1.StatefulSetList{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("statefulsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -118,7 +113,6 @@ func (c *statefulSets) Watch(ctx context.Context, opts metav1.ListOptions) (watc
 	}
 	opts.Watch = true
 	return c.client.Get().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("statefulsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -130,7 +124,6 @@ func (c *statefulSets) Watch(ctx context.Context, opts metav1.ListOptions) (watc
 func (c *statefulSets) Create(ctx context.Context, statefulSet *v1.StatefulSet, opts metav1.CreateOptions) (result *v1.StatefulSet, err error) {
 	result = &v1.StatefulSet{}
 	err = c.client.Post().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("statefulsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -144,7 +137,6 @@ func (c *statefulSets) Create(ctx context.Context, statefulSet *v1.StatefulSet, 
 func (c *statefulSets) Update(ctx context.Context, statefulSet *v1.StatefulSet, opts metav1.UpdateOptions) (result *v1.StatefulSet, err error) {
 	result = &v1.StatefulSet{}
 	err = c.client.Put().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("statefulsets").
 		Name(statefulSet.Name).
@@ -160,7 +152,6 @@ func (c *statefulSets) Update(ctx context.Context, statefulSet *v1.StatefulSet, 
 func (c *statefulSets) UpdateStatus(ctx context.Context, statefulSet *v1.StatefulSet, opts metav1.UpdateOptions) (result *v1.StatefulSet, err error) {
 	result = &v1.StatefulSet{}
 	err = c.client.Put().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("statefulsets").
 		Name(statefulSet.Name).
@@ -175,7 +166,6 @@ func (c *statefulSets) UpdateStatus(ctx context.Context, statefulSet *v1.Statefu
 // Delete takes name of the statefulSet and deletes it. Returns an error if one occurs.
 func (c *statefulSets) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("statefulsets").
 		Name(name).
@@ -191,7 +181,6 @@ func (c *statefulSets) DeleteCollection(ctx context.Context, opts metav1.DeleteO
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("statefulsets").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
@@ -205,7 +194,6 @@ func (c *statefulSets) DeleteCollection(ctx context.Context, opts metav1.DeleteO
 func (c *statefulSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.StatefulSet, err error) {
 	result = &v1.StatefulSet{}
 	err = c.client.Patch(pt).
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("statefulsets").
 		Name(name).
@@ -233,7 +221,6 @@ func (c *statefulSets) Apply(ctx context.Context, statefulSet *appsv1.StatefulSe
 	}
 	result = &v1.StatefulSet{}
 	err = c.client.Patch(types.ApplyPatchType).
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("statefulsets").
 		Name(*name).
@@ -263,7 +250,6 @@ func (c *statefulSets) ApplyStatus(ctx context.Context, statefulSet *appsv1.Stat
 
 	result = &v1.StatefulSet{}
 	err = c.client.Patch(types.ApplyPatchType).
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("statefulsets").
 		Name(*name).
@@ -279,7 +265,6 @@ func (c *statefulSets) ApplyStatus(ctx context.Context, statefulSet *appsv1.Stat
 func (c *statefulSets) GetScale(ctx context.Context, statefulSetName string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
 	result = &autoscalingv1.Scale{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("statefulsets").
 		Name(statefulSetName).
@@ -294,7 +279,6 @@ func (c *statefulSets) GetScale(ctx context.Context, statefulSetName string, opt
 func (c *statefulSets) UpdateScale(ctx context.Context, statefulSetName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
 	result = &autoscalingv1.Scale{}
 	err = c.client.Put().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("statefulsets").
 		Name(statefulSetName).
@@ -320,7 +304,6 @@ func (c *statefulSets) ApplyScale(ctx context.Context, statefulSetName string, s
 
 	result = &autoscalingv1.Scale{}
 	err = c.client.Patch(types.ApplyPatchType).
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("statefulsets").
 		Name(statefulSetName).

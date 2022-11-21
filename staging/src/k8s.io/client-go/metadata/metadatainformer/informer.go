@@ -39,32 +39,13 @@ func NewSharedInformerFactory(client metadata.Interface, defaultResync time.Dura
 // NewFilteredSharedInformerFactory constructs a new instance of metadataSharedInformerFactory.
 // Listers obtained via this factory will be subject to the same filters as specified here.
 func NewFilteredSharedInformerFactory(client metadata.Interface, defaultResync time.Duration, namespace string, tweakListOptions TweakListOptionsFunc) SharedInformerFactory {
-	return NewFilteredSharedInformerFactoryWithOptions(
-		client,
-		namespace,
-		tweakListOptions,
-		cache.WithResyncPeriod(defaultResync),
-		cache.WithIndexers(cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}),
-	)
-}
-
-// NewFilteredSharedInformerFactoryWithOptions constructs a new instance of metadataSharedInformerFactory for
-// namespace (specify "" for all namespaces). Unlike NewSharedInformerFactory and NewFilteredSharedInformerFactory,
-// this variant does not set a default resync period or default indexers. If you want to set these, pass
-// cache.WithResyncPeriod() and/or cache.WithIndexers() in via opts.
-func NewFilteredSharedInformerFactoryWithOptions(
-	client metadata.Interface,
-	namespace string,
-	tweakListOptions TweakListOptionsFunc,
-	opts ...cache.SharedInformerOption,
-) SharedInformerFactory {
 	return &metadataSharedInformerFactory{
 		client:           client,
+		defaultResync:    defaultResync,
 		namespace:        namespace,
 		informers:        map[schema.GroupVersionResource]informers.GenericInformer{},
 		startedInformers: make(map[schema.GroupVersionResource]bool),
 		tweakListOptions: tweakListOptions,
-		informerOptions:  opts,
 	}
 }
 
@@ -79,8 +60,6 @@ type metadataSharedInformerFactory struct {
 	// This allows Start() to be called multiple times safely.
 	startedInformers map[schema.GroupVersionResource]bool
 	tweakListOptions TweakListOptionsFunc
-
-	informerOptions []cache.SharedInformerOption
 }
 
 var _ SharedInformerFactory = &metadataSharedInformerFactory{}
@@ -95,14 +74,7 @@ func (f *metadataSharedInformerFactory) ForResource(gvr schema.GroupVersionResou
 		return informer
 	}
 
-	informer = NewFilteredMetadataInformerWithOptions(
-		f.client,
-		gvr,
-		f.namespace,
-		f.tweakListOptions,
-		f.informerOptions...,
-
-	)
+	informer = NewFilteredMetadataInformer(f.client, gvr, f.namespace, f.defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 	f.informers[key] = informer
 
 	return informer
@@ -145,29 +117,9 @@ func (f *metadataSharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{})
 
 // NewFilteredMetadataInformer constructs a new informer for a metadata type.
 func NewFilteredMetadataInformer(client metadata.Interface, gvr schema.GroupVersionResource, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions TweakListOptionsFunc) informers.GenericInformer {
-	return NewFilteredMetadataInformerWithOptions(
-		client,
-		gvr,
-		namespace,
-		tweakListOptions,
-		cache.WithResyncPeriod(resyncPeriod),
-		cache.WithIndexers(indexers),
-	)
-}
-
-// NewFilteredMetadataInformerWithOptions constructs a new informer for a metadata type. Unlike
-// NewFilteredMetadataInformer, this variant does not set a default resync period or default indexers. If you want to
-// set these, pass cache.WithResyncPeriod() and/or cache.WithIndexers() in via opts.
-func NewFilteredMetadataInformerWithOptions(
-	client metadata.Interface,
-	gvr schema.GroupVersionResource,
-	namespace string,
-	tweakListOptions TweakListOptionsFunc,
-	opts ...cache.SharedInformerOption,
-) informers.GenericInformer {
 	return &metadataInformer{
 		gvr: gvr,
-		informer: cache.NewSharedIndexInformerWithOptions(
+		informer: cache.NewSharedIndexInformer(
 			&cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 					if tweakListOptions != nil {
@@ -183,7 +135,8 @@ func NewFilteredMetadataInformerWithOptions(
 				},
 			},
 			&metav1.PartialObjectMetadata{},
-			opts...,
+			resyncPeriod,
+			indexers,
 		),
 	}
 }

@@ -21,7 +21,6 @@ package v1
 import (
 	"net/http"
 
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/api/storage/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
@@ -39,7 +38,6 @@ type StorageV1Interface interface {
 // StorageV1Client is used to interact with features provided by the storage.k8s.io group.
 type StorageV1Client struct {
 	restClient rest.Interface
-	cluster    logicalcluster.Name
 }
 
 func (c *StorageV1Client) CSIDrivers() CSIDriverInterface {
@@ -88,7 +86,7 @@ func NewForConfigAndClient(c *rest.Config, h *http.Client) (*StorageV1Client, er
 	if err != nil {
 		return nil, err
 	}
-	return &StorageV1Client{restClient: client}, nil
+	return &StorageV1Client{client}, nil
 }
 
 // NewForConfigOrDie creates a new StorageV1Client for the given config and
@@ -103,12 +101,7 @@ func NewForConfigOrDie(c *rest.Config) *StorageV1Client {
 
 // New creates a new StorageV1Client for the given RESTClient.
 func New(c rest.Interface) *StorageV1Client {
-	return &StorageV1Client{restClient: c}
-}
-
-// NewWithCluster creates a new StorageV1Client for the given RESTClient and cluster.
-func NewWithCluster(c rest.Interface, cluster logicalcluster.Name) *StorageV1Client {
-	return &StorageV1Client{restClient: c, cluster: cluster}
+	return &StorageV1Client{c}
 }
 
 func setConfigDefaults(config *rest.Config) error {

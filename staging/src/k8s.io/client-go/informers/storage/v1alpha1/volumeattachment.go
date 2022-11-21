@@ -55,11 +55,7 @@ func NewVolumeAttachmentInformer(client kubernetes.Interface, resyncPeriod time.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredVolumeAttachmentInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewFilteredVolumeAttachmentInformerWithOptions(client, tweakListOptions, cache.WithResyncPeriod(resyncPeriod), cache.WithIndexers(indexers))
-}
-
-func NewFilteredVolumeAttachmentInformerWithOptions(client kubernetes.Interface, tweakListOptions internalinterfaces.TweakListOptionsFunc, opts ...cache.SharedInformerOption) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -75,22 +71,13 @@ func NewFilteredVolumeAttachmentInformerWithOptions(client kubernetes.Interface,
 			},
 		},
 		&storagev1alpha1.VolumeAttachment{},
-		opts...,
+		resyncPeriod,
+		indexers,
 	)
 }
 
 func (f *volumeAttachmentInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	indexers := cache.Indexers{}
-	for k, v := range f.factory.ExtraClusterScopedIndexers() {
-		indexers[k] = v
-	}
-
-	return NewFilteredVolumeAttachmentInformerWithOptions(client,
-		f.tweakListOptions,
-		cache.WithResyncPeriod(resyncPeriod),
-		cache.WithIndexers(indexers),
-		cache.WithKeyFunction(f.factory.KeyFunction()),
-	)
+	return NewFilteredVolumeAttachmentInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *volumeAttachmentInformer) Informer() cache.SharedIndexInformer {

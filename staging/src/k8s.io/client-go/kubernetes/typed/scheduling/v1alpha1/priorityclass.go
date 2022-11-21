@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"time"
 
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -56,15 +55,13 @@ type PriorityClassInterface interface {
 
 // priorityClasses implements PriorityClassInterface
 type priorityClasses struct {
-	client  rest.Interface
-	cluster logicalcluster.Name
+	client rest.Interface
 }
 
 // newPriorityClasses returns a PriorityClasses
 func newPriorityClasses(c *SchedulingV1alpha1Client) *priorityClasses {
 	return &priorityClasses{
-		client:  c.RESTClient(),
-		cluster: c.cluster,
+		client: c.RESTClient(),
 	}
 }
 
@@ -72,7 +69,6 @@ func newPriorityClasses(c *SchedulingV1alpha1Client) *priorityClasses {
 func (c *priorityClasses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.PriorityClass, err error) {
 	result = &v1alpha1.PriorityClass{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Resource("priorityclasses").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -89,7 +85,6 @@ func (c *priorityClasses) List(ctx context.Context, opts v1.ListOptions) (result
 	}
 	result = &v1alpha1.PriorityClassList{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Resource("priorityclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -106,7 +101,6 @@ func (c *priorityClasses) Watch(ctx context.Context, opts v1.ListOptions) (watch
 	}
 	opts.Watch = true
 	return c.client.Get().
-		Cluster(c.cluster).
 		Resource("priorityclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -117,7 +111,6 @@ func (c *priorityClasses) Watch(ctx context.Context, opts v1.ListOptions) (watch
 func (c *priorityClasses) Create(ctx context.Context, priorityClass *v1alpha1.PriorityClass, opts v1.CreateOptions) (result *v1alpha1.PriorityClass, err error) {
 	result = &v1alpha1.PriorityClass{}
 	err = c.client.Post().
-		Cluster(c.cluster).
 		Resource("priorityclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(priorityClass).
@@ -130,7 +123,6 @@ func (c *priorityClasses) Create(ctx context.Context, priorityClass *v1alpha1.Pr
 func (c *priorityClasses) Update(ctx context.Context, priorityClass *v1alpha1.PriorityClass, opts v1.UpdateOptions) (result *v1alpha1.PriorityClass, err error) {
 	result = &v1alpha1.PriorityClass{}
 	err = c.client.Put().
-		Cluster(c.cluster).
 		Resource("priorityclasses").
 		Name(priorityClass.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -143,7 +135,6 @@ func (c *priorityClasses) Update(ctx context.Context, priorityClass *v1alpha1.Pr
 // Delete takes name of the priorityClass and deletes it. Returns an error if one occurs.
 func (c *priorityClasses) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
-		Cluster(c.cluster).
 		Resource("priorityclasses").
 		Name(name).
 		Body(&opts).
@@ -158,7 +149,6 @@ func (c *priorityClasses) DeleteCollection(ctx context.Context, opts v1.DeleteOp
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
-		Cluster(c.cluster).
 		Resource("priorityclasses").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -171,7 +161,6 @@ func (c *priorityClasses) DeleteCollection(ctx context.Context, opts v1.DeleteOp
 func (c *priorityClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.PriorityClass, err error) {
 	result = &v1alpha1.PriorityClass{}
 	err = c.client.Patch(pt).
-		Cluster(c.cluster).
 		Resource("priorityclasses").
 		Name(name).
 		SubResource(subresources...).
@@ -198,7 +187,6 @@ func (c *priorityClasses) Apply(ctx context.Context, priorityClass *schedulingv1
 	}
 	result = &v1alpha1.PriorityClass{}
 	err = c.client.Patch(types.ApplyPatchType).
-		Cluster(c.cluster).
 		Resource("priorityclasses").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

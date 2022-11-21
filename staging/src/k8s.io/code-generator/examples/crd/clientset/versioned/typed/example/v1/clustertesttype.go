@@ -22,7 +22,6 @@ import (
 	"context"
 	"time"
 
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -57,15 +56,13 @@ type ClusterTestTypeInterface interface {
 
 // clusterTestTypes implements ClusterTestTypeInterface
 type clusterTestTypes struct {
-	client  rest.Interface
-	cluster logicalcluster.Name
+	client rest.Interface
 }
 
 // newClusterTestTypes returns a ClusterTestTypes
 func newClusterTestTypes(c *ExampleV1Client) *clusterTestTypes {
 	return &clusterTestTypes{
-		client:  c.RESTClient(),
-		cluster: c.cluster,
+		client: c.RESTClient(),
 	}
 }
 
@@ -73,7 +70,6 @@ func newClusterTestTypes(c *ExampleV1Client) *clusterTestTypes {
 func (c *clusterTestTypes) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ClusterTestType, err error) {
 	result = &v1.ClusterTestType{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Resource("clustertesttypes").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -90,7 +86,6 @@ func (c *clusterTestTypes) List(ctx context.Context, opts metav1.ListOptions) (r
 	}
 	result = &v1.ClusterTestTypeList{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Resource("clustertesttypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -107,7 +102,6 @@ func (c *clusterTestTypes) Watch(ctx context.Context, opts metav1.ListOptions) (
 	}
 	opts.Watch = true
 	return c.client.Get().
-		Cluster(c.cluster).
 		Resource("clustertesttypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -118,7 +112,6 @@ func (c *clusterTestTypes) Watch(ctx context.Context, opts metav1.ListOptions) (
 func (c *clusterTestTypes) Create(ctx context.Context, clusterTestType *v1.ClusterTestType, opts metav1.CreateOptions) (result *v1.ClusterTestType, err error) {
 	result = &v1.ClusterTestType{}
 	err = c.client.Post().
-		Cluster(c.cluster).
 		Resource("clustertesttypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(clusterTestType).
@@ -131,7 +124,6 @@ func (c *clusterTestTypes) Create(ctx context.Context, clusterTestType *v1.Clust
 func (c *clusterTestTypes) Update(ctx context.Context, clusterTestType *v1.ClusterTestType, opts metav1.UpdateOptions) (result *v1.ClusterTestType, err error) {
 	result = &v1.ClusterTestType{}
 	err = c.client.Put().
-		Cluster(c.cluster).
 		Resource("clustertesttypes").
 		Name(clusterTestType.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -146,7 +138,6 @@ func (c *clusterTestTypes) Update(ctx context.Context, clusterTestType *v1.Clust
 func (c *clusterTestTypes) UpdateStatus(ctx context.Context, clusterTestType *v1.ClusterTestType, opts metav1.UpdateOptions) (result *v1.ClusterTestType, err error) {
 	result = &v1.ClusterTestType{}
 	err = c.client.Put().
-		Cluster(c.cluster).
 		Resource("clustertesttypes").
 		Name(clusterTestType.Name).
 		SubResource("status").
@@ -160,7 +151,6 @@ func (c *clusterTestTypes) UpdateStatus(ctx context.Context, clusterTestType *v1
 // Delete takes name of the clusterTestType and deletes it. Returns an error if one occurs.
 func (c *clusterTestTypes) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
-		Cluster(c.cluster).
 		Resource("clustertesttypes").
 		Name(name).
 		Body(&opts).
@@ -175,7 +165,6 @@ func (c *clusterTestTypes) DeleteCollection(ctx context.Context, opts metav1.Del
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
-		Cluster(c.cluster).
 		Resource("clustertesttypes").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -188,7 +177,6 @@ func (c *clusterTestTypes) DeleteCollection(ctx context.Context, opts metav1.Del
 func (c *clusterTestTypes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterTestType, err error) {
 	result = &v1.ClusterTestType{}
 	err = c.client.Patch(pt).
-		Cluster(c.cluster).
 		Resource("clustertesttypes").
 		Name(name).
 		SubResource(subresources...).
@@ -203,7 +191,6 @@ func (c *clusterTestTypes) Patch(ctx context.Context, name string, pt types.Patc
 func (c *clusterTestTypes) GetScale(ctx context.Context, clusterTestTypeName string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
 	result = &autoscalingv1.Scale{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Resource("clustertesttypes").
 		Name(clusterTestTypeName).
 		SubResource("scale").
@@ -217,7 +204,6 @@ func (c *clusterTestTypes) GetScale(ctx context.Context, clusterTestTypeName str
 func (c *clusterTestTypes) UpdateScale(ctx context.Context, clusterTestTypeName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
 	result = &autoscalingv1.Scale{}
 	err = c.client.Put().
-		Cluster(c.cluster).
 		Resource("clustertesttypes").
 		Name(clusterTestTypeName).
 		SubResource("scale").

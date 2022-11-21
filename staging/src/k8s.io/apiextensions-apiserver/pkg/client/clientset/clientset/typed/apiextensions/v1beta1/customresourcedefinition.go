@@ -22,7 +22,6 @@ import (
 	"context"
 	"time"
 
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	scheme "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,15 +52,13 @@ type CustomResourceDefinitionInterface interface {
 
 // customResourceDefinitions implements CustomResourceDefinitionInterface
 type customResourceDefinitions struct {
-	client  rest.Interface
-	cluster logicalcluster.Name
+	client rest.Interface
 }
 
 // newCustomResourceDefinitions returns a CustomResourceDefinitions
 func newCustomResourceDefinitions(c *ApiextensionsV1beta1Client) *customResourceDefinitions {
 	return &customResourceDefinitions{
-		client:  c.RESTClient(),
-		cluster: c.cluster,
+		client: c.RESTClient(),
 	}
 }
 
@@ -69,7 +66,6 @@ func newCustomResourceDefinitions(c *ApiextensionsV1beta1Client) *customResource
 func (c *customResourceDefinitions) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.CustomResourceDefinition, err error) {
 	result = &v1beta1.CustomResourceDefinition{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Resource("customresourcedefinitions").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -86,7 +82,6 @@ func (c *customResourceDefinitions) List(ctx context.Context, opts v1.ListOption
 	}
 	result = &v1beta1.CustomResourceDefinitionList{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Resource("customresourcedefinitions").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -103,7 +98,6 @@ func (c *customResourceDefinitions) Watch(ctx context.Context, opts v1.ListOptio
 	}
 	opts.Watch = true
 	return c.client.Get().
-		Cluster(c.cluster).
 		Resource("customresourcedefinitions").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -114,7 +108,6 @@ func (c *customResourceDefinitions) Watch(ctx context.Context, opts v1.ListOptio
 func (c *customResourceDefinitions) Create(ctx context.Context, customResourceDefinition *v1beta1.CustomResourceDefinition, opts v1.CreateOptions) (result *v1beta1.CustomResourceDefinition, err error) {
 	result = &v1beta1.CustomResourceDefinition{}
 	err = c.client.Post().
-		Cluster(c.cluster).
 		Resource("customresourcedefinitions").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(customResourceDefinition).
@@ -127,7 +120,6 @@ func (c *customResourceDefinitions) Create(ctx context.Context, customResourceDe
 func (c *customResourceDefinitions) Update(ctx context.Context, customResourceDefinition *v1beta1.CustomResourceDefinition, opts v1.UpdateOptions) (result *v1beta1.CustomResourceDefinition, err error) {
 	result = &v1beta1.CustomResourceDefinition{}
 	err = c.client.Put().
-		Cluster(c.cluster).
 		Resource("customresourcedefinitions").
 		Name(customResourceDefinition.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -142,7 +134,6 @@ func (c *customResourceDefinitions) Update(ctx context.Context, customResourceDe
 func (c *customResourceDefinitions) UpdateStatus(ctx context.Context, customResourceDefinition *v1beta1.CustomResourceDefinition, opts v1.UpdateOptions) (result *v1beta1.CustomResourceDefinition, err error) {
 	result = &v1beta1.CustomResourceDefinition{}
 	err = c.client.Put().
-		Cluster(c.cluster).
 		Resource("customresourcedefinitions").
 		Name(customResourceDefinition.Name).
 		SubResource("status").
@@ -156,7 +147,6 @@ func (c *customResourceDefinitions) UpdateStatus(ctx context.Context, customReso
 // Delete takes name of the customResourceDefinition and deletes it. Returns an error if one occurs.
 func (c *customResourceDefinitions) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
-		Cluster(c.cluster).
 		Resource("customresourcedefinitions").
 		Name(name).
 		Body(&opts).
@@ -171,7 +161,6 @@ func (c *customResourceDefinitions) DeleteCollection(ctx context.Context, opts v
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
-		Cluster(c.cluster).
 		Resource("customresourcedefinitions").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -184,7 +173,6 @@ func (c *customResourceDefinitions) DeleteCollection(ctx context.Context, opts v
 func (c *customResourceDefinitions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.CustomResourceDefinition, err error) {
 	result = &v1beta1.CustomResourceDefinition{}
 	err = c.client.Patch(pt).
-		Cluster(c.cluster).
 		Resource("customresourcedefinitions").
 		Name(name).
 		SubResource(subresources...).

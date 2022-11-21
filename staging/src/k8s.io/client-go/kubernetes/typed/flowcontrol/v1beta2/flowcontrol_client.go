@@ -21,7 +21,6 @@ package v1beta2
 import (
 	"net/http"
 
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
@@ -36,7 +35,6 @@ type FlowcontrolV1beta2Interface interface {
 // FlowcontrolV1beta2Client is used to interact with features provided by the flowcontrol.apiserver.k8s.io group.
 type FlowcontrolV1beta2Client struct {
 	restClient rest.Interface
-	cluster    logicalcluster.Name
 }
 
 func (c *FlowcontrolV1beta2Client) FlowSchemas() FlowSchemaInterface {
@@ -73,7 +71,7 @@ func NewForConfigAndClient(c *rest.Config, h *http.Client) (*FlowcontrolV1beta2C
 	if err != nil {
 		return nil, err
 	}
-	return &FlowcontrolV1beta2Client{restClient: client}, nil
+	return &FlowcontrolV1beta2Client{client}, nil
 }
 
 // NewForConfigOrDie creates a new FlowcontrolV1beta2Client for the given config and
@@ -88,12 +86,7 @@ func NewForConfigOrDie(c *rest.Config) *FlowcontrolV1beta2Client {
 
 // New creates a new FlowcontrolV1beta2Client for the given RESTClient.
 func New(c rest.Interface) *FlowcontrolV1beta2Client {
-	return &FlowcontrolV1beta2Client{restClient: c}
-}
-
-// NewWithCluster creates a new FlowcontrolV1beta2Client for the given RESTClient and cluster.
-func NewWithCluster(c rest.Interface, cluster logicalcluster.Name) *FlowcontrolV1beta2Client {
-	return &FlowcontrolV1beta2Client{restClient: c, cluster: cluster}
+	return &FlowcontrolV1beta2Client{c}
 }
 
 func setConfigDefaults(config *rest.Config) error {

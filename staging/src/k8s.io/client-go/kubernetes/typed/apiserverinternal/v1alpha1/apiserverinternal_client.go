@@ -21,7 +21,6 @@ package v1alpha1
 import (
 	"net/http"
 
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
@@ -35,7 +34,6 @@ type InternalV1alpha1Interface interface {
 // InternalV1alpha1Client is used to interact with features provided by the internal.apiserver.k8s.io group.
 type InternalV1alpha1Client struct {
 	restClient rest.Interface
-	cluster    logicalcluster.Name
 }
 
 func (c *InternalV1alpha1Client) StorageVersions() StorageVersionInterface {
@@ -68,7 +66,7 @@ func NewForConfigAndClient(c *rest.Config, h *http.Client) (*InternalV1alpha1Cli
 	if err != nil {
 		return nil, err
 	}
-	return &InternalV1alpha1Client{restClient: client}, nil
+	return &InternalV1alpha1Client{client}, nil
 }
 
 // NewForConfigOrDie creates a new InternalV1alpha1Client for the given config and
@@ -83,12 +81,7 @@ func NewForConfigOrDie(c *rest.Config) *InternalV1alpha1Client {
 
 // New creates a new InternalV1alpha1Client for the given RESTClient.
 func New(c rest.Interface) *InternalV1alpha1Client {
-	return &InternalV1alpha1Client{restClient: c}
-}
-
-// NewWithCluster creates a new InternalV1alpha1Client for the given RESTClient and cluster.
-func NewWithCluster(c rest.Interface, cluster logicalcluster.Name) *InternalV1alpha1Client {
-	return &InternalV1alpha1Client{restClient: c, cluster: cluster}
+	return &InternalV1alpha1Client{c}
 }
 
 func setConfigDefaults(config *rest.Config) error {

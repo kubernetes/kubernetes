@@ -21,7 +21,6 @@ package v1
 import (
 	"net/http"
 
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/api/coordination/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
@@ -35,7 +34,6 @@ type CoordinationV1Interface interface {
 // CoordinationV1Client is used to interact with features provided by the coordination.k8s.io group.
 type CoordinationV1Client struct {
 	restClient rest.Interface
-	cluster    logicalcluster.Name
 }
 
 func (c *CoordinationV1Client) Leases(namespace string) LeaseInterface {
@@ -68,7 +66,7 @@ func NewForConfigAndClient(c *rest.Config, h *http.Client) (*CoordinationV1Clien
 	if err != nil {
 		return nil, err
 	}
-	return &CoordinationV1Client{restClient: client}, nil
+	return &CoordinationV1Client{client}, nil
 }
 
 // NewForConfigOrDie creates a new CoordinationV1Client for the given config and
@@ -83,12 +81,7 @@ func NewForConfigOrDie(c *rest.Config) *CoordinationV1Client {
 
 // New creates a new CoordinationV1Client for the given RESTClient.
 func New(c rest.Interface) *CoordinationV1Client {
-	return &CoordinationV1Client{restClient: c}
-}
-
-// NewWithCluster creates a new CoordinationV1Client for the given RESTClient and cluster.
-func NewWithCluster(c rest.Interface, cluster logicalcluster.Name) *CoordinationV1Client {
-	return &CoordinationV1Client{restClient: c, cluster: cluster}
+	return &CoordinationV1Client{c}
 }
 
 func setConfigDefaults(config *rest.Config) error {

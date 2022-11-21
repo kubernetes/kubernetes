@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"time"
 
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,17 +63,15 @@ type DeploymentInterface interface {
 
 // deployments implements DeploymentInterface
 type deployments struct {
-	client  rest.Interface
-	cluster logicalcluster.Name
-	ns      string
+	client rest.Interface
+	ns     string
 }
 
 // newDeployments returns a Deployments
 func newDeployments(c *AppsV1Client, namespace string) *deployments {
 	return &deployments{
-		client:  c.RESTClient(),
-		cluster: c.cluster,
-		ns:      namespace,
+		client: c.RESTClient(),
+		ns:     namespace,
 	}
 }
 
@@ -82,7 +79,6 @@ func newDeployments(c *AppsV1Client, namespace string) *deployments {
 func (c *deployments) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Deployment, err error) {
 	result = &v1.Deployment{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(name).
@@ -100,7 +96,6 @@ func (c *deployments) List(ctx context.Context, opts metav1.ListOptions) (result
 	}
 	result = &v1.DeploymentList{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -118,7 +113,6 @@ func (c *deployments) Watch(ctx context.Context, opts metav1.ListOptions) (watch
 	}
 	opts.Watch = true
 	return c.client.Get().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -130,7 +124,6 @@ func (c *deployments) Watch(ctx context.Context, opts metav1.ListOptions) (watch
 func (c *deployments) Create(ctx context.Context, deployment *v1.Deployment, opts metav1.CreateOptions) (result *v1.Deployment, err error) {
 	result = &v1.Deployment{}
 	err = c.client.Post().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -144,7 +137,6 @@ func (c *deployments) Create(ctx context.Context, deployment *v1.Deployment, opt
 func (c *deployments) Update(ctx context.Context, deployment *v1.Deployment, opts metav1.UpdateOptions) (result *v1.Deployment, err error) {
 	result = &v1.Deployment{}
 	err = c.client.Put().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(deployment.Name).
@@ -160,7 +152,6 @@ func (c *deployments) Update(ctx context.Context, deployment *v1.Deployment, opt
 func (c *deployments) UpdateStatus(ctx context.Context, deployment *v1.Deployment, opts metav1.UpdateOptions) (result *v1.Deployment, err error) {
 	result = &v1.Deployment{}
 	err = c.client.Put().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(deployment.Name).
@@ -175,7 +166,6 @@ func (c *deployments) UpdateStatus(ctx context.Context, deployment *v1.Deploymen
 // Delete takes name of the deployment and deletes it. Returns an error if one occurs.
 func (c *deployments) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(name).
@@ -191,7 +181,6 @@ func (c *deployments) DeleteCollection(ctx context.Context, opts metav1.DeleteOp
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
@@ -205,7 +194,6 @@ func (c *deployments) DeleteCollection(ctx context.Context, opts metav1.DeleteOp
 func (c *deployments) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Deployment, err error) {
 	result = &v1.Deployment{}
 	err = c.client.Patch(pt).
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(name).
@@ -233,7 +221,6 @@ func (c *deployments) Apply(ctx context.Context, deployment *appsv1.DeploymentAp
 	}
 	result = &v1.Deployment{}
 	err = c.client.Patch(types.ApplyPatchType).
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(*name).
@@ -263,7 +250,6 @@ func (c *deployments) ApplyStatus(ctx context.Context, deployment *appsv1.Deploy
 
 	result = &v1.Deployment{}
 	err = c.client.Patch(types.ApplyPatchType).
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(*name).
@@ -279,7 +265,6 @@ func (c *deployments) ApplyStatus(ctx context.Context, deployment *appsv1.Deploy
 func (c *deployments) GetScale(ctx context.Context, deploymentName string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
 	result = &autoscalingv1.Scale{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(deploymentName).
@@ -294,7 +279,6 @@ func (c *deployments) GetScale(ctx context.Context, deploymentName string, optio
 func (c *deployments) UpdateScale(ctx context.Context, deploymentName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
 	result = &autoscalingv1.Scale{}
 	err = c.client.Put().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(deploymentName).
@@ -320,7 +304,6 @@ func (c *deployments) ApplyScale(ctx context.Context, deploymentName string, sca
 
 	result = &autoscalingv1.Scale{}
 	err = c.client.Patch(types.ApplyPatchType).
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("deployments").
 		Name(deploymentName).

@@ -22,7 +22,6 @@ import (
 	"context"
 	"time"
 
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -53,17 +52,15 @@ type TestTypeInterface interface {
 
 // testTypes implements TestTypeInterface
 type testTypes struct {
-	client  rest.Interface
-	cluster logicalcluster.Name
-	ns      string
+	client rest.Interface
+	ns     string
 }
 
 // newTestTypes returns a TestTypes
 func newTestTypes(c *ThirdExampleV1Client, namespace string) *testTypes {
 	return &testTypes{
-		client:  c.RESTClient(),
-		cluster: c.cluster,
-		ns:      namespace,
+		client: c.RESTClient(),
+		ns:     namespace,
 	}
 }
 
@@ -71,7 +68,6 @@ func newTestTypes(c *ThirdExampleV1Client, namespace string) *testTypes {
 func (c *testTypes) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.TestType, err error) {
 	result = &v1.TestType{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("testtypes").
 		Name(name).
@@ -89,7 +85,6 @@ func (c *testTypes) List(ctx context.Context, opts metav1.ListOptions) (result *
 	}
 	result = &v1.TestTypeList{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("testtypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -107,7 +102,6 @@ func (c *testTypes) Watch(ctx context.Context, opts metav1.ListOptions) (watch.I
 	}
 	opts.Watch = true
 	return c.client.Get().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("testtypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -119,7 +113,6 @@ func (c *testTypes) Watch(ctx context.Context, opts metav1.ListOptions) (watch.I
 func (c *testTypes) Create(ctx context.Context, testType *v1.TestType, opts metav1.CreateOptions) (result *v1.TestType, err error) {
 	result = &v1.TestType{}
 	err = c.client.Post().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("testtypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -133,7 +126,6 @@ func (c *testTypes) Create(ctx context.Context, testType *v1.TestType, opts meta
 func (c *testTypes) Update(ctx context.Context, testType *v1.TestType, opts metav1.UpdateOptions) (result *v1.TestType, err error) {
 	result = &v1.TestType{}
 	err = c.client.Put().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("testtypes").
 		Name(testType.Name).
@@ -149,7 +141,6 @@ func (c *testTypes) Update(ctx context.Context, testType *v1.TestType, opts meta
 func (c *testTypes) UpdateStatus(ctx context.Context, testType *v1.TestType, opts metav1.UpdateOptions) (result *v1.TestType, err error) {
 	result = &v1.TestType{}
 	err = c.client.Put().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("testtypes").
 		Name(testType.Name).
@@ -164,7 +155,6 @@ func (c *testTypes) UpdateStatus(ctx context.Context, testType *v1.TestType, opt
 // Delete takes name of the testType and deletes it. Returns an error if one occurs.
 func (c *testTypes) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("testtypes").
 		Name(name).
@@ -180,7 +170,6 @@ func (c *testTypes) DeleteCollection(ctx context.Context, opts metav1.DeleteOpti
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("testtypes").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
@@ -194,7 +183,6 @@ func (c *testTypes) DeleteCollection(ctx context.Context, opts metav1.DeleteOpti
 func (c *testTypes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.TestType, err error) {
 	result = &v1.TestType{}
 	err = c.client.Patch(pt).
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("testtypes").
 		Name(name).

@@ -55,11 +55,7 @@ func NewFlowSchemaInformer(client kubernetes.Interface, resyncPeriod time.Durati
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFilteredFlowSchemaInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
-	return NewFilteredFlowSchemaInformerWithOptions(client, tweakListOptions, cache.WithResyncPeriod(resyncPeriod), cache.WithIndexers(indexers))
-}
-
-func NewFilteredFlowSchemaInformerWithOptions(client kubernetes.Interface, tweakListOptions internalinterfaces.TweakListOptionsFunc, opts ...cache.SharedInformerOption) cache.SharedIndexInformer {
-	return cache.NewSharedIndexInformerWithOptions(
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
@@ -75,22 +71,13 @@ func NewFilteredFlowSchemaInformerWithOptions(client kubernetes.Interface, tweak
 			},
 		},
 		&flowcontrolv1alpha1.FlowSchema{},
-		opts...,
+		resyncPeriod,
+		indexers,
 	)
 }
 
 func (f *flowSchemaInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	indexers := cache.Indexers{}
-	for k, v := range f.factory.ExtraClusterScopedIndexers() {
-		indexers[k] = v
-	}
-
-	return NewFilteredFlowSchemaInformerWithOptions(client,
-		f.tweakListOptions,
-		cache.WithResyncPeriod(resyncPeriod),
-		cache.WithIndexers(indexers),
-		cache.WithKeyFunction(f.factory.KeyFunction()),
-	)
+	return NewFilteredFlowSchemaInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *flowSchemaInformer) Informer() cache.SharedIndexInformer {

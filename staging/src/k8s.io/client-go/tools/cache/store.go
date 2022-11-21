@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kcp-dev/logicalcluster/v2"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 )
 
@@ -107,38 +105,14 @@ func MetaNamespaceKeyFunc(obj interface{}) (string, error) {
 	if key, ok := obj.(ExplicitKey); ok {
 		return string(key), nil
 	}
-	metaObj, err := meta.Accessor(obj)
+	meta, err := meta.Accessor(obj)
 	if err != nil {
 		return "", fmt.Errorf("object has no meta: %v", err)
 	}
-
-	name := logicalcluster.From(metaObj).String() + "|" + metaObj.GetName()
-	if len(metaObj.GetNamespace()) > 0 {
-		return metaObj.GetNamespace() + "/" + name, nil
+	if len(meta.GetNamespace()) > 0 {
+		return meta.GetNamespace() + "/" + meta.GetName(), nil
 	}
-	return name, nil
-}
-
-// LegacyMetaNamespaceKeyFunc is a convenient default KeyFunc which knows how to make
-// keys for API objects which implement meta.Interface.
-// The key uses the format <namespace>/<name> unless <namespace> is empty, then
-// it's just <name>.
-//
-// TODO: replace key-as-string with a key-as-struct so that this
-// packing/unpacking won't be necessary.
-func LegacyMetaNamespaceKeyFunc(obj interface{}) (string, error) {
-	if key, ok := obj.(ExplicitKey); ok {
-		return string(key), nil
-	}
-	metaObj, err := meta.Accessor(obj)
-	if err != nil {
-		return "", fmt.Errorf("object has no meta: %v", err)
-	}
-
-	if len(metaObj.GetNamespace()) > 0 {
-		return metaObj.GetNamespace() + "/" + metaObj.GetName(), nil
-	}
-	return metaObj.GetName(), nil
+	return meta.GetName(), nil
 }
 
 // SplitMetaNamespaceKey returns the namespace and name that

@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"time"
 
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1beta1 "k8s.io/api/events/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -56,17 +55,15 @@ type EventInterface interface {
 
 // events implements EventInterface
 type events struct {
-	client  rest.Interface
-	cluster logicalcluster.Name
-	ns      string
+	client rest.Interface
+	ns     string
 }
 
 // newEvents returns a Events
 func newEvents(c *EventsV1beta1Client, namespace string) *events {
 	return &events{
-		client:  c.RESTClient(),
-		cluster: c.cluster,
-		ns:      namespace,
+		client: c.RESTClient(),
+		ns:     namespace,
 	}
 }
 
@@ -74,7 +71,6 @@ func newEvents(c *EventsV1beta1Client, namespace string) *events {
 func (c *events) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.Event, err error) {
 	result = &v1beta1.Event{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("events").
 		Name(name).
@@ -92,7 +88,6 @@ func (c *events) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1
 	}
 	result = &v1beta1.EventList{}
 	err = c.client.Get().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("events").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -110,7 +105,6 @@ func (c *events) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interfac
 	}
 	opts.Watch = true
 	return c.client.Get().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("events").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -122,7 +116,6 @@ func (c *events) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interfac
 func (c *events) Create(ctx context.Context, event *v1beta1.Event, opts v1.CreateOptions) (result *v1beta1.Event, err error) {
 	result = &v1beta1.Event{}
 	err = c.client.Post().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("events").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -136,7 +129,6 @@ func (c *events) Create(ctx context.Context, event *v1beta1.Event, opts v1.Creat
 func (c *events) Update(ctx context.Context, event *v1beta1.Event, opts v1.UpdateOptions) (result *v1beta1.Event, err error) {
 	result = &v1beta1.Event{}
 	err = c.client.Put().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("events").
 		Name(event.Name).
@@ -150,7 +142,6 @@ func (c *events) Update(ctx context.Context, event *v1beta1.Event, opts v1.Updat
 // Delete takes name of the event and deletes it. Returns an error if one occurs.
 func (c *events) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("events").
 		Name(name).
@@ -166,7 +157,6 @@ func (c *events) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, li
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("events").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
@@ -180,7 +170,6 @@ func (c *events) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, li
 func (c *events) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Event, err error) {
 	result = &v1beta1.Event{}
 	err = c.client.Patch(pt).
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("events").
 		Name(name).
@@ -208,7 +197,6 @@ func (c *events) Apply(ctx context.Context, event *eventsv1beta1.EventApplyConfi
 	}
 	result = &v1beta1.Event{}
 	err = c.client.Patch(types.ApplyPatchType).
-		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("events").
 		Name(*name).

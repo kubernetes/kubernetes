@@ -21,7 +21,6 @@ package v2
 import (
 	"net/http"
 
-	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v2 "k8s.io/api/autoscaling/v2"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
@@ -35,7 +34,6 @@ type AutoscalingV2Interface interface {
 // AutoscalingV2Client is used to interact with features provided by the autoscaling group.
 type AutoscalingV2Client struct {
 	restClient rest.Interface
-	cluster    logicalcluster.Name
 }
 
 func (c *AutoscalingV2Client) HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerInterface {
@@ -68,7 +66,7 @@ func NewForConfigAndClient(c *rest.Config, h *http.Client) (*AutoscalingV2Client
 	if err != nil {
 		return nil, err
 	}
-	return &AutoscalingV2Client{restClient: client}, nil
+	return &AutoscalingV2Client{client}, nil
 }
 
 // NewForConfigOrDie creates a new AutoscalingV2Client for the given config and
@@ -83,12 +81,7 @@ func NewForConfigOrDie(c *rest.Config) *AutoscalingV2Client {
 
 // New creates a new AutoscalingV2Client for the given RESTClient.
 func New(c rest.Interface) *AutoscalingV2Client {
-	return &AutoscalingV2Client{restClient: c}
-}
-
-// NewWithCluster creates a new AutoscalingV2Client for the given RESTClient and cluster.
-func NewWithCluster(c rest.Interface, cluster logicalcluster.Name) *AutoscalingV2Client {
-	return &AutoscalingV2Client{restClient: c, cluster: cluster}
+	return &AutoscalingV2Client{c}
 }
 
 func setConfigDefaults(config *rest.Config) error {

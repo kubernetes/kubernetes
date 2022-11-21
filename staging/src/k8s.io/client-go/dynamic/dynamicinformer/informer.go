@@ -40,25 +40,13 @@ func NewDynamicSharedInformerFactory(client dynamic.Interface, defaultResync tim
 // NewFilteredDynamicSharedInformerFactory constructs a new instance of dynamicSharedInformerFactory.
 // Listers obtained via this factory will be subject to the same filters as specified here.
 func NewFilteredDynamicSharedInformerFactory(client dynamic.Interface, defaultResync time.Duration, namespace string, tweakListOptions TweakListOptionsFunc) DynamicSharedInformerFactory {
-	return NewFilteredDynamicSharedInformerFactoryWithOptions(
-		client,
-		namespace,
-		tweakListOptions,
-		cache.WithResyncPeriod(defaultResync),
-		cache.WithIndexers(cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}),
-	)
-}
-
-// NewFilteredDynamicSharedInformerFactoryWithOptions constructs a new instance of dynamicSharedInformerFactory.
-// Listers obtained via this factory will be subject to the same filters as specified here.
-func NewFilteredDynamicSharedInformerFactoryWithOptions(client dynamic.Interface, namespace string, tweakListOptions TweakListOptionsFunc, opts ...cache.SharedInformerOption) DynamicSharedInformerFactory {
 	return &dynamicSharedInformerFactory{
-		client:                 client,
-		namespace:              namespace,
-		informers:              map[schema.GroupVersionResource]informers.GenericInformer{},
-		startedInformers:       make(map[schema.GroupVersionResource]bool),
-		tweakListOptions:       tweakListOptions,
-		dynamicInformerOptions: opts,
+		client:           client,
+		defaultResync:    defaultResync,
+		namespace:        namespace,
+		informers:        map[schema.GroupVersionResource]informers.GenericInformer{},
+		startedInformers: make(map[schema.GroupVersionResource]bool),
+		tweakListOptions: tweakListOptions,
 	}
 }
 
@@ -73,8 +61,6 @@ type dynamicSharedInformerFactory struct {
 	// This allows Start() to be called multiple times safely.
 	startedInformers map[schema.GroupVersionResource]bool
 	tweakListOptions TweakListOptionsFunc
-
-	dynamicInformerOptions []cache.SharedInformerOption
 }
 
 var _ DynamicSharedInformerFactory = &dynamicSharedInformerFactory{}
@@ -89,13 +75,7 @@ func (f *dynamicSharedInformerFactory) ForResource(gvr schema.GroupVersionResour
 		return informer
 	}
 
-	informer = NewFilteredDynamicInformerWithOptions(
-		f.client,
-		gvr,
-		f.namespace,
-		f.tweakListOptions,
-		f.dynamicInformerOptions...,
-	)
+	informer = NewFilteredDynamicInformer(f.client, gvr, f.namespace, f.defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 	f.informers[key] = informer
 
 	return informer
@@ -138,20 +118,9 @@ func (f *dynamicSharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) 
 
 // NewFilteredDynamicInformer constructs a new informer for a dynamic type.
 func NewFilteredDynamicInformer(client dynamic.Interface, gvr schema.GroupVersionResource, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions TweakListOptionsFunc) informers.GenericInformer {
-	return NewFilteredDynamicInformerWithOptions(
-		client,
-		gvr,
-		namespace,
-		tweakListOptions,
-		cache.WithResyncPeriod(resyncPeriod),
-		cache.WithIndexers(indexers),
-	)
-}
-
-func NewFilteredDynamicInformerWithOptions(client dynamic.Interface, gvr schema.GroupVersionResource, namespace string, tweakListOptions TweakListOptionsFunc, opts ...cache.SharedInformerOption) informers.GenericInformer {
 	return &dynamicInformer{
 		gvr: gvr,
-		informer: cache.NewSharedIndexInformerWithOptions(
+		informer: cache.NewSharedIndexInformer(
 			&cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 					if tweakListOptions != nil {
@@ -167,8 +136,10 @@ func NewFilteredDynamicInformerWithOptions(client dynamic.Interface, gvr schema.
 				},
 			},
 			&unstructured.Unstructured{},
-			opts...,
-		)}
+			resyncPeriod,
+			indexers,
+		),
+	}
 }
 
 type dynamicInformer struct {
