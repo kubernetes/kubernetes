@@ -25,5 +25,36 @@ type WebhookAdmission struct {
 	metav1.TypeMeta
 
 	// KubeConfigFile is the path to the kubeconfig file.
+	// +optional
 	KubeConfigFile string
+
+	// ExclusionRules are a list of rules that the webhooks while ignore
+	// +optional
+	ExclusionRules []ExclusionRule //NOTE: using ExclusionRule rather than Rule with name/namespace because don't want to have scope field
+}
+
+type ExclusionRule struct {
+	// APIGroups is the API groups the resources belong to. '*' is all groups.
+	// If '*' is present, the length of the slice must be one.
+	// Required.
+	// +listType=atomic
+	APIGroups []string `json:"apiGroups,omitempty"`
+
+	// APIVersions is the API versions the resources belong to. '*' is all versions.
+	// If '*' is present, the length of the slice must be one.
+	// Required.
+	// +listType=atomic
+	APIVersions []string `json:"apiVersions,omitempty"`
+
+	// Kind to exclude.
+	// Required.
+	Kind string `json:"kind,omitempty"`
+
+	// Name is a list of object names this rule applies to.
+	// Required.
+	Name string `json:"name,omitempty"`
+
+	// Namespace is a the namespace this rule applies to.
+	// Required.
+	Namespace string `json:"namespace,omitempty"`
 }

@@ -18,6 +18,7 @@ package generic
 
 import (
 	"fmt"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
 	"strings"
 	"testing"
 
@@ -34,8 +35,16 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/object"
 )
 
+func getWebhookWithExclusionRules(exclusionRules []webhookadmission.ExclusionRule) *Webhook {
+	return &Webhook{
+		namespaceMatcher: &namespace.Matcher{},
+		objectMatcher:    &object.Matcher{},
+		exclusionRules:   exclusionRules,
+	}
+}
+
 func TestShouldCallHook(t *testing.T) {
-	a := &Webhook{namespaceMatcher: &namespace.Matcher{}, objectMatcher: &object.Matcher{}}
+	noExclusionRules := &Webhook{namespaceMatcher: &namespace.Matcher{}, objectMatcher: &object.Matcher{}}
 
 	allScopes := v1.AllScopes
 	exactMatch := v1.Exact
@@ -67,8 +76,9 @@ func TestShouldCallHook(t *testing.T) {
 	testcases := []struct {
 		name string
 
-		webhook *v1.ValidatingWebhook
-		attrs   admission.Attributes
+		webhookManager *Webhook
+		webhook        *v1.ValidatingWebhook
+		attrs          admission.Attributes
 
 		expectCall            bool
 		expectErr             string
@@ -77,13 +87,15 @@ func TestShouldCallHook(t *testing.T) {
 		expectCallKind        schema.GroupVersionKind
 	}{
 		{
-			name:       "no rules (just write)",
-			webhook:    &v1.ValidatingWebhook{NamespaceSelector: &metav1.LabelSelector{}, Rules: []v1.RuleWithOperations{}},
-			attrs:      admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
-			expectCall: false,
+			name:           "no rules (just write)",
+			webhookManager: noExclusionRules,
+			webhook:        &v1.ValidatingWebhook{NamespaceSelector: &metav1.LabelSelector{}, Rules: []v1.RuleWithOperations{}},
+			attrs:          admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectCall:     false,
 		},
 		{
-			name: "invalid kind lookup",
+			name:           "invalid kind lookup",
+			webhookManager: noExclusionRules,
 			webhook: &v1.ValidatingWebhook{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
@@ -97,7 +109,8 @@ func TestShouldCallHook(t *testing.T) {
 			expectErr:  "unknown kind",
 		},
 		{
-			name: "wildcard rule, match as requested",
+			name:           "wildcard rule, match as requested",
+			webhookManager: noExclusionRules,
 			webhook: &v1.ValidatingWebhook{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
@@ -112,7 +125,60 @@ func TestShouldCallHook(t *testing.T) {
 			expectCallSubresource: "",
 		},
 		{
-			name: "specific rules, prefer exact match",
+			name: "wildcard rule but exclusionRules match should not call",
+			webhookManager: getWebhookWithExclusionRules([]webhookadmission.ExclusionRule{
+				{
+					APIGroups:   []string{"test"},
+					APIVersions: []string{"test"},
+					Namespace:   "ns",
+					Kind:        "test",
+					Name:        "test",
+				},
+				{
+					APIGroups:   []string{"apps"},
+					APIVersions: []string{"*"},
+					Namespace:   "ns",
+					Kind:        "Deployment",
+					Name:        "name",
+				},
+			}),
+			webhook: &v1.ValidatingWebhook{
+				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector:    &metav1.LabelSelector{},
+				Rules: []v1.RuleWithOperations{{
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
+				}}},
+			attrs:      admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectCall: false,
+		},
+		{
+			name: "wildcard rule but no exclusionRules match should not call",
+			webhookManager: getWebhookWithExclusionRules([]webhookadmission.ExclusionRule{
+				{
+					APIGroups:   []string{"test"},
+					APIVersions: []string{"test"},
+					Namespace:   "ns",
+					Kind:        "test",
+					Name:        "test",
+				},
+			}),
+			webhook: &v1.ValidatingWebhook{
+				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector:    &metav1.LabelSelector{},
+				Rules: []v1.RuleWithOperations{{
+					Operations: []v1.OperationType{"*"},
+					Rule:       v1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
+				}}},
+			attrs:                 admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
+			expectCall:            true,
+			expectCallKind:        schema.GroupVersionKind{"apps", "v1", "Deployment"},
+			expectCallResource:    schema.GroupVersionResource{"apps", "v1", "deployments"},
+			expectCallSubresource: "",
+		},
+		{
+			name:           "specific rules, prefer exact match",
+			webhookManager: noExclusionRules,
 			webhook: &v1.ValidatingWebhook{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
@@ -133,7 +199,8 @@ func TestShouldCallHook(t *testing.T) {
 			expectCallSubresource: "",
 		},
 		{
-			name: "specific rules, match miss",
+			name:           "specific rules, match miss",
+			webhookManager: noExclusionRules,
 			webhook: &v1.ValidatingWebhook{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
@@ -148,7 +215,8 @@ func TestShouldCallHook(t *testing.T) {
 			expectCall: false,
 		},
 		{
-			name: "specific rules, exact match miss",
+			name:           "specific rules, exact match miss",
+			webhookManager: noExclusionRules,
 			webhook: &v1.ValidatingWebhook{
 				MatchPolicy:       &exactMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
@@ -164,7 +232,8 @@ func TestShouldCallHook(t *testing.T) {
 			expectCall: false,
 		},
 		{
-			name: "specific rules, equivalent match, prefer extensions",
+			name:           "specific rules, equivalent match, prefer extensions",
+			webhookManager: noExclusionRules,
 			webhook: &v1.ValidatingWebhook{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
@@ -183,7 +252,8 @@ func TestShouldCallHook(t *testing.T) {
 			expectCallSubresource: "",
 		},
 		{
-			name: "specific rules, equivalent match, prefer apps",
+			name:           "specific rules, equivalent match, prefer apps",
+			webhookManager: noExclusionRules,
 			webhook: &v1.ValidatingWebhook{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
@@ -203,7 +273,8 @@ func TestShouldCallHook(t *testing.T) {
 		},
 
 		{
-			name: "specific rules, subresource prefer exact match",
+			name:           "specific rules, subresource prefer exact match",
+			webhookManager: noExclusionRules,
 			webhook: &v1.ValidatingWebhook{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
@@ -224,7 +295,8 @@ func TestShouldCallHook(t *testing.T) {
 			expectCallSubresource: "scale",
 		},
 		{
-			name: "specific rules, subresource match miss",
+			name:           "specific rules, subresource match miss",
+			webhookManager: noExclusionRules,
 			webhook: &v1.ValidatingWebhook{
 				NamespaceSelector: &metav1.LabelSelector{},
 				ObjectSelector:    &metav1.LabelSelector{},
@@ -239,7 +311,8 @@ func TestShouldCallHook(t *testing.T) {
 			expectCall: false,
 		},
 		{
-			name: "specific rules, subresource exact match miss",
+			name:           "specific rules, subresource exact match miss",
+			webhookManager: noExclusionRules,
 			webhook: &v1.ValidatingWebhook{
 				MatchPolicy:       &exactMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
@@ -255,7 +328,8 @@ func TestShouldCallHook(t *testing.T) {
 			expectCall: false,
 		},
 		{
-			name: "specific rules, subresource equivalent match, prefer extensions",
+			name:           "specific rules, subresource equivalent match, prefer extensions",
+			webhookManager: noExclusionRules,
 			webhook: &v1.ValidatingWebhook{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
@@ -274,7 +348,8 @@ func TestShouldCallHook(t *testing.T) {
 			expectCallSubresource: "scale",
 		},
 		{
-			name: "specific rules, subresource equivalent match, prefer apps",
+			name:           "specific rules, subresource equivalent match, prefer apps",
+			webhookManager: noExclusionRules,
 			webhook: &v1.ValidatingWebhook{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
@@ -296,7 +371,7 @@ func TestShouldCallHook(t *testing.T) {
 
 	for i, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			invocation, err := a.ShouldCallHook(webhook.NewValidatingWebhookAccessor(fmt.Sprintf("webhook-%d", i), fmt.Sprintf("webhook-cfg-%d", i), testcase.webhook), testcase.attrs, interfaces)
+			invocation, err := testcase.webhookManager.ShouldCallHook(webhook.NewValidatingWebhookAccessor(fmt.Sprintf("webhook-%d", i), fmt.Sprintf("webhook-cfg-%d", i), testcase.webhook), testcase.attrs, interfaces)
 			if err != nil {
 				if len(testcase.expectErr) == 0 {
 					t.Fatal(err)

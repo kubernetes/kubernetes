@@ -1,0 +1,14 @@
+apiVersion: apiserver.config.k8s.io/v1
+kind: AdmissionConfiguration
+plugins:
+- name: ValidatingAdmissionWebhook
+  configuration:
+    apiVersion: apiserver.config.k8s.io/v1
+    kind: WebhookAdmissionConfiguration
+    exclusionRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        kind: "Pod"
+        namespace: "default"
+        name: "test"
+

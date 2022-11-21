@@ -18,16 +18,18 @@ package config
 
 import (
 	"bytes"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
 	"strings"
 	"testing"
 )
 
 func TestLoadConfig(t *testing.T) {
 	testcases := []struct {
-		name             string
-		input            string
-		expectErr        string
-		expectKubeconfig string
+		name                   string
+		input                  string
+		expectErr              string
+		expectKubeconfig       string
+		expectedExclusionRules []webhookadmission.ExclusionRule
 	}{
 		{
 			name:      "empty",
@@ -49,7 +51,7 @@ kubeConfigFile: /foo
 			expectKubeconfig: "/foo",
 		},
 		{
-			name: "valid v1",
+			name: "valid v1 kubeconfig",
 			input: `
 kind: WebhookAdmissionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
@@ -57,11 +59,33 @@ kubeConfigFile: /foo
 `,
 			expectKubeconfig: "/foo",
 		},
+		{
+			name: "valid v1 exclusionRules",
+			input: `
+kind: WebhookAdmissionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+exclusionRules:
+- apiGroups: ["*"]
+  apiVersions: ["v1"]
+  kind: "Deployment"
+  namespace: "default"
+  name: "test"
+`,
+			expectedExclusionRules: []webhookadmission.ExclusionRule{
+				{
+					APIGroups:   []string{"*"},
+					APIVersions: []string{"v1"},
+					Kind:        "Deployment",
+					Namespace:   "default",
+					Name:        "test",
+				},
+			},
+		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			kubeconfig, err := LoadConfig(bytes.NewBufferString(tc.input))
+			kubeconfig, exclusionRules, err := LoadConfig(bytes.NewBufferString(tc.input))
 			if len(tc.expectErr) > 0 {
 				if err == nil {
 					t.Fatal("expected err, got none")
@@ -77,6 +101,45 @@ kubeConfigFile: /foo
 			if kubeconfig != tc.expectKubeconfig {
 				t.Fatalf("expected %q, got %q", tc.expectKubeconfig, kubeconfig)
 			}
+			if !exclusionRulesEqual(tc.expectedExclusionRules, exclusionRules) {
+				t.Fatal("unexpected exclusion rules")
+			}
 		})
 	}
+}
+
+func exclusionRulesEqual(expected []webhookadmission.ExclusionRule, actual []webhookadmission.ExclusionRule) bool {
+	if len(expected) != len(actual) {
+		return false
+	}
+	for index := range expected {
+		if !testEqualStrings(expected[index].APIGroups, actual[index].APIGroups) {
+			return false
+		}
+		if !testEqualStrings(expected[index].APIVersions, actual[index].APIVersions) {
+			return false
+		}
+		if expected[index].Name != actual[index].Name {
+			return false
+		}
+		if expected[index].Kind != actual[index].Kind {
+			return false
+		}
+		if expected[index].Namespace != actual[index].Namespace {
+			return false
+		}
+	}
+	return true
+}
+
+func testEqualStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

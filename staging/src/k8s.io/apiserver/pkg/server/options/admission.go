@@ -137,7 +137,7 @@ func (a *AdmissionOptions) ApplyTo(
 	}
 
 	pluginNames := a.enabledPluginNames()
-
+	
 	pluginsConfigProvider, err := admission.ReadAdmissionConfiguration(pluginNames, a.ConfigFile, configScheme)
 	if err != nil {
 		return fmt.Errorf("failed to read plugin config: %v", err)

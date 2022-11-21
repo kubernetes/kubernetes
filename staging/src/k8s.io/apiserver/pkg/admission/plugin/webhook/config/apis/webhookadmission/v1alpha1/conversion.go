@@ -16,15 +16,11 @@ limitations under the License.
 
 package v1alpha1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
+)
 
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// WebhookAdmission provides configuration for the webhook admission controller.
-type WebhookAdmission struct {
-	metav1.TypeMeta `json:",inline"`
-
-	// KubeConfigFile is the path to the kubeconfig file.
-	// +optional
-	KubeConfigFile string `json:"kubeConfigFile"`
+func Convert_webhookadmission_WebhookAdmission_To_v1alpha1_WebhookAdmission(in *webhookadmission.WebhookAdmission, out *WebhookAdmission, s conversion.Scope) error {
+	return autoConvert_webhookadmission_WebhookAdmission_To_v1alpha1_WebhookAdmission(in, out, s)
 }

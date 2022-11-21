@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/api/admissionregistration/v1"
@@ -30,6 +29,8 @@ import (
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/exclusionrules"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/namespace"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/object"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/predicates/rules"
@@ -49,6 +50,7 @@ type Webhook struct {
 	namespaceMatcher *namespace.Matcher
 	objectMatcher    *object.Matcher
 	dispatcher       Dispatcher
+	exclusionRules   []webhookadmission.ExclusionRule
 }
 
 var (
@@ -61,7 +63,7 @@ type dispatcherFactory func(cm *webhookutil.ClientManager) Dispatcher
 
 // NewWebhook creates a new generic admission webhook.
 func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory sourceFactory, dispatcherFactory dispatcherFactory) (*Webhook, error) {
-	kubeconfigFile, err := config.LoadConfig(configFile)
+	kubeconfigFile, exclusionRules, err := config.LoadConfig(configFile)
 	if err != nil {
 		return nil, err
 	}
@@ -92,6 +94,7 @@ func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory 
 		namespaceMatcher: &namespace.Matcher{},
 		objectMatcher:    &object.Matcher{},
 		dispatcher:       dispatcherFactory(&cm),
+		exclusionRules:   exclusionRules,
 	}, nil
 }
 
@@ -151,6 +154,13 @@ func (a *Webhook) ShouldCallHook(h webhook.WebhookAccessor, attr admission.Attri
 	matches, matchObjErr := a.objectMatcher.MatchObjectSelector(h, attr)
 	if !matches && matchObjErr == nil {
 		return nil, nil
+	}
+
+	for _, r := range a.exclusionRules {
+		m := exclusionrules.Matcher{ExclusionRule: r, Attr: attr}
+		if m.Matches() {
+			return nil, nil
+		}
 	}
 
 	var invocation *WebhookInvocation

@@ -43,29 +43,33 @@ func init() {
 }
 
 // LoadConfig extract the KubeConfigFile from configFile
-func LoadConfig(configFile io.Reader) (string, error) {
+func LoadConfig(configFile io.Reader) (string, []webhookadmission.ExclusionRule, error) {
 	var kubeconfigFile string
+	var exclusionRules []webhookadmission.ExclusionRule
 	if configFile != nil {
 		// we have a config so parse it.
 		data, err := ioutil.ReadAll(configFile)
 		if err != nil {
-			return "", err
+			return "", exclusionRules, err
 		}
 		decoder := codecs.UniversalDecoder()
 		decodedObj, err := runtime.Decode(decoder, data)
 		if err != nil {
-			return "", err
+			return "", exclusionRules, err
 		}
 		config, ok := decodedObj.(*webhookadmission.WebhookAdmission)
 		if !ok {
-			return "", fmt.Errorf("unexpected type: %T", decodedObj)
+			return "", exclusionRules, fmt.Errorf("unexpected type: %T", decodedObj)
 		}
 
-		if !path.IsAbs(config.KubeConfigFile) {
-			return "", field.Invalid(field.NewPath("kubeConfigFile"), config.KubeConfigFile, "must be an absolute file path")
+		if config.KubeConfigFile != "" && !path.IsAbs(config.KubeConfigFile) {
+			return "", exclusionRules, field.Invalid(field.NewPath("kubeConfigFile"), config.KubeConfigFile, "must be an absolute file path")
 		}
+
+		//TODO: validate fields on exclusion rules
 
 		kubeconfigFile = config.KubeConfigFile
+		exclusionRules = config.ExclusionRules
 	}
-	return kubeconfigFile, nil
+	return kubeconfigFile, exclusionRules, nil
 }
