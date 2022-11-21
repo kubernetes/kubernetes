@@ -54,5 +54,8 @@ func (o *JobControllerOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	if o.ConcurrentJobSyncs < 1 {
+		errs = append(errs, fmt.Errorf("concurrent-job-syncs must be greater than 0, but got %d", o.ConcurrentJobSyncs))
+	}
 	return errs
 }

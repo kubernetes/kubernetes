@@ -54,5 +54,8 @@ func (o *CronJobControllerOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	if o.ConcurrentCronJobSyncs < 1 {
+		errs = append(errs, fmt.Errorf("concurrent-cronjob-syncs must be greater than 0, but got %d", o.ConcurrentCronJobSyncs))
+	}
 	return errs
 }
